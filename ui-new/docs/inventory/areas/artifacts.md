@@ -22,8 +22,9 @@ Upstream recipe: `maps/feature-map/documents-artifacts.md` (`library`).
   to its source task.
 - **Requests:** `GET /api/companies/:companyId/artifacts`; opening an item uses the task requests
   (attachments content, documents, work products) listed in [tasks](tasks.md).
-- **Notes:** the same list feeds the task side panel's Artifacts tab and Agent Chat
-  (`GET /api/companies/:companyId/artifacts` with a task filter).
+- **Notes:** the same request, filtered by agent, feeds Agent Chat's work panel
+  (`components/chat/AgentWorkPanels.tsx`). The task side panel's Artifacts tab lists the task's own
+  outputs (work products and attachments) instead.
 
 ## Redesign notes
 
