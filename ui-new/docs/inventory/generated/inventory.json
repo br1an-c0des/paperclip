@@ -19942,7 +19942,7 @@
           "requests": [
             {
               "method": "POST",
-              "path": "/api/companies:COMPANY_IMPORT_TRANSFERS_ROUTE_PATH"
+              "path": "/api/companies/import/transfers"
             }
           ],
           "via": [
@@ -34195,7 +34195,7 @@
       "requests": [
         {
           "method": "POST",
-          "path": "/api/companies:COMPANY_IMPORT_TRANSFERS_ROUTE_PATH"
+          "path": "/api/companies/import/transfers"
         }
       ],
       "usedBy": [

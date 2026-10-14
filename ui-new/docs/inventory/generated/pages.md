@@ -1512,7 +1512,6 @@ Conditions: gate `CloudManagedPageGate`; gate `HiddenSettingsPageGate(pageKey=co
 - `POST /api/companies:`: `companiesApi.importTransferApply` (api/companies.ts), via pages/CompanyImport.tsx
 - `POST /api/companies:`: `companiesApi.importTransferPreview` (api/companies.ts), via pages/CompanyImport.tsx
 - `PUT /api/companies:`: `companiesApi.importTransferUploadPart` (api/companies.ts), via pages/CompanyImport.tsx
-- `POST /api/companies:COMPANY_IMPORT_TRANSFERS_ROUTE_PATH`: `companiesApi.importTransferCreate` (api/companies.ts), via pages/CompanyImport.tsx
 - `GET /api/companies/:companyId`: `companiesApi.get` (api/companies.ts), via pages/CompanyImport.tsx
 - `GET /api/companies/:companyId/agents`: `agentsApi.list` (api/agents.ts), via pages/CompanyImport.tsx
 - `PUT /api/companies/:companyId/sidebar-preferences/me`: `sidebarPreferencesApi.updateProjectOrder` (api/sidebarPreferences.ts), via pages/CompanyImport.tsx
@@ -1521,6 +1520,7 @@ Conditions: gate `CloudManagedPageGate`; gate `HiddenSettingsPageGate(pageKey=co
 - `GET /api/companies/import/jobs/:jobId`: `companiesApi.getImportJob` (api/companies.ts), via pages/CompanyImport.tsx
 - `POST /api/companies/import/preview`: `companiesApi.importPreview` (api/companies.ts), via pages/CompanyImport.tsx
 - `POST /api/companies/import/preview`: `companiesApi.importPreviewPackage` (api/companies.ts), via pages/CompanyImport.tsx
+- `POST /api/companies/import/transfers`: `companiesApi.importTransferCreate` (api/companies.ts), via pages/CompanyImport.tsx
 - `GET /api/instance/settings/experimental`: `instanceSettingsApi.getExperimental` (api/instanceSettings.ts), via pages/CompanyImport.tsx
 - `PATCH /api/routines/:id`: `routinesApi.update` (api/routines.ts), via pages/CompanyImport.tsx
 

@@ -347,7 +347,7 @@ Every method in `ui/src/api/` with the request(s) it makes and the pages that re
 | `companiesApi.importPreview` | `POST /api/companies/import/preview` | pages/CompanyImport.tsx |
 | `companiesApi.importPreviewPackage` | `POST /api/companies/import/preview` | pages/CompanyImport.tsx |
 | `companiesApi.importTransferApply` | `POST /api/companies:` | pages/CompanyImport.tsx |
-| `companiesApi.importTransferCreate` | `POST /api/companies:COMPANY_IMPORT_TRANSFERS_ROUTE_PATH` | pages/CompanyImport.tsx |
+| `companiesApi.importTransferCreate` | `POST /api/companies/import/transfers` | pages/CompanyImport.tsx |
 | `companiesApi.importTransferPreview` | `POST /api/companies:` | pages/CompanyImport.tsx |
 | `companiesApi.importTransferStatus` | `GET /api/companies:` | **unused** |
 | `companiesApi.importTransferUploadPart` | `PUT /api/companies:` | pages/CompanyImport.tsx |

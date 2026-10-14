@@ -225,6 +225,26 @@ function lastName(node) {
   return "?";
 }
 
+// `export const NAME = "value"` string constants from packages/shared/src.
+let sharedConstantsCache = null;
+function sharedStringConstants() {
+  if (sharedConstantsCache) return sharedConstantsCache;
+  sharedConstantsCache = new Map();
+  const visit = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) visit(full);
+      else if (entry.name.endsWith(".ts") && !entry.name.includes(".test.")) {
+        for (const m of fs.readFileSync(full, "utf8").matchAll(/export const ([A-Z][A-Z0-9_]+) = "([^"]*)"/g)) {
+          sharedConstantsCache.set(m[1], m[2]);
+        }
+      }
+    }
+  };
+  visit(path.join(REPO, "packages/shared/src"));
+  return sharedConstantsCache;
+}
+
 // Renders a URL expression to a path pattern such as /companies/:companyId/issues.
 // ctx: { mod, scopes, bindings: Map<string,string>, unwrapUnknownCalls, depth }
 function renderUrl(node, ctx) {
@@ -268,6 +288,10 @@ function renderUrl(node, ctx) {
         if (scope.locals.has(node.name)) return renderUrl(scope.locals.get(node.name), next);
       }
       if (ctx.mod?.consts.has(node.name)) return renderUrl(ctx.mod.consts.get(node.name), next);
+      // Route constants imported from @paperclipai/shared, e.g. COMPANY_IMPORT_TRANSFERS_ROUTE_PATH.
+      if (/^[A-Z][A-Z0-9_]+$/.test(node.name) && sharedStringConstants().has(node.name)) {
+        return sharedStringConstants().get(node.name);
+      }
       return `:${node.name}`;
     }
     case "MemberExpression":

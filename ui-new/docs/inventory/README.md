@@ -7,7 +7,7 @@ without dropping functionality.
 
 | Layer | Files | What it answers |
 | --- | --- | --- |
-| Generated inventory | [`generated/`](generated/) | Every route, the page behind it, and every API request each page can make. Mechanical and complete. |
+| Generated inventory | [`generated/`](generated/) | Every route, the page behind it, every API request each page can make, and the experimental flags that change the UI. Mechanical and complete. |
 | Area guides | [`areas/`](areas/) | What each page is *for*: its sections, what a person can do, and the request behind each action. Written by reading the code. |
 | Capability checklist | [`capabilities.md`](capabilities.md) | One row per capability, with where it lives now and where it lands in `ui-new`. The tracking document for the redesign. |
 
@@ -33,7 +33,8 @@ What a request list can't show, and the area guides must call out explicitly:
 pnpm --filter @paperclipai/ui-new inventory
 ```
 
-Run it after every `git sync-ui` and commit the result. `git diff ui-new/docs/inventory/generated` then
+It writes `routes.md`, `pages.md`, `api.md`, `flags.md` and `inventory.json`. Run it after every
+`git sync-ui` and commit the result. `git diff ui-new/docs/inventory/generated` then
 shows exactly which routes, pages and requests upstream added, removed or changed. Triage those into the
 area guides and the checklist. The output is deterministic, so an unchanged UI produces no diff.
 
@@ -83,13 +84,13 @@ Not yet placed in a tier: Dashboard (`Dashboard`, `DashboardLive`), Board chat (
 
 | Area guide | Pages |
 | --- | --- |
-| Company settings | `CompanySettings`, `CompanyConnections`, `CompanyAccess`, `Secrets`, `CompanyExport`, `CompanyImport`, `CompanySettingsPluginPage`, `JoinRequestQueue` |
-| Instance settings | `ProfileSettings`, `CompanyEnvironments`, `InstanceAccess`, `InstanceExperimentalSettings`, `PluginManager`, `PluginSettings`, `AdapterManager`, `PluginPage` |
-| Skills | `CompanySkills`, `SkillSources`, `SkillStudio` |
-| Apps and tools | `Browse`, `AppsConnect`, `AppsReview`, `AppDetail`, `AppNotConnected`, `AssistantConnection`, `GatewaysList`, `GatewayDetail`, `AdvancedToolsRoute`, `ProfileWizardRoute`, `ProfileDetailRoute`, `ChatEndpointSetup`, `ChatEndpointDetail` |
-| Activity and costs | `AuditHub`, `CompanyActivity` |
-| Companies and onboarding | `Companies`, `OnboardingRoutePage` |
-| Sign-in and connect flows (outside a company) | `Auth`, `BoardClaim`, `CliAuth`, `InviteLanding`, `McpConnect`, `ChatIdentityConfirm`, `PaperclipCloudOAuthHandoff` |
+| [Company settings](areas/settings-and-admin.md#company-settings) | `CompanySettings`, `CompanyConnections`, `CompanyAccess`, `Secrets`, `CompanyExport`, `CompanyImport`, `CompanySettingsPluginPage`, `JoinRequestQueue` |
+| [Instance settings](areas/settings-and-admin.md#instance-settings) | `ProfileSettings`, `CompanyEnvironments`, `InstanceAccess`, `InstanceExperimentalSettings`, `PluginManager`, `PluginSettings`, `AdapterManager`, `PluginPage` |
+| [Skills](areas/settings-and-admin.md#skills) | `CompanySkills`, `SkillSources`, `SkillStudio` |
+| [Apps and tools](areas/settings-and-admin.md#apps-and-tools-connectors) | `Browse`, `AppsConnect`, `AppsReview`, `AppDetail`, `AppNotConnected`, `AssistantConnection`, `GatewaysList`, `GatewayDetail`, `AdvancedToolsRoute`, `ProfileWizardRoute`, `ProfileDetailRoute`, `ChatEndpointSetup`, `ChatEndpointDetail` |
+| [Activity and costs](areas/settings-and-admin.md#activity-and-costs) | `AuditHub`, `CompanyActivity` |
+| [Companies and onboarding](areas/settings-and-admin.md#companies-and-onboarding) | `Companies`, `OnboardingRoutePage` |
+| [Sign-in and connect flows](areas/settings-and-admin.md#sign-in-and-connect-flows-outside-a-company) | `Auth`, `BoardClaim`, `CliAuth`, `InviteLanding`, `McpConnect`, `ChatIdentityConfirm`, `PaperclipCloudOAuthHandoff` |
 
 ### Tier 3: skip
 
