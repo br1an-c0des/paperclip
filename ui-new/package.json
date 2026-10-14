@@ -1,0 +1,27 @@
+{
+  "name": "@paperclipai/ui-new",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Experimental SolidJS board UI for Paperclip.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@paperclipai/shared": "workspace:*",
+    "@solidjs/router": "^1.0.0",
+    "solid-js": "^1.9.17"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vite-plugin-solid": "^2.11.14"
+  },
+  "engines": {
+    "node": ">=24.11.0"
+  }
+}
