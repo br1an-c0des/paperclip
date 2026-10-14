@@ -51,8 +51,13 @@ or every few days); small merges are much easier than large ones.
 git sync-ui            # updates master from upstream, then merges it into new-ui
 pnpm install           # upstream changes dependencies often
 pnpm --filter @paperclipai/ui-new typecheck   # catches API type changes from @paperclipai/shared
+pnpm --filter @paperclipai/ui-new inventory   # regenerate the existing-UI inventory
+git diff ui-new/docs/inventory/generated      # new or changed routes, requests and flags upstream added
 git push
 ```
+
+When the inventory diff shows new capabilities, add them to `ui-new/docs/inventory/capabilities.md`
+(see [ui-new/docs/inventory/README.md](ui-new/docs/inventory/README.md)).
 
 - **Merge, don't rebase.** `new-ui` is long-lived and pushed. Rebasing it would replay hundreds of
   upstream commits and rewrite pushed history.
