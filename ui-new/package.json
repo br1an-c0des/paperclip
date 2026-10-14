@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "inventory": "node scripts/ui-inventory.mjs"
   },
   "dependencies": {
     "@paperclipai/shared": "workspace:*",
@@ -16,6 +17,7 @@
     "solid-js": "^1.9.17"
   },
   "devDependencies": {
+    "@babel/parser": "^7.29.0",
     "@types/node": "^24.0.0",
     "typescript": "^7.0.2",
     "vite": "^8.2.2",
