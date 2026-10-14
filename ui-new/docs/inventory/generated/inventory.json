@@ -23579,7 +23579,7 @@
           "requests": [
             {
               "method": "POST",
-              "path": ":"
+              "path": "/api/companies/:companyId/summary-slots/:scopeKind/:slotKey/generate"
             }
           ],
           "via": [
@@ -23591,7 +23591,7 @@
           "requests": [
             {
               "method": "GET",
-              "path": ":"
+              "path": "/api/companies/:companyId/summary-slots/:scopeKind/:slotKey"
             }
           ],
           "via": [
@@ -23603,7 +23603,7 @@
           "requests": [
             {
               "method": "GET",
-              "path": ":"
+              "path": "/api/companies/:companyId/summary-slots/:scopeKind/:slotKey/revisions"
             }
           ],
           "via": [
@@ -27074,7 +27074,7 @@
           "requests": [
             {
               "method": "POST",
-              "path": ":"
+              "path": "/api/companies/:companyId/summary-slots/:scopeKind/:slotKey/generate"
             }
           ],
           "via": [
@@ -27086,7 +27086,7 @@
           "requests": [
             {
               "method": "GET",
-              "path": ":"
+              "path": "/api/companies/:companyId/summary-slots/:scopeKind/:slotKey"
             }
           ],
           "via": [
@@ -27098,7 +27098,7 @@
           "requests": [
             {
               "method": "GET",
-              "path": ":"
+              "path": "/api/companies/:companyId/summary-slots/:scopeKind/:slotKey/revisions"
             }
           ],
           "via": [
@@ -31003,7 +31003,7 @@
           "requests": [
             {
               "method": "POST",
-              "path": ":"
+              "path": "/api/companies/:companyId/summary-slots/:scopeKind/:slotKey/generate"
             }
           ],
           "via": [
@@ -31015,7 +31015,7 @@
           "requests": [
             {
               "method": "GET",
-              "path": ":"
+              "path": "/api/companies/:companyId/summary-slots/:scopeKind/:slotKey"
             }
           ],
           "via": [
@@ -31027,7 +31027,7 @@
           "requests": [
             {
               "method": "GET",
-              "path": ":"
+              "path": "/api/companies/:companyId/summary-slots/:scopeKind/:slotKey/revisions"
             }
           ],
           "via": [
@@ -40898,7 +40898,7 @@
       "requests": [
         {
           "method": "POST",
-          "path": ":"
+          "path": "/api/companies/:companyId/summary-slots/:scopeKind/:slotKey/generate"
         }
       ],
       "usedBy": [
@@ -40912,7 +40912,7 @@
       "requests": [
         {
           "method": "GET",
-          "path": ":"
+          "path": "/api/companies/:companyId/summary-slots/:scopeKind/:slotKey"
         }
       ],
       "usedBy": [
@@ -40926,7 +40926,7 @@
       "requests": [
         {
           "method": "GET",
-          "path": ":"
+          "path": "/api/companies/:companyId/summary-slots/:scopeKind/:slotKey/revisions"
         }
       ],
       "usedBy": [

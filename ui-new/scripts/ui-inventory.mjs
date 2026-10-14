@@ -302,6 +302,11 @@ function renderUrl(node, ctx) {
       }
       // `${base}?${params.toString()}` and similar: query strings are dropped later.
       if (callee.type === "MemberExpression" && callee.property.name === "toString") return "";
+      // [`/a/${b}`, suffix, query].join("")
+      if (callee.type === "MemberExpression" && callee.property.name === "join" && unwrapTs(callee.object).type === "ArrayExpression") {
+        const sep = node.arguments[0]?.type === "StringLiteral" ? node.arguments[0].value : ",";
+        return unwrapTs(callee.object).elements.map((el) => (el ? renderUrl(el, next) : "")).join(sep);
+      }
       if (ctx.unwrapUnknownCalls && node.arguments[0]) return renderUrl(node.arguments[0], next);
       return ":?";
     }

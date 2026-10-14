@@ -1061,9 +1061,9 @@ Every method in `ui/src/api/` with the request(s) it makes and the pages that re
 
 | Method | Request | Used by |
 | --- | --- | --- |
-| `summarySlotsApi.generate` | `POST :` | pages/ExecutionWorkspaceDetail.tsx, pages/ProjectDetail.tsx, pages/Workspaces.tsx |
-| `summarySlotsApi.get` | `GET :` | pages/ExecutionWorkspaceDetail.tsx, pages/ProjectDetail.tsx, pages/Workspaces.tsx |
-| `summarySlotsApi.revisions` | `GET :` | pages/ExecutionWorkspaceDetail.tsx, pages/ProjectDetail.tsx, pages/Workspaces.tsx |
+| `summarySlotsApi.generate` | `POST /api/companies/:companyId/summary-slots/:scopeKind/:slotKey/generate` | pages/ExecutionWorkspaceDetail.tsx, pages/ProjectDetail.tsx, pages/Workspaces.tsx |
+| `summarySlotsApi.get` | `GET /api/companies/:companyId/summary-slots/:scopeKind/:slotKey` | pages/ExecutionWorkspaceDetail.tsx, pages/ProjectDetail.tsx, pages/Workspaces.tsx |
+| `summarySlotsApi.revisions` | `GET /api/companies/:companyId/summary-slots/:scopeKind/:slotKey/revisions` | pages/ExecutionWorkspaceDetail.tsx, pages/ProjectDetail.tsx, pages/Workspaces.tsx |
 
 ## api/teamCatalog.ts
 

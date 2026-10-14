@@ -1911,9 +1911,6 @@ Conditions: gate `IsolatedWorkspacesRouteGate`; gate `ExecutionWorkspaceCompanyG
 
 26 page-specific calls:
 
-- `GET :`: `summarySlotsApi.get` (api/summarySlots.ts), via components/SummarySlotCard.tsx
-- `GET :`: `summarySlotsApi.revisions` (api/summarySlots.ts), via components/SummarySlotCard.tsx
-- `POST :`: `summarySlotsApi.generate` (api/summarySlots.ts), via components/SummarySlotCard.tsx
 - `GET /api/adapters`: `adaptersApi.list` (api/adapters.ts), via components/ConfigureBuiltInAgentModal.tsx
 - `POST /api/agents/:id/resume`: `agentsApi.resume` (api/agents.ts), via components/SummarySlotCard.tsx
 - `GET /api/companies/:companyId/adapters/:type/models`: `agentsApi.adapterModels` (api/agents.ts), via components/ConfigureBuiltInAgentModal.tsx
@@ -1925,6 +1922,9 @@ Conditions: gate `IsolatedWorkspacesRouteGate`; gate `ExecutionWorkspaceCompanyG
 - `GET /api/companies/:companyId/issues`: `issuesApi.list` (api/issues.ts), via pages/ExecutionWorkspaceDetail.tsx
 - `GET /api/companies/:companyId/live-runs`: `heartbeatsApi.liveRunsForCompany` (api/heartbeats.ts), via pages/ExecutionWorkspaceDetail.tsx
 - `GET /api/companies/:companyId/routines`: `routinesApi.list` (api/routines.ts), via pages/ExecutionWorkspaceDetail.tsx
+- `GET /api/companies/:companyId/summary-slots/:scopeKind/:slotKey`: `summarySlotsApi.get` (api/summarySlots.ts), via components/SummarySlotCard.tsx
+- `POST /api/companies/:companyId/summary-slots/:scopeKind/:slotKey/generate`: `summarySlotsApi.generate` (api/summarySlots.ts), via components/SummarySlotCard.tsx
+- `GET /api/companies/:companyId/summary-slots/:scopeKind/:slotKey/revisions`: `summarySlotsApi.revisions` (api/summarySlots.ts), via components/SummarySlotCard.tsx
 - `GET /api/execution-workspaces/:id`: `executionWorkspacesApi.get` (api/execution-workspaces.ts), via pages/ExecutionWorkspaceDetail.tsx
 - `PATCH /api/execution-workspaces/:id`: `executionWorkspacesApi.update` (api/execution-workspaces.ts), via components/ExecutionWorkspaceCloseDialog.tsx, pages/ExecutionWorkspaceDetail.tsx
 - `GET /api/execution-workspaces/:id/close-readiness`: `executionWorkspacesApi.getCloseReadiness` (api/execution-workspaces.ts), via components/ExecutionWorkspaceCloseDialog.tsx
@@ -2233,9 +2233,6 @@ Routes: `/:co/projects/:projectId`, `/:co/projects/:projectId/overview`, `/:co/p
 
 41 page-specific calls:
 
-- `GET :`: `summarySlotsApi.get` (api/summarySlots.ts), via components/SummarySlotCard.tsx
-- `GET :`: `summarySlotsApi.revisions` (api/summarySlots.ts), via components/SummarySlotCard.tsx
-- `POST :`: `summarySlotsApi.generate` (api/summarySlots.ts), via components/SummarySlotCard.tsx
 - `GET /api/adapters`: `adaptersApi.list` (api/adapters.ts), via components/ConfigureBuiltInAgentModal.tsx
 - `POST /api/agents/:id/resume`: `agentsApi.resume` (api/agents.ts), via components/SummarySlotCard.tsx
 - `GET /api/auth/get-session`: `authApi.getSession` (api/auth.ts), via components/ProjectProperties.tsx
@@ -2255,6 +2252,9 @@ Routes: `/:co/projects/:projectId`, `/:co/projects/:projectId/overview`, `/:co/p
 - `GET /api/companies/:companyId/projects`: `projectsApi.list` (api/projects.ts), via pages/ProjectDetail.tsx
 - `GET /api/companies/:companyId/secrets`: `secretsApi.list` (api/secrets.ts), via components/ProjectProperties.tsx
 - `POST /api/companies/:companyId/secrets`: `secretsApi.create` (api/secrets.ts), via components/ProjectProperties.tsx
+- `GET /api/companies/:companyId/summary-slots/:scopeKind/:slotKey`: `summarySlotsApi.get` (api/summarySlots.ts), via components/SummarySlotCard.tsx
+- `POST /api/companies/:companyId/summary-slots/:scopeKind/:slotKey/generate`: `summarySlotsApi.generate` (api/summarySlots.ts), via components/SummarySlotCard.tsx
+- `GET /api/companies/:companyId/summary-slots/:scopeKind/:slotKey/revisions`: `summarySlotsApi.revisions` (api/summarySlots.ts), via components/SummarySlotCard.tsx
 - `GET /api/companies/:companyId/user-directory`: `accessApi.listUserDirectory` (api/access.ts), via components/ProjectAccessMembers.tsx
 - `GET /api/companies/:companyId/user-secret-definitions`: `secretsApi.listUserSecretDefinitions` (api/secrets.ts), via components/ProjectProperties.tsx
 - `PATCH /api/execution-workspaces/:id`: `executionWorkspacesApi.update` (api/execution-workspaces.ts), via components/ExecutionWorkspaceCloseDialog.tsx
@@ -2652,14 +2652,14 @@ Conditions: gate `IsolatedWorkspacesRouteGate`
 
 16 page-specific calls:
 
-- `GET :`: `summarySlotsApi.get` (api/summarySlots.ts), via components/SummarySlotCard.tsx
-- `GET :`: `summarySlotsApi.revisions` (api/summarySlots.ts), via components/SummarySlotCard.tsx
-- `POST :`: `summarySlotsApi.generate` (api/summarySlots.ts), via components/SummarySlotCard.tsx
 - `GET /api/adapters`: `adaptersApi.list` (api/adapters.ts), via components/ConfigureBuiltInAgentModal.tsx
 - `POST /api/agents/:id/resume`: `agentsApi.resume` (api/agents.ts), via components/SummarySlotCard.tsx
 - `GET /api/companies/:companyId/adapters/:type/models`: `agentsApi.adapterModels` (api/agents.ts), via components/ConfigureBuiltInAgentModal.tsx
 - `GET /api/companies/:companyId/built-in-agents`: `builtInAgentsApi.list` (api/builtInAgents.ts), via components/SummarySlotCard.tsx
 - `POST /api/companies/:companyId/built-in-agents/:key/provision`: `builtInAgentsApi.provision` (api/builtInAgents.ts), via components/ConfigureBuiltInAgentModal.tsx
+- `GET /api/companies/:companyId/summary-slots/:scopeKind/:slotKey`: `summarySlotsApi.get` (api/summarySlots.ts), via components/SummarySlotCard.tsx
+- `POST /api/companies/:companyId/summary-slots/:scopeKind/:slotKey/generate`: `summarySlotsApi.generate` (api/summarySlots.ts), via components/SummarySlotCard.tsx
+- `GET /api/companies/:companyId/summary-slots/:scopeKind/:slotKey/revisions`: `summarySlotsApi.revisions` (api/summarySlots.ts), via components/SummarySlotCard.tsx
 - `GET /api/companies/:companyId/workspace-overview`: `executionWorkspacesApi.listOverview` (api/execution-workspaces.ts), via pages/Workspaces.tsx
 - `PATCH /api/execution-workspaces/:id`: `executionWorkspacesApi.update` (api/execution-workspaces.ts), via components/ExecutionWorkspaceCloseDialog.tsx
 - `GET /api/execution-workspaces/:id/close-readiness`: `executionWorkspacesApi.getCloseReadiness` (api/execution-workspaces.ts), via components/ExecutionWorkspaceCloseDialog.tsx
