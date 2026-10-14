@@ -1,0 +1,73 @@
+# Production stack for this fork: Postgres + Paperclip (with ui-new).
+# Adapted from docker/docker-compose.yml upstream, with bind mounts so every
+# repo clone and agent worktree is a normal directory on the host.
+#
+# Run it through deploy/deploy.sh, which supplies UPSTREAM_SHA. Settings come
+# from deploy/.env (copy .env.example).
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: paperclip
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}"
+      POSTGRES_DB: paperclip
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperclip -d paperclip"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    # No published port: only the server container talks to Postgres.
+    volumes:
+      - "${PAPERCLIP_DATA_ROOT:?PAPERCLIP_DATA_ROOT must be set}/postgres:/var/lib/postgresql/data"
+
+  server:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        # Taken from the environment, where deploy/deploy.sh sets it. Omitted
+        # when unset, so logs/ps/restart work without it and a stray build
+        # fails on the Dockerfile's placeholder base image.
+        - UPSTREAM_SHA
+    image: paperclip-fork:local
+    restart: unless-stopped
+    # The image makes tini PID 1 itself; see upstream's compose file for why
+    # init: true is deliberately absent and why the pid limit is set.
+    pids_limit: 2048
+    stop_grace_period: 90s
+    ports:
+      # Loopback by default: reach it through Caddy or `tailscale serve`.
+      - "${PAPERCLIP_BIND_ADDR:-127.0.0.1}:${PAPERCLIP_PORT:-3100}:3100"
+    environment:
+      DATABASE_URL: "postgres://paperclip:${POSTGRES_PASSWORD}@db:5432/paperclip"
+      PORT: "3100"
+      SERVE_UI: "true"
+      # The container's node user is remapped to these IDs so files under
+      # PAPERCLIP_DATA_ROOT/home are owned by your host user.
+      USER_UID: "${USER_UID:-1000}"
+      USER_GID: "${USER_GID:-1000}"
+
+      PAPERCLIP_DEPLOYMENT_MODE: "authenticated"
+      PAPERCLIP_DEPLOYMENT_EXPOSURE: "${PAPERCLIP_DEPLOYMENT_EXPOSURE:-private}"
+      PAPERCLIP_PUBLIC_URL: "${PAPERCLIP_PUBLIC_URL:?PAPERCLIP_PUBLIC_URL must be set}"
+      PAPERCLIP_ALLOWED_HOSTNAMES: "${PAPERCLIP_ALLOWED_HOSTNAMES:-}"
+
+      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set}"
+      PAPERCLIP_TOOL_ACTION_SIGNING_SECRET: "${PAPERCLIP_TOOL_ACTION_SIGNING_SECRET:?PAPERCLIP_TOOL_ACTION_SIGNING_SECRET must be set}"
+
+      # Fallback token for cloning private GitHub repos. A company secret
+      # named GITHUB_TOKEN set in the UI takes precedence over this.
+      GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
+
+      # LLM provider keys for agents (at least one is needed).
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+    volumes:
+      # PAPERCLIP_HOME: config, uploads, logs, secrets key, repo clones and
+      # agent worktrees (instances/default/projects/...).
+      - "${PAPERCLIP_DATA_ROOT}/home:/paperclip"
+    depends_on:
+      db:
+        condition: service_healthy
