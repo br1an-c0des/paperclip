@@ -46,7 +46,7 @@ src/
 
 ## Staying merge-friendly with upstream
 
-This fork tracks `paperclipai/paperclip`. Keep changes outside `ui-new/` to a minimum. The only shared file touched so far is `pnpm-workspace.yaml` (one line).
+This fork tracks `paperclipai/paperclip`. Keep changes outside `ui-new/` to a minimum, and record any change to an upstream file in [FORK-PATCHES.md](../FORK-PATCHES.md). Syncing with upstream is described in [FORK.md](../FORK.md#staying-in-sync-with-upstream).
 
 If `pnpm-lock.yaml` conflicts during a merge, don't resolve it by hand. Take upstream's version and regenerate it:
 

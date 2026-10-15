@@ -2,19 +2,29 @@
 
 This is a fork of [paperclipai/paperclip](https://github.com/paperclipai/paperclip) at
 [br1an-c0des/paperclip](https://github.com/br1an-c0des/paperclip). Its purpose is to build a new
-board UI in SolidJS (`ui-new/`) while continuing to take upstream's daily changes.
+board UI in SolidJS (`ui-new/`) while continuing to take upstream's daily changes. The fork's own
+features will also reach into the server and database.
 
-The rule behind every decision below: **keep changes in files upstream doesn't own.** New files
-never conflict with upstream, so merges stay easy.
+The rule behind every decision below: **keep changes in files upstream doesn't own wherever
+possible, and record every exception.** New files never conflict with upstream, so merges stay
+easy. Each change to an upstream file is recorded in [FORK-PATCHES.md](FORK-PATCHES.md), so a merge
+can check what upstream changed against what the fork depends on.
+
+### Fork-only files
 
 | Fork-only files | Purpose |
 | --- | --- |
 | `FORK.md` | This plan |
+| `FORK-PATCHES.md` | Every change the fork makes to upstream files, and why |
+| `CLAUDE.md` | Instructions for Claude Code in this fork |
 | `ui-new/` | The SolidJS UI ([ui-new/README.md](ui-new/README.md)) |
 | `deploy/` | Production deployment ([deploy/README.md](deploy/README.md)) |
+| `fork/` | Fork records, such as upstream sync reports |
+| `.claude/skills/upstream-sync/` | The upstream sync skill |
+| `packages/plugins/fork-*/` | Plugins the fork adds (see below). Already in the pnpm workspace through `packages/plugins/*`. |
 
-The only upstream file the fork edits is `pnpm-workspace.yaml` (one line, `- ui-new`), plus the
-`pnpm-lock.yaml` entries that line causes.
+The upstream files the fork edits are listed in [FORK-PATCHES.md](FORK-PATCHES.md). So far that is
+`pnpm-workspace.yaml` (one line, `- ui-new`), plus the `pnpm-lock.yaml` entries that line causes.
 
 ## Remotes and branches
 
@@ -27,6 +37,7 @@ The only upstream file the fork edits is `pnpm-workspace.yaml` (one line, `- ui-
 | --- | --- |
 | `master` | An exact mirror of `upstream/master`. Never commit here; it only fast-forwards. |
 | `new-ui` | All fork work. Upstream changes come in by merging `master`. |
+| `sync/<date>` | Short-lived, local. The `upstream-sync` skill merges `master` here first; `new-ui` fast-forwards to it once you approve. |
 
 Setting this up in a fresh clone (the git aliases and rerere live in `.git/config`, so they are
 per-clone):
@@ -42,22 +53,79 @@ git config alias.sync-master '!f() { set -e; cur=$(git branch --show-current); g
 git config alias.sync-ui '!f() { set -e; git sync-master; git checkout new-ui; git merge master --no-edit; echo "Merged master into new-ui. Run tests, then: git push"; }; f'
 ```
 
+## Changing server, database and packages
+
+Fork features may need server, database or package changes. Pick the first option that works:
+
+1. **A plugin.** Paperclip's plugin system ([doc/plugins/PLUGIN_AUTHORING_GUIDE.md](doc/plugins/PLUGIN_AUTHORING_GUIDE.md))
+   gives a plugin its own Postgres schema with its own migrations, JSON API routes under
+   `/api/plugins/:pluginId/api/*`, event subscriptions, scheduled jobs, and read access to core
+   tables on an allowed list. `ui-new` can call plugin routes like any other API. A plugin can't
+   alter core tables or claim core API paths. Plugins never conflict with upstream.
+2. **New files plus a small hook.** Put the logic in new files (new routes, services, schema
+   files) and keep the edit to upstream files to a line or two that wires them in, such as
+   registering a router. Mark each hook with a `FORK:` comment and add an entry to
+   [FORK-PATCHES.md](FORK-PATCHES.md).
+3. **Editing upstream logic directly.** Last resort, for when a hook can't do it. Same marking and
+   entry, and the entry says why a hook wasn't enough. Expect these to need attention on syncs.
+
+`@paperclipai/shared` is upstream-owned too. Put fork-only types in fork files rather than adding
+them to `packages/shared`.
+
+### Database changes
+
+Upstream numbers its migrations in one sequence (`packages/db/src/migrations/NNNN_*.sql`, tracked
+in `meta/_journal.json`) and adds new ones most days. **Don't add fork migrations to that
+sequence:** the next upstream migration would take the same number, and renumbering a migration
+that a database has already applied breaks that database.
+
+- Prefer a plugin's own schema and migrations (option 1 above).
+- If core code needs fork tables, keep them on a separate migration track: their own folder and
+  tracking table, applied after upstream's. The mechanism isn't built yet; build it with the
+  first such feature and record it in [FORK-PATCHES.md](FORK-PATCHES.md).
+- Prefer side tables that reference upstream tables over altering upstream tables. A fork column
+  on an upstream table conflicts with every upstream change to that table.
+- List every fork database object under **Database objects** in [FORK-PATCHES.md](FORK-PATCHES.md).
+
 ## Staying in sync with upstream
 
 Upstream lands about 25 commits a day, and about a third of them touch `ui/`. Sync often (daily
 or every few days); small merges are much easier than large ones.
 
+### With the sync skill (normal route)
+
+In Claude Code, run `/upstream-sync`. The skill
+([.claude/skills/upstream-sync/SKILL.md](.claude/skills/upstream-sync/SKILL.md)):
+
+1. Updates `master` from upstream and pushes it to origin.
+2. Summarizes the new commits and checks them against [FORK-PATCHES.md](FORK-PATCHES.md).
+3. Merges `master` into a new local `sync/<date>` branch, resolving the conflicts its policy lets
+   it decide alone.
+4. Asks you about anything else, giving its options and a recommendation.
+5. Runs the checks: install, typechecks, tests near fork patches, the migration check, and the
+   inventory.
+6. Writes a report to `fork/sync-reports/<date>.md`.
+
+`new-ui` isn't touched until you approve. Then the skill fast-forwards `new-ui` to the sync branch
+and pushes it.
+
+### By hand
+
 ```bash
 git sync-ui            # updates master from upstream, then merges it into new-ui
-pnpm install           # upstream changes dependencies often
-pnpm --filter @paperclipai/ui-new typecheck   # catches API type changes from @paperclipai/shared
-pnpm --filter @paperclipai/ui-new inventory   # regenerate the existing-UI inventory
+corepack pnpm install  # upstream changes dependencies often
+corepack pnpm --filter @paperclipai/ui-new typecheck   # catches API type changes from @paperclipai/shared
+corepack pnpm --filter @paperclipai/ui-new inventory   # regenerate the existing-UI inventory
 git diff ui-new/docs/inventory/generated      # new or changed routes, requests and flags upstream added
 git push
 ```
 
 When the inventory diff shows new capabilities, add them to `ui-new/docs/inventory/capabilities.md`
-(see [ui-new/docs/inventory/README.md](ui-new/docs/inventory/README.md)).
+(see [ui-new/docs/inventory/README.md](ui-new/docs/inventory/README.md)). Once the fork patches
+server code, also check upstream's changes against [FORK-PATCHES.md](FORK-PATCHES.md) and run the
+tests around each patch.
+
+### Rules
 
 - **Merge, don't rebase.** `new-ui` is long-lived and pushed. Rebasing it would replay hundreds of
   upstream commits and rewrite pushed history.
@@ -113,6 +181,9 @@ bind-mounted from `<PAPERCLIP_DATA_ROOT>/home`. Everything is visible on the hos
 
 ## Open items
 
+- Build the separate migration track for fork tables in core code, when the first feature needs
+  one (see [Database changes](#database-changes)).
+- Once the sync skill has run by hand a few times, consider scheduling it.
 - Test the full image build and a first deploy on a real server.
 - Optionally, a GitHub Actions workflow in this fork that builds the image on pushes to `new-ui`
   and publishes it to `ghcr.io/br1an-c0des/paperclip`, so the server only pulls. Keep upstream's
