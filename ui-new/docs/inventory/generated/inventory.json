@@ -1,5 +1,5 @@
 {
-  "upstreamCommit": "82884443bebf4742ec8e91dcaf2862466d4b6f7f",
+  "upstreamCommit": "23e7ee9a2d2b7f23dd0d22d6c858d7abe915cbd8",
   "routes": [
     {
       "path": "/oauth-handoff",
@@ -17224,6 +17224,18 @@
           ]
         },
         {
+          "key": "api/issues.ts::issuesApi.recoveryActions",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:id/recovery-actions"
+            }
+          ],
+          "via": [
+            "components/ExecutionBlockerNotice.tsx"
+          ]
+        },
+        {
           "key": "api/file-resources.ts::fileResourcesApi.content",
           "requests": [
             {
@@ -24376,6 +24388,18 @@
           "via": [
             "components/ExecutionBlockerNotice.tsx",
             "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.recoveryActions",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:id/recovery-actions"
+            }
+          ],
+          "via": [
+            "components/ExecutionBlockerNotice.tsx"
           ]
         },
         {
@@ -38274,6 +38298,19 @@
         {
           "method": "GET",
           "path": "/api/issues/:id/privacy-constraints"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
+    "api/issues.ts::issuesApi.recoveryActions": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/issues/:id/recovery-actions"
         }
       ],
       "usedBy": [

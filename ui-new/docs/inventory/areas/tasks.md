@@ -269,9 +269,10 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
 - **What:** notices when the task is stuck, with one-click fixes: recovery actions (missing disposition,
   wait without target, stranded assignment, workspace or configuration validation, active-run watchdog,
   task-graph liveness), disposition recovery retry, reissue as an isolated recovery task, workspace export
-  and base-ref recovery, execution blockers, write-denied notice, "retry access check".
-- **Requests:** `POST /api/issues/:id/recovery-actions/resolve`, `POST /api/companies/:companyId/issues`
-  (reissue), `POST /api/execution-workspaces/:id/reconcile-branch`.
+  and base-ref recovery, execution blockers (with expandable "Recovery details": whether automatic
+  retries were stopped, and the hold's resolution note), write-denied notice, "retry access check".
+- **Requests:** `GET /api/issues/:id/recovery-actions`, `POST /api/issues/:id/recovery-actions/resolve`,
+  `POST /api/companies/:companyId/issues` (reissue), `POST /api/execution-workspaces/:id/reconcile-branch`.
 
 ### `tasks/runner-goal`: Runner goal
 
