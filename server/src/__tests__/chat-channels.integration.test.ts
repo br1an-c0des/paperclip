@@ -6037,46 +6037,6 @@ describeEmbeddedPostgres("chat channel control-plane integration", () => {
       };
     }
 
-    it("persists registration before enabling the runtime and preserves unrelated commands", async () => {
-      const f = await registrationFixture();
-      try {
-        await f.configure();
-        const connected = await f.service.get(f.endpoint.id);
-        expect(connected?.capabilities).toMatchObject({
-          slashCommands: true,
-          ephemeralMessages: true,
-        });
-        expect(
-          f.runtime.configurations.get(f.endpoint.id)?.callbacks.onSlashCommand,
-        ).toBeTypeOf("function");
-        expect(f.calls).toEqual(["GET", "POST"]);
-        expect(f.commandRows().map((row) => row.name)).toEqual([
-          "other",
-          "paperclip",
-        ]);
-        const [registration] = await db
-          .select()
-          .from(chatActions)
-          .where(
-            and(
-              eq(chatActions.endpointId, f.endpoint.id),
-              eq(chatActions.kind, "discord_command_registration"),
-            ),
-          );
-        expect(registration?.status).toBe("processed");
-        expect(registration?.payload.registration).toMatchObject({
-          phase: "registered",
-        });
-        expect(JSON.stringify(registration)).not.toContain(
-          f.credentials.botToken,
-        );
-        await f.service.reconcileProviderRuntimes();
-        expect(f.calls).toEqual(["GET", "POST"]);
-      } finally {
-        await retireRegistrationFixture(f.service, f.endpoint.id);
-      }
-    });
-
     it("keeps mention setup usable on registration failure and upgrades automatically when due", async () => {
       const f = await registrationFixture("unavailable");
       try {
@@ -6150,6 +6110,37 @@ describeEmbeddedPostgres("chat channel control-plane integration", () => {
         )!.callbacks;
         expect(originalCallbacks.onMessage).toBeTypeOf("function");
         expect(originalCallbacks.onSlashCommand).toBeTypeOf("function");
+        const connected = await f.service.get(f.endpoint.id);
+        expect(connected?.capabilities).toMatchObject({
+          slashCommands: true,
+          ephemeralMessages: true,
+        });
+        expect(
+          f.runtime.configurations.get(f.endpoint.id)?.callbacks.onSlashCommand,
+        ).toBeTypeOf("function");
+        expect(f.calls).toEqual(["GET", "POST"]);
+        expect(f.commandRows().map((row) => row.name)).toEqual([
+          "other",
+          "paperclip",
+        ]);
+        const [registration] = await db
+          .select()
+          .from(chatActions)
+          .where(
+            and(
+              eq(chatActions.endpointId, f.endpoint.id),
+              eq(chatActions.kind, "discord_command_registration"),
+            ),
+          );
+        expect(registration?.status).toBe("processed");
+        expect(registration?.payload.registration).toMatchObject({
+          phase: "registered",
+        });
+        expect(JSON.stringify(registration)).not.toContain(
+          f.credentials.botToken,
+        );
+        await f.service.reconcileProviderRuntimes();
+        expect(f.calls).toEqual(["GET", "POST"]);
         const shutdown = vi.spyOn(original!, "shutdown");
         const targetRestart = vi.fn(async () => {
           throw new Error(
@@ -8105,10 +8096,12 @@ describeEmbeddedPostgres("chat channel control-plane integration", () => {
 
   it("refreshes Slack tool guidance without restoring disabled catalog policies", async () => {
     const { SLACK_TOOLS } = await import("@paperclipai/shared");
-    const { syncSlackBotTools } = await import("../services/connectors/slack-catalog.js");
+    const { slackBotCatalogIsCurrent, syncSlackBotTools } = await import("../services/connectors/slack-catalog.js");
     const fixture = await seedCompany();
     const { endpoint } = await configuredSlackEndpoint(fixture);
+    expect(await slackBotCatalogIsCurrent(db, endpoint)).toBe(false);
     await db.transaction(tx => syncSlackBotTools(tx, endpoint, "owner-user", true));
+    expect(await slackBotCatalogIsCurrent(db, endpoint)).toBe(true);
     const tool = SLACK_TOOLS.find(tool => tool.name === "slack_post_message")!;
     // Simulate the previous hash contract, which omitted descriptions.
     const oldHash = createHash("sha256").update(JSON.stringify({ name: tool.name, inputSchema: tool.inputSchema, risk: tool.risk, scopes: tool.scopes })).digest("hex");
@@ -8117,7 +8110,9 @@ describeEmbeddedPostgres("chat channel control-plane integration", () => {
       description: "Old posting guidance", versionHash: oldHash, schemaHash: oldHash,
       status: "removed", reviewedByUserId: "owner-user", reviewedAt,
     }).where(and(eq(toolCatalogEntries.connectionId, endpoint.connectionId), eq(toolCatalogEntries.toolName, tool.name)));
+    expect(await slackBotCatalogIsCurrent(db, endpoint)).toBe(false);
     await db.transaction(tx => syncSlackBotTools(tx, endpoint, "different-operator", true));
+    expect(await slackBotCatalogIsCurrent(db, endpoint)).toBe(true);
     const [updated] = await db.select().from(toolCatalogEntries).where(and(eq(toolCatalogEntries.connectionId, endpoint.connectionId), eq(toolCatalogEntries.toolName, tool.name)));
     expect(updated).toMatchObject({ description: tool.description, status: "removed", reviewedByUserId: "owner-user", reviewedAt });
     expect(updated!.versionHash).not.toBe(oldHash);
@@ -8141,6 +8136,12 @@ describeEmbeddedPostgres("chat channel control-plane integration", () => {
     expect(assignments.map(item => item.key)).toEqual(["slack"]);
     expect(assignments[0].resources[0]).toMatchObject({ id: endpoint.id, metadata: { requesterId: "UROUTINE" } });
     expect(assignments[0].tools.some(tool => tool.name === "slack_open_dm")).toBe(true);
+    const transactions = vi.spyOn(db, "transaction");
+    try {
+      expect(await resolveConnectorAssignments(db, binding)).toEqual(assignments);
+      expect(transactions).toHaveBeenCalledTimes(2);
+    } finally { transactions.mockRestore(); }
+
     await expect(resolveSlackTaskAuthority(db, binding)).resolves.toMatchObject({ conversation: null, userId: "owner-user", slackUserId: "UROUTINE" });
     const upstream = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = String(input).split("/").at(-1);
