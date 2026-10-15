@@ -119,10 +119,16 @@ git diff --stat ui-new/docs/inventory/generated
   `corepack pnpm typecheck` and the vitest files next to each patched file
   (`corepack pnpm exec vitest run <paths>`).
 - Commit the regenerated inventory separately: `Regenerate UI inventory after upstream sync`.
-- For new routes, requests or flags in the inventory diff, add rows to
-  `ui-new/docs/inventory/capabilities.md` in the right area table. Leave **New home** and
-  **Status** blank, put `Added by upstream sync <date>` in **Notes**, and list them in the report.
-  If a capability needs a new area guide entry, say so in the report instead of writing one.
+- For new routes, requests or flags in the inventory diff, find the capability they belong to:
+  - **An existing capability** (the new request serves a page or feature already in the
+    checklist): add the request, and a few words on what it does, to that capability's entry in
+    `ui-new/docs/inventory/areas/`, and note the change in the **Notes** of its row in
+    `ui-new/docs/inventory/capabilities.md` (`Upstream sync <date>: <what changed>`).
+  - **A new capability:** add a row to `capabilities.md` in the right area table. Leave
+    **New home** and **Status** blank and put `Added by upstream sync <date>` in **Notes**. Don't
+    write its area guide entry; say in the report that one is needed.
+
+  List them all in the report.
 - If a resolution moved or rewrote a patch, update its FORK-PATCHES.md entry in the same commit.
 
 ## 7. Report
