@@ -1,6 +1,6 @@
 import { trace } from "@opentelemetry/api";
 import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
-import { configuredEnvironmentProjection } from "../../vendor/paperclip-runner/index.js";
+import { configuredEnvironment, configuredEnvironmentProjection } from "../../vendor/paperclip-runner/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { PgDialect } from "drizzle-orm/pg-core";
@@ -66,6 +66,7 @@ import {
   NativeSessionProtocolIntegrityError,
 } from "../../vendor/paperclip-runner/index.js";
 import * as issueServiceModule from "../issues.js";
+import * as runEventWriter from "../heartbeat-run-events.js";
 import { NativePermissionDeclinedError } from "./native-permission-decline.js";
 import { resolvePaperclipRunnerNativeProviderInput } from "./provider-profile.js";
 import {
@@ -1344,7 +1345,7 @@ describe("remote provider pack manifest", () => {
         claude:
           "sha256:9d73d1f0f121fb96cc8badb28c22d5bff02d8582eb2e40360a81c189e1b9422a",
         codex:
-          "sha256:c4538599d1ab767db5dff50934f13bb5ba313a59d9c4a83e993fac4617ea63d3",
+          "sha256:443491f4e814501a5dc47347e4510e84faeec9c9382e2d4e53bfe69386d5aabc",
       },
       artifacts: {
         grokLauncher: { path: "dist/providers/grok/launcher.cjs", sha256: digest(grokLauncher) },
@@ -1554,6 +1555,14 @@ describe("provider pack read diagnostics", () => {
 });
 
 describe("native harness persistence profiles", () => {
+  it("does not back up the external Codex home in preconfigured mode", () => {
+    const execution = { homeMode: "preconfigured", provider: { kind: "codex" }, session: {
+      driverKind: "codex_app_server", normalizedSessionId: "session", protocolVersion: 1,
+      lifecyclePolicy: { mode: "per_turn", idleTimeoutMs: null },
+    } } as unknown as NativeExecutionInputV1;
+    expect(resolveNativeHarnessPersistenceProfile(execution).directories.map(directory => directory.name)).toEqual(["runner"]);
+  });
+
   const profile = (provider: Record<string, unknown>, driverKind: string) =>
     resolveNativeHarnessPersistenceProfile({
       provider,
@@ -2680,6 +2689,18 @@ describe("remote runner build metadata", () => {
     durableSessionCapabilities: ["unlimited_runtime", "connection_lease_renewal"],
     prpTransportModes: ["dial_ws_loopback", "dial_wss", "listen_ws"],
   };
+
+  it("accepts the current contract with the required transport", () => {
+    expect(() =>
+      assertRemoteRunnerBuildMetadata(current, "listen_ws"),
+    ).not.toThrow();
+  });
+
+  it("requires the versioned Muse artifact capability and does not accept Dot capability as proof", () => {
+    expect(() => assertRemoteRunnerBuildMetadata(current, "listen_ws", "muse_external_v1")).toThrow("runner_remote_muse_capability_missing");
+    expect(() => assertRemoteRunnerBuildMetadata({ ...current, externalProviderCapabilities: ["openai_dot_mcp"] }, "listen_ws", "muse_external_v1")).toThrow("runner_remote_muse_capability_missing");
+    expect(() => assertRemoteRunnerBuildMetadata({ ...current, externalProviderCapabilities: ["openai_dot_mcp", "muse_external_v1"] }, "listen_ws", "muse_external_v1")).not.toThrow();
+  });
 
   it("requires an explicit Dot bridge capability only for remote Dot execution", () => {
     expect(() => assertRemoteRunnerBuildMetadata(current, "listen_ws", "openai_dot_mcp"))
@@ -9670,12 +9691,24 @@ describe("native process ownership", () => {
       startedAt: "2026-08-18T18:00:00.000Z",
     };
     const onSpawn = vi.fn(async () => undefined);
+    const db = leaseDb(execution);
+    const admissionWriter = vi.spyOn(runEventWriter, "appendHeartbeatRunEvent").mockResolvedValueOnce({
+      row: {
+        id: 1, companyId: execution.binding.companyId, runId: execution.binding.runId,
+        agentId: execution.binding.agentId, seq: 1, eventType: "native.process_start_requested",
+        stream: "system", level: "info", color: null, message: null, payload: null,
+        sourceInstanceId: null, sourceEventId: null, sourceSeq: null,
+        sourcePayloadSha256: null, protocolSchemaVersion: null, createdAt: new Date(),
+      },
+      disposition: "committed", highestContiguousSourceSeq: 0,
+    });
     state.createBackend.mockClear();
     state.execute.mockReset().mockImplementation(async (options) => {
       await options.onSessionAdmission();
-      expect(updates).toContainEqual({ table: heartbeatRunEvents, values: expect.objectContaining({
+      expect(admissionWriter).toHaveBeenCalledWith(db, expect.objectContaining({
         eventType: "native.process_start_requested", runId: execution.binding.runId,
-      }) });
+        companyId: execution.binding.companyId, agentId: execution.binding.agentId,
+      }));
       await options.backend.onSpawn(processMetadata);
       return {
         result: { summary: "completed" },
@@ -9689,18 +9722,17 @@ describe("native process ownership", () => {
         highestContiguousSourceSeq: 1,
       };
     });
-    const updates: Array<{ table: unknown; values: Record<string, unknown> }> = [];
     state.createBackend.mockImplementationOnce((_input, options) => {
-      expect(updates.some(update => update.values.eventType === "native.process_start_requested")).toBe(false);
+      expect(admissionWriter).not.toHaveBeenCalled();
       return { kind: "test", onSpawn: options.onSpawn };
     });
 
-    await executePaperclipNativeSession({
-      db: leaseDb(execution, {}, {}, updates),
-      execution,
-      runnerInstanceId: "runner",
-      onSpawn,
-    });
+    try {
+      await executePaperclipNativeSession({ db, execution, runnerInstanceId: "runner", onSpawn });
+      expect(admissionWriter).toHaveBeenCalledOnce();
+    } finally {
+      admissionWriter.mockRestore();
+    }
 
     expect(state.createBackend).toHaveBeenCalledWith(
       execution,
@@ -10427,8 +10459,9 @@ describe("runnerd provider runtime wiring", () => {
     { PAPERCLIP_NATIVE_MCP_URL: "http://127.0.0.1:3217/mcp/gateways/test" },
     { PAPERCLIP_NATIVE_MCP_TOKEN: "private-run-token" },
   ])("rejects partial remote assigned MCP bindings", async (runnerEnvironment) => {
+    const prepareRunnerEnvironment = vi.fn(async () => runnerEnvironment);
     await expect(createRunnerdBackend({
-      db: leaseDb(execution), execution, runnerInstanceId: "runner-partial-mcp", runnerEnvironment,
+      db: leaseDb(execution), execution, runnerInstanceId: "runner-partial-mcp", runnerEnvironment, prepareRunnerEnvironment,
       runnerExecutionTarget: {
         kind: "remote", transport: "sandbox", providerKey: "daytona",
         leaseId: "lease-partial-mcp", remoteCwd: "/home/daytona/paperclip-workspace",
@@ -10436,6 +10469,138 @@ describe("runnerd provider runtime wiring", () => {
       } as never,
     })).rejects.toThrow("assigned native MCP launch binding is incomplete");
     expect(state.createAssignedMcpTools).not.toHaveBeenCalled();
+    expect(prepareRunnerEnvironment).not.toHaveBeenCalled();
+  });
+
+  it.each(["success", "environment", "assigned", "both"] as const)("drains overlapping backend preparation before admission: %s", async failure => {
+    let releaseEnvironment!: () => void;
+    let releaseAssigned!: () => void;
+    let assignedStarted!: () => void;
+    const environmentGate = new Promise<void>(resolve => { releaseEnvironment = resolve; });
+    const assignedGate = new Promise<void>(resolve => { releaseAssigned = resolve; });
+    const assignedReady = new Promise<void>(resolve => { assignedStarted = resolve; });
+    const runnerEnvironment = {
+      PAPERCLIP_NATIVE_MCP_NAME: "paperclip-assigned",
+      PAPERCLIP_NATIVE_MCP_URL: "http://127.0.0.1:3217/mcp/gateways/assigned-overlap",
+      PAPERCLIP_NATIVE_MCP_TOKEN: "private-overlap-token",
+    };
+    const assignedMcpTools = { definitions: () => [], has: () => false, execute: vi.fn() };
+    const prepareRunnerEnvironment = vi.fn(async () => {
+      await environmentGate;
+      if (failure === "environment" || failure === "both") throw new Error("environment failed");
+      return { ...runnerEnvironment, PAPERCLIP_GITHUB_BROKER_TOKEN: "prepared-github-capability" };
+    });
+    state.createAssignedMcpTools.mockImplementationOnce(async () => {
+      assignedStarted();
+      await assignedGate;
+      if (failure === "assigned" || failure === "both") throw new Error("assigned failed");
+      return assignedMcpTools;
+    });
+    state.createBackend.mockClear();
+    state.createTransport.mockClear();
+    let settled = false;
+    const preparation = createRunnerdBackend({
+      db: leaseDb(execution), execution, runnerInstanceId: "runner-overlap",
+      runnerEnvironment, prepareRunnerEnvironment,
+      runnerExecutionTarget: {
+        kind: "remote", transport: "sandbox", providerKey: "daytona",
+        leaseId: "lease-overlap", remoteCwd: "/home/daytona/paperclip-workspace",
+        runner: { execute: vi.fn() },
+      } as never,
+    }).then(value => ({ value }), error => ({ error })).finally(() => { settled = true; });
+    try {
+      await assignedReady;
+      expect(prepareRunnerEnvironment).toHaveBeenCalledOnce();
+      expect(settled).toBe(false);
+      expect(state.createBackend).not.toHaveBeenCalled();
+      if (failure === "assigned") releaseAssigned();
+      else releaseEnvironment();
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(settled).toBe(false);
+      expect(state.createBackend).not.toHaveBeenCalled();
+      releaseEnvironment();
+      releaseAssigned();
+      const result = await preparation;
+      if (failure !== "success") {
+        expect(result).toMatchObject({ error: { message: failure === "assigned" ? "assigned failed" : "environment failed" } });
+        expect(state.createBackend).not.toHaveBeenCalled();
+      } else {
+        expect(result).not.toHaveProperty("error");
+        expect(state.toolAuthorityDefinitions).toHaveBeenCalledWith(expect.objectContaining({ assignedMcpTools }));
+        state.createBackend.mock.calls[0]![1].codexTransportFactory!();
+        const options = state.createTransport.mock.calls[0]![0] as { environment: NodeJS.ProcessEnv };
+        expect(options.environment.PAPERCLIP_GITHUB_BROKER_TOKEN).toBe("prepared-github-capability");
+        expect(options.environment.PAPERCLIP_NATIVE_MCP_TOKEN).toBeUndefined();
+      }
+    } finally {
+      releaseEnvironment();
+      releaseAssigned();
+      await preparation;
+    }
+  });
+
+  it.each(["github", "assigned"] as const)("cleans run-owned access after overlapping executor failure: %s", async failure => {
+    const issueService = vi.spyOn(issueServiceModule, "issueService").mockReturnValue({
+      update: vi.fn(async () => ({ status: "blocked", statusVersion: 1 })),
+    } as unknown as ReturnType<typeof issueServiceModule.issueService>);
+    let releaseGitHub!: () => void;
+    let releaseAssigned!: () => void;
+    const githubGate = new Promise<void>(resolve => { releaseGitHub = resolve; });
+    const assignedGate = new Promise<void>(resolve => { releaseAssigned = resolve; });
+    const deactivate = vi.fn();
+    const stop = vi.fn(async () => undefined);
+    const activate = vi.fn(() => deactivate);
+    githubAccess.create.mockImplementationOnce(async () => {
+      await githubGate;
+      if (failure === "github") throw new Error("github setup failed");
+      return { env: { PAPERCLIP_GITHUB_BROKER_TOKEN: "run-owned-capability" }, ready: true,
+        duplexRequested: false, activate, stop };
+    });
+    state.createAssignedMcpTools.mockImplementationOnce(async () => {
+      await assignedGate;
+      if (failure === "assigned") throw new Error("assigned setup failed");
+      return { definitions: () => [], has: () => false, execute: vi.fn() };
+    });
+    state.execute.mockClear();
+    state.createBackend.mockClear();
+    let settled = false;
+    const running = executePaperclipNativeSession({
+      db: leaseDb(execution), execution, runnerInstanceId: "runner-overlap-cleanup",
+      useRunnerd: true, managedGitHub: true,
+      runnerEnvironment: {
+        PAPERCLIP_NATIVE_MCP_NAME: "paperclip-assigned",
+        PAPERCLIP_NATIVE_MCP_URL: "http://127.0.0.1:3217/mcp/gateways/assigned-cleanup",
+        PAPERCLIP_NATIVE_MCP_TOKEN: "private-cleanup-token",
+      },
+      runnerExecutionTarget: {
+        kind: "remote", transport: "sandbox", providerKey: "daytona",
+        leaseId: "lease-overlap-cleanup", remoteCwd: "/home/daytona/paperclip-workspace",
+        runner: { execute: vi.fn() },
+      } as never,
+    }).then(value => ({ value }), error => ({ error })).finally(() => { settled = true; });
+    try {
+      await vi.waitFor(() => expect(state.createAssignedMcpTools).toHaveBeenCalledOnce());
+      expect(githubAccess.create).toHaveBeenCalled();
+      if (failure === "github") releaseGitHub();
+      else releaseAssigned();
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(settled).toBe(false);
+      releaseGitHub();
+      releaseAssigned();
+      expect(await running).toMatchObject({ error: { message: `${failure} setup failed` } });
+      expect(state.execute).not.toHaveBeenCalled();
+      expect(state.createBackend).not.toHaveBeenCalled();
+      if (failure === "assigned") {
+        expect(activate).toHaveBeenCalledWith(execution.binding);
+        expect(deactivate).toHaveBeenCalledOnce();
+        expect(stop).toHaveBeenCalledOnce();
+      }
+    } finally {
+      releaseGitHub();
+      releaseAssigned();
+      await running;
+      issueService.mockRestore();
+    }
   });
 
   it("keeps assigned MCP credentials on the control plane for remote Codex", async () => {
@@ -12436,6 +12601,32 @@ describe("runnerd provider runtime wiring", () => {
     expect(state.createTransport.mock.calls[0]![0].runnerBinary).not.toBe(
       `${remoteCwd}/.paperclip-runtime/paperclip-runner/bin/paperclip-runnerd`,
     );
+  });
+
+  it("removes controller path bindings from the remote preconfigured environment manifest", async () => {
+    const paths = { CLAUDE_CONFIG_DIR: "/controller/claude", XDG_CONFIG_HOME: "/controller/config",
+      XDG_DATA_HOME: "/controller/data", XDG_CACHE_HOME: "/controller/cache" };
+    const runnerEnvironment = { ...configuredEnvironmentProjection({ ...paths, TASK_FLAG: "kept" }),
+      HOME: "/controller/home", CODEX_HOME: "/controller/codex", AMBIENT_FLAG: "not-task-bound" };
+    const remoteExecution = { ...execution, schema: "paperclip.native-execution-input.v7" as const,
+      homeMode: "preconfigured" as const, executionMode: "default" as const, planningContext: null,
+      provider: { kind: "codex" as const, model: null, approvalPolicy: "never" as const }, runtimeContext: nativeRuntimeContextFixture() };
+    const remoteExecute = vi.fn(async (command: { args?: string[] }) => ({
+      exitCode: 0, timedOut: false, stderr: "", stdout: command.args?.[1]?.includes("getent passwd") ? "/home/executor\n" : "",
+    }));
+    await createRunnerdBackend({ db: leaseDb(remoteExecution), execution: remoteExecution, runnerInstanceId: "remote-home-manifest",
+      runnerEnvironment, runnerIngressAuthorized: true, runnerExecutionTarget: {
+        kind: "remote", transport: "sandbox", remoteCwd: "/workspace", environmentId: "environment",
+        leaseId: "remote-home-manifest", providerKey: "daytona", effectiveCapabilities: { runnerWebSocketIngress: true },
+        runner: { execute: remoteExecute, syncIn: vi.fn(async () => undefined) },
+      } as never });
+    state.createBackend.mock.calls.at(-1)![1].codexTransportFactory!();
+    const environment = (state.createTransport.mock.calls.at(-1)![0] as RunnerTransportOptions & { environment: NodeJS.ProcessEnv }).environment;
+    expect(environment.HOME).toBe("/home/executor");
+    expect(environment.CODEX_HOME).toBeUndefined();
+    for (const key of Object.keys(paths)) expect(environment[key]).toBeUndefined();
+    expect(configuredEnvironment(environment)).toEqual({ TASK_FLAG: "kept", PAPERCLIP_CONFIGURED_ENV_KEYS: '["TASK_FLAG"]' });
+    expect(runnerEnvironment).toMatchObject(paths);
   });
 
   it("archives failover evidence with an explicitly replaced provider session", async () => {

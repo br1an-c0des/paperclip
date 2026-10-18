@@ -48,10 +48,32 @@ top-level replies to top-level DMs. Channel messages and thread replies still
 require a mention when that setting is enabled. Disable direct messages and
 confirm a plain DM is rejected. Use a private channel for threaded conversations.
 
+For Slack acknowledgement latency, mention the bot with and without an attachment.
+Eyes should appear after authorized task/comment persistence, independently of
+file preparation, subscription and agent startup. Duplicate delivery must keep
+one receipt; the final reply must remove only its source message's eyes. Record
+live mention-to-reaction timing separately from the PostgreSQL fixture tests and
+the `chat.slack.receipt` transport span described in [Observability](../../doc/observability.md).
+
 During a top-level DM run, verify that the bot adds eyes to the source message
 and removes them when the final reply arrives. The pinned Slack SDK encodes a
 linear DM with an empty thread timestamp; receipt transport accepts that address
 while still validating the channel and the source message timestamp.
+
+For an agent with two linked Slack endpoints, compare assignment preparation and
+tool discovery in the run trace. Endpoint checks may overlap in pairs. Confirm
+that both permitted tool sets remain available, then revoke one linked identity
+and confirm that the next preparation excludes it. The
+[database regression](../../server/src/__tests__/slack-tool-preparation.test.ts)
+uses real PostgreSQL with one connection and controlled credential resolution;
+it does not prove live provider latency or an end-to-end response target.
+
+Catalog discovery rechecks live authority and current credentials without
+computing the unused compatibility fingerprint. Assignment snapshots and
+governed calls retain full revision resolution. The same regression verifies
+identical catalog membership, absence of digest SQL during discovery, and
+revocation on the next preparation. A faster component is not proof of a faster
+Slack reaction or final reply; measure those separately on the deployed revision.
 
 ### `endpoint-management`
 

@@ -5,6 +5,16 @@ Run-log events write to the `heartbeat_run_events` table
 Paperclip Telemetry events, and they are not OpenTelemetry exports. A run-log
 event needs no operator endpoint.
 
+## Ordinary event persistence
+
+Events without a native source identity or retry-exhaustion receipt use one
+atomic PostgreSQL statement. The statement checks the stored run's company and
+agent, allocates its next sequence, and inserts the event. An insertion failure
+also rolls back the sequence allocation. The returned row uses the existing
+column decoders, including the lossless payload codec. Callers still wait for
+the durable write before they publish or acknowledge the event. Native-source
+replay and retry-exhaustion deduplication retain their existing transaction path.
+
 ## Provider-pack preparation timing
 
 The existing `run.performance.span` event also records `provider_pack.select`,
@@ -20,6 +30,20 @@ material. These events retain the existing schema and carry no paths or exceptio
 They also become native Observability spans only with an operator OTLP endpoint.
 
 ## Native PRP Run-Log Events
+
+`auth.credentials.updated` is a runner-produced PRP event for a change to a
+supported credential store, including account identity changes and later token
+refreshes on the new account. The bundled transport awaits a host commit callback
+before acknowledging delivery, including during warm idle and provider cleanup.
+The callback writes directly to the bound run through the shared run-log writer.
+Its separate credential source namespace avoids collisions with driver-normalized
+source sequences and deduplicates retries using the original PRP event identity.
+The original envelope is retained in `prpEvent`. Its payload contains only a
+provider, an opaque binding ID, a revision, and a detection method. It contains
+no credentials, account identity, file path, or credential fingerprint. The
+consumer can use the event to read the updated credentials through its existing
+private credential channel. This run-log event stays in the instance database.
+
 
 `native.recovery.execution_reclaimed` records an atomic same-run recovery claim
 that restores a released task execution binding. The claim locks the task,

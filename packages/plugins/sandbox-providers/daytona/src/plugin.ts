@@ -24,6 +24,8 @@ import type {
   PluginEnvironmentDeleteTemplateParams,
   PluginEnvironmentDeleteTemplateResult,
   PluginEnvironmentDestroyLeaseParams,
+  PluginEnvironmentInspectLeaseParams,
+  PluginEnvironmentLeaseObservation,
   PluginEnvironmentExecuteParams,
   PluginEnvironmentExecuteResult,
   PluginEnvironmentRunnerIngressEndpointParams,
@@ -48,6 +50,7 @@ import type {
 } from "@paperclipai/plugin-sdk";
 import { performSyncIn, performSyncOut, withProviderSpan } from "./file-sync.js";
 import { DEFAULT_DAYTONA_OPERATION_TIMEOUT_MS } from "./manifest.js";
+import { observeSessionStreamExit } from "./session-stream-exit.js";
 
 // The Claude `setup-token` login pseudo-terminal (PTY) session for this provider.
 // The session runs the login command on a real pseudo-terminal, streams the
@@ -318,8 +321,8 @@ function resolveApiKey(config: DaytonaDriverConfig): string {
   return envApiKey;
 }
 
-function createDaytonaClient(config: DaytonaDriverConfig): Daytona {
-  providerUsed = true;
+function createDaytonaClient(config: DaytonaDriverConfig, readOnly = false): Daytona {
+  if (!readOnly) providerUsed = true;
   const clientConfig: DaytonaConfig = {
     apiKey: resolveApiKey(config),
   };
@@ -2050,6 +2053,7 @@ async function runSessionLogStream(
   while (true) {
     let streamClosed = false;
     let acceptingOutput = true;
+    let exitObservation: ReturnType<typeof observeSessionStreamExit> | undefined;
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
     let signalIdle!: () => void;
     const idle = new Promise<"idle">((resolve) => { signalIdle = () => resolve("idle"); });
@@ -2065,15 +2069,24 @@ async function runSessionLogStream(
     };
     try {
       armIdleTimer();
-      const outcome = await withinCommandDeadline(commandDeadline, () => Promise.race([
-        sandbox.process.getSessionCommandLogs(
-          sessionId,
-          commandId,
-          (chunk) => receive("stdout", chunk),
-          (chunk) => receive("stderr", chunk),
-        ).then(() => "closed" as const),
-        idle,
-      ]));
+      const observed = await withinCommandDeadline(commandDeadline, () => {
+        exitObservation = observeSessionStreamExit(Promise.race([
+          sandbox.process.getSessionCommandLogs(
+            sessionId,
+            commandId,
+            (chunk) => receive("stdout", chunk),
+            (chunk) => receive("stderr", chunk),
+          ).then(() => "closed" as const),
+          idle,
+        ]), async () => {
+          const status = await observeSessionCommand(Math.min(timeoutMs, SESSION_INITIAL_STATUS_TIMEOUT_MS),
+            () => sandbox.process.getSessionCommand(sessionId, commandId), commandDeadline);
+          return typeof status.exitCode === "number" ? status.exitCode : null;
+        });
+        return exitObservation.result;
+      });
+      if (observed.kind === "exit") return { exitCode: observed.exitCode, pollUntilExit: false, buffer };
+      const outcome = observed.value;
       if (outcome === "idle") {
         // Do not wait for the abandoned socket or open another one. The SDK
         // exposes no cancellation handle. Fence its callbacks before the
@@ -2089,6 +2102,7 @@ async function runSessionLogStream(
       // The SDK exposes no cancellation handle for this socket. Session
       // teardown owns closing it; late data cannot change a settled execution.
       acceptingOutput = false;
+      exitObservation?.stop();
       clearTimeout(idleTimer);
     }
     if (streamClosed) {
@@ -2786,7 +2800,9 @@ const plugin = definePlugin({
       await withLivenessTimeout("sandbox.setAutoDeleteInterval", deadline, () => sandbox.setAutoDeleteInterval(-1));
       await withLivenessTimeout("sandbox.refreshData", deadline, () => sandbox.refreshData());
       if (sandbox.autoDeleteInterval !== -1) throw new Error("Daytona retention policy was not confirmed");
-      if (sandbox.state !== "stopped") {
+      // An archive already has no live process and retains its filesystem.
+      // Daytona rejects Stop in this state; leave the confirmed archive cold.
+      if (sandbox.state !== "stopped" && sandbox.state !== "archived") {
         await terminateAtProvider(scope, "sandbox.stop", () => sandbox.stop(Math.min(toTimeoutSeconds(config.timeoutMs), 30)));
       }
       sandboxHandleSessionStore.clear(scope);
@@ -2871,6 +2887,30 @@ const plugin = definePlugin({
     } finally {
       sandboxHandleTeardownGates.end(scope, teardownGate);
       evictSandboxHandle(scope);
+    }
+  },
+
+  async onEnvironmentInspectLease(
+    params: PluginEnvironmentInspectLeaseParams,
+  ): Promise<PluginEnvironmentLeaseObservation> {
+    // An environment-variable fallback may have changed accounts since this
+    // historical allocation. Inspection requires explicitly scoped credentials.
+    if (typeof params.config.apiKey !== "string" || !params.config.apiKey.trim()) {
+      return { providerLeaseId: params.providerLeaseId, state: "unknown" };
+    }
+    const config = parseDriverConfig(params.config);
+    if (!config.apiUrl && (process.env.DAYTONA_API_URL?.trim() || process.env.DAYTONA_SERVER_URL?.trim())) {
+      return { providerLeaseId: params.providerLeaseId, state: "unknown" };
+    }
+    // Read directly from the provider. The setup-status path and cached lease
+    // reconnect path can start a stopped sandbox, so neither is an observation.
+    try {
+      const sandbox = await createDaytonaClient(config, true).get(params.providerLeaseId);
+      if (sandbox.id !== params.providerLeaseId) return { providerLeaseId: params.providerLeaseId, state: "unknown" };
+      return { providerLeaseId: sandbox.id, state: sandbox.state === "stopped" ? "stopped" : "active" };
+    } catch (error) {
+      if (error instanceof DaytonaNotFoundError) return { providerLeaseId: params.providerLeaseId, state: "destroyed" };
+      throw error;
     }
   },
 

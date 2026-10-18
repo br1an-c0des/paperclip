@@ -115,12 +115,37 @@ apply. Top-level DM replies retain their linear conversation destination. Source
 [queued run policy](../../server/src/services/durable-chat-wakeup.ts). Live Slack
 verification of this exemption remains separate from provider-fixture coverage.
 
+Slack eyes acknowledge the authorized task/comment commit before attachment
+preparation or scheduler acceptance. This server-owned receipt grants no agent
+authority. Generation/credential fencing, durable retries and exact-source final
+cleanup still apply. PostgreSQL fixtures block attachments, subscription and
+wakeup independently to verify that none gates the reaction; live Slack latency
+remains a separate check. See [receipt worker](../../server/src/services/chat-channels/receipt-reactions.ts).
+
 Controller-owned receipt reactions accept the SDK's empty thread timestamp for
 linear DMs. Channel IDs and source message timestamps remain validated. This
 does not add an agent tool or change sender, task, or credential authorization.
 The pinned SDK transport regression is covered in
 [receipt tests](../../server/src/services/chat-slack-receipts.test.ts); live
 acknowledgement speed needs a separate provider test.
+
+Slack assignment and tool discovery bound concurrent endpoint preparation to
+two. Every endpoint keeps the live task, company, agent and linked-user checks;
+403 denials omit only that endpoint. Preparation waits for both active checks
+before it returns an ordered result or propagates an error. Tool authority reads
+the current bot token without resolving unrelated webhook credentials. See the
+[real-database preparation controls](../../server/src/__tests__/slack-tool-preparation.test.ts)
+and [batch failure controls](../../server/src/services/connectors/slack-endpoint-preparation.test.ts).
+These local controls do not establish live Slack latency or provider access.
+
+Catalog authorization projection (2026-10-17): tool discovery uses the same live
+service-owned task, company, agent, requester, endpoint and credential checks as
+full authority resolution. It omits the revision digest and search-action token,
+which catalog descriptors do not consume. Connector assignments and governed
+operations retain full revision resolution; invocation policy is still checked
+by the gateway. Registry replacement and missing-service controls are in
+[authority registration tests](../../server/src/services/connectors/slack-authority.test.ts).
+This is a source and local-database contract; hosted latency needs live evidence.
 
 New conversations resolve typed project/workspace defaults from their endpoint
 and destination under the task-creation transaction. Defaults do not authorize
