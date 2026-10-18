@@ -1,5 +1,5 @@
 {
-  "upstreamCommit": "23e7ee9a2d2b7f23dd0d22d6c858d7abe915cbd8",
+  "upstreamCommit": "c9669a6c2237626ab0b0b2059d34c3965a86f02f",
   "routes": [
     {
       "path": "/oauth-handoff",
@@ -5668,6 +5668,19 @@
         ]
       },
       {
+        "key": "api/agents.ts::agentsApi.pause",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/agents/:id/pause"
+          }
+        ],
+        "via": [
+          "components/MuseRunnerConnection.tsx",
+          "components/SidebarAgents.tsx"
+        ]
+      },
+      {
         "key": "api/goals.ts::goalsApi.create",
         "requests": [
           {
@@ -5800,18 +5813,6 @@
           "components/Sidebar.tsx",
           "components/SidebarAgents.tsx",
           "plugins/bridge-init.ts"
-        ]
-      },
-      {
-        "key": "api/agents.ts::agentsApi.pause",
-        "requests": [
-          {
-            "method": "POST",
-            "path": "/api/agents/:id/pause"
-          }
-        ],
-        "via": [
-          "components/SidebarAgents.tsx"
         ]
       },
       {
@@ -6126,6 +6127,30 @@
           {
             "method": "POST",
             "path": "/api/companies/:companyId/agents/:agentId/dot-binding/event-test"
+          }
+        ],
+        "via": [
+          "components/new-agent/ExternalAgentInviteDialog.tsx"
+        ]
+      },
+      {
+        "key": "api/museInvitations.ts::museInvitationsApi.create",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/companies/:companyId/muse-invitations"
+          }
+        ],
+        "via": [
+          "components/new-agent/ExternalAgentInviteDialog.tsx"
+        ]
+      },
+      {
+        "key": "api/museInvitations.ts::museInvitationsApi.resume",
+        "requests": [
+          {
+            "method": "GET",
+            "path": ":path"
           }
         ],
         "via": [
@@ -6617,6 +6642,78 @@
         ],
         "via": [
           "hooks/useIssueExternalObjects.ts"
+        ]
+      },
+      {
+        "key": "api/museInvitations.ts::museInvitationsApi.attestDetectorCleanup",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/companies/:companyId/agents/:agentId/muse-binding/attest-detector-cleanup"
+          }
+        ],
+        "via": [
+          "hooks/useMuseConnection.ts"
+        ]
+      },
+      {
+        "key": "api/museInvitations.ts::museInvitationsApi.attestStop",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/companies/:companyId/agents/:agentId/muse-binding/attest-stop"
+          }
+        ],
+        "via": [
+          "hooks/useMuseConnection.ts"
+        ]
+      },
+      {
+        "key": "api/museInvitations.ts::museInvitationsApi.connection",
+        "requests": [
+          {
+            "method": "GET",
+            "path": ":path"
+          }
+        ],
+        "via": [
+          "hooks/useMuseConnection.ts"
+        ]
+      },
+      {
+        "key": "api/museInvitations.ts::museInvitationsApi.pair",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/companies/:companyId/agents/:agentId/muse-binding"
+          }
+        ],
+        "via": [
+          "hooks/useMuseConnection.ts"
+        ]
+      },
+      {
+        "key": "api/museInvitations.ts::museInvitationsApi.revoke",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/companies/:companyId/agents/:agentId/muse-binding/revoke"
+          }
+        ],
+        "via": [
+          "hooks/useMuseConnection.ts"
+        ]
+      },
+      {
+        "key": "api/museInvitations.ts::museInvitationsApi.verify",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/companies/:companyId/agents/:agentId/muse-binding/verify"
+          }
+        ],
+        "via": [
+          "hooks/useMuseConnection.ts"
         ]
       },
       {
@@ -7821,6 +7918,22 @@
           ]
         },
         {
+          "key": "api/agents.ts::agentsApi.get",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/agents/:id"
+            },
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/agents"
+            }
+          ],
+          "via": [
+            "pages/Costs.tsx"
+          ]
+        },
+        {
           "key": "api/budgets.ts::budgetsApi.overview",
           "requests": [
             {
@@ -8235,6 +8348,22 @@
           ],
           "via": [
             "components/fast-responses/FastResponseHistory.tsx"
+          ]
+        },
+        {
+          "key": "api/agents.ts::agentsApi.get",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/agents/:id"
+            },
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/agents"
+            }
+          ],
+          "via": [
+            "pages/Costs.tsx"
           ]
         },
         {
@@ -17176,6 +17305,7 @@
           ],
           "via": [
             "components/EmailMessageCard.tsx",
+            "components/WorkspaceReconstructionRecovery.tsx",
             "components/issue-properties/IssueProperties.tsx",
             "components/issue-properties/IssuePropertiesArtifactsTab.tsx",
             "components/task-side-panel/TaskAttachmentPanel.tsx",
@@ -17774,6 +17904,18 @@
             "components/chat/AgentWorkPanels.tsx",
             "components/issue-properties/IssueProperties.tsx",
             "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.reconstructWorkspace",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/recovery-actions/reconstruct-workspace"
+            }
+          ],
+          "via": [
+            "components/WorkspaceReconstructionRecovery.tsx"
           ]
         },
         {
@@ -24343,6 +24485,7 @@
           ],
           "via": [
             "components/EmailMessageCard.tsx",
+            "components/WorkspaceReconstructionRecovery.tsx",
             "components/issue-properties/IssueProperties.tsx",
             "components/issue-properties/IssuePropertiesArtifactsTab.tsx",
             "components/task-side-panel/TaskAttachmentPanel.tsx",
@@ -24940,6 +25083,18 @@
             "components/chat/AgentWorkPanels.tsx",
             "components/issue-properties/IssueProperties.tsx",
             "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.reconstructWorkspace",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/recovery-actions/reconstruct-workspace"
+            }
+          ],
+          "via": [
+            "components/WorkspaceReconstructionRecovery.tsx"
           ]
         },
         {
@@ -31878,7 +32033,9 @@
         "pages/apps/AppsConnect.tsx",
         "pages/apps/AppsReview.tsx",
         "pages/apps/chat/ChatEndpointDetail.tsx",
-        "pages/apps/chat/ChatEndpointSetup.tsx"
+        "pages/apps/chat/ChatEndpointSetup.tsx",
+        "pages/audit/AuditHub.tsx",
+        "pages/audit/CompanyActivity.tsx"
       ],
       "referenced": true
     },
@@ -38306,6 +38463,19 @@
       ],
       "referenced": true
     },
+    "api/issues.ts::issuesApi.reconstructWorkspace": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/issues/:id/recovery-actions/reconstruct-workspace"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
     "api/issues.ts::issuesApi.recoveryActions": {
       "requests": [
         {
@@ -38676,6 +38846,102 @@
         "pages/AgentChat.tsx",
         "pages/CaseDetail.tsx",
         "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
+    "api/museInvitations.ts::museInvitationsApi.attestDetectorCleanup": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/agents/:agentId/muse-binding/attest-detector-cleanup"
+        }
+      ],
+      "usedBy": [
+        "App shell"
+      ],
+      "referenced": true
+    },
+    "api/museInvitations.ts::museInvitationsApi.attestStop": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/agents/:agentId/muse-binding/attest-stop"
+        }
+      ],
+      "usedBy": [
+        "App shell"
+      ],
+      "referenced": true
+    },
+    "api/museInvitations.ts::museInvitationsApi.connection": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": ":path"
+        }
+      ],
+      "usedBy": [
+        "App shell"
+      ],
+      "referenced": true
+    },
+    "api/museInvitations.ts::museInvitationsApi.create": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/muse-invitations"
+        }
+      ],
+      "usedBy": [
+        "App shell"
+      ],
+      "referenced": true
+    },
+    "api/museInvitations.ts::museInvitationsApi.pair": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/agents/:agentId/muse-binding"
+        }
+      ],
+      "usedBy": [
+        "App shell"
+      ],
+      "referenced": true
+    },
+    "api/museInvitations.ts::museInvitationsApi.resume": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": ":path"
+        }
+      ],
+      "usedBy": [
+        "App shell"
+      ],
+      "referenced": true
+    },
+    "api/museInvitations.ts::museInvitationsApi.revoke": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/agents/:agentId/muse-binding/revoke"
+        }
+      ],
+      "usedBy": [
+        "App shell"
+      ],
+      "referenced": true
+    },
+    "api/museInvitations.ts::museInvitationsApi.verify": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/agents/:agentId/muse-binding/verify"
+        }
+      ],
+      "usedBy": [
+        "App shell"
       ],
       "referenced": true
     },
