@@ -65,9 +65,11 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
 - **Where:** "New agent" from the roster and sidebar (`/agents/new`); onboarding.
 - **What:** steps: choose a harness (adapter; experimental harnesses flagged), connect a model/account
   (AI connection, OAuth or local login, with model detection), name and role, then saved. Variants:
-  invite an external agent (pairing code, `enableOpenAiDot`) and Grok bot setup (`enableGrokBot`).
+  invite an external agent (pairing code, `enableOpenAiDot`), invite a personal Muse agent
+  (`enableMuse`), and Grok bot setup (`enableGrokBot`).
 - **Requests:** `POST /api/companies/:companyId/agent-hires` (hire, may need approval) or
-  `POST /api/companies/:companyId/agents` (direct create), `GET /api/adapters`,
+  `POST /api/companies/:companyId/agents` (direct create),
+  `GET|POST /api/companies/:companyId/muse-invitations` (resume or create a Muse invitation), `GET /api/adapters`,
   `GET /api/companies/:companyId/adapters/:type/models`,
   `GET /api/companies/:companyId/environments` (+ `/capabilities`), `GET /api/companies/:companyId/secrets`,
   `GET /api/companies/:companyId/me/user-secrets`; AI connection and adapter-login requests in the app
@@ -117,10 +119,13 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   prompt template (and legacy bootstrap prompt), default environment and override, heartbeat on interval,
   wake on demand, cooldown, max concurrent runs, timeout, interrupt grace period, continue after max-turn
   stop (attempts, delay), capture raw provider traces, browser access; adapter login (e.g. Claude login);
-  test environment.
+  test environment. Agents run through Muse show a Muse connection panel: pair, verify, pause,
+  disconnect, record a detector-removal observation, attest that a worker stopped, and allow an
+  externally billed provider (`enableMuse`).
 - **Requests:** `PATCH /api/agents/:id`, `POST /api/agents/:id/claude-login`,
   `GET /api/companies/:companyId/adapters/:type/models`, `.../detect-model`, `.../test-environment`,
-  `.../login-sessions/*`.
+  `.../login-sessions/*`; Muse: `GET|POST /api/companies/:companyId/agents/:agentId/muse-binding`
+  (`/verify`, `/revoke`, `/attest-detector-cleanup`, `/attest-stop`), `POST /api/agents/:id/pause`.
 - **Notes:** unsaved changes prompt before navigating away. Built-in agents show their own bundle panel
   (`BuiltInBundlePanel`) and limit what can change.
 
@@ -204,7 +209,7 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
 ## Switches that change this area
 
 `enableAgentChat`, `enableBuiltInAgents`, `enableNativeRunner`, `enableEnvironments`,
-`enableAiConnectionRouters`, `enableOpenAiDot`, `enableGrokBot`, `enableChatConnectors`,
+`enableAiConnectionRouters`, `enableOpenAiDot`, `enableGrokBot`, `enableMuse`, `enableChatConnectors`,
 `enableConferenceRoomChat`. Full list with affected files: [generated/flags.md](../generated/flags.md).
 
 ## Redesign notes

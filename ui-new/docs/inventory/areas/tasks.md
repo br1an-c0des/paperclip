@@ -271,7 +271,11 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   task-graph liveness), disposition recovery retry, reissue as an isolated recovery task, workspace export
   and base-ref recovery, execution blockers (with expandable "Recovery details": whether automatic
   retries were stopped, and the hold's resolution note), write-denied notice, "retry access check".
+  When the original workspace was destroyed before its edits were saved, "Continue from saved
+  sources" starts a fresh session from chosen task attachments, after the person describes the
+  missing work and which external actions were already done.
 - **Requests:** `GET /api/issues/:id/recovery-actions`, `POST /api/issues/:id/recovery-actions/resolve`,
+  `POST /api/issues/:id/recovery-actions/reconstruct-workspace` (continue from saved sources),
   `POST /api/companies/:companyId/issues` (reissue), `POST /api/execution-workspaces/:id/reconcile-branch`.
 
 ### `tasks/runner-goal`: Runner goal

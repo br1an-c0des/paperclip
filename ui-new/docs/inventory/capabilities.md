@@ -48,7 +48,7 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 | [documents-artifacts/documents + /annotations](areas/tasks.md#documents-artifactsdocuments-and-annotations-task-documents) | Task documents | | | |
 | [documents-artifacts/attachments + /work-products](areas/tasks.md#documents-artifactsattachments-work-products-files-and-outputs) | Files and outputs | | | |
 | [tasks/workspace](areas/tasks.md#tasksworkspace-execution-workspace-on-the-task) | Execution workspace on the task | | | |
-| [tasks/recovery](areas/tasks.md#tasksrecovery-recovery-and-health-notices) | Recovery and health notices | | | Upstream sync 2026-10-15: execution blocker notice gained "Recovery details" (`GET /api/issues/:id/recovery-actions`, polled every 5s) |
+| [tasks/recovery](areas/tasks.md#tasksrecovery-recovery-and-health-notices) | Recovery and health notices | | | Upstream sync 2026-10-15: execution blocker notice gained "Recovery details" (`GET /api/issues/:id/recovery-actions`, polled every 5s). Upstream sync 2026-10-18: "Continue from saved sources" after a destroyed workspace (`POST /api/issues/:id/recovery-actions/reconstruct-workspace`) |
 | [tasks/runner-goal](areas/tasks.md#tasksrunner-goal-runner-goal) | Runner goal | | | |
 | [tasks/feedback](areas/tasks.md#tasksfeedback-feedback-votes) | Feedback votes | | | |
 | [tasks/integrations](areas/tasks.md#tasksintegrations-integrations-surfaced-on-a-task) | Integrations surfaced on a task | | | |
@@ -76,12 +76,12 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 | [agents/organization](areas/agents.md#agentsorganization-reporting-relationships) | Reporting relationships | | | |
 | [agents/primary-agent](areas/agents.md#agentsprimary-agent-personal-primary-agent) | Personal primary agent | | | |
 | [agents/membership](areas/agents.md#agentsmembership-join-leave-star) | Join, leave, star | | | |
-| [agents/hire](areas/agents.md#agentshire-new-agent) | New agent | | | |
+| [agents/hire](areas/agents.md#agentshire-new-agent) | New agent | | | Upstream sync 2026-10-18: personal Muse invitation variant (`enableMuse`, `/muse-invitations`) |
 | [agents/overview](areas/agents.md#agentsoverview-overview) | Overview | | | |
 | [agents/lifecycle](areas/agents.md#agentslifecycle-pause-resume-terminate-recover) | Pause, resume, terminate, recover | | | |
 | [agents/instructions](areas/agents.md#agentsinstructions-instructions) | Instructions | | | |
 | [agents/skills](areas/agents.md#agentsskills-skills) | Skills | | | |
-| [agents/runtime](areas/agents.md#agentsruntime-harness--runtime-configuration) | Harness / Runtime configuration | | | |
+| [agents/runtime](areas/agents.md#agentsruntime-harness--runtime-configuration) | Harness / Runtime configuration | | | Upstream sync 2026-10-18: Muse connection panel for Muse-run agents (`/agents/:agentId/muse-binding/*`, `enableMuse`) |
 | [agents/secrets](areas/agents.md#agentssecrets-secrets) | Secrets | | | |
 | [agents/tools](areas/agents.md#agentstools-tools) | Tools | | | |
 | [agents/channels](areas/agents.md#agentschannels-channels) | Channels | | | |
