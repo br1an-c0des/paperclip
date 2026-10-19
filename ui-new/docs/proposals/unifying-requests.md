@@ -1,16 +1,28 @@
 # Unifying questions, decisions and approvals
 
-Oct 16, 2026 · revised Oct 18, 2026 · @Brian Abbott
+Oct 16, 2026 · revised Oct 19, 2026 · @Brian Abbott
 
 ## Summary
 
-Treat agent questions, Decisions and approvals as one concept in the interface, a **request**: something waiting on someone's response, where the response decides what happens next. Today they are three separate systems, added months apart, with different tables, audiences, lifecycles and agent guidance. The lines between them are also not where the code draws them: question cards and approvals already make server-side changes, which was the stated reason for adding Decisions.
+Treat agent questions, Decisions and approvals as one concept in the interface, a **request**: something waiting on someone's response, where the response decides what happens next. Today they are three separate systems, added months apart, with different tables, audiences, lifecycles and agent guidance, and their boundaries don't follow the lines they imply.
 
-The request model is a **view model in the fork's new UI**, not a storage change. Storage stays as it is, for three reasons: the differences between the systems mostly encode real differences in authority and lifecycle; upstream already has a shared layer over all of them (the attention feed, with its queues, triage, retention and training data); and upstream is actively building on the current split. `ui-new` builds its request view from the attention feed plus detail requests, with no server changes.
+The request model lives entirely in the fork's new UI (`ui-new`). It is built from upstream's attention feed, which already presents every kind of request as one item shape, plus detail requests to the existing API. The fork makes no server, database or package changes for it.
 
-On the server, a short list of small, independent fixes is worth sending upstream, led by a review-stage bypass in the Paperclip Runner. One larger change, showing a Decision as a confirmation card on its task, is optional and needs upstream agreement first. Earlier drafts also proposed a shared `board` audience value, formal cards and one requests table; those are dropped, with reasons in [Considered and dropped](#considered-and-dropped).
+Earlier drafts also proposed server changes, among them closing a review-stage bypass, rules for removing reviewers, default reviewers, and showing a Decision as a card on its task. As of this revision the fork is UI-only (see [Scope](#scope-ui-only)), and those ideas are sorted into three lists:
 
-Review stages stay a separate concept: they are a sign-off rule configured on a task, not a request. Each turn to sign should appear as a request, and the rule itself needs several smaller fixes, covered in [Review stages](#review-stages).
+- [In the new UI](#in-the-new-ui): what `ui-new` builds on the existing API.
+- [Left to upstream](#left-to-upstream): server changes the fork neither makes nor proposes.
+- [Small upstream contributions](#small-upstream-contributions): four small pull requests and one bug report worth sending upstream.
+
+Review stages stay a separate concept: a sign-off rule configured on a task, not a request. The new UI shows each turn to sign as a request and makes handoffs visible, but doesn't change how stages work.
+
+## Scope: UI only
+
+Upstream lands many commits a day, and the server code these ideas touch is among its busiest. In the 30 days to Oct 19, `server/src/routes/issues.ts` (about 19,600 lines) had 38 commits, `server/src/services/issues.ts` 32, the Runner finalizer 19 and `issue-thread-interactions.ts` 17.
+
+Review stages in particular are under active development. Upstream already has open work on two of the earlier server changes: [#16431](https://github.com/paperclipai/paperclip/pull/16431) stops agents from editing a policy that includes a person participant (the earlier rules for removing reviewers), and [#15267](https://github.com/paperclipai/paperclip/pull/15267) adds company and project default policies (the earlier default reviewers). More open pull requests ([#16416](https://github.com/paperclipai/paperclip/pull/16416), [#15159](https://github.com/paperclipai/paperclip/pull/15159), [#15321](https://github.com/paperclipai/paperclip/pull/15321)) and issues ([#12325](https://github.com/paperclipai/paperclip/issues/12325), [#12883](https://github.com/paperclipai/paperclip/issues/12883), [#13001](https://github.com/paperclipai/paperclip/issues/13001), [#13744](https://github.com/paperclipai/paperclip/issues/13744), [#15240](https://github.com/paperclipai/paperclip/issues/15240)) change the same area.
+
+So the fork builds the request model in its UI, watches that work land, and sends upstream only small fixes that stand on their own. The fork's general policy is in [FORK.md](../../../FORK.md).
 
 ## Today
 
@@ -28,7 +40,7 @@ Paperclip has three main ways to wait on someone's response, and they differ on 
 | Lifetime | until answered or withdrawn; ends early when a later user comment supersedes it (on by default for target-bound cards), when a newer card replaces it, when the task closes, or when its addressee is deleted; ask-first tool approvals expire after 60 minutes | 7-day default expiry, 30 days at most; also retired when its strict targets complete or disappear | no expiry; a revision loop (request changes, edit, resubmit) |
 | Discussion | the task thread | none | its own comment thread |
 | Where it appears | the task thread, the attention feed, and configured chat channels such as Slack, Discord and Telegram | the attention feed only | the Approvals pages, linked task threads, and the attention feed |
-| Agent guidance | detailed, across the skill and its API reference | one table row and one section in `SKILL.md`; mentions `wake_origin_agent` but not how to read the outcome | a short section in `SKILL.md`, framed as "governed actions" |
+| Agent guidance | detailed, across the skill and its API reference | a table row and a section in `SKILL.md` covering options, effects, expiry and `wake_origin_agent`; nothing on reading the outcome or what `strict` means | a short section in `SKILL.md`, framed as "governed actions" |
 | Paperclip Runner | built-in `request_human_input` tool | generic `call_api` only | optional `request_approval`, `decide_approval` and `comment_on_approval` tools, each gated by a claim, plus read tools |
 
 "People only" and "board-only" mean the same thing throughout this document. In Paperclip a board actor is any signed-in person with access to the company, and the cards' legacy `board_only` value is an alias for `human_only`.
@@ -59,7 +71,21 @@ The attention feed (`GET /api/companies/:co/attention`) already presents all of 
 | `decision_training_examples` | labeled human decisions from cards, approvals and review-stage verdicts (`execution_decision`) |
 | `inbox_dismissals` | per-person dismiss and snooze |
 
-The feed also includes items that are not requests: failed runs, budget alerts and agent errors.
+The feed also includes items that are not requests: failed runs, budget alerts, agent errors and blocked tasks (`blocker_attention`).
+
+### Review stages
+
+A review stage is a **sign-off rule configured on a task in advance**: "before this task counts as finished, Sam checks it, then Alex approves it." Each turn to sign is effectively a request ("approve, or send back?"), but the ordering, the hand-back to the worker, the round limit and escalation belong to the task.
+
+- **Storage.** The rule is `executionPolicy.stages[]` and its progress is `executionState`, both JSON columns on the task. Stage verdicts are logged in `issue_execution_decisions`. Each stage needs one approval; its participants are alternatives, not a sequence.
+- **Trigger.** A stage starts when the worker moves the task to `in_review` or `done`. Requesting `done` with an unfinished stage starts the stage instead of closing the task.
+- **Handoff.** The task is reassigned to each participant in turn. The worker is stored as `returnAssignee` and gets the task back when changes are requested or the last stage approves. After the round limit (3 by default) of agent-requested changes, the stage escalates to the task's responsible person or creator.
+- **Board override.** A person can close or reassign a task mid-stage through PATCH; this clears the stage.
+- **Who can change stages.** Any actor allowed to modify the task can add or remove participants, by sending the whole policy, so a worker agent can remove a reviewer a person added. Upstream [#16431](https://github.com/paperclipai/paperclip/pull/16431) would stop that.
+- **What is recorded.** The task stores its creator and `responsibleUserId`. Reviewer and approver changes are logged as `issue.reviewers_updated` and `issue.approvers_updated`, but only for the first stage of each type. Assignee changes are logged in `issue.updated`: updates through PATCH include the new `executionState`, while approving by comment records only the status. There is no assignee-history table, and a stage handoff is not labelled as such.
+- **Old UI.** It allows one review stage followed by one approval stage, although the API accepts any number in any order. The properties panel shows "Review pending with Sam" but not who the task returns to.
+- **`review` and `approval` behave the same**, apart from their label, the wake reason, and one auto-skip rule for review stages.
+- **Related settings.** A separate issue-level `reviewPolicy` (`anyone`, `not_creator` or `human_only`) governs who may give a verdict on a review card. Tasks returned by the API carry `reviewAttention`, which lists what an `in_review` task is waiting on (a stage participant, a card, an approval, a monitor, a run), with labels and responders.
 
 ## Problem
 
@@ -78,12 +104,12 @@ The three systems are confusing because their boundaries do not follow the lines
 So "applies a change when approved" is already spread across all three systems. The Decision object is a general version of something cards do in special cases. The practical results:
 
 - **The UI already merges them, inconsistently.** The Decisions page lists questions, Decisions, approvals, join requests, connection requests, recovery actions and reviews as one feed. Questions open as the task-thread card; Decisions open in a separate resolver and never appear on the task they came from or the tasks they change. Upstream removed a decision strip from task headers in [#10891](https://github.com/paperclipai/paperclip/pull/10891) as noise, so this is a deliberate choice of one place for decision work, not an oversight.
-- **Agents rarely use Decisions.** The skill's routing rule ("same issue → interaction; other issues or bundles → decision") is the only guidance. It never says when to propose a change instead of making it, who can respond, or how to read the result. The Decisions sidebar link is also behind the `enableDecisions` flag, which is off by default.
-- **Audiences are set in different ways.** Cards default to `anyone` (people or agents), configurable per company and per kind. Decisions and approvals are people-only, with no setting. The real open question is whether agents should ever decide Decisions, not how to name the audience.
+- **Agents get little guidance on Decisions.** The skill's routing rule ("same issue → interaction; other issues or bundles → decision") is the only guidance on when to use one. It never says when to propose a change instead of making it, or how to read the result. The Decisions sidebar link is also behind the `enableDecisions` flag, which is off by default.
+- **Audiences are set in different ways.** Cards default to `anyone` (people or agents), configurable per company and per kind. Decisions and approvals are people-only, with no setting.
 - **Some paths to `done` skip review stages.** See [Review-stage bypass](#review-stage-bypass).
-- **Some documented rules are not enforced.** The skill says a CEO's first strategic plan must be approved (`approve_ceo_strategy`) before the CEO can move tasks to `in_progress`. Nothing on the server checks this.
+- **Some documented rules are not enforced.** The skill's API reference (`references/api-reference.md`) says a CEO's first strategic plan must be approved (`approve_ceo_strategy`) before the CEO can move tasks to `in_progress`. Nothing on the server checks this.
 
-Approvals overlap the most with cards. Two approval types, `request_board_approval` and `approve_ceo_strategy`, have no server-side handler at all: they store a payload, record approve or reject, and wake the requester, which is what a `human_only` confirmation card does. The vocabulary is mixed too: the skill's example confirmation card (in `references/api-reference.md`) is titled "Plan approval", and the feed's detail kind for plan confirmations is `plan_approval`.
+Approvals overlap the most with cards. Two approval types, `request_board_approval` and `approve_ceo_strategy`, have no server-side handler at all: they store a payload, record approve or reject, and wake the requester, which is what a `human_only` confirmation card does. The vocabulary is mixed too: the skill's example confirmation card is titled "Plan approval", and the feed's detail kind for plan confirmations is `plan_approval`.
 
 Four approval features are genuinely distinct from cards: a **discussion thread**, a **revision loop** (request changes, edit, resubmit), a **subject that need not be a task**, and **links to several tasks**. Cards always belong to exactly one task (`issue_thread_interactions.issue_id` is `NOT NULL`).
 
@@ -100,6 +126,8 @@ Review-stage logic is a pure function, `applyIssueExecutionPolicyTransition`, th
 
 Through PATCH, people already have an override: asking for `done` during an active stage clears the stage and closes the task. So the two person-driven paths are mostly that override with stale state left behind. The Runner paths are the real hole, because an agent can finish its own task past a reviewer someone configured. These findings come from reading the code; each needs a test to confirm.
 
+The fix is not a matter of copying an existing check. `issueService.update` already refuses an agent's `done` while a tool review is pending, but only when the update names an acting agent, and the Runner finalizer writes with no acting agent. A guard for stages would have to work without an actor and still allow the board override, in upstream's busiest files. The fork reports the bypass upstream with failing tests rather than fixing it (see [Small upstream contributions](#small-upstream-contributions)).
+
 ## Proposed model: requests
 
 A **request** is something waiting on someone's response, usually but not always attached to a task. Every request is described by the same properties.
@@ -114,7 +142,7 @@ A **request** is something waiting on someone's response, usually but not always
 | Revisions | answered once · revision loop (request changes, edit, resubmit) |
 | Lifetime | expires · can be superseded · open until answered |
 
-Earlier drafts had a single "formality" property bundling people-only resolution, a discussion thread, a revision loop, no expiry and permanence. In the code these vary independently: people-only is just an audience, approvals are archived from the feed like everything else, and only the thread and revision loop are unique to approvals. "Formal" stays only as a display label for approvals.
+Only the discussion thread and the revision loop are unique to approvals; "formal" is just a display label for them.
 
 Today's objects become combinations of these properties rather than separate systems:
 
@@ -143,7 +171,7 @@ The interface explains every request with one line answering "what happens if I 
 
 The interface also keeps a decision and its result as separate facts: an approved tool call can still fail to run, and an applied Decision can succeed only partly.
 
-**Vocabulary (fork UI only).** **Request** for the umbrella; **question** for outcome = return; **proposal** for outcome = apply; **approval** for requests stored in the approvals table. Plan confirmations stop being labelled "approvals". Upstream overloads these words: "decision" names proposals, attention queues (`decision_queues`), LLM classifiers (`decision_models`), Runner status decisions and review-stage verdicts (`issue_execution_decisions`), while "approval" and "review" both name ask-first tool gates. The fork renames things in its own UI and does not try to change upstream's names.
+**Vocabulary.** **Request** for the umbrella; **question** for outcome = return; **proposal** for outcome = apply; **approval** for requests stored in the approvals table. Plan confirmations stop being labelled "approvals". Upstream overloads these words: "decision" names proposals, attention queues (`decision_queues`), LLM classifiers (`decision_models`), Runner status decisions and review-stage verdicts (`issue_execution_decisions`), while "approval" and "review" both name ask-first tool gates. The fork renames things in its own UI and does not try to change upstream's names.
 
 ### Where the model lives
 
@@ -153,124 +181,95 @@ The model is a **view model in `ui-new`**, built from:
 - detail requests where needed: `GET /api/decisions/:id` for effects and results, the task's interactions for card payloads, and `GET /api/approvals/:id` with its comments and linked tasks;
 - derived fields: the outcome, the "what happens next" line, and the formal label.
 
-No server change is needed. `attention.ts` is an upstream file that changes often, so the fork does not change the feed's shape. If the extra detail requests become slow, a fork-only endpoint that bundles them is the next step; that is still a read-side change.
+Storage stays as it is. Upstream's own feature map (`maps/feature-map/questions-and-approvals.md`) says these requests "can look similar but have different authority and continuation rules", and upstream keeps building on the split: queues in [#10651](https://github.com/paperclipai/paperclip/pull/10651), retention in [#10672](https://github.com/paperclipai/paperclip/pull/10672), retiring Decisions with completed targets in [#10892](https://github.com/paperclipai/paperclip/pull/10892). If the detail requests become slow, the UI caches and batches them; a server endpoint that bundles them would be a proposal to upstream, not a fork change.
 
-Storage stays as it is. Merging it would mean re-keying every table in the shared layer, changing the Runner's governance checks and the chat-channel publishing (both query cards and approvals directly), and letting cards exist without a task. Upstream's own feature map (`maps/feature-map/questions-and-approvals.md`) says these requests "can look similar but have different authority and continuation rules", and upstream keeps building on the split: queues in [#10651](https://github.com/paperclipai/paperclip/pull/10651), retention in [#10672](https://github.com/paperclipai/paperclip/pull/10672), retiring Decisions with completed targets in [#10892](https://github.com/paperclipai/paperclip/pull/10892).
+## In the new UI
 
-## In the fork's new UI (no server changes)
+Everything here uses the existing API: the attention feed, `GET /api/companies/:co/decisions`, `GET /api/decisions/:id`, `GET /api/issues/:id/interactions`, the approval endpoints and the budget endpoints. Capability IDs refer to [capabilities.md](../inventory/capabilities.md).
 
-The fork's SolidJS board (`ui-new`) can present the request model now, using the existing API. `GET /api/companies/:co/attention`, `GET /api/companies/:co/decisions`, `GET /api/decisions/:id`, `GET /api/issues/:id/interactions` and the approval endpoints already return what it needs.
+### Requests
 
-1. **One card design for every request.** Group feed items as question, proposal, approval or review. Every card shows who is asking, about what, why, the response controls, and the "what happens next" line. Cards that run a tool call or write a secret look distinct, show the scope being approved, and show the execution result separately from the decision.
-2. **Approvals as formal requests.** Show "formal" as a badge. Formal requests open a detail view with the discussion thread and revision history. The Approvals pages become a "formal" filter on the requests page rather than a separate area. Budget overrides open the budget resolution (raise the limit to an amount, or keep paused) instead of Approve and Reject; hires show the agent being activated.
-3. **Proposals on task pages, in the thread.** Show a waiting proposal in the thread or properties panel of its origin task and of every task it changes, not as a header strip (the strip upstream removed in [#10891](https://github.com/paperclipai/paperclip/pull/10891)). Find proposals that target a task with `GET /api/companies/:co/decisions?targetIssueId=` (people only, at most 100 results). The list has no origin filter, so find a task's own proposals through the feed's Decision items, which carry `originIssueId`. Linked approvals already appear in task threads.
-4. **A preview of each change.** Port the old `DecisionCard`, which already summarizes each effect and warns when a target changed. Add current versus proposed values: current from the task, proposed from the effect. Stale-target flags (`targetChanged`) come from the list endpoint, not from `GET /api/decisions/:id`.
-5. **Rename the page** from "Decisions" to something like "Needs you". The old page is `WhatNeedsMe` at `/decisions`; rename the queue and triage labels to match.
-6. **Live updates.** Today the feed refreshes only on window focus or after your own actions. Activity is already published over the live-events socket as `activity.logged` events; the new UI refreshes the feed on `decision.*`, `approval.*` and `issue.thread_interaction_*` actions, and on task status changes.
-7. **Queues, triage and archiving.** Port saved queues, decide-by and snooze, keep, and the aging shelf (capability `decisions/queues`), or drop them on purpose in `capabilities.md`.
-8. **Audience settings.** Expose each company's per-kind default and cap for card audiences in company settings.
+1. **A "Needs you" page with one card design.** It replaces the old `WhatNeedsMe` page at `/decisions` (capability `decisions/feed`). Group feed items as question, proposal, approval or sign-off, and keep alerts (failed runs, budget alerts, agent errors, blocked tasks) in their own group. Every card shows who is asking, about what, why now (`whyNow`), who can answer, the response controls, the expiry and the "what happens next" line. Who can answer comes from the feed's `resolverAudience` for cards; Decisions and approvals are always people only. Queue and triage labels use the same vocabulary.
+2. **A proposal resolver with a change preview.** Port the old `DecisionCard`, which already summarizes each effect and warns when a target changed. Add current versus proposed values: current from the task, proposed from the effect. Stale-target flags (`targetChanged`) come from the list endpoint, not from `GET /api/decisions/:id`. After a decision, show each effect's result (`executions`) separately from the decision.
+3. **Proposals on their tasks.** Show a waiting proposal in the thread or properties panel of its origin task and of every task it changes, not as a header strip (the strip upstream removed in [#10891](https://github.com/paperclipai/paperclip/pull/10891)). Find proposals that target a task with `GET /api/companies/:co/decisions?targetIssueId=` (people only; 50 results by default, at most 100). There is no filter by origin task, so a task's own proposals come from the feed's Decision items, whose `subject.metadata.originIssueId` names it. Linked approvals already appear in task threads (capability `tasks/approvals`).
+4. **Approvals as formal requests.** Show "formal" as a badge. Formal requests open a detail view with the discussion thread and revision history, and the Approvals pages become a "formal" filter on the requests page (capability `approvals/governance`). Hires show the agent being activated. Budget overrides open the budget resolution instead of Approve and Reject: raise the limit to an amount, or keep the scope paused, through `POST /api/companies/:co/budget-incidents/:incidentId/resolve`. `GET /api/companies/:co/budgets/overview` lists incidents with their `approvalId`, which links an approval to its incident.
+5. **Cards that act.** Cards that run a tool call (capability `approvals/tool-review`) or write a secret look distinct, show the scope being approved, and show the execution result separately from the decision.
+6. **Live updates.** The old UI refreshes the feed only on window focus or after your own actions. The new UI also refreshes it on the live-events socket's `activity.logged` events for `decision.*`, `approval.*`, `issue.thread_interaction_*` and `issue.updated` actions. For signed-in users these events carry only the action, entity type and entity ID, which is enough to know what to refetch.
+7. **Vocabulary.** Use the request vocabulary above everywhere: page names, filters, queue labels and empty states.
 
-## Upstream changes
+### Review stages (display only)
 
-Each is a small, focused pull request that stands on its own, which is the easiest kind for upstream to accept. None is carried as a fork patch: they touch files upstream changes often (`issue-thread-interactions.ts` had 43 commits between Aug 1 and mid-October), and `CONTRIBUTING.md` warns that "uncoordinated feature PRs against the core product may be closed".
+8. **Each turn to sign appears as a request.** Whoever's turn it is, person or agent, sees the same card as every other request: "Your sign-off is needed on PAP-12: approve or send back." For people, the feed's `review` items provide this. For agents, read the turn from the task's `executionState.currentParticipant`; don't keep a second copy.
+9. **Where the task is, and where it returns.** Show "With Sam for review · returns to Agent A" from `executionState` (`currentParticipant` and `returnAssignee`). Task lists tell "reviewing" apart from "working on" for the same assignee.
+10. **What `in_review` is waiting on.** The status means "waiting on anything". Show what, from the task's `reviewAttention.paths`, rather than the bare status.
+11. **Handoffs in the history.** Label stage handoffs ("handed to Sam for review", "returned to Agent A with changes requested") where the `issue.updated` entry records the new `executionState`, as updates through PATCH do. Approving by comment records only the status, so those entries show as a plain status change.
+12. **Two kinds of review.** Present **planned sign-offs** (stages) and **one-off review requests** (a card asked for on the spot). Label tool, plan and pull-request reviews by what they are.
+13. **The stage editor keeps the old UI's shape:** one review stage, then one approval stage. The API accepts any number in any order, but participant changes are logged only for the first stage of each type, and upstream is still changing how stages work. Revisit once the work listed under [Scope](#scope-ui-only) lands.
 
-| # | Change | Kind | Size |
+### Port, or drop on purpose
+
+14. **Queues, triage and archiving** (capability `decisions/queues`): saved queues, decide-by and snooze, keep, and the aging shelf. Port them, or mark them dropped in `capabilities.md` with the reason.
+15. **Audience settings.** The old Company Settings page already edits each company's per-kind default and cap for card audiences (`interactionResolverGovernance`). Port it as it is.
+
+## Left to upstream
+
+The fork neither makes nor proposes these. Each is either a feature change, which upstream's `CONTRIBUTING.md` says needs agreement first ("uncoordinated feature PRs against the core product may be closed"), or sits in code upstream is actively changing.
+
+| Idea | Why it's left alone |
+| --- | --- |
+| One requests table, or any merged storage | It would re-key every table in the shared layer, change the Runner's governance checks and chat-channel publishing (both query cards and approvals directly), and let cards exist without a task. `hire_agent` and `budget_override_required` are also tied to the agent lifecycle and to budget incidents, and are the audit trail for the two most consequential governance actions. |
+| Formal cards, with `request_board_approval` and `approve_ceo_strategy` moved into them | Cards must belong to exactly one task. Strategy approvals have no task, and board approvals link zero or more and can be created by people. It would also copy approvals' thread and revision loop rather than retire anything. |
+| A `board` audience for Decisions, or letting agents decide them | `board` already means `human_only`, and Decisions are already people only. Letting agents decide is an authority change: effects run with the decider's permissions, and a deciding agent has no person's permissions to check against. |
+| A Decision shown as a confirmation card on its task | A feature change, and upstream deliberately moved Decision work off task pages in [#10891](https://github.com/paperclipai/paperclip/pull/10891). The UI shows proposals on their tasks instead (UI item 3). |
+| Fixing the review-stage bypass in the fork | A real bug, but the fix sits in upstream's busiest files and needs care (see [Review-stage bypass](#review-stage-bypass)). Reported upstream instead (small contribution 5). |
+| Rules for removing reviewers, with "added by" fields on participants | Upstream [#16431](https://github.com/paperclipai/paperclip/pull/16431) covers the main case: agents can't change a policy that includes a person. |
+| Default reviewers per project or company | Upstream [#15267](https://github.com/paperclipai/paperclip/pull/15267). If it lands, the UI exposes the setting. |
+| Approval as the final step, or several stages of one type | Needs upstream validation that runs only when a policy changes, plus participant logging for every stage. The UI keeps the old shape meanwhile (UI item 13). |
+| Runner tools to add a reviewer or sign off, and guidance on when a task needs a reviewer | Runner and skill design are upstream's call. |
+| Merging the many kinds of review (review child tasks, stalled reviews, completion reviews and others) | The UI presents two kinds (UI item 12) without changing the server. |
+| A stage-handoff marker on activity entries | The UI infers most handoffs (UI item 11). The marker would go in the PATCH route's activity code, which open upstream pull requests also edit. |
+| Rewriting the skill's guidance into one decision tree | The skill is the core agent prompt, and restructuring it is a product decision. The narrow missing pieces go upstream as small contribution 2. |
+| Growing the Decision effect catalog | Upstream's roadmap plans for agents to propose structural changes, so upstream may grow it. |
+| Enforcing the CEO-strategy gate | A product decision. Small contribution 3 asks upstream which is intended. |
+
+## Small upstream contributions
+
+Each is one logical change that stands on its own, the kind upstream's `CONTRIBUTING.md` says gets merged fastest. None is carried as a fork patch: each goes from its own branch off `master` (see [FORK.md](../../../FORK.md#contributing-fixes-upstream)) and comes back through the normal sync once merged.
+
+| # | Change | Kind | Files |
 | --- | --- | --- | --- |
-| 1 | Close the review-stage bypass, starting with the Runner | bug fix | medium |
-| 2 | Rewrite the skill's guidance on asking for input | documentation | small |
-| 3 | Stop the approvals API resolving budget overrides | bug fix | small |
-| 4 | Mark stage handoffs in activity entries | server | small |
-| 5 | Log participant changes for every stage | bug fix | small |
-| 6 | Optional: show a Decision as a confirmation card on its task | server, shared types | medium |
+| 1 | Refuse approve and reject on budget-override approvals | bug fix | `server/src/services/approvals.ts`, plus a test |
+| 2 | Document how an agent reads a Decision's outcome | docs | `skills/paperclip/SKILL.md` |
+| 3 | Stop the skill promising an unenforced CEO-strategy gate | docs, or an issue | `skills/paperclip/references/api-reference.md` |
+| 4 | Optional: log participant changes for every stage of a type | bug fix | `server/src/routes/issues.ts`, plus a test |
+| 5 | Report the review-stage bypass, with failing tests | bug report | none |
 
-1. **Close the review-stage bypass.** Write the tests first: a Runner agent finishing a task with configured but unstarted stages, and someone accepting a Runner completion-review card on such a task. The cheapest fix is a guard in `issueService.update` that refuses `done` while the task has unfinished stages, unless the same update completes or clears the stage state, as the transition's board override does. The service already has a similar guard: it refuses an agent's `done` while a tool review is pending. With the guard, every path fails closed, and callers can then be changed to run the transition one at a time. Extracting one shared "apply a task change" path is larger than it looks: stage wakeups, stage-decision records and reviewer activity live in `server/src/routes/issues.ts`, which is about 19,600 lines.
-2. **Skill guidance.** Replace the scattered guidance with one decision tree: *Do you need information, or a change applied exactly as approved?* *Who should respond?* *Does it need formal sign-off* (spending, hiring, strategy, public commitments)? Document what is missing today: who can decide a Decision, what status to leave the task in, the `decided`, `expired` and `cancelled` outcomes of the `wake_origin_agent` wake, how to read the outcome and effect results, and what `strict` means. Either enforce the CEO-strategy gate on the server or remove the claim from the skill.
-3. **Budget overrides in the approvals API.** `POST /api/approvals/:id/approve` and `/reject` on a `budget_override_required` approval should refuse, or resolve the incident the same way the budget controls do. Today they mark the approval and leave the scope paused.
-4. **Stage handoff marker.** The PATCH route already knows when an assignment comes from a stage (`transition.workflowControlledAssignment`). Record that on the activity entry, for example as `assignmentReason: "execution_stage"`, so interfaces need not infer handoffs.
-5. **Participant logging for every stage.** `issue.reviewers_updated` and `issue.approvers_updated` only look at the first stage of each type (`summarizeExecutionParticipants` uses `stages.find`), so changes to later stages go unlogged. This is needed before more than one stage of a type is supported.
-6. **Optional: a Decision as a card on its task.** Post a confirmation card on the origin task that points to a Decision. It would follow the pattern of cards that carry a tool call or a secret: always people-only, never offered as quick-reply buttons in chat channels, and executed by the existing Decision executor (signing, snapshots, permission checks, per-effect idempotency). Most single-task Decisions would then appear in the thread with a card's lifecycle, without merging the systems. Start with yes/no only; effects per checkbox option or per verdict bring partial application and repeated submissions. This is a feature change, so it should be discussed in upstream's Discord `#dev` channel before any code is written.
+1. **Budget-override approvals.** `POST /api/approvals/:id/approve` and `/reject` on a `budget_override_required` approval mark it approved or rejected, and leave the budget incident open and the scope paused. Plugins reach the same code through the plugin host. Add a check to the approvals service's `decide` that refuses these approvals with an error pointing to the budget-incident resolve endpoint. Refusing is simpler than resolving, because an approval carries no new limit amount. The old UI already hides Approve and Reject on these approvals, so the change only makes the API agree with it. The files involved have barely changed in the last month (`routes/approvals.ts` once, `services/approvals.ts` five times).
+2. **Reading a Decision's outcome.** The skill's Standalone Decisions section covers creating a Decision but not what happens afterwards. Add a few lines:
+    - with `wake_origin_agent`, the proposer is woken with reason `decision_<outcome>` (`decided`, `expired` or `cancelled`) and a payload naming the `decisionId`;
+    - `GET /api/decisions/:id` returns the status, the chosen option and each effect's result (`executions`);
+    - an effect with `staleness: "strict"` is skipped if its target task changed after the proposal;
+    - only people can decide a Decision.
+3. **The CEO-strategy line.** `references/api-reference.md` says a CEO's first strategic plan must be approved before the CEO can move tasks to `in_progress`; nothing on the server checks this. Either reword the line so it doesn't promise enforcement, or open a short issue asking which is intended. The issue is the safer start, since the answer is a product decision.
+4. **Participant logging for every stage.** `summarizeExecutionParticipants` in `server/src/routes/issues.ts` uses `stages.find`, so `issue.reviewers_updated` and `issue.approvers_updated` miss changes to every stage after the first of its type. The fix is a few lines, but the file is upstream's busiest, and no interface creates a second stage of one type yet. Send it only as an easy first contribution.
+5. **The review-stage bypass.** Write tests for the two Runner paths: a Runner agent finishing a task with configured but unstarted stages, and someone accepting a Runner completion-review card on such a task. If they fail, file a bug with upstream's bug template, attach the tests, and link [#13744](https://github.com/paperclipai/paperclip/issues/13744) and [#13001](https://github.com/paperclipai/paperclip/issues/13001). Let upstream own the fix.
 
-### Considered and dropped
+Before sending any of these, search upstream for duplicate pull requests; upstream's PR template asks you to confirm the search. As of Oct 19, none of the five had a duplicate.
 
-- **A `board` audience value for Decisions, with proposals defaulting to `human_only`.** `board` already means `human_only` (the legacy `board_only` alias), and Decisions are already people-only. The real question, whether agents may decide Decisions, is an authority change: effects run with the decider's permissions, and a deciding agent has no person's permissions to check against. If a narrower change is needed, letting a Decision name a specific person (`addresseeUserId`, as cards do) is useful.
-- **Formal cards, with `request_board_approval` and `approve_ceo_strategy` moved into them.** Cards must belong to exactly one task. Strategy approvals have no task, and board approvals link zero or more tasks and can be created by people, so this cannot happen unless cards lose their task requirement. It would also copy approvals' thread and revision loop rather than retire anything.
-- **One requests table.** It would re-key every table in the shared layer, change the Runner's checks and chat-channel publishing, and land in upstream's busiest area against its current direction. The fork UI's view model gives the unified presentation without it. Raise it upstream only if upstream starts moving that way, or if the fork needs something that truly needs shared storage, such as discussion threads on Decisions.
-
-`hire_agent` and `budget_override_required` keep their own storage. They are tied to the agent lifecycle (`pending_approval`) and to budget incidents, are often created with no task or run behind them, and are the audit trail for the two most consequential governance actions.
-
-## Review stages
-
-Review stages remain their own concept. A request is a single ask, created when someone needs a response. A review stage is a **sign-off rule configured on a task in advance**: "before this task counts as finished, Sam checks it, then Alex approves it." The rule produces requests (each turn to sign is effectively "approve, or send back?"), but the ordering, the hand-back to the worker, the round limit and escalation belong to the task.
-
-### How stages work today
-
-- **Storage.** The rule is `executionPolicy.stages[]` and its progress is `executionState`, both JSON columns on the task. Stage verdicts are logged in `issue_execution_decisions`. Each stage needs one approval; its participants are alternatives, not a sequence.
-- **Trigger.** A stage starts when the worker moves the task to `in_review` or `done`. Requesting `done` with an unfinished stage starts the stage instead of closing the task.
-- **Handoff.** The task is reassigned to each participant in turn. The worker is stored as `returnAssignee` and gets the task back when changes are requested or the last stage approves. After the round limit (3 by default) of agent-requested changes, the stage escalates to the task's responsible person or creator.
-- **Board override.** A person can close or reassign a task mid-stage through PATCH; this clears the stage.
-- **Who can change stages.** Any actor allowed to modify the task can add or remove participants, by sending the whole policy. An agent can add a reviewer to its own task and submit in one request (route test at `server/src/__tests__/issue-execution-policy-routes.test.ts:641`). No participant-level check prevents a worker agent from removing a reviewer a person added, before it submits.
-- **What is recorded.** The task stores its creator (`createdByAgentId` or `createdByUserId`) and `responsibleUserId`. Reviewer and approver changes are logged as `issue.reviewers_updated` and `issue.approvers_updated`, with the actor and the participants added or removed, but only for the first stage of each type. Assignee changes are logged in `issue.updated`, whose details include the new `executionState`. There is no separate assignee-history table, and a stage handoff is not labelled as such: it can only be inferred from that state.
-- **Old UI.** It allows one review stage followed by one approval stage, although the API accepts any number in any order. The properties panel shows "Review pending with Sam" but not who the task returns to.
-- **`review` and `approval` behave the same**, apart from their label, the wake reason, and one auto-skip rule for review stages.
-- **Related settings.** A separate issue-level `reviewPolicy` (`anyone`, `not_creator` or `human_only`) governs who may give a verdict on a review card. Tasks returned by the API carry `reviewAttention`, which lists what an `in_review` task is waiting on (a stage participant, a card, an approval, a monitor, a run), with labels and responders.
-
-### Changes
-
-1. **Each turn to sign appears as a request.** Whoever's turn it is, person or agent, sees the same card as every other request: "Your sign-off is needed on PAP-12: approve or send back." For people, the feed's `review` items already provide this. For agents, the turn stays in `executionState` and is presented as a request rather than stored as a second record. A second copy would drift from the stage state, which the transition code already works hard to repair.
-2. **No back doors.** Every route to "finished" respects the sign-off rule. This is upstream change 1.
-3. **Conditional removal of reviewers.** Anyone allowed to modify the task can add a reviewer. Removing one is limited:
-    - a person, including the task's responsible person, can remove any participant;
-    - an agent can remove a participant that an agent added, if it added that participant itself or created the task;
-    - no agent can remove a participant a person added.
-
-   To enforce this:
-    - Each participant records who added it (`addedByAgentId` / `addedByUserId`). The server stamps this from its own diff of the old and new policy and never takes it from the client.
-    - `normalizeIssueExecutionPolicy` rebuilds participants field by field, so the shared schema and the normalizer must both carry the new fields.
-    - For participants added before the field exists, use the latest `issue.reviewers_updated` or `issue.approvers_updated` entry whose `addedParticipants` includes that participant. Until upstream change 5 lands, this works only for the first stage of each type.
-    - The rule must also cover removing a whole stage, changing a stage's type, and clearing the policy.
-4. **Keep the reassignment, and make it visible.** Reviewers keep receiving the task, which puts the work in their queue. What changes is how clearly it reads:
-    - The task shows "With Sam for review · returns to Agent A", using the stored `returnAssignee`.
-    - The activity history labels stage handoffs ("handed to Sam for review", "returned to Agent A with changes requested") instead of showing a plain reassignment.
-    - Task lists can tell "reviewing" apart from "working on" for the same assignee.
-
-   The fork's UI infers handoffs from the `executionState` recorded in each `issue.updated` entry. Upstream change 4 removes the need to infer.
-5. **One kind of review.** Paperclip has many things called review: stages, review cards (governed by the issue-level `reviewPolicy`), the Runner's completion reviews, review child tasks, stalled reviews, the `in_review` status, ask-first tool reviews, plan review, artifact review documents and pull-request reviews. The fork UI presents two: **planned sign-offs** (stages) and **one-off review requests** (a card asked for on the spot). It labels tool, plan and pull-request reviews by what they are. Keep review child tasks only for reviews big enough to be their own piece of work, and make the skill consistent about them. The `in_review` status currently means "waiting on anything"; the interface shows what it is waiting on, from `reviewAttention`, rather than renaming the status upstream.
-6. **Flexible review steps, with approval as the final step.** Allow any number of review steps, in any order. Give approval a concrete meaning: **at most one approval stage, always the last**. Its participant can be an agent or a person. The fork's UI enforces this in its editor. Upstream validation must run only when a policy changes, not inside `normalizeIssueExecutionPolicy`: PATCH normalizes the stored policy on every update, so existing tasks with other stage orders would stop accepting updates. More than one review stage also needs upstream change 5.
-7. **Guidance and tools for agents.** The skill says how to add a reviewer but not when. Add guidance on when a task should get one (code changes, anything customer-facing). The Runner has `request_review`, which submits the agent's own task for review, but no tool to add a reviewer. When a Runner agent that is the current stage participant reports `finish_task`, the finalizer appears to treat the pending stage as a gate and keep the task in review, so there is no tool to sign off either. Add both.
-8. **Default reviewers.** There is no way to say "every task in this project is reviewed by Sam". Add default reviewers and approvers per project or company, applied when a task is created.
-
-### Where each change happens
-
-| Change | Fork UI alone | Needs upstream |
-| --- | --- | --- |
-| 1. Turns to sign as requests | for people, from the feed's `review` items; for agents, presented from `executionState` | no |
-| 2. No back doors | | yes (upstream change 1) |
-| 3. Conditional removal | can hide the remove control | yes, to enforce it |
-| 4. Visible handoffs | yes, inferred from `executionState` | optional marker (upstream change 4) |
-| 5. One kind of review | labels, and what `in_review` waits on | merging the variants; skill consistency |
-| 6. Approval as final step | in the editor | validation when a policy changes; logging for every stage (upstream change 5) |
-| 7. Agent guidance and tools | | yes |
-| 8. Default reviewers | pre-fill the new-task form | a real project or company setting |
-
-## Out of scope and open questions
-
-Out of scope:
-
-- **Merging storage.** Questions, Decisions and approvals keep their tables; see [Where the model lives](#where-the-model-lives) and [Considered and dropped](#considered-and-dropped).
-- **Merging review stages into requests.** Stages stay a rule on the task; see [Review stages](#review-stages).
+## Open questions
 
 Answered by reading the code:
 
 - [x] Is a housekeeping ("gardener") agent the intended main producer of Decisions? It is a role the code supports, not a bundled agent. An agent with `decision_triage:manage` creates archive proposals (`POST /api/companies/:co/decision-archive-proposals`), sets triage, and reads the stats endpoint, which the route documents as the "Gardener telemetry contract".
-- [x] Does approving a `budget_override_required` approval from the Approvals page lift the budget pause? No. The approvals API only marks the approval; the old UI hides the buttons and points to the budget controls on `/costs`. See upstream change 3.
-- [x] Should `anyone` remain the default audience for questions? It is already configurable per company and per kind, with a cap. The fork UI exposes that setting (UI item 8) rather than changing the default.
+- [x] Does approving a `budget_override_required` approval from the Approvals page lift the budget pause? No. The approvals API only marks the approval; the old UI hides the buttons and points to the budget controls on `/costs`. See small contribution 1.
+- [x] Should `anyone` remain the default audience for questions? It is already configurable per company and per kind, with a cap. The new UI ports that setting (UI item 15) rather than changing the default.
 - [x] Which routes may create formal requests? Any agent with approval access can create `request_board_approval` and `approve_ceo_strategy`, through `POST /api/companies/:co/approvals` or the Runner's `request_approval`; people can create them too. Hires and budget overrides are created by their own flows.
+- [x] Can a worker agent remove a reviewer a person added, before it submits? Yes. Upstream [#16431](https://github.com/paperclipai/paperclip/pull/16431) describes the same gap and proposes a fix.
 
 Open:
 
-- [ ] Does the review-stage bypass reproduce in a test, for each path in [Review-stage bypass](#review-stage-bypass)?
-- [ ] Can a worker agent remove a person-added reviewer before submitting? No participant-level check was found; confirm with a test.
-- [ ] Should the effect catalog grow (priority, labels, adding a reviewer), or stay at six to keep proposals easy to audit? Upstream's roadmap plans for agents to propose structural changes, so upstream may grow it; the fork should not add effects on its own.
-- [ ] Should an agent that created a task be able to remove a reviewer a person added later? Change 3 proposes no.
-- [ ] Should approval stages be limited to people in some companies, as a setting? The issue-level `reviewPolicy` already offers `human_only` for review cards and could serve as the model.
-- [ ] Should the CEO-strategy gate be enforced on the server, or removed from the skill?
+- [ ] Does the review-stage bypass reproduce in a test, for each path in [Review-stage bypass](#review-stage-bypass)? Small contribution 5 starts here.
+- [ ] Port or drop queues, triage and the aging shelf (UI item 14)?
+- [ ] Do alerts (failed runs, budget alerts, agent errors, blocked tasks) belong on the "Needs you" page, or somewhere else, such as the dashboard?
+- [ ] What should the page be called? "Needs you" is a working name.
+- [ ] When upstream's review-stage work lands (#16431, #15267 and the others under [Scope](#scope-ui-only)), which of UI items 8–13 change?

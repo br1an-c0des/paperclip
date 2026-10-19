@@ -2,8 +2,13 @@
 
 This is a fork of [paperclipai/paperclip](https://github.com/paperclipai/paperclip) at
 [br1an-c0des/paperclip](https://github.com/br1an-c0des/paperclip). Its purpose is to build a new
-board UI in SolidJS (`ui-new/`) while continuing to take upstream's daily changes. The fork's own
-features will also reach into the server and database.
+board UI in SolidJS (`ui-new/`) while continuing to take upstream's daily changes.
+
+**The fork is UI-only.** Apart from registering `ui-new` in the pnpm workspace, it doesn't change
+server, database or package code. Upstream lands many commits a day, and the server areas the
+redesign touches are still changing, so `ui-new` works with the API as it is. Small server or
+documentation fixes found along the way go upstream as focused pull requests (see
+[Contributing fixes upstream](#contributing-fixes-upstream)), not into the fork.
 
 The rule behind every decision below: **keep changes in files upstream doesn't own wherever
 possible, and record every exception.** New files never conflict with upstream, so merges stay
@@ -38,6 +43,7 @@ The upstream files the fork edits are listed in [FORK-PATCHES.md](FORK-PATCHES.m
 | `master` | An exact mirror of `upstream/master`. Never commit here; it only fast-forwards. |
 | `new-ui` | All fork work. Upstream changes come in by merging `master`. |
 | `sync/<date>` | Short-lived, local. The `upstream-sync` skill merges `master` here first; `new-ui` fast-forwards to it once you approve. |
+| `fix/*`, `docs/*` | Pull requests to upstream. Branched from `master`, never merged into `new-ui` (see [Contributing fixes upstream](#contributing-fixes-upstream)). |
 
 Setting this up in a fresh clone (the git aliases and rerere live in `.git/config`, so they are
 per-clone):
@@ -55,7 +61,10 @@ git config alias.sync-ui '!f() { set -e; git sync-master; git checkout new-ui; g
 
 ## Changing server, database and packages
 
-Fork features may need server, database or package changes. Pick the first option that works:
+The fork plans no server, database or package changes. When a UI feature seems to need one, first
+look for a way to build it on the existing API, then consider proposing the change upstream. The
+options below are kept for a change that turns out to be unavoidable; agree on it before starting.
+If one is needed, pick the first option that works:
 
 1. **A plugin.** Paperclip's plugin system ([doc/plugins/PLUGIN_AUTHORING_GUIDE.md](doc/plugins/PLUGIN_AUTHORING_GUIDE.md))
    gives a plugin its own Postgres schema with its own migrations, JSON API routes under
@@ -81,11 +90,35 @@ that a database has already applied breaks that database.
 
 - Prefer a plugin's own schema and migrations (option 1 above).
 - If core code needs fork tables, keep them on a separate migration track: their own folder and
-  tracking table, applied after upstream's. The mechanism isn't built yet; build it with the
-  first such feature and record it in [FORK-PATCHES.md](FORK-PATCHES.md).
+  tracking table, applied after upstream's. The mechanism isn't built, and isn't planned while
+  the fork is UI-only. If it's ever needed, record it in [FORK-PATCHES.md](FORK-PATCHES.md).
 - Prefer side tables that reference upstream tables over altering upstream tables. A fork column
   on an upstream table conflicts with every upstream change to that table.
 - List every fork database object under **Database objects** in [FORK-PATCHES.md](FORK-PATCHES.md).
+
+## Contributing fixes upstream
+
+Small server or documentation fixes found while building the UI go to `paperclipai/paperclip` as
+pull requests instead of fork patches. Once upstream merges one, it reaches the fork through the
+normal sync.
+
+```bash
+git sync-master                                  # start from an up-to-date master
+git checkout -b fix/<short-description> master
+# make the change, with tests
+git push -u origin fix/<short-description>
+gh pr create --repo paperclipai/paperclip --base master --head br1an-c0des:fix/<short-description>
+```
+
+- **Branch from `master`, never from `new-ui`,** so the pull request contains only the fix. Don't
+  merge these branches into `new-ui`.
+- **Follow upstream's rules for contributors:** [CONTRIBUTING.md](CONTRIBUTING.md) (one logical
+  change in as few files as possible, and a search for duplicate pull requests first) and the PR
+  template rules in [AGENTS.md](AGENTS.md). Feature changes need agreement in upstream's Discord
+  `#dev` channel before any code is written.
+- **Name branches after the change** (`fix/…`, `docs/…`), with no internal task IDs.
+- **Track candidates in the proposal that found them**, for example
+  [ui-new/docs/proposals/unifying-requests.md](ui-new/docs/proposals/unifying-requests.md#small-upstream-contributions).
 
 ## Staying in sync with upstream
 
@@ -181,8 +214,6 @@ bind-mounted from `<PAPERCLIP_DATA_ROOT>/home`. Everything is visible on the hos
 
 ## Open items
 
-- Build the separate migration track for fork tables in core code, when the first feature needs
-  one (see [Database changes](#database-changes)).
 - Once the sync skill has run by hand a few times, consider scheduling it.
 - Test the full image build and a first deploy on a real server.
 - Optionally, a GitHub Actions workflow in this fork that builds the image on pushes to `new-ui`

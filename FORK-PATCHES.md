@@ -11,7 +11,10 @@ update it whenever a merge moves or rewrites the patch.
 
 ## How to add a patch
 
-Prefer, in order (details in [FORK.md](FORK.md#changing-server-database-and-packages)):
+The fork is UI-only, so new patches should be rare: agree on one before adding it, and send fixes that
+upstream could use as upstream pull requests instead (see
+[FORK.md](FORK.md#contributing-fixes-upstream)). When a patch is needed, prefer, in order (details in
+[FORK.md](FORK.md#changing-server-database-and-packages)):
 
 1. **A plugin.** No entry needed: plugins live in fork-only directories.
 2. **New files plus a small hook** in an upstream file. Mark the hook with a `FORK:` comment
