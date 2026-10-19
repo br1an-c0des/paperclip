@@ -178,6 +178,48 @@ upstream type changes show up as type errors after a merge. Use `ui/src` (especi
 `ui/src/api/`) as the reference for how the API is used. Details:
 [ui-new/README.md](ui-new/README.md).
 
+### A standalone app, not a plugin
+
+Paperclip's plugin SDK can add UI too: [paperclip-office](https://github.com/Kshitijm7/paperclip-office)
+is a full page built that way. In October 2026 we looked at building `ui-new` as a plugin instead and
+decided against it:
+
+- **A plugin adds to the old UI; it can't replace it.** Plugin pages mount at
+  `/:companyPrefix/<slug>/*` inside the old app's layout, sidebar and breadcrumbs
+  (`ui/src/pages/PluginPage.tsx`). A plugin can't own `/`, sign-in, onboarding, settings or company
+  switching, or remove old pages and experimental flags, and replacing those is what the redesign
+  is for.
+- **Plugin UI is React that shares the old UI's page.** The old UI lends plugins its own React
+  through a global and loads each plugin as one ES module from a blob URL
+  (`ui/src/plugins/slots.tsx`). There's no code splitting, relative assets don't resolve, and the
+  old UI's global CSS applies. Solid would only fit through the custom-element fallback, without the
+  SDK's hooks.
+- **The plugin worker can read only part of the API.** It has no attention feed, Decisions, budgets
+  or runs. Plugins work around that with per-issue scans or `SELECT`s on allowed core tables, which
+  ties them to the database layout. Calling `/api` straight from plugin UI works today, but the spec
+  says plugins must not (`doc/plugins/PLUGIN_SPEC.md`, §19.0.2).
+- **The fork already has most of what a plugin would win.** It changes one upstream line, and the
+  deploy reuses upstream's image with only the UI swapped. What's left is installing on a stock
+  Paperclip with no custom image, which would matter only if pieces of the redesign were meant for
+  other Paperclip users.
+
+Where plugins do fit:
+
+- **A companion plugin** (`packages/plugins/fork-*`) for state that belongs to the fork, such as
+  saved views, per-user triage state or agent tools. `ui-new` calls its routes under
+  `/api/plugins/:pluginId/api/*`. This is option 1 in
+  [Changing server, database and packages](#changing-server-database-and-packages). Don't use it to
+  combine core data; `ui-new` does that from the API.
+- **A demo of one idea on stock Paperclip**, such as the "Needs you" page from the
+  [requests proposal](ui-new/docs/proposals/unifying-requests.md), written as a React plugin page to
+  share in upstream's Discord. Optional.
+- **Hosting other plugins in `ui-new`.** Once `ui-new` replaces the old UI in production, installed
+  plugins (paperclip-office included) appear only if `ui-new` provides their mount points. That
+  means the global React registry the old UI sets up (`ui/src/plugins/bridge-init.ts`), the module
+  loader and slots, React loaded only for plugin areas, and the shared components the SDK promises
+  (`IssuesList`, `AssigneePicker` and others, which wrap old-UI components today). Tracked as
+  `shell/plugins` in the [capability checklist](ui-new/docs/inventory/capabilities.md).
+
 ## Production deployment
 
 Summary (full steps in [deploy/README.md](deploy/README.md)):
@@ -220,3 +262,5 @@ bind-mounted from `<PAPERCLIP_DATA_ROOT>/home`. Everything is visible on the hos
   and publishes it to `ghcr.io/br1an-c0des/paperclip`, so the server only pulls. Keep upstream's
   own workflows disabled in the fork (GitHub disables them on forks by default).
 - Agent git push / PR authentication inside the container (see above).
+- Decide how `ui-new` hosts plugin UI before it replaces the old UI in production (see
+  [A standalone app, not a plugin](#a-standalone-app-not-a-plugin)).

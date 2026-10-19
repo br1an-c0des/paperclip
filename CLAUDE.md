@@ -47,7 +47,7 @@ or package code.
 
 | Doc | What it covers |
 | --- | --- |
-| [FORK.md](FORK.md) | Remotes, branches, the UI-only policy and its fallback rules, sending fixes upstream, the upstream sync routine, deployment summary, open items. |
+| [FORK.md](FORK.md) | Remotes, branches, the UI-only policy and its fallback rules, sending fixes upstream, the upstream sync routine, why `ui-new` is a standalone app rather than a plugin, deployment summary, open items. |
 | [FORK-PATCHES.md](FORK-PATCHES.md) | Every change the fork makes to upstream files: what, why, what it depends on, how to resolve conflicts. |
 | [.claude/skills/upstream-sync/SKILL.md](.claude/skills/upstream-sync/SKILL.md) | The upstream sync procedure and conflict-resolution policy. Reports go to `fork/sync-reports/`. |
 | [ui-new/README.md](ui-new/README.md) | Running and building the SolidJS app; layout; lockfile-conflict fix. |

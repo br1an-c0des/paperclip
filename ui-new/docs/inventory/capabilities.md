@@ -22,7 +22,7 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 | [shell/dialogs](areas/app-shell.md#shelldialogs-global-create-dialogs) | Global create dialogs | | | |
 | [shell/live-updates](areas/app-shell.md#shelllive-updates-live-updates-and-toasts) | Live updates and toasts | | | |
 | [shell/company](areas/app-shell.md#shellcompany-company-context) | Company context | | | |
-| [shell/plugins](areas/app-shell.md#shellplugins-plugin-extension-points) | Plugin extension points | | | |
+| [shell/plugins](areas/app-shell.md#shellplugins-plugin-extension-points) | Plugin extension points | | | Needed before `ui-new` replaces the old UI: React for plugin areas, the bridge registry, module loader, slot mounts and the SDK's shared components ([FORK.md](../../../FORK.md#a-standalone-app-not-a-plugin)). |
 | [shell/misc](areas/app-shell.md#shellmisc-other-shell-features) | Other shell features | | | |
 
 ### Tasks
