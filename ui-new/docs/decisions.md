@@ -28,6 +28,10 @@ decision changes, mark the old one superseded and link the new entry rather than
 | # | Entry | Area | Status | Opened |
 | --- | --- | --- | --- | --- |
 | 1 | [Projects can't hold documents or files](#1-projects-cant-hold-documents-or-files) | `projects/*`, `documents-artifacts/library` | Open | Oct 20, 2026 |
+| 2 | [Agent chat is off unless the instance turns it on](#2-agent-chat-is-off-unless-the-instance-turns-it-on) | `agent-chat/*`, shell navigation | Open | Oct 20, 2026 |
+| 3 | [Agents can work on several things at once](#3-agents-can-work-on-several-things-at-once) | `agent-chat/*`, runs | Decided | Oct 20, 2026 |
+| 4 | [A run's full model input only exists when provider tracing is on](#4-a-runs-full-model-input-only-exists-when-provider-tracing-is-on) | `runs-adapters/runs`, `agents/runtime` | Open | Oct 20, 2026 |
+| 5 | [Agents can have three memory systems that don't know about each other](#5-agents-can-have-three-memory-systems-that-dont-know-about-each-other) | `agents/runtime`, `agents/skills`, `agents/instructions`, Connectors | Open | Oct 22, 2026 |
 
 ## Entries
 
@@ -72,3 +76,192 @@ adds project documents.
 
 **Decision.** Not made yet. Until then the design keeps the section, and `ui-new` can build the
 "From tasks" part first.
+
+### 2. Agent chat is off unless the instance turns it on
+
+- **Status:** Open
+- **Area:** `agent-chat/history`, `agent-chat/handoff`, sidebar navigation
+- **Found in:** the agent chat view in the design canvas (screens 12 and 13).
+
+**What we found.** The design makes chat an agent's home: clicking an agent in the sidebar opens one
+ongoing conversation with it, and its settings move behind a "Manage agent" button. The API already
+works this way. Each person has one standing conversation per agent, stored as a task
+(`GET|POST /api/companies/:companyId/chats/:agentRef`), and `/new` starts a fresh session while
+keeping the history visible.
+
+But the server only serves chat when the instance's experimental setting `enableAgentChat` is on.
+It's off by default, and with it off the chat routes return 404. Instance admins change it with
+`PATCH /api/instance/settings/experimental`.
+
+**Why it matters.** `ui-new` drops the old UI's feature switches, but this one is enforced by the
+server, so the new UI can't simply treat chat as always on. With the setting off, clicking an agent
+would land on an error.
+
+**Options.**
+
+1. **Require it.** Treat `enableAgentChat` as part of setting up an instance for `ui-new`: set it in
+   the deployment and document it.
+2. **Check and offer.** On startup `ui-new` reads the experimental settings. If chat is off, an
+   instance admin sees a prompt to turn it on, and everyone else falls back to the agent's details
+   page.
+3. **Fall back silently.** With chat off, the sidebar opens agent details as the old UI does.
+
+**Decision.** Not made yet.
+
+### 3. Agents can work on several things at once
+
+- **Status:** Decided
+- **Area:** `agent-chat/history`, runs and live status
+- **Found in:** the agent chat view's "busy" state (screen 12).
+
+**What we found.** The first draft showed an agent working on a task as busy, with your chat
+message queued until that run finished. That's not how Paperclip works by default. An agent can run
+up to 20 runs at once (`AGENT_DEFAULT_MAX_CONCURRENT_RUNS`, set per agent as "Max concurrent runs").
+So a chat reply runs alongside the agent's task work. A message waits only behind a reply already
+running in the same chat, or when the agent is at its limit or paused.
+
+**Decision.** Chat shows what the agent is working on but doesn't call it busy. When the agent is
+working on a task, the chat says "Working on TRA-41. Replies here run alongside it." The send button
+only becomes "Queue" while the agent is replying in this chat. Still to design: what the chat shows
+when the agent is at its run limit or paused.
+
+### 4. A run's full model input only exists when provider tracing is on
+
+- **Status:** Open
+- **Area:** `runs-adapters/runs`, `agents/runtime`
+- **Found in:** the task run modal in the design canvas (screens 16 to 18).
+
+**What we found.** By default a run keeps:
+
+- the prompt Paperclip renders for the agent, with the wake context, command and environment (the
+  `adapter.invoke` event in `GET /api/heartbeat-runs/:runId/events`);
+- the harness's stdout and stderr, which the UI parses into a transcript of messages, thinking and
+  tool calls (`GET /api/heartbeat-runs/:runId/log`);
+- token usage and cost.
+
+None of these is what the model received. The harness (Claude Code, Codex and others) wraps
+Paperclip's prompt in its own system prompt, tool definitions and session history before calling the
+provider. Only a provider trace records those exact requests and responses, and capture is off by
+default. There are two ways to turn it on:
+
+- **For an agent:** the "Capture raw provider traces" setting under Debugging in the agent's
+  configuration. It records every future run until someone turns it off.
+- **For one run:** "Run with provider trace", which wakes the agent with
+  `debug: { providerTrace: "raw" }`.
+
+Traces have tight limits. Only instance admins can view them (`GET /api/heartbeat-runs/:runId/provider-trace`).
+Message bodies stay redacted until an admin reveals a frame, and both viewing and revealing are logged
+as activity. Each run keeps at most 64 MiB, and anything over that marks the trace `truncated`. Every
+trace is deleted after 24 hours.
+
+**Why it matters.** The run modal is meant to show a run's full input and output. For most runs it
+can show Paperclip's prompt and the parsed transcript, but not everything the model saw. People who
+aren't instance admins never see the full input, and admins only see it within a day of the run.
+
+**Options.**
+
+1. **Show what exists and label it.** The Input tab shows Paperclip's prompt and says the harness
+   adds more. The Provider trace tab shows the trace when there is one. Otherwise it offers "Rerun
+   with trace" and the agent setting, and it's hidden from anyone who isn't an instance admin.
+2. **Turn tracing on for every agent.** Every run gets its full input and output. But traces hold
+   sensitive prompts and tool arguments, last only 24 hours and are admin-only, so this mostly adds
+   storage and risk.
+3. **Propose a request summary upstream.** Ask Paperclip to keep a small record of each model call
+   without the bodies: system prompt and tool definition sizes, message count, and token usage per
+   call. That explains a run's context size and cost without storing sensitive content.
+
+Options 1 and 3 can be combined.
+
+**Decision.** Not made yet. Screens 16 to 18 follow option 1.
+
+### 5. Agents can have three memory systems that don't know about each other
+
+- **Status:** Open. An interim fix is decided; the long-term fix isn't.
+- **Area:** `agents/runtime`, `agents/skills`, `agents/instructions`, Connectors, and the
+  `enableMemoryConnectors` flag
+- **Found in:** a review of how Claude agents remember things between runs.
+
+**What we found.** Three things can give an agent memory, and nothing coordinates them:
+
+1. **Paperclip's `para-memory-files` skill.** It's one of the core skills every lead agent gets
+   (`PAPERCLIP_CORE_SKILL_KEYS`), and the CEO's heartbeat checklist uses it. It tells the agent to keep
+   notes in `$AGENT_HOME/MEMORY.md`, `$AGENT_HOME/memory/<date>.md` and `$AGENT_HOME/life/`.
+   `AGENT_HOME` is the agent's instructions bundle folder. Paperclip restores it before a run and saves
+   changes afterwards, so these notes belong to the agent and the API can read them
+   (`GET /api/agents/:id/instructions-bundle`).
+2. **Claude Code's auto memory.** It's built into Claude Code and on by default. `claude_local` runs
+   the normal `claude` CLI and doesn't turn it off. Claude therefore also saves notes to
+   `<Claude config dir>/projects/<project>/memory/` and loads that `MEMORY.md` at the start of every
+   session. The folder is named after the run's git repository or working directory, not the agent.
+   One agent's notes end up split between project workspaces and its fallback folder
+   (`workspaces/<agentId>`), and every agent working in the same project shares a single folder. In
+   the [deployment](../../deploy/README.md) the notes live on the host under
+   `$PAPERCLIP_DATA_ROOT/home/.claude/projects/`. Neither the API nor the UI can see them.
+3. **Memory connectors** (experimental, behind `enableMemoryConnectors`, off by default). Mem0, Zep,
+   Supermemory, Cognee and Honcho connect as ordinary company tool connections. Each comes with a short
+   instruction, on by default and editable on the connection, that's added to the prompt of every
+   agent assigned the connection: search memory before relying on remembered context, and save durable
+   facts after useful work. The memories stay with the provider and are scoped by the provider's key or
+   sign-in, not by Paperclip agent. Tools are classed as read, write or destructive, and all are
+   Allowed by default. See upstream's
+   [doc/connections/MEMORY.md](../../doc/connections/MEMORY.md).
+
+An agent with a memory connector can get all three sets of "save what you learn" instructions at
+once. Upstream's connector docs and plans don't mention the other two. Upstream's March plan for a
+memory service with company and agent memory bindings
+([doc/plans/2026-03-17-memory-service-surface-api.md](../../doc/plans/2026-03-17-memory-service-surface-api.md))
+was never built.
+
+The Paperclip Runner changes this for Claude agents that use it. By default only new Codex agents
+get the Runner.
+
+- **Claude through ACP, in the default isolated mode.** Each session gets a new Claude config folder
+  (`runtime/paperclip-runner/acpx/<session>/claude-home`). Auto memory stays on but lasts only as long
+  as that session. In preconfigured-home mode Claude uses the real home folder, as `claude_local`
+  does.
+- **Environment variables.** The Runner passes Claude only an allowlist of the server's variables,
+  plus the agent's own `env`. A variable set on the server container doesn't reach it.
+- **Claude Managed** (Anthropic's Managed Agents). There's no agent folder, so `para-memory-files`
+  can't keep anything, and Paperclip attaches no Managed Agents memory stores. Each session starts
+  with no memory unless the agent is assigned a memory connector.
+- **Copilot.** The Runner explicitly turns memory off for Copilot (`memory: false`) but not for
+  Claude.
+
+Paperclip saves the agent's folder (`AGENT_HOME`) on both runners.
+
+Upstream has two open issues about this: [#2671](https://github.com/paperclipai/paperclip/issues/2671)
+(auto memory duplicates `para-memory-files`; its fix,
+[#2700](https://github.com/paperclipai/paperclip/pull/2700), was closed unmerged) and
+[#6325](https://github.com/paperclipai/paperclip/issues/6325) (auto memory splits by working
+directory).
+
+**Why it matters.** An agent says a lesson is "saved to memory", then a later run reads a different
+store and repeats the mistake. #6325 has a worked example. Duplicated facts also cost tokens on every
+run and drift apart over time. For the redesign, people should be able to see and correct what an
+agent remembers. Only the `para-memory-files` notes are reachable through the API. Connector memories
+live in each provider's console, and auto memory isn't in the API at all. `enableMemoryConnectors`
+also needs a decision, like the other flags.
+
+**Options.**
+
+1. **Turn off Claude Code's auto memory.** Set `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`. Set on the server
+   container in `deploy/docker-compose.yml`, it reaches every local `claude_local` run. Runner agents
+   and remote or sandbox targets need it in the agent's adapter `env`. A project
+   `.claude/settings.json` isn't enough: with a managed AI connection, Paperclip passes
+   `--setting-sources user` and project settings are ignored. Existing notes stay on disk; they just
+   stop loading.
+2. **Keep auto memory, but give each agent its own folder.** For `claude_local` agents, pin the folder
+   with `extraArgs: ["--settings", "{\"autoMemoryDirectory\": \"/paperclip/agent-memory/<agentId>\"}"]`
+   and remove `para-memory-files`. This fixes #6325, but the notes stay outside the API.
+3. **Fix it upstream.** Send a focused PR so that `claude_local`, and the Runner's isolated Claude
+   settings, disable auto memory whenever `para-memory-files` is among the agent's skills. That's
+   #2700 again, but setting the environment variable instead of writing settings files into
+   workspaces, because the variable also works with `--setting-sources user`. A larger alternative
+   lets each agent choose its memory system.
+4. **Show memory in the new UI.** An agent "Memory" view that reads `MEMORY.md`, `memory/` and `life/`
+   from the agent's files and lists the agent's memory connections. With option 1 or 3 in place, this
+   covers everything the agent remembers, and it works on the existing API.
+
+**Decision.** For now, option 1: set the environment variable. Long term, option 3 is the candidate
+upstream PR, and option 4 goes into the agent page design. The `enableMemoryConnectors` flag isn't
+decided yet.
