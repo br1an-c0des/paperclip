@@ -729,6 +729,10 @@ function analyzeRoutes() {
         if (importSource) {
           const target = resolveImport(appFile, importSource);
           if (target) componentFiles.set(d.id.name, target);
+        } else if (unwrapTs(d.init).type === "CallExpression") {
+          // lazy(loadX), where an earlier `const loadX = () => import("...")` names the file.
+          const loader = unwrapTs(d.init).arguments.find((a) => a.type === "Identifier" && componentFiles.has(a.name));
+          if (loader) componentFiles.set(d.id.name, componentFiles.get(loader.name));
         } else if (["ArrowFunctionExpression", "FunctionExpression"].includes(unwrapTs(d.init).type)) {
           localFunctions.set(d.id.name, unwrapTs(d.init));
         }
