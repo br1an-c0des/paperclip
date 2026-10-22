@@ -41,7 +41,8 @@ Agent Chat (`/:co/chats/:agentRef`) reuses `TaskDetailSurface` in a conversation
   - *Organization* (rendered by `IssuesList`): All tasks, Active (`todo`, `in_progress`, `in_review`,
     `blocked`), Backlog, Done (`done`, `cancelled`).
 - **Requests:** `GET /api/companies/:companyId/issues` (compact list, paged 100 at a time, sorted by
-  updated) and the Inbox requests below.
+  updated), `POST /api/issues/:issueId/retry` (Retry on an interrupted task's row, since the 2026-10-22
+  sync) and the Inbox requests below.
 - **Notes:** flag `enableCombinedInboxTasks` (default off) merges Inbox into Tasks. With it off, Tasks is
   only the organization list and Inbox keeps its own pages at `/inbox/mine|recent|unread|blocked|all`.
   The badge on the Views menu is the inbox count (`hooks/useInboxBadge.ts`).
@@ -71,11 +72,15 @@ Agent Chat (`/:co/chats/:agentRef`) reuses `TaskDetailSurface` in a conversation
 - **What:** a personal feed of four item kinds: tasks, approvals, failed runs, join requests. Group by
   type, assignee, project or workspace; nesting of subtasks; search.
   - Mark read/unread, mark all read, archive and unarchive tasks from the inbox.
-  - Approve/reject approvals and join requests inline; retry a failed run.
+  - Approve/reject approvals and join requests inline; retry a failed run; Retry an interrupted task
+    (since the 2026-10-22 sync).
+  - Mine leaves out work that arrived through channels or routines unless the person takes part, is
+    assigned the task or has a current request addressed to them (since the 2026-10-22 sync; the same
+    rule applies to unread state, archives and task notifications).
 - **Requests:** `POST|DELETE /api/issues/:id/read`, `POST|DELETE /api/issues/:id/inbox-archive`,
   `POST /api/approvals/:id/approve|reject`,
   `POST /api/companies/:companyId/join-requests/:requestId/approve|reject`, `POST /api/agents/:id/wakeup`
-  (retry failed run), `GET /api/companies/:companyId/approvals`, `/heartbeat-runs`, `/join-requests`,
+  (retry failed run), `POST /api/issues/:issueId/retry` (Retry an interrupted task), `GET /api/companies/:companyId/approvals`, `/heartbeat-runs`, `/join-requests`,
   `/dashboard`; dismissing and snoozing items goes through `inboxDismissalsApi` (server, shared with the
   Decisions page).
 - **Notes:** archiving is "out of my inbox", not completing the task. Read state for non-task items
@@ -269,14 +274,18 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
 - **What:** notices when the task is stuck, with one-click fixes: recovery actions (missing disposition,
   wait without target, stranded assignment, workspace or configuration validation, active-run watchdog,
   task-graph liveness), disposition recovery retry, reissue as an isolated recovery task, workspace export
-  and base-ref recovery, execution blockers (with expandable "Recovery details": whether automatic
-  retries were stopped, and the hold's resolution note), write-denied notice, "retry access check".
-  When the original workspace was destroyed before its edits were saved, "Continue from saved
-  sources" starts a fresh session from chosen task attachments, after the person describes the
-  missing work and which external actions were already done.
-- **Requests:** `GET /api/issues/:id/recovery-actions`, `POST /api/issues/:id/recovery-actions/resolve`,
-  `POST /api/issues/:id/recovery-actions/reconstruct-workspace` (continue from saved sources),
-  `POST /api/companies/:companyId/issues` (reissue), `POST /api/execution-workspaces/:id/reconcile-branch`.
+  and base-ref recovery, execution blockers, write-denied notice, "retry access check".
+  Since the 2026-10-22 sync, an interrupted task shows one state instead of separate recovery,
+  failed-run and saved-message warnings: "Retry available", "Trying again in Ns" (scheduled retry), or
+  "Taking longer than usual", with a single Retry button. Retry is also offered on task rows and in
+  the Inbox. The "Recovery details" panel and the "Continue from saved sources" form are gone from the
+  old UI; the server now recovers saved work itself.
+- **Requests:** `POST /api/issues/:issueId/retry` (Retry, with an idempotency key and the run it saw),
+  `POST /api/issues/:id/recovery-actions/resolve`, `POST /api/companies/:companyId/issues` (reissue),
+  `POST /api/execution-workspaces/:id/reconcile-branch`. The interruption state arrives on the task.
+- **Unused by the old UI:** `GET /api/issues/:id/recovery-actions`,
+  `POST /api/issues/:id/recovery-actions/reconstruct-workspace` (continue from saved sources) and the new
+  `POST /api/issues/:id/recovery-actions/recover-workspace`.
 
 ### `tasks/runner-goal`: Runner goal
 

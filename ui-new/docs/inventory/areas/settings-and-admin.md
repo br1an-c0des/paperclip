@@ -11,8 +11,8 @@ Many settings pages can be hidden by an operator with `PAPERCLIP_HIDDEN_SETTINGS
 
 | Page | Route (under `/:co`) | What it does |
 | --- | --- | --- |
-| General (`CompanySettings`) | `/company/settings` | Organization name, description, logo; "require board approval for new hires"; interaction governance (who may resolve agent requests); decision model (when fast responses are off); instance general settings for admins; archive the company. |
-| Connections (`CompanyConnections`) | `/company/settings/connections` | Decision model connection and fast-response model, each with a billed setup test. |
+| General (`CompanySettings`) | `/company/settings` | Organization name, description, logo; "require board approval for new hires"; interaction governance (who may resolve agent requests); agent observability (where managed Codex and Claude Code runs send OpenTelemetry logs and traces, with a test); instance general settings for admins; archive the company. |
+| Connections (`CompanyConnections`) | `/company/settings/connections` | Decision model connection; prompt injection prevention (an optional model check on tool results, with a regex fallback, a model picker and a test); fast-response model (flag `enableFastResponses`). Each has a setup test. |
 | Members (`CompanyAccess`) | `/company/settings/members` (`?tab=invites`) | Members and roles; invites (create, list); join requests. |
 | Secrets (`Secrets`) | `/company/settings/secrets` | Company secrets (create, edit, delete, remote import); secret providers and provider configs (e.g. AWS) with discovery and health; user secret definitions; your own user secrets; secret proposals from agents. |
 | Export (`CompanyExport`) | `/company/export/*` | Export the company (agents, projects and more) with preview and fidelity report. |
@@ -21,13 +21,15 @@ Many settings pages can be hidden by an operator with `PAPERCLIP_HIDDEN_SETTINGS
 | Join requests (`JoinRequestQueue`) | `/inbox/requests` | Approve or reject requests to join the company. |
 
 Resources: `PATCH /api/companies/:companyId`, `/logo`, `/archive`, `/decision-model` (+ `/test`),
-`/fast-response` (+ `/models`, `/test`), `/members`, `/invites`, `/join-requests`, `/secrets*`,
+`/observability` (`GET|PUT|DELETE`, + `/test`), `/prompt-injection-prevention` (`GET|PUT`, + `/models`,
+`/test`), `/fast-response` (+ `/models`, `/test`), `/members`, `/invites`, `/join-requests`, `/secrets*`,
 `/secret-providers*`, `/secret-provider-configs*`, `/user-secret-definitions`, `/me/user-secrets`,
 `/secret-proposals`, `/exports` (+ `/preview`), `/export/fidelity`, company import (`/preview`, jobs,
 `/api/companies/import/transfers`), `GET|PATCH /api/instance/settings`.
 
-Notes: decision model setup moves from General to Connections when fast responses are enabled
-(`doc/decision-models.md`). Decision charges appear under Activity → Costs.
+Notes: since the 2026-10-22 upstream sync, decision model setup is always on Connections (before, it
+was on General unless fast responses were on), and General shows agent observability in its place.
+Decision charges appear under Activity → Costs.
 
 ## Instance settings
 
@@ -56,7 +58,7 @@ terminal WebSocket (`pages/CompanyEnvironments.tsx`).
 | --- | --- | --- |
 | Library (`CompanySkills`) | `/skills/*` | Company skill library in folders; install from the catalog; import; scan projects for skills; browse a project's skills; assign to agents. |
 | Sources (`SkillSources`) | `/skills/sources` (+ `/:sourceId`) | Skill sources (git repositories): add, preview, discover, adopt a project's repository, edit, remove. |
-| Studio (`SkillStudio`) | `/skills/studio` (+ `/new`, `/:skillId`) | Author and edit skills; test them with test-run templates (runs a real agent task); review interactions the test produces. |
+| Studio (`SkillStudio`) | `/skills/studio` (+ `/new`, `/:skillId`) | Author and edit skills; test them with test-run templates (runs a real agent task); review interactions the test produces. In the streamlined shell, `/skills/studio` itself now shows the library filtered to authored skills (`CompanySkills`); `/new` and `/:skillId` still open the studio. |
 
 Resources: `/api/companies/:companyId/skills*` (`/catalog`, `/import`, `/install-catalog`,
 `/scan-projects`, `/browse-project`), `/skill-sources*`, `/skill-test-run-templates`, `/folders*`.
@@ -88,10 +90,11 @@ still means a substantial amount of UI.
 
 | Page | Route (under `/:co`) | What it does |
 | --- | --- | --- |
-| Activity hub (`AuditHub`, `CompanyActivity`) | `/activity`, `/activity/runs|costs|budgets|timeline` | Activity log; runs list (filter by agent); costs by agent, model, provider, biller, project and user, finance events and summaries, quota windows, subscriptions, data quality; budgets (policies, incidents); timeline; agent actions audit with CSV export; decision-model call history. |
+| Activity hub (`AuditHub`, `CompanyActivity`) | `/activity`, `/activity/runs|costs|budgets|timeline|commentary` | Activity log (with a case filter when `enableCases` is on); runs list (filter by agent); costs by agent, model, provider, biller, project and user, finance events and summaries, quota windows, subscriptions, data quality; budgets (policies, incidents); timeline; agent commentary (suggestions and complaints agents submit while working, filtered and paged by 50, each with a shareable link); agent actions audit with CSV export; decision-model call history. |
 
 Resources: `/api/companies/:companyId/activity`, `/heartbeat-runs`, `/costs/*`, `/budgets/*`,
-`/budget-incidents`, `/audit/agent-actions` (+ `.csv`), `/decision-model/history`.
+`/budget-incidents`, `/audit/agent-actions` (+ `.csv`), `/decision-model/history`,
+`/agent-commentary` (+ `/:id`).
 Upstream recipes: `maps/feature-map/activity.md`, `budgets-costs.md`.
 
 Note: an agent's runs, costs and budget link here filtered to the agent ([agents](agents.md)).

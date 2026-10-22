@@ -76,15 +76,20 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   shell (`/ai-connections/*`, `/adapters/:type/login-sessions/*`, `/adapters/:type/test-environment`).
 - **Notes:** a hire that needs a formal approval shows "pending approval" until approved
   (`POST /api/agents/:id/approve`). Codex hires default to Paperclip Runner on a qualified target (flag
-  `enableNativeRunner`).
+  `enableNativeRunner`). Since the 2026-10-22 sync, the setup flow saves a paused agent record as soon as
+  the name is submitted and finishes the hire on that record (`POST /api/companies/:companyId/agents`,
+  then `PATCH /api/agents/:id`), can probe the chosen environment
+  (`POST /api/environments/:environmentId/probe`), and new Claude (qualified macOS and Linux targets),
+  OpenCode and Pi agents also default to Paperclip Runner.
 
 ## Agent detail
 
 ### `agents/overview`: Overview
 
 - **What:** identity (public key, creator), status and lifecycle state, capabilities, skills summary,
-  latest run card, recent tasks, board link; header actions: run now, run with provider trace, pause or
-  resume, clear error, terminate.
+  latest run card, recent tasks, board link; header actions: run now, pause or resume, clear error,
+  terminate. (The header's "Run with provider trace" button was removed upstream on 2026-10-22; the
+  agent's saved tracing setting and the run detail's "Re-run with provider trace" remain.)
 - **Requests:** `GET /api/agents/:id`, `/identity`, `/runtime-state`, `GET /api/companies/:companyId/issues`
   (agent filter), `GET /api/companies/:companyId/heartbeat-runs`, `POST /api/agents/:id/heartbeat/invoke`.
 
@@ -127,7 +132,9 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   `.../login-sessions/*`; Muse: `GET|POST /api/companies/:companyId/agents/:agentId/muse-binding`
   (`/verify`, `/revoke`, `/attest-detector-cleanup`, `/attest-stop`), `POST /api/agents/:id/pause`.
 - **Notes:** unsaved changes prompt before navigating away. Built-in agents show their own bundle panel
-  (`BuiltInBundlePanel`) and limit what can change.
+  (`BuiltInBundlePanel`) and limit what can change. Since the 2026-10-22 sync, existing Claude and
+  Codex agents are offered "Upgrade to Paperclip Runner", which saves the switch together with any
+  unsaved changes.
 
 ### `agents/secrets`: Secrets
 

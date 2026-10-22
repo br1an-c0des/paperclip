@@ -24,20 +24,22 @@ cheatsheet, the command palette, global dialogs, and plugin overlays.
   - *Top:* Search, Dashboard (with live-run count), Inbox (hidden when combined into Tasks), Chat,
     Decisions, Status (beta), Conference Room.
   - *Work:* Chat (as a rail when Agent Chat is on), Tasks (with inbox badge when combined), Projects with
-    starred projects, Routines, Artifacts, Cases (beta), Pipelines, Goals, Workspaces.
+    starred projects, Routines, Artifacts, Cases (beta), Goals, Workspaces.
   - *Org:* Agents, Skills, Connectors (Apps), Audit (Activity hub).
   - Agents list (`SidebarAgents`): your agents with status, pause/resume, wake; primary agent first.
-  - Recent tasks (`SidebarRecentTasks`) with wake action.
+  - Recent tasks (`SidebarRecentTasks`) with wake action; since the 2026-10-22 sync they load as
+    bounded summaries (`GET /api/companies/:companyId/issues/summaries?ids=`).
   - Company menu: switch organization, create organization.
   - Account menu: view profile, settings, invite people, documentation, share feedback, sign out.
   - Plugin launchers and slots.
 - **Requests:** `GET /api/companies/:companyId/agents`, `/built-in-agents`, `/attention` (badge),
   `/approvals` (badge), `/live-runs`, `GET /api/companies/:companyId/resource-memberships/me`,
   `POST /api/agents/:id/pause|resume|wakeup`, `GET /api/companies` (company list), `POST /api/companies`.
-- **Notes:** nine links appear or disappear with flags: Inbox (`enableCombinedInboxTasks`), Chat
+- **Notes:** eight links appear or disappear with flags: Inbox (`enableCombinedInboxTasks`), Chat
   (`enableAgentChat`), Decisions (`enableDecisions`), Status (`enableStatusCards`), Conference Room
-  (`enableConferenceRoomChat`), Cases (`enableCases`), Pipelines (`enablePipelines`), Goals
-  (`enableGoalsSidebarLink`), Workspaces (`enableIsolatedWorkspaces`, hidden when the chat rail shows).
+  (`enableConferenceRoomChat`), Cases (`enableCases`), Goals (`enableGoalsSidebarLink`), Workspaces
+  (`enableIsolatedWorkspaces`, hidden when the chat rail shows). (Pipelines and `enablePipelines` were
+  removed upstream on 2026-10-22.)
   Section collapse state and recent items are kept locally.
 
 ### `shell/contextual-sidebars`: Section sidebars
@@ -97,8 +99,9 @@ cheatsheet, the command palette, global dialogs, and plugin overlays.
 ### `shell/plugins`: Plugin extension points
 
 - **What:** installed plugins can add sidebar launchers and slots, app-shell overlays, project tabs,
-  company settings pages (`/company/settings/:settingsRoutePath/*`) and full pages
-  (`/:pluginRoutePath/*`). Plugin UI runs through a bridge (`plugins/bridge.ts`, including an
+  agent detail tabs (`detailTab` slots for agents, at `/agents/:agentId/plugin:<pluginKey>:<slotId>`;
+  added upstream on 2026-10-22), company settings pages (`/company/settings/:settingsRoutePath/*`) and
+  full pages (`/:pluginRoutePath/*`). Plugin UI runs through a bridge (`plugins/bridge.ts`, including an
   EventSource stream).
 - **Source:** `PluginSlotMount`, `PluginSlotOutlet`, `PluginLauncherOutlet`, `PluginAppShellOverlays`,
   `plugins/`.

@@ -76,9 +76,9 @@ These may be merged or regrouped in `ui-new`.
 
 ### Undecided
 
-Not yet placed in a tier: Dashboard (`Dashboard`, `DashboardLive`), Board chat (`BoardChat`), Pipelines
-(`Pipelines.tsx`: pipelines, review queue, learnings, item detail; `PipelineSettings`), Status cards
-(`StatusCards`), User profile (`UserProfile`).
+Not yet placed in a tier: Dashboard (`Dashboard`, `DashboardLive`), Board chat (`BoardChat`), Status cards
+(`StatusCards`), User profile (`UserProfile`). Pipelines were also here until upstream removed the
+experiment on 2026-10-22 (its data is kept, but the UI, API and CLI are gone).
 
 ### Tier 2: port mostly as-is
 

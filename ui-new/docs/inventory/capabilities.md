@@ -15,23 +15,23 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 
 | ID | Capability | New home | Status | Notes |
 | --- | --- | --- | --- | --- |
-| [shell/navigation](areas/app-shell.md#shellnavigation-sidebar) | Sidebar | | | |
+| [shell/navigation](areas/app-shell.md#shellnavigation-sidebar) | Sidebar | | | Upstream sync 2026-10-22: Pipelines link and `enablePipelines` removed; recent tasks load as summaries (`GET /api/companies/:companyId/issues/summaries`) |
 | [shell/contextual-sidebars](areas/app-shell.md#shellcontextual-sidebars-section-sidebars) | Section sidebars | | | |
 | [shell/command-palette](areas/app-shell.md#shellcommand-palette-command-palette) | Command palette | | | |
 | [shell/shortcuts](areas/app-shell.md#shellshortcuts-keyboard-shortcuts) | Keyboard shortcuts | | | |
 | [shell/dialogs](areas/app-shell.md#shelldialogs-global-create-dialogs) | Global create dialogs | | | |
 | [shell/live-updates](areas/app-shell.md#shelllive-updates-live-updates-and-toasts) | Live updates and toasts | | | |
 | [shell/company](areas/app-shell.md#shellcompany-company-context) | Company context | | | |
-| [shell/plugins](areas/app-shell.md#shellplugins-plugin-extension-points) | Plugin extension points | | | Needed before `ui-new` replaces the old UI: React for plugin areas, the bridge registry, module loader, slot mounts and the SDK's shared components ([FORK.md](../../../FORK.md#a-standalone-app-not-a-plugin)). |
+| [shell/plugins](areas/app-shell.md#shellplugins-plugin-extension-points) | Plugin extension points | | | Needed before `ui-new` replaces the old UI: React for plugin areas, the bridge registry, module loader, slot mounts and the SDK's shared components ([FORK.md](../../../FORK.md#a-standalone-app-not-a-plugin)).. Upstream sync 2026-10-22: plugins can add agent detail tabs (`detailTab` slots, `/agents/:agentId/plugin:<pluginKey>:<slotId>`) |
 | [shell/misc](areas/app-shell.md#shellmisc-other-shell-features) | Other shell features | | | |
 
 ### Tasks
 
 | ID | Capability | New home | Status | Notes |
 | --- | --- | --- | --- | --- |
-| [tasks/views](areas/tasks.md#tasksviews-task-views) | Task views | | | |
+| [tasks/views](areas/tasks.md#tasksviews-task-views) | Task views | | | Upstream sync 2026-10-22: Retry on interrupted task rows (`POST /api/issues/:issueId/retry`) |
 | [tasks/organize](areas/tasks.md#tasksorganize-filter-sort-group-board) | Filter, sort, group, board | | | |
-| [inbox-search/triage](areas/tasks.md#inbox-searchtriage-inbox-triage) | Inbox triage | | | |
+| [inbox-search/triage](areas/tasks.md#inbox-searchtriage-inbox-triage) | Inbox triage | | | Upstream sync 2026-10-22: Mine leaves out channel and routine work unless the person takes part, is assigned or is asked; Retry on interrupted tasks (`POST /api/issues/:issueId/retry`) |
 | [inbox-search/search](areas/tasks.md#inbox-searchsearch-search) | Search | | | |
 | [tasks/create](areas/tasks.md#taskscreate-new-task-dialog) | New-task dialog | | | |
 | [tasks/thread](areas/tasks.md#tasksthread-conversation-thread) | Conversation thread | | | |
@@ -48,7 +48,7 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 | [documents-artifacts/documents + /annotations](areas/tasks.md#documents-artifactsdocuments-and-annotations-task-documents) | Task documents | | | |
 | [documents-artifacts/attachments + /work-products](areas/tasks.md#documents-artifactsattachments-work-products-files-and-outputs) | Files and outputs | | | |
 | [tasks/workspace](areas/tasks.md#tasksworkspace-execution-workspace-on-the-task) | Execution workspace on the task | | | |
-| [tasks/recovery](areas/tasks.md#tasksrecovery-recovery-and-health-notices) | Recovery and health notices | | | Upstream sync 2026-10-15: execution blocker notice gained "Recovery details" (`GET /api/issues/:id/recovery-actions`, polled every 5s). Upstream sync 2026-10-18: "Continue from saved sources" after a destroyed workspace (`POST /api/issues/:id/recovery-actions/reconstruct-workspace`) |
+| [tasks/recovery](areas/tasks.md#tasksrecovery-recovery-and-health-notices) | Recovery and health notices | | | Upstream sync 2026-10-15: execution blocker notice gained "Recovery details" (`GET /api/issues/:id/recovery-actions`, polled every 5s). Upstream sync 2026-10-18: "Continue from saved sources" after a destroyed workspace (`POST /api/issues/:id/recovery-actions/reconstruct-workspace`). Upstream sync 2026-10-22: one interruption state with a single Retry (`POST /api/issues/:issueId/retry`) replaces the recovery notices; "Recovery details" (`GET /api/issues/:id/recovery-actions`) and "Continue from saved sources" (`/reconstruct-workspace`) are no longer used by the old UI |
 | [tasks/runner-goal](areas/tasks.md#tasksrunner-goal-runner-goal) | Runner goal | | | |
 | [tasks/feedback](areas/tasks.md#tasksfeedback-feedback-votes) | Feedback votes | | | |
 | [tasks/integrations](areas/tasks.md#tasksintegrations-integrations-surfaced-on-a-task) | Integrations surfaced on a task | | | |
@@ -76,12 +76,12 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 | [agents/organization](areas/agents.md#agentsorganization-reporting-relationships) | Reporting relationships | | | |
 | [agents/primary-agent](areas/agents.md#agentsprimary-agent-personal-primary-agent) | Personal primary agent | | | |
 | [agents/membership](areas/agents.md#agentsmembership-join-leave-star) | Join, leave, star | | | |
-| [agents/hire](areas/agents.md#agentshire-new-agent) | New agent | | | Upstream sync 2026-10-18: personal Muse invitation variant (`enableMuse`, `/muse-invitations`) |
-| [agents/overview](areas/agents.md#agentsoverview-overview) | Overview | | | |
+| [agents/hire](areas/agents.md#agentshire-new-agent) | New agent | | | Upstream sync 2026-10-18: personal Muse invitation variant (`enableMuse`, `/muse-invitations`). Upstream sync 2026-10-22: the agent record is saved when the name is submitted, then updated (`POST /api/companies/:companyId/agents`, `PATCH /api/agents/:id`); environment probe (`POST /api/environments/:environmentId/probe`) |
+| [agents/overview](areas/agents.md#agentsoverview-overview) | Overview | | | Upstream sync 2026-10-22: header "Run with provider trace" removed (re-run with trace stays on run detail) |
 | [agents/lifecycle](areas/agents.md#agentslifecycle-pause-resume-terminate-recover) | Pause, resume, terminate, recover | | | |
 | [agents/instructions](areas/agents.md#agentsinstructions-instructions) | Instructions | | | |
 | [agents/skills](areas/agents.md#agentsskills-skills) | Skills | | | |
-| [agents/runtime](areas/agents.md#agentsruntime-harness--runtime-configuration) | Harness / Runtime configuration | | | Upstream sync 2026-10-18: Muse connection panel for Muse-run agents (`/agents/:agentId/muse-binding/*`, `enableMuse`) |
+| [agents/runtime](areas/agents.md#agentsruntime-harness--runtime-configuration) | Harness / Runtime configuration | | | Upstream sync 2026-10-18: Muse connection panel for Muse-run agents (`/agents/:agentId/muse-binding/*`, `enableMuse`). Upstream sync 2026-10-22: "Upgrade to Paperclip Runner" for existing Claude and Codex agents |
 | [agents/secrets](areas/agents.md#agentssecrets-secrets) | Secrets | | | |
 | [agents/tools](areas/agents.md#agentstools-tools) | Tools | | | |
 | [agents/channels](areas/agents.md#agentschannels-channels) | Channels | | | |
@@ -131,9 +131,9 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 
 | ID | Capability | New home | Status | Notes |
 | --- | --- | --- | --- | --- |
-| [cases/browse](areas/cases.md#casesbrowse-case-list) | Case list | | | |
-| [cases/structure + /history](areas/cases.md#casesstructure-and-history-case-detail) | Case detail | | | |
-| [cases/task-links](areas/cases.md#casestask-links-linked-work) | Linked work | | | |
+| [cases/browse](areas/cases.md#casesbrowse-case-list) | Case list | | | Upstream sync 2026-10-22: read-only (inline edits and label filter removed, `PATCH /api/cases/:id` unused); type filter (`GET /api/companies/:companyId/cases/types`) |
+| [cases/structure + /history](areas/cases.md#casesstructure-and-history-case-detail) | Case detail | | | Upstream sync 2026-10-22: read-only; document editing, revisions, annotations and event history removed; primary-task document previews and handoff history (`GET /api/cases/:caseId/handoffs`) |
+| [cases/task-links](areas/cases.md#casestask-links-linked-work) | Linked work | | | Upstream sync 2026-10-22: primary task summary (phase, workflow, pending handoff) and related task links replace the embedded task components |
 
 ## Tier 2: port mostly as-is
 
@@ -141,11 +141,11 @@ Tracked per page group; see [areas/settings-and-admin.md](areas/settings-and-adm
 
 | Area | Pages | New home | Status | Notes |
 | --- | --- | --- | --- | --- |
-| [Company settings](areas/settings-and-admin.md#company-settings) | General, Connections, Members, Secrets, Export, Import, Plugin settings pages, Join requests | | | |
+| [Company settings](areas/settings-and-admin.md#company-settings) | General, Connections, Members, Secrets, Export, Import, Plugin settings pages, Join requests | | | Upstream sync 2026-10-22: General gains agent observability (`/observability`, + `/test`); decision model always on Connections; Connections gains prompt injection prevention (`/prompt-injection-prevention`, + `/models`, `/test`) |
 | [Instance settings](areas/settings-and-admin.md#instance-settings) | Profile, Environments, Access, Experimental, Plugins, Adapters, Plugin pages | | | |
-| [Skills](areas/settings-and-admin.md#skills) | Library, Sources, Studio | | | |
+| [Skills](areas/settings-and-admin.md#skills) | Library, Sources, Studio | | | Upstream sync 2026-10-22: streamlined `/skills/studio` shows the library filtered to authored skills |
 | [Apps and tools ("Connectors")](areas/settings-and-admin.md#apps-and-tools-connectors) | Browse, Connect, App detail, Review, Assistant connection, Gateways, Advanced, Chat endpoints | | | |
-| [Activity and costs](areas/settings-and-admin.md#activity-and-costs) | Activity hub | | | |
+| [Activity and costs](areas/settings-and-admin.md#activity-and-costs) | Activity hub | | | Upstream sync 2026-10-22: Commentary tab (`/activity/commentary`; `GET /api/companies/:companyId/agent-commentary`, `/:id`); case filter on the activity log |
 | [Companies and onboarding](areas/settings-and-admin.md#companies-and-onboarding) | Companies, Onboarding | | | |
 | [Sign-in and connect flows (outside a company)](areas/settings-and-admin.md#sign-in-and-connect-flows-outside-a-company) | Sign in, Board claim, CLI auth, Invite, MCP connect, Chat identity, Cloud OAuth handoff | | | |
 
@@ -157,4 +157,4 @@ Tracked per page group; see [areas/settings-and-admin.md](areas/settings-and-adm
 | Plugin extension points | Sidebar slots and launchers, shell overlays, project tabs, settings pages, full pages ([app shell](areas/app-shell.md)). |
 | Live updates and toasts | Company event socket and toast rules ([app shell](areas/app-shell.md)). |
 | Keyboard shortcuts | Global, list, task-detail and decision shortcuts ([app shell](areas/app-shell.md)). |
-| Undecided areas | Dashboard, Board chat, Pipelines, Status cards, User profile: not yet placed in a tier ([README](README.md#undecided)). |
+| Undecided areas | Dashboard, Board chat, Status cards, User profile: not yet placed in a tier ([README](README.md#undecided)). Pipelines were removed upstream on 2026-10-22. |
