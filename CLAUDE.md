@@ -69,6 +69,7 @@ corepack pnpm --filter @paperclipai/ui-new inventory # regenerate the existing-U
 git sync-master                                      # fast-forward master from upstream and push it
 ```
 
-To sync with upstream, run the `upstream-sync` skill (`/upstream-sync`). It merges on a `sync/<date>`
-branch, checks upstream's changes against FORK-PATCHES.md, regenerates the inventory, and moves
-`new-ui` only after approval. `git sync-ui` merges straight into `new-ui` and is the manual fallback.
+To sync with upstream, run the `upstream-sync` skill (`/upstream-sync`). It first outlines the
+unsynced upstream commits (features, bug fixes) and waits for your go-ahead. Then it merges on a
+`sync/<date>` branch, checks upstream's changes against FORK-PATCHES.md, regenerates the inventory,
+and moves `new-ui` only after approval. `git sync-ui` merges straight into `new-ui` and is the manual fallback.

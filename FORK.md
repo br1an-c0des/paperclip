@@ -130,9 +130,12 @@ or every few days); small merges are much easier than large ones.
 In Claude Code, run `/upstream-sync`. The skill
 ([.claude/skills/upstream-sync/SKILL.md](.claude/skills/upstream-sync/SKILL.md)):
 
-1. Updates `master` from upstream and pushes it to origin.
-2. Summarizes the new commits and checks them against [FORK-PATCHES.md](FORK-PATCHES.md).
-3. Merges `master` into a new local `sync/<date>` branch, resolving the conflicts its policy lets
+1. Fetches upstream and outlines the commits `new-ui` doesn't have yet: the larger new features,
+   the bug fixes by area, other changes, and what to expect from the merge. Then it stops and
+   waits; nothing is pushed or merged until you give the go-ahead.
+2. Updates `master` from upstream, pushes it to origin, and checks the new commits against
+   [FORK-PATCHES.md](FORK-PATCHES.md).
+3. Merges them into a new local `sync/<date>` branch, resolving the conflicts its policy lets
    it decide alone.
 4. Asks you about anything else, giving its options and a recommendation.
 5. Runs the checks: install, typechecks, tests near fork patches, the migration check, and the
