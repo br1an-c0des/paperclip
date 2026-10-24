@@ -38,18 +38,18 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 | [tasks/thread](areas/tasks.md#tasksthread-conversation-thread) | Conversation thread | [3 Activity thread](../design/boards.md#board-3), [6 Task modal](../design/boards.md#board-6) | | |
 | [tasks/discussion](areas/tasks.md#tasksdiscussion-comment-and-reassign) | Comment and reassign | [3 Activity thread](../design/boards.md#board-3), [6 Task modal](../design/boards.md#board-6) | | |
 | [steering/*](areas/tasks.md#steering-queued-messages-steer-interrupt-stop) | Queued messages, steer, interrupt, stop | [3 Activity thread](../design/boards.md#board-3), [16 Run modal](../design/boards.md#board-16) | | |
-| [tasks/interactions](areas/tasks.md#tasksinteractions-agent-requests-in-the-thread) | Agent requests in the thread | [3 Activity thread](../design/boards.md#board-3), [15 Request cards](../design/boards.md#board-15) | | |
+| [tasks/interactions](areas/tasks.md#tasksinteractions-agent-requests-in-the-thread) | Agent requests in the thread | [3 Activity thread](../design/boards.md#board-3), [15 Request cards](../design/boards.md#board-15) | |. Upstream sync 2026-10-24: dismiss any request to history without answering (`POST /api/issues/:id/interactions/:interactionId/dismiss`) |
 | [tasks/approvals](areas/tasks.md#tasksapprovals-approvals-on-a-task) | Approvals on a task | [14 Inbox](../design/boards.md#board-14), [15 Request cards](../design/boards.md#board-15) | | |
 | [tasks/run-control](areas/tasks.md#tasksrun-control-runs-live-state-and-run-debugging) | Runs, live state and run debugging | [16 Run modal](../design/boards.md#board-16) | | |
-| [tasks/properties](areas/tasks.md#tasksproperties-properties-panel) | Properties panel | [2 Task details](../design/boards.md#board-2), [6 Task modal](../design/boards.md#board-6) | | |
+| [tasks/properties](areas/tasks.md#tasksproperties-properties-panel) | Properties panel | [2 Task details](../design/boards.md#board-2), [6 Task modal](../design/boards.md#board-6) | |. Upstream sync 2026-10-24: Routine row links a routine-created task to its routine (`GET /api/routines/:id`) |
 | [task-coordination/delegation + /dependencies](areas/tasks.md#task-coordinationdelegation-and-dependencies-subtasks-and-blockers) | Subtasks and blockers | [2 Task details](../design/boards.md#board-2) | | |
 | [task-coordination/tree-control](areas/tasks.md#task-coordinationtree-control-pause-resume-cancel-restore-a-task-tree) | Pause, resume, cancel, restore a task tree | | | |
 | [tasks/lifecycle](areas/tasks.md#taskslifecycle-other-header-actions) | Other header actions | | | |
 | [tasks/privacy](areas/tasks.md#tasksprivacy-private-tasks-and-sharing) | Private tasks and sharing | [7b New task](../design/boards.md#board-7b) | | |
 | [documents-artifacts/documents + /annotations](areas/tasks.md#documents-artifactsdocuments-and-annotations-task-documents) | Task documents | [5 Docs and files](../design/boards.md#board-5), [7 Task modal with docs](../design/boards.md#board-7) | | |
-| [documents-artifacts/attachments + /work-products](areas/tasks.md#documents-artifactsattachments-work-products-files-and-outputs) | Files and outputs | [5 Docs and files](../design/boards.md#board-5), [7 Task modal with docs](../design/boards.md#board-7) | | |
+| [documents-artifacts/attachments + /work-products](areas/tasks.md#documents-artifactsattachments-work-products-files-and-outputs) | Files and outputs | [5 Docs and files](../design/boards.md#board-5), [7 Task modal with docs](../design/boards.md#board-7) | |. Upstream sync 2026-10-24: Artifacts V1 presentation in the panel tab and thread behind `enableArtifactsV1` |
 | [tasks/workspace](areas/tasks.md#tasksworkspace-execution-workspace-on-the-task) | Execution workspace on the task | [2 Task details](../design/boards.md#board-2), [7b New task](../design/boards.md#board-7b) | | |
-| [tasks/recovery](areas/tasks.md#tasksrecovery-recovery-and-health-notices) | Recovery and health notices | | | Upstream sync 2026-10-15: execution blocker notice gained "Recovery details" (`GET /api/issues/:id/recovery-actions`, polled every 5s). Upstream sync 2026-10-18: "Continue from saved sources" after a destroyed workspace (`POST /api/issues/:id/recovery-actions/reconstruct-workspace`). Upstream sync 2026-10-22: one interruption state with a single Retry (`POST /api/issues/:issueId/retry`) replaces the recovery notices; "Recovery details" (`GET /api/issues/:id/recovery-actions`) and "Continue from saved sources" (`/reconstruct-workspace`) are no longer used by the old UI |
+| [tasks/recovery](areas/tasks.md#tasksrecovery-recovery-and-health-notices) | Recovery and health notices | | | Upstream sync 2026-10-15: execution blocker notice gained "Recovery details" (`GET /api/issues/:id/recovery-actions`, polled every 5s). Upstream sync 2026-10-18: "Continue from saved sources" after a destroyed workspace (`POST /api/issues/:id/recovery-actions/reconstruct-workspace`). Upstream sync 2026-10-22: one interruption state with a single Retry (`POST /api/issues/:issueId/retry`) replaces the recovery notices; "Recovery details" (`GET /api/issues/:id/recovery-actions`) and "Continue from saved sources" (`/reconstruct-workspace`) are no longer used by the old UI. Upstream sync 2026-10-24: project access denial notice with a link to the agent's project access and an explicit retry (`GET /api/agents/:id/project-access`) |
 | [tasks/runner-goal](areas/tasks.md#tasksrunner-goal-runner-goal) | Runner goal | | | |
 | [tasks/feedback](areas/tasks.md#tasksfeedback-feedback-votes) | Feedback votes | | | |
 | [tasks/integrations](areas/tasks.md#tasksintegrations-integrations-surfaced-on-a-task) | Integrations surfaced on a task | | | |
@@ -73,7 +73,7 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 
 | ID | Capability | New home | Status | Notes |
 | --- | --- | --- | --- | --- |
-| [agents/roster](areas/agents.md#agentsroster-agents-list-and-org-chart) | Agents list and org chart | [19 Org dashboard](../design/boards.md#board-19), [20 Manage agents](../design/boards.md#board-20) | | |
+| [agents/roster](areas/agents.md#agentsroster-agents-list-and-org-chart) | Agents list and org chart | [19 Org dashboard](../design/boards.md#board-19), [20 Manage agents](../design/boards.md#board-20) | |. Upstream sync 2026-10-24: status tabs removed (old tab URLs redirect to the full roster); harness filter and bulk edit of AI connection and default model (`PATCH /api/agents/:id` `runtimeSettings`) |
 | [agents/organization](areas/agents.md#agentsorganization-reporting-relationships) | Reporting relationships | [19 Org dashboard](../design/boards.md#board-19) | | |
 | [agents/primary-agent](areas/agents.md#agentsprimary-agent-personal-primary-agent) | Personal primary agent | | | |
 | [agents/membership](areas/agents.md#agentsmembership-join-leave-star) | Join, leave, star | | | |
@@ -82,11 +82,11 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 | [agents/lifecycle](areas/agents.md#agentslifecycle-pause-resume-terminate-recover) | Pause, resume, terminate, recover | [20 Manage agents](../design/boards.md#board-20) | | |
 | [agents/instructions](areas/agents.md#agentsinstructions-instructions) | Instructions | [27 Agent instructions](../design/boards.md#board-27) | | |
 | [agents/skills](areas/agents.md#agentsskills-skills) | Skills | [30 Settings outline](../design/boards.md#board-30) (outline only) | | |
-| [agents/runtime](areas/agents.md#agentsruntime-harness--runtime-configuration) | Harness / Runtime configuration | [26 Agent settings](../design/boards.md#board-26) | | Upstream sync 2026-10-18: Muse connection panel for Muse-run agents (`/agents/:agentId/muse-binding/*`, `enableMuse`). Upstream sync 2026-10-22: "Upgrade to Paperclip Runner" for existing Claude and Codex agents |
+| [agents/runtime](areas/agents.md#agentsruntime-harness--runtime-configuration) | Harness / Runtime configuration | [26 Agent settings](../design/boards.md#board-26) | | Upstream sync 2026-10-18: Muse connection panel for Muse-run agents (`/agents/:agentId/muse-binding/*`, `enableMuse`). Upstream sync 2026-10-22: "Upgrade to Paperclip Runner" for existing Claude and Codex agents. Upstream sync 2026-10-24: qualify the agent's Runner (`POST /api/agents/:id/qualify-runner`) |
 | [agents/secrets](areas/agents.md#agentssecrets-secrets) | Secrets | [30 Settings outline](../design/boards.md#board-30) (outline only) | | |
 | [agents/tools](areas/agents.md#agentstools-tools) | Tools | [30 Settings outline](../design/boards.md#board-30) (outline only) | | |
 | [agents/channels](areas/agents.md#agentschannels-channels) | Channels | [30 Settings outline](../design/boards.md#board-30) (outline only) | | |
-| [agents/permissions](areas/agents.md#agentspermissions-permissions--trust) | Permissions / Trust | [30 Settings outline](../design/boards.md#board-30) (outline only) | | |
+| [agents/permissions](areas/agents.md#agentspermissions-permissions--trust) | Permissions / Trust | [30 Settings outline](../design/boards.md#board-30) (outline only) | |. Upstream sync 2026-10-24: project access scope, view and add projects (`GET|POST /api/agents/:id/project-access`) |
 | [agents/api-keys](areas/agents.md#agentsapi-keys-api-keys) | API keys | [30 Settings outline](../design/boards.md#board-30) (outline only) | | |
 | [agents/revisions](areas/agents.md#agentsrevisions-configuration-revisions) | Configuration revisions | [30 Settings outline](../design/boards.md#board-30) (outline only) | | |
 | [agents/audit](areas/agents.md#agentsaudit-agent-actions-audit) | Agent actions audit | | | |
@@ -126,7 +126,7 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 
 | ID | Capability | New home | Status | Notes |
 | --- | --- | --- | --- | --- |
-| [documents-artifacts/library](areas/artifacts.md#documents-artifactslibrary-artifact-library) | Artifact library | [9 Project docs](../design/boards.md#board-9) | | |
+| [documents-artifacts/library](areas/artifacts.md#documents-artifactslibrary-artifact-library) | Artifact library | [9 Project docs](../design/boards.md#board-9) | |. Upstream sync 2026-10-24: Artifacts V1 presentation (stacks and tiles) behind `enableArtifactsV1`; design lab in `ui/src/artifact-directions` |
 
 ### Cases
 

@@ -40,6 +40,12 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   `GET /api/companies/:companyId/live-runs`, `GET /api/companies/:companyId/built-in-agents`,
   `POST /api/companies/:companyId/built-in-agents/:key/provision`.
 - **Notes:** `/org` redirects to the roster's org view. The production shell defaults to org view.
+  Since the 2026-10-24 sync, the status tabs are gone: `/agents/active|paused|error|builtin` redirect to
+  the full roster, and paused agents show a badge instead. The list filters by harness (icons) and can
+  bulk edit the selected agents' AI connection and default model, with compatible choices, a preview
+  of the change, per-agent save results and retry (`components/agents/AgentBulkSettingsSheet.tsx`;
+  `PATCH /api/agents/:id` with `runtimeSettings`, `GET /api/companies/:companyId/ai-connections`,
+  `GET /api/companies/:companyId/adapters/:type/models`).
 
 ### `agents/organization`: Reporting relationships
 
@@ -124,10 +130,11 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   prompt template (and legacy bootstrap prompt), default environment and override, heartbeat on interval,
   wake on demand, cooldown, max concurrent runs, timeout, interrupt grace period, continue after max-turn
   stop (attempts, delay), capture raw provider traces, browser access; adapter login (e.g. Claude login);
-  test environment. Agents run through Muse show a Muse connection panel: pair, verify, pause,
+  test environment; qualify the agent's Runner on its environment. Agents run through Muse show a Muse connection panel: pair, verify, pause,
   disconnect, record a detector-removal observation, attest that a worker stopped, and allow an
   externally billed provider (`enableMuse`).
 - **Requests:** `PATCH /api/agents/:id`, `POST /api/agents/:id/claude-login`,
+  `POST /api/agents/:id/qualify-runner` (since the 2026-10-24 sync),
   `GET /api/companies/:companyId/adapters/:type/models`, `.../detect-model`, `.../test-environment`,
   `.../login-sessions/*`; Muse: `GET|POST /api/companies/:companyId/agents/:agentId/muse-binding`
   (`/verify`, `/revoke`, `/attest-detector-cleanup`, `/attest-stop`), `POST /api/agents/:id/pause`.
@@ -159,8 +166,10 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
 
 ### `agents/permissions`: Permissions / Trust
 
-- **What:** trust presets and individual permissions (what the agent may do without approval).
-- **Requests:** `PATCH /api/agents/:id/permissions`.
+- **What:** trust presets and individual permissions (what the agent may do without approval). Since
+  the 2026-10-24 sync, project access: which projects a low-trust agent may read, and adding projects
+  to that scope while keeping its other restrictions (`components/AgentProjectAccessSettings.tsx`).
+- **Requests:** `PATCH /api/agents/:id/permissions`, `GET|POST /api/agents/:id/project-access`.
 
 ### `agents/api-keys`: API keys
 

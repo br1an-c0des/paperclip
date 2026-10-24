@@ -162,7 +162,11 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   them), questions (answer form), confirmations and checkbox confirmations (accept/reject), per-item
   verdicts, and connection intents (agent asks to connect an app or AI connection; complete, decline,
   set phase, adopt). Cards can be skipped or cancelled.
-- **Requests:** `POST /api/issues/:id/interactions/:interactionId/accept|reject|respond|verdicts|skip|cancel`;
+- **Dismiss** (since the 2026-10-24 sync): a person can set any request aside. It leaves the
+  composer reminders and stops gating completion, stays in the conversation history and can be
+  reopened from there. Dismissing never counts as an answer or approval (`dismissedAt`,
+  `dismissedByUserId` on the interaction).
+- **Requests:** `POST /api/issues/:id/interactions/:interactionId/accept|reject|respond|verdicts|skip|cancel|dismiss`;
   `/api/connection-intents/:interactionId/complete|decline|phase|setup-options`;
   `POST /api/agents/:agentId/connection-intents/:interactionId/adopt`;
   `PUT /api/companies/:companyId/ai-connections/default`.
@@ -195,7 +199,9 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
 - **What:**
   - *About:* status, priority, assignee, labels (and create label), project, parent, created / updated /
     started / completed, originating task, archived.
-  - *Relationships:* blocked by (search and add), blocking, subtasks with completion, depth.
+  - *Relationships:* blocked by (search and add), blocking, subtasks with completion, depth; the
+    source routine of a routine-created task, linked (since the 2026-10-24 sync,
+    `components/issue-properties/routine-origin-row.tsx`, `GET /api/routines/:id`).
   - *Execution:* execution policy (normal or auto, reviewers and approvers), model and model lane,
     monitor (external service; check now; cancel), watchdog (agent + instructions; open watchdog task),
     scheduled retry (retry now).
@@ -257,7 +263,9 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   `GET /api/attachments/:attachmentId/content`, `GET /api/issues/:id/work-products`,
   `POST .../work-products/:workProductId/review-document`, `GET /api/companies/:companyId/artifacts`,
   `GET /api/issues/:issueId/file-resources/list|content|resolve`, `GET /api/companies/:companyId/skills/:skillId`.
-- **Notes:** flag `enableExperimentalFileViewer` changes the file viewer.
+- **Notes:** flag `enableExperimentalFileViewer` changes the file viewer. Flag `enableArtifactsV1`
+  (since the 2026-10-24 sync, default off) switches the panel's Artifacts tab to compact rows and the
+  thread to grouped artifact rows (`components/artifacts/v1/*`).
 
 ### `tasks/workspace`: Execution workspace on the task
 
@@ -280,6 +288,9 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   "Taking longer than usual", with a single Retry button. Retry is also offered on task rows and in
   the Inbox. The "Recovery details" panel and the "Continue from saved sources" form are gone from the
   old UI; the server now recovers saved work itself.
+  Since the 2026-10-24 sync, a task stopped because its agent may not read the project explains the
+  denial and links to the agent's project access settings; after access is added, the task offers an
+  explicit retry (`components/TaskProjectAccessNotice.tsx`, `GET /api/agents/:id/project-access`).
 - **Requests:** `POST /api/issues/:issueId/retry` (Retry, with an idempotency key and the run it saw),
   `POST /api/issues/:id/recovery-actions/resolve`, `POST /api/companies/:companyId/issues` (reissue),
   `POST /api/execution-workspaces/:id/reconcile-branch`. The interruption state arrives on the task.

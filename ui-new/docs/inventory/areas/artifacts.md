@@ -25,6 +25,11 @@ Upstream recipe: `maps/feature-map/documents-artifacts.md` (`library`).
 - **Notes:** the same request, filtered by agent, feeds Agent Chat's work panel
   (`components/chat/AgentWorkPanels.tsx`). The task side panel's Artifacts tab lists the task's own
   outputs (work products and attachments) instead.
+- **Artifacts V1** (since the 2026-10-24 sync, flag `enableArtifactsV1`, default off): a new
+  presentation from upstream's artifact directions lab (`ui/src/artifact-directions`, a backend-free
+  design reference). The page shows paper stacks and tiles, the panel compact rows and the thread
+  grouped rows, using `--artifact-*` tokens and the primitives in `components/artifacts/v1/`. Same
+  requests; `adapters.ts` maps the API records onto the V1 kinds.
 
 ## Redesign notes
 
