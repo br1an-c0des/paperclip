@@ -1021,7 +1021,8 @@ function writeFlags({ fileInfo, pages, shellFiles, commit }) {
   const body = block.slice(0, block.indexOf("\n});"));
   const flags = [];
   let comment = "";
-  for (const line of body.split("\n")) {
+  // Split on CRLF too: Windows checkouts with core.autocrlf have \r before each \n.
+  for (const line of body.split(/\r?\n/)) {
     const c = line.match(/^\s*\/\/\s?(.*)$/);
     if (c) {
       comment += `${c[1]} `;
