@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capsule Stack style guide</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Fragment+Mono&amp;display=swap">
+<link rel="stylesheet" href="tokens.css">
+<style>
+/* Page scaffolding for this guide only. Component rules below match the boards (see design-system.md). */
+body { margin: 0; background: #0a0a0a; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; margin: 0; }
+.page { background: var(--ground); color: var(--text); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; }
+.cap { font-size: 12px; color: var(--muted); }
+.lbl { margin: 0; font-size: 12px; font-weight: 700; color: var(--muted); }
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.themes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(640px, 100%), 1fr)); }
+.theme { background: var(--ground); color: var(--text); padding: 44px 48px 72px; display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+.theme h2 { margin: 0; font-size: 44px; font-weight: 800; letter-spacing: -.04em; }
+.block { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 20px; align-items: start; }
+
+/* Capsules and indicators */
+.capsule { display: inline-block; width: 7px; height: 18px; border-radius: var(--r-pill); flex-shrink: 0; }
+.pill { height: 30px; padding: 0 12px 0 9px; border-radius: var(--r-pill); background: var(--ground); display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+.pill small { font-size: 13px; font-weight: 500; color: var(--muted); }
+.pbars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+.pbars i { width: 4px; border-radius: var(--r-pill); background: var(--pri-off); }
+.pbars i:nth-child(1) { height: 7px; } .pbars i:nth-child(2) { height: 10px; } .pbars i:nth-child(3) { height: 14px; }
+.pbars i.on { background: var(--pri-on); } .pbars i.crit { background: #f2272c; }
+.label { height: 26px; padding: 0 10px 0 8px; border-radius: var(--r-pill); border: 1px solid var(--edge); display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--body); }
+.label i { width: 8px; height: 8px; border-radius: 50%; }
+.tone { height: 26px; padding: 0 10px; border-radius: var(--r-pill); display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+.av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: #111113; font-size: 9px; font-weight: 800; box-sizing: border-box; flex-shrink: 0; }
+
+/* Selection */
+.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--r-pill); background: var(--well); align-self: flex-start; }
+.seg button { height: 28px; padding: 0 12px; border-radius: var(--r-pill); font-size: 13px; font-weight: 600; color: var(--body); }
+.seg button[aria-pressed="true"] { background: var(--sel); box-shadow: var(--sel-shadow); color: var(--text); font-weight: 800; }
+.navi { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: var(--r-pill); color: var(--body); font-weight: 600; text-decoration: none; }
+.navi:hover { background: var(--hover); }
+.navi[aria-current="page"] { background: var(--sel); box-shadow: var(--sel-shadow); color: var(--text); font-weight: 800; }
+
+/* Buttons */
+.b-pri { height: 38px; padding: 0 18px 0 14px; border-radius: var(--r-pill); background: var(--primary); color: var(--on-primary); font-weight: 800; display: inline-flex; align-items: center; gap: 6px; }
+.b-sec { height: 38px; padding: 0 16px; border-radius: var(--r-pill); border: 1px solid var(--edge); background: var(--card); color: var(--text); font-weight: 700; }
+.b-well { height: 36px; padding: 0 14px; border-radius: var(--r-pill); background: var(--well); color: var(--text); display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+.b-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--edge); background: var(--card); color: var(--body); }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; box-sizing: border-box; border-radius: var(--r-pill); border: 1px solid var(--edge); color: var(--body); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.pbtn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; box-sizing: border-box; border-radius: var(--r-pill); background: var(--primary); color: var(--on-primary); font-size: 13px; font-weight: 800; white-space: nowrap; }
+.dbtn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; box-sizing: border-box; border-radius: var(--r-pill); border: 1px solid color-mix(in srgb, var(--red-fg) 55%, transparent); color: var(--red-fg); font-size: 13px; font-weight: 700; }
+.quiet { height: 32px; padding: 0 8px; color: var(--muted); font-size: 13px; font-weight: 700; }
+.btn:hover, .b-sec:hover, .b-icon:hover { background: var(--well); }
+.tipbtn { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px 0 9px; border-radius: var(--r-pill); background: var(--violet-bg); color: var(--violet-fg); font-size: 13px; font-weight: 700; }
+.tipbtn:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--violet-fg) 50%, transparent); }
+
+/* Inputs */
+.field { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 10px; box-sizing: border-box; border: 1px solid var(--edge); border-radius: var(--r-field); background: var(--ground); color: var(--text); font-size: 14px; }
+.input { width: 100%; box-sizing: border-box; padding: 10px 14px; border: 1px solid var(--edge); border-radius: var(--r-inner); background: var(--ground); color: var(--text); font: inherit; outline: none; }
+.input::placeholder { color: var(--muted); }
+.input:focus { box-shadow: 0 0 0 2px var(--run-fg); }
+.input.title { font-family: var(--display); letter-spacing: -.02em; font-size: 22px; font-weight: 800; }
+.switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; border-radius: var(--r-pill); background: var(--pri-off); }
+.switch span { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--knob-off); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.switch[aria-checked="true"] { background: var(--primary); }
+.switch[aria-checked="true"] span { left: 19px; background: var(--card); }
+.opt { display: flex; align-items: flex-start; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--r-inner); font-size: 13px; line-height: 1.45; color: var(--body); text-align: left; }
+.opt small { display: block; font-size: 12px; color: var(--muted); }
+.opt.on { border-color: color-mix(in srgb, var(--run-fg) 75%, transparent); background: var(--run-bg); }
+.radio { width: 14px; height: 14px; flex-shrink: 0; margin-top: 2px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--edge); }
+.opt.on .radio { border: 4px solid color-mix(in srgb, var(--run-fg) 45%, transparent); }
+
+/* Menus, popovers, tooltips (shown open here; on the boards they start closed) */
+.menu { width: 300px; box-sizing: border-box; padding: 6px; border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--card); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 2px; }
+.menu .mi { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 0 10px; box-sizing: border-box; border-radius: 12px; text-align: left; font-size: 14px; color: var(--text); }
+.menu .mi:hover, .menu .mi[aria-selected="true"] { background: var(--well); }
+.menu .mi small { margin-left: auto; color: var(--muted); font-size: 12px; }
+.menu .mh { padding: 8px 10px 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.tip { width: 280px; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; box-sizing: border-box; border: 1px solid var(--edge); border-radius: var(--r-inner); background: var(--sel); box-shadow: var(--shadow-lg); color: var(--body); font-size: 13px; font-weight: 500; line-height: 1.5; }
+.tip b { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 800; }
+.flag { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; }
+
+/* Project header with rising disc stacks */
+.disc-col { position: relative; overflow: hidden; display: block; width: 32px; border-radius: 16px 16px 0 0; }
+.disc { position: absolute; left: 0; width: 32px; height: 32px; border-radius: 50%; box-shadow: 0 8px 10px -6px var(--disc-shadow); }
+
+/* Task rows */
+.grow { display: flex; align-items: center; gap: 10px; min-height: 50px; padding: 0 18px; border-top: 1px solid var(--row-line); }
+.grow:hover { background: var(--row-hover); }
+
+/* Request card */
+.rq { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 16px 22px 18px 38px; border: 1px solid var(--card-edge); border-radius: var(--r-card); background: var(--card); box-shadow: var(--shadow); overflow: hidden; }
+.rq::before { content: ""; position: absolute; left: 15px; top: 15px; bottom: 15px; width: 7px; border-radius: var(--r-pill); background: var(--dashed); }
+.k-q::before { background: var(--g-tide); } .k-p::before { background: var(--g-orchid); } .k-a::before { background: var(--g-ember); } .k-s::before { background: var(--g-lagoon); }
+.rq-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.rq-kind { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: var(--r-pill); font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+.k-q .rq-kind, .rq-kind.q { background: var(--cyan-bg); color: var(--cyan-fg); }
+.k-p .rq-kind, .rq-kind.p { background: var(--violet-bg); color: var(--violet-fg); }
+.k-a .rq-kind, .rq-kind.a { background: var(--amber-bg); color: var(--amber-fg); }
+.k-s .rq-kind, .rq-kind.s { background: var(--green-bg); color: var(--green-fg); }
+.rq-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: var(--r-pill); border: 1px solid var(--edge); color: var(--body); font-size: 11px; font-weight: 500; }
+.rq h3 { margin: 0; font-family: var(--display); letter-spacing: -.01em; font-size: 19px; font-weight: 800; line-height: 1.25; }
+.rq p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--body); }
+.rq-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Workload heatmap */
+.cell { width: 28px; height: 26px; border-radius: var(--r-cell); }
+.node { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px 0 5px; border-radius: var(--r-pill); background: var(--well); font-size: 13px; white-space: nowrap; }
+.node small { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<svg aria-hidden="true" width="0" height="0" style="position: absolute"><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.88" numOctaves="2" stitchTiles="stitch"></feTurbulence><feColorMatrix type="saturate" values="0"></feColorMatrix></filter></svg>
+
+<div class="page dark f-hanken">
+  <header style="padding: 56px 56px 40px; display: flex; flex-wrap: wrap; gap: 32px 56px; align-items: flex-end; justify-content: space-between">
+    <div style="flex: 1 1 520px; display: flex; flex-direction: column; gap: 12px">
+      <span class="mono cap">Paperclip ui-new · design system</span>
+      <h1 class="disp" style="margin: 0; font-size: 80px; font-weight: 800; line-height: .92">Capsule Stack</h1>
+      <p style="margin: 0; max-width: 600px; font-size: 17px; color: var(--body)">Raised cards and a white selection pill, with gradient capsules for status. One set of components in two themes. Dark is the default.</p>
+      <p class="cap" style="margin: 0">Colors and type come from <span class="mono">tokens.css</span>. The rules for using them are in <span class="mono">design-system.md</span>, and every screen is listed in <span class="mono">boards.md</span>.</p>
+    </div>
+    <div class="card" style="flex: 0 1 560px; padding: 20px 24px; display: flex; flex-direction: column; gap: 4px">
+      <span class="lbl">Type</span>
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line)">
+        <span class="disp" style="font-size: 34px; font-weight: 800; line-height: 1">trading workbench</span>
+        <span class="mono cap">Display · Hanken Grotesk 800</span>
+      </div>
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line)">
+        <span style="font-size: 14px; font-weight: 600">H4 download derivatives price data</span>
+        <span class="mono cap">UI · Hanken Grotesk 400–800</span>
+      </div>
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 10px 0 2px">
+        <span class="mono" style="font-size: 13px; color: var(--muted)">TRA-41 · run #7 · 02:14</span>
+        <span class="mono cap">IDs and code · Fragment Mono</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="themes" id="themes"></div>
+</div>
+
+<template id="theme-tpl">
+  <section class="theme">
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+      <h2 class="disp" data-name></h2>
+      <span class="mono cap" data-note></span>
+    </div>
+
+    <div class="stack">
+      <h3 class="lbl">Surfaces and text</h3>
+      <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px 12px" data-swatches></div>
+    </div>
+
+    <div class="stack">
+      <h3 class="lbl">Status capsules</h3>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px" data-statuses></div>
+    </div>
+
+    <div class="card block">
+      <h3 class="lbl">Tones: tinted background with matching text</h3>
+      <div class="row">
+        <span class="tone" style="background: var(--run-bg); color: var(--run-fg)"><span class="capsule live" style="width: 5px; height: 12px; background: var(--g-ion)"></span>Running</span>
+        <span class="tone" style="background: var(--violet-bg); color: var(--violet-fg)">Proposal</span>
+        <span class="tone" style="background: var(--amber-bg); color: var(--amber-fg)">Needs your approval</span>
+        <span class="tone" style="background: var(--red-bg); color: var(--red-fg)">Blocked by TRA-41</span>
+        <span class="tone" style="background: var(--green-bg); color: var(--green-fg)">Merged</span>
+        <span class="tone" style="background: var(--cyan-bg); color: var(--cyan-fg)">Question</span>
+      </div>
+      <span class="cap">run · violet · amber · red · green · cyan, each as --*-bg and --*-fg</span>
+    </div>
+
+    <div class="card block">
+      <h3 class="lbl">Indicators</h3>
+      <div class="row">
+        <span class="pill"><span class="capsule" style="background: var(--g-ion)"></span>In progress<small>3</small></span>
+        <span class="pill"><span class="capsule" style="background: var(--g-orchid)"></span>In review<small>2</small></span>
+        <span class="pill"><span class="capsule" style="background: var(--g-ember)"></span>Todo<small>4</small></span>
+        <span class="pill"><span class="capsule" style="background: var(--g-flare)"></span>Blocked<small>1</small></span>
+        <span class="pill"><span class="capsule" style="background: var(--g-ash)"></span>Backlog<small>3</small></span>
+        <span class="pill"><span class="capsule" style="background: var(--g-lagoon)"></span>Done<small>3</small></span>
+      </div>
+      <div class="row" style="gap: 18px; font-size: 13px; font-weight: 600; color: var(--body)">
+        <span class="row" style="gap: 7px; flex-wrap: nowrap"><span class="pbars" aria-hidden="true"><i class="crit"></i><i class="crit"></i><i class="crit"></i></span>Critical</span>
+        <span class="row" style="gap: 7px; flex-wrap: nowrap"><span class="pbars" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i></span>High</span>
+        <span class="row" style="gap: 7px; flex-wrap: nowrap"><span class="pbars" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i></span>Medium</span>
+        <span class="row" style="gap: 7px; flex-wrap: nowrap"><span class="pbars" aria-hidden="true"><i class="on"></i><i></i><i></i></span>Low</span>
+      </div>
+      <div class="row">
+        <span class="label"><i style="background: linear-gradient(135deg, #2fd12f, #22b5a5)"></i>data</span>
+        <span class="label"><i style="background: linear-gradient(135deg, #ff2bd6, #8b2cf0)"></i>strategies</span>
+        <span class="label"><i style="background: linear-gradient(135deg, #f2286f, #f2272c)"></i>bug</span>
+      </div>
+      <div class="row" style="gap: 16px">
+        <span class="row" style="gap: 8px"><span style="padding: 2px; border-radius: 50%; background: var(--g-ion)"><span class="av" style="border: 2px solid var(--card); background: linear-gradient(160deg, #2fd12f, #22b5a5)">QR</span></span><span style="font-size: 13px; font-weight: 600">Live ring: agent is running</span></span>
+        <span style="display: inline-flex">
+          <span class="av" style="border: 2px solid var(--card); background: linear-gradient(160deg, #2fd12f, #22b5a5); position: relative; z-index: 3"></span>
+          <span class="av" style="border: 2px solid var(--card); background: linear-gradient(160deg, #ff2bd6, #f2286f); margin-left: -9px; position: relative; z-index: 2"></span>
+          <span class="av" style="border: 2px solid var(--card); background: linear-gradient(160deg, #f7b52f, #f5822a); margin-left: -9px; position: relative; z-index: 1"></span>
+        </span>
+        <span style="min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 999px; background: linear-gradient(135deg, #ff2bd6, #f7b52f); color: #111113; font-size: 12px; font-weight: 800; display: grid; place-items: center">8</span>
+        <span class="av" style="background: var(--primary); color: var(--on-primary)">BA</span>
+      </div>
+      <span class="cap">Agents appear as ClipLab 3D avatars on the boards (see board 34); the gradient discs stand in for them in small spaces.</span>
+    </div>
+
+    <div class="grid2">
+      <div class="stack">
+        <h3 class="lbl">Selection</h3>
+        <div class="seg" role="group" aria-label="Example range"><button aria-pressed="false">Today</button><button aria-pressed="true">7 days</button><button aria-pressed="false">30 days</button></div>
+        <div style="display: flex; flex-direction: column; gap: 2px; max-width: 260px">
+          <a class="navi" href="#"><span class="av disp" style="width: 24px; height: 24px; font-size: 11px; background: linear-gradient(160deg, #ff2bd6, #8b2cf0)">g</span>gearBase<span style="margin-left: auto; color: var(--muted); font-size: 13px">11</span></a>
+          <a class="navi" href="#" aria-current="page"><span class="av disp" style="width: 24px; height: 24px; font-size: 11px; background: linear-gradient(160deg, #f7b52f, #f5822a)">t</span>trading workbench<span style="margin-left: auto; font-size: 13px">16</span></a>
+        </div>
+      </div>
+      <div class="stack">
+        <h3 class="lbl">Buttons</h3>
+        <div class="row">
+          <button class="b-pri"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Task</button>
+          <button class="b-sec">Request changes</button>
+        </div>
+        <div class="row">
+          <button class="pbtn">Approve</button><button class="btn">Pick someone else</button><button class="dbtn">Archive</button><button class="quiet">Not now</button>
+        </div>
+        <div class="row">
+          <button class="b-well"><span style="width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, #ff2bd6, #f7b52f)"></span>1 filter</button>
+          <button class="b-icon" aria-label="Search"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+          <button class="tipbtn"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"></path></svg>1 suggestion</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card block">
+      <h3 class="lbl">Inputs</h3>
+      <input class="input title" value="Backfill OKX funding history to 2022" aria-label="Example title">
+      <textarea class="input" rows="2" placeholder="Add a description, or paste a spec" aria-label="Example description" style="resize: vertical"></textarea>
+      <div class="grid2" style="gap: 16px">
+        <div class="stack">
+          <span class="field">Shared workspace<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: auto; color: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg></span>
+          <div class="row" style="gap: 12px"><button class="switch" role="switch" aria-checked="true" aria-label="Example on"><span></span></button><span>Require approval for new hires</span></div>
+          <div class="row" style="gap: 12px"><button class="switch" role="switch" aria-checked="false" aria-label="Example off"><span></span></button><span style="color: var(--body)">Share rated outputs</span></div>
+        </div>
+        <div class="stack" style="gap: 6px">
+          <button class="opt on"><span class="radio"></span><span>Backfill all of 2022–2024<small>About 6h of runs, $4 on Coinalyze</small></span></button>
+          <button class="opt"><span class="radio"></span><span>Only 2024 for now<small>Leaves ML testing on partial data</small></span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="stack">
+        <h3 class="lbl">Menu (opens 8px below its button)</h3>
+        <div class="menu" role="listbox" aria-label="Example priority">
+          <div class="mh">Priority</div>
+          <button class="mi" role="option" aria-selected="false"><span class="pbars" aria-hidden="true"><i class="crit"></i><i class="crit"></i><i class="crit"></i></span>Critical</button>
+          <button class="mi" role="option" aria-selected="true"><span class="pbars" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i></span>High<small>Selected</small></button>
+          <button class="mi" role="option" aria-selected="false"><span class="pbars" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i></span>Medium</button>
+        </div>
+      </div>
+      <div class="stack">
+        <h3 class="lbl">Marker and its tooltip (shown on hover or focus)</h3>
+        <div class="row" style="gap: 14px; flex-wrap: nowrap; align-items: flex-start">
+          <span class="flag" style="background: linear-gradient(160deg, #f7b52f, #f5822a); color: #111113; box-shadow: 0 0 0 3px color-mix(in srgb, #f5822a 30%, transparent)"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"></path></svg></span>
+          <span class="tip"><b><span class="capsule" style="width: 6px; height: 14px; background: var(--g-ember)"></span>Busiest</b>59h of runs this week, 1.6× the average agent.</span>
+        </div>
+        <div class="row" style="gap: 12px">
+          <span class="flag" style="background: linear-gradient(160deg, #f2286f, #f2272c); color: #fff; box-shadow: 0 0 0 3px color-mix(in srgb, #f2272c 30%, transparent)"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5.6 5.6l12.8 12.8"></path></svg></span><span class="cap">Most time blocked</span>
+          <span class="flag" style="background: linear-gradient(160deg, #2fd12f, #22b5a5); color: #111113; box-shadow: 0 0 0 3px color-mix(in srgb, #22b5a5 30%, transparent)"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span><span class="cap">Most spare capacity</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px 28px; padding: 22px 24px 0">
+      <div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 10px; padding-bottom: 22px">
+        <span class="cap" style="font-weight: 600">Projects /</span>
+        <span class="disp" style="font-size: 32px; font-weight: 800; line-height: .95">trading workbench</span>
+        <span class="row" style="gap: 12px; font-size: 13px; font-weight: 600; color: var(--body)"><span><b style="font-size: 15px; color: var(--text)">16</b> open</span><span class="row" style="gap: 6px"><span class="capsule live" style="width: 5px; height: 12px; background: var(--g-ion)"></span><b style="font-size: 15px; color: var(--text)">2</b> running</span></span>
+      </div>
+      <div aria-label="Tasks by status" style="display: flex; gap: 8px; align-items: flex-end" data-chart></div>
+    </div>
+
+    <section class="card" style="overflow: hidden" aria-label="Example group">
+      <div style="display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 16px 0 18px">
+        <span class="capsule" style="width: 8px; height: 20px; background: var(--g-ion)"></span>
+        <h3 style="margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -.01em">In progress</h3>
+        <span style="font-size: 14px; font-weight: 600; color: var(--muted)">2</span>
+      </div>
+      <div class="grow">
+        <span class="capsule" style="width: 6px; height: 16px; margin: 0 4px 0 1px; background: var(--g-ion)"></span>
+        <span class="mono cap">TRA-41</span>
+        <span style="flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">H4 download derivatives price data</span>
+        <span class="tone" style="height: 24px; background: var(--run-bg); color: var(--run-fg)"><span class="capsule live" style="width: 5px; height: 12px; background: var(--g-ion)"></span>Running</span>
+        <span class="av" style="background: linear-gradient(160deg, #2fd12f, #22b5a5)">QR</span>
+      </div>
+      <div class="grow">
+        <span class="capsule" style="width: 6px; height: 16px; margin: 0 4px 0 1px; background: var(--g-ion)"></span>
+        <span class="mono cap">TRA-35</span>
+        <span style="flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">Known bugs and limitations</span>
+        <span class="pbars" aria-hidden="true"><i class="on"></i><i></i><i></i></span>
+        <span class="av" style="background: var(--primary); color: var(--on-primary)">BA</span>
+      </div>
+    </section>
+
+    <div class="stack">
+      <h3 class="lbl">Request kinds</h3>
+      <div class="row">
+        <span class="rq-kind q"><span class="capsule" style="width: 4px; height: 10px; background: var(--g-tide)"></span>QUESTION</span>
+        <span class="rq-kind p"><span class="capsule" style="width: 4px; height: 10px; background: var(--g-orchid)"></span>PROPOSAL</span>
+        <span class="rq-kind a"><span class="capsule" style="width: 4px; height: 10px; background: var(--g-ember)"></span>APPROVAL</span>
+        <span class="rq-kind s"><span class="capsule" style="width: 4px; height: 10px; background: var(--g-lagoon)"></span>SUGGESTED TASKS</span>
+      </div>
+      <article class="rq k-q" aria-label="Example question">
+        <div class="rq-top"><span class="rq-kind">QUESTION</span><span class="rq-tag">Blocking</span><span class="mono">TRA-41</span>H4 download derivatives price data<span style="margin-left: auto">Quant Researcher · 12m ago</span></div>
+        <h3>OK to backfill 2022–2024 from Coinalyze?</h3>
+        <p>The free tier stops at 2024. Going further back needs the paid plan for about a day.</p>
+        <div class="stack" style="gap: 6px">
+          <button class="opt on"><span class="radio"></span><span>Yes, backfill all three years<small>About 6h of runs</small></span></button>
+          <button class="opt"><span class="radio"></span><span>Only 2024 for now</span></button>
+        </div>
+        <div class="rq-acts"><button class="pbtn">Send answer</button><button class="btn">Reply in thread</button><button class="quiet">Not now</button></div>
+      </article>
+    </div>
+
+    <div class="card block">
+      <h3 class="lbl">Workload</h3>
+      <div class="row" style="gap: 3px">
+        <span class="cap" style="margin-right: 6px">Idle</span>
+        <span class="cell" style="background: color-mix(in srgb, var(--text) 8%, transparent)"></span>
+        <span class="cell" style="background: color-mix(in srgb, #8b2cf0 30%, var(--well))"></span>
+        <span class="cell" style="background: color-mix(in srgb, #8b2cf0 55%, var(--well))"></span>
+        <span class="cell" style="background: color-mix(in srgb, #6a4cf0 80%, var(--well))"></span>
+        <span class="cell" style="background: linear-gradient(160deg, #8b2cf0, #1f6fe0)"></span>
+        <span class="cap" style="margin: 0 14px 0 6px">Busy</span>
+        <span class="cell" style="background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--red-fg) 55%, transparent) 0 2px, var(--red-bg) 2px 6px)"></span><span class="cap" style="margin: 0 14px 0 6px">Blocked</span>
+        <span class="cell" style="box-shadow: inset 0 0 0 1px var(--line); background: repeating-linear-gradient(135deg, var(--dashed) 0 1.5px, transparent 1.5px 6px)"></span><span class="cap" style="margin-left: 6px">Paused</span>
+      </div>
+      <div class="row">
+        <span class="node"><span class="av" style="width: 24px; height: 24px; background: linear-gradient(160deg, #2fd12f, #22b5a5)">QR</span>TRA-41<small>running · 70%</small></span>
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--dashed)"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+        <span class="node" style="box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red-fg) 55%, transparent)"><span class="av" style="width: 24px; height: 24px; background: linear-gradient(160deg, #f2272c, #ff2bd6)">ML</span>TRA-45<small>blocked 5h</small></span>
+      </div>
+    </div>
+
+    <div class="card" style="padding: 20px 22px; display: flex; flex-direction: column; gap: 12px">
+      <div class="row" style="justify-content: space-between">
+        <span class="row" style="font-size: 13px; font-weight: 600"><span class="mono cap">TRA-41</span>H4 download derivatives price data</span>
+        <span class="mono" style="font-size: 13px; color: var(--run-fg)">02:14</span>
+      </div>
+      <div aria-hidden="true" style="display: flex" data-steps></div>
+      <span class="cap">Run progress · step 4 of 7 · fetching funding rates</span>
+    </div>
+  </section>
+</template>
+
+<script>
+// Builds the light and dark columns from the one template above.
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const mix = (a, b, t) => { const x = hex(a), y = hex(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
+const STATUSES = [
+  ['Ion', 'In progress, running, live', '--g-ion', '#8b2cf0', '#1f6fe0', 3],
+  ['Orchid', 'In review; proposals', '--g-orchid', '#ff2bd6', '#8b2cf0', 2],
+  ['Ember', 'Todo, waiting on you; approvals', '--g-ember', '#f7b52f', '#f5822a', 4],
+  ['Flare', 'Blocked, failed', '--g-flare', '#f2286f', '#f2272c', 1],
+  ['Ash', 'Backlog, idle', '--g-ash', null, null, 3],
+  ['Lagoon', 'Done, healthy; suggestions', '--g-lagoon', '#2fd12f', '#22b5a5', 3]
+];
+const SWATCHES = ['--ground', '--card', '--well', '--sel', '--edge', '--line', '--text', '--body', '--muted', '--primary'];
+const tpl = document.getElementById('theme-tpl');
+for (const dark of [false, true]) {
+  const sec = tpl.content.firstElementChild.cloneNode(true);
+  sec.classList.add(dark ? 'dark' : 'light', 'f-hanken');
+  sec.setAttribute('aria-label', (dark ? 'Dark' : 'Light') + ' theme');
+  sec.querySelector('[data-name]').textContent = dark ? 'Dark' : 'Light';
+  sec.querySelector('[data-note]').textContent = dark ? 'bone on ink; cards lift with an edge · default' : 'ink on paper; cards lift with a shadow';
+  document.getElementById('themes').appendChild(sec);
+  const css = getComputedStyle(sec);
+  const val = (t) => css.getPropertyValue(t).trim();
+  sec.querySelector('[data-swatches]').innerHTML = SWATCHES.map((t) => `<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0"><span style="height: 44px; border-radius: 14px; background: var(${t}); border: 1px solid var(--edge)"></span><span class="mono" style="font-size: 12px; font-weight: 700">${t}</span><span class="mono cap">${val(t)}</span></div>`).join('');
+  const ash = [val('--ash-a'), val('--ash-b')];
+  sec.querySelector('[data-statuses]').innerHTML = STATUSES.map(([name, role, tok, a, b]) => `<div class="card" style="display: flex; gap: 12px; padding: 14px; min-width: 0"><span style="position: relative; overflow: hidden; flex-shrink: 0; width: 20px; height: 60px; border-radius: 999px; background: var(${tok})"><svg class="grain"><rect width="100%" height="100%" filter="url(#grain)"></rect></svg></span><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><span style="font-size: 15px; font-weight: 800">${name}</span><span style="font-size: 12px; color: var(--body)">${role}</span><span class="mono cap" style="margin-top: auto">${tok}</span></span></div>`).join('');
+  sec.querySelector('[data-chart]').innerHTML = STATUSES.map(([, , , a, b, n]) => {
+    const [ca, cb] = a ? [a, b] : ash;
+    const discs = Array.from({ length: n + 1 }, (_, i) => `<span class="disc" style="bottom: ${i * 15 - 16}px; background: linear-gradient(0deg, ${mix(ca, cb, i / (n + 1))}, ${mix(ca, cb, (i + 1) / (n + 1))})"></span>`).join('');
+    return `<div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><span style="font-size: 14px; font-weight: 800; line-height: 1">${n}</span><span class="disc-col" aria-hidden="true" style="height: ${n * 15 + 16}px">${discs}<svg class="grain"><rect width="100%" height="100%" filter="url(#grain)"></rect></svg></span></div>`;
+  }).join('');
+  const off = dark ? '#161616' : '#e9e9ec';
+  sec.querySelector('[data-steps]').innerHTML = Array.from({ length: 7 }, (_, i) => `<span style="width: 32px; height: 32px; border-radius: 50%; box-sizing: border-box; margin-right: -9px; border: 3px solid var(--card); position: relative; z-index: ${10 - i}; background: ${i < 4 ? `linear-gradient(160deg, ${mix('#8b2cf0', '#1f6fe0', i / 4)}, ${mix('#8b2cf0', '#1f6fe0', (i + 1) / 4)})` : off}"></span>`).join('');
+}
+</script>
+</body>
+</html>

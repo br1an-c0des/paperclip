@@ -32,6 +32,8 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 3 | [Agents can work on several things at once](#3-agents-can-work-on-several-things-at-once) | `agent-chat/*`, runs | Decided | Oct 20, 2026 |
 | 4 | [A run's full model input only exists when provider tracing is on](#4-a-runs-full-model-input-only-exists-when-provider-tracing-is-on) | `runs-adapters/runs`, `agents/runtime` | Open | Oct 20, 2026 |
 | 5 | [Agents can have three memory systems that don't know about each other](#5-agents-can-have-three-memory-systems-that-dont-know-about-each-other) | `agents/runtime`, `agents/skills`, `agents/instructions`, Connectors | Open | Oct 22, 2026 |
+| 6 | [Tasks have no due date](#6-tasks-have-no-due-date) | `tasks/create`, `tasks/properties` | Decided | Oct 24, 2026 |
+| 7 | [Model and effort overrides depend on the agent's adapter](#7-model-and-effort-overrides-depend-on-the-agents-adapter) | `tasks/create`, `agents/runtime` | Decided | Oct 24, 2026 |
 
 ## Entries
 
@@ -265,3 +267,54 @@ also needs a decision, like the other flags.
 **Decision.** For now, option 1: set the environment variable. Long term, option 3 is the candidate
 upstream PR, and option 4 goes into the agent page design. The `enableMemoryConnectors` flag isn't
 decided yet.
+
+### 6. Tasks have no due date
+
+- **Status:** Decided
+- **Area:** `tasks/create`, `tasks/properties`
+- **Found in:** the new-task dialog ([board 7b](design/boards.md#board-7b)).
+
+**What we found.** An early draft of the dialog had a "Due date" button. Tasks don't have one:
+`createIssueBaseSchema` in `packages/shared/src/validators/issue.ts` has no date field of that kind,
+and neither do the shared types or the database schema.
+
+**Why it matters.** A due date the UI can't save would look like it works and then disappear.
+
+**Options.**
+
+1. **Leave it out.** The dialog and properties show only fields the API stores.
+2. **Keep it somewhere else.** A label or the description could carry a date, but nothing would act
+   on it.
+3. **Propose due dates upstream.**
+
+**Decision.** Option 1. Board 7b dropped the button. Revisit if upstream adds due dates.
+
+### 7. Model and effort overrides depend on the agent's adapter
+
+- **Status:** Decided
+- **Area:** `tasks/create`, `agents/runtime`
+- **Found in:** the assignee capsule in the new-task dialog ([board 7b](design/boards.md#board-7b)).
+
+**What we found.** A task can run on a different model or thinking effort than its agent's own
+settings, through `assigneeAdapterOverrides.adapterConfig`. The old UI builds that payload in
+`ui/src/lib/issue-assignee-overrides.ts`:
+
+- It only applies to `claude_local`, `codex_local` and `opencode_local`. For any other adapter, and
+  for people, it sends no overrides.
+- The model always goes in `adapterConfig.model`.
+- The effort key differs per adapter: `effort` (Claude), `modelReasoningEffort` (Codex), `variant`
+  (OpenCode).
+- The effort choices differ too (`thinkingEffortOptionsFor` in
+  `ui/src/components/issue-properties/helpers.ts`). Codex's depend on the chosen model.
+
+**Why it matters.** The design shows model and effort for every assignee, defaulting to "Agent
+default". The UI has to know when the choice applies and which key to write.
+
+**Options.**
+
+1. **Mirror the old UI.** Show model and effort only for the three adapters, use the same key mapping
+   and option lists, and send no override when both are left at "Agent default".
+2. **Show the choice for every agent** and ignore it where it doesn't apply. That's misleading.
+
+**Decision.** Option 1. For people and other adapters the capsule shows the assignee only, with a
+short note in the menu.

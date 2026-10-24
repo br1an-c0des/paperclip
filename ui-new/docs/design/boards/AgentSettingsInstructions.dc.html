@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent settings: instructions</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Fragment+Mono&amp;display=swap">
+<style>
+body{margin:0;background:#0a0a0a}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;margin:0}
+.light{--ground:#f2f2f4;--card:#ffffff;--card-edge:transparent;--shadow:0 1px 2px rgba(17,17,19,.06),0 10px 28px -14px rgba(17,17,19,.2);--shadow-lg:0 2px 6px rgba(17,17,19,.08),0 30px 70px -24px rgba(17,17,19,.38);--well:#e7e7ea;--sel:#ffffff;--sel-shadow:0 1px 3px rgba(17,17,19,.12);--line:#ececf0;--row-line:#f0f0f3;--hover:#e7e7ea;--row-hover:#f8f8fa;--code:#f6f6f8;--text:#111113;--body:#45454d;--muted:#6b6b75;--edge:#cfcfd6;--dashed:#b4b4bd;--primary:#111113;--on-primary:#ffffff;--run-bg:#ecebff;--run-fg:#3b2fc0;--violet-bg:#f6e6ff;--violet-fg:#7a1fb8;--amber-bg:#fff1dc;--amber-fg:#94480a;--red-bg:#fde7ea;--red-fg:#b0102a;--green-bg:#e2f6e5;--green-fg:#17672f;--cyan-bg:#dcf4f1;--cyan-fg:#0e6a61;--pri-on:#111113;--pri-off:#dcdce2;--ash-a:#c9c9cf;--ash-b:#9a9aa3;--scrim:rgba(17,17,19,.34);--disc-shadow:rgba(17,17,19,.35);--grain-blend:soft-light;--grain-op:.9;--knob-off:#ffffff}
+.dark{--ground:#0a0a0a;--card:#141414;--card-edge:#1f1f1f;--shadow:inset 0 1px 0 rgba(255,255,255,.04),0 16px 34px -18px rgba(0,0,0,.95);--shadow-lg:inset 0 1px 0 rgba(255,255,255,.06),0 34px 80px -20px rgba(0,0,0,.95);--well:#161616;--sel:#262626;--sel-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 3px rgba(0,0,0,.7);--line:#1f1f1f;--row-line:#1a1a1a;--hover:#1a1a1a;--row-hover:#181818;--code:#0f0f0f;--text:#f4f1ea;--body:#c9c6bf;--muted:#8f8c86;--edge:#2c2c2c;--dashed:#4a4843;--primary:#f4f1ea;--on-primary:#0a0a0a;--run-bg:#17142b;--run-fg:#c9c2ff;--violet-bg:rgba(139,44,240,.15);--violet-fg:#dcb8ff;--amber-bg:rgba(247,181,47,.1);--amber-fg:#ffc98a;--red-bg:rgba(242,40,111,.12);--red-fg:#ff9aa8;--green-bg:rgba(47,209,47,.1);--green-fg:#9be59b;--cyan-bg:rgba(34,181,165,.12);--cyan-fg:#8fe3d8;--pri-on:#f4f1ea;--pri-off:#2c2c2c;--ash-a:#3a3a3a;--ash-b:#6b6b6b;--scrim:rgba(0,0,0,.62);--disc-shadow:rgba(0,0,0,.6);--grain-blend:overlay;--grain-op:.75;--knob-off:#8f8c86}
+.f-hanken{--display:'Hanken Grotesk',system-ui,sans-serif;--dtrack:-.045em}
+.f-bricolage{--display:'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif;--dtrack:-.035em}
+.disp{font-family:var(--display);letter-spacing:var(--dtrack)}
+.card{background:var(--card);border:1px solid var(--card-edge);border-radius:18px;box-shadow:var(--shadow)}
+.mono{font-family:'Fragment Mono',ui-monospace,monospace}
+.grain{position:absolute;inset:0;width:100%;height:100%;mix-blend-mode:var(--grain-blend);opacity:var(--grain-op);pointer-events:none}
+.no-grain .grain{display:none}
+@keyframes breathe{0%,100%{opacity:1;transform:scaleY(1)}50%{opacity:.55;transform:scaleY(.65)}}
+.live{animation:breathe 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.live{animation:none}}
+a{color:var(--run-fg)}
+a:hover{color:var(--run-fg)}
+.nav{text-decoration:none}
+.nav:hover,.ghost:hover,.icon:hover{background:var(--well)}
+.row:hover{background:var(--card)}
+.lnk{color:var(--run-fg);text-decoration:none;font-size:13px}
+.lnk:hover{text-decoration:underline}
+.btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;box-sizing:border-box;border-radius:999px;border:1px solid var(--edge);color:var(--body);font-size:13px;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--well);color:var(--text)}
+.pbtn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;box-sizing:border-box;border-radius:999px;color:var(--on-primary);font-size:13px;font-weight:500;text-decoration:none;white-space:nowrap}
+.pbtn:hover{filter:brightness(1.12);color:var(--on-primary)}
+.dbtn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;box-sizing:border-box;border-radius:999px;border:1px solid color-mix(in srgb, var(--red-fg) 55%, transparent);color:var(--red-fg);font-size:13px;white-space:nowrap}
+.dbtn:hover{background:var(--red-bg)}
+.item:hover{background:var(--card)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px}
+.chead{padding:16px 20px;border-bottom:1px solid var(--line)}
+.chead h3{margin:0;font-size:15px;font-weight:600}
+.chead p{margin:4px 0 0;font-size:13px;color:var(--muted);line-height:1.5}
+.frow{display:grid;grid-template-columns:220px minmax(0,1fr);gap:24px;align-items:start;padding:14px 20px;border-top:1px solid var(--line)}
+.frow:first-child{border-top:0}
+.flabel{padding-top:7px;font-size:14px;font-weight:500;color:var(--text)}
+.fhelp{display:block;margin-top:3px;font-size:12px;font-weight:400;line-height:1.45;color:var(--muted)}
+.field{display:flex;align-items:center;gap:8px;min-height:34px;padding:0 10px;box-sizing:border-box;border:1px solid var(--edge);border-radius:14px;background:var(--ground);color:var(--text);font-size:14px}
+.sel{width:100%;justify-content:flex-start;text-align:left}
+.sel:hover,.field:hover{border-color:var(--edge)}
+.mono{font-family:'Fragment Mono', ui-monospace, monospace;font-size:13px}
+.chip{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:5px;background:var(--well);color:var(--body);font-size:12px;white-space:nowrap}
+.lrow{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 20px;border-top:1px solid var(--line)}
+.cfoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.seg{display:inline-flex;padding:2px;border:1px solid var(--edge);border-radius:14px;background:var(--ground)}
+.seg button{height:28px;padding:0 12px;border-radius:14px;font-size:13px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--pri-off);color:var(--text);font-weight:500}
+.sec-title h2{margin:0;font-size:20px;font-weight:600}
+.sec-title p{margin:6px 0 0;font-size:14px;color:var(--muted);line-height:1.5;max-width:70ch}
+.th{font-size:12px;font-weight:500;color:var(--muted)}
+details.card > summary{list-style:none;cursor:pointer}
+details.card > summary::-webkit-details-marker{display:none}
+details.card[open] > summary .rot{transform:rotate(90deg)}
+.ln{color:var(--dashed);text-align:right;padding-right:14px;user-select:none}
+.ftree button{display:flex;align-items:center;gap:8px;width:100%;height:30px;padding:0 8px;border-radius:14px;font-size:13px;color:var(--body);text-align:left}
+.ftree button:hover{background:var(--card)}
+.nav:hover,.ghost:hover,.icon:hover{background:var(--hover)}
+.row:hover,.item:hover{background:var(--row-hover)}
+.card{background:var(--card);border:1px solid var(--card-edge);border-radius:18px;box-shadow:var(--shadow)}
+.seg{padding:3px;border:0;border-radius:999px;background:var(--well)}
+.seg button{border-radius:999px;font-weight:600;color:var(--body)}
+.seg button[aria-pressed="true"]{background:var(--sel);box-shadow:var(--sel-shadow);color:var(--text);font-weight:800}
+.chip{border-radius:999px}
+.field{border-radius:12px}
+.sec-title h2{font-family:var(--display);letter-spacing:-.02em;font-size:24px;font-weight:800}
+.chead h3{font-family:var(--display);letter-spacing:-.01em;font-weight:800}
+.rq{border:1px solid var(--card-edge);border-radius:18px;box-shadow:var(--shadow);padding-left:30px}
+.rq::before{left:13px;top:16px;bottom:auto;width:6px;height:20px;border-radius:999px}
+.btn{height:32px;padding:0 14px;font-weight:700}
+.pbtn{height:32px;padding:0 14px;font-weight:800}
+.k-q::before{background:linear-gradient(180deg,#22b5a5,#4c7896)}
+.k-p::before{background:linear-gradient(180deg,#ff2bd6,#8b2cf0)}
+.k-a::before{background:linear-gradient(180deg,#f7b52f,#f5822a)}
+.k-s::before{background:linear-gradient(180deg,#2fd12f,#22b5a5)}
+.rq-kind,.rq-st,.rq-tag{border-radius:999px;letter-spacing:0}
+.rq-btn{font-weight:700}
+.rq-btn.pri,.rq-btn.pri:hover{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.rm{border:1px solid var(--card-edge);border-radius:24px;box-shadow:var(--shadow-lg)}
+.rm-av{border-radius:50%;background:linear-gradient(160deg,#2fd12f,#22b5a5);color:#111113;font-weight:800}
+.rm-avdot{border-color:var(--card)}
+.rm-tabs{align-self:center;padding:3px;gap:2px;border-radius:999px;background:var(--well)}
+.rm-tab{height:30px;padding:0 12px;border-radius:999px;font-weight:600;box-shadow:none!important}
+.rm-tab[aria-selected="true"]{background:var(--sel);box-shadow:var(--sel-shadow)!important;color:var(--text)!important;font-weight:800}
+.rm-stats dd{font-family:var(--display);font-size:15px;font-weight:800}
+.rm-live{border-radius:16px}
+</style>
+</helmet>
+<div class="{{rootClass}}" style="min-height: 1240px; display: flex; flex-wrap: wrap; background: var(--ground); color: var(--text); font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 14px; line-height: 1.4; position: relative">
+<svg aria-hidden="true" width="0" height="0" style="position: absolute"><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.88" numOctaves="2" stitchTiles="stitch"></feTurbulence><feColorMatrix type="saturate" values="0"></feColorMatrix></filter></svg>
+
+<nav aria-label="Main" style="flex: 0 0 248px; box-sizing: border-box; padding: 18px 14px; display: flex; flex-direction: column; gap: 22px">
+  <div style="display: flex; align-items: center; gap: 4px">
+    <button class="ghost" style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; height: 40px; padding: 0 8px 0 5px; border-radius: 999px; text-align: left">
+      <span class="disp" style="position: relative; overflow: hidden; width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(160deg, #ff2bd6, #f2272c 55%, #f7b52f); color: #111113; display: grid; place-items: center; font-size: 13px; font-weight: 800">C<svg class="grain"><rect width="100%" height="100%" filter="url(#grain)"></rect></svg></span>
+      <span class="disp" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; font-size: 15px; letter-spacing: -.01em">Cuebik Creative</span>
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg>
+    </button>
+    <button class="icon" aria-label="Search" style="width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--body)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+    <button class="ghost" aria-label="New task" style="width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--edge); color: var(--text)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <a class="nav" href="OrgDashboard.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px; border-radius: 999px; color: var(--body); font-weight: 600"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="3.5"></rect><rect x="14" y="3" width="7" height="5" rx="2.5"></rect><rect x="14" y="12" width="7" height="9" rx="3.5"></rect><rect x="3" y="16" width="7" height="5" rx="2.5"></rect></svg>Org dashboard</a>
+    <a class="nav" href="Inbox.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 8px 0 12px; border-radius: 999px; color: var(--body); font-weight: 600"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>Inbox<span style="margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 999px; background: linear-gradient(135deg, #ff2bd6, #f7b52f); color: #111113; font-size: 12px; font-weight: 800; display: grid; place-items: center">8</span></a>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 6px 6px 12px">
+      <h2 style="margin: 0; font-size: 12px; font-weight: 700; color: var(--muted)">Projects</h2>
+      <button class="icon" aria-label="New project" style="width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+    </div>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="width: 24px; height: 24px; border-radius: 50%; border: 1.5px dashed var(--dashed); box-sizing: border-box"></span>All tasks<span style="margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 500">company</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #ff2bd6, #8b2cf0); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">g</span>gearBase<span style="margin-left: auto; font-size: 13px">11</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #3b3df5, #22b5a5); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">s</span>sfo lighting database<span style="margin-left: auto; font-size: 13px">7</span></a>
+    <a class="nav" href="ProjectDashboard.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #f7b52f, #f5822a); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">t</span>trading workbench<span style="margin-left: auto; font-size: 13px">16</span></a>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 12px 6px">
+      <h2 style="margin: 0; font-size: 12px; font-weight: 700; color: var(--muted)">Agents</h2>
+      <span style="font-size: 12px; font-weight: 700; color: var(--run-fg)">2 running</span>
+    </div>
+    <a class="nav" href="AgentChat.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--text); font-weight: 800; background: var(--sel); box-shadow: var(--sel-shadow)"><span style="padding: 2px; border-radius: 50%; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #2fd12f, #22b5a5); color: #111113; font-size: 8px; font-weight: 800">QR</span></span>Quant Researcher<span style="margin-left: auto; color: var(--run-fg); font-size: 12px; font-weight: 600">running</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #ff2bd6, #f2286f); color: #111113; font-size: 8px; font-weight: 800">SE</span></span>Strategy Engineer<span style="margin-left: auto; color: var(--run-fg); font-size: 12px; font-weight: 600">running</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #f7b52f, #f5822a); color: #111113; font-size: 8px; font-weight: 800">FE</span></span>Frontend Engineer<span style="margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 600">idle</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #f2272c, #ff2bd6); color: #111113; font-size: 8px; font-weight: 800">ML</span></span>ML Engineer<span style="margin-left: auto; color: var(--red-fg); font-size: 12px; font-weight: 600">blocked</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #6a93ad, #a9c6d6); color: #111113; font-size: 8px; font-weight: 800">CE</span></span>CEO<span style="margin-left: auto; color: var(--amber-fg); font-size: 12px; font-weight: 600">paused</span></a>
+  </div>
+
+  <div style="margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 4px 0 6px">
+    <span style="width: 30px; height: 30px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-size: 11px; font-weight: 800; display: grid; place-items: center">BA</span>
+    <span style="color: var(--body); font-weight: 600">Brian A.</span>
+    <a class="icon" href="AppSettings.dc.html" aria-label="Settings" style="margin-left: auto; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--body)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"></path><circle cx="15" cy="6" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg></a>
+  </div>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+  <header class="card" style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 14px 20px 0 4px; padding: 18px 22px">
+    <nav aria-label="Breadcrumb" style="display: flex; align-items: center; gap: 8px; font-size: 14px"><a href="OrgAgents.dc.html" style="color: var(--muted); text-decoration: none">Agents</a><span style="color: var(--dashed)">/</span></nav>
+    <span style="position: relative; width: 38px; height: 38px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(160deg, #2fd12f, #22b5a5); color: #111113; font-size: 13px; display: grid; place-items: center; font-weight: 800">QR<span style="position: absolute; right: -3px; bottom: -3px; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--line); background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"></span></span>
+    <div style="min-width: 0">
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+        <h1 class="disp" style="margin: 0; font-size: 26px; font-weight: 800; line-height: 1.05">Quant Researcher</h1>
+        <span title="Your primary agent" style="color: var(--amber-fg); display: inline-flex"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8 4 4 5-6 5 6 4-4-2 11H5z"></path></svg></span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; box-sizing: border-box; border-radius: 999px; background: var(--run-bg); border: 1px solid color-mix(in srgb, var(--run-fg) 50%, transparent); color: var(--run-fg); font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0"><span class="live" style="width: 5px; height: 12px; border-radius: 999px; flex-shrink: 0; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"></span>Working on TRA-41</span>
+      </div>
+      <div style="margin-top: 3px; font-size: 13px; color: var(--muted)">Research · reports to CEO · Claude Code · Opus 5.5 · $38.20 of $80 this month</div>
+    </div>
+    <div style="margin-left: auto; display: flex; align-items: center; gap: 6px">
+      <a class="btn" href="RunModal.dc.html"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>Watch run</a>
+      <a class="btn" href="AgentChat.dc.html"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.8 7L4 20l1.1-4.6A8 8 0 1 1 21 12z"></path></svg>Open chat</a>
+      <button class="btn"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5v14M15 5v14"></path></svg>Pause</button>
+      <button class="icon" aria-label="More actions" style="width: 28px; height: 28px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6" fill="currentColor"></circle><circle cx="12" cy="12" r="1.6" fill="currentColor"></circle><circle cx="19" cy="12" r="1.6" fill="currentColor"></circle></svg></button>
+    </div>
+  </header>
+  <div style="display: flex; gap: 32px; padding: 24px 24px 48px; align-items: flex-start; flex-wrap: wrap">
+    <nav aria-label="Agent settings" style="flex: 0 0 210px; display: flex; flex-direction: column; gap: 2px">
+      <sc-for list="{{nav}}" as="s" hint-placeholder-count="9">
+        <sc-if value="{{s.isHead}}" hint-placeholder-val="{{false}}"><h2 class="disp" style="margin: 14px 0 4px; padding: 0 10px; font-size: 12px; font-weight: 800; color: var(--muted); letter-spacing: -.01em">{{s.label}}</h2></sc-if>
+        <sc-if value="{{s.isItem}}" hint-placeholder-val="{{true}}"><button class="ghost" aria-current="{{s.current}}" onClick="{{s.select}}" style="display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; padding: 0 10px; border-radius: 999px; text-align: left; background: {{s.bg}}; color: {{s.fg}}; font-weight: {{s.weight}}; box-shadow: {{s.shadow}}">{{s.label}}<span style="margin-left: auto; font-size: 11px; font-weight: 400; color: var(--dashed)">{{s.tag}}</span></button></sc-if>
+      </sc-for>
+      
+    </nav>
+    <div style="flex: 1 1 600px; min-width: 0; max-width: 900px; display: flex; flex-direction: column; gap: 20px">
+      <sc-if value="{{show.runtime}}" hint-placeholder-val="{{false}}">
+<div class="sec-title"><h2 class="disp">Model and runtime</h2><p>How Quant Researcher runs: its harness and model, where it runs, when it wakes, and its limits. Changes are saved together, as a new revision.</p></div>
+<div role="note" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--run-fg) 45%, transparent); border-radius: 18px; background: var(--run-bg)"><span style="color: var(--run-fg); display: inline-flex"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"></path></svg></span><div style="flex: 1 1 360px; min-width: 0"><div style="font-weight: 600">Paperclip Runner can run this agent</div><div style="margin-top: 3px; font-size: 13px; color: var(--muted)">Switching keeps the model and instructions. It is saved with your other changes, as one revision.</div></div><button class="btn">Switch to Paperclip Runner</button></div>
+<section class="card" aria-labelledby="a-harness"><div class="chead"><h3 class="disp" id="a-harness">Harness and model</h3></div><div><div class="frow"><div class="flabel">Harness<span class="fhelp">The program the agent runs in.</span></div><div style="min-width: 0"><button class="field sel" style="max-width: 320px"><span style="width: 18px; height: 18px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(160deg, #f5822a, #f2272c); color: #111113; font-size: 7px; display: grid; place-items: center; font-weight: 800">CC</span>Claude Code<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: auto; stroke: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg></button></div></div><div class="frow"><div class="flabel">Sign-in<span class="fhelp">How the harness reaches the model.</span></div><div style="min-width: 0"><div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 34px"><span style="display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: 999px; background: var(--green-bg); color: var(--green-fg); font-size: 12px; font-weight: 500; white-space: nowrap"><span style="background: linear-gradient(180deg, #2fd12f, #22b5a5); width: 5px; height: 12px; border-radius: 999px; flex-shrink: 0"></span>Signed in with Claude</span><span style="font-size: 13px; color: var(--muted)">since Oct 2</span><button class="btn" style="margin-left: auto">Sign in again</button></div></div></div><div class="frow"><div class="flabel">Model</div><div style="min-width: 0"><div style="display: flex; gap: 8px"><button class="field sel" style="max-width: 320px">Opus 5.5<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: auto; stroke: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg></button><button class="btn">Detect</button></div></div></div><div class="frow"><div class="flabel">Thinking effort<span class="fhelp">More effort is slower and costs more.</span></div><div style="min-width: 0"><div class="seg" role="group"><button aria-pressed="false">Low</button><button aria-pressed="false">Medium</button><button aria-pressed="true">High</button></div><span style="margin-left: 10px; font-size: 12px; color: var(--amber-fg)">Changed from Medium</span></div></div></div><div class="cfoot"><button class="btn"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg>Test environment</button><span style="font-size: 13px; color: var(--muted)">Passed Oct 18: harness found, signed in, model available.</span></div></section>
+<section class="card" aria-labelledby="a-where"><div class="chead"><h3 class="disp" id="a-where">Where it runs</h3></div><div><div class="frow"><div class="flabel">Environment<span class="fhelp">Uses the organization default unless you pick another.</span></div><div style="min-width: 0"><button class="field sel" style="max-width: 440px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--muted)"><rect x="3" y="4" width="18" height="7" rx="1.5"></rect><rect x="3" y="13" width="18" height="7" rx="1.5"></rect><path d="M7 7.5h.01M7 16.5h.01"></path></svg>Organization default · Local (this machine)<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: auto; stroke: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg></button></div></div><div class="frow" style="grid-template-columns: minmax(0,1fr) auto"><div class="flabel" style="padding-top: 0">Browser access<span class="fhelp">Lets the agent open and read web pages in a real browser.</span></div><div style="padding-top: 2px"><button role="switch" aria-checked="true" aria-label="Browser access" style="position: relative; width: 36px; height: 20px; flex-shrink: 0; border-radius: 999px; background: var(--primary)"><span style="position: absolute; top: 3px; left: 19px; width: 14px; height: 14px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.25)"></span></button></div></div></div></section>
+<section class="card" aria-labelledby="a-wake"><div class="chead"><h3 class="disp" id="a-wake">When it wakes</h3></div><div><div class="frow" style="grid-template-columns: minmax(0,1fr) auto"><div class="flabel" style="padding-top: 0">When there is work<span class="fhelp">It is assigned a task, mentioned, or sent a message.</span></div><div style="padding-top: 2px"><button role="switch" aria-checked="true" aria-label="When there is work" style="position: relative; width: 36px; height: 20px; flex-shrink: 0; border-radius: 999px; background: var(--primary)"><span style="position: absolute; top: 3px; left: 19px; width: 14px; height: 14px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.25)"></span></button></div></div><div class="frow" style="grid-template-columns: minmax(0,1fr) auto"><div class="flabel" style="padding-top: 0">On a heartbeat<span class="fhelp">Checks in on a schedule, even when nothing is new.</span><div style="margin-top: 10px; font-weight: 400"><button class="field sel" style="max-width: 220px">Every 30 minutes<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: auto; stroke: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg></button></div></div><div style="padding-top: 2px"><button role="switch" aria-checked="true" aria-label="On a heartbeat" style="position: relative; width: 36px; height: 20px; flex-shrink: 0; border-radius: 999px; background: var(--primary)"><span style="position: absolute; top: 3px; left: 19px; width: 14px; height: 14px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.25)"></span></button></div></div><div class="frow"><div class="flabel">Cooldown<span class="fhelp">The shortest gap between two runs.</span></div><div style="min-width: 0"><div style="display: flex; align-items: center; gap: 8px"><div class="field" style="width: 80px; font-variant-numeric: tabular-nums">60</div><span style="font-size: 13px; color: var(--muted)">seconds</span></div></div></div><div class="frow"><div class="flabel">Runs at once<span class="fhelp">How many runs may overlap.</span></div><div style="min-width: 0"><div style="display: flex; align-items: center; gap: 8px"><div class="field" style="width: 80px; font-variant-numeric: tabular-nums">1</div><span style="font-size: 13px; color: var(--muted)">run</span></div></div></div></div></section>
+<section class="card" aria-labelledby="a-limits"><div class="chead"><h3 class="disp" id="a-limits">Run limits</h3></div><div><div class="frow"><div class="flabel">Timeout<span class="fhelp">A run is stopped after this long.</span></div><div style="min-width: 0"><div style="display: flex; align-items: center; gap: 8px"><div class="field" style="width: 80px; font-variant-numeric: tabular-nums">60</div><span style="font-size: 13px; color: var(--muted)">minutes</span></div></div></div><div class="frow"><div class="flabel">Grace period<span class="fhelp">Time a run gets to wrap up after it is stopped.</span></div><div style="min-width: 0"><div style="display: flex; align-items: center; gap: 8px"><div class="field" style="width: 80px; font-variant-numeric: tabular-nums">30</div><span style="font-size: 13px; color: var(--muted)">seconds</span></div></div></div><div class="frow" style="grid-template-columns: minmax(0,1fr) auto"><div class="flabel" style="padding-top: 0">Continue after a turn limit<span class="fhelp">When the harness stops at its turn limit, start a follow-up run that picks up where it left off.</span><div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 400; font-size: 13px; color: var(--muted)">Up to<div class="field" style="width: 56px">2</div>more runs,<div class="field" style="width: 64px">30</div>seconds apart</div></div><div style="padding-top: 2px"><button role="switch" aria-checked="true" aria-label="Continue after a turn limit" style="position: relative; width: 36px; height: 20px; flex-shrink: 0; border-radius: 999px; background: var(--primary)"><span style="position: absolute; top: 3px; left: 19px; width: 14px; height: 14px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.25)"></span></button></div></div></div></section>
+<section class="card" aria-labelledby="a-debug"><div class="chead"><h3 class="disp" id="a-debug">Debugging</h3></div><div><div class="frow" style="grid-template-columns: minmax(0,1fr) auto"><div class="flabel" style="padding-top: 0">Capture raw provider traces<span class="fhelp">Records the full model input and output of every run and keeps it for 24 hours. Only instance admins can read traces. Turn it on while you investigate a problem.</span></div><div style="padding-top: 2px"><button role="switch" aria-checked="false" aria-label="Capture raw provider traces" style="position: relative; width: 36px; height: 20px; flex-shrink: 0; border-radius: 999px; background: var(--pri-off)"><span style="position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--knob-off); box-shadow: 0 1px 2px rgba(0,0,0,.25)"></span></button></div></div></div></section>
+<details class="card">
+        <summary style="display: flex; align-items: center; gap: 10px; padding: 16px 20px"><span class="rot" style="display: inline-flex; color: var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"></path></svg></span><span style="font-size: 15px; font-weight: 600">Advanced</span><span style="font-size: 13px; color: var(--muted)">Command, arguments and prompt templates</span></summary>
+        <div style="border-top: 1px solid var(--line)">
+          <div class="frow"><div class="flabel">Command<span class="fhelp">Leave empty to use the harness default.</span></div><div style="min-width: 0"><div class="field mono" style="color: var(--dashed)">claude</div></div></div>
+          <div class="frow"><div class="flabel">Extra arguments<span class="fhelp">Separated by commas.</span></div><div style="min-width: 0"><div class="field mono">--verbose</div></div></div>
+          <div class="frow"><div class="flabel">Prompt template<span class="fhelp">Sent at the start of every run.</span></div><div style="min-width: 0"><div class="field mono" style="display: block; padding: 10px 12px; min-height: 64px; line-height: 1.6; white-space: pre-wrap">You are &#123;&#123;agent.name&#125;&#125;, &#123;&#123;agent.title&#125;&#125; at &#123;&#123;company.name&#125;&#125;.
+Work on &#123;&#123;task.identifier&#125;&#125;: &#123;&#123;task.title&#125;&#125;.</div></div></div>
+          <div class="frow"><div class="flabel">Bootstrap prompt<span class="fhelp">Legacy. Move it into Instructions.</span></div><div style="min-width: 0"><div style="min-height: 34px; display: flex; align-items: center; color: var(--muted)">Not set</div></div></div>
+        </div>
+      </details>
+<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; border: 1px solid var(--card-edge); border-radius: 18px; background: var(--card); box-shadow: var(--shadow)"><span style="color: var(--muted); display: inline-flex"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5M12 7v5l3 2"></path></svg></span><span style="font-size: 13px; color: var(--muted)">Revision 14, saved Oct 18 by you</span><a class="lnk" href="#">History</a><span style="margin-left: auto; font-size: 13px; color: var(--amber-fg)">1 unsaved change</span><button class="btn">Discard</button><button class="pbtn" style="background: var(--primary)">Save as revision 15</button></div>
+      </sc-if>
+      <sc-if value="{{show.instructions}}" hint-placeholder-val="{{false}}">
+<div class="sec-title"><h2 class="disp">Instructions</h2><p>The files that tell Quant Researcher how to work. It reads AGENTS.md first, which can point to the others. Agents can suggest edits; you decide.</p></div>
+<section class="card" aria-labelledby="i-proposal" style="border-color: color-mix(in srgb, var(--amber-fg) 50%, transparent)">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 18px">
+          <span style="width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(160deg, #2fd12f, #22b5a5); color: #111113; font-size: 11px; display: grid; place-items: center; font-weight: 800">QR</span>
+          <div style="flex: 1 1 320px; min-width: 0"><h3 class="disp" id="i-proposal" style="margin: 0; font-size: 14px; font-weight: 800; letter-spacing: -.01em">Run #6 suggested a change to AGENTS.md</h3><div style="margin-top: 2px; font-size: 13px; color: var(--muted)">Oct 21, after finishing TRA-42 · adds 1 line</div></div>
+          <button class="ghost" onClick="{{toggleDiff}}" style="height: 30px; padding: 0 10px; border-radius: 999px; color: var(--muted); font-size: 13px">{{diffLabel}}</button>
+          <button class="btn">Reject</button>
+          <button class="pbtn" style="background: var(--primary)">Accept</button>
+        </div>
+        <sc-if value="{{diffOpen}}" hint-placeholder-val="{{true}}">
+        <div class="mono" style="margin: 0 18px 16px; padding: 8px 0; border: 1px solid var(--card-edge); border-radius: 18px; background: var(--ground); font-size: 12px; line-height: 1.7; box-shadow: var(--shadow)"><div style="display: grid; grid-template-columns: 22px minmax(0, 1fr); padding: 1px 12px; background: transparent"><span style="color: var(--dashed)"> </span><span style="color: var(--muted); white-space: pre-wrap">## How you work</span></div><div style="display: grid; grid-template-columns: 22px minmax(0, 1fr); padding: 1px 12px; background: transparent"><span style="color: var(--dashed)"> </span><span style="color: var(--muted); white-space: pre-wrap">- Read the task, its documents and the project description before you start.</span></div><div style="display: grid; grid-template-columns: 22px minmax(0, 1fr); padding: 1px 12px; background: transparent"><span style="color: var(--dashed)"> </span><span style="color: var(--muted); white-space: pre-wrap">- Prefer Binance and Bybit for funding and open interest history.</span></div><div style="display: grid; grid-template-columns: 22px minmax(0, 1fr); padding: 1px 12px; background: var(--green-bg)"><span style="color: var(--green-fg)">+</span><span style="color: var(--green-fg); white-space: pre-wrap">- Hyperliquid liquidation data starts in March 2024. Flag any range that starts earlier.</span></div><div style="display: grid; grid-template-columns: 22px minmax(0, 1fr); padding: 1px 12px; background: transparent"><span style="color: var(--dashed)"> </span><span style="color: var(--muted); white-space: pre-wrap">- Save datasets to data/raw/&lt;exchange&gt;/&lt;symbol&gt;/ as Parquet.</span></div></div>
+        </sc-if>
+      </section>
+<section class="card" aria-label="Instruction files" style="display: grid; grid-template-columns: 230px minmax(0, 1fr); overflow: hidden">
+        <div style="border-right: 1px solid var(--line); display: flex; flex-direction: column">
+          <div style="display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 10px 0 14px; border-bottom: 1px solid var(--line)"><span style="font-weight: 600">Files</span><button class="icon" aria-label="New file" style="margin-left: auto; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+          <div class="ftree" style="padding: 8px; display: flex; flex-direction: column; gap: 1px">
+            <button aria-current="page" style="padding-left: 8px; background: var(--sel); color: var(--text); box-shadow: var(--sel-shadow); font-weight: 700"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--muted)"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"></path><path d="M14 3v5h5"></path></svg>AGENTS.md<span class="chip" style="margin-left: auto; height: 18px; font-size: 11px">entry</span></button>
+            <button aria-current="false" style="padding-left: 8px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--muted)"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"></path><path d="M14 3v5h5"></path></svg>HEARTBEAT.md</button>
+            <button aria-current="false" style="padding-left: 8px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--muted)"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"></path><path d="M14 3v5h5"></path></svg>SOUL.md</button>
+            <button aria-current="false" style="padding-left: 8px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--muted)"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"></path><path d="M14 3v5h5"></path></svg>TOOLS.md</button>
+            <button aria-current="false" style="padding-left: 8px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--muted)"><path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"></path></svg>research</button>
+            <button aria-current="false" style="padding-left: 24px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--muted)"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"></path><path d="M14 3v5h5"></path></svg>data-sources.md</button>
+            <button aria-current="false" style="padding-left: 24px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--muted)"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"></path><path d="M14 3v5h5"></path></svg>backtest-checklist.md</button>
+          </div>
+          <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted)">6 files · 9.4 KB<button class="btn" style="align-self: flex-start"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"></path></svg>Download all</button></div>
+        </div>
+        <div style="min-width: 0; display: flex; flex-direction: column">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 46px; padding: 6px 12px 6px 16px; border-bottom: 1px solid var(--line)">
+            <span class="mono" style="color: var(--text)">AGENTS.md</span><span style="font-size: 12px; color: var(--muted)">Edited Oct 18 by you</span>
+            <div style="margin-left: auto; display: flex; align-items: center; gap: 6px"><div class="seg" role="group"><button aria-pressed="true">Edit</button><button aria-pressed="false">Preview</button></div><button class="btn"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5M12 7v5l3 2"></path></svg>History</button><button class="pbtn" style="background: var(--primary); opacity: .55" disabled>Saved</button></div>
+          </div>
+          <div class="mono" style="padding: 14px 16px 18px 4px; font-size: 13px; line-height: 1.75; min-height: 420px"><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">1</span><span style="color: var(--text); font-weight: 600; white-space: pre-wrap"># Quant Researcher</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">2</span><span style="color: var(--body); white-space: pre-wrap">&nbsp;</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">3</span><span style="color: var(--body); white-space: pre-wrap">You research market data and signals for the trading workbench project.</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">4</span><span style="color: var(--body); white-space: pre-wrap">&nbsp;</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">5</span><span style="color: var(--text); font-weight: 600; white-space: pre-wrap">## How you work</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">6</span><span style="color: var(--body); white-space: pre-wrap"><span style="color: var(--dashed)">-</span> Read the task, its documents and the project description before you start.</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">7</span><span style="color: var(--body); white-space: pre-wrap"><span style="color: var(--dashed)">-</span> Prefer Binance and Bybit for funding and open interest history.</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">8</span><span style="color: var(--body); white-space: pre-wrap"><span style="color: var(--dashed)">-</span> Save datasets to data/raw/&lt;exchange&gt;/&lt;symbol&gt;/ as Parquet.</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">9</span><span style="color: var(--body); white-space: pre-wrap"><span style="color: var(--dashed)">-</span> When a download finishes, post a summary with row counts and date ranges.</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">10</span><span style="color: var(--body); white-space: pre-wrap">&nbsp;</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">11</span><span style="color: var(--text); font-weight: 600; white-space: pre-wrap">## Ask Brian first when</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">12</span><span style="color: var(--body); white-space: pre-wrap"><span style="color: var(--dashed)">-</span> A data source needs a paid API key.</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">13</span><span style="color: var(--body); white-space: pre-wrap"><span style="color: var(--dashed)">-</span> A backfill will cost more than $5 in API calls.</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">14</span><span style="color: var(--body); white-space: pre-wrap">&nbsp;</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">15</span><span style="color: var(--text); font-weight: 600; white-space: pre-wrap">## Every wake</span></div><div style="display: grid; grid-template-columns: 40px minmax(0, 1fr)"><span class="ln">16</span><span style="color: var(--body); white-space: pre-wrap">Follow HEARTBEAT.md.</span></div></div>
+        </div>
+      </section>
+      </sc-if>
+
+      <sc-if value="{{isOutline}}" hint-placeholder-val="{{false}}">
+      <div class="sec-title"><h2 class="disp">{{outline.title}}</h2><p>{{outline.purpose}}</p></div>
+      <section aria-label="Planned contents" style="border: 1px dashed var(--edge); border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted)"><span style="height: 20px; padding: 0 7px; border-radius: 999px; background: var(--well); color: var(--body); font-weight: 600; display: inline-flex; align-items: center">OUTLINE</span>Not mocked yet. This section will hold:</div>
+        <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column">
+          <sc-for list="{{outline.rows}}" as="o" hint-placeholder-count="4">
+            <li style="display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 16px; padding: 10px 0; border-top: 1px solid var(--line)"><span style="font-weight: 500; color: var(--text)">{{o.name}}</span><span style="color: var(--muted); line-height: 1.5">{{o.text}}</span></li>
+          </sc-for>
+        </ul>
+        <div style="font-size: 12px; color: var(--muted)">Comes from: {{outline.was}}</div>
+      </section>
+      </sc-if>
+    </div>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"dark","options":["light","dark"]},"display":{"editor":"enum","default":"Hanken Grotesk","options":["Hanken Grotesk","Bricolage Grotesque"]},"grain":{"editor":"boolean","default":true},"section":{"editor":"enum","default":"instructions","options":["profile","instructions","skills","runtime","tools","secrets","budget","permissions","keys","history"]},"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const font = (this.props.display ?? 'Hanken Grotesk') === 'Bricolage Grotesque' ? 'f-bricolage' : 'f-hanken';
+    const dark = (this.props.theme ?? 'dark') === 'dark';
+    return Object.assign({}, this.baseVals(), {
+      accent: 'var(--primary)',
+      rootClass: (dark ? 'dark' : 'light') + ' ' + font + ((this.props.grain ?? true) ? '' : ' no-grain')
+    });
+  }
+  constructor(props) {
+    super(props);
+    this.state = {};
+  }
+  baseVals() {
+    const accent = 'var(--primary)';
+    const st = this.state || {};
+    const sideCurrent = 'QR';
+    const agents = [
+      ['QR', 'Quant Researcher', 'var(--cyan-fg)', 'var(--run-fg)', 'running', 'AgentChat.dc.html'],
+      ['SE', 'Strategy Engineer', 'var(--violet-fg)', 'var(--run-fg)', 'running', '#'],
+      ['FE', 'Frontend Engineer', 'var(--amber-fg)', 'var(--muted)', 'idle', '#'],
+      ['ML', 'ML Engineer', 'var(--red-fg)', 'var(--red-fg)', 'blocked', '#'],
+      ['CE', 'CEO', 'var(--body)', 'var(--amber-fg)', 'paused', '#']
+    ].map(([initials, name, bg, dot, state, href]) => {
+      const on = initials === sideCurrent;
+      return { initials, name, bg, dot, state, href, current: on ? 'page' : 'false', navBg: on ? 'var(--well)' : 'transparent', navFg: on ? 'var(--text)' : 'var(--body)' };
+    });
+
+    const sec = st.section || this.props.section || 'instructions';
+    const NAV = [["h", "Agent", 0], ["profile", "Profile", 0], ["instructions", "Instructions", 1], ["skills", "Skills", 0], ["h", "How it runs", 0], ["runtime", "Model and runtime", 1], ["tools", "Tools and channels", 0], ["secrets", "Secrets and variables", 0], ["budget", "Budget", 0], ["h", "Governance", 0], ["permissions", "Permissions and trust", 0], ["keys", "API keys", 0], ["history", "History", 0]];
+    const OUT = {"profile": {"title": "Profile", "purpose": "Who this agent is, where it sits in the org, and its lifecycle.", "rows": [{"name": "Identity", "text": "Name, title, avatar and color, and the description other agents read."}, {"name": "Reports to", "text": "Its manager in the org chart."}, {"name": "For you", "text": "Make it your primary agent; show it in your sidebar."}, {"name": "Lifecycle", "text": "Pause or resume, clear an error, reset its sessions, retire it."}], "was": "Overview (identity), Harness / Runtime (name, title, reports to), header actions"}, "skills": {"title": "Skills", "purpose": "What the agent knows how to do.", "rows": [{"name": "Assigned skills", "text": "Skills from the library, with the version each one uses."}, {"name": "Sync", "text": "Update to the library’s latest versions."}, {"name": "Add", "text": "Pick more skills from the library."}], "was": "Skills"}, "tools": {"title": "Tools and channels", "purpose": "The apps and chat channels the agent can use.", "rows": [{"name": "Apps and MCP servers", "text": "Connections the agent may use; add or remove them."}, {"name": "Tool profile", "text": "Which tools a run gets, and the policies that apply."}, {"name": "Recent decisions", "text": "Tool calls that were allowed, asked about, or blocked."}, {"name": "Channels", "text": "Slack, GitHub and other chat channels connected to the agent."}], "was": "Tools, Channels"}, "secrets": {"title": "Secrets and variables", "purpose": "Values the agent’s runs receive.", "rows": [{"name": "Variables", "text": "Plain environment variables."}, {"name": "Secrets", "text": "Organization or personal secrets passed to runs by reference."}], "was": "Secrets"}, "budget": {"title": "Budget", "purpose": "How much the agent may spend each month.", "rows": [{"name": "Monthly limit", "text": "Limit, spend so far, and what happens at the limit."}, {"name": "Costs", "text": "A link to Activity → Costs filtered to this agent."}], "was": "Activity → Budgets and Costs, filtered to the agent"}, "permissions": {"title": "Permissions and trust", "purpose": "What the agent may do without asking.", "rows": [{"name": "Trust preset", "text": "Standard, or low-trust review with a boundary (projects, tasks, agents, tools, secrets)."}, {"name": "Permissions", "text": "Hire agents, create skills, assign tasks."}, {"name": "Effective policy", "text": "The full policy that results."}], "was": "Permissions / Trust"}, "keys": {"title": "API keys", "purpose": "Keys that let outside tools act as this agent.", "rows": [{"name": "Keys", "text": "Create (shown once), list, revoke."}], "was": "API Keys"}, "history": {"title": "History", "purpose": "Every change to the agent’s configuration, and everything it did.", "rows": [{"name": "Revisions", "text": "Who changed what and when; compare; roll back."}, {"name": "Action log", "text": "The agent’s actions, exportable as CSV."}], "was": "Revisions; Activity → Agent actions audit"}};
+    const nav = NAV.map(([key, label, mock]) => {
+      if (key === 'h') return { isHead: true, isItem: false, label, current: 'false', bg: 'transparent', fg: 'var(--muted)', weight: '400', tag: '', select: () => {} };
+      const on = key === sec;
+      return { isHead: false, isItem: true, label, current: on ? 'page' : 'false', bg: on ? 'var(--sel)' : 'transparent', shadow: on ? 'var(--sel-shadow)' : 'none', fg: on ? 'var(--text)' : 'var(--muted)', weight: on ? '800' : '600', tag: mock ? '' : 'outline', select: () => this.setState({ section: key }) };
+    });
+    const show = {};
+    NAV.forEach(([key]) => { if (key !== 'h') show[key] = key === sec; });
+    const isOutline = !!OUT[sec];
+    const outline = OUT[sec] || { title: '', purpose: '', rows: [], was: '' };
+
+    const diffOpen = st.diff === undefined ? true : st.diff;
+    const vals = { nav, show, isOutline, outline, diffOpen, diffLabel: diffOpen ? 'Hide change' : 'Show change', toggleDiff: () => this.setState({ diff: !diffOpen }) };
+    return Object.assign({ accent, agents }, vals);
+  }
+}
+</script>
+</body>
+</html>

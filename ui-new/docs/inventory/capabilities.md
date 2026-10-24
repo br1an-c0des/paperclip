@@ -2,7 +2,8 @@
 
 One row per capability of the existing UI. This is the tracking document for the redesign: fill in
 **New home** while designing `ui-new`'s structure, and **Status** while building. Each ID links to its
-entry in the area guide, which lists the requests behind it.
+entry in the area guide, which lists the requests behind it. New home links point to the screens in
+the [design handoff](../design/boards.md).
 
 Status values: blank (not decided), `planned`, `partial`, `done`, `dropped` (say why in Notes).
 
@@ -15,13 +16,13 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 
 | ID | Capability | New home | Status | Notes |
 | --- | --- | --- | --- | --- |
-| [shell/navigation](areas/app-shell.md#shellnavigation-sidebar) | Sidebar | | | Upstream sync 2026-10-22: Pipelines link and `enablePipelines` removed; recent tasks load as summaries (`GET /api/companies/:companyId/issues/summaries`) |
-| [shell/contextual-sidebars](areas/app-shell.md#shellcontextual-sidebars-section-sidebars) | Section sidebars | | | |
+| [shell/navigation](areas/app-shell.md#shellnavigation-sidebar) | Sidebar | [1 Task list](../design/boards.md#board-1) (left nav on every board) | | Upstream sync 2026-10-22: Pipelines link and `enablePipelines` removed; recent tasks load as summaries (`GET /api/companies/:companyId/issues/summaries`) |
+| [shell/contextual-sidebars](areas/app-shell.md#shellcontextual-sidebars-section-sidebars) | Section sidebars | [21 Company settings](../design/boards.md#board-21), [26 Agent settings](../design/boards.md#board-26), [28 App settings](../design/boards.md#board-28) (settings section rails) | | |
 | [shell/command-palette](areas/app-shell.md#shellcommand-palette-command-palette) | Command palette | | | |
 | [shell/shortcuts](areas/app-shell.md#shellshortcuts-keyboard-shortcuts) | Keyboard shortcuts | | | |
-| [shell/dialogs](areas/app-shell.md#shelldialogs-global-create-dialogs) | Global create dialogs | | | |
+| [shell/dialogs](areas/app-shell.md#shelldialogs-global-create-dialogs) | Global create dialogs | [7b New task](../design/boards.md#board-7b) (tasks only) | | |
 | [shell/live-updates](areas/app-shell.md#shelllive-updates-live-updates-and-toasts) | Live updates and toasts | | | |
-| [shell/company](areas/app-shell.md#shellcompany-company-context) | Company context | | | |
+| [shell/company](areas/app-shell.md#shellcompany-company-context) | Company context | [19 Org dashboard](../design/boards.md#board-19) | | |
 | [shell/plugins](areas/app-shell.md#shellplugins-plugin-extension-points) | Plugin extension points | | | Needed before `ui-new` replaces the old UI: React for plugin areas, the bridge registry, module loader, slot mounts and the SDK's shared components ([FORK.md](../../../FORK.md#a-standalone-app-not-a-plugin)).. Upstream sync 2026-10-22: plugins can add agent detail tabs (`detailTab` slots, `/agents/:agentId/plugin:<pluginKey>:<slotId>`) |
 | [shell/misc](areas/app-shell.md#shellmisc-other-shell-features) | Other shell features | | | |
 
@@ -29,25 +30,25 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 
 | ID | Capability | New home | Status | Notes |
 | --- | --- | --- | --- | --- |
-| [tasks/views](areas/tasks.md#tasksviews-task-views) | Task views | | | Upstream sync 2026-10-22: Retry on interrupted task rows (`POST /api/issues/:issueId/retry`) |
-| [tasks/organize](areas/tasks.md#tasksorganize-filter-sort-group-board) | Filter, sort, group, board | | | |
-| [inbox-search/triage](areas/tasks.md#inbox-searchtriage-inbox-triage) | Inbox triage | | | Upstream sync 2026-10-22: Mine leaves out channel and routine work unless the person takes part, is assigned or is asked; Retry on interrupted tasks (`POST /api/issues/:issueId/retry`) |
+| [tasks/views](areas/tasks.md#tasksviews-task-views) | Task views | [1 Task list](../design/boards.md#board-1), [4 Board view](../design/boards.md#board-4) | | Upstream sync 2026-10-22: Retry on interrupted task rows (`POST /api/issues/:issueId/retry`) |
+| [tasks/organize](areas/tasks.md#tasksorganize-filter-sort-group-board) | Filter, sort, group, board | [1 Task list](../design/boards.md#board-1), [4 Board view](../design/boards.md#board-4) | | |
+| [inbox-search/triage](areas/tasks.md#inbox-searchtriage-inbox-triage) | Inbox triage | [14 Inbox](../design/boards.md#board-14) | | Upstream sync 2026-10-22: Mine leaves out channel and routine work unless the person takes part, is assigned or is asked; Retry on interrupted tasks (`POST /api/issues/:issueId/retry`) |
 | [inbox-search/search](areas/tasks.md#inbox-searchsearch-search) | Search | | | |
-| [tasks/create](areas/tasks.md#taskscreate-new-task-dialog) | New-task dialog | | | |
-| [tasks/thread](areas/tasks.md#tasksthread-conversation-thread) | Conversation thread | | | |
-| [tasks/discussion](areas/tasks.md#tasksdiscussion-comment-and-reassign) | Comment and reassign | | | |
-| [steering/*](areas/tasks.md#steering-queued-messages-steer-interrupt-stop) | Queued messages, steer, interrupt, stop | | | |
-| [tasks/interactions](areas/tasks.md#tasksinteractions-agent-requests-in-the-thread) | Agent requests in the thread | | | |
-| [tasks/approvals](areas/tasks.md#tasksapprovals-approvals-on-a-task) | Approvals on a task | | | |
-| [tasks/run-control](areas/tasks.md#tasksrun-control-runs-live-state-and-run-debugging) | Runs, live state and run debugging | | | |
-| [tasks/properties](areas/tasks.md#tasksproperties-properties-panel) | Properties panel | | | |
-| [task-coordination/delegation + /dependencies](areas/tasks.md#task-coordinationdelegation-and-dependencies-subtasks-and-blockers) | Subtasks and blockers | | | |
+| [tasks/create](areas/tasks.md#taskscreate-new-task-dialog) | New-task dialog | [7b New task](../design/boards.md#board-7b) | | |
+| [tasks/thread](areas/tasks.md#tasksthread-conversation-thread) | Conversation thread | [3 Activity thread](../design/boards.md#board-3), [6 Task modal](../design/boards.md#board-6) | | |
+| [tasks/discussion](areas/tasks.md#tasksdiscussion-comment-and-reassign) | Comment and reassign | [3 Activity thread](../design/boards.md#board-3), [6 Task modal](../design/boards.md#board-6) | | |
+| [steering/*](areas/tasks.md#steering-queued-messages-steer-interrupt-stop) | Queued messages, steer, interrupt, stop | [3 Activity thread](../design/boards.md#board-3), [16 Run modal](../design/boards.md#board-16) | | |
+| [tasks/interactions](areas/tasks.md#tasksinteractions-agent-requests-in-the-thread) | Agent requests in the thread | [3 Activity thread](../design/boards.md#board-3), [15 Request cards](../design/boards.md#board-15) | | |
+| [tasks/approvals](areas/tasks.md#tasksapprovals-approvals-on-a-task) | Approvals on a task | [14 Inbox](../design/boards.md#board-14), [15 Request cards](../design/boards.md#board-15) | | |
+| [tasks/run-control](areas/tasks.md#tasksrun-control-runs-live-state-and-run-debugging) | Runs, live state and run debugging | [16 Run modal](../design/boards.md#board-16) | | |
+| [tasks/properties](areas/tasks.md#tasksproperties-properties-panel) | Properties panel | [2 Task details](../design/boards.md#board-2), [6 Task modal](../design/boards.md#board-6) | | |
+| [task-coordination/delegation + /dependencies](areas/tasks.md#task-coordinationdelegation-and-dependencies-subtasks-and-blockers) | Subtasks and blockers | [2 Task details](../design/boards.md#board-2) | | |
 | [task-coordination/tree-control](areas/tasks.md#task-coordinationtree-control-pause-resume-cancel-restore-a-task-tree) | Pause, resume, cancel, restore a task tree | | | |
 | [tasks/lifecycle](areas/tasks.md#taskslifecycle-other-header-actions) | Other header actions | | | |
-| [tasks/privacy](areas/tasks.md#tasksprivacy-private-tasks-and-sharing) | Private tasks and sharing | | | |
-| [documents-artifacts/documents + /annotations](areas/tasks.md#documents-artifactsdocuments-and-annotations-task-documents) | Task documents | | | |
-| [documents-artifacts/attachments + /work-products](areas/tasks.md#documents-artifactsattachments-work-products-files-and-outputs) | Files and outputs | | | |
-| [tasks/workspace](areas/tasks.md#tasksworkspace-execution-workspace-on-the-task) | Execution workspace on the task | | | |
+| [tasks/privacy](areas/tasks.md#tasksprivacy-private-tasks-and-sharing) | Private tasks and sharing | [7b New task](../design/boards.md#board-7b) | | |
+| [documents-artifacts/documents + /annotations](areas/tasks.md#documents-artifactsdocuments-and-annotations-task-documents) | Task documents | [5 Docs and files](../design/boards.md#board-5), [7 Task modal with docs](../design/boards.md#board-7) | | |
+| [documents-artifacts/attachments + /work-products](areas/tasks.md#documents-artifactsattachments-work-products-files-and-outputs) | Files and outputs | [5 Docs and files](../design/boards.md#board-5), [7 Task modal with docs](../design/boards.md#board-7) | | |
+| [tasks/workspace](areas/tasks.md#tasksworkspace-execution-workspace-on-the-task) | Execution workspace on the task | [2 Task details](../design/boards.md#board-2), [7b New task](../design/boards.md#board-7b) | | |
 | [tasks/recovery](areas/tasks.md#tasksrecovery-recovery-and-health-notices) | Recovery and health notices | | | Upstream sync 2026-10-15: execution blocker notice gained "Recovery details" (`GET /api/issues/:id/recovery-actions`, polled every 5s). Upstream sync 2026-10-18: "Continue from saved sources" after a destroyed workspace (`POST /api/issues/:id/recovery-actions/reconstruct-workspace`). Upstream sync 2026-10-22: one interruption state with a single Retry (`POST /api/issues/:issueId/retry`) replaces the recovery notices; "Recovery details" (`GET /api/issues/:id/recovery-actions`) and "Continue from saved sources" (`/reconstruct-workspace`) are no longer used by the old UI |
 | [tasks/runner-goal](areas/tasks.md#tasksrunner-goal-runner-goal) | Runner goal | | | |
 | [tasks/feedback](areas/tasks.md#tasksfeedback-feedback-votes) | Feedback votes | | | |
@@ -57,13 +58,13 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 
 | ID | Capability | New home | Status | Notes |
 | --- | --- | --- | --- | --- |
-| [projects/lifecycle](areas/projects.md#projectslifecycle-create-list-archive) | Create, list, archive | | | |
-| [projects/membership](areas/projects.md#projectsmembership-join-leave-star) | Join, leave, star | | | |
-| [projects/task-context](areas/projects.md#projectstask-context-project-tasks) | Project tasks | | | |
-| [projects/defaults](areas/projects.md#projectsdefaults-project-configuration) | Project configuration | | | |
-| [projects/budget](areas/projects.md#projectsbudget-project-budget) | Project budget | | | |
-| [projects/summary](areas/projects.md#projectssummary-ai-summaries) | AI summaries | | | |
-| [workspaces/project-workspaces](areas/projects.md#workspacesproject-workspaces-configured-codebases) | Configured codebases | | | |
+| [projects/lifecycle](areas/projects.md#projectslifecycle-create-list-archive) | Create, list, archive | [10 Project settings](../design/boards.md#board-10) (archive only) | | |
+| [projects/membership](areas/projects.md#projectsmembership-join-leave-star) | Join, leave, star | [10 Project settings](../design/boards.md#board-10) | | |
+| [projects/task-context](areas/projects.md#projectstask-context-project-tasks) | Project tasks | [1 Task list](../design/boards.md#board-1), [8 Project dashboard](../design/boards.md#board-8) | | |
+| [projects/defaults](areas/projects.md#projectsdefaults-project-configuration) | Project configuration | [10 Project settings](../design/boards.md#board-10), [11 Project settings: code](../design/boards.md#board-11) | | |
+| [projects/budget](areas/projects.md#projectsbudget-project-budget) | Project budget | [8 Project dashboard](../design/boards.md#board-8), [10 Project settings](../design/boards.md#board-10) | | |
+| [projects/summary](areas/projects.md#projectssummary-ai-summaries) | AI summaries | [8 Project dashboard](../design/boards.md#board-8) | | |
+| [workspaces/project-workspaces](areas/projects.md#workspacesproject-workspaces-configured-codebases) | Configured codebases | [8 Project dashboard](../design/boards.md#board-8), [11 Project settings: code](../design/boards.md#board-11) | | |
 | [workspaces/overview](areas/projects.md#workspacesoverview-all-workspaces) | All workspaces | | | |
 | [workspaces/binding + /services](areas/projects.md#workspacesbinding-and-services-execution-workspace-detail) | Execution workspace detail | | | |
 | [workspaces/files-git](areas/projects.md#workspacesfiles-git-files-and-git-state) | Files and git state | | | |
@@ -72,26 +73,26 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 
 | ID | Capability | New home | Status | Notes |
 | --- | --- | --- | --- | --- |
-| [agents/roster](areas/agents.md#agentsroster-agents-list-and-org-chart) | Agents list and org chart | | | |
-| [agents/organization](areas/agents.md#agentsorganization-reporting-relationships) | Reporting relationships | | | |
+| [agents/roster](areas/agents.md#agentsroster-agents-list-and-org-chart) | Agents list and org chart | [19 Org dashboard](../design/boards.md#board-19), [20 Manage agents](../design/boards.md#board-20) | | |
+| [agents/organization](areas/agents.md#agentsorganization-reporting-relationships) | Reporting relationships | [19 Org dashboard](../design/boards.md#board-19) | | |
 | [agents/primary-agent](areas/agents.md#agentsprimary-agent-personal-primary-agent) | Personal primary agent | | | |
 | [agents/membership](areas/agents.md#agentsmembership-join-leave-star) | Join, leave, star | | | |
 | [agents/hire](areas/agents.md#agentshire-new-agent) | New agent | | | Upstream sync 2026-10-18: personal Muse invitation variant (`enableMuse`, `/muse-invitations`). Upstream sync 2026-10-22: the agent record is saved when the name is submitted, then updated (`POST /api/companies/:companyId/agents`, `PATCH /api/agents/:id`); environment probe (`POST /api/environments/:environmentId/probe`) |
-| [agents/overview](areas/agents.md#agentsoverview-overview) | Overview | | | Upstream sync 2026-10-22: header "Run with provider trace" removed (re-run with trace stays on run detail) |
-| [agents/lifecycle](areas/agents.md#agentslifecycle-pause-resume-terminate-recover) | Pause, resume, terminate, recover | | | |
-| [agents/instructions](areas/agents.md#agentsinstructions-instructions) | Instructions | | | |
-| [agents/skills](areas/agents.md#agentsskills-skills) | Skills | | | |
-| [agents/runtime](areas/agents.md#agentsruntime-harness--runtime-configuration) | Harness / Runtime configuration | | | Upstream sync 2026-10-18: Muse connection panel for Muse-run agents (`/agents/:agentId/muse-binding/*`, `enableMuse`). Upstream sync 2026-10-22: "Upgrade to Paperclip Runner" for existing Claude and Codex agents |
-| [agents/secrets](areas/agents.md#agentssecrets-secrets) | Secrets | | | |
-| [agents/tools](areas/agents.md#agentstools-tools) | Tools | | | |
-| [agents/channels](areas/agents.md#agentschannels-channels) | Channels | | | |
-| [agents/permissions](areas/agents.md#agentspermissions-permissions--trust) | Permissions / Trust | | | |
-| [agents/api-keys](areas/agents.md#agentsapi-keys-api-keys) | API keys | | | |
-| [agents/revisions](areas/agents.md#agentsrevisions-configuration-revisions) | Configuration revisions | | | |
+| [agents/overview](areas/agents.md#agentsoverview-overview) | Overview | [12 Agent chat](../design/boards.md#board-12) | | Upstream sync 2026-10-22: header "Run with provider trace" removed (re-run with trace stays on run detail) |
+| [agents/lifecycle](areas/agents.md#agentslifecycle-pause-resume-terminate-recover) | Pause, resume, terminate, recover | [20 Manage agents](../design/boards.md#board-20) | | |
+| [agents/instructions](areas/agents.md#agentsinstructions-instructions) | Instructions | [27 Agent instructions](../design/boards.md#board-27) | | |
+| [agents/skills](areas/agents.md#agentsskills-skills) | Skills | [30 Settings outline](../design/boards.md#board-30) (outline only) | | |
+| [agents/runtime](areas/agents.md#agentsruntime-harness--runtime-configuration) | Harness / Runtime configuration | [26 Agent settings](../design/boards.md#board-26) | | Upstream sync 2026-10-18: Muse connection panel for Muse-run agents (`/agents/:agentId/muse-binding/*`, `enableMuse`). Upstream sync 2026-10-22: "Upgrade to Paperclip Runner" for existing Claude and Codex agents |
+| [agents/secrets](areas/agents.md#agentssecrets-secrets) | Secrets | [30 Settings outline](../design/boards.md#board-30) (outline only) | | |
+| [agents/tools](areas/agents.md#agentstools-tools) | Tools | [30 Settings outline](../design/boards.md#board-30) (outline only) | | |
+| [agents/channels](areas/agents.md#agentschannels-channels) | Channels | [30 Settings outline](../design/boards.md#board-30) (outline only) | | |
+| [agents/permissions](areas/agents.md#agentspermissions-permissions--trust) | Permissions / Trust | [30 Settings outline](../design/boards.md#board-30) (outline only) | | |
+| [agents/api-keys](areas/agents.md#agentsapi-keys-api-keys) | API keys | [30 Settings outline](../design/boards.md#board-30) (outline only) | | |
+| [agents/revisions](areas/agents.md#agentsrevisions-configuration-revisions) | Configuration revisions | [30 Settings outline](../design/boards.md#board-30) (outline only) | | |
 | [agents/audit](areas/agents.md#agentsaudit-agent-actions-audit) | Agent actions audit | | | |
-| [agents/built-in](areas/agents.md#agentsbuilt-in-built-in-agents) | Built-in agents | | | |
-| [runs-adapters/runs](areas/agents.md#runs-adaptersruns-run-detail) | Run detail | | | |
-| [agent-chat/history + /handoff](areas/agents.md#agent-chathistory-and-handoff-conversations) | Conversations | | | |
+| [agents/built-in](areas/agents.md#agentsbuilt-in-built-in-agents) | Built-in agents | [20 Manage agents](../design/boards.md#board-20) | | |
+| [runs-adapters/runs](areas/agents.md#runs-adaptersruns-run-detail) | Run detail | [16 Run modal](../design/boards.md#board-16), [17 Run input](../design/boards.md#board-17) | | |
+| [agent-chat/history + /handoff](areas/agents.md#agent-chathistory-and-handoff-conversations) | Conversations | [12 Agent chat](../design/boards.md#board-12) | | |
 
 ### Goals
 
@@ -99,7 +100,7 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 | --- | --- | --- | --- | --- |
 | [goals/hierarchy](areas/goals.md#goalshierarchy-goal-tree-and-creation) | Goal tree and creation | | | |
 | [goals/detail](areas/goals.md#goalsdetail-goal-detail-and-properties) | Goal detail and properties | | | |
-| [goals/alignment](areas/goals.md#goalsalignment-goal-context-on-work) | Goal context on work | | | |
+| [goals/alignment](areas/goals.md#goalsalignment-goal-context-on-work) | Goal context on work | [2 Task details](../design/boards.md#board-2), [7b New task](../design/boards.md#board-7b) | | |
 
 ### Routines
 
@@ -116,16 +117,16 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 
 | ID | Capability | New home | Status | Notes |
 | --- | --- | --- | --- | --- |
-| [approvals/governance](areas/approvals-decisions.md#approvalsgovernance-approvals-list-and-detail) | Approvals list and detail | | | |
-| [decisions/feed](areas/approvals-decisions.md#decisionsfeed-what-needs-me) | What needs me | | | |
-| [decisions/queues](areas/approvals-decisions.md#decisionsqueues-decision-queues-and-triage) | Decision queues and triage | | | |
-| [approvals/tool-review](areas/approvals-decisions.md#approvalstool-review-app-call-review) | App call review | | | |
+| [approvals/governance](areas/approvals-decisions.md#approvalsgovernance-approvals-list-and-detail) | Approvals list and detail | [14 Inbox](../design/boards.md#board-14), [15 Request cards](../design/boards.md#board-15) | | |
+| [decisions/feed](areas/approvals-decisions.md#decisionsfeed-what-needs-me) | What needs me | [14 Inbox](../design/boards.md#board-14), [8 Project dashboard](../design/boards.md#board-8), [19 Org dashboard](../design/boards.md#board-19) | | |
+| [decisions/queues](areas/approvals-decisions.md#decisionsqueues-decision-queues-and-triage) | Decision queues and triage | [14 Inbox](../design/boards.md#board-14) | | |
+| [approvals/tool-review](areas/approvals-decisions.md#approvalstool-review-app-call-review) | App call review | [14 Inbox](../design/boards.md#board-14), [15 Request cards](../design/boards.md#board-15) | | |
 
 ### Artifacts
 
 | ID | Capability | New home | Status | Notes |
 | --- | --- | --- | --- | --- |
-| [documents-artifacts/library](areas/artifacts.md#documents-artifactslibrary-artifact-library) | Artifact library | | | |
+| [documents-artifacts/library](areas/artifacts.md#documents-artifactslibrary-artifact-library) | Artifact library | [9 Project docs](../design/boards.md#board-9) | | |
 
 ### Cases
 
@@ -141,8 +142,8 @@ Tracked per page group; see [areas/settings-and-admin.md](areas/settings-and-adm
 
 | Area | Pages | New home | Status | Notes |
 | --- | --- | --- | --- | --- |
-| [Company settings](areas/settings-and-admin.md#company-settings) | General, Connections, Members, Secrets, Export, Import, Plugin settings pages, Join requests | | | Upstream sync 2026-10-22: General gains agent observability (`/observability`, + `/test`); decision model always on Connections; Connections gains prompt injection prevention (`/prompt-injection-prevention`, + `/models`, `/test`) |
-| [Instance settings](areas/settings-and-admin.md#instance-settings) | Profile, Environments, Access, Experimental, Plugins, Adapters, Plugin pages | | | |
+| [Company settings](areas/settings-and-admin.md#company-settings) | General, Connections, Members, Secrets, Export, Import, Plugin settings pages, Join requests | [21 Company settings](../design/boards.md#board-21), [30 Settings outline](../design/boards.md#board-30) | | Upstream sync 2026-10-22: General gains agent observability (`/observability`, + `/test`); decision model always on Connections; Connections gains prompt injection prevention (`/prompt-injection-prevention`, + `/models`, `/test`) |
+| [Instance settings](areas/settings-and-admin.md#instance-settings) | Profile, Environments, Access, Experimental, Plugins, Adapters, Plugin pages | [28 App settings](../design/boards.md#board-28), [30 Settings outline](../design/boards.md#board-30) | | |
 | [Skills](areas/settings-and-admin.md#skills) | Library, Sources, Studio | | | Upstream sync 2026-10-22: streamlined `/skills/studio` shows the library filtered to authored skills |
 | [Apps and tools ("Connectors")](areas/settings-and-admin.md#apps-and-tools-connectors) | Browse, Connect, App detail, Review, Assistant connection, Gateways, Advanced, Chat endpoints | | | |
 | [Activity and costs](areas/settings-and-admin.md#activity-and-costs) | Activity hub | | | Upstream sync 2026-10-22: Commentary tab (`/activity/commentary`; `GET /api/companies/:companyId/agent-commentary`, `/:id`); case filter on the activity log |

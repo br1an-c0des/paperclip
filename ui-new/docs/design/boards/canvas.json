@@ -1,0 +1,376 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-23T18:30:00Z"
+  },
+  "title": "Paperclip Redesign · Capsule Stack",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1240,
+      "title": "1 · Task list",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "TaskDetail.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 1240,
+      "title": "2 · Task open: details",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "TaskActivity.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1240,
+      "title": "3 · Task open: activity thread",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Board.dc.html": {
+      "x": 0,
+      "y": 1360,
+      "w": 1440,
+      "h": 1240,
+      "title": "4 · Board view",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "TaskFiles.dc.html": {
+      "x": 4560,
+      "y": 0,
+      "w": 1440,
+      "h": 1240,
+      "title": "5 · Task open: docs and files",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "TaskModal.dc.html": {
+      "x": 1520,
+      "y": 1360,
+      "w": 1440,
+      "h": 1240,
+      "title": "6 · Task modal: details and activity",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "TaskModalFiles.dc.html": {
+      "x": 3040,
+      "y": 1360,
+      "w": 1440,
+      "h": 1240,
+      "title": "7 · Task modal: details and docs",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "ProjectDashboard.dc.html": {
+      "x": 0,
+      "y": 2720,
+      "w": 1440,
+      "h": 2080,
+      "title": "8 · Project dashboard",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "ProjectDocs.dc.html": {
+      "x": 3040,
+      "y": 2720,
+      "w": 1440,
+      "h": 1860,
+      "title": "9 · Project docs",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "ProjectSettings.dc.html": {
+      "x": 4560,
+      "y": 2720,
+      "w": 1440,
+      "h": 1320,
+      "title": "10 · Project settings: general",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "ProjectSettingsCode.dc.html": {
+      "x": 6080,
+      "y": 2720,
+      "w": 1440,
+      "h": 1320,
+      "title": "11 · Project settings: code and workspaces",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "AgentChat.dc.html": {
+      "x": 0,
+      "y": 4920,
+      "w": 1440,
+      "h": 1240,
+      "title": "12 · Agent chat: working on a task",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "AgentChatReplying.dc.html": {
+      "x": 1520,
+      "y": 4920,
+      "w": 1440,
+      "h": 1240,
+      "title": "13 · Agent chat: replying",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Inbox.dc.html": {
+      "x": 0,
+      "y": 6280,
+      "w": 1440,
+      "h": 3160,
+      "title": "14 · Inbox: needs you",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "RequestCards.dc.html": {
+      "x": 1520,
+      "y": 6280,
+      "w": 1440,
+      "h": 3000,
+      "title": "15 · Request cards",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "RunModal.dc.html": {
+      "x": 0,
+      "y": 9560,
+      "w": 1440,
+      "h": 1240,
+      "title": "16 · Task run: live, from the task thread",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "RunModalInput.dc.html": {
+      "x": 1520,
+      "y": 9560,
+      "w": 1440,
+      "h": 1240,
+      "title": "17 · Task run: what the agent was sent",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "RunModalFinished.dc.html": {
+      "x": 3040,
+      "y": 9560,
+      "w": 1440,
+      "h": 1240,
+      "title": "18 · Task run: finished, from agent chat",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "OrgDashboard.dc.html": {
+      "x": 0,
+      "y": 10920,
+      "w": 1440,
+      "h": 2000,
+      "title": "19 · Org dashboard: org chart",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "OrgAgents.dc.html": {
+      "x": 1520,
+      "y": 10920,
+      "w": 1440,
+      "h": 1240,
+      "title": "20 · Org: manage agents",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "CompanySettings.dc.html": {
+      "x": 0,
+      "y": 13040,
+      "w": 1440,
+      "h": 1700,
+      "title": "21 · Company settings: general",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "CompanySettingsMembers.dc.html": {
+      "x": 1520,
+      "y": 13040,
+      "w": 1440,
+      "h": 1240,
+      "title": "22 · Company settings: members",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "CompanySettingsConnections.dc.html": {
+      "x": 3040,
+      "y": 13040,
+      "w": 1440,
+      "h": 1500,
+      "title": "23 · Company settings: connections",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "CompanySettingsSecrets.dc.html": {
+      "x": 4560,
+      "y": 13040,
+      "w": 1440,
+      "h": 1340,
+      "title": "24 · Company settings: secrets",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "CompanySettingsBudgets.dc.html": {
+      "x": 6080,
+      "y": 13040,
+      "w": 1440,
+      "h": 1560,
+      "title": "25 · Company settings: budgets",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "AgentSettings.dc.html": {
+      "x": 0,
+      "y": 14860,
+      "w": 1440,
+      "h": 2040,
+      "title": "26 · Agent settings: model and runtime",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "AgentSettingsInstructions.dc.html": {
+      "x": 1520,
+      "y": 14860,
+      "w": 1440,
+      "h": 1240,
+      "title": "27 · Agent settings: instructions",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "AppSettings.dc.html": {
+      "x": 0,
+      "y": 17020,
+      "w": 1440,
+      "h": 1240,
+      "title": "28 · App settings: general",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "AppSettingsHarnesses.dc.html": {
+      "x": 1520,
+      "y": 17020,
+      "w": 1440,
+      "h": 1240,
+      "title": "29 · App settings: harnesses",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "SettingsOutline.dc.html": {
+      "x": 7600,
+      "y": 13040,
+      "w": 1440,
+      "h": 2800,
+      "title": "30 · Settings outline: every section",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "AgentWorkload.dc.html": {
+      "x": 7600,
+      "y": 2720,
+      "w": 1440,
+      "h": 1140,
+      "title": "31 · Project agent workload",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "AgentWorkloadWeek.dc.html": {
+      "x": 9120,
+      "y": 2720,
+      "w": 1440,
+      "h": 1180,
+      "title": "32 · Project agent workload: last 7 days",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "OrgWorkload.dc.html": {
+      "x": 3040,
+      "y": 10920,
+      "w": 1440,
+      "h": 1760,
+      "title": "33 · Company agent workload",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "AgentAvatars.dc.html": {
+      "x": 9120,
+      "y": 13040,
+      "w": 1440,
+      "h": 2200,
+      "title": "34 · Agent avatars (reference)",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "NewTask.dc.html": {
+      "x": 4560,
+      "y": 1360,
+      "w": 1440,
+      "h": 1240,
+      "title": "7b · New task",
+      "expand": "fill",
+      "is_interactive": true
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "TaskDetail.dc.html",
+    "TaskActivity.dc.html",
+    "TaskFiles.dc.html",
+    "Board.dc.html",
+    "TaskModal.dc.html",
+    "TaskModalFiles.dc.html",
+    "NewTask.dc.html",
+    "ProjectDashboard.dc.html",
+    "AgentWorkload.dc.html",
+    "AgentWorkloadWeek.dc.html",
+    "ProjectDocs.dc.html",
+    "ProjectSettings.dc.html",
+    "ProjectSettingsCode.dc.html",
+    "AgentChat.dc.html",
+    "AgentChatReplying.dc.html",
+    "Inbox.dc.html",
+    "RequestCards.dc.html",
+    "RunModal.dc.html",
+    "RunModalInput.dc.html",
+    "RunModalFinished.dc.html",
+    "OrgDashboard.dc.html",
+    "OrgAgents.dc.html",
+    "OrgWorkload.dc.html",
+    "CompanySettings.dc.html",
+    "CompanySettingsMembers.dc.html",
+    "CompanySettingsConnections.dc.html",
+    "CompanySettingsSecrets.dc.html",
+    "CompanySettingsBudgets.dc.html",
+    "AgentSettings.dc.html",
+    "AgentSettingsInstructions.dc.html",
+    "AppSettings.dc.html",
+    "AppSettingsHarnesses.dc.html",
+    "SettingsOutline.dc.html",
+    "AgentAvatars.dc.html"
+  ],
+  "notes": {
+    "title": {
+      "x": 0,
+      "y": -300,
+      "text": "Paperclip redesign in Capsule Stack: tasks, projects, agents, inbox, runs, org and settings",
+      "kind": "title1",
+      "maxW": 6000
+    }
+  },
+  "designSystems": []
+}

@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent workload</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Fragment+Mono&amp;display=swap">
+<style>
+body{margin:0;background:#0a0a0a}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;margin:0}
+.light{--ground:#f2f2f4;--card:#ffffff;--card-edge:transparent;--shadow:0 1px 2px rgba(17,17,19,.06),0 10px 28px -14px rgba(17,17,19,.2);--shadow-lg:0 2px 6px rgba(17,17,19,.08),0 30px 70px -24px rgba(17,17,19,.38);--well:#e7e7ea;--sel:#ffffff;--sel-shadow:0 1px 3px rgba(17,17,19,.12);--line:#ececf0;--row-line:#f0f0f3;--hover:#e7e7ea;--row-hover:#f8f8fa;--code:#f6f6f8;--text:#111113;--body:#45454d;--muted:#6b6b75;--edge:#cfcfd6;--dashed:#b4b4bd;--primary:#111113;--on-primary:#ffffff;--run-bg:#ecebff;--run-fg:#3b2fc0;--violet-bg:#f6e6ff;--violet-fg:#7a1fb8;--amber-bg:#fff1dc;--amber-fg:#94480a;--red-bg:#fde7ea;--red-fg:#b0102a;--green-bg:#e2f6e5;--green-fg:#17672f;--cyan-bg:#dcf4f1;--cyan-fg:#0e6a61;--pri-on:#111113;--pri-off:#dcdce2;--ash-a:#c9c9cf;--ash-b:#9a9aa3;--scrim:rgba(17,17,19,.34);--disc-shadow:rgba(17,17,19,.35);--grain-blend:soft-light;--grain-op:.9;--knob-off:#ffffff}
+.dark{--ground:#0a0a0a;--card:#141414;--card-edge:#1f1f1f;--shadow:inset 0 1px 0 rgba(255,255,255,.04),0 16px 34px -18px rgba(0,0,0,.95);--shadow-lg:inset 0 1px 0 rgba(255,255,255,.06),0 34px 80px -20px rgba(0,0,0,.95);--well:#161616;--sel:#262626;--sel-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 3px rgba(0,0,0,.7);--line:#1f1f1f;--row-line:#1a1a1a;--hover:#1a1a1a;--row-hover:#181818;--code:#0f0f0f;--text:#f4f1ea;--body:#c9c6bf;--muted:#8f8c86;--edge:#2c2c2c;--dashed:#4a4843;--primary:#f4f1ea;--on-primary:#0a0a0a;--run-bg:#17142b;--run-fg:#c9c2ff;--violet-bg:rgba(139,44,240,.15);--violet-fg:#dcb8ff;--amber-bg:rgba(247,181,47,.1);--amber-fg:#ffc98a;--red-bg:rgba(242,40,111,.12);--red-fg:#ff9aa8;--green-bg:rgba(47,209,47,.1);--green-fg:#9be59b;--cyan-bg:rgba(34,181,165,.12);--cyan-fg:#8fe3d8;--pri-on:#f4f1ea;--pri-off:#2c2c2c;--ash-a:#3a3a3a;--ash-b:#6b6b6b;--scrim:rgba(0,0,0,.62);--disc-shadow:rgba(0,0,0,.6);--grain-blend:overlay;--grain-op:.75;--knob-off:#8f8c86}
+.f-hanken{--display:'Hanken Grotesk',system-ui,sans-serif;--dtrack:-.045em}
+.f-bricolage{--display:'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif;--dtrack:-.035em}
+.disp{font-family:var(--display);letter-spacing:var(--dtrack)}
+.card{background:var(--card);border:1px solid var(--card-edge);border-radius:18px;box-shadow:var(--shadow)}
+.mono{font-family:'Fragment Mono',ui-monospace,monospace}
+.grain{position:absolute;inset:0;width:100%;height:100%;mix-blend-mode:var(--grain-blend);opacity:var(--grain-op);pointer-events:none}
+.no-grain .grain{display:none}
+@keyframes breathe{0%,100%{opacity:1;transform:scaleY(1)}50%{opacity:.55;transform:scaleY(.65)}}
+.live{animation:breathe 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.live{animation:none}}
+a{color:var(--run-fg)}
+a:hover{color:var(--run-fg)}
+.nav{text-decoration:none}
+.nav:hover,.ghost:hover,.icon:hover{background:var(--well)}
+.card:hover{border-color:var(--edge);background:var(--card)}
+.card a{color:var(--text);text-decoration:none}
+.card a:hover{text-decoration:underline}
+.add:hover{background:var(--hover)}
+.nav:hover,.ghost:hover,.icon:hover{background:var(--hover)}
+.row:hover,.item:hover{background:var(--row-hover)}
+.card{background:var(--card);border:1px solid var(--card-edge);border-radius:18px;box-shadow:var(--shadow)}
+.seg{padding:3px;border:0;border-radius:999px;background:var(--well)}
+.seg button{border-radius:999px;font-weight:600;color:var(--body)}
+.seg button[aria-pressed="true"]{background:var(--sel);box-shadow:var(--sel-shadow);color:var(--text);font-weight:800}
+.chip{border-radius:999px}
+.field{border-radius:12px}
+.sec-title h2{font-family:var(--display);letter-spacing:-.02em;font-size:24px;font-weight:800}
+.chead h3{font-family:var(--display);letter-spacing:-.01em;font-weight:800}
+.rq{position:relative;display:flex;flex-direction:column;gap:10px;padding:14px 16px 14px 19px;border:1px solid var(--edge);border-radius:14px;background:var(--card);overflow:hidden;text-align:left}
+.rq::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--dashed)}
+.k-q::before{background:#2a9c9e}
+.k-q .rq-kind{background:var(--cyan-bg);color:var(--cyan-fg)}
+.k-p::before{background:var(--violet-bg)}
+.k-p .rq-kind{background:var(--violet-bg);color:var(--violet-fg)}
+.k-a::before{background:#f69a2d}
+.k-a .rq-kind{background:var(--amber-bg);color:var(--amber-fg)}
+.k-s::before{background:#29c35f}
+.k-s .rq-kind{background:var(--green-bg);color:var(--green-fg)}
+.rq.settled{background:var(--card);gap:8px;padding-top:12px;padding-bottom:12px}
+.rq.settled::before{opacity:.25}
+.rq.settled{box-shadow:0 1px 2px rgba(17,17,19,.06)}
+.rq-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted);min-width:0}
+.rq-kind{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:5px;font-size:11px;font-weight:600;letter-spacing:.04em;flex-shrink:0}
+.rq-tag{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:5px;border:1px solid var(--edge);color:var(--body);font-size:11px;font-weight:500;flex-shrink:0}
+.rq-subj{display:inline-flex;align-items:center;gap:6px;min-width:0;color:var(--body);text-decoration:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.rq-subj:hover{text-decoration:underline}
+.rq-mono{font-family:'Fragment Mono', ui-monospace, monospace;font-size:12px;color:var(--muted)}
+.rq-life{margin-left:auto;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.rq-soon{color:var(--red-fg)}
+.rq-ask{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.rq-ask b{color:var(--text);font-weight:500}
+.rq h3{margin:0;font-size:15px;font-weight:600;line-height:1.4;color:var(--text)}
+.rq p{margin:0;font-size:14px;line-height:1.55;color:var(--body)}
+.rq-next{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:14px;background:var(--card);font-size:13px;line-height:1.45;color:var(--muted)}
+.rq-next svg{flex-shrink:0;margin-top:2px}
+.rq-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rq-btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;box-sizing:border-box;border-radius:999px;border:1px solid var(--edge);background:transparent;color:var(--body);font-size:13px;font-weight:500;white-space:nowrap}
+.rq-btn:hover{background:var(--well)}
+.rq-btn.pri{background:#5b45ea;border-color:color-mix(in srgb, var(--run-fg) 45%, transparent);color:var(--text)}
+.rq-btn.pri:hover{background:#5b45ea}
+.rq-btn.quiet{border-color:transparent;color:var(--muted);padding:0 8px}
+.rq-btn.warn{color:var(--red-fg)}
+.rq-who{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap}
+.rq-opts{display:flex;flex-direction:column;gap:6px}
+.rq-opt{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:14px;font-size:13px;line-height:1.45;color:var(--body)}
+.rq-opt.on{border-color:color-mix(in srgb, var(--run-fg) 75%, transparent);background:var(--run-bg)}
+.rq-opt small{display:block;font-size:12px;color:var(--muted)}
+.rq-radio{width:14px;height:14px;flex-shrink:0;margin-top:2px;box-sizing:border-box;border-radius:50%;border:2px solid var(--edge)}
+.rq-opt.on .rq-radio{border:4px solid color-mix(in srgb, var(--run-fg) 45%, transparent)}
+.rq-check{width:14px;height:14px;flex-shrink:0;margin-top:2px;box-sizing:border-box;border-radius:4px;border:2px solid var(--edge);display:grid;place-items:center}
+.rq-opt.on .rq-check{background:#5b45ea;border-color:color-mix(in srgb, var(--run-fg) 45%, transparent)}
+.rq-chips{display:flex;gap:6px;flex-wrap:wrap}
+.rq-chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:999px;border:1px solid var(--edge);font-size:13px;color:var(--body)}
+.rq-chip.on{border-color:color-mix(in srgb, var(--run-fg) 75%, transparent);background:var(--run-bg);color:var(--text)}
+.rq-q{font-size:13px;font-weight:500;color:var(--text)}
+.rq-field{display:flex;align-items:center;gap:6px;min-height:32px;padding:0 10px;box-sizing:border-box;border:1px solid var(--edge);border-radius:14px;background:var(--ground);font-size:13px;color:var(--muted)}
+.rq-diff{border:1px solid var(--line);border-radius:14px;overflow:hidden;font-size:13px}
+.rq-drow{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:center;padding:7px 10px;border-top:1px solid var(--line);color:var(--body)}
+.rq-drow:first-child{border-top:0;background:var(--card);font-size:12px;color:var(--muted)}
+.rq-was{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dashed)}
+.rq-st{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:0;color:var(--text);flex-shrink:0}
+.rq-alert{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:14px;border:1px solid color-mix(in srgb, var(--amber-fg) 50%, transparent);background:var(--amber-bg);font-size:12px;line-height:1.45;color:var(--amber-fg)}
+.rq-code{margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--code);font-family:'Fragment Mono', ui-monospace, monospace;font-size:12px;line-height:1.6;color:var(--body);white-space:pre-wrap}
+.rq-code span{color:var(--muted)}
+.rq-res{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--body)}
+.rq-res .ok{color:var(--green-fg)}
+.rq-res .bad{color:var(--red-fg)}
+.rq-res .mid{color:var(--amber-fg)}
+.rq-res small{font-size:12px;color:var(--muted)}
+.rq-meter{height:6px;border-radius:3px;background:var(--well);overflow:hidden}
+.rq-meter span{display:block;height:100%;border-radius:3px}
+.rq-agent{display:flex;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.rq-kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin-top:6px;font-size:12px;color:var(--muted)}
+.rq-kv b{font-weight:400;color:var(--body)}
+.rq-stage{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.rq-step{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:14px;border:1px solid var(--edge);color:var(--muted)}
+.rq-step.now{border-color:color-mix(in srgb, var(--green-fg) 65%, transparent);background:var(--green-bg);color:var(--green-fg)}
+.rq-file{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--edge);border-radius:14px;font-size:12px;color:var(--body);text-decoration:none}
+.rq{border:1px solid var(--card-edge);border-radius:18px;box-shadow:var(--shadow);padding-left:30px}
+.rq::before{left:13px;top:16px;bottom:auto;width:6px;height:20px;border-radius:999px}
+.k-q::before{background:linear-gradient(180deg,#22b5a5,#4c7896)}
+.k-p::before{background:linear-gradient(180deg,#ff2bd6,#8b2cf0)}
+.k-a::before{background:linear-gradient(180deg,#f7b52f,#f5822a)}
+.k-s::before{background:linear-gradient(180deg,#2fd12f,#22b5a5)}
+.rq-kind,.rq-st,.rq-tag{border-radius:999px;letter-spacing:0}
+.rq-btn{font-weight:700}
+.rq-btn.pri,.rq-btn.pri:hover{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.rq{padding:16px 22px 18px 38px;gap:12px}
+.rq::before{left:15px;top:15px;bottom:15px;height:auto;width:7px;border-radius:999px}
+.rq-top{padding-bottom:12px;border-bottom:1px solid var(--line)}
+.rq h3{font-size:19px;font-weight:800;line-height:1.25}
+.rq-next{background:var(--code)}
+.rq-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:28px;align-items:start}
+.rq-main{display:flex;flex-direction:column;gap:12px;min-width:0}
+.rq-ctx{display:flex;flex-direction:column;gap:10px;padding-left:22px;border-left:1px solid var(--line);font-size:13px;color:var(--muted)}
+.rq-ctx h4{margin:0;font-family:var(--display);font-size:12px;font-weight:800;letter-spacing:-.01em;color:var(--muted)}
+.rq-rel{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1px solid var(--edge);border-radius:18px;background:var(--ground);text-decoration:none;color:var(--text);font-size:13px;line-height:1.35}
+.rq-rel:hover{border-color:var(--dashed)}
+.rq-rel-glyph{width:6px;height:16px;flex-shrink:0;margin:1px 4px 0;border-radius:999px}
+.rq-rel-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.rq-rel-top{display:flex;align-items:baseline;gap:8px;min-width:0}
+.rq-rel-title{font-weight:500;min-width:0}
+.rq-rel-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.rq-ctx ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.rq-new{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;background:var(--run-bg);color:var(--run-fg);font-size:11px;font-weight:700;flex-shrink:0}
+.rq-new::before{content:"";width:5px;height:10px;border-radius:999px;background:linear-gradient(180deg,#8b2cf0,#1f6fe0)}
+.rq-stack{display:flex;flex-direction:column;gap:14px}
+.rq-stack .rq{transition:transform .15s ease,box-shadow .15s ease}
+.rq-stack .rq:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+@media (prefers-reduced-motion: reduce){.rq-stack .rq{transition:none}.rq-stack .rq:hover{transform:none}}
+.rq-compact{gap:10px;padding-top:14px;padding-bottom:16px}
+.rq-compact .rq-top{padding-bottom:10px}
+.rq-compact h3{font-size:17px}
+.rq.settled .rq-top{padding-bottom:8px}
+.dark .rq.settled{background:var(--code);border-color:var(--row-line);box-shadow:none}
+.rq.settled.issue{background:var(--card);box-shadow:var(--shadow)}
+.rq.settled.issue::before{opacity:1}
+.rq.settled.issue-bad{border-color:color-mix(in srgb,var(--red-fg) 45%,transparent)}
+.rq.settled.issue-mid{border-color:color-mix(in srgb,var(--amber-fg) 45%,transparent)}
+.rq-res.alert-bad,.rq-res.alert-mid{padding:8px 10px;border-radius:14px;border:1px solid;color:var(--text)}
+.rq-res.alert-bad{background:var(--red-bg);border-color:color-mix(in srgb,var(--red-fg) 40%,transparent)}
+.rq-res.alert-mid{background:var(--amber-bg);border-color:color-mix(in srgb,var(--amber-fg) 40%,transparent)}
+.btn{height:32px;padding:0 14px;font-weight:700}
+.pbtn{height:32px;padding:0 14px;font-weight:800}
+.rm{border:1px solid var(--card-edge);border-radius:24px;box-shadow:var(--shadow-lg)}
+.rm-av{border-radius:50%;background:linear-gradient(160deg,#2fd12f,#22b5a5);color:#111113;font-weight:800}
+.rm-avdot{border-color:var(--card)}
+.rm-tabs{align-self:center;padding:3px;gap:2px;border-radius:999px;background:var(--well)}
+.rm-tab{height:30px;padding:0 12px;border-radius:999px;font-weight:600;box-shadow:none!important}
+.rm-tab[aria-selected="true"]{background:var(--sel);box-shadow:var(--sel-shadow)!important;color:var(--text)!important;font-weight:800}
+.rm-stats dd{font-family:var(--display);font-size:15px;font-weight:800}
+.rm-live{border-radius:16px}
+.wl-grid{display:grid;grid-template-columns:212px minmax(0,1fr) 250px}
+.wl-row{border-top:1px solid var(--line)}
+.wl-row>*{padding:14px 18px}
+.wl-track{position:relative;height:52px;margin:0;padding:0 !important;background-image:repeating-linear-gradient(90deg,var(--row-line) 0 1px,transparent 1px 16.6667%)}
+.wl-bar{position:absolute;top:16px;height:20px;box-sizing:border-box;border-radius:999px;overflow:hidden;display:flex;align-items:center;padding:0 8px;font-family:'Fragment Mono',ui-monospace,monospace;font-size:11px;font-weight:600;color:#111113;white-space:nowrap}
+.wl-bar.ghost{border:1.5px dashed var(--dashed);color:var(--muted);background:transparent}
+.wl-bar.blocked{border:1px solid color-mix(in srgb,var(--red-fg) 40%,transparent);color:var(--red-fg);background:repeating-linear-gradient(135deg,var(--red-bg) 0 6px,transparent 6px 12px)}
+.wl-bar.paused{border:1px solid var(--line);color:var(--muted);background:repeating-linear-gradient(135deg,var(--well) 0 6px,transparent 6px 12px)}
+.wl-bar.livebar{box-shadow:0 0 0 3px color-mix(in srgb,#8b2cf0 30%,transparent),0 0 18px rgba(139,44,240,.55)}
+.wl-now{position:absolute;top:0;bottom:0;width:2px;background:var(--primary);border-radius:2px}
+.wl-group{padding:12px 18px 6px;border-top:1px solid var(--line);font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.02em}
+.wl-q{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.wl-q li{display:flex;align-items:center;gap:8px;min-width:0}
+.wl-hm{display:grid;align-items:center;padding:14px 0 !important}
+.wl-hm-col{display:flex;gap:2px;min-width:0}
+.wl-cell{flex:1 1 0;min-width:0;height:26px;border-radius:6px}
+.wl-hm-day{font-size:12px;color:var(--muted);white-space:nowrap;overflow:visible;font-variant-numeric:tabular-nums}
+.wl-hm-day.today{color:var(--text);font-weight:800}
+.wl-heat{grid-template-columns:244px minmax(0,1fr) 250px}
+.wl-flag{position:relative;width:22px;height:22px;flex-shrink:0;border-radius:50%;display:grid;place-items:center;cursor:help;transition:transform .12s ease}
+.wl-flag:hover,.wl-flag:focus-visible{transform:scale(1.12)}
+.wl-flag:focus-visible{outline:2px solid var(--run-fg);outline-offset:3px}
+.wl-flag-tip{position:absolute;left:calc(100% + 12px);top:50%;z-index:20;width:280px;display:flex;flex-direction:column;gap:4px;padding:10px 12px;box-sizing:border-box;border:1px solid var(--edge);border-radius:14px;background:var(--sel);box-shadow:var(--shadow-lg);color:var(--body);font-size:13px;font-weight:500;line-height:1.5;text-align:left;white-space:normal;opacity:0;transform:translate(-4px,-50%);pointer-events:none;transition:opacity .12s ease,transform .12s ease}
+.wl-flag-tip b{display:flex;align-items:center;gap:8px;color:var(--text);font-weight:800}
+.wl-flag:hover .wl-flag-tip,.wl-flag:focus-visible .wl-flag-tip{opacity:1;transform:translate(0,-50%)}
+@media (prefers-reduced-motion: reduce){.wl-flag,.wl-flag-tip{transition:none}}
+.wl-chain{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.wl-node{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 12px 0 5px;border-radius:999px;background:var(--well);font-size:13px;color:var(--text);white-space:nowrap}
+.wl-node small{font-size:12px;color:var(--muted)}
+.wl-av{width:24px;height:24px;flex-shrink:0;border-radius:50%;display:grid;place-items:center;color:#111113;font-size:9px;font-weight:800}
+.wl-load{display:flex;height:12px;gap:2px;border-radius:999px;overflow:hidden;background:var(--well)}
+.wl-budget{height:6px;border-radius:999px;background:var(--well);overflow:hidden}
+.wl-budget span{display:block;height:100%;border-radius:999px}
+.wl-tipbtn{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 10px 0 9px;border-radius:999px;background:var(--violet-bg);color:var(--violet-fg);font-size:13px;font-weight:700;white-space:nowrap}
+.wl-tipbtn:hover,.wl-tipbtn[aria-expanded="true"]{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--violet-fg) 50%,transparent)}
+.wl-tipbtn:focus-visible{outline:2px solid var(--run-fg);outline-offset:2px}
+.rail{position:sticky;top:14px;display:flex;flex-direction:column;gap:10px}
+.rail .crew-col{display:flex;align-items:center;gap:12px;padding:8px 12px 8px 6px;border-radius:16px;background:var(--well);outline:none}
+.rail .crew-col:focus-visible{box-shadow:0 0 0 2px var(--run-fg)}
+.rail .crew-pop{left:auto;right:calc(100% + 12px);top:-6px;width:340px}
+.rail .crew-pop::before{top:0;bottom:0;left:auto;right:-14px;width:14px;height:auto}
+.rail .crew-col:last-child .crew-pop{right:calc(100% + 12px);top:auto;bottom:-6px}
+.ph{position:relative}
+.ph-home,.card .ph-home:hover{color:inherit;text-decoration:none;outline:none}
+.ph-home::after{content:"";position:absolute;inset:0;z-index:0;border-radius:18px}
+.ph a:not(.ph-home),.ph button,.ph nav{position:relative;z-index:1}
+.ph-go{display:inline-flex;align-items:center;gap:5px;margin-left:12px;vertical-align:middle;height:24px;padding:0 10px;border-radius:999px;background:var(--well);color:var(--body);font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:12px;font-weight:700;letter-spacing:0;opacity:0;transform:translateX(-4px);transition:opacity .15s ease,transform .15s ease}
+.ph:has(.ph-home:hover),.ph:has(.ph-home:focus-visible){border-color:var(--edge)}
+.ph:has(.ph-home:hover) .ph-go,.ph-home:focus-visible .ph-go{opacity:1;transform:none}
+.ph-home:focus-visible::after{box-shadow:inset 0 0 0 2px var(--run-fg)}
+</style>
+</helmet>
+<div class="{{rootClass}}" style="min-height: 100vh; display: flex; flex-wrap: wrap; background: var(--ground); color: var(--text); font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 14px; line-height: 1.4; position: relative">
+<svg aria-hidden="true" width="0" height="0" style="position: absolute"><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.88" numOctaves="2" stitchTiles="stitch"></feTurbulence><feColorMatrix type="saturate" values="0"></feColorMatrix></filter></svg>
+
+<nav aria-label="Main" style="flex: 0 0 248px; box-sizing: border-box; padding: 18px 14px; display: flex; flex-direction: column; gap: 22px">
+  <div style="display: flex; align-items: center; gap: 4px">
+    <button class="ghost" style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; height: 40px; padding: 0 8px 0 5px; border-radius: 999px; text-align: left">
+      <span class="disp" style="position: relative; overflow: hidden; width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(160deg, #ff2bd6, #f2272c 55%, #f7b52f); color: #111113; display: grid; place-items: center; font-size: 13px; font-weight: 800">C<svg class="grain"><rect width="100%" height="100%" filter="url(#grain)"></rect></svg></span>
+      <span class="disp" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; font-size: 15px; letter-spacing: -.01em">Cuebik Creative</span>
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg>
+    </button>
+    <button class="icon" aria-label="Search" style="width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--body)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+    <button class="ghost" aria-label="New task" style="width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--edge); color: var(--text)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <a class="nav" href="OrgDashboard.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px; border-radius: 999px; color: var(--body); font-weight: 600"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="3.5"></rect><rect x="14" y="3" width="7" height="5" rx="2.5"></rect><rect x="14" y="12" width="7" height="9" rx="3.5"></rect><rect x="3" y="16" width="7" height="5" rx="2.5"></rect></svg>Org dashboard</a>
+    <a class="nav" href="Inbox.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 8px 0 12px; border-radius: 999px; color: var(--body); font-weight: 600"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>Inbox<span style="margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 999px; background: linear-gradient(135deg, #ff2bd6, #f7b52f); color: #111113; font-size: 12px; font-weight: 800; display: grid; place-items: center">8</span></a>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 6px 6px 12px">
+      <h2 style="margin: 0; font-size: 12px; font-weight: 700; color: var(--muted)">Projects</h2>
+      <button class="icon" aria-label="New project" style="width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+    </div>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="width: 24px; height: 24px; border-radius: 50%; border: 1.5px dashed var(--dashed); box-sizing: border-box"></span>All tasks<span style="margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 500">company</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #ff2bd6, #8b2cf0); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">g</span>gearBase<span style="margin-left: auto; font-size: 13px">11</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #3b3df5, #22b5a5); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">s</span>sfo lighting database<span style="margin-left: auto; font-size: 13px">7</span></a>
+    <a class="nav" href="ProjectDashboard.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--text); font-weight: 800; background: var(--sel); box-shadow: var(--sel-shadow)"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #f7b52f, #f5822a); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">t</span>trading workbench<span style="margin-left: auto; font-size: 13px">16</span></a>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 12px 6px">
+      <h2 style="margin: 0; font-size: 12px; font-weight: 700; color: var(--muted)">Agents</h2>
+      <span style="font-size: 12px; font-weight: 700; color: var(--run-fg)">2 running</span>
+    </div>
+    <a class="nav" href="AgentChat.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #2fd12f, #22b5a5); color: #111113; font-size: 8px; font-weight: 800">QR</span></span>Quant Researcher<span style="margin-left: auto; color: var(--run-fg); font-size: 12px; font-weight: 600">running</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #ff2bd6, #f2286f); color: #111113; font-size: 8px; font-weight: 800">SE</span></span>Strategy Engineer<span style="margin-left: auto; color: var(--run-fg); font-size: 12px; font-weight: 600">running</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #f7b52f, #f5822a); color: #111113; font-size: 8px; font-weight: 800">FE</span></span>Frontend Engineer<span style="margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 600">idle</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #f2272c, #ff2bd6); color: #111113; font-size: 8px; font-weight: 800">ML</span></span>ML Engineer<span style="margin-left: auto; color: var(--red-fg); font-size: 12px; font-weight: 600">blocked</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #6a93ad, #a9c6d6); color: #111113; font-size: 8px; font-weight: 800">CE</span></span>CEO<span style="margin-left: auto; color: var(--amber-fg); font-size: 12px; font-weight: 600">paused</span></a>
+  </div>
+
+  <div style="margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 4px 0 6px">
+    <span style="width: 30px; height: 30px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-size: 11px; font-weight: 800; display: grid; place-items: center">BA</span>
+    <span style="color: var(--body); font-weight: 600">Brian A.</span>
+    <a class="icon" href="AppSettings.dc.html" aria-label="Settings" style="margin-left: auto; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--body)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"></path><circle cx="15" cy="6" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg></a>
+  </div>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+  <header class="card ph" style="margin: 14px 24px 6px; display: flex; align-items: center; gap: 14px 28px; flex-wrap: wrap; box-sizing: border-box; padding: 16px 22px 12px 26px">
+    <div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 7px">
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--muted)">
+        <a href="#" style="color: inherit; text-decoration: none">Projects</a><span aria-hidden="true">/</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; box-sizing: border-box; border-radius: 999px; background: var(--run-bg); border: 1px solid color-mix(in srgb, var(--run-fg) 50%, transparent); color: var(--run-fg); font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0"><span class="live" style="width: 5px; height: 12px; border-radius: 999px; flex-shrink: 0; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"></span>In progress</span>
+        <span>Target Dec 15</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px">
+        <h1 class="disp" style="margin: 0; font-size: 34px; font-weight: 800; line-height: 1; letter-spacing: -.02em"><a class="ph-home" href="ProjectDashboard.dc.html">trading workbench<span class="ph-go">Project dashboard<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span></a></h1>
+        <button class="icon" aria-label="Star project" style="width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 13px; font-weight: 600; color: var(--body)">
+        <span><span class="disp" style="font-size: 15px; font-weight: 800; color: var(--text); letter-spacing: 0">16</span> open</span>
+        <span><span class="disp" style="font-size: 15px; font-weight: 800; color: var(--text); letter-spacing: 0">2</span> agents running</span>
+        <span style="color: var(--red-fg)"><span class="disp" style="font-size: 15px; font-weight: 800; letter-spacing: 0">1</span> blocked</span>
+        <span style="color: var(--muted)">Updated 2m ago</span>
+      </div>
+    </div>
+    <div aria-label="Agents on this project" style="display: flex; align-items: center; padding-left: 4px"><a href="AgentChat.dc.html" title="Quant Researcher · Running TRA-41" style="position: relative; display: block; width: 64px; height: 64px"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128' role='img'%3E%3Cdefs%3E%3ClinearGradient id='a-body-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='50.7' y1='104.3' x2='79.7' y2='24.5'%3E%3Cstop stop-color='%2322ccea'/%3E%3Cstop offset='1' stop-color='%23a5ea96'/%3E%3C/linearGradient%3E%3ClinearGradient id='a-candle-light-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='48.9' y1='103.7' x2='78.0' y2='23.9'%3E%3Cstop stop-color='%2326dfff'/%3E%3Cstop offset='1' stop-color='%23b4ffa4'/%3E%3C/linearGradient%3E%3CclipPath id='a-face-visible'%3E%3Cpath d='M39.7 47.9L39.7 84.2L88.2 84.2L88.2 47.9L39.7 47.9Z'/%3E%3C/clipPath%3E%3C/defs%3E%3Cg id='a-ground-shadow'%3E%3Cpath d='M35.7 113.2L35.8 112.9L36.3 112.5L37.9 111.9L40.5 111.2L44.0 110.7L48.3 110.3L53.1 109.9L58.4 109.7L64 109.6L69.5 109.7L74.8 109.9L79.6 110.3L83.9 110.7L87.4 111.2L90.0 111.9L91.7 112.5L92.1 112.9L92.2 113.2L92.1 113.6L91.7 113.9L90.0 114.6L87.4 115.2L83.9 115.7L79.6 116.2L74.8 116.5L69.5 116.7L64 116.8L58.4 116.7L53.1 116.5L48.3 116.2L44.0 115.7L40.5 115.2L37.9 114.6L36.3 113.9L35.8 113.6L35.7 113.2Z' fill='%23809299' opacity='0.2'/%3E%3C/g%3E%3Cg id='a-body'%3E%3Cpath fill='url(%23a-body-gradient)' d='M21.5 64L21.5 61.9L21.9 57.7L22.8 53.6L24.0 49.6L25.6 45.8L26.5 43.9L28.6 40.4L29.8 38.7L32.5 35.4L35.4 32.5L37.0 31.1L38.7 29.8L42.1 27.5L45.8 25.6L49.6 24.0L51.6 23.3L53.6 22.8L57.7 21.9L61.9 21.5L64 21.5L68.1 21.7L72.2 22.3L76.3 23.3L78.3 24.0L82.1 25.6L85.8 27.5L89.3 29.8L92.5 32.5L95.4 35.4L98.1 38.7L99.3 40.4L101.4 43.9L103.2 47.7L104.6 51.6L105.1 53.6L106.0 57.7L106.4 61.9L106.4 100.5L106.4 101.3L106.0 102.8L105.2 104.1L104.1 105.2L103.4 105.6L102.0 106.2L100.5 106.4L27.4 106.4L26.6 106.4L25.2 106.0L23.8 105.2L22.7 104.1L21.9 102.8L21.5 101.3L21.5 64Z'/%3E%3C/g%3E%3Cg id='a-candle-light'%3E%3Cpath fill='url(%23a-candle-light-gradient)' d='M26.6 62.7L26.6 60.9L27.0 57.4L27.7 53.9L28.7 50.5L30.0 47.2L30.8 45.7L32.7 42.6L33.7 41.2L35.9 38.4L38.4 35.9L39.8 34.8L41.2 33.7L44.1 31.7L47.2 30.0L50.5 28.7L52.2 28.1L53.9 27.7L57.4 27.0L60.9 26.6L62.7 26.6L66.2 26.7L69.7 27.3L73.2 28.1L74.8 28.7L78.1 30.0L81.2 31.7L84.2 33.7L86.9 35.9L89.4 38.4L91.7 41.2L92.7 42.6L94.5 45.7L96.0 48.9L97.2 52.2L97.7 53.9L98.4 57.4L98.7 60.9L98.8 93.7L98.7 94.4L98.4 95.7L97.7 96.8L96.8 97.7L96.2 98.1L95.0 98.6L93.7 98.8L31.6 98.8L31.0 98.7L29.7 98.4L28.6 97.7L27.6 96.8L27.0 95.7L26.6 94.4L26.6 62.7Z'/%3E%3C/g%3E%3Cg id='a-face'%3E%3Cg clip-path='url(%23a-face-visible)'%3E%3Cdefs%3E%3CclipPath id='a-face-clip-0' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M50.9 62.2L51.0 61.5L51.6 60.9L52.5 60.5L53.4 60.4L54.4 60.5L55.2 60.9L55.8 61.5L56.0 62.2L55.8 62.8L55.2 63.4L54.4 63.8L53.4 64.0L52.5 63.8L51.6 63.4L51.0 62.8L50.9 62.2Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-1' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M70.3 62.2L70.5 61.5L71.1 60.9L71.9 60.5L72.9 60.4L73.8 60.5L74.7 60.9L75.3 61.5L75.4 62.2L75.3 62.8L74.7 63.4L73.8 63.8L72.9 64.0L71.9 63.8L71.1 63.4L70.5 62.8L70.3 62.2Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-2' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M60.4 69.0L60.6 68.5L61.1 68.2L63.8 68.4L66.3 68.2L66.9 68.4L67.1 69.0L66.9 69.5L66.4 69.8L63.7 70.1L61.1 69.8L60.6 69.5L60.4 69.0Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-3' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M63.8 68.8L63.8 68.8Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3C/defs%3E%3Cpath d='M50.9 62.2L51.0 61.5L51.6 60.9L52.5 60.5L53.4 60.4L54.4 60.5L55.2 60.9L55.8 61.5L56.0 62.2L55.8 62.8L55.2 63.4L54.4 63.8L53.4 64.0L52.5 63.8L51.6 63.4L51.0 62.8L50.9 62.2Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M70.3 62.2L70.5 61.5L71.1 60.9L71.9 60.5L72.9 60.4L73.8 60.5L74.7 60.9L75.3 61.5L75.4 62.2L75.3 62.8L74.7 63.4L73.8 63.8L72.9 64.0L71.9 63.8L71.1 63.4L70.5 62.8L70.3 62.2Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M60.4 69.0L60.6 68.5L61.1 68.2L63.8 68.4L66.3 68.2L66.9 68.4L67.1 69.0L66.9 69.5L66.4 69.8L63.7 70.1L61.1 69.8L60.6 69.5L60.4 69.0Z' opacity='1' fill='%23172023' fill-rule='nonzero'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E" alt="Quant Researcher" width="64" height="64" style="display: block; width: 64px; height: 64px"><span aria-hidden="true" style="position: absolute; right: 5px; bottom: 11px; width: 6px; height: 14px; border-radius: 999px; background: linear-gradient(180deg, #8b2cf0, #1f6fe0); box-shadow: 0 0 0 2.5px var(--card)"></span></a><a href="#" title="Strategy Engineer · Running TRA-38" style="position: relative; display: block; width: 64px; height: 64px"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128' role='img'%3E%3Cdefs%3E%3ClinearGradient id='a-body-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='50.7' y1='104.3' x2='79.7' y2='24.5'%3E%3Cstop stop-color='%23eae27e'/%3E%3Cstop offset='1' stop-color='%23ea229a'/%3E%3C/linearGradient%3E%3ClinearGradient id='a-candle-light-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='48.9' y1='103.7' x2='78.0' y2='23.9'%3E%3Cstop stop-color='%23fff78a'/%3E%3Cstop offset='1' stop-color='%23ff26a8'/%3E%3C/linearGradient%3E%3CclipPath id='a-face-visible'%3E%3Cpath d='M39.7 47.9L39.7 84.2L88.2 84.2L88.2 47.9L39.7 47.9Z'/%3E%3C/clipPath%3E%3C/defs%3E%3Cg id='a-ground-shadow'%3E%3Cpath d='M35.7 113.2L35.8 112.9L36.3 112.5L37.9 111.9L40.5 111.2L44.0 110.7L48.3 110.3L53.1 109.9L58.4 109.7L64 109.6L69.5 109.7L74.8 109.9L79.6 110.3L83.9 110.7L87.4 111.2L90.0 111.9L91.7 112.5L92.1 112.9L92.2 113.2L92.1 113.6L91.7 113.9L90.0 114.6L87.4 115.2L83.9 115.7L79.6 116.2L74.8 116.5L69.5 116.7L64 116.8L58.4 116.7L53.1 116.5L48.3 116.2L44.0 115.7L40.5 115.2L37.9 114.6L36.3 113.9L35.8 113.6L35.7 113.2Z' fill='%23809299' opacity='0.2'/%3E%3C/g%3E%3Cg id='a-body'%3E%3Cpath fill='url(%23a-body-gradient)' d='M21.5 64L21.5 61.9L21.9 57.7L22.8 53.6L24.0 49.6L25.6 45.8L26.5 43.9L28.6 40.4L29.8 38.7L32.5 35.4L35.4 32.5L37.0 31.1L38.7 29.8L42.1 27.5L45.8 25.6L49.6 24.0L51.6 23.3L53.6 22.8L57.7 21.9L61.9 21.5L64 21.5L68.1 21.7L72.2 22.3L76.3 23.3L78.3 24.0L82.1 25.6L85.8 27.5L89.3 29.8L92.5 32.5L95.4 35.4L98.1 38.7L99.3 40.4L101.4 43.9L103.2 47.7L104.6 51.6L105.1 53.6L106.0 57.7L106.4 61.9L106.4 100.5L106.4 101.3L106.0 102.8L105.2 104.1L104.1 105.2L103.4 105.6L102.0 106.2L100.5 106.4L27.4 106.4L26.6 106.4L25.2 106.0L23.8 105.2L22.7 104.1L21.9 102.8L21.5 101.3L21.5 64Z'/%3E%3C/g%3E%3Cg id='a-candle-light'%3E%3Cpath fill='url(%23a-candle-light-gradient)' d='M26.6 62.7L26.6 60.9L27.0 57.4L27.7 53.9L28.7 50.5L30.0 47.2L30.8 45.7L32.7 42.6L33.7 41.2L35.9 38.4L38.4 35.9L39.8 34.8L41.2 33.7L44.1 31.7L47.2 30.0L50.5 28.7L52.2 28.1L53.9 27.7L57.4 27.0L60.9 26.6L62.7 26.6L66.2 26.7L69.7 27.3L73.2 28.1L74.8 28.7L78.1 30.0L81.2 31.7L84.2 33.7L86.9 35.9L89.4 38.4L91.7 41.2L92.7 42.6L94.5 45.7L96.0 48.9L97.2 52.2L97.7 53.9L98.4 57.4L98.7 60.9L98.8 93.7L98.7 94.4L98.4 95.7L97.7 96.8L96.8 97.7L96.2 98.1L95.0 98.6L93.7 98.8L31.6 98.8L31.0 98.7L29.7 98.4L28.6 97.7L27.6 96.8L27.0 95.7L26.6 94.4L26.6 62.7Z'/%3E%3C/g%3E%3Cg id='a-face'%3E%3Cg clip-path='url(%23a-face-visible)'%3E%3Cdefs%3E%3CclipPath id='a-face-clip-0' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M50.9 62.2L51.0 61.5L51.6 60.9L52.5 60.5L53.4 60.4L54.4 60.5L55.2 60.9L55.8 61.5L56.0 62.2L55.8 62.8L55.2 63.4L54.4 63.8L53.4 64.0L52.5 63.8L51.6 63.4L51.0 62.8L50.9 62.2Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-1' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M70.3 62.2L70.5 61.5L71.1 60.9L71.9 60.5L72.9 60.4L73.8 60.5L74.7 60.9L75.3 61.5L75.4 62.2L75.3 62.8L74.7 63.4L73.8 63.8L72.9 64.0L71.9 63.8L71.1 63.4L70.5 62.8L70.3 62.2Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-2' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M60.4 69.0L60.6 68.5L61.1 68.2L63.8 68.4L66.3 68.2L66.9 68.4L67.1 69.0L66.9 69.5L66.4 69.8L63.7 70.1L61.1 69.8L60.6 69.5L60.4 69.0Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-3' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M63.8 68.8L63.8 68.8Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3C/defs%3E%3Cpath d='M50.9 62.2L51.0 61.5L51.6 60.9L52.5 60.5L53.4 60.4L54.4 60.5L55.2 60.9L55.8 61.5L56.0 62.2L55.8 62.8L55.2 63.4L54.4 63.8L53.4 64.0L52.5 63.8L51.6 63.4L51.0 62.8L50.9 62.2Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M70.3 62.2L70.5 61.5L71.1 60.9L71.9 60.5L72.9 60.4L73.8 60.5L74.7 60.9L75.3 61.5L75.4 62.2L75.3 62.8L74.7 63.4L73.8 63.8L72.9 64.0L71.9 63.8L71.1 63.4L70.5 62.8L70.3 62.2Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M60.4 69.0L60.6 68.5L61.1 68.2L63.8 68.4L66.3 68.2L66.9 68.4L67.1 69.0L66.9 69.5L66.4 69.8L63.7 70.1L61.1 69.8L60.6 69.5L60.4 69.0Z' opacity='1' fill='%23172023' fill-rule='nonzero'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E" alt="Strategy Engineer" width="64" height="64" style="display: block; width: 64px; height: 64px"><span aria-hidden="true" style="position: absolute; right: 5px; bottom: 11px; width: 6px; height: 14px; border-radius: 999px; background: linear-gradient(180deg, #8b2cf0, #1f6fe0); box-shadow: 0 0 0 2.5px var(--card)"></span></a><a href="#" title="ML Engineer · Blocked on TRA-41" style="position: relative; display: block; width: 64px; height: 64px"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128' role='img'%3E%3Cdefs%3E%3ClinearGradient id='a-body-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='50.7' y1='104.3' x2='79.7' y2='24.5'%3E%3Cstop stop-color='%23c3193f'/%3E%3Cstop offset='1' stop-color='%23ea60c9'/%3E%3C/linearGradient%3E%3ClinearGradient id='a-candle-light-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='48.9' y1='103.7' x2='78.0' y2='23.9'%3E%3Cstop stop-color='%23d51c46'/%3E%3Cstop offset='1' stop-color='%23ff69db'/%3E%3C/linearGradient%3E%3CclipPath id='a-face-visible'%3E%3Cpath d='M39.7 47.9L39.7 84.2L88.2 84.2L88.2 47.9L39.7 47.9Z'/%3E%3C/clipPath%3E%3Cmask id='a-prop-occlusion' maskUnits='userSpaceOnUse' x='0' y='0' width='128' height='128'%3E%3Crect width='128' height='128' fill='white'/%3E%3Cpath d='M64 106.4L99.0 106.4L99.8 106.2L101.3 105.6L102.0 105.2L103.2 104.1L104.0 102.8L104.4 101.3L104.5 100.5L104.5 64L104.2 59.8L103.6 55.7L103.1 53.6L101.8 49.6L100.1 45.8L99.1 43.9L96.9 40.4L94.2 37.0L92.7 35.4L89.5 32.5L85.8 29.8L83.8 28.6L81.5 27.4L78.9 26.3L76.9 25.6L74.8 24.9L71.8 24.2L69.2 23.8L67.0 23.6L64 23.4L59.8 23.7L56.1 24.2L53.1 24.9L51.0 25.6L48.5 26.5L46.2 27.5L44.1 28.6L42.1 29.8L38.4 32.5L35.2 35.4L33.2 37.6L31.0 40.4L28.8 43.9L26.9 47.7L25.4 51.6L24.3 55.7L23.7 59.8L23.5 64L23.5 100.5L23.5 101.3L23.9 102.8L24.7 104.1L25.3 104.7L26.6 105.6L27.3 106.0L28.9 106.4L29.7 106.4L64 106.4Z' fill='black'/%3E%3C/mask%3E%3C/defs%3E%3Cg id='a-ground-shadow'%3E%3Cpath d='M35.7 113.2L35.8 112.9L36.3 112.5L37.9 111.9L40.5 111.2L44.0 110.7L48.3 110.3L53.1 109.9L58.4 109.7L64 109.6L69.5 109.7L74.8 109.9L79.6 110.3L83.9 110.7L87.4 111.2L90.0 111.9L91.7 112.5L92.1 112.9L92.2 113.2L92.1 113.6L91.7 113.9L90.0 114.6L87.4 115.2L83.9 115.7L79.6 116.2L74.8 116.5L69.5 116.7L64 116.8L58.4 116.7L53.1 116.5L48.3 116.2L44.0 115.7L40.5 115.2L37.9 114.6L36.3 113.9L35.8 113.6L35.7 113.2Z' fill='%23809299' opacity='0.2'/%3E%3C/g%3E%3Cg id='a-body'%3E%3Cpath fill='url(%23a-body-gradient)' d='M21.5 64L21.5 61.9L21.9 57.7L22.8 53.6L24.0 49.6L25.6 45.8L26.5 43.9L28.6 40.4L29.8 38.7L32.5 35.4L35.4 32.5L37.0 31.1L38.7 29.8L42.1 27.5L45.8 25.6L49.6 24.0L51.6 23.3L53.6 22.8L57.7 21.9L61.9 21.5L64 21.5L68.1 21.7L72.2 22.3L76.3 23.3L78.3 24.0L82.1 25.6L85.8 27.5L89.3 29.8L92.5 32.5L95.4 35.4L98.1 38.7L99.3 40.4L101.4 43.9L103.2 47.7L104.6 51.6L105.1 53.6L106.0 57.7L106.4 61.9L106.4 100.5L106.4 101.3L106.0 102.8L105.2 104.1L104.1 105.2L103.4 105.6L102.0 106.2L100.5 106.4L27.4 106.4L26.6 106.4L25.2 106.0L23.8 105.2L22.7 104.1L21.9 102.8L21.5 101.3L21.5 64Z'/%3E%3C/g%3E%3Cg id='a-candle-light'%3E%3Cpath fill='url(%23a-candle-light-gradient)' d='M26.6 62.7L26.6 60.9L27.0 57.4L27.7 53.9L28.7 50.5L30.0 47.2L30.8 45.7L32.7 42.6L33.7 41.2L35.9 38.4L38.4 35.9L39.8 34.8L41.2 33.7L44.1 31.7L47.2 30.0L50.5 28.7L52.2 28.1L53.9 27.7L57.4 27.0L60.9 26.6L62.7 26.6L66.2 26.7L69.7 27.3L73.2 28.1L74.8 28.7L78.1 30.0L81.2 31.7L84.2 33.7L86.9 35.9L89.4 38.4L91.7 41.2L92.7 42.6L94.5 45.7L96.0 48.9L97.2 52.2L97.7 53.9L98.4 57.4L98.7 60.9L98.8 93.7L98.7 94.4L98.4 95.7L97.7 96.8L96.8 97.7L96.2 98.1L95.0 98.6L93.7 98.8L31.6 98.8L31.0 98.7L29.7 98.4L28.6 97.7L27.6 96.8L27.0 95.7L26.6 94.4L26.6 62.7Z'/%3E%3C/g%3E%3Cg id='a-face'%3E%3Cg id='a-supporting-elements' mask='url(%23a-prop-occlusion)' opacity='1'%3E%3Cg transform='translate(79.1 6.9) scale(0.2 0.2)'%3E%3Cdefs%3E%3C/defs%3E%3Ctext x='0' y='48' transform='matrix(0.4 0 0 0.4 129.3 128.6)' font-family='sans-serif' font-size='144' font-weight='bold' text-anchor='middle' fill='%23ffd362' opacity='1'%3E?%3C/text%3E%3C/g%3E%3C/g%3E%3Cg clip-path='url(%23a-face-visible)'%3E%3Cdefs%3E%3CclipPath id='a-face-clip-0' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M52.4 61.9L52.5 61.5L53.0 61.1L53.6 60.8L54.2 60.7L54.9 60.8L55.5 61.1L55.9 61.5L56.0 61.9L55.9 62.3L55.5 62.7L54.9 63.0L54.2 63.1L53.6 63.0L53.0 62.7L52.5 62.3L52.4 61.9Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-1' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M70.9 61.9L71.1 61.2L71.7 60.6L72.7 60.2L73.7 60.1L74.7 60.2L75.7 60.6L76.3 61.2L76.5 61.9L76.3 62.5L75.7 63.2L74.7 63.6L73.7 63.7L72.7 63.6L71.7 63.2L71.1 62.5L70.9 61.9Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-2' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M57.4 69.1L57.5 68.6L57.7 68.5L58.4 68.0L59.5 67.6L60.6 67.4L62.2 67.5L65.5 68.2L66.9 68.4L68.0 68.3L68.6 68.0L69.4 67.6L69.8 67.5L70.1 67.6L70.4 67.9L70.5 68.3L70.4 68.8L70.2 68.9L69.5 69.4L68.4 69.8L67.3 70.0L65.7 69.9L62.4 69.2L61.0 69.0L59.9 69.1L59.3 69.4L58.5 69.8L58.1 69.9L57.8 69.8L57.5 69.5L57.4 69.1Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-3' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M64 68.7L64 68.7Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3C/defs%3E%3Cpath d='M52.4 61.9L52.5 61.5L53.0 61.1L53.6 60.8L54.2 60.7L54.9 60.8L55.5 61.1L55.9 61.5L56.0 61.9L55.9 62.3L55.5 62.7L54.9 63.0L54.2 63.1L53.6 63.0L53.0 62.7L52.5 62.3L52.4 61.9Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M70.9 61.9L71.1 61.2L71.7 60.6L72.7 60.2L73.7 60.1L74.7 60.2L75.7 60.6L76.3 61.2L76.5 61.9L76.3 62.5L75.7 63.2L74.7 63.6L73.7 63.7L72.7 63.6L71.7 63.2L71.1 62.5L70.9 61.9Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M57.4 69.1L57.5 68.6L57.7 68.5L58.4 68.0L59.5 67.6L60.6 67.4L62.2 67.5L65.5 68.2L66.9 68.4L68.0 68.3L68.6 68.0L69.4 67.6L69.8 67.5L70.1 67.6L70.4 67.9L70.5 68.3L70.4 68.8L70.2 68.9L69.5 69.4L68.4 69.8L67.3 70.0L65.7 69.9L62.4 69.2L61.0 69.0L59.9 69.1L59.3 69.4L58.5 69.8L58.1 69.9L57.8 69.8L57.5 69.5L57.4 69.1Z' opacity='1' fill='%23172023' fill-rule='nonzero'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E" alt="ML Engineer" width="64" height="64" style="display: block; width: 64px; height: 64px"><span aria-hidden="true" style="position: absolute; right: 5px; bottom: 11px; width: 6px; height: 14px; border-radius: 999px; background: linear-gradient(180deg, #f2286f, #f2272c); box-shadow: 0 0 0 2.5px var(--card)"></span></a><a href="#" title="Frontend Engineer · Idle since 2:25" style="position: relative; display: block; width: 64px; height: 64px"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128' role='img'%3E%3Cdefs%3E%3ClinearGradient id='a-body-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='50.7' y1='104.3' x2='79.7' y2='24.5'%3E%3Cstop stop-color='%23e8d2aa'/%3E%3Cstop offset='1' stop-color='%23eabc48'/%3E%3C/linearGradient%3E%3ClinearGradient id='a-candle-light-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='48.9' y1='103.7' x2='78.0' y2='23.9'%3E%3Cstop stop-color='%23fde5ba'/%3E%3Cstop offset='1' stop-color='%23ffcd4f'/%3E%3C/linearGradient%3E%3CclipPath id='a-face-visible'%3E%3Cpath d='M40.1 48.2L40.1 84.0L87.8 84.0L87.8 48.2L40.1 48.2Z'/%3E%3C/clipPath%3E%3C/defs%3E%3Cg id='a-ground-shadow'%3E%3Cpath d='M35.7 113.2L35.8 112.9L36.3 112.5L37.9 111.9L40.5 111.2L44.0 110.7L48.3 110.3L53.1 109.9L58.4 109.7L64 109.6L69.5 109.7L74.8 109.9L79.6 110.3L83.9 110.7L87.4 111.2L90.0 111.9L91.7 112.5L92.1 112.9L92.2 113.2L92.1 113.6L91.7 113.9L90.0 114.6L87.4 115.2L83.9 115.7L79.6 116.2L74.8 116.5L69.5 116.7L64 116.8L58.4 116.7L53.1 116.5L48.3 116.2L44.0 115.7L40.5 115.2L37.9 114.6L36.3 113.9L35.8 113.6L35.7 113.2Z' fill='%23809299' opacity='0.2'/%3E%3C/g%3E%3Cg id='a-body'%3E%3Cpath fill='url(%23a-body-gradient)' d='M21.5 64L21.5 61.9L21.9 57.7L22.8 53.6L24.0 49.6L25.6 45.8L26.5 43.9L28.6 40.4L29.8 38.7L32.5 35.4L35.4 32.5L37.0 31.1L38.7 29.8L42.1 27.5L45.8 25.6L49.6 24.0L51.6 23.3L53.6 22.8L57.7 21.9L61.9 21.5L64 21.5L68.1 21.7L72.2 22.3L76.3 23.3L78.3 24.0L82.1 25.6L85.8 27.5L89.3 29.8L92.5 32.5L95.4 35.4L98.1 38.7L99.3 40.4L101.4 43.9L103.2 47.7L104.6 51.6L105.1 53.6L106.0 57.7L106.4 61.9L106.4 100.5L106.4 101.3L106.0 102.8L105.2 104.1L104.1 105.2L103.4 105.6L102.0 106.2L100.5 106.4L27.4 106.4L26.6 106.4L25.2 106.0L23.8 105.2L22.7 104.1L21.9 102.8L21.5 101.3L21.5 64Z'/%3E%3C/g%3E%3Cg id='a-candle-light'%3E%3Cpath fill='url(%23a-candle-light-gradient)' d='M26.6 62.7L26.6 60.9L27.0 57.4L27.7 53.9L28.7 50.5L30.0 47.2L30.8 45.7L32.7 42.6L33.7 41.2L35.9 38.4L38.4 35.9L39.8 34.8L41.2 33.7L44.1 31.7L47.2 30.0L50.5 28.7L52.2 28.1L53.9 27.7L57.4 27.0L60.9 26.6L62.7 26.6L66.2 26.7L69.7 27.3L73.2 28.1L74.8 28.7L78.1 30.0L81.2 31.7L84.2 33.7L86.9 35.9L89.4 38.4L91.7 41.2L92.7 42.6L94.5 45.7L96.0 48.9L97.2 52.2L97.7 53.9L98.4 57.4L98.7 60.9L98.8 93.7L98.7 94.4L98.4 95.7L97.7 96.8L96.8 97.7L96.2 98.1L95.0 98.6L93.7 98.8L31.6 98.8L31.0 98.7L29.7 98.4L28.6 97.7L27.6 96.8L27.0 95.7L26.6 94.4L26.6 62.7Z'/%3E%3C/g%3E%3Cg id='a-face'%3E%3Cg clip-path='url(%23a-face-visible)'%3E%3Cdefs%3E%3CclipPath id='a-face-clip-0' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M51.8 61.9L52.0 61.0L52.6 60.2L53.4 59.6L54.3 59.4L55.3 59.6L56.1 60.2L56.7 61.0L56.9 61.9L56.7 62.9L56.1 63.7L55.3 64.3L54.3 64.5L53.4 64.3L52.6 63.7L52.0 62.9L51.8 61.9Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-1' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M71.0 61.9L71.2 61.0L71.8 60.2L72.6 59.6L73.6 59.4L74.5 59.6L75.3 60.2L75.9 61.0L76.1 61.9L75.9 62.9L75.3 63.7L74.5 64.3L73.6 64.5L72.6 64.3L71.8 63.7L71.2 62.9L71.0 61.9Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-2' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M57.3 71.1L57.4 70.6L57.7 70.2L58.2 69.9L58.9 69.9L59.4 70.2L60.6 71.6L61.5 72.2L62.7 72.7L64.0 72.8L65.3 72.7L66.5 72.2L67.5 71.4L68.5 70.2L69.0 69.9L69.8 70.0L70.2 70.2L70.5 70.6L70.6 71.2L70.5 71.7L69.7 72.7L69.0 73.5L67.9 74.3L67.0 74.7L66.0 75.1L65.0 75.3L63.9 75.4L62.9 75.3L61.6 75.0L60.6 74.6L59.7 74.1L58.9 73.5L58.0 72.5L57.4 71.6L57.3 71.1Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-3' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M64 68.7L64 68.7Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3C/defs%3E%3Cpath d='M51.8 61.9L52.0 61.0L52.6 60.2L53.4 59.6L54.3 59.4L55.3 59.6L56.1 60.2L56.7 61.0L56.9 61.9L56.7 62.9L56.1 63.7L55.3 64.3L54.3 64.5L53.4 64.3L52.6 63.7L52.0 62.9L51.8 61.9Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M71.0 61.9L71.2 61.0L71.8 60.2L72.6 59.6L73.6 59.4L74.5 59.6L75.3 60.2L75.9 61.0L76.1 61.9L75.9 62.9L75.3 63.7L74.5 64.3L73.6 64.5L72.6 64.3L71.8 63.7L71.2 62.9L71.0 61.9Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M57.3 71.1L57.4 70.6L57.7 70.2L58.2 69.9L58.9 69.9L59.4 70.2L60.6 71.6L61.5 72.2L62.7 72.7L64.0 72.8L65.3 72.7L66.5 72.2L67.5 71.4L68.5 70.2L69.0 69.9L69.8 70.0L70.2 70.2L70.5 70.6L70.6 71.2L70.5 71.7L69.7 72.7L69.0 73.5L67.9 74.3L67.0 74.7L66.0 75.1L65.0 75.3L63.9 75.4L62.9 75.3L61.6 75.0L60.6 74.6L59.7 74.1L58.9 73.5L58.0 72.5L57.4 71.6L57.3 71.1Z' opacity='1' fill='%23172023' fill-rule='nonzero'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E" alt="Frontend Engineer" width="64" height="64" style="display: block; width: 64px; height: 64px"><span aria-hidden="true" style="position: absolute; right: 5px; bottom: 11px; width: 6px; height: 14px; border-radius: 999px; background: linear-gradient(180deg, var(--ash-a), var(--ash-b)); box-shadow: 0 0 0 2.5px var(--card)"></span></a></div>
+    <button class="ghost" style="align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--edge); color: var(--body); font-size: 13px; font-weight: 700"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"></path></svg>Share</button>
+    <div style="flex: 1 1 100%; display: flex; margin: 0 -22px 0 -26px; padding: 12px 22px 0 26px; border-top: 1px solid var(--line)">
+    <nav aria-label="Project" style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 0 20px; padding: 4px; gap: 2px; border-radius: 999px; background: var(--well)">
+    <a href="Main.dc.html" style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; color: var(--body); text-decoration: none; border-radius: 999px; font-weight: 600"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>List</a>
+    <a href="Board.dc.html" style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; color: var(--body); text-decoration: none; border-radius: 999px; font-weight: 600"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M8 7v7M12 7v4M16 7v9"></path></svg>Board</a>
+    <a href="AgentWorkload.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; color: var(--text); text-decoration: none; box-sizing: border-box; border-radius: 999px; font-weight: 800; background: var(--sel); box-shadow: var(--sel-shadow)"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"></path></svg>Agent workload</a>
+    <a href="ProjectDocs.dc.html" style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; color: var(--body); text-decoration: none; border-radius: 999px; font-weight: 600"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"></path><path d="M14 3v5h5"></path></svg>Docs</a>
+    <a href="ProjectSettings.dc.html" style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; color: var(--body); text-decoration: none; border-radius: 999px; font-weight: 600"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg>Settings</a>
+  </nav>
+    </div>
+  </header>
+
+  <div style="display: flex; flex-direction: column; gap: 16px; padding: 12px 24px 40px">
+    <div class="card" style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr)">
+      <section aria-labelledby="h-chains" style="min-width: 0; padding: 14px 22px 4px 18px">
+        <div style="display: flex; align-items: center; gap: 10px; min-height: 30px; padding-bottom: 10px">
+          <h2 class="disp" id="h-chains" style="margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -.01em; white-space: nowrap">Who's waiting on whom</h2>
+          <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--muted)">Follow a chain to find what's holding work up</span>
+        </div>
+        <sc-for list="{{chains}}" as="c" hint-placeholder-count="3">
+          <div title="{{c.summary}}" style="padding: 12px 0; border-top: 1px solid var(--row-line)">
+            <div class="wl-chain">
+              <sc-for list="{{c.nodes}}" as="n" hint-placeholder-count="3">
+                <span style="display: {{n.arrow}}"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--dashed); flex-shrink: 0"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span>
+                <span class="wl-node" style="box-shadow: {{n.ring}}"><span class="wl-av" style="background: {{n.bg}}; color: {{n.fg}}">{{n.initials}}</span>{{n.label}}<small>{{n.note}}</small></span>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </section>
+
+      <section aria-labelledby="h-balance" style="min-width: 0; display: flex; flex-direction: column; padding: 14px 18px 16px 22px; border-left: 1px solid var(--line)">
+        <div style="display: flex; align-items: center; gap: 10px; min-height: 30px; padding-bottom: 10px">
+          <h2 class="disp" id="h-balance" style="margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -.01em; white-space: nowrap">Open work</h2>
+          <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--muted)">{{loadSub}}</span>
+          <div style="position: relative; margin-left: auto; flex-shrink: 0">
+            <button class="wl-tipbtn" aria-haspopup="dialog" aria-expanded="{{tipExpanded}}" onClick="{{toggleTip}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"></path></svg>1 suggestion<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: {{tipChevron}}"><path d="m6 9 6 6 6-6"></path></svg></button>
+            <sc-if value="{{tipOpen}}" hint-placeholder-val="{{false}}">
+              <div aria-hidden="true" onClick="{{closeTip}}" style="position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 29"></div>
+              <article class="rq rq-compact k-p" role="dialog" aria-label="Suggestion from Paperclip" style="position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: 500px; box-sizing: border-box; box-shadow: var(--shadow-lg)"><div class="rq-top"><span class="rq-kind"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12l-3-3M20 16H8l3 3"></path></svg>PROPOSAL</span><span class="rq-tag">Suggestion</span><a class="rq-subj" href="#" style="color: var(--body)"><span class="rq-mono">{{tip.id}}</span>{{tip.task}}</a><span class="rq-life"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2"></path></svg>Only a hint</span><button class="icon" aria-label="Snooze or dismiss" style="width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button><button class="icon" aria-label="Close" onClick="{{closeTip}}" style="width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div><div class="rq-ask"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--violet-fg)"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"></path></svg><b>Paperclip</b>suggests a change<span>· {{tip.basis}}</span></div><h3 class="disp">{{tip.title}}</h3><p>{{tip.body}}</p><div class="rq-next"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--muted)"><circle cx="12" cy="12" r="9"></circle><path d="M10 8l4 4-4 4"></path></svg><span>{{tip.next}}</span></div><div class="rq-acts"><button class="rq-btn pri">{{tip.action}}</button><button class="rq-btn">{{tip.alt}}</button><button class="rq-btn quiet" onClick="{{closeTip}}">Not now</button><span class="rq-who"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"></path></svg>People only</span></div></article>
+            </sc-if>
+          </div>
+        </div>
+        <ul style="list-style: none; margin: 0; padding: 14px 0 0; border-top: 1px solid var(--row-line); display: flex; flex-direction: column; gap: 10px">
+          <sc-for list="{{load}}" as="l" hint-placeholder-count="4">
+            <li style="display: grid; grid-template-columns: 150px minmax(0, 1fr) 54px; align-items: center; gap: 12px; font-size: 13px">
+              <span style="display: flex; align-items: center; gap: 8px; min-width: 0"><span class="wl-av" style="background: {{l.bg}}">{{l.initials}}</span><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{l.name}}</span></span>
+              <span class="wl-load" style="width: {{l.width}}"><sc-for list="{{l.segs}}" as="s" hint-placeholder-count="3"><span title="{{s.tip}}" style="flex: {{s.n}} 1 0px; background: {{s.glyph}}"></span></sc-for></span>
+              <span style="text-align: right; color: var(--muted)"><span style="color: var(--text); font-weight: 700">{{l.total}}</span> open</span>
+            </li>
+          </sc-for>
+        </ul>
+        <div style="display: flex; gap: 14px; flex-wrap: wrap; margin-top: auto; padding-top: 14px; font-size: 12px; color: var(--muted)">
+          <sc-for list="{{loadKey}}" as="k" hint-placeholder-count="4"><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 3px; background: {{k.glyph}}"></span>{{k.label}}</span></sc-for>
+        </div>
+      </section>
+    </div>
+
+    <section aria-labelledby="h-lanes" class="card" style="overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 16px 18px">
+        <h2 class="disp" id="h-lanes" style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em">{{rangeTitle}}</h2>
+        <div class="seg" role="group" aria-label="Range" style="display: flex; gap: 2px">
+          <sc-for list="{{ranges}}" as="r" hint-placeholder-count="3"><button aria-pressed="{{r.pressed}}" onClick="{{r.select}}" style="height: 28px; padding: 0 12px; font-size: 13px">{{r.label}}</button></sc-for>
+        </div>
+        <span style="font-size: 13px; color: var(--muted)">{{rangeSub}}</span>
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted)">
+          <sc-if value="{{isToday}}" hint-placeholder-val="{{true}}">
+            <sc-for list="{{legend}}" as="l" hint-placeholder-count="5"><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 16px; height: 8px; border-radius: 999px; background: {{l.glyph}}"></span><span style="{{l.font}}">{{l.id}}</span></span></sc-for>
+            <span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 16px; height: 8px; box-sizing: border-box; border-radius: 999px; border: 1.5px dashed var(--dashed)"></span>Scheduled</span>
+          </sc-if>
+          <sc-if value="{{isHeat}}" hint-placeholder-val="{{false}}">
+            <span style="display: inline-flex; align-items: center; gap: 3px">Idle<sc-for list="{{scale}}" as="s" hint-placeholder-count="5"><span style="width: 12px; height: 12px; border-radius: 4px; background: {{s}}"></span></sc-for>Busy</span>
+            <span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 12px; height: 12px; border-radius: 4px; background: {{hatchRed}}"></span>Blocked</span>
+            <span style="display: {{pausedKey}}; align-items: center; gap: 6px"><span style="width: 12px; height: 12px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--line); background: {{hatchGrey}}"></span>Paused</span>
+          </sc-if>
+        </div>
+      </div>
+
+      <sc-if value="{{isToday}}" hint-placeholder-val="{{true}}">
+        <div class="wl-grid" style="font-size: 12px; color: var(--muted)">
+          <div style="padding: 0 18px 8px">Agent</div>
+          <div style="position: relative; height: 22px">
+            <sc-for list="{{ticks}}" as="t" hint-placeholder-count="6"><span style="position: absolute; left: {{t.left}}; transform: translateX(-50%); font-variant-numeric: tabular-nums">{{t.label}}</span></sc-for>
+            <span style="position: absolute; left: {{nowLeft}}; transform: translateX(-50%); top: -2px; height: 20px; padding: 0 8px; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-size: 11px; font-weight: 800; display: inline-flex; align-items: center">Now 4:30</span>
+          </div>
+          <div style="padding: 0 18px 8px">Up next</div>
+        </div>
+        <sc-for list="{{laneGroups}}" as="g" hint-placeholder-count="1">
+          <div class="wl-group" style="display: {{g.headDisplay}}">{{g.label}}</div>
+          <sc-for list="{{g.agents}}" as="a" hint-placeholder-count="4">
+            <div class="wl-grid wl-row">
+              <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+                <div style="display: flex; align-items: center; gap: 9px">
+              <span class="wl-av" style="width: 30px; height: 30px; font-size: 10px; background: {{a.bg}}">{{a.initials}}</span>
+              <span style="min-width: 0">
+                <a href="{{a.href}}" style="display: block; font-size: 14px; font-weight: 700; color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{a.name}}</a>
+                <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: {{a.stateFg}}"><span class="{{a.live}}" style="width: 5px; height: 11px; border-radius: 999px; background: {{a.glyph}}"></span>{{a.state}}</span>
+              </span>
+            </div>
+                <div style="font-size: 12px; color: var(--muted)"><span style="color: var(--text); font-weight: 600">{{a.busy}}</span> busy · {{a.spend}} today</div>
+              </div>
+              <div class="wl-track">
+                <sc-for list="{{a.bars}}" as="b" hint-placeholder-count="3">
+                  <span class="wl-bar {{b.cls}}" title="{{b.tip}}" style="left: {{b.left}}; width: {{b.width}}; background: {{b.bg}}">{{b.label}}</span>
+                </sc-for>
+                <span class="wl-now" style="left: {{nowLeft}}"></span>
+              </div>
+              <div style="min-width: 0">
+                <ol class="wl-q">
+                  <sc-for list="{{a.queue}}" as="q" hint-placeholder-count="2">
+                    <li><span aria-hidden="true" style="display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; flex-shrink: 0"><span style="width: 3px; height: 5px; border-radius: 999px; background: {{q.b1}}"></span><span style="width: 3px; height: 8px; border-radius: 999px; background: {{q.b2}}"></span><span style="width: 3px; height: 11px; border-radius: 999px; background: {{q.b3}}"></span></span><span style="font-family: 'Fragment Mono', ui-monospace, monospace; font-size: 12px; color: var(--muted); flex-shrink: 0">{{q.id}}</span><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--body)">{{q.title}}</span></li>
+                  </sc-for>
+                </ol>
+                <div style="margin-top: 6px; font-size: 12px; color: var(--muted)">{{a.queueNote}}</div>
+              </div>
+            </div>
+          </sc-for>
+        </sc-for>
+      </sc-if>
+
+      <sc-if value="{{isHeat}}" hint-placeholder-val="{{false}}">
+        <div class="wl-grid wl-heat">
+          <div style="padding: 0 18px 8px; font-size: 12px; color: var(--muted)">Agent</div>
+          <div class="wl-hm" style="padding: 0 0 8px !important; gap: {{hmGap}}; grid-template-columns: repeat({{hmCols}}, minmax(0, 1fr))">
+            <sc-for list="{{hmDays}}" as="d" hint-placeholder-count="7"><span class="wl-hm-day {{d.cls}}" style="text-align: {{d.align}}">{{d.label}}</span></sc-for>
+          </div>
+          <div style="padding: 0 18px 8px; font-size: 12px; color: var(--muted)">{{sideHead}}</div>
+        </div>
+        <sc-for list="{{heatGroups}}" as="g" hint-placeholder-count="1">
+          <div class="wl-group" style="display: {{g.headDisplay}}">{{g.label}}</div>
+          <sc-for list="{{g.agents}}" as="a" hint-placeholder-count="4">
+            <div class="wl-grid wl-heat wl-row">
+              <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+                <div style="display: flex; align-items: center; gap: 9px">
+              <span class="wl-av" style="width: 30px; height: 30px; font-size: 10px; background: {{a.bg}}">{{a.initials}}</span>
+              <span style="flex: 1; min-width: 0">
+                <a href="{{a.href}}" style="display: block; font-size: 14px; font-weight: 700; color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{a.name}}</a>
+                <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: {{a.stateFg}}"><span class="{{a.live}}" style="width: 5px; height: 11px; border-radius: 999px; background: {{a.glyph}}"></span>{{a.state}}</span>
+              </span>
+              <sc-for list="{{a.flags}}" as="f" hint-placeholder-count="1"><button type="button" class="wl-flag" aria-label="{{f.label}}" style="background: {{f.bg}}; color: {{f.fg}}; box-shadow: 0 0 0 3px {{f.ring}}"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{f.icon}}"></path></svg><span class="wl-flag-tip" aria-hidden="true"><b><span style="width: 6px; height: 14px; flex-shrink: 0; border-radius: 999px; background: {{f.bg}}"></span>{{f.head}}</b>{{f.body}}</span></button></sc-for>
+            </div>
+              </div>
+              <div class="wl-hm" style="gap: {{hmGap}}; grid-template-columns: repeat({{hmCols}}, minmax(0, 1fr))">
+                <sc-for list="{{a.days}}" as="d" hint-placeholder-count="7"><span class="wl-hm-col"><sc-for list="{{d.cells}}" as="c" hint-placeholder-count="6"><span class="wl-cell" title="{{c.tip}}" style="background: {{c.bg}}; box-shadow: {{c.ring}}"></span></sc-for></span></sc-for>
+              </div>
+              <div style="display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; font-size: 12px; color: var(--muted)">
+                <div><span style="font-size: 14px; color: var(--text); font-weight: 700">{{a.hours}}</span> busy · {{a.cost}}</div>
+                <div>{{a.note}}</div>
+                <div style="display: {{a.budgetDisplay}}; align-items: center; gap: 8px"><span class="wl-budget" style="flex: 1"><span style="width: {{a.budgetPct}}; background: {{a.budgetBg}}"></span></span><span style="font-variant-numeric: tabular-nums">{{a.budgetLabel}}</span></div>
+              </div>
+            </div>
+          </sc-for>
+        </sc-for>
+        <div class="wl-grid wl-heat wl-row" style="background: var(--well)">
+          <div style="display: flex; flex-direction: column; justify-content: center; gap: 2px">
+            <span style="font-size: 14px; font-weight: 700; color: var(--text)">All agents</span>
+            <span style="font-size: 12px; color: var(--muted)">How many were busy at once</span>
+          </div>
+          <div class="wl-hm" style="gap: {{hmGap}}; grid-template-columns: repeat({{hmCols}}, minmax(0, 1fr))">
+            <sc-for list="{{hmTotal.days}}" as="d" hint-placeholder-count="7"><span class="wl-hm-col"><sc-for list="{{d.cells}}" as="c" hint-placeholder-count="6"><span class="wl-cell" title="{{c.tip}}" style="background: {{c.bg}}; box-shadow: {{c.ring}}"></span></sc-for></span></sc-for>
+          </div>
+          <div style="display: flex; flex-direction: column; justify-content: center; gap: 4px; font-size: 12px; color: var(--muted)">
+            <div><span style="font-size: 14px; color: var(--text); font-weight: 700">{{hmTotal.hours}}</span> busy · {{hmTotal.cost}}</div>
+            <div>{{hmTotal.note}}</div>
+          </div>
+        </div>
+      </sc-if>
+    </section>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"dark","options":["light","dark"]},"display":{"editor":"enum","default":"Hanken Grotesk","options":["Hanken Grotesk","Bricolage Grotesque"]},"grain":{"editor":"boolean","default":true},"range":{"editor":"enum","default":"today","options":["today","week","month"]},"tipOpen":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1140}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const font = (this.props.display ?? 'Hanken Grotesk') === 'Bricolage Grotesque' ? 'f-bricolage' : 'f-hanken';
+    const dark = (this.props.theme ?? 'dark') === 'dark';
+    return Object.assign({}, this.baseVals(), {
+      accent: 'var(--primary)',
+      rootClass: (dark ? 'dark' : 'light') + ' ' + font + ((this.props.grain ?? true) ? '' : ' no-grain'),
+      tipOpen: !!this.state.tipOpen,
+      tipExpanded: this.state.tipOpen ? 'true' : 'false',
+      tipChevron: this.state.tipOpen ? 'rotate(180deg)' : 'none',
+      toggleTip: () => this.setState({ tipOpen: !this.state.tipOpen }),
+      closeTip: () => this.setState({ tipOpen: false })
+    });
+  }
+  constructor(props) {
+    super(props);
+    this.state = { range: this.props.range ?? 'today', tipOpen: this.props.tipOpen ?? false };
+  }
+  baseVals() {
+    const NOW = 16.5, START = 6, SPAN = 18;
+    const pct = (h) => ((h - START) / SPAN * 100).toFixed(3) + '%';
+    const len = (h) => (h / SPAN * 100).toFixed(3) + '%';
+    const run = (bg, label, a, b, tip, live) => ({ cls: live ? 'livebar' : '', left: pct(a), width: len(b - a), bg, label: b - a >= 1.3 ? label : '', tip });
+    const ghost = (label, a, b, tip) => ({ cls: 'ghost', left: pct(a), width: len(b - a), bg: 'transparent', label, tip });
+    const blocked = (label, a, b, tip) => ({ cls: 'blocked', left: pct(a), width: len(b - a), bg: '', label, tip });
+    const paused = (label, a, b, tip) => ({ cls: 'paused', left: pct(a), width: len(b - a), bg: '', label, tip });
+    const P = { high: ['var(--pri-on)', 'var(--pri-on)', 'var(--pri-on)'], medium: ['var(--pri-on)', 'var(--pri-on)', 'var(--pri-off)'], low: ['var(--pri-on)', 'var(--pri-off)', 'var(--pri-off)'] };
+    const q = (id, title, pri) => ({ id, title, b1: P[pri][0], b2: P[pri][1], b3: P[pri][2] });
+    const T = {
+      'TRA-41': 'linear-gradient(90deg, #8b2cf0, #1f6fe0)',
+      'TRA-38': 'linear-gradient(90deg, #22b5a5, #4c7896)',
+      'TRA-44': 'linear-gradient(90deg, #ff2bd6, #8b2cf0)',
+      'TRA-45': 'linear-gradient(90deg, #f7b52f, #f5822a)',
+      'TRA-29': 'linear-gradient(90deg, #ff2bd6, #f7b52f)'
+    };
+    const r = (task, a, b, tip, live) => run(T[task], task, a, b, tip, live);
+    const ion = 'linear-gradient(180deg, #8b2cf0, #1f6fe0)';
+    const groups = [{ label: '', agents: [
+      { initials: 'QR', name: 'Quant Researcher', href: 'AgentChat.dc.html', bg: 'linear-gradient(160deg, #2fd12f, #22b5a5)', state: 'Running TRA-41', stateFg: 'var(--run-fg)', live: 'live', glyph: ion, busy: '4h 30m', spend: '$2.10',
+        bars: [r('TRA-41', 6.2, 7.5, 'Run #5 · 1h 18m'), r('TRA-41', 11.3, 13.2, 'Run #6 · 1h 54m'), r('TRA-41', 16.2, NOW, 'Run #7 · running 18m', true), ghost('Heartbeat', 20.5, 22.3, 'Heartbeat every 4h · next at 8:30 pm')],
+        queue: [q('TRA-51', 'Order book snapshot schema', 'low'), q('TRA-52', 'OKX funding-rate backfill', 'medium')], queueNote: 'TRA-41 first · about 2h left at this pace',
+        week: '101010 101010 113410 024320 123421 014310 01121.', mprof: [2, 1, 1, []], rate: 0.46,
+        spareWhy: 'Its heartbeat keeps it ticking over, but TRA-41 is its only real task.' },
+      { initials: 'SE', name: 'Strategy Engineer', href: '#', bg: 'linear-gradient(160deg, #ff2bd6, #f2286f)', state: 'Running TRA-38', stateFg: 'var(--run-fg)', live: 'live', glyph: ion, busy: '5h 40m', spend: '$2.55',
+        bars: [r('TRA-44', 9, 10.3, 'TRA-44 · run #28'), r('TRA-44', 10.7, 12.5, 'TRA-44 · run #29 · opened PR #14'), r('TRA-38', 14, 15.95, 'TRA-38 · run #30'), r('TRA-38', 16.4, NOW, 'TRA-38 · run #31 · running 6m', true), ghost('TRA-47 next', 18.5, 20.6, 'Picks up TRA-47 next')],
+        queue: [q('TRA-47', 'Center of gravity strategy', 'medium'), q('TRA-48', 'Boom Hunter XL v4: FPB entry', 'medium'), q('TRA-49', 'Add 15m execution layer on 4H', 'low')], queueNote: '+2 more · about 11h of queued work',
+        week: '001100 000000 024430 034441 024440 134431 00342.', mprof: [3, 0, 2, []], rate: 0.45,
+        spareWhy: 'It still has 6 open tasks queued.' },
+      { initials: 'ML', name: 'ML Engineer', href: '#', bg: 'linear-gradient(160deg, #f2272c, #ff2bd6)', state: 'Blocked', stateFg: 'var(--red-fg)', live: '', glyph: 'linear-gradient(180deg, #f2286f, #f2272c)', busy: '45m', spend: '$0.30',
+        bars: [r('TRA-45', 8, 8.75, 'TRA-45 · run #3'), blocked('Waiting on TRA-41', 11.5, NOW, 'Blocked by TRA-41 since 11:30 am'), ghost('Resumes after TRA-41', NOW + 2, NOW + 5.2, 'Resumes when TRA-41 is done')],
+        queue: [q('TRA-45', 'Start ML testing on VPA', 'high')], queueNote: 'Nothing else queued',
+        week: '000000 000000 024310 013bb0 023210 034200 001bb.', mprof: [2, 0, 3, [9, 10, 16]], rate: 0.38,
+        spare: false, blockedWhy: 'It waits on your reviews and on TRA-41, which has held it up since 11:30 today.' },
+      { initials: 'FE', name: 'Frontend Engineer', href: '#', bg: 'linear-gradient(160deg, #f7b52f, #f5822a)', state: 'Idle since 2:25', stateFg: 'var(--muted)', live: '', glyph: 'linear-gradient(180deg, var(--ash-a), var(--ash-b))', busy: '2h 35m', spend: '$0.60',
+        bars: [r('TRA-29', 9.5, 11.2, 'TRA-29 · run #12'), r('TRA-29', 13.5, 14.42, 'TRA-29 · run #13 · uploaded screenshots'), ghost('Chart QA', 18, 19.7, 'Routine: daily chart QA at 6 pm')],
+        queue: [], queueNote: 'Queue is empty · TRA-29 is in review with you',
+        week: '000000 000000 002311 000010 003421 013210 00220.', mprof: [2, 0, 4, []], rate: 0.23,
+        spareWhy: 'Its queue is empty, so it could take unassigned UI work such as TRA-50.' }
+    ] }];
+    const legend = Object.keys(T).map((id) => ({ id, glyph: T[id], font: "font-family: 'Fragment Mono', ui-monospace, monospace" }));
+    const subs = {
+      today: 'Runs, schedules and blocked time for agents on trading workbench',
+      week: 'How busy each agent was, in 4-hour blocks from midnight',
+      month: 'How busy each agent was, day by day'
+    };
+    const ring = 'inset 0 0 0 1px color-mix(in srgb, var(--red-fg) 55%, transparent)';
+    const node = (initials, bg, label, note, first, opts) => Object.assign({ initials, bg, fg: '#111113', label, note, arrow: first ? 'none' : 'inline-flex', ring: 'none' }, opts || {});
+    const chains = [
+      { nodes: [node('QR', 'linear-gradient(160deg, #2fd12f, #22b5a5)', 'TRA-41', 'running · 70%', true), node('ML', 'linear-gradient(160deg, #f2272c, #ff2bd6)', 'TRA-45', 'blocked 5h', false, { ring })],
+        summary: 'ML testing starts when the derivatives backfill lands, about 2h at the current pace.' },
+      { nodes: [node('SE', 'linear-gradient(160deg, #ff2bd6, #f2286f)', 'TRA-44', 'PR #14 ready', true), node('BA', 'var(--primary)', 'You', 'sign-off', false, { fg: 'var(--on-primary)', ring }), node('CE', 'linear-gradient(160deg, #6a93ad, #a9c6d6)', 'CEO', 'approval', false)],
+        summary: 'Your sign-off is the next step. The merge request expires in 52 minutes.' },
+      { nodes: [node('FE', 'linear-gradient(160deg, #f7b52f, #f5822a)', 'TRA-29', 'in review', true), node('BA', 'var(--primary)', 'You', 'review', false, { fg: 'var(--on-primary)' })],
+        summary: 'Frontend Engineer is idle until you review the chart polish.' }
+    ];
+    const S = { prog: ['In progress', 'linear-gradient(180deg, #8b2cf0, #1f6fe0)'], rev: ['In review', 'linear-gradient(180deg, #ff2bd6, #8b2cf0)'], todo: ['Todo', 'linear-gradient(180deg, #f7b52f, #f5822a)'], blk: ['Blocked', 'linear-gradient(180deg, #f2286f, #f2272c)'], back: ['Backlog', 'linear-gradient(180deg, var(--ash-a), var(--ash-b))'] };
+    const loadRow = (initials, name, bg, parts) => {
+      const total = parts.reduce((n, [, c]) => n + c, 0);
+      return { initials, name, bg, total: String(total), width: (total / 6 * 100) + '%', segs: parts.map(([k, n]) => ({ n, glyph: S[k][1], tip: `${S[k][0]}: ${n}` })) };
+    };
+    const load = [
+      loadRow('SE', 'Strategy Engineer', 'linear-gradient(160deg, #ff2bd6, #f2286f)', [['prog', 1], ['todo', 3], ['back', 2]]),
+      loadRow('QR', 'Quant Researcher', 'linear-gradient(160deg, #2fd12f, #22b5a5)', [['prog', 1], ['todo', 1], ['back', 1]]),
+      loadRow('ML', 'ML Engineer', 'linear-gradient(160deg, #f2272c, #ff2bd6)', [['blk', 1]]),
+      loadRow('FE', 'Frontend Engineer', 'linear-gradient(160deg, #f7b52f, #f5822a)', [['rev', 1]])
+    ];
+    const extra = {
+      chains, load, loadSub: 'Tasks assigned in this project', loadKey: Object.values(S).map(([label, glyph]) => ({ label, glyph })),
+      tip: { id: 'TRA-50', task: 'Create cost profile editor', next: 'Assigning moves TRA-50 to Frontend Engineer, which picks it up on its next run.', basis: "worked out from open tasks and today's runs", title: 'Give TRA-50 to Frontend Engineer?', action: 'Assign to Frontend Engineer', alt: 'Pick someone else',
+        body: 'Frontend Engineer has been idle since 2:25 with one task in review. "Create cost profile editor" is UI work and has had no assignee for 10 days. Strategy Engineer already has 6 open tasks.' }
+    };
+    const range = this.state.range;
+    const ID = { cls: '', align: 'center' };
+    const SCALE = ['color-mix(in srgb, var(--text) 8%, transparent)', 'color-mix(in srgb, #8b2cf0 30%, var(--well))', 'color-mix(in srgb, #8b2cf0 55%, var(--well))', 'color-mix(in srgb, #6a4cf0 80%, var(--well))', 'linear-gradient(160deg, #8b2cf0, #1f6fe0)'];
+    const HATCH_RED = 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--red-fg) 55%, transparent) 0 2px, var(--red-bg) 2px 6px)';
+    const HATCH_GREY = 'repeating-linear-gradient(135deg, var(--dashed) 0 1.5px, transparent 1.5px 6px)';
+    const BLOCK = ['12–4 am', '4–8 am', '8 am–12 pm', '12–4 pm', '4–8 pm', '8 pm–12 am'];
+    const BLOCK_H = [0, 0.6, 1.6, 2.6, 3.5];
+    const DAY_H = [0, 1.5, 3.5, 7, 10.5];
+    const WEEK = ['Sat 17', 'Sun 18', 'Mon 19', 'Tue 20', 'Wed 21', 'Thu 22', 'Fri 23'];
+    const fmtDay = (i) => { const d = new Date(2026, 8, 24 + i); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+    const cell = (ch, tip) => {
+      if (ch === '.') return { bg: 'transparent', ring: 'inset 0 0 0 1px var(--line)', tip: tip + ': still ahead' };
+      if (ch === 'b') return { bg: HATCH_RED, ring: 'none', tip: tip + ': blocked' };
+      if (ch === 'p') return { bg: HATCH_GREY, ring: 'inset 0 0 0 1px var(--line)', tip: tip + ': paused' };
+      return { bg: SCALE[+ch], ring: 'none', tip: tip + (ch === '0' ? ': idle' : '') };
+    };
+    const money = (n) => '$' + (n >= 100 ? Math.round(n) : n.toFixed(2));
+    const hrs = (n) => (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10) + 'h';
+    // one entry per day: its blocks (week) or a single daily value (month)
+    const series = (a) => {
+      const week = a.week.split(' ');
+      if (range === 'week') return week.map((d) => d.split(''));
+      const [wd, we, seed, blk] = a.mprof;
+      const early = Array.from({ length: 23 }, (_, i) => {
+        if (blk.includes(i)) return ['b'];
+        const dow = (4 + i) % 7;
+        const base = dow === 0 || dow === 6 ? we : wd;
+        const nudge = (i * 37 + seed * 11) % 7 === 0 ? -1 : ((i * 53 + seed * 5) % 9 === 0 ? 1 : 0);
+        return [String(Math.max(0, Math.min(4, base + (base ? nudge : 0))))];
+      });
+      const late = week.map((d) => {
+        const c = d.split('');
+        if (c.filter((x) => x === 'p').length >= 3) return ['p'];
+        if (c.filter((x) => x === 'b').length >= 2) return ['b'];
+        const h = c.reduce((n, x) => n + (BLOCK_H[+x] || 0), 0);
+        return [String(h === 0 ? 0 : h <= 2 ? 1 : h <= 5 ? 2 : h <= 9 ? 3 : 4)];
+      });
+      return early.concat(late);
+    };
+    const tipFor = (di, bi) => range === 'week' ? `${WEEK[di]}, ${BLOCK[bi]}` : (di === 29 ? 'Today' : fmtDay(di));
+    const heatRow = (a) => {
+      const s = series(a);
+      const unit = range === 'week' ? BLOCK_H : DAY_H;
+      const k = a.hscale || 1;
+      let hours = 0, blockedH = 0, active = 0;
+      s.forEach((d) => { let on = false; d.forEach((x) => { if (x === 'b') blockedH += range === 'week' ? 4 : 6; else if (unit[+x]) { hours += unit[+x] * k; on = true; } }); if (on) active += 1; });
+      const out = Object.assign({}, a, {
+        days: s.map((d, di) => ({ cells: d.map((x, bi) => cell(x, `${a.name} · ${tipFor(di, bi)}`)) })),
+        hours: hrs(hours), cost: money(hours * a.rate),
+        note: blockedH ? `${hrs(blockedH)} blocked` : `${active} of ${s.length} days active`,
+        budgetDisplay: a.budget ? 'flex' : 'none', budgetPct: '0%', budgetBg: 'var(--primary)', budgetLabel: '',
+        flags: [], _h: hours, _b: blockedH, _s: s
+      });
+      if (a.budget) {
+        const [spent, cap] = a.budget;
+        out.budgetPct = Math.min(100, spent / cap * 100).toFixed(1) + '%';
+        out.budgetBg = spent / cap > 0.8 ? 'linear-gradient(90deg, #f7b52f, #f2286f)' : 'linear-gradient(90deg, #2fd12f, #22b5a5)';
+        out.budgetLabel = `$${Math.round(spent)} of $${cap} this month`;
+      }
+      return out;
+    };
+    const isHeat = range !== 'today';
+    const heatGroups = isHeat ? groups.map((g) => ({ label: g.label, headDisplay: g.label ? 'block' : 'none', agents: g.agents.map(heatRow) })) : [];
+    const rows = heatGroups.flatMap((g) => g.agents);
+    let hmTotal = { days: [], hours: '', cost: '', note: '' };
+    if (isHeat) {
+      const shape = rows[0]._s;
+      const unit = range === 'week' ? BLOCK_H : DAY_H;
+      const tot = rows.reduce((n, r) => n + r._h, 0);
+      hmTotal = {
+        days: shape.map((d, di) => ({ cells: d.map((x, bi) => {
+          if (x === '.') return cell('.', tipFor(di, bi));
+          const busy = rows.filter((r) => unit[+r._s[di][bi]]).length;
+          const lv = Math.min(4, Math.round(busy / rows.length * 6));
+          return { bg: SCALE[lv], ring: 'none', tip: `${tipFor(di, bi)}: ${busy} of ${rows.length} agents busy` };
+        }) })),
+        hours: hrs(tot), cost: money(rows.reduce((n, r) => n + r._h * r.rate, 0)),
+        note: `${rows.length} agents · ${hrs(rows.reduce((n, r) => n + r._b, 0))} blocked`
+      };
+      const pool = rows.filter((r) => r.spare !== false);
+      const busiest = rows.slice().sort((x, y) => y._h - x._h)[0];
+      const avg = tot / rows.length;
+      const stuck = rows.slice().sort((x, y) => y._b - x._b)[0];
+      const quiet = pool.slice().sort((x, y) => x._h - y._h)[0];
+      const span = range === 'week' ? 'this week' : 'in 30 days';
+      const flag = (row, head, body, bg, fg, ring, icon) => row.flags.push({ head, body, bg, fg, icon, label: `${head}: ${body}`, ring: `color-mix(in srgb, ${ring} 30%, transparent)` });
+      flag(busiest, 'Busiest', `${hrs(busiest._h)} of runs ${span}, ${(busiest._h / avg).toFixed(1)}× the average agent. Most of it lands on weekday afternoons.`, 'linear-gradient(160deg, #f7b52f, #f5822a)', '#111113', '#f5822a', 'M13 2 4 14h7l-1 8 9-12h-7l1-8z');
+      if (stuck._b) flag(stuck, 'Most time blocked', `${hrs(stuck._b)} spent waiting ${span}. ${stuck.blockedWhy}`, 'linear-gradient(160deg, #f2286f, #f2272c)', '#ffffff', '#f2272c', 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5.6 5.6l12.8 12.8');
+      flag(quiet, 'Most spare capacity', `Only ${hrs(quiet._h)} busy ${span}. ${quiet.spareWhy}`, 'linear-gradient(160deg, #2fd12f, #22b5a5)', '#111113', '#22b5a5', 'M12 5v14M5 12h14');
+    }
+    const laneGroups = isHeat ? [] : groups.map((g) => ({ label: g.label, headDisplay: g.label ? 'block' : 'none', agents: g.agents }));
+    const hmDays = range === 'week'
+      ? WEEK.map((label, i) => Object.assign({}, ID, { label: i === 6 ? 'Today' : label, cls: i === 6 ? 'today' : '' }))
+      : Array.from({ length: 30 }, (_, i) => ({ label: i === 29 ? 'Today' : (i % 7 === 0 && i < 27 ? fmtDay(i) : ''), cls: i === 29 ? 'today' : '', align: i === 29 ? 'right' : 'left' }));
+    const ticks = [6, 9, 12, 15, 18, 21].filter((h) => Math.abs(h - NOW) > 1.2).map((h) => ({ left: pct(h), label: h === 12 ? '12p' : (h > 12 ? (h - 12) + 'p' : h + 'a') }));
+    const ranges = [['today', 'Today'], ['week', '7 days'], ['month', '30 days']].map(([k, label]) => ({ label, pressed: range === k ? 'true' : 'false', select: () => this.setState({ range: k }) }));
+    return Object.assign({
+      accent: 'var(--primary)', ranges, ticks, legend, laneGroups, heatGroups, hmTotal, hmDays, nowLeft: pct(NOW),
+      isToday: !isHeat, isHeat, rangeTitle: { today: 'Today', week: 'Last 7 days', month: 'Last 30 days' }[range], rangeSub: subs[range],
+      sideHead: range === 'week' ? 'This week' : 'Last 30 days', hmCols: String(range === 'week' ? 7 : 30), hmGap: range === 'week' ? '8px' : '3px',
+      scale: SCALE, hatchRed: HATCH_RED, hatchGrey: HATCH_GREY, pausedKey: groups.some((g) => g.agents.some((a) => a.week.includes('p'))) ? 'inline-flex' : 'none'
+    }, extra);
+  }
+}
+</script>
+</body>
+</html>
