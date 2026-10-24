@@ -1,5 +1,5 @@
 {
-  "upstreamCommit": "25f2d05282f990949343ea473b0eb367d5998984",
+  "upstreamCommit": "5c3dce09b5cb80911a65a03ec09d20bf8fbf78dd",
   "routes": [
     {
       "path": "/oauth-handoff",
@@ -5063,6 +5063,18 @@
         ]
       },
       {
+        "key": "api/agents.ts::agentsApi.qualifyRunner",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/agents/:id/qualify-runner"
+          }
+        ],
+        "via": [
+          "components/AgentConfigForm.tsx"
+        ]
+      },
+      {
         "key": "api/agents.ts::agentsApi.startAdapterAuthLogin",
         "requests": [
           {
@@ -7729,6 +7741,18 @@
           ]
         },
         {
+          "key": "api/instanceSettings.ts::instanceSettingsApi.getExperimental",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/instance/settings/experimental"
+            }
+          ],
+          "via": [
+            "hooks/useArtifactsV1Enabled.ts"
+          ]
+        },
+        {
           "key": "api/email.ts::emailApi.thread",
           "requests": [
             {
@@ -8960,6 +8984,43 @@
           ]
         },
         {
+          "key": "api/agents.ts::agentsApi.addProjectAccess",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/agents/:id/project-access"
+            }
+          ],
+          "via": [
+            "components/AgentProjectAccessSettings.tsx"
+          ]
+        },
+        {
+          "key": "api/agents.ts::agentsApi.projectAccess",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/agents/:id/project-access"
+            }
+          ],
+          "via": [
+            "components/AgentProjectAccessSettings.tsx"
+          ]
+        },
+        {
+          "key": "api/projects.ts::projectsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/projects"
+            }
+          ],
+          "via": [
+            "components/AgentProjectAccessSettings.tsx",
+            "pages/AgentDetail.tsx"
+          ]
+        },
+        {
           "key": "api/adapters.ts::adaptersApi.list",
           "requests": [
             {
@@ -9190,6 +9251,21 @@
           ],
           "via": [
             "components/chat/AgentChannelsPanel.tsx"
+          ]
+        },
+        {
+          "key": "api/instanceSettings.ts::instanceSettingsApi.getExperimental",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/instance/settings/experimental"
+            }
+          ],
+          "via": [
+            "hooks/useArtifactsV1Enabled.ts",
+            "pages/AgentDetail.tsx",
+            "pages/agent-skills/AgentSkillsTab.tsx",
+            "pages/audit/AuditFeed.tsx"
           ]
         },
         {
@@ -9654,20 +9730,6 @@
           ]
         },
         {
-          "key": "api/instanceSettings.ts::instanceSettingsApi.getExperimental",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/instance/settings/experimental"
-            }
-          ],
-          "via": [
-            "pages/AgentDetail.tsx",
-            "pages/agent-skills/AgentSkillsTab.tsx",
-            "pages/audit/AuditFeed.tsx"
-          ]
-        },
-        {
           "key": "api/instanceSettings.ts::instanceSettingsApi.getGeneral",
           "requests": [
             {
@@ -9685,18 +9747,6 @@
             {
               "method": "GET",
               "path": "/api/companies/:companyId/issues"
-            }
-          ],
-          "via": [
-            "pages/AgentDetail.tsx"
-          ]
-        },
-        {
-          "key": "api/projects.ts::projectsApi.list",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/companies/:companyId/projects"
             }
           ],
           "via": [
@@ -9888,7 +9938,8 @@
             }
           ],
           "via": [
-            "components/ConfigureBuiltInAgentModal.tsx"
+            "components/ConfigureBuiltInAgentModal.tsx",
+            "components/agents/AgentBulkSettingsSheet.tsx"
           ]
         },
         {
@@ -9901,6 +9952,47 @@
           ],
           "via": [
             "components/ConfigureBuiltInAgentModal.tsx"
+          ]
+        },
+        {
+          "key": "api/ai-connections.ts::aiConnectionsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/ai-connections"
+            }
+          ],
+          "via": [
+            "components/agents/AgentBulkRoster.tsx",
+            "components/agents/AgentBulkSettingsSheet.tsx"
+          ]
+        },
+        {
+          "key": "api/agents.ts::agentsApi.get",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/agents/:id"
+            },
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/agents"
+            }
+          ],
+          "via": [
+            "components/agents/AgentBulkSettingsSheet.tsx"
+          ]
+        },
+        {
+          "key": "api/agents.ts::agentsApi.updateRuntimeSettings",
+          "requests": [
+            {
+              "method": "PATCH",
+              "path": "/api/agents/:id"
+            }
+          ],
+          "via": [
+            "components/agents/AgentBulkSettingsSheet.tsx"
           ]
         },
         {
@@ -16597,6 +16689,18 @@
       ],
       "calls": [
         {
+          "key": "api/instanceSettings.ts::instanceSettingsApi.getExperimental",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/instance/settings/experimental"
+            }
+          ],
+          "via": [
+            "hooks/useArtifactsV1Enabled.ts"
+          ]
+        },
+        {
           "key": "api/artifacts.ts::artifactsApi.list",
           "requests": [
             {
@@ -17025,6 +17129,7 @@
             "components/IssueCasesPanel.tsx",
             "components/IssueWorkspaceCard.tsx",
             "components/issue-properties/IssueProperties.tsx",
+            "hooks/useArtifactsV1Enabled.ts",
             "hooks/useManagedSandboxOnly.ts",
             "pages/IssueDetail.tsx"
           ]
@@ -17468,6 +17573,18 @@
           ]
         },
         {
+          "key": "api/agents.ts::agentsApi.projectAccess",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/agents/:id/project-access"
+            }
+          ],
+          "via": [
+            "components/TaskProjectAccessNotice.tsx"
+          ]
+        },
+        {
           "key": "api/heartbeats.ts::heartbeatsApi.get",
           "requests": [
             {
@@ -17720,6 +17837,18 @@
           "via": [
             "components/issue-properties/IssuePropertiesPlansTab.tsx",
             "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/routines.ts::routinesApi.get",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/routines/:id"
+            }
+          ],
+          "via": [
+            "components/issue-properties/routine-origin-row.tsx"
           ]
         },
         {
@@ -18431,6 +18560,18 @@
             {
               "method": "DELETE",
               "path": "/api/issues/:id/queued-comments/:commentId"
+            }
+          ],
+          "via": [
+            "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.dismissInteraction",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/interactions/:interactionId/dismiss"
             }
           ],
           "via": [
@@ -21204,6 +21345,18 @@
           ]
         },
         {
+          "key": "api/instanceSettings.ts::instanceSettingsApi.getExperimental",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/instance/settings/experimental"
+            }
+          ],
+          "via": [
+            "hooks/useArtifactsV1Enabled.ts"
+          ]
+        },
+        {
           "key": "api/email.ts::emailApi.thread",
           "requests": [
             {
@@ -21583,6 +21736,18 @@
           ],
           "via": [
             "features/connections/ConnectionIntentInteractionBody.tsx"
+          ]
+        },
+        {
+          "key": "api/instanceSettings.ts::instanceSettingsApi.getExperimental",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/instance/settings/experimental"
+            }
+          ],
+          "via": [
+            "hooks/useArtifactsV1Enabled.ts"
           ]
         },
         {
@@ -23102,6 +23267,18 @@
           ]
         },
         {
+          "key": "api/instanceSettings.ts::instanceSettingsApi.getExperimental",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/instance/settings/experimental"
+            }
+          ],
+          "via": [
+            "hooks/useArtifactsV1Enabled.ts"
+          ]
+        },
+        {
           "key": "api/email.ts::emailApi.thread",
           "requests": [
             {
@@ -23251,6 +23428,18 @@
           ],
           "via": [
             "components/WorkspaceBaseRefRecovery.tsx"
+          ]
+        },
+        {
+          "key": "api/instanceSettings.ts::instanceSettingsApi.getExperimental",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/instance/settings/experimental"
+            }
+          ],
+          "via": [
+            "hooks/useArtifactsV1Enabled.ts"
           ]
         },
         {
@@ -24314,6 +24503,7 @@
             "components/IssueCasesPanel.tsx",
             "components/IssueWorkspaceCard.tsx",
             "components/issue-properties/IssueProperties.tsx",
+            "hooks/useArtifactsV1Enabled.ts",
             "hooks/useManagedSandboxOnly.ts",
             "pages/IssueDetail.tsx"
           ]
@@ -24756,6 +24946,18 @@
           ]
         },
         {
+          "key": "api/agents.ts::agentsApi.projectAccess",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/agents/:id/project-access"
+            }
+          ],
+          "via": [
+            "components/TaskProjectAccessNotice.tsx"
+          ]
+        },
+        {
           "key": "api/heartbeats.ts::heartbeatsApi.get",
           "requests": [
             {
@@ -25007,6 +25209,18 @@
           "via": [
             "components/issue-properties/IssuePropertiesPlansTab.tsx",
             "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/routines.ts::routinesApi.get",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/routines/:id"
+            }
+          ],
+          "via": [
+            "components/issue-properties/routine-origin-row.tsx"
           ]
         },
         {
@@ -25693,6 +25907,18 @@
             {
               "method": "DELETE",
               "path": "/api/issues/:id/queued-comments/:commentId"
+            }
+          ],
+          "via": [
+            "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.dismissInteraction",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/interactions/:interactionId/dismiss"
             }
           ],
           "via": [
@@ -30328,6 +30554,18 @@
       ],
       "referenced": true
     },
+    "api/agents.ts::agentsApi.addProjectAccess": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/agents/:id/project-access"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentDetailPage.tsx"
+      ],
+      "referenced": true
+    },
     "api/agents.ts::agentsApi.adoptAiConnection": {
       "requests": [
         {
@@ -30504,6 +30742,7 @@
         "App.tsx#AppsConnectEntryRoute",
         "pages/AgentChat.tsx",
         "pages/AgentDetailPage.tsx",
+        "pages/Agents.tsx",
         "pages/Dashboard.tsx",
         "pages/DashboardLive.tsx",
         "pages/DecisionQueuePage.tsx",
@@ -30868,6 +31107,32 @@
       ],
       "referenced": true
     },
+    "api/agents.ts::agentsApi.projectAccess": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/agents/:id/project-access"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/AgentDetailPage.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
+    "api/agents.ts::agentsApi.qualifyRunner": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/agents/:id/qualify-runner"
+        }
+      ],
+      "usedBy": [
+        "App shell"
+      ],
+      "referenced": true
+    },
     "api/agents.ts::agentsApi.remove": {
       "requests": [
         {
@@ -31183,6 +31448,18 @@
       ],
       "referenced": true
     },
+    "api/agents.ts::agentsApi.updateRuntimeSettings": {
+      "requests": [
+        {
+          "method": "PATCH",
+          "path": "/api/agents/:id"
+        }
+      ],
+      "usedBy": [
+        "pages/Agents.tsx"
+      ],
+      "referenced": true
+    },
     "api/agents.ts::agentsApi.wakeup": {
       "requests": [
         {
@@ -31334,6 +31611,7 @@
       "usedBy": [
         "App shell",
         "App.tsx#AppsConnectEntryRoute",
+        "pages/Agents.tsx",
         "pages/apps/AppDetail.tsx",
         "pages/apps/AppNotConnected.tsx",
         "pages/apps/AppsConnect.tsx",
@@ -36059,12 +36337,17 @@
         "App shell",
         "pages/AgentChat.tsx",
         "pages/AgentDetailPage.tsx",
+        "pages/Artifacts.tsx",
         "pages/CompanyConnections.tsx",
         "pages/CompanyEnvironments.tsx",
         "pages/CompanyImport.tsx",
+        "pages/Dashboard.tsx",
+        "pages/DashboardLive.tsx",
+        "pages/DesignGuide.tsx",
         "pages/ExecutionWorkspaceDetail.tsx",
         "pages/Inbox.tsx",
         "pages/InstanceExperimentalSettings.tsx",
+        "pages/IssueChatLongThreadPerf.tsx",
         "pages/IssueDetail.tsx",
         "pages/Issues.tsx",
         "pages/NewAgent.tsx",
@@ -36073,6 +36356,7 @@
         "pages/ProjectWorkspaceDetail.tsx",
         "pages/RoutineDetail.tsx",
         "pages/Routines.tsx",
+        "pages/TaskChatLab.tsx",
         "pages/Workspaces.tsx",
         "pages/apps/chat/ChatEndpointSetup.tsx",
         "pages/audit/AuditHub.tsx",
@@ -36423,6 +36707,19 @@
         {
           "method": "DELETE",
           "path": "/api/issues/:id/queued-comments/:commentId"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
+    "api/issues.ts::issuesApi.dismissInteraction": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/issues/:id/interactions/:interactionId/dismiss"
         }
       ],
       "usedBy": [
@@ -38105,6 +38402,8 @@
       ],
       "usedBy": [
         "App shell",
+        "pages/AgentChat.tsx",
+        "pages/IssueDetail.tsx",
         "pages/RoutineDetail.tsx",
         "pages/audit/AuditHub.tsx",
         "pages/audit/CompanyActivity.tsx"
