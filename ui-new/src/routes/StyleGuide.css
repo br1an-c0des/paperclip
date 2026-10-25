@@ -1,0 +1,332 @@
+/* Page scaffolding for the style guide only; the components carry their own styles. */
+.sg-page {
+  min-height: 100dvh;
+  background: var(--ground);
+  color: var(--text);
+}
+
+.sg-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px 56px;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: clamp(28px, 6vw, 56px) clamp(16px, 4vw, 56px) 40px;
+}
+
+.sg-head-text {
+  flex: 1 1 min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sg-head-text h1 {
+  font-size: clamp(48px, 9vw, 80px);
+  font-weight: 800;
+  line-height: 0.92;
+}
+
+.sg-head-text p {
+  max-width: 600px;
+  font-size: 17px;
+  color: var(--body);
+}
+
+.sg-type {
+  flex: 0 1 560px;
+  min-width: 0;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sg-type-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.sg-type-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 2px;
+}
+
+.sg-type-display {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.sg-type-ui {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sg-type-mono {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sg-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(640px, 100%), 1fr));
+}
+
+.sg-theme {
+  background: var(--ground);
+  color: var(--text);
+  container: sg / inline-size;
+  min-width: 0;
+}
+
+.sg-col {
+  padding: 44px clamp(16px, 4vw, 48px) 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+}
+
+.sg-col-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.sg-col-head h2 {
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.sg-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sg-block {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sg-row--wide {
+  gap: 18px;
+}
+
+.sg-row--tight {
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.sg-grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.sg-grid2--tight {
+  gap: 16px;
+}
+
+.sg-swatches {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px 12px;
+}
+
+.sg-swatch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sg-swatch > span:first-child {
+  height: 44px;
+  border-radius: var(--r-inner);
+  border: 1px solid var(--edge);
+}
+
+.sg-swatch-name {
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.sg-gradients {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sg-gradient {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  min-width: 0;
+}
+
+.sg-gradient-bar {
+  width: 20px;
+  height: 60px;
+  flex-shrink: 0;
+  border-radius: var(--r-pill);
+}
+
+.sg-gradient-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--body);
+}
+
+.sg-gradient-text b {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.sg-gradient-text .mono {
+  margin-top: auto;
+}
+
+.sg-badge {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(135deg, var(--orchid-a), var(--ember-a));
+  color: #111113;
+  font-size: 12px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+
+.sg-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 260px;
+}
+
+.sg-nav .navi {
+  padding-left: 7px;
+}
+
+.sg-nav-count {
+  margin-left: auto;
+  font-size: 13px;
+}
+
+.sg-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--orchid-a), var(--ember-a));
+}
+
+.sg-flag {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, var(--ember-a), var(--ember-b));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ember-b) 30%, transparent);
+  color: #111113;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: default;
+}
+
+.sg-body {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--body);
+}
+
+.sg-rows {
+  overflow: hidden;
+}
+
+.sg-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 16px 0 18px;
+}
+
+.sg-group-head h3 {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.sg-task {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 0 18px;
+  border-top: 1px solid var(--row-line);
+}
+
+.sg-task:hover {
+  background: var(--row-hover);
+}
+
+.sg-task .capsule {
+  margin: 0 4px 0 1px;
+}
+
+.sg-task-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The style guide's own columns respond to their width, like any component would */
+@container sg (max-width: 600px) {
+  .sg-swatches {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sg-gradients {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container sg (max-width: 400px) {
+  .sg-gradients {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
