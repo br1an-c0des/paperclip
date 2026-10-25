@@ -66,7 +66,7 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | --- | --- | --- |
 | Clicking an agent opens one endless chat | 1 | Board 12, on `GET\|POST /api/companies/:companyId/chats/:agentRef`. The server only serves chat with `enableAgentChat` on ([decision 2](decisions.md#2-agent-chat-is-off-unless-the-instance-turns-it-on)). |
 | The chat shows runs in progress, or is ready for input | 1 | Board 12's states (busy, replying, idle) and its activity timeline ([decision 3](decisions.md#3-agents-can-work-on-several-things-at-once)). |
-| Tasks separated from agent chats and runs | 1, optionally 3 | Underneath, each chat is a hidden task, and the server already keeps it out of task lists ([decision 8](decisions.md#8-agent-chats-are-tasks-underneath)). Stage 1 builds on that: the chat is drawn as a conversation, never a task page, and work it hands off shows as linked tasks. A chat that runs outside tasks entirely is an optional exploration ([3.12](#312-chat-outside-tasks-optional)). |
+| Tasks separated from agent chats and runs | 1, optionally 3 | Underneath, each chat is a hidden task, and the server already keeps it out of task lists ([decision 8](decisions.md#8-agent-chats-are-tasks-underneath)). Stage 1 builds on that: the chat is drawn as a conversation, never a task page, and work it hands off shows as linked tasks. A run per message is a fine default. A task-less chat, as a fork plugin messenger, is an optional experiment ([3.12](#312-chat-outside-tasks-optional)). |
 | A task's progress as short notes in the right sidebar | 1 | Board 3, from `GET /api/issues/:issueId/activity`, comments and runs. |
 | "Go to" the run, then interrupt, add context or start over | 1 | The run modal (boards 16–18) with steer, queue and interrupt (`/queued-comments/*`, `POST /api/heartbeat-runs/:runId/cancel`). "New session" is the chat's `/new`, or `POST /api/agents/:id/runtime-state/reset-session`. |
 | Task runs open as separate windows, to talk to the agent about that run | 1 | Same run modal. A message sent from it is queued or steered into that task's run. |
@@ -107,7 +107,8 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | --- | --- | --- |
 | Voting | Tabled | Set aside, and may be dropped ([3.6](#36-voting)). |
 | Group announcement channels | 3 | [3.7](#37-announcement-channels). The old UI's Board chat is a concierge for running the company, not this. |
-| Meetings: scheduled work sessions with an agent | 3, partly 1 | [3.9](#39-meetings). Each meeting is its own conversation, with an agenda before, notes after and the agreed actions as tasks. A routine's schedule trigger already starts work for an agent at a set time. |
+| Meetings: scheduled work sessions with an agent | 3, partly 1 | [3.9](#39-meetings). Each meeting is a scheduled task: the agent writes the agenda to it, you talk in its thread, and notes and the agreed actions follow. A routine's schedule trigger already creates a task for an agent at a set time. |
+| Agents message you first: a morning briefing, scheduled reports, reports after milestones | 1, then 3 and 2b | Raised in discussion on Oct 24, 2026. A recurring task does the work, and the result reaches your chat through a fork plugin tool, later through "report to chat" upstream ([3.13](#313-briefings-and-reports), [2b-14](#2b-small-features-ask-upstream-first)). |
 | A "fast mode" for meetings | 2b | Codex agents already have a `fastMode` setting (`codex_local`). `claude_local` has none ([2b-11](#2b-small-features-ask-upstream-first)). A fast model or low effort per message works today. |
 | A core skill add-on for new behaviour | 3 | [3.10](#310-core-skill-add-on). Fork-owned, with no conflict. |
 
@@ -306,7 +307,9 @@ Covers `projects/*`, `workspaces/*`, `goals/*`, `routines/*`, `documents-artifac
   - tasks handed off from the chat show as linked cards, and their results arrive as replies;
   - the reply streams in from the run's live output (`heartbeat.run.log`), if that turns out fast
     enough;
-  - search shows a chat as a chat, not as a task.
+  - search shows a chat as a chat, not as a task;
+  - the agent's briefings and reports show as cards between messages
+    ([3.13](#313-briefings-and-reports)), until the plugin can post them as messages.
 
   Note how responsive it feels in use: that decides whether [3.12](#312-chat-outside-tasks-optional)
   is worth exploring.
@@ -382,6 +385,7 @@ dropped.
 | 11 | A fast-mode option for `claude_local`, matching Codex's `fastMode` | Meetings |
 | 12 | Due dates on tasks | Only if you want them back ([decision 6](decisions.md#6-tasks-have-no-due-date)) |
 | 13 | More relation types ("relates to", "duplicates") | Only if mentions and blockers prove too little |
+| 14 | "Report to chat": let any task or routine deliver its result into a person's chat with the agent | Briefings and reports ([3.13](#313-briefings-and-reports)). The delivery already exists for tasks handed off from a chat (`chatTaskHandoffs`, decision 8); this adds a way to link other tasks. |
 
 ## Stage 3: experimental features
 
@@ -392,7 +396,8 @@ dropped.
   `ui-new` calls like any other API), agent tools, scheduled jobs, event subscriptions, and read access
   to allowed core tables. Plugins never conflict with upstream.
 - **A fork skill to steer agents.** Plugins can't add to the core prompt. The skill in [3.10](#310-core-skill-add-on)
-  tells agents when to use the plugin's tools: read project docs, save memory, read announcements.
+  tells agents when to use the plugin's tools: read project docs, save memory, read announcements,
+  message the user.
   Plugin plus skill covers most of stage 3 without touching upstream code.
 - **Patches only when unavoidable.** Ask first, then follow
   [FORK.md](../../FORK.md#changing-server-database-and-packages): a hook in new files over edits to
@@ -494,8 +499,8 @@ Tabled Oct 24, 2026, and may be dropped. The sketch below is kept as a record, n
 
 ### 3.9 Meetings
 
-- **Have:** routines with schedule triggers, ordinary tasks with threads and documents, task-less
-  plugin sessions (3.12), fast responses (`enableFastResponses`), Codex fast mode.
+- **Have:** routines with schedule triggers, ordinary tasks with threads and documents, fast responses
+  (`enableFastResponses`), Codex fast mode.
 - **Missing:** a calendar of meetings, the timing around each one, and a view that presents a meeting
   as a conversation.
 - **What a meeting is** ([question 8](#questions-for-you)):
@@ -503,17 +508,20 @@ Tabled Oct 24, 2026, and may be dropped. The sketch below is kept as a record, n
   - The agent prepares an agenda beforehand.
   - Afterwards, the agent writes notes, and the agreed actions become ordinary tasks linked from the
     notes.
-- **Approach:** a meeting can't be a second built-in chat, because the server allows one chat per
-  person and agent (decision 8). Two ways to build it:
-  - **A task per meeting.** A routine creates the meeting task, assigned to the agent, far enough
-    ahead for the agent to prepare the agenda as the task's plan document. At the time, you talk in
-    the task's thread, which `ui-new` draws as a conversation. Afterwards, the agent saves notes as a
-    document and creates the action tasks. This is mostly existing pieces. The plugin adds the
-    calendar, one-off meetings, and the reminder when a meeting starts.
-  - **A plugin session.** Built on `ctx.agents.sessions`, as in 3.12, with the plugin storing the
-    conversation. Closer to a natural chat, but it uses fewer built-in pieces.
+- **Approach:** decided Oct 24, 2026: a scheduled task per meeting. A meeting can't be a second
+  built-in chat, because the server allows one chat per person and agent (decision 8), and a task
+  already has what a meeting needs: a thread, documents and linked tasks.
+  1. A routine creates the meeting task, assigned to the agent, far enough ahead for the agent to
+     write the agenda to it as the task's plan document.
+  2. A reminder with the agenda reaches you in your chat with the agent, the same way briefings do
+     ([3.13](#313-briefings-and-reports)).
+  3. At the time, you talk in the task's thread, which `ui-new` draws as a conversation.
+  4. Afterwards, the agent saves notes as a document on the task, and creates the action tasks,
+     linked from the notes.
 
-  Speed comes from a fast model or effort per message today, and 2b-11 for Claude.
+  Most of this exists already. The plugin adds a calendar view, one-off meetings (a routine's schedule
+  repeats), and the reminder. Speed comes from a fast model or effort per message today, and 2b-11
+  for Claude. If the messenger in 3.12 is ever built, a meeting could move into one of its threads.
 - **Risk:** low.
 
 ### 3.10 Core skill add-on
@@ -540,13 +548,18 @@ Tabled Oct 24, 2026, and may be dropped. The sketch below is kept as a record, n
 
 ### 3.12 Chat outside tasks (optional)
 
-An exploration you may or may not take up. The stage 1 chat, built on hidden tasks, may turn out to
-work fine, in which case this is dropped.
+Optional and experimental. The default is the built-in chat on hidden tasks, with a run per message
+(decision 8), and that may well be all that's needed. Agent-initiated messages don't depend on this
+entry: [3.13](#313-briefings-and-reports) adds them to the built-in chat.
 
 - **Have:**
   - Chats stored as hidden tasks ([decision 8](decisions.md#8-agent-chats-are-tasks-underneath)).
     Each message wakes the agent through the run queue, the adapter starts, and the reply arrives as
     a comment. `enableFastResponses` adds a quick acknowledgement first.
+  - Chat connectors (Slack, Discord, Telegram, Teams, email) work the same way: each conversation
+    creates a task, and replies go back to the thread it came from. Only email can start a
+    conversation (`proactiveDirectMessages`). The list of providers is fixed in
+    `packages/shared/src/types/chat-channels.ts`, so a plugin can't add one.
   - Task-less agent sessions for plugins. `ctx.agents.sessions` in the plugin SDK creates a session
     with an agent, sends it messages and streams back the run's output as it's written
     (`server/src/services/plugin-host-services.ts`). The agent's own session carries over between
@@ -557,20 +570,60 @@ work fine, in which case this is dropped.
     standing task.
 - **Missing:** a chat that behaves like an ordinary LLM conversation, with replies streamed as they're
   written and its own message history rather than a task's comments.
-- **Approach:**
-  1. Find out where any delay comes from in the stage 1 chat (waiting in the queue, the adapter
-     starting up, or the model itself), because each has a different fix.
-  2. Then try the options in order, from least to most invasive:
-     - Stream from the run's live output in the chat view. This is UI only, and part of M5.
-     - A fork plugin chat on `ctx.agents.sessions`: the plugin stores the messages and streams
-       replies, and `ui-new` draws them. Plugin sessions still go through the run queue, so this
-       fixes how the chat feels, not how long the agent takes to start. They also lose what the
-       built-in chat adds: its instructions to the agent, handed-off tasks reporting back, and the
-       person's identity on each run (runs are requested by the plugin as `system`).
-     - A streaming reply path for agent chat that skips the queue, like the concierge's, proposed
-       upstream.
-- **Risk:** none for the UI option, and low for the plugin. A server change upstream would be high:
+- **Approach:** first find out where any delay comes from in the stage 1 chat (waiting in the queue,
+  the adapter starting up, or the model itself), because each has a different fix. Streaming the
+  reply from the run's live output is UI only and already part of M5. Beyond that, the direction is
+  **a fork plugin messenger**, modelled on a chat connector like Slack: messages come in and go out,
+  and `ui-new` is the client.
+  - **You to the agent:** `ui-new` sends the message to a plugin route. The plugin passes it on with
+    `ctx.agents.sessions` and streams the reply back with `ctx.streams`.
+  - **The agent to you:** the plugin's "message the user" tool (3.13) writes into the messenger
+    instead of the built-in chat.
+  - **Conversations:** the plugin keeps its own message store, so it can hold threads, or several
+    conversations per agent.
+
+  The trade-offs: plugin sessions still go through the run queue, so the agent takes as long to
+  start; and they lose what the built-in chat adds, such as its instructions to the agent, handed-off
+  tasks reporting back, and the person's identity on each run (the plugin requests runs as `system`).
+  A streaming path that skips the queue, like the concierge's, would need an upstream change.
+- **Risk:** none for the UI part, and low for the plugin. A server change upstream would be high:
   agent chat and the run queue are some of upstream's busiest code.
+
+### 3.13 Briefings and reports
+
+Raised in discussion on Oct 24, 2026. The agent writes to you first: a morning briefing, other
+scheduled reports, and a report when a milestone is reached. "Report to chat" is the end goal, with
+plugins added as needed.
+
+- **Have:**
+  - Recurring tasks: routines with schedule, webhook and API triggers create a task for the agent
+    each time.
+  - Tasks handed off from a chat already report back to it when they're done (decision 8). That
+    covers milestone reports for work that started in the chat.
+  - Read markers on tasks (`POST /api/issues/:id/read`), so the chat can show what's new.
+- **Missing:**
+  - A way for any other run to post into your chat. The server only accepts a chat message from a
+    run the chat started, so a briefing run's message would be refused.
+  - Routines triggered by events. They only have schedule, webhook and API triggers.
+- **Approach:**
+  1. **In M5, UI only:** the chat shows the agent's report tasks as cards between messages. This
+     needs a way to tell report tasks apart, so check what a routine can carry (a label, for
+     example).
+  2. **A fork plugin tool, "message the user":** any run can call it, including a briefing's. The
+     plugin posts the message into the person's built-in chat as a comment from the agent. From
+     reading the code, plugins can add comments attributed to an agent (`createComment` in
+     `server/src/services/plugin-host-services.ts`), and the chat's check that a reply comes from one
+     of its own runs doesn't apply to them. That's untested, and upstream could close it. Finding the
+     chat's task ID is a detail to work out (`ui-new` knows it). The fork skill tells agents when to
+     use the tool.
+  3. **Upstream, "report to chat"** ([2b-14](#2b-small-features-ask-upstream-first)): the proper
+     version, reusing the hand-off delivery. The plugin tool switches to it if it lands.
+  4. **Milestone reports for work that didn't start in the chat:** the plugin watches for events (a
+     list's last task done, a project reaching a state) and fires the briefing routine through its
+     API trigger.
+
+  Meetings (3.9) use the same delivery for their reminder and agenda.
+- **Risk:** low for the plugin, with the caveat in step 2.
 
 ## Questions for you
 
@@ -588,8 +641,8 @@ All answered Oct 24, 2026.
 6. ~~**Runner visibility.**~~ All of session history, sandbox state, the Runner's own logs, and costs and
    usage ([3.11](#311-runner-visibility-beyond-the-api)).
 7. ~~**Voting.**~~ Tabled, and may be dropped ([3.6](#36-voting)).
-8. ~~**Meetings.**~~ Each meeting is its own conversation, with an agenda before, notes after and the
-   actions as tasks ([3.9](#39-meetings)).
+8. ~~**Meetings.**~~ Each meeting is a scheduled task, its own conversation: the agent writes the agenda
+   to it beforehand, and notes and action tasks follow ([3.9](#39-meetings)).
 9. ~~**Memory.**~~ `claude_local`, the Paperclip Runner and Claude Managed
    ([memory ideas](#memory), [3.5](#35-memory-service)).
 10. ~~**Announcements.**~~ They reach agents on their next run, without waking them
