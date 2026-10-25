@@ -66,7 +66,7 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | --- | --- | --- |
 | Clicking an agent opens one endless chat | 1 | Board 12, on `GET\|POST /api/companies/:companyId/chats/:agentRef`. The server only serves chat with `enableAgentChat` on ([decision 2](decisions.md#2-agent-chat-is-off-unless-the-instance-turns-it-on)). |
 | The chat shows runs in progress, or is ready for input | 1 | Board 12's states (busy, replying, idle) and its activity timeline ([decision 3](decisions.md#3-agents-can-work-on-several-things-at-once)). |
-| Tasks separated from agent chats and runs | 1, optionally 3 | Underneath, each chat is a hidden task, and the server already keeps it out of task lists ([decision 8](decisions.md#8-agent-chats-are-tasks-underneath)). Stage 1 builds on that: the chat is drawn as a conversation, never a task page, and work it hands off shows as linked tasks. A run per message is a fine default. A task-less chat, as a fork plugin messenger, is an optional experiment ([3.12](#312-chat-outside-tasks-optional)). |
+| Tasks separated from agent chats and runs | 1 | Underneath, each chat is a hidden task, and the server already keeps it out of task lists ([decision 8](decisions.md#8-agent-chats-are-tasks-underneath)). Stage 1 builds on that: the chat is drawn as a conversation, never a task page, and work it hands off shows as linked tasks. A run per message is a fine default. For a fluid conversation outside tasks, connect Claude Code through Paperclip's MCP connection ([3.12](#312-chat-outside-tasks-dropped)). |
 | A task's progress as short notes in the right sidebar | 1 | Board 3, from `GET /api/issues/:issueId/activity`, comments and runs. |
 | "Go to" the run, then interrupt, add context or start over | 1 | The run modal (boards 16–18) with steer, queue and interrupt (`/queued-comments/*`, `POST /api/heartbeat-runs/:runId/cancel`). "New session" is the chat's `/new`, or `POST /api/agents/:id/runtime-state/reset-session`. |
 | Task runs open as separate windows, to talk to the agent about that run | 1 | Same run modal. A message sent from it is queued or steered into that task's run. |
@@ -198,7 +198,7 @@ responsive pass in M7.
 | B | Task panel or modal ([design open question](design/README.md#open-questions)) | M2 | Panel when opened from a list or board (boards 2, 3, 5). Modal when opened from anywhere without a list: Inbox, chat, dashboards (boards 6, 7). Full page for direct links. |
 | C | Lists as goals | M4 | Decided: a project's lists are its goals, as named lists without dates for now ([question 2](#questions-for-you)). |
 | D | Project-level docs ([decision 1](decisions.md#1-projects-cant-hold-documents-or-files)) | M4 | Decided: build "From tasks", and start the 2b-8 conversation upstream. The project section waits for project documents, with the plugin (3.4) if upstream declines. No hidden docs task. |
-| E | Each experimental flag | M0 | Settle every flag in [generated/flags.md](inventory/generated/flags.md) as permanent, dropped, or a plain setting where the server still enforces it. Record the results in a new decisions entry. |
+| E | Each experimental flag | M0 | Settle every flag in [generated/flags.md](inventory/generated/flags.md) as permanent, dropped, or a plain setting where the server still enforces it. Record the results in a new decisions entry. `enablePublicMcp` should end up on, since the MCP connection replaces the chat outside tasks ([3.12](#312-chat-outside-tasks-dropped)). |
 | F | Cases | M6 | Drop for now: they're experimental and read-only on the board. Mark `cases/*` dropped with that reason, and revisit if upstream builds them out. |
 | G | Hosting plugin UI ([FORK.md](../../FORK.md#a-standalone-app-not-a-plugin)) | M7 | Mount points for sidebar, project tabs, agent tabs, settings pages and full pages, with React loaded only for plugin areas. |
 | H | Responsive layouts | M0 | Decided: desktop first, built ready for mobile, with mobile layouts folded in as their wireframes arrive ([Desktop first, ready for mobile](#desktop-first-ready-for-mobile)). |
@@ -310,9 +310,6 @@ Covers `projects/*`, `workspaces/*`, `goals/*`, `routines/*`, `documents-artifac
   - search shows a chat as a chat, not as a task;
   - the agent's briefings and reports show as cards between messages
     ([3.13](#313-briefings-and-reports)), until the plugin can post them as messages.
-
-  Note how responsive it feels in use: that decides whether [3.12](#312-chat-outside-tasks-optional)
-  is worth exploring.
 - Org dashboard (board 19), Manage agents (board 20) including upstream's new bulk edit of connections
   and models, and company workload (board 33).
 - Agent settings (boards 26, 27, and the board 30 outline): profile, instructions, skills, model and
@@ -335,7 +332,9 @@ Tier 2, ported mostly as is into the new layout:
   settings.
 - App settings (boards 28, 29, and the board 30 outline).
 - Skills, Apps and tools, Activity and costs.
-- Onboarding, and the sign-in and connect pages outside a company.
+- Onboarding, and the sign-in and connect pages outside a company. These include the pages where you
+  approve an MCP connection (`/mcp-connect/:id`, `/mcp-device`, `/assistant-connections`), which only
+  work with `enablePublicMcp` on ([3.12](#312-chat-outside-tasks-dropped)).
 
 These are large areas: Apps and tools alone reaches about 60 requests per page. Plan a few iterations.
 
@@ -521,7 +520,7 @@ Tabled Oct 24, 2026, and may be dropped. The sketch below is kept as a record, n
 
   Most of this exists already. The plugin adds a calendar view, one-off meetings (a routine's schedule
   repeats), and the reminder. Speed comes from a fast model or effort per message today, and 2b-11
-  for Claude. If the messenger in 3.12 is ever built, a meeting could move into one of its threads.
+  for Claude.
 - **Risk:** low.
 
 ### 3.10 Core skill add-on
@@ -546,54 +545,39 @@ Tabled Oct 24, 2026, and may be dropped. The sketch below is kept as a record, n
 - **Approach:** M5 lists exactly what's still missing. Then propose exposing it upstream (2b), since
   plugins can't read runs.
 
-### 3.12 Chat outside tasks (optional)
+### 3.12 Chat outside tasks (dropped)
 
-Optional and experimental. The default is the built-in chat on hidden tasks, with a run per message
-(decision 8), and that may well be all that's needed. Agent-initiated messages don't depend on this
-entry: [3.13](#313-briefings-and-reports) adds them to the built-in chat.
+Dropped Oct 24, 2026. What it was for, a fluid conversation that isn't a task underneath, is covered
+by Paperclip's MCP connection instead ([doc/public-mcp.md](../../doc/public-mcp.md)):
 
-- **Have:**
-  - Chats stored as hidden tasks ([decision 8](decisions.md#8-agent-chats-are-tasks-underneath)).
-    Each message wakes the agent through the run queue, the adapter starts, and the reply arrives as
-    a comment. `enableFastResponses` adds a quick acknowledgement first.
-  - Chat connectors (Slack, Discord, Telegram, Teams, email) work the same way: each conversation
-    creates a task, and replies go back to the thread it came from. Only email can start a
-    conversation (`proactiveDirectMessages`). The list of providers is fixed in
-    `packages/shared/src/types/chat-channels.ts`, so a plugin can't add one.
-  - Task-less agent sessions for plugins. `ctx.agents.sessions` in the plugin SDK creates a session
-    with an agent, sends it messages and streams back the run's output as it's written
-    (`server/src/services/plugin-host-services.ts`). The agent's own session carries over between
-    messages, and no task is created. `ctx.streams` forwards events to the UI over server-sent events
-    (`GET /api/plugins/:pluginId/bridge/stream/:channel`), and the SDK's own example of it is a chat.
-  - The board concierge (`POST /api/board/chat/stream`). It skips the run queue, starts the Claude
-    CLI straight away and streams the reply token by token, but it still saves the conversation on a
-    standing task.
-- **Missing:** a chat that behaves like an ordinary LLM conversation, with replies streamed as they're
-  written and its own message history rather than a task's comments.
-- **Approach:** first find out where any delay comes from in the stage 1 chat (waiting in the queue,
-  the adapter starting up, or the model itself), because each has a different fix. Streaming the
-  reply from the run's live output is UI only and already part of M5. Beyond that, the direction is
-  **a fork plugin messenger**, modelled on a chat connector like Slack: messages come in and go out,
-  and `ui-new` is the client.
-  - **You to the agent:** `ui-new` sends the message to a plugin route. The plugin passes it on with
-    `ctx.agents.sessions` and streams the reply back with `ctx.streams`.
-  - **The agent to you:** the plugin's "message the user" tool (3.13) writes into the messenger
-    instead of the built-in chat.
-  - **Conversations:** the plugin keeps its own message store, so it can hold threads, or several
-    conversations per agent.
+- **What it is:** Claude Code, Codex or ChatGPT connects to one company over MCP
+  (`POST /mcp/paperclip`), acting as you. The conversation lives in the assistant, and the work stays
+  in Paperclip.
+- **What it can do:** search and read tasks, create them, comment, update or finish them, write
+  documents, upload attachments, and see pending approvals. With the `paperclip:configure` scope it
+  can also edit agents, projects and skills. Its comments wake agents as yours would.
+- **What it isn't:** a Paperclip agent. The assistant uses its own model and settings, not an agent's
+  instructions, memory or skills. Talking to a particular agent stays in the built-in chat.
+- **What it needs:**
+  - the experimental setting `enablePublicMcp`, which should end up on (decision E);
+  - a deployment with real user accounts;
+  - an endpoint reachable over HTTPS (plain HTTP works only on localhost).
 
-  The trade-offs: plugin sessions still go through the run queue, so the agent takes as long to
-  start; and they lose what the built-in chat adds, such as its instructions to the agent, handed-off
-  tasks reporting back, and the person's identity on each run (the plugin requests runs as `system`).
-  A streaming path that skips the queue, like the concierge's, would need an upstream change.
-- **Risk:** none for the UI part, and low for the plugin. A server change upstream would be high:
-  agent chat and the run queue are some of upstream's busiest code.
+  Claude clients can't subscribe to the MCP's task events yet, so they check on tasks when asked
+  rather than being told when one changes.
+- **For `ui-new`:** the pages where you approve a connection, in M6.
+
+Kept as a record of the research: Paperclip's chat connectors also create a task per conversation,
+and only email can start one; plugins can't add a chat provider; and the plugin SDK has task-less
+agent sessions (`ctx.agents.sessions`) and streaming to the UI (`ctx.streams`), which a fork plugin
+messenger would have used. Agent-initiated messages are a separate feature
+([3.13](#313-briefings-and-reports)), and don't depend on this one.
 
 ### 3.13 Briefings and reports
 
 Raised in discussion on Oct 24, 2026. The agent writes to you first: a morning briefing, other
 scheduled reports, and a report when a milestone is reached. "Report to chat" is the end goal, with
-plugins added as needed.
+plugins added as needed. This is its own feature, added to the built-in chat as it is.
 
 - **Have:**
   - Recurring tasks: routines with schedule, webhook and API triggers create a task for the agent
@@ -629,8 +613,9 @@ plugins added as needed.
 
 All answered Oct 24, 2026.
 
-1. ~~**"Tasks become separated from agent chats/runs."**~~ Stage 1 builds on the hidden chat tasks, and
-   a chat outside tasks is the optional [3.12](#312-chat-outside-tasks-optional).
+1. ~~**"Tasks become separated from agent chats/runs."**~~ Stage 1 builds on the hidden chat tasks. A
+   chat outside tasks was dropped in favor of the MCP connection
+   ([3.12](#312-chat-outside-tasks-dropped)).
 2. ~~**Lists and sprints.**~~ A project's lists are its goals, as named lists for now. Sprint dates and
    capacity come later ([decision C](#decisions-to-make-early), [3.3](#33-sprints)).
 3. ~~**Custom statuses.**~~ Each custom status maps onto one of the seven built-in ones

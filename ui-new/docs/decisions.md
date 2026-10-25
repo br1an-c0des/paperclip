@@ -373,8 +373,8 @@ already exists on the server; what's left is how the UI presents a chat.
    built-in chat adds, such as handed-off tasks reporting back. Doing it in the server would be a
    large change in some of upstream's most active code.
 
-**Decision.** Option 1, in stage 1 (M5). Option 2 stays an optional exploration
-([build plan 3.12](build-plan.md#312-chat-outside-tasks-optional)), taken up only if the chat
-feels slow or too task-like once it's in use. A run per message is the expected default, not a
-stopgap. Agent-initiated messages, such as briefings, are added to this chat separately
+**Decision.** Option 1, in stage 1 (M5). Option 2 was first kept as an optional exploration, then
+dropped on Oct 24, 2026: Paperclip's MCP connection gives a fluid conversation outside tasks without
+it ([build plan 3.12](build-plan.md#312-chat-outside-tasks-dropped)). A run per message is the
+expected default, not a stopgap. Agent-initiated messages, such as briefings, are added to this chat separately
 ([build plan 3.13](build-plan.md#313-briefings-and-reports)).
