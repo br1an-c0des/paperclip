@@ -1,0 +1,93 @@
+.mi {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 12px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+
+.mi:has(.mi-desc) {
+  min-height: 44px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.mi[data-highlighted],
+.mi[data-checked] {
+  background: var(--well);
+}
+
+.mi[data-disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mi--danger {
+  color: var(--red-fg);
+}
+
+.mi-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--body);
+}
+
+.mi-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.mi-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mi-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.mi-hint {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.mi-check {
+  margin-left: auto;
+  display: inline-flex;
+  color: var(--text);
+}
+
+.mh {
+  padding: 8px 10px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.mg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.msep {
+  height: 1px;
+  margin: 4px 6px;
+  border: 0;
+  background: var(--line);
+}

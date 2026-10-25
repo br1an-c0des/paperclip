@@ -1,0 +1,62 @@
+.dialog-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 22px 64px 0 24px;
+}
+
+.dialog-title {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.dialog-desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--body);
+}
+
+.dialog-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--body);
+}
+
+.dialog-close:hover {
+  background: var(--well);
+}
+
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 24px 22px;
+  min-width: 0;
+}
+
+.dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--ground);
+  border-radius: 0 0 var(--r-modal) var(--r-modal);
+}
+
+[data-mode="sheet"] .dialog-foot {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  border-radius: 0;
+  padding-bottom: max(14px, env(safe-area-inset-bottom));
+}

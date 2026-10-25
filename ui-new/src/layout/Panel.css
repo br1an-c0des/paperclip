@@ -1,0 +1,67 @@
+/* The task panel's frame from boards 2, 3 and 5 */
+.panel {
+  container: panel / inline-size;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 2 * var(--main-pad-top, 14px));
+  overflow: hidden;
+  border: 1px solid var(--card-edge);
+  border-radius: 22px;
+  background: var(--card);
+  box-shadow: 0 34px 80px -24px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 0, 0, 0.04), var(--shadow-lg);
+  outline: none;
+  animation: panel-in 0.15s ease-out;
+}
+
+.panel:focus-visible {
+  box-shadow: 0 0 0 2px var(--run-fg), var(--shadow-lg);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 14px 12px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-head-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 22px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel--floating {
+  position: fixed;
+  top: 14px;
+  right: 20px;
+  z-index: calc(var(--z-overlay) - 2);
+  width: min(620px, calc(100vw - 40px));
+}
+
+:root[data-viewport="phone"] .panel--floating {
+  inset: 0;
+  width: auto;
+  border-radius: 0;
+}
+
+:root[data-viewport="phone"] .panel {
+  max-height: none;
+  animation-name: sheet-in;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}

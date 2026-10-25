@@ -1,0 +1,28 @@
+.tip {
+  /* Above every other layer, including menus in dialogs (layer.css, "Stacking") */
+  z-index: calc(var(--z-overlay) + 2);
+  width: max-content;
+  max-width: min(280px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+  background: var(--sel);
+  box-shadow: var(--shadow-lg);
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  pointer-events: none;
+  animation: fade-in 0.12s ease-out;
+}
+
+.tip b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-weight: 800;
+}
