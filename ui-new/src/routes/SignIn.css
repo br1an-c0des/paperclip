@@ -1,0 +1,29 @@
+.signin {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+}
+
+.signin-card {
+  width: min(400px, 100%);
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.signin-card h1 {
+  margin-top: -8px;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.signin-error {
+  padding: 8px 12px;
+  border-radius: var(--r-inner);
+  background: var(--red-bg);
+  color: var(--red-fg);
+  font-size: 13px;
+}

@@ -1,0 +1,76 @@
+/* A plain page header card, from board 1's `.ph`. M1 turns this into the shared header with tabs. */
+.page-head {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 16px 22px 16px 26px;
+}
+
+.page-head-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.page-head-title {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.page-head-numbers {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--body);
+}
+
+.page-head-numbers b {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 0;
+}
+
+.page-head-status {
+  color: var(--amber-fg);
+  text-transform: capitalize;
+}
+
+.home-note {
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.home-note h2 {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.home-note p {
+  color: var(--body);
+  line-height: 1.55;
+  max-width: 70ch;
+}
+
+@container main (max-width: 520px) {
+  .page-head {
+    padding: 14px 16px;
+  }
+
+  .page-head-title {
+    font-size: 28px;
+  }
+}

@@ -1,0 +1,49 @@
+.splash {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+}
+
+.splash-card {
+  width: min(460px, 100%);
+  padding: 26px 26px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.splash-card h1 {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.splash-card p {
+  color: var(--body);
+  line-height: 1.55;
+}
+
+.splash-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.splash-quiet {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.reconnecting {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-popover);
+  padding: 8px 16px;
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
