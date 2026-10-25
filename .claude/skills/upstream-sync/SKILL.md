@@ -191,6 +191,9 @@ git diff --stat ui-new/docs/inventory/generated
   - **A new capability:** add a row to `capabilities.md` in the right area table. Leave
     **New home** and **Status** blank and put `Added by upstream sync <date>` in **Notes**. Don't
     write its area guide entry; say in the report that one is needed.
+  - **A new or removed flag** in `generated/flags.md`: propose its outcome (built in, dropped, or
+    follows the instance setting) by the rules in decision 12 of `ui-new/docs/decisions.md`, and
+    list it in the report for the user to confirm. Add it to that entry only once confirmed.
 
   List them all in the report.
 - If a resolution moved or rewrote a patch, update its FORK-PATCHES.md entry in the same commit.
