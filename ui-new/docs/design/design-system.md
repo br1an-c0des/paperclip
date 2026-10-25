@@ -101,7 +101,9 @@ as a board tweak. Bold weights mark the selected item: a selected tab or nav ite
   the top (14px from the top edge), then content cards 16px apart.
 - **Cards:** 16–22px padding. List rows are at least 50px tall with `--row-line` between them.
 - **Boards are 1440px wide** and drawn at that width only. Responsive behavior is still to be
-  designed; keep layouts in grids and flex rows with `minmax(0, 1fr)` so they can shrink.
+  designed; keep layouts in grids and flex rows with `minmax(0, 1fr)` so they can shrink. The
+  [build plan](../build-plan.md#desktop-first-ready-for-mobile) lists the rest of what keeps mobile
+  cheap to add later.
 
 ## Elevation and layers
 

@@ -138,6 +138,57 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 - **Tracking.** As each screen lands, fill in **Status** in [capabilities.md](inventory/capabilities.md)
   (`partial`, `done`, or `dropped` with the reason). Record new API gaps in [decisions.md](decisions.md).
 
+### Design still coming
+
+The boards cover most of stage 1, but not all of it. More are being designed, and will land in
+[design/](design/README.md#still-to-design) while development runs:
+
+- **Desktop boards for capabilities that have none yet:**
+  - new project and new agent;
+  - goals as a project's lists, and recurring tasks;
+  - the command palette and search;
+  - workspaces, skills, apps and tools, activity;
+  - onboarding and sign-in;
+  - the settings sections that board 30 only outlines.
+
+  The full list is the empty **New home** cells in [capabilities.md](inventory/capabilities.md).
+- **Mobile wireframes**, possibly. Every board is drawn at 1440px today.
+
+Development starts now on what's drawn and doesn't wait for these:
+
+- In each milestone, build the screens that have boards first.
+- Before starting a milestone, check [design/boards.md](design/boards.md) for boards added since.
+- A tier 1 screen with no board yet (new project, new agent, lists, recurring tasks) waits for its
+  board. If the rest of the milestone is done first, build a plain version from the design system's
+  components, and mark it `partial` in capabilities.md so it's revisited.
+- Tier 2 screens (settings, skills, apps and tools, activity) port mostly as they are, so the design
+  system and the board 30 outline are enough to build them. A board, if one comes, refines them.
+
+### Desktop first, ready for mobile
+
+Development doesn't wait for mobile wireframes, but it shouldn't build anything they would force it
+to tear up. Most of the cost of adding mobile later comes from a few structural choices, and those
+can be made now without knowing what the mobile screens look like:
+
+- **The shell is a grid with named areas** (nav, main, side panel). On a phone, the nav becomes a
+  drawer and the side panel a full-screen sheet. That's a change to the grid at a breakpoint, not to
+  the components inside it.
+- **No fixed page widths.** The boards' 1440px is where the layout looks its best, not what it needs.
+  Use `minmax(0, 1fr)`, `clamp()` and `min()`, as the design system already says.
+- **Components respond to their container** (`@container`), not the viewport. A task row then works
+  the same in the full list, in a side panel and on a phone.
+- **Breakpoints live in one file**, even while only the desktop ones are used.
+- **Nothing works only on hover.** Every hover action also has a way to reach it by tap: a visible
+  button, or a menu. Test with `@media (hover: none)`.
+- **Dialogs, popovers and panels each go through one wrapper component**, so each can switch to a
+  full-screen sheet in one place.
+- **Lists rank their columns**, so the least important drop first as the width shrinks.
+
+Mobile wireframes are worth most for the screens that set the structure: the shell and navigation,
+the task list, the task panel and modal, the Inbox, and the agent chat. Each one that arrives early is
+folded in during or right after its milestone, while that code is fresh. The rest wait for the
+responsive pass in M7.
+
 ### Decisions to make early
 
 | # | Decision | Needed by | Recommendation |
@@ -149,6 +200,7 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | E | Each experimental flag | M0 | Settle every flag in [generated/flags.md](inventory/generated/flags.md) as permanent, dropped, or a plain setting where the server still enforces it. Record the results in a new decisions entry. |
 | F | Cases | M6 | Drop for now: they're experimental and read-only on the board. Mark `cases/*` dropped with that reason, and revisit if upstream builds them out. |
 | G | Hosting plugin UI ([FORK.md](../../FORK.md#a-standalone-app-not-a-plugin)) | M7 | Mount points for sidebar, project tabs, agent tabs, settings pages and full pages, with React loaded only for plugin areas. |
+| H | Responsive layouts | M0 | Decided: desktop first, built ready for mobile, with mobile layouts folded in as their wireframes arrive ([Desktop first, ready for mobile](#desktop-first-ready-for-mobile)). |
 
 The board set already settles one of the requests proposal's open questions: alerts get their own
 Inbox tab (board 14 has Needs you, Updates, Alerts, Snoozed and Cleared).
@@ -168,6 +220,8 @@ modal and the new-task dialog.
   segmented control, menu, popover, tooltip, dialog, avatar (ClipLab and initials disc).
 - A `/style-guide` route, ported from [style-guide.html](design/style-guide.html), for checking
   components in both themes.
+- The layout pieces that keep mobile cheap later (decision H): the shell grid, the breakpoints file,
+  and the dialog, popover and panel wrappers.
 
 Done when the style guide renders in both themes and a signed-in user sees their companies.
 
@@ -287,8 +341,8 @@ These are large areas: Apps and tools alone reaches about 60 requests per page. 
 - Plugin hosting (decision G).
 - Parity audit: every row in [capabilities.md](inventory/capabilities.md) is `done` or `dropped` with
   a reason.
-- A responsive pass (boards are 1440px only), and an accessibility pass against the design system's
-  patterns.
+- The responsive pass: mobile layouts for every screen not folded in earlier (decision H). And an
+  accessibility pass against the design system's patterns.
 - Deploy with [deploy/](../../deploy/README.md), run it beside the old UI for a while, then switch.
 
 After M7, stage 3 work starts in earnest.

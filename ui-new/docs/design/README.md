@@ -57,20 +57,29 @@ Notes:
 ## Open questions
 
 - **Panel or modal.** A task opens beside the list on boards 2, 3 and 5, and as a modal on boards 6
-  and 7. Which one is the default, and when is the other used?
-- **Responsive layouts.** Every board is drawn at 1440px only.
+  and 7. Which one is the default, and when is the other used? The
+  [build plan](../build-plan.md#decisions-to-make-early) recommends one (decision B).
+
+## Still to design
+
+More boards are on the way. Development starts on the current ones without waiting for them; the
+[build plan](../build-plan.md#design-still-coming) says how it handles the gaps.
+
+- **Capabilities with no board yet.** These have an empty "New home" in the
+  [checklist](../inventory/capabilities.md):
+  - The command palette, keyboard shortcuts, search, toasts.
+  - Goals (now a project's lists), routines (now recurring tasks), cases.
+  - New project and new agent.
+  - Workspaces, skills, connectors, activity.
+  - Onboarding and sign-in.
 - **Settings drawn only as an outline.** Board 30 lists sections with no board of their own:
   - Organization: Environments, Import and export, plugin sections such as Linear sync.
   - Agent: Profile, Skills, Tools and channels, Secrets and variables, Budget, Permissions and trust,
     API keys, History.
   - App: Account, Organizations, Admins, Plugins.
-- **Capabilities with no board yet.** These have an empty "New home" in the
-  [checklist](../inventory/capabilities.md):
-  - The command palette, keyboard shortcuts, search, toasts.
-  - Goals, routines, cases.
-  - New project and new agent.
-  - Workspaces, skills, connectors, activity.
-  - Onboarding and sign-in.
+- **Mobile layouts**, possibly. Every board is drawn at 1440px only. The screens that set the structure
+  help most if they come first: the shell and navigation, the task list, the task panel and modal, the
+  Inbox, and the agent chat.
 
 ## Refreshing the snapshot
 
