@@ -511,7 +511,7 @@ Server-enforced flags, all following the setting:
 | --- | --- |
 | `enableAgentChat` | Decision A: on in every `ui-new` deployment. |
 | `enablePublicMcp` | Should be on: the MCP connection replaces chat outside tasks (3.12). Also needed by `enableOpenAiDot` and `enableGrokBot`. |
-| `enableCases` | Decision F: the cases pages are dropped for now, so this has no surface in `ui-new` yet. |
+| `enableCases` | Decision F: no cases page. When the setting is on, cases show inside the task views: the case chip, the task panel's Case section, Group: Case, and Start case in New task. |
 | `enableConferenceRoomChat` | No surface: team chat and its onboarding are dropped, as with chat outside tasks (3.12). |
 | `enableSmokeLab` | No surface: maintainer tooling. |
 | `enableServerInfoDebugView` | The server-info section in the account menu, when the setting is on. |
