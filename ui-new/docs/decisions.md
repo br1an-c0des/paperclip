@@ -38,6 +38,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 9 | [Agent avatars need a runtime import from the shared package](#9-agent-avatars-need-a-runtime-import-from-the-shared-package) | `agents/*`, design system | Decided | Oct 25, 2026 |
 | 10 | [Some response types aren't exported from the shared package](#10-some-response-types-arent-exported-from-the-shared-package) | shell, session | Decided | Oct 25, 2026 |
 | 11 | [Menus inside dialogs need to sit above the overlay](#11-menus-inside-dialogs-need-to-sit-above-the-overlay) | design system | Decided | Oct 25, 2026 |
+| 12 | [What happens to each experimental flag](#12-what-happens-to-each-experimental-flag) | every flagged area | Open | Oct 25, 2026 |
 
 ## Entries
 
@@ -456,3 +457,75 @@ drawn underneath.
 
 **Decision.** Option 1. If the design tokens are revised, fold the change in there.
 
+
+### 12. What happens to each experimental flag
+
+- **Status:** Open. The recommendations below need confirming (build plan, decision E).
+- **Area:** every area a flag touches; listed per flag in
+  [generated/flags.md](inventory/generated/flags.md).
+- **Found in:** `instanceExperimentalSettingsSchema` and its metadata,
+  `packages/shared/src/feature-catalog.ts`, checked against the server code that reads each flag.
+
+**What we found.** The schema has 46 flags. The old UI reads 32 of them. 21 of those 32 are also
+enforced by the server, which turns the feature's routes or background work on or off. Turning those
+21 into permanent parts of the UI isn't something `ui-new` can do: with the flag off, the API refuses
+or returns nothing. The other 11 only change what the old UI shows. The 13 flags the old UI never
+reads (14) are server or runtime behavior.
+
+**Why it matters.** The fork aims to settle on one interface without toggles. That works for the
+UI-only flags. For the server-enforced ones, the switch remains an instance setting, and `ui-new`
+follows it.
+
+**Options.**
+
+1. **Three outcomes per flag.**
+   - *Built in:* a UI-only flag whose feature `ui-new` always has.
+   - *Dropped:* a UI-only flag whose feature `ui-new` leaves out, or replaces with its own design.
+   - *Follows the setting:* `ui-new` shows the feature when the server has it on
+     (`GET /api/instance/settings/experimental`). The switch stays on the instance settings page,
+     ported in M6.
+2. **Build every feature in and require each instance to turn its flags on.** This is simpler for
+   the UI, but it breaks on any instance that keeps a flag off.
+
+**Recommendation.** Option 1, as follows.
+
+UI-only flags:
+
+| Flag | Outcome | Why |
+| --- | --- | --- |
+| `enableStreamlinedUi` | Dropped | `ui-new` is its own shell and navigation (M1). |
+| `enableClassicTaskInterface` | Dropped | One task interface, from the boards (M2). |
+| `enableCombinedInboxTasks` | Dropped | The boards keep Inbox separate from Tasks (board 14). |
+| `enableDecisions` | Dropped | The Inbox and the requests proposal take its place (M3). |
+| `enableGoalsSidebarLink` | Dropped | Goals become a project's lists (decision C). |
+| `enableArtifactsV1` | Dropped | The artifact boards set the presentation. |
+| `enablePaperclipDeveloperMode` | Dropped | Maintainer tooling (Honeycomb links). |
+| `enableApps` | Built in | A compatibility key; Apps is always on. |
+| `enableEnvironments` | Built in | Environments are a company settings section (boards 21–25). |
+| `enableIssuePlanDecompositions` | Built in | Shown in a task's history when there is one (M2). |
+| `enableExperimentalFileViewer` | **Ask** | A task's workspace file browser. Build it in (M2) or drop it. |
+
+Server-enforced flags, all following the setting:
+
+| Flag | Notes |
+| --- | --- |
+| `enableAgentChat` | Decision A: on in every `ui-new` deployment. |
+| `enablePublicMcp` | Should be on: the MCP connection replaces chat outside tasks (3.12). Also needed by `enableOpenAiDot` and `enableGrokBot`. |
+| `enableCases` | Decision F: the cases pages are dropped for now, so this has no surface in `ui-new` yet. |
+| `enableConferenceRoomChat` | **Ask.** Team chat and its onboarding. The recommendation is no surface, as with chat outside tasks (3.12). |
+| `enableSmokeLab` | No surface: maintainer tooling. |
+| `enableServerInfoDebugView` | The server-info section in the account menu, when the setting is on. |
+| `enableManagedSandboxOnly`, `enableIsolatedWorkspaces`, `enableNativeRunner` | Agent, project and environment settings show the controls these allow. |
+| `enableChatConnectors`, `enableGitHubReviewBots`, `enableMemoryConnectors`, `enableFastResponses` | Apps and tools sections (M6). |
+| `enableOpenAiDot`, `enableGrokBot`, `enableMuse`, `enableBuiltInAgents`, `enableBetaSkills` | New-agent choices and agent settings (M5). |
+| `enableExternalObjects`, `enableSummaries`, `enableStatusCards` | Their panels on tasks, projects and workspaces, when the setting is on. |
+
+The 14 flags the old UI doesn't read stay switches on the ported settings page, and `ui-new`
+doesn't branch on them: `enableAiConnectionRouters`, `enableIsolatedWorkspacesByDefault`,
+`enableStreamlinedLeftNavigation`, `enablePaperclipNotebook`, `enableSimplifiedEnglishInteractions`,
+`enableFirstTaskPlanProposal`, `autoRestartDevServerWhenIdle`, `enableWorkspaceBranchReconcileForward`,
+`enableWorkspaceDirtyQuarantineRepair`, `enableOwnerInstanceAdmin`, `enableSandboxDuplexBridge`,
+`enableWorktreeRunExecution`, and the compatibility keys `enableMcpAggregators` and
+`enableRunnerPreviewIngress`.
+
+**Decision.** Not yet made.
