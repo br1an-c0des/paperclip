@@ -27,7 +27,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 
 | # | Entry | Area | Status | Opened |
 | --- | --- | --- | --- | --- |
-| 1 | [Projects can't hold documents or files](#1-projects-cant-hold-documents-or-files) | `projects/*`, `documents-artifacts/library` | Open | Oct 20, 2026 |
+| 1 | [Projects can't hold documents or files](#1-projects-cant-hold-documents-or-files) | `projects/*`, `documents-artifacts/library` | Decided | Oct 20, 2026 |
 | 2 | [Agent chat is off unless the instance turns it on](#2-agent-chat-is-off-unless-the-instance-turns-it-on) | `agent-chat/*`, shell navigation | Open | Oct 20, 2026 |
 | 3 | [Agents can work on several things at once](#3-agents-can-work-on-several-things-at-once) | `agent-chat/*`, runs | Decided | Oct 20, 2026 |
 | 4 | [A run's full model input only exists when provider tracing is on](#4-a-runs-full-model-input-only-exists-when-provider-tracing-is-on) | `runs-adapters/runs`, `agents/runtime` | Open | Oct 20, 2026 |
@@ -40,7 +40,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 
 ### 1. Projects can't hold documents or files
 
-- **Status:** Open
+- **Status:** Decided
 - **Area:** `projects/*`, `documents-artifacts/library`
 - **Found in:** the project Docs tab in the tasks and projects design canvas (screen 9,
   [private link](https://claude.ai/artifact/Rfim4J3VCm6qkSvcpeLsi7)).
@@ -77,8 +77,11 @@ well as people.
 Options 1 and 3 can be combined: start with a project docs task and move its contents over if upstream
 adds project documents.
 
-**Decision.** Not made yet. Until then the design keeps the section, and `ui-new` can build the
-"From tasks" part first.
+**Decision.** Option 3, without the option 1 stopgap (Oct 24, 2026). `ui-new` builds the
+"From tasks" part, and project documents are proposed upstream
+([build plan 2b-8](build-plan.md#2b-small-features-ask-upstream-first)). The project section waits
+for them. If upstream declines, the fork plugin provides them instead
+([build plan 3.4](build-plan.md#34-project-knowledge-base)).
 
 ### 2. Agent chat is off unless the instance turns it on
 
@@ -268,6 +271,14 @@ also needs a decision, like the other flags.
 **Decision.** For now, option 1: set the environment variable. Long term, option 3 is the candidate
 upstream PR, and option 4 goes into the agent page design. The `enableMemoryConnectors` flag isn't
 decided yet.
+
+Harnesses in use (Oct 24, 2026): `claude_local`, the Paperclip Runner and Claude Managed. So:
+
+- Option 1 also needs the variable in the adapter `env` of each Runner agent, since the Runner
+  doesn't pass on the server's variables.
+- Claude Managed agents remember nothing between sessions without a memory connector. That makes the
+  `enableMemoryConnectors` decision, and a memory service that works for every harness
+  ([build plan 3.5](build-plan.md#35-memory-service)), matter more.
 
 ### 6. Tasks have no due date
 

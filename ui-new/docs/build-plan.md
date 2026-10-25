@@ -48,11 +48,11 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | A fuller, more interactive Tasks page, like ClickUp | 1 | Boards 1 and 4, with inline edits, multi-select, drag between groups, quick add, keyboard navigation and saved views. All of it is `PATCH /api/issues/:id` and the list endpoints ([M2](#m2-tasks)). |
 | "Tags" for categorizing tasks | 1 | Labels already exist: company-wide, colored, filterable (`GET\|POST /api/companies/:companyId/labels`). The boards draw them as outline pills. |
 | Custom fields and columns | 3 | No field storage exists. A plugin side table keyed by task ([3.2](#32-custom-fields)). |
-| Custom status text | 3 | Statuses are a fixed list (`ISSUE_STATUSES`). Agents, review stages and the inbox all depend on it ([3.1](#31-custom-statuses-and-status-rules)). |
+| Custom status text | 3 | Statuses are a fixed list (`ISSUE_STATUSES`). Agents, review stages and the inbox all depend on it, so each custom status maps onto one of the seven ([3.1](#31-custom-statuses-and-status-rules)). |
 | Statuses that trigger review or approval | 1, then 3 | Review stages already do this: moving a task to `in_review` or `done` starts its configured review, then approval. Stage 1 shows that as a rule on the task ("When it's done, Sam reviews, then Alex approves"). Rules on other statuses are 3.1. |
 | AI tags `@user` in comments to say who it's waiting on | 1, then 3 | Stage 1 shows what a task waits on (`reviewAttention`, stage participants, requests addressed to a person). Getting agents to do this consistently is agent guidance, which goes in the fork skill ([3.10](#310-core-skill-add-on)). |
-| Multiple lists ("sprints") per project | 1 if lists are goals, otherwise 3 | Tasks already carry a `goalId`, and projects link goals (`goalIds`). A project's goals can work as its lists, which needs no new storage. Sprint dates and capacity are [3.3](#33-sprints). Needs your call ([question 2](#questions-for-you)). |
-| Project dashboard showing every sprint | 1 | Board 8 gains a lists section if lists are goals. |
+| Multiple lists ("sprints") per project | 1 | Each list is one of the project's goals (decision C). Tasks already carry a `goalId`, and projects link goals (`goalIds`), so it needs no new storage. Named lists for now; sprint dates and capacity are [3.3](#33-sprints), for later. |
+| Project dashboard showing every sprint | 1 | Board 8 gains a lists section. |
 | Goals assigned to lists: one list per sprint per goal | 1 | The same mapping: the goal *is* the list. |
 | Mention another task in a comment | 1 (exists) | Mentions already become related work on both tasks (`IssueRelatedWorkItem`, with mention counts and sources). The thread renders them as task links. |
 | ClickUp-style relationships and dependencies | 1, then 2b or 3 | Blockers exist (`blockedByIssueIds`, the only relation type is `blocks`). Other relation types, like "relates to" or "duplicates", are new: [2b-13](#2b-small-features-ask-upstream-first). |
@@ -77,7 +77,7 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | Idea | Stage | How |
 | --- | --- | --- |
 | Memory files visible per agent in its settings | 1 | A Memory section reading `MEMORY.md`, `memory/` and `life/` from the agent's files (`GET /api/agents/:id/instructions-bundle`), plus the agent's memory connections ([decision 5](decisions.md#5-agents-can-have-three-memory-systems-that-dont-know-about-each-other), option 4). |
-| Every run sees the same per-agent memory | Deploy setting now, then 2a | Now: `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in `deploy/docker-compose.yml`, a fork-only file (decision 5, option 1). Later: the upstream fix ([2a-6](#2a-fixes-and-docs-send-when-ready)). |
+| Every run sees the same per-agent memory | Deploy setting now, then 2a | Now: `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in `deploy/docker-compose.yml`, a fork-only file, which reaches `claude_local` runs. Paperclip Runner agents don't inherit the server's variables, so they need it in their adapter `env` (decision 5, option 1). Later: the upstream fix ([2a-6](#2a-fixes-and-docs-send-when-ready)). Claude Managed agents keep no memory between sessions unless they have a memory connector, or [3.5](#35-memory-service). |
 | Clean up memory across harnesses; maybe Postgres or a memory MCP server | 3 | A memory plugin with its own schema and agent tools ([3.5](#35-memory-service)). |
 
 ### Projects, goals, docs and artifacts
@@ -86,7 +86,7 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | --- | --- | --- |
 | Goals as part of a project, with no Goals page | 1 | The project header shows its goals (board 8 already links one), edited in project settings. `goals/hierarchy` and `goals/detail` move there. |
 | Project description and goals sent with every run | 1 (exists) | Agents read `GET /api/issues/:id/heartbeat-context`, which returns the task's project and goal. Check exactly which fields it includes during M4. If the description is missing, that's a small stage 2 change. |
-| Documents attached to a whole project | 1 for now, then 2b or 3 | [Decision 1](decisions.md#1-projects-cant-hold-documents-or-files). M4 builds "From tasks" first. The project section then needs one of: a hidden project-docs task (UI only), project documents upstream ([2b-8](#2b-small-features-ask-upstream-first)), or the plugin ([3.4](#34-project-knowledge-base)). |
+| Documents attached to a whole project | 1 for now, then 2b, or 3 if declined | [Decision 1](decisions.md#1-projects-cant-hold-documents-or-files). M4 builds "From tasks". Project documents are proposed upstream ([2b-8](#2b-small-features-ask-upstream-first)), and the project section waits for them, with the plugin ([3.4](#34-project-knowledge-base)) as the fallback. No hidden docs task as a stopgap. |
 | Project docs listed in the run prompt, with short descriptions | 3, or 2b | Plugins can't add to the core prompt. The fork skill can tell agents to call a plugin tool for them ([3.4](#34-project-knowledge-base)). If upstream adds project documents, it could return them in `heartbeat-context` instead. |
 | Docs that point to files in a repo | 1 for tasks, 3 for projects | Tasks already support this: work products with `metadata.resourceRef.kind: "workspace_file"`, and `/api/issues/:issueId/file-resources/*`. Project-level references are part of 3.4. |
 | Agent-made and uploaded docs look the same | 1 | One tile and row component for documents, attachments and work products (boards 5 and 9). Upstream's new Artifacts V1 (`enableArtifactsV1`) takes the same direction and is worth comparing. |
@@ -105,9 +105,9 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 
 | Idea | Stage | How |
 | --- | --- | --- |
-| Voting | 3 | [3.6](#36-voting) |
+| Voting | Tabled | Set aside, and may be dropped ([3.6](#36-voting)). |
 | Group announcement channels | 3 | [3.7](#37-announcement-channels). The old UI's Board chat is a concierge for running the company, not this. |
-| Meetings: scheduled work sessions with an agent | 3, partly 1 | [3.9](#39-meetings). A schedule trigger assigned to an agent already starts work at a set time. |
+| Meetings: scheduled work sessions with an agent | 3, partly 1 | [3.9](#39-meetings). Each meeting is its own conversation, with an agenda before, notes after and the agreed actions as tasks. A routine's schedule trigger already starts work for an agent at a set time. |
 | A "fast mode" for meetings | 2b | Codex agents already have a `fastMode` setting (`codex_local`). `claude_local` has none ([2b-11](#2b-small-features-ask-upstream-first)). A fast model or low effort per message works today. |
 | A core skill add-on for new behaviour | 3 | [3.10](#310-core-skill-add-on). Fork-owned, with no conflict. |
 
@@ -144,8 +144,8 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | --- | --- | --- | --- |
 | A | Agent chat flag ([decision 2](decisions.md#2-agent-chat-is-off-unless-the-instance-turns-it-on)) | M5 | Turn `enableAgentChat` on as part of every `ui-new` deployment (option 1). Fall back to agent settings if it's off (option 2). |
 | B | Task panel or modal ([design open question](design/README.md#open-questions)) | M2 | Panel when opened from a list or board (boards 2, 3, 5). Modal when opened from anywhere without a list: Inbox, chat, dashboards (boards 6, 7). Full page for direct links. |
-| C | Lists as goals | M4 | Yes, if your answer to [question 2](#questions-for-you) allows it. |
-| D | Project-level docs (decision 1) | M4 | Build "From tasks" first. Start a 2b-8 conversation upstream in parallel, and fall back to the hidden docs task only if upstream declines. |
+| C | Lists as goals | M4 | Decided: a project's lists are its goals, as named lists without dates for now ([question 2](#questions-for-you)). |
+| D | Project-level docs ([decision 1](decisions.md#1-projects-cant-hold-documents-or-files)) | M4 | Decided: build "From tasks", and start the 2b-8 conversation upstream. The project section waits for project documents, with the plugin (3.4) if upstream declines. No hidden docs task. |
 | E | Each experimental flag | M0 | Settle every flag in [generated/flags.md](inventory/generated/flags.md) as permanent, dropped, or a plain setting where the server still enforces it. Record the results in a new decisions entry. |
 | F | Cases | M6 | Drop for now: they're experimental and read-only on the board. Mark `cases/*` dropped with that reason, and revisit if upstream builds them out. |
 | G | Hosting plugin UI ([FORK.md](../../FORK.md#a-standalone-app-not-a-plugin)) | M7 | Mount points for sidebar, project tabs, agent tabs, settings pages and full pages, with React loaded only for plugin areas. |
@@ -228,15 +228,16 @@ Covers `inbox-search/triage`, `decisions/*`, `approvals/*`, `tasks/approvals`, `
 #### M4: Projects
 
 - Project dashboard (board 8): brief, budget, code, agents at work, waiting on you, stuck work. Plus a
-  lists section if lists are goals.
+  lists section: the project's goals, each with its tasks.
 - Docs (board 9): "From tasks" on `GET /api/companies/:companyId/artifacts?projectId=&groupBy=task`.
-  The project section follows decision D.
+  The project section waits for project documents (decision D).
 - Agent workload (boards 31, 32), built from runs, live runs and assignments.
 - Settings (boards 10, 11): details, members, repositories, workspaces, task checkouts, environment,
   variables, budget, archive, and goals.
-- Goals folded into projects. Lists (goals) per project, if decision C holds.
+- Goals folded into projects, and shown as the project's lists (decision C).
 - Recurring tasks replace Routines: Repeat in the new-task dialog, a Recurring view, and every routine
-  setting (triggers, variables, delivery policy, run history) in the recurring task's panel.
+  setting (triggers, variables, delivery policy, run history) in the recurring task's panel. Each
+  occurrence is a new task, grouped under its recurring task.
 - New project.
 - Check what `heartbeat-context` returns for the project and goal, and open a 2a item if the
   description is missing.
@@ -259,8 +260,12 @@ Covers `projects/*`, `workspaces/*`, `goals/*`, `routines/*`, `documents-artifac
   and models, and company workload (board 33).
 - Agent settings (boards 26, 27, and the board 30 outline): profile, instructions, skills, model and
   runtime, tools and channels, secrets, budget, permissions and project access, API keys, history.
-- Memory section (decision 5, option 4).
-- Runner information: runtime state, task sessions, Runner qualification, the upgrade offer.
+- Memory section (decision 5, option 4). It says which memory applies to the agent's harness: files
+  for `claude_local` and the Paperclip Runner, and none for Claude Managed unless the agent has a
+  memory connector.
+- Runner information: runtime state, session history from task sessions, Runner qualification, the
+  upgrade offer, and usage and cost from runs and the costs API (`/api/companies/:companyId/costs/*`).
+  List what's still missing for [3.11](#311-runner-visibility-beyond-the-api).
 - New agent (hire flow).
 
 Covers `agents/*`, `agent-chat/*`.
@@ -333,7 +338,7 @@ dropped.
   `ui-new` calls like any other API), agent tools, scheduled jobs, event subscriptions, and read access
   to allowed core tables. Plugins never conflict with upstream.
 - **A fork skill to steer agents.** Plugins can't add to the core prompt. The skill in [3.10](#310-core-skill-add-on)
-  tells agents when to use the plugin's tools: read project docs, save memory, vote, read announcements.
+  tells agents when to use the plugin's tools: read project docs, save memory, read announcements.
   Plugin plus skill covers most of stage 3 without touching upstream code.
 - **Patches only when unavoidable.** Ask first, then follow
   [FORK.md](../../FORK.md#changing-server-database-and-packages): a hook in new files over edits to
@@ -348,12 +353,12 @@ dropped.
 
 - **Have:** seven fixed statuses. Review and approval stages start on `in_review` and `done`.
 - **Missing:** your own status names, and rules on other statuses.
-- **Approach:** keep the seven as the underlying state, and let a project define display statuses that
-  each map onto one of them ("QA" maps to `in_review`, "Waiting on client" to `blocked`). The plugin
-  stores the mapping and each task's display status, and agents and review stages keep working
-  unchanged. Rules ("moving to QA asks Sam to sign off") become plugin event handlers that set up
-  review stages through the API. True custom workflows would mean changing upstream's status enum,
-  which is a much larger and less likely change.
+- **Approach:** decided ([question 3](#questions-for-you)): keep the seven as the underlying state,
+  and let a project define display statuses that each map onto one of them ("QA" maps to `in_review`,
+  "Waiting on client" to `blocked`). The plugin stores the mapping and each task's display status, and
+  agents and review stages keep working unchanged. Rules ("moving to QA asks Sam to sign off") become
+  plugin event handlers that set up review stages through the API. Fully custom workflows, which would
+  mean changing upstream's status enum, are out of scope.
 - **Risk:** low as a plugin.
 
 ### 3.2 Custom fields
@@ -367,7 +372,10 @@ dropped.
 
 ### 3.3 Sprints
 
-- **Have:** if decision C holds, lists are goals: status, description, parent, and a link to projects.
+Later. Named lists cover sprints for now ([question 2](#questions-for-you)); this entry is for when
+dates start to matter.
+
+- **Have:** lists are goals (decision C): status, description, parent, and a link to projects.
 - **Missing:** start and end dates, capacity, rollover of unfinished tasks, burndown.
 - **Approach:** plugin data attached to a goal (dates, capacity), plus a scheduled job that rolls over
   unfinished tasks at the end. The dashboard shows a burndown from task activity.
@@ -385,31 +393,38 @@ dropped.
 
 ### 3.5 Memory service
 
-- **Have:** three memory systems that don't coordinate (decision 5).
+- **Have:** three memory systems that don't coordinate (decision 5). Your agents run on
+  `claude_local`, the Paperclip Runner and Claude Managed ([question 9](#questions-for-you)). Claude
+  Managed agents have no agent folder, so file memory can't work for them at all.
 - **Missing:** one memory store per agent, the same for every harness, that people can read and edit.
 - **Approach:** after the 2a-6 fix, a plugin with a memory schema in Postgres (per agent, optionally per
   project), agent tools to search and save, and a Memory section in agent settings to review and
   correct entries. The fork skill takes over from `para-memory-files` for agents that opt in. A memory
-  MCP server is the same idea for harnesses that only speak MCP.
+  MCP server is the same idea for harnesses that only speak MCP. Check first that plugin tools reach
+  Claude Managed agents, since they're the ones with no memory today. Until then, a memory connector
+  (`enableMemoryConnectors`) is their only option, which makes that flag's decision (E) matter more.
 - **Risk:** medium. It competes with upstream's memory connectors and its unbuilt memory-service plan,
   so check upstream's direction before building.
 
 ### 3.6 Voting
+
+Tabled Oct 24, 2026, and may be dropped. The sketch below is kept as a record, not as planned work.
 
 - **Have:** Decisions (people only), and cards that only one actor answers.
 - **Missing:** a proposal many agents vote on, with options, abstentions, questions and amendments.
 - **Approach:** plugin tables for proposals, options and ballots. Agent tools to propose, vote, ask or
   amend. The plugin wakes the agents involved by commenting on the task with mentions, and closes the
   vote on quorum or a deadline. `ui-new` shows the vote as a request card and on the task.
-- **Risk:** low. Needs a design pass first ([question 7](#questions-for-you)).
+- **Risk:** low.
 
 ### 3.7 Announcement channels
 
 - **Have:** comments on tasks, chats with single agents, Slack and other chat connectors.
 - **Missing:** one message to many agents that each records or acts on.
 - **Approach:** plugin channels with members (all agents, or some), and an agent tool to read unseen
-  announcements. The fork skill tells agents to check at the start of each run. Optionally, the plugin
-  wakes members through a comment on each agent's chat task.
+  announcements. The fork skill tells agents to check at the start of each run. Announcements reach
+  agents on their next run and don't wake them ([question 10](#questions-for-you)), so they add no runs
+  or cost.
 - **Risk:** low.
 
 ### 3.8 Assigned comments and review assignments
@@ -425,15 +440,27 @@ dropped.
 
 ### 3.9 Meetings
 
-- **Have:** schedule triggers, agent chat with `/new`, fast responses (`enableFastResponses`), Codex
-  fast mode.
-- **Missing:** a scheduled session with an agent: a calendar entry, an agenda the agent prepares, a
-  fresh chat session at the time, and notes afterwards.
-- **Approach:** plugin meeting records with a scheduled job. Ahead of time, the agent is asked to
-  prepare an agenda. At the time, a new session starts in the agent's chat and you get a notification.
-  Afterwards, the agent writes notes into a document. Speed comes from a fast model or effort per message
-  today, and 2b-11 for Claude.
-- **Risk:** low. Needs a design pass ([question 8](#questions-for-you)).
+- **Have:** routines with schedule triggers, ordinary tasks with threads and documents, task-less
+  plugin sessions (3.12), fast responses (`enableFastResponses`), Codex fast mode.
+- **Missing:** a calendar of meetings, the timing around each one, and a view that presents a meeting
+  as a conversation.
+- **What a meeting is** ([question 8](#questions-for-you)):
+  - Its own conversation, not the agent's standing chat.
+  - The agent prepares an agenda beforehand.
+  - Afterwards, the agent writes notes, and the agreed actions become ordinary tasks linked from the
+    notes.
+- **Approach:** a meeting can't be a second built-in chat, because the server allows one chat per
+  person and agent (decision 8). Two ways to build it:
+  - **A task per meeting.** A routine creates the meeting task, assigned to the agent, far enough
+    ahead for the agent to prepare the agenda as the task's plan document. At the time, you talk in
+    the task's thread, which `ui-new` draws as a conversation. Afterwards, the agent saves notes as a
+    document and creates the action tasks. This is mostly existing pieces. The plugin adds the
+    calendar, one-off meetings, and the reminder when a meeting starts.
+  - **A plugin session.** Built on `ctx.agents.sessions`, as in 3.12, with the plugin storing the
+    conversation. Closer to a natural chat, but it uses fewer built-in pieces.
+
+  Speed comes from a fast model or effort per message today, and 2b-11 for Claude.
+- **Risk:** low.
 
 ### 3.10 Core skill add-on
 
@@ -447,9 +474,14 @@ dropped.
 
 ### 3.11 Runner visibility beyond the API
 
-- **Have:** what stage 1 shows from the API.
-- **Missing:** whatever the Runner keeps only on disk (sessions, sandboxes, ACP state).
-- **Approach:** depends on [question 6](#questions-for-you). Likely a 2b proposal to expose it, since
+- **Wanted** ([question 6](#questions-for-you)): session history, sandbox state, the Runner's own
+  logs, and costs and usage.
+- **Have:** what M5 shows from the API: runtime state, task sessions, run events and transcripts,
+  workspace operations, runner goal, provider traces, and usage and cost from runs and the costs API.
+  That likely covers session history and costs.
+- **Missing:** sandbox state and the Runner's own logs, and whatever else the Runner keeps only on
+  disk (ACP state, for example).
+- **Approach:** M5 lists exactly what's still missing. Then propose exposing it upstream (2b), since
   plugins can't read runs.
 
 ### 3.12 Chat outside tasks (optional)
@@ -488,27 +520,26 @@ work fine, in which case this is dropped.
 
 ## Questions for you
 
-1. ~~**"Tasks become separated from agent chats/runs."**~~ Answered Oct 24, 2026: stage 1 builds on
-   the hidden chat tasks, and a chat outside tasks is the optional [3.12](#312-chat-outside-tasks-optional).
-2. **Lists and sprints.** Could a project's lists be its goals? Each list would be a goal linked to the
-   project, and each task would belong to at most one list. Do sprints need dates and capacity from the
-   start, or are named lists enough for now?
-3. **Custom statuses.** Is it enough for custom statuses to map onto the seven built-in ones (3.1)? Or
-   do you need fully custom workflows?
-4. **Recurring tasks.** A routine creates a new task each time it fires. Is that what you want (each
-   occurrence its own task, grouped under the recurring task)? Or should one task reopen each time?
-5. **Project docs while waiting on upstream.** Are you OK with a hidden "project docs" task as a
-   stopgap (decision 1, option 1)? Or should the project section wait for upstream or the plugin?
-6. **Runner visibility.** What do you want to see that the UI doesn't show today? Session history,
-   sandbox state, the Runner's own logs, costs per lane?
-7. **Voting.** Who votes: every agent on the task (assignee, reviewers, participants), or a list the
-   proposer picks? Is a vote binding (it applies the result), or advice for the person who decides?
-8. **Meetings.** Should a meeting reuse the agent's standing chat with a fresh session, or be its own
-   conversation? Should the agent prepare an agenda beforehand and write notes afterwards?
-9. **Memory.** Which harnesses do your agents mostly run on (`claude_local`, the Paperclip Runner,
-   Claude Managed, Codex)? That decides which part of decision 5 matters most.
-10. **Announcements.** Should an announcement wake agents to act on it, or just reach them on their
-    next run?
+All answered Oct 24, 2026.
+
+1. ~~**"Tasks become separated from agent chats/runs."**~~ Stage 1 builds on the hidden chat tasks, and
+   a chat outside tasks is the optional [3.12](#312-chat-outside-tasks-optional).
+2. ~~**Lists and sprints.**~~ A project's lists are its goals, as named lists for now. Sprint dates and
+   capacity come later ([decision C](#decisions-to-make-early), [3.3](#33-sprints)).
+3. ~~**Custom statuses.**~~ Each custom status maps onto one of the seven built-in ones
+   ([3.1](#31-custom-statuses-and-status-rules)).
+4. ~~**Recurring tasks.**~~ A new task each time, grouped under the recurring task ([M4](#m4-projects)).
+5. ~~**Project docs while waiting on upstream.**~~ "From tasks" only; the project section waits for
+   upstream or the plugin, with no hidden docs task ([decision D](#decisions-to-make-early)).
+6. ~~**Runner visibility.**~~ All of session history, sandbox state, the Runner's own logs, and costs and
+   usage ([3.11](#311-runner-visibility-beyond-the-api)).
+7. ~~**Voting.**~~ Tabled, and may be dropped ([3.6](#36-voting)).
+8. ~~**Meetings.**~~ Each meeting is its own conversation, with an agenda before, notes after and the
+   actions as tasks ([3.9](#39-meetings)).
+9. ~~**Memory.**~~ `claude_local`, the Paperclip Runner and Claude Managed
+   ([memory ideas](#memory), [3.5](#35-memory-service)).
+10. ~~**Announcements.**~~ They reach agents on their next run, without waking them
+    ([3.7](#37-announcement-channels)).
 
 ## Keeping this plan current
 
