@@ -1,0 +1,39 @@
+.disc-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: #111113;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  user-select: none;
+}
+
+.disc-avatar--you {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.agent-avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.agent-avatar img {
+  display: block;
+  object-fit: contain;
+}
+
+/* A running agent: a 2px Ion ring with a gap in the surface color */
+.agent-avatar--ring {
+  padding: 2px;
+  background: var(--g-ion);
+}
+
+.agent-avatar--ring > * {
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--ground);
+  background: var(--ground);
+}

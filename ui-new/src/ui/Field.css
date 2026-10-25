@@ -1,0 +1,173 @@
+.input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 14px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-field);
+  background: var(--ground);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.4;
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--muted);
+}
+
+.input:focus,
+.input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--run-fg);
+}
+
+.input[aria-invalid="true"] {
+  border-color: color-mix(in srgb, var(--red-fg) 60%, transparent);
+}
+
+.input--title {
+  padding: 10px 14px;
+  border-radius: var(--r-inner);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.input--area {
+  border-radius: var(--r-inner);
+  resize: vertical;
+  min-height: 64px;
+  line-height: 1.5;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-field);
+  background: var(--ground);
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+}
+
+.field:hover {
+  border-color: var(--dashed);
+}
+
+.field[aria-expanded="true"] {
+  box-shadow: 0 0 0 2px var(--run-fg);
+}
+
+.field-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-caret {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.field-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.field-error {
+  font-size: 12px;
+  color: var(--red-fg);
+}
+
+/* Settings cards and rows */
+.settings-card {
+  container-type: inline-size;
+  min-width: 0;
+}
+
+.chead {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.chead h3 {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.chead p {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.frow {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.frow:first-child {
+  border-top: 0;
+}
+
+.flabel {
+  padding-top: 7px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.fhelp {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.fcontrol {
+  min-width: 0;
+}
+
+.cfoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+}
+
+/* In a narrow card, labels move above their controls */
+@container (max-width: 560px) {
+  .frow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .flabel {
+    padding-top: 0;
+  }
+}

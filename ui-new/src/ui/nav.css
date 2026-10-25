@@ -1,0 +1,23 @@
+/* Nav items: a 38px pill; the current page is raised with --sel and weight 800 (board 1). */
+.navi {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.navi:hover {
+  background: var(--hover);
+}
+
+.navi[aria-current="page"] {
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+  color: var(--text);
+  font-weight: 800;
+}
