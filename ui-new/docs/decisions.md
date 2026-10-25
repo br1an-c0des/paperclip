@@ -38,7 +38,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 9 | [Agent avatars need a runtime import from the shared package](#9-agent-avatars-need-a-runtime-import-from-the-shared-package) | `agents/*`, design system | Decided | Oct 25, 2026 |
 | 10 | [Some response types aren't exported from the shared package](#10-some-response-types-arent-exported-from-the-shared-package) | shell, session | Decided | Oct 25, 2026 |
 | 11 | [Menus inside dialogs need to sit above the overlay](#11-menus-inside-dialogs-need-to-sit-above-the-overlay) | design system | Decided | Oct 25, 2026 |
-| 12 | [What happens to each experimental flag](#12-what-happens-to-each-experimental-flag) | every flagged area | Open | Oct 25, 2026 |
+| 12 | [What happens to each experimental flag](#12-what-happens-to-each-experimental-flag) | every flagged area | Decided | Oct 25, 2026 |
 
 ## Entries
 
@@ -460,7 +460,7 @@ drawn underneath.
 
 ### 12. What happens to each experimental flag
 
-- **Status:** Open. The recommendations below need confirming (build plan, decision E).
+- **Status:** Decided (build plan, decision E).
 - **Area:** every area a flag touches; listed per flag in
   [generated/flags.md](inventory/generated/flags.md).
 - **Found in:** `instanceExperimentalSettingsSchema` and its metadata,
@@ -503,7 +503,7 @@ UI-only flags:
 | `enableApps` | Built in | A compatibility key; Apps is always on. |
 | `enableEnvironments` | Built in | Environments are a company settings section (boards 21–25). |
 | `enableIssuePlanDecompositions` | Built in | Shown in a task's history when there is one (M2). |
-| `enableExperimentalFileViewer` | **Ask** | A task's workspace file browser. Build it in (M2) or drop it. |
+| `enableExperimentalFileViewer` | Built in | A task's workspace file browser, for reviewing an agent's work (M2). |
 
 Server-enforced flags, all following the setting:
 
@@ -512,7 +512,7 @@ Server-enforced flags, all following the setting:
 | `enableAgentChat` | Decision A: on in every `ui-new` deployment. |
 | `enablePublicMcp` | Should be on: the MCP connection replaces chat outside tasks (3.12). Also needed by `enableOpenAiDot` and `enableGrokBot`. |
 | `enableCases` | Decision F: the cases pages are dropped for now, so this has no surface in `ui-new` yet. |
-| `enableConferenceRoomChat` | **Ask.** Team chat and its onboarding. The recommendation is no surface, as with chat outside tasks (3.12). |
+| `enableConferenceRoomChat` | No surface: team chat and its onboarding are dropped, as with chat outside tasks (3.12). |
 | `enableSmokeLab` | No surface: maintainer tooling. |
 | `enableServerInfoDebugView` | The server-info section in the account menu, when the setting is on. |
 | `enableManagedSandboxOnly`, `enableIsolatedWorkspaces`, `enableNativeRunner` | Agent, project and environment settings show the controls these allow. |
@@ -528,4 +528,6 @@ doesn't branch on them: `enableAiConnectionRouters`, `enableIsolatedWorkspacesBy
 `enableWorktreeRunExecution`, and the compatibility keys `enableMcpAggregators` and
 `enableRunnerPreviewIngress`.
 
-**Decision.** Not yet made.
+**Decision.** Option 1, as recommended above (Oct 25, 2026). The file viewer is built into the task
+panel in M2, and Conference Room chat is dropped. A flag that upstream adds later gets a row here,
+with the same three outcomes; the upstream sync report flags new ones.

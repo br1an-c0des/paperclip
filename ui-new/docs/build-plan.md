@@ -198,7 +198,7 @@ responsive pass in M7.
 | B | Task panel or modal ([design open question](design/README.md#open-questions)) | M2 | Panel when opened from a list or board (boards 2, 3, 5). Modal when opened from anywhere without a list: Inbox, chat, dashboards (boards 6, 7). Full page for direct links. |
 | C | Lists as goals | M4 | Decided: a project's lists are its goals, as named lists without dates for now ([question 2](#questions-for-you)). |
 | D | Project-level docs ([decision 1](decisions.md#1-projects-cant-hold-documents-or-files)) | M4 | Decided: build "From tasks", and start the 2b-8 conversation upstream. The project section waits for project documents, with the plugin (3.4) if upstream declines. No hidden docs task. |
-| E | Each experimental flag ([decision 12](decisions.md#12-what-happens-to-each-experimental-flag)) | M0 | Settle every flag in [generated/flags.md](inventory/generated/flags.md) as permanent, dropped, or a plain setting where the server still enforces it. Record the results in a new decisions entry. `enablePublicMcp` should end up on, since the MCP connection replaces the chat outside tasks ([3.12](#312-chat-outside-tasks-dropped)). |
+| E | Each experimental flag ([decision 12](decisions.md#12-what-happens-to-each-experimental-flag)) | M0 | Decided: built in, dropped, or following the instance setting, per flag. Agent chat and `enablePublicMcp` on; the file viewer built in (M2); Conference Room chat dropped. |
 | F | Cases | M6 | Drop for now: they're experimental and read-only on the board. Mark `cases/*` dropped with that reason, and revisit if upstream builds them out. |
 | G | Hosting plugin UI ([FORK.md](../../FORK.md#a-standalone-app-not-a-plugin)) | M7 | Mount points for sidebar, project tabs, agent tabs, settings pages and full pages, with React loaded only for plugin areas. |
 | H | Responsive layouts | M0 | Decided: desktop first, built ready for mobile, with mobile layouts folded in as their wireframes arrive ([Desktop first, ready for mobile](#desktop-first-ready-for-mobile)). |
@@ -256,6 +256,8 @@ Covers `shell/*` except plugins. Done when you can move around the app and creat
 - Run modal: transcript, what the agent was sent, raw output, provider trace (boards 16–18,
   [decision 4](decisions.md#4-a-runs-full-model-input-only-exists-when-provider-tracing-is-on)).
 - Task documents with the editor: revisions, locks, annotations.
+- The workspace file viewer: browse and preview a task's workspace files, built in rather than
+  behind `enableExperimentalFileViewer` ([decision 12](decisions.md#12-what-happens-to-each-experimental-flag)).
 - Recovery and interruption state with Retry, and the project access notice from the 2026-10-24 sync.
 
 Covers `tasks/*`, `steering/*`, `task-coordination/*`, `documents-artifacts/documents`,
