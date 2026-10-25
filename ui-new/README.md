@@ -31,12 +31,22 @@ To point at a different server: `PAPERCLIP_API_URL=http://host:port pnpm dev`.
 
 ```
 src/
-  index.tsx        mounts the app
-  App.tsx          router and layout shell
-  api/client.ts    small fetch wrapper for /api
-  routes/          one component per page
-  styles.css       design tokens (light and dark) and base styles
+  index.tsx        mounts the app: fonts, tokens, base styles, theme
+  App.tsx          query client and routes
+  api/             fetch wrapper (client.ts), one module per API area, query keys
+  lib/             query client, session gate, company selection, live-events socket, theme
+  layout/          breakpoints (the only place they're defined), the shell grid, the side panel
+  ui/              shared components: buttons, status capsules and pills, fields, switch,
+                   segmented control, menu, popover, tooltip, dialog, avatars, grain, layers
+  routes/          one component per page, each with its own CSS file
+  styles/          tokens.css (copied verbatim from docs/design/tokens.css), fonts, base styles
 ```
+
+Components respond to their own width with `@container` queries; the viewport breakpoints in
+`layout/breakpoints.ts` set `data-viewport` on `<html>` for the few things that change with the
+window (the shell, and layers turning into sheets on a phone). Menus, popovers, dialogs and the panel
+each go through one wrapper, so their phone behavior lives in one place. `/style-guide` shows every
+component in both themes.
 
 `@/` is an alias for `src/`.
 

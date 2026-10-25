@@ -22,7 +22,7 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 | [shell/shortcuts](areas/app-shell.md#shellshortcuts-keyboard-shortcuts) | Keyboard shortcuts | | | |
 | [shell/dialogs](areas/app-shell.md#shelldialogs-global-create-dialogs) | Global create dialogs | [7b New task](../design/boards.md#board-7b) (tasks only) | | |
 | [shell/live-updates](areas/app-shell.md#shelllive-updates-live-updates-and-toasts) | Live updates and toasts | | | |
-| [shell/company](areas/app-shell.md#shellcompany-company-context) | Company context | [19 Org dashboard](../design/boards.md#board-19) | | |
+| [shell/company](areas/app-shell.md#shellcompany-company-context) | Company context | [19 Org dashboard](../design/boards.md#board-19) | partial | M0: company prefix in the URL, last company remembered, switcher in a stand-in nav; the designed nav is M1 |
 | [shell/plugins](areas/app-shell.md#shellplugins-plugin-extension-points) | Plugin extension points | | | Needed before `ui-new` replaces the old UI: React for plugin areas, the bridge registry, module loader, slot mounts and the SDK's shared components ([FORK.md](../../../FORK.md#a-standalone-app-not-a-plugin)).. Upstream sync 2026-10-22: plugins can add agent detail tabs (`detailTab` slots, `/agents/:agentId/plugin:<pluginKey>:<slotId>`) |
 | [shell/misc](areas/app-shell.md#shellmisc-other-shell-features) | Other shell features | | | |
 
@@ -147,8 +147,8 @@ Tracked per page group; see [areas/settings-and-admin.md](areas/settings-and-adm
 | [Skills](areas/settings-and-admin.md#skills) | Library, Sources, Studio | | | Upstream sync 2026-10-22: streamlined `/skills/studio` shows the library filtered to authored skills |
 | [Apps and tools ("Connectors")](areas/settings-and-admin.md#apps-and-tools-connectors) | Browse, Connect, App detail, Review, Assistant connection, Gateways, Advanced, Chat endpoints | | | |
 | [Activity and costs](areas/settings-and-admin.md#activity-and-costs) | Activity hub | | | Upstream sync 2026-10-22: Commentary tab (`/activity/commentary`; `GET /api/companies/:companyId/agent-commentary`, `/:id`); case filter on the activity log |
-| [Companies and onboarding](areas/settings-and-admin.md#companies-and-onboarding) | Companies, Onboarding | | | |
-| [Sign-in and connect flows (outside a company)](areas/settings-and-admin.md#sign-in-and-connect-flows-outside-a-company) | Sign in, Board claim, CLI auth, Invite, MCP connect, Chat identity, Cloud OAuth handoff | | | |
+| [Companies and onboarding](areas/settings-and-admin.md#companies-and-onboarding) | Companies, Onboarding | | partial | M0: company list with counts (`/companies`); onboarding is M6 |
+| [Sign-in and connect flows (outside a company)](areas/settings-and-admin.md#sign-in-and-connect-flows-outside-a-company) | Sign in, Board claim, CLI auth, Invite, MCP connect, Chat identity, Cloud OAuth handoff | | partial | M0: session check and email sign-in (`/auth`); sign-up and the other flows are M6 |
 
 ## Cross-cutting
 

@@ -35,6 +35,9 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 6 | [Tasks have no due date](#6-tasks-have-no-due-date) | `tasks/create`, `tasks/properties` | Decided | Oct 24, 2026 |
 | 7 | [Model and effort overrides depend on the agent's adapter](#7-model-and-effort-overrides-depend-on-the-agents-adapter) | `tasks/create`, `agents/runtime` | Decided | Oct 24, 2026 |
 | 8 | [Agent chats are tasks underneath](#8-agent-chats-are-tasks-underneath) | `agent-chat/*`, `inbox-search/search`, `tasks/views` | Decided | Oct 24, 2026 |
+| 9 | [Agent avatars need a runtime import from the shared package](#9-agent-avatars-need-a-runtime-import-from-the-shared-package) | `agents/*`, design system | Decided | Oct 25, 2026 |
+| 10 | [Some response types aren't exported from the shared package](#10-some-response-types-arent-exported-from-the-shared-package) | shell, session | Decided | Oct 25, 2026 |
+| 11 | [Menus inside dialogs need to sit above the overlay](#11-menus-inside-dialogs-need-to-sit-above-the-overlay) | design system | Decided | Oct 25, 2026 |
 
 ## Entries
 
@@ -378,3 +381,78 @@ dropped on Oct 24, 2026: Paperclip's MCP connection gives a fluid conversation o
 it ([build plan 3.12](build-plan.md#312-chat-outside-tasks-dropped)). A run per message is the
 expected default, not a stopgap. Agent-initiated messages, such as briefings, are added to this chat separately
 ([build plan 3.13](build-plan.md#313-briefings-and-reports)).
+
+### 9. Agent avatars need a runtime import from the shared package
+
+- **Status:** Decided
+- **Area:** `agents/*`, design system (avatars)
+- **Found in:** building the `AgentAvatar` component for M0.
+
+**What we found.** Agents are ClipLab characters. The server renders each one as a PNG
+(`/api/agent-avatars/...`), and the URL encodes the agent's appearance, size, pixel ratio and pose.
+`agentAvatarUrl`, `resolveAgentAppearance` and `characterStateForAgent` in
+`packages/shared/src/agent-appearance.ts` build that URL and pick the palette and pose the server
+expects. They're runtime code, and the module imports `zod`.
+
+**Why it matters.** `ui-new` imports from `@paperclipai/shared` with `import type` only, to keep
+the bundle free of server-side code. Copying the URL builder would drift from the server the first
+time upstream changes the scheme.
+
+**Options.**
+
+1. **Import those three functions at runtime** from `@paperclipai/shared/agent-appearance` (the
+   package exports each file through `./*`). That pulls `zod` into the bundle.
+2. **Copy the functions into `ui-new`** and check them against upstream at each sync.
+3. **Render ClipLab in the browser** (`packages/shared/src/cliplab`), as the old UI's
+   `AgentCharacter.tsx` does. The build plan allows this import ("Avatars" under the stack), but a
+   static avatar doesn't need it.
+
+**Decision.** Option 1, limited to `ui/Avatar.tsx`. Animated characters, such as the appearance
+editor (M5), can adopt the ClipLab runtime under the same exception when they're built; record any
+other runtime import from the shared package here.
+
+### 10. Some response types aren't exported from the shared package
+
+- **Status:** Decided
+- **Area:** shell, session check
+- **Found in:** the API client for M0 (`api/health.ts`, `api/access.ts`, `api/companies.ts`).
+
+**What we found.** Three responses `ui-new` reads at startup have no type in `@paperclipai/shared`:
+
+- `GET /api/health` (`HealthStatus`): the old UI declares it in `ui/src/api/health.ts`.
+- `GET /api/cli-auth/me` (`CurrentBoardAccess`): declared in `ui/src/api/access.ts`.
+- `GET /api/companies/stats`: a map from company id to agent and task counts, untyped in the old
+  UI. It leaves out companies with no agents or tasks, so a missing entry means zero.
+
+**Why it matters.** Local copies of these types can drift from the server without the typecheck
+noticing.
+
+**Options.**
+
+1. **Declare local types** with only the fields `ui-new` reads, each naming the old UI's
+   declaration it mirrors.
+2. **Propose exporting them from `packages/shared`** upstream.
+
+**Decision.** Option 1 for now. Option 2 is a candidate for a small upstream pull request (stage
+2a); if it lands, switch to the shared types.
+
+### 11. Menus inside dialogs need to sit above the overlay
+
+- **Status:** Decided
+- **Area:** design system (layers)
+- **Found in:** checking M0 on a phone-sized viewport, where the company switcher's sheet opened
+  behind the nav drawer.
+
+**What we found.** `tokens.css` sets `--z-popover: 30` below `--z-overlay: 50`, the level of dialogs
+and the phone nav drawer. That suits a menu on the page, but menus and popovers also open from inside
+dialogs (the new-task dialog's status and assignee menus) and from the drawer, and there they were
+drawn underneath.
+
+**Options.**
+
+1. **Put menus, popovers and tooltips above the overlay level** in `ui/layer.css` and
+   `ui/Tooltip.css` (`--z-overlay` + 1 and + 2), and keep `tokens.css` identical to the design copy.
+2. **Change the tokens** in the design and in `ui-new`.
+
+**Decision.** Option 1. If the design tokens are revised, fold the change in there.
+
