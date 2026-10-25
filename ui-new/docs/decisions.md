@@ -34,6 +34,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 5 | [Agents can have three memory systems that don't know about each other](#5-agents-can-have-three-memory-systems-that-dont-know-about-each-other) | `agents/runtime`, `agents/skills`, `agents/instructions`, Connectors | Open | Oct 22, 2026 |
 | 6 | [Tasks have no due date](#6-tasks-have-no-due-date) | `tasks/create`, `tasks/properties` | Decided | Oct 24, 2026 |
 | 7 | [Model and effort overrides depend on the agent's adapter](#7-model-and-effort-overrides-depend-on-the-agents-adapter) | `tasks/create`, `agents/runtime` | Decided | Oct 24, 2026 |
+| 8 | [Agent chats are tasks underneath](#8-agent-chats-are-tasks-underneath) | `agent-chat/*`, `inbox-search/search`, `tasks/views` | Decided | Oct 24, 2026 |
 
 ## Entries
 
@@ -318,3 +319,49 @@ default". The UI has to know when the choice applies and which key to write.
 
 **Decision.** Option 1. For people and other adapters the capsule shows the assignee only, with a
 short note in the menu.
+
+### 8. Agent chats are tasks underneath
+
+- **Status:** Decided
+- **Area:** `agent-chat/*`, `inbox-search/search`, `tasks/views`
+- **Found in:** the "tasks separated from agent chats" idea in
+  [paperclip-redesign-ideas.md](paperclip-redesign-ideas.md), checked against
+  `server/src/routes/issues.ts` and `server/src/services/agent-conversations.ts`.
+
+**What we found.** Each person's chat with an agent is a row in `issues`:
+
+- Opening a chat (`POST /api/companies/:companyId/chats/:agentRef`) creates a task titled
+  "Chat with <agent>" and assigned to that agent. Columns `conversationAgentId` and
+  `conversationUserId` mark it as a chat, `conversationState` says whether the agent is replying
+  (`active`) or waiting for you (`waiting`), and `/new` increments `conversationSessionGeneration`. A
+  unique index allows one chat per person and agent.
+- Each message is a comment on that task, and each one wakes the agent through the normal run queue.
+- The server keeps chats apart from real work. Task lists, work queues and the inbox leave them out.
+  They can't have subtasks, be marked done or cancelled, or be reassigned. The agent's chat
+  instructions (`AGENT_CHAT_DIRECTIVE`) tell it to plan in the chat and create ordinary project
+  tasks for the work.
+- Tasks an agent creates during a chat run are linked to the chat in `chatTaskHandoffs`. When one
+  reaches `done`, the agent is woken in the chat (`chat_task_completed`) to report the result.
+- The old UI shows a chat as the task page in "conversation mode", with the task header and
+  properties hidden.
+
+Two things leak through:
+
+- A chat takes a task number (`TRA-57`) like any other task.
+- Searches with a query (`q`) skip the filter, so chats can show up in search results.
+
+**Why it matters.** The redesign ideas ask for tasks to be separated from chats. Most of that separation
+already exists on the server; what's left is how the UI presents a chat.
+
+**Options.**
+
+1. **Build on hidden tasks.** `ui-new` draws a chat as a conversation (board 12), never as a task
+   page. Handed-off tasks show as linked cards in the chat, and search results show a chat as a chat.
+2. **Make chat its own kind of object**, stored and run outside tasks. A fork plugin could do this
+   with the plugin SDK's task-less agent sessions (`ctx.agents.sessions`), but would lose what the
+   built-in chat adds, such as handed-off tasks reporting back. Doing it in the server would be a
+   large change in some of upstream's most active code.
+
+**Decision.** Option 1, in stage 1 (M5). Option 2 stays an optional exploration
+([build plan 3.12](build-plan.md#312-chat-outside-tasks-optional)), taken up only if the chat
+feels slow or too task-like once it's in use.

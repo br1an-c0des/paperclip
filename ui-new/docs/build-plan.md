@@ -66,7 +66,7 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | --- | --- | --- |
 | Clicking an agent opens one endless chat | 1 | Board 12, on `GET\|POST /api/companies/:companyId/chats/:agentRef`. The server only serves chat with `enableAgentChat` on ([decision 2](decisions.md#2-agent-chat-is-off-unless-the-instance-turns-it-on)). |
 | The chat shows runs in progress, or is ready for input | 1 | Board 12's states (busy, replying, idle) and its activity timeline ([decision 3](decisions.md#3-agents-can-work-on-several-things-at-once)). |
-| Tasks separated from agent chats and runs | 1 | In the new UI, a task page shows its timeline and links out to runs and chat. Underneath, a chat is a task, and the UI hides it from task lists. Needs your read ([question 1](#questions-for-you)). |
+| Tasks separated from agent chats and runs | 1, optionally 3 | Underneath, each chat is a hidden task, and the server already keeps it out of task lists ([decision 8](decisions.md#8-agent-chats-are-tasks-underneath)). Stage 1 builds on that: the chat is drawn as a conversation, never a task page, and work it hands off shows as linked tasks. A chat that runs outside tasks entirely is an optional exploration ([3.12](#312-chat-outside-tasks-optional)). |
 | A task's progress as short notes in the right sidebar | 1 | Board 3, from `GET /api/issues/:issueId/activity`, comments and runs. |
 | "Go to" the run, then interrupt, add context or start over | 1 | The run modal (boards 16–18) with steer, queue and interrupt (`/queued-comments/*`, `POST /api/heartbeat-runs/:runId/cancel`). "New session" is the chat's `/new`, or `POST /api/agents/:id/runtime-state/reset-session`. |
 | Task runs open as separate windows, to talk to the agent about that run | 1 | Same run modal. A message sent from it is queued or steered into that task's run. |
@@ -245,7 +245,16 @@ Covers `projects/*`, `workspaces/*`, `goals/*`, `routines/*`, `documents-artifac
 
 #### M5: Agents and the organization
 
-- Agent chat (boards 12, 13), with decision A.
+- Agent chat (boards 12, 13), with decision A, built on the hidden chat tasks
+  ([decision 8](decisions.md#8-agent-chats-are-tasks-underneath)):
+  - the chat is its own view, never the task page;
+  - tasks handed off from the chat show as linked cards, and their results arrive as replies;
+  - the reply streams in from the run's live output (`heartbeat.run.log`), if that turns out fast
+    enough;
+  - search shows a chat as a chat, not as a task.
+
+  Note how responsive it feels in use: that decides whether [3.12](#312-chat-outside-tasks-optional)
+  is worth exploring.
 - Org dashboard (board 19), Manage agents (board 20) including upstream's new bulk edit of connections
   and models, and company workload (board 33).
 - Agent settings (boards 26, 27, and the board 30 outline): profile, instructions, skills, model and
@@ -443,13 +452,44 @@ dropped.
 - **Approach:** depends on [question 6](#questions-for-you). Likely a 2b proposal to expose it, since
   plugins can't read runs.
 
+### 3.12 Chat outside tasks (optional)
+
+An exploration you may or may not take up. The stage 1 chat, built on hidden tasks, may turn out to
+work fine, in which case this is dropped.
+
+- **Have:**
+  - Chats stored as hidden tasks ([decision 8](decisions.md#8-agent-chats-are-tasks-underneath)).
+    Each message wakes the agent through the run queue, the adapter starts, and the reply arrives as
+    a comment. `enableFastResponses` adds a quick acknowledgement first.
+  - Task-less agent sessions for plugins. `ctx.agents.sessions` in the plugin SDK creates a session
+    with an agent, sends it messages and streams back the run's output as it's written
+    (`server/src/services/plugin-host-services.ts`). The agent's own session carries over between
+    messages, and no task is created. `ctx.streams` forwards events to the UI over server-sent events
+    (`GET /api/plugins/:pluginId/bridge/stream/:channel`), and the SDK's own example of it is a chat.
+  - The board concierge (`POST /api/board/chat/stream`). It skips the run queue, starts the Claude
+    CLI straight away and streams the reply token by token, but it still saves the conversation on a
+    standing task.
+- **Missing:** a chat that behaves like an ordinary LLM conversation, with replies streamed as they're
+  written and its own message history rather than a task's comments.
+- **Approach:**
+  1. Find out where any delay comes from in the stage 1 chat (waiting in the queue, the adapter
+     starting up, or the model itself), because each has a different fix.
+  2. Then try the options in order, from least to most invasive:
+     - Stream from the run's live output in the chat view. This is UI only, and part of M5.
+     - A fork plugin chat on `ctx.agents.sessions`: the plugin stores the messages and streams
+       replies, and `ui-new` draws them. Plugin sessions still go through the run queue, so this
+       fixes how the chat feels, not how long the agent takes to start. They also lose what the
+       built-in chat adds: its instructions to the agent, handed-off tasks reporting back, and the
+       person's identity on each run (runs are requested by the plugin as `system`).
+     - A streaming reply path for agent chat that skips the queue, like the concierge's, proposed
+       upstream.
+- **Risk:** none for the UI option, and low for the plugin. A server change upstream would be high:
+  agent chat and the run queue are some of upstream's busiest code.
+
 ## Questions for you
 
-1. **"Tasks become separated from agent chats/runs."** Today a chat is a task underneath, with one
-   standing chat per person and agent. Is the separation you want in the interface (a task page shows a
-   timeline and links out to runs and chat, and chats never appear as tasks)? Or do you want them to
-   be different kinds of object in the data model? The first is stage 1; the second is a big upstream
-   change.
+1. ~~**"Tasks become separated from agent chats/runs."**~~ Answered Oct 24, 2026: stage 1 builds on
+   the hidden chat tasks, and a chat outside tasks is the optional [3.12](#312-chat-outside-tasks-optional).
 2. **Lists and sprints.** Could a project's lists be its goals? Each list would be a goal linked to the
    project, and each task would belong to at most one list. Do sprints need dates and capacity from the
    start, or are named lists enough for now?
@@ -477,4 +517,5 @@ dropped.
 - Upstream syncs can move items between stages. When upstream ships something the plan expected to
   build (as Artifacts V1 and bulk agent edits did on 2026-10-24), update the matching milestone or
   stage 3 entry.
-- When an answer to a question above changes an entry, edit the entry and remove the question.
+- When a question above is answered, edit the entries it affects, and mark the question answered with
+  a link to them. Keep the numbering, since other entries refer to questions by number.
