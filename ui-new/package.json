@@ -9,6 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "inventory": "node scripts/ui-inventory.mjs"
   },
   "dependencies": {
@@ -23,10 +25,14 @@
   },
   "devDependencies": {
     "@babel/parser": "^7.29.0",
+    "@solidjs/testing-library": "^0.8.10",
+    "@testing-library/jest-dom": "^6.9.1",
     "@types/node": "^24.0.0",
+    "jsdom": "^30.0.1",
     "typescript": "^7.0.2",
     "vite": "^8.2.2",
-    "vite-plugin-solid": "^2.11.14"
+    "vite-plugin-solid": "^2.11.14",
+    "vitest": "^5.0.3"
   },
   "engines": {
     "node": ">=24.11.0"

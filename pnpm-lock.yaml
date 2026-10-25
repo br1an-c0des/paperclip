@@ -1383,9 +1383,18 @@ importers:
       '@babel/parser':
         specifier: ^7.29.0
         version: 7.29.8
+      '@solidjs/testing-library':
+        specifier: ^0.8.10
+        version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.17))(solid-js@1.9.17)
+      '@testing-library/jest-dom':
+        specifier: ^6.9.1
+        version: 6.9.1
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
+      jsdom:
+        specifier: ^30.0.1
+        version: 30.0.1(@noble/hashes@2.4.0)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -1395,6 +1404,9 @@ importers:
       vite-plugin-solid:
         specifier: ^2.11.14
         version: 2.11.14(@testing-library/jest-dom@6.9.1)(solid-js@1.9.17)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
 packages:
 
@@ -5168,6 +5180,16 @@ packages:
     resolution: {integrity: sha512-cCSk1hvgCowiMa9bzzYWHiLu1U4E22+DfJe6/rOwAyECKrxc3jrd5QnoW3sDDJtW+e077cz/M67bPl3DqOBw1Q==}
     peerDependencies:
       solid-js: ^1.8.6
+
+  '@solidjs/testing-library@0.8.10':
+    resolution: {integrity: sha512-qdeuIerwyq7oQTIrrKvV0aL9aFeuwTd86VYD3afdq5HYEwoox1OBTJy4y8A3TFZr8oAR0nujYgCzY/8wgHGfeQ==}
+    engines: {node: '>= 14'}
+    peerDependencies:
+      '@solidjs/router': '>=0.9.0'
+      solid-js: '>=1.0.0'
+    peerDependenciesMeta:
+      '@solidjs/router':
+        optional: true
 
   '@spekoai/client@0.0.13':
     resolution: {integrity: sha512-Jodmw5jE9UPY0k2UrVJETFMahtSbwpImHsJ5eWrk7nWjPi0BgOOzlUVaNQsGR9153SIyeY/pNUu8RmDx4ryKaw==}
@@ -13483,6 +13505,13 @@ snapshots:
   '@solidjs/router@1.0.0(solid-js@1.9.17)':
     dependencies:
       solid-js: 1.9.17
+
+  '@solidjs/testing-library@0.8.10(@solidjs/router@1.0.0(solid-js@1.9.17))(solid-js@1.9.17)':
+    dependencies:
+      '@testing-library/dom': 10.4.2
+      solid-js: 1.9.17
+    optionalDependencies:
+      '@solidjs/router': 1.0.0(solid-js@1.9.17)
 
   '@spekoai/client@0.0.13':
     dependencies:

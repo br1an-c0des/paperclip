@@ -26,6 +26,7 @@ To point at a different server: `PAPERCLIP_API_URL=http://host:port pnpm dev`.
 | `pnpm build` | Production build to `dist/` |
 | `pnpm preview` | Serve the production build on :3102 |
 | `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm test` | Vitest, once (`pnpm test:watch` to keep it running) |
 
 ## Layout
 
@@ -40,7 +41,12 @@ src/
                    segmented control, menu, popover, tooltip, dialog, avatars, grain, layers
   routes/          one component per page, each with its own CSS file
   styles/          tokens.css (copied verbatim from docs/design/tokens.css), fonts, base styles
+  test/            test setup (jsdom stand-ins)
 ```
+
+Tests sit next to the code as `*.test.ts(x)`: view models and logic as plain unit tests, key
+components rendered in jsdom with `@solidjs/testing-library`. The config is the `test` block in
+`vite.config.ts`. They aren't part of the root `pnpm test`, whose project list is upstream's.
 
 Components respond to their own width with `@container` queries; the viewport breakpoints in
 `layout/breakpoints.ts` set `data-viewport` on `<html>` for the few things that change with the

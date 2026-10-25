@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import path from "path";
 import { defineConfig, type ProxyOptions } from "vite";
 import solid from "vite-plugin-solid";
@@ -28,7 +29,8 @@ const apiProxy: Record<string, ProxyOptions> = {
 };
 
 export default defineConfig({
-  plugins: [solid()],
+  // Hot reload has no place in tests, and its runtime module breaks Vitest's loader.
+  plugins: [solid({ hot: !process.env.VITEST })],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),
@@ -43,5 +45,13 @@ export default defineConfig({
   preview: {
     port: 3102,
     proxy: apiProxy,
+  },
+  // Tests for view models and key components (build plan, "How it's built"). They run in jsdom so
+  // components can render; vite-plugin-solid resolves Solid's browser build for them.
+  test: {
+    environment: "jsdom",
+    include: ["src/**/*.test.{ts,tsx}"],
+    setupFiles: ["./src/test/setup.ts"],
+    restoreMocks: true,
   },
 });
