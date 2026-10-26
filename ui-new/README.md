@@ -35,10 +35,15 @@ src/
   index.tsx        mounts the app: fonts, tokens, base styles, theme
   App.tsx          query client and routes
   api/             fetch wrapper (client.ts), one module per API area, query keys
-  lib/             query client, session gate, company selection, live-events socket, theme
-  layout/          breakpoints (the only place they're defined), the shell grid, the side panel
+  lib/             query client, session gate, company selection, live-events socket and toasts,
+                   shared company queries, the commands context, keyboard shortcuts, theme
+  layout/          breakpoints (the only place they're defined), the shell grid, the left nav,
+                   the side panel
+  shell/           the command palette and the shortcuts cheatsheet
+  tasks/           the new-task dialog and its payload rules (new-task.ts)
   ui/              shared components: buttons, status capsules and pills, fields, switch,
-                   segmented control, menu, popover, tooltip, dialog, avatars, grain, layers
+                   segmented control, menu, popover, tooltip, dialog, avatars, grain, layers,
+                   page header with tabs and section rail, toasts
   routes/          one component per page, each with its own CSS file
   styles/          tokens.css (copied verbatim from docs/design/tokens.css), fonts, base styles
   test/            test setup (jsdom stand-ins)

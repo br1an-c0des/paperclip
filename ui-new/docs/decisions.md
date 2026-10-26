@@ -39,6 +39,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 10 | [Some response types aren't exported from the shared package](#10-some-response-types-arent-exported-from-the-shared-package) | shell, session | Decided | Oct 25, 2026 |
 | 11 | [Menus inside dialogs need to sit above the overlay](#11-menus-inside-dialogs-need-to-sit-above-the-overlay) | design system | Decided | Oct 25, 2026 |
 | 12 | [What happens to each experimental flag](#12-what-happens-to-each-experimental-flag) | every flagged area | Decided | Oct 25, 2026 |
+| 13 | [The task composer overrides runs for more adapters than New task does](#13-the-task-composer-overrides-runs-for-more-adapters-than-new-task-does) | `tasks/create`, `agents/runtime` | Open | Oct 25, 2026 |
 
 ## Entries
 
@@ -531,3 +532,42 @@ doesn't branch on them: `enableAiConnectionRouters`, `enableIsolatedWorkspacesBy
 **Decision.** Option 1, as recommended above (Oct 25, 2026). The file viewer is built into the task
 panel in M2, and Conference Room chat is dropped. A flag that upstream adds later gets a row here,
 with the same three outcomes; the upstream sync report flags new ones.
+
+### 13. The task composer overrides runs for more adapters than New task does
+
+- **Status:** Open
+- **Area:** `tasks/create`, `agents/runtime`
+- **Found in:** building the assignee capsule in M1, against
+  `ui/src/components/task-chat/composer-run-settings.ts`.
+
+**What we found.** [Decision 7](#7-model-and-effort-overrides-depend-on-the-agents-adapter) follows
+the old new-task dialog, which still overrides only `claude_local`, `codex_local` and
+`opencode_local`, with a fixed Claude effort list (low, medium, high). Upstream's newer task composer
+(the run settings under a task's comment box) has moved on:
+
+- It overrides 11 adapters: the three above plus `pi_local`, `kimi_local`, `gemini_local`, `cursor`,
+  `cursor_cloud`, `grok_local`, `hermes_local` and `paperclip_runner`.
+- Effort keys differ further: `reasoningEffort` (Grok), `thinking` (Pi), `effort` (Kimi).
+- Effort lists depend on the model for Claude too (`claudeLocalReasoningEffortsForModel`: none for
+  Haiku; up to `xhigh` and `max` for the newest Opus, Sonnet and Fable models), and for Grok and Kimi.
+- The lists are runtime functions in the adapter packages (`@paperclipai/adapter-*`), not types, so
+  `ui-new` can't import them without breaking the `import type` rule, and copies drift silently.
+  `new-task.ts` already mirrors the Codex table by hand.
+
+**Why it matters.** M1's capsule offers fewer choices than the composer does for the same agent, and
+the Claude list is wrong for the newest models. M2 builds the composer, which needs the full set.
+
+**Options.**
+
+1. **Keep decision 7 for New task; mirror the composer in M2.** New task stays as the old dialog
+   behaves; the M2 composer copies the 11-adapter rules by hand, and the upstream sync checks the
+   adapter packages for changes.
+2. **One mirrored table for both, now.** Extend `new-task.ts` to the composer's adapters and model
+   lists, so New task and the composer agree from the start. Same drift risk, more to check.
+3. **Ask upstream for an endpoint** that returns each adapter's effort choices per model (beside
+   `GET /api/companies/:companyId/adapters/:type/models`), as a small upstream PR. No copies to
+   drift; New task and the composer read the same list.
+
+**Recommendation.** Option 3, with option 2 as the fallback until it lands: the model list already
+comes from the server, and the efforts belong with it.
+
