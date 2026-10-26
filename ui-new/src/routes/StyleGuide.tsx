@@ -9,6 +9,7 @@ import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Field, FieldButton, SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
 import { Grain } from "@/ui/Grain";
+import { HeaderNumber, PageHeader, SectionRail, Tabs } from "@/ui/PageHeader";
 import { Menu } from "@/ui/Menu";
 import { Popover } from "@/ui/Popover";
 import { Segmented } from "@/ui/Segmented";
@@ -16,6 +17,7 @@ import { Capsule, LabelPill, PriorityBars, RunningPill, StatusCapsule, StatusPil
 import { PRIORITY_META, STATUS_META, type Gradient } from "@/ui/status-meta";
 import { Switch } from "@/ui/Switch";
 import { ThemeScope } from "@/ui/ThemeScope";
+import { pushToast, type ToastTone } from "@/ui/Toast";
 import { Tooltip } from "@/ui/Tooltip";
 import "@/ui/nav.css";
 import "./StyleGuide.css";
@@ -75,6 +77,13 @@ function Swatches(props: { root: () => HTMLElement | undefined }) {
     </div>
   );
 }
+
+const TOAST_SAMPLES: { tone: ToastTone; title: string; body: string; action?: { label: string; href: string } }[] = [
+  { tone: "info", title: "Quant Researcher updated TRA-41", body: "status → in review" },
+  { tone: "success", title: "Created TRA-42", body: "H4 download derivatives price data", action: { label: "Open TRA-42", href: "/style-guide" } },
+  { tone: "warn", title: "Created TRA-42, but a file didn't upload", body: "prices.csv" },
+  { tone: "error", title: "Quant Researcher's run failed", body: "Out of credits", action: { label: "View run", href: "/style-guide" } },
+];
 
 function ThemeColumn(props: { theme: Theme }) {
   const [root, setRoot] = createSignal<HTMLElement>();
@@ -336,6 +345,57 @@ function ThemeColumn(props: { theme: Theme }) {
           <span class="cap">
             On a phone-sized window, menus and popovers become bottom sheets and the dialog and panel go full screen.
           </span>
+        </section>
+
+        <PageHeader
+          crumbs={<span>Projects</span>}
+          title="trading workbench"
+          titleHref="/style-guide"
+          titleHint="Project dashboard"
+          mark={<InitialsDisc name="trading workbench" seed="trading-workbench" size={40} />}
+          numbers={
+            <>
+              <HeaderNumber value={12} label="open" />
+              <HeaderNumber value={2} label="blocked" tone="red" />
+            </>
+          }
+          tabs={
+            <Tabs
+              label="Project views"
+              items={[
+                { label: "List", href: "/style-guide", end: true },
+                { label: "Board", href: "/style-guide/board" },
+                { label: "Docs", href: "/style-guide/docs" },
+              ]}
+            />
+          }
+        />
+
+        <section class="card sg-block">
+          <h3 class="lbl">Section rail, for settings</h3>
+          <SectionRail
+            label="Settings sections"
+            entries={[
+              { heading: "Organization" },
+              { label: "General", href: "/style-guide", end: true },
+              { label: "Members", href: "/style-guide/members" },
+              { label: "Budgets", href: "/style-guide/budgets", tag: "Soon" },
+            ]}
+          />
+        </section>
+
+        <section class="card sg-block">
+          <h3 class="lbl">Toasts</h3>
+          <div class="sg-row">
+            <For each={TOAST_SAMPLES}>
+              {(sample) => (
+                <Button size="compact" onClick={() => pushToast({ ...sample, dedupeKey: `sg-${sample.tone}-${Date.now()}` })}>
+                  {sample.tone}
+                </Button>
+              )}
+            </For>
+          </div>
+          <span class="cap">Bottom left, newest first, at most five; errors stay 10s and info 4s (doc/TOASTS.md).</span>
         </section>
 
         <section class="card sg-rows" aria-label="Example task rows">

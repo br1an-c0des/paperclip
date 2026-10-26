@@ -1,4 +1,5 @@
-/* Nav items: a 38px pill; the current page is raised with --sel and weight 800 (board 1). */
+/* Nav items: a 38px pill; the current page, or the item owning it (the router's `.active`), is
+   raised with --sel and weight 800 (board 1). */
 .navi {
   display: flex;
   align-items: center;
@@ -15,7 +16,8 @@
   background: var(--hover);
 }
 
-.navi[aria-current="page"] {
+.navi[aria-current="page"],
+.navi.active {
   background: var(--sel);
   box-shadow: var(--sel-shadow);
   color: var(--text);

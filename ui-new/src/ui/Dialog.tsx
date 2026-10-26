@@ -31,6 +31,8 @@ export type DialogProps = ParentProps<{
   footer?: JSX.Element;
   /** Hide the ✕ button, for dialogs whose footer has its own Cancel. */
   hideClose?: boolean;
+  /** What takes focus on open, such as a title field; by default the first focusable element. */
+  initialFocus?: () => HTMLElement | null | undefined;
 }>;
 
 export function Dialog(props: DialogProps) {
@@ -62,6 +64,12 @@ export function Dialog(props: DialogProps) {
             data-mode={layerMode()}
             class="dialog"
             onCloseAutoFocus={restoreFocus}
+            onOpenAutoFocus={(event: Event) => {
+              const target = props.initialFocus?.();
+              if (!target) return;
+              event.preventDefault();
+              target.focus();
+            }}
             style={{ "--dialog-width": `${props.width ?? 760}px` }}
           >
             <SheetOnly>
