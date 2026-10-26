@@ -24,7 +24,7 @@ can check what upstream changed against what the fork depends on.
 | `CLAUDE.md` | Instructions for Claude Code in this fork |
 | `ui-new/` | The SolidJS UI ([ui-new/README.md](ui-new/README.md)) |
 | `deploy/` | Production deployment ([deploy/README.md](deploy/README.md)) |
-| `fork/` | Fork records, such as upstream sync reports |
+| `fork/` | Fork records, such as upstream sync reports and the upstream fixes list |
 | `.claude/skills/upstream-sync/` | The upstream sync skill |
 | `packages/plugins/fork-*/` | Plugins the fork adds (see below). Already in the pnpm workspace through `packages/plugins/*`. |
 
@@ -117,7 +117,9 @@ gh pr create --repo paperclipai/paperclip --base master --head br1an-c0des:fix/<
   template rules in [AGENTS.md](AGENTS.md). Feature changes need agreement in upstream's Discord
   `#dev` channel before any code is written.
 - **Name branches after the change** (`fix/…`, `docs/…`), with no internal task IDs.
-- **Track candidates in the proposal that found them**, for example
+- **Track each fix in [fork/upstream-fixes.md](fork/upstream-fixes.md)** from the moment it's
+  found until it's merged: add it as a candidate, then record its branch, pull request and dates.
+  Ideas that still need agreement upstream stay in the proposal that found them, for example
   [ui-new/docs/proposals/unifying-requests.md](ui-new/docs/proposals/unifying-requests.md#small-upstream-contributions).
 
 ## Staying in sync with upstream

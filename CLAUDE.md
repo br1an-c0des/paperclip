@@ -28,7 +28,8 @@ or package code.
   first, then follow [FORK.md](FORK.md#changing-server-database-and-packages).
 - **Fixes for upstream** go in their own `fix/*` or `docs/*` branch off `master`, as a pull request to
   `paperclipai/paperclip` that follows upstream's `CONTRIBUTING.md` and PR template. They are never
-  merged into `new-ui`. See [FORK.md](FORK.md#contributing-fixes-upstream).
+  merged into `new-ui`. Record each one in [fork/upstream-fixes.md](fork/upstream-fixes.md), from
+  candidate to merged. See [FORK.md](FORK.md#contributing-fixes-upstream).
 - **Record every upstream edit.** Mark it with a `FORK: <entry id>` comment and add or update its
   entry in [FORK-PATCHES.md](FORK-PATCHES.md) in the same commit. Never edit `ui/`: the old UI is the
   reference, and `ui-new` replaces it.
@@ -49,6 +50,7 @@ or package code.
 | --- | --- |
 | [FORK.md](FORK.md) | Remotes, branches, the UI-only policy and its fallback rules, sending fixes upstream, the upstream sync routine, why `ui-new` is a standalone app rather than a plugin, deployment summary, open items. |
 | [FORK-PATCHES.md](FORK-PATCHES.md) | Every change the fork makes to upstream files: what, why, what it depends on, how to resolve conflicts. |
+| [fork/upstream-fixes.md](fork/upstream-fixes.md) | Small fixes for upstream: candidates to build, and each one's branch, pull request and status until it's merged. |
 | [.claude/skills/upstream-sync/SKILL.md](.claude/skills/upstream-sync/SKILL.md) | The upstream sync procedure and conflict-resolution policy. Reports go to `fork/sync-reports/`. |
 | [ui-new/README.md](ui-new/README.md) | Running and building the SolidJS app; layout; lockfile-conflict fix. |
 | [deploy/README.md](deploy/README.md) | Production deployment: Docker image on top of upstream's, Compose with bind mounts, Tailscale or Caddy. |
