@@ -10,8 +10,10 @@ import { Companies, CompanyRootRedirect } from "./routes/Companies";
 import { CompanyHome } from "./routes/CompanyHome";
 import { CompanyLayout } from "./routes/CompanyLayout";
 import { NotBuiltYet, NotFound } from "./routes/NotFound";
-import { AgentPage, InboxPage, ProjectPage, SettingsPage, TaskPage, TasksPage } from "./routes/Planned";
+import { AgentPage, InboxPage, SettingsPage } from "./routes/Planned";
+import { ProjectPage } from "./routes/Project";
 import { SignIn } from "./routes/SignIn";
+import { TaskPage, TasksPage } from "./routes/Tasks";
 
 const StyleGuide = lazy(() => import("./routes/StyleGuide").then((m) => ({ default: m.StyleGuide })));
 

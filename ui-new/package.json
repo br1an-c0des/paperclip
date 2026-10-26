@@ -20,7 +20,9 @@
     "@paperclipai/shared": "workspace:*",
     "@solidjs/router": "^1.0.0",
     "@tanstack/solid-query": "^5.104.5",
+    "dompurify": "^3.4.17",
     "lucide-solid": "^1.61.0",
+    "marked": "^16.4.2",
     "solid-js": "^1.9.17"
   },
   "devDependencies": {

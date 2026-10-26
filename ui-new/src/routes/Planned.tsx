@@ -13,7 +13,7 @@ import "./Planned.css";
  * app works from M1 on and old-UI links keep resolving.
  */
 
-function PlannedNote(props: { milestone: string; children: JSX.Element }) {
+export function PlannedNote(props: { milestone: string; children: JSX.Element }) {
   return (
     <section class="card planned">
       <p class="cap">Arrives in {props.milestone}</p>
@@ -27,61 +27,6 @@ export function InboxPage() {
     <>
       <PageHeader title="Inbox" crumbs={<span>Everything waiting on you</span>} />
       <PlannedNote milestone="M3">Questions, proposals, approvals and suggested tasks, as one stack of request cards.</PlannedNote>
-    </>
-  );
-}
-
-export function TasksPage() {
-  const company = useCompany();
-  return (
-    <>
-      <PageHeader title="All tasks" crumbs={<span>{company().name}</span>} />
-      <PlannedNote milestone="M2">The task list and board for the whole company.</PlannedNote>
-    </>
-  );
-}
-
-export function TaskPage() {
-  const params = useParams<{ issueRef: string }>();
-  return (
-    <>
-      <PageHeader title={<span class="mono">{params.issueRef}</span>} crumbs={<span>Task</span>} />
-      <PlannedNote milestone="M2">The task page, with its details, thread, runs, documents and files.</PlannedNote>
-    </>
-  );
-}
-
-const PROJECT_TABS = [
-  { label: "List", path: "" },
-  { label: "Board", path: "/board" },
-  { label: "Agent workload", path: "/workload" },
-  { label: "Docs", path: "/docs" },
-  { label: "Settings", path: "/settings" },
-];
-
-export function ProjectPage() {
-  const params = useParams<{ projectKey: string }>();
-  const company = useCompany();
-  const projects = useProjectsQuery();
-  const project = createMemo(() =>
-    projects.data?.find((candidate) => candidate.urlKey === params.projectKey || candidate.id === params.projectKey),
-  );
-  const base = () => `/${company().issuePrefix}/projects/${params.projectKey}`;
-  return (
-    <>
-      <PageHeader
-        crumbs={<span>Projects</span>}
-        title={project()?.name ?? params.projectKey}
-        titleHref={base()}
-        titleHint="Project dashboard"
-        numbers={
-          <Show when={project()?.taskCount !== undefined}>
-            <HeaderNumber value={project()!.taskCount} label="tasks" />
-          </Show>
-        }
-        tabs={<Tabs label="Project" items={PROJECT_TABS.map((tab) => ({ label: tab.label, href: `${base()}${tab.path}`, end: tab.path === "" }))} />}
-      />
-      <PlannedNote milestone="M2 and M4">The task list and board come in M2; the dashboard, workload, docs and settings in M4.</PlannedNote>
     </>
   );
 }

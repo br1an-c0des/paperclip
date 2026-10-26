@@ -29,6 +29,8 @@ type SessionValue = {
   /** The signed-in user, or null on a local_trusted instance. */
   session: () => AuthSession | null;
   userId: () => string | null;
+  /** The id tasks use for you: your user id, or `local-board` on a local_trusted instance. */
+  youId: () => string | null;
   isAuthenticatedMode: () => boolean;
 };
 
@@ -111,6 +113,7 @@ export function SessionGate(props: ParentProps) {
     health: () => health.data,
     session: () => session.data ?? null,
     userId: () => session.data?.user.id ?? null,
+    youId: () => session.data?.user.id ?? (isAuthenticatedMode() ? null : "local-board"),
     isAuthenticatedMode,
   };
 

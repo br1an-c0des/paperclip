@@ -174,6 +174,7 @@ function NewTaskForm() {
     if (!start.extras.includes("parent")) start.extras = [...start.extras, "parent"];
   }
   if (defaults.assigneeAgentId) start.assignee = { kind: "agent", id: defaults.assigneeAgentId };
+  if (defaults.status) start.status = defaults.status;
   const [draft, setDraft] = createStore<NewTaskDraft>(start);
   const [files, setFiles] = createSignal<File[]>([]);
   const [error, setError] = createSignal<string | null>(null);
@@ -186,7 +187,7 @@ function NewTaskForm() {
   const project = createMemo(() => projects.data?.find((candidate) => candidate.id === draft.projectId) ?? null);
   const agentList = createMemo(() => activeAgents(agents.data));
   const running = createMemo(() => runningAgentIds(liveRuns.data));
-  const youId = () => session.userId() ?? (session.isAuthenticatedMode() ? null : "local-board");
+  const youId = () => session.youId();
   const personList = createMemo<Person[]>(() =>
     (people.data?.users ?? []).map((entry) => ({
       id: entry.principalId,

@@ -327,7 +327,7 @@ export function useLiveToasts() {
   createEffect(on(connection, (state) => state === "open" && quietAfterReconnect(gate)));
 
   const visibleIssueRef = () => /^\/[^/]+\/issues\/([^/?#]+)/.exec(location.pathname)?.[1] ?? null;
-  const userId = () => session.userId() ?? (session.isAuthenticatedMode() ? null : "local-board");
+  const userId = () => session.youId();
 
   useLiveEvent(["activity.logged", "heartbeat.run.status"], (event) => {
     const lookup = cacheLookup(client, company().id, company().issuePrefix, userId(), visibleIssueRef);

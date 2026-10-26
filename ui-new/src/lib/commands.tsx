@@ -1,3 +1,4 @@
+import type { IssueStatus } from "@paperclipai/shared";
 import { createContext, createSignal, useContext, type ParentProps } from "solid-js";
 
 /*
@@ -11,6 +12,8 @@ export type NewTaskDefaults = {
   projectId?: string | null;
   parentId?: string | null;
   assigneeAgentId?: string | null;
+  /** The status of the group it was added from, on the task list. */
+  status?: IssueStatus;
 };
 
 type CommandsValue = {

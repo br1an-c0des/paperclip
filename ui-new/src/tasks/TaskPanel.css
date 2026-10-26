@@ -1,0 +1,28 @@
+.tp-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tp-head .btn--icon {
+  color: var(--muted);
+}
+
+.tp-head .btn--icon:disabled {
+  opacity: 0.4;
+}
+
+.tp-project {
+  display: inline-flex;
+  margin-left: 6px;
+}
+
+.tp-sep {
+  color: var(--dashed);
+}
+
+.tp-id {
+  font-size: 13px;
+  color: var(--body);
+}

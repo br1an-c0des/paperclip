@@ -49,6 +49,10 @@ export function Panel(
     header?: JSX.Element;
     /** Extra header actions, before the close button. */
     actions?: JSX.Element;
+    /** A dense toolbar header (boards 2, 3 and 5) instead of a titled one. */
+    toolbar?: boolean;
+    /** The body has no padding of its own, for content that lays out its own columns. */
+    flush?: boolean;
   }>,
 ) {
   const dock = useContext(DockContext);
@@ -84,14 +88,22 @@ export function Panel(
             tabindex="-1"
             onKeyDown={onKeyDown}
           >
-            <header class="panel-head">
+            <header class="panel-head" classList={{ "panel-head--toolbar": props.toolbar }}>
               <div class="panel-head-main">{props.header}</div>
               {props.actions}
-              <button type="button" class="btn btn--icon btn--ghost" aria-label="Close" onClick={() => props.onClose()}>
+              <button
+                type="button"
+                class="btn btn--icon btn--ghost"
+                classList={{ "btn--compact": props.toolbar }}
+                aria-label="Close"
+                onClick={() => props.onClose()}
+              >
                 <X size={16} aria-hidden="true" />
               </button>
             </header>
-            <div class="panel-body">{props.children}</div>
+            <div class="panel-body" classList={{ "panel-body--flush": props.flush }}>
+              {props.children}
+            </div>
           </aside>
         </Portal>
       )}

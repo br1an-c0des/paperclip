@@ -1,0 +1,273 @@
+/*
+ * Board 1's group cards, with board 2's docked behaviour: `.tl-scroll` scrolls sideways, and each
+ * card's frame (`.tl-frame`) and header bars (`.tl-bar`) stay put while the rows move under them.
+ * The Name column (`.tl-pin-col`) sticks to the left edge while pinned.
+ */
+
+.tl {
+  --tl-cols: minmax(0, 1fr) 190px 130px 200px 90px;
+  min-width: 0;
+}
+
+.tl-scroll {
+  overflow-x: auto;
+  container-type: inline-size;
+  scrollbar-width: thin;
+  scrollbar-color: var(--edge) transparent;
+}
+
+.tl-sheet {
+  min-width: 1040px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tl-card {
+  display: grid;
+  isolation: isolate;
+}
+
+.tl-card > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+.tl-frame {
+  position: sticky;
+  left: 0;
+  z-index: -1;
+  width: 100cqw;
+  box-sizing: border-box;
+}
+
+.tl-body {
+  padding: 1px;
+}
+
+.tl-bar {
+  position: sticky;
+  left: 1px;
+  z-index: 2;
+  width: calc(100cqw - 2px);
+  box-sizing: border-box;
+}
+
+.tl-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 54px;
+  padding: 0 14px 0 20px;
+}
+
+.tl-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.tl-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.tl-head-add {
+  margin-left: auto;
+}
+
+.tl-head .btn--icon {
+  color: var(--muted);
+}
+
+.tl-chevron {
+  transition: transform 0.15s ease;
+}
+
+.tl-chevron--closed {
+  transform: rotate(-90deg);
+}
+
+.tl-cols,
+.tl-row {
+  display: grid;
+  grid-template-columns: var(--tl-cols);
+  align-items: center;
+  padding-right: 18px;
+}
+
+.tl-cols {
+  height: 30px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  border-top: 1px solid var(--line);
+}
+
+.tl-cols-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 46px;
+}
+
+.tl-pin {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.tl-pin[aria-pressed="true"] {
+  color: var(--text);
+}
+
+.tl-pin:hover {
+  background: var(--row-hover);
+}
+
+.tl-row {
+  min-height: 40px;
+  border-top: 1px solid var(--row-line);
+  cursor: pointer;
+}
+
+.tl-row:hover {
+  background: var(--row-hover);
+}
+
+.tl-row--selected {
+  background: var(--run-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--run-fg) 45%, transparent);
+}
+
+.tl-row--selected:hover {
+  background: var(--run-bg);
+}
+
+.tl-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 12px 0 18px;
+}
+
+.tl-name > .capsule {
+  margin: 0 8px 0 5px;
+}
+
+.tl-id {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tl-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+}
+
+.tl-title:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--edge);
+}
+
+.tl-subtasks {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tl-name .tone-pill {
+  flex-shrink: 0;
+}
+
+.tl-labels {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.tl-updated {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tl-add {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding-left: 46px;
+  color: var(--muted);
+  font-weight: 600;
+  text-align: left;
+  border-top: 1px solid var(--row-line);
+}
+
+.tl-add:hover {
+  color: var(--text);
+}
+
+/* The pinned Name column carries the row's background so rows slide under it */
+.tl--pinned .tl-pin-col {
+  position: sticky;
+  left: 1px;
+  z-index: 1;
+  align-self: stretch;
+  background: var(--card);
+}
+
+.tl--pinned .tl-row:hover > .tl-pin-col {
+  background: var(--row-hover);
+}
+
+.tl--pinned .tl-row--selected > .tl-pin-col {
+  --ring: color-mix(in srgb, var(--run-fg) 45%, transparent);
+  background: var(--run-bg);
+  box-shadow: inset 1px 0 0 var(--ring), inset 0 1px 0 var(--ring), inset 0 -1px 0 var(--ring);
+}
+
+@supports (animation-timeline: scroll()) {
+  .tl--pinned .tl-pin-col::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 100%;
+    width: 14px;
+    pointer-events: none;
+    border-left: 1px solid var(--line);
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.16), transparent);
+    opacity: 0;
+    animation: tl-pin-shade linear both;
+    animation-timeline: scroll(nearest inline);
+  }
+}
+
+@keyframes tl-pin-shade {
+  0% {
+    opacity: 0;
+  }
+  3%,
+  100% {
+    opacity: 1;
+  }
+}

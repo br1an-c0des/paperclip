@@ -1,0 +1,15 @@
+.tv-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tv-note {
+  padding: 22px 24px;
+}
+
+.tv-note p {
+  margin: 0;
+}

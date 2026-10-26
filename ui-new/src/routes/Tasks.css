@@ -1,0 +1,17 @@
+.task-page {
+  display: flex;
+  min-height: 480px;
+  overflow: hidden;
+}
+
+.task-page .td-main {
+  overflow: visible;
+}
+
+.task-page-note {
+  padding: 22px 24px;
+}
+
+.task-page-note p {
+  margin: 0;
+}

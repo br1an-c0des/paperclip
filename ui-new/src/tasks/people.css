@@ -1,0 +1,27 @@
+.assignee {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.assignee-none {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border: 1.5px dashed var(--dashed);
+  border-radius: 50%;
+}
+
+.assignee-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.assignee-name--none {
+  color: var(--muted);
+}

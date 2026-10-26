@@ -35,6 +35,9 @@ export const queryKeys = {
   issues: {
     /** Prefix for every task list in a company. */
     list: (companyId: string) => ["issues", companyId] as const,
+    /** One task list: the whole company, a project, or a task's subtasks. */
+    view: (companyId: string, scope: { projectId?: string; parentId?: string }) =>
+      ["issues", companyId, "view", scope.projectId ?? "__all__", scope.parentId ?? "__all__"] as const,
     detail: (issueId: string) => ["issues", "detail", issueId] as const,
     search: (companyId: string, q: string, limit: number) => ["issues", companyId, "search", q, limit] as const,
     labels: (companyId: string) => ["issues", companyId, "labels"] as const,
