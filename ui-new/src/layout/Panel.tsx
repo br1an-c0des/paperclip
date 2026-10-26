@@ -1,20 +1,44 @@
 import { X } from "lucide-solid";
-import { onCleanup, onMount, Show, type JSX, type ParentProps } from "solid-js";
+import { createContext, createSignal, onCleanup, onMount, Show, useContext, type JSX, type ParentProps } from "solid-js";
 import { Portal } from "solid-js/web";
 import { useLayerMount } from "@/ui/layer";
-import { useShell } from "./Shell";
+import { isCompact } from "./breakpoints";
 import "./Panel.css";
 
 /*
- * Every side panel goes through this wrapper (build plan, decision H). It renders into the shell's
- * panel area, beside the list it was opened from (boards 2, 3 and 5), and becomes a full-screen
- * sheet on a phone-sized viewport (Shell.css). It isn't modal: the list behind it stays usable.
+ * Every side panel goes through this wrapper (build plan, decision H). Inside a <Dock> it renders
+ * into the dock's own column, beside the list it was opened from (boards 2, 3 and 5), and becomes
+ * a full-screen sheet on a phone-sized viewport. It isn't modal: the list beside it stays usable.
  * Escape closes it, and focus moves into it when it opens and back to where it was when it closes.
  *
- *   <Show when={openTaskId()}>
- *     <Panel label="Task TRA-41" onClose={() => setOpenTaskId(null)} header={…}>…</Panel>
- *   </Show>
+ *   <Dock>
+ *     <TaskList />
+ *     <Show when={openTaskId()}>
+ *       <Panel label="Task TRA-41" onClose={() => setOpenTaskId(null)} header={…}>…</Panel>
+ *     </Show>
+ *   </Dock>
  */
+
+const DockContext = createContext<() => HTMLElement | undefined>();
+
+/**
+ * A list with room for a docked panel. While a <Panel> inside it is open, the panel takes a 620px
+ * column and the list keeps the rest; when the dock is too narrow for both, the panel lies over the
+ * list's right edge instead.
+ */
+export function Dock(props: ParentProps<{ class?: string }>) {
+  const [host, setHost] = createSignal<HTMLElement>();
+  return (
+    <DockContext.Provider value={host}>
+      <div class="dock">
+        <div class="dock-grid">
+          <div class={props.class ? `dock-main ${props.class}` : "dock-main"}>{props.children}</div>
+          <div ref={setHost} class="dock-panel" />
+        </div>
+      </div>
+    </DockContext.Provider>
+  );
+}
 
 export function Panel(
   props: ParentProps<{
@@ -27,7 +51,7 @@ export function Panel(
     actions?: JSX.Element;
   }>,
 ) {
-  const shell = useShell();
+  const dock = useContext(DockContext);
   const mount = useLayerMount();
   let aside: HTMLElement | undefined;
   const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -43,9 +67,10 @@ export function Panel(
     if (opener?.isConnected) opener.focus({ preventScroll: true });
   });
 
-  // Inside the shell the panel goes to its panel area; elsewhere (the style guide) it floats at the
-  // window's right edge.
-  const host = () => shell?.panelHost() ?? mount() ?? document.body;
+  // Inside a dock the panel goes to the dock's column. Elsewhere, and on a phone, it floats over
+  // the page: the dock is a size container, so a fixed sheet inside it would cover only the dock.
+  const docked = () => Boolean(dock) && !isCompact();
+  const host = () => (docked() ? dock?.() : mount() ?? document.body);
 
   return (
     <Show when={host()}>
@@ -54,7 +79,7 @@ export function Panel(
           <aside
             ref={aside}
             class="panel"
-            classList={{ "panel--floating": !shell }}
+            classList={{ "panel--floating": !docked() }}
             aria-label={props.label}
             tabindex="-1"
             onKeyDown={onKeyDown}

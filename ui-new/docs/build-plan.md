@@ -171,9 +171,9 @@ Development doesn't wait for mobile wireframes, but it shouldn't build anything 
 to tear up. Most of the cost of adding mobile later comes from a few structural choices, and those
 can be made now without knowing what the mobile screens look like:
 
-- **The shell is a grid with named areas** (nav, main, side panel). On a phone, the nav becomes a
-  drawer and the side panel a full-screen sheet. That's a change to the grid at a breakpoint, not to
-  the components inside it.
+- **The shell is a grid with named areas** (nav, main). Side panels dock in their own column beside
+  the list they came from (boards 2, 3, 5). On a phone, the nav becomes a drawer and the side panel a
+  full-screen sheet. That's a change to the grid at a breakpoint, not to the components inside it.
 - **No fixed page widths.** The boards' 1440px is where the layout looks its best, not what it needs.
   Use `minmax(0, 1fr)`, `clamp()` and `min()`, as the design system already says.
 - **Components respond to their container** (`@container`), not the viewport. A task row then works

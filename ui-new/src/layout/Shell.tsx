@@ -5,12 +5,12 @@ import { isCompact } from "./breakpoints";
 import "./Shell.css";
 
 /*
- * The app shell: a grid with named areas, nav and main, with the side panel laid over main's
- * right edge (boards 2, 3 and 5). Nothing in it has a fixed page width; the 248px nav column is
- * the only fixed track, and main is `minmax(0, 1fr)`.
+ * The app shell: a grid with named areas, nav and main. Nothing in it has a fixed page width; the
+ * 248px nav column is the only fixed track, and main is `minmax(0, 1fr)`. Side panels dock beside
+ * the list they were opened from, inside main (<Dock> in Panel.tsx).
  *
  * On a phone-sized viewport the grid drops to one column: the nav becomes a drawer opened from a
- * top bar, and the panel becomes a full-screen sheet. That switch lives in Shell.css under
+ * top bar, and panels become full-screen sheets. That switch lives in Shell.css under
  * `:root[data-viewport="phone"]`; components inside the shell don't change.
  *
  * `main` is a size container named `main`, so content responds to the space it's given with
@@ -18,7 +18,6 @@ import "./Shell.css";
  */
 
 type ShellContextValue = {
-  panelHost: () => HTMLElement | undefined;
   closeNav: () => void;
 };
 
@@ -36,7 +35,6 @@ export function Shell(
     title?: JSX.Element;
   }>,
 ) {
-  const [panelHost, setPanelHost] = createSignal<HTMLElement>();
   const [navOpen, setNavOpen] = createSignal(false);
   const location = useLocation();
 
@@ -52,7 +50,7 @@ export function Shell(
   };
 
   return (
-    <ShellContext.Provider value={{ panelHost, closeNav: () => setNavOpen(false) }}>
+    <ShellContext.Provider value={{ closeNav: () => setNavOpen(false) }}>
       <div class="shell" data-nav-open={navOpen() ? "" : undefined} onKeyDown={onKeyDown}>
         <header class="shell-bar">
           <button
@@ -76,7 +74,6 @@ export function Shell(
           {props.nav}
         </nav>
         <main class="shell-main">{props.children}</main>
-        <div ref={setPanelHost} class="shell-panel" />
       </div>
     </ShellContext.Provider>
   );

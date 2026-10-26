@@ -2,7 +2,7 @@ import type { IssuePriority, IssueStatus } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { Lightbulb, Plus, Search } from "lucide-solid";
 import { createSignal, For, onMount, Show } from "solid-js";
-import { Panel } from "@/layout/Panel";
+import { Dock, Panel } from "@/layout/Panel";
 import { theme, toggleTheme, type Theme } from "@/lib/theme";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
@@ -398,27 +398,50 @@ function ThemeColumn(props: { theme: Theme }) {
           <span class="cap">Bottom left, newest first, at most five; errors stay 10s and info 4s (doc/TOASTS.md).</span>
         </section>
 
-        <section class="card sg-rows" aria-label="Example task rows">
-          <div class="sg-group-head">
-            <StatusCapsule status="in_progress" size="group" />
-            <h3>{STATUS_META.in_progress.label}</h3>
-            <span class="muted">2</span>
-          </div>
-          <div class="sg-task">
-            <StatusCapsule status="in_progress" size="row" />
-            <span class="mono cap">TRA-41</span>
-            <span class="sg-task-title">H4 download derivatives price data</span>
-            <RunningPill compact />
-            <InitialsDisc name="Quant Researcher" seed="quant-researcher" label="Quant Researcher" />
-          </div>
-          <div class="sg-task">
-            <StatusCapsule status="in_progress" size="row" />
-            <span class="mono cap">TRA-35</span>
-            <span class="sg-task-title">Known bugs and limitations</span>
-            <PriorityBars priority="low" />
-            <InitialsDisc name="Brian A." you label="You" />
-          </div>
-        </section>
+        <Dock>
+          <section class="card sg-rows" aria-label="Example task rows">
+            <div class="sg-group-head">
+              <StatusCapsule status="in_progress" size="group" />
+              <h3>{STATUS_META.in_progress.label}</h3>
+              <span class="muted">2</span>
+            </div>
+            <div class="sg-task">
+              <StatusCapsule status="in_progress" size="row" />
+              <span class="mono cap">TRA-41</span>
+              <span class="sg-task-title">H4 download derivatives price data</span>
+              <RunningPill compact />
+              <InitialsDisc name="Quant Researcher" seed="quant-researcher" label="Quant Researcher" />
+            </div>
+            <div class="sg-task">
+              <StatusCapsule status="in_progress" size="row" />
+              <span class="mono cap">TRA-35</span>
+              <span class="sg-task-title">Known bugs and limitations</span>
+              <PriorityBars priority="low" />
+              <InitialsDisc name="Brian A." you label="You" />
+            </div>
+          </section>
+          <Show when={panelOpen()}>
+            <Panel
+              label="Example panel"
+              onClose={() => setPanelOpen(false)}
+              header={
+                <span class="sg-row sg-row--tight">
+                  <span class="mono cap">TRA-41</span>
+                  <b>H4 download derivatives price data</b>
+                </span>
+              }
+            >
+              <p class="sg-body">
+                Panels dock beside the list they came from and keep the list usable. Escape or ✕ closes them.
+              </p>
+              <div class="sg-row">
+                <StatusPill status="in_progress" />
+                <PriorityBars priority="high" withLabel />
+                <LabelPill name="data" color="#2fd12f" />
+              </div>
+            </Panel>
+          </Show>
+        </Dock>
 
         <Dialog
           open={dialogOpen()}
@@ -442,27 +465,6 @@ function ThemeColumn(props: { theme: Theme }) {
           </Field>
         </Dialog>
 
-        <Show when={panelOpen()}>
-          <Panel
-            label="Example panel"
-            onClose={() => setPanelOpen(false)}
-            header={
-              <span class="sg-row sg-row--tight">
-                <span class="mono cap">TRA-41</span>
-                <b>H4 download derivatives price data</b>
-              </span>
-            }
-          >
-            <p class="sg-body">
-              Panels open beside the list they came from and keep the list usable. Escape or ✕ closes them.
-            </p>
-            <div class="sg-row">
-              <StatusPill status="in_progress" />
-              <PriorityBars priority="high" withLabel />
-              <LabelPill name="data" color="#2fd12f" />
-            </div>
-          </Panel>
-        </Show>
       </div>
     </ThemeScope>
   );

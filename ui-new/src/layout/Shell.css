@@ -43,33 +43,11 @@
   padding: var(--main-pad-top) var(--main-pad-end) 48px 4px;
 }
 
-/* The side panel floats over main's right edge. It's empty (and takes no space) until a <Panel>
-   renders into it. */
-.shell-panel {
-  grid-area: main;
-  justify-self: end;
-  align-self: start;
-  position: sticky;
-  top: var(--main-pad-top);
-  z-index: 4;
-  width: min(620px, 100%);
-  margin: var(--main-pad-top) var(--main-pad-end) 0 0;
-  pointer-events: none;
-}
-
-.shell-panel > * {
-  pointer-events: auto;
-}
-
-.shell-panel:empty {
-  display: none;
-}
-
 .shell-nav-scrim {
   display: none;
 }
 
-/* Phone: one column. The nav is a drawer and the panel a full-screen sheet. */
+/* Phone: one column. The nav is a drawer (panels become sheets in Panel.css). */
 :root[data-viewport="phone"] .shell {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
@@ -128,19 +106,4 @@
   inset: 0;
   z-index: calc(var(--z-overlay) - 1);
   background: var(--scrim);
-}
-
-:root[data-viewport="phone"] .shell-panel {
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--z-overlay) - 2);
-  width: auto;
-  margin: 0;
-}
-
-/* Solid's <Portal> wraps the panel in a div; both fill the sheet */
-:root[data-viewport="phone"] .shell-panel > *,
-:root[data-viewport="phone"] .shell-panel .panel {
-  height: 100%;
-  border-radius: 0;
 }
