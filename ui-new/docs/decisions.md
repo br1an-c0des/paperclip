@@ -41,6 +41,10 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 12 | [What happens to each experimental flag](#12-what-happens-to-each-experimental-flag) | every flagged area | Decided | Oct 25, 2026 |
 | 13 | [The task composer overrides runs for more adapters than New task does](#13-the-task-composer-overrides-runs-for-more-adapters-than-new-task-does) | `tasks/create`, `agents/runtime` | Decided | Oct 25, 2026 |
 | 14 | [Lists need their own storage, so they're on hold](#14-lists-need-their-own-storage-so-theyre-on-hold) | `goals/*`, `tasks/organize`, `projects/task-context` | Decided | Oct 26, 2026 |
+| 15 | [Run transcripts use the adapter packages' parsers at runtime](#15-run-transcripts-use-the-adapter-packages-parsers-at-runtime) | `runs-adapters/runs`, `tasks/run-control` | Decided | Oct 26, 2026 |
+| 16 | [Cases don't store the structure the case boards draw](#16-cases-dont-store-the-structure-the-case-boards-draw) | `cases/*`, `tasks/views` | Open | Oct 26, 2026 |
+| 17 | [Search results are shaped differently from board S1](#17-search-results-are-shaped-differently-from-board-s1) | `inbox-search/search` | Open | Oct 26, 2026 |
+| 18 | [The phone layouts assume push notifications](#18-the-phone-layouts-assume-push-notifications) | phone navigation, `inbox-search/triage` | Open | Oct 26, 2026 |
 
 ## Entries
 
@@ -584,7 +588,7 @@ packages for changes to it.
 
 - **Status:** Decided
 - **Area:** `goals/*`, `tasks/organize`, `projects/task-context`
-- **Found in:** the lists boards (L1 to L4 on the [canvas](design/README.md)), checked against
+- **Found in:** the lists boards ([L1 to L4](design/boards.md#lists-on-hold)), checked against
   `server/src/services/issue-goal-fallback.ts`, `server/src/services/heartbeat/run-preparation.ts`,
   `server/src/routes/issues.ts` and upstream's history for goals.
 
@@ -634,8 +638,106 @@ agents and onboarding see. They would also rest on a surface upstream is keeping
 4. **Put lists on hold** until one of those is worth the database work.
 
 **Decision.** Option 4, decided Oct 26, 2026. It replaces build plan decision C. Lists need their own
-table, so they wait; boards L1 to L4 stay on the canvas as the design for when they come back
+table, so they wait; boards L1 to L4 stay in the board set, marked on hold, as the design for when they come back
 ([3.3](build-plan.md#33-lists-and-sprints-on-hold)). Goals keep their old role in the meantime: a task
 property, and the project's goals in project settings, with no Goals page. Separately, returning the
 goal and project descriptions in `heartbeat-context` is a small upstream change
 ([2b-15](build-plan.md#2b-small-features-ask-upstream-first)).
+
+### 15. Run transcripts use the adapter packages' parsers at runtime
+
+- **Status:** Decided
+- **Area:** `runs-adapters/runs`, `tasks/run-control`
+- **Found in:** building the run modal (boards 16–18, `ui-new/src/runs/`).
+
+**What we found.** A run's log is the harness's raw output. Each adapter package turns its own output
+into transcript entries with a parser exported from its `/ui` path (`@paperclipai/adapter-claude-local`,
+codex, cursor, gemini, grok, kimi, opencode, pi, openclaw-gateway and hermes), and
+`@paperclipai/adapter-utils` has the log and command redaction. The old UI imports them at runtime.
+Some transcripts have no package parser:
+
+- `paperclip_runner` and `cursor_cloud` parsers live in `ui/src`.
+- Native-runtime runs build their transcript from run events
+  (`ui/src/components/transcript/native-run-events.ts`, about 1,000 lines).
+- External and plugin adapters' parsers are loaded from the server at run time.
+
+Two smaller gaps came up alongside:
+
+- `GET /api/heartbeat-runs/:id` has no `adapterType`, and returns row fields (such as `runtimeMode`)
+  that the shared `HeartbeatRun` type leaves out. `ui-new` takes the adapter type from the run's
+  `adapter.invoke` event, or else the agent, which is wrong if the agent has changed adapters since.
+- The `adapter.invoke` payload doesn't record the instructions revision or the skills a run loaded,
+  which board 17's "Loaded with it" shows. This could feed the request summary in
+  [2b-10](build-plan.md#2b-small-features-ask-upstream-first).
+
+**Why it matters.** `ui-new` imports from `@paperclipai/shared` with `import type` only
+([decision 9](#9-agent-avatars-need-a-runtime-import-from-the-shared-package) is the one exception so
+far). Copying the parsers would drift every time upstream changes a harness's output.
+
+**Options.**
+
+1. **Import the adapter packages' `/ui` parsers at runtime**, as the old UI does.
+2. **Copy the parsers into `ui-new`** and check them at each sync.
+3. **Propose upstream that the server serves a parsed transcript.**
+
+**Decision.** Option 1, decided Oct 26, 2026. `ui-new` depends on the eleven packages above as
+workspace dependencies, a second exception to `import type` alongside decision 9. Runs without a
+package parser show plain lines and say so. Porting the runner, Cursor Cloud and native-run parsers,
+or proposing upstream that they move into packages, is still open. The parsers grew the main bundle
+past Vite's 500 KB warning (627 KB); loading the run modal as its own chunk is the fix when it matters.
+
+### 16. Cases don't store the structure the case boards draw
+
+- **Status:** Open
+- **Area:** `cases/*`, `tasks/views`
+- **Found in:** boards C1, C2 and C5, checked against the cases API.
+
+**What we found.**
+
+- **Phases are free text.** A workflow is a name and a prompt, and a case stores only its current
+  `phase` as text. The phase track, its agents, "Phase 4 of 6", the ticks, and the template preview's
+  loops and waits have no structured source. Rounds per phase can be counted from
+  `GET /api/cases/:caseId/handoffs`.
+- **No count of a workflow's cases.** C5's "Used by 5 cases" has no endpoint; the case list can't
+  filter by workflow.
+- **Task lists don't carry case membership.** Case chips on rows and Group: Case need
+  `GET /api/issues/:id/cases` per task or `GET /api/cases/:id` per case. The case list gives only each
+  case's main task.
+
+**Why it matters.** Cases come in M6 ([decision F](build-plan.md#decisions-to-make-early)). Without
+these, the case views either parse prose or make a request per task.
+
+**Options.** To decide before M6: draw what the API stores (the phase as text, no track), load case
+membership per visible task, or propose structured phases and a membership field upstream. Upstream
+is still changing cases, so check its direction first.
+
+**Decision.** Open.
+
+### 17. Search results are shaped differently from board S1
+
+- **Status:** Open
+- **Area:** `inbox-search/search`
+- **Found in:** boards S1 to S3, checked against the search API.
+
+**What we found.** S1 draws one row per matching comment, with its author, and document results with
+a revision number. The API returns comment matches as task results, each with one best-matching
+snippet and no author, and document results without a revision.
+
+**Options.** Draw results as the API returns them (a task with its best snippet), or fetch more per
+result, or propose richer results upstream.
+
+**Decision.** Open, needed by the search screen.
+
+### 18. The phone layouts assume push notifications
+
+- **Status:** Open
+- **Area:** phone navigation ([design/mobile.md](design/mobile.md)), `inbox-search/triage`
+- **Found in:** the phone navigation boards (N1, N2): the You sheet has push settings.
+
+**What we found.** There's no web-push subscription or notification preference API. The phone
+layouts' morning brief (M10) also depends on build plan [3.13](build-plan.md#313-briefings-and-reports).
+
+**Options.** Leave push settings out of the You sheet until there's an API, propose web push
+upstream, or build it as a fork plugin (stage 3).
+
+**Decision.** Open.
