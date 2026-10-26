@@ -5,6 +5,7 @@ import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } 
 import { heartbeatsApi } from "@/api/heartbeats";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
+import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useLiveRunsQuery } from "@/lib/company-data";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
@@ -22,7 +23,7 @@ import "./TaskActivity.css";
 /*
  * The task panel's Activity section (board 3): the thread, oldest first, with comments as cards,
  * changes and finished runs as compact lines between them, and the live run as a card at the foot
- * with Stop. Older comments load in pages. A plain comment box sits under the thread; the full
+ * with Stop. Runs open in the run modal ("View run"). Older comments load in pages. A plain comment box sits under the thread; the full
  * composer (mentions, attachments, work modes, queued messages, steer and interrupt) and request
  * cards come with the thread-and-composer slice of M2.
  */
@@ -37,6 +38,7 @@ const FILTERS: { value: ThreadFilter; label: string }[] = [
 
 export function TaskActivity(props: { taskId: string; title?: string }) {
   const company = useCompany();
+  const commands = useCommands();
   const client = useQueryClient();
   const people = useTaskPeople();
   const liveRuns = useLiveRunsQuery();
@@ -170,6 +172,13 @@ export function TaskActivity(props: { taskId: string; title?: string }) {
                                 </Show>
                                 <Show when={line.count}>{(count) => <span class="ta-count"> ×{count()}</span>}</Show>
                               </span>
+                              <Show when={line.runId}>
+                                {(runId) => (
+                                  <button type="button" class="ta-view-run" onClick={() => commands.openRunModal(runId())}>
+                                    View run
+                                  </button>
+                                )}
+                              </Show>
                               <time class="ta-time" datetime={line.at.toISOString()}>
                                 {stampLabel(line.at)}
                               </time>
@@ -194,7 +203,10 @@ export function TaskActivity(props: { taskId: string; title?: string }) {
                     Run {run.id.slice(0, 8)}
                     <Show when={run.startedAt}>{(start) => <> · {duration(start(), new Date())}</>}</Show>
                   </span>
-                  <Button size="compact" class="ta-live-stop" onClick={() => void stop(run.id)}>
+                  <Button size="compact" class="ta-live-view" onClick={() => commands.openRunModal(run.id)}>
+                    View run
+                  </Button>
+                  <Button size="compact" onClick={() => void stop(run.id)}>
                     <Square size={12} aria-hidden="true" />
                     Stop
                   </Button>

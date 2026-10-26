@@ -194,8 +194,18 @@
   font-weight: 700;
 }
 
-.ta-live-stop {
+.ta-live-view {
   margin-left: auto;
+}
+
+/* "View run" on a run's line opens the run modal */
+.ta-view-run {
+  flex-shrink: 0;
+  color: var(--run-fg);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* The comment box */

@@ -98,6 +98,13 @@
 .tr-status[data-tone="green"] { --tone-bg: var(--green-bg); --tone-fg: var(--green-fg); }
 .tr-status[data-tone="neutral"] { --tone-bg: var(--pri-off); --tone-fg: var(--text); }
 
+.tr-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .tr-error {
   margin: 4px 0 0;
   color: var(--red-fg);
