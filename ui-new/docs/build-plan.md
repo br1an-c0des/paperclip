@@ -51,9 +51,9 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | Custom status text | 3 | Statuses are a fixed list (`ISSUE_STATUSES`). Agents, review stages and the inbox all depend on it, so each custom status maps onto one of the seven ([3.1](#31-custom-statuses-and-status-rules)). |
 | Statuses that trigger review or approval | 1, then 3 | Review stages already do this: moving a task to `in_review` or `done` starts its configured review, then approval. Stage 1 shows that as a rule on the task ("When it's done, Sam reviews, then Alex approves"). Rules on other statuses are 3.1. |
 | AI tags `@user` in comments to say who it's waiting on | 1, then 3 | Stage 1 shows what a task waits on (`reviewAttention`, stage participants, requests addressed to a person). Getting agents to do this consistently is agent guidance, which goes in the fork skill ([3.10](#310-core-skill-add-on)). |
-| Multiple lists ("sprints") per project | 1 | Each list is one of the project's goals (decision C). Tasks already carry a `goalId`, and projects link goals (`goalIds`), so it needs no new storage. Named lists for now; sprint dates and capacity are [3.3](#33-sprints), for later. |
-| Project dashboard showing every sprint | 1 | Board 8 gains a lists section. |
-| Goals assigned to lists: one list per sprint per goal | 1 | The same mapping: the goal *is* the list. |
+| Multiple lists ("sprints") per project | On hold | Lists need their own table: goals always give a project's tasks its first goal, and carry meanings lists shouldn't have ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)). The boards are drawn (L1 to L4) for when it resumes ([3.3](#33-lists-and-sprints-on-hold)). |
+| Project dashboard showing every sprint | On hold | Waits for lists. Board L4 draws the section. |
+| Goals assigned to lists: one list per sprint per goal | On hold | Waits for lists. Goals stay as they are meanwhile. |
 | Mention another task in a comment | 1 (exists) | Mentions already become related work on both tasks (`IssueRelatedWorkItem`, with mention counts and sources). The thread renders them as task links. |
 | ClickUp-style relationships and dependencies | 1, then 2b or 3 | Blockers exist (`blockedByIssueIds`, the only relation type is `blocks`). Other relation types, like "relates to" or "duplicates", are new: [2b-13](#2b-small-features-ask-upstream-first). |
 | Assigned comments, like ClickUp | 3 | No comment assignment exists ([3.8](#38-assigned-comments-and-review-assignments)). |
@@ -85,7 +85,7 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | Idea | Stage | How |
 | --- | --- | --- |
 | Goals as part of a project, with no Goals page | 1 | The project header shows its goals (board 8 already links one), edited in project settings. `goals/hierarchy` and `goals/detail` move there. |
-| Project description and goals sent with every run | 1 (exists) | Agents read `GET /api/issues/:id/heartbeat-context`, which returns the task's project and goal. Check exactly which fields it includes during M4. If the description is missing, that's a small stage 2 change. |
+| Project description and goals sent with every run | 1 for names, then 2b | The run's prompt carries neither. `heartbeat-context`, which agents read first, returns the project's and goal's names but not their descriptions; `GET /api/issues/:id` has both ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)). Adding the descriptions to `heartbeat-context` is [2b-15](#2b-small-features-ask-upstream-first). |
 | Documents attached to a whole project | 1 for now, then 2b, or 3 if declined | [Decision 1](decisions.md#1-projects-cant-hold-documents-or-files). M4 builds "From tasks". Project documents are proposed upstream ([2b-8](#2b-small-features-ask-upstream-first)), and the project section waits for them, with the plugin ([3.4](#34-project-knowledge-base)) as the fallback. No hidden docs task as a stopgap. |
 | Project docs listed in the run prompt, with short descriptions | 3, or 2b | Plugins can't add to the core prompt. The fork skill can tell agents to call a plugin tool for them ([3.4](#34-project-knowledge-base)). If upstream adds project documents, it could return them in `heartbeat-context` instead. |
 | Docs that point to files in a repo | 1 for tasks, 3 for projects | Tasks already support this: work products with `metadata.resourceRef.kind: "workspace_file"`, and `/api/issues/:issueId/file-resources/*`. Project-level references are part of 3.4. |
@@ -146,7 +146,7 @@ The boards cover most of stage 1, but not all of it. More are being designed, an
 
 - **Desktop boards for capabilities that have none yet:**
   - new project and new agent;
-  - goals as a project's lists, and recurring tasks;
+  - recurring tasks;
   - the command palette and search;
   - workspaces, skills, apps and tools, activity;
   - onboarding and sign-in;
@@ -159,7 +159,7 @@ Development starts now on what's drawn and doesn't wait for these:
 
 - In each milestone, build the screens that have boards first.
 - Before starting a milestone, check [design/boards.md](design/boards.md) for boards added since.
-- A tier 1 screen with no board yet (new project, new agent, lists, recurring tasks) waits for its
+- A tier 1 screen with no board yet (new project, new agent, recurring tasks) waits for its
   board. If the rest of the milestone is done first, build a plain version from the design system's
   components, and mark it `partial` in capabilities.md so it's revisited.
 - Tier 2 screens (settings, skills, apps and tools, activity) port mostly as they are, so the design
@@ -196,7 +196,7 @@ responsive pass in M7.
 | --- | --- | --- | --- |
 | A | Agent chat flag ([decision 2](decisions.md#2-agent-chat-is-off-unless-the-instance-turns-it-on)) | M5 | Turn `enableAgentChat` on as part of every `ui-new` deployment (option 1). Fall back to agent settings if it's off (option 2). |
 | B | Task panel or modal ([design open question](design/README.md#open-questions)) | M2 | Panel when opened from a list or board (boards 2, 3, 5). Modal when opened from anywhere without a list: Inbox, chat, dashboards (boards 6, 7). Full page for direct links. |
-| C | Lists as goals | M4 | Decided: a project's lists are its goals, as named lists without dates for now ([question 2](#questions-for-you)). |
+| C | Lists as goals | M4 | Superseded Oct 26, 2026: lists are on hold until they have their own storage ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)). Goals stay a task property and a project setting. |
 | D | Project-level docs ([decision 1](decisions.md#1-projects-cant-hold-documents-or-files)) | M4 | Decided: build "From tasks", and start the 2b-8 conversation upstream. The project section waits for project documents, with the plugin (3.4) if upstream declines. No hidden docs task. |
 | E | Each experimental flag ([decision 12](decisions.md#12-what-happens-to-each-experimental-flag)) | M0 | Decided: built in, dropped, or following the instance setting, per flag. Agent chat and `enablePublicMcp` on; the file viewer built in (M2); Conference Room chat dropped. |
 | F | Cases | M6 | Decided: no cases page. Cases show inside the task views, when the instance has `enableCases` on: a case chip with phase ticks on task rows and a Case section in the task panel (option A), Group: Case in the task list (option B), and a Start case switch in New task with an optional workflow template (C5). The agent who gets the task sets up the case and makes that task its main task; the request goes in the task description, since the API has no field for it. Designs: boards C1, C2 and C5 on the [canvas](design/README.md), not yet in the board set. |
@@ -246,7 +246,7 @@ Covers `shell/*` except plugins. Done when you can move around the app and creat
   - dragging between groups and columns;
   - quick add in a group;
   - subtasks expanded inline;
-  - group by status, assignee, priority, label, list (goal) or parent;
+  - group by status, assignee, priority, label or parent;
   - filters, saved views and keyboard navigation.
   Saved views use local storage until stage 3 adds a plugin.
 - Task panel and modal: Details, Activity and Docs and files (boards 2, 3, 5, 6, 7), including
@@ -284,20 +284,18 @@ Covers `inbox-search/triage`, `decisions/*`, `approvals/*`, `tasks/approvals`, `
 
 #### M4: Projects
 
-- Project dashboard (board 8): brief, budget, code, agents at work, waiting on you, stuck work. Plus a
-  lists section: the project's goals, each with its tasks.
+- Project dashboard (board 8): brief, budget, code, agents at work, waiting on you, stuck work.
 - Docs (board 9): "From tasks" on `GET /api/companies/:companyId/artifacts?projectId=&groupBy=task`.
   The project section waits for project documents (decision D).
 - Agent workload (boards 31, 32), built from runs, live runs and assignments.
 - Settings (boards 10, 11): details, members, repositories, workspaces, task checkouts, environment,
   variables, budget, archive, and goals.
-- Goals folded into projects, and shown as the project's lists (decision C).
+- Goals folded into projects: the project's goals in settings and the task's goal in its properties,
+  with no Goals page. Lists are on hold ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)).
 - Recurring tasks replace Routines: Repeat in the new-task dialog, a Recurring view, and every routine
   setting (triggers, variables, delivery policy, run history) in the recurring task's panel. Each
   occurrence is a new task, grouped under its recurring task.
 - New project.
-- Check what `heartbeat-context` returns for the project and goal, and open a 2a item if the
-  description is missing.
 
 Covers `projects/*`, `workspaces/*`, `goals/*`, `routines/*`, `documents-artifacts/library`.
 
@@ -387,6 +385,7 @@ dropped.
 | 12 | Due dates on tasks | Only if you want them back ([decision 6](decisions.md#6-tasks-have-no-due-date)) |
 | 13 | More relation types ("relates to", "duplicates") | Only if mentions and blockers prove too little |
 | 14 | "Report to chat": let any task or routine deliver its result into a person's chat with the agent | Briefings and reports ([3.13](#313-briefings-and-reports)). The delivery already exists for tasks handed off from a chat (`chatTaskHandoffs`, decision 8); this adds a way to link other tasks. |
+| 15 | Return the project's and goal's descriptions in `heartbeat-context` | Agents read it first, but it gives only names, so the "why" behind a task reaches them only if they load the full task ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)). |
 
 ## Stage 3: experimental features
 
@@ -430,16 +429,20 @@ dropped.
 - **Risk:** low. Filtering and sorting on server-side lists can't use plugin fields, so `ui-new` filters
   what it has loaded, or the plugin returns matching task IDs.
 
-### 3.3 Sprints
+### 3.3 Lists and sprints (on hold)
 
-Later. Named lists cover sprints for now ([question 2](#questions-for-you)); this entry is for when
-dates start to matter.
+On hold since Oct 26, 2026 ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)). Boards L1 to L4 on the
+[canvas](design/README.md) draw it: the task list grouped by list, a list's panel, New list, and a
+Lists section on the dashboard.
 
-- **Have:** lists are goals (decision C): status, description, parent, and a link to projects.
-- **Missing:** start and end dates, capacity, rollover of unfinished tasks, burndown.
-- **Approach:** plugin data attached to a goal (dates, capacity), plus a scheduled job that rolls over
-  unfinished tasks at the end. The dashboard shows a burndown from task activity.
-- **Risk:** low.
+- **Have:** nothing that fits. Goals were the plan (decision C), but every task in a project with goals
+  gets the first one, goals belong to the company rather than a project, and they mean the "why" behind
+  work elsewhere.
+- **Missing:** a list table (a list belongs to one project, and a task to at most one list, or none),
+  list order, and later start and end dates, capacity, rollover of unfinished tasks and burndown.
+- **Approach, when it resumes:** a fork plugin table first, or a proposal upstream if the plugin's
+  limits matter: server-side task filters and agents can't see plugin data.
+- **Risk:** medium. It's new storage for something the task list leans on.
 
 ### 3.4 Project knowledge base
 
@@ -618,8 +621,8 @@ All answered Oct 24, 2026.
 1. ~~**"Tasks become separated from agent chats/runs."**~~ Stage 1 builds on the hidden chat tasks. A
    chat outside tasks was dropped in favor of the MCP connection
    ([3.12](#312-chat-outside-tasks-dropped)).
-2. ~~**Lists and sprints.**~~ A project's lists are its goals, as named lists for now. Sprint dates and
-   capacity come later ([decision C](#decisions-to-make-early), [3.3](#33-sprints)).
+2. ~~**Lists and sprints.**~~ A project's lists were to be its goals. Reopened Oct 26, 2026: lists are
+   on hold until they have their own storage ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold), [3.3](#33-lists-and-sprints-on-hold)).
 3. ~~**Custom statuses.**~~ Each custom status maps onto one of the seven built-in ones
    ([3.1](#31-custom-statuses-and-status-rules)).
 4. ~~**Recurring tasks.**~~ A new task each time, grouped under the recurring task ([M4](#m4-projects)).

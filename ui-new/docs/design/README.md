@@ -68,7 +68,9 @@ More boards are on the way. Development starts on the current ones without waiti
 - **Capabilities with no board yet.** These have an empty "New home" in the
   [checklist](../inventory/capabilities.md):
   - The command palette, keyboard shortcuts, search, toasts.
-  - Goals (now a project's lists), routines (now recurring tasks), cases.
+  - Goals (a task property and a project setting; lists are on hold, see
+    [decision 14](../decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)), routines (now
+    recurring tasks), cases.
   - New project and new agent.
   - Workspaces, skills, connectors, activity.
   - Onboarding and sign-in.

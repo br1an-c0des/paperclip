@@ -40,6 +40,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 11 | [Menus inside dialogs need to sit above the overlay](#11-menus-inside-dialogs-need-to-sit-above-the-overlay) | design system | Decided | Oct 25, 2026 |
 | 12 | [What happens to each experimental flag](#12-what-happens-to-each-experimental-flag) | every flagged area | Decided | Oct 25, 2026 |
 | 13 | [The task composer overrides runs for more adapters than New task does](#13-the-task-composer-overrides-runs-for-more-adapters-than-new-task-does) | `tasks/create`, `agents/runtime` | Open | Oct 25, 2026 |
+| 14 | [Lists need their own storage, so they're on hold](#14-lists-need-their-own-storage-so-theyre-on-hold) | `goals/*`, `tasks/organize`, `projects/task-context` | Decided | Oct 26, 2026 |
 
 ## Entries
 
@@ -498,7 +499,7 @@ UI-only flags:
 | `enableClassicTaskInterface` | Dropped | One task interface, from the boards (M2). |
 | `enableCombinedInboxTasks` | Dropped | The boards keep Inbox separate from Tasks (board 14). |
 | `enableDecisions` | Dropped | The Inbox and the requests proposal take its place (M3). |
-| `enableGoalsSidebarLink` | Dropped | Goals become a project's lists (decision C). |
+| `enableGoalsSidebarLink` | Dropped | No Goals page: goals show on tasks and in project settings ([decision 14](#14-lists-need-their-own-storage-so-theyre-on-hold)). |
 | `enableArtifactsV1` | Dropped | The artifact boards set the presentation. |
 | `enablePaperclipDeveloperMode` | Dropped | Maintainer tooling (Honeycomb links). |
 | `enableApps` | Built in | A compatibility key; Apps is always on. |
@@ -571,3 +572,63 @@ the Claude list is wrong for the newest models. M2 builds the composer, which ne
 **Recommendation.** Option 3, with option 2 as the fallback until it lands: the model list already
 comes from the server, and the efforts belong with it.
 
+
+### 14. Lists need their own storage, so they're on hold
+
+- **Status:** Decided
+- **Area:** `goals/*`, `tasks/organize`, `projects/task-context`
+- **Found in:** the lists boards (L1 to L4 on the [canvas](design/README.md)), checked against
+  `server/src/services/issue-goal-fallback.ts`, `server/src/services/heartbeat/run-preparation.ts`,
+  `server/src/routes/issues.ts` and upstream's history for goals.
+
+**What we found.** Build plan decision C made each of a project's lists one of its goals. Goals don't
+fit that well:
+
+- **How goals are stored.** Goals belong to the company and form one tree (`parentId`, with levels
+  company, team, agent and task). Projects link goals many to many through `project_goals`, and keep
+  the first one in the older `projects.goal_id` column too. A task points to at most one goal
+  (`issues.goal_id`). The server doesn't check that a task's goal is one its project links, and the task
+  list endpoint can't filter by goal.
+- **Every task in a project with goals has one.** When a task is created without a goal, the server
+  gives it the project's first goal, or the company's default goal when it has no project
+  (`resolveIssueGoalId`). Clearing the goal later puts the project's first goal back
+  (`resolveNextIssueGoalId`). So a task can't sit in a project without being in a list, and the first
+  goal acts as a default list.
+- **Deleting a goal only removes its row.** `DELETE /api/goals/:id` doesn't clear the tasks, projects
+  or sub-goals that point to it, so the database should refuse while any remain. Not tested. The old UI
+  retires goals by cancelling them instead.
+- **What reaches a run.** The prompt that starts a run carries the task's title, description, status,
+  priority and work mode, with no project or goal (`run-preparation.ts`). Agents fetch the rest:
+  - `GET /api/issues/:id/heartbeat-context`, which the core skill tells them to read first, returns
+    the goal's id, title, status, level and parent, and the project's id, name, status and target date.
+    Neither description is included.
+  - `GET /api/issues/:id` returns the full goal and project, with descriptions, plus each parent task's
+    project and goal.
+  - Both use the task's goal, or else the project's first goal, or else the company's default goal.
+- **Where upstream is taking goals.** The goals table hasn't changed since February and the goal
+  service since March; since then the pages have only had app-wide changes, plus a check on project goal
+  ids (#12779, Sep 3). The Goals sidebar link was hidden on Jul 7 (#9189) "while the goals surface is
+  being evaluated", with the pages kept. Cases arrived two days later (#9198) and are still growing
+  (workflows and handoffs, Oct 20 and 21). "Session goals" in the Paperclip Runner (Sep 8) are a
+  different thing: an objective for one agent session. Onboarding, plugins, cost tracking and the README
+  still use company goals.
+
+**Why it matters.** The lists in the boards need things goals can't give: tasks in no list, lists that
+belong to one project, their own order, and later sprint dates. Built on goals, the first list would
+quietly collect every new task, and lists would carry the meaning goals have elsewhere, as the "why"
+agents and onboarding see. They would also rest on a surface upstream is keeping out of view.
+
+**Options.**
+
+1. **Keep lists as goals** (decision C), with the first list shown as the project's default.
+2. **A fork plugin table** mapping tasks to lists (stage 3). Server-side filters and agents wouldn't
+   see the lists.
+3. **Propose lists upstream** as a new table. Bigger than the small features in stage 2.
+4. **Put lists on hold** until one of those is worth the database work.
+
+**Decision.** Option 4, decided Oct 26, 2026. It replaces build plan decision C. Lists need their own
+table, so they wait; boards L1 to L4 stay on the canvas as the design for when they come back
+([3.3](build-plan.md#33-lists-and-sprints-on-hold)). Goals keep their old role in the meantime: a task
+property, and the project's goals in project settings, with no Goals page. Separately, returning the
+goal and project descriptions in `heartbeat-context` is a small upstream change
+([2b-15](build-plan.md#2b-small-features-ask-upstream-first)).

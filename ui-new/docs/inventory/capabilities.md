@@ -98,7 +98,7 @@ Seeded from the area guides; edit by hand from here on. When an upstream sync ad
 
 | ID | Capability | New home | Status | Notes |
 | --- | --- | --- | --- | --- |
-| [goals/hierarchy](areas/goals.md#goalshierarchy-goal-tree-and-creation) | Goal tree and creation | | | |
+| [goals/hierarchy](areas/goals.md#goalshierarchy-goal-tree-and-creation) | Goal tree and creation | | | No Goals page: goals move to project settings. Lists, once planned as goals, are on hold ([decision 14](../decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)) |
 | [goals/detail](areas/goals.md#goalsdetail-goal-detail-and-properties) | Goal detail and properties | | | |
 | [goals/alignment](areas/goals.md#goalsalignment-goal-context-on-work) | Goal context on work | [2 Task details](../design/boards.md#board-2), [7b New task](../design/boards.md#board-7b) | | |
 
