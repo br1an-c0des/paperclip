@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
-import { join } from "node:path";
+import { join, parse } from "node:path";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import childProcess, { execFileSync } from "node:child_process";
@@ -210,11 +210,18 @@ describe("stable live agent directory observation", () => {
   it("runs the local observation in its bounded credential-free child", async () => {
     expect(await observeLocalAgentDirectory(root)).toEqual(probeAgentDirectory(root));
   });
+  it("observes a local directory whose path is longer than the Windows working-directory limit", async () => {
+    let deep = root;
+    while (deep.length < 300) deep = join(deep, "nested-agent-directory-segment");
+    fs.mkdirSync(deep, { recursive: true });
+    fs.writeFileSync(join(deep, "AGENTS.md"), "Instructions\n");
+    expect(await observeLocalAgentDirectory(deep)).toEqual(probeAgentDirectory(deep));
+  });
   it.each(["timeout", "oversized", "malformed"])("rejects %s local-child observations", async kind => {
     const stub = vi.spyOn(childProcess, "execFile").mockImplementation(((file: string, args: string[], options: object, callback: (error: Error | null, stdout: string, stderr: string) => void) => {
       expect(file).toBe(process.execPath);
       expect(args).toEqual(["-e", agentDirectoryProbeProgram, root]);
-      expect(options).toMatchObject({ cwd: root, env: {}, timeout: 10_000, maxBuffer: 1024, killSignal: "SIGKILL" });
+      expect(options).toMatchObject({ cwd: parse(root).root, env: {}, timeout: 10_000, maxBuffer: 1024, killSignal: "SIGKILL" });
       callback(kind === "timeout" ? Object.assign(new Error("timed out"), { killed: true, signal: "SIGKILL" }) : null,
         kind === "oversized" ? "x".repeat(1025) : "{}", "");
       return {} as childProcess.ChildProcess;

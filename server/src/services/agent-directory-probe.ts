@@ -158,7 +158,7 @@ export const agentDirectoryTransferCleanupProgram = `${childNameHelper} const re
 export async function observeLocalAgentDirectory(root: string) {
   const result = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
     childProcess.execFile(process.execPath, ["-e", agentDirectoryProbeProgram, root], {
-      cwd: root, env: {}, timeout: 10_000, maxBuffer: 1024, killSignal: "SIGKILL", encoding: "utf8",
+      cwd: path.parse(root).root, env: {}, timeout: 10_000, maxBuffer: 1024, killSignal: "SIGKILL", encoding: "utf8",
     }, (error, stdout, stderr) => { if (error) reject(error); else resolve({ stdout, stderr }); });
   });
   if (result.stdout.length > 1024) throw new Error("Agent directory observation exceeds bound");
