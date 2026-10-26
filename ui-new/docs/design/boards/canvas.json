@@ -324,6 +324,195 @@
       "title": "7b · New task",
       "expand": "fill",
       "is_interactive": true
+    },
+    "CasesInTask.dc.html": {
+      "x": 0,
+      "y": 18680,
+      "w": 1440,
+      "h": 1760,
+      "title": "C1 · Cases, option A (chosen): the task carries the case",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "CasesGrouped.dc.html": {
+      "x": 1520,
+      "y": 18680,
+      "w": 1440,
+      "h": 2120,
+      "title": "C2 · Cases, option B (chosen): group the list by case",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "CasesNewTask.dc.html": {
+      "x": 3040,
+      "y": 18680,
+      "w": 1440,
+      "h": 1280,
+      "title": "C5 · New task: Start case, with an optional workflow template",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "NewProject.dc.html": {
+      "x": 0,
+      "y": 21220,
+      "w": 1440,
+      "h": 1240,
+      "title": "N1 · New project: a modal, like New task",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "NewAgentProfile.dc.html": {
+      "x": 1520,
+      "y": 21220,
+      "w": 1440,
+      "h": 1240,
+      "title": "N2 · New agent, a page: profile",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "NewAgentModel.dc.html": {
+      "x": 3040,
+      "y": 21220,
+      "w": 1440,
+      "h": 1240,
+      "title": "N3 · New agent, a page: harness and model",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "NewTaskRepeat.dc.html": {
+      "x": 4560,
+      "y": 21220,
+      "w": 1440,
+      "h": 1240,
+      "title": "N4 · New task: the Repeat menu",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "NewTaskRecurring.dc.html": {
+      "x": 6080,
+      "y": 21220,
+      "w": 1440,
+      "h": 1240,
+      "title": "N5 · New task: a recurring task, ready to create",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Recurring.dc.html": {
+      "x": 0,
+      "y": 22880,
+      "w": 1440,
+      "h": 1240,
+      "title": "R1 · Recurring tasks: a view of the task list",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "RecurringDetails.dc.html": {
+      "x": 1520,
+      "y": 22880,
+      "w": 1440,
+      "h": 1800,
+      "title": "R2 · Recurring task: triggers, inputs and run policy",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "RecurringRuns.dc.html": {
+      "x": 3040,
+      "y": 22880,
+      "w": 1440,
+      "h": 1240,
+      "title": "R3 · Recurring task: runs, with Run now",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "RecurringHistory.dc.html": {
+      "x": 4560,
+      "y": 22880,
+      "w": 1440,
+      "h": 1240,
+      "title": "R4 · Recurring task: history of changes",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "NewTaskWebhook.dc.html": {
+      "x": 7600,
+      "y": 21220,
+      "w": 1440,
+      "h": 1240,
+      "title": "N6 · New task: Repeat with a webhook as well",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "NewTaskConnect.dc.html": {
+      "x": 9120,
+      "y": 21220,
+      "w": 1440,
+      "h": 1240,
+      "title": "N7 · New task: after Create, connect the webhook",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Lists.dc.html": {
+      "x": 0,
+      "y": 25100,
+      "w": 1440,
+      "h": 1440,
+      "title": "L1 · Lists: the task list grouped by list",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "ListDetails.dc.html": {
+      "x": 1520,
+      "y": 25100,
+      "w": 1440,
+      "h": 1440,
+      "title": "L2 · A list open in the docked panel",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "NewList.dc.html": {
+      "x": 3040,
+      "y": 25100,
+      "w": 1440,
+      "h": 1440,
+      "title": "L3 · New list",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "ProjectDashboardLists.dc.html": {
+      "x": 4560,
+      "y": 25100,
+      "w": 1440,
+      "h": 2560,
+      "title": "L4 · Project dashboard with its lists",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Search.dc.html": {
+      "x": 0,
+      "y": 28080,
+      "w": 1440,
+      "h": 1440,
+      "title": "S1 · Search: everything, grouped by kind",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "SearchTasks.dc.html": {
+      "x": 1520,
+      "y": 28080,
+      "w": 1440,
+      "h": 1440,
+      "title": "S2 · Search: tasks, with filters and the Filter menu",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "SearchEmpty.dc.html": {
+      "x": 3040,
+      "y": 28080,
+      "w": 1440,
+      "h": 1440,
+      "title": "S3 · Search: no results, with ways to loosen the filters",
+      "expand": "fill",
+      "is_interactive": true
     }
   },
   "order": [
@@ -361,7 +550,28 @@
     "AppSettings.dc.html",
     "AppSettingsHarnesses.dc.html",
     "SettingsOutline.dc.html",
-    "AgentAvatars.dc.html"
+    "AgentAvatars.dc.html",
+    "CasesInTask.dc.html",
+    "CasesGrouped.dc.html",
+    "CasesNewTask.dc.html",
+    "NewProject.dc.html",
+    "NewAgentProfile.dc.html",
+    "NewAgentModel.dc.html",
+    "NewTaskRepeat.dc.html",
+    "NewTaskRecurring.dc.html",
+    "NewTaskWebhook.dc.html",
+    "NewTaskConnect.dc.html",
+    "Recurring.dc.html",
+    "RecurringDetails.dc.html",
+    "RecurringRuns.dc.html",
+    "RecurringHistory.dc.html",
+    "Lists.dc.html",
+    "ListDetails.dc.html",
+    "NewList.dc.html",
+    "ProjectDashboardLists.dc.html",
+    "Search.dc.html",
+    "SearchTasks.dc.html",
+    "SearchEmpty.dc.html"
   ],
   "notes": {
     "title": {
@@ -370,6 +580,41 @@
       "text": "Paperclip redesign in Capsule Stack: tasks, projects, agents, inbox, runs, org and settings",
       "kind": "title1",
       "maxW": 6000
+    },
+    "cases": {
+      "x": 0,
+      "y": 18380,
+      "text": "Cases: going with A + B + New task (C1, C2, C5). Not yet in the repo board set.",
+      "kind": "title1",
+      "maxW": 4480
+    },
+    "create": {
+      "x": 0,
+      "y": 20920,
+      "text": "Creating things: new project (modal), new agent (page), and Repeat in New task, with a schedule, a webhook or both (N1 to N7). Not yet in the repo board set.",
+      "kind": "title1",
+      "maxW": 10560
+    },
+    "recurring": {
+      "x": 0,
+      "y": 22580,
+      "text": "Recurring tasks: the Recurring view of the task list and the recurring task's panel (R1 to R4). Not yet in the repo board set.",
+      "kind": "title1",
+      "maxW": 5960
+    },
+    "lists": {
+      "x": 0,
+      "y": 24800,
+      "text": "Lists (on hold): they need their own storage, since goals don't fit (decision 14). Kept as the design for when they come back: group by list, the list panel, New list, and a Lists section on the dashboard (L1 to L4).",
+      "kind": "title1",
+      "maxW": 5960
+    },
+    "search": {
+      "x": 0,
+      "y": 27780,
+      "text": "Search: one page for tasks, chats, comments, docs, files, agents and projects, with facets from the API's filter counts (S1 to S3). Not yet in the repo board set.",
+      "kind": "title1",
+      "maxW": 4480
     }
   },
   "designSystems": []

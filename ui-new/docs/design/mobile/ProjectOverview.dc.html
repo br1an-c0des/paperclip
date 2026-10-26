@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Project overview (phone)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Fragment+Mono&amp;display=swap">
+<style>
+body{margin:0;background:#0a0a0a}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;margin:0;padding:0}
+.light{--ground:#f2f2f4;--card:#ffffff;--card-edge:transparent;--shadow:0 1px 2px rgba(17,17,19,.06),0 10px 28px -14px rgba(17,17,19,.2);--shadow-lg:0 2px 6px rgba(17,17,19,.08),0 30px 70px -24px rgba(17,17,19,.38);--well:#e7e7ea;--sel:#ffffff;--sel-shadow:0 1px 3px rgba(17,17,19,.12);--line:#ececf0;--row-line:#f0f0f3;--hover:#e7e7ea;--row-hover:#f8f8fa;--code:#f6f6f8;--text:#111113;--body:#45454d;--muted:#6b6b75;--edge:#cfcfd6;--dashed:#b4b4bd;--primary:#111113;--on-primary:#ffffff;--run-bg:#ecebff;--run-fg:#3b2fc0;--violet-bg:#f6e6ff;--violet-fg:#7a1fb8;--amber-bg:#fff1dc;--amber-fg:#94480a;--red-bg:#fde7ea;--red-fg:#b0102a;--green-bg:#e2f6e5;--green-fg:#17672f;--cyan-bg:#dcf4f1;--cyan-fg:#0e6a61;--ash-a:#c9c9cf;--ash-b:#9a9aa3}
+.dark{--ground:#0a0a0a;--card:#141414;--card-edge:#1f1f1f;--shadow:inset 0 1px 0 rgba(255,255,255,.04),0 16px 34px -18px rgba(0,0,0,.95);--shadow-lg:inset 0 1px 0 rgba(255,255,255,.06),0 34px 80px -20px rgba(0,0,0,.95);--well:#161616;--sel:#262626;--sel-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 3px rgba(0,0,0,.7);--line:#1f1f1f;--row-line:#1a1a1a;--hover:#1a1a1a;--row-hover:#181818;--code:#0f0f0f;--text:#f4f1ea;--body:#c9c6bf;--muted:#8f8c86;--edge:#2c2c2c;--dashed:#4a4843;--primary:#f4f1ea;--on-primary:#0a0a0a;--run-bg:#17142b;--run-fg:#c9c2ff;--violet-bg:rgba(139,44,240,.15);--violet-fg:#dcb8ff;--amber-bg:rgba(247,181,47,.1);--amber-fg:#ffc98a;--red-bg:rgba(242,40,111,.12);--red-fg:#ff9aa8;--green-bg:rgba(47,209,47,.1);--green-fg:#9be59b;--cyan-bg:rgba(34,181,165,.12);--cyan-fg:#8fe3d8;--ash-a:#3a3a3a;--ash-b:#6b6b6b}
+.light,.dark{--g-ion:linear-gradient(180deg,#8b2cf0,#1f6fe0);--g-orchid:linear-gradient(180deg,#ff2bd6,#8b2cf0);--g-ember:linear-gradient(180deg,#f7b52f,#f5822a);--g-flare:linear-gradient(180deg,#f2286f,#f2272c);--g-lagoon:linear-gradient(180deg,#2fd12f,#22b5a5);--g-tide:linear-gradient(180deg,#22b5a5,#4c7896);--g-ash:linear-gradient(180deg,var(--ash-a),var(--ash-b))}
+.f-hanken{--display:'Hanken Grotesk',system-ui,sans-serif;--dtrack:-.045em}
+.f-bricolage{--display:'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif;--dtrack:-.035em}
+.disp{font-family:var(--display);letter-spacing:var(--dtrack)}
+.mono{font-family:'Fragment Mono',ui-monospace,monospace}
+.card{background:var(--card);border:1px solid var(--card-edge);border-radius:18px;box-shadow:var(--shadow)}
+@keyframes breathe{0%,100%{opacity:1;transform:scaleY(1)}50%{opacity:.55;transform:scaleY(.65)}}
+.live{animation:breathe 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.live{animation:none}}
+a{color:var(--text)}
+:focus-visible{outline:2px solid var(--run-fg);outline-offset:2px}
+.phone{position:relative;width:390px;height:844px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;background:var(--ground);color:var(--text);font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:14px;line-height:1.4}
+.scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.ib{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--body);text-decoration:none;flex-shrink:0;box-sizing:border-box}
+.ib:hover,.ghost:hover{background:var(--hover)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;box-sizing:border-box;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;flex-shrink:0}
+.t-run{background:var(--run-bg);border:1px solid color-mix(in srgb,var(--run-fg) 50%,transparent);color:var(--run-fg)}
+.glyph{width:5px;height:12px;border-radius:999px;flex-shrink:0}
+.disc{display:grid;place-items:center;border-radius:50%;color:#111113;font-weight:800;flex-shrink:0;letter-spacing:0;box-sizing:border-box}
+.st{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0}
+.seg{display:flex;gap:2px;padding:4px;border-radius:999px;background:var(--well)}
+.seg a{flex:1 1 auto;height:36px;padding:0 12px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:999px;color:var(--body);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap}
+.seg [aria-current="page"]{background:var(--sel);box-shadow:var(--sel-shadow);color:var(--text);font-weight:800}
+.num{font-family:var(--display);font-size:15px;font-weight:800;letter-spacing:0;color:var(--text)}
+.av{position:relative;display:block;width:38px;height:38px;margin-left:-8px;text-decoration:none}
+.av img{display:block;width:38px;height:38px}
+.av .s{position:absolute;right:3px;bottom:6px;width:5px;height:12px;border-radius:999px;box-shadow:0 0 0 2px var(--card)}
+.dock-wrap{position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;align-items:center;justify-content:center;gap:10px;padding:34px 16px 18px;background:linear-gradient(180deg,transparent,var(--ground) 62%);pointer-events:none}
+.dock{pointer-events:auto;display:flex;gap:2px;padding:5px;border-radius:999px;background:var(--card);border:1px solid var(--card-edge);box-shadow:var(--shadow-lg)}
+.dock a{position:relative;height:46px;min-width:50px;padding:0 14px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;color:var(--body);font-size:14px;font-weight:600;text-decoration:none}
+.dock a:hover{background:var(--hover)}
+.dock a[aria-current="page"]{background:var(--sel);box-shadow:var(--sel-shadow);color:var(--text);font-weight:800}
+.dock .lbl{display:none}
+.dock a[aria-current="page"] .lbl{display:inline}
+.fab{pointer-events:auto;width:56px;height:56px;flex-shrink:0;border-radius:50%;display:grid;place-items:center;background:var(--primary);color:var(--on-primary);box-shadow:var(--shadow-lg);text-decoration:none}
+.badge{min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:999px;background:linear-gradient(135deg,#ff2bd6,#f7b52f);color:#111113;font-size:11px;font-weight:800;display:inline-grid;place-items:center}
+.sh{display:flex;align-items:center;gap:8px;padding:14px 16px 10px}
+.sh h2{margin:0;font-size:15px;font-weight:800}
+.sh small{font-size:13px;color:var(--muted)}
+.sh a{margin-left:auto;display:inline-flex;align-items:center;gap:3px;min-height:32px;font-size:13px;font-weight:700;color:var(--body);text-decoration:none}
+.row{display:flex;align-items:center;gap:12px;padding:12px 14px 12px 16px;border-top:1px solid var(--row-line);text-decoration:none;color:var(--text)}
+.row:hover{background:var(--row-hover)}
+.row .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.row .tt{font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .mt{display:flex;align-items:center;gap:6px;min-width:0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .stripe{width:6px;height:30px;border-radius:999px;flex-shrink:0}
+.aw{position:relative;width:40px;height:40px;flex-shrink:0}
+.aw img{display:block;width:40px;height:40px}
+.aw .s{position:absolute;right:0;bottom:3px;width:5px;height:12px;border-radius:999px;box-shadow:0 0 0 2px var(--card)}
+.meter{position:relative;height:10px;border-radius:5px;background:var(--well);overflow:visible}
+.meter .f{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:linear-gradient(90deg,#2fd12f,#22b5a5)}
+.meter .p{position:absolute;top:-4px;bottom:-4px;width:2px;border-radius:1px;background:var(--text);opacity:.55}
+.bars{display:flex;align-items:flex-end;gap:3px;height:44px}
+.bars span{flex:1;border-radius:3px 3px 1px 1px;background:var(--well)}
+</style>
+</helmet>
+<div class="phone {{rootClass}}">
+<div class="scroll" style="padding-bottom: 112px">
+  <header class="card" style="margin: 12px 12px 0; padding: 10px 10px 12px 18px; display: flex; flex-direction: column; gap: 8px">
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--muted)">
+      <span>Projects</span><span aria-hidden="true">/</span>
+      <span class="pill t-run"><span class="glyph live" style="background: var(--g-ion)"></span>In progress</span>
+      <span>Dec 15</span>
+      <div style="margin-left: auto; display: flex">
+        <a class="ib" href="Search.dc.html" aria-label="Search this project"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></a>
+        <button class="ib" aria-label="More project actions"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="19" cy="12" r="1.7"></circle></svg></button>
+      </div>
+    </div>
+    <h1 style="margin: -4px 0 0 -8px">
+      <button class="ghost" aria-haspopup="dialog" aria-label="trading workbench, switch project" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 10px 0 8px; border-radius: 14px; text-align: left">
+        <span class="disp" style="font-size: 30px; font-weight: 800; line-height: 1.05; letter-spacing: -.02em">trading workbench</span>
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); flex-shrink: 0"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+    </h1>
+    <p style="margin: -2px 8px 0 0; font-size: 14px; line-height: 1.45; color: var(--body)">Research, backtest and ship crypto trading strategies on Hyperliquid, from market data to paper trading.</p>
+    <div style="display: flex; align-items: center; gap: 10px; padding-right: 8px">
+      <div style="flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px; font-weight: 600; color: var(--body)">
+        <span><b class="num">16</b> open</span>
+        <span><b class="num">2</b> running</span>
+        <span style="color: var(--red-fg)"><b class="num" style="color: inherit">1</b> blocked</span>
+      </div>
+      <div aria-label="Agents on this project" style="display: flex; padding-left: 8px">
+        <a class="av" href="AgentChat.dc.html" title="Quant Researcher · Running TRA-41"><img src="/_blob/7aaa93c4d4541bd76051e13cbe0ea6a7" alt="Quant Researcher, running" width="38" height="38"><span class="s" aria-hidden="true" style="background: var(--g-ion)"></span></a>
+        <a class="av" href="Agents.dc.html" title="Strategy Engineer · Running TRA-38"><img src="/_blob/923b60a102d23a6e59f85ad0632aeb19" alt="Strategy Engineer, running" width="38" height="38"><span class="s" aria-hidden="true" style="background: var(--g-ion)"></span></a>
+        <a class="av" href="Agents.dc.html" title="ML Engineer · Blocked on TRA-41"><img src="/_blob/e9322069f1f2ecddbd54eb0a09925910" alt="ML Engineer, blocked" width="38" height="38"><span class="s" aria-hidden="true" style="background: var(--g-flare)"></span></a>
+        <a class="av" href="Agents.dc.html" title="Frontend Engineer · Paused, hit its October limit"><img src="/_blob/3b04710f48e2284cfab9eeffb5bf5d4b" alt="Frontend Engineer, paused" width="38" height="38"><span class="s" aria-hidden="true" style="background: var(--g-ember)"></span></a>
+      </div>
+    </div>
+    <div style="margin: 4px -10px 0 -18px; padding: 12px 12px 0; border-top: 1px solid var(--line)">
+      <nav aria-label="Project views" class="seg">
+        <a href="ProjectOverview.dc.html" aria-current="page">Overview</a>
+        <a href="Main.dc.html">List</a>
+        <a href="ProjectDocs.dc.html">Docs</a>
+      </nav>
+    </div>
+  </header>
+
+  <div style="display: flex; flex-direction: column; gap: 12px; padding: 12px 12px 0">
+    <section class="card" aria-label="Brief" style="padding: 14px 16px; display: flex; flex-direction: column; gap: 9px">
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted)">
+        <span style="font-weight: 700; letter-spacing: .06em">BRIEF</span>
+        <span class="st" style="background: var(--violet-bg); color: var(--violet-fg)">AI</span>
+        <span style="margin-left: auto">3h ago · rev 4</span>
+      </div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.55; color: var(--text)">Market data is the bottleneck. The derivatives backfill in <a href="TaskDetail.dc.html" class="mono" style="font-size: 13px">TRA-41</a> is about 70% done and is holding up ML testing on VPA. The liquidation sweep needs your sign-off before PR #14 can merge. Spend is on pace for about $220 of the $300 budget.</p>
+      <a href="#" style="align-self: flex-start; min-height: 32px; display: inline-flex; align-items: center; font-size: 13px; font-weight: 700; color: var(--body); text-decoration: none">Earlier briefs</a>
+    </section>
+
+    <section class="card" aria-labelledby="wait-h" style="overflow: hidden">
+      <div class="sh"><h2 id="wait-h">Waiting on you</h2><span class="badge">7</span><a href="Inbox.dc.html">Inbox<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"></path></svg></a></div>
+      <sc-for list="{{waiting}}" as="w" hint-placeholder-count="3">
+        <a class="row" href="Inbox.dc.html"><span class="stripe" aria-hidden="true" style="background: {{w.glyph}}"></span><span class="tx"><span class="tt">{{w.title}}</span><span class="mt"><span style="font-weight: 700; color: {{w.kindFg}}">{{w.kind}}</span>· {{w.who}} · <span style="color: {{w.whenFg}}">{{w.when}}</span></span></span></a>
+      </sc-for>
+      <a href="Inbox.dc.html" style="display: flex; align-items: center; justify-content: center; height: 44px; border-top: 1px solid var(--row-line); font-size: 13px; font-weight: 700; color: var(--body); text-decoration: none">4 more</a>
+    </section>
+
+    <section class="card" aria-labelledby="agents-h" style="overflow: hidden">
+      <div class="sh"><h2 id="agents-h">Agents at work</h2><small>2 running</small><a href="Agents.dc.html">All</a></div>
+      <sc-for list="{{agents}}" as="a" hint-placeholder-count="4">
+        <a class="row" href="{{a.href}}" style="align-items: flex-start">
+          <span class="aw"><img src="{{a.src}}" alt="" width="40" height="40"><span class="s {{a.liveClass}}" aria-hidden="true" style="background: {{a.capsule}}"></span></span>
+          <span class="tx">
+            <span style="display: flex; align-items: center; gap: 8px"><b style="font-weight: 700">{{a.name}}</b><span class="st" style="background: {{a.stBg}}; color: {{a.stFg}}">{{a.status}}</span></span>
+            <span class="mt"><span class="mono">{{a.id}}</span>{{a.line}}</span>
+            <span class="mono" style="display: {{a.stepDisplay}}; font-size: 11.5px; color: var(--run-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">› {{a.step}}</span>
+          </span>
+        </a>
+      </sc-for>
+    </section>
+
+    <section class="card" aria-labelledby="budget-h" style="padding: 0 16px 16px">
+      <div class="sh" style="padding-left: 0; padding-right: 0"><h2 id="budget-h">Budget</h2><small>October</small><span style="margin-left: auto; font-size: 12px; color: var(--muted)">5 days left</span></div>
+      <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px">
+        <span class="disp" style="font-size: 28px; font-weight: 800; line-height: 1">$142.18</span>
+        <span style="font-size: 13px; color: var(--muted)">of $300 monthly limit</span>
+      </div>
+      <div class="meter" role="img" aria-label="$142.18 spent of $300. On pace for about $220 by October 31."><span class="f" style="width: 47.4%"></span><span class="p" style="left: 73.3%"></span></div>
+      <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--muted)"><span>Spent so far</span><span>On pace for about $220 by Oct 31</span></div>
+      <div class="bars" aria-hidden="true" style="margin-top: 14px">
+        <sc-for list="{{days}}" as="d" hint-placeholder-count="26"><span style="height: {{d.h}}; background: {{d.bg}}"></span></sc-for>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--muted)"><span>Oct 1</span><span>Daily spend</span><span>Today</span></div>
+    </section>
+
+    <section class="card" aria-labelledby="stuck-h" style="overflow: hidden">
+      <div class="sh"><h2 id="stuck-h">Stuck work</h2><small>3</small></div>
+      <sc-for list="{{stuck}}" as="s" hint-placeholder-count="3">
+        <a class="row" href="{{s.href}}"><span class="stripe" aria-hidden="true" style="height: 20px; background: {{s.glyph}}"></span><span class="tx"><span class="tt"><span class="mono" style="font-size: 12px; font-weight: 400; color: var(--muted)">{{s.id}}</span> {{s.title}}</span><span class="mt" style="color: {{s.whyFg}}">{{s.why}}</span></span><span style="font-size: 12px; color: var(--muted); flex-shrink: 0">{{s.when}}</span></a>
+      </sc-for>
+    </section>
+
+    <section class="card" aria-label="Code" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px">
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); flex-shrink: 0"><circle cx="6" cy="6" r="2.2"></circle><circle cx="6" cy="18" r="2.2"></circle><circle cx="18" cy="8" r="2.2"></circle><path d="M6 8.2v7.6M18 10.2c0 4-6 3-10 6"></path></svg>
+      <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+        <span class="mono" style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">br1an-c0des/trading-workbench</span>
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted)">main · 3 task checkouts<span aria-hidden="true" style="width: 4px; height: 10px; border-radius: 999px; background: var(--g-lagoon)"></span>dev server running</span>
+      </span>
+    </section>
+  </div>
+</div>
+
+<div class="dock-wrap">
+  <nav class="dock" aria-label="Main">
+    <a href="Inbox.dc.html" aria-label="Inbox, 8 need you"><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg><span class="lbl">Inbox</span><span class="badge">8</span></a>
+    <a href="Main.dc.html" aria-current="page"><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="3.5"></rect><rect x="3" y="13" width="18" height="7" rx="3.5"></rect></svg><span class="lbl">Tasks</span></a>
+    <a href="Agents.dc.html" aria-label="Agents, 2 running"><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8a7 7 0 0 1 14 0v8z"></path><path d="M9.5 13h.01M14.5 13h.01"></path></svg><span class="lbl">Agents</span><span class="live" aria-hidden="true" style="width: 4px; height: 11px; border-radius: 999px; background: var(--g-ion)"></span></a>
+  </nav>
+  <a class="fab" href="NewTask.dc.html" aria-label="New task"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></a>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"dark","options":["light","dark"]},"display":{"editor":"enum","default":"Hanken Grotesk","options":["Hanken Grotesk","Bricolage Grotesque"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = (this.props.theme ?? 'dark') === 'dark';
+    const font = (this.props.display ?? 'Hanken Grotesk') === 'Bricolage Grotesque' ? 'f-bricolage' : 'f-hanken';
+    const KIND = {
+      Proposal: ['var(--g-orchid)', 'var(--violet-fg)'],
+      'Sign-off': ['var(--g-lagoon)', 'var(--green-fg)'],
+      Question: ['var(--g-tide)', 'var(--cyan-fg)']
+    };
+    const wait = (kind, title, who, when, soon) => ({ kind, title, who, when, glyph: KIND[kind][0], kindFg: KIND[kind][1], whenFg: soon ? 'var(--red-fg)' : 'var(--muted)' });
+    const waiting = [
+      wait('Proposal', 'Merge PR #14 into main?', 'Strategy Engineer', '52 min left', true),
+      wait('Sign-off', 'Your sign-off on TRA-44', 'Strategy Engineer', '32m ago'),
+      wait('Question', 'OK to backfill 2022–2024 from Coinalyze?', 'Quant Researcher', 'blocking TRA-41')
+    ];
+    const S = {
+      running: ['RUNNING', 'var(--run-bg)', 'var(--run-fg)', 'var(--g-ion)'],
+      blocked: ['BLOCKED', 'var(--red-bg)', 'var(--red-fg)', 'var(--g-flare)'],
+      paused: ['PAUSED', 'var(--amber-bg)', 'var(--amber-fg)', 'var(--g-ember)']
+    };
+    const ag = (name, src, state, id, line, step, href) => ({
+      name, src, id, line, step: step || '', stepDisplay: step ? 'block' : 'none', href: href || 'Agents.dc.html',
+      status: S[state][0], stBg: S[state][1], stFg: S[state][2], capsule: S[state][3], liveClass: state === 'running' ? 'live' : ''
+    });
+    const agents = [
+      ag('Quant Researcher', '/_blob/7aaa93c4d4541bd76051e13cbe0ea6a7', 'running', 'TRA-41', ' · run #7 · 18m · $0.38', 'fetching OKX funding rates', 'AgentChat.dc.html'),
+      ag('Strategy Engineer', '/_blob/923b60a102d23a6e59f85ad0632aeb19', 'running', 'TRA-38', ' · run #31 · 6m', 'porting BB squeeze and VPA'),
+      ag('ML Engineer', '/_blob/e9322069f1f2ecddbd54eb0a09925910', 'blocked', 'TRA-45', ' · waits on TRA-41 for SOL data'),
+      ag('Frontend Engineer', '/_blob/3b04710f48e2284cfab9eeffb5bf5d4b', 'paused', 'TRA-29', ' · hit its October limit')
+    ];
+    const spend = [3.1, 4.8, 2.2, 5.9, 6.4, 1.2, 0.8, 4.4, 7.1, 6.2, 5.0, 2.6, 1.4, 6.8, 9.8, 10.1, 5.5, 3.0, 2.1, 9.0, 12.4, 10.3, 7.76, 4.9, 6.3, 3.12];
+    const max = Math.max(...spend);
+    const days = spend.map((v, i) => ({ h: Math.max(8, Math.round(v / max * 100)) + '%', bg: i === spend.length - 1 ? 'linear-gradient(180deg, #2fd12f, #22b5a5)' : 'var(--edge)' }));
+    const stuck = [
+      { id: 'TRA-45', title: 'Start ML testing on VPA', why: 'Blocked by TRA-41 · ML Engineer', whyFg: 'var(--red-fg)', when: '5h', glyph: 'var(--g-flare)', href: '#' },
+      { id: 'TRA-29', title: 'Refine and polish all custom charts', why: 'Paused · Frontend Engineer is over budget', whyFg: 'var(--amber-fg)', when: '12m', glyph: 'var(--g-orchid)', href: 'Inbox.dc.html' },
+      { id: 'TRA-50', title: 'Create cost profile editor', why: 'Unassigned for 16 days', whyFg: 'var(--muted)', when: 'Oct 10', glyph: 'var(--g-ember)', href: '#' }
+    ];
+    return { rootClass: (dark ? 'dark' : 'light') + ' ' + font, waiting, agents, days, stuck };
+  }
+}
+</script>
+</body>
+</html>

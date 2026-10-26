@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Task: activity (phone)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Fragment+Mono&amp;display=swap">
+<style>
+body{margin:0;background:#0a0a0a}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;margin:0;padding:0}
+textarea,input{font:inherit;color:inherit}
+.light{--ground:#f2f2f4;--card:#ffffff;--card-edge:transparent;--shadow:0 1px 2px rgba(17,17,19,.06),0 10px 28px -14px rgba(17,17,19,.2);--shadow-lg:0 2px 6px rgba(17,17,19,.08),0 30px 70px -24px rgba(17,17,19,.38);--well:#e7e7ea;--sel:#ffffff;--sel-shadow:0 1px 3px rgba(17,17,19,.12);--line:#ececf0;--row-line:#f0f0f3;--hover:#e7e7ea;--row-hover:#f8f8fa;--code:#f6f6f8;--text:#111113;--body:#45454d;--muted:#6b6b75;--edge:#cfcfd6;--dashed:#b4b4bd;--primary:#111113;--on-primary:#ffffff;--run-bg:#ecebff;--run-fg:#3b2fc0;--violet-bg:#f6e6ff;--violet-fg:#7a1fb8;--amber-bg:#fff1dc;--amber-fg:#94480a;--red-bg:#fde7ea;--red-fg:#b0102a;--green-bg:#e2f6e5;--green-fg:#17672f;--cyan-bg:#dcf4f1;--cyan-fg:#0e6a61;--pri-on:#111113;--pri-off:#dcdce2;--ash-a:#c9c9cf;--ash-b:#9a9aa3;--scrim:rgba(17,17,19,.34);--grain-blend:soft-light;--grain-op:.9}
+.dark{--ground:#0a0a0a;--card:#141414;--card-edge:#1f1f1f;--shadow:inset 0 1px 0 rgba(255,255,255,.04),0 16px 34px -18px rgba(0,0,0,.95);--shadow-lg:inset 0 1px 0 rgba(255,255,255,.06),0 34px 80px -20px rgba(0,0,0,.95);--well:#161616;--sel:#262626;--sel-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 3px rgba(0,0,0,.7);--line:#1f1f1f;--row-line:#1a1a1a;--hover:#1a1a1a;--row-hover:#181818;--code:#0f0f0f;--text:#f4f1ea;--body:#c9c6bf;--muted:#8f8c86;--edge:#2c2c2c;--dashed:#4a4843;--primary:#f4f1ea;--on-primary:#0a0a0a;--run-bg:#17142b;--run-fg:#c9c2ff;--violet-bg:rgba(139,44,240,.15);--violet-fg:#dcb8ff;--amber-bg:rgba(247,181,47,.1);--amber-fg:#ffc98a;--red-bg:rgba(242,40,111,.12);--red-fg:#ff9aa8;--green-bg:rgba(47,209,47,.1);--green-fg:#9be59b;--cyan-bg:rgba(34,181,165,.12);--cyan-fg:#8fe3d8;--pri-on:#f4f1ea;--pri-off:#2c2c2c;--ash-a:#3a3a3a;--ash-b:#6b6b6b;--scrim:rgba(0,0,0,.62);--grain-blend:overlay;--grain-op:.75}
+.light,.dark{--g-ion:linear-gradient(180deg,#8b2cf0,#1f6fe0);--g-orchid:linear-gradient(180deg,#ff2bd6,#8b2cf0);--g-ember:linear-gradient(180deg,#f7b52f,#f5822a);--g-flare:linear-gradient(180deg,#f2286f,#f2272c);--g-lagoon:linear-gradient(180deg,#2fd12f,#22b5a5);--g-tide:linear-gradient(180deg,#22b5a5,#4c7896);--g-ash:linear-gradient(180deg,var(--ash-a),var(--ash-b))}
+.f-hanken{--display:'Hanken Grotesk',system-ui,sans-serif;--dtrack:-.045em}
+.f-bricolage{--display:'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif;--dtrack:-.035em}
+.disp{font-family:var(--display);letter-spacing:var(--dtrack)}
+.mono{font-family:'Fragment Mono',ui-monospace,monospace}
+.card{background:var(--card);border:1px solid var(--card-edge);border-radius:18px;box-shadow:var(--shadow)}
+@keyframes breathe{0%,100%{opacity:1;transform:scaleY(1)}50%{opacity:.55;transform:scaleY(.65)}}
+.live{animation:breathe 1.6s ease-in-out infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion: reduce){.live{animation:none}}
+a{color:var(--text)}
+:focus-visible{outline:2px solid var(--run-fg);outline-offset:2px}
+.phone{position:relative;width:390px;height:844px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;background:var(--ground);color:var(--text);font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:14px;line-height:1.4}
+.scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.ib{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--body);text-decoration:none;flex-shrink:0;box-sizing:border-box}
+.ib:hover,.ghost:hover{background:var(--hover)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 16px;box-sizing:border-box;border-radius:999px;border:1px solid var(--edge);background:transparent;color:var(--body);font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--well)}
+.btn.pri{background:var(--primary);border-color:var(--primary);color:var(--on-primary);font-weight:800}
+.btn.warn{color:var(--red-fg)}
+.btn.quiet{border-color:transparent;color:var(--muted);padding:0 10px}
+.btn.sm{height:34px;padding:0 13px;font-size:13px}
+.glyph{width:5px;height:12px;border-radius:999px;flex-shrink:0}
+.disc{display:grid;place-items:center;border-radius:50%;color:#111113;font-weight:800;flex-shrink:0;letter-spacing:0;box-sizing:border-box}
+.seg{display:flex;gap:2px;padding:4px;border-radius:999px;background:var(--well)}
+.seg a,.seg button{flex:1 1 0;height:36px;padding:0 10px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:999px;color:var(--body);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap}
+.seg [aria-current="page"],.seg [aria-pressed="true"]{background:var(--sel);box-shadow:var(--sel-shadow);color:var(--text);font-weight:800}
+.seg .m{font-size:12px;font-weight:600;color:var(--muted)}
+.topbar{display:flex;align-items:center;gap:2px;height:56px;padding:0 6px;flex-shrink:0}
+.st{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0}
+.ev{display:flex;align-items:flex-start;gap:10px;padding:5px 0;font-size:13px;line-height:1.45;color:var(--muted)}
+.ev .i{width:24px;height:24px;flex-shrink:0;border-radius:50%;background:var(--well);color:var(--muted);display:grid;place-items:center}
+.ev b{font-weight:600;color:var(--body)}
+.ev time{margin-left:auto;flex-shrink:0;font-size:12px}
+.msg{display:flex;gap:10px}
+.msg .who{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.msg .who span:first-child{font-weight:700}
+.msg time{font-size:12px;color:var(--muted)}
+.msg p{margin:0;color:var(--body);line-height:1.5}
+.tag{height:18px;padding:0 6px;border-radius:999px;border:1px solid var(--edge);color:var(--muted);font-size:11px;display:inline-flex;align-items:center}
+.docchip{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px 0 11px;box-sizing:border-box;border:1px solid var(--edge);border-radius:999px;color:var(--body);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap;align-self:flex-start}
+.rq{position:relative;display:flex;flex-direction:column;gap:10px;padding:14px 14px 14px 30px;border:1px solid var(--card-edge);border-radius:18px;background:var(--card);box-shadow:var(--shadow);text-align:left}
+.rq::before{content:"";position:absolute;left:12px;top:14px;bottom:14px;width:6px;border-radius:999px}
+.k-q::before{background:var(--g-tide)}
+.k-q .rq-kind{background:var(--cyan-bg);color:var(--cyan-fg)}
+.rq-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;padding-bottom:10px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+.rq-kind{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em;flex-shrink:0}
+.rq-life{margin-left:auto;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.rq-ask{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.rq-ask b{color:var(--text);font-weight:600}
+.rq h3{margin:0;font-family:var(--display);letter-spacing:-.01em;font-size:17px;font-weight:800;line-height:1.25}
+.rq p{margin:0;font-size:14px;line-height:1.5;color:var(--body)}
+.rq-next{display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border-radius:14px;background:var(--code);font-size:13px;line-height:1.45;color:var(--muted)}
+.rq-next svg{flex-shrink:0;margin-top:2px}
+.rq-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rq-who{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.composer{position:absolute;left:0;right:0;bottom:0;z-index:5;padding:22px 10px 12px;background:linear-gradient(180deg,transparent,var(--ground) 26%)}
+.composer form{margin:0;border:1px solid var(--card-edge);border-radius:22px;background:var(--card);box-shadow:var(--shadow-lg)}
+.composer textarea{display:block;width:100%;box-sizing:border-box;resize:none;border:0;background:transparent;color:var(--text);padding:14px 16px 4px;font-size:15px;line-height:1.4;outline:none}
+.composer textarea::placeholder{color:var(--muted)}
+</style>
+</helmet>
+<div class="phone {{rootClass}}">
+<div class="topbar">
+  <a class="ib" href="Main.dc.html" aria-label="Back to trading workbench"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg></a>
+  <span class="disc disp" aria-hidden="true" style="width: 20px; height: 20px; font-size: 10px; background: linear-gradient(160deg, #f7b52f, #f5822a)">t</span>
+  <span aria-hidden="true" style="color: var(--dashed); padding: 0 4px">/</span>
+  <span class="mono" style="font-size: 13px; color: var(--body)">TRA-41</span>
+  <div style="margin-left: auto; display: flex">
+    <button class="ib" aria-label="Search activity"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+    <button class="ib" aria-label="More task actions" aria-haspopup="menu"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="19" cy="12" r="1.7"></circle></svg></button>
+  </div>
+</div>
+
+<div class="scroll" style="padding-bottom: 150px">
+  <div style="padding: 0 20px">
+    <h1 class="disp" style="margin: 0; font-size: 22px; line-height: 1.2; font-weight: 800; letter-spacing: -.015em">H4 download derivatives price data</h1>
+  </div>
+
+  <nav aria-label="Task sections" class="seg" style="margin: 14px 12px 8px">
+    <a href="TaskDetail.dc.html">Details</a>
+    <a href="TaskActivity.dc.html" aria-current="page">Activity</a>
+    <a href="TaskFiles.dc.html" aria-label="Docs and files, 9">Files<span class="m">9</span></a>
+  </nav>
+
+  <div role="log" aria-label="Task thread" style="display: flex; flex-direction: column; gap: 16px; padding: 10px 14px 0 16px">
+    <ul style="list-style: none; margin: 0; padding: 0">
+      <li class="ev"><span class="i" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span><span><b>You</b> created this task</span><time>Oct 12</time></li>
+      <li class="ev"><span class="i" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"></circle><path d="M5.5 20a6.5 6.5 0 0 1 13 0"></path></svg></span><span><b>You</b> assigned Quant Researcher and set yourself as reviewer</span><time>Oct 12</time></li>
+      <li class="ev"><span class="i" aria-hidden="true" style="background: var(--run-bg); color: var(--run-fg)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span><span><b>Quant Researcher</b> moved it <span class="st" style="background: var(--amber-bg); color: var(--amber-fg)">TODO</span> → <span class="st" style="background: var(--run-bg); color: var(--run-fg)">IN PROGRESS</span></span><time>Oct 13</time></li>
+    </ul>
+
+    <article class="msg">
+      <span class="disc" aria-hidden="true" style="width: 30px; height: 30px; font-size: 10px; background: linear-gradient(160deg, #2fd12f, #22b5a5)">QR</span>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+        <div class="who"><span>Quant Researcher</span><span class="tag">agent</span><time>Oct 13, 8:05 am</time></div>
+        <p>Plan is up. Binance and Bybit public endpoints for funding and open interest; Hyperliquid for liquidations. I split the Hyperliquid research into TRA-42 and need you to create the AWS account (TRA-43).</p>
+        <a class="docchip" href="Document.dc.html"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"></path><path d="M14 3v5h5"></path></svg>Plan<span style="color: var(--muted); font-weight: 500">rev 2</span></a>
+      </div>
+    </article>
+
+    <article class="rq k-q" aria-label="Question from Quant Researcher">
+      <div class="rq-top">
+        <span class="rq-kind"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.5M12 16.5h.01"></path></svg>QUESTION</span>
+        <span class="rq-life">Ends if you comment instead</span>
+        <button class="ib" aria-label="Snooze or dismiss" aria-haspopup="menu" style="width: 32px; height: 32px; margin: -6px -6px -6px 0; color: var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      </div>
+      <div class="rq-ask"><span class="disc" aria-hidden="true" style="width: 20px; height: 20px; font-size: 8px; background: linear-gradient(160deg, #2fd12f, #22b5a5)">QR</span><b>Quant Researcher</b>asks you<span>· 1h ago</span></div>
+      <h3>OK to backfill 2022–2024 from Coinalyze?</h3>
+      <p>Hyperliquid only has liquidation history from March 2024. Coinalyze covers the earlier years, but it needs an API key stored as a company secret.</p>
+      <div class="rq-next"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--muted)"><circle cx="12" cy="12" r="9"></circle><path d="M10 8l4 4-4 4"></path></svg><span>Your answer goes to Quant Researcher, which continues TRA-41. It's blocking the liquidation backfill.</span></div>
+      <div class="rq-acts">
+        <button class="btn pri" style="flex: 1">Accept</button>
+        <button class="btn" style="flex: 1">Reject</button>
+        <button class="btn quiet">Reply instead</button>
+      </div>
+    </article>
+
+    <article class="msg">
+      <span class="disc" aria-hidden="true" style="width: 30px; height: 30px; font-size: 10px; background: var(--primary); color: var(--on-primary)">BA</span>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+        <div class="who"><span>Brian A.</span><time>Today, 10:31 am</time></div>
+        <p>Start with 4H only. We can add 1H later once the parquet layout settles.</p>
+      </div>
+    </article>
+
+    <article aria-label="Live run" style="display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--run-fg) 50%, transparent); border-radius: 18px; background: var(--run-bg)">
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span class="glyph live" style="background: var(--g-ion)"></span>
+        <a href="#" style="color: var(--run-fg); font-weight: 700; text-decoration: none">Quant Researcher is working</a>
+      </div>
+      <span class="mono" style="margin-top: -6px; font-size: 12px; color: var(--muted)">Run #7 · 18m 12s · $0.38</span>
+      <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-family: 'Fragment Mono', ui-monospace, monospace; font-size: 12px; color: var(--muted)">
+        <li style="display: flex; gap: 8px; min-width: 0"><span style="color: var(--green-fg)">✓</span><span style="width: 36px; flex-shrink: 0">Bash</span><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">python -m tools.backfill --symbol BTC</span></li>
+        <li style="display: flex; gap: 8px; min-width: 0"><span style="color: var(--green-fg)">✓</span><span style="width: 36px; flex-shrink: 0">Edit</span><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">downloader/hyperliquid.py <span style="color: var(--green-fg)">+84</span> <span style="color: var(--red-fg)">−12</span></span></li>
+        <li style="display: flex; gap: 8px; min-width: 0; color: var(--run-fg)"><span>›</span><span style="width: 36px; flex-shrink: 0; color: var(--muted)">Think</span><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">Writing tests for the funding-rate merge…</span></li>
+      </ul>
+      <div style="display: flex; gap: 8px">
+        <a class="btn sm" href="Run.dc.html" style="flex: 1">View run</a>
+        <button class="btn sm warn" style="flex: 1"><svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"></rect></svg>Stop</button>
+      </div>
+    </article>
+
+    <div role="status" style="display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px dashed var(--dashed); border-radius: 18px; font-size: 13px; line-height: 1.45; color: var(--body)">
+      <span><strong style="font-weight: 700; color: var(--text)">1 message queued</strong> for the next turn: “Also pull ETH funding from OKX…”</span>
+      <div style="display: flex; gap: 8px">
+        <button class="btn sm">Steer now</button>
+        <button class="btn sm quiet">Edit</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="composer">
+  <form>
+    <label for="composer" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Comment on TRA-41</label>
+    <textarea id="composer" rows="2" placeholder="Comment, @mention an agent, or type / for commands"></textarea>
+    <div style="display: flex; align-items: center; gap: 2px; padding: 4px 8px 8px">
+      <button type="button" class="ib" aria-label="Attach a file or document" style="width: 40px; height: 40px; color: var(--body)"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+      <button type="button" class="ib" aria-label="Mention" style="width: 40px; height: 40px; color: var(--body)"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"></path></svg></button>
+      <button type="button" class="ghost" aria-haspopup="menu" style="display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px 0 6px; border-radius: 999px; color: var(--body); font-size: 13px; font-weight: 600"><span class="disc" aria-hidden="true" style="width: 20px; height: 20px; font-size: 8px; background: linear-gradient(160deg, #2fd12f, #22b5a5)">QR</span>To Quant Res.</button>
+      <div style="margin-left: auto; display: flex; height: 40px; border-radius: 999px; overflow: hidden; background: var(--primary)">
+        <button type="submit" style="display: flex; align-items: center; gap: 6px; padding: 0 12px 0 14px; color: var(--on-primary); font-weight: 800; font-size: 14px">Queue</button>
+        <button type="button" aria-label="Send options: steer now, or interrupt and send" aria-haspopup="menu" style="width: 32px; display: grid; place-items: center; color: var(--on-primary); border-left: 1px solid color-mix(in srgb, var(--on-primary) 25%, transparent)"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+      </div>
+    </div>
+  </form>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"dark","options":["light","dark"]},"display":{"editor":"enum","default":"Hanken Grotesk","options":["Hanken Grotesk","Bricolage Grotesque"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = (this.props.theme ?? 'dark') === 'dark';
+    const font = (this.props.display ?? 'Hanken Grotesk') === 'Bricolage Grotesque' ? 'f-bricolage' : 'f-hanken';
+    return { rootClass: (dark ? 'dark' : 'light') + ' ' + font };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cases: start from New task</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Fragment+Mono&amp;display=swap">
+<style>
+body{margin:0;background:#0a0a0a}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;margin:0}
+.light{--ground:#f2f2f4;--card:#ffffff;--card-edge:transparent;--shadow:0 1px 2px rgba(17,17,19,.06),0 10px 28px -14px rgba(17,17,19,.2);--shadow-lg:0 2px 6px rgba(17,17,19,.08),0 30px 70px -24px rgba(17,17,19,.38);--well:#e7e7ea;--sel:#ffffff;--sel-shadow:0 1px 3px rgba(17,17,19,.12);--line:#ececf0;--row-line:#f0f0f3;--hover:#e7e7ea;--row-hover:#f8f8fa;--code:#f6f6f8;--text:#111113;--body:#45454d;--muted:#6b6b75;--edge:#cfcfd6;--dashed:#b4b4bd;--primary:#111113;--on-primary:#ffffff;--run-bg:#ecebff;--run-fg:#3b2fc0;--violet-bg:#f6e6ff;--violet-fg:#7a1fb8;--amber-bg:#fff1dc;--amber-fg:#94480a;--red-bg:#fde7ea;--red-fg:#b0102a;--green-bg:#e2f6e5;--green-fg:#17672f;--cyan-bg:#dcf4f1;--cyan-fg:#0e6a61;--pri-on:#111113;--pri-off:#dcdce2;--ash-a:#c9c9cf;--ash-b:#9a9aa3;--scrim:rgba(17,17,19,.34);--disc-shadow:rgba(17,17,19,.35);--grain-blend:soft-light;--grain-op:.9;--knob-off:#ffffff}
+.dark{--ground:#0a0a0a;--card:#141414;--card-edge:#1f1f1f;--shadow:inset 0 1px 0 rgba(255,255,255,.04),0 16px 34px -18px rgba(0,0,0,.95);--shadow-lg:inset 0 1px 0 rgba(255,255,255,.06),0 34px 80px -20px rgba(0,0,0,.95);--well:#161616;--sel:#262626;--sel-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 3px rgba(0,0,0,.7);--line:#1f1f1f;--row-line:#1a1a1a;--hover:#1a1a1a;--row-hover:#181818;--code:#0f0f0f;--text:#f4f1ea;--body:#c9c6bf;--muted:#8f8c86;--edge:#2c2c2c;--dashed:#4a4843;--primary:#f4f1ea;--on-primary:#0a0a0a;--run-bg:#17142b;--run-fg:#c9c2ff;--violet-bg:rgba(139,44,240,.15);--violet-fg:#dcb8ff;--amber-bg:rgba(247,181,47,.1);--amber-fg:#ffc98a;--red-bg:rgba(242,40,111,.12);--red-fg:#ff9aa8;--green-bg:rgba(47,209,47,.1);--green-fg:#9be59b;--cyan-bg:rgba(34,181,165,.12);--cyan-fg:#8fe3d8;--pri-on:#f4f1ea;--pri-off:#2c2c2c;--ash-a:#3a3a3a;--ash-b:#6b6b6b;--scrim:rgba(0,0,0,.62);--disc-shadow:rgba(0,0,0,.6);--grain-blend:overlay;--grain-op:.75;--knob-off:#8f8c86}
+.f-hanken{--display:'Hanken Grotesk',system-ui,sans-serif;--dtrack:-.045em}
+.f-bricolage{--display:'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif;--dtrack:-.035em}
+.disp{font-family:var(--display);letter-spacing:var(--dtrack)}
+.card{background:var(--card);border:1px solid var(--card-edge);border-radius:18px;box-shadow:var(--shadow)}
+.mono{font-family:'Fragment Mono',ui-monospace,monospace}
+.grain{position:absolute;inset:0;width:100%;height:100%;mix-blend-mode:var(--grain-blend);opacity:var(--grain-op);pointer-events:none}
+.no-grain .grain{display:none}
+a{color:var(--text)}
+.nav{text-decoration:none}
+.nav:hover,.ghost:hover,.icon:hover{background:var(--hover)}
+.row:hover{background:var(--row-hover)}
+.row a{color:var(--text);text-decoration:none}
+.row a:hover{text-decoration:underline}
+@keyframes breathe{0%,100%{opacity:1;transform:scaleY(1)}50%{opacity:.55;transform:scaleY(.65)}}
+.live{animation:breathe 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.live{animation:none}}
+.ph{position:relative}
+.ph-home,.card .ph-home:hover{color:inherit;text-decoration:none;outline:none}
+.ph-home::after{content:"";position:absolute;inset:0;z-index:0;border-radius:18px}
+.ph a:not(.ph-home),.ph button,.ph nav{position:relative;z-index:1}
+.ph-go{display:inline-flex;align-items:center;gap:5px;margin-left:12px;vertical-align:middle;height:24px;padding:0 10px;border-radius:999px;background:var(--well);color:var(--body);font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:12px;font-weight:700;letter-spacing:0;opacity:0;transform:translateX(-4px);transition:opacity .15s ease,transform .15s ease}
+.ph:has(.ph-home:hover),.ph:has(.ph-home:focus-visible){border-color:var(--edge)}
+.ph:has(.ph-home:hover) .ph-go,.ph-home:focus-visible .ph-go{opacity:1;transform:none}
+.ph-home:focus-visible::after{box-shadow:inset 0 0 0 2px var(--run-fg)}
+a:focus-visible,button:focus-visible{outline:2px solid var(--run-fg);outline-offset:2px}
+.cchip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px 0 6px;box-sizing:border-box;border-radius:999px;border:1px solid var(--edge);background:var(--well);color:var(--body);font-size:12px;font-weight:600;white-space:nowrap;flex-shrink:0;text-decoration:none}
+.cchip .mono{font-size:11.5px;color:var(--text)}
+.cchip.link{background:transparent;border-style:dashed;color:var(--muted)}
+.cchip.link .mono{color:var(--muted)}
+.ticks{display:inline-flex;align-items:center;gap:3px;flex-shrink:0}
+.ticks i{display:block;width:10px;height:6px;border-radius:999px;background:var(--pri-off)}
+.ticks i.d{background:linear-gradient(90deg,#2fd12f,#22b5a5)}
+.ticks i.c{background:linear-gradient(90deg,#8b2cf0,#1f6fe0)}
+.ticks i.w{background:linear-gradient(90deg,#f7b52f,#f5822a)}
+.ticks i.n{background:transparent;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--run-fg) 70%,transparent)}
+.ticks i.g{width:6px;height:6px;border-radius:2px;transform:rotate(45deg);margin:0 1px}
+.ticks i.g.d{background:linear-gradient(90deg,#2fd12f,#22b5a5)}
+.stitle{margin:0;font-family:var(--display);letter-spacing:-.01em;font-size:15px;font-weight:800}
+.kv{margin:0;display:grid;grid-template-columns:190px minmax(0,1fr);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.kv dt,.kv dd{margin:0;padding:8px 12px;border-top:1px solid var(--row-line);min-width:0}
+.kv dt{font-family:'Fragment Mono',ui-monospace,monospace;font-size:12px;color:var(--muted);background:var(--well);display:flex;align-items:center}
+.kv dd{font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.kv dt:first-of-type,.kv dd:first-of-type{border-top:0}
+.pconn{flex:1 1 10px;height:2px;margin-top:16px;border-radius:999px;min-width:8px}
+.pstep{flex:0 0 auto;width:74px;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}
+.pdisc{position:relative;width:34px;height:34px;box-sizing:border-box;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:800}
+.pcheck{position:absolute;right:-3px;bottom:-3px;width:15px;height:15px;border-radius:50%;background:linear-gradient(160deg,#2fd12f,#22b5a5);color:#111113;display:grid;place-items:center;box-shadow:0 0 0 2px var(--card)}
+.hop{display:grid;grid-template-columns:72px 62px minmax(0,1fr) auto;align-items:start;gap:10px;padding:10px 14px;border-top:1px solid var(--row-line);font-size:13px}
+.hop:first-child{border-top:0}
+.disc{border-radius:50%;display:grid;place-items:center;font-weight:800;color:#111113;flex-shrink:0}
+.tile{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border:1px solid var(--edge);border-radius:999px;color:var(--body);text-decoration:none;font-size:13px;white-space:nowrap}
+.tile:hover{background:var(--hover)}
+.rec{display:flex;flex-direction:column;gap:12px;padding:16px 18px 14px;text-align:left;text-decoration:none;color:var(--text);transition:transform .14s ease,border-color .14s ease}
+.rec:hover{transform:translateY(-2px);border-color:var(--edge)}
+@media (prefers-reduced-motion: reduce){.rec,.rec:hover{transition:none;transform:none}}
+.stat{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:12px;background:var(--well);min-width:0}
+.stat b{font-family:var(--display);font-size:17px;font-weight:800;letter-spacing:-.01em;color:var(--text);white-space:nowrap}
+.stat span{font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap}
+.info{position:relative;display:inline-grid;place-items:center;width:20px;height:20px;padding:0;border-radius:50%;color:var(--muted);flex-shrink:0;cursor:help;vertical-align:middle}
+.info:hover,.info:focus-visible{color:var(--text);background:var(--hover)}
+.info .tipb{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);z-index:40;width:max-content;max-width:260px;padding:8px 11px;border-radius:11px;background:var(--text);color:var(--ground);font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:12px;font-weight:500;line-height:1.45;letter-spacing:0;text-align:left;white-space:normal;box-shadow:0 12px 30px -12px rgba(0,0,0,.7);opacity:0;visibility:hidden;transition:opacity .12s ease}
+.info:hover .tipb,.info:focus-visible .tipb{opacity:1;visibility:visible}
+@media (prefers-reduced-motion: reduce){.info .tipb{transition:none}}
+</style>
+
+</helmet>
+<div class="{{rootClass}}" style="min-height: 1280px; display: flex; flex-wrap: wrap; background: var(--ground); color: var(--text); font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 14px; line-height: 1.4; position: relative">
+<svg aria-hidden="true" width="0" height="0" style="position: absolute"><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.88" numOctaves="2" stitchTiles="stitch"></feTurbulence><feColorMatrix type="saturate" values="0"></feColorMatrix></filter></svg>
+
+<nav aria-label="Main" style="flex: 0 0 248px; box-sizing: border-box; padding: 18px 14px; display: flex; flex-direction: column; gap: 22px">
+  <div style="display: flex; align-items: center; gap: 4px">
+    <button class="ghost" style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; height: 40px; padding: 0 8px 0 5px; border-radius: 999px; text-align: left">
+      <span class="disp" style="position: relative; overflow: hidden; width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(160deg, #ff2bd6, #f2272c 55%, #f7b52f); color: #111113; display: grid; place-items: center; font-size: 13px; font-weight: 800">C<svg class="grain"><rect width="100%" height="100%" filter="url(#grain)"></rect></svg></span>
+      <span class="disp" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; font-size: 15px; letter-spacing: -.01em">Cuebik Creative</span>
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg>
+    </button>
+    <button class="icon" aria-label="Search" style="width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--body)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+    <a class="ghost" href="NewTask.dc.html" aria-label="New task" style="width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--edge); color: var(--text)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></a>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <a class="nav" href="OrgDashboard.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px; border-radius: 999px; color: var(--body); font-weight: 600"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="3.5"></rect><rect x="14" y="3" width="7" height="5" rx="2.5"></rect><rect x="14" y="12" width="7" height="9" rx="3.5"></rect><rect x="3" y="16" width="7" height="5" rx="2.5"></rect></svg>Org dashboard</a>
+    <a class="nav" href="Inbox.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 8px 0 12px; border-radius: 999px; color: var(--body); font-weight: 600"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>Inbox<span style="margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 999px; background: linear-gradient(135deg, #ff2bd6, #f7b52f); color: #111113; font-size: 12px; font-weight: 800; display: grid; place-items: center">8</span></a>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 6px 6px 12px">
+      <h2 style="margin: 0; font-size: 12px; font-weight: 700; color: var(--muted)">Projects</h2>
+      <button class="icon" aria-label="New project" style="width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+    </div>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="width: 24px; height: 24px; border-radius: 50%; border: 1.5px dashed var(--dashed); box-sizing: border-box"></span>All tasks<span style="margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 500">company</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #ff2bd6, #8b2cf0); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">g</span>gearBase<span style="margin-left: auto; font-size: 13px">11</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #3b3df5, #22b5a5); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">s</span>sfo lighting database<span style="margin-left: auto; font-size: 13px">7</span></a>
+    <a class="nav" href="ProjectDashboard.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--text); font-weight: 800; background: var(--sel); box-shadow: var(--sel-shadow)"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #f7b52f, #f5822a); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">t</span>trading workbench<span style="margin-left: auto; font-size: 13px">16</span></a>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 12px 6px">
+      <h2 style="margin: 0; font-size: 12px; font-weight: 700; color: var(--muted)">Agents</h2>
+      <span style="font-size: 12px; font-weight: 700; color: var(--run-fg)">2 running</span>
+    </div>
+    <a class="nav" href="AgentChat.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #2fd12f, #22b5a5); color: #111113; font-size: 8px; font-weight: 800">QR</span></span>Quant Researcher<span style="margin-left: auto; color: var(--run-fg); font-size: 12px; font-weight: 600">running</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #ff2bd6, #f2286f); color: #111113; font-size: 8px; font-weight: 800">SE</span></span>Strategy Engineer<span style="margin-left: auto; color: var(--run-fg); font-size: 12px; font-weight: 600">running</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #f7b52f, #f5822a); color: #111113; font-size: 8px; font-weight: 800">FE</span></span>Frontend Engineer<span style="margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 600">idle</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #f2272c, #ff2bd6); color: #111113; font-size: 8px; font-weight: 800">ML</span></span>ML Engineer<span style="margin-left: auto; color: var(--red-fg); font-size: 12px; font-weight: 600">blocked</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #6a93ad, #a9c6d6); color: #111113; font-size: 8px; font-weight: 800">CE</span></span>CEO<span style="margin-left: auto; color: var(--amber-fg); font-size: 12px; font-weight: 600">paused</span></a>
+  </div>
+
+  <div style="margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 4px 0 6px">
+    <span style="width: 30px; height: 30px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-size: 11px; font-weight: 800; display: grid; place-items: center">BA</span>
+    <span style="color: var(--body); font-weight: 600">Brian A.</span>
+    <a class="icon" href="AppSettings.dc.html" aria-label="Settings" style="margin-left: auto; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--body)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"></path><circle cx="15" cy="6" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg></a>
+  </div>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 14px 20px 48px 4px; box-sizing: border-box">
+  <header class="card ph" style="display: flex; align-items: center; gap: 14px 28px; flex-wrap: wrap; box-sizing: border-box; padding: 16px 22px 12px 26px">
+    <div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 7px">
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--muted)">
+        <a href="#" style="color: inherit; text-decoration: none">Projects</a><span aria-hidden="true">/</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; box-sizing: border-box; border-radius: 999px; background: var(--run-bg); border: 1px solid color-mix(in srgb, var(--run-fg) 50%, transparent); color: var(--run-fg); font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0"><span class="live" style="width: 5px; height: 12px; border-radius: 999px; flex-shrink: 0; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"></span>In progress</span>
+        <span>Target Dec 15</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px">
+        <h1 class="disp" style="margin: 0; font-size: 34px; font-weight: 800; line-height: 1; letter-spacing: -.02em"><a class="ph-home" href="ProjectDashboard.dc.html">trading workbench<span class="ph-go">Project dashboard<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span></a></h1>
+        <button class="icon" aria-label="Star project" style="width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 13px; font-weight: 600; color: var(--body)">
+        <span><span class="disp" style="font-size: 15px; font-weight: 800; color: var(--text); letter-spacing: 0">16</span> open</span>
+        <span><span class="disp" style="font-size: 15px; font-weight: 800; color: var(--text); letter-spacing: 0">2</span> agents running</span>
+        <span style="color: var(--red-fg)"><span class="disp" style="font-size: 15px; font-weight: 800; letter-spacing: 0">1</span> blocked</span>
+        <span style="color: var(--muted)">Updated 2m ago</span>
+      </div>
+    </div>
+    <div aria-label="Agents on this project" style="display: flex; align-items: center; padding-left: 4px"><a href="AgentChat.dc.html" title="Quant Researcher · Running TRA-41" style="position: relative; display: block; width: 64px; height: 64px"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128' role='img'%3E%3Cdefs%3E%3ClinearGradient id='a-body-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='50.7' y1='104.3' x2='79.7' y2='24.5'%3E%3Cstop stop-color='%2322ccea'/%3E%3Cstop offset='1' stop-color='%23a5ea96'/%3E%3C/linearGradient%3E%3ClinearGradient id='a-candle-light-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='48.9' y1='103.7' x2='78.0' y2='23.9'%3E%3Cstop stop-color='%2326dfff'/%3E%3Cstop offset='1' stop-color='%23b4ffa4'/%3E%3C/linearGradient%3E%3CclipPath id='a-face-visible'%3E%3Cpath d='M39.7 47.9L39.7 84.2L88.2 84.2L88.2 47.9L39.7 47.9Z'/%3E%3C/clipPath%3E%3C/defs%3E%3Cg id='a-ground-shadow'%3E%3Cpath d='M35.7 113.2L35.8 112.9L36.3 112.5L37.9 111.9L40.5 111.2L44.0 110.7L48.3 110.3L53.1 109.9L58.4 109.7L64 109.6L69.5 109.7L74.8 109.9L79.6 110.3L83.9 110.7L87.4 111.2L90.0 111.9L91.7 112.5L92.1 112.9L92.2 113.2L92.1 113.6L91.7 113.9L90.0 114.6L87.4 115.2L83.9 115.7L79.6 116.2L74.8 116.5L69.5 116.7L64 116.8L58.4 116.7L53.1 116.5L48.3 116.2L44.0 115.7L40.5 115.2L37.9 114.6L36.3 113.9L35.8 113.6L35.7 113.2Z' fill='%23809299' opacity='0.2'/%3E%3C/g%3E%3Cg id='a-body'%3E%3Cpath fill='url(%23a-body-gradient)' d='M21.5 64L21.5 61.9L21.9 57.7L22.8 53.6L24.0 49.6L25.6 45.8L26.5 43.9L28.6 40.4L29.8 38.7L32.5 35.4L35.4 32.5L37.0 31.1L38.7 29.8L42.1 27.5L45.8 25.6L49.6 24.0L51.6 23.3L53.6 22.8L57.7 21.9L61.9 21.5L64 21.5L68.1 21.7L72.2 22.3L76.3 23.3L78.3 24.0L82.1 25.6L85.8 27.5L89.3 29.8L92.5 32.5L95.4 35.4L98.1 38.7L99.3 40.4L101.4 43.9L103.2 47.7L104.6 51.6L105.1 53.6L106.0 57.7L106.4 61.9L106.4 100.5L106.4 101.3L106.0 102.8L105.2 104.1L104.1 105.2L103.4 105.6L102.0 106.2L100.5 106.4L27.4 106.4L26.6 106.4L25.2 106.0L23.8 105.2L22.7 104.1L21.9 102.8L21.5 101.3L21.5 64Z'/%3E%3C/g%3E%3Cg id='a-candle-light'%3E%3Cpath fill='url(%23a-candle-light-gradient)' d='M26.6 62.7L26.6 60.9L27.0 57.4L27.7 53.9L28.7 50.5L30.0 47.2L30.8 45.7L32.7 42.6L33.7 41.2L35.9 38.4L38.4 35.9L39.8 34.8L41.2 33.7L44.1 31.7L47.2 30.0L50.5 28.7L52.2 28.1L53.9 27.7L57.4 27.0L60.9 26.6L62.7 26.6L66.2 26.7L69.7 27.3L73.2 28.1L74.8 28.7L78.1 30.0L81.2 31.7L84.2 33.7L86.9 35.9L89.4 38.4L91.7 41.2L92.7 42.6L94.5 45.7L96.0 48.9L97.2 52.2L97.7 53.9L98.4 57.4L98.7 60.9L98.8 93.7L98.7 94.4L98.4 95.7L97.7 96.8L96.8 97.7L96.2 98.1L95.0 98.6L93.7 98.8L31.6 98.8L31.0 98.7L29.7 98.4L28.6 97.7L27.6 96.8L27.0 95.7L26.6 94.4L26.6 62.7Z'/%3E%3C/g%3E%3Cg id='a-face'%3E%3Cg clip-path='url(%23a-face-visible)'%3E%3Cdefs%3E%3CclipPath id='a-face-clip-0' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M50.9 62.2L51.0 61.5L51.6 60.9L52.5 60.5L53.4 60.4L54.4 60.5L55.2 60.9L55.8 61.5L56.0 62.2L55.8 62.8L55.2 63.4L54.4 63.8L53.4 64.0L52.5 63.8L51.6 63.4L51.0 62.8L50.9 62.2Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-1' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M70.3 62.2L70.5 61.5L71.1 60.9L71.9 60.5L72.9 60.4L73.8 60.5L74.7 60.9L75.3 61.5L75.4 62.2L75.3 62.8L74.7 63.4L73.8 63.8L72.9 64.0L71.9 63.8L71.1 63.4L70.5 62.8L70.3 62.2Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-2' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M60.4 69.0L60.6 68.5L61.1 68.2L63.8 68.4L66.3 68.2L66.9 68.4L67.1 69.0L66.9 69.5L66.4 69.8L63.7 70.1L61.1 69.8L60.6 69.5L60.4 69.0Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-3' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M63.8 68.8L63.8 68.8Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3C/defs%3E%3Cpath d='M50.9 62.2L51.0 61.5L51.6 60.9L52.5 60.5L53.4 60.4L54.4 60.5L55.2 60.9L55.8 61.5L56.0 62.2L55.8 62.8L55.2 63.4L54.4 63.8L53.4 64.0L52.5 63.8L51.6 63.4L51.0 62.8L50.9 62.2Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M70.3 62.2L70.5 61.5L71.1 60.9L71.9 60.5L72.9 60.4L73.8 60.5L74.7 60.9L75.3 61.5L75.4 62.2L75.3 62.8L74.7 63.4L73.8 63.8L72.9 64.0L71.9 63.8L71.1 63.4L70.5 62.8L70.3 62.2Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M60.4 69.0L60.6 68.5L61.1 68.2L63.8 68.4L66.3 68.2L66.9 68.4L67.1 69.0L66.9 69.5L66.4 69.8L63.7 70.1L61.1 69.8L60.6 69.5L60.4 69.0Z' opacity='1' fill='%23172023' fill-rule='nonzero'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E" alt="Quant Researcher" width="64" height="64" style="display: block; width: 64px; height: 64px"><span aria-hidden="true" style="position: absolute; right: 5px; bottom: 11px; width: 6px; height: 14px; border-radius: 999px; background: linear-gradient(180deg, #8b2cf0, #1f6fe0); box-shadow: 0 0 0 2.5px var(--card)"></span></a><a href="#" title="Strategy Engineer · Running TRA-38" style="position: relative; display: block; width: 64px; height: 64px"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128' role='img'%3E%3Cdefs%3E%3ClinearGradient id='a-body-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='50.7' y1='104.3' x2='79.7' y2='24.5'%3E%3Cstop stop-color='%23eae27e'/%3E%3Cstop offset='1' stop-color='%23ea229a'/%3E%3C/linearGradient%3E%3ClinearGradient id='a-candle-light-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='48.9' y1='103.7' x2='78.0' y2='23.9'%3E%3Cstop stop-color='%23fff78a'/%3E%3Cstop offset='1' stop-color='%23ff26a8'/%3E%3C/linearGradient%3E%3CclipPath id='a-face-visible'%3E%3Cpath d='M39.7 47.9L39.7 84.2L88.2 84.2L88.2 47.9L39.7 47.9Z'/%3E%3C/clipPath%3E%3C/defs%3E%3Cg id='a-ground-shadow'%3E%3Cpath d='M35.7 113.2L35.8 112.9L36.3 112.5L37.9 111.9L40.5 111.2L44.0 110.7L48.3 110.3L53.1 109.9L58.4 109.7L64 109.6L69.5 109.7L74.8 109.9L79.6 110.3L83.9 110.7L87.4 111.2L90.0 111.9L91.7 112.5L92.1 112.9L92.2 113.2L92.1 113.6L91.7 113.9L90.0 114.6L87.4 115.2L83.9 115.7L79.6 116.2L74.8 116.5L69.5 116.7L64 116.8L58.4 116.7L53.1 116.5L48.3 116.2L44.0 115.7L40.5 115.2L37.9 114.6L36.3 113.9L35.8 113.6L35.7 113.2Z' fill='%23809299' opacity='0.2'/%3E%3C/g%3E%3Cg id='a-body'%3E%3Cpath fill='url(%23a-body-gradient)' d='M21.5 64L21.5 61.9L21.9 57.7L22.8 53.6L24.0 49.6L25.6 45.8L26.5 43.9L28.6 40.4L29.8 38.7L32.5 35.4L35.4 32.5L37.0 31.1L38.7 29.8L42.1 27.5L45.8 25.6L49.6 24.0L51.6 23.3L53.6 22.8L57.7 21.9L61.9 21.5L64 21.5L68.1 21.7L72.2 22.3L76.3 23.3L78.3 24.0L82.1 25.6L85.8 27.5L89.3 29.8L92.5 32.5L95.4 35.4L98.1 38.7L99.3 40.4L101.4 43.9L103.2 47.7L104.6 51.6L105.1 53.6L106.0 57.7L106.4 61.9L106.4 100.5L106.4 101.3L106.0 102.8L105.2 104.1L104.1 105.2L103.4 105.6L102.0 106.2L100.5 106.4L27.4 106.4L26.6 106.4L25.2 106.0L23.8 105.2L22.7 104.1L21.9 102.8L21.5 101.3L21.5 64Z'/%3E%3C/g%3E%3Cg id='a-candle-light'%3E%3Cpath fill='url(%23a-candle-light-gradient)' d='M26.6 62.7L26.6 60.9L27.0 57.4L27.7 53.9L28.7 50.5L30.0 47.2L30.8 45.7L32.7 42.6L33.7 41.2L35.9 38.4L38.4 35.9L39.8 34.8L41.2 33.7L44.1 31.7L47.2 30.0L50.5 28.7L52.2 28.1L53.9 27.7L57.4 27.0L60.9 26.6L62.7 26.6L66.2 26.7L69.7 27.3L73.2 28.1L74.8 28.7L78.1 30.0L81.2 31.7L84.2 33.7L86.9 35.9L89.4 38.4L91.7 41.2L92.7 42.6L94.5 45.7L96.0 48.9L97.2 52.2L97.7 53.9L98.4 57.4L98.7 60.9L98.8 93.7L98.7 94.4L98.4 95.7L97.7 96.8L96.8 97.7L96.2 98.1L95.0 98.6L93.7 98.8L31.6 98.8L31.0 98.7L29.7 98.4L28.6 97.7L27.6 96.8L27.0 95.7L26.6 94.4L26.6 62.7Z'/%3E%3C/g%3E%3Cg id='a-face'%3E%3Cg clip-path='url(%23a-face-visible)'%3E%3Cdefs%3E%3CclipPath id='a-face-clip-0' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M50.9 62.2L51.0 61.5L51.6 60.9L52.5 60.5L53.4 60.4L54.4 60.5L55.2 60.9L55.8 61.5L56.0 62.2L55.8 62.8L55.2 63.4L54.4 63.8L53.4 64.0L52.5 63.8L51.6 63.4L51.0 62.8L50.9 62.2Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-1' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M70.3 62.2L70.5 61.5L71.1 60.9L71.9 60.5L72.9 60.4L73.8 60.5L74.7 60.9L75.3 61.5L75.4 62.2L75.3 62.8L74.7 63.4L73.8 63.8L72.9 64.0L71.9 63.8L71.1 63.4L70.5 62.8L70.3 62.2Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-2' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M60.4 69.0L60.6 68.5L61.1 68.2L63.8 68.4L66.3 68.2L66.9 68.4L67.1 69.0L66.9 69.5L66.4 69.8L63.7 70.1L61.1 69.8L60.6 69.5L60.4 69.0Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-3' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M63.8 68.8L63.8 68.8Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3C/defs%3E%3Cpath d='M50.9 62.2L51.0 61.5L51.6 60.9L52.5 60.5L53.4 60.4L54.4 60.5L55.2 60.9L55.8 61.5L56.0 62.2L55.8 62.8L55.2 63.4L54.4 63.8L53.4 64.0L52.5 63.8L51.6 63.4L51.0 62.8L50.9 62.2Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M70.3 62.2L70.5 61.5L71.1 60.9L71.9 60.5L72.9 60.4L73.8 60.5L74.7 60.9L75.3 61.5L75.4 62.2L75.3 62.8L74.7 63.4L73.8 63.8L72.9 64.0L71.9 63.8L71.1 63.4L70.5 62.8L70.3 62.2Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M60.4 69.0L60.6 68.5L61.1 68.2L63.8 68.4L66.3 68.2L66.9 68.4L67.1 69.0L66.9 69.5L66.4 69.8L63.7 70.1L61.1 69.8L60.6 69.5L60.4 69.0Z' opacity='1' fill='%23172023' fill-rule='nonzero'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E" alt="Strategy Engineer" width="64" height="64" style="display: block; width: 64px; height: 64px"><span aria-hidden="true" style="position: absolute; right: 5px; bottom: 11px; width: 6px; height: 14px; border-radius: 999px; background: linear-gradient(180deg, #8b2cf0, #1f6fe0); box-shadow: 0 0 0 2.5px var(--card)"></span></a><a href="#" title="ML Engineer · Blocked on TRA-41" style="position: relative; display: block; width: 64px; height: 64px"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128' role='img'%3E%3Cdefs%3E%3ClinearGradient id='a-body-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='50.7' y1='104.3' x2='79.7' y2='24.5'%3E%3Cstop stop-color='%23c3193f'/%3E%3Cstop offset='1' stop-color='%23ea60c9'/%3E%3C/linearGradient%3E%3ClinearGradient id='a-candle-light-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='48.9' y1='103.7' x2='78.0' y2='23.9'%3E%3Cstop stop-color='%23d51c46'/%3E%3Cstop offset='1' stop-color='%23ff69db'/%3E%3C/linearGradient%3E%3CclipPath id='a-face-visible'%3E%3Cpath d='M39.7 47.9L39.7 84.2L88.2 84.2L88.2 47.9L39.7 47.9Z'/%3E%3C/clipPath%3E%3Cmask id='a-prop-occlusion' maskUnits='userSpaceOnUse' x='0' y='0' width='128' height='128'%3E%3Crect width='128' height='128' fill='white'/%3E%3Cpath d='M64 106.4L99.0 106.4L99.8 106.2L101.3 105.6L102.0 105.2L103.2 104.1L104.0 102.8L104.4 101.3L104.5 100.5L104.5 64L104.2 59.8L103.6 55.7L103.1 53.6L101.8 49.6L100.1 45.8L99.1 43.9L96.9 40.4L94.2 37.0L92.7 35.4L89.5 32.5L85.8 29.8L83.8 28.6L81.5 27.4L78.9 26.3L76.9 25.6L74.8 24.9L71.8 24.2L69.2 23.8L67.0 23.6L64 23.4L59.8 23.7L56.1 24.2L53.1 24.9L51.0 25.6L48.5 26.5L46.2 27.5L44.1 28.6L42.1 29.8L38.4 32.5L35.2 35.4L33.2 37.6L31.0 40.4L28.8 43.9L26.9 47.7L25.4 51.6L24.3 55.7L23.7 59.8L23.5 64L23.5 100.5L23.5 101.3L23.9 102.8L24.7 104.1L25.3 104.7L26.6 105.6L27.3 106.0L28.9 106.4L29.7 106.4L64 106.4Z' fill='black'/%3E%3C/mask%3E%3C/defs%3E%3Cg id='a-ground-shadow'%3E%3Cpath d='M35.7 113.2L35.8 112.9L36.3 112.5L37.9 111.9L40.5 111.2L44.0 110.7L48.3 110.3L53.1 109.9L58.4 109.7L64 109.6L69.5 109.7L74.8 109.9L79.6 110.3L83.9 110.7L87.4 111.2L90.0 111.9L91.7 112.5L92.1 112.9L92.2 113.2L92.1 113.6L91.7 113.9L90.0 114.6L87.4 115.2L83.9 115.7L79.6 116.2L74.8 116.5L69.5 116.7L64 116.8L58.4 116.7L53.1 116.5L48.3 116.2L44.0 115.7L40.5 115.2L37.9 114.6L36.3 113.9L35.8 113.6L35.7 113.2Z' fill='%23809299' opacity='0.2'/%3E%3C/g%3E%3Cg id='a-body'%3E%3Cpath fill='url(%23a-body-gradient)' d='M21.5 64L21.5 61.9L21.9 57.7L22.8 53.6L24.0 49.6L25.6 45.8L26.5 43.9L28.6 40.4L29.8 38.7L32.5 35.4L35.4 32.5L37.0 31.1L38.7 29.8L42.1 27.5L45.8 25.6L49.6 24.0L51.6 23.3L53.6 22.8L57.7 21.9L61.9 21.5L64 21.5L68.1 21.7L72.2 22.3L76.3 23.3L78.3 24.0L82.1 25.6L85.8 27.5L89.3 29.8L92.5 32.5L95.4 35.4L98.1 38.7L99.3 40.4L101.4 43.9L103.2 47.7L104.6 51.6L105.1 53.6L106.0 57.7L106.4 61.9L106.4 100.5L106.4 101.3L106.0 102.8L105.2 104.1L104.1 105.2L103.4 105.6L102.0 106.2L100.5 106.4L27.4 106.4L26.6 106.4L25.2 106.0L23.8 105.2L22.7 104.1L21.9 102.8L21.5 101.3L21.5 64Z'/%3E%3C/g%3E%3Cg id='a-candle-light'%3E%3Cpath fill='url(%23a-candle-light-gradient)' d='M26.6 62.7L26.6 60.9L27.0 57.4L27.7 53.9L28.7 50.5L30.0 47.2L30.8 45.7L32.7 42.6L33.7 41.2L35.9 38.4L38.4 35.9L39.8 34.8L41.2 33.7L44.1 31.7L47.2 30.0L50.5 28.7L52.2 28.1L53.9 27.7L57.4 27.0L60.9 26.6L62.7 26.6L66.2 26.7L69.7 27.3L73.2 28.1L74.8 28.7L78.1 30.0L81.2 31.7L84.2 33.7L86.9 35.9L89.4 38.4L91.7 41.2L92.7 42.6L94.5 45.7L96.0 48.9L97.2 52.2L97.7 53.9L98.4 57.4L98.7 60.9L98.8 93.7L98.7 94.4L98.4 95.7L97.7 96.8L96.8 97.7L96.2 98.1L95.0 98.6L93.7 98.8L31.6 98.8L31.0 98.7L29.7 98.4L28.6 97.7L27.6 96.8L27.0 95.7L26.6 94.4L26.6 62.7Z'/%3E%3C/g%3E%3Cg id='a-face'%3E%3Cg id='a-supporting-elements' mask='url(%23a-prop-occlusion)' opacity='1'%3E%3Cg transform='translate(79.1 6.9) scale(0.2 0.2)'%3E%3Cdefs%3E%3C/defs%3E%3Ctext x='0' y='48' transform='matrix(0.4 0 0 0.4 129.3 128.6)' font-family='sans-serif' font-size='144' font-weight='bold' text-anchor='middle' fill='%23ffd362' opacity='1'%3E?%3C/text%3E%3C/g%3E%3C/g%3E%3Cg clip-path='url(%23a-face-visible)'%3E%3Cdefs%3E%3CclipPath id='a-face-clip-0' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M52.4 61.9L52.5 61.5L53.0 61.1L53.6 60.8L54.2 60.7L54.9 60.8L55.5 61.1L55.9 61.5L56.0 61.9L55.9 62.3L55.5 62.7L54.9 63.0L54.2 63.1L53.6 63.0L53.0 62.7L52.5 62.3L52.4 61.9Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-1' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M70.9 61.9L71.1 61.2L71.7 60.6L72.7 60.2L73.7 60.1L74.7 60.2L75.7 60.6L76.3 61.2L76.5 61.9L76.3 62.5L75.7 63.2L74.7 63.6L73.7 63.7L72.7 63.6L71.7 63.2L71.1 62.5L70.9 61.9Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-2' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M57.4 69.1L57.5 68.6L57.7 68.5L58.4 68.0L59.5 67.6L60.6 67.4L62.2 67.5L65.5 68.2L66.9 68.4L68.0 68.3L68.6 68.0L69.4 67.6L69.8 67.5L70.1 67.6L70.4 67.9L70.5 68.3L70.4 68.8L70.2 68.9L69.5 69.4L68.4 69.8L67.3 70.0L65.7 69.9L62.4 69.2L61.0 69.0L59.9 69.1L59.3 69.4L58.5 69.8L58.1 69.9L57.8 69.8L57.5 69.5L57.4 69.1Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-3' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M64 68.7L64 68.7Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3C/defs%3E%3Cpath d='M52.4 61.9L52.5 61.5L53.0 61.1L53.6 60.8L54.2 60.7L54.9 60.8L55.5 61.1L55.9 61.5L56.0 61.9L55.9 62.3L55.5 62.7L54.9 63.0L54.2 63.1L53.6 63.0L53.0 62.7L52.5 62.3L52.4 61.9Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M70.9 61.9L71.1 61.2L71.7 60.6L72.7 60.2L73.7 60.1L74.7 60.2L75.7 60.6L76.3 61.2L76.5 61.9L76.3 62.5L75.7 63.2L74.7 63.6L73.7 63.7L72.7 63.6L71.7 63.2L71.1 62.5L70.9 61.9Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M57.4 69.1L57.5 68.6L57.7 68.5L58.4 68.0L59.5 67.6L60.6 67.4L62.2 67.5L65.5 68.2L66.9 68.4L68.0 68.3L68.6 68.0L69.4 67.6L69.8 67.5L70.1 67.6L70.4 67.9L70.5 68.3L70.4 68.8L70.2 68.9L69.5 69.4L68.4 69.8L67.3 70.0L65.7 69.9L62.4 69.2L61.0 69.0L59.9 69.1L59.3 69.4L58.5 69.8L58.1 69.9L57.8 69.8L57.5 69.5L57.4 69.1Z' opacity='1' fill='%23172023' fill-rule='nonzero'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E" alt="ML Engineer" width="64" height="64" style="display: block; width: 64px; height: 64px"><span aria-hidden="true" style="position: absolute; right: 5px; bottom: 11px; width: 6px; height: 14px; border-radius: 999px; background: linear-gradient(180deg, #f2286f, #f2272c); box-shadow: 0 0 0 2.5px var(--card)"></span></a><a href="#" title="Frontend Engineer · Idle since 2:25" style="position: relative; display: block; width: 64px; height: 64px"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128' role='img'%3E%3Cdefs%3E%3ClinearGradient id='a-body-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='50.7' y1='104.3' x2='79.7' y2='24.5'%3E%3Cstop stop-color='%23e8d2aa'/%3E%3Cstop offset='1' stop-color='%23eabc48'/%3E%3C/linearGradient%3E%3ClinearGradient id='a-candle-light-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='48.9' y1='103.7' x2='78.0' y2='23.9'%3E%3Cstop stop-color='%23fde5ba'/%3E%3Cstop offset='1' stop-color='%23ffcd4f'/%3E%3C/linearGradient%3E%3CclipPath id='a-face-visible'%3E%3Cpath d='M40.1 48.2L40.1 84.0L87.8 84.0L87.8 48.2L40.1 48.2Z'/%3E%3C/clipPath%3E%3C/defs%3E%3Cg id='a-ground-shadow'%3E%3Cpath d='M35.7 113.2L35.8 112.9L36.3 112.5L37.9 111.9L40.5 111.2L44.0 110.7L48.3 110.3L53.1 109.9L58.4 109.7L64 109.6L69.5 109.7L74.8 109.9L79.6 110.3L83.9 110.7L87.4 111.2L90.0 111.9L91.7 112.5L92.1 112.9L92.2 113.2L92.1 113.6L91.7 113.9L90.0 114.6L87.4 115.2L83.9 115.7L79.6 116.2L74.8 116.5L69.5 116.7L64 116.8L58.4 116.7L53.1 116.5L48.3 116.2L44.0 115.7L40.5 115.2L37.9 114.6L36.3 113.9L35.8 113.6L35.7 113.2Z' fill='%23809299' opacity='0.2'/%3E%3C/g%3E%3Cg id='a-body'%3E%3Cpath fill='url(%23a-body-gradient)' d='M21.5 64L21.5 61.9L21.9 57.7L22.8 53.6L24.0 49.6L25.6 45.8L26.5 43.9L28.6 40.4L29.8 38.7L32.5 35.4L35.4 32.5L37.0 31.1L38.7 29.8L42.1 27.5L45.8 25.6L49.6 24.0L51.6 23.3L53.6 22.8L57.7 21.9L61.9 21.5L64 21.5L68.1 21.7L72.2 22.3L76.3 23.3L78.3 24.0L82.1 25.6L85.8 27.5L89.3 29.8L92.5 32.5L95.4 35.4L98.1 38.7L99.3 40.4L101.4 43.9L103.2 47.7L104.6 51.6L105.1 53.6L106.0 57.7L106.4 61.9L106.4 100.5L106.4 101.3L106.0 102.8L105.2 104.1L104.1 105.2L103.4 105.6L102.0 106.2L100.5 106.4L27.4 106.4L26.6 106.4L25.2 106.0L23.8 105.2L22.7 104.1L21.9 102.8L21.5 101.3L21.5 64Z'/%3E%3C/g%3E%3Cg id='a-candle-light'%3E%3Cpath fill='url(%23a-candle-light-gradient)' d='M26.6 62.7L26.6 60.9L27.0 57.4L27.7 53.9L28.7 50.5L30.0 47.2L30.8 45.7L32.7 42.6L33.7 41.2L35.9 38.4L38.4 35.9L39.8 34.8L41.2 33.7L44.1 31.7L47.2 30.0L50.5 28.7L52.2 28.1L53.9 27.7L57.4 27.0L60.9 26.6L62.7 26.6L66.2 26.7L69.7 27.3L73.2 28.1L74.8 28.7L78.1 30.0L81.2 31.7L84.2 33.7L86.9 35.9L89.4 38.4L91.7 41.2L92.7 42.6L94.5 45.7L96.0 48.9L97.2 52.2L97.7 53.9L98.4 57.4L98.7 60.9L98.8 93.7L98.7 94.4L98.4 95.7L97.7 96.8L96.8 97.7L96.2 98.1L95.0 98.6L93.7 98.8L31.6 98.8L31.0 98.7L29.7 98.4L28.6 97.7L27.6 96.8L27.0 95.7L26.6 94.4L26.6 62.7Z'/%3E%3C/g%3E%3Cg id='a-face'%3E%3Cg clip-path='url(%23a-face-visible)'%3E%3Cdefs%3E%3CclipPath id='a-face-clip-0' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M51.8 61.9L52.0 61.0L52.6 60.2L53.4 59.6L54.3 59.4L55.3 59.6L56.1 60.2L56.7 61.0L56.9 61.9L56.7 62.9L56.1 63.7L55.3 64.3L54.3 64.5L53.4 64.3L52.6 63.7L52.0 62.9L51.8 61.9Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-1' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M71.0 61.9L71.2 61.0L71.8 60.2L72.6 59.6L73.6 59.4L74.5 59.6L75.3 60.2L75.9 61.0L76.1 61.9L75.9 62.9L75.3 63.7L74.5 64.3L73.6 64.5L72.6 64.3L71.8 63.7L71.2 62.9L71.0 61.9Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-2' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M57.3 71.1L57.4 70.6L57.7 70.2L58.2 69.9L58.9 69.9L59.4 70.2L60.6 71.6L61.5 72.2L62.7 72.7L64.0 72.8L65.3 72.7L66.5 72.2L67.5 71.4L68.5 70.2L69.0 69.9L69.8 70.0L70.2 70.2L70.5 70.6L70.6 71.2L70.5 71.7L69.7 72.7L69.0 73.5L67.9 74.3L67.0 74.7L66.0 75.1L65.0 75.3L63.9 75.4L62.9 75.3L61.6 75.0L60.6 74.6L59.7 74.1L58.9 73.5L58.0 72.5L57.4 71.6L57.3 71.1Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-3' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M64 68.7L64 68.7Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3C/defs%3E%3Cpath d='M51.8 61.9L52.0 61.0L52.6 60.2L53.4 59.6L54.3 59.4L55.3 59.6L56.1 60.2L56.7 61.0L56.9 61.9L56.7 62.9L56.1 63.7L55.3 64.3L54.3 64.5L53.4 64.3L52.6 63.7L52.0 62.9L51.8 61.9Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M71.0 61.9L71.2 61.0L71.8 60.2L72.6 59.6L73.6 59.4L74.5 59.6L75.3 60.2L75.9 61.0L76.1 61.9L75.9 62.9L75.3 63.7L74.5 64.3L73.6 64.5L72.6 64.3L71.8 63.7L71.2 62.9L71.0 61.9Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M57.3 71.1L57.4 70.6L57.7 70.2L58.2 69.9L58.9 69.9L59.4 70.2L60.6 71.6L61.5 72.2L62.7 72.7L64.0 72.8L65.3 72.7L66.5 72.2L67.5 71.4L68.5 70.2L69.0 69.9L69.8 70.0L70.2 70.2L70.5 70.6L70.6 71.2L70.5 71.7L69.7 72.7L69.0 73.5L67.9 74.3L67.0 74.7L66.0 75.1L65.0 75.3L63.9 75.4L62.9 75.3L61.6 75.0L60.6 74.6L59.7 74.1L58.9 73.5L58.0 72.5L57.4 71.6L57.3 71.1Z' opacity='1' fill='%23172023' fill-rule='nonzero'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E" alt="Frontend Engineer" width="64" height="64" style="display: block; width: 64px; height: 64px"><span aria-hidden="true" style="position: absolute; right: 5px; bottom: 11px; width: 6px; height: 14px; border-radius: 999px; background: linear-gradient(180deg, var(--ash-a), var(--ash-b)); box-shadow: 0 0 0 2.5px var(--card)"></span></a></div>
+    <button class="ghost" style="align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--edge); color: var(--body); font-size: 13px; font-weight: 700"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"></path></svg>Share</button>
+<div style="flex: 1 1 100%; display: flex; margin: 0 -22px 0 -26px; padding: 12px 22px 0 26px; border-top: 1px solid var(--line)">
+<nav aria-label="Project" style="display: flex; flex-wrap: wrap; gap: 2px; padding: 4px; border-radius: 999px; background: var(--well)">
+  <a href="Main.dc.html" aria-current="page" style="height: 32px; padding: 0 14px; border-radius: 999px; display: flex; align-items: center; background: var(--sel); box-shadow: var(--sel-shadow); color: var(--text); font-weight: 800; text-decoration: none; font-size: 13px">List</a>
+  <a href="Board.dc.html" style="height: 32px; padding: 0 14px; border-radius: 999px; display: flex; align-items: center; color: var(--body); text-decoration: none; font-size: 13px; font-weight: 600">Board</a>
+  <a href="AgentWorkload.dc.html" style="height: 32px; padding: 0 14px; border-radius: 999px; display: flex; align-items: center; color: var(--body); text-decoration: none; font-size: 13px; font-weight: 600">Agent workload</a>
+  <a href="ProjectDocs.dc.html" style="height: 32px; padding: 0 14px; border-radius: 999px; display: flex; align-items: center; color: var(--body); text-decoration: none; font-size: 13px; font-weight: 600">Docs</a>
+  <a href="ProjectSettings.dc.html" style="height: 32px; padding: 0 14px; border-radius: 999px; display: flex; align-items: center; color: var(--body); text-decoration: none; font-size: 13px; font-weight: 600">Settings</a>
+</nav>
+</div>
+</header>
+
+  <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+    <button class="ghost" style="height: 34px; padding: 0 13px; border-radius: 999px; border: 1px solid var(--edge); background: var(--card); color: var(--text); font-size: 13px; font-weight: 700">Group: Status</button>
+    <a href="CasesNewTask.dc.html" style="margin-left: auto; display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-size: 13px; font-weight: 800; text-decoration: none"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Task</a>
+  </div>
+  <sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+    <section class="card" aria-label="{{g.name}}" style="overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 12px 0 18px">
+        <span aria-hidden="true" style="width: 8px; height: 20px; flex-shrink: 0; border-radius: 999px; background: {{g.glyph}}"></span>
+        <h2 class="disp" style="margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -.01em">{{g.name}}</h2>
+        <span style="color: var(--muted); font-size: 13px; font-weight: 600">{{g.count}}</span>
+      </div>
+      <sc-for list="{{g.tasks}}" as="t" hint-placeholder-count="3">
+        <div class="row" style="display: flex; align-items: center; gap: 9px; min-height: 42px; padding: 0 14px 0 20px; border-top: 1px solid var(--row-line)">
+          <span aria-hidden="true" style="width: 6px; height: 16px; flex-shrink: 0; border-radius: 999px; background: {{g.glyph}}"></span>
+          <span class="mono" style="font-size: 12px; color: var(--muted); flex-shrink: 0">{{t.id}}</span>
+          <a href="#" style="flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600">{{t.title}}</a>
+          <sc-if value="{{t.hasCase}}" hint-placeholder-val="{{false}}">
+            <span class="cchip"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="12" height="14" rx="2.5"></rect><path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h7A2.5 2.5 0 0 1 20 5.5v9a2.5 2.5 0 0 1-2.5 2.5H16"></path></svg><span class="mono">{{t.c.id}}</span><span class="ticks" aria-hidden="true"><sc-for list="{{t.c.ticks}}" as="k" hint-placeholder-count="5"><i class="{{k.cls}}"></i></sc-for></span></span>
+          </sc-if>
+          <sc-if value="{{t.hasReq}}" hint-placeholder-val="{{false}}">
+            <span class="cchip" title="{{t.reqTitle}}" style="background: transparent; border-style: dashed; border-color: {{t.reqBd}}; color: var(--run-fg)"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="12" height="14" rx="2.5"></rect><path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h7A2.5 2.5 0 0 1 20 5.5v9a2.5 2.5 0 0 1-2.5 2.5H16"></path></svg>Case requested</span>
+          </sc-if>
+        </div>
+      </sc-for>
+    </section>
+  </sc-for>
+
+</main>
+<div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 50; background: var(--scrim); display: flex; justify-content: center; align-items: flex-start; padding: 56px 32px; box-sizing: border-box">
+  <div role="dialog" aria-modal="true" aria-labelledby="nc-h" style="width: 100%; max-width: 800px; box-sizing: border-box; background: var(--card); border: 1px solid var(--card-edge); border-radius: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column">
+    <div style="display: flex; align-items: center; gap: 8px; padding: 12px 12px 0 18px">
+      <button class="ghost" style="display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px 0 6px; border-radius: 999px; border: 1px solid var(--edge); color: var(--body); font-size: 13px"><span style="width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(160deg, #f7b52f, #f5822a); color: #111113; font-size: 10px; display: grid; place-items: center; font-weight: 800">t</span>trading workbench</button>
+      <span style="color: var(--dashed)">/</span>
+      <h2 class="disp" id="nc-h" style="margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -.01em">New task</h2>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 2px">
+        <a class="icon" href="Main.dc.html" aria-label="Close" style="width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></a>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 14px 24px 4px">
+      <button class="ghost" style="display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--edge); color: var(--body); font-size: 13px"><span aria-hidden="true" style="width: 5px; height: 13px; border-radius: 999px; background: linear-gradient(180deg, #f7b52f, #f5822a)"></span>Todo</button>
+      <button class="ghost" style="display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--edge); color: var(--body); font-size: 13px"><span aria-hidden="true" style="display: inline-flex; align-items: flex-end; gap: 2px; height: 13px"><span style="width: 3px; height: 6px; border-radius: 999px; background: var(--body)"></span><span style="width: 3px; height: 9px; border-radius: 999px; background: var(--body)"></span><span style="width: 3px; height: 13px; border-radius: 999px; background: var(--pri-off)"></span></span>Medium</button>
+      <sc-if value="{{startOff}}" hint-placeholder-val="{{false}}">
+        <div style="position: relative">
+          <button class="ghost" aria-haspopup="listbox" aria-expanded="{{linkOpen}}" onClick="{{toggleLink}}" style="display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px 0 11px; box-sizing: border-box; border-radius: 999px; border: 1px {{linkPill.border}} {{linkPill.bd}}; background: {{linkPill.bg}}; color: {{linkPill.fg}}; font-size: 13px; font-weight: 700; white-space: nowrap"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="12" height="14" rx="2.5"></rect><path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h7A2.5 2.5 0 0 1 20 5.5v9a2.5 2.5 0 0 1-2.5 2.5H16"></path></svg>{{linkPill.label}}<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: .7"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <sc-if value="{{linkOpen}}" hint-placeholder-val="{{false}}">
+            <div role="listbox" aria-label="Add to a case" style="position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; width: 340px; box-sizing: border-box; padding: 6px; border: 1px solid var(--edge); border-radius: 18px; background: var(--card); box-shadow: 0 24px 50px -18px rgba(0,0,0,.7); display: flex; flex-direction: column; gap: 2px">
+              <sc-for list="{{linkOpts}}" as="o" hint-placeholder-count="3">
+                <button class="ghost" role="option" aria-selected="{{o.on}}" onClick="{{o.pick}}" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 6px 10px; box-sizing: border-box; border-radius: 12px; text-align: left; background: {{o.rowBg}}">
+                  <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+                    <span style="display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 700; color: var(--text)">{{o.label}}<span class="mono" style="font-size: 11.5px; font-weight: 400; color: var(--muted)">{{o.id}}</span></span>
+                    <span style="font-size: 12px; color: var(--muted)">{{o.desc}}</span>
+                  </span>
+                  <sc-if value="{{o.on}}" hint-placeholder-val="{{false}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text)"><path d="m5 12 5 5 9-10"></path></svg></sc-if>
+                </button>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="padding: 12px 24px 0; display: flex; flex-direction: column; gap: 10px">
+      <label for="nc-title" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Task title</label>
+      <input id="nc-title" class="disp" value="{{title}}" autocomplete="off" style="width: 100%; box-sizing: border-box; border: 1px solid var(--edge); border-radius: 14px; outline: none; background: var(--well); padding: 10px 14px; color: var(--text); font-size: 22px; font-weight: 800; letter-spacing: -.01em">
+      <label for="nc-desc" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Description</label>
+      <textarea id="nc-desc" rows="3" value="{{desc}}" style="width: 100%; box-sizing: border-box; resize: vertical; border: 1px solid var(--edge); border-radius: 14px; outline: none; background: var(--well); padding: 12px 14px; color: var(--body); font: inherit; font-size: 15px; line-height: 1.6"></textarea>
+    </div>
+
+    <section aria-labelledby="nc-case" style="margin: 14px 24px 0; padding: 10px 12px 10px 14px; border-radius: 18px; background: {{caseBox.bg}}; border: 1px solid {{caseBox.bd}}; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center; gap: 10px">
+        <span aria-hidden="true" style="width: 30px; height: 30px; flex-shrink: 0; border-radius: 10px; background: var(--card); border: 1px solid var(--edge); display: grid; place-items: center; color: var(--text)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="12" height="14" rx="2.5"></rect><path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h7A2.5 2.5 0 0 1 20 5.5v9a2.5 2.5 0 0 1-2.5 2.5H16"></path></svg></span>
+        <h3 class="stitle" id="nc-case" style="font-size: 15px">Start a case</h3>
+        <button type="button" class="info" aria-label="{{tips.start}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.6v.01"></path></svg><span class="tipb" aria-hidden="true">{{tips.start}}</span></button>
+        <button type="button" role="switch" aria-checked="{{startOn}}" aria-labelledby="nc-case" onClick="{{toggleStart}}" style="margin-left: auto; flex-shrink: 0; width: 44px; height: 26px; border-radius: 999px; background: {{sw.track}}; position: relative"><span aria-hidden="true" style="position: absolute; top: 3px; left: {{sw.knob}}; width: 20px; height: 20px; border-radius: 50%; background: {{sw.knobBg}}; box-shadow: 0 1px 3px rgba(0,0,0,.35)"></span></button>
+      </div>
+
+      <sc-if value="{{startOn}}" hint-placeholder-val="{{true}}">
+        <div style="display: flex; flex-direction: column; gap: 8px; padding-left: 40px">
+          <div style="display: flex; align-items: center; gap: 4px">
+            <h4 class="stitle" id="nc-tpl" style="font-size: 13px">Workflow template</h4>
+            <button type="button" class="info" aria-label="{{tips.template}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.6v.01"></path></svg><span class="tipb" aria-hidden="true">{{tips.template}}</span></button>
+          </div>
+          <div style="position: relative; width: 320px">
+            <button class="ghost" aria-haspopup="listbox" aria-expanded="{{tplOpen}}" aria-labelledby="nc-tpl nc-tpl-v" onClick="{{toggleTpl}}" style="display: flex; align-items: center; gap: 8px; width: 100%; height: 38px; padding: 0 12px 0 14px; box-sizing: border-box; border-radius: 12px; border: 1px solid var(--edge); background: var(--card); color: var(--text); font-size: 14px; font-weight: 700; text-align: left"><span id="nc-tpl-v" style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{tplName}}</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg></button>
+            <sc-if value="{{tplOpen}}" hint-placeholder-val="{{false}}">
+              <div role="listbox" aria-label="Workflow template" style="position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; width: 100%; box-sizing: border-box; padding: 6px; border: 1px solid var(--edge); border-radius: 16px; background: var(--card); box-shadow: 0 24px 50px -18px rgba(0,0,0,.7); display: flex; flex-direction: column; gap: 2px">
+                <sc-for list="{{templates}}" as="tp" hint-placeholder-count="4">
+                  <button class="ghost" role="option" aria-selected="{{tp.on}}" onClick="{{tp.pick}}" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 0 10px; box-sizing: border-box; border-radius: 11px; text-align: left; font-size: 14px; font-weight: 600; color: var(--text); background: {{tp.rowBg}}"><span style="flex: 1; min-width: 0">{{tp.name}}</span><sc-if value="{{tp.on}}" hint-placeholder-val="{{false}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></button>
+                </sc-for>
+                <span aria-hidden="true" style="height: 1px; margin: 4px 6px; background: var(--line)"></span>
+                <a class="ghost" href="#" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; border-radius: 11px; color: var(--body); font-size: 13px; text-decoration: none"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>Manage templates</a>
+              </div>
+            </sc-if>
+          </div>
+
+          <sc-if value="{{hasPreview}}" hint-placeholder-val="{{true}}">
+            <div aria-label="Template preview" role="group" style="display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line)">
+              <div style="display: flex; align-items: baseline; gap: 10px">
+                <span style="flex: 1; min-width: 0; font-size: 13px; color: var(--body); line-height: 1.45">{{pv.desc}}</span>
+                <span style="flex-shrink: 0; font-size: 12px; color: var(--muted)">{{pv.meta}}</span>
+              </div>
+              <ol aria-label="Phases" style="margin: 0; padding: 0; list-style: none; display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+                <sc-for list="{{pv.steps}}" as="ps" hint-placeholder-count="5">
+                  <sc-if value="{{ps.notFirst}}" hint-placeholder-val="{{true}}"><svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></sc-if>
+                  <li title="{{ps.who}}" aria-label="{{ps.aria}}" style="display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px 0 3px; box-sizing: border-box; border-radius: 999px; background: var(--well)">
+                    <span class="disc" aria-hidden="true" style="width: 22px; height: 22px; font-size: 8px; background: {{ps.bg}}; color: {{ps.ink}}">{{ps.initials}}</span>
+                    <span style="font-size: 12.5px; font-weight: 700; color: var(--text)">{{ps.name}}</span>
+                  </li>
+                </sc-for>
+              </ol>
+              <sc-if value="{{pv.hasFacts}}" hint-placeholder-val="{{true}}">
+                <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
+                  <sc-for list="{{pv.facts}}" as="pf" hint-placeholder-count="2">
+                    <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--body)"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="{{pf.icon}}"></path></svg>{{pf.text}}</span>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+    </section>
+
+    <sc-if value="{{isLink}}" hint-placeholder-val="{{false}}">
+      <section aria-labelledby="nc-link" style="margin: 10px 24px 0; padding: 12px 14px; border-radius: 18px; background: var(--well); border: 1px solid var(--line); display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <h3 class="stitle" id="nc-link" style="font-size: 14px">Adds this task to {{link.title}}</h3>
+        <span class="cchip"><span class="mono">{{link.id}}</span><span class="ticks" aria-hidden="true"><sc-for list="{{link.ticks}}" as="lt" hint-placeholder-count="6"><i class="{{lt.cls}}"></i></sc-for></span></span>
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 4px">
+          <span id="nc-role" style="font-size: 13px; font-weight: 700; color: var(--text)">Role</span>
+          <button type="button" class="info" aria-label="{{tips.role}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.6v.01"></path></svg><span class="tipb" aria-hidden="true">{{tips.role}}</span></button>
+          <div role="radiogroup" aria-labelledby="nc-role" style="display: flex; gap: 2px; margin-left: 4px; padding: 3px; border-radius: 999px; background: var(--card); border: 1px solid var(--line)">
+            <sc-for list="{{roles}}" as="r" hint-placeholder-count="2">
+              <button type="button" role="radio" aria-checked="{{r.on}}" onClick="{{r.pick}}" style="height: 28px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 700; background: {{r.bg}}; color: {{r.fg}}">{{r.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+    </sc-if>
+
+    <div style="display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 14px 24px; border-top: 1px solid var(--line); background: var(--ground)">
+      <button class="ghost" aria-label="{{who.aria}}" style="display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px 0 5px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--edge); background: var(--card); color: var(--body); font-size: 13px; white-space: nowrap">
+        <span aria-hidden="true" style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; background: {{who.bg}}; color: {{who.ink}}; font-size: 10px; display: grid; place-items: center; font-weight: 800">{{who.initials}}</span>
+        <span style="font-weight: 700; color: var(--text)">{{who.name}}</span>
+        <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+      <span style="margin-left: 4px; font-size: 13px; font-weight: 700; color: var(--body)">{{whoRole}}</span>
+      <sc-if value="{{hasWhoTip}}" hint-placeholder-val="{{true}}">
+        <button type="button" class="info" aria-label="{{tips.who}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.6v.01"></path></svg><span class="tipb" aria-hidden="true">{{tips.who}}</span></button>
+      </sc-if>
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 12px 14px 12px 24px; border-top: 1px solid var(--line)">
+      <a class="ghost" href="Main.dc.html" style="display: inline-flex; align-items: center; height: 34px; padding: 0 14px; box-sizing: border-box; border-radius: 999px; color: var(--body); font-size: 14px; text-decoration: none">Cancel</a>
+      <button type="button" style="display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 16px; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-weight: 700; font-size: 14px; white-space: nowrap">{{primaryLabel}}<kbd style="font-family: inherit; font-size: 12px; font-weight: 600; opacity: .6">⌘↵</kbd></button>
+    </div>
+  </div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme": {"editor": "enum", "default": "dark", "options": ["light", "dark"]}, "display": {"editor": "enum", "default": "Hanken Grotesk", "options": ["Hanken Grotesk", "Bricolage Grotesque"]}, "grain": {"editor": "boolean", "default": true}, "startCase": {"editor": "boolean", "default": true}, "template": {"editor": "enum", "default": "Strategy pipeline", "options": ["None", "Strategy pipeline", "Dataset build", "Bug fix"]}, "$preview": {"width": 1440, "height": 1280}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { start: null, tpl: null, tplOpen: false, link: null, linkOpen: false, role: 'work' };
+  }
+  kit() {
+    const dark = (this.props.theme ?? 'dark') === 'dark';
+    const font = (this.props.display ?? 'Hanken Grotesk') === 'Bricolage Grotesque' ? 'f-bricolage' : 'f-hanken';
+    const rootClass = (dark ? 'dark' : 'light') + ' ' + font + ((this.props.grain ?? true) ? '' : ' no-grain');
+    const cap = (a, b) => 'linear-gradient(180deg, ' + a + ', ' + b + ')';
+    const disc = (a, b) => 'linear-gradient(160deg, ' + a + ', ' + b + ')';
+    const G = { ion: cap('#8b2cf0', '#1f6fe0'), orchid: cap('#ff2bd6', '#8b2cf0'), ember: cap('#f7b52f', '#f5822a'), flare: cap('#f2286f', '#f2272c'), lagoon: cap('#2fd12f', '#22b5a5'), tide: cap('#22b5a5', '#4c7896'), ash: cap('var(--ash-a)', 'var(--ash-b)') };
+    const edge = (v) => 'color-mix(in srgb, var(--' + v + ') 50%, transparent)';
+    const A = {
+      qr: { key: 'qr', initials: 'QR', name: 'Quant Researcher', short: 'Researcher', bg: disc('#2fd12f', '#22b5a5'), ink: '#111113' },
+      se: { key: 'se', initials: 'SE', name: 'Strategy Engineer', short: 'Strategy Eng.', bg: disc('#ff2bd6', '#f2286f'), ink: '#111113' },
+      fe: { key: 'fe', initials: 'FE', name: 'Frontend Engineer', short: 'Frontend Eng.', bg: disc('#f7b52f', '#f5822a'), ink: '#111113' },
+      ml: { key: 'ml', initials: 'ML', name: 'ML Engineer', short: 'ML Eng.', bg: disc('#f2272c', '#ff2bd6'), ink: '#111113' },
+      me: { key: 'me', initials: 'BA', name: 'You', short: 'You', bg: 'var(--primary)', ink: 'var(--on-primary)' },
+      none: { key: 'none', initials: '', name: 'Unassigned', short: 'Unassigned', bg: 'transparent', ink: 'var(--muted)' }
+    };
+    const pill = (label, glyph, tone) => ({ label, glyph, bg: tone ? 'var(--' + tone + '-bg)' : 'var(--well)', fg: tone ? 'var(--' + tone + '-fg)' : 'var(--body)', bd: tone ? edge(tone + '-fg') : 'var(--edge)' });
+    const caseStatus = {
+      draft: pill('Draft', G.ash, ''),
+      in_progress: pill('In progress', G.ion, 'run'),
+      in_review: pill('In review', G.orchid, 'violet'),
+      approved: pill('Approved', G.lagoon, 'green'),
+      done: pill('Done', G.lagoon, 'green'),
+      cancelled: pill('Cancelled', G.ash, '')
+    };
+    const taskStatus = {
+      in_progress: pill('In progress', G.ion, 'run'),
+      in_review: pill('In review', G.orchid, 'violet'),
+      todo: pill('Todo', G.ember, 'amber'),
+      blocked: pill('Blocked', G.flare, 'red'),
+      backlog: pill('Backlog', G.ash, ''),
+      done: pill('Done', G.lagoon, 'green')
+    };
+    const workflows = {
+      strategy: { name: 'Strategy pipeline', steps: [['Research', 'qr'], ['Build', 'se'], ['Backtest', 'ml'], ['Approval', 'me'], ['Paper trade', 'se'], ['Done', '']] },
+      dataset: { name: 'Dataset build', steps: [['Source', 'qr'], ['Ingest', 'qr'], ['Validate', 'ml'], ['Done', '']] }
+    };
+    const ring = (c) => '0 0 0 2px var(--card), 0 0 0 4px ' + c;
+    // One entry per step of the case's workflow, for the full phase track.
+    const track = (c) => {
+      const wf = workflows[c.wf];
+      return wf.steps.map((s, i) => {
+        const who = s[1] ? A[s[1]] : null;
+        const last = i === wf.steps.length - 1;
+        let state = 'future';
+        if (c.mode === 'done' || i < c.at) state = 'done';
+        else if (i === c.at) state = c.mode === 'handing' ? 'done' : c.mode;
+        else if (c.mode === 'handing' && i === c.at + 1) state = 'next';
+        let style = { bg: 'transparent', fg: 'var(--muted)', shadow: 'none', border: '1.5px dashed var(--dashed)' };
+        const filled = (bg, fg, shadow) => ({ bg, fg, shadow: shadow || 'none', border: '0' });
+        if (state === 'done' && who) style = filled(who.bg, who.ink);
+        if (state === 'done' && !who) style = filled(disc('#2fd12f', '#22b5a5'), '#111113');
+        if (state === 'running') style = filled(who.bg, who.ink, ring('#6a3ef0'));
+        if (state === 'idle') style = filled(who.bg, who.ink, ring('var(--edge)'));
+        if (state === 'waiting') style = filled(who.bg, who.ink, ring('#f69a2d'));
+        if (state === 'next') style = { bg: 'transparent', fg: 'var(--run-fg)', shadow: 'none', border: '1.5px dashed #7b5cf5' };
+        const current = ['running', 'idle', 'waiting', 'next'].indexOf(state) >= 0;
+        const rounds = (c.rounds || {})[i];
+        const notes = { running: 'working now', idle: 'up next', waiting: 'waiting on you', next: 'hand-off queued' };
+        return {
+          name: s[0], initials: who ? who.initials : '', isEnd: !who, who: who ? (who.key === 'me' ? 'You' : who.short) : 'Finish',
+          style, check: state === 'done' && !!who, notFirst: i > 0,
+          connBg: (i <= c.at || c.mode === 'done') ? 'linear-gradient(90deg, #2fd12f, #22b5a5)' : 'var(--line)',
+          nameFg: current ? 'var(--text)' : (state === 'done' ? 'var(--body)' : 'var(--muted)'),
+          nameWeight: current ? 800 : 700,
+          note: notes[state] || (rounds ? rounds + ' rounds' : ''), noteFg: state === 'waiting' ? 'var(--amber-fg)' : (current ? 'var(--run-fg)' : 'var(--muted)'),
+          aria: s[0] + ', ' + (who ? (who.key === 'me' ? 'you' : who.name) : 'finish') + ', ' + (state === 'done' ? 'done' : (notes[state] || 'not started'))
+        };
+      });
+    };
+    // The compact ticks shown on rows and cards.
+    const ticks = (c) => workflows[c.wf].steps.map((s, i) => {
+      let cls = '';
+      if (c.mode === 'done' || i < c.at) cls = 'd';
+      else if (i === c.at) cls = { running: 'c', idle: 'c', waiting: 'w', handing: 'd' }[c.mode] || '';
+      else if (c.mode === 'handing' && i === c.at + 1) cls = 'n';
+      return { cls: (s[1] === 'me' ? 'g ' : '') + cls };
+    });
+    const C = {
+      c3: { id: 'TRA-C3', type: 'Strategy', title: 'Liquidation sweep', summary: 'Fade forced liquidations after a sweep of the prior 4h low.', status: 'in_review', wf: 'strategy', at: 3, mode: 'waiting', rounds: { 1: 2, 2: 2 }, primary: 'TRA-44', who: 'ml', phase: 'Approval', phaseNote: 'waiting on you', phaseFg: 'var(--amber-fg)', updated: '32m ago', docs: 3, children: 0,
+        stats: [['1.62', 'sharpe'], ['−0.114', 'max drawdown'], ['312', 'trades']] },
+      c4: { id: 'TRA-C4', type: 'Strategy', title: 'Center of gravity', summary: 'Mean reversion to a volume-weighted center on 1h bars.', status: 'in_progress', wf: 'strategy', at: 1, mode: 'handing', primary: 'TRA-47', who: 'se', phase: 'Build → Backtest', phaseNote: 'hand-off queued', phaseFg: 'var(--run-fg)', updated: '6m ago', docs: 2, children: 0,
+        stats: [['1.18', 'sharpe in sample'], ['1h', 'timeframe'], ['BTC', 'market']] },
+      c5: { id: 'TRA-C5', type: 'Strategy', title: 'Boom Hunter XL v4', summary: 'FPB entries on 4h bars, with a 15m execution layer as its own case.', status: 'in_progress', wf: 'strategy', at: 0, mode: 'running', primary: 'TRA-48', who: 'qr', phase: 'Research', phaseNote: 'working now', phaseFg: 'var(--run-fg)', updated: '14m ago', docs: 1, children: 1,
+        stats: [['4h', 'timeframe'], ['FPB', 'entry'], ['3', 'markets']] },
+      c6: { id: 'TRA-C6', type: 'Strategy', title: '15m execution layer', summary: 'Child of Boom Hunter XL v4: time entries on 15m bars.', status: 'in_progress', wf: 'strategy', at: 1, mode: 'idle', primary: 'TRA-49', who: 'se', phase: 'Build', phaseNote: 'up next', phaseFg: 'var(--muted)', updated: 'Oct 11', docs: 0, children: 0,
+        stats: [['15m', 'timeframe'], ['4h', 'parent timeframe'], ['—', 'trades']] },
+      c2: { id: 'TRA-C2', type: 'Dataset', title: 'H4 derivatives dataset', summary: '4h OHLCV, funding, open interest and liquidations for BTC, ETH and SOL perps.', status: 'in_progress', wf: 'dataset', at: 1, mode: 'running', primary: 'TRA-41', who: 'qr', phase: 'Ingest', phaseNote: 'working now', phaseFg: 'var(--run-fg)', updated: '2m ago', docs: 2, children: 0,
+        stats: [['1.9M', 'rows'], ['3', 'symbols'], ['2022-01-01', 'since']] },
+      c7: { id: 'TRA-C7', type: 'Strategy', title: 'BB squeeze + VPA', summary: 'Bollinger squeeze breakouts confirmed by volume-price analysis.', status: 'draft', wf: 'strategy', at: -1, mode: 'draft', primary: '', who: 'none', phase: 'No work yet', phaseNote: '', phaseFg: 'var(--muted)', updated: 'Oct 8', docs: 0, children: 0,
+        stats: [['—', 'sharpe'], ['—', 'max drawdown'], ['—', 'trades']] },
+      c1: { id: 'TRA-C1', type: 'Dataset', title: 'Daily OHLCV', summary: 'Daily candles for 40 spot and perp markets, refreshed every night.', status: 'done', wf: 'dataset', at: 3, mode: 'done', primary: 'TRA-27', who: 'qr', phase: 'Done', phaseNote: 'Oct 6', phaseFg: 'var(--muted)', updated: 'Oct 6', docs: 1, children: 0,
+        stats: [['612K', 'rows'], ['40', 'markets'], ['daily', 'refresh']] }
+    };
+    const kase = (k) => {
+      const c = C[k];
+      const wf = workflows[c.wf];
+      return Object.assign({ key: k, st: caseStatus[c.status], ticks: ticks(c), track: track(c), wfName: wf.name, owner: A[c.who],
+        step: c.at >= 0 ? Math.min(c.at + 1, wf.steps.length) : 0, steps: wf.steps.length, isDraft: c.mode === 'draft', notDraft: c.mode !== 'draft',
+        tickLabel: c.mode === 'draft' ? 'Not started' : (c.title + ': ' + c.phase + ', ' + (c.phaseNote || '') )
+      }, c);
+    };
+    // Fields, documents and hand-offs of the case that the open task belongs to.
+    const fields = [
+      { k: 'market', v: '', list: [{ v: 'BTC-PERP' }, { v: 'ETH-PERP' }], isList: true },
+      { k: 'timeframe', v: '4h' },
+      { k: 'entry', v: 'Sweep of the prior 4h low with open interest down 3% or more' },
+      { k: 'exit', v: '1.8R target or 12 bars' },
+      { k: 'risk_per_trade', v: '0.005' },
+      { k: 'backtest.period', v: '2022-01-01 to 2026-09-30' },
+      { k: 'backtest.trades', v: '312' },
+      { k: 'backtest.win_rate', v: '0.542' },
+      { k: 'backtest.sharpe', v: '1.62' },
+      { k: 'backtest.max_drawdown', v: '-0.114' },
+      { k: 'paper.account', v: 'null', isNull: true }
+    ].map((f) => Object.assign({ list: [], isList: false, isNull: false, isText: true }, f, { isText: !f.isList && !f.isNull }));
+    const docs = [
+      { name: 'spec', meta: 'rev 2 · from TRA-44', icon: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5' },
+      { name: 'backtest-report', meta: 'rev 3 · from TRA-44', icon: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5' },
+      { name: 'workflow', meta: 'Strategy pipeline · rev 1', icon: 'M6 3v6M6 15v6M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9c0 5-6 3-9 3' },
+      { name: 'equity-curve.png', meta: '214 KB', icon: 'M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5' }
+    ];
+    const hop = (time, from, to, move, note, extra) => Object.assign({ time, f: A[from], t: A[to], move, note, state: 'Delivered', stBg: 'var(--well)', stFg: 'var(--muted)', rowBg: 'transparent', isKickoff: false, notKickoff: true }, extra || {});
+    const hops = [
+      hop('Oct 21', 'se', 'ml', 'Build → Backtest · round 2', 'Fee model fixed for partial fills. Rerun 2022 to 2026 on both markets.'),
+      hop('Oct 19', 'ml', 'se', 'Backtest → Build · round 2', 'Fees are counted twice on partial fills. Details in backtest-report rev 1.'),
+      hop('Oct 18', 'se', 'ml', 'Build → Backtest', 'Candidate is on branch tra-44-sweep. Run the full period with 0.05% fees.'),
+      hop('Oct 16', 'qr', 'se', 'Research → Build', 'Spec saved as spec rev 2. Implement the entries in section 3.'),
+      hop('Oct 14', 'me', 'qr', 'Started · Research', 'Find liquidation-sweep setups worth testing on BTC and ETH perps.', { isKickoff: true, notKickoff: false })
+    ];
+    return { dark, rootClass, G, A, caseStatus, taskStatus, workflows, kase, track, ticks, fields, docs, hops, edge };
+
+  }
+  renderVals() {
+    const K = this.kit();
+    const A = K.A, G = K.G;
+    const startOn = this.state.start ?? (this.props.startCase ?? true);
+    const fromProp = { 'None': 'none', 'Strategy pipeline': 'strategy', 'Dataset build': 'dataset', 'Bug fix': 'bugfix' };
+    const tpl = this.state.tpl ?? (fromProp[this.props.template ?? 'Strategy pipeline'] || 'strategy');
+
+    // Company templates (reusable workflows). Phases, owners, loops and waits are read from each template's prompt.
+    const loop = 'M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4';
+    const gate = 'M12 3l9 9-9 9-9-9z';
+    const T = {
+      none: { name: 'No template', desc: '', meta: '', steps: [], facts: [] },
+      strategy: { name: 'Strategy pipeline', desc: 'Take a trading idea from research to paper trading, with your approval before it trades.', meta: 'Used by 5 cases · edited Oct 21',
+        steps: [['Research', 'qr'], ['Build', 'se'], ['Backtest', 'ml'], ['Approval', 'me'], ['Paper trade', 'se']],
+        facts: [[loop, 'Backtest can send it back to Build, 2 rounds at most'], [gate, 'Approval waits on you']] },
+      dataset: { name: 'Dataset build', desc: 'Source, ingest and validate a market dataset the strategies can use.', meta: 'Used by 2 cases · edited Oct 9',
+        steps: [['Source', 'qr'], ['Ingest', 'qr'], ['Validate', 'ml']],
+        facts: [[loop, 'Validate can send it back to Ingest, 2 rounds at most']] },
+      bugfix: { name: 'Bug fix', desc: 'Reproduce, fix and verify a bug in the workbench.', meta: 'Used by 1 case · edited Oct 3',
+        steps: [['Triage', 'se'], ['Fix', 'fe'], ['Verify', 'se']],
+        facts: [[loop, 'Verify can send it back to Fix, 2 rounds at most'], [gate, 'Code review waits on you']] }
+    };
+    const t = T[tpl];
+    const firstOwner = t.steps.length ? A[t.steps[0][1]] : null;
+    const templates = ['none', 'strategy', 'dataset', 'bugfix'].map((k) => ({
+      name: T[k].name, on: tpl === k, rowBg: tpl === k ? 'var(--hover)' : 'transparent',
+      pick: () => this.setState({ tpl: k, tplOpen: false })
+    }));
+    const pv = {
+      desc: t.desc, meta: t.meta,
+      steps: t.steps.map((s, i) => {
+        const a = A[s[1]];
+        return { name: s[0], notFirst: i > 0, initials: a.initials, bg: a.bg, ink: a.ink, who: a.name, aria: s[0] + ', ' + (a.key === 'me' ? 'you' : a.name) };
+      }),
+      facts: t.facts.map((f) => ({ icon: f[0], text: f[1] })),
+      hasFacts: t.facts.length > 0
+    };
+
+    const link = this.state.link;
+    const isLink = !startOn && !!link;
+    const lk = K.kase(link === 'c2' ? 'c2' : 'c3');
+    const linkOpts = [
+      { k: null, label: 'No case', id: '', desc: 'Just a task' },
+      { k: 'c3', label: 'Liquidation sweep', id: 'TRA-C3', desc: 'Strategy · Approval, waiting on you' },
+      { k: 'c2', label: 'H4 derivatives dataset', id: 'TRA-C2', desc: 'Dataset · Ingest, working now' }
+    ].map((o) => Object.assign({}, o, { on: link === o.k, rowBg: link === o.k ? 'var(--hover)' : 'transparent', pick: () => this.setState({ link: o.k, linkOpen: false }) }));
+    const role = this.state.role;
+    const roleOpt = (k, label) => ({ label, on: role === k,
+      bg: role === k ? 'var(--primary)' : 'transparent', fg: role === k ? 'var(--on-primary)' : 'var(--body)',
+      pick: () => this.setState({ role: k }) });
+
+    // Who sets up the case: the template's first-phase owner when it names one.
+    const who = startOn ? (firstOwner || A.qr) : (isLink ? A.fe : A.se);
+
+    const list = [
+      { name: 'In progress', glyph: G.ion, tasks: [
+        { id: 'TRA-41', title: 'H4 download derivatives price data', c: K.kase('c2') },
+        { id: 'TRA-47', title: 'Center of gravity strategy', c: K.kase('c4') },
+        { id: 'TRA-38', title: 'Port all open-source strategies to Python', c: null }
+      ] },
+      { name: 'In review', glyph: G.orchid, tasks: [
+        { id: 'TRA-44', title: 'Liquidation sweep strategy', c: K.kase('c3') },
+        { id: 'TRA-29', title: 'Refine and polish all custom charts', c: null }
+      ] },
+      { name: 'Todo', glyph: G.ember, tasks: [
+        { id: 'TRA-55', title: 'Grid bot for range-bound markets', c: null, req: true },
+        { id: 'TRA-49', title: 'Boom Hunter XL v4: add 15m execution layer on 4H', c: K.kase('c6') },
+        { id: 'TRA-50', title: 'Create cost profile editor', c: null }
+      ] }
+    ];
+    const groups = list.map((g) => Object.assign({}, g, { count: g.tasks.length,
+      tasks: g.tasks.map((x) => Object.assign({}, x, {
+        hasCase: !!x.c, c: x.c || { id: '', ticks: [] },
+        hasReq: !!x.req, reqTitle: 'Strategy Engineer is setting up a case for this task', reqBd: K.edge('run-fg')
+      })) }));
+
+    return {
+      rootClass: K.rootClass,
+      groups,
+      title: 'Funding-rate mean reversion',
+      desc: 'Look for mean reversion after extreme funding on BTC and ETH perps. Use 2023 to 2026 data and keep fees at 0.05%.',
+      startOn, startOff: !startOn,
+      toggleStart: () => this.setState({ start: !startOn, linkOpen: false, tplOpen: false }),
+      sw: { track: startOn ? 'var(--primary)' : 'var(--pri-off)', knob: startOn ? '21px' : '3px', knobBg: startOn ? 'var(--on-primary)' : 'var(--card)' },
+      caseBox: startOn ? { bg: 'var(--well)', bd: 'var(--line)' } : { bg: 'transparent', bd: 'var(--line)' },
+      tplOpen: this.state.tplOpen,
+      toggleTpl: () => this.setState({ tplOpen: !this.state.tplOpen }),
+      templates,
+      tplName: t.name,
+      hasPreview: t.steps.length > 0,
+      pv,
+      tips: {
+        start: 'The assignee sets up a case for this task and makes this task its main task. A line asking for this is added to the description.',
+        template: t.steps.length
+          ? 'The agent copies the template into the case and can adjust it. Editing the template later doesn’t change this case.'
+          : 'Without a template, the agent writes the workflow itself.',
+        who: firstOwner ? 'Suggested by ' + t.name + ': this agent owns ' + t.steps[0][0] + '.' : '',
+        role: 'Work counts toward getting the case done. Reference is related context only.'
+      },
+      hasWhoTip: startOn && !!firstOwner,
+      linkOpen: this.state.linkOpen,
+      toggleLink: () => this.setState({ linkOpen: !this.state.linkOpen }),
+      linkOpts,
+      linkPill: isLink
+        ? { label: 'In ' + lk.id, border: 'solid', bd: K.edge('run-fg'), bg: 'var(--run-bg)', fg: 'var(--run-fg)' }
+        : { label: 'Add to case', border: 'dashed', bd: 'var(--edge)', bg: 'transparent', fg: 'var(--body)' },
+      isLink,
+      link: { title: lk.title, id: lk.id, ticks: lk.ticks },
+      roles: [roleOpt('work', 'Work'), roleOpt('reference', 'Reference')],
+      who: Object.assign({}, who, { aria: 'Assignee: ' + who.name }),
+      whoRole: startOn ? 'Sets up the case' : 'Assignee',
+      primaryLabel: startOn ? 'Create and start case' : 'Create task'
+    };
+  }
+}
+
+</script>
+</body>
+</html>

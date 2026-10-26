@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Search</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Fragment+Mono&amp;display=swap">
+<style>
+body{margin:0;background:#0a0a0a}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;margin:0}
+.light{--ground:#f2f2f4;--card:#ffffff;--card-edge:transparent;--shadow:0 1px 2px rgba(17,17,19,.06),0 10px 28px -14px rgba(17,17,19,.2);--shadow-lg:0 2px 6px rgba(17,17,19,.08),0 30px 70px -24px rgba(17,17,19,.38);--well:#e7e7ea;--sel:#ffffff;--sel-shadow:0 1px 3px rgba(17,17,19,.12);--line:#ececf0;--row-line:#f0f0f3;--hover:#e7e7ea;--row-hover:#f8f8fa;--code:#f6f6f8;--text:#111113;--body:#45454d;--muted:#6b6b75;--edge:#cfcfd6;--dashed:#b4b4bd;--primary:#111113;--on-primary:#ffffff;--run-bg:#ecebff;--run-fg:#3b2fc0;--violet-bg:#f6e6ff;--violet-fg:#7a1fb8;--amber-bg:#fff1dc;--amber-fg:#94480a;--red-bg:#fde7ea;--red-fg:#b0102a;--green-bg:#e2f6e5;--green-fg:#17672f;--cyan-bg:#dcf4f1;--cyan-fg:#0e6a61;--pri-on:#111113;--pri-off:#dcdce2;--ash-a:#c9c9cf;--ash-b:#9a9aa3;--scrim:rgba(17,17,19,.34);--disc-shadow:rgba(17,17,19,.35);--grain-blend:soft-light;--grain-op:.9;--knob-off:#ffffff}
+.dark{--ground:#0a0a0a;--card:#141414;--card-edge:#1f1f1f;--shadow:inset 0 1px 0 rgba(255,255,255,.04),0 16px 34px -18px rgba(0,0,0,.95);--shadow-lg:inset 0 1px 0 rgba(255,255,255,.06),0 34px 80px -20px rgba(0,0,0,.95);--well:#161616;--sel:#262626;--sel-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 3px rgba(0,0,0,.7);--line:#1f1f1f;--row-line:#1a1a1a;--hover:#1a1a1a;--row-hover:#181818;--code:#0f0f0f;--text:#f4f1ea;--body:#c9c6bf;--muted:#8f8c86;--edge:#2c2c2c;--dashed:#4a4843;--primary:#f4f1ea;--on-primary:#0a0a0a;--run-bg:#17142b;--run-fg:#c9c2ff;--violet-bg:rgba(139,44,240,.15);--violet-fg:#dcb8ff;--amber-bg:rgba(247,181,47,.1);--amber-fg:#ffc98a;--red-bg:rgba(242,40,111,.12);--red-fg:#ff9aa8;--green-bg:rgba(47,209,47,.1);--green-fg:#9be59b;--cyan-bg:rgba(34,181,165,.12);--cyan-fg:#8fe3d8;--pri-on:#f4f1ea;--pri-off:#2c2c2c;--ash-a:#3a3a3a;--ash-b:#6b6b6b;--scrim:rgba(0,0,0,.62);--disc-shadow:rgba(0,0,0,.6);--grain-blend:overlay;--grain-op:.75;--knob-off:#8f8c86}
+.f-hanken{--display:'Hanken Grotesk',system-ui,sans-serif;--dtrack:-.045em}
+.f-bricolage{--display:'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif;--dtrack:-.035em}
+.disp{font-family:var(--display);letter-spacing:var(--dtrack)}
+.card{background:var(--card);border:1px solid var(--card-edge);border-radius:18px;box-shadow:var(--shadow)}
+.mono{font-family:'Fragment Mono',ui-monospace,monospace}
+.grain{position:absolute;inset:0;width:100%;height:100%;mix-blend-mode:var(--grain-blend);opacity:var(--grain-op);pointer-events:none}
+.no-grain .grain{display:none}
+a{color:var(--text)}
+.nav{text-decoration:none}
+.nav:hover,.ghost:hover,.icon:hover{background:var(--hover)}
+.row:hover{background:var(--row-hover)}
+.row a{color:var(--text);text-decoration:none}
+.row a:hover{text-decoration:underline}
+@keyframes breathe{0%,100%{opacity:1;transform:scaleY(1)}50%{opacity:.55;transform:scaleY(.65)}}
+.live{animation:breathe 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.live{animation:none}}
+.ph{position:relative}
+.ph-home,.card .ph-home:hover{color:inherit;text-decoration:none;outline:none}
+.ph-home::after{content:"";position:absolute;inset:0;z-index:0;border-radius:18px}
+.ph a:not(.ph-home),.ph button,.ph nav{position:relative;z-index:1}
+.ph-go{display:inline-flex;align-items:center;gap:5px;margin-left:12px;vertical-align:middle;height:24px;padding:0 10px;border-radius:999px;background:var(--well);color:var(--body);font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:12px;font-weight:700;letter-spacing:0;opacity:0;transform:translateX(-4px);transition:opacity .15s ease,transform .15s ease}
+.ph:has(.ph-home:hover),.ph:has(.ph-home:focus-visible){border-color:var(--edge)}
+.ph:has(.ph-home:hover) .ph-go,.ph-home:focus-visible .ph-go{opacity:1;transform:none}
+.ph-home:focus-visible::after{box-shadow:inset 0 0 0 2px var(--run-fg)}
+a:focus-visible,button:focus-visible{outline:2px solid var(--run-fg);outline-offset:2px}
+.cchip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px 0 6px;box-sizing:border-box;border-radius:999px;border:1px solid var(--edge);background:var(--well);color:var(--body);font-size:12px;font-weight:600;white-space:nowrap;flex-shrink:0;text-decoration:none}
+.cchip .mono{font-size:11.5px;color:var(--text)}
+.cchip.link{background:transparent;border-style:dashed;color:var(--muted)}
+.cchip.link .mono{color:var(--muted)}
+.ticks{display:inline-flex;align-items:center;gap:3px;flex-shrink:0}
+.ticks i{display:block;width:10px;height:6px;border-radius:999px;background:var(--pri-off)}
+.ticks i.d{background:linear-gradient(90deg,#2fd12f,#22b5a5)}
+.ticks i.c{background:linear-gradient(90deg,#8b2cf0,#1f6fe0)}
+.ticks i.w{background:linear-gradient(90deg,#f7b52f,#f5822a)}
+.ticks i.n{background:transparent;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--run-fg) 70%,transparent)}
+.ticks i.g{width:6px;height:6px;border-radius:2px;transform:rotate(45deg);margin:0 1px}
+.ticks i.g.d{background:linear-gradient(90deg,#2fd12f,#22b5a5)}
+.stitle{margin:0;font-family:var(--display);letter-spacing:-.01em;font-size:15px;font-weight:800}
+.kv{margin:0;display:grid;grid-template-columns:190px minmax(0,1fr);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.kv dt,.kv dd{margin:0;padding:8px 12px;border-top:1px solid var(--row-line);min-width:0}
+.kv dt{font-family:'Fragment Mono',ui-monospace,monospace;font-size:12px;color:var(--muted);background:var(--well);display:flex;align-items:center}
+.kv dd{font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.kv dt:first-of-type,.kv dd:first-of-type{border-top:0}
+.pconn{flex:1 1 10px;height:2px;margin-top:16px;border-radius:999px;min-width:8px}
+.pstep{flex:0 0 auto;width:74px;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}
+.pdisc{position:relative;width:34px;height:34px;box-sizing:border-box;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:800}
+.pcheck{position:absolute;right:-3px;bottom:-3px;width:15px;height:15px;border-radius:50%;background:linear-gradient(160deg,#2fd12f,#22b5a5);color:#111113;display:grid;place-items:center;box-shadow:0 0 0 2px var(--card)}
+.hop{display:grid;grid-template-columns:72px 62px minmax(0,1fr) auto;align-items:start;gap:10px;padding:10px 14px;border-top:1px solid var(--row-line);font-size:13px}
+.hop:first-child{border-top:0}
+.disc{border-radius:50%;display:grid;place-items:center;font-weight:800;color:#111113;flex-shrink:0}
+.tile{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border:1px solid var(--edge);border-radius:999px;color:var(--body);text-decoration:none;font-size:13px;white-space:nowrap}
+.tile:hover{background:var(--hover)}
+.rec{display:flex;flex-direction:column;gap:12px;padding:16px 18px 14px;text-align:left;text-decoration:none;color:var(--text);transition:transform .14s ease,border-color .14s ease}
+.rec:hover{transform:translateY(-2px);border-color:var(--edge)}
+@media (prefers-reduced-motion: reduce){.rec,.rec:hover{transition:none;transform:none}}
+.stat{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:12px;background:var(--well);min-width:0}
+.stat b{font-family:var(--display);font-size:17px;font-weight:800;letter-spacing:-.01em;color:var(--text);white-space:nowrap}
+.stat span{font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap}
+.info{position:relative;display:inline-grid;place-items:center;width:20px;height:20px;padding:0;border-radius:50%;color:var(--muted);flex-shrink:0;cursor:help;vertical-align:middle}
+.info:hover,.info:focus-visible{color:var(--text);background:var(--hover)}
+.info .tipb{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);z-index:40;width:max-content;max-width:260px;padding:8px 11px;border-radius:11px;background:var(--text);color:var(--ground);font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:12px;font-weight:500;line-height:1.45;letter-spacing:0;text-align:left;white-space:normal;box-shadow:0 12px 30px -12px rgba(0,0,0,.7);opacity:0;visibility:hidden;transition:opacity .12s ease}
+.info:hover .tipb,.info:focus-visible .tipb{opacity:1;visibility:visible}
+@media (prefers-reduced-motion: reduce){.info .tipb{transition:none}}
+.frow{display:grid;grid-template-columns:170px minmax(0,1fr);gap:20px;align-items:start;padding:14px 22px;border-top:1px solid var(--line)}
+.flabel{min-height:38px;display:flex;align-items:center;gap:4px;font-size:14px;font-weight:600;color:var(--text)}
+.fin{width:100%;max-width:420px;box-sizing:border-box;height:38px;padding:0 12px;border:1px solid var(--edge);border-radius:12px;outline:none;background:var(--well);color:var(--text);font:inherit;font-size:14px}
+.fin:focus,.fta:focus{border-color:var(--run-fg)}
+.fta{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--edge);border-radius:12px;outline:none;background:var(--well);color:var(--body);font:inherit;font-size:14px;line-height:1.55;resize:vertical}
+.ddb{display:inline-flex;align-items:center;gap:9px;width:100%;max-width:320px;height:38px;padding:0 10px 0 12px;box-sizing:border-box;border:1px solid var(--edge);border-radius:12px;background:var(--well);color:var(--text);font-size:14px;text-align:left}
+.ddb:hover{border-color:var(--dashed)}
+.lb{position:absolute;top:calc(100% + 6px);left:0;z-index:30;width:320px;box-sizing:border-box;padding:6px;border:1px solid var(--edge);border-radius:16px;background:var(--card);box-shadow:0 18px 40px -16px rgba(0,0,0,.65);display:flex;flex-direction:column;gap:2px}
+.lbo{display:flex;align-items:center;gap:10px;width:100%;min-height:38px;padding:5px 10px;box-sizing:border-box;border-radius:12px;text-align:left;font-size:14px;color:var(--text)}
+.lbo:hover{background:var(--hover)}
+.seg{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:var(--well)}
+.seg button{height:32px;padding:0 14px;border-radius:999px;font-size:13px;font-weight:700}
+/* Docked panels: the list beside a panel keeps its full row width. One sideways scroll moves every card, and the Name column can stay in view. */
+.dock-x{overflow-x:auto;container-type:inline-size;scrollbar-width:thin;scrollbar-color:var(--edge) transparent}
+.dock-card{display:grid;isolation:isolate}
+.dock-card>*{grid-area:1/1;min-width:0}
+.dock-frame{position:sticky;left:0;z-index:-1;width:100cqw;box-sizing:border-box}
+.dock-body{padding:1px}
+.dock-bar{position:sticky;left:1px;z-index:2;width:calc(100cqw - 2px);box-sizing:border-box}
+.row.sel-run{background:var(--run-bg);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--run-fg) 45%,transparent)}
+.row.sel-bar{background:var(--row-hover);box-shadow:inset 3px 0 0 var(--text)}
+.pinned .pin-col{position:sticky;left:1px;z-index:1;align-self:stretch;background:var(--card)}
+.pinned .row:hover>.pin-col{background:var(--row-hover)}
+.pinned .row.sel-run>.pin-col{background:var(--run-bg);box-shadow:inset 1px 0 0 color-mix(in srgb,var(--run-fg) 45%,transparent),inset 0 1px 0 color-mix(in srgb,var(--run-fg) 45%,transparent),inset 0 -1px 0 color-mix(in srgb,var(--run-fg) 45%,transparent)}
+.pinned .row.sel-bar>.pin-col{background:var(--row-hover);box-shadow:inset 3px 0 0 var(--text)}
+@supports (animation-timeline: scroll()){
+.pinned .pin-col::after{content:"";position:absolute;top:0;bottom:0;left:100%;width:14px;pointer-events:none;border-left:1px solid var(--line);background:linear-gradient(90deg,rgba(0,0,0,.16),transparent);opacity:0;animation:pin-shade linear both;animation-timeline:scroll(nearest inline)}
+}
+@keyframes pin-shade{0%{opacity:0}3%,100%{opacity:1}}
+</style>
+
+</helmet>
+<div class="{{rootClass}}" style="min-height: 1440px; display: flex; flex-wrap: wrap; background: var(--ground); color: var(--text); font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 14px; line-height: 1.4; position: relative">
+<svg aria-hidden="true" width="0" height="0" style="position: absolute"><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.88" numOctaves="2" stitchTiles="stitch"></feTurbulence><feColorMatrix type="saturate" values="0"></feColorMatrix></filter></svg>
+
+<nav aria-label="Main" style="flex: 0 0 248px; box-sizing: border-box; padding: 18px 14px; display: flex; flex-direction: column; gap: 22px">
+  <div style="display: flex; align-items: center; gap: 4px">
+    <button class="ghost" style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; height: 40px; padding: 0 8px 0 5px; border-radius: 999px; text-align: left">
+      <span class="disp" style="position: relative; overflow: hidden; width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(160deg, #ff2bd6, #f2272c 55%, #f7b52f); color: #111113; display: grid; place-items: center; font-size: 13px; font-weight: 800">C<svg class="grain"><rect width="100%" height="100%" filter="url(#grain)"></rect></svg></span>
+      <span class="disp" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; font-size: 15px; letter-spacing: -.01em">Cuebik Creative</span>
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg>
+    </button>
+    <button class="icon" aria-label="Search" style="width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--body)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+    <a class="ghost" href="NewTask.dc.html" aria-label="New task" style="width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--edge); color: var(--text)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></a>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <a class="nav" href="OrgDashboard.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px; border-radius: 999px; color: var(--body); font-weight: 600"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="3.5"></rect><rect x="14" y="3" width="7" height="5" rx="2.5"></rect><rect x="14" y="12" width="7" height="9" rx="3.5"></rect><rect x="3" y="16" width="7" height="5" rx="2.5"></rect></svg>Org dashboard</a>
+    <a class="nav" href="Inbox.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 8px 0 12px; border-radius: 999px; color: var(--body); font-weight: 600"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>Inbox<span style="margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 999px; background: linear-gradient(135deg, #ff2bd6, #f7b52f); color: #111113; font-size: 12px; font-weight: 800; display: grid; place-items: center">8</span></a>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 6px 6px 12px">
+      <h2 style="margin: 0; font-size: 12px; font-weight: 700; color: var(--muted)">Projects</h2>
+      <button class="icon" aria-label="New project" style="width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+    </div>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="width: 24px; height: 24px; border-radius: 50%; border: 1.5px dashed var(--dashed); box-sizing: border-box"></span>All tasks<span style="margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 500">company</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #ff2bd6, #8b2cf0); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">g</span>gearBase<span style="margin-left: auto; font-size: 13px">11</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #3b3df5, #22b5a5); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">s</span>sfo lighting database<span style="margin-left: auto; font-size: 13px">7</span></a>
+    <a class="nav" href="ProjectDashboard.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #f7b52f, #f5822a); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">t</span>trading workbench<span style="margin-left: auto; font-size: 13px">16</span></a>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 12px 6px">
+      <h2 style="margin: 0; font-size: 12px; font-weight: 700; color: var(--muted)">Agents</h2>
+      <span style="font-size: 12px; font-weight: 700; color: var(--run-fg)">2 running</span>
+    </div>
+    <a class="nav" href="AgentChat.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #2fd12f, #22b5a5); color: #111113; font-size: 8px; font-weight: 800">QR</span></span>Quant Researcher<span style="margin-left: auto; color: var(--run-fg); font-size: 12px; font-weight: 600">running</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #ff2bd6, #f2286f); color: #111113; font-size: 8px; font-weight: 800">SE</span></span>Strategy Engineer<span style="margin-left: auto; color: var(--run-fg); font-size: 12px; font-weight: 600">running</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #f7b52f, #f5822a); color: #111113; font-size: 8px; font-weight: 800">FE</span></span>Frontend Engineer<span style="margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 600">idle</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #f2272c, #ff2bd6); color: #111113; font-size: 8px; font-weight: 800">ML</span></span>ML Engineer<span style="margin-left: auto; color: var(--red-fg); font-size: 12px; font-weight: 600">blocked</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #6a93ad, #a9c6d6); color: #111113; font-size: 8px; font-weight: 800">CE</span></span>CEO<span style="margin-left: auto; color: var(--amber-fg); font-size: 12px; font-weight: 600">paused</span></a>
+  </div>
+
+  <div style="margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 4px 0 6px">
+    <span style="width: 30px; height: 30px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-size: 11px; font-weight: 800; display: grid; place-items: center">BA</span>
+    <span style="color: var(--body); font-weight: 600">Brian A.</span>
+    <a class="icon" href="AppSettings.dc.html" aria-label="Settings" style="margin-left: auto; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--body)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"></path><circle cx="15" cy="6" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg></a>
+  </div>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 14px 20px 48px 4px; box-sizing: border-box">
+
+
+  <header class="card" style="padding: 18px 22px 0 22px; box-sizing: border-box">
+    <div role="search" style="display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 10px 0 18px; border: 1px solid var(--edge); border-radius: 999px; background: var(--well)">
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink: 0; color: var(--muted)"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+      <label for="sq" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search everything</label>
+      <input id="sq" class="disp" value="{{query}}" placeholder="Search tasks, comments, docs, agents and projects" autocomplete="off" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--text); font-size: 22px; font-weight: 800; letter-spacing: -.01em">
+      <button class="icon" aria-label="Clear search" style="width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; margin: 14px -22px 0; padding: 12px 22px; border-top: 1px solid var(--line)">
+      <nav aria-label="Search in" style="display: flex; flex-wrap: wrap; gap: 2px; padding: 4px; border-radius: 999px; background: var(--well)">
+        <sc-for list="{{scopes}}" as="sc" hint-placeholder-count="7">
+          <button type="button" aria-pressed="{{sc.on}}" onClick="{{sc.pick}}" style="display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 14px; border-radius: 999px; background: {{sc.bg}}; box-shadow: {{sc.shadow}}; color: {{sc.fg}}; font-size: 13px; font-weight: {{sc.weight}}">{{sc.label}}<span style="font-size: 12px; font-weight: 600; color: var(--muted)">{{sc.count}}</span></button>
+        </sc-for>
+      </nav>
+      <span style="margin-left: auto; font-size: 13px; color: var(--muted); white-space: nowrap">In Cuebik Creative</span>
+    </div>
+  </header>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 16px; align-items: start">
+    <div style="min-width: 0; display: flex; flex-direction: column; gap: 14px">
+      <div style="position: relative; display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+        <sc-for list="{{chips}}" as="ch" hint-placeholder-count="2">
+          <span style="display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 4px 0 12px; box-sizing: border-box; border-radius: 999px; background: var(--well); font-size: 13px; white-space: nowrap"><span style="color: var(--muted)">{{ch.k}}</span><span style="font-weight: 700; color: var(--text)">{{ch.v}}</span><button class="icon" aria-label="Remove {{ch.k}} filter" onClick="{{ch.remove}}" style="width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></span>
+        </sc-for>
+        <sc-if value="{{canFilter}}" hint-placeholder-val="{{true}}">
+          <div style="position: relative">
+            <button class="ghost" aria-haspopup="menu" aria-expanded="{{menuOpen}}" onClick="{{toggleMenu}}" style="display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 10px; box-sizing: border-box; border-radius: 999px; border: 1px dashed var(--edge); color: var(--body); font-size: 13px; font-weight: 700"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Filter</button>
+          <sc-if value="{{menuOpen}}" hint-placeholder-val="{{false}}">
+            <div role="menu" aria-label="Add a filter" style="position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; width: 290px; box-sizing: border-box; padding: 6px; border: 1px solid var(--edge); border-radius: 16px; background: var(--card); box-shadow: 0 18px 40px -16px rgba(0,0,0,.65); display: flex; flex-direction: column; gap: 2px">
+              <sc-for list="{{menu}}" as="mi" hint-placeholder-count="6">
+                <button type="button" class="lbo ghost" role="menuitem" onClick="{{toggleMenu}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; color: var(--muted)"><path d="{{mi.icon}}"></path></svg><span style="flex: 1; font-weight: 600">{{mi.label}}</span><code class="mono" style="font-size: 12px; color: var(--muted)">{{mi.op}}</code></button>
+              </sc-for>
+            </div>
+          </sc-if>
+          </div>
+          <button type="button" class="info" aria-label="{{tips.typed}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.6v.01"></path></svg><span class="tipb" aria-hidden="true">{{tips.typed}}</span></button>
+        </sc-if>
+        <button class="ghost" aria-haspopup="listbox" style="margin-left: auto; display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px 0 12px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--edge); color: var(--body); font-size: 13px; white-space: nowrap"><span style="color: var(--muted)">Sort</span><span style="font-weight: 700; color: var(--text)">{{sortLabel}}</span><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg></button>
+      </div>
+
+      <sc-for list="{{sections}}" as="se" hint-placeholder-count="3">
+        <section class="card" aria-label="{{se.label}}" style="overflow: hidden">
+          <div style="display: flex; align-items: center; gap: 10px; height: 50px; padding: 0 14px 0 20px">
+            <h2 class="disp" style="margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -.01em">{{se.label}}</h2>
+            <span style="font-size: 14px; font-weight: 600; color: var(--muted)">{{se.count}}</span>
+            <sc-if value="{{se.hasNote}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; color: var(--muted)">{{se.note}}</span></sc-if>
+            <sc-if value="{{se.hasMore}}" hint-placeholder-val="{{true}}"><button class="ghost" onClick="{{se.more}}" style="margin-left: auto; height: 30px; padding: 0 12px; border-radius: 999px; color: var(--body); font-size: 13px; font-weight: 700">{{se.moreLabel}}</button></sc-if>
+          </div>
+          <sc-for list="{{se.items}}" as="r" hint-placeholder-count="3">
+            <a class="row" href="{{r.href}}" style="display: flex; align-items: flex-start; gap: 12px; padding: 11px 18px 12px 20px; border-top: 1px solid var(--row-line); color: inherit; text-decoration: none">
+              <span aria-hidden="true" style="width: 32px; height: 32px; flex-shrink: 0; display: grid; place-items: center">
+                <sc-if value="{{r.lead.isGlyph}}" hint-placeholder-val="{{true}}"><span class="{{r.lead.live}}" style="width: 6px; height: 18px; border-radius: 999px; background: {{r.lead.glyph}}"></span></sc-if>
+                <sc-if value="{{r.lead.isDisc}}" hint-placeholder-val="{{false}}"><span style="width: 28px; height: 28px; border-radius: 50%; background: {{r.lead.disc.bg}}; color: {{r.lead.disc.ink}}; font-size: 10px; font-weight: 800; display: grid; place-items: center">{{r.lead.disc.initials}}</span></sc-if>
+                <sc-if value="{{r.lead.isIcon}}" hint-placeholder-val="{{false}}"><span style="width: 30px; height: 30px; border-radius: 9px; background: var(--well); color: var(--body); display: grid; place-items: center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="{{r.lead.icon}}"></path></svg></span></sc-if>
+                <sc-if value="{{r.lead.isThumb}}" hint-placeholder-val="{{false}}"><span style="position: relative; overflow: hidden; width: 32px; height: 32px; border-radius: 9px; background: {{r.lead.thumb}}"></span></sc-if>
+              </span>
+              <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+                <span style="display: flex; align-items: center; gap: 8px; min-width: 0">
+                  <sc-if value="{{r.hasId}}" hint-placeholder-val="{{true}}"><span class="mono" style="font-size: 12px; color: var(--muted); flex-shrink: 0">{{r.id}}</span></sc-if>
+                  <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; color: var(--text)"><sc-for list="{{r.title}}" as="sg" hint-placeholder-count="2"><sc-if value="{{sg.hit}}" hint-placeholder-val="{{false}}"><mark style="padding: 0 2px; border-radius: 4px; background: var(--amber-bg); color: var(--amber-fg)">{{sg.text}}</mark></sc-if><sc-if value="{{sg.plain}}" hint-placeholder-val="{{true}}">{{sg.text}}</sc-if></sc-for></span>
+                  <sc-if value="{{r.hasChip}}" hint-placeholder-val="{{false}}"><span style="display: inline-flex; align-items: center; height: 20px; padding: 0 8px; box-sizing: border-box; border-radius: 999px; background: {{r.chip.bg}}; border: 1px solid {{r.chip.bd}}; color: {{r.chip.fg}}; font-size: 11.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0">{{r.chip.label}}</span></sc-if>
+                </span>
+                <sc-if value="{{r.hasSnip}}" hint-placeholder-val="{{true}}"><span style="font-size: 13px; line-height: 1.5; color: var(--body); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"><span style="color: var(--muted); font-weight: 600">{{r.snipLabel}} · </span><sc-for list="{{r.snip}}" as="sg" hint-placeholder-count="3"><sc-if value="{{sg.hit}}" hint-placeholder-val="{{false}}"><mark style="padding: 0 2px; border-radius: 4px; background: var(--amber-bg); color: var(--amber-fg); font-weight: 600">{{sg.text}}</mark></sc-if><sc-if value="{{sg.plain}}" hint-placeholder-val="{{true}}">{{sg.text}}</sc-if></sc-for></span></sc-if>
+                <span style="font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{r.where}}</span>
+              </span>
+              <span style="flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding-top: 2px">
+                <sc-if value="{{r.hasWho}}" hint-placeholder-val="{{false}}"><span title="{{r.who.name}}" style="width: 22px; height: 22px; border-radius: 50%; background: {{r.who.bg}}; border: {{r.who.border}}; box-sizing: border-box; color: {{r.who.ink}}; font-size: 8px; font-weight: 800; display: grid; place-items: center">{{r.who.initials}}</span></sc-if>
+                <span style="min-width: 54px; text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap">{{r.when}}</span>
+              </span>
+            </a>
+          </sc-for>
+        </section>
+      </sc-for>
+
+      <sc-if value="{{isEmpty}}" hint-placeholder-val="{{false}}">
+        <section class="card" aria-labelledby="se-none" style="padding: 28px 28px 26px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px">
+          <h2 class="disp" id="se-none" style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.01em">No tasks match these filters</h2>
+          <p style="margin: 0 0 10px; color: var(--body)">{{emptyNote}}</p>
+          <sc-for list="{{loosen}}" as="ls" hint-placeholder-count="2">
+            <button class="ghost" onClick="{{ls.apply}}" style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px 0 12px; border-radius: 12px; border: 1px solid var(--edge); color: var(--text); font-size: 14px; font-weight: 600"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color: var(--muted)"><path d="M6 6l12 12M18 6 6 18"></path></svg>{{ls.label}}<span style="font-size: 13px; color: var(--muted)">{{ls.count}}</span></button>
+          </sc-for>
+        </section>
+      </sc-if>
+    </div>
+
+    <aside class="card" aria-labelledby="facet-h" style="padding: 14px 10px 10px; display: flex; flex-direction: column; gap: 4px">
+      <div style="display: flex; align-items: center; gap: 4px; padding: 0 8px 4px">
+        <h2 class="stitle" id="facet-h">Narrow tasks</h2>
+        <sc-if value="{{hasFilters}}" hint-placeholder-val="{{false}}"><button class="ghost" onClick="{{clearFilters}}" style="margin-left: auto; height: 26px; padding: 0 10px; border-radius: 999px; color: var(--body); font-size: 12px; font-weight: 700">Clear</button></sc-if>
+      </div>
+      <sc-for list="{{facets}}" as="fa" hint-placeholder-count="3">
+        <div role="group" aria-label="{{fa.label}}" style="display: flex; flex-direction: column; gap: 1px; padding: 8px 0 6px; border-top: 1px solid var(--line)">
+          <span style="padding: 0 8px 4px; font-size: 12px; font-weight: 700; color: var(--muted)">{{fa.label}}</span>
+          <sc-for list="{{fa.opts}}" as="fo" hint-placeholder-count="4">
+            <button type="button" class="ghost" role="checkbox" aria-checked="{{fo.on}}" onClick="{{fo.flip}}" style="display: flex; align-items: center; gap: 9px; min-height: 32px; padding: 0 8px; border-radius: 10px; text-align: left; font-size: 13px; color: var(--text)">
+              <span aria-hidden="true" style="width: 16px; height: 16px; flex-shrink: 0; box-sizing: border-box; border-radius: 5px; border: {{fo.box}}; background: {{fo.boxBg}}; color: var(--on-primary); display: grid; place-items: center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="opacity: {{fo.tick}}"><path d="M5 12l5 5 9-10"></path></svg></span>
+              <sc-if value="{{fo.hasGlyph}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="width: 5px; height: 13px; flex-shrink: 0; border-radius: 999px; background: {{fo.glyph}}"></span></sc-if>
+              <sc-if value="{{fo.hasDisc}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; background: {{fo.disc.bg}}; border: {{fo.disc.border}}; box-sizing: border-box; color: {{fo.disc.ink}}; font-size: 8px; font-weight: 800; display: grid; place-items: center">{{fo.disc.initials}}</span></sc-if>
+              <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600">{{fo.label}}</span>
+              <span style="font-size: 12px; color: var(--muted)">{{fo.n}}</span>
+            </button>
+          </sc-for>
+        </div>
+      </sc-for>
+    </aside>
+  </div>
+
+</main>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme": {"editor": "enum", "default": "dark", "options": ["light", "dark"]}, "display": {"editor": "enum", "default": "Hanken Grotesk", "options": ["Hanken Grotesk", "Bricolage Grotesque"]}, "grain": {"editor": "boolean", "default": true}, "scope": {"editor": "enum", "default": "All", "options": ["All", "Tasks", "Comments", "Docs", "Files", "Agents", "Projects"]}, "filterMenu": {"editor": "boolean", "default": false}, "noResults": {"editor": "boolean", "default": false}, "$preview": {"width": 1440, "height": 1440}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { scope: null, filters: null, menu: null };
+  }
+  kit() {
+    const dark = (this.props.theme ?? 'dark') === 'dark';
+    const font = (this.props.display ?? 'Hanken Grotesk') === 'Bricolage Grotesque' ? 'f-bricolage' : 'f-hanken';
+    const rootClass = (dark ? 'dark' : 'light') + ' ' + font + ((this.props.grain ?? true) ? '' : ' no-grain');
+    const cap = (a, b) => 'linear-gradient(180deg, ' + a + ', ' + b + ')';
+    const disc = (a, b) => 'linear-gradient(160deg, ' + a + ', ' + b + ')';
+    const G = { ion: cap('#8b2cf0', '#1f6fe0'), orchid: cap('#ff2bd6', '#8b2cf0'), ember: cap('#f7b52f', '#f5822a'), flare: cap('#f2286f', '#f2272c'), lagoon: cap('#2fd12f', '#22b5a5'), tide: cap('#22b5a5', '#4c7896'), ash: cap('var(--ash-a)', 'var(--ash-b)') };
+    const edge = (v) => 'color-mix(in srgb, var(--' + v + ') 50%, transparent)';
+    const A = {
+      qr: { key: 'qr', initials: 'QR', name: 'Quant Researcher', short: 'Researcher', bg: disc('#2fd12f', '#22b5a5'), ink: '#111113' },
+      se: { key: 'se', initials: 'SE', name: 'Strategy Engineer', short: 'Strategy Eng.', bg: disc('#ff2bd6', '#f2286f'), ink: '#111113' },
+      fe: { key: 'fe', initials: 'FE', name: 'Frontend Engineer', short: 'Frontend Eng.', bg: disc('#f7b52f', '#f5822a'), ink: '#111113' },
+      ml: { key: 'ml', initials: 'ML', name: 'ML Engineer', short: 'ML Eng.', bg: disc('#f2272c', '#ff2bd6'), ink: '#111113' },
+      me: { key: 'me', initials: 'BA', name: 'You', short: 'You', bg: 'var(--primary)', ink: 'var(--on-primary)' },
+      none: { key: 'none', initials: '', name: 'Unassigned', short: 'Unassigned', bg: 'transparent', ink: 'var(--muted)' }
+    };
+    const pill = (label, glyph, tone) => ({ label, glyph, bg: tone ? 'var(--' + tone + '-bg)' : 'var(--well)', fg: tone ? 'var(--' + tone + '-fg)' : 'var(--body)', bd: tone ? edge(tone + '-fg') : 'var(--edge)' });
+    const caseStatus = {
+      draft: pill('Draft', G.ash, ''),
+      in_progress: pill('In progress', G.ion, 'run'),
+      in_review: pill('In review', G.orchid, 'violet'),
+      approved: pill('Approved', G.lagoon, 'green'),
+      done: pill('Done', G.lagoon, 'green'),
+      cancelled: pill('Cancelled', G.ash, '')
+    };
+    const taskStatus = {
+      in_progress: pill('In progress', G.ion, 'run'),
+      in_review: pill('In review', G.orchid, 'violet'),
+      todo: pill('Todo', G.ember, 'amber'),
+      blocked: pill('Blocked', G.flare, 'red'),
+      backlog: pill('Backlog', G.ash, ''),
+      done: pill('Done', G.lagoon, 'green')
+    };
+    const workflows = {
+      strategy: { name: 'Strategy pipeline', steps: [['Research', 'qr'], ['Build', 'se'], ['Backtest', 'ml'], ['Approval', 'me'], ['Paper trade', 'se'], ['Done', '']] },
+      dataset: { name: 'Dataset build', steps: [['Source', 'qr'], ['Ingest', 'qr'], ['Validate', 'ml'], ['Done', '']] }
+    };
+    const ring = (c) => '0 0 0 2px var(--card), 0 0 0 4px ' + c;
+    // One entry per step of the case's workflow, for the full phase track.
+    const track = (c) => {
+      const wf = workflows[c.wf];
+      return wf.steps.map((s, i) => {
+        const who = s[1] ? A[s[1]] : null;
+        const last = i === wf.steps.length - 1;
+        let state = 'future';
+        if (c.mode === 'done' || i < c.at) state = 'done';
+        else if (i === c.at) state = c.mode === 'handing' ? 'done' : c.mode;
+        else if (c.mode === 'handing' && i === c.at + 1) state = 'next';
+        let style = { bg: 'transparent', fg: 'var(--muted)', shadow: 'none', border: '1.5px dashed var(--dashed)' };
+        const filled = (bg, fg, shadow) => ({ bg, fg, shadow: shadow || 'none', border: '0' });
+        if (state === 'done' && who) style = filled(who.bg, who.ink);
+        if (state === 'done' && !who) style = filled(disc('#2fd12f', '#22b5a5'), '#111113');
+        if (state === 'running') style = filled(who.bg, who.ink, ring('#6a3ef0'));
+        if (state === 'idle') style = filled(who.bg, who.ink, ring('var(--edge)'));
+        if (state === 'waiting') style = filled(who.bg, who.ink, ring('#f69a2d'));
+        if (state === 'next') style = { bg: 'transparent', fg: 'var(--run-fg)', shadow: 'none', border: '1.5px dashed #7b5cf5' };
+        const current = ['running', 'idle', 'waiting', 'next'].indexOf(state) >= 0;
+        const rounds = (c.rounds || {})[i];
+        const notes = { running: 'working now', idle: 'up next', waiting: 'waiting on you', next: 'hand-off queued' };
+        return {
+          name: s[0], initials: who ? who.initials : '', isEnd: !who, who: who ? (who.key === 'me' ? 'You' : who.short) : 'Finish',
+          style, check: state === 'done' && !!who, notFirst: i > 0,
+          connBg: (i <= c.at || c.mode === 'done') ? 'linear-gradient(90deg, #2fd12f, #22b5a5)' : 'var(--line)',
+          nameFg: current ? 'var(--text)' : (state === 'done' ? 'var(--body)' : 'var(--muted)'),
+          nameWeight: current ? 800 : 700,
+          note: notes[state] || (rounds ? rounds + ' rounds' : ''), noteFg: state === 'waiting' ? 'var(--amber-fg)' : (current ? 'var(--run-fg)' : 'var(--muted)'),
+          aria: s[0] + ', ' + (who ? (who.key === 'me' ? 'you' : who.name) : 'finish') + ', ' + (state === 'done' ? 'done' : (notes[state] || 'not started'))
+        };
+      });
+    };
+    // The compact ticks shown on rows and cards.
+    const ticks = (c) => workflows[c.wf].steps.map((s, i) => {
+      let cls = '';
+      if (c.mode === 'done' || i < c.at) cls = 'd';
+      else if (i === c.at) cls = { running: 'c', idle: 'c', waiting: 'w', handing: 'd' }[c.mode] || '';
+      else if (c.mode === 'handing' && i === c.at + 1) cls = 'n';
+      return { cls: (s[1] === 'me' ? 'g ' : '') + cls };
+    });
+    const C = {
+      c3: { id: 'TRA-C3', type: 'Strategy', title: 'Liquidation sweep', summary: 'Fade forced liquidations after a sweep of the prior 4h low.', status: 'in_review', wf: 'strategy', at: 3, mode: 'waiting', rounds: { 1: 2, 2: 2 }, primary: 'TRA-44', who: 'ml', phase: 'Approval', phaseNote: 'waiting on you', phaseFg: 'var(--amber-fg)', updated: '32m ago', docs: 3, children: 0,
+        stats: [['1.62', 'sharpe'], ['−0.114', 'max drawdown'], ['312', 'trades']] },
+      c4: { id: 'TRA-C4', type: 'Strategy', title: 'Center of gravity', summary: 'Mean reversion to a volume-weighted center on 1h bars.', status: 'in_progress', wf: 'strategy', at: 1, mode: 'handing', primary: 'TRA-47', who: 'se', phase: 'Build → Backtest', phaseNote: 'hand-off queued', phaseFg: 'var(--run-fg)', updated: '6m ago', docs: 2, children: 0,
+        stats: [['1.18', 'sharpe in sample'], ['1h', 'timeframe'], ['BTC', 'market']] },
+      c5: { id: 'TRA-C5', type: 'Strategy', title: 'Boom Hunter XL v4', summary: 'FPB entries on 4h bars, with a 15m execution layer as its own case.', status: 'in_progress', wf: 'strategy', at: 0, mode: 'running', primary: 'TRA-48', who: 'qr', phase: 'Research', phaseNote: 'working now', phaseFg: 'var(--run-fg)', updated: '14m ago', docs: 1, children: 1,
+        stats: [['4h', 'timeframe'], ['FPB', 'entry'], ['3', 'markets']] },
+      c6: { id: 'TRA-C6', type: 'Strategy', title: '15m execution layer', summary: 'Child of Boom Hunter XL v4: time entries on 15m bars.', status: 'in_progress', wf: 'strategy', at: 1, mode: 'idle', primary: 'TRA-49', who: 'se', phase: 'Build', phaseNote: 'up next', phaseFg: 'var(--muted)', updated: 'Oct 11', docs: 0, children: 0,
+        stats: [['15m', 'timeframe'], ['4h', 'parent timeframe'], ['—', 'trades']] },
+      c2: { id: 'TRA-C2', type: 'Dataset', title: 'H4 derivatives dataset', summary: '4h OHLCV, funding, open interest and liquidations for BTC, ETH and SOL perps.', status: 'in_progress', wf: 'dataset', at: 1, mode: 'running', primary: 'TRA-41', who: 'qr', phase: 'Ingest', phaseNote: 'working now', phaseFg: 'var(--run-fg)', updated: '2m ago', docs: 2, children: 0,
+        stats: [['1.9M', 'rows'], ['3', 'symbols'], ['2022-01-01', 'since']] },
+      c7: { id: 'TRA-C7', type: 'Strategy', title: 'BB squeeze + VPA', summary: 'Bollinger squeeze breakouts confirmed by volume-price analysis.', status: 'draft', wf: 'strategy', at: -1, mode: 'draft', primary: '', who: 'none', phase: 'No work yet', phaseNote: '', phaseFg: 'var(--muted)', updated: 'Oct 8', docs: 0, children: 0,
+        stats: [['—', 'sharpe'], ['—', 'max drawdown'], ['—', 'trades']] },
+      c1: { id: 'TRA-C1', type: 'Dataset', title: 'Daily OHLCV', summary: 'Daily candles for 40 spot and perp markets, refreshed every night.', status: 'done', wf: 'dataset', at: 3, mode: 'done', primary: 'TRA-27', who: 'qr', phase: 'Done', phaseNote: 'Oct 6', phaseFg: 'var(--muted)', updated: 'Oct 6', docs: 1, children: 0,
+        stats: [['612K', 'rows'], ['40', 'markets'], ['daily', 'refresh']] }
+    };
+    const kase = (k) => {
+      const c = C[k];
+      const wf = workflows[c.wf];
+      return Object.assign({ key: k, st: caseStatus[c.status], ticks: ticks(c), track: track(c), wfName: wf.name, owner: A[c.who],
+        step: c.at >= 0 ? Math.min(c.at + 1, wf.steps.length) : 0, steps: wf.steps.length, isDraft: c.mode === 'draft', notDraft: c.mode !== 'draft',
+        tickLabel: c.mode === 'draft' ? 'Not started' : (c.title + ': ' + c.phase + ', ' + (c.phaseNote || '') )
+      }, c);
+    };
+    // Fields, documents and hand-offs of the case that the open task belongs to.
+    const fields = [
+      { k: 'market', v: '', list: [{ v: 'BTC-PERP' }, { v: 'ETH-PERP' }], isList: true },
+      { k: 'timeframe', v: '4h' },
+      { k: 'entry', v: 'Sweep of the prior 4h low with open interest down 3% or more' },
+      { k: 'exit', v: '1.8R target or 12 bars' },
+      { k: 'risk_per_trade', v: '0.005' },
+      { k: 'backtest.period', v: '2022-01-01 to 2026-09-30' },
+      { k: 'backtest.trades', v: '312' },
+      { k: 'backtest.win_rate', v: '0.542' },
+      { k: 'backtest.sharpe', v: '1.62' },
+      { k: 'backtest.max_drawdown', v: '-0.114' },
+      { k: 'paper.account', v: 'null', isNull: true }
+    ].map((f) => Object.assign({ list: [], isList: false, isNull: false, isText: true }, f, { isText: !f.isList && !f.isNull }));
+    const docs = [
+      { name: 'spec', meta: 'rev 2 · from TRA-44', icon: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5' },
+      { name: 'backtest-report', meta: 'rev 3 · from TRA-44', icon: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5' },
+      { name: 'workflow', meta: 'Strategy pipeline · rev 1', icon: 'M6 3v6M6 15v6M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9c0 5-6 3-9 3' },
+      { name: 'equity-curve.png', meta: '214 KB', icon: 'M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5' }
+    ];
+    const hop = (time, from, to, move, note, extra) => Object.assign({ time, f: A[from], t: A[to], move, note, state: 'Delivered', stBg: 'var(--well)', stFg: 'var(--muted)', rowBg: 'transparent', isKickoff: false, notKickoff: true }, extra || {});
+    const hops = [
+      hop('Oct 21', 'se', 'ml', 'Build → Backtest · round 2', 'Fee model fixed for partial fills. Rerun 2022 to 2026 on both markets.'),
+      hop('Oct 19', 'ml', 'se', 'Backtest → Build · round 2', 'Fees are counted twice on partial fills. Details in backtest-report rev 1.'),
+      hop('Oct 18', 'se', 'ml', 'Build → Backtest', 'Candidate is on branch tra-44-sweep. Run the full period with 0.05% fees.'),
+      hop('Oct 16', 'qr', 'se', 'Research → Build', 'Spec saved as spec rev 2. Implement the entries in section 3.'),
+      hop('Oct 14', 'me', 'qr', 'Started · Research', 'Find liquidation-sweep setups worth testing on BTC and ETH perps.', { isKickoff: true, notKickoff: false })
+    ];
+    return { dark, rootClass, G, A, caseStatus, taskStatus, workflows, kase, track, ticks, fields, docs, hops, edge };
+
+  }
+  renderVals() {
+    const K = this.kit();
+    const G = K.G;
+    const A = K.A;
+    const who = (k) => Object.assign({}, A[k], k === 'none' ? { border: '1.5px dashed var(--dashed)' } : { border: '0' });
+    // "**word**" marks a match, as the API's snippet highlights do.
+    const segs = (s) => s.split('**').map((text, i) => ({ text, hit: i % 2 === 1, plain: i % 2 === 0 })).filter((x) => x.text);
+    const st = this.state;
+    const set = (patch) => this.setState(patch);
+    const query = 'liquidation';
+    const doc = 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5';
+    const sheet = 'M4 4h16v16H4zM4 10h16M4 15h16M10 4v16';
+
+    // Tasks, with the field that matched and the facet values each one counts toward.
+    const tasks = [
+      ['TRA-44', '**Liquidation** sweep strategy', 'in_review', 'se', '32m ago', '24h', 'Description', 'Fade forced **liquidations** after a sweep of the prior 4h low, with open interest down 3% or more.'],
+      ['TRA-41', 'H4 download derivatives price data', 'in_progress', 'qr', '2m ago', '24h', 'Description', '4h OHLCV, funding, open interest and **liquidations** for BTC, ETH and SOL perps, from 2022.'],
+      ['TRA-29', 'Refine and polish all custom charts', 'in_review', 'fe', '3h ago', '24h', 'Description', 'Tighten the axis labels, match the theme tokens, and add the **liquidation** heatmap under the sweep chart.'],
+      ['TRA-45', 'Start ML testing on VPA', 'blocked', 'ml', '5h ago', '24h', 'Description', 'Waiting on the H4 set: the model needs **liquidation** volume as a feature.'],
+      ['TRA-58', '**Liquidation** heatmap overlay', 'todo', 'none', 'Oct 22', '7d', '', ''],
+      ['TRA-51', 'Equity curve chart for **liquidation** sweep', 'done', 'fe', 'Oct 20', '7d', 'Title', '']
+    ];
+    const filters = st.filters || (this.props.noResults ? { status: ['blocked'], who: ['fe'] }
+      : ((this.props.scope ?? 'All') === 'Tasks' ? { status: ['in_progress', 'in_review'], who: [] } : { status: [], who: [] }));
+    const fs = { status: filters.status || [], who: filters.who || [] };
+    const match = (t, f) => (!f.status.length || f.status.indexOf(t[2]) >= 0) && (!f.who.length || f.who.indexOf(t[3]) >= 0);
+    const hits = tasks.filter((t) => match(t, fs));
+    // Every result row has the same fields; each kind turns on its own leading mark.
+    const row = (o) => Object.assign({ href: '#', hasId: false, id: '', hasChip: false, hasSnip: true, snipLabel: '', where: '', hasWho: false, who: who('none'), when: '' }, o, {
+      title: segs(o.title), snip: segs(o.snip || ''),
+      chip: Object.assign({ label: '', bg: '', fg: '', bd: '' }, o.chip),
+      lead: Object.assign({ isGlyph: false, isDisc: false, isIcon: false, isThumb: false, live: '', glyph: '', disc: A.none, icon: '', thumb: '' }, o.lead)
+    });
+    const taskRow = (t) => row({
+      href: 'TaskDetail.dc.html', hasId: true, id: t[0], title: t[1],
+      lead: { isGlyph: true, glyph: K.taskStatus[t[2]].glyph, live: t[2] === 'in_progress' ? 'live' : '' },
+      hasChip: true, chip: K.taskStatus[t[2]], hasSnip: !!t[7], snipLabel: t[6], snip: t[7],
+      where: 'trading workbench', hasWho: true, who: who(t[3]), when: t[4]
+    });
+    const chats = [row({ href: 'AgentChat.dc.html', title: 'Chat with Strategy Engineer', lead: { isDisc: true, disc: A.se }, hasChip: true,
+      chip: { label: 'Waiting for you', bg: 'var(--amber-bg)', fg: 'var(--amber-fg)', bd: K.edge('amber-fg') },
+      snipLabel: 'Strategy Engineer', snip: 'Should the **liquidation** filter scale with open interest, or stay fixed at 3%?', where: 'Agent chat', when: '1h ago' })];
+    const comment = (k, id, title, snip, when) => row({ href: 'TaskActivity.dc.html', title: id + ' · ' + title, lead: { isDisc: true, disc: A[k] }, snipLabel: A[k].name, snip, where: 'Comment', when });
+    const comments = [
+      comment('ml', 'TRA-44', 'Liquidation sweep strategy', 'Rerun done with fees fixed for partial fills. The **liquidation** filter still holds at 1.62 sharpe.', '40m ago'),
+      comment('me', 'TRA-44', 'Liquidation sweep strategy', 'Looks good. Try ETH with the same **liquidation** threshold before sign-off.', '35m ago'),
+      comment('qr', 'TRA-41', 'H4 download derivatives price data', 'Bybit **liquidation** history only goes back to 2023, so the rest comes from Coinglass.', '2h ago'),
+      comment('se', 'TRA-47', 'Center of gravity strategy', 'Compared with the **liquidation** sweep: lower drawdown, fewer trades.', 'Oct 22'),
+      comment('fe', 'TRA-51', 'Equity curve chart for liquidation sweep', 'Equity curve is up, with the **liquidation** clusters marked.', 'Oct 20')
+    ];
+    const docRow = (name, id, rev, snip, when) => row({ href: 'TaskFiles.dc.html', title: name, lead: { isIcon: true, icon: doc }, snipLabel: 'rev ' + rev, snip, where: 'Document on ' + id, when });
+    const docs = [
+      docRow('backtest-report', 'TRA-44', 3, '312 trades from 2022 to 2026. **Liquidation** size above $10M lifts the win rate to 0.58.', '40m ago'),
+      docRow('spec', 'TRA-44', 2, 'Entry: a sweep of the prior 4h low that sets off at least $5M of long **liquidations**.', 'Oct 16'),
+      docRow('data-sources', 'TRA-41', 1, '**Liquidations**: Bybit and Binance from 2023, Coinglass before that.', 'Oct 15')
+    ];
+    const files = [
+      row({ href: 'TaskFiles.dc.html', title: '**liquidation**-heatmap.png', lead: { isThumb: true, thumb: 'linear-gradient(90deg, transparent 0 18%, rgba(242,39,44,.85) 18% 26%, transparent 26% 52%, rgba(247,181,47,.8) 52% 58%, transparent 58%), linear-gradient(180deg, #1f6fe0, #8b2cf0)' },
+        hasSnip: false, where: 'Image · 380 KB · on TRA-58', when: 'Oct 22' }),
+      row({ href: 'TaskFiles.dc.html', title: '**liquidations**-btc-2024.csv', lead: { isIcon: true, icon: sheet }, hasSnip: false, where: 'File · 12.4 MB · output of TRA-41', when: '2h ago' })
+    ];
+    const agents = [row({ href: '#', title: 'ML Engineer', lead: { isDisc: true, disc: A.ml }, snipLabel: 'Capabilities', snip: 'Feature work and model tests on market data: volume, open interest, **liquidation** flow.', where: 'Agent · Engineering', when: '' })];
+
+    const S = [
+      { key: 'Tasks', label: 'Tasks', items: hits.map(taskRow), all: tasks.length },
+      { key: 'Tasks', label: 'Chats', items: chats, note: 'Shown as chats, not tasks' },
+      { key: 'Comments', label: 'Comments', items: comments },
+      { key: 'Docs', label: 'Docs', items: docs },
+      { key: 'Files', label: 'Files', items: files },
+      { key: 'Agents', label: 'Agents', items: agents },
+      { key: 'Projects', label: 'Projects', items: [] }
+    ];
+    const scope = st.scope || (this.props.scope ?? 'All');
+    const counts = { All: hits.length + 1 + comments.length + docs.length + files.length + agents.length, Tasks: hits.length + 1, Comments: comments.length, Docs: docs.length, Files: files.length, Agents: agents.length, Projects: 0 };
+    const scopes = ['All', 'Tasks', 'Comments', 'Docs', 'Files', 'Agents', 'Projects'].map((k) => ({
+      label: k, count: counts[k], on: k === scope, pick: () => set({ scope: k, menu: false }),
+      bg: k === scope ? 'var(--sel)' : 'transparent', shadow: k === scope ? 'var(--sel-shadow)' : 'none', fg: k === scope ? 'var(--text)' : 'var(--body)', weight: k === scope ? 800 : 600
+    }));
+    const isAll = scope === 'All';
+    const sections = S.filter((s) => s.items.length && (isAll || s.key === scope)).map((s) => {
+      const cap = isAll ? (s.label === 'Tasks' ? 4 : 2) : 99;
+      const more = s.items.length > cap;
+      return { label: s.label, count: s.items.length, items: s.items.slice(0, cap), hasNote: !!s.note, note: s.note || '',
+        hasMore: more, moreLabel: 'All ' + s.items.length, more: () => set({ scope: s.key }) };
+    });
+    const canFilter = scope === 'All' || scope === 'Tasks';
+    const isEmpty = canFilter && !hits.length;
+
+    const nm = { status: (v) => K.taskStatus[v].label, who: (v) => A[v].name };
+    const chips = [['status', 'Status'], ['who', 'Assignee']].filter(([f]) => fs[f].length).map(([f, k]) => ({
+      k, v: fs[f].map(nm[f]).join(', '), remove: () => set({ filters: Object.assign({}, fs, { [f]: [] }) })
+    }));
+    const loosen = [];
+    [['who', 'Assignee'], ['status', 'Status']].forEach(([f, k]) => {
+      if (!fs[f].length) return;
+      const n = tasks.filter((t) => match(t, Object.assign({}, fs, { [f]: [] }))).length;
+      if (n) loosen.push({ label: 'Remove ' + k + ': ' + fs[f].map(nm[f]).join(', '), count: n + (n === 1 ? ' task' : ' tasks'), apply: () => set({ filters: Object.assign({}, fs, { [f]: [] }) }) });
+    });
+    loosen.push({ label: 'Clear every filter', count: tasks.length + ' tasks', apply: () => set({ filters: { status: [], who: [] } }) });
+
+    const flip = (f, v) => () => {
+      const cur = fs[f];
+      set({ filters: Object.assign({}, fs, { [f]: cur.indexOf(v) >= 0 ? cur.filter((x) => x !== v) : cur.concat([v]) }) });
+    };
+    // Facet counts come from the response's filterOptionCounts: each counts the tasks the other filters leave.
+    const facetOpt = (f, v, extra) => {
+      const others = Object.assign({}, fs, { [f]: [] });
+      const n = tasks.filter((t) => match(t, others) && (f === 'status' ? t[2] === v : t[3] === v)).length;
+      const on = fs[f].indexOf(v) >= 0;
+      return Object.assign({ n, on, flip: flip(f, v), hasGlyph: false, hasDisc: false, glyph: '', disc: who('none'),
+        box: on ? '0' : '1.5px solid var(--dashed)', boxBg: on ? 'var(--primary)' : 'transparent', tick: on ? 1 : 0 }, extra);
+    };
+    const facets = [
+      { label: 'Status', opts: ['in_progress', 'in_review', 'todo', 'blocked', 'done'].map((v) => facetOpt('status', v, { label: K.taskStatus[v].label, hasGlyph: true, glyph: K.taskStatus[v].glyph })) },
+      { label: 'Assignee', opts: ['se', 'fe', 'qr', 'ml', 'none'].map((v) => facetOpt('who', v, { label: A[v].name, hasDisc: true, disc: who(v) })) },
+      { label: 'Updated', opts: [['24h', 'Last 24 hours', 4], ['7d', 'Last 7 days', 6], ['30d', 'Last 30 days', 6]].map(([v, label, n]) => ({ label, n, on: false, flip: () => {}, hasGlyph: false, hasDisc: false, glyph: '', disc: who('none'), box: '1.5px solid var(--dashed)', boxBg: 'transparent', tick: 0 })) }
+    ];
+    const menuOpen = st.menu ?? !!this.props.filterMenu;
+    return {
+      rootClass: K.rootClass,
+      query, scopes, sections, chips, canFilter, isEmpty, loosen, facets,
+      emptyNote: tasks.length + ' tasks match "' + query + '" without them.',
+      hasFilters: chips.length > 0, clearFilters: () => set({ filters: { status: [], who: [] } }),
+      menuOpen, toggleMenu: () => set({ menu: !menuOpen }),
+      menu: [
+        ['Status', 'status:', 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2'], ['Priority', 'priority:', 'M5 20V14M12 20V9M19 20V4'],
+        ['Assignee', 'assignee:', 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0'], ['Project', 'project:', 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'],
+        ['Label', 'label:', 'M3 12V4h8l10 10-8 8zM7.5 7.5h.01'], ['Updated', 'updated:7d', 'M3 5h18v16H3zM3 10h18M8 3v4M16 3v4']
+      ].map(([label, op, icon]) => ({ label, op, icon })),
+      sortLabel: 'Relevance',
+      tips: { typed: 'Or type them in the search box, like status:blocked or updated:7d.' }
+    };
+  }
+}
+
+</script>
+</body>
+</html>

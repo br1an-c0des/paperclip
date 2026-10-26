@@ -51,7 +51,7 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | Custom status text | 3 | Statuses are a fixed list (`ISSUE_STATUSES`). Agents, review stages and the inbox all depend on it, so each custom status maps onto one of the seven ([3.1](#31-custom-statuses-and-status-rules)). |
 | Statuses that trigger review or approval | 1, then 3 | Review stages already do this: moving a task to `in_review` or `done` starts its configured review, then approval. Stage 1 shows that as a rule on the task ("When it's done, Sam reviews, then Alex approves"). Rules on other statuses are 3.1. |
 | AI tags `@user` in comments to say who it's waiting on | 1, then 3 | Stage 1 shows what a task waits on (`reviewAttention`, stage participants, requests addressed to a person). Getting agents to do this consistently is agent guidance, which goes in the fork skill ([3.10](#310-core-skill-add-on)). |
-| Multiple lists ("sprints") per project | On hold | Lists need their own table: goals always give a project's tasks its first goal, and carry meanings lists shouldn't have ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)). The boards are drawn (L1 to L4) for when it resumes ([3.3](#33-lists-and-sprints-on-hold)). |
+| Multiple lists ("sprints") per project | On hold | Lists need their own table: goals always give a project's tasks its first goal, and carry meanings lists shouldn't have ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)). The boards are drawn ([L1 to L4](design/boards.md#lists-on-hold)) for when it resumes ([3.3](#33-lists-and-sprints-on-hold)). |
 | Project dashboard showing every sprint | On hold | Waits for lists. Board L4 draws the section. |
 | Goals assigned to lists: one list per sprint per goal | On hold | Waits for lists. Goals stay as they are meanwhile. |
 | Mention another task in a comment | 1 (exists) | Mentions already become related work on both tasks (`IssueRelatedWorkItem`, with mention counts and sources). The thread renders them as task links. |
@@ -145,23 +145,24 @@ The boards cover most of stage 1, but not all of it. More are being designed, an
 [design/](design/README.md#still-to-design) while development runs:
 
 - **Desktop boards for capabilities that have none yet:**
-  - new project and new agent;
-  - recurring tasks;
-  - the command palette and search;
+  - the command palette;
+  - goals as a project setting;
   - workspaces, skills, apps and tools, activity;
   - onboarding and sign-in;
   - the settings sections that board 30 only outlines.
 
   The full list is the empty **New home** cells in [capabilities.md](inventory/capabilities.md).
-- **Mobile wireframes**, possibly. Every board is drawn at 1440px today.
+
+New project, new agent, recurring tasks, search and cases now have boards, and the phone layouts are
+in [design/mobile.md](design/mobile.md).
 
 Development starts now on what's drawn and doesn't wait for these:
 
 - In each milestone, build the screens that have boards first.
 - Before starting a milestone, check [design/boards.md](design/boards.md) for boards added since.
-- A tier 1 screen with no board yet (new project, new agent, recurring tasks) waits for its
-  board. If the rest of the milestone is done first, build a plain version from the design system's
-  components, and mark it `partial` in capabilities.md so it's revisited.
+- A tier 1 screen with no board yet (goals in project settings, for one) waits for its board. If the
+  rest of the milestone is done first, build a plain version from the design system's components,
+  and mark it `partial` in capabilities.md so it's revisited.
 - Tier 2 screens (settings, skills, apps and tools, activity) port mostly as they are, so the design
   system and the board 30 outline are enough to build them. A board, if one comes, refines them.
 
@@ -172,8 +173,9 @@ to tear up. Most of the cost of adding mobile later comes from a few structural 
 can be made now without knowing what the mobile screens look like:
 
 - **The shell is a grid with named areas** (nav, main). Side panels dock in their own column beside
-  the list they came from (boards 2, 3, 5). On a phone, the nav becomes a drawer and the side panel a
-  full-screen sheet. That's a change to the grid at a breakpoint, not to the components inside it.
+  the list they came from (boards 2, 3, 5). On a phone, the nav becomes the floating dock
+  ([design/mobile.md](design/mobile.md#navigation)) and the side panel a full-screen page. That's a
+  change to the grid at a breakpoint, not to the components inside it.
 - **No fixed page widths.** The boards' 1440px is where the layout looks its best, not what it needs.
   Use `minmax(0, 1fr)`, `clamp()` and `min()`, as the design system already says.
 - **Components respond to their container** (`@container`), not the viewport. A task row then works
@@ -185,10 +187,11 @@ can be made now without knowing what the mobile screens look like:
   full-screen sheet in one place.
 - **Lists rank their columns**, so the least important drop first as the width shrinks.
 
-Mobile wireframes are worth most for the screens that set the structure: the shell and navigation,
-the task list, the task panel and modal, the Inbox, and the agent chat. Each one that arrives early is
-folded in during or right after its milestone, while that code is fresh. The rest wait for the
-responsive pass in M7.
+The phone layouts have arrived ([design/mobile.md](design/mobile.md)): the dock, and phone versions
+of the task list, task panel, new task, Inbox, agents, agent chat, runs, the project overview and
+docs, and search. Each is folded in during or right after its milestone, while that code is fresh;
+the shell's dock comes first, since it replaces the drawer `Shell.tsx` uses now. The rest wait for
+the responsive pass in M7.
 
 ### Decisions to make early
 
@@ -199,7 +202,7 @@ responsive pass in M7.
 | C | Lists as goals | M4 | Superseded Oct 26, 2026: lists are on hold until they have their own storage ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)). Goals stay a task property and a project setting. |
 | D | Project-level docs ([decision 1](decisions.md#1-projects-cant-hold-documents-or-files)) | M4 | Decided: build "From tasks", and start the 2b-8 conversation upstream. The project section waits for project documents, with the plugin (3.4) if upstream declines. No hidden docs task. |
 | E | Each experimental flag ([decision 12](decisions.md#12-what-happens-to-each-experimental-flag)) | M0 | Decided: built in, dropped, or following the instance setting, per flag. Agent chat and `enablePublicMcp` on; the file viewer built in (M2); Conference Room chat dropped. |
-| F | Cases | M6 | Decided: no cases page. Cases show inside the task views, when the instance has `enableCases` on: a case chip with phase ticks on task rows and a Case section in the task panel (option A), Group: Case in the task list (option B), and a Start case switch in New task with an optional workflow template (C5). The agent who gets the task sets up the case and makes that task its main task; the request goes in the task description, since the API has no field for it. Designs: boards C1, C2 and C5 on the [canvas](design/README.md), not yet in the board set. |
+| F | Cases | M6 | Decided: no cases page. Cases show inside the task views, when the instance has `enableCases` on: a case chip with phase ticks on task rows and a Case section in the task panel (option A), Group: Case in the task list (option B), and a Start case switch in New task with an optional workflow template (C5). The agent who gets the task sets up the case and makes that task its main task; the request goes in the task description, since the API has no field for it. Designs: boards [C1, C2 and C5](design/boards.md#cases). |
 | G | Hosting plugin UI ([FORK.md](../../FORK.md#a-standalone-app-not-a-plugin)) | M7 | Mount points for sidebar, project tabs, agent tabs, settings pages and full pages, with React loaded only for plugin areas. |
 | H | Responsive layouts | M0 | Decided: desktop first, built ready for mobile, with mobile layouts folded in as their wireframes arrive ([Desktop first, ready for mobile](#desktop-first-ready-for-mobile)). |
 
@@ -432,8 +435,8 @@ dropped.
 
 ### 3.3 Lists and sprints (on hold)
 
-On hold since Oct 26, 2026 ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)). Boards L1 to L4 on the
-[canvas](design/README.md) draw it: the task list grouped by list, a list's panel, New list, and a
+On hold since Oct 26, 2026 ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)). Boards
+[L1 to L4](design/boards.md#lists-on-hold) draw it: the task list grouped by list, a list's panel, New list, and a
 Lists section on the dashboard.
 
 - **Have:** nothing that fits. Goals were the plan (decision C), but every task in a project with goals

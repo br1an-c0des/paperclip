@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Run (phone)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Fragment+Mono&amp;display=swap">
+<style>
+body{margin:0;background:#0a0a0a}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;margin:0;padding:0}
+textarea{font:inherit;color:inherit}
+.light{--ground:#f2f2f4;--card:#ffffff;--card-edge:transparent;--shadow:0 1px 2px rgba(17,17,19,.06),0 10px 28px -14px rgba(17,17,19,.2);--shadow-lg:0 2px 6px rgba(17,17,19,.08),0 30px 70px -24px rgba(17,17,19,.38);--well:#e7e7ea;--sel:#ffffff;--sel-shadow:0 1px 3px rgba(17,17,19,.12);--line:#ececf0;--row-line:#f0f0f3;--hover:#e7e7ea;--row-hover:#f8f8fa;--code:#f6f6f8;--text:#111113;--body:#45454d;--muted:#6b6b75;--edge:#cfcfd6;--dashed:#b4b4bd;--primary:#111113;--on-primary:#ffffff;--run-bg:#ecebff;--run-fg:#3b2fc0;--violet-bg:#f6e6ff;--violet-fg:#7a1fb8;--amber-bg:#fff1dc;--amber-fg:#94480a;--red-bg:#fde7ea;--red-fg:#b0102a;--green-bg:#e2f6e5;--green-fg:#17672f;--cyan-bg:#dcf4f1;--cyan-fg:#0e6a61;--ash-a:#c9c9cf;--ash-b:#9a9aa3}
+.dark{--ground:#0a0a0a;--card:#141414;--card-edge:#1f1f1f;--shadow:inset 0 1px 0 rgba(255,255,255,.04),0 16px 34px -18px rgba(0,0,0,.95);--shadow-lg:inset 0 1px 0 rgba(255,255,255,.06),0 34px 80px -20px rgba(0,0,0,.95);--well:#161616;--sel:#262626;--sel-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 3px rgba(0,0,0,.7);--line:#1f1f1f;--row-line:#1a1a1a;--hover:#1a1a1a;--row-hover:#181818;--code:#0f0f0f;--text:#f4f1ea;--body:#c9c6bf;--muted:#8f8c86;--edge:#2c2c2c;--dashed:#4a4843;--primary:#f4f1ea;--on-primary:#0a0a0a;--run-bg:#17142b;--run-fg:#c9c2ff;--violet-bg:rgba(139,44,240,.15);--violet-fg:#dcb8ff;--amber-bg:rgba(247,181,47,.1);--amber-fg:#ffc98a;--red-bg:rgba(242,40,111,.12);--red-fg:#ff9aa8;--green-bg:rgba(47,209,47,.1);--green-fg:#9be59b;--cyan-bg:rgba(34,181,165,.12);--cyan-fg:#8fe3d8;--ash-a:#3a3a3a;--ash-b:#6b6b6b}
+.light,.dark{--g-ion:linear-gradient(180deg,#8b2cf0,#1f6fe0);--g-orchid:linear-gradient(180deg,#ff2bd6,#8b2cf0);--g-ember:linear-gradient(180deg,#f7b52f,#f5822a);--g-flare:linear-gradient(180deg,#f2286f,#f2272c);--g-lagoon:linear-gradient(180deg,#2fd12f,#22b5a5);--g-tide:linear-gradient(180deg,#22b5a5,#4c7896);--g-ash:linear-gradient(180deg,var(--ash-a),var(--ash-b))}
+.f-hanken{--display:'Hanken Grotesk',system-ui,sans-serif;--dtrack:-.045em}
+.f-bricolage{--display:'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif;--dtrack:-.035em}
+.disp{font-family:var(--display);letter-spacing:var(--dtrack)}
+.mono{font-family:'Fragment Mono',ui-monospace,monospace}
+.card{background:var(--card);border:1px solid var(--card-edge);border-radius:22px;box-shadow:var(--shadow)}
+@keyframes breathe{0%,100%{opacity:1;transform:scaleY(1)}50%{opacity:.55;transform:scaleY(.65)}}
+.live{animation:breathe 1.6s ease-in-out infinite}
+@keyframes caret{0%,49%{opacity:1}50%,100%{opacity:0}}
+.caret{display:inline-block;width:7px;height:13px;margin-left:3px;vertical-align:-2px;border-radius:2px;background:var(--run-fg);animation:caret 1s step-end infinite}
+@media (prefers-reduced-motion: reduce){.live,.caret{animation:none}}
+a{color:var(--text)}
+:focus-visible{outline:2px solid var(--run-fg);outline-offset:2px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.phone{position:relative;width:390px;height:844px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;background:var(--ground);color:var(--text);font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:14px;line-height:1.4}
+.scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.ib{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--body);text-decoration:none;flex-shrink:0;box-sizing:border-box}
+.ib:hover{background:var(--hover)}
+.ib[aria-disabled="true"]{opacity:.35;cursor:default}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 16px;box-sizing:border-box;border-radius:999px;border:1px solid var(--edge);background:transparent;color:var(--body);font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--well)}
+.btn.pri{background:var(--primary);border-color:var(--primary);color:var(--on-primary);font-weight:800}
+.btn.warn{color:var(--red-fg)}
+.btn.sm{height:36px;padding:0 13px;font-size:13px}
+.disc{display:grid;place-items:center;border-radius:50%;color:#111113;font-weight:800;flex-shrink:0;letter-spacing:0;box-sizing:border-box}
+.topbar{display:flex;align-items:center;gap:2px;height:60px;padding:0 4px;flex-shrink:0;border-bottom:1px solid var(--line)}
+.pill{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 11px;border-radius:999px;border:1px solid;font-size:13px;font-weight:700}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stats div{display:flex;flex-direction:column;gap:2px;padding:10px 11px;border-radius:14px;background:var(--code);min-width:0}
+.stats small{font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--muted)}
+.stats b{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stats span{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 12px;box-sizing:border-box;border-radius:999px;border:1px solid var(--edge);font-size:13px;font-weight:600;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--sel);border-color:transparent;box-shadow:var(--sel-shadow);color:var(--text)}
+.chip .bx{width:14px;height:14px;box-sizing:border-box;border-radius:4px;border:1.5px solid var(--dashed);display:grid;place-items:center;color:var(--on-primary)}
+.chip[aria-pressed="true"] .bx{background:var(--run-fg);border-color:var(--run-fg)}
+.step{display:flex;gap:10px;padding:11px 14px;border-top:1px solid var(--row-line)}
+.step .t{width:38px;flex-shrink:0;padding-top:2px;font-size:11px;color:var(--muted)}
+.step .ic{width:26px;height:26px;flex-shrink:0;border-radius:8px;display:grid;place-items:center}
+.step .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.step .hd{display:flex;align-items:baseline;gap:7px;min-width:0}
+.step .hd b{font-size:13px;font-weight:700}
+.step .hd code{font-family:'Fragment Mono',ui-monospace,monospace;font-size:12px;color:var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.step .dt{font-size:12px;color:var(--muted)}
+.step .say{font-size:13px;line-height:1.45;color:var(--body)}
+.frow{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--row-line);font-size:12px}
+.frow:first-child{border-top:0}
+.frow code{flex:1;min-width:0;font-family:'Fragment Mono',ui-monospace,monospace;color:var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.out{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;box-sizing:border-box;border:1px solid var(--edge);border-radius:999px;font-size:12px;font-weight:600;color:var(--body);text-decoration:none;white-space:nowrap}
+.composer{margin:0 12px 14px;padding:10px 10px 8px 14px;border:1px solid var(--edge);border-radius:24px;background:var(--card);box-shadow:var(--shadow)}
+.composer textarea{display:block;width:100%;box-sizing:border-box;border:0;outline:0;resize:none;background:transparent;font-size:15px;line-height:1.45;padding:2px 0 6px}
+.composer textarea::placeholder{color:var(--muted)}
+.send{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:44px;padding:0 16px;box-sizing:border-box;border-radius:999px;background:var(--primary);color:var(--on-primary);font-size:14px;font-weight:800;flex-shrink:0}
+.fieldlink{display:flex;align-items:center;gap:10px;height:52px;margin:0 12px 16px;padding:0 8px 0 18px;border:1px solid var(--edge);border-radius:999px;background:var(--card);box-shadow:var(--shadow);font-size:15px;color:var(--muted);text-decoration:none}
+</style>
+</helmet>
+<div class="phone {{rootClass}}">
+  <header class="topbar">
+    <a class="ib" href="TaskActivity.dc.html" aria-label="Back to TRA-41"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg></a>
+    <span class="disc" aria-hidden="true" style="width: 32px; height: 32px; font-size: 11px; margin: 0 10px 0 2px; background: linear-gradient(160deg, #2fd12f, #22b5a5)">QR</span>
+    <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+      <h1 class="disp" style="margin: 0; font-size: 18px; font-weight: 800; line-height: 1.15; letter-spacing: -.01em">{{run.title}}</h1>
+      <span style="font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Quant Researcher · <span class="mono">TRA-41</span></span>
+    </div>
+    <button class="ib" aria-label="Previous run" onClick="{{prev}}" aria-disabled="{{prevDisabled}}"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"></path></svg></button>
+    <button class="ib" aria-label="Next run" onClick="{{next}}" aria-disabled="{{nextDisabled}}"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+  </header>
+
+  <div class="scroll" style="padding-bottom: 8px">
+    <section class="card" aria-label="Run summary" style="margin: 12px 12px 0; padding: 14px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span class="pill" role="status" style="background: {{run.pillBg}}; border-color: {{run.pillEdge}}; color: {{run.pillFg}}"><span class="{{run.liveClass}}" aria-hidden="true" style="width: 4px; height: 12px; border-radius: 999px; background: {{run.capsule}}"></span>{{run.status}}</span>
+        <span style="margin-left: auto; font-size: 12px; color: var(--muted)">{{run.position}}</span>
+      </div>
+      <div style="font-size: 13px; color: var(--body)">{{run.trigger}}</div>
+      <div class="stats">
+        <sc-for list="{{run.stats}}" as="s" hint-placeholder-count="3">
+          <div><small>{{s.k}}</small><b>{{s.v}}</b><span>{{s.sub}}</span></div>
+        </sc-for>
+      </div>
+      <div style="display: flex; gap: 8px">
+        <button class="btn warn" style="flex: 1; display: {{liveDisplay}}">Stop run</button>
+        <button class="btn" style="flex: 1; display: {{doneDisplay}}">Rerun</button>
+        <a class="btn" href="TaskDetail.dc.html" style="flex: 1">Open task</a>
+      </div>
+    </section>
+
+    <sc-if value="{{isLive}}" hint-placeholder-val="{{true}}">
+      <section aria-label="Working now" style="margin: 12px 12px 0; padding: 13px 14px; border-radius: 18px; border: 1px solid color-mix(in srgb, var(--run-fg) 45%, transparent); background: var(--run-bg); display: flex; flex-direction: column; gap: 6px">
+        <span style="display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--run-fg)"><span class="live" aria-hidden="true" style="width: 4px; height: 11px; border-radius: 999px; background: var(--g-ion)"></span>WORKING NOW · LAST OUTPUT 2S AGO</span>
+        <span style="font-size: 15px; font-weight: 700">Writing tests for the funding-rate merge<span class="caret" aria-hidden="true"></span></span>
+        <span style="font-size: 13px; line-height: 1.45; color: var(--body)">Binance funding settles every 8h, so I'll forward-fill it onto the 4h bars before joining on symbol and timestamp.</span>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{isDone}}" hint-placeholder-val="{{false}}">
+      <section class="card" aria-label="Result" style="margin: 12px 12px 0; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px">
+        <div style="font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--muted)">RESULT</div>
+        <p style="margin: 0; font-size: 15px; line-height: 1.5; color: var(--body)">Backfilled BTC and ETH 4H funding, open interest and liquidations from 2022. Two gaps are logged in data notes. SOL starts in the next run.</p>
+        <div>
+          <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px"><span style="font-size: 13px; font-weight: 700">3 files changed</span><span style="font-size: 12px; color: var(--green-fg)">+148</span><span style="font-size: 12px; color: var(--red-fg)">−14</span></div>
+          <div class="frow"><code>downloader/hyperliquid.py</code><span style="color: var(--green-fg)">+84</span><span style="color: var(--red-fg)">−12</span></div>
+          <div class="frow"><code>tests/test_downloader.py</code><span style="color: var(--green-fg)">+58</span></div>
+          <div class="frow"><code>data/derivatives/schema.py</code><span style="color: var(--green-fg)">+6</span><span style="color: var(--red-fg)">−2</span></div>
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap">
+          <a class="out" href="TaskFiles.dc.html"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.2"></circle><circle cx="6" cy="18" r="2.2"></circle><circle cx="18" cy="18" r="2.2"></circle><path d="M6 8.2v7.6M18 15.8V10a4 4 0 0 0-4-4h-3"></path></svg>PR #12<span class="st" style="display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 999px; font-size: 10px; font-weight: 700; background: var(--green-bg); color: var(--green-fg)">OPEN</span></a>
+          <a class="out" href="TaskFiles.dc.html">liquidation-heatmap.png</a>
+          <a class="out" href="TaskFiles.dc.html">backfill-btc-4h.log</a>
+        </div>
+      </section>
+    </sc-if>
+
+    <section class="card" aria-label="Transcript" style="margin: 12px 12px 0; overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 8px; padding: 14px 14px 10px">
+        <span style="font-weight: 800">Transcript</span><span style="font-size: 13px; color: var(--muted)">{{run.steps}}</span>
+      </div>
+      <div role="group" aria-label="Show in transcript" style="display: flex; gap: 6px; padding: 0 14px 12px">
+        <button class="chip" aria-pressed="{{thinkPressed}}" onClick="{{toggleThink}}"><span class="bx" aria-hidden="true"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span>Thinking</button>
+        <button class="chip" aria-pressed="{{toolsPressed}}" onClick="{{toggleTools}}"><span class="bx" aria-hidden="true"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span>Tool calls</button>
+      </div>
+      <button style="display: block; width: 100%; height: 44px; border-top: 1px solid var(--row-line); font-size: 13px; font-weight: 700; color: var(--body)">{{run.earlier}}</button>
+      <sc-for list="{{steps}}" as="s" hint-placeholder-count="6">
+        <div class="step">
+          <span class="t mono">{{s.t}}</span>
+          <span class="ic" aria-hidden="true" style="background: {{s.bg}}; color: {{s.fg}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{s.icon}}"></path></svg></span>
+          <span class="tx">
+            <span class="hd"><b>{{s.kind}}</b><code>{{s.target}}</code></span>
+            <span class="say" style="display: {{s.sayDisplay}}">{{s.say}}<span class="caret" aria-hidden="true" style="display: {{s.caretDisplay}}"></span></span>
+            <span class="dt" style="display: {{s.detailDisplay}}; color: {{s.detailFg}}">{{s.detail}}</span>
+          </span>
+        </div>
+      </sc-for>
+      <div style="display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--row-line); font-size: 12px; color: var(--muted)"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8M12 16v4"></path></svg>Input, raw output and provider trace open on desktop</div>
+    </section>
+    <div style="height: 12px"></div>
+  </div>
+
+  <sc-if value="{{isLive}}" hint-placeholder-val="{{true}}">
+    <div style="display: flex; align-items: center; gap: 8px; margin: 0 12px 8px; padding: 8px 8px 8px 14px; border: 1.5px dashed var(--dashed); border-radius: 18px; font-size: 13px; color: var(--body)">
+      <span style="flex: 1; min-width: 0; line-height: 1.35">1 queued for the next turn: <span style="color: var(--text)">"Also pull ETH funding from OKX…"</span></span>
+      <button class="btn sm" style="height: 34px">Steer now</button>
+    </div>
+    <form class="composer" onSubmit="{{noop}}">
+      <label class="vh" for="steer">Note for this run</label>
+      <textarea id="steer" rows="1" placeholder="Add a note for Quant Researcher's next step"></textarea>
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span style="flex: 1; font-size: 11px; line-height: 1.3; color: var(--muted)">Queued notes are read when the current step ends</span>
+        <button type="button" class="send">Queue<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg></button>
+      </div>
+    </form>
+  </sc-if>
+  <sc-if value="{{isDone}}" hint-placeholder-val="{{false}}">
+    <a class="fieldlink" href="TaskActivity.dc.html"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path></svg><span style="flex: 1">Comment on TRA-41…</span></a>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"dark","options":["light","dark"]},"display":{"editor":"enum","default":"Hanken Grotesk","options":["Hanken Grotesk","Bricolage Grotesque"]},"state":{"editor":"enum","default":"live","options":["live","finished"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { run: null, think: true, tools: true };
+  }
+  renderVals() {
+    const dark = (this.props.theme ?? 'dark') === 'dark';
+    const font = (this.props.display ?? 'Hanken Grotesk') === 'Bricolage Grotesque' ? 'f-bricolage' : 'f-hanken';
+    const live = (this.state.run ?? (this.props.state ?? 'live')) === 'live';
+    const { think, tools } = this.state;
+    const run = live ? {
+      title: 'Run #7', status: 'Running · 18m 12s', position: 'Run 7 of 7',
+      pillBg: 'var(--run-bg)', pillEdge: 'color-mix(in srgb, var(--run-fg) 50%, transparent)', pillFg: 'var(--run-fg)', capsule: 'var(--g-ion)', liveClass: 'live',
+      trigger: 'Woken by your comment at 10:31 am. Resumed from run #6.',
+      stats: [{ k: 'COST', v: '$0.38', sub: '$38.20 this month' }, { k: 'TOKENS', v: '412k in', sub: '9.8k out · 371k cached' }, { k: 'MODEL', v: 'Opus 5.5', sub: 'Claude Code' }],
+      steps: '41 steps', earlier: 'Show 35 earlier steps'
+    } : {
+      title: 'Run #6', status: 'Succeeded · 24m 06s', position: 'Run 6 of 7',
+      pillBg: 'var(--green-bg)', pillEdge: 'color-mix(in srgb, var(--green-fg) 45%, transparent)', pillFg: 'var(--green-fg)', capsule: 'var(--g-lagoon)', liveClass: '',
+      trigger: 'Woken because TRA-42 was completed. Ended 7:50 am.',
+      stats: [{ k: 'COST', v: '$0.71', sub: '$38.20 this month' }, { k: 'TOKENS', v: '1.21M in', sub: '21.4k out · 1.08M cached' }, { k: 'EXIT', v: '0', sub: 'Succeeded' }],
+      steps: '58 steps', earlier: 'Show 53 earlier steps'
+    };
+    const T = {
+      Read: { icon: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5', bg: 'var(--well)', fg: 'var(--body)', tool: true },
+      Bash: { icon: 'M4 17l6-5-6-5M12 19h8', bg: 'var(--well)', fg: 'var(--body)', tool: true },
+      Edit: { icon: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4', bg: 'var(--violet-bg)', fg: 'var(--violet-fg)', tool: true },
+      Upload: { icon: 'M12 16V4M7 9l5-5 5 5M5 20h14', bg: 'var(--cyan-bg)', fg: 'var(--cyan-fg)', tool: true },
+      Think: { icon: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.6.6 1 1.4 1 2.5h6c0-1.1.4-1.9 1-2.5A6 6 0 0 0 12 3z', bg: 'var(--run-bg)', fg: 'var(--run-fg)', think: true },
+      Message: { icon: 'M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z', bg: 'var(--green-bg)', fg: 'var(--green-fg)' }
+    };
+    const st = (t, kind, target, o) => {
+      const e = o || {};
+      return Object.assign({ t, kind, target, icon: T[kind].icon, bg: T[kind].bg, fg: T[kind].fg, isTool: !!T[kind].tool, isThink: !!T[kind].think,
+        say: e.say || '', sayDisplay: e.say ? 'block' : 'none', caretDisplay: e.now ? 'inline-block' : 'none',
+        detail: e.detail || '', detailDisplay: e.detail ? 'block' : 'none', detailFg: e.fg || 'var(--muted)' });
+    };
+    const liveSteps = [
+      st('12:04', 'Bash', 'python -m tools.backfill --symbol ETH --tf 4h', { detail: 'exit 0 · 2m 10s', fg: 'var(--green-fg)' }),
+      st('14:20', 'Message', 'to TRA-41', { say: 'BTC and ETH 4H are in. Starting the funding merge before SOL.' }),
+      st('15:02', 'Read', 'data/derivatives/schema.py', { detail: '96 lines' }),
+      st('15:40', 'Edit', 'downloader/hyperliquid.py', { detail: '+84 −12' }),
+      st('17:31', 'Bash', 'pytest tests/test_downloader.py', { detail: '14 passed · 9s', fg: 'var(--green-fg)' }),
+      st('18:02', 'Think', '', { say: 'Writing tests for the funding-rate merge', now: true })
+    ];
+    const doneSteps = [
+      st('19:12', 'Bash', 'pytest tests/', { detail: '31 passed · 22s', fg: 'var(--green-fg)' }),
+      st('21:40', 'Edit', 'data/derivatives/schema.py', { detail: '+6 −2' }),
+      st('22:58', 'Bash', 'gh pr create --title "feat: H4 derivatives downloader"', { detail: 'Opened PR #12', fg: 'var(--green-fg)' }),
+      st('23:30', 'Upload', 'liquidation-heatmap.png', { detail: '312 KB · to TRA-41' }),
+      st('24:06', 'Message', 'to TRA-41', { say: 'Backfilled BTC and ETH 4H from 2022. Two gaps are logged in data notes. SOL is next.' })
+    ];
+    const steps = (live ? liveSteps : doneSteps).filter((s) => (think || !s.isThink) && (tools || !s.isTool));
+    const setRun = (r) => this.setState({ run: r });
+    return {
+      rootClass: (dark ? 'dark' : 'light') + ' ' + font,
+      run, steps, isLive: live, isDone: !live,
+      liveDisplay: live ? 'inline-flex' : 'none', doneDisplay: live ? 'none' : 'inline-flex',
+      prev: () => setRun('finished'), next: () => setRun('live'),
+      prevDisabled: live ? 'false' : 'true', nextDisabled: live ? 'true' : 'false',
+      thinkPressed: think ? 'true' : 'false', toolsPressed: tools ? 'true' : 'false',
+      toggleThink: () => this.setState({ think: !think }), toggleTools: () => this.setState({ tools: !tools }),
+      noop: (e) => { if (e && e.preventDefault) e.preventDefault(); }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New task: connect the webhook</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Fragment+Mono&amp;display=swap">
+<style>
+body{margin:0;background:#0a0a0a}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;margin:0}
+.light{--ground:#f2f2f4;--card:#ffffff;--card-edge:transparent;--shadow:0 1px 2px rgba(17,17,19,.06),0 10px 28px -14px rgba(17,17,19,.2);--shadow-lg:0 2px 6px rgba(17,17,19,.08),0 30px 70px -24px rgba(17,17,19,.38);--well:#e7e7ea;--sel:#ffffff;--sel-shadow:0 1px 3px rgba(17,17,19,.12);--line:#ececf0;--row-line:#f0f0f3;--hover:#e7e7ea;--row-hover:#f8f8fa;--code:#f6f6f8;--text:#111113;--body:#45454d;--muted:#6b6b75;--edge:#cfcfd6;--dashed:#b4b4bd;--primary:#111113;--on-primary:#ffffff;--run-bg:#ecebff;--run-fg:#3b2fc0;--violet-bg:#f6e6ff;--violet-fg:#7a1fb8;--amber-bg:#fff1dc;--amber-fg:#94480a;--red-bg:#fde7ea;--red-fg:#b0102a;--green-bg:#e2f6e5;--green-fg:#17672f;--cyan-bg:#dcf4f1;--cyan-fg:#0e6a61;--pri-on:#111113;--pri-off:#dcdce2;--ash-a:#c9c9cf;--ash-b:#9a9aa3;--scrim:rgba(17,17,19,.34);--disc-shadow:rgba(17,17,19,.35);--grain-blend:soft-light;--grain-op:.9;--knob-off:#ffffff}
+.dark{--ground:#0a0a0a;--card:#141414;--card-edge:#1f1f1f;--shadow:inset 0 1px 0 rgba(255,255,255,.04),0 16px 34px -18px rgba(0,0,0,.95);--shadow-lg:inset 0 1px 0 rgba(255,255,255,.06),0 34px 80px -20px rgba(0,0,0,.95);--well:#161616;--sel:#262626;--sel-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 3px rgba(0,0,0,.7);--line:#1f1f1f;--row-line:#1a1a1a;--hover:#1a1a1a;--row-hover:#181818;--code:#0f0f0f;--text:#f4f1ea;--body:#c9c6bf;--muted:#8f8c86;--edge:#2c2c2c;--dashed:#4a4843;--primary:#f4f1ea;--on-primary:#0a0a0a;--run-bg:#17142b;--run-fg:#c9c2ff;--violet-bg:rgba(139,44,240,.15);--violet-fg:#dcb8ff;--amber-bg:rgba(247,181,47,.1);--amber-fg:#ffc98a;--red-bg:rgba(242,40,111,.12);--red-fg:#ff9aa8;--green-bg:rgba(47,209,47,.1);--green-fg:#9be59b;--cyan-bg:rgba(34,181,165,.12);--cyan-fg:#8fe3d8;--pri-on:#f4f1ea;--pri-off:#2c2c2c;--ash-a:#3a3a3a;--ash-b:#6b6b6b;--scrim:rgba(0,0,0,.62);--disc-shadow:rgba(0,0,0,.6);--grain-blend:overlay;--grain-op:.75;--knob-off:#8f8c86}
+.f-hanken{--display:'Hanken Grotesk',system-ui,sans-serif;--dtrack:-.045em}
+.f-bricolage{--display:'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif;--dtrack:-.035em}
+.disp{font-family:var(--display);letter-spacing:var(--dtrack)}
+.card{background:var(--card);border:1px solid var(--card-edge);border-radius:18px;box-shadow:var(--shadow)}
+.mono{font-family:'Fragment Mono',ui-monospace,monospace}
+.grain{position:absolute;inset:0;width:100%;height:100%;mix-blend-mode:var(--grain-blend);opacity:var(--grain-op);pointer-events:none}
+.no-grain .grain{display:none}
+@keyframes breathe{0%,100%{opacity:1;transform:scaleY(1)}50%{opacity:.55;transform:scaleY(.65)}}
+.live{animation:breathe 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.live{animation:none}}
+a{color:var(--run-fg)}
+a:hover{color:var(--run-fg)}
+textarea{font:inherit}
+textarea::placeholder{color:var(--muted)}
+.nav{text-decoration:none}
+.nav:hover,.ghost:hover,.icon:hover{background:var(--well)}
+.row:hover{background:var(--card)}
+.row a{color:var(--text);text-decoration:none}
+.row a:hover{text-decoration:underline}
+.rq{position:relative;display:flex;flex-direction:column;gap:10px;padding:14px 16px 14px 19px;border:1px solid var(--edge);border-radius:14px;background:var(--card);overflow:hidden;text-align:left}
+.rq::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--dashed)}
+.k-q::before{background:#2a9c9e}
+.k-q .rq-kind{background:var(--cyan-bg);color:var(--cyan-fg)}
+.k-p::before{background:var(--violet-bg)}
+.k-p .rq-kind{background:var(--violet-bg);color:var(--violet-fg)}
+.k-a::before{background:#f69a2d}
+.k-a .rq-kind{background:var(--amber-bg);color:var(--amber-fg)}
+.k-s::before{background:#29c35f}
+.k-s .rq-kind{background:var(--green-bg);color:var(--green-fg)}
+.rq.settled{background:var(--card);gap:8px;padding-top:12px;padding-bottom:12px}
+.rq.settled::before{opacity:.25}
+.rq.settled{box-shadow:0 1px 2px rgba(17,17,19,.06)}
+.rq-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted);min-width:0}
+.rq-kind{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:5px;font-size:11px;font-weight:600;letter-spacing:.04em;flex-shrink:0}
+.rq-tag{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:5px;border:1px solid var(--edge);color:var(--body);font-size:11px;font-weight:500;flex-shrink:0}
+.rq-subj{display:inline-flex;align-items:center;gap:6px;min-width:0;color:var(--body);text-decoration:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.rq-subj:hover{text-decoration:underline}
+.rq-mono{font-family:'Fragment Mono', ui-monospace, monospace;font-size:12px;color:var(--muted)}
+.rq-life{margin-left:auto;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.rq-soon{color:var(--red-fg)}
+.rq-ask{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.rq-ask b{color:var(--text);font-weight:500}
+.rq h3{margin:0;font-size:15px;font-weight:600;line-height:1.4;color:var(--text)}
+.rq p{margin:0;font-size:14px;line-height:1.55;color:var(--body)}
+.rq-next{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:14px;background:var(--card);font-size:13px;line-height:1.45;color:var(--muted)}
+.rq-next svg{flex-shrink:0;margin-top:2px}
+.rq-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rq-btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;box-sizing:border-box;border-radius:999px;border:1px solid var(--edge);background:transparent;color:var(--body);font-size:13px;font-weight:500;white-space:nowrap}
+.rq-btn:hover{background:var(--well)}
+.rq-btn.pri{background:#5b45ea;border-color:color-mix(in srgb, var(--run-fg) 45%, transparent);color:var(--text)}
+.rq-btn.pri:hover{background:#5b45ea}
+.rq-btn.quiet{border-color:transparent;color:var(--muted);padding:0 8px}
+.rq-btn.warn{color:var(--red-fg)}
+.rq-who{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap}
+.rq-opts{display:flex;flex-direction:column;gap:6px}
+.rq-opt{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:14px;font-size:13px;line-height:1.45;color:var(--body)}
+.rq-opt.on{border-color:color-mix(in srgb, var(--run-fg) 75%, transparent);background:var(--run-bg)}
+.rq-opt small{display:block;font-size:12px;color:var(--muted)}
+.rq-radio{width:14px;height:14px;flex-shrink:0;margin-top:2px;box-sizing:border-box;border-radius:50%;border:2px solid var(--edge)}
+.rq-opt.on .rq-radio{border:4px solid color-mix(in srgb, var(--run-fg) 45%, transparent)}
+.rq-check{width:14px;height:14px;flex-shrink:0;margin-top:2px;box-sizing:border-box;border-radius:4px;border:2px solid var(--edge);display:grid;place-items:center}
+.rq-opt.on .rq-check{background:#5b45ea;border-color:color-mix(in srgb, var(--run-fg) 45%, transparent)}
+.rq-chips{display:flex;gap:6px;flex-wrap:wrap}
+.rq-chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:999px;border:1px solid var(--edge);font-size:13px;color:var(--body)}
+.rq-chip.on{border-color:color-mix(in srgb, var(--run-fg) 75%, transparent);background:var(--run-bg);color:var(--text)}
+.rq-q{font-size:13px;font-weight:500;color:var(--text)}
+.rq-field{display:flex;align-items:center;gap:6px;min-height:32px;padding:0 10px;box-sizing:border-box;border:1px solid var(--edge);border-radius:14px;background:var(--ground);font-size:13px;color:var(--muted)}
+.rq-diff{border:1px solid var(--line);border-radius:14px;overflow:hidden;font-size:13px}
+.rq-drow{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:center;padding:7px 10px;border-top:1px solid var(--line);color:var(--body)}
+.rq-drow:first-child{border-top:0;background:var(--card);font-size:12px;color:var(--muted)}
+.rq-was{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dashed)}
+.rq-st{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:0;color:var(--text);flex-shrink:0}
+.rq-alert{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:14px;border:1px solid color-mix(in srgb, var(--amber-fg) 50%, transparent);background:var(--amber-bg);font-size:12px;line-height:1.45;color:var(--amber-fg)}
+.rq-code{margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--code);font-family:'Fragment Mono', ui-monospace, monospace;font-size:12px;line-height:1.6;color:var(--body);white-space:pre-wrap}
+.rq-code span{color:var(--muted)}
+.rq-res{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--body)}
+.rq-res .ok{color:var(--green-fg)}
+.rq-res .bad{color:var(--red-fg)}
+.rq-res .mid{color:var(--amber-fg)}
+.rq-res small{font-size:12px;color:var(--muted)}
+.rq-meter{height:6px;border-radius:3px;background:var(--well);overflow:hidden}
+.rq-meter span{display:block;height:100%;border-radius:3px}
+.rq-agent{display:flex;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.rq-kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin-top:6px;font-size:12px;color:var(--muted)}
+.rq-kv b{font-weight:400;color:var(--body)}
+.rq-stage{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.rq-step{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:14px;border:1px solid var(--edge);color:var(--muted)}
+.rq-step.now{border-color:color-mix(in srgb, var(--green-fg) 65%, transparent);background:var(--green-bg);color:var(--green-fg)}
+.rq-file{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--edge);border-radius:14px;font-size:12px;color:var(--body);text-decoration:none}
+.rq{border:1px solid var(--card-edge);border-radius:18px;box-shadow:var(--shadow);padding-left:30px}
+.rq::before{left:13px;top:16px;bottom:auto;width:6px;height:20px;border-radius:999px}
+.k-q::before{background:linear-gradient(180deg,#22b5a5,#4c7896)}
+.k-p::before{background:linear-gradient(180deg,#ff2bd6,#8b2cf0)}
+.k-a::before{background:linear-gradient(180deg,#f7b52f,#f5822a)}
+.k-s::before{background:linear-gradient(180deg,#2fd12f,#22b5a5)}
+.rq-kind,.rq-st,.rq-tag{border-radius:999px;letter-spacing:0}
+.rq-btn{font-weight:700}
+.rq-btn.pri,.rq-btn.pri:hover{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.rq{padding:16px 22px 18px 38px;gap:12px}
+.rq::before{left:15px;top:15px;bottom:15px;height:auto;width:7px;border-radius:999px}
+.rq-top{padding-bottom:12px;border-bottom:1px solid var(--line)}
+.rq h3{font-size:19px;font-weight:800;line-height:1.25}
+.rq-next{background:var(--code)}
+.rq-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:28px;align-items:start}
+.rq-main{display:flex;flex-direction:column;gap:12px;min-width:0}
+.rq-ctx{display:flex;flex-direction:column;gap:10px;padding-left:22px;border-left:1px solid var(--line);font-size:13px;color:var(--muted)}
+.rq-ctx h4{margin:0;font-family:var(--display);font-size:12px;font-weight:800;letter-spacing:-.01em;color:var(--muted)}
+.rq-rel{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1px solid var(--edge);border-radius:18px;background:var(--ground);text-decoration:none;color:var(--text);font-size:13px;line-height:1.35}
+.rq-rel:hover{border-color:var(--dashed)}
+.rq-rel-glyph{width:6px;height:16px;flex-shrink:0;margin:1px 4px 0;border-radius:999px}
+.rq-rel-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.rq-rel-top{display:flex;align-items:baseline;gap:8px;min-width:0}
+.rq-rel-title{font-weight:500;min-width:0}
+.rq-rel-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.rq-ctx ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.rq-new{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;background:var(--run-bg);color:var(--run-fg);font-size:11px;font-weight:700;flex-shrink:0}
+.rq-new::before{content:"";width:5px;height:10px;border-radius:999px;background:linear-gradient(180deg,#8b2cf0,#1f6fe0)}
+.rq-stack{display:flex;flex-direction:column;gap:14px}
+.rq-stack .rq{transition:transform .15s ease,box-shadow .15s ease}
+.rq-stack .rq:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+@media (prefers-reduced-motion: reduce){.rq-stack .rq{transition:none}.rq-stack .rq:hover{transform:none}}
+.rq-compact{gap:10px;padding-top:14px;padding-bottom:16px}
+.rq-compact .rq-top{padding-bottom:10px}
+.rq-compact h3{font-size:17px}
+.rq.settled .rq-top{padding-bottom:8px}
+.dark .rq.settled{background:var(--code);border-color:var(--row-line);box-shadow:none}
+.rq.settled.issue{background:var(--card);box-shadow:var(--shadow)}
+.rq.settled.issue::before{opacity:1}
+.rq.settled.issue-bad{border-color:color-mix(in srgb,var(--red-fg) 45%,transparent)}
+.rq.settled.issue-mid{border-color:color-mix(in srgb,var(--amber-fg) 45%,transparent)}
+.rq-res.alert-bad,.rq-res.alert-mid{padding:8px 10px;border-radius:14px;border:1px solid;color:var(--text)}
+.rq-res.alert-bad{background:var(--red-bg);border-color:color-mix(in srgb,var(--red-fg) 40%,transparent)}
+.rq-res.alert-mid{background:var(--amber-bg);border-color:color-mix(in srgb,var(--amber-fg) 40%,transparent)}
+.nav:hover,.ghost:hover,.icon:hover{background:var(--hover)}
+.row:hover,.item:hover{background:var(--row-hover)}
+.card{background:var(--card);border:1px solid var(--card-edge);border-radius:18px;box-shadow:var(--shadow)}
+.seg{padding:3px;border:0;border-radius:999px;background:var(--well)}
+.seg button{border-radius:999px;font-weight:600;color:var(--body)}
+.seg button[aria-pressed="true"]{background:var(--sel);box-shadow:var(--sel-shadow);color:var(--text);font-weight:800}
+.chip{border-radius:999px}
+.field{border-radius:12px}
+.sec-title h2{font-family:var(--display);letter-spacing:-.02em;font-size:24px;font-weight:800}
+.chead h3{font-family:var(--display);letter-spacing:-.01em;font-weight:800}
+.btn{height:32px;padding:0 14px;font-weight:700}
+.pbtn{height:32px;padding:0 14px;font-weight:800}
+.rm{border:1px solid var(--card-edge);border-radius:24px;box-shadow:var(--shadow-lg)}
+.rm-av{border-radius:50%;background:linear-gradient(160deg,#2fd12f,#22b5a5);color:#111113;font-weight:800}
+.rm-avdot{border-color:var(--card)}
+.rm-tabs{align-self:center;padding:3px;gap:2px;border-radius:999px;background:var(--well)}
+.rm-tab{height:30px;padding:0 12px;border-radius:999px;font-weight:600;box-shadow:none!important}
+.rm-tab[aria-selected="true"]{background:var(--sel);box-shadow:var(--sel-shadow)!important;color:var(--text)!important;font-weight:800}
+.rm-stats dd{font-family:var(--display);font-size:15px;font-weight:800}
+.rm-live{border-radius:16px}
+.rail{position:sticky;top:14px;display:flex;flex-direction:column;gap:10px}
+.rail .crew-col{display:flex;align-items:center;gap:12px;padding:8px 12px 8px 6px;border-radius:16px;background:var(--well);outline:none}
+.rail .crew-col:focus-visible{box-shadow:0 0 0 2px var(--run-fg)}
+.rail .crew-pop{left:auto;right:calc(100% + 12px);top:-6px;width:340px}
+.rail .crew-pop::before{top:0;bottom:0;left:auto;right:-14px;width:14px;height:auto}
+.rail .crew-col:last-child .crew-pop{right:calc(100% + 12px);top:auto;bottom:-6px}
+.ph{position:relative}
+.ph-home,.card .ph-home:hover{color:inherit;text-decoration:none;outline:none}
+.ph-home::after{content:"";position:absolute;inset:0;z-index:0;border-radius:18px}
+.ph a:not(.ph-home),.ph button,.ph nav{position:relative;z-index:1}
+.ph-go{display:inline-flex;align-items:center;gap:5px;margin-left:12px;vertical-align:middle;height:24px;padding:0 10px;border-radius:999px;background:var(--well);color:var(--body);font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:12px;font-weight:700;letter-spacing:0;opacity:0;transform:translateX(-4px);transition:opacity .15s ease,transform .15s ease}
+.ph:has(.ph-home:hover),.ph:has(.ph-home:focus-visible){border-color:var(--edge)}
+.ph:has(.ph-home:hover) .ph-go,.ph-home:focus-visible .ph-go{opacity:1;transform:none}
+.ph-home:focus-visible::after{box-shadow:inset 0 0 0 2px var(--run-fg)}
+.nt-field::placeholder{color:var(--muted)}
+.nt-field:focus{box-shadow:0 0 0 2px var(--run-fg)}
+.info{position:relative;display:inline-grid;place-items:center;width:22px;height:22px;padding:0;border-radius:50%;color:var(--muted);flex-shrink:0;cursor:help;vertical-align:middle}
+.info:hover,.info:focus-visible{color:var(--text);background:var(--hover)}
+.info .tipb{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);z-index:40;width:max-content;max-width:280px;padding:8px 11px;border-radius:11px;background:var(--text);color:var(--ground);font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:12px;font-weight:500;line-height:1.45;letter-spacing:0;text-align:left;white-space:normal;box-shadow:0 12px 30px -12px rgba(0,0,0,.7);opacity:0;visibility:hidden;transition:opacity .12s ease}
+.info:hover .tipb,.info:focus-visible .tipb{opacity:1;visibility:visible}
+@media (prefers-reduced-motion: reduce){.info .tipb{transition:none}}
+</style>
+</helmet>
+<div class="{{rootClass}}" style="min-height: 1240px; display: flex; flex-wrap: wrap; background: var(--ground); color: var(--text); font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 14px; line-height: 1.4; position: relative">
+<svg aria-hidden="true" width="0" height="0" style="position: absolute"><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.88" numOctaves="2" stitchTiles="stitch"></feTurbulence><feColorMatrix type="saturate" values="0"></feColorMatrix></filter></svg>
+
+<nav aria-label="Main" style="flex: 0 0 248px; box-sizing: border-box; padding: 18px 14px; display: flex; flex-direction: column; gap: 22px">
+  <div style="display: flex; align-items: center; gap: 4px">
+    <button class="ghost" style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; height: 40px; padding: 0 8px 0 5px; border-radius: 999px; text-align: left">
+      <span class="disp" style="position: relative; overflow: hidden; width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(160deg, #ff2bd6, #f2272c 55%, #f7b52f); color: #111113; display: grid; place-items: center; font-size: 13px; font-weight: 800">C<svg class="grain"><rect width="100%" height="100%" filter="url(#grain)"></rect></svg></span>
+      <span class="disp" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; font-size: 15px; letter-spacing: -.01em">Cuebik Creative</span>
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg>
+    </button>
+    <button class="icon" aria-label="Search" style="width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--body)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+    <button class="ghost" aria-label="New task" style="width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--edge); color: var(--text)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <a class="nav" href="OrgDashboard.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px; border-radius: 999px; color: var(--body); font-weight: 600"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="3.5"></rect><rect x="14" y="3" width="7" height="5" rx="2.5"></rect><rect x="14" y="12" width="7" height="9" rx="3.5"></rect><rect x="3" y="16" width="7" height="5" rx="2.5"></rect></svg>Org dashboard</a>
+    <a class="nav" href="Inbox.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 8px 0 12px; border-radius: 999px; color: var(--body); font-weight: 600"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>Inbox<span style="margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 999px; background: linear-gradient(135deg, #ff2bd6, #f7b52f); color: #111113; font-size: 12px; font-weight: 800; display: grid; place-items: center">8</span></a>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 6px 6px 12px">
+      <h2 style="margin: 0; font-size: 12px; font-weight: 700; color: var(--muted)">Projects</h2>
+      <button class="icon" aria-label="New project" style="width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+    </div>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="width: 24px; height: 24px; border-radius: 50%; border: 1.5px dashed var(--dashed); box-sizing: border-box"></span>All tasks<span style="margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 500">company</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #ff2bd6, #8b2cf0); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">g</span>gearBase<span style="margin-left: auto; font-size: 13px">11</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #3b3df5, #22b5a5); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">s</span>sfo lighting database<span style="margin-left: auto; font-size: 13px">7</span></a>
+    <a class="nav" href="ProjectDashboard.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--text); font-weight: 800; background: var(--sel); box-shadow: var(--sel-shadow)"><span class="disp" style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(160deg, #f7b52f, #f5822a); color: #111113; font-size: 11px; font-weight: 800; display: grid; place-items: center; letter-spacing: 0">t</span>trading workbench<span style="margin-left: auto; font-size: 13px">16</span></a>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 12px 6px">
+      <h2 style="margin: 0; font-size: 12px; font-weight: 700; color: var(--muted)">Agents</h2>
+      <span style="font-size: 12px; font-weight: 700; color: var(--run-fg)">2 running</span>
+    </div>
+    <a class="nav" href="AgentChat.dc.html" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #2fd12f, #22b5a5); color: #111113; font-size: 8px; font-weight: 800">QR</span></span>Quant Researcher<span style="margin-left: auto; color: var(--run-fg); font-size: 12px; font-weight: 600">running</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #ff2bd6, #f2286f); color: #111113; font-size: 8px; font-weight: 800">SE</span></span>Strategy Engineer<span style="margin-left: auto; color: var(--run-fg); font-size: 12px; font-weight: 600">running</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #f7b52f, #f5822a); color: #111113; font-size: 8px; font-weight: 800">FE</span></span>Frontend Engineer<span style="margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 600">idle</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #f2272c, #ff2bd6); color: #111113; font-size: 8px; font-weight: 800">ML</span></span>ML Engineer<span style="margin-left: auto; color: var(--red-fg); font-size: 12px; font-weight: 600">blocked</span></a>
+    <a class="nav" href="#" style="display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 5px; border-radius: 999px; color: var(--body); font-weight: 600"><span style="padding: 2px; border-radius: 50%; background: transparent"><span style="display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; background: linear-gradient(160deg, #6a93ad, #a9c6d6); color: #111113; font-size: 8px; font-weight: 800">CE</span></span>CEO<span style="margin-left: auto; color: var(--amber-fg); font-size: 12px; font-weight: 600">paused</span></a>
+  </div>
+
+  <div style="margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 4px 0 6px">
+    <span style="width: 30px; height: 30px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-size: 11px; font-weight: 800; display: grid; place-items: center">BA</span>
+    <span style="color: var(--body); font-weight: 600">Brian A.</span>
+    <a class="icon" href="AppSettings.dc.html" aria-label="Settings" style="margin-left: auto; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--body)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"></path><circle cx="15" cy="6" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg></a>
+  </div>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+  <header class="card ph" style="margin: 14px 24px 6px; display: flex; align-items: center; gap: 14px 28px; flex-wrap: wrap; box-sizing: border-box; padding: 16px 22px 12px 26px">
+    <div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 7px">
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--muted)">
+        <a href="#" style="color: inherit; text-decoration: none">Projects</a><span aria-hidden="true">/</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; box-sizing: border-box; border-radius: 999px; background: var(--run-bg); border: 1px solid color-mix(in srgb, var(--run-fg) 50%, transparent); color: var(--run-fg); font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0"><span class="live" style="width: 5px; height: 12px; border-radius: 999px; flex-shrink: 0; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"></span>In progress</span>
+        <span>Target Dec 15</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px">
+        <h1 class="disp" style="margin: 0; font-size: 34px; font-weight: 800; line-height: 1; letter-spacing: -.02em"><a class="ph-home" href="ProjectDashboard.dc.html">trading workbench<span class="ph-go">Project dashboard<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span></a></h1>
+        <button class="icon" aria-label="Star project" style="width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 13px; font-weight: 600; color: var(--body)">
+        <span><span class="disp" style="font-size: 15px; font-weight: 800; color: var(--text); letter-spacing: 0">16</span> open</span>
+        <span><span class="disp" style="font-size: 15px; font-weight: 800; color: var(--text); letter-spacing: 0">2</span> agents running</span>
+        <span style="color: var(--red-fg)"><span class="disp" style="font-size: 15px; font-weight: 800; letter-spacing: 0">1</span> blocked</span>
+        <span style="color: var(--muted)">Updated 2m ago</span>
+      </div>
+    </div>
+    <div aria-label="Agents on this project" style="display: flex; align-items: center; padding-left: 4px"><a href="AgentChat.dc.html" title="Quant Researcher · Running TRA-41" style="position: relative; display: block; width: 64px; height: 64px"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128' role='img'%3E%3Cdefs%3E%3ClinearGradient id='a-body-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='50.7' y1='104.3' x2='79.7' y2='24.5'%3E%3Cstop stop-color='%2322ccea'/%3E%3Cstop offset='1' stop-color='%23a5ea96'/%3E%3C/linearGradient%3E%3ClinearGradient id='a-candle-light-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='48.9' y1='103.7' x2='78.0' y2='23.9'%3E%3Cstop stop-color='%2326dfff'/%3E%3Cstop offset='1' stop-color='%23b4ffa4'/%3E%3C/linearGradient%3E%3CclipPath id='a-face-visible'%3E%3Cpath d='M39.7 47.9L39.7 84.2L88.2 84.2L88.2 47.9L39.7 47.9Z'/%3E%3C/clipPath%3E%3C/defs%3E%3Cg id='a-ground-shadow'%3E%3Cpath d='M35.7 113.2L35.8 112.9L36.3 112.5L37.9 111.9L40.5 111.2L44.0 110.7L48.3 110.3L53.1 109.9L58.4 109.7L64 109.6L69.5 109.7L74.8 109.9L79.6 110.3L83.9 110.7L87.4 111.2L90.0 111.9L91.7 112.5L92.1 112.9L92.2 113.2L92.1 113.6L91.7 113.9L90.0 114.6L87.4 115.2L83.9 115.7L79.6 116.2L74.8 116.5L69.5 116.7L64 116.8L58.4 116.7L53.1 116.5L48.3 116.2L44.0 115.7L40.5 115.2L37.9 114.6L36.3 113.9L35.8 113.6L35.7 113.2Z' fill='%23809299' opacity='0.2'/%3E%3C/g%3E%3Cg id='a-body'%3E%3Cpath fill='url(%23a-body-gradient)' d='M21.5 64L21.5 61.9L21.9 57.7L22.8 53.6L24.0 49.6L25.6 45.8L26.5 43.9L28.6 40.4L29.8 38.7L32.5 35.4L35.4 32.5L37.0 31.1L38.7 29.8L42.1 27.5L45.8 25.6L49.6 24.0L51.6 23.3L53.6 22.8L57.7 21.9L61.9 21.5L64 21.5L68.1 21.7L72.2 22.3L76.3 23.3L78.3 24.0L82.1 25.6L85.8 27.5L89.3 29.8L92.5 32.5L95.4 35.4L98.1 38.7L99.3 40.4L101.4 43.9L103.2 47.7L104.6 51.6L105.1 53.6L106.0 57.7L106.4 61.9L106.4 100.5L106.4 101.3L106.0 102.8L105.2 104.1L104.1 105.2L103.4 105.6L102.0 106.2L100.5 106.4L27.4 106.4L26.6 106.4L25.2 106.0L23.8 105.2L22.7 104.1L21.9 102.8L21.5 101.3L21.5 64Z'/%3E%3C/g%3E%3Cg id='a-candle-light'%3E%3Cpath fill='url(%23a-candle-light-gradient)' d='M26.6 62.7L26.6 60.9L27.0 57.4L27.7 53.9L28.7 50.5L30.0 47.2L30.8 45.7L32.7 42.6L33.7 41.2L35.9 38.4L38.4 35.9L39.8 34.8L41.2 33.7L44.1 31.7L47.2 30.0L50.5 28.7L52.2 28.1L53.9 27.7L57.4 27.0L60.9 26.6L62.7 26.6L66.2 26.7L69.7 27.3L73.2 28.1L74.8 28.7L78.1 30.0L81.2 31.7L84.2 33.7L86.9 35.9L89.4 38.4L91.7 41.2L92.7 42.6L94.5 45.7L96.0 48.9L97.2 52.2L97.7 53.9L98.4 57.4L98.7 60.9L98.8 93.7L98.7 94.4L98.4 95.7L97.7 96.8L96.8 97.7L96.2 98.1L95.0 98.6L93.7 98.8L31.6 98.8L31.0 98.7L29.7 98.4L28.6 97.7L27.6 96.8L27.0 95.7L26.6 94.4L26.6 62.7Z'/%3E%3C/g%3E%3Cg id='a-face'%3E%3Cg clip-path='url(%23a-face-visible)'%3E%3Cdefs%3E%3CclipPath id='a-face-clip-0' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M50.9 62.2L51.0 61.5L51.6 60.9L52.5 60.5L53.4 60.4L54.4 60.5L55.2 60.9L55.8 61.5L56.0 62.2L55.8 62.8L55.2 63.4L54.4 63.8L53.4 64.0L52.5 63.8L51.6 63.4L51.0 62.8L50.9 62.2Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-1' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M70.3 62.2L70.5 61.5L71.1 60.9L71.9 60.5L72.9 60.4L73.8 60.5L74.7 60.9L75.3 61.5L75.4 62.2L75.3 62.8L74.7 63.4L73.8 63.8L72.9 64.0L71.9 63.8L71.1 63.4L70.5 62.8L70.3 62.2Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-2' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M60.4 69.0L60.6 68.5L61.1 68.2L63.8 68.4L66.3 68.2L66.9 68.4L67.1 69.0L66.9 69.5L66.4 69.8L63.7 70.1L61.1 69.8L60.6 69.5L60.4 69.0Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-3' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M63.8 68.8L63.8 68.8Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3C/defs%3E%3Cpath d='M50.9 62.2L51.0 61.5L51.6 60.9L52.5 60.5L53.4 60.4L54.4 60.5L55.2 60.9L55.8 61.5L56.0 62.2L55.8 62.8L55.2 63.4L54.4 63.8L53.4 64.0L52.5 63.8L51.6 63.4L51.0 62.8L50.9 62.2Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M70.3 62.2L70.5 61.5L71.1 60.9L71.9 60.5L72.9 60.4L73.8 60.5L74.7 60.9L75.3 61.5L75.4 62.2L75.3 62.8L74.7 63.4L73.8 63.8L72.9 64.0L71.9 63.8L71.1 63.4L70.5 62.8L70.3 62.2Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M60.4 69.0L60.6 68.5L61.1 68.2L63.8 68.4L66.3 68.2L66.9 68.4L67.1 69.0L66.9 69.5L66.4 69.8L63.7 70.1L61.1 69.8L60.6 69.5L60.4 69.0Z' opacity='1' fill='%23172023' fill-rule='nonzero'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E" alt="Quant Researcher" width="64" height="64" style="display: block; width: 64px; height: 64px"><span aria-hidden="true" style="position: absolute; right: 5px; bottom: 11px; width: 6px; height: 14px; border-radius: 999px; background: linear-gradient(180deg, #8b2cf0, #1f6fe0); box-shadow: 0 0 0 2.5px var(--card)"></span></a><a href="#" title="Strategy Engineer · Running TRA-38" style="position: relative; display: block; width: 64px; height: 64px"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128' role='img'%3E%3Cdefs%3E%3ClinearGradient id='a-body-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='50.7' y1='104.3' x2='79.7' y2='24.5'%3E%3Cstop stop-color='%23eae27e'/%3E%3Cstop offset='1' stop-color='%23ea229a'/%3E%3C/linearGradient%3E%3ClinearGradient id='a-candle-light-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='48.9' y1='103.7' x2='78.0' y2='23.9'%3E%3Cstop stop-color='%23fff78a'/%3E%3Cstop offset='1' stop-color='%23ff26a8'/%3E%3C/linearGradient%3E%3CclipPath id='a-face-visible'%3E%3Cpath d='M39.7 47.9L39.7 84.2L88.2 84.2L88.2 47.9L39.7 47.9Z'/%3E%3C/clipPath%3E%3C/defs%3E%3Cg id='a-ground-shadow'%3E%3Cpath d='M35.7 113.2L35.8 112.9L36.3 112.5L37.9 111.9L40.5 111.2L44.0 110.7L48.3 110.3L53.1 109.9L58.4 109.7L64 109.6L69.5 109.7L74.8 109.9L79.6 110.3L83.9 110.7L87.4 111.2L90.0 111.9L91.7 112.5L92.1 112.9L92.2 113.2L92.1 113.6L91.7 113.9L90.0 114.6L87.4 115.2L83.9 115.7L79.6 116.2L74.8 116.5L69.5 116.7L64 116.8L58.4 116.7L53.1 116.5L48.3 116.2L44.0 115.7L40.5 115.2L37.9 114.6L36.3 113.9L35.8 113.6L35.7 113.2Z' fill='%23809299' opacity='0.2'/%3E%3C/g%3E%3Cg id='a-body'%3E%3Cpath fill='url(%23a-body-gradient)' d='M21.5 64L21.5 61.9L21.9 57.7L22.8 53.6L24.0 49.6L25.6 45.8L26.5 43.9L28.6 40.4L29.8 38.7L32.5 35.4L35.4 32.5L37.0 31.1L38.7 29.8L42.1 27.5L45.8 25.6L49.6 24.0L51.6 23.3L53.6 22.8L57.7 21.9L61.9 21.5L64 21.5L68.1 21.7L72.2 22.3L76.3 23.3L78.3 24.0L82.1 25.6L85.8 27.5L89.3 29.8L92.5 32.5L95.4 35.4L98.1 38.7L99.3 40.4L101.4 43.9L103.2 47.7L104.6 51.6L105.1 53.6L106.0 57.7L106.4 61.9L106.4 100.5L106.4 101.3L106.0 102.8L105.2 104.1L104.1 105.2L103.4 105.6L102.0 106.2L100.5 106.4L27.4 106.4L26.6 106.4L25.2 106.0L23.8 105.2L22.7 104.1L21.9 102.8L21.5 101.3L21.5 64Z'/%3E%3C/g%3E%3Cg id='a-candle-light'%3E%3Cpath fill='url(%23a-candle-light-gradient)' d='M26.6 62.7L26.6 60.9L27.0 57.4L27.7 53.9L28.7 50.5L30.0 47.2L30.8 45.7L32.7 42.6L33.7 41.2L35.9 38.4L38.4 35.9L39.8 34.8L41.2 33.7L44.1 31.7L47.2 30.0L50.5 28.7L52.2 28.1L53.9 27.7L57.4 27.0L60.9 26.6L62.7 26.6L66.2 26.7L69.7 27.3L73.2 28.1L74.8 28.7L78.1 30.0L81.2 31.7L84.2 33.7L86.9 35.9L89.4 38.4L91.7 41.2L92.7 42.6L94.5 45.7L96.0 48.9L97.2 52.2L97.7 53.9L98.4 57.4L98.7 60.9L98.8 93.7L98.7 94.4L98.4 95.7L97.7 96.8L96.8 97.7L96.2 98.1L95.0 98.6L93.7 98.8L31.6 98.8L31.0 98.7L29.7 98.4L28.6 97.7L27.6 96.8L27.0 95.7L26.6 94.4L26.6 62.7Z'/%3E%3C/g%3E%3Cg id='a-face'%3E%3Cg clip-path='url(%23a-face-visible)'%3E%3Cdefs%3E%3CclipPath id='a-face-clip-0' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M50.9 62.2L51.0 61.5L51.6 60.9L52.5 60.5L53.4 60.4L54.4 60.5L55.2 60.9L55.8 61.5L56.0 62.2L55.8 62.8L55.2 63.4L54.4 63.8L53.4 64.0L52.5 63.8L51.6 63.4L51.0 62.8L50.9 62.2Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-1' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M70.3 62.2L70.5 61.5L71.1 60.9L71.9 60.5L72.9 60.4L73.8 60.5L74.7 60.9L75.3 61.5L75.4 62.2L75.3 62.8L74.7 63.4L73.8 63.8L72.9 64.0L71.9 63.8L71.1 63.4L70.5 62.8L70.3 62.2Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-2' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M60.4 69.0L60.6 68.5L61.1 68.2L63.8 68.4L66.3 68.2L66.9 68.4L67.1 69.0L66.9 69.5L66.4 69.8L63.7 70.1L61.1 69.8L60.6 69.5L60.4 69.0Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-3' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M63.8 68.8L63.8 68.8Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3C/defs%3E%3Cpath d='M50.9 62.2L51.0 61.5L51.6 60.9L52.5 60.5L53.4 60.4L54.4 60.5L55.2 60.9L55.8 61.5L56.0 62.2L55.8 62.8L55.2 63.4L54.4 63.8L53.4 64.0L52.5 63.8L51.6 63.4L51.0 62.8L50.9 62.2Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M70.3 62.2L70.5 61.5L71.1 60.9L71.9 60.5L72.9 60.4L73.8 60.5L74.7 60.9L75.3 61.5L75.4 62.2L75.3 62.8L74.7 63.4L73.8 63.8L72.9 64.0L71.9 63.8L71.1 63.4L70.5 62.8L70.3 62.2Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M60.4 69.0L60.6 68.5L61.1 68.2L63.8 68.4L66.3 68.2L66.9 68.4L67.1 69.0L66.9 69.5L66.4 69.8L63.7 70.1L61.1 69.8L60.6 69.5L60.4 69.0Z' opacity='1' fill='%23172023' fill-rule='nonzero'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E" alt="Strategy Engineer" width="64" height="64" style="display: block; width: 64px; height: 64px"><span aria-hidden="true" style="position: absolute; right: 5px; bottom: 11px; width: 6px; height: 14px; border-radius: 999px; background: linear-gradient(180deg, #8b2cf0, #1f6fe0); box-shadow: 0 0 0 2.5px var(--card)"></span></a><a href="#" title="ML Engineer · Blocked on TRA-41" style="position: relative; display: block; width: 64px; height: 64px"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128' role='img'%3E%3Cdefs%3E%3ClinearGradient id='a-body-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='50.7' y1='104.3' x2='79.7' y2='24.5'%3E%3Cstop stop-color='%23c3193f'/%3E%3Cstop offset='1' stop-color='%23ea60c9'/%3E%3C/linearGradient%3E%3ClinearGradient id='a-candle-light-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='48.9' y1='103.7' x2='78.0' y2='23.9'%3E%3Cstop stop-color='%23d51c46'/%3E%3Cstop offset='1' stop-color='%23ff69db'/%3E%3C/linearGradient%3E%3CclipPath id='a-face-visible'%3E%3Cpath d='M39.7 47.9L39.7 84.2L88.2 84.2L88.2 47.9L39.7 47.9Z'/%3E%3C/clipPath%3E%3Cmask id='a-prop-occlusion' maskUnits='userSpaceOnUse' x='0' y='0' width='128' height='128'%3E%3Crect width='128' height='128' fill='white'/%3E%3Cpath d='M64 106.4L99.0 106.4L99.8 106.2L101.3 105.6L102.0 105.2L103.2 104.1L104.0 102.8L104.4 101.3L104.5 100.5L104.5 64L104.2 59.8L103.6 55.7L103.1 53.6L101.8 49.6L100.1 45.8L99.1 43.9L96.9 40.4L94.2 37.0L92.7 35.4L89.5 32.5L85.8 29.8L83.8 28.6L81.5 27.4L78.9 26.3L76.9 25.6L74.8 24.9L71.8 24.2L69.2 23.8L67.0 23.6L64 23.4L59.8 23.7L56.1 24.2L53.1 24.9L51.0 25.6L48.5 26.5L46.2 27.5L44.1 28.6L42.1 29.8L38.4 32.5L35.2 35.4L33.2 37.6L31.0 40.4L28.8 43.9L26.9 47.7L25.4 51.6L24.3 55.7L23.7 59.8L23.5 64L23.5 100.5L23.5 101.3L23.9 102.8L24.7 104.1L25.3 104.7L26.6 105.6L27.3 106.0L28.9 106.4L29.7 106.4L64 106.4Z' fill='black'/%3E%3C/mask%3E%3C/defs%3E%3Cg id='a-ground-shadow'%3E%3Cpath d='M35.7 113.2L35.8 112.9L36.3 112.5L37.9 111.9L40.5 111.2L44.0 110.7L48.3 110.3L53.1 109.9L58.4 109.7L64 109.6L69.5 109.7L74.8 109.9L79.6 110.3L83.9 110.7L87.4 111.2L90.0 111.9L91.7 112.5L92.1 112.9L92.2 113.2L92.1 113.6L91.7 113.9L90.0 114.6L87.4 115.2L83.9 115.7L79.6 116.2L74.8 116.5L69.5 116.7L64 116.8L58.4 116.7L53.1 116.5L48.3 116.2L44.0 115.7L40.5 115.2L37.9 114.6L36.3 113.9L35.8 113.6L35.7 113.2Z' fill='%23809299' opacity='0.2'/%3E%3C/g%3E%3Cg id='a-body'%3E%3Cpath fill='url(%23a-body-gradient)' d='M21.5 64L21.5 61.9L21.9 57.7L22.8 53.6L24.0 49.6L25.6 45.8L26.5 43.9L28.6 40.4L29.8 38.7L32.5 35.4L35.4 32.5L37.0 31.1L38.7 29.8L42.1 27.5L45.8 25.6L49.6 24.0L51.6 23.3L53.6 22.8L57.7 21.9L61.9 21.5L64 21.5L68.1 21.7L72.2 22.3L76.3 23.3L78.3 24.0L82.1 25.6L85.8 27.5L89.3 29.8L92.5 32.5L95.4 35.4L98.1 38.7L99.3 40.4L101.4 43.9L103.2 47.7L104.6 51.6L105.1 53.6L106.0 57.7L106.4 61.9L106.4 100.5L106.4 101.3L106.0 102.8L105.2 104.1L104.1 105.2L103.4 105.6L102.0 106.2L100.5 106.4L27.4 106.4L26.6 106.4L25.2 106.0L23.8 105.2L22.7 104.1L21.9 102.8L21.5 101.3L21.5 64Z'/%3E%3C/g%3E%3Cg id='a-candle-light'%3E%3Cpath fill='url(%23a-candle-light-gradient)' d='M26.6 62.7L26.6 60.9L27.0 57.4L27.7 53.9L28.7 50.5L30.0 47.2L30.8 45.7L32.7 42.6L33.7 41.2L35.9 38.4L38.4 35.9L39.8 34.8L41.2 33.7L44.1 31.7L47.2 30.0L50.5 28.7L52.2 28.1L53.9 27.7L57.4 27.0L60.9 26.6L62.7 26.6L66.2 26.7L69.7 27.3L73.2 28.1L74.8 28.7L78.1 30.0L81.2 31.7L84.2 33.7L86.9 35.9L89.4 38.4L91.7 41.2L92.7 42.6L94.5 45.7L96.0 48.9L97.2 52.2L97.7 53.9L98.4 57.4L98.7 60.9L98.8 93.7L98.7 94.4L98.4 95.7L97.7 96.8L96.8 97.7L96.2 98.1L95.0 98.6L93.7 98.8L31.6 98.8L31.0 98.7L29.7 98.4L28.6 97.7L27.6 96.8L27.0 95.7L26.6 94.4L26.6 62.7Z'/%3E%3C/g%3E%3Cg id='a-face'%3E%3Cg id='a-supporting-elements' mask='url(%23a-prop-occlusion)' opacity='1'%3E%3Cg transform='translate(79.1 6.9) scale(0.2 0.2)'%3E%3Cdefs%3E%3C/defs%3E%3Ctext x='0' y='48' transform='matrix(0.4 0 0 0.4 129.3 128.6)' font-family='sans-serif' font-size='144' font-weight='bold' text-anchor='middle' fill='%23ffd362' opacity='1'%3E?%3C/text%3E%3C/g%3E%3C/g%3E%3Cg clip-path='url(%23a-face-visible)'%3E%3Cdefs%3E%3CclipPath id='a-face-clip-0' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M52.4 61.9L52.5 61.5L53.0 61.1L53.6 60.8L54.2 60.7L54.9 60.8L55.5 61.1L55.9 61.5L56.0 61.9L55.9 62.3L55.5 62.7L54.9 63.0L54.2 63.1L53.6 63.0L53.0 62.7L52.5 62.3L52.4 61.9Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-1' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M70.9 61.9L71.1 61.2L71.7 60.6L72.7 60.2L73.7 60.1L74.7 60.2L75.7 60.6L76.3 61.2L76.5 61.9L76.3 62.5L75.7 63.2L74.7 63.6L73.7 63.7L72.7 63.6L71.7 63.2L71.1 62.5L70.9 61.9Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-2' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M57.4 69.1L57.5 68.6L57.7 68.5L58.4 68.0L59.5 67.6L60.6 67.4L62.2 67.5L65.5 68.2L66.9 68.4L68.0 68.3L68.6 68.0L69.4 67.6L69.8 67.5L70.1 67.6L70.4 67.9L70.5 68.3L70.4 68.8L70.2 68.9L69.5 69.4L68.4 69.8L67.3 70.0L65.7 69.9L62.4 69.2L61.0 69.0L59.9 69.1L59.3 69.4L58.5 69.8L58.1 69.9L57.8 69.8L57.5 69.5L57.4 69.1Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-3' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M64 68.7L64 68.7Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3C/defs%3E%3Cpath d='M52.4 61.9L52.5 61.5L53.0 61.1L53.6 60.8L54.2 60.7L54.9 60.8L55.5 61.1L55.9 61.5L56.0 61.9L55.9 62.3L55.5 62.7L54.9 63.0L54.2 63.1L53.6 63.0L53.0 62.7L52.5 62.3L52.4 61.9Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M70.9 61.9L71.1 61.2L71.7 60.6L72.7 60.2L73.7 60.1L74.7 60.2L75.7 60.6L76.3 61.2L76.5 61.9L76.3 62.5L75.7 63.2L74.7 63.6L73.7 63.7L72.7 63.6L71.7 63.2L71.1 62.5L70.9 61.9Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M57.4 69.1L57.5 68.6L57.7 68.5L58.4 68.0L59.5 67.6L60.6 67.4L62.2 67.5L65.5 68.2L66.9 68.4L68.0 68.3L68.6 68.0L69.4 67.6L69.8 67.5L70.1 67.6L70.4 67.9L70.5 68.3L70.4 68.8L70.2 68.9L69.5 69.4L68.4 69.8L67.3 70.0L65.7 69.9L62.4 69.2L61.0 69.0L59.9 69.1L59.3 69.4L58.5 69.8L58.1 69.9L57.8 69.8L57.5 69.5L57.4 69.1Z' opacity='1' fill='%23172023' fill-rule='nonzero'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E" alt="ML Engineer" width="64" height="64" style="display: block; width: 64px; height: 64px"><span aria-hidden="true" style="position: absolute; right: 5px; bottom: 11px; width: 6px; height: 14px; border-radius: 999px; background: linear-gradient(180deg, #f2286f, #f2272c); box-shadow: 0 0 0 2.5px var(--card)"></span></a><a href="#" title="Frontend Engineer · Idle since 2:25" style="position: relative; display: block; width: 64px; height: 64px"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128' role='img'%3E%3Cdefs%3E%3ClinearGradient id='a-body-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='50.7' y1='104.3' x2='79.7' y2='24.5'%3E%3Cstop stop-color='%23e8d2aa'/%3E%3Cstop offset='1' stop-color='%23eabc48'/%3E%3C/linearGradient%3E%3ClinearGradient id='a-candle-light-gradient' gradientUnits='userSpaceOnUse' color-interpolation='linearRGB' x1='48.9' y1='103.7' x2='78.0' y2='23.9'%3E%3Cstop stop-color='%23fde5ba'/%3E%3Cstop offset='1' stop-color='%23ffcd4f'/%3E%3C/linearGradient%3E%3CclipPath id='a-face-visible'%3E%3Cpath d='M40.1 48.2L40.1 84.0L87.8 84.0L87.8 48.2L40.1 48.2Z'/%3E%3C/clipPath%3E%3C/defs%3E%3Cg id='a-ground-shadow'%3E%3Cpath d='M35.7 113.2L35.8 112.9L36.3 112.5L37.9 111.9L40.5 111.2L44.0 110.7L48.3 110.3L53.1 109.9L58.4 109.7L64 109.6L69.5 109.7L74.8 109.9L79.6 110.3L83.9 110.7L87.4 111.2L90.0 111.9L91.7 112.5L92.1 112.9L92.2 113.2L92.1 113.6L91.7 113.9L90.0 114.6L87.4 115.2L83.9 115.7L79.6 116.2L74.8 116.5L69.5 116.7L64 116.8L58.4 116.7L53.1 116.5L48.3 116.2L44.0 115.7L40.5 115.2L37.9 114.6L36.3 113.9L35.8 113.6L35.7 113.2Z' fill='%23809299' opacity='0.2'/%3E%3C/g%3E%3Cg id='a-body'%3E%3Cpath fill='url(%23a-body-gradient)' d='M21.5 64L21.5 61.9L21.9 57.7L22.8 53.6L24.0 49.6L25.6 45.8L26.5 43.9L28.6 40.4L29.8 38.7L32.5 35.4L35.4 32.5L37.0 31.1L38.7 29.8L42.1 27.5L45.8 25.6L49.6 24.0L51.6 23.3L53.6 22.8L57.7 21.9L61.9 21.5L64 21.5L68.1 21.7L72.2 22.3L76.3 23.3L78.3 24.0L82.1 25.6L85.8 27.5L89.3 29.8L92.5 32.5L95.4 35.4L98.1 38.7L99.3 40.4L101.4 43.9L103.2 47.7L104.6 51.6L105.1 53.6L106.0 57.7L106.4 61.9L106.4 100.5L106.4 101.3L106.0 102.8L105.2 104.1L104.1 105.2L103.4 105.6L102.0 106.2L100.5 106.4L27.4 106.4L26.6 106.4L25.2 106.0L23.8 105.2L22.7 104.1L21.9 102.8L21.5 101.3L21.5 64Z'/%3E%3C/g%3E%3Cg id='a-candle-light'%3E%3Cpath fill='url(%23a-candle-light-gradient)' d='M26.6 62.7L26.6 60.9L27.0 57.4L27.7 53.9L28.7 50.5L30.0 47.2L30.8 45.7L32.7 42.6L33.7 41.2L35.9 38.4L38.4 35.9L39.8 34.8L41.2 33.7L44.1 31.7L47.2 30.0L50.5 28.7L52.2 28.1L53.9 27.7L57.4 27.0L60.9 26.6L62.7 26.6L66.2 26.7L69.7 27.3L73.2 28.1L74.8 28.7L78.1 30.0L81.2 31.7L84.2 33.7L86.9 35.9L89.4 38.4L91.7 41.2L92.7 42.6L94.5 45.7L96.0 48.9L97.2 52.2L97.7 53.9L98.4 57.4L98.7 60.9L98.8 93.7L98.7 94.4L98.4 95.7L97.7 96.8L96.8 97.7L96.2 98.1L95.0 98.6L93.7 98.8L31.6 98.8L31.0 98.7L29.7 98.4L28.6 97.7L27.6 96.8L27.0 95.7L26.6 94.4L26.6 62.7Z'/%3E%3C/g%3E%3Cg id='a-face'%3E%3Cg clip-path='url(%23a-face-visible)'%3E%3Cdefs%3E%3CclipPath id='a-face-clip-0' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M51.8 61.9L52.0 61.0L52.6 60.2L53.4 59.6L54.3 59.4L55.3 59.6L56.1 60.2L56.7 61.0L56.9 61.9L56.7 62.9L56.1 63.7L55.3 64.3L54.3 64.5L53.4 64.3L52.6 63.7L52.0 62.9L51.8 61.9Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-1' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M71.0 61.9L71.2 61.0L71.8 60.2L72.6 59.6L73.6 59.4L74.5 59.6L75.3 60.2L75.9 61.0L76.1 61.9L75.9 62.9L75.3 63.7L74.5 64.3L73.6 64.5L72.6 64.3L71.8 63.7L71.2 62.9L71.0 61.9Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-2' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M57.3 71.1L57.4 70.6L57.7 70.2L58.2 69.9L58.9 69.9L59.4 70.2L60.6 71.6L61.5 72.2L62.7 72.7L64.0 72.8L65.3 72.7L66.5 72.2L67.5 71.4L68.5 70.2L69.0 69.9L69.8 70.0L70.2 70.2L70.5 70.6L70.6 71.2L70.5 71.7L69.7 72.7L69.0 73.5L67.9 74.3L67.0 74.7L66.0 75.1L65.0 75.3L63.9 75.4L62.9 75.3L61.6 75.0L60.6 74.6L59.7 74.1L58.9 73.5L58.0 72.5L57.4 71.6L57.3 71.1Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3CclipPath id='a-face-clip-3' clipPathUnits='userSpaceOnUse'%3E%3Cpath d='M64 68.7L64 68.7Z' clip-rule='nonzero'/%3E%3C/clipPath%3E%3C/defs%3E%3Cpath d='M51.8 61.9L52.0 61.0L52.6 60.2L53.4 59.6L54.3 59.4L55.3 59.6L56.1 60.2L56.7 61.0L56.9 61.9L56.7 62.9L56.1 63.7L55.3 64.3L54.3 64.5L53.4 64.3L52.6 63.7L52.0 62.9L51.8 61.9Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M71.0 61.9L71.2 61.0L71.8 60.2L72.6 59.6L73.6 59.4L74.5 59.6L75.3 60.2L75.9 61.0L76.1 61.9L75.9 62.9L75.3 63.7L74.5 64.3L73.6 64.5L72.6 64.3L71.8 63.7L71.2 62.9L71.0 61.9Z' opacity='1' fill='rgb(23,32,35)' fill-rule='nonzero'/%3E%3Cpath d='M57.3 71.1L57.4 70.6L57.7 70.2L58.2 69.9L58.9 69.9L59.4 70.2L60.6 71.6L61.5 72.2L62.7 72.7L64.0 72.8L65.3 72.7L66.5 72.2L67.5 71.4L68.5 70.2L69.0 69.9L69.8 70.0L70.2 70.2L70.5 70.6L70.6 71.2L70.5 71.7L69.7 72.7L69.0 73.5L67.9 74.3L67.0 74.7L66.0 75.1L65.0 75.3L63.9 75.4L62.9 75.3L61.6 75.0L60.6 74.6L59.7 74.1L58.9 73.5L58.0 72.5L57.4 71.6L57.3 71.1Z' opacity='1' fill='%23172023' fill-rule='nonzero'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E" alt="Frontend Engineer" width="64" height="64" style="display: block; width: 64px; height: 64px"><span aria-hidden="true" style="position: absolute; right: 5px; bottom: 11px; width: 6px; height: 14px; border-radius: 999px; background: linear-gradient(180deg, var(--ash-a), var(--ash-b)); box-shadow: 0 0 0 2.5px var(--card)"></span></a></div>
+    <button class="ghost" style="align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--edge); color: var(--body); font-size: 13px; font-weight: 700"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"></path></svg>Share</button>
+    <div style="flex: 1 1 100%; display: flex; margin: 0 -22px 0 -26px; padding: 12px 22px 0 26px; border-top: 1px solid var(--line)">
+    <nav aria-label="Project" style="display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding: 0 14px; font-size: 13px; padding: 4px; gap: 2px; border-radius: 999px; background: var(--well)">
+    <a href="Main.dc.html" aria-current="page" style="display: flex; align-items: center; height: 32px; padding: 0 14px; color: var(--text); text-decoration: none; box-sizing: border-box; border-radius: 999px; font-weight: 800; background: var(--sel); box-shadow: var(--sel-shadow)">List</a>
+    <a href="Board.dc.html" style="display: flex; align-items: center; height: 32px; padding: 0 14px; color: var(--body); text-decoration: none; border-radius: 999px; font-weight: 600">Board</a>
+    <a href="AgentWorkload.dc.html" style="display: flex; align-items: center; height: 32px; padding: 0 14px; color: var(--body); text-decoration: none; border-radius: 999px; font-weight: 600">Agent workload</a>
+    <a href="ProjectDocs.dc.html" style="display: flex; align-items: center; height: 32px; padding: 0 14px; color: var(--body); text-decoration: none; border-radius: 999px; font-weight: 600">Docs</a>
+    <a href="ProjectSettings.dc.html" style="display: flex; align-items: center; height: 32px; padding: 0 14px; color: var(--body); text-decoration: none; border-radius: 999px; font-weight: 600">Settings</a>
+  </nav>
+    </div>
+  </header>
+  <div style="padding: 8px 24px 40px">
+    <sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
+      <section class="card" aria-label="{{g.name}}" style="overflow: hidden; margin-bottom: 12px">
+        <div style="display: flex; align-items: center; gap: 10px; height: 50px; padding: 0 14px 0 10px">
+          <span style="position: relative; overflow: hidden; width: 8px; height: 20px; flex-shrink: 0; border-radius: 999px; background: {{g.glyph}}"><svg class="grain"><rect width="100%" height="100%" filter="url(#grain)"></rect></svg></span><h2 class="disp" style="margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -.01em">{{g.name}}</h2>
+          <span style="color: var(--muted); font-size: 13px">{{g.count}}</span>
+        </div>
+        <sc-if value="{{g.open}}" hint-placeholder-val="{{true}}">
+          <sc-for list="{{g.tasks}}" as="t" hint-placeholder-count="3">
+            <div class="row" style="display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 0 12px; border-bottom: 1px solid var(--line); background: {{t.rowBg}}; box-shadow: {{t.rowRing}}">
+              <span aria-hidden="true" style="width: 6px; height: 16px; flex-shrink: 0; margin: 0 4px; border-radius: 999px; background: {{g.glyph}}"></span>
+              <span style="font-family: 'Fragment Mono', ui-monospace, monospace; font-size: 12px; color: var(--muted)">{{t.id}}</span>
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{t.title}}</span>
+            </div>
+          </sc-for>
+        </sc-if>
+      </section>
+    </sc-for>
+  </div>
+</main>
+
+<div style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 50; background: var(--scrim); display: flex; justify-content: center; align-items: flex-start; padding: 72px 32px; box-sizing: border-box">
+  <sc-if value="{{notConnect}}" hint-placeholder-val="{{true}}">
+  <div role="dialog" aria-modal="true" aria-labelledby="nt-h" style="width: 100%; max-width: 760px; box-sizing: border-box; background: var(--card); border: 1px solid var(--card-edge); border-radius: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column">
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 12px 0 18px">
+      <button class="ghost" style="display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px 0 6px; border-radius: 999px; border: 1px solid var(--edge); color: var(--body); font-size: 13px"><span style="width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(160deg, #f7b52f, #f5822a); color: #111113; font-size: 10px; display: grid; place-items: center; font-weight: 800">t</span>trading workbench<svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+      <span style="color: var(--dashed)">/</span>
+      <h2 class="disp" id="nt-h" style="margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -.01em">{{dialogTitle}}</h2>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 2px">
+        <button class="icon" aria-label="Open as full page" style="width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg></button>
+        <a class="icon" href="Main.dc.html" aria-label="Close" style="width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></a>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 14px 24px 4px">
+      <sc-if value="{{notRepeat}}" hint-placeholder-val="{{true}}"><button class="ghost" style="display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--edge); color: var(--body); font-size: 13px; white-space: nowrap"><span aria-hidden="true" style="width: 5px; height: 13px; border-radius: 999px; background: linear-gradient(180deg, #f7b52f, #f5822a)"></span>Todo<svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button></sc-if>
+
+      <div style="position: relative">
+        <button class="ghost" aria-haspopup="listbox" aria-expanded="{{prioOpen}}" onClick="{{togglePrio}}" style="display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--edge); color: var(--body); font-size: 13px; white-space: nowrap"><span aria-hidden="true" style="display: inline-flex; align-items: flex-end; gap: 2px; height: 14px"><span style="width: 4px; height: 7px; border-radius: 999px; background: {{P.b1}}"></span><span style="width: 4px; height: 10px; border-radius: 999px; background: {{P.b2}}"></span><span style="width: 4px; height: 14px; border-radius: 999px; background: {{P.b3}}"></span></span>{{P.label}}</button>
+        <sc-if value="{{prioOpen}}" hint-placeholder-val="{{false}}">
+          <div role="listbox" aria-label="Priority" style="position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; width: 220px; box-sizing: border-box; padding: 6px; border: 1px solid var(--edge); border-radius: 16px; background: var(--card); box-shadow: 0 18px 40px -16px rgba(0,0,0,.65); display: flex; flex-direction: column; gap: 2px">
+            <sc-for list="{{prios}}" as="o" hint-placeholder-count="4">
+              <button class="ghost" role="option" aria-selected="{{o.on}}" onClick="{{o.pick}}" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 0 10px; box-sizing: border-box; border-radius: 12px; text-align: left; font-size: 14px; color: var(--text); background: {{o.bg}}"><span aria-hidden="true" style="display: inline-flex; align-items: flex-end; gap: 2px; height: 14px"><span style="width: 4px; height: 7px; border-radius: 999px; background: {{o.b1}}"></span><span style="width: 4px; height: 10px; border-radius: 999px; background: {{o.b2}}"></span><span style="width: 4px; height: 14px; border-radius: 999px; background: {{o.b3}}"></span></span><span style="flex: 1">{{o.label}}</span><span style="display: {{o.checkDisplay}}; color: var(--text)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span></button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="position: relative; display: flex; align-items: center; gap: 2px">
+        <button class="ghost" aria-haspopup="dialog" aria-expanded="{{repeatOpen}}" aria-label="{{repeatPill.aria}}" onClick="{{toggleRepeat}}" style="display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 10px; box-sizing: border-box; border-radius: 999px; border: 1px {{repeatPill.border}} {{repeatPill.bd}}; background: {{repeatPill.bg}}; color: {{repeatPill.fg}}; font-size: 13px; font-weight: 700; white-space: nowrap"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4"></path></svg>{{repeatPill.label}}</button>
+        <sc-if value="{{isRepeat}}" hint-placeholder-val="{{true}}"><button type="button" class="info" aria-label="{{repeatTip}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.6v.01"></path></svg><span class="tipb" aria-hidden="true">{{repeatTip}}</span></button></sc-if>
+        <sc-if value="{{repeatOpen}}" hint-placeholder-val="{{false}}">
+          <div role="dialog" aria-label="Repeat" style="position: absolute; top: calc(100% + 8px); left: 0; z-index: 30; width: 440px; box-sizing: border-box; border: 1px solid var(--edge); border-radius: 18px; background: var(--card); box-shadow: 0 24px 50px -18px rgba(0,0,0,.7); display: flex; flex-direction: column">
+            <section aria-labelledby="nt-sch-l" style="display: flex; flex-direction: column; gap: 12px; padding: 12px 14px">
+              <div style="display: flex; align-items: center; gap: 10px">
+                <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2"></path></svg>
+                <span id="nt-sch-l" style="flex: 1; font-size: 14px; font-weight: 700; color: var(--text)">On a schedule</span>
+                <button type="button" role="switch" aria-checked="{{schedOn}}" aria-labelledby="nt-sch-l" onClick="{{flipSched}}" style="position: relative; width: 34px; height: 20px; flex-shrink: 0; border-radius: 999px; background: {{schedSw.track}}"><span aria-hidden="true" style="position: absolute; top: 3px; left: {{schedSw.knob}}; width: 14px; height: 14px; border-radius: 50%; background: {{schedSw.knobBg}}; box-shadow: 0 1px 2px rgba(0,0,0,.3)"></span></button>
+              </div>
+              <sc-if value="{{schedOn}}" hint-placeholder-val="{{true}}">
+              <div role="radiogroup" aria-label="How often" style="display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--well)">
+                <sc-for list="{{freqs}}" as="fq" hint-placeholder-count="5">
+                  <button type="button" role="radio" aria-checked="{{fq.on}}" onClick="{{fq.pick}}" style="flex: 1; height: 30px; padding: 0 6px; border-radius: 999px; font-size: 13px; font-weight: 700; background: {{fq.bg}}; color: {{fq.fg}}; box-shadow: {{fq.shadow}}">{{fq.label}}</button>
+                </sc-for>
+              </div>
+              <sc-if value="{{isWeekly}}" hint-placeholder-val="{{false}}">
+                <div role="group" aria-label="Days of the week" style="display: flex; gap: 6px">
+                  <sc-for list="{{days}}" as="dy" hint-placeholder-count="7">
+                    <button type="button" aria-pressed="{{dy.on}}" aria-label="{{dy.name}}" onClick="{{dy.toggle}}" style="flex: 1; height: 34px; border-radius: 10px; border: 1px solid {{dy.bd}}; background: {{dy.bg}}; color: {{dy.fg}}; font-size: 13px; font-weight: 700">{{dy.short}}</button>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{isMonthly}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; align-items: center; gap: 10px">
+                  <label for="nt-mday" style="width: 64px; font-size: 13px; font-weight: 600; color: var(--muted)">On day</label>
+                  <input id="nt-mday" type="number" min="1" max="28" value="1" style="width: 72px; height: 34px; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--edge); border-radius: 10px; outline: none; background: var(--well); color: var(--text); font: inherit; font-size: 14px">
+                </div>
+              </sc-if>
+              <sc-if value="{{isCustom}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; align-items: center; gap: 10px">
+                  <label for="nt-cron" style="width: 64px; font-size: 13px; font-weight: 600; color: var(--muted)">Cron</label>
+                  <input id="nt-cron" class="mono" value="0 9 * * 1-5" style="flex: 1; min-width: 0; height: 34px; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--edge); border-radius: 10px; outline: none; background: var(--well); color: var(--text); font-size: 13px">
+                </div>
+              </sc-if>
+              <sc-if value="{{notCustom}}" hint-placeholder-val="{{true}}">
+                <div style="display: flex; align-items: center; gap: 10px">
+                  <label for="nt-time" style="width: 64px; font-size: 13px; font-weight: 600; color: var(--muted)">At</label>
+                  <input id="nt-time" type="time" value="09:00" style="width: 112px; height: 34px; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--edge); border-radius: 10px; outline: none; background: var(--well); color: var(--text); font: inherit; font-size: 14px; color-scheme: {{scheme}}">
+                  <button type="button" class="ghost" aria-label="Time zone: Chicago, Central time" style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 10px; box-sizing: border-box; border-radius: 10px; border: 1px solid var(--edge); color: var(--body); font-size: 13px; font-weight: 600"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path></svg>Chicago (CDT)<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg></button>
+                </div>
+              </sc-if>
+              <div style="display: flex; gap: 6px; font-size: 12px; line-height: 1.5; color: var(--muted)"><span style="font-weight: 700; color: var(--body)">Next</span><span>{{nextRuns}}</span></div>
+              </sc-if>
+            </section>
+            <section aria-labelledby="nt-hook-l" style="display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line)">
+              <div style="display: flex; align-items: center; gap: 10px">
+                <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path></svg>
+                <span style="flex: 1; display: flex; align-items: center; gap: 2px"><span id="nt-hook-l" style="font-size: 14px; font-weight: 700; color: var(--text)">When a webhook arrives</span><button type="button" class="info" aria-label="{{hookTip}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.6v.01"></path></svg><span class="tipb" aria-hidden="true">{{hookTip}}</span></button></span>
+                <button type="button" role="switch" aria-checked="{{hookOn}}" aria-labelledby="nt-hook-l" onClick="{{flipHook}}" style="position: relative; width: 34px; height: 20px; flex-shrink: 0; border-radius: 999px; background: {{hookSw.track}}"><span aria-hidden="true" style="position: absolute; top: 3px; left: {{hookSw.knob}}; width: 14px; height: 14px; border-radius: 50%; background: {{hookSw.knobBg}}; box-shadow: 0 1px 2px rgba(0,0,0,.3)"></span></button>
+              </div>
+              <sc-if value="{{hookOn}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; align-items: center; gap: 10px">
+                  <span id="nt-snd-l" style="width: 64px; font-size: 13px; font-weight: 600; color: var(--muted)">Sent by</span>
+                  <div role="radiogroup" aria-labelledby="nt-snd-l" style="display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--well)">
+                    <sc-for list="{{senders}}" as="sd" hint-placeholder-count="2">
+                      <button type="button" role="radio" aria-checked="{{sd.on}}" onClick="{{sd.pick}}" style="display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 700; background: {{sd.bg}}; color: {{sd.fg}}; box-shadow: {{sd.shadow}}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="{{sd.icon}}"></path></svg>{{sd.label}}</button>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+            </section>
+            <div role="radiogroup" aria-labelledby="nt-pol-l" style="display: flex; flex-direction: column; gap: 2px; padding: 10px 8px 8px; border-top: 1px solid var(--line)">
+              <div id="nt-pol-l" style="padding: 0 6px 4px; font-size: 12px; font-weight: 600; color: var(--muted)">If the last one is still open</div>
+              <sc-for list="{{policies}}" as="pl" hint-placeholder-count="3">
+                <button type="button" class="ghost" role="radio" aria-checked="{{pl.on}}" onClick="{{pl.pick}}" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 0 8px; box-sizing: border-box; border-radius: 10px; text-align: left; font-size: 14px; color: var(--text); background: {{pl.rowBg}}"><span aria-hidden="true" style="width: 16px; height: 16px; flex-shrink: 0; box-sizing: border-box; border-radius: 50%; border: {{pl.ring}}"></span><span style="font-weight: {{pl.weight}}">{{pl.label}}</span></button>
+              </sc-for>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 14px; border-top: 1px solid var(--line); background: var(--ground); border-radius: 0 0 17px 17px">
+              <button type="button" class="ghost" onClick="{{stopRepeat}}" style="height: 32px; padding: 0 12px; border-radius: 999px; color: var(--body); font-size: 13px; font-weight: 600">Don't repeat</button>
+              <button type="button" onClick="{{closeRepeat}}" style="margin-left: auto; height: 32px; padding: 0 14px; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-size: 13px; font-weight: 700">Done</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{notRepeat}}" hint-placeholder-val="{{true}}"><span style="display: inline-flex; align-items: center; gap: 7px; height: 32px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--edge); color: var(--body); font-size: 13px; white-space: nowrap; padding: 0 5px 0 10px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12V4h8l9 9-8 8zM7.5 7.5h.01"></path></svg><span style="height: 22px; padding: 0 8px; border-radius: 999px; background: var(--cyan-bg); color: var(--cyan-fg); font-size: 12px; display: inline-flex; align-items: center">data</span><button class="icon" aria-label="Add label" style="width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg></button></span></sc-if>
+
+      <sc-for list="{{topRows}}" as="r" hint-placeholder-count="1">
+        <span style="display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 4px 0 11px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--edge); color: var(--body); font-size: 13px; white-space: nowrap"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; color: var(--muted)"><path d="{{r.icon}}"></path></svg><span style="color: var(--muted)">{{r.label}}</span><span style="font-weight: 700; color: var(--text)">{{r.short}}</span><button class="icon" aria-label="Remove {{r.label}}" onClick="{{r.remove}}" style="width: 24px; height: 24px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></span>
+      </sc-for>
+
+      <div style="position: relative">
+        <button class="ghost" aria-haspopup="menu" aria-expanded="{{moreOpen}}" onClick="{{toggleMore}}" style="display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 10px; box-sizing: border-box; border-radius: 999px; border: 1px dashed var(--edge); color: var(--body); font-size: 13px; font-weight: 700; white-space: nowrap"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>More fields</button>
+        <sc-if value="{{moreOpen}}" hint-placeholder-val="{{false}}">
+          <div role="menu" aria-label="More fields" style="position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: 360px; box-sizing: border-box; padding: 6px; border: 1px solid var(--edge); border-radius: 18px; background: var(--card); box-shadow: 0 24px 50px -18px rgba(0,0,0,.7); display: flex; flex-direction: column; gap: 2px">
+            <sc-for list="{{fieldGroups}}" as="g" hint-placeholder-count="4">
+              <div style="padding: 8px 10px 3px; font-size: 12px; font-weight: 600; color: var(--muted)">{{g.name}}</div>
+              <sc-for list="{{g.items}}" as="it" hint-placeholder-count="3">
+                <button class="ghost" role="menuitemcheckbox" aria-checked="{{it.on}}" onClick="{{it.toggle}}" style="display: flex; align-items: center; gap: 11px; width: 100%; min-height: 44px; padding: 6px 10px; box-sizing: border-box; border-radius: 12px; text-align: left"><span style="width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center; border-radius: 10px; background: var(--well); color: var(--body)"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="{{it.icon}}"></path></svg></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 14px; font-weight: 700; color: var(--text)">{{it.label}}</span><span style="font-size: 12px; color: var(--muted)">{{it.desc}}</span></span><span style="display: {{it.checkDisplay}}; color: var(--text)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span></button>
+              </sc-for>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+
+    <div style="padding: 12px 24px 0; display: flex; flex-direction: column; gap: 10px">
+      <label for="nt-title" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Task title</label>
+      <input id="nt-title" class="disp nt-field" value="{{title}}" onChange="{{setTitle}}" placeholder="Task title" autocomplete="off" style="width: 100%; box-sizing: border-box; border: 1px solid var(--edge); border-radius: 14px; outline: none; background: var(--well); padding: 10px 14px; color: var(--text); font-size: 22px; font-weight: 800; letter-spacing: -.01em">
+      <label for="nt-desc" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Description</label>
+      <textarea id="nt-desc" class="nt-field" rows="6" value="{{desc}}" onChange="{{setDesc}}" placeholder="Add a description, acceptance criteria or context. Type @ to mention an agent or a task." style="width: 100%; box-sizing: border-box; resize: vertical; border: 1px solid var(--edge); border-radius: 14px; outline: none; background: var(--well); padding: 12px 14px; color: var(--body); font: inherit; font-size: 15px; line-height: 1.6"></textarea>
+    </div>
+
+    <sc-if value="{{notRepeat}}" hint-placeholder-val="{{true}}"><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 24px 16px">
+      <sc-for list="{{files}}" as="f" hint-placeholder-count="2">
+        <span style="display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 4px 0 10px; box-sizing: border-box; border: 1px solid var(--edge); border-radius: 999px; color: var(--body); font-size: 12px"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5"></path></svg>{{f.name}}<span style="color: var(--muted)">· {{f.size}}</span><button class="icon" aria-label="Remove {{f.name}}" onClick="{{f.remove}}" style="width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></span>
+      </sc-for>
+      <button class="ghost" onClick="{{addFile}}" style="display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; box-sizing: border-box; border: 1px dashed var(--edge); border-radius: 999px; color: var(--muted); font-size: 12px"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"></path></svg>Attach files</button>
+    </div></sc-if>
+    <sc-if value="{{isRepeat}}" hint-placeholder-val="{{false}}"><div style="height: 16px"></div></sc-if>
+
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; padding: 14px 24px; border-top: 1px solid var(--line); background: var(--ground)">
+      <div style="position: relative; flex-shrink: 0">
+        <button class="ghost" aria-haspopup="dialog" aria-expanded="{{whoOpen}}" aria-label="{{capsuleLabel}}" onClick="{{toggleWho}}" style="display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px 0 5px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--edge); background: var(--card); box-shadow: var(--shadow); color: var(--body); font-size: 13px; white-space: nowrap">
+          <span aria-hidden="true" style="position: relative; overflow: hidden; width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; background: {{A.bg}}; color: {{A.ink}}; font-size: 10px; display: grid; place-items: center; font-weight: 800">{{A.initials}}<svg class="grain"><rect width="100%" height="100%" filter="url(#grain)"></rect></svg></span>
+          <span style="font-weight: 700; color: var(--text)">{{A.name}}</span>
+          <sc-if value="{{showRunCaps}}" hint-placeholder-val="{{true}}">
+            <span aria-hidden="true" class="{{A.live}}" style="width: 5px; height: 12px; border-radius: 999px; flex-shrink: 0; background: {{A.glyph}}"></span>
+            <span aria-hidden="true" style="width: 1px; height: 18px; background: var(--edge)"></span>
+            <span aria-hidden="true" style="display: inline-flex; align-items: center; gap: 6px; color: {{runModel.fg}}; font-weight: {{runModel.weight}}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10H7zM10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"></path></svg>{{runModel.label}}</span>
+            <span aria-hidden="true" style="display: inline-flex; align-items: center; gap: 6px; color: {{runEffort.fg}}; font-weight: {{runEffort.weight}}"><span style="display: inline-flex; align-items: flex-end; gap: 2px; height: 13px"><span style="width: 3px; height: 6px; border-radius: 999px; background: {{runEffort.b1}}"></span><span style="width: 3px; height: 9px; border-radius: 999px; background: {{runEffort.b2}}"></span><span style="width: 3px; height: 13px; border-radius: 999px; background: {{runEffort.b3}}"></span></span>{{runEffort.label}}</span>
+          </sc-if>
+          <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg>
+        </button>
+
+        <sc-if value="{{whoOpen}}" hint-placeholder-val="{{false}}">
+          <div role="dialog" aria-label="Assignee and run settings" style="position: absolute; top: calc(100% + 8px); left: 0; z-index: 30; width: 620px; box-sizing: border-box; border: 1px solid var(--edge); border-radius: 18px; background: var(--card); box-shadow: 0 24px 50px -18px rgba(0,0,0,.7); display: grid; grid-template-columns: minmax(0, 1fr) 280px">
+            <div role="listbox" aria-label="Assignee" style="display: flex; flex-direction: column; gap: 2px; padding: 6px">
+              <label for="nt-who" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Find an agent or person</label>
+              <div style="display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; margin-bottom: 2px; border-radius: 12px; background: var(--well); color: var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4"></path></svg><input id="nt-who" placeholder="Assign to…" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--text); font: inherit; font-size: 14px"></div>
+              <div style="padding: 8px 10px 4px; font-size: 12px; font-weight: 600; color: var(--muted)">Agents</div>
+              <sc-for list="{{agentOpts}}" as="o" hint-placeholder-count="5">
+                <button class="ghost" role="option" aria-selected="{{o.on}}" onClick="{{o.pick}}" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 0 10px; box-sizing: border-box; border-radius: 12px; text-align: left; font-size: 14px; color: var(--text); background: {{o.rowBg}}"><span style="width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; background: {{o.bg}}; color: {{o.ink}}; font-size: 9px; display: grid; place-items: center; font-weight: 800">{{o.initials}}</span><span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{o.name}}</span><span style="display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; box-sizing: border-box; border-radius: 999px; background: {{o.sBg}}; border: 1px solid {{o.sBd}}; color: {{o.sFg}}; font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0"><span class="{{o.live}}" style="width: 5px; height: 12px; border-radius: 999px; flex-shrink: 0; background: {{o.glyph}}"></span>{{o.state}}</span></button>
+              </sc-for>
+              <sc-if value="{{notRepeat}}" hint-placeholder-val="{{true}}"><div style="padding: 8px 10px 4px; font-size: 12px; font-weight: 600; color: var(--muted)">People</div>
+              <sc-for list="{{peopleOpts}}" as="o" hint-placeholder-count="3">
+                <button class="ghost" role="option" aria-selected="{{o.on}}" onClick="{{o.pick}}" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 0 10px; box-sizing: border-box; border-radius: 12px; text-align: left; font-size: 14px; color: var(--text); background: {{o.rowBg}}"><span style="width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; background: {{o.bg}}; color: {{o.ink}}; font-size: 9px; display: grid; place-items: center; font-weight: 800">{{o.initials}}</span><span style="flex: 1; min-width: 0">{{o.name}}</span><span style="display: {{o.checkDisplay}}; color: var(--text)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span></button>
+              </sc-for></sc-if>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 2px; padding: 6px; border-left: 1px solid var(--line); background: var(--ground); border-radius: 0 17px 17px 0">
+              <sc-if value="{{showRunCaps}}" hint-placeholder-val="{{true}}">
+                <div role="radiogroup" aria-labelledby="nt-model-l" style="display: flex; flex-direction: column; gap: 2px">
+                  <div id="nt-model-l" style="padding: 8px 10px 4px; font-size: 12px; font-weight: 600; color: var(--muted)">Model</div>
+                  <sc-for list="{{modelOpts}}" as="m" hint-placeholder-count="4">
+                    <button class="ghost" role="radio" aria-checked="{{m.on}}" onClick="{{m.pick}}" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 0 10px; box-sizing: border-box; border-radius: 12px; text-align: left; font-size: 14px; color: var(--text); background: {{m.rowBg}}; box-shadow: {{m.rowShadow}}"><span style="flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px"><span style="font-weight: {{m.weight}}">{{m.label}}</span><span style="font-size: 12px; color: var(--muted)">{{m.note}}</span></span><span style="display: {{m.checkDisplay}}; color: var(--text)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span></button>
+                  </sc-for>
+                </div>
+                <div role="radiogroup" aria-labelledby="nt-effort-l" style="display: flex; flex-direction: column; gap: 2px; margin-top: 4px">
+                  <div id="nt-effort-l" style="padding: 8px 10px 4px; font-size: 12px; font-weight: 600; color: var(--muted)">Effort</div>
+                  <sc-for list="{{effortOpts}}" as="e" hint-placeholder-count="4">
+                    <button class="ghost" role="radio" aria-checked="{{e.on}}" onClick="{{e.pick}}" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 0 10px; box-sizing: border-box; border-radius: 12px; text-align: left; font-size: 14px; color: var(--text); background: {{e.rowBg}}; box-shadow: {{e.rowShadow}}"><span aria-hidden="true" style="display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; width: 16px"><span style="width: 4px; height: 7px; border-radius: 999px; background: {{e.b1}}"></span><span style="width: 4px; height: 10px; border-radius: 999px; background: {{e.b2}}"></span><span style="width: 4px; height: 14px; border-radius: 999px; background: {{e.b3}}"></span></span><span style="flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px"><span style="font-weight: {{e.weight}}">{{e.label}}</span><span style="font-size: 12px; color: var(--muted)">{{e.note}}</span></span><span style="display: {{e.checkDisplay}}; color: var(--text)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span></button>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{repeatAgent}}" hint-placeholder-val="{{false}}">
+                <div style="padding: 14px 10px; font-size: 13px; line-height: 1.5; color: var(--muted)">Recurring tasks run on the agent's own model and effort.</div>
+              </sc-if>
+              <sc-if value="{{isPerson}}" hint-placeholder-val="{{false}}">
+                <div style="padding: 14px 10px; font-size: 13px; line-height: 1.5; color: var(--muted)">People don't run on a model, so there's nothing to set here.</div>
+              </sc-if>
+              <button type="button" onClick="{{closeWho}}" style="margin-top: auto; align-self: flex-end; display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-size: 13px; font-weight: 700">Done</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{notRepeat}}" hint-placeholder-val="{{true}}"><button class="ghost" style="flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 12px 0 5px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--edge); background: var(--card); color: var(--body); font-size: 13px; white-space: nowrap"><span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-size: 10px; display: grid; place-items: center; font-weight: 800">BA</span><span style="color: var(--muted)">Review</span><span style="font-weight: 700; color: var(--text)">You</span></button></sc-if>
+
+      <sc-if value="{{notRepeat}}" hint-placeholder-val="{{true}}"><sc-for list="{{bottomRows}}" as="r" hint-placeholder-count="1">
+        <span style="display: inline-flex; align-items: center; gap: 7px; min-width: 0; height: 38px; padding: 0 4px 0 5px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--edge); background: var(--card); color: var(--body); font-size: 13px; white-space: nowrap"><span aria-hidden="true" style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; background: {{r.bg}}; color: {{r.ink}}; font-size: 10px; display: grid; place-items: center; font-weight: 800">{{r.initials}}</span><span style="color: var(--muted)">{{r.verb}}</span><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 700; color: var(--text)">{{r.short}}</span><button class="icon" aria-label="Remove {{r.label}}" onClick="{{r.remove}}" style="width: 28px; height: 28px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></span>
+      </sc-for></sc-if>
+
+      <sc-if value="{{notRepeat}}" hint-placeholder-val="{{true}}"><div style="position: relative; flex-shrink: 0">
+        <button class="icon" aria-haspopup="menu" aria-expanded="{{roleOpen}}" aria-label="Add an assignment role" onClick="{{toggleRole}}" style="width: 38px; height: 38px; box-sizing: border-box; display: grid; place-items: center; border-radius: 50%; border: 1px dashed var(--edge); color: var(--body)"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+        <sc-if value="{{roleOpen}}" hint-placeholder-val="{{false}}">
+          <div role="menu" aria-label="Assignment roles" style="position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: 320px; box-sizing: border-box; padding: 6px; border: 1px solid var(--edge); border-radius: 18px; background: var(--card); box-shadow: 0 24px 50px -18px rgba(0,0,0,.7); display: flex; flex-direction: column; gap: 2px">
+            <div style="padding: 8px 10px 3px; font-size: 12px; font-weight: 600; color: var(--muted)">Add a role</div>
+            <sc-for list="{{roleItems}}" as="it" hint-placeholder-count="2">
+              <button class="ghost" role="menuitemcheckbox" aria-checked="{{it.on}}" onClick="{{it.toggle}}" style="display: flex; align-items: center; gap: 11px; width: 100%; min-height: 44px; padding: 6px 10px; box-sizing: border-box; border-radius: 12px; text-align: left"><span style="width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center; border-radius: 10px; background: var(--well); color: var(--body)"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="{{it.icon}}"></path></svg></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 14px; font-weight: 700; color: var(--text)">{{it.label}}</span><span style="font-size: 12px; color: var(--muted)">{{it.desc}}</span></span><span style="display: {{it.checkDisplay}}; color: var(--text)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span></button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div></sc-if>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 12px 14px 12px 24px; border-top: 1px solid var(--line)">
+      <sc-if value="{{notRepeat}}" hint-placeholder-val="{{true}}"><sc-for list="{{footPills}}" as="p" hint-placeholder-count="3">
+        <div style="position: relative">
+          <button class="ghost" aria-haspopup="listbox" aria-expanded="{{p.open}}" aria-label="{{p.aria}}" onClick="{{p.toggle}}" style="display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px 0 9px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--edge); color: var(--body); font-size: 12px; font-weight: 600; white-space: nowrap"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; color: var(--muted)"><path d="{{p.icon}}"></path></svg>{{p.value}}<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <sc-if value="{{p.open}}" hint-placeholder-val="{{false}}">
+            <div role="listbox" aria-label="{{p.label}}" style="position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30; width: 270px; box-sizing: border-box; padding: 6px; border: 1px solid var(--edge); border-radius: 16px; background: var(--card); box-shadow: 0 18px 40px -16px rgba(0,0,0,.65); display: flex; flex-direction: column; gap: 2px">
+              <div style="padding: 6px 10px 4px; font-size: 12px; font-weight: 600; color: var(--muted)">{{p.label}}</div>
+              <sc-for list="{{p.opts}}" as="o" hint-placeholder-count="3">
+                <button class="ghost" role="option" aria-selected="{{o.on}}" onClick="{{o.pick}}" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 10px; box-sizing: border-box; border-radius: 12px; text-align: left; background: {{o.rowBg}}"><span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 14px; font-weight: 700; color: var(--text)">{{o.label}}</span><span style="font-size: 12px; color: var(--muted)">{{o.desc}}</span></span><span style="display: {{o.checkDisplay}}; color: var(--text)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span></button>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for></sc-if>
+      <sc-if value="{{isRepeat}}" hint-placeholder-val="{{false}}"><span style="display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--body)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"></path></svg>{{firstLabel}}</span></sc-if>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 8px">
+        <a class="ghost" href="Main.dc.html" style="display: inline-flex; align-items: center; height: 34px; padding: 0 14px; box-sizing: border-box; border-radius: 999px; color: var(--body); font-size: 14px; text-decoration: none">Cancel</a>
+        <div style="display: flex; height: 34px; border-radius: 999px; overflow: hidden; background: var(--primary)">
+          <button type="button" onClick="{{create}}" style="display: flex; align-items: center; gap: 8px; padding: 0 14px; color: var(--on-primary); font-weight: 700; font-size: 14px">{{createLabel}}<kbd style="font-family: inherit; font-size: 12px; font-weight: 600; opacity: .6">⌘↵</kbd></button>
+          <button type="button" aria-label="{{createMenuLabel}}" style="width: 30px; display: grid; place-items: center; color: var(--on-primary); border-left: 1px solid color-mix(in srgb, var(--on-primary) 25%, transparent)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+  <sc-if value="{{isConnect}}" hint-placeholder-val="{{false}}">
+  <div role="dialog" aria-modal="true" aria-labelledby="cw-h" style="width: 100%; max-width: 760px; box-sizing: border-box; background: var(--card); border: 1px solid var(--card-edge); border-radius: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column">
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 12px 0 18px">
+      <span style="display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px 0 6px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--edge); color: var(--body); font-size: 13px"><span style="width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(160deg, #f7b52f, #f5822a); color: #111113; font-size: 10px; display: grid; place-items: center; font-weight: 800">t</span>trading workbench</span>
+      <span style="color: var(--dashed)">/</span>
+      <h2 class="disp" id="cw-h" style="margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -.01em">{{cw.heading}}</h2>
+      <a class="icon" href="Recurring.dc.html" aria-label="Close and finish setup later" style="margin-left: auto; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></a>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 18px; padding: 18px 24px 20px">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <span aria-hidden="true" style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(160deg, #2fd12f, #22b5a5); color: #111113; display: grid; place-items: center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+          <span class="disp" style="font-size: 18px; font-weight: 800; letter-spacing: -.01em; color: var(--text)">{{title}}</span>
+          <ul aria-label="Triggers" style="list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap">
+            <sc-for list="{{cw.chips}}" as="tc" hint-placeholder-count="2">
+              <li style="display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px 0 8px; box-sizing: border-box; border-radius: 999px; border: 1px solid {{tc.bd}}; background: {{tc.bg}}; color: {{tc.fg}}; font-size: 12px; font-weight: 600; white-space: nowrap"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="{{tc.icon}}"></path></svg>{{tc.label}}<span style="opacity: .75">· {{tc.state}}</span></li>
+            </sc-for>
+          </ul>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <label for="cw-url" style="font-size: 13px; font-weight: 700; color: var(--text)">{{cw.urlLabel}}</label>
+        <div style="display: flex; gap: 8px">
+          <input id="cw-url" class="mono" readonly value="{{cw.url}}" style="flex: 1; min-width: 0; height: 38px; box-sizing: border-box; padding: 0 12px; border: 1px solid var(--edge); border-radius: 12px; outline: none; background: var(--well); color: var(--text); font-size: 12.5px">
+          <button type="button" class="ghost" style="display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px 0 12px; box-sizing: border-box; border-radius: 12px; border: 1px solid var(--edge); color: var(--text); font-size: 13px; font-weight: 700"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8h12v12H8zM4 16V4h12"></path></svg>Copy</button>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="display: flex; align-items: center; gap: 2px"><label for="cw-secret" style="font-size: 13px; font-weight: 700; color: var(--text)">Secret</label><button type="button" class="info" aria-label="{{cw.secretTip}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.6v.01"></path></svg><span class="tipb" aria-hidden="true">{{cw.secretTip}}</span></button></span>
+        <div style="display: flex; gap: 8px">
+          <input id="cw-secret" class="mono" readonly value="{{cw.secret}}" style="flex: 1; min-width: 0; height: 38px; box-sizing: border-box; padding: 0 12px; border: 1px solid var(--edge); border-radius: 12px; outline: none; background: var(--well); color: var(--text); font-size: 12.5px; letter-spacing: {{cw.secretSpacing}}">
+          <button type="button" class="ghost" aria-pressed="{{cw.shown}}" onClick="{{cw.toggleSecret}}" style="height: 38px; padding: 0 14px; box-sizing: border-box; border-radius: 12px; border: 1px solid var(--edge); color: var(--body); font-size: 13px; font-weight: 700">{{cw.showLabel}}</button>
+          <button type="button" class="ghost" style="display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px 0 12px; box-sizing: border-box; border-radius: 12px; border: 1px solid var(--edge); color: var(--text); font-size: 13px; font-weight: 700"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8h12v12H8zM4 16V4h12"></path></svg>Copy</button>
+        </div>
+      </div>
+      <button type="button" class="ghost" style="align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 10px; box-sizing: border-box; border-radius: 999px; border: 1px dashed var(--edge); color: var(--body); font-size: 13px; font-weight: 700"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8h12v12H8zM4 16V4h12"></path></svg>Copy setup steps for an agent</button>
+
+      <div role="status" style="display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid {{cw.check.bd}}; border-radius: 14px; background: {{cw.check.bg}}">
+        <span aria-hidden="true" class="{{cw.check.live}}" style="width: 5px; height: 16px; margin-top: 2px; flex-shrink: 0; border-radius: 999px; background: {{cw.check.glyph}}"></span>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+          <span style="font-weight: 700; color: var(--text)">{{cw.check.title}}</span>
+          <span style="font-size: 13px; line-height: 1.5; color: var(--muted)">{{cw.check.sub}}</span>
+        </div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; padding: 12px 14px 14px 18px; border-top: 1px solid var(--line)">
+      <a class="ghost" href="Recurring.dc.html" style="display: inline-flex; align-items: center; height: 34px; padding: 0 14px; box-sizing: border-box; border-radius: 999px; color: var(--body); font-size: 14px; text-decoration: none">Finish later</a><button type="button" class="info" aria-label="{{cw.laterTip}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.6v.01"></path></svg><span class="tipb" aria-hidden="true">{{cw.laterTip}}</span></button>
+      <a href="Recurring.dc.html" style="margin-left: auto; display: inline-flex; align-items: center; height: 34px; padding: 0 16px; box-sizing: border-box; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-size: 14px; font-weight: 700; text-decoration: none">{{cw.finishLabel}}</a>
+    </div>
+  </div>
+  </sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme": {"editor": "enum", "default": "dark", "options": ["light", "dark"]}, "display": {"editor": "enum", "default": "Hanken Grotesk", "options": ["Hanken Grotesk", "Bricolage Grotesque"]}, "grain": {"editor": "boolean", "default": true}, "assigneeOpen": {"editor": "boolean", "default": false}, "moreOpen": {"editor": "boolean", "default": false}, "repeat": {"editor": "enum", "default": "Weekdays", "options": ["Off", "Daily", "Weekdays", "Weekly", "Monthly", "Custom"]}, "repeatOpen": {"editor": "boolean", "default": false}, "webhook": {"editor": "boolean", "default": true}, "connect": {"editor": "enum", "default": "Waiting", "options": ["No", "Waiting", "Received", "Rejected"]}, "$preview": {"width": 1440, "height": 1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const font = (this.props.display ?? 'Hanken Grotesk') === 'Bricolage Grotesque' ? 'f-bricolage' : 'f-hanken';
+    const dark = (this.props.theme ?? 'dark') === 'dark';
+    return Object.assign({}, this.baseVals(), {
+      accent: 'var(--primary)',
+      rootClass: (dark ? 'dark' : 'light') + ' ' + font + ((this.props.grain ?? true) ? '' : ' no-grain')
+    });
+  }
+  baseVals() {
+    const task = (id, title, extra) => Object.assign({ id, title, rowBg: 'transparent', rowRing: 'none' }, extra || {});
+    const selected = { rowBg: 'var(--run-bg)', rowRing: 'inset 0 0 0 1px color-mix(in srgb, var(--run-fg) 45%, transparent)' };
+    const groups = [
+      { name: 'In progress', label: 'IN PROGRESS', bg: 'var(--run-bg)', fg: 'var(--run-fg)', color: '#5b45ea', glyph: 'linear-gradient(180deg, #8b2cf0, #1f6fe0)', dash: 'none', inner: 3, open: true, tasks: [
+        task('TRA-41', 'H4 download derivatives price data'),
+        task('TRA-38', 'Port all open-source strategies to Python'),
+        task('TRA-35', 'Known bugs and limitations')
+      ] },
+      { name: 'In review', label: 'IN REVIEW', bg: 'var(--violet-bg)', fg: 'var(--violet-fg)', color: '#c22be3', glyph: 'linear-gradient(180deg, #ff2bd6, #8b2cf0)', dash: 'none', inner: 3, open: true, tasks: [
+        task('TRA-44', 'Liquidation sweep strategy'),
+        task('TRA-29', 'Refine and polish all custom charts')
+      ] },
+      { name: 'Todo', label: 'TODO', bg: 'var(--amber-bg)', fg: 'var(--amber-fg)', color: '#f69a2d', glyph: 'linear-gradient(180deg, #f7b52f, #f5822a)', dash: 'none', inner: 0, open: true, tasks: [
+        task('TRA-47', 'Center of gravity strategy'),
+        task('TRA-48', 'Boom Hunter XL v4: FPB entry strategy'),
+        task('TRA-49', 'Boom Hunter XL v4: add 15m execution layer on 4H'),
+        task('TRA-50', 'Create cost profile editor')
+      ] },
+      { name: 'Blocked', label: 'BLOCKED', bg: 'var(--red-bg)', fg: 'var(--red-fg)', color: '#f2283f', glyph: 'linear-gradient(180deg, #f2286f, #f2272c)', dash: 'none', inner: 0, open: true, tasks: [
+        task('TRA-45', 'Start ML testing on VPA')
+      ] }
+    ].map((g) => Object.assign(g, { count: g.tasks.length }));
+    const agents = [
+      { initials: 'QR', name: 'Quant Researcher', bg: 'linear-gradient(160deg, #2fd12f, #22b5a5)', dot: 'linear-gradient(180deg, #8b2cf0, #1f6fe0)', state: 'running', href: 'AgentChat.dc.html' },
+      { initials: 'SE', name: 'Strategy Engineer', bg: 'linear-gradient(160deg, #ff2bd6, #f2286f)', dot: 'linear-gradient(180deg, #8b2cf0, #1f6fe0)', state: 'running', href: '#' },
+      { initials: 'FE', name: 'Frontend Engineer', bg: 'linear-gradient(160deg, #f7b52f, #f5822a)', dot: 'linear-gradient(180deg, var(--ash-a), var(--ash-b))', state: 'idle', href: '#' },
+      { initials: 'ML', name: 'ML Engineer', bg: 'linear-gradient(160deg, #f2272c, #ff2bd6)', dot: 'linear-gradient(180deg, #f2286f, #f2272c)', state: 'blocked', href: '#' },
+      { initials: 'CE', name: 'CEO', bg: 'linear-gradient(160deg, #6a93ad, #a9c6d6)', dot: 'linear-gradient(180deg, #f7b52f, #f5822a)', state: 'paused', href: '#' }
+    ];
+    return Object.assign({ groups, agents }, this.formVals());
+  }
+  formVals() {
+    const st = this.state || {};
+    const propRepeat = this.props.repeat ?? 'Weekdays';
+    const FREQ = { Off: 'off', Daily: 'daily', Weekdays: 'weekdays', Weekly: 'weekly', Monthly: 'monthly', Custom: 'custom' };
+    const repeat = st.repeat ?? FREQ[propRepeat];
+    // A recurring task can start on a schedule, on a webhook, or both; with neither it's a plain task.
+    const schedOn = st.schedOn ?? true;
+    const hookOn = st.hookOn ?? (this.props.webhook ?? false);
+    const sender = st.sender ?? 'app';
+    const connect = st.connect ?? { No: 'no', Waiting: 'waiting', Received: 'received', Rejected: 'rejected' }[this.props.connect ?? 'No'];
+    const isRepeat = repeat !== 'off' && (schedOn || hookOn);
+    const repeatOpen = st.repeatOpen ?? (this.props.repeatOpen ?? false);
+    const daysOn = st.daysOn ?? [1, 4];
+    const policy = st.policy ?? 'coalesce_if_active';
+    const title = st.title ?? (propRepeat === 'Off' ? 'Backfill OKX funding history to 2022' : 'Funding rate snapshot for {{date}}');
+    const desc = st.desc ?? (propRepeat === 'Off' ? '' : 'Pull the last 24 hours of funding rates for BTC, ETH and SOL perps from Binance, Bybit and OKX. Append them to data/raw/funding/ and post the row counts.');
+    const whoOpen = st.whoOpen ?? (this.props.assigneeOpen ?? false);
+    const moreOpen = st.moreOpen ?? (this.props.moreOpen ?? false);
+    const prioOpen = st.prioOpen ?? false;
+    const roleOpen = st.roleOpen ?? false;
+    const footOpen = st.footOpen ?? null;
+    const mode = st.mode ?? 'standard';
+    const ws = st.ws ?? 'shared_workspace';
+    const review = st.review ?? 'anyone';
+    const closed = { whoOpen: false, prioOpen: false, moreOpen: false, roleOpen: false, footOpen: null, repeatOpen: false };
+    const prio = st.prio ?? 'high';
+    const who = st.who ?? 'qr';
+    const model = st.model ?? 'default';
+    const effort = st.effort ?? 'medium';
+    const added = (st.added ?? ['parent']).filter((k) => !isRepeat || ['parent', 'goal'].includes(k));
+    const files = st.files ?? [{ name: 'okx-funding-endpoints.md', size: '4 KB' }, { name: 'funding-rates-sample.csv', size: '48 KB' }];
+    const ON = 'var(--pri-on)', OFF = 'var(--pri-off)';
+    const P = {
+      urgent: { label: 'Urgent', b1: 'var(--red-fg)', b2: 'var(--red-fg)', b3: 'var(--red-fg)' },
+      high: { label: 'High', b1: ON, b2: ON, b3: ON },
+      medium: { label: 'Medium', b1: ON, b2: ON, b3: OFF },
+      low: { label: 'Low', b1: ON, b2: OFF, b3: OFF }
+    };
+    const M = { opus: { label: 'Opus 5.5', note: 'Most capable' }, sonnet: { label: 'Sonnet 5.5', note: 'Balanced' }, haiku: { label: 'Haiku 5.5', note: 'Fastest' } };
+    const E = { low: { label: 'Low', n: 1 }, medium: { label: 'Medium', n: 2 }, high: { label: 'High', n: 3 } };
+    const bars = (n, on) => ({ b1: n >= 1 ? on : OFF, b2: n >= 2 ? on : OFF, b3: n >= 3 ? on : OFF });
+    const S = {
+      running: { sBg: 'var(--run-bg)', sFg: 'var(--run-fg)', sBd: 'color-mix(in srgb, var(--run-fg) 50%, transparent)', glyph: 'linear-gradient(180deg, #8b2cf0, #1f6fe0)', live: 'live', state: 'Running' },
+      idle: { sBg: 'var(--hover)', sFg: 'var(--body)', sBd: 'var(--edge)', glyph: 'linear-gradient(180deg, var(--ash-a), var(--ash-b))', live: '', state: 'Idle' },
+      blocked: { sBg: 'var(--red-bg)', sFg: 'var(--red-fg)', sBd: 'color-mix(in srgb, var(--red-fg) 50%, transparent)', glyph: 'linear-gradient(180deg, #f2286f, #f2272c)', live: '', state: 'Blocked' },
+      paused: { sBg: 'var(--amber-bg)', sFg: 'var(--amber-fg)', sBd: 'color-mix(in srgb, var(--amber-fg) 50%, transparent)', glyph: 'linear-gradient(180deg, #f7b52f, #f5822a)', live: '', state: 'Paused' }
+    };
+    const W = {
+      qr: { initials: 'QR', name: 'Quant Researcher', bg: 'linear-gradient(160deg, #2fd12f, #22b5a5)', ink: '#111113', kind: 'agent', s: 'running', model: 'opus', effort: 'high' },
+      se: { initials: 'SE', name: 'Strategy Engineer', bg: 'linear-gradient(160deg, #ff2bd6, #f2286f)', ink: '#111113', kind: 'agent', s: 'running', model: 'sonnet', effort: 'medium' },
+      fe: { initials: 'FE', name: 'Frontend Engineer', bg: 'linear-gradient(160deg, #f7b52f, #f5822a)', ink: '#111113', kind: 'agent', s: 'idle', model: 'sonnet', effort: 'medium' },
+      ml: { initials: 'ML', name: 'ML Engineer', bg: 'linear-gradient(160deg, #f2272c, #ff2bd6)', ink: '#111113', kind: 'agent', s: 'blocked', model: 'opus', effort: 'high' },
+      ce: { initials: 'CE', name: 'CEO', bg: 'linear-gradient(160deg, #6a93ad, #a9c6d6)', ink: '#111113', kind: 'agent', s: 'paused', model: 'opus', effort: 'medium' },
+      me: { initials: 'BA', name: 'You', bg: 'var(--primary)', ink: 'var(--on-primary)', kind: 'person' },
+      sk: { initials: 'SK', name: 'Sam K.', bg: 'linear-gradient(160deg, #ff2bd6, #8b2cf0)', ink: '#111113', kind: 'person' },
+      mr: { initials: 'MR', name: 'Maya R.', bg: 'linear-gradient(160deg, #22b5a5, #4c7896)', ink: '#111113', kind: 'person' }
+    };
+    const w = W[who];
+    const isAgent = w.kind === 'agent';
+    const A = Object.assign({}, w, w.s ? S[w.s] : {});
+    const opt = (k) => Object.assign({}, W[k], W[k].s ? S[W[k].s] : {}, {
+      on: k === who, rowBg: k === who ? 'var(--well)' : 'transparent', checkDisplay: k === who ? 'inline-flex' : 'none',
+      pick: () => this.setState({ who: k, model: 'default', effort: 'default' })
+    });
+    const row = (on) => ({ on, rowBg: on ? 'var(--sel)' : 'transparent', rowShadow: on ? 'var(--sel-shadow)' : 'none', weight: on ? 700 : 500, checkDisplay: on ? 'inline-flex' : 'none' });
+    const modelKey = isAgent ? (model === 'default' ? w.model : model) : null;
+    const effortKey = isAgent ? (effort === 'default' ? w.effort : effort) : null;
+    const runModel = isAgent ? { label: M[modelKey].label, fg: model === 'default' ? 'var(--body)' : 'var(--run-fg)', weight: model === 'default' ? 600 : 700 } : {};
+    const runEffort = isAgent ? Object.assign({ label: E[effortKey].label, fg: effort === 'default' ? 'var(--body)' : 'var(--run-fg)', weight: effort === 'default' ? 600 : 700 }, bars(E[effortKey].n, effort === 'default' ? ON : 'var(--run-fg)')) : {};
+    const capsuleLabel = isAgent
+      ? 'Assignee: ' + w.name + '. Model: ' + runModel.label + (model === 'default' ? ', agent default' : ', chosen for this task') + '. Effort: ' + runEffort.label + (effort === 'default' ? ', agent default' : ', chosen for this task') + '.'
+      : 'Assignee: ' + w.name;
+    const F = {
+      parent: { label: 'Parent task', desc: 'Nest it under another task', short: 'TRA-41', icon: 'M6 3v12a3 3 0 0 0 3 3h9M14 14l4 4-4 4' },
+      goal: { label: 'Goal', desc: 'Link it to a company goal', short: 'Trading workbench v1', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM12 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2z' },
+      blocked: { label: 'Blocked by', desc: 'Wait for other tasks to finish first', short: 'TRA-45', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5.6 5.6l12.8 12.8' },
+      watchdog: { label: 'Watchdog', desc: 'An agent that checks the work stays on track', short: 'CEO', verb: 'Watch', initials: 'CE', bg: W.ce.bg, ink: W.ce.ink, bottom: true, icon: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z' },
+      approver: { label: 'Approver', desc: 'Signs off after the review', short: 'Maya R.', verb: 'Approve', initials: 'MR', bg: W.mr.bg, ink: W.mr.ink, bottom: true, icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM16 11l2 2 4-4' },
+      billing: { label: 'Billing code', desc: 'Charge the run cost to a code', short: 'RESEARCH-OPS', icon: 'M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2zM9 8h6M9 12h6' },
+      private: { label: 'Private', desc: 'Only you and the assignee can see it', short: 'On', icon: 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4' }
+    };
+    // Repeat saves a routine with a schedule trigger. Its next three occurrences, from Sun Oct 25 2026, 10:15.
+    const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], DAYNAME = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const fires = (d) => repeat === 'daily' ? true
+      : repeat === 'weekdays' || repeat === 'custom' ? d.getDay() >= 1 && d.getDay() <= 5
+      : repeat === 'weekly' ? daysOn.includes(d.getDay())
+      : repeat === 'monthly' ? d.getDate() === 1 : false;
+    const next = [];
+    for (let d = new Date(2026, 9, 26); next.length < 3 && d < new Date(2027, 3, 1); d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+      if (fires(d)) next.push(DAY[d.getDay()] + ' ' + MON[d.getMonth()] + ' ' + d.getDate());
+    }
+    const nextRuns = next.length ? next[0] + ' at 09:00, then ' + next.slice(1).join(' and ') : 'Pick at least one day';
+    const weekLabel = daysOn.length ? daysOn.slice().sort().map((i) => DAY[i]).join(', ') : 'no days';
+    const PILL = { daily: 'Every day at 09:00', weekdays: 'Weekdays at 09:00', weekly: 'Every ' + weekLabel + ' at 09:00', monthly: 'Monthly on the 1st at 09:00', custom: 'Custom: 0 9 * * 1-5' };
+    const hookName = sender === 'github' ? 'GitHub webhook' : 'webhook';
+    const pillLabel = schedOn && hookOn ? PILL[repeat] + ' + ' + hookName : schedOn ? PILL[repeat] : 'When a ' + hookName + ' arrives';
+    const repeatPill = isRepeat
+      ? { label: pillLabel, aria: 'Repeat: ' + pillLabel, border: 'solid', bd: 'color-mix(in srgb, var(--run-fg) 50%, transparent)', bg: 'var(--run-bg)', fg: 'var(--run-fg)' }
+      : { label: 'Repeat', aria: 'Repeat: does not repeat', border: 'dashed', bd: 'var(--edge)', bg: 'transparent', fg: 'var(--body)' };
+    const seg = (on) => ({ bg: on ? 'var(--sel)' : 'transparent', fg: on ? 'var(--text)' : 'var(--body)', shadow: on ? 'var(--sel-shadow)' : 'none' });
+    const POL = [['coalesce_if_active', 'Add it to the open one'], ['skip_if_active', 'Skip it'], ['always_enqueue', 'Create another anyway']];
+    const sw = (on) => ({ track: on ? 'var(--primary)' : 'var(--pri-off)', knob: on ? '17px' : '3px', knobBg: on ? 'var(--card)' : 'var(--knob-off)' });
+    const github = sender === 'github';
+    const shown = st.showSecret ?? false;
+    const CHECKS = {
+      waiting: { title: 'Waiting for a test event', sub: github ? 'In GitHub, open the webhook’s Recent Deliveries and redeliver one. Test events don’t create a task.' : 'Send one from your app, or do what should start this task. Test events don’t create a task.',
+        glyph: 'linear-gradient(180deg, #8b2cf0, #1f6fe0)', live: 'live', bd: 'var(--line)', bg: 'var(--well)' },
+      received: { title: 'Test event received', sub: 'The signature checked out. No task was created.', glyph: 'linear-gradient(180deg, #2fd12f, #22b5a5)', live: '',
+        bd: 'color-mix(in srgb, var(--green-fg) 40%, transparent)', bg: 'var(--green-bg)' },
+      rejected: { title: 'An event arrived, but its signature didn’t match', sub: 'Check the secret in ' + (github ? 'GitHub' : 'your app') + ' and send another.', glyph: 'linear-gradient(180deg, #f2286f, #f2272c)', live: '',
+        bd: 'color-mix(in srgb, var(--red-fg) 40%, transparent)', bg: 'var(--red-bg)' }
+    };
+    const chip = (icon, label, state, tone) => ({ icon, label, state, bg: 'var(--' + tone + '-bg)', fg: 'var(--' + tone + '-fg)', bd: 'color-mix(in srgb, var(--' + tone + '-fg) 45%, transparent)' });
+    const toggleField = (k) => () => this.setState({ added: added.includes(k) ? added.filter((x) => x !== k) : added.concat([k]) });
+    return {
+      isRepeat, notRepeat: !isRepeat, repeatOpen, repeatPill, nextRuns,
+      dialogTitle: isRepeat ? 'New recurring task' : 'New task',
+      createLabel: isRepeat ? 'Create recurring task' : 'Create task',
+      createMenuLabel: isRepeat ? 'Create options: create and start the first one now' : 'Create options: create and open, save as draft',
+      firstLabel: !schedOn ? 'First one when a webhook arrives' : next.length ? 'First one ' + next[0] + ', 09:00' : '',
+      showRunCaps: isAgent && !isRepeat, repeatAgent: isAgent && isRepeat,
+      scheme: (this.props.theme ?? 'dark') === 'dark' ? 'dark' : 'light',
+      repeatTip: 'Each time, a new task is made from this one’s title, description, assignee, project, priority, goal and parent. Labels, files, reviewers and run settings aren’t copied.',
+      hookTip: 'You get its URL and secret after you create the task. Fields in the JSON it sends fill the placeholders with the same name.',
+      toggleRepeat: () => this.setState(Object.assign({}, closed, { repeatOpen: !repeatOpen, repeat: isRepeat ? repeat : 'weekdays', schedOn: isRepeat ? schedOn : true, who: isAgent ? who : 'qr' })),
+      closeRepeat: () => this.setState({ repeatOpen: false }),
+      stopRepeat: () => this.setState({ repeatOpen: false, repeat: 'off', schedOn: true, hookOn: false }),
+      schedOn, hookOn, schedSw: sw(schedOn), hookSw: sw(hookOn),
+      flipSched: () => this.setState({ schedOn: !schedOn }),
+      flipHook: () => this.setState({ hookOn: !hookOn }),
+      senders: [['app', 'An app or script', 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18'], ['github', 'GitHub', 'M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9']].map(([k, label, icon]) => Object.assign({ label, icon, on: sender === k, pick: () => this.setState({ sender: k }) }, seg(sender === k))),
+      create: () => { if (isRepeat && hookOn) this.setState(Object.assign({}, closed, { connect: 'waiting' })); },
+      isConnect: connect !== 'no', notConnect: connect === 'no',
+      cw: {
+        heading: github ? 'Connect GitHub' : 'Connect your app',
+        chips: (schedOn && repeat !== 'off' ? [chip('M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2', PILL[repeat], 'On', 'green')] : []).concat([chip('M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7', github ? 'GitHub webhook' : 'Webhook', connect === 'received' ? 'Ready to turn on' : 'Setting up', 'amber')]),
+        urlLabel: github ? 'Payload URL' : 'Webhook URL',
+        url: 'https://paperclip.tail4b2e.ts.net/api/routine-triggers/public/6d1f0b93c4a87e25f0b4d1c9/fire',
+        shown, secret: shown ? '9f2c7a41d8e3b6650c1f4e2a9b7d3c58e04a6b1f72c9d3e8' : '••••••••••••••••••••••••••••••••', secretSpacing: shown ? '0' : '.08em',
+        showLabel: shown ? 'Hide' : 'Show', toggleSecret: () => this.setState({ showSecret: !shown }),
+        secretTip: (github ? 'Paste it into GitHub’s Secret field, with application/json as the content type.' : 'Your app signs each request with it (HMAC SHA-256), or sends it as Authorization: Bearer.') + ' It’s shown only now. If you lose it, rotate it from the recurring task’s panel.',
+        laterTip: 'The webhook stays off until you finish setup from the recurring task’s panel.' + (schedOn ? ' The schedule is already on.' : ''),
+        check: CHECKS[connect] || CHECKS.waiting,
+        finishLabel: connect === 'received' ? 'Turn on webhook' : 'Turn on without a test'
+      },
+      isWeekly: repeat === 'weekly', isMonthly: repeat === 'monthly', isCustom: repeat === 'custom', notCustom: repeat !== 'custom',
+      freqs: [['daily', 'Daily'], ['weekdays', 'Weekdays'], ['weekly', 'Weekly'], ['monthly', 'Monthly'], ['custom', 'Custom']].map(([k, label]) => Object.assign({ label, on: repeat === k, pick: () => this.setState({ repeat: k }) }, seg(repeat === k))),
+      days: [1, 2, 3, 4, 5, 6, 0].map((i) => {
+        const on = daysOn.includes(i);
+        return { short: DAY[i].slice(0, 2), name: DAYNAME[i], on, bd: on ? 'var(--text)' : 'var(--edge)', bg: on ? 'var(--sel)' : 'transparent', fg: on ? 'var(--text)' : 'var(--body)',
+          toggle: () => this.setState({ daysOn: on ? daysOn.filter((x) => x !== i) : daysOn.concat([i]) }) };
+      }),
+      policies: POL.map(([k, label]) => ({ label, on: policy === k, rowBg: policy === k ? 'var(--well)' : 'transparent', weight: policy === k ? 700 : 500,
+        ring: policy === k ? '5px solid var(--text)' : '1.5px solid var(--edge)', pick: () => this.setState({ policy: k }) })),
+      title, desc, whoOpen, prioOpen, moreOpen, A, isAgent, isPerson: !isAgent, runModel, runEffort, capsuleLabel,
+      setTitle: (e) => this.setState({ title: e.target.value }),
+      setDesc: (e) => this.setState({ desc: e.target.value }),
+      roleOpen,
+      toggleWho: () => this.setState(Object.assign({}, closed, { whoOpen: !whoOpen })),
+      closeWho: () => this.setState({ whoOpen: false }),
+      togglePrio: () => this.setState(Object.assign({}, closed, { prioOpen: !prioOpen })),
+      toggleMore: () => this.setState(Object.assign({}, closed, { moreOpen: !moreOpen })),
+      toggleRole: () => this.setState(Object.assign({}, closed, { roleOpen: !roleOpen })),
+      roleItems: ['approver', 'watchdog'].map((k) => Object.assign({}, F[k], { on: added.includes(k), checkDisplay: added.includes(k) ? 'inline-flex' : 'none', toggle: toggleField(k) })),
+      footPills: [
+        { key: 'mode', label: 'Work mode', cur: mode, icon: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6', opts: [
+          { v: 'standard', label: 'Do the work', desc: 'Make the change and report back' },
+          { v: 'ask', label: 'Answer a question', desc: 'Reply with findings, change nothing' },
+          { v: 'planning', label: 'Plan first', desc: 'Propose a plan for you to approve' }
+        ] },
+        { key: 'ws', label: 'Workspace', cur: ws, icon: 'M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9', opts: [
+          { v: 'shared_workspace', label: 'Shared workspace', desc: "The project's main checkout" },
+          { v: 'isolated_workspace', label: 'New worktree', desc: 'A fresh branch just for this task' },
+          { v: 'reuse_existing', label: 'Reuse a worktree', desc: 'Continue in another task\'s worktree' }
+        ] },
+        { key: 'review', label: 'Review policy', cur: review, icon: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4', opts: [
+          { v: 'anyone', label: 'Anyone approves', desc: 'Any reviewer can approve the result' },
+          { v: 'not_creator', label: 'Not the creator', desc: 'Whoever made the task can\'t approve it' },
+          { v: 'human_only', label: 'People only', desc: 'Agents can\'t approve the result' }
+        ] }
+      ].map((p) => {
+        const sel = p.opts.find((o) => o.v === p.cur);
+        return Object.assign({}, p, {
+          value: sel.label, aria: p.label + ': ' + sel.label, open: footOpen === p.key,
+          toggle: () => this.setState(Object.assign({}, closed, { footOpen: footOpen === p.key ? null : p.key })),
+          opts: p.opts.map((o) => ({ label: o.label, desc: o.desc, on: o.v === p.cur, rowBg: o.v === p.cur ? 'var(--well)' : 'transparent', checkDisplay: o.v === p.cur ? 'inline-flex' : 'none', pick: () => this.setState({ [p.key]: o.v, footOpen: null }) }))
+        });
+      }),
+      P: P[prio],
+      prios: Object.keys(P).map((k) => Object.assign({}, P[k], { on: k === prio, bg: k === prio ? 'var(--well)' : 'transparent', checkDisplay: k === prio ? 'inline-flex' : 'none', pick: () => this.setState({ prio: k, prioOpen: false }) })),
+      agentOpts: ['qr', 'se', 'fe', 'ml', 'ce'].map(opt),
+      peopleOpts: isRepeat ? [] : ['me', 'sk', 'mr'].map(opt),
+      modelOpts: isAgent ? [Object.assign({ label: 'Agent default', note: M[w.model].label }, row(model === 'default'), { pick: () => this.setState({ model: 'default' }) })]
+        .concat(Object.keys(M).map((k) => Object.assign({}, M[k], row(model === k), { pick: () => this.setState({ model: k }) }))) : [],
+      effortOpts: isAgent ? [Object.assign({ label: 'Agent default', note: E[w.effort].label }, bars(E[w.effort].n, 'var(--muted)'), row(effort === 'default'), { pick: () => this.setState({ effort: 'default' }) })]
+        .concat(Object.keys(E).map((k) => Object.assign({}, E[k], { note: '' }, bars(E[k].n, ON), row(effort === k), { pick: () => this.setState({ effort: k }) }))) : [],
+      topRows: added.filter((k) => !F[k].bottom).map((k) => Object.assign({}, F[k], { remove: toggleField(k) })),
+      bottomRows: added.filter((k) => F[k].bottom).map((k) => Object.assign({}, F[k], { remove: toggleField(k) })),
+      fieldGroups: (isRepeat ? [['Plan', ['parent', 'goal']]] : [['Plan', ['parent', 'goal', 'blocked']], ['Admin', ['billing', 'private']]]).map(([name, keys]) => ({
+        name,
+        items: keys.map((k) => Object.assign({}, F[k], { on: added.includes(k), checkDisplay: added.includes(k) ? 'inline-flex' : 'none', toggle: toggleField(k) }))
+      })),
+      files: files.map((f, i) => Object.assign({}, f, { remove: () => this.setState({ files: files.filter((_, j) => j !== i) }) })),
+      addFile: () => this.setState({ files: files.concat([{ name: 'okx-api-notes.pdf', size: '1.1 MB' }]) })
+    };
+  }
+}
+</script>
+</body>
+</html>

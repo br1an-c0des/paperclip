@@ -6,9 +6,12 @@ Every screen in the redesign, in canvas order. Each entry links the board's sour
 
 **Status:** *Approved* boards are the design to build. *State* boards draw another state of the
 board named, from a near-identical file. *Reference* boards document a system rather than a screen.
+*On hold* boards are kept for a feature that's waiting on a decision; don't build them yet.
 
 All boards are 1440px wide, drawn in the dark theme, and share the left nav described in the
-[design system](design-system.md#components).
+[design system](design-system.md#components). Boards 1 to 34 are numbered; the later groups use the
+canvas's letters: C for cases, N for creating things, R for recurring tasks, L for lists, S for
+search. The phone layouts are in [mobile.md](mobile.md).
 
 ## Tasks
 
@@ -403,3 +406,301 @@ The ClipLab avatars:
 - Sizes.
 
 The avatars are rendered from `packages/shared/src/cliplab`.
+
+## Cases
+
+Shown only when the instance has `enableCases` on. There's no cases page: cases live in the task views
+([decision F](../build-plan.md#decisions-to-make-early)). Like upstream's own pages, these boards only
+read cases; agents write them. The exceptions are answering a case's requests, starting a draft case
+and cancelling a queued hand-off.
+
+<a id="board-c1"></a>
+### C1 · Cases, option A (chosen): the task carries the case
+
+[CasesInTask.dc.html](boards/CasesInTask.dc.html) · Approved
+
+The task list (board 1) with cases on the rows, and a task open in the docked panel:
+
+- A task that is a case's main task shows the case ID and its phase ticks; a task linked to a case
+  shows the case ID. An "In a case" filter sits beside Group.
+- The panel rail gains a **Case** section (Details, Case, Activity, Docs and files, Runs). It shows the
+  case's type, ID and status, "This is the case's main task" and Open case; the title and summary; the
+  workflow's phase track, each phase with its agent and state (done, working now, up next, waiting on
+  you, hand-off queued, rounds taken); a strip with the request when a phase waits on you; the case's
+  fields; its documents and files; the hand-offs between agents; other tasks in the case; child cases.
+
+Tweak: `history` (hand-offs shown or hidden).
+
+Covers `cases/structure + /history`, `cases/task-links`.
+
+<a id="board-c2"></a>
+### C2 · Cases, option B (chosen): group the list by case
+
+[CasesGrouped.dc.html](boards/CasesGrouped.dc.html) · Approved
+
+The task list with **Group: Case**. Each case is a group card:
+
+- A header with the title, type and ID, status, phase ticks with the current phase, and a few key
+  fields as stats, then the workflow's name and the document count.
+- A strip when the case waits on you (Review) or has a hand-off queued (Cancel hand-off).
+- Rows with a Role column (Main task, Work, Reference), assignee, status and updated, and notes such as
+  "Asks you a question" or "Blocked by TRA-41".
+- Child cases nest inside their parent's card. A draft case shows "No work yet" and a button that
+  starts its workflow.
+
+"Not in a case" comes last, and done cases are hidden behind Show.
+
+Tweak: `fields` (the stats in each header).
+
+Covers `cases/browse` (in place of the case list), `cases/task-links`, `tasks/organize` (Group: Case).
+
+<a id="board-c5"></a>
+### C5 · New task: Start case, with an optional workflow template
+
+[CasesNewTask.dc.html](boards/CasesNewTask.dc.html) · Approved
+
+New task (board 7b) with a **Start a case** switch:
+
+- **On:** the assignee sets up a case and makes this task its main task; a line asking for it is added
+  to the description. A **Workflow template** picker (None, or one of the company's templates) shows
+  a preview: what it's for, how often it's used, its phases with their agents, and its loops and
+  waits. The assignee defaults to the first phase's agent ("Sets up the case"), and the button reads
+  Create and start case.
+- **Off:** an **Add to case** pill links the new task to an existing case, with a role (Work or
+  Reference).
+
+The rows behind the dialog show case chips, and "Case requested" on a task whose case is being set up.
+
+Tweaks: `startCase`, `template` (None, Strategy pipeline, Dataset build, Bug fix).
+
+Covers `tasks/create`, `cases/task-links`. Templates are the company's workflows
+(`GET /api/companies/:companyId/workflows`).
+
+## Creating things
+
+<a id="board-n1"></a>
+### N1 · New project: a modal, like New task
+
+[NewProject.dc.html](boards/NewProject.dc.html) · Approved
+
+A dialog over the task list, laid out like New task:
+
+- An icon tile (the name's first letter or one of 15 icons, on one of 8 colours), then the name and
+  description.
+- Pills for status (Backlog, Planned, In progress), lead, and visibility (Open, or Private with its
+  members), and a target date.
+- **Code:** GitHub (repositories from connected accounts; the first is the primary, each with its
+  branch), a local folder on the server, or none.
+
+Tweaks: `iconOpen`, `repoOpen`.
+
+Covers `projects/lifecycle` (create), `projects/membership`, `workspaces/project-workspaces`,
+`shell/dialogs`.
+
+<a id="board-n2"></a>
+### N2 · New agent, a page: profile
+
+[NewAgentProfile.dc.html](boards/NewAgentProfile.dc.html) · Approved
+
+A page (Agents / New agent) in two steps, Profile and Harness and model, with a preview card on the
+right. Profile has the avatar (one of 16 ClipLab palettes, or an uploaded image), name, role, reports
+to, title, and "What they do", which other agents read when they decide what to hand over. Continue
+saves the agent as a paused draft that can be finished later from Agents.
+
+Tweaks: `step` (profile, harness and model), `needsApproval`.
+
+Covers `agents/hire`.
+
+<a id="board-n3"></a>
+### N3 · New agent, a page: harness and model
+
+[NewAgentModel.dc.html](boards/NewAgentModel.dc.html) · State of N2 (`step` = harness and model)
+
+The harness (Claude Code, Codex, OpenCode, Gemini CLI, Cursor, Pi, Kimi, Hermes, each with how many
+agents use it), its sign-in, the model, where it runs, thinking effort, the runner (Paperclip Runner
+where the harness supports it), and Test. The button is Hire agent, or Ask for approval when the
+organization approves new agents first (`needsApproval`).
+
+<a id="board-n4"></a>
+### N4 · New task: the Repeat menu
+
+[NewTaskRepeat.dc.html](boards/NewTaskRepeat.dc.html) · Approved
+
+New task (board 7b) with a **Repeat** pill. Its menu:
+
+- **On a schedule:** Daily, Weekdays, Weekly (pick days), Monthly (on a day) or Custom (cron), a time
+  and time zone, and the next three runs.
+- **When a webhook arrives:** sent by an app or script, or by GitHub.
+- **If the last one is still open:** add it to the open one, skip it, or create another anyway.
+- Don't repeat, and Done.
+
+With Repeat on, the dialog becomes "New recurring task". Only the fields a recurring task copies to
+each occurrence stay: title, description, assignee (agents only), project, priority, goal and parent.
+Status, labels, attachments, reviewer, approver, watchdog, model and effort, the Admin fields and the
+footer pills go away, and a tooltip on the pill says so. The button is Create recurring task, with
+"create and start the first one now" in its menu.
+
+Tweaks: `repeat` (off, daily, weekdays, weekly, monthly, custom), `repeatOpen`, `webhook`, `connect`
+(no, waiting, received, rejected), and board 7b's `assigneeOpen` and `moreOpen`.
+
+Covers `tasks/create`, `routines/definition`, `routines/triggers`, `routines/delivery`. Saving creates
+a routine and its triggers (`POST /api/companies/:companyId/routines`,
+`POST /api/routines/:id/triggers`).
+
+<a id="board-n5"></a>
+### N5 · New task: a recurring task, ready to create
+
+[NewTaskRecurring.dc.html](boards/NewTaskRecurring.dc.html) · State of N4 (`repeatOpen` off)
+
+The pill reads "Weekdays at 09:00", and "First one Mon Oct 26, 09:00" sits beside the button.
+
+<a id="board-n6"></a>
+### N6 · New task: Repeat with a webhook as well
+
+[NewTaskWebhook.dc.html](boards/NewTaskWebhook.dc.html) · State of N4 (`webhook` on)
+
+<a id="board-n7"></a>
+### N7 · New task: after Create, connect the webhook
+
+[NewTaskConnect.dc.html](boards/NewTaskConnect.dc.html) · State of N4 (`connect` = waiting)
+
+After Create, a "Connect your app" (or "Connect GitHub") dialog: the triggers as chips, the webhook
+URL and its secret (shown only now; rotate it later from the recurring task's panel), "Copy setup
+steps for an agent", and a live check for a test event (waiting, received, or a signature that didn't
+match). Turn on webhook, or Finish later, which leaves the webhook off.
+
+## Recurring tasks
+
+Routines become tasks marked recurring, with no Routines page
+([build plan](../build-plan.md#routines-decisions-and-governance)).
+
+<a id="board-r1"></a>
+### R1 · Recurring tasks: a view of the task list
+
+[Recurring.dc.html](boards/Recurring.dc.html) · Approved
+
+The task list with **Show: Recurring** (beside Tasks, in the toolbar) and Group: Folder. Each row has
+the name, assignee, when it runs (its trigger kinds and schedule), the next run, the last run (the task
+it made and its status), and an on switch. A row expands to its recent runs, and each folder has an
+actions menu. Opening a row docks the recurring task's panel, with Details, Runs and History.
+
+Tweaks: `panel` (none, details, runs, history), `runOpen`.
+
+Covers `routines/management`.
+
+<a id="board-r2"></a>
+### R2 · Recurring task: triggers, inputs and run policy
+
+[RecurringDetails.dc.html](boards/RecurringDetails.dc.html) · State of R1 (`panel` = details)
+
+The panel's Details:
+
+- Active switch, next run, Run now.
+- Properties (assignee, project, priority, goal, parent task, folder), and the description with its
+  placeholders as chips.
+- **Triggers:** schedule, webhook (Copy URL, Rotate secret) and API, each with a switch and when it
+  last fired; Add trigger.
+- **Inputs:** name, type, default and whether it's required, plus the built-in `date`.
+- **Secrets.**
+- **Run policy:** if the last one is still open, missed runs, and "Only when something changed" (in
+  this project or anywhere).
+
+Covers `routines/definition`, `routines/variables + /secrets`, `routines/triggers`,
+`routines/delivery`.
+
+<a id="board-r3"></a>
+### R3 · Recurring task: runs, with Run now
+
+[RecurringRuns.dc.html](boards/RecurringRuns.dc.html) · State of R1 (`panel` = runs, `runOpen` on)
+
+Each run's time, source (schedule, webhook, API, Run now) and outcome: the task it made and that
+task's status, or skipped, added to the open one, or failed with the reason. A filter (all, created a
+task, no task). The Run now popover takes the inputs and who to assign.
+
+Covers `routines/run-now + /history`.
+
+<a id="board-r4"></a>
+### R4 · Recurring task: history of changes
+
+[RecurringHistory.dc.html](boards/RecurringHistory.dc.html) · State of R1 (`panel` = history)
+
+Revisions with who, when and what changed, and Restore on older ones.
+
+Covers `routines/run-now + /history` (revisions).
+
+## Lists (on hold)
+
+On hold: lists need their own storage, since goals don't fit
+([decision 14](../decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)). The boards are
+kept for when lists come back ([3.3](../build-plan.md#33-lists-and-sprints-on-hold)). No capability of
+the old UI depends on them.
+
+<a id="board-l1"></a>
+### L1 · Lists: the task list grouped by list
+
+[Lists.dc.html](boards/Lists.dc.html) · On hold
+
+The task list with Group: List. Each list's card shows its status, progress by status ("n of m
+done"), owner, details and add task; tasks in no list come last.
+
+Tweaks: `panel` (none, list), `newList`.
+
+<a id="board-l2"></a>
+### L2 · A list open in the docked panel
+
+[ListDetails.dc.html](boards/ListDetails.dc.html) · On hold · State of L1 (`panel` = list)
+
+The list's status, owner, the company goal it serves, created date, description, progress, and who's
+on it. Show only this list.
+
+<a id="board-l3"></a>
+### L3 · New list
+
+[NewList.dc.html](boards/NewList.dc.html) · On hold · State of L1 (`newList` on)
+
+Name, description, status, owner, the goal it serves, and tasks to move into it.
+
+<a id="board-l4"></a>
+### L4 · Project dashboard with its lists
+
+[ProjectDashboardLists.dc.html](boards/ProjectDashboardLists.dc.html) · On hold
+
+Board 8 with a Lists section: each list's progress, status, owner and what's moving now, New list,
+and achieved lists folded away.
+
+Tweak: `requests`, as on board 8.
+
+## Search
+
+<a id="board-s1"></a>
+### S1 · Search: everything, grouped by kind
+
+[Search.dc.html](boards/Search.dc.html) · Approved
+
+A search page:
+
+- The query, scope tabs with counts (All, Tasks, Comments, Docs, Files, Agents, Projects), filter
+  chips, a Filter menu (status, priority, assignee, project, label, updated; they can also be typed,
+  like `status:blocked` or `updated:7d`) and sort.
+- In All, a section per kind with its top results and "All n": tasks (status and the matched
+  snippet), agent chats (shown as chats, not tasks), comments (author and snippet), docs (revision and
+  snippet), files, agents and projects. Matches are highlighted.
+- A "Narrow tasks" column with counts per status, assignee and updated.
+
+Tweaks: `scope`, `filterMenu`, `noResults`.
+
+Covers `inbox-search/search` (`GET /api/companies/:companyId/search`; the facet counts are its
+`filterOptionCounts`).
+
+<a id="board-s2"></a>
+### S2 · Search: tasks, with filters and the Filter menu
+
+[SearchTasks.dc.html](boards/SearchTasks.dc.html) · State of S1 (`scope` = tasks, `filterMenu` on)
+
+<a id="board-s3"></a>
+### S3 · Search: no results, with ways to loosen the filters
+
+[SearchEmpty.dc.html](boards/SearchEmpty.dc.html) · State of S1 (`noResults` on)
+
+"No tasks match these filters", with ways out: remove one filter (with the count it would give), or
+clear every filter. These come from the response's `zeroResults`.
