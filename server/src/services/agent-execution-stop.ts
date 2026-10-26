@@ -4,8 +4,7 @@ import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { environmentLeases, heartbeatRuns, nativeRunFinalizations, type Db } from "@paperclipai/db";
 import { hasNativeLocalProcessStop } from "./native-local-process-stop.js";
 import { hasRemoteTerminationReceipt } from "./remote-execution-termination.js";
-import { isCancelledNativeStartup } from "./cancelled-native-startup.js";
-import { legacyControllerBootId } from "./legacy-controller-lease.js";
+import { isCancelledNativeStartup, isRestartStoppedLegacyPreparation } from "./cancelled-native-startup.js";
 
 /** Cancellation changes admission. Process and lease evidence controls cleanup. */
 export async function agentExecutionsHaveStopped(db: Db, agentIds: string[]) {
@@ -58,8 +57,7 @@ export async function agentExecutionsHaveStopped(db: Db, agentIds: string[]) {
     if (run.runtimeMode === "legacy" && !run.processPid && !run.processGroupId &&
         (run.resultJson?.executionCancellation as Record<string, unknown> | undefined)?.state !== "acknowledged" &&
         !(run.executionStage === "settled" && !await runUsedConversationAdapter(db, run)) &&
-        !(run.executionStage === "preparing" && run.controllerBootId && run.controllerBootId !== legacyControllerBootId &&
-          run.controllerLeaseExpiresAt && run.controllerLeaseExpiresAt <= new Date()) &&
+        !await isRestartStoppedLegacyPreparation(db, run, coordinators.find(row => row.runId === run.id)) &&
         !await isCancelledNativeStartup(db, run, coordinators.find(row => row.runId === run.id))) return false;
   }
   // Release an expired owner only after its cancelled execution has stop proof.

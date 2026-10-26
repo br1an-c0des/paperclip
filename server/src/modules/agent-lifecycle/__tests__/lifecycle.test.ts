@@ -17,7 +17,7 @@ import { errorHandler } from "../../../middleware/error-handler.js";
 import { createLifecycleDriver } from "../../../services/agent-lifecycle-driver.js";
 import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
-import { agents, approvals, projects, issues, heartbeatRuns, nativeRunFinalizations, budgetPolicies, environmentLeases, agentApiKeys, activityLog, agentConfigRevisions, userCompanyPreferences, companies, companyMemberships, principalPermissionGrants, plugins, pluginCompanySettings, createDb, type Db } from "@paperclipai/db";
+import { agents, approvals, projects, issues, heartbeatRuns, heartbeatRunEvents, nativeRunFinalizations, budgetPolicies, environmentLeases, agentApiKeys, activityLog, agentConfigRevisions, userCompanyPreferences, companies, companyMemberships, principalPermissionGrants, plugins, pluginCompanySettings, createDb, type Db } from "@paperclipai/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "../../../__tests__/helpers/embedded-postgres.js";
 import { createAgentLifecycle, configureAgentLifecycle, startAgentLifecycle } from "../../../services/agent-lifecycle.js";
@@ -370,6 +370,9 @@ const support = await getEmbeddedPostgresTestSupport();
     await db.update(heartbeatRuns).set({ executionStage: "preparing", controllerLeaseExpiresAt: new Date(Date.now() + 60_000) }).where(eq(heartbeatRuns.id, run.id));
     expect(await agentExecutionsHaveStopped(db, [agent.id])).toBe(false);
     await db.update(heartbeatRuns).set({ controllerLeaseExpiresAt: new Date(0) }).where(eq(heartbeatRuns.id, run.id));
+    await db.insert(heartbeatRunEvents).values({ companyId, runId: run.id, agentId: agent.id, seq: 1, eventType: "adapter.invoke" });
+    expect(await agentExecutionsHaveStopped(db, [agent.id])).toBe(false);
+    await db.delete(heartbeatRunEvents).where(eq(heartbeatRunEvents.runId, run.id));
     expect(await agentExecutionsHaveStopped(db, [agent.id])).toBe(true);
   });
 
