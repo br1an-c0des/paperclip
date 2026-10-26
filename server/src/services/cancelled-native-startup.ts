@@ -64,6 +64,8 @@ export async function isCancelledNativeStartup(db: Db, run: Run, coordinator: Co
     lease.provider === "local"
       ? !lease.releasedAt || lease.status === "pending_cleanup" || lease.cleanupStatus === "failed"
       : !hasRemoteTerminationReceipt(lease))) return false;
+  // Reject contradictory retained evidence, including a crash after a launch
+  // request but before the PID callback. Provider events never certify a stop.
   return !await hasRunExecutionEvidence(db, run);
 }
 
@@ -76,8 +78,6 @@ export async function isRestartStoppedLegacyPreparation(db: Db, run: Run, coordi
   return !await hasRunExecutionEvidence(db, run);
 }
 
-// Reject contradictory retained evidence, including a crash after a launch
-// request but before the PID callback. Provider events never certify a stop.
 async function hasRunExecutionEvidence(db: Db, run: Pick<Run, "id" | "companyId">) {
   const [execution] = await db.select({ id: heartbeatRunEvents.id }).from(heartbeatRunEvents).where(and(
     eq(heartbeatRunEvents.companyId, run.companyId), eq(heartbeatRunEvents.runId, run.id),
