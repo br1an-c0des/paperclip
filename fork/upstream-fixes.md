@@ -35,9 +35,10 @@ until one becomes a concrete fix.
 
 | # | Fix | Status | Branch | Pull request | Found | Submitted | Merged |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | [Clear the compact issue-list cache when an issue changes](#1-clear-the-compact-issue-list-cache-when-an-issue-changes) | candidate | | | 2026-10-26 | | |
+| 1 | [Clear the compact issue-list cache when an issue changes](#1-clear-the-compact-issue-list-cache-when-an-issue-changes) | building | `fix/issue-list-cache-invalidation` | | 2026-10-26 | | |
 | 2 | [Don't crash on Windows when an agent directory path is longer than 260 characters](#2-dont-crash-on-windows-when-an-agent-directory-path-is-longer-than-260-characters) | submitted | `fix/agent-directory-probe-long-cwd` | [#17691](https://github.com/paperclipai/paperclip/pull/17691) | | 2026-10-26 | |
 | 3 | [Let a pause finish after a restart stopped a legacy run during preparation](#3-let-a-pause-finish-after-a-restart-stopped-a-legacy-run-during-preparation) | submitted | `fix/pause-after-restart-during-preparation` | [#17692](https://github.com/paperclipai/paperclip/pull/17692) | | 2026-10-26 | |
+| 4 | [Link the plugin SDK on Windows without symlink rights](#4-link-the-plugin-sdk-on-windows-without-symlink-rights) | candidate | | | 2026-10-24 | | |
 
 ## Details
 
@@ -74,3 +75,13 @@ until one becomes a concrete fix.
 - **Files:** `server/src/services/agent-execution-stop.ts`,
   `server/src/services/cancelled-native-startup.ts`, the lifecycle test, and
   `doc/execution-semantics.md`.
+
+### 4. Link the plugin SDK on Windows without symlink rights
+
+- **Problem:** the root `postinstall` (`scripts/link-plugin-dev-sdk.mjs`) symlinks the plugin SDK
+  into plugins outside the pnpm workspace. Windows refuses to create symlinks (`EPERM`) unless
+  Developer Mode is on or the shell runs as administrator, so `pnpm install` fails at the end.
+  Found in the [2026-10-24 sync](sync-reports/2026-10-24.md); build plan item 2a-7.
+- **Likely fix:** on Windows, create a directory junction (`fs.symlinkSync(target, path, "junction")`),
+  which needs no special rights, or fall back to one when the symlink fails with `EPERM`.
+- **Fork workaround to revisit once merged:** none in the code. This machine has Developer Mode on.
