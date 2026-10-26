@@ -13,6 +13,7 @@ import { columnTone, COLUMN_PAGE, moveCursor, neighbourColumn, type CursorMove }
 import { moveUpdate, type GroupValue, type TaskGroup, type TaskRow } from "./list-model";
 import { assigneeName, type TaskPeople } from "./people";
 import { AssigneeItems, LabelItems, PriorityItems } from "./pickers";
+import { RetryMark, type TaskRetry } from "./retry";
 import type { TaskUpdates } from "./task-updates";
 import { GroupMarkView, hasOpenLayer, latest, openMoreOptions, plainClick, QuickAdd } from "./TaskList";
 import { assigneeKey } from "./view-state";
@@ -39,6 +40,7 @@ export function BoardView(props: {
   columns: readonly TaskGroup[];
   people: TaskPeople;
   updates: TaskUpdates;
+  retry: TaskRetry;
   /** The open task, highlighted. */
   selectedId?: string | null;
   onOpen: (task: CompactIssue) => void;
@@ -332,6 +334,7 @@ export function BoardView(props: {
                             row={row()}
                             people={props.people}
                             updates={props.updates}
+                            retry={props.retry}
                             selected={props.selectedId === row().task.id}
                             checked={props.checked.has(row().task.id)}
                             draggable={canDrag()}
@@ -405,6 +408,7 @@ function Card(props: {
   row: TaskRow;
   people: TaskPeople;
   updates: TaskUpdates;
+  retry: TaskRetry;
   selected: boolean;
   checked: boolean;
   draggable: boolean;
@@ -486,6 +490,7 @@ function Card(props: {
           </TonePill>
         )}
       </Show>
+      <RetryMark task={task()} retry={props.retry} />
       <div class="bv-pills">
         <Menu>
           <Menu.Trigger class="bv-who" aria-label={`Assignee: ${who()}. Change assignee`} title={who()}>

@@ -14,6 +14,7 @@ import { pushToast } from "@/ui/Toast";
 import { groupDefaults, moveUpdate, updatedLabel, type GroupMark, type GroupValue, type TaskGroup, type TaskRow } from "./list-model";
 import { Assignee, assigneeName, type TaskPeople } from "./people";
 import { AssigneeItems, LabelDot, LabelItems, PriorityItems, StatusItems } from "./pickers";
+import { RetryMark, type TaskRetry } from "./retry";
 import type { TaskUpdates } from "./task-updates";
 import { assigneeKey } from "./view-state";
 import "./TaskList.css";
@@ -27,7 +28,8 @@ import "./TaskList.css";
  * A row's title links to the task's full page, so it can open in a new tab; a plain click calls
  * `onOpen` instead, which opens the panel. The status, assignee, priority and labels cells are menus
  * that change the task in place. Rows can be ticked (shift-click ticks a range, ⌘/Ctrl-click one
- * more), dragged into another group, and added to a group by typing a title at its foot.
+ * more), dragged into another group, and added to a group by typing a title at its foot. An
+ * interrupted task shows its state, with Retry when the server allows one (retry.tsx).
  *
  * Keys, after the old list: j/k or the arrows move between group headings and rows, Enter or o
  * opens a row, x ticks it, ←/→ fold and unfold a group, Esc clears the ticks.
@@ -71,6 +73,7 @@ export function TaskList(props: {
   groups: readonly TaskGroup[];
   people: TaskPeople;
   updates: TaskUpdates;
+  retry: TaskRetry;
   /** The open task, highlighted. */
   selectedId?: string | null;
   onOpen: (task: CompactIssue) => void;
@@ -315,6 +318,7 @@ export function TaskList(props: {
                               group={group()}
                               people={props.people}
                               updates={props.updates}
+                              retry={props.retry}
                               selected={props.selectedId === row().task.id}
                               checked={props.checked.has(row().task.id)}
                               draggable={canDrag()}
@@ -405,6 +409,7 @@ function Row(props: {
   group: TaskGroup;
   people: TaskPeople;
   updates: TaskUpdates;
+  retry: TaskRetry;
   selected: boolean;
   checked: boolean;
   draggable: boolean;
@@ -495,6 +500,7 @@ function Row(props: {
             </TonePill>
           )}
         </Show>
+        <RetryMark task={task()} retry={props.retry} />
       </div>
       <Menu>
         <Menu.Trigger class="tl-cell" aria-label={`Assignee: ${assigneeName(task(), props.people)}. Change assignee`}>

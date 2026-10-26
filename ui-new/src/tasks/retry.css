@@ -1,0 +1,37 @@
+/* An interruption on a list row or board card: its tone pill and, when allowed, Retry. */
+
+.retry-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.retry-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.retry-button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.retry-button:disabled {
+  color: var(--muted);
+  cursor: progress;
+}
+
+.retry-button:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 1px;
+}

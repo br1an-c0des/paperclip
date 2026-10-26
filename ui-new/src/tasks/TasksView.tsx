@@ -21,6 +21,7 @@ import { BoardView } from "./BoardView";
 import { buildTaskGroups, PRIORITY_ORDER, startsCollapsed, STATUS_PICK_ORDER, type GroupNames, type TaskGroup } from "./list-model";
 import { useTaskPeople } from "./people";
 import { AssigneeItems, LabelDot, LabelItems, PriorityItems, StatusItems } from "./pickers";
+import { useTaskRetry } from "./retry";
 import { useTaskUpdates } from "./task-updates";
 import { TaskList } from "./TaskList";
 import { TaskPanel } from "./TaskPanel";
@@ -73,6 +74,7 @@ export function TasksView(props: {
   const people = useTaskPeople();
   const labels = useLabelsQuery();
   const updates = useTaskUpdates();
+  const retry = useTaskRetry();
   const [params, setParams] = useSearchParams<{ task?: string; section?: string }>();
   const tasks = () => props.tasks.data ?? [];
 
@@ -267,6 +269,7 @@ export function TasksView(props: {
                     groups={groups()}
                     people={people}
                     updates={updates}
+                    retry={retry}
                     selectedId={openTask()?.id ?? null}
                     onOpen={open}
                     projectId={props.projectId}
@@ -281,6 +284,7 @@ export function TasksView(props: {
                   columns={columns()}
                   people={people}
                   updates={updates}
+                  retry={retry}
                   selectedId={openTask()?.id ?? null}
                   onOpen={open}
                   projectId={props.projectId}
