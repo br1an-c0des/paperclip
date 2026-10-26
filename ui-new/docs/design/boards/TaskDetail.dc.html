@@ -74,6 +74,23 @@ a:hover{color:var(--run-fg)}
 .ph:has(.ph-home:hover),.ph:has(.ph-home:focus-visible){border-color:var(--edge)}
 .ph:has(.ph-home:hover) .ph-go,.ph-home:focus-visible .ph-go{opacity:1;transform:none}
 .ph-home:focus-visible::after{box-shadow:inset 0 0 0 2px var(--run-fg)}
+/* Docked panels: the list beside a panel keeps its full row width. One sideways scroll moves every card, and the Name column can stay in view. */
+.dock-x{overflow-x:auto;container-type:inline-size;scrollbar-width:thin;scrollbar-color:var(--edge) transparent}
+.dock-card{display:grid;isolation:isolate}
+.dock-card>*{grid-area:1/1;min-width:0}
+.dock-frame{position:sticky;left:0;z-index:-1;width:100cqw;box-sizing:border-box}
+.dock-body{padding:1px}
+.dock-bar{position:sticky;left:1px;z-index:2;width:calc(100cqw - 2px);box-sizing:border-box}
+.row.sel-run{background:var(--run-bg);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--run-fg) 45%,transparent)}
+.row.sel-bar{background:var(--row-hover);box-shadow:inset 3px 0 0 var(--text)}
+.pinned .pin-col{position:sticky;left:1px;z-index:1;align-self:stretch;background:var(--card)}
+.pinned .row:hover>.pin-col{background:var(--row-hover)}
+.pinned .row.sel-run>.pin-col{background:var(--run-bg);box-shadow:inset 1px 0 0 color-mix(in srgb,var(--run-fg) 45%,transparent),inset 0 1px 0 color-mix(in srgb,var(--run-fg) 45%,transparent),inset 0 -1px 0 color-mix(in srgb,var(--run-fg) 45%,transparent)}
+.pinned .row.sel-bar>.pin-col{background:var(--row-hover);box-shadow:inset 3px 0 0 var(--text)}
+@supports (animation-timeline: scroll()){
+.pinned .pin-col::after{content:"";position:absolute;top:0;bottom:0;left:100%;width:14px;pointer-events:none;border-left:1px solid var(--line);background:linear-gradient(90deg,rgba(0,0,0,.16),transparent);opacity:0;animation:pin-shade linear both;animation-timeline:scroll(nearest inline)}
+}
+@keyframes pin-shade{0%{opacity:0}3%,100%{opacity:1}}
 </style>
 </helmet>
 <div class="{{rootClass}}" style="min-height: 1240px; display: flex; flex-wrap: wrap; background: var(--ground); color: var(--text); font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 14px; line-height: 1.4; position: relative">
@@ -125,9 +142,9 @@ a:hover{color:var(--run-fg)}
   </div>
 </nav>
 
-<div style="flex: 999 1 560px; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 0 20px 20px 0; box-sizing: border-box; align-items: start">
+<div style="flex: 999 1 560px; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 620px; gap: 16px; padding: 0 20px 20px 0; box-sizing: border-box; align-items: start">
   
-  <header class="card ph" style="flex: 1 1 100%; margin: 14px 0 0 20px; display: flex; align-items: center; gap: 14px 28px; flex-wrap: wrap; box-sizing: border-box; padding: 16px 22px 12px 26px">
+  <header class="card ph" style="grid-column: 1 / -1; margin: 14px 0 0 20px; display: flex; align-items: center; gap: 14px 28px; flex-wrap: wrap; box-sizing: border-box; padding: 16px 22px 12px 26px">
     <div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 7px">
       <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--muted)">
         <a href="#" style="color: inherit; text-decoration: none">Projects</a><span aria-hidden="true">/</span>
@@ -157,41 +174,66 @@ a:hover{color:var(--run-fg)}
     </nav>
     </div>
   </header>
-  <main style="grid-row: 2; grid-column: 1; min-width: 0; display: flex; flex-direction: column">
-    <div style="display: flex; align-items: center; gap: 8px; padding: 10px 20px">
-      <button class="ghost" style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--run-fg) 45%, transparent); color: var(--run-fg); font-size: 13px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"></path><path d="m3 13 9 5 9-5"></path></svg>Group: Status</button>
-      <button class="ghost" style="margin-left: auto; display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 999px; background: var(--run-bg); color: var(--run-fg); font-size: 13px">1 filter</button>
+  <div style="grid-row: 2; grid-column: 1 / -1; margin-left: 20px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+    <div style="margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+      <button class="ghost" style="height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--edge); background: var(--card); color: var(--text); font-size: 13px; font-weight: 700">Group: Status</button>
+      <button class="ghost" style="display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: 999px; background: var(--well); color: var(--text); font-size: 13px; font-weight: 700"><span style="width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, #ff2bd6, #f7b52f)"></span>1 filter</button>
+      <button class="icon" aria-label="Search tasks" style="width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--body)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+      <button style="display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 18px 0 14px; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-weight: 800"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Task</button>
     </div>
+  </div>
 
-    <div style="padding: 6px 0 40px 20px">
+  <main class="dock-x {{pinClass}}" style="grid-row: 3; grid-column: 1; min-width: 0; margin-left: 20px">
+    <div style="min-width: 1166px; display: flex; flex-direction: column; gap: 14px">
       <sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
-        <section class="card" aria-label="{{g.name}}" style="overflow: hidden; margin-bottom: 12px">
-          <div style="display: flex; align-items: center; gap: 10px; height: 50px; padding: 0 14px 0 10px">
-            <button class="icon" aria-label="Collapse or expand {{g.name}}" onClick="{{g.toggle}}" style="width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)">
-              <sc-if value="{{g.open}}" hint-placeholder-val="{{true}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 9h12l-6 7z"></path></svg></sc-if>
-              <sc-if value="{{g.closed}}" hint-placeholder-val="{{false}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 6v12l7-6z"></path></svg></sc-if>
-            </button>
-            <span style="position: relative; overflow: hidden; width: 8px; height: 20px; flex-shrink: 0; border-radius: 999px; background: {{g.glyph}}"><svg class="grain"><rect width="100%" height="100%" filter="url(#grain)"></rect></svg></span><h2 class="disp" style="margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -.01em">{{g.name}}</h2>
-            <span style="color: var(--muted); font-size: 13px">{{g.count}}</span>
-          </div>
-          <sc-if value="{{g.open}}" hint-placeholder-val="{{true}}">
-            <div style="height: 28px; display: flex; align-items: center; padding-left: 36px; color: var(--muted); font-size: 12px; font-weight: 600; border-top: 1px solid var(--line)">Name</div>
-            <sc-for list="{{g.tasks}}" as="t" hint-placeholder-count="3">
-              <div class="row" style="display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 0 12px 0 22px; border-top: 1px solid var(--row-line); background: {{t.rowBg}}; box-shadow: {{t.rowRing}}">
-                <span aria-hidden="true" style="width: 6px; height: 16px; flex-shrink: 0; margin: 0 4px; border-radius: 999px; background: {{g.glyph}}"></span>
-                <span style="font-family: 'Fragment Mono', ui-monospace, monospace; font-size: 12px; color: var(--muted); flex-shrink: 0">{{t.id}}</span>
-                <a href="TaskDetail.dc.html" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{t.title}}</a>
-                <sc-if value="{{t.hasSubtasks}}" hint-placeholder-val="{{false}}"><span style="display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; flex-shrink: 0"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 4v12a3 3 0 0 0 3 3h7"></path><path d="M6 10h10"></path></svg>{{t.subtasks}}</span></sc-if>
-                <sc-if value="{{t.live}}" hint-placeholder-val="{{false}}"><span aria-label="Running" style="background: linear-gradient(180deg, #8b2cf0, #1f6fe0); width: 5px; height: 12px; border-radius: 999px; flex-shrink: 0; animation: breathe 1.6s ease-in-out infinite"></span></sc-if>
+        <section class="dock-card" aria-label="{{g.name}}">
+          <div class="card dock-frame" aria-hidden="true"></div>
+          <div class="dock-body">
+            <div class="dock-bar" style="display: flex; align-items: center; gap: 10px; height: 54px; padding: 0 14px 0 20px">
+              <span style="position: relative; overflow: hidden; width: 8px; height: 20px; border-radius: 999px; background: {{g.glyph}}"><svg class="grain"><rect width="100%" height="100%" filter="url(#grain)"></rect></svg></span>
+              <h2 class="disp" style="margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.01em">{{g.name}}</h2>
+              <span style="font-size: 14px; font-weight: 600; color: var(--muted)">{{g.count}}</span>
+              <button class="icon" aria-label="Add task to {{g.name}}" style="margin-left: auto; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+              <button class="icon" aria-label="Collapse or expand {{g.name}}" onClick="{{g.toggle}}" style="width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="transform: rotate({{g.rot}})"><path d="m6 9 6 6 6-6"></path></svg></button>
+            </div>
+            <sc-if value="{{g.open}}" hint-placeholder-val="{{true}}">
+              <div style="display: grid; grid-template-columns: minmax(0, 1fr) 190px 110px 200px 90px; align-items: center; height: 30px; padding: 0 18px 0 0; color: var(--muted); font-size: 12px; font-weight: 600; border-top: 1px solid var(--line)">
+                <span class="pin-col" style="display: flex; align-items: center; gap: 4px; padding-left: 46px">Name<button class="icon" aria-pressed="{{pinName}}" aria-label="Pin the Name column" onClick="{{togglePin}}" style="width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; color: {{pinFg}}"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="{{pinFill}}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"></path></svg></button></span><span>Assignee</span><span>Priority</span><span>Labels</span><span>Updated</span>
               </div>
-            </sc-for>
-          </sc-if>
+              <sc-for list="{{g.tasks}}" as="t" hint-placeholder-count="3">
+                <div class="row {{t.selClass}}" style="display: grid; grid-template-columns: minmax(0, 1fr) 190px 110px 200px 90px; align-items: center; min-height: 40px; padding: 0 18px 0 0; border-top: 1px solid var(--row-line)">
+                  <div class="pin-col" style="display: flex; align-items: center; gap: 10px; min-width: 0; padding: 0 12px 0 18px">
+                    <span aria-hidden="true" style="width: 6px; height: 16px; flex-shrink: 0; margin: 0 8px 0 5px; border-radius: 999px; background: {{g.glyph}}"></span>
+                    <span class="mono" style="font-size: 12px; color: var(--muted); flex-shrink: 0">{{t.id}}</span>
+                    <a href="TaskDetail.dc.html" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600">{{t.title}}</a>
+                    <sc-if value="{{t.hasSubtasks}}" hint-placeholder-val="{{false}}"><span style="display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; font-weight: 600; flex-shrink: 0"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 4v12a3 3 0 0 0 3 3h7"></path><path d="M6 10h10"></path></svg>{{t.subtasks}}</span></sc-if>
+                    <sc-if value="{{t.live}}" hint-placeholder-val="{{false}}"><span style="display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; box-sizing: border-box; border-radius: 999px; background: var(--run-bg); border: 1px solid color-mix(in srgb, var(--run-fg) 50%, transparent); color: var(--run-fg); font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0"><span class="live" style="width: 5px; height: 12px; border-radius: 999px; flex-shrink: 0; background: linear-gradient(180deg, #8b2cf0, #1f6fe0)"></span>Running</span></sc-if>
+                    <sc-if value="{{t.hasNote}}" hint-placeholder-val="{{false}}"><span style="display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; box-sizing: border-box; border-radius: 999px; background: {{t.noteBg}}; border: 1px solid {{t.noteBorder}}; color: {{t.noteFg}}; font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0"><span style="width: 5px; height: 12px; border-radius: 999px; flex-shrink: 0; background: {{t.noteGlyph}}"></span>{{t.note}}</span></sc-if>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+                    <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: {{t.who.bg}}; border: {{t.who.border}}; box-sizing: border-box; color: {{t.who.ink}}; font-size: 9px; font-weight: 800; display: grid; place-items: center">{{t.who.initials}}</span>
+                    <span style="color: {{t.who.fg}}; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{t.who.name}}</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--body)">
+                    <span aria-hidden="true" style="display: inline-flex; align-items: flex-end; gap: 2px; height: 14px"><span style="width: 4px; height: 7px; border-radius: 999px; background: {{t.pri.b1}}"></span><span style="width: 4px; height: 10px; border-radius: 999px; background: {{t.pri.b2}}"></span><span style="width: 4px; height: 14px; border-radius: 999px; background: {{t.pri.b3}}"></span></span>{{t.pri.label}}
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap">
+                    <sc-for list="{{t.labels}}" as="l" hint-placeholder-count="1">
+                      <span style="height: 24px; padding: 0 9px 0 7px; border-radius: 999px; border: 1px solid var(--edge); display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--body)"><span style="width: 7px; height: 7px; border-radius: 50%; background: {{l.dot}}"></span>{{l.name}}</span>
+                    </sc-for>
+                  </div>
+                  <span style="color: var(--muted); font-size: 13px; font-weight: 500">{{t.updated}}</span>
+                </div>
+              </sc-for>
+              <button class="ghost dock-bar" style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 0 0 46px; color: var(--muted); font-weight: 600; text-align: left; border-top: 1px solid var(--row-line)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Add task</button>
+            </sc-if>
+          </div>
         </section>
       </sc-for>
     </div>
   </main>
 
-  <aside aria-label="Task TRA-41" style="grid-row: 2; grid-column: 1; justify-self: end; position: relative; z-index: 4; width: min(620px, 100%); min-width: 0; box-sizing: border-box; margin-top: 0; border: 1px solid var(--card-edge); border-radius: 22px; background: var(--card); box-shadow: 0 34px 80px -24px rgba(0,0,0,.6), 0 0 0 1px rgba(0,0,0,.04), var(--shadow-lg); overflow: hidden; display: flex; flex-direction: column">
+  <aside aria-label="Task TRA-41" style="grid-row: 3; grid-column: 2; position: relative; z-index: 4; min-width: 0; box-sizing: border-box; margin-top: 0; border: 1px solid var(--card-edge); border-radius: 18px; background: var(--card); box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column">
     <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--line)">
       <button class="icon" aria-label="Previous task" style="width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 15 6-6 6 6"></path></svg></button>
       <button class="icon" aria-label="Next task" style="width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; color: var(--muted)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></button>
@@ -329,36 +371,68 @@ class Component extends DCLogic {
     this.state = { collapsed: { backlog: true, done: true } };
   }
   baseVals() {
-    const task = (id, title, extra) => Object.assign({ id, title, subtasks: 0, hasSubtasks: false, live: false, rowBg: 'transparent', rowRing: 'none' }, extra || {});
-    const selected = { rowBg: 'var(--run-bg)', rowRing: 'inset 0 0 0 1px color-mix(in srgb, var(--run-fg) 45%, transparent)' };
+    const grad = (a, b, deg) => 'linear-gradient(' + (deg || 160) + 'deg, ' + a + ', ' + b + ')';
+    const agent = (initials, name, a, b) => ({ initials, name, bg: grad(a, b), border: '0', ink: '#111113', fg: 'var(--body)' });
+    const W = {
+      qr: agent('QR', 'Quant Researcher', '#2fd12f', '#22b5a5'),
+      se: agent('SE', 'Strategy Engineer', '#ff2bd6', '#f2286f'),
+      fe: agent('FE', 'Frontend Engineer', '#f7b52f', '#f5822a'),
+      ml: agent('ML', 'ML Engineer', '#f2272c', '#ff2bd6'),
+      me: { initials: 'BA', name: 'Brian A. (you)', bg: 'var(--primary)', border: '0', ink: 'var(--on-primary)', fg: 'var(--body)' },
+      none: { initials: '', name: 'Unassigned', bg: 'transparent', border: '1.5px dashed var(--dashed)', ink: 'var(--muted)', fg: 'var(--muted)' }
+    };
+    const on = 'var(--pri-on)', off = 'var(--pri-off)', red = '#f2272c';
+    const P = {
+      critical: { label: 'Critical', b1: red, b2: red, b3: red },
+      high: { label: 'High', b1: on, b2: on, b3: on },
+      medium: { label: 'Medium', b1: on, b2: on, b3: off },
+      low: { label: 'Low', b1: on, b2: off, b3: off }
+    };
+    const L = {
+      data: { name: 'data', dot: grad('#2fd12f', '#22b5a5', 135) },
+      strategies: { name: 'strategies', dot: grad('#ff2bd6', '#8b2cf0', 135) },
+      design: { name: 'design', dot: grad('#3b3df5', '#8b2cf0', 135) },
+      general: { name: 'general', dot: grad('#4c7896', '#22b5a5', 135) },
+      indicators: { name: 'indicators', dot: grad('#d9e02a', '#2fd12f', 135) },
+      bug: { name: 'bug', dot: grad('#f2286f', '#f2272c', 135) }
+    };
+    const task = (id, title, who, pri, labels, updated, extra) => Object.assign({
+      id, title, who: W[who], pri: P[pri], labels: labels.map((k) => L[k]), updated, selClass: '',
+      subtasks: 0, hasSubtasks: false, live: false, hasNote: false, note: '', noteBg: '', noteBorder: '', noteFg: '', noteGlyph: ''
+    }, extra || {});
+    const kindNote = (k, note) => ({ hasNote: true, note, noteBg: 'var(--' + k + '-bg)', noteBorder: 'color-mix(in srgb, var(--' + k + '-fg) 50%, transparent)', noteFg: 'var(--' + k + '-fg)', noteGlyph: { cyan: 'linear-gradient(180deg, #22b5a5, #4c7896)', green: 'linear-gradient(180deg, #2fd12f, #22b5a5)', red: 'linear-gradient(180deg, #f2286f, #f2272c)' }[k] });
+    const questionNote = (note) => kindNote('cyan', note);
+    const signoffNote = (note) => kindNote('green', note);
+    const redNote = (note) => kindNote('red', note);
+    const selected = { selClass: 'sel-run' };
     const defs = [
       { key: 'in_progress', name: 'In progress', label: 'IN PROGRESS', bg: 'var(--run-bg)', fg: 'var(--run-fg)', color: '#5b45ea', glyph: 'linear-gradient(180deg, #8b2cf0, #1f6fe0)', dash: 'none', inner: 3, tasks: [
-        task('TRA-41', 'H4 download derivatives price data', Object.assign({ live: true, subtasks: 2, hasSubtasks: true }, selected)),
-        task('TRA-38', 'Port all open-source strategies to Python', { live: true }),
-        task('TRA-35', 'Known bugs and limitations')
+        task('TRA-41', 'H4 download derivatives price data', 'qr', 'high', ['data'], '2m ago', Object.assign({ live: true, subtasks: 2, hasSubtasks: true }, questionNote('Asks you a question'), selected)),
+        task('TRA-38', 'Port all open-source strategies to Python', 'se', 'medium', ['strategies'], '14m ago', { live: true }),
+        task('TRA-35', 'Known bugs and limitations', 'me', 'low', ['bug'], '1h ago')
       ] },
       { key: 'in_review', name: 'In review', label: 'IN REVIEW', bg: 'var(--violet-bg)', fg: 'var(--violet-fg)', color: '#c22be3', glyph: 'linear-gradient(180deg, #ff2bd6, #8b2cf0)', dash: 'none', inner: 3, tasks: [
-        task('TRA-44', 'Liquidation sweep strategy'),
-        task('TRA-29', 'Refine and polish all custom charts')
+        task('TRA-44', 'Liquidation sweep strategy', 'se', 'high', ['strategies'], '32m ago', signoffNote('Needs your sign-off')),
+        task('TRA-29', 'Refine and polish all custom charts', 'fe', 'medium', ['design'], '3h ago')
       ] },
       { key: 'todo', name: 'Todo', label: 'TODO', bg: 'var(--amber-bg)', fg: 'var(--amber-fg)', color: '#f69a2d', glyph: 'linear-gradient(180deg, #f7b52f, #f5822a)', dash: 'none', inner: 0, tasks: [
-        task('TRA-47', 'Center of gravity strategy'),
-        task('TRA-48', 'Boom Hunter XL v4: FPB entry strategy'),
-        task('TRA-49', 'Boom Hunter XL v4: add 15m execution layer on 4H', { subtasks: 3, hasSubtasks: true }),
-        task('TRA-50', 'Create cost profile editor')
+        task('TRA-47', 'Center of gravity strategy', 'se', 'medium', ['strategies'], 'Yesterday'),
+        task('TRA-48', 'Boom Hunter XL v4: FPB entry strategy', 'se', 'medium', ['strategies', 'indicators'], 'Yesterday'),
+        task('TRA-49', 'Boom Hunter XL v4: add 15m execution layer on 4H', 'se', 'low', ['strategies'], 'Oct 11', { subtasks: 3, hasSubtasks: true }),
+        task('TRA-50', 'Create cost profile editor', 'none', 'medium', ['design'], 'Oct 10')
       ] },
       { key: 'blocked', name: 'Blocked', label: 'BLOCKED', bg: 'var(--red-bg)', fg: 'var(--red-fg)', color: '#f2283f', glyph: 'linear-gradient(180deg, #f2286f, #f2272c)', dash: 'none', inner: 0, tasks: [
-        task('TRA-45', 'Start ML testing on VPA')
+        task('TRA-45', 'Start ML testing on VPA', 'ml', 'high', ['data'], '5h ago', redNote('Blocked by TRA-41'))
       ] },
       { key: 'backlog', name: 'Backlog', label: 'BACKLOG', bg: 'var(--pri-off)', fg: 'var(--text)', color: 'var(--muted)', glyph: 'linear-gradient(180deg, var(--ash-a), var(--ash-b))', dash: '2 2.4', inner: 0, tasks: [
-        task('TRA-52', 'Explore skilled quant agents to analyze my workflow'),
-        task('TRA-53', 'Hire an assistant agent to run the trading workbench'),
-        task('TRA-54', 'BB squeeze + VPA strategy refinement')
+        task('TRA-52', 'Explore skilled quant agents to analyze my workflow', 'none', 'low', ['general'], 'Oct 9'),
+        task('TRA-53', 'Hire an assistant agent to run the trading workbench', 'me', 'medium', ['general'], 'Oct 9'),
+        task('TRA-54', 'BB squeeze + VPA strategy refinement', 'none', 'low', ['strategies', 'indicators'], 'Oct 8')
       ] },
       { key: 'done', name: 'Done', label: 'DONE', bg: 'var(--green-bg)', fg: 'var(--green-fg)', color: '#29c35f', glyph: 'linear-gradient(180deg, #2fd12f, #22b5a5)', dash: 'none', inner: 6, tasks: [
-        task('TRA-31', 'Store exchange API keys as company secrets'),
-        task('TRA-27', 'Daily OHLCV ingest routine'),
-        task('TRA-22', 'Chart theme tokens')
+        task('TRA-31', 'Store exchange API keys as company secrets', 'me', 'high', ['general'], 'Oct 7'),
+        task('TRA-27', 'Daily OHLCV ingest routine', 'qr', 'medium', ['data'], 'Oct 6'),
+        task('TRA-22', 'Chart theme tokens', 'fe', 'low', ['design'], 'Oct 3')
       ] }
     ];
     const collapsed = this.state.collapsed;
@@ -366,6 +440,7 @@ class Component extends DCLogic {
       count: g.tasks.length,
       open: !collapsed[g.key],
       closed: !!collapsed[g.key],
+      rot: collapsed[g.key] ? '-90deg' : '0deg',
       toggle: () => this.setState({ collapsed: Object.assign({}, collapsed, { [g.key]: !collapsed[g.key] }) })
     }));
     const agents = [
@@ -375,7 +450,12 @@ class Component extends DCLogic {
       { initials: 'ML', name: 'ML Engineer', bg: 'linear-gradient(160deg, #f2272c, #ff2bd6)', dot: 'linear-gradient(180deg, #f2286f, #f2272c)', state: 'blocked', href: '#' },
       { initials: 'CE', name: 'CEO', bg: 'linear-gradient(160deg, #6a93ad, #a9c6d6)', dot: 'linear-gradient(180deg, #f7b52f, #f5822a)', state: 'paused', href: '#' }
     ];
-    return { groups, agents };
+    const pinName = this.state.pinName ?? true;
+    return {
+      groups, agents, pinName, pinClass: pinName ? 'pinned' : '',
+      pinFg: pinName ? 'var(--text)' : 'var(--muted)', pinFill: pinName ? 'currentColor' : 'none',
+      togglePin: () => this.setState({ pinName: !pinName })
+    };
   }
 }
 </script>

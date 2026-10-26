@@ -28,9 +28,10 @@ Covers `tasks/views`, `tasks/organize`, `projects/task-context`, `shell/navigati
 
 [TaskDetail.dc.html](boards/TaskDetail.dc.html) · Approved
 
-A task opened in a panel beside the list. The panel has three sections (Details, Activity, Docs and
-files); this board shows Details: description, properties, subtasks and dependencies, and the task's
-workspace.
+A task opened in a panel docked beside the list. The panel takes its own column; the list keeps its
+full rows and scrolls sideways, with the Name column pinned. The panel has three sections (Details,
+Activity, Docs and files); this board shows Details: description, properties, subtasks and
+dependencies, and the task's workspace.
 
 Covers `tasks/properties`, `task-coordination/delegation + /dependencies`, `goals/alignment`,
 `tasks/workspace`.
