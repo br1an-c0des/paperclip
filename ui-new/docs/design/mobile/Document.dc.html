@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Document: plan (phone)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Fragment+Mono&amp;display=swap">
+<style>
+body{margin:0;background:#0a0a0a}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;margin:0;padding:0}
+.light{--ground:#f2f2f4;--card:#ffffff;--card-edge:transparent;--shadow:0 1px 2px rgba(17,17,19,.06),0 10px 28px -14px rgba(17,17,19,.2);--shadow-lg:0 2px 6px rgba(17,17,19,.08),0 30px 70px -24px rgba(17,17,19,.38);--well:#e7e7ea;--sel:#ffffff;--sel-shadow:0 1px 3px rgba(17,17,19,.12);--line:#ececf0;--row-line:#f0f0f3;--hover:#e7e7ea;--row-hover:#f8f8fa;--code:#f6f6f8;--text:#111113;--body:#45454d;--muted:#6b6b75;--edge:#cfcfd6;--dashed:#b4b4bd;--primary:#111113;--on-primary:#ffffff;--run-bg:#ecebff;--run-fg:#3b2fc0;--violet-bg:#f6e6ff;--violet-fg:#7a1fb8;--amber-bg:#fff1dc;--amber-fg:#94480a;--red-bg:#fde7ea;--red-fg:#b0102a;--green-bg:#e2f6e5;--green-fg:#17672f;--cyan-bg:#dcf4f1;--cyan-fg:#0e6a61;--pri-on:#111113;--pri-off:#dcdce2;--ash-a:#c9c9cf;--ash-b:#9a9aa3;--scrim:rgba(17,17,19,.34);--grain-blend:soft-light;--grain-op:.9}
+.dark{--ground:#0a0a0a;--card:#141414;--card-edge:#1f1f1f;--shadow:inset 0 1px 0 rgba(255,255,255,.04),0 16px 34px -18px rgba(0,0,0,.95);--shadow-lg:inset 0 1px 0 rgba(255,255,255,.06),0 34px 80px -20px rgba(0,0,0,.95);--well:#161616;--sel:#262626;--sel-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 3px rgba(0,0,0,.7);--line:#1f1f1f;--row-line:#1a1a1a;--hover:#1a1a1a;--row-hover:#181818;--code:#0f0f0f;--text:#f4f1ea;--body:#c9c6bf;--muted:#8f8c86;--edge:#2c2c2c;--dashed:#4a4843;--primary:#f4f1ea;--on-primary:#0a0a0a;--run-bg:#17142b;--run-fg:#c9c2ff;--violet-bg:rgba(139,44,240,.15);--violet-fg:#dcb8ff;--amber-bg:rgba(247,181,47,.1);--amber-fg:#ffc98a;--red-bg:rgba(242,40,111,.12);--red-fg:#ff9aa8;--green-bg:rgba(47,209,47,.1);--green-fg:#9be59b;--cyan-bg:rgba(34,181,165,.12);--cyan-fg:#8fe3d8;--pri-on:#f4f1ea;--pri-off:#2c2c2c;--ash-a:#3a3a3a;--ash-b:#6b6b6b;--scrim:rgba(0,0,0,.62);--grain-blend:overlay;--grain-op:.75}
+.light,.dark{--g-ion:linear-gradient(180deg,#8b2cf0,#1f6fe0);--g-lagoon:linear-gradient(180deg,#2fd12f,#22b5a5)}
+.f-hanken{--display:'Hanken Grotesk',system-ui,sans-serif;--dtrack:-.045em}
+.f-bricolage{--display:'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif;--dtrack:-.035em}
+.disp{font-family:var(--display);letter-spacing:var(--dtrack)}
+.mono{font-family:'Fragment Mono',ui-monospace,monospace}
+@keyframes breathe{0%,100%{opacity:1;transform:scaleY(1)}50%{opacity:.55;transform:scaleY(.65)}}
+.live{animation:breathe 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.live{animation:none}}
+a{color:var(--run-fg)}
+:focus-visible{outline:2px solid var(--run-fg);outline-offset:2px}
+.phone{position:relative;width:390px;height:844px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;background:var(--ground);color:var(--text);font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:14px;line-height:1.4}
+.scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.ib{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--body);text-decoration:none;flex-shrink:0;box-sizing:border-box}
+.ib:hover,.ghost:hover{background:var(--hover)}
+.disc{display:grid;place-items:center;border-radius:50%;color:#111113;font-weight:800;flex-shrink:0;letter-spacing:0;box-sizing:border-box}
+.topbar{display:flex;align-items:center;gap:2px;height:56px;padding:0 6px;flex-shrink:0;border-bottom:1px solid var(--line)}
+.st{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0}
+.doc{padding:20px 22px 0;color:var(--body);font-size:15px;line-height:1.62}
+.doc h1{margin:0 0 6px;font-family:var(--display);letter-spacing:-.02em;font-size:28px;font-weight:800;line-height:1.1;color:var(--text)}
+.doc h2{margin:26px 0 8px;font-family:var(--display);letter-spacing:-.01em;font-size:18px;font-weight:800;line-height:1.25;color:var(--text)}
+.doc p{margin:0 0 10px}
+.doc ul,.doc ol{margin:0 0 10px;padding-left:22px}
+.doc li{margin:0 0 6px;padding-left:2px}
+.doc li::marker{color:var(--muted)}
+.doc code{font-family:'Fragment Mono',ui-monospace,monospace;font-size:13px;padding:1px 5px;border-radius:6px;background:var(--code);border:1px solid var(--line);color:var(--text)}
+.doc pre{margin:4px 0 12px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--code);overflow-x:auto;font-family:'Fragment Mono',ui-monospace,monospace;font-size:12px;line-height:1.6;color:var(--body)}
+.doc .done{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dashed)}
+.hl{background:var(--amber-bg);box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--amber-fg) 60%,transparent);color:var(--text);border-radius:3px;padding:0 2px}
+.cmark{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;margin-left:4px;vertical-align:1px;border-radius:999px;background:var(--amber-bg);border:1px solid color-mix(in srgb,var(--amber-fg) 50%,transparent);color:var(--amber-fg);font-size:12px;font-weight:700;line-height:1}
+.bottom{position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;align-items:center;gap:8px;padding:28px 12px 14px;background:linear-gradient(180deg,transparent,var(--ground) 45%)}
+.fieldlink{flex:1;min-width:0;display:flex;align-items:center;gap:10px;height:50px;padding:0 16px;box-sizing:border-box;border-radius:999px;background:var(--card);border:1px solid var(--edge);box-shadow:var(--shadow-lg);color:var(--muted);text-decoration:none}
+.rev{display:inline-flex;align-items:center;gap:6px;height:50px;padding:0 16px;box-sizing:border-box;border-radius:999px;background:var(--card);border:1px solid var(--edge);box-shadow:var(--shadow-lg);color:var(--body);font-size:13px;font-weight:700;white-space:nowrap}
+</style>
+</helmet>
+<div class="phone {{rootClass}}">
+<div class="topbar">
+  <a class="ib" href="TaskFiles.dc.html" aria-label="Back to TRA-41 docs and files"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg></a>
+  <span style="min-width: 0; display: flex; flex-direction: column; line-height: 1.25; padding-left: 2px">
+    <span style="font-weight: 800">Plan</span>
+    <span style="font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap"><span class="mono">TRA-41</span> · H4 download derivatives price data</span>
+  </span>
+  <div style="margin-left: auto; display: flex">
+    <button class="ib" aria-label="Share or copy link"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"></path></svg></button>
+    <button class="ib" aria-label="More document actions" aria-haspopup="menu"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="19" cy="12" r="1.7"></circle></svg></button>
+  </div>
+</div>
+
+<div class="scroll" style="padding-bottom: 110px">
+  <article class="doc">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 13px; color: var(--muted)">
+      <span class="st" style="background: var(--well); color: var(--body)">Task plan</span>
+      <span class="disc" aria-hidden="true" style="width: 20px; height: 20px; font-size: 8px; background: linear-gradient(160deg, #2fd12f, #22b5a5)">QR</span>
+      <span>Quant Researcher · rev 2 · 1h ago</span>
+    </div>
+    <h1>Plan</h1>
+
+    <h2>Goal</h2>
+    <p>Backfill 4-hour derivatives data for BTC, ETH and SOL perpetuals from 2022-01-01, then keep it current with a daily ingest.</p>
+
+    <h2>Sources</h2>
+    <ul>
+      <li>Funding rates and open interest: Binance and Bybit public endpoints.</li>
+      <li>Liquidations: Hyperliquid's public archive, which <span class="hl">only goes back to March 2024</span><button class="cmark" aria-label="2 comments on this passage"><svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path></svg>2</button>. Earlier years wait on the Coinalyze question.</li>
+      <li>OKX funding history, three months per request, paged back to 2022.</li>
+    </ul>
+
+    <h2>Storage</h2>
+    <p>Parquet under <code>data/derivatives/h4</code>, partitioned by symbol and month:</p>
+<pre>data/derivatives/h4/
+  symbol=BTC/
+    month=2024-03/part-0.parquet
+  symbol=ETH/ …</pre>
+
+    <h2>Steps</h2>
+    <ol>
+      <li class="done">Downloader for each source, with retries and rate limits</li>
+      <li class="done">BTC and ETH backfill</li>
+      <li><span style="display: inline-flex; align-items: center; gap: 6px">SOL backfill <span class="st" style="gap: 5px; background: var(--run-bg); color: var(--run-fg)"><span class="live" style="width: 4px; height: 10px; border-radius: 999px; background: var(--g-ion)"></span>RUNNING</span></span></li>
+      <li>Merge funding rates across exchanges</li>
+      <li>Daily ingest routine, reusing the one from <a href="#">TRA-27</a></li>
+    </ol>
+
+    <h2>Open questions</h2>
+    <ul>
+      <li>A Coinalyze API key for 2022–2024 liquidations, stored as a company secret. Asked on <a href="TaskActivity.dc.html">TRA-41</a>.</li>
+    </ul>
+  </article>
+</div>
+
+<div class="bottom">
+  <button class="rev" aria-haspopup="dialog" aria-label="Revisions, showing revision 2 of 2"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>rev 2</button>
+  <a class="fieldlink" href="TaskActivity.dc.html"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path></svg><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">Comment on this plan…</span></a>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"dark","options":["light","dark"]},"display":{"editor":"enum","default":"Hanken Grotesk","options":["Hanken Grotesk","Bricolage Grotesque"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = (this.props.theme ?? 'dark') === 'dark';
+    const font = (this.props.display ?? 'Hanken Grotesk') === 'Bricolage Grotesque' ? 'f-bricolage' : 'f-hanken';
+    return { rootClass: (dark ? 'dark' : 'light') + ' ' + font };
+  }
+}
+</script>
+</body>
+</html>

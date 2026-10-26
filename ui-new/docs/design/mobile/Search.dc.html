@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Search (phone)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Fragment+Mono&amp;display=swap">
+<style>
+body{margin:0;background:#0a0a0a}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;margin:0;padding:0}
+.light{--ground:#f2f2f4;--card:#ffffff;--card-edge:transparent;--shadow:0 1px 2px rgba(17,17,19,.06),0 10px 28px -14px rgba(17,17,19,.2);--shadow-lg:0 2px 6px rgba(17,17,19,.08),0 30px 70px -24px rgba(17,17,19,.38);--well:#e7e7ea;--sel:#ffffff;--sel-shadow:0 1px 3px rgba(17,17,19,.12);--line:#ececf0;--row-line:#f0f0f3;--hover:#e7e7ea;--row-hover:#f8f8fa;--code:#f6f6f8;--text:#111113;--body:#45454d;--muted:#6b6b75;--edge:#cfcfd6;--dashed:#b4b4bd;--primary:#111113;--on-primary:#ffffff;--run-bg:#ecebff;--run-fg:#3b2fc0;--violet-bg:#f6e6ff;--violet-fg:#7a1fb8;--amber-bg:#fff1dc;--amber-fg:#94480a;--red-bg:#fde7ea;--red-fg:#b0102a;--green-bg:#e2f6e5;--green-fg:#17672f;--cyan-bg:#dcf4f1;--cyan-fg:#0e6a61;--ash-a:#c9c9cf;--ash-b:#9a9aa3;--hit:rgba(247,181,47,.34)}
+.dark{--ground:#0a0a0a;--card:#141414;--card-edge:#1f1f1f;--shadow:inset 0 1px 0 rgba(255,255,255,.04),0 16px 34px -18px rgba(0,0,0,.95);--shadow-lg:inset 0 1px 0 rgba(255,255,255,.06),0 34px 80px -20px rgba(0,0,0,.95);--well:#161616;--sel:#262626;--sel-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 3px rgba(0,0,0,.7);--line:#1f1f1f;--row-line:#1a1a1a;--hover:#1a1a1a;--row-hover:#181818;--code:#0f0f0f;--text:#f4f1ea;--body:#c9c6bf;--muted:#8f8c86;--edge:#2c2c2c;--dashed:#4a4843;--primary:#f4f1ea;--on-primary:#0a0a0a;--run-bg:#17142b;--run-fg:#c9c2ff;--violet-bg:rgba(139,44,240,.15);--violet-fg:#dcb8ff;--amber-bg:rgba(247,181,47,.1);--amber-fg:#ffc98a;--red-bg:rgba(242,40,111,.12);--red-fg:#ff9aa8;--green-bg:rgba(47,209,47,.1);--green-fg:#9be59b;--cyan-bg:rgba(34,181,165,.12);--cyan-fg:#8fe3d8;--ash-a:#3a3a3a;--ash-b:#6b6b6b;--hit:rgba(247,181,47,.3)}
+.light,.dark{--g-ion:linear-gradient(180deg,#8b2cf0,#1f6fe0);--g-orchid:linear-gradient(180deg,#ff2bd6,#8b2cf0);--g-ember:linear-gradient(180deg,#f7b52f,#f5822a);--g-flare:linear-gradient(180deg,#f2286f,#f2272c);--g-lagoon:linear-gradient(180deg,#2fd12f,#22b5a5);--g-tide:linear-gradient(180deg,#22b5a5,#4c7896);--g-ash:linear-gradient(180deg,var(--ash-a),var(--ash-b))}
+.f-hanken{--display:'Hanken Grotesk',system-ui,sans-serif;--dtrack:-.045em}
+.f-bricolage{--display:'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif;--dtrack:-.035em}
+.disp{font-family:var(--display);letter-spacing:var(--dtrack)}
+.mono{font-family:'Fragment Mono',ui-monospace,monospace}
+.card{background:var(--card);border:1px solid var(--card-edge);border-radius:18px;box-shadow:var(--shadow)}
+@keyframes breathe{0%,100%{opacity:1;transform:scaleY(1)}50%{opacity:.55;transform:scaleY(.65)}}
+.live{animation:breathe 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.live{animation:none}}
+a{color:var(--text)}
+:focus-visible{outline:2px solid var(--run-fg);outline-offset:2px}
+.phone{position:relative;width:390px;height:844px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;background:var(--ground);color:var(--text);font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:14px;line-height:1.4}
+.scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+.scroll::-webkit-scrollbar,.hscroll::-webkit-scrollbar,.sheet .body::-webkit-scrollbar{display:none}
+.hscroll{overflow-x:auto;scrollbar-width:none}
+.ib{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--body);text-decoration:none;flex-shrink:0;box-sizing:border-box}
+.ib:hover{background:var(--hover)}
+.glyph{width:5px;height:12px;border-radius:999px;flex-shrink:0}
+.disc{display:grid;place-items:center;border-radius:50%;font-weight:800;flex-shrink:0;letter-spacing:0;box-sizing:border-box}
+.field{flex:1;min-width:0;height:48px;display:flex;align-items:center;gap:8px;padding:0 4px 0 16px;box-sizing:border-box;border-radius:999px;background:var(--card);border:1px solid var(--card-edge);box-shadow:var(--shadow);color:var(--muted)}
+.field:focus-within{box-shadow:var(--shadow),0 0 0 2px var(--run-fg)}
+.field input{flex:1;min-width:0;height:100%;border:0;background:transparent;color:var(--text);font:inherit;font-size:16px;font-weight:600;outline:none;padding:0}
+.field input::placeholder{color:var(--muted);font-weight:500}
+.field input::-webkit-search-cancel-button{display:none}
+.cancel{min-height:44px;padding:0 10px;display:flex;align-items:center;font-size:15px;font-weight:700;text-decoration:none;color:var(--text)}
+.kchip{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 13px;box-sizing:border-box;border-radius:999px;border:1px solid var(--edge);color:var(--body);font-size:13px;font-weight:600;white-space:nowrap;flex-shrink:0}
+.kchip[aria-pressed="true"]{background:var(--sel);border-color:transparent;box-shadow:var(--sel-shadow);color:var(--text);font-weight:800}
+.kchip .n{color:var(--muted);font-weight:600}
+.cbadge{min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:var(--run-fg);color:var(--on-primary);font-size:11px;font-weight:800;display:inline-grid;place-items:center}
+.fchip{display:inline-flex;align-items:center;gap:4px;height:36px;padding:0 4px 0 12px;box-sizing:border-box;border-radius:999px;background:var(--run-bg);border:1px solid color-mix(in srgb,var(--run-fg) 45%,transparent);color:var(--run-fg);font-size:13px;font-weight:700;white-space:nowrap;flex-shrink:0}
+.fchip .x{width:28px;height:28px;display:grid;place-items:center;border-radius:50%}
+.ghd{display:flex;align-items:center;gap:8px;min-height:48px;padding:4px 6px 0 16px;box-sizing:border-box}
+.ghd h2{margin:0;font-size:15px;font-weight:800}
+.ghd .cnt{font-size:13px;font-weight:600;color:var(--muted)}
+.more{margin-left:auto;min-height:44px;padding:0 10px;border-radius:999px;font-size:13px;font-weight:700;color:var(--run-fg)}
+.more:hover{background:var(--hover)}
+.row{display:flex;gap:12px;padding:12px 16px 13px 14px;border-top:1px solid var(--row-line);text-decoration:none;color:var(--text)}
+.row:hover{background:var(--row-hover)}
+.row .lead{width:36px;flex-shrink:0;display:flex;justify-content:center}
+.row .lead img{display:block;width:36px;height:36px}
+.row .tag{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-family:'Fragment Mono',ui-monospace,monospace;font-size:10px;font-weight:700}
+.row .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.row .top{display:flex;align-items:center;gap:7px;min-width:0;font-size:12px;color:var(--muted)}
+.row .top .sub{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .top .when{margin-left:auto;padding-left:8px;flex-shrink:0;white-space:nowrap}
+.row .ttl{font-size:15px;font-weight:700;line-height:1.3}
+.row .snip{font-size:13px;color:var(--body);-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.row .lab{font-weight:700;color:var(--muted);margin-right:6px}
+.hit{background:var(--hit);color:var(--text);border-radius:3px;box-shadow:0 0 0 1px var(--hit)}
+.bd{align-self:flex-start;align-items:center;gap:6px;height:22px;padding:0 9px;margin-top:3px;border-radius:999px;font-size:11px;font-weight:700;background:var(--amber-bg);border:1px solid color-mix(in srgb,var(--amber-fg) 50%,transparent);color:var(--amber-fg)}
+.none{align-items:center;gap:10px;padding:12px 8px 14px 16px;border-top:1px solid var(--row-line);font-size:13px;color:var(--muted)}
+.srow{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:0 14px 0 16px;box-sizing:border-box;border-top:1px solid var(--row-line);text-align:left;font-size:14px;font-weight:600;color:var(--text)}
+.srow:hover{background:var(--row-hover)}
+.scrim{position:absolute;inset:0;z-index:8;background:rgba(0,0,0,.5)}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:9;max-height:720px;flex-direction:column;background:var(--card);border-radius:28px 28px 0 0;border-top:1px solid var(--card-edge);box-shadow:var(--shadow-lg)}
+.sheet .body{overflow-y:auto;padding:0 18px 8px;scrollbar-width:none}
+.sheet h3{margin:16px 0 8px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.wrap{display:flex;flex-wrap:wrap;gap:6px}
+.seg{display:flex;gap:2px;padding:4px;border-radius:999px;background:var(--well)}
+.seg button{flex:1 1 0;height:36px;border-radius:999px;color:var(--body);font-size:13px;font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--sel);box-shadow:var(--sel-shadow);color:var(--text);font-weight:800}
+.tog{width:44px;height:26px;border-radius:999px;background:var(--well);border:1px solid var(--edge);position:relative;box-sizing:border-box;flex-shrink:0}
+.tog::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--muted)}
+.tog.on{background:var(--run-fg);border-color:var(--run-fg)}
+.tog.on::after{left:21px;background:var(--on-primary)}
+.primary{height:50px;border-radius:999px;background:var(--primary);color:var(--on-primary);font-size:15px;font-weight:800}
+</style>
+</helmet>
+<div class="phone {{rootClass}}">
+<div style="display: flex; align-items: center; gap: 4px; padding: 12px 6px 8px 12px">
+  <div class="field">
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+    <input type="search" aria-label="Search trading workbench" placeholder="Search tasks, chats, docs, files" value="{{q}}" onInput="{{onQuery}}">
+    <button class="ib" aria-label="Clear search" onClick="{{clear}}" style="width: 40px; height: 40px; display: {{clearDisplay}}"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm3.5 12.1-1.4 1.4L12 13.4l-2.1 2.1-1.4-1.4 2.1-2.1-2.1-2.1 1.4-1.4 2.1 2.1 2.1-2.1 1.4 1.4-2.1 2.1z"></path></svg></button>
+  </div>
+  <a class="cancel" href="Main.dc.html">Cancel</a>
+</div>
+
+<div style="display: {{chipsDisplay}}">
+  <div class="hscroll" role="group" aria-label="Result kinds" style="display: flex; align-items: center; gap: 6px; padding: 2px 12px 6px">
+    <button class="kchip" aria-haspopup="dialog" aria-label="{{filterAria}}" onClick="{{openSheet}}" style="padding: 0 12px 0 11px"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>Filters<span class="cbadge" style="display: {{fCountDisplay}}">{{fCount}}</span></button>
+    <span aria-hidden="true" style="width: 1px; height: 22px; background: var(--edge); flex-shrink: 0; margin: 0 2px"></span>
+    <sc-for list="{{kinds}}" as="k" hint-placeholder-count="7">
+      <button class="kchip" aria-pressed="{{k.pressed}}" onClick="{{k.select}}">{{k.label}}<span class="n">{{k.count}}</span></button>
+    </sc-for>
+  </div>
+  <div class="hscroll" role="group" aria-label="Active filters" style="display: {{activeDisplay}}; align-items: center; gap: 6px; padding: 0 12px 6px">
+    <sc-for list="{{active}}" as="a" hint-placeholder-count="2">
+      <span class="fchip">{{a.label}}<button class="x" aria-label="{{a.aria}}" onClick="{{a.remove}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></span>
+    </sc-for>
+    <button class="more" style="margin-left: 0; flex-shrink: 0" onClick="{{clearFilters}}">Clear all</button>
+  </div>
+</div>
+
+<div class="scroll" style="padding-bottom: 28px">
+  <div style="display: {{lineDisplay}}; padding: 6px 20px 8px; font-size: 12px; font-weight: 600; color: var(--muted)">{{resultLine}}</div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px; padding: 0 12px">
+    <sc-for list="{{groups}}" as="g" hint-placeholder-count="6">
+      <section class="card" aria-labelledby="sg-{{g.k}}" style="overflow: hidden">
+        <div class="ghd">
+          <h2 id="sg-{{g.k}}">{{g.label}}</h2><span class="cnt">{{g.count}}</span>
+          <button class="more" style="display: {{g.moreDisplay}}" onClick="{{g.seeAll}}">{{g.moreLabel}}</button>
+        </div>
+        <div class="none" style="display: {{g.noneDisplay}}"><span style="flex: 1">No tasks match these filters</span><button class="more" style="margin-left: 0" onClick="{{clearFilters}}">Clear filters</button></div>
+        <sc-for list="{{g.rows}}" as="r" hint-placeholder-count="3">
+          <a class="row" href="{{r.href}}">
+            <span class="lead">
+              <sc-if value="{{r.leadImg}}" hint-placeholder-val="true"><img src="{{r.img}}" alt="" width="36" height="36"></sc-if>
+              <sc-if value="{{r.leadIni}}" hint-placeholder-val="false"><span class="disc" style="width: 36px; height: 36px; font-size: 12px; background: {{r.iniBg}}; color: {{r.iniFg}}; border: {{r.iniBorder}}">{{r.ini}}</span></sc-if>
+              <sc-if value="{{r.leadTag}}" hint-placeholder-val="false"><span class="tag" style="background: {{r.tagBg}}; color: {{r.tagFg}}">{{r.tag}}</span></sc-if>
+            </span>
+            <span class="tx">
+              <span class="top">
+                <span class="{{r.glyphClass}}" aria-hidden="true" style="display: {{r.glyphDisplay}}; background: {{r.glyph}}"></span>
+                <span class="mono" style="display: {{r.idDisplay}}; flex-shrink: 0">{{r.id}}</span>
+                <span class="sub">{{r.sub}}</span>
+                <span class="when">{{r.when}}</span>
+              </span>
+              <span class="ttl"><sc-for list="{{r.titleSegs}}" as="s" hint-placeholder-count="2"><span class="{{s.cls}}">{{s.t}}</span></sc-for></span>
+              <span class="snip" style="display: {{r.snipDisplay}}"><span class="lab" style="display: {{r.labelDisplay}}">{{r.label}}</span><sc-for list="{{r.snipSegs}}" as="s" hint-placeholder-count="3"><span class="{{s.cls}}">{{s.t}}</span></sc-for></span>
+              <span class="bd" style="display: {{r.badgeDisplay}}"><span class="live" aria-hidden="true" style="width: 4px; height: 10px; border-radius: 999px; background: var(--g-ember)"></span>{{r.badge}}</span>
+            </span>
+          </a>
+        </sc-for>
+      </section>
+    </sc-for>
+
+    <section class="card" aria-labelledby="empty-h" style="display: {{emptyDisplay}}; overflow: hidden">
+      <div style="padding: 28px 22px 18px; text-align: center">
+        <div aria-hidden="true" style="width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 50%; background: var(--well); display: grid; place-items: center; color: var(--muted)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5M8 11h6"></path></svg></div>
+        <h2 id="empty-h" class="disp" style="margin: 0 0 6px; font-size: 20px; font-weight: 800; letter-spacing: -.01em">{{emptyTitle}}</h2>
+        <p style="margin: 0; font-size: 14px; color: var(--body)">{{emptyBody}}</p>
+      </div>
+      <div style="display: {{suggDisplay}}">
+        <div style="padding: 0 16px 8px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted)">Loosen the search</div>
+        <sc-for list="{{sugg}}" as="s" hint-placeholder-count="3">
+          <button class="srow" onClick="{{s.act}}"><span style="flex: 1">{{s.label}}</span><span style="font-size: 13px; color: var(--muted)">{{s.count}}</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="m9 6 6 6-6 6"></path></svg></button>
+        </sc-for>
+      </div>
+      <button class="srow" style="display: {{allBtnDisplay}}; justify-content: center; color: var(--run-fg); font-weight: 700" onClick="{{showAll}}">{{allBtnLabel}}</button>
+    </section>
+
+    <section class="card" aria-labelledby="recent-h" style="display: {{recentDisplay}}; overflow: hidden">
+      <div class="ghd"><h2 id="recent-h">Recent searches</h2></div>
+      <sc-for list="{{recent}}" as="s" hint-placeholder-count="4">
+        <button class="srow" onClick="{{s.act}}"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); flex-shrink: 0"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg><span class="{{s.cls}}" style="flex: 1">{{s.label}}</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="M7 17 17 7M9 7h8v8"></path></svg></button>
+      </sc-for>
+    </section>
+    <p style="display: {{recentDisplay}}; margin: 4px 8px 0; font-size: 13px; color: var(--muted)">Search looks through task titles and descriptions, comments, agent chats, docs, file names and agents. Type a task ID, like TRA-41, to jump straight to it.</p>
+  </div>
+</div>
+
+<div class="scrim" style="display: {{scrimDisplay}}" onClick="{{closeSheet}}"></div>
+<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-h" style="display: {{sheetDisplay}}">
+  <div aria-hidden="true" style="width: 40px; height: 5px; border-radius: 999px; background: var(--edge); margin: 8px auto 0"></div>
+  <div style="display: flex; align-items: center; gap: 6px; padding: 6px 8px 0 18px">
+    <div style="flex: 1"><h2 id="sheet-h" style="margin: 0; font-size: 18px; font-weight: 800">Filter tasks</h2><div style="font-size: 12px; color: var(--muted)">These narrow the task results; other kinds stay as they are</div></div>
+    <button class="more" style="margin-left: 0" onClick="{{resetSheet}}">Reset</button>
+  </div>
+  <div class="body">
+    <h3>Where</h3>
+    <div class="seg" role="group" aria-label="Where to search">
+      <sc-for list="{{scopes}}" as="o" hint-placeholder-count="2"><button aria-pressed="{{o.pressed}}" onClick="{{o.select}}">{{o.label}}</button></sc-for>
+    </div>
+    <h3>Status</h3>
+    <div class="wrap" role="group" aria-label="Status">
+      <sc-for list="{{statusOpts}}" as="o" hint-placeholder-count="6"><button class="kchip" aria-pressed="{{o.pressed}}" onClick="{{o.select}}"><span class="glyph" aria-hidden="true" style="display: {{o.glyphDisplay}}; background: {{o.glyph}}"></span>{{o.label}}</button></sc-for>
+    </div>
+    <h3>Assignee</h3>
+    <div class="wrap" role="group" aria-label="Assignee">
+      <sc-for list="{{agentOpts}}" as="o" hint-placeholder-count="6"><button class="kchip" aria-pressed="{{o.pressed}}" onClick="{{o.select}}" style="padding-left: {{o.padLeft}}"><sc-if value="{{o.hasImg}}" hint-placeholder-val="true"><img src="{{o.img}}" alt="" width="24" height="24" style="display: block"></sc-if><sc-if value="{{o.dashed}}" hint-placeholder-val="false"><span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 50%; border: 1.5px dashed var(--dashed); box-sizing: border-box"></span></sc-if>{{o.label}}</button></sc-for>
+    </div>
+    <h3>Updated</h3>
+    <div class="wrap" role="group" aria-label="Updated">
+      <sc-for list="{{updOpts}}" as="o" hint-placeholder-count="3"><button class="kchip" aria-pressed="{{o.pressed}}" onClick="{{o.select}}">{{o.label}}</button></sc-for>
+    </div>
+    <button style="display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; margin-top: 10px; border-top: 1px solid var(--line); text-align: left" aria-pressed="{{closedPressed}}" onClick="{{toggleClosed}}">
+      <span style="flex: 1"><span style="display: block; font-size: 14px; font-weight: 700">Include done and cancelled tasks</span><span style="display: block; font-size: 12px; color: var(--muted)">Closed tasks still turn up by title and description</span></span>
+      <span class="tog {{closedClass}}" aria-hidden="true"></span>
+    </button>
+  </div>
+  <div style="display: flex; padding: 10px 16px 22px; border-top: 1px solid var(--line)">
+    <button class="primary" style="flex: 1" onClick="{{closeSheet}}">{{sheetCta}}</button>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"dark","options":["light","dark"]},"display":{"editor":"enum","default":"Hanken Grotesk","options":["Hanken Grotesk","Bricolage Grotesque"]},"state":{"editor":"enum","default":"results","options":["results","empty","recent"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sheet: false };
+  }
+  renderVals() {
+    const dark = (this.props.theme ?? 'dark') === 'dark';
+    const font = (this.props.display ?? 'Hanken Grotesk') === 'Bricolage Grotesque' ? 'f-bricolage' : 'f-hanken';
+    const mode = this.props.state ?? 'results';
+    const DEF = { status: 'any', agent: 'any', updated: 'any', closed: true };
+    const preset = Object.assign({}, DEF, { q: mode === 'recent' ? '' : 'liquidation', kind: mode === 'empty' ? 'tasks' : 'all', scope: 'project' },
+      mode === 'empty' ? { status: 'blocked', agent: 'fe' } : {});
+    const st = this.state;
+    const v = (k) => (st[k] === undefined ? preset[k] : st[k]);
+    const set = (patch) => () => this.setState(patch);
+    const q = v('q');
+    const kind = v('kind');
+    const scope = v('scope');
+    const f = { status: v('status'), agent: v('agent'), updated: v('updated'), closed: v('closed') };
+    const needle = q.trim().toLowerCase();
+    const has = (s) => !!needle && !!s && s.toLowerCase().includes(needle);
+    const esc = (s) => s.replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/[{}]/g, '\\$&');
+    const hl = (s) => {
+      if (!s) return [];
+      if (!needle) return [{ t: s, cls: '' }];
+      const re = new RegExp('(' + esc(q.trim()) + ')', 'ig');
+      return s.split(re).filter((t) => t !== '').map((t) => ({ t, cls: t.toLowerCase() === needle ? 'hit' : '' }));
+    };
+
+    const P = {
+      qr: { name: 'Quant Researcher', img: '/_blob/7aaa93c4d4541bd76051e13cbe0ea6a7' },
+      se: { name: 'Strategy Engineer', img: '/_blob/923b60a102d23a6e59f85ad0632aeb19' },
+      fe: { name: 'Frontend Engineer', img: '/_blob/3b04710f48e2284cfab9eeffb5bf5d4b' },
+      ml: { name: 'ML Engineer', img: '/_blob/e9322069f1f2ecddbd54eb0a09925910' },
+      me: { name: 'You', ini: 'BA' },
+      none: { name: 'Unassigned', ini: '' }
+    };
+    const lead = (who) => {
+      const p = P[who];
+      if (p.img) return { leadImg: true, img: p.img, leadIni: false, leadTag: false };
+      return { leadImg: false, leadTag: false, leadIni: true, ini: p.ini, iniBg: p.ini ? 'var(--primary)' : 'transparent', iniFg: 'var(--on-primary)', iniBorder: p.ini ? '0' : '1.5px dashed var(--dashed)' };
+    };
+    const TAG = { MD: ['var(--run-bg)', 'var(--run-fg)'], PNG: ['var(--cyan-bg)', 'var(--cyan-fg)'], CSV: ['var(--green-bg)', 'var(--green-fg)'] };
+    const tagLead = (t) => ({ leadImg: false, leadIni: false, leadTag: true, tag: t, tagBg: TAG[t][0], tagFg: TAG[t][1] });
+    const S = { todo: ['To do', 'var(--g-ash)', 'still to do'], in_progress: ['In progress', 'var(--g-ion)', 'in progress'], in_review: ['In review', 'var(--g-orchid)', 'in review'], blocked: ['Blocked', 'var(--g-flare)', 'blocked'], done: ['Done', 'var(--g-lagoon)', 'done'] };
+    const base = (o) => Object.assign({ id: '', sub: '', when: '', title: '', snip: '', label: '', badge: '', glyph: '', live: false, href: '#' }, o);
+
+    const task = (id, title, status, who, when, age, snip, href) => base(Object.assign(lead(who), {
+      kind: 'tasks', id, title, status, who, when, age, snip: snip || '', label: 'Description', sub: S[status][0], glyph: S[status][1], live: status === 'in_progress', href: href || '#'
+    }));
+    const tasks = [
+      task('TRA-44', 'Liquidation sweep strategy', 'in_review', 'se', '32m ago', 0, 'Fade forced liquidations after a sweep of the prior 4h low.'),
+      task('TRA-41', 'H4 download derivatives price data', 'in_progress', 'qr', '2m ago', 0, '4h OHLCV, funding, open interest and liquidations for BTC, ETH and SOL perps, from 2022.', 'TaskDetail.dc.html'),
+      task('TRA-29', 'Refine and polish all custom charts', 'in_review', 'fe', '3h ago', 0, 'Tighten the axis labels, match the theme tokens, and add the liquidation heatmap under the sweep chart.'),
+      task('TRA-45', 'Start ML testing on VPA', 'blocked', 'ml', '5h ago', 0, 'Waiting on the H4 set: the model needs liquidation volume as a feature.'),
+      task('TRA-58', 'Liquidation heatmap overlay', 'todo', 'none', 'Oct 22', 4),
+      task('TRA-51', 'Equity curve chart for liquidation sweep', 'done', 'fe', 'Oct 20', 6)
+    ];
+    const comment = (who, id, taskTitle, text, when, href) => base(Object.assign(lead(who), { kind: 'comments', id, sub: taskTitle, title: P[who].name, snip: text, when, href: href || '#' }));
+    const doc = (id, name, rev, text, when, href) => base(Object.assign(tagLead('MD'), { kind: 'docs', id, sub: 'Doc · rev ' + rev, title: name, snip: text, when, href: href || '#' }));
+    const file = (t, name, id, meta, when, href) => base(Object.assign(tagLead(t), { kind: 'files', id, sub: meta, title: name, when, href: href || '#' }));
+    const others = [
+      base(Object.assign(lead('se'), { kind: 'chats', sub: 'Chat', title: 'Strategy Engineer', snip: 'Should the liquidation filter scale with open interest, or stay fixed at 3%?', badge: 'Waiting for you', when: '1h ago' })),
+      comment('ml', 'TRA-44', 'Liquidation sweep strategy', 'Rerun done with fees fixed for partial fills. The liquidation filter still holds at 1.62 sharpe.', '40m ago'),
+      comment('me', 'TRA-44', 'Liquidation sweep strategy', 'Looks good. Try ETH with the same liquidation threshold before sign-off.', '35m ago'),
+      comment('qr', 'TRA-41', 'H4 download derivatives price data', 'Bybit liquidation history only goes back to 2023, so the rest comes from Coinglass.', '2h ago', 'TaskActivity.dc.html'),
+      comment('se', 'TRA-47', 'Center of gravity strategy', 'Compared with the liquidation sweep: lower drawdown, fewer trades.', 'Oct 22'),
+      comment('fe', 'TRA-51', 'Equity curve chart for liquidation sweep', 'Equity curve is up, with the liquidation clusters marked.', 'Oct 20'),
+      doc('TRA-44', 'backtest-report', 3, '312 trades from 2022 to 2026. Liquidation size above $10M lifts the win rate to 0.58.', '40m ago'),
+      doc('TRA-44', 'spec', 2, 'Entry: a sweep of the prior 4h low that sets off at least $5M of long liquidations.', 'Oct 16'),
+      doc('TRA-41', 'data-sources', 1, 'Liquidations: Bybit and Binance from 2023, Coinglass before that.', 'Oct 15', 'TaskFiles.dc.html'),
+      file('PNG', 'liquidation-heatmap.png', 'TRA-58', '380 KB', 'Oct 22'),
+      file('CSV', 'liquidations-btc-2024.csv', 'TRA-41', '12.4 MB · run output', '2h ago', 'TaskFiles.dc.html'),
+      base(Object.assign(lead('ml'), { kind: 'agents', sub: 'Agent · Engineering', title: 'ML Engineer', label: 'Capabilities', snip: 'Feature work and model tests on market data: volume, open interest, liquidation flow.', href: 'Agents.dc.html' }))
+    ];
+
+    const passes = (t, ff) => (ff.status === 'any' || t.status === ff.status)
+      && (ff.agent === 'any' || t.who === ff.agent)
+      && (ff.updated === 'any' || (ff.updated === 'today' ? t.age === 0 : t.age <= 7))
+      && (ff.closed || t.status !== 'done');
+    const matches = (r) => has(r.title) || has(r.snip);
+    const taskHits = (ff) => tasks.filter((t) => matches(t) && passes(t, ff));
+    const hitTasks = taskHits(f);
+    const all = hitTasks.concat(others.filter(matches));
+    const plural = (n) => n + (n === 1 ? ' task' : ' tasks');
+
+    const STATUS_OPTS = [['any', 'Any'], ['todo', 'To do'], ['in_progress', 'In progress'], ['in_review', 'In review'], ['blocked', 'Blocked'], ['done', 'Done']];
+    const AGENT_OPTS = [['any', 'Anyone'], ['qr', 'Quant Researcher'], ['se', 'Strategy Engineer'], ['fe', 'Frontend Engineer'], ['ml', 'ML Engineer'], ['none', 'Unassigned']];
+    const UPD_OPTS = [['any', 'Any time'], ['today', 'Today'], ['week', 'Past 7 days']];
+    const lbl = (opts, k) => opts.find((o) => o[0] === k)[1];
+    const clearFilters = set({ status: DEF.status, agent: DEF.agent, updated: DEF.updated, closed: DEF.closed });
+    const active = [];
+    if (f.status !== 'any') active.push({ key: 'status', label: lbl(STATUS_OPTS, f.status) });
+    if (f.agent !== 'any') active.push({ key: 'agent', label: lbl(AGENT_OPTS, f.agent) });
+    if (f.updated !== 'any') active.push({ key: 'updated', label: 'Updated ' + lbl(UPD_OPTS, f.updated).toLowerCase() });
+    if (!f.closed) active.push({ key: 'closed', label: 'Open tasks only' });
+    active.forEach((a) => { a.aria = 'Remove filter: ' + a.label; a.remove = set({ [a.key]: DEF[a.key] }); });
+
+    const KINDS = [['all', 'All'], ['tasks', 'Tasks'], ['chats', 'Chats'], ['comments', 'Comments'], ['docs', 'Docs'], ['files', 'Files'], ['agents', 'Agents']];
+    const countOf = (k) => (k === 'all' ? all.length : all.filter((r) => r.kind === k).length);
+    const kinds = KINDS.map(([k, label]) => ({ label, count: String(countOf(k)), pressed: k === kind ? 'true' : 'false', select: set({ kind: k }) }));
+    const NAMES = Object.fromEntries(KINDS);
+
+    const view = (r) => Object.assign({}, r, {
+      titleSegs: hl(r.title), snipSegs: hl(r.snip), snipDisplay: has(r.snip) ? '-webkit-box' : 'none',
+      labelDisplay: r.label ? 'inline' : 'none', idDisplay: r.id ? 'inline' : 'none',
+      glyphDisplay: r.glyph ? 'inline-block' : 'none', glyphClass: r.live ? 'glyph live' : 'glyph',
+      badgeDisplay: r.badge ? 'inline-flex' : 'none'
+    });
+    const order = kind === 'all' ? ['tasks', 'chats', 'comments', 'docs', 'files', 'agents'] : [kind];
+    const groups = needle ? order.map((k) => {
+      const rows = all.filter((r) => r.kind === k);
+      const filteredOut = k === 'tasks' && kind === 'all' && active.length > 0 && rows.length === 0;
+      const more = kind === 'all' && rows.length > 3;
+      return { k, label: NAMES[k], count: String(rows.length), rows: rows.slice(0, kind === 'all' ? 3 : rows.length).map(view),
+        moreDisplay: more ? 'inline-flex' : 'none', moreLabel: 'See all ' + rows.length, seeAll: set({ kind: k }),
+        noneDisplay: filteredOut ? 'flex' : 'none', show: rows.length > 0 || filteredOut };
+    }).filter((g) => g.show) : [];
+
+    const showEmpty = !!needle && groups.length === 0;
+    const nNoFilters = taskHits(DEF).length;
+    const filterEmpty = showEmpty && kind === 'tasks' && active.length > 0 && nNoFilters > 0;
+    const sugg = filterEmpty ? active.map((a) => {
+      const n = taskHits(Object.assign({}, f, { [a.key]: DEF[a.key] })).length;
+      return { label: 'Remove ' + a.label, count: plural(n), n, act: a.remove };
+    }).filter((s) => s.n > 0) : [];
+    if (filterEmpty && active.length > 1) sugg.push({ label: 'Clear all filters', count: plural(nNoFilters), n: nNoFilters, act: clearFilters });
+    const phrase = [];
+    if (f.status !== 'any') phrase.push(S[f.status][2]);
+    if (f.agent === 'none') phrase.push('unassigned');
+    else if (f.agent !== 'any') phrase.push('assigned to ' + P[f.agent].name);
+    if (f.updated !== 'any') phrase.push(f.updated === 'today' ? 'updated today' : 'updated in the past 7 days');
+    if (!f.closed) phrase.push('still open');
+    const kindWord = kind === 'all' ? 'results' : NAMES[kind].toLowerCase();
+    const emptyTitle = filterEmpty ? 'No tasks match these filters' : 'No ' + kindWord + ' for “' + q.trim() + '”';
+    const emptyBody = filterEmpty
+      ? plural(nNoFilters) + ' mention “' + q.trim() + '”, but none are ' + phrase.join(' and ') + '.'
+      : 'Try a shorter word or a different spelling. A task ID, like TRA-41, finds the task straight away.';
+    const total = all.length;
+    const showAllBtn = showEmpty && !filterEmpty && kind !== 'all' && total > 0;
+
+    const recentTerms = ['funding rates', 'TRA-41', 'sharpe', 'Coinglass'];
+    const recent = ['liquidation'].concat(recentTerms).map((t) => ({ label: t, cls: /^TRA-/.test(t) ? 'mono' : '', act: set({ q: t, kind: 'all' }) }));
+
+    const scopes = [['project', 'trading workbench'], ['company', 'All projects']].map(([k, label]) => ({ label, pressed: k === scope ? 'true' : 'false', select: set({ scope: k }) }));
+    const statusOpts = STATUS_OPTS.map(([k, label]) => ({ label, pressed: f.status === k ? 'true' : 'false', select: set({ status: k }),
+      glyphDisplay: k === 'any' ? 'none' : 'inline-block', glyph: k === 'any' ? '' : S[k][1] }));
+    const agentOpts = AGENT_OPTS.map(([k, label]) => {
+      const p = P[k];
+      return { label, pressed: f.agent === k ? 'true' : 'false', select: set({ agent: k }),
+        hasImg: !!(p && p.img), img: p && p.img ? p.img : '', dashed: k === 'none', padLeft: k === 'any' ? '13px' : '6px' };
+    });
+    const updOpts = UPD_OPTS.map(([k, label]) => ({ label, pressed: f.updated === k ? 'true' : 'false', select: set({ updated: k }) }));
+    const sheet = !!st.sheet;
+    const fCount = active.length;
+
+    return {
+      rootClass: (dark ? 'dark' : 'light') + ' ' + font,
+      q, onQuery: (e) => this.setState({ q: e && e.target ? e.target.value : '' }),
+      clear: set({ q: '' }), clearDisplay: q ? 'grid' : 'none',
+      chipsDisplay: needle ? 'block' : 'none',
+      kinds, filterAria: fCount ? 'Filters, ' + fCount + ' on' : 'Filters',
+      fCount: String(fCount), fCountDisplay: fCount ? 'inline-grid' : 'none',
+      active, activeDisplay: fCount ? 'flex' : 'none', clearFilters,
+      lineDisplay: needle && !showEmpty ? 'block' : 'none',
+      resultLine: total + (total === 1 ? ' result' : ' results') + ' in ' + (scope === 'project' ? 'trading workbench' : 'all projects') + (fCount ? ' · task filters on' : ''),
+      groups,
+      emptyDisplay: showEmpty ? 'block' : 'none', emptyTitle, emptyBody,
+      sugg, suggDisplay: sugg.length ? 'block' : 'none',
+      allBtnDisplay: showAllBtn ? 'flex' : 'none', allBtnLabel: 'See all ' + total + ' results', showAll: set({ kind: 'all' }),
+      recent, recentDisplay: needle ? 'none' : 'block',
+      openSheet: set({ sheet: true }), closeSheet: set({ sheet: false }),
+      scrimDisplay: sheet ? 'block' : 'none', sheetDisplay: sheet ? 'flex' : 'none',
+      resetSheet: set({ status: DEF.status, agent: DEF.agent, updated: DEF.updated, closed: DEF.closed, scope: 'project' }),
+      scopes, statusOpts, agentOpts, updOpts,
+      closedPressed: f.closed ? 'true' : 'false', closedClass: f.closed ? 'on' : '', toggleClosed: set({ closed: !f.closed }),
+      sheetCta: hitTasks.length ? 'Show ' + plural(hitTasks.length) : 'No tasks match yet'
+    };
+  }
+}
+</script>
+</body>
+</html>

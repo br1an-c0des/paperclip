@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Nav: tab bar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Fragment+Mono&amp;display=swap">
+<style>
+body{margin:0;background:#050505}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;margin:0;padding:0}
+.light{--board:#dcdce1;--ground:#f2f2f4;--card:#ffffff;--card-edge:transparent;--shadow:0 1px 2px rgba(17,17,19,.06),0 10px 28px -14px rgba(17,17,19,.2);--shadow-lg:0 2px 6px rgba(17,17,19,.08),0 30px 70px -24px rgba(17,17,19,.38);--well:#e7e7ea;--sel:#ffffff;--sel-shadow:0 1px 3px rgba(17,17,19,.12);--line:#ececf0;--row-line:#f0f0f3;--hover:#e7e7ea;--row-hover:#f8f8fa;--code:#f6f6f8;--text:#111113;--body:#45454d;--muted:#6b6b75;--edge:#cfcfd6;--dashed:#b4b4bd;--primary:#111113;--on-primary:#ffffff;--run-bg:#ecebff;--run-fg:#3b2fc0;--violet-bg:#f6e6ff;--violet-fg:#7a1fb8;--amber-bg:#fff1dc;--amber-fg:#94480a;--red-bg:#fde7ea;--red-fg:#b0102a;--green-bg:#e2f6e5;--green-fg:#17672f;--cyan-bg:#dcf4f1;--cyan-fg:#0e6a61;--ash-a:#c9c9cf;--ash-b:#9a9aa3;--scrim:rgba(17,17,19,.34)}
+.dark{--board:#050505;--ground:#0a0a0a;--card:#141414;--card-edge:#1f1f1f;--shadow:inset 0 1px 0 rgba(255,255,255,.04),0 16px 34px -18px rgba(0,0,0,.95);--shadow-lg:inset 0 1px 0 rgba(255,255,255,.06),0 34px 80px -20px rgba(0,0,0,.95);--well:#161616;--sel:#262626;--sel-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 3px rgba(0,0,0,.7);--line:#1f1f1f;--row-line:#1a1a1a;--hover:#1a1a1a;--row-hover:#181818;--code:#0f0f0f;--text:#f4f1ea;--body:#c9c6bf;--muted:#8f8c86;--edge:#2c2c2c;--dashed:#4a4843;--primary:#f4f1ea;--on-primary:#0a0a0a;--run-bg:#17142b;--run-fg:#c9c2ff;--violet-bg:rgba(139,44,240,.15);--violet-fg:#dcb8ff;--amber-bg:rgba(247,181,47,.1);--amber-fg:#ffc98a;--red-bg:rgba(242,40,111,.12);--red-fg:#ff9aa8;--green-bg:rgba(47,209,47,.1);--green-fg:#9be59b;--cyan-bg:rgba(34,181,165,.12);--cyan-fg:#8fe3d8;--ash-a:#3a3a3a;--ash-b:#6b6b6b;--scrim:rgba(0,0,0,.62)}
+.light,.dark{--g-ion:linear-gradient(180deg,#8b2cf0,#1f6fe0);--g-orchid:linear-gradient(180deg,#ff2bd6,#8b2cf0);--g-ember:linear-gradient(180deg,#f7b52f,#f5822a);--g-flare:linear-gradient(180deg,#f2286f,#f2272c);--g-lagoon:linear-gradient(180deg,#2fd12f,#22b5a5);--g-tide:linear-gradient(180deg,#22b5a5,#4c7896);--g-ash:linear-gradient(180deg,var(--ash-a),var(--ash-b))}
+.f-hanken{--display:'Hanken Grotesk',system-ui,sans-serif;--dtrack:-.045em}
+.f-bricolage{--display:'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif;--dtrack:-.035em}
+.disp{font-family:var(--display);letter-spacing:var(--dtrack)}
+.mono{font-family:'Fragment Mono',ui-monospace,monospace}
+.card{background:var(--card);border:1px solid var(--card-edge);border-radius:22px;box-shadow:var(--shadow)}
+@keyframes breathe{0%,100%{opacity:1;transform:scaleY(1)}50%{opacity:.55;transform:scaleY(.65)}}
+.live{animation:breathe 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.live{animation:none}}
+a{color:var(--text)}
+:focus-visible{outline:2px solid var(--run-fg);outline-offset:2px}
+.board{width:920px;height:924px;box-sizing:border-box;display:flex;gap:60px;padding:40px;background:var(--board);font-family:'Hanken Grotesk',system-ui,sans-serif}
+.phone{position:relative;width:390px;height:844px;flex-shrink:0;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;border-radius:36px;background:var(--ground);color:var(--text);font-size:14px;line-height:1.4;box-shadow:0 0 0 1px var(--edge),0 40px 90px -40px rgba(0,0,0,.9)}
+.ib{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--body);text-decoration:none;flex-shrink:0}
+.disc{display:grid;place-items:center;border-radius:50%;color:#111113;font-weight:800;flex-shrink:0;letter-spacing:0;box-sizing:border-box}
+.cap{display:inline-block;border-radius:999px;flex-shrink:0}
+.badge{min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:linear-gradient(135deg,#ff2bd6,#f7b52f);color:#111113;font-size:10px;font-weight:800;display:inline-grid;place-items:center}
+.hdr{margin:14px 12px 0;padding:14px 16px 16px}
+.crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.runpill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:999px;background:var(--run-bg);color:var(--run-fg);font-size:12px;font-weight:700}
+.ttl{display:flex;align-items:center;gap:6px;margin:6px 0 8px;font-size:28px;font-weight:800;line-height:1.05}
+.nums{display:flex;gap:14px;font-size:13px;color:var(--muted)}
+.nums b{color:var(--text);font-weight:800}
+.grp{margin:12px 12px 0;overflow:hidden}
+.gh{display:flex;align-items:center;gap:10px;padding:13px 16px 11px;font-weight:800}
+.gh small{font-weight:600;color:var(--muted);font-size:13px}
+.trow{display:flex;align-items:flex-start;gap:10px;padding:11px 14px 11px 16px;border-top:1px solid var(--row-line)}
+.trow .t{font-weight:600;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow .id{font-size:12px;font-weight:400;color:var(--muted)}
+.trow .meta{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:12px;color:var(--muted)}
+.sq{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;font-size:13px;font-weight:800;color:#111113;flex-shrink:0}
+.tabbar{position:absolute;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:flex-start;height:86px;padding:6px 4px 0;box-sizing:border-box;background:var(--card);border-top:1px solid var(--line)}
+.tab{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px;padding-top:2px;color:var(--muted);font-size:11px;font-weight:600;text-decoration:none}
+.tab .ind{position:relative;width:58px;height:32px;display:grid;place-items:center;border-radius:999px}
+.tab[aria-current="page"]{color:var(--text);font-weight:800}
+.tab[aria-current="page"] .ind{background:var(--sel);box-shadow:var(--sel-shadow)}
+.tab .badge{position:absolute;top:-2px;right:6px;box-shadow:0 0 0 2px var(--card)}
+.tab .lv{position:absolute;top:4px;right:13px;width:4px;height:10px;border-radius:999px;background:var(--g-ion)}
+.plus{width:52px;height:52px;margin-top:-2px;border-radius:50%;display:grid;place-items:center;background:var(--primary);color:var(--on-primary);box-shadow:var(--shadow-lg)}
+.home{position:absolute;left:50%;bottom:8px;width:134px;height:5px;margin-left:-67px;border-radius:999px;background:var(--text);opacity:.35}
+.sec{margin:12px 12px 0;padding:4px 0}
+.sec h2{margin:0;padding:12px 16px 4px;font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+.row{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 16px;border-top:1px solid var(--row-line);font-size:15px;font-weight:600;text-decoration:none;color:var(--text)}
+.sec h2 + .row{border-top:0}
+.row small{font-size:12px;font-weight:500;color:var(--muted)}
+.row .end{margin-left:auto;display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;font-weight:600}
+.seg{display:inline-flex;gap:2px;padding:4px;border-radius:999px;background:var(--well)}
+.seg span{height:34px;padding:0 13px;display:flex;align-items:center;border-radius:999px;color:var(--body);font-size:13px;font-weight:600}
+.seg span[aria-current="true"]{background:var(--sel);box-shadow:var(--sel-shadow);color:var(--text);font-weight:800}
+.tog{width:44px;height:26px;border-radius:999px;background:var(--well);border:1px solid var(--edge);position:relative;box-sizing:border-box;flex-shrink:0}
+.tog::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--muted)}
+.tog.on{background:var(--run-fg);border-color:var(--run-fg)}
+.tog.on::after{left:21px;background:var(--on-primary)}
+</style>
+</helmet>
+<div class="board {{rootClass}}">
+
+  <div class="phone" role="region" aria-label="Task list with a tab bar">
+    <section class="card hdr">
+      <div class="crumb">Projects /<span class="runpill"><span class="live" style="width: 4px; height: 10px; border-radius: 999px; background: var(--g-ion)"></span>In progress</span></div>
+      <div class="ttl disp">trading workbench<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="m7 10 5 5 5-5"></path></svg></div>
+      <div class="nums"><span><b>16</b> open</span><span><b>2</b> running</span><span><b>1</b> blocked</span></div>
+    </section>
+    <sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+      <section class="card grp">
+        <div class="gh"><span class="cap" style="width: 8px; height: 20px; background: {{g.glyph}}"></span>{{g.name}}<small>{{g.count}}</small></div>
+        <sc-for list="{{g.tasks}}" as="t" hint-placeholder-count="3">
+          <div class="trow"><span class="cap" style="width: 5px; height: 12px; margin-top: 4px; background: {{g.glyph}}"></span><div style="flex: 1; min-width: 0"><div class="t"><span class="mono id">{{t.id}}</span> {{t.title}}</div><div class="meta"><span class="disc" style="width: 18px; height: 18px; font-size: 7px; background: {{t.bg}}; color: {{t.ink}}">{{t.ini}}</span>{{t.updated}}</div></div></div>
+        </sc-for>
+      </section>
+    </sc-for>
+    <nav class="tabbar" aria-label="Main">
+      <a class="tab" href="Inbox.dc.html"><span class="ind"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg><span class="badge">8</span></span>Inbox</a>
+      <a class="tab" href="Main.dc.html" aria-current="page"><span class="ind"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="3.5"></rect><rect x="3" y="13" width="18" height="7" rx="3.5"></rect></svg></span>Tasks</a>
+      <a class="tab" href="NewTask.dc.html" aria-label="New task"><span class="plus"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span></a>
+      <a class="tab" href="Agents.dc.html" aria-label="Agents, 2 running"><span class="ind"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8a7 7 0 0 1 14 0v8z"></path><path d="M9.5 13h.01M14.5 13h.01"></path></svg><span class="lv live"></span></span>Agents</a>
+      <a class="tab" href="#"><span class="ind"><span class="disc" style="width: 24px; height: 24px; font-size: 9px; background: var(--primary); color: var(--on-primary)">BA</span></span>You</a>
+      <span class="home"></span>
+    </nav>
+  </div>
+
+  <div class="phone" role="region" aria-label="The You tab">
+    <header style="display: flex; align-items: center; padding: 14px 8px 0 20px">
+      <h1 class="disp" style="margin: 0; font-size: 30px; font-weight: 800; line-height: 1; letter-spacing: -.02em">You</h1>
+    </header>
+    <section class="card" style="margin: 14px 12px 0; padding: 14px 16px; display: flex; align-items: center; gap: 14px">
+      <span class="disc" style="width: 52px; height: 52px; font-size: 17px; background: var(--primary); color: var(--on-primary)">BA</span>
+      <div style="flex: 1; min-width: 0"><div style="font-size: 17px; font-weight: 800">Brian A.</div><div style="font-size: 13px; color: var(--muted)">Board owner · Cuebik Creative</div></div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted)"><path d="m9 6 6 6-6 6"></path></svg>
+    </section>
+    <section class="card sec" aria-label="Company">
+      <h2>COMPANY</h2>
+      <a class="row" href="#" aria-current="page"><span class="sq" style="background: var(--primary); color: var(--on-primary)">C</span><span style="display: flex; flex-direction: column">Cuebik Creative<small>3 projects · 5 agents</small></span><span class="end"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color: var(--run-fg)"><path d="M5 12l5 5 9-10"></path></svg></span></a>
+      <a class="row" href="#"><span class="sq" style="background: var(--well); color: var(--body)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 9 5-5 5 5M7 15l5 5 5-5"></path></svg></span>Switch company<span class="end">2 more</span></a>
+    </section>
+    <section class="card sec" aria-label="On this phone">
+      <h2>ON THIS PHONE</h2>
+      <div class="row">Theme<span class="end"><span class="seg"><span>Light</span><span aria-current="true">Dark</span><span>Auto</span></span></span></div>
+      <div class="row"><span style="display: flex; flex-direction: column">Push for requests<small>Questions, approvals and sign-offs</small></span><span class="end"><span class="tog on"></span></span></div>
+      <div class="row"><span style="display: flex; flex-direction: column">Push when a run finishes<small>Only for tasks you watch</small></span><span class="end"><span class="tog"></span></span></div>
+    </section>
+    <section class="card sec" aria-label="On desktop">
+      <h2>ON DESKTOP</h2>
+      <sc-for list="{{desktop}}" as="d" hint-placeholder-count="5">
+        <a class="row" href="#" style="color: var(--body); font-weight: 500">{{d.label}}<span class="end"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8M12 16v4"></path></svg></span></a>
+      </sc-for>
+    </section>
+    <nav class="tabbar" aria-label="Main">
+      <a class="tab" href="Inbox.dc.html"><span class="ind"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg><span class="badge">8</span></span>Inbox</a>
+      <a class="tab" href="Main.dc.html"><span class="ind"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="3.5"></rect><rect x="3" y="13" width="18" height="7" rx="3.5"></rect></svg></span>Tasks</a>
+      <a class="tab" href="NewTask.dc.html" aria-label="New task"><span class="plus"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span></a>
+      <a class="tab" href="Agents.dc.html" aria-label="Agents, 2 running"><span class="ind"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8a7 7 0 0 1 14 0v8z"></path><path d="M9.5 13h.01M14.5 13h.01"></path></svg><span class="lv live"></span></span>Agents</a>
+      <a class="tab" href="#" aria-current="page"><span class="ind"><span class="disc" style="width: 24px; height: 24px; font-size: 9px; background: var(--primary); color: var(--on-primary)">BA</span></span>You</a>
+      <span class="home"></span>
+    </nav>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"dark","options":["light","dark"]},"display":{"editor":"enum","default":"Hanken Grotesk","options":["Hanken Grotesk","Bricolage Grotesque"]},"$preview":{"width":920,"height":924}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = (this.props.theme ?? 'dark') === 'dark';
+    const font = (this.props.display ?? 'Hanken Grotesk') === 'Bricolage Grotesque' ? 'f-bricolage' : 'f-hanken';
+    const W = {
+      qr: ['QR', 'linear-gradient(160deg, #2fd12f, #22b5a5)', '#111113'],
+      se: ['SE', 'linear-gradient(160deg, #ff2bd6, #f2286f)', '#111113'],
+      fe: ['FE', 'linear-gradient(160deg, #f7b52f, #f5822a)', '#111113'],
+      me: ['BA', 'var(--primary)', 'var(--on-primary)']
+    };
+    const t = (id, title, who, updated) => ({ id, title, ini: W[who][0], bg: W[who][1], ink: W[who][2], updated });
+    const groups = [
+      { name: 'In progress', count: '3', glyph: 'var(--g-ion)', tasks: [
+        t('TRA-41', 'H4 download derivatives price data', 'qr', '2m'),
+        t('TRA-38', 'Port all open-source strategies to Python', 'se', '14m'),
+        t('TRA-35', 'Known bugs and limitations', 'me', '1h')
+      ] },
+      { name: 'In review', count: '2', glyph: 'var(--g-orchid)', tasks: [
+        t('TRA-44', 'Liquidation sweep strategy', 'se', '32m'),
+        t('TRA-29', 'Refine and polish all custom charts', 'fe', '3h')
+      ] },
+      { name: 'Todo', count: '4', glyph: 'var(--g-ember)', tasks: [
+        t('TRA-47', 'Center of gravity strategy', 'se', 'Yesterday')
+      ] }
+    ];
+    const desktop = ['Company settings', 'Secrets', 'Plugins and skills', 'Routines', 'Activity log'].map((label) => ({ label }));
+    return { rootClass: (dark ? 'dark' : 'light') + ' ' + font, groups, desktop };
+  }
+}
+</script>
+</body>
+</html>

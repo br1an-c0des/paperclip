@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Inbox (phone)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Fragment+Mono&amp;display=swap">
+<style>
+body{margin:0;background:#0a0a0a}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;margin:0;padding:0}
+textarea,input{font:inherit;color:inherit}
+.light{--ground:#f2f2f4;--card:#ffffff;--card-edge:transparent;--shadow:0 1px 2px rgba(17,17,19,.06),0 10px 28px -14px rgba(17,17,19,.2);--shadow-lg:0 2px 6px rgba(17,17,19,.08),0 30px 70px -24px rgba(17,17,19,.38);--well:#e7e7ea;--sel:#ffffff;--sel-shadow:0 1px 3px rgba(17,17,19,.12);--line:#ececf0;--row-line:#f0f0f3;--hover:#e7e7ea;--row-hover:#f8f8fa;--code:#f6f6f8;--text:#111113;--body:#45454d;--muted:#6b6b75;--edge:#cfcfd6;--dashed:#b4b4bd;--primary:#111113;--on-primary:#ffffff;--run-bg:#ecebff;--run-fg:#3b2fc0;--violet-bg:#f6e6ff;--violet-fg:#7a1fb8;--amber-bg:#fff1dc;--amber-fg:#94480a;--red-bg:#fde7ea;--red-fg:#b0102a;--green-bg:#e2f6e5;--green-fg:#17672f;--cyan-bg:#dcf4f1;--cyan-fg:#0e6a61;--pri-on:#111113;--pri-off:#dcdce2;--ash-a:#c9c9cf;--ash-b:#9a9aa3;--scrim:rgba(17,17,19,.34);--grain-blend:soft-light;--grain-op:.9}
+.dark{--ground:#0a0a0a;--card:#141414;--card-edge:#1f1f1f;--shadow:inset 0 1px 0 rgba(255,255,255,.04),0 16px 34px -18px rgba(0,0,0,.95);--shadow-lg:inset 0 1px 0 rgba(255,255,255,.06),0 34px 80px -20px rgba(0,0,0,.95);--well:#161616;--sel:#262626;--sel-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 3px rgba(0,0,0,.7);--line:#1f1f1f;--row-line:#1a1a1a;--hover:#1a1a1a;--row-hover:#181818;--code:#0f0f0f;--text:#f4f1ea;--body:#c9c6bf;--muted:#8f8c86;--edge:#2c2c2c;--dashed:#4a4843;--primary:#f4f1ea;--on-primary:#0a0a0a;--run-bg:#17142b;--run-fg:#c9c2ff;--violet-bg:rgba(139,44,240,.15);--violet-fg:#dcb8ff;--amber-bg:rgba(247,181,47,.1);--amber-fg:#ffc98a;--red-bg:rgba(242,40,111,.12);--red-fg:#ff9aa8;--green-bg:rgba(47,209,47,.1);--green-fg:#9be59b;--cyan-bg:rgba(34,181,165,.12);--cyan-fg:#8fe3d8;--pri-on:#f4f1ea;--pri-off:#2c2c2c;--ash-a:#3a3a3a;--ash-b:#6b6b6b;--scrim:rgba(0,0,0,.62);--grain-blend:overlay;--grain-op:.75}
+.light,.dark{--g-ion:linear-gradient(180deg,#8b2cf0,#1f6fe0);--g-orchid:linear-gradient(180deg,#ff2bd6,#8b2cf0);--g-ember:linear-gradient(180deg,#f7b52f,#f5822a);--g-flare:linear-gradient(180deg,#f2286f,#f2272c);--g-lagoon:linear-gradient(180deg,#2fd12f,#22b5a5);--g-tide:linear-gradient(180deg,#22b5a5,#4c7896);--g-ash:linear-gradient(180deg,var(--ash-a),var(--ash-b))}
+.f-hanken{--display:'Hanken Grotesk',system-ui,sans-serif;--dtrack:-.045em}
+.f-bricolage{--display:'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif;--dtrack:-.035em}
+.disp{font-family:var(--display);letter-spacing:var(--dtrack)}
+.mono{font-family:'Fragment Mono',ui-monospace,monospace}
+@keyframes breathe{0%,100%{opacity:1;transform:scaleY(1)}50%{opacity:.55;transform:scaleY(.65)}}
+.live{animation:breathe 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.live{animation:none}}
+a{color:var(--text)}
+:focus-visible{outline:2px solid var(--run-fg);outline-offset:2px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.phone{position:relative;width:390px;height:844px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;background:var(--ground);color:var(--text);font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:14px;line-height:1.4}
+.scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.hscroll{overflow-x:auto;scrollbar-width:none}
+.hscroll::-webkit-scrollbar{display:none}
+.ib{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--body);text-decoration:none;flex-shrink:0;box-sizing:border-box}
+.ib:hover,.ghost:hover{background:var(--hover)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 16px;box-sizing:border-box;border-radius:999px;border:1px solid var(--edge);background:transparent;color:var(--body);font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--well)}
+.btn.pri{background:var(--primary);border-color:var(--primary);color:var(--on-primary);font-weight:800}
+.btn.warn{color:var(--red-fg)}
+.btn.quiet{border-color:transparent;color:var(--muted);padding:0 10px}
+.disc{display:grid;place-items:center;border-radius:50%;color:#111113;font-weight:800;flex-shrink:0;letter-spacing:0;box-sizing:border-box}
+.seg{display:inline-flex;gap:2px;padding:4px;border-radius:999px;background:var(--well)}
+.seg a,.seg button{height:36px;padding:0 13px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:999px;color:var(--body);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap}
+.seg [aria-current="page"],.seg [aria-pressed="true"]{background:var(--sel);box-shadow:var(--sel-shadow);color:var(--text);font-weight:800}
+.seg .n{font-size:12px;font-weight:700;color:var(--run-fg)}
+.seg .m{font-size:12px;font-weight:600;color:var(--muted)}
+.kchip{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 13px;box-sizing:border-box;border-radius:999px;border:1px solid var(--edge);color:var(--body);font-size:13px;font-weight:600;white-space:nowrap;flex-shrink:0}
+.kchip[aria-pressed="true"]{background:var(--sel);border-color:transparent;box-shadow:var(--sel-shadow);color:var(--text);font-weight:800}
+.st{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0}
+.dock-wrap{position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;align-items:center;justify-content:center;gap:10px;padding:34px 16px 18px;background:linear-gradient(180deg,transparent,var(--ground) 62%);pointer-events:none}
+.dock{pointer-events:auto;display:flex;gap:2px;padding:5px;border-radius:999px;background:var(--card);border:1px solid var(--card-edge);box-shadow:var(--shadow-lg)}
+.dock a{position:relative;height:46px;min-width:50px;padding:0 14px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;color:var(--body);font-size:14px;font-weight:600;text-decoration:none}
+.dock a:hover{background:var(--hover)}
+.dock a[aria-current="page"]{background:var(--sel);box-shadow:var(--sel-shadow);color:var(--text);font-weight:800}
+.dock .lbl{display:none}
+.dock a[aria-current="page"] .lbl{display:inline}
+.fab{pointer-events:auto;width:56px;height:56px;flex-shrink:0;border-radius:50%;display:grid;place-items:center;background:var(--primary);color:var(--on-primary);box-shadow:var(--shadow-lg);text-decoration:none}
+.badge{min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:999px;background:linear-gradient(135deg,#ff2bd6,#f7b52f);color:#111113;font-size:11px;font-weight:800;display:inline-grid;place-items:center}
+.rq{position:relative;display:flex;flex-direction:column;gap:11px;padding:14px 14px 14px 30px;border:1px solid var(--card-edge);border-radius:18px;background:var(--card);box-shadow:var(--shadow);text-align:left}
+.rq::before{content:"";position:absolute;left:12px;top:14px;bottom:14px;width:6px;border-radius:999px}
+.k-q::before{background:var(--g-tide)}.k-p::before{background:var(--g-orchid)}.k-a::before{background:var(--g-ember)}.k-s::before{background:var(--g-lagoon)}
+.k-q .rq-kind{background:var(--cyan-bg);color:var(--cyan-fg)}.k-p .rq-kind{background:var(--violet-bg);color:var(--violet-fg)}.k-a .rq-kind{background:var(--amber-bg);color:var(--amber-fg)}.k-s .rq-kind{background:var(--green-bg);color:var(--green-fg)}
+.rq-top{display:flex;align-items:center;gap:6px;min-width:0;padding-bottom:10px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+.rq-kind{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em;flex-shrink:0}
+.rq-tag{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:999px;border:1px solid var(--edge);color:var(--body);font-size:11px;font-weight:600;flex-shrink:0}
+.rq-new{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:999px;background:var(--run-bg);color:var(--run-fg);font-size:11px;font-weight:700;flex-shrink:0}
+.rq-new::before{content:"";width:4px;height:10px;border-radius:999px;background:var(--g-ion)}
+.rq-life{margin-left:auto;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.rq-soon{color:var(--red-fg);font-weight:600}
+.rq-menu{width:32px;height:32px;margin:-6px -6px -6px 0;display:grid;place-items:center;border-radius:50%;color:var(--muted);flex-shrink:0}
+.rq-ask{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.rq-ask b{color:var(--text);font-weight:600}
+.rq h3{margin:0;font-family:var(--display);letter-spacing:-.01em;font-size:17px;font-weight:800;line-height:1.25}
+.rq p{margin:0;font-size:14px;line-height:1.5;color:var(--body)}
+.rq-q{font-size:14px;font-weight:600;color:var(--text)}
+.rq-q span{font-weight:500;color:var(--muted);font-size:12px}
+.rq-next{display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border-radius:14px;background:var(--code);font-size:13px;line-height:1.45;color:var(--muted)}
+.rq-next svg{flex-shrink:0;margin-top:2px}
+.rq-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rq-acts .btn{flex:1 1 auto}
+.rq-acts .btn.quiet{flex:0 0 auto}
+.rq-who{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.rq-opts{display:flex;flex-direction:column;gap:6px}
+.rq-opt{position:relative;display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;font-size:14px;line-height:1.45;color:var(--body);cursor:pointer}
+.rq-opt.on{border-color:color-mix(in srgb,var(--run-fg) 75%,transparent);background:var(--run-bg);color:var(--text)}
+.rq-opt small{display:block;font-size:12px;color:var(--muted)}
+.rq-radio{width:16px;height:16px;flex-shrink:0;margin-top:2px;box-sizing:border-box;border-radius:50%;border:2px solid var(--edge)}
+.rq-opt.on .rq-radio{border:5px solid var(--run-fg)}
+.rq-check{width:16px;height:16px;flex-shrink:0;margin-top:2px;box-sizing:border-box;border-radius:5px;border:2px solid var(--edge);display:grid;place-items:center;color:var(--on-primary)}
+.rq-opt.on .rq-check{background:var(--run-fg);border-color:var(--run-fg)}
+.rq-chips{display:flex;gap:6px;flex-wrap:wrap}
+.rq-chip{height:36px;padding:0 12px;box-sizing:border-box;border-radius:999px;border:1px solid var(--edge);font-size:13px;color:var(--body)}
+.rq-chip[aria-pressed="true"]{border-color:color-mix(in srgb,var(--run-fg) 75%,transparent);background:var(--run-bg);color:var(--text)}
+.rq-field{display:flex;align-items:center;min-height:44px;padding:0 12px;box-sizing:border-box;border:1px solid var(--edge);border-radius:14px;background:var(--ground);font-size:14px;color:var(--muted)}
+.rq-code{margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--code);font-family:'Fragment Mono',ui-monospace,monospace;font-size:12px;line-height:1.6;color:var(--body);white-space:pre-wrap;word-break:break-word}
+.rq-code span{color:var(--muted)}
+.rq-meter{height:6px;border-radius:3px;background:var(--well);overflow:hidden}
+.rq-meter span{display:block;height:100%;border-radius:3px}
+.rq-stage{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.rq-step{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;border:1px solid var(--edge);color:var(--muted)}
+.rq-step.now{border-color:color-mix(in srgb,var(--green-fg) 65%,transparent);background:var(--green-bg);color:var(--green-fg)}
+.rq-file{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;box-sizing:border-box;border:1px solid var(--edge);border-radius:999px;font-size:12px;color:var(--body);text-decoration:none;white-space:nowrap}
+.rq-agent{display:flex;gap:12px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--ground)}
+.rq-kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin-top:6px;font-size:12px;color:var(--muted)}
+.rq-kv b{font-weight:500;color:var(--body)}
+.rq-diff{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden;font-size:13px}
+.rq-drow{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-top:1px solid var(--line);color:var(--body)}
+.rq-drow:first-child{border-top:0;font-size:12px;color:var(--muted);background:var(--code)}
+.rq-drow small{font-size:12px;color:var(--muted)}
+.rq-was{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dashed)}
+.rq-alert{display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border-radius:14px;border:1px solid color-mix(in srgb,var(--amber-fg) 50%,transparent);background:var(--amber-bg);font-size:12px;line-height:1.45;color:var(--amber-fg)}
+.rq-about{display:flex;align-items:center;gap:10px;padding:10px 6px 10px 12px;border:1px solid var(--edge);border-radius:14px;background:var(--ground);color:var(--text);text-decoration:none;font-size:13px;line-height:1.35}
+.rq-about:hover{border-color:var(--dashed)}
+.rq-about .g{width:6px;height:16px;flex-shrink:0;border-radius:999px}
+.rq-about .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.rq-about .tt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.rq-about .mt{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+</style>
+</helmet>
+<div class="phone {{rootClass}}">
+<div class="scroll" style="padding-bottom: 112px">
+  <header style="display: flex; align-items: center; gap: 4px; padding: 14px 8px 4px 20px">
+    <h1 class="disp" style="margin: 0; font-size: 30px; font-weight: 800; line-height: 1; letter-spacing: -.02em">Inbox</h1>
+    <div style="margin-left: auto; display: flex">
+      <a class="ib" href="Search.dc.html" aria-label="Search the inbox"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></a>
+      <button class="ib" aria-label="Notification settings"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"></path><circle cx="15" cy="6" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg></button>
+    </div>
+  </header>
+
+  <div class="hscroll" style="padding: 10px 12px 0">
+    <nav aria-label="Inbox views" class="seg">
+      <a href="Inbox.dc.html" aria-current="page">Needs you<span class="n">8</span></a>
+      <a href="InboxUpdates.dc.html">Updates<span class="m">12</span></a>
+      <a href="InboxUpdates.dc.html">Alerts<span class="m">3</span></a>
+      <a href="#">Snoozed<span class="m">2</span></a>
+      <a href="#">Cleared</a>
+    </nav>
+  </div>
+
+  <div class="hscroll" role="group" aria-label="Request kinds" style="display: flex; gap: 6px; padding: 10px 12px 4px">
+    <sc-for list="{{filters}}" as="f" hint-placeholder-count="5">
+      <button class="kchip" aria-pressed="{{f.pressed}}" onClick="{{f.select}}"><span style="display: {{f.glyphDisplay}}; width: 5px; height: 12px; border-radius: 999px; background: {{f.glyph}}"></span>{{f.label}}<span style="color: var(--muted); font-weight: 600">{{f.count}}</span></button>
+    </sc-for>
+  </div>
+  <div style="padding: 6px 20px 10px; font-size: 12px; color: var(--muted)">Most urgent first</div>
+
+  <section aria-label="Requests waiting on you" style="display: flex; flex-direction: column; gap: 12px; padding: 0 12px">
+
+    <sc-if value="{{show.tool}}" hint-placeholder-val="{{true}}">
+      <article class="rq k-p" aria-label="Tool call from Strategy Engineer">
+        <div class="rq-top">
+          <span class="rq-kind"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12l-3-3M20 16H8l3 3"></path></svg>PROPOSAL</span>
+          <span class="rq-tag" style="border-color: color-mix(in srgb, var(--violet-fg) 60%, transparent); color: var(--violet-fg)"><svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"></path></svg>Acts</span>
+          <span class="rq-new">New</span>
+          <span class="rq-life rq-soon"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>52 min left</span>
+          <button class="rq-menu" aria-label="Snooze or dismiss" aria-haspopup="menu"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+        </div>
+        <div class="rq-ask"><span class="disc" aria-hidden="true" style="width: 20px; height: 20px; font-size: 8px; background: linear-gradient(160deg, #ff2bd6, #f2286f)">SE</span><b>Strategy Engineer</b>wants to run a tool<span>· 8m ago</span></div>
+        <h3>Merge PR #14 into main?</h3>
+<pre class="rq-code"><span>tool </span> github.merge_pull_request
+<span>repo </span> br1an-c0des/trading-workbench
+<span>pr   </span> #14 · feat: liquidation sweep strategy
+<span>mode </span> squash</pre>
+        <div class="rq-next"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--muted)"><circle cx="12" cy="12" r="9"></circle><path d="M10 8l4 4-4 4"></path></svg><span>Approving runs this call once. Always allow also approves future merges to trading-workbench by Strategy Engineer.</span></div>
+        <div class="rq-acts">
+          <button class="btn pri" style="flex-basis: 100%">Approve and run</button>
+          <button class="btn">Always allow</button>
+          <button class="btn warn">Decline</button>
+        </div>
+        <a class="rq-about" href="#"><span class="g" aria-hidden="true" style="background: var(--g-orchid)"></span><span class="tx"><span class="tt"><span class="mono" style="font-size: 12px; color: var(--muted); font-weight: 400">TRA-44</span> Liquidation sweep strategy</span><span class="mt"><span class="st" style="background: var(--violet-bg); color: var(--violet-fg)">IN REVIEW</span>PR #14 checks passed · 32m</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); flex-shrink: 0"><path d="m9 6 6 6-6 6"></path></svg></a>
+      </article>
+    </sc-if>
+
+    <sc-if value="{{show.budget}}" hint-placeholder-val="{{true}}">
+      <article class="rq k-a" aria-label="Budget stop for Frontend Engineer">
+        <div class="rq-top">
+          <span class="rq-kind"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"></path><path d="m9 12 2 2 4-4"></path></svg>APPROVAL</span>
+          <span class="rq-new">New</span>
+          <span class="rq-life">Open until resolved</span>
+          <button class="rq-menu" aria-label="Snooze or dismiss" aria-haspopup="menu"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+        </div>
+        <div class="rq-ask"><b>Paperclip</b>paused Frontend Engineer<span>· 12m ago</span></div>
+        <h3>Raise Frontend Engineer's limit, or keep it paused?</h3>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--muted)"><span><b style="color: var(--text); font-weight: 700">$80.25</b> of $80 this October</span><span style="color: var(--red-fg); font-weight: 600">100%</span></div>
+          <div class="rq-meter" aria-hidden="true"><span style="width: 100%; background: linear-gradient(90deg, #f7b52f, #f2272c)"></span></div>
+        </div>
+        <div class="rq-opts" role="radiogroup" aria-label="Budget choice">
+          <label class="rq-opt on"><input class="vh" type="radio" name="budget" checked><span class="rq-radio" aria-hidden="true"></span><span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">Raise the limit to <span class="rq-field" style="min-height: 34px; color: var(--text); font-weight: 600">$ 120</span> for October</span></label>
+          <label class="rq-opt"><input class="vh" type="radio" name="budget"><span class="rq-radio" aria-hidden="true"></span>Keep it paused until November</label>
+        </div>
+        <div class="rq-next"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--muted)"><circle cx="12" cy="12" r="9"></circle><path d="M10 8l4 4-4 4"></path></svg><span>Raising the limit resumes Frontend Engineer's paused runs now.</span></div>
+        <div class="rq-acts"><button class="btn pri">Resolve</button></div>
+        <a class="rq-about" href="#"><span class="g" aria-hidden="true" style="background: var(--g-orchid)"></span><span class="tx"><span class="tt"><span class="mono" style="font-size: 12px; color: var(--muted); font-weight: 400">TRA-29</span> Refine and polish all custom charts</span><span class="mt"><span class="st" style="background: var(--amber-bg); color: var(--amber-fg)">PAUSED</span>Frontend Engineer</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); flex-shrink: 0"><path d="m9 6 6 6-6 6"></path></svg></a>
+      </article>
+    </sc-if>
+
+    <sc-if value="{{show.signoff}}" hint-placeholder-val="{{true}}">
+      <article class="rq k-s" aria-label="Sign-off for TRA-44">
+        <div class="rq-top">
+          <span class="rq-kind"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l4 4 8-9M13 16l1 1 7-8"></path></svg>SIGN-OFF</span>
+          <span class="rq-new">New</span>
+          <span class="rq-life">Open until answered</span>
+          <button class="rq-menu" aria-label="Snooze or dismiss" aria-haspopup="menu"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+        </div>
+        <div class="rq-ask"><span class="disc" aria-hidden="true" style="width: 20px; height: 20px; font-size: 8px; background: linear-gradient(160deg, #ff2bd6, #f2286f)">SE</span><b>Strategy Engineer</b>handed this to you<span>· 32m ago</span></div>
+        <h3>Your sign-off is needed: approve, or send back</h3>
+        <div class="rq-stage"><span class="rq-step now">Review · you</span><span class="rq-step">Approval · CEO</span><span>Round 1 of 3</span></div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap">
+          <a class="rq-file" href="#"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.2"></circle><circle cx="6" cy="18" r="2.2"></circle><circle cx="18" cy="18" r="2.2"></circle><path d="M6 8.2v7.6M18 15.8V10a4 4 0 0 0-4-4h-3"></path></svg>PR #14 <span style="color: var(--green-fg)">+268</span> <span style="color: var(--red-fg)">−12</span></a>
+          <a class="rq-file" href="Document.dc.html">Backtest report · rev 2</a>
+          <a class="rq-file" href="#">equity-curve.png</a>
+        </div>
+        <div class="rq-next"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--muted)"><circle cx="12" cy="12" r="9"></circle><path d="M10 8l4 4-4 4"></path></svg><span>Approving moves TRA-44 to its approval stage with CEO. Sending back returns it to Strategy Engineer.</span></div>
+        <div class="rq-acts"><button class="btn pri">Approve</button><button class="btn">Send back with notes</button></div>
+        <a class="rq-about" href="#"><span class="g" aria-hidden="true" style="background: var(--g-orchid)"></span><span class="tx"><span class="tt"><span class="mono" style="font-size: 12px; color: var(--muted); font-weight: 400">TRA-44</span> Liquidation sweep strategy</span><span class="mt"><span class="st" style="background: var(--violet-bg); color: var(--violet-fg)">IN REVIEW</span>You</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); flex-shrink: 0"><path d="m9 6 6 6-6 6"></path></svg></a>
+      </article>
+    </sc-if>
+
+    <sc-if value="{{show.form}}" hint-placeholder-val="{{true}}">
+      <article class="rq k-q" aria-label="Questions from Strategy Engineer">
+        <div class="rq-top">
+          <span class="rq-kind"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.5M12 16.5h.01"></path></svg>QUESTION</span>
+          <span class="rq-new">New</span>
+          <span class="rq-life">Open until answered</span>
+          <button class="rq-menu" aria-label="Snooze or dismiss" aria-haspopup="menu"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+        </div>
+        <div class="rq-ask"><span class="disc" aria-hidden="true" style="width: 20px; height: 20px; font-size: 8px; background: linear-gradient(160deg, #ff2bd6, #f2286f)">SE</span><b>Strategy Engineer</b>asks you 2 questions<span>· 1h ago</span></div>
+        <div class="rq-q">Which strategies should I port first? <span>Pick any</span></div>
+        <div class="rq-chips">
+          <button class="rq-chip" aria-pressed="true">Center of gravity</button>
+          <button class="rq-chip" aria-pressed="false">Boom Hunter XL v4</button>
+          <button class="rq-chip" aria-pressed="true">BB squeeze + VPA</button>
+          <button class="rq-chip" aria-pressed="false">Liquidation sweep</button>
+        </div>
+        <div class="rq-q">Which Python version should the ports target?</div>
+        <div class="rq-opts" role="radiogroup" aria-label="Python version">
+          <label class="rq-opt on"><input class="vh" type="radio" name="py" checked><span class="rq-radio" aria-hidden="true"></span>3.12, same as the backtest engine</label>
+          <label class="rq-opt"><input class="vh" type="radio" name="py"><span class="rq-radio" aria-hidden="true"></span>3.13</label>
+        </div>
+        <label class="vh" for="rq-more">Anything else (optional)</label>
+        <input id="rq-more" class="rq-field" placeholder="Anything else? (optional)" style="outline: none; color: var(--text)">
+        <div class="rq-acts"><button class="btn pri">Send answers</button><button class="btn quiet">Reply instead</button></div>
+        <a class="rq-about" href="#"><span class="g" aria-hidden="true" style="background: var(--g-ion)"></span><span class="tx"><span class="tt"><span class="mono" style="font-size: 12px; color: var(--muted); font-weight: 400">TRA-38</span> Port all open-source strategies to Python</span><span class="mt"><span class="st" style="background: var(--run-bg); color: var(--run-fg)">IN PROGRESS</span>Strategy Engineer</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); flex-shrink: 0"><path d="m9 6 6 6-6 6"></path></svg></a>
+      </article>
+    </sc-if>
+
+    <sc-if value="{{show.confirm}}" hint-placeholder-val="{{true}}">
+      <article class="rq k-q" aria-label="Question from Quant Researcher">
+        <div class="rq-top">
+          <span class="rq-kind"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.5M12 16.5h.01"></path></svg>QUESTION</span>
+          <span class="rq-life">Ends if you comment instead</span>
+          <button class="rq-menu" aria-label="Snooze or dismiss" aria-haspopup="menu"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+        </div>
+        <div class="rq-ask"><span class="disc" aria-hidden="true" style="width: 20px; height: 20px; font-size: 8px; background: linear-gradient(160deg, #2fd12f, #22b5a5)">QR</span><b>Quant Researcher</b>asks you<span>· 1h ago</span><span>· blocking the backfill</span></div>
+        <h3>OK to backfill 2022–2024 from Coinalyze?</h3>
+        <p>Hyperliquid only has liquidation history from March 2024. Coinalyze covers the earlier years, but it needs an API key stored as a company secret.</p>
+        <div class="rq-acts"><button class="btn pri">Accept</button><button class="btn">Reject</button><button class="btn quiet">Reply instead</button></div>
+        <a class="rq-about" href="TaskActivity.dc.html"><span class="g" aria-hidden="true" style="background: var(--g-ion)"></span><span class="tx"><span class="tt"><span class="mono" style="font-size: 12px; color: var(--muted); font-weight: 400">TRA-41</span> H4 download derivatives price data</span><span class="mt"><span class="live" style="width: 4px; height: 10px; border-radius: 999px; background: var(--g-ion)"></span>Quant Researcher is working · run #7</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); flex-shrink: 0"><path d="m9 6 6 6-6 6"></path></svg></a>
+      </article>
+    </sc-if>
+
+    <sc-if value="{{show.tasks}}" hint-placeholder-val="{{true}}">
+      <article class="rq k-p" aria-label="Suggested tasks from Quant Researcher">
+        <div class="rq-top">
+          <span class="rq-kind"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12l-3-3M20 16H8l3 3"></path></svg>PROPOSAL</span>
+          <span class="rq-new">New</span>
+          <span class="rq-life">Open until answered</span>
+          <button class="rq-menu" aria-label="Snooze or dismiss" aria-haspopup="menu"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+        </div>
+        <div class="rq-ask"><span class="disc" aria-hidden="true" style="width: 20px; height: 20px; font-size: 8px; background: linear-gradient(160deg, #2fd12f, #22b5a5)">QR</span><b>Quant Researcher</b>suggests 3 tasks<span>· 25m ago</span></div>
+        <h3>Split the rest of the backfill into tasks?</h3>
+        <div class="rq-opts">
+          <label class="rq-opt on"><input class="vh" type="checkbox" checked><span class="rq-check" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span><span style="flex: 1">OKX funding-rate backfill<small>Quant Researcher · medium priority</small></span></label>
+          <label class="rq-opt on"><input class="vh" type="checkbox" checked><span class="rq-check" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span><span style="flex: 1">Order book snapshot schema<small>Quant Researcher · low priority</small></span></label>
+          <label class="rq-opt"><input class="vh" type="checkbox"><span class="rq-check" aria-hidden="true"></span><span style="flex: 1">Add the Coinalyze API key as a secret<small>You · high priority</small></span></label>
+        </div>
+        <div class="rq-next"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--muted)"><circle cx="12" cy="12" r="9"></circle><path d="M10 8l4 4-4 4"></path></svg><span>Creates 2 tasks in trading workbench, then tells Quant Researcher which ones you picked.</span></div>
+        <div class="rq-acts"><button class="btn pri">Create 2 tasks</button><button class="btn">Dismiss</button></div>
+      </article>
+    </sc-if>
+
+    <sc-if value="{{show.decision}}" hint-placeholder-val="{{true}}">
+      <article class="rq k-p" aria-label="Proposal from CEO">
+        <div class="rq-top">
+          <span class="rq-kind"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12l-3-3M20 16H8l3 3"></path></svg>PROPOSAL</span>
+          <span class="rq-tag">+1 task</span>
+          <span class="rq-life">6 days left</span>
+          <button class="rq-menu" aria-label="Snooze or dismiss" aria-haspopup="menu"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+        </div>
+        <div class="rq-ask"><span class="disc" aria-hidden="true" style="width: 20px; height: 20px; font-size: 8px; background: linear-gradient(160deg, #6a93ad, #a9c6d6)">CE</span><b>CEO</b>proposes changes<span>· 2h ago</span></div>
+        <h3>How should we unblock ML testing on VPA?</h3>
+        <div class="rq-opts" role="radiogroup" aria-label="Options">
+          <label class="rq-opt on"><input class="vh" type="radio" name="dec" checked><span class="rq-radio" aria-hidden="true"></span><span>Start with BTC and ETH now<small>Their backfill is done. SOL joins when TRA-41 finishes.</small></span></label>
+          <label class="rq-opt"><input class="vh" type="radio" name="dec"><span class="rq-radio" aria-hidden="true"></span><span>Hand the SOL backfill to ML Engineer<small>Creates a task and keeps TRA-45 blocked until it lands.</small></span></label>
+          <label class="rq-opt"><input class="vh" type="radio" name="dec"><span class="rq-radio" aria-hidden="true"></span><span>Keep waiting<small>No changes.</small></span></label>
+        </div>
+        <div class="rq-diff">
+          <div class="rq-drow">What option 1 changes</div>
+          <div class="rq-drow"><small>TRA-45 blocked by</small><span><span class="rq-was">TRA-41</span> → Nothing</span></div>
+          <div class="rq-drow"><small>TRA-45 status</small><span style="display: flex; align-items: center; gap: 6px"><span class="st" style="background: var(--red-bg); color: var(--red-fg)">BLOCKED</span>→<span class="st" style="background: var(--amber-bg); color: var(--amber-fg)">TODO</span></span></div>
+          <div class="rq-drow"><small>Comment on TRA-45</small><span>"Start with BTC and ETH…"</span></div>
+        </div>
+        <div class="rq-alert"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px"><path d="M12 3 2 20h20z"></path><path d="M12 10v4M12 17h.01"></path></svg><span>TRA-45 changed after this was proposed. Strict changes are skipped if it changes again before you apply.</span></div>
+        <div class="rq-acts"><button class="btn pri">Apply option 1</button><button class="btn">Decline</button></div>
+        <a class="rq-about" href="#"><span class="g" aria-hidden="true" style="background: var(--g-flare)"></span><span class="tx"><span class="tt"><span class="mono" style="font-size: 12px; color: var(--muted); font-weight: 400">TRA-45</span> Start ML testing on VPA</span><span class="mt"><span class="st" style="background: var(--red-bg); color: var(--red-fg)">BLOCKED</span>ML Engineer · and TRA-41</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); flex-shrink: 0"><path d="m9 6 6 6-6 6"></path></svg></a>
+      </article>
+    </sc-if>
+
+    <sc-if value="{{show.hire}}" hint-placeholder-val="{{true}}">
+      <article class="rq k-a" aria-label="Approval request from CEO">
+        <div class="rq-top">
+          <span class="rq-kind"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"></path><path d="m9 12 2 2 4-4"></path></svg>APPROVAL</span>
+          <span class="rq-tag">Formal</span>
+          <span class="rq-life">Open until answered</span>
+          <button class="rq-menu" aria-label="Snooze or dismiss" aria-haspopup="menu"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+        </div>
+        <div class="rq-ask"><span class="disc" aria-hidden="true" style="width: 20px; height: 20px; font-size: 8px; background: linear-gradient(160deg, #6a93ad, #a9c6d6)">CE</span><b>CEO</b>requests approval<span>· 3h ago · revision 2</span></div>
+        <h3>Hire a Risk Analyst</h3>
+        <div class="rq-agent">
+          <span class="disc" aria-hidden="true" style="width: 40px; height: 40px; font-size: 13px; background: linear-gradient(160deg, #f2272c, #f5822a)">RA</span>
+          <div style="min-width: 0">
+            <div style="font-weight: 700">Risk Analyst</div>
+            <div style="font-size: 13px; color: var(--body)">Watches open positions and enforces the trading rules.</div>
+            <div class="rq-kv"><span>Reports to</span><b>CEO</b><span>Model</span><b>Sonnet 5.5</b><span>Budget</span><b>$60 a month</b></div>
+          </div>
+        </div>
+        <div style="font-size: 13px; color: var(--muted)">Changed in revision 2: budget lowered from $100 to $60 a month.</div>
+        <div class="rq-acts"><button class="btn pri">Approve</button><button class="btn">Request changes</button><button class="btn warn">Reject</button></div>
+        <a class="rq-about" href="#"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); flex-shrink: 0"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path></svg><span class="tx"><span class="tt">3 comments</span><span class="mt">CEO: Lowered the budget to $60 as you asked.</span></span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); flex-shrink: 0"><path d="m9 6 6 6-6 6"></path></svg></a>
+      </article>
+    </sc-if>
+  </section>
+</div>
+
+<div class="dock-wrap">
+  <nav class="dock" aria-label="Main">
+    <a href="Inbox.dc.html" aria-current="page"><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg><span class="lbl">Inbox</span><span class="badge">8</span></a>
+    <a href="Main.dc.html" aria-label="Tasks"><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="3.5"></rect><rect x="3" y="13" width="18" height="7" rx="3.5"></rect></svg><span class="lbl">Tasks</span></a>
+    <a href="Agents.dc.html" aria-label="Agents, 2 running"><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-8a7 7 0 0 1 14 0v8z"></path><path d="M9.5 13h.01M14.5 13h.01"></path></svg><span class="lbl">Agents</span><span class="live" aria-hidden="true" style="width: 4px; height: 11px; border-radius: 999px; background: var(--g-ion)"></span></a>
+  </nav>
+  <a class="fab" href="NewTask.dc.html" aria-label="New task"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></a>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"dark","options":["light","dark"]},"display":{"editor":"enum","default":"Hanken Grotesk","options":["Hanken Grotesk","Bricolage Grotesque"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { kind: 'all' };
+  }
+  renderVals() {
+    const dark = (this.props.theme ?? 'dark') === 'dark';
+    const font = (this.props.display ?? 'Hanken Grotesk') === 'Bricolage Grotesque' ? 'f-bricolage' : 'f-hanken';
+    const K = {
+      q: { name: 'Questions', glyph: 'var(--g-tide)' },
+      p: { name: 'Proposals', glyph: 'var(--g-orchid)' },
+      a: { name: 'Approvals', glyph: 'var(--g-ember)' },
+      s: { name: 'Sign-offs', glyph: 'var(--g-lagoon)' }
+    };
+    const items = { tool: 'p', budget: 'a', signoff: 's', form: 'q', confirm: 'q', tasks: 'p', decision: 'p', hire: 'a' };
+    const kind = this.state.kind;
+    const show = {};
+    Object.keys(items).forEach((key) => { show[key] = kind === 'all' || items[key] === kind; });
+    const count = (k) => Object.values(items).filter((v) => k === 'all' || v === k).length;
+    const filters = ['all', 'q', 'p', 'a', 's'].map((k) => ({
+      label: k === 'all' ? 'All' : K[k].name,
+      count: String(count(k)),
+      pressed: k === kind ? 'true' : 'false',
+      glyph: k === 'all' ? 'none' : K[k].glyph,
+      glyphDisplay: k === 'all' ? 'none' : 'inline-block',
+      select: () => this.setState({ kind: k })
+    }));
+    return { rootClass: (dark ? 'dark' : 'light') + ' ' + font, filters, show };
+  }
+}
+</script>
+</body>
+</html>
