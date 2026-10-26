@@ -4,7 +4,8 @@ import { createContext, createSignal, useContext, type ParentProps } from "solid
 /*
  * The shell's global actions, after ui/src/context/DialogContext.tsx: any page, the nav, the command
  * palette and the keyboard shortcuts open the same new-task dialog, palette and cheatsheet through
- * here. The dialogs themselves are mounted once, in CompanyLayout.
+ * here, and anything that shows a run opens it in the run modal with `openRunModal(runId)`. The
+ * dialogs themselves are mounted once, in CompanyLayout.
  */
 
 /** What a new task starts with when it's opened from somewhere specific, such as a project. */
@@ -26,6 +27,10 @@ type CommandsValue = {
   setPaletteOpen: (open: boolean) => void;
   shortcutsOpen: () => boolean;
   setShortcutsOpen: (open: boolean) => void;
+  /** The run shown in the run modal (boards 16–18), or null. */
+  runModal: () => string | null;
+  openRunModal: (runId: string) => void;
+  closeRunModal: () => void;
 };
 
 const CommandsContext = createContext<CommandsValue>();
@@ -34,6 +39,7 @@ export function CommandsProvider(props: ParentProps) {
   const [newTask, setNewTask] = createSignal<NewTaskDefaults | null>(null);
   const [paletteOpen, setPaletteOpen] = createSignal(false);
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
+  const [runModal, setRunModal] = createSignal<string | null>(null);
   const value: CommandsValue = {
     newTask,
     openNewTask: (defaults = {}) => {
@@ -45,6 +51,12 @@ export function CommandsProvider(props: ParentProps) {
     setPaletteOpen,
     shortcutsOpen,
     setShortcutsOpen,
+    runModal,
+    openRunModal: (runId) => {
+      setPaletteOpen(false);
+      setRunModal(runId);
+    },
+    closeRunModal: () => setRunModal(null),
   };
   return <CommandsContext.Provider value={value}>{props.children}</CommandsContext.Provider>;
 }

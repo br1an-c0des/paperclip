@@ -1,0 +1,105 @@
+/* The run modal's Provider trace view */
+.rx {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rx-head {
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+  flex-wrap: wrap;
+}
+
+.rx-head h3 {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.rx-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.rx-table-wrap {
+  overflow-x: auto;
+}
+
+.rx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.rx-table th {
+  padding: 0 10px 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.rx-table td {
+  height: 36px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--body);
+  white-space: nowrap;
+}
+
+.rx-table .rx-num {
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rx-frame {
+  max-width: 420px;
+}
+
+.rx-frame button {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: inherit;
+  text-align: left;
+}
+
+.rx-frame button:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.rx-table tr.rx-on td {
+  background: var(--run-bg);
+}
+
+.rx-table tr.rx-on td:first-child {
+  box-shadow: inset 2px 0 0 var(--run-fg);
+}
+
+.rx-frame-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rx-pre {
+  max-height: 520px;
+  overflow: auto;
+}
+
+@container rm (max-width: 560px) {
+  .rx {
+    padding: 16px 16px 24px;
+  }
+}

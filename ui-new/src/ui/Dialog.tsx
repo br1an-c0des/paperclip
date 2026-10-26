@@ -33,6 +33,8 @@ export type DialogProps = ParentProps<{
   hideClose?: boolean;
   /** What takes focus on open, such as a title field; by default the first focusable element. */
   initialFocus?: () => HTMLElement | null | undefined;
+  /** A class for the dialog card, for dialogs that lay out their own body, like the run modal. */
+  class?: string;
 }>;
 
 export function Dialog(props: DialogProps) {
@@ -62,7 +64,7 @@ export function Dialog(props: DialogProps) {
           <KDialog.Content
             data-layer="dialog"
             data-mode={layerMode()}
-            class="dialog"
+            class={props.class ? `dialog ${props.class}` : "dialog"}
             onCloseAutoFocus={restoreFocus}
             onOpenAutoFocus={(event: Event) => {
               const target = props.initialFocus?.();
