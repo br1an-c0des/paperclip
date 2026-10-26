@@ -5,6 +5,7 @@ import { agentLifecycleCompanyDeletion } from "../company-deletion.js";
 import { requireServerAdapter } from "../../../adapters/index.js";
 import { agentExecutionsHaveStopped } from "../../../services/agent-execution-stop.js";
 import { remoteTerminationReceipt } from "../../../services/remote-execution-termination.js";
+import { legacyControllerBootId } from "../../../services/legacy-controller-lease.js";
 import { approvalService } from "../../../services/approvals.js";
 import { updateAgentConfigurationInTransaction } from "../../../services/agent-configuration-transaction.js";
 import { agentService as agentConfiguration } from "../../../services/agents.js";
@@ -355,6 +356,21 @@ const support = await getEmbeddedPostgresTestSupport();
     await db.update(nativeRunFinalizations).set({ leaseExpiresAt: new Date(0) }).where(eq(nativeRunFinalizations.runId, run.id));
     expect(await agentExecutionsHaveStopped(db, [agent.id])).toBe(true);
     expect((await db.select().from(nativeRunFinalizations).where(eq(nativeRunFinalizations.runId, run.id)))[0]).toMatchObject({ leaseOwner: null, leaseExpiresAt: null });
+  });
+
+  it("accepts a cancelled legacy run that a restart stopped during preparation", async () => {
+    const agent = await hire();
+    const [run] = await db.insert(heartbeatRuns).values({ companyId, agentId: agent.id,
+      status: "cancelled", invocationSource: "on_demand", runtimeMode: "legacy", executionStage: "preparing",
+      startedAt: new Date(), finishedAt: new Date(), controllerBootId: legacyControllerBootId,
+      controllerLeaseExpiresAt: new Date(0) }).returning();
+    expect(await agentExecutionsHaveStopped(db, [agent.id])).toBe(false);
+    await db.update(heartbeatRuns).set({ controllerBootId: randomUUID(), executionStage: "dispatching" }).where(eq(heartbeatRuns.id, run.id));
+    expect(await agentExecutionsHaveStopped(db, [agent.id])).toBe(false);
+    await db.update(heartbeatRuns).set({ executionStage: "preparing", controllerLeaseExpiresAt: new Date(Date.now() + 60_000) }).where(eq(heartbeatRuns.id, run.id));
+    expect(await agentExecutionsHaveStopped(db, [agent.id])).toBe(false);
+    await db.update(heartbeatRuns).set({ controllerLeaseExpiresAt: new Date(0) }).where(eq(heartbeatRuns.id, run.id));
+    expect(await agentExecutionsHaveStopped(db, [agent.id])).toBe(true);
   });
 
   it("does not advance termination while a cancelled process still runs", async () => {
