@@ -17,6 +17,7 @@ export const queryKeys = {
   },
   instance: {
     experimentalSettings: ["instance", "experimental-settings"] as const,
+    generalSettings: ["instance", "general-settings"] as const,
   },
   companies: {
     /** Prefix for everything company-shaped. */
@@ -59,6 +60,16 @@ export const queryKeys = {
   dashboard: (companyId: string) => ["dashboard", companyId] as const,
   org: (companyId: string) => ["org", companyId] as const,
   liveRuns: (companyId: string) => ["live-runs", companyId] as const,
+  /**
+   * One run, for the run modal. The live-events socket refreshes `["heartbeat-run", runId]` on
+   * `heartbeat.run.status`, so the run's events and trace refresh with it.
+   */
+  runs: {
+    detail: (runId: string) => ["heartbeat-run", runId] as const,
+    events: (runId: string) => ["heartbeat-run", runId, "events"] as const,
+    providerTrace: (runId: string) => ["heartbeat-run", runId, "provider-trace"] as const,
+    providerTraceMetadata: (companyId: string, runId: string) => ["provider-traces", companyId, runId] as const,
+  },
   heartbeats: (companyId: string) => ["heartbeats", companyId] as const,
   sidebarBadges: (companyId: string) => ["sidebar-badges", companyId] as const,
 };
