@@ -30,7 +30,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 1 | [Projects can't hold documents or files](#1-projects-cant-hold-documents-or-files) | `projects/*`, `documents-artifacts/library` | Decided | Oct 20, 2026 |
 | 2 | [Agent chat is off unless the instance turns it on](#2-agent-chat-is-off-unless-the-instance-turns-it-on) | `agent-chat/*`, shell navigation | Open | Oct 20, 2026 |
 | 3 | [Agents can work on several things at once](#3-agents-can-work-on-several-things-at-once) | `agent-chat/*`, runs | Decided | Oct 20, 2026 |
-| 4 | [A run's full model input only exists when provider tracing is on](#4-a-runs-full-model-input-only-exists-when-provider-tracing-is-on) | `runs-adapters/runs`, `agents/runtime` | Open | Oct 20, 2026 |
+| 4 | [A run's full model input only exists when provider tracing is on](#4-a-runs-full-model-input-only-exists-when-provider-tracing-is-on) | `runs-adapters/runs`, `agents/runtime` | Decided | Oct 20, 2026 |
 | 5 | [Agents can have three memory systems that don't know about each other](#5-agents-can-have-three-memory-systems-that-dont-know-about-each-other) | `agents/runtime`, `agents/skills`, `agents/instructions`, Connectors | Open | Oct 22, 2026 |
 | 6 | [Tasks have no due date](#6-tasks-have-no-due-date) | `tasks/create`, `tasks/properties` | Decided | Oct 24, 2026 |
 | 7 | [Model and effort overrides depend on the agent's adapter](#7-model-and-effort-overrides-depend-on-the-agents-adapter) | `tasks/create`, `agents/runtime` | Decided | Oct 24, 2026 |
@@ -39,7 +39,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 10 | [Some response types aren't exported from the shared package](#10-some-response-types-arent-exported-from-the-shared-package) | shell, session | Decided | Oct 25, 2026 |
 | 11 | [Menus inside dialogs need to sit above the overlay](#11-menus-inside-dialogs-need-to-sit-above-the-overlay) | design system | Decided | Oct 25, 2026 |
 | 12 | [What happens to each experimental flag](#12-what-happens-to-each-experimental-flag) | every flagged area | Decided | Oct 25, 2026 |
-| 13 | [The task composer overrides runs for more adapters than New task does](#13-the-task-composer-overrides-runs-for-more-adapters-than-new-task-does) | `tasks/create`, `agents/runtime` | Open | Oct 25, 2026 |
+| 13 | [The task composer overrides runs for more adapters than New task does](#13-the-task-composer-overrides-runs-for-more-adapters-than-new-task-does) | `tasks/create`, `agents/runtime` | Decided | Oct 25, 2026 |
 | 14 | [Lists need their own storage, so they're on hold](#14-lists-need-their-own-storage-so-theyre-on-hold) | `goals/*`, `tasks/organize`, `projects/task-context` | Decided | Oct 26, 2026 |
 
 ## Entries
@@ -139,7 +139,7 @@ when the agent is at its run limit or paused.
 
 ### 4. A run's full model input only exists when provider tracing is on
 
-- **Status:** Open
+- **Status:** Decided
 - **Area:** `runs-adapters/runs`, `agents/runtime`
 - **Found in:** the task run modal in the design canvas (screens 16 to 18).
 
@@ -184,7 +184,8 @@ aren't instance admins never see the full input, and admins only see it within a
 
 Options 1 and 3 can be combined.
 
-**Decision.** Not made yet. Screens 16 to 18 follow option 1.
+**Decision.** Option 1, decided Oct 26, 2026, as screens 16 to 18 draw it. The request summary of
+option 3 stays proposed upstream as [2b-10](build-plan.md#2b-small-features-ask-upstream-first).
 
 ### 5. Agents can have three memory systems that don't know about each other
 
@@ -536,7 +537,7 @@ with the same three outcomes; the upstream sync report flags new ones.
 
 ### 13. The task composer overrides runs for more adapters than New task does
 
-- **Status:** Open
+- **Status:** Decided
 - **Area:** `tasks/create`, `agents/runtime`
 - **Found in:** building the assignee capsule in M1, against
   `ui/src/components/task-chat/composer-run-settings.ts`.
@@ -571,6 +572,12 @@ the Claude list is wrong for the newest models. M2 builds the composer, which ne
 
 **Recommendation.** Option 3, with option 2 as the fallback until it lands: the model list already
 comes from the server, and the efforts belong with it.
+
+**Decision.** Option 3 with option 2 as the fallback, decided Oct 26, 2026. The endpoint is a small
+feature, so it starts as a message in upstream's `#dev` channel
+([2b-16](build-plan.md#2b-small-features-ask-upstream-first)). Until it lands, `new-task.ts` holds one
+mirrored table that New task and the composer share, and the upstream sync checks the adapter
+packages for changes to it.
 
 
 ### 14. Lists need their own storage, so they're on hold

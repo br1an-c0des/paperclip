@@ -56,9 +56,8 @@ Notes:
 
 ## Open questions
 
-- **Panel or modal.** A task opens beside the list on boards 2, 3 and 5, and as a modal on boards 6
-  and 7. Which one is the default, and when is the other used? The
-  [build plan](../build-plan.md#decisions-to-make-early) recommends one (decision B).
+- ~~**Panel or modal.**~~ Both get built. The docked panel is the default for now, and a setting will
+  choose between them ([decision B](../build-plan.md#decisions-to-make-early)).
 
 ## Still to design
 

@@ -195,7 +195,7 @@ responsive pass in M7.
 | # | Decision | Needed by | Recommendation |
 | --- | --- | --- | --- |
 | A | Agent chat flag ([decision 2](decisions.md#2-agent-chat-is-off-unless-the-instance-turns-it-on)) | M5 | Turn `enableAgentChat` on as part of every `ui-new` deployment (option 1). Fall back to agent settings if it's off (option 2). |
-| B | Task panel or modal ([design open question](design/README.md#open-questions)) | M2 | Panel when opened from a list or board (boards 2, 3, 5). Modal when opened from anywhere without a list: Inbox, chat, dashboards (boards 6, 7). Full page for direct links. |
+| B | Task panel or modal ([design open question](design/README.md#open-questions)) | M2 | Decided Oct 26, 2026: build both. The docked panel (boards 2, 3, 5) is the default for now; a setting will choose between the panel and the modal (boards 6, 7). Pages without a list (Inbox, chat, dashboards) open the modal, and direct links open the full page. |
 | C | Lists as goals | M4 | Superseded Oct 26, 2026: lists are on hold until they have their own storage ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)). Goals stay a task property and a project setting. |
 | D | Project-level docs ([decision 1](decisions.md#1-projects-cant-hold-documents-or-files)) | M4 | Decided: build "From tasks", and start the 2b-8 conversation upstream. The project section waits for project documents, with the plugin (3.4) if upstream declines. No hidden docs task. |
 | E | Each experimental flag ([decision 12](decisions.md#12-what-happens-to-each-experimental-flag)) | M0 | Decided: built in, dropped, or following the instance setting, per flag. Agent chat and `enablePublicMcp` on; the file viewer built in (M2); Conference Room chat dropped. |
@@ -386,6 +386,7 @@ dropped.
 | 13 | More relation types ("relates to", "duplicates") | Only if mentions and blockers prove too little |
 | 14 | "Report to chat": let any task or routine deliver its result into a person's chat with the agent | Briefings and reports ([3.13](#313-briefings-and-reports)). The delivery already exists for tasks handed off from a chat (`chatTaskHandoffs`, decision 8); this adds a way to link other tasks. |
 | 15 | Return the project's and goal's descriptions in `heartbeat-context` | Agents read it first, but it gives only names, so the "why" behind a task reaches them only if they load the full task ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)). |
+| 16 | Each adapter's effort choices per model, beside `GET /api/companies/:companyId/adapters/:type/models` | [Decision 13](decisions.md#13-the-task-composer-overrides-runs-for-more-adapters-than-new-task-does). New task and the composer read one list instead of a mirrored copy that drifts. |
 
 ## Stage 3: experimental features
 
