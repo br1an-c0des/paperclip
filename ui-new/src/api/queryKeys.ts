@@ -39,6 +39,11 @@ export const queryKeys = {
     view: (companyId: string, scope: { projectId?: string; parentId?: string }) =>
       ["issues", companyId, "view", scope.projectId ?? "__all__", scope.parentId ?? "__all__"] as const,
     detail: (issueId: string) => ["issues", "detail", issueId] as const,
+    /**
+     * A task panel section's data (comments, activity, runs, documents…), under the task's detail
+     * key so that anything refreshing the task refreshes its sections too.
+     */
+    section: (issueId: string, section: string, ...rest: string[]) => ["issues", "detail", issueId, section, ...rest] as const,
     search: (companyId: string, q: string, limit: number) => ["issues", companyId, "search", q, limit] as const,
     labels: (companyId: string) => ["issues", companyId, "labels"] as const,
   },

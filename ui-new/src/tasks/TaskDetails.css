@@ -1,10 +1,4 @@
-/* Board 2's Details section: the content column and the section rail on its right */
-.td {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-
+/* Board 2's Details section */
 .td-main {
   flex: 1;
   min-width: 0;
@@ -331,35 +325,6 @@ a.td-chip:hover {
   margin-left: auto;
   flex-shrink: 0;
   color: var(--muted);
-}
-
-.td-rail {
-  flex: 0 0 52px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding-top: 14px;
-  border-left: 1px solid var(--line);
-}
-
-.td-rail-btn {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  color: var(--muted);
-}
-
-.td-rail-btn[aria-current="page"] {
-  background: var(--primary);
-  color: var(--on-primary);
-}
-
-.td-rail-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 /* A narrow panel stacks the property labels over their values */

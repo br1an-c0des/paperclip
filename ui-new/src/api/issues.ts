@@ -1,4 +1,15 @@
-import type { CompactIssue, Issue, IssueAttachment, IssueLabel } from "@paperclipai/shared";
+import type {
+  ActivityEvent,
+  CompactIssue,
+  Issue,
+  IssueAttachment,
+  IssueComment,
+  IssueCostSummary,
+  IssueDocument,
+  IssueDocumentSummary,
+  IssueLabel,
+  IssueWorkProduct,
+} from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
@@ -68,6 +79,49 @@ export const issuesApi = {
     return api.postForm<IssueAttachment>(`/companies/${companyId}/issues/${issueId}/attachments`, form);
   },
   listLabels: (companyId: string) => api.get<IssueLabel[]>(`/companies/${companyId}/labels`),
+
+  // The task panel's sections (boards 3 and 5, and the Runs and Workspace sections).
+  /** A page of comments, newest first. `after` is the last comment of the previous page. */
+  listComments: (id: string, page: { limit: number; after?: string }, signal?: AbortSignal) => {
+    const params = new URLSearchParams({ order: "desc", limit: String(page.limit) });
+    if (page.after) params.set("after", page.after);
+    return api.get<IssueComment[]>(`/issues/${id}/comments?${params}`, { signal });
+  },
+  /** Posts a comment. The client request id makes a retried post land once. */
+  addComment: (id: string, body: string, clientRequestId: string) =>
+    api.post<IssueComment>(`/issues/${id}/comments`, { body, clientRequestId }),
+  activity: (id: string, signal?: AbortSignal) => api.get<ActivityEvent[]>(`/issues/${id}/activity`, { signal }),
+  runs: (id: string, signal?: AbortSignal) => api.get<RunForIssue[]>(`/issues/${id}/runs`, { signal }),
+  costSummary: (id: string, signal?: AbortSignal) => api.get<IssueCostSummary>(`/issues/${id}/cost-summary`, { signal }),
+  listDocuments: (id: string, signal?: AbortSignal) => api.get<IssueDocumentSummary[]>(`/issues/${id}/documents`, { signal }),
+  getDocument: (id: string, key: string, signal?: AbortSignal) =>
+    api.get<IssueDocument>(`/issues/${id}/documents/${encodeURIComponent(key)}`, { signal }),
+  listAttachments: (id: string, signal?: AbortSignal) => api.get<IssueAttachment[]>(`/issues/${id}/attachments`, { signal }),
+  listWorkProducts: (id: string, signal?: AbortSignal) => api.get<IssueWorkProduct[]>(`/issues/${id}/work-products`, { signal }),
+};
+
+/**
+ * One of a task's runs (`GET /issues/:id/runs`). The full type lives in the old UI
+ * (ui/src/api/activity.ts, `RunForIssue`); these are the fields ui-new reads.
+ */
+export type RunForIssue = {
+  runId: string;
+  status: string;
+  agentId: string;
+  adapterType: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  invocationSource: string;
+  errorCode?: string | null;
+  error?: string | null;
+  usageJson: Record<string, unknown> | null;
+  resultJson: Record<string, unknown> | null;
+  retryOfRunId?: string | null;
+  scheduledRetryAt?: string | null;
+  livenessState?: string | null;
+  livenessReason?: string | null;
+  lastUsefulActionAt?: string | null;
 };
 
 /** The URL path of a task, under the company prefix. */

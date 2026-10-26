@@ -1,0 +1,100 @@
+/* A task's open section and the section rail on its right (boards 2, 3 and 5) */
+.tsec {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.tsec-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* In the dock the panel keeps its full height, so switching sections or tasks doesn't resize it */
+.panel:has(> .panel-body > .tsec) {
+  height: calc(100dvh - 2 * var(--main-pad-top, 14px));
+}
+
+.tsec-rail {
+  flex: 0 0 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-top: 14px;
+  border-left: 1px solid var(--line);
+}
+
+.tsec-rail-btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.tsec-rail-btn:hover {
+  background: var(--well);
+  color: var(--text);
+}
+
+.tsec-rail-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--run-fg);
+}
+
+.tsec-rail-btn[aria-current="page"] {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+/* The sections below Details share a frame: a heading row, then content that scrolls */
+.tsec-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 18px 24px 12px;
+}
+
+.tsec-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.tsec-head-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tsec-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tsec-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@container panel (width < 480px) {
+  .tsec-head {
+    padding: 14px 16px 10px;
+  }
+
+  .tsec-scroll {
+    padding: 4px 16px 24px;
+  }
+}

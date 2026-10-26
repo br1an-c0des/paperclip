@@ -7,7 +7,7 @@ import { Panel } from "@/layout/Panel";
 import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
 import { InitialsDisc } from "@/ui/Avatar";
-import { TaskDetails } from "./TaskDetails";
+import { TaskSections } from "./TaskSections";
 import "./TaskPanel.css";
 
 /*
@@ -63,7 +63,7 @@ export function TaskPanel(props: {
         </A>
       }
     >
-      <TaskDetails taskId={props.task.id} onOpenTask={props.onOpenTask} />
+      <TaskSections taskId={props.task.id} title={props.task.title} onOpenTask={props.onOpenTask} />
     </Panel>
   );
 }

@@ -1,0 +1,106 @@
+/* The task panel's Runs section */
+.tr {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tr-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.tr-totals div {
+  padding: 10px 14px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+}
+
+.tr-totals dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tr-totals dd {
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.tr-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  box-shadow: none;
+}
+
+.tr-run {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.tr-run + .tr-run {
+  border-top: 1px solid var(--line);
+}
+
+.tr-avatar-gap {
+  flex: 0 0 24px;
+}
+
+.tr-run-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tr-run-main .tsec-muted {
+  font-size: 12px;
+}
+
+.tr-run-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tr-agent {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.tr-status {
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--r-pill);
+  background: var(--tone-bg);
+  color: var(--tone-fg);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 20px;
+  text-transform: uppercase;
+}
+
+.tr-status[data-tone="run"] { --tone-bg: var(--run-bg); --tone-fg: var(--run-fg); }
+.tr-status[data-tone="amber"] { --tone-bg: var(--amber-bg); --tone-fg: var(--amber-fg); }
+.tr-status[data-tone="red"] { --tone-bg: var(--red-bg); --tone-fg: var(--red-fg); }
+.tr-status[data-tone="green"] { --tone-bg: var(--green-bg); --tone-fg: var(--green-fg); }
+.tr-status[data-tone="neutral"] { --tone-bg: var(--pri-off); --tone-fg: var(--text); }
+
+.tr-error {
+  margin: 4px 0 0;
+  color: var(--red-fg);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}

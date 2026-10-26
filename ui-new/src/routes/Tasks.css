@@ -8,6 +8,11 @@
   overflow: visible;
 }
 
+/* The other sections scroll inside the card, so the thread's composer stays in view */
+.task-page:has(.tsec:not([data-section="details"])) {
+  height: calc(100dvh - 150px);
+}
+
 .task-page-note {
   padding: 22px 24px;
 }

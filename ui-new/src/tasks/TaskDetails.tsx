@@ -1,7 +1,6 @@
 import type { CompactIssue, Issue, IssuePriority, IssueRelationIssueSummary, IssueStatus } from "@paperclipai/shared";
 import { createQuery } from "@tanstack/solid-query";
 import {
-  Activity,
   Box,
   Calendar,
   ChevronDown,
@@ -12,9 +11,7 @@ import {
   FolderGit2,
   GitPullRequest,
   Hash,
-  Layers,
   ListTree,
-  Play,
   Plus,
   Tag,
   Target,
@@ -35,8 +32,8 @@ import "./TaskDetails.css";
 
 /*
  * The task panel's Details section (board 2): kind and run, title, properties, description with
- * the task's documents and work products, subtasks and dependencies. The other sections (Activity,
- * Docs and files, Runs, Workspace) arrive later in M2; their rail buttons are there but disabled.
+ * the task's documents and work products, subtasks and dependencies. TaskSections puts it beside
+ * the rail with the other sections.
  *
  * Read-only for now: the inline edits come with the list's interactions.
  */
@@ -207,188 +204,166 @@ export function TaskDetails(props: {
   const empty = () => properties().filter((property) => property.value === null);
 
   return (
-    <div class="td">
-      <div class="td-main">
-        <Switch>
-          <Match when={query.isError && !task()}>
-            <p class="td-muted">This task couldn't be loaded: {(query.error as Error).message}</p>
-          </Match>
-          <Match when={!task()}>
-            <p class="td-muted">Loading…</p>
-          </Match>
-          <Match when={task()}>
-            {(current) => (
-              <>
-                <div class="td-top">
-                  <span class="td-kind">
-                    <Capsule gradient="ash" size="tiny" />
-                    Task
+    <div class="td-main">
+      <Switch>
+        <Match when={query.isError && !task()}>
+          <p class="td-muted">This task couldn't be loaded: {(query.error as Error).message}</p>
+        </Match>
+        <Match when={!task()}>
+          <p class="td-muted">Loading…</p>
+        </Match>
+        <Match when={task()}>
+          {(current) => (
+            <>
+              <div class="td-top">
+                <span class="td-kind">
+                  <Capsule gradient="ash" size="tiny" />
+                  Task
+                </span>
+                <Show when={run()}>{(live) => <RunningPill compact label={`Running · ${elapsed(live().startedAt ?? live().createdAt)}`} />}</Show>
+                <Show when={kids().length > 0}>
+                  <span class="td-muted">
+                    {kidsDone()} of {kids().length} subtasks done
                   </span>
-                  <Show when={run()}>{(live) => <RunningPill compact label={`Running · ${elapsed(live().startedAt ?? live().createdAt)}`} />}</Show>
+                </Show>
+              </div>
+
+              <Show when={!props.hideTitle}>
+                <h1 class="disp td-title">{current().title}</h1>
+              </Show>
+
+              <dl class="td-props">
+                <For each={showEmpty() ? properties() : filled()}>
+                  {(property) => (
+                    <>
+                      <dt>
+                        <span aria-hidden="true">{property.icon}</span>
+                        {property.label}
+                      </dt>
+                      <dd>{property.value ?? <span class="td-muted">None</span>}</dd>
+                    </>
+                  )}
+                </For>
+              </dl>
+              <Show when={empty().length > 0}>
+                <button type="button" class="td-more" aria-expanded={showEmpty()} onClick={() => setShowEmpty(!showEmpty())}>
+                  <ChevronDown size={14} aria-hidden="true" classList={{ "td-more-open": showEmpty() }} />
+                  {showEmpty()
+                    ? "Hide empty fields"
+                    : `Show ${empty().length} empty field${empty().length === 1 ? "" : "s"}: ${empty()
+                        .map((property) => property.label.toLowerCase())
+                        .join(", ")}`}
+                </button>
+              </Show>
+
+              <section class="td-section td-description" aria-label="Description">
+                <Show when={current().description?.trim()} fallback={<p class="td-muted">No description.</p>}>
+                  {(text) => <Markdown source={text()} />}
+                </Show>
+                <Show when={(current().documentSummaries?.length ?? 0) + (current().workProducts?.length ?? 0) > 0}>
+                  <div class="td-chips">
+                    <For each={current().documentSummaries ?? []}>
+                      {(doc) => (
+                        <span class="td-chip">
+                          <FileText size={14} aria-hidden="true" />
+                          {doc.title ?? doc.key}
+                          <Show when={doc.latestRevisionNumber > 1}>
+                            <span class="td-muted">· rev {doc.latestRevisionNumber}</span>
+                          </Show>
+                        </span>
+                      )}
+                    </For>
+                    <For each={current().workProducts ?? []}>
+                      {(product) => (
+                        <Show
+                          when={product.url}
+                          fallback={
+                            <span class="td-chip">
+                              <GitPullRequest size={14} aria-hidden="true" />
+                              {product.title}
+                            </span>
+                          }
+                        >
+                          {(url) => (
+                            <a class="td-chip" href={url()} target="_blank" rel="noopener noreferrer">
+                              <GitPullRequest size={14} aria-hidden="true" />
+                              {product.title}
+                              <span class="td-muted">· {String(product.status).replace(/_/g, " ")}</span>
+                            </a>
+                          )}
+                        </Show>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </section>
+
+              <section class="td-section" aria-labelledby={`td-subtasks-${props.taskId}`}>
+                <div class="td-section-head">
+                  <ListTree size={16} aria-hidden="true" />
+                  <h2 class="disp" id={`td-subtasks-${props.taskId}`}>
+                    Subtasks
+                  </h2>
                   <Show when={kids().length > 0}>
                     <span class="td-muted">
-                      {kidsDone()} of {kids().length} subtasks done
+                      {kidsDone()} of {kids().length}
+                    </span>
+                    <span class="td-progress" aria-hidden="true">
+                      <span style={{ width: `${(kidsDone() / kids().length) * 100}%` }} />
                     </span>
                   </Show>
                 </div>
-
-                <Show when={!props.hideTitle}>
-                  <h1 class="disp td-title">{current().title}</h1>
-                </Show>
-
-                <dl class="td-props">
-                  <For each={showEmpty() ? properties() : filled()}>
-                    {(property) => (
-                      <>
-                        <dt>
-                          <span aria-hidden="true">{property.icon}</span>
-                          {property.label}
-                        </dt>
-                        <dd>{property.value ?? <span class="td-muted">None</span>}</dd>
-                      </>
-                    )}
-                  </For>
-                </dl>
-                <Show when={empty().length > 0}>
-                  <button type="button" class="td-more" aria-expanded={showEmpty()} onClick={() => setShowEmpty(!showEmpty())}>
-                    <ChevronDown size={14} aria-hidden="true" classList={{ "td-more-open": showEmpty() }} />
-                    {showEmpty()
-                      ? "Hide empty fields"
-                      : `Show ${empty().length} empty field${empty().length === 1 ? "" : "s"}: ${empty()
-                          .map((property) => property.label.toLowerCase())
-                          .join(", ")}`}
-                  </button>
-                </Show>
-
-                <section class="td-section td-description" aria-label="Description">
-                  <Show when={current().description?.trim()} fallback={<p class="td-muted">No description.</p>}>
-                    {(text) => <Markdown source={text()} />}
-                  </Show>
-                  <Show when={(current().documentSummaries?.length ?? 0) + (current().workProducts?.length ?? 0) > 0}>
-                    <div class="td-chips">
-                      <For each={current().documentSummaries ?? []}>
-                        {(doc) => (
-                          <span class="td-chip">
-                            <FileText size={14} aria-hidden="true" />
-                            {doc.title ?? doc.key}
-                            <Show when={doc.latestRevisionNumber > 1}>
-                              <span class="td-muted">· rev {doc.latestRevisionNumber}</span>
-                            </Show>
-                          </span>
-                        )}
-                      </For>
-                      <For each={current().workProducts ?? []}>
-                        {(product) => (
-                          <Show
-                            when={product.url}
-                            fallback={
-                              <span class="td-chip">
-                                <GitPullRequest size={14} aria-hidden="true" />
-                                {product.title}
-                              </span>
-                            }
-                          >
-                            {(url) => (
-                              <a class="td-chip" href={url()} target="_blank" rel="noopener noreferrer">
-                                <GitPullRequest size={14} aria-hidden="true" />
-                                {product.title}
-                                <span class="td-muted">· {String(product.status).replace(/_/g, " ")}</span>
-                              </a>
-                            )}
-                          </Show>
-                        )}
-                      </For>
+                <div class="card td-table">
+                  <Show when={kids().length > 0}>
+                    <div class="td-table-cols" role="presentation">
+                      <span>Name</span>
+                      <span>Assignee</span>
+                      <span>Status</span>
                     </div>
                   </Show>
-                </section>
-
-                <section class="td-section" aria-labelledby={`td-subtasks-${props.taskId}`}>
-                  <div class="td-section-head">
-                    <ListTree size={16} aria-hidden="true" />
-                    <h2 class="disp" id={`td-subtasks-${props.taskId}`}>
-                      Subtasks
-                    </h2>
-                    <Show when={kids().length > 0}>
-                      <span class="td-muted">
-                        {kidsDone()} of {kids().length}
-                      </span>
-                      <span class="td-progress" aria-hidden="true">
-                        <span style={{ width: `${(kidsDone() / kids().length) * 100}%` }} />
-                      </span>
-                    </Show>
-                  </div>
-                  <div class="card td-table">
-                    <Show when={kids().length > 0}>
-                      <div class="td-table-cols" role="presentation">
-                        <span>Name</span>
-                        <span>Assignee</span>
-                        <span>Status</span>
+                  <For each={kids()}>
+                    {(kid: CompactIssue) => (
+                      <div class="td-table-row">
+                        <button type="button" class="td-link td-ellipsis" onClick={() => props.onOpenTask(kid)}>
+                          <span class="mono td-id">{kid.identifier}</span>
+                          {kid.title}
+                        </button>
+                        <Assignee task={kid} people={people} size={20} />
+                        <StatusChip status={kid.status as IssueStatus} small />
                       </div>
-                    </Show>
-                    <For each={kids()}>
-                      {(kid: CompactIssue) => (
-                        <div class="td-table-row">
-                          <button type="button" class="td-link td-ellipsis" onClick={() => props.onOpenTask(kid)}>
-                            <span class="mono td-id">{kid.identifier}</span>
-                            {kid.title}
-                          </button>
-                          <Assignee task={kid} people={people} size={20} />
-                          <StatusChip status={kid.status as IssueStatus} small />
-                        </div>
-                      )}
-                    </For>
-                    <button
-                      type="button"
-                      class="td-table-add"
-                      onClick={() => commands.openNewTask({ parentId: props.taskId, projectId: current().projectId })}
-                    >
-                      <Plus size={14} aria-hidden="true" />
-                      Add subtask
-                    </button>
-                  </div>
-                </section>
-
-                <section class="td-section" aria-labelledby={`td-deps-${props.taskId}`}>
-                  <h2 class="disp td-section-title" id={`td-deps-${props.taskId}`}>
-                    Dependencies
-                  </h2>
-                  <Show
-                    when={(current().blockedBy?.length ?? 0) + (current().blocks?.length ?? 0) > 0}
-                    fallback={<p class="td-muted">Nothing blocks this task, and it blocks nothing.</p>}
+                    )}
+                  </For>
+                  <button
+                    type="button"
+                    class="td-table-add"
+                    onClick={() => commands.openNewTask({ parentId: props.taskId, projectId: current().projectId })}
                   >
-                    <For each={current().blockedBy ?? []}>
-                      {(blocker) => <Relation kind="blocked-by" relation={blocker} people={people} onOpen={props.onOpenTask} />}
-                    </For>
-                    <For each={current().blocks ?? []}>
-                      {(blocked) => <Relation kind="blocking" relation={blocked} people={people} onOpen={props.onOpenTask} />}
-                    </For>
-                  </Show>
-                </section>
-              </>
-            )}
-          </Match>
-        </Switch>
-      </div>
+                    <Plus size={14} aria-hidden="true" />
+                    Add subtask
+                  </button>
+                </div>
+              </section>
 
-      <nav class="td-rail" aria-label="Task panel sections">
-        <button type="button" class="td-rail-btn" aria-current="page" aria-label="Details" title="Details">
-          <Layers size={16} aria-hidden="true" />
-        </button>
-        <For
-          each={[
-            { label: "Activity", icon: <Activity size={16} aria-hidden="true" /> },
-            { label: "Docs and files", icon: <FileText size={16} aria-hidden="true" /> },
-            { label: "Runs", icon: <Play size={16} aria-hidden="true" /> },
-            { label: "Workspace", icon: <FolderGit2 size={16} aria-hidden="true" /> },
-          ]}
-        >
-          {(section) => (
-            <button type="button" class="td-rail-btn" disabled aria-label={`${section.label} (arrives later in M2)`} title={`${section.label}: arrives later in M2`}>
-              {section.icon}
-            </button>
+              <section class="td-section" aria-labelledby={`td-deps-${props.taskId}`}>
+                <h2 class="disp td-section-title" id={`td-deps-${props.taskId}`}>
+                  Dependencies
+                </h2>
+                <Show
+                  when={(current().blockedBy?.length ?? 0) + (current().blocks?.length ?? 0) > 0}
+                  fallback={<p class="td-muted">Nothing blocks this task, and it blocks nothing.</p>}
+                >
+                  <For each={current().blockedBy ?? []}>
+                    {(blocker) => <Relation kind="blocked-by" relation={blocker} people={people} onOpen={props.onOpenTask} />}
+                  </For>
+                  <For each={current().blocks ?? []}>
+                    {(blocked) => <Relation kind="blocking" relation={blocked} people={people} onOpen={props.onOpenTask} />}
+                  </For>
+                </Show>
+              </section>
+            </>
           )}
-        </For>
-      </nav>
+        </Match>
+      </Switch>
     </div>
   );
 }

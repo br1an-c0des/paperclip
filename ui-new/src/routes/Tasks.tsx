@@ -5,7 +5,7 @@ import { Match, Show, Switch } from "solid-js";
 import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
-import { TaskDetails } from "@/tasks/TaskDetails";
+import { TaskSections } from "@/tasks/TaskSections";
 import { TasksView, useTaskList } from "@/tasks/TasksView";
 import { HeaderNumber, PageHeader } from "@/ui/PageHeader";
 import "./Tasks.css";
@@ -72,7 +72,7 @@ export function TaskPage() {
               title={found().title}
             />
             <section class="card task-page">
-              <TaskDetails
+              <TaskSections
                 taskId={found().id}
                 initial={found()}
                 hideTitle

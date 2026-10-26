@@ -62,7 +62,7 @@ export function TasksView(props: { projectId?: string; tasks: ReturnType<typeof 
   const people = useTaskPeople();
   const labels = useLabelsQuery();
   const updates = useTaskUpdates();
-  const [params, setParams] = useSearchParams<{ task?: string }>();
+  const [params, setParams] = useSearchParams<{ task?: string; section?: string }>();
   const tasks = () => props.tasks.data ?? [];
 
   // The view: saved per list, and read again when the list changes (another project).
@@ -142,7 +142,7 @@ export function TasksView(props: { projectId?: string; tasks: ReturnType<typeof 
   };
 
   const open = (task: { id: string; identifier: string | null }) => setParams({ task: task.identifier ?? task.id });
-  const close = () => setParams({ task: undefined });
+  const close = () => setParams({ task: undefined, section: undefined });
   const activeFilters = () => filterCount(view().filters);
   const groupLabel = () => GROUP_BY_OPTIONS.find((option) => option.value === view().groupBy)?.label ?? "Status";
 
