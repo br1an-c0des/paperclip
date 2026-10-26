@@ -61,7 +61,9 @@ function ItemBody(props: Pick<ItemProps, "icon" | "description" | "hint" | "chil
   return (
     <>
       <Show when={props.icon}>
-        <span class="mi-icon">{props.icon}</span>
+        <span class="mi-icon" aria-hidden="true">
+          {props.icon}
+        </span>
       </Show>
       <span class="mi-text">
         <KMenu.ItemLabel class="mi-label">{props.children}</KMenu.ItemLabel>

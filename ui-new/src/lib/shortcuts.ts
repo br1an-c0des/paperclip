@@ -9,7 +9,8 @@ import { onCleanup } from "solid-js";
  *   dashboard. These don't fire while typing in a field or while a dialog is open.
  *
  * The old UI's `[` (toggle sidebar) and `]` (toggle panel) wait for a collapsible nav and the task
- * panel (M2). List and Inbox shortcuts (j/k, Enter, archive) come with those screens.
+ * panel (M2). The task list's own keys (j/k, Enter, x, ←/→) live in tasks/TaskList.tsx and are listed
+ * here for the cheatsheet; the Inbox's come with that screen.
  */
 
 export type ShortcutAction = "palette" | "new-task" | "search" | "cheatsheet" | "go-inbox" | "go-dashboard";
@@ -34,6 +35,18 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     items: [
       { keys: ["G", "I"], label: "Inbox" },
       { keys: ["G", "D"], label: "Org dashboard" },
+    ],
+  },
+  {
+    title: "Task list",
+    items: [
+      { keys: ["J"], label: "Next row" },
+      { keys: ["K"], label: "Previous row" },
+      { keys: ["Enter"], label: "Open the task" },
+      { keys: ["X"], label: "Select the row" },
+      { keys: ["Shift", "Click"], label: "Select a range" },
+      { keys: ["←", "→"], label: "Fold or unfold the group" },
+      { keys: ["Esc"], label: "Clear the selection" },
     ],
   },
   {

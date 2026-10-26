@@ -14,6 +14,8 @@ export type NewTaskDefaults = {
   assigneeAgentId?: string | null;
   /** The status of the group it was added from, on the task list. */
   status?: IssueStatus;
+  /** A title typed into the list's quick add before "More options". */
+  title?: string;
 };
 
 type CommandsValue = {

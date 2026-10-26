@@ -175,6 +175,7 @@ function NewTaskForm() {
   }
   if (defaults.assigneeAgentId) start.assignee = { kind: "agent", id: defaults.assigneeAgentId };
   if (defaults.status) start.status = defaults.status;
+  if (defaults.title) start.title = defaults.title;
   const [draft, setDraft] = createStore<NewTaskDraft>(start);
   const [files, setFiles] = createSignal<File[]>([]);
   const [error, setError] = createSignal<string | null>(null);

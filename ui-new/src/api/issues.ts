@@ -22,6 +22,8 @@ export type IssueListFilters = {
   projectId?: string;
   parentId?: string;
   includeBlockedBy?: boolean;
+  /** Tasks that routine runs created, which the server leaves out unless asked. The old list asks. */
+  includeRoutineExecutions?: boolean;
   limit?: number;
   offset?: number;
 };
@@ -31,6 +33,7 @@ function listParams(filters: IssueListFilters) {
   if (filters.projectId) params.set("projectId", filters.projectId);
   if (filters.parentId) params.set("parentId", filters.parentId);
   if (filters.includeBlockedBy) params.set("includeBlockedBy", "true");
+  if (filters.includeRoutineExecutions) params.set("includeRoutineExecutions", "true");
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.offset) params.set("offset", String(filters.offset));
   return params.toString();

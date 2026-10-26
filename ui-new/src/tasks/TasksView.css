@@ -1,9 +1,76 @@
 .tv-toolbar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.tv-caret {
+  color: var(--muted);
+}
+
+.tv-filter-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: var(--r-pill);
+  background: var(--run-fg);
+  color: var(--ground);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tv-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 240px;
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.tv-search > svg {
+  position: absolute;
+  left: 12px;
+  pointer-events: none;
+}
+
+.tv-search .input {
+  padding-block: 7px;
+  padding-left: 32px;
+}
+
+/* The selection bar, after board 20's */
+.tv-selection {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--run-fg) 45%, transparent);
+  border-radius: 18px;
+  background: var(--run-bg);
+}
+
+.tv-selection-count {
+  font-weight: 600;
+}
+
+.tv-selection-rule {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--pri-off);
+}
+
+.tv-selection-clear {
+  margin-left: auto;
 }
 
 .tv-note {
@@ -12,4 +79,18 @@
 
 .tv-note p {
   margin: 0;
+}
+
+.tv-note--row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .tv-search {
+    order: 5;
+    width: 100%;
+  }
 }

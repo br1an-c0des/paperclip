@@ -2,6 +2,10 @@
  * Board 1's group cards, with board 2's docked behaviour: `.tl-scroll` scrolls sideways, and each
  * card's frame (`.tl-frame`) and header bars (`.tl-bar`) stay put while the rows move under them.
  * The Name column (`.tl-pin-col`) sticks to the left edge while pinned.
+ *
+ * The cells that change a task (`.tl-status`, `.tl-cell`) look like plain text until hovered. The
+ * tick box sits in the Name column's left padding and shows on hover, or on every row once any row
+ * is ticked.
  */
 
 .tl {
@@ -145,11 +149,44 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--run-fg) 45%, transparent);
 }
 
-.tl-row--selected:hover {
+.tl-row--selected:hover,
+.tl-row--checked,
+.tl-row--checked:hover {
   background: var(--run-bg);
 }
 
+.tl-row[draggable="true"] {
+  -webkit-user-drag: element;
+}
+
+.tl--dragging .tl-row {
+  cursor: grabbing;
+}
+
+/* A group a drag would drop into */
+.tl-card--drop > .tl-frame {
+  outline: 2px dashed var(--run-fg);
+  outline-offset: -2px;
+}
+
+.tl-mark {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.tl-mark-disc {
+  width: 24px;
+  height: 24px;
+}
+
+.tl-mark .pick-dot {
+  width: 12px;
+  height: 12px;
+}
+
 .tl-name {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -157,8 +194,78 @@
   padding: 0 12px 0 18px;
 }
 
-.tl-name > .capsule {
+.tl-check {
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  translate: 0 -50%;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--dashed);
+  border-radius: 4px;
+  color: var(--ground);
+  opacity: 0;
+}
+
+.tl-row:hover .tl-check,
+.tl--checking .tl-check,
+.tl-check:focus-visible {
+  opacity: 1;
+}
+
+.tl-check[aria-checked="true"] {
+  border-color: var(--run-fg);
+  background: var(--run-fg);
+}
+
+.tl-status {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
   margin: 0 8px 0 5px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+}
+
+.tl-status:hover,
+.tl-status[data-expanded] {
+  background: var(--well);
+}
+
+.tl-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: calc(100% - 8px);
+  justify-self: start;
+  min-height: 32px;
+  margin-left: -6px;
+  padding: 0 6px;
+  border-radius: 10px;
+  text-align: left;
+  color: inherit;
+}
+
+.tl-cell:hover,
+.tl-cell[data-expanded] {
+  background: var(--well);
+}
+
+.tl-labels-add {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0;
+}
+
+.tl-row:hover .tl-labels-add,
+.tl-cell:focus-visible .tl-labels-add,
+.tl-cell[data-expanded] .tl-labels-add {
+  opacity: 1;
 }
 
 .tl-id {
@@ -197,10 +304,8 @@
 }
 
 .tl-labels {
-  display: flex;
-  align-items: center;
-  gap: 4px;
   flex-wrap: wrap;
+  padding-block: 3px;
 }
 
 .tl-updated {
@@ -226,6 +331,27 @@
   color: var(--text);
 }
 
+.tl-quick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 6px 14px 6px 46px;
+  color: var(--muted);
+  border-top: 1px solid var(--row-line);
+}
+
+.tl-quick .input {
+  flex: 1;
+  max-width: 560px;
+  padding-block: 7px;
+}
+
+.tl-quick-hint {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 /* The pinned Name column carries the row's background so rows slide under it */
 .tl--pinned .tl-pin-col {
   position: sticky;
@@ -237,6 +363,10 @@
 
 .tl--pinned .tl-row:hover > .tl-pin-col {
   background: var(--row-hover);
+}
+
+.tl--pinned .tl-row--checked > .tl-pin-col {
+  background: var(--run-bg);
 }
 
 .tl--pinned .tl-row--selected > .tl-pin-col {

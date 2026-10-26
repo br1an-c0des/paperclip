@@ -8,7 +8,7 @@ import "./people.css";
 
 /*
  * Who a task belongs to, for the task list and panel: agents by id, people by id from the company's
- * user directory, and you. Also which tasks have a run going right now.
+ * user directory, and you; who a task can be assigned to. Also which tasks have a run going right now.
  */
 
 export type TaskPeople = ReturnType<typeof useTaskPeople>;
@@ -27,8 +27,22 @@ export function useTaskPeople() {
     () => new Set((liveRuns.data ?? []).flatMap((run) => (run.issueId ? [run.issueId] : []))),
   );
 
+  const assignableAgents = createMemo(() =>
+    (agents.data ?? []).filter((agent) => agent.status !== "terminated").sort((a, b) => a.name.localeCompare(b.name)),
+  );
+  const otherPeople = createMemo(() =>
+    (people.data?.users ?? [])
+      .filter((entry) => entry.principalId !== session.youId())
+      .map((entry) => ({ id: entry.principalId, name: personName(entry) }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  );
+
   return {
     agent: (id: string | null | undefined): Agent | undefined => (id ? agentsById().get(id) : undefined),
+    /** Agents a task can go to, by name: everyone but terminated agents. */
+    assignableAgents,
+    /** The company's people other than you, by name. */
+    otherPeople,
     personName: (id: string) => namesById().get(id) ?? (id === "local-board" ? "Board" : `User ${id.slice(0, 6)}`),
     youId: () => session.youId(),
     liveIssueIds,
@@ -36,6 +50,14 @@ export function useTaskPeople() {
 }
 
 type Assigned = { assigneeAgentId: string | null; assigneeUserId: string | null };
+
+/** Who a task is assigned to, in words: an agent's name, "You", a person's name, or "Unassigned". */
+export function assigneeName(task: Assigned, people: TaskPeople) {
+  const agent = people.agent(task.assigneeAgentId);
+  if (agent) return agent.name;
+  if (task.assigneeUserId) return task.assigneeUserId === people.youId() ? "You" : people.personName(task.assigneeUserId);
+  return "Unassigned";
+}
 
 /** The assignee cell: an agent's avatar, a person's disc, or a dashed empty disc. */
 export function Assignee(props: { task: Assigned; people: TaskPeople; size?: 20 | 24 }) {

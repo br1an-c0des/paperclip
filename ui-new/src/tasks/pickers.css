@@ -1,0 +1,16 @@
+.pick-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.pick-none {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  border: 1.5px dashed var(--dashed);
+  border-radius: 50%;
+}
