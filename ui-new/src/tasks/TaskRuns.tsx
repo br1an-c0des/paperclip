@@ -4,6 +4,7 @@ import { createMemo, For, Match, Show, Switch } from "solid-js";
 import { heartbeatsApi } from "@/api/heartbeats";
 import { issuesApi, type RunForIssue } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
+import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
@@ -14,8 +15,8 @@ import "./TaskRuns.css";
 
 /*
  * The task panel's Runs section: what the task's runs cost in all, then each run, newest first, with
- * its agent, how it started, how long it took, how it ended, and Stop while it's going. A run's
- * transcript opens in the run modal, which comes with its own slice of M2.
+ * its agent, how it started, how long it took, how it ended, and Stop while it's going. "View run"
+ * opens its transcript in the run modal.
  */
 
 const ACTIVE = new Set(["queued", "running", "scheduled_retry"]);
@@ -52,6 +53,7 @@ export function tokenCount(count: number) {
 
 export function TaskRuns(props: { taskId: string }) {
   const company = useCompany();
+  const commands = useCommands();
   const client = useQueryClient();
   const people = useTaskPeople();
   const runs = createQuery(() => ({
@@ -154,12 +156,17 @@ export function TaskRuns(props: { taskId: string }) {
                           {(at) => <p class="tsec-muted">Retries {stampLabel(at())}</p>}
                         </Show>
                       </div>
-                      <Show when={active()}>
-                        <Button size="compact" onClick={() => void stop(run)}>
-                          <Square size={12} aria-hidden="true" />
-                          Stop
+                      <div class="tr-actions">
+                        <Button size="compact" onClick={() => commands.openRunModal(run.runId)}>
+                          View run
                         </Button>
-                      </Show>
+                        <Show when={active()}>
+                          <Button size="compact" onClick={() => void stop(run)}>
+                            <Square size={12} aria-hidden="true" />
+                            Stop
+                          </Button>
+                        </Show>
+                      </div>
                     </li>
                   );
                 }}

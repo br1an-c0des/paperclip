@@ -64,7 +64,7 @@ describe("buildThread", () => {
       "c2",
     ]);
     const runLine = items[2]!.kind === "lines" ? items[2].lines[1] : undefined;
-    expect(runLine).toMatchObject({ actor: "Ben", text: "finished a run · 2m 30s", tone: "green" });
+    expect(runLine).toMatchObject({ actor: "Ben", text: "finished a run · 2m 30s", tone: "green", runId: "r1" });
   });
 
   it("holds back older events while earlier comments are left to load", () => {

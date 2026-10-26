@@ -12,8 +12,11 @@ import { activityLine, type ActivityLine, type ActivityNames } from "./activity-
 
 export type ThreadFilter = "all" | "comments" | "changes";
 
-/** `count` is how many identical lines in a row this one stands for; `at` is the latest's time. */
-export type ThreadLine = ActivityLine & { key: string; at: Date; tone?: "red" | "green"; count?: number };
+/**
+ * `count` is how many identical lines in a row this one stands for; `at` is the latest's time. A
+ * run's line carries its `runId`, to open it in the run modal.
+ */
+export type ThreadLine = ActivityLine & { key: string; at: Date; tone?: "red" | "green"; count?: number; runId?: string };
 
 export type ThreadItem =
   | { kind: "lines"; key: string; lines: ThreadLine[] }
@@ -90,7 +93,7 @@ export function buildThread(input: {
       if (ACTIVE_RUN.has(run.status)) continue;
       const at = new Date(run.finishedAt ?? run.startedAt ?? run.createdAt);
       if (at.getTime() < oldest) continue;
-      const line: ThreadLine = { actor: input.names.agent(run.agentId) ?? "An agent", ...runText(run), key: `run:${run.runId}`, at };
+      const line: ThreadLine = { actor: input.names.agent(run.agentId) ?? "An agent", ...runText(run), key: `run:${run.runId}`, at, runId: run.runId };
       if (words.length > 0 && !matches(`${line.actor} ${line.text}`)) continue;
       entries.push({ at, line });
     }
@@ -110,7 +113,8 @@ export function buildThread(input: {
       continue;
     }
     const previous = last.lines[last.lines.length - 1]!;
-    if (!line.status && !previous.status && previous.actor === line.actor && previous.text === line.text && previous.tone === line.tone) {
+    // Each run keeps its own line, so each can open in the run modal.
+    if (!line.status && !previous.status && !line.runId && !previous.runId && previous.actor === line.actor && previous.text === line.text && previous.tone === line.tone) {
       last.lines[last.lines.length - 1] = { ...previous, at: line.at, count: (previous.count ?? 1) + 1 };
     } else {
       last.lines.push(line);

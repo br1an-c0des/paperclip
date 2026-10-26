@@ -1,0 +1,501 @@
+/* The run modal's Transcript view (board 16) */
+.rt {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  container: rt / inline-size;
+}
+
+/* Each line: the time since the run started, then the item */
+.rt-e {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.rt-ts {
+  padding-top: 7px;
+  text-align: right;
+  color: var(--dashed);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rt-main {
+  min-width: 0;
+}
+
+.rt-sys {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 28px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rt-sys b {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.rt-sys[data-tone="error"],
+.rt-sys[data-tone="error"] b {
+  color: var(--red-fg);
+}
+
+.rt-wait {
+  padding-left: 64px;
+}
+
+/* Cards: the prompt and the outcome */
+.rt-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--card);
+}
+
+.rt-input-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.rt-input-head .rm-b {
+  margin-left: auto;
+}
+
+.rt-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--well);
+  color: var(--body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rt-fade {
+  position: relative;
+  max-height: 92px;
+  overflow: hidden;
+}
+
+.rt-fade::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 40px;
+  background: linear-gradient(transparent, var(--card));
+}
+
+.rt-out {
+  border-color: color-mix(in srgb, var(--green-fg) 45%, transparent);
+  background: var(--green-bg);
+}
+
+.rt-out[data-disposition="blocked"] {
+  border-color: color-mix(in srgb, var(--red-fg) 45%, transparent);
+  background: var(--red-bg);
+}
+
+.rt-out[data-disposition="needs_review"] {
+  border-color: color-mix(in srgb, var(--violet-fg) 45%, transparent);
+  background: var(--violet-bg);
+}
+
+.rt-og {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 8px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.rt-og dt {
+  padding-top: 3px;
+  color: var(--muted);
+}
+
+.rt-og dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  color: var(--body);
+}
+
+.rt-li {
+  line-height: 1.5;
+}
+
+.rt-li[data-passed="true"] {
+  color: var(--green-fg);
+}
+
+.rt-li[data-passed="false"] {
+  color: var(--red-fg);
+}
+
+.rt-obj {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  background: var(--card);
+  color: var(--body);
+  font-size: 12px;
+}
+
+/* The agent's messages */
+.rt-say {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding-top: 2px;
+}
+
+.rt-sav {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--lagoon-a), var(--lagoon-b));
+  color: #111113;
+}
+
+.rt-say[data-role="user"] .rt-sav {
+  background: var(--well);
+  color: var(--body);
+}
+
+.rt-say-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.rt-who {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rt-md {
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.rt-caret {
+  color: var(--run-fg);
+  animation: rt-blink 1s steps(1) infinite;
+}
+
+@keyframes rt-blink {
+  50% { opacity: 0; }
+}
+
+/* Disclosures: thinking and tool calls */
+.rt details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.rt details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.rt-chev {
+  flex-shrink: 0;
+  color: var(--dashed);
+  transition: transform 0.12s;
+}
+
+details[open] > summary .rt-chev {
+  transform: rotate(90deg);
+}
+
+.rt-think > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.rt-think > summary i {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rt-tb {
+  margin: 4px 0 0 6px;
+  padding: 8px 0 4px 22px;
+  border-left: 2px solid var(--line);
+}
+
+.rt-tb p {
+  margin: 0;
+  color: var(--muted);
+  font-style: italic;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.rt-think--live {
+  padding: 0 12px 10px;
+  border: 1px solid color-mix(in srgb, var(--run-fg) 50%, transparent);
+  border-radius: var(--r-inner);
+  background: var(--run-bg);
+}
+
+.rt-think--live > summary,
+.rt-think--live > summary i {
+  color: var(--run-fg);
+}
+
+.rt-tool {
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--card);
+}
+
+.rt-tool > summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  padding: 0 12px;
+  color: var(--body);
+  font-size: 13px;
+}
+
+.rt-tool[data-status="error"] {
+  border-color: color-mix(in srgb, var(--red-fg) 35%, transparent);
+}
+
+.rt-tn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--well);
+  color: var(--body);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rt-tt {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--body);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.rt-tm {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rt-add {
+  color: var(--green-fg);
+}
+
+.rt-del,
+.rt-failed {
+  color: var(--red-fg);
+}
+
+.rt-running {
+  color: var(--run-fg);
+}
+
+.rt-tbody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 12px 12px;
+}
+
+.rt-tbody .rm-pre {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.rt-lbl {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.rt-diff {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--code);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.rt-diff > div {
+  padding: 0 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+  color: var(--muted);
+}
+
+.rt-diff > div[data-type="add"] {
+  background: var(--green-bg);
+  color: var(--green-fg);
+}
+
+.rt-diff > div[data-type="remove"] {
+  background: var(--red-bg);
+  color: var(--red-fg);
+}
+
+.rt-diff > div[data-type="hunk"],
+.rt-diff > div[data-type="file"] {
+  background: var(--run-bg);
+  color: var(--run-fg);
+}
+
+.rt-diff-more {
+  display: block;
+  width: 100%;
+  padding: 4px 12px;
+  text-align: left;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.rt-diff-more:hover {
+  color: var(--text);
+}
+
+/* Folded steps, notes */
+.rt-fold {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px dashed var(--edge);
+  border-radius: var(--r-inner);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: left;
+}
+
+.rt-fold:hover {
+  background: var(--card);
+  color: var(--text);
+}
+
+.rt-note {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.rt-note-label {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.rt-note pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rt-note[data-tone="warn"] {
+  color: var(--amber-fg);
+}
+
+.rt-note[data-tone="error"] {
+  color: var(--red-fg);
+}
+
+.rt-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+@container rt (max-width: 520px) {
+  .rt-e {
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .rt-og {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rt-wait {
+    padding-left: 46px;
+  }
+}
+
+@container rm (max-width: 560px) {
+  .rt {
+    padding: 16px 16px 24px;
+  }
+}

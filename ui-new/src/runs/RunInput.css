@@ -1,0 +1,127 @@
+/* "What the agent was sent" (board 17) */
+.ri {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ri-link {
+  color: var(--run-fg);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ri-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ri-sech {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ri-sech h3,
+.ri-xs > summary {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ri-sech .rm-b {
+  margin-left: auto;
+}
+
+.ri-kvl {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--card);
+}
+
+.ri-kvl > li {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 38px;
+  padding: 6px 12px;
+  color: var(--body);
+  font-size: 13px;
+}
+
+.ri-kvl > li + li {
+  border-top: 1px solid var(--line);
+}
+
+.ri-k {
+  color: var(--muted);
+}
+
+.ri-wrap {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.ri-notes {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+}
+
+.ri-xs > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--card);
+  list-style: none;
+  cursor: pointer;
+}
+
+.ri-xs > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ri-xs > summary .cap {
+  font-weight: 500;
+}
+
+.ri-xs[open] > summary {
+  border-radius: var(--r-inner) var(--r-inner) 0 0;
+}
+
+.ri-xs > .rm-pre {
+  border-top: 0;
+  border-radius: 0 0 var(--r-inner) var(--r-inner);
+  max-height: 480px;
+  overflow: auto;
+}
+
+.ri-hidden {
+  color: var(--muted);
+}
+
+@container rm (max-width: 560px) {
+  .ri {
+    padding: 16px 16px 24px;
+  }
+
+  .ri-kvl > li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}

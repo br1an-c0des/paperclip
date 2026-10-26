@@ -1,0 +1,521 @@
+/* The run modal (boards 16–18). The card comes from ui/Dialog; the modal lays out its own body. */
+.dialog.rm {
+  height: calc(100dvh - 2 * clamp(24px, 6vh, 72px));
+  overflow: hidden;
+  font-size: 14px;
+}
+
+.dialog.rm[data-mode="sheet"] {
+  height: 100dvh;
+}
+
+.dialog.rm .dialog-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+}
+
+.rm-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  container: rm / inline-size;
+}
+
+/* Header: avatar, title and status, who and why, then the actions. Room is left for the ✕. */
+.rm-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 64px 14px 22px;
+}
+
+.rm-av {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+
+.rm-av--live {
+  background: linear-gradient(160deg, var(--ion-a), var(--ion-b));
+}
+
+.rm-av--live > * {
+  outline: 2px solid var(--card);
+  border-radius: 50%;
+}
+
+.rm-av-gap {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--well);
+}
+
+.rm-hmain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.rm-hrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rm-title {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.rm-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--tone-fg) 45%, transparent);
+  background: var(--tone-bg);
+  color: var(--tone-fg);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rm-pill[data-tone="run"],
+.rm-alert[data-tone="run"] { --tone-bg: var(--run-bg); --tone-fg: var(--run-fg); }
+.rm-pill[data-tone="green"] { --tone-bg: var(--green-bg); --tone-fg: var(--green-fg); }
+.rm-pill[data-tone="red"],
+.rm-alert[data-tone="red"] { --tone-bg: var(--red-bg); --tone-fg: var(--red-fg); }
+.rm-pill[data-tone="amber"],
+.rm-alert[data-tone="amber"] { --tone-bg: var(--amber-bg); --tone-fg: var(--amber-fg); }
+.rm-pill[data-tone="neutral"] { --tone-bg: var(--well); --tone-fg: var(--body); }
+
+.rm-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.rm-sub b {
+  color: var(--body);
+  font-weight: 600;
+}
+
+.rm-task {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.rm-task:hover .rm-task-title,
+.rm-task:focus-visible .rm-task-title {
+  text-decoration: underline;
+}
+
+.rm-task-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rm-hacts {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.rm-pos {
+  margin-right: 2px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.rm-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 6px;
+  background: var(--pri-off);
+}
+
+/* Stats: six cells, wrapping to three and then two columns as the modal narrows */
+.rm-stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  background: var(--line);
+  border-block: 1px solid var(--line);
+}
+
+.rm-stats > div {
+  min-width: 0;
+  padding: 10px 14px 11px;
+  background: var(--card);
+}
+
+.rm-stats > div:first-child {
+  padding-left: 22px;
+}
+
+.rm-stats dt {
+  margin-bottom: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.rm-stats dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.rm-ss {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.rm-alert {
+  margin: 0;
+  padding: 8px 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--tone-bg);
+  color: var(--tone-fg);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* The tab bar, with the transcript's chips on the right */
+.rm-tabs-root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rm-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  min-height: 48px;
+  padding: 8px 18px 8px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rm-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.rm-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rm-tab:hover {
+  color: var(--text);
+}
+
+.rm-tab[aria-selected="true"] {
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.rm-tabn {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.rm-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.rm-lbl {
+  margin-right: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.rm-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--ground);
+}
+
+/* The live footer, and the place the composer's controls will go */
+.rm-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  padding: 10px 18px 10px 22px;
+  border-top: 1px solid var(--line);
+  background: var(--card);
+  color: var(--run-fg);
+  font-size: 13px;
+}
+
+.rm-foot-meta {
+  color: var(--run-fg);
+  opacity: 0.85;
+}
+
+.rm-foot-hint {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+}
+
+.rm-foot-follow {
+  margin-left: auto;
+}
+
+/* Small pieces the views share */
+.rm-b {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rm-b:hover:not(:disabled) {
+  background: var(--well);
+  color: var(--text);
+}
+
+.rm-b:disabled {
+  opacity: 0.5;
+}
+
+.rm-b[aria-pressed="true"] {
+  background: var(--card);
+  color: var(--text);
+}
+
+.rm-b--warn {
+  border-color: color-mix(in srgb, var(--red-fg) 50%, transparent);
+  color: var(--red-fg);
+}
+
+.rm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rm-chip[aria-pressed="true"] {
+  border-color: var(--edge);
+  background: var(--card);
+  color: var(--text);
+}
+
+.rm-chk {
+  width: 12px;
+  height: 12px;
+  border: 1px dashed var(--dashed);
+  border-radius: 3px;
+}
+
+.rm-chip[aria-pressed="true"] .rm-chk {
+  border: 0;
+  background: var(--run-fg);
+  box-shadow: inset 0 0 0 2px var(--card);
+}
+
+.rm-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.rm-note > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.rm-note > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.rm-note--error {
+  border-color: color-mix(in srgb, var(--red-fg) 40%, transparent);
+  color: var(--red-fg);
+}
+
+.rm-pre {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--code);
+  color: var(--body);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rm-pre[data-tone="error"] {
+  color: var(--red-fg);
+}
+
+.rm-empty {
+  max-width: 520px;
+  margin: 72px auto 0;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.rm-empty h3 {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.rm-empty p {
+  line-height: 1.6;
+}
+
+.rm-pulse {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--run-fg);
+  animation: rm-pulse 1.8s ease-out infinite;
+}
+
+@keyframes rm-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--run-fg) 55%, transparent); }
+  100% { box-shadow: 0 0 0 8px transparent; }
+}
+
+@container rm (max-width: 820px) {
+  .rm-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .rm-stats > div:nth-child(3n + 1) {
+    padding-left: 22px;
+  }
+
+  .rm-tools {
+    margin-left: 0;
+  }
+}
+
+@container rm (max-width: 560px) {
+  .rm-head {
+    flex-wrap: wrap;
+    padding: 14px 56px 12px 16px;
+  }
+
+  .rm-hacts {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  /* The sub line wraps here, so its separator dot would sit on a line of its own */
+  .rm-sub > [aria-hidden="true"] {
+    display: none;
+  }
+
+  .rm-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rm-stats > div,
+  .rm-stats > div:first-child,
+  .rm-stats > div:nth-child(3n + 1) {
+    padding-left: 16px;
+  }
+
+  .rm-bar,
+  .rm-foot,
+  .rm-alert {
+    padding-inline: 16px;
+  }
+}

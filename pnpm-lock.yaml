@@ -1364,6 +1364,39 @@ importers:
       '@kobalte/core':
         specifier: ^0.13.14
         version: 0.13.14(solid-js@1.9.17)
+      '@paperclipai/adapter-claude-local':
+        specifier: workspace:*
+        version: link:../packages/adapters/claude-local
+      '@paperclipai/adapter-codex-local':
+        specifier: workspace:*
+        version: link:../packages/adapters/codex-local
+      '@paperclipai/adapter-cursor-local':
+        specifier: workspace:*
+        version: link:../packages/adapters/cursor-local
+      '@paperclipai/adapter-gemini-local':
+        specifier: workspace:*
+        version: link:../packages/adapters/gemini-local
+      '@paperclipai/adapter-grok-local':
+        specifier: workspace:*
+        version: link:../packages/adapters/grok-local
+      '@paperclipai/adapter-kimi-local':
+        specifier: workspace:*
+        version: link:../packages/adapters/kimi-local
+      '@paperclipai/adapter-openclaw-gateway':
+        specifier: workspace:*
+        version: link:../packages/adapters/openclaw-gateway
+      '@paperclipai/adapter-opencode-local':
+        specifier: workspace:*
+        version: link:../packages/adapters/opencode-local
+      '@paperclipai/adapter-pi-local':
+        specifier: workspace:*
+        version: link:../packages/adapters/pi-local
+      '@paperclipai/adapter-utils':
+        specifier: workspace:*
+        version: link:../packages/adapter-utils
+      '@paperclipai/hermes-paperclip-adapter':
+        specifier: workspace:*
+        version: link:../packages/adapters/hermes
       '@paperclipai/shared':
         specifier: workspace:*
         version: link:../packages/shared
@@ -8165,7 +8198,6 @@ packages:
 
   opencode-ai@1.18.34:
     resolution: {integrity: sha512-9WUS2T0t4HHDVzXvuwTHF0nvhXvZ9mQ0r+ozCvKdJu0LVoQpOzqAW4qWTC3ygNc5Oedcc7j+Oct24JYlQYnySA==}
-    cpu: [arm64, x64]
     os: [darwin, linux, win32]
     hasBin: true
 

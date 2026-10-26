@@ -1,0 +1,103 @@
+/* The run modal's Raw output view */
+.rr {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 22px 24px;
+}
+
+.rr-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+}
+
+.rr-chips,
+.rr-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rr-actions {
+  margin-left: auto;
+}
+
+.rr-n {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rr-empty {
+  padding: 24px 0;
+  text-align: center;
+}
+
+.rr-log {
+  padding: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--code);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.rr-log > div {
+  display: grid;
+  grid-template-columns: 96px 52px minmax(0, 1fr);
+  gap: 12px;
+  padding: 0 14px;
+  color: var(--body);
+}
+
+.rr-t {
+  color: var(--dashed);
+}
+
+.rr-s {
+  color: var(--muted);
+}
+
+.rr-log code {
+  font: inherit;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.rr-log--nowrap {
+  overflow-x: auto;
+}
+
+.rr-log--nowrap code {
+  white-space: pre;
+  word-break: normal;
+}
+
+.rr-log > div[data-stream="stderr"] .rr-s,
+.rr-log > div[data-stream="stderr"] code {
+  color: var(--amber-fg);
+}
+
+.rr-log > div[data-stream="system"] .rr-s,
+.rr-log > div[data-stream="system"] code {
+  color: var(--run-fg);
+}
+
+@container rm (max-width: 560px) {
+  .rr {
+    padding: 12px 12px 20px;
+  }
+
+  .rr-log > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 4px 12px;
+  }
+
+  .rr-log > div + div {
+    border-top: 1px solid var(--line);
+  }
+}
