@@ -1,14 +1,16 @@
-import { Route, Router, type RouteSectionProps } from "@solidjs/router";
+import { Navigate, Route, Router, type RouteSectionProps } from "@solidjs/router";
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { lazy } from "solid-js";
 import { watchViewport } from "@/layout/breakpoints";
 import { queryClient } from "@/lib/query";
 import { SessionGate } from "@/lib/session";
 import { GrainFilter } from "@/ui/Grain";
+import { ToastViewport } from "@/ui/Toast";
 import { Companies, CompanyRootRedirect } from "./routes/Companies";
 import { CompanyHome } from "./routes/CompanyHome";
 import { CompanyLayout } from "./routes/CompanyLayout";
 import { NotBuiltYet, NotFound } from "./routes/NotFound";
+import { AgentPage, InboxPage, ProjectPage, SettingsPage, TaskPage, TasksPage } from "./routes/Planned";
 import { SignIn } from "./routes/SignIn";
 
 const StyleGuide = lazy(() => import("./routes/StyleGuide").then((m) => ({ default: m.StyleGuide })));
@@ -28,6 +30,7 @@ function Root(props: RouteSectionProps) {
     <>
       <GrainFilter />
       {props.children}
+      <ToastViewport />
     </>
   );
 }
@@ -42,7 +45,14 @@ export function App() {
           <Route path="/" component={CompanyRootRedirect} />
           <Route path="/companies" component={Companies} />
           <Route path="/:companyPrefix" component={CompanyLayout}>
-            <Route path="/" component={CompanyHome} />
+            <Route path="/" component={() => <Navigate href="dashboard" />} />
+            <Route path="/dashboard" component={CompanyHome} />
+            <Route path="/inbox/*" component={InboxPage} />
+            <Route path="/issues" component={TasksPage} />
+            <Route path="/issues/:issueRef/*" component={TaskPage} />
+            <Route path="/projects/:projectKey/*" component={ProjectPage} />
+            <Route path="/agents/:agentKey/*" component={AgentPage} />
+            <Route path="/company/settings/*" component={SettingsPage} />
             <Route path="/*rest" component={NotBuiltYet} />
           </Route>
         </Route>

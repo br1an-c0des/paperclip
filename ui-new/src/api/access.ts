@@ -13,6 +13,20 @@ export type CurrentBoardAccess = {
   source: string;
 };
 
+/** The company's people (`GET /companies/:id/user-directory`), for assignee and reviewer menus. */
+export type CompanyUserDirectoryEntry = {
+  principalId: string;
+  status: "active";
+  user: { id: string; email: string | null; name: string | null; image: string | null } | null;
+};
+
 export const accessApi = {
   currentBoardAccess: () => api.get<CurrentBoardAccess>("/cli-auth/me"),
+  userDirectory: (companyId: string) =>
+    api.get<{ users: CompanyUserDirectoryEntry[] }>(`/companies/${companyId}/user-directory`),
 };
+
+/** A person's display name: name, then email, then a short id. */
+export function personName(entry: CompanyUserDirectoryEntry) {
+  return entry.user?.name?.trim() || entry.user?.email || `User ${entry.principalId.slice(0, 6)}`;
+}

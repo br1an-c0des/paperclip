@@ -1,0 +1,36 @@
+import { describe, expect, it } from "vitest";
+import { filterPalette, matchScore, type PaletteCommand, type PaletteGroup } from "./palette";
+
+const command = (label: string, keywords?: string): PaletteCommand => ({ id: label, label, keywords, run: () => {} });
+
+describe("matchScore", () => {
+  it("needs every word, in the label or the keywords", () => {
+    expect(matchScore(command("Open inbox"), "inbox open")).not.toBeNull();
+    expect(matchScore(command("Fix login", "GEA-12"), "gea-12")).not.toBeNull();
+    expect(matchScore(command("Open inbox"), "inbox settings")).toBeNull();
+  });
+
+  it("ranks a label prefix over a word start over anything else", () => {
+    expect(matchScore(command("Settings"), "set")).toBe(0);
+    expect(matchScore(command("Company settings"), "set")).toBe(1);
+    expect(matchScore(command("Reset view"), "set")).toBe(2);
+  });
+});
+
+describe("filterPalette", () => {
+  const groups: PaletteGroup[] = [
+    { title: "Pages", commands: [command("Reset view"), command("Company settings"), command("Settings")] },
+    { title: "Agents", commands: [command("Ada"), command("Bob"), command("Cy")], idleLimit: 2 },
+  ];
+
+  it("shows each group's first entries with no query", () => {
+    const idle = filterPalette(groups, " ");
+    expect(idle.map((group) => group.commands.length)).toEqual([3, 2]);
+  });
+
+  it("ranks matches and drops empty groups", () => {
+    const result = filterPalette(groups, "set");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.commands.map((entry) => entry.label)).toEqual(["Settings", "Company settings", "Reset view"]);
+  });
+});

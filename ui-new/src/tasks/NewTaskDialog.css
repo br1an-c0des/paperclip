@@ -1,0 +1,561 @@
+/* The new-task dialog (board 7b). It draws its own header and footer, so the dialog body has no padding. */
+.dialog:has(.nt) .dialog-body {
+  padding: 0;
+  gap: 0;
+}
+
+.nt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 12px 0 18px;
+}
+
+.nt-slash {
+  color: var(--dashed);
+}
+
+.nt-title-label {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.nt-close {
+  margin-left: auto;
+}
+
+.nt-muted {
+  color: var(--muted);
+}
+
+/* Icon buttons: the header's ✕ and the small remove buttons inside pills. */
+.nt-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.nt-icon:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.nt-icon--small {
+  width: 22px;
+  height: 22px;
+}
+
+/* Pills: project, status, priority, labels and the extra fields. */
+.nt-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.nt-head .nt-pill {
+  height: 30px;
+  padding: 0 10px 0 6px;
+}
+
+button.nt-pill:hover,
+.nt-extra-trigger:hover {
+  background: var(--hover);
+}
+
+.nt-pill--labels {
+  padding: 0 5px 0 10px;
+}
+
+.nt-pill--extra {
+  padding: 0 4px 0 11px;
+}
+
+.nt-pill--extra b {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.nt-pill--quiet {
+  padding: 0 12px 0 10px;
+  border-style: dashed;
+  font-weight: 700;
+}
+
+.nt-extra-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  height: 26px;
+  margin-left: -6px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+}
+
+.nt-project-none {
+  width: 18px;
+  height: 18px;
+  border: 1px dashed var(--dashed);
+  border-radius: 50%;
+}
+
+.nt-label-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.nt-menu-note {
+  margin: 0;
+  padding: 12px 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.nt-fields {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 14px 24px 4px;
+}
+
+.nt-text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 24px 0;
+}
+
+.nt-input {
+  border-radius: var(--r-inner);
+  background: var(--well);
+}
+
+.nt-input--desc {
+  padding: 12px 14px;
+  color: var(--body);
+  font-size: 15px;
+}
+
+.nt-files {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 24px 16px;
+}
+
+.nt-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 12px;
+}
+
+.nt-attach {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px dashed var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.nt-attach:hover {
+  border-color: var(--dashed);
+  color: var(--text);
+}
+
+/* The assignment row: the assignee capsule, then reviewer, approver and watchdog. */
+.nt-assign {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  padding: 14px 24px;
+  border-top: 1px solid var(--line);
+  background: var(--ground);
+}
+
+.nt-capsule,
+.nt-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px 0 5px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  background: var(--card);
+  color: var(--body);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.nt-capsule {
+  box-shadow: var(--shadow);
+}
+
+.nt-capsule:hover,
+.nt-role-trigger:hover {
+  border-color: var(--dashed);
+}
+
+.nt-capsule .agent-avatar img,
+.nt-role .agent-avatar img {
+  width: 28px;
+  height: 28px;
+}
+
+.nt-capsule-name {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.nt-capsule-rule {
+  width: 1px;
+  height: 18px;
+  background: var(--edge);
+}
+
+.nt-capsule-run {
+  color: var(--body);
+}
+
+.nt-capsule-run--set {
+  color: var(--run-fg);
+  font-weight: 700;
+}
+
+.nt-role {
+  padding: 0 4px 0 0;
+}
+
+.nt-role-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 100%;
+  padding: 0 10px 0 4px;
+  border-radius: var(--r-pill);
+}
+
+.nt-role:not(:has(.nt-icon)) .nt-role-trigger {
+  padding-right: 8px;
+}
+
+.nt-role b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.nt-disc-empty {
+  flex-shrink: 0;
+  border: 1px dashed var(--dashed);
+  border-radius: 50%;
+}
+
+.nt-add-role {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border: 1px dashed var(--edge);
+  border-radius: 50%;
+  color: var(--body);
+}
+
+.nt-add-role:hover {
+  border-color: var(--dashed);
+  background: var(--hover);
+}
+
+/* The assignee popover: who on the left, the run's model and effort on the right. */
+.popover.nt-who {
+  padding: 0;
+}
+
+.nt-who-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  max-height: min(520px, 70vh);
+}
+
+.nt-who-list,
+.nt-who-run,
+.nt-picker {
+  max-height: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.nt-who-list .input,
+.nt-picker .input {
+  margin-bottom: 4px;
+  background: var(--well);
+}
+
+.nt-who-run {
+  border-left: 1px solid var(--line);
+  border-radius: 0 var(--r-card) var(--r-card) 0;
+  background: var(--ground);
+}
+
+.nt-option,
+.nt-radio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+}
+
+.nt-option:hover,
+.nt-radio:hover {
+  background: var(--hover);
+}
+
+.nt-option[aria-selected="true"],
+.nt-radio[aria-checked="true"] {
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+}
+
+.nt-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nt-option-id {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.nt-option-state {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.nt-option-check {
+  flex-shrink: 0;
+  color: var(--run-fg);
+}
+
+.nt-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* The model list scrolls on its own, so Effort and Done stay in view. */
+.nt-radios--models {
+  flex-shrink: 1;
+  min-height: 120px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.nt-radio {
+  min-height: 38px;
+  justify-content: space-between;
+}
+
+.nt-radio small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nt-done {
+  align-self: flex-end;
+  margin-top: auto;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.nt-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nt-picker-empty {
+  margin: 0;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* The footer: work mode, workspace and review policy, then Cancel and Create task. */
+.nt-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 12px 14px 12px 24px;
+  border-top: 1px solid var(--line);
+}
+
+.nt-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px 0 9px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.nt-choice:hover {
+  background: var(--hover);
+}
+
+.nt-foot-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.nt-error {
+  max-width: 260px;
+  color: var(--red-fg);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.nt-cancel {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 14px;
+}
+
+.nt-cancel:hover {
+  background: var(--hover);
+}
+
+.nt-create {
+  display: flex;
+  height: 34px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--primary);
+}
+
+.nt-create-main,
+.nt-create-more {
+  display: flex;
+  align-items: center;
+  color: var(--on-primary);
+}
+
+.nt-create-main {
+  gap: 8px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.nt-create-main kbd {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.6;
+}
+
+.nt-create-more {
+  justify-content: center;
+  width: 30px;
+  border-left: 1px solid color-mix(in srgb, var(--on-primary) 25%, transparent);
+}
+
+.nt-create-main:disabled,
+.nt-create-more:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.nt-create-main:focus-visible,
+.nt-create-more:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: -2px;
+}
+
+@media (max-width: 720px) {
+  .nt-who-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nt-who-run {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+    border-radius: 0 0 var(--r-card) var(--r-card);
+  }
+
+  .nt-foot-end {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

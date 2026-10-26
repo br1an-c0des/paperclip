@@ -1,0 +1,127 @@
+/* The palette fills its dialog: no header, a search field, the results, and a key legend. */
+.dialog:has(.palette) .dialog-body {
+  padding: 0;
+  gap: 0;
+}
+
+.palette {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.palette-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.palette-input {
+  flex: 1;
+  min-width: 0;
+  height: 56px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+}
+
+.palette-input::placeholder {
+  color: var(--muted);
+}
+
+.palette-status {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.palette-list {
+  max-height: min(440px, 60dvh);
+  overflow-y: auto;
+  padding: 6px;
+}
+
+[data-mode="sheet"] .palette-list {
+  max-height: none;
+  flex: 1;
+}
+
+.palette-option {
+  scroll-margin: 6px;
+}
+
+.palette-empty {
+  padding: 18px 12px;
+  color: var(--muted);
+}
+
+.palette-foot {
+  display: flex;
+  gap: 16px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.palette-foot kbd,
+.shortcuts kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  margin-right: 2px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: var(--ground);
+  color: var(--body);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+:root[data-viewport="phone"] .palette-foot {
+  display: none;
+}
+
+/* Keyboard shortcuts cheatsheet */
+.shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px 28px;
+}
+
+.shortcuts h3 {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shortcuts dl {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shortcuts dl > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+}
+
+.shortcuts dt {
+  color: var(--body);
+}
+
+.shortcuts dd {
+  display: flex;
+  gap: 3px;
+}

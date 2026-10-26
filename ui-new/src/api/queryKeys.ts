@@ -13,6 +13,10 @@ export const queryKeys = {
   },
   access: {
     currentBoardAccess: ["access", "current-board-access"] as const,
+    userDirectory: (companyId: string) => ["access", "company-user-directory", companyId] as const,
+  },
+  instance: {
+    experimentalSettings: ["instance", "experimental-settings"] as const,
   },
   companies: {
     /** Prefix for everything company-shaped. */
@@ -25,15 +29,23 @@ export const queryKeys = {
   agents: {
     list: (companyId: string) => ["agents", companyId] as const,
     detail: (agentId: string) => ["agents", "detail", agentId] as const,
+    adapterModels: (companyId: string, adapterType: string) =>
+      ["agents", companyId, "adapter-models", adapterType] as const,
   },
   issues: {
     /** Prefix for every task list in a company. */
     list: (companyId: string) => ["issues", companyId] as const,
     detail: (issueId: string) => ["issues", "detail", issueId] as const,
+    search: (companyId: string, q: string, limit: number) => ["issues", companyId, "search", q, limit] as const,
+    labels: (companyId: string) => ["issues", companyId, "labels"] as const,
   },
   projects: {
     /** Prefix for every project query in a company. */
     all: (companyId: string) => ["projects", companyId] as const,
+    list: (companyId: string) => ["projects", companyId, "list"] as const,
+  },
+  goals: {
+    list: (companyId: string) => ["goals", companyId] as const,
   },
   activity: (companyId: string) => ["activity", companyId] as const,
   dashboard: (companyId: string) => ["dashboard", companyId] as const,
