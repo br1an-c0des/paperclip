@@ -1,0 +1,335 @@
+/*
+ * Board 4's columns: 280px tinted wells of cards, side by side in one sideways scroll. A folded
+ * column is a 48px strip with its name running down it. When the board's own width is narrow (a
+ * phone, or beside the docked panel) each column takes most of it and snaps into place.
+ */
+
+.bv {
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.bv-scroll {
+  overflow-x: auto;
+  padding-bottom: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--edge) transparent;
+}
+
+.bv-track {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: max-content;
+}
+
+.bv-col {
+  flex: 0 0 280px;
+  width: 280px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--r-card);
+  background: var(--bv-tint, var(--well));
+}
+
+.bv-col--drop {
+  outline: 2px dashed var(--run-fg);
+  outline-offset: -2px;
+}
+
+.bv-col--closed {
+  flex: 0 0 48px;
+  width: 48px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0 16px;
+}
+
+.bv-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 2px 4px;
+}
+
+.bv-head h2 {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.bv-head .btn--icon,
+.bv-fold {
+  color: var(--muted);
+}
+
+.bv-head .bv-fold {
+  margin-left: auto;
+}
+
+.bv-count {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.bv-vlabel {
+  writing-mode: vertical-rl;
+  padding: 8px 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Cards */
+
+.bv-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.bv-card:hover {
+  border-color: var(--edge);
+}
+
+.bv-card[draggable="true"] {
+  -webkit-user-drag: element;
+}
+
+.bv--dragging .bv-card {
+  cursor: grabbing;
+}
+
+.bv-card--selected,
+.bv-card--selected:hover {
+  border-color: color-mix(in srgb, var(--run-fg) 55%, transparent);
+  box-shadow: var(--shadow), 0 0 0 1px color-mix(in srgb, var(--run-fg) 45%, transparent);
+}
+
+.bv-card--checked,
+.bv-card--checked:hover {
+  background: var(--run-bg);
+  border-color: color-mix(in srgb, var(--run-fg) 55%, transparent);
+}
+
+.bv-card:focus-within {
+  border-color: var(--edge);
+}
+
+.bv-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.bv-id {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.bv-ticked {
+  color: var(--run-fg);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bv-live {
+  margin-left: auto;
+}
+
+.bv-title {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.bv-title:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--edge);
+}
+
+.bv-card > .tone-pill,
+.bv-card > .retry-mark {
+  align-self: flex-start;
+}
+
+.bv-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.bv-who {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.bv-none {
+  width: 24px;
+  height: 24px;
+}
+
+.bv-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 7px;
+  box-sizing: border-box;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  color: var(--body);
+  white-space: nowrap;
+}
+
+.bv-pill--add {
+  border-style: dashed;
+  border-color: var(--dashed);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.bv-labels {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+  border-radius: var(--r-pill);
+}
+
+.bv-labels .label-pill {
+  height: 24px;
+  padding: 0 9px 0 7px;
+}
+
+.bv-who:hover,
+.bv-pill:hover,
+.bv-who[data-expanded],
+.bv-pill[data-expanded],
+.bv-labels:hover .label-pill,
+.bv-labels[data-expanded] .label-pill {
+  background: var(--well);
+}
+
+.bv-who:focus-visible,
+.bv-pill:focus-visible,
+.bv-title:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 2px;
+}
+
+.bv-labels:focus-visible .label-pill,
+.bv-labels:focus-visible .bv-pill {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 1px;
+}
+
+.bv-subtasks {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.bv-progress {
+  margin-left: auto;
+  width: 56px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--pri-off);
+}
+
+.bv-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--g-lagoon);
+}
+
+/* Column foot */
+
+.bv-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-weight: 600;
+  text-align: left;
+}
+
+.bv-add:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.bv-more {
+  justify-content: center;
+}
+
+.bv-quick {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px;
+  color: var(--muted);
+}
+
+.bv-quick > svg {
+  display: none;
+}
+
+.bv-quick .input {
+  padding-block: 7px;
+}
+
+.bv-quick .btn {
+  align-self: flex-end;
+}
+
+/* Narrow boards: each column takes most of the width and snaps into place. */
+@container (max-width: 560px) {
+  .bv-scroll {
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 4px;
+  }
+
+  .bv-col {
+    scroll-snap-align: start;
+  }
+
+  .bv-col:not(.bv-col--closed) {
+    flex-basis: min(280px, 84cqw);
+    width: min(280px, 84cqw);
+  }
+}

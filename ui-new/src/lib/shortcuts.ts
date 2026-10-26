@@ -9,8 +9,9 @@ import { onCleanup } from "solid-js";
  *   dashboard. These don't fire while typing in a field or while a dialog is open.
  *
  * The old UI's `[` (toggle sidebar) and `]` (toggle panel) wait for a collapsible nav and the task
- * panel (M2). The task list's own keys (j/k, Enter, x, ←/→) live in tasks/TaskList.tsx and are listed
- * here for the cheatsheet; the Inbox's come with that screen.
+ * panel (M2). The task list's own keys (j/k, Enter, x, ←/→) live in tasks/TaskList.tsx, and the
+ * board's (j/k, h/l, Enter, x, Shift+←/→) in tasks/BoardView.tsx; both are listed here for the
+ * cheatsheet. The Inbox's come with that screen.
  */
 
 export type ShortcutAction = "palette" | "new-task" | "search" | "cheatsheet" | "go-inbox" | "go-dashboard";
@@ -46,6 +47,17 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["X"], label: "Select the row" },
       { keys: ["Shift", "Click"], label: "Select a range" },
       { keys: ["←", "→"], label: "Fold or unfold the group" },
+      { keys: ["Esc"], label: "Clear the selection" },
+    ],
+  },
+  {
+    title: "Task board",
+    items: [
+      { keys: ["J", "K"], label: "Next or previous card" },
+      { keys: ["H", "L"], label: "Previous or next column" },
+      { keys: ["Enter"], label: "Open the task" },
+      { keys: ["X"], label: "Select the card" },
+      { keys: ["Shift", "←", "→"], label: "Move the card to the next column" },
       { keys: ["Esc"], label: "Clear the selection" },
     ],
   },

@@ -14,7 +14,10 @@ import { Button } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { PriorityBars, StatusCapsule } from "@/ui/Status";
+import { Segmented } from "@/ui/Segmented";
 import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
+import { boardCollapseKey, boardColumns, boardStartsCollapsed } from "./board-model";
+import { BoardView } from "./BoardView";
 import { buildTaskGroups, PRIORITY_ORDER, startsCollapsed, STATUS_PICK_ORDER, type GroupNames, type TaskGroup } from "./list-model";
 import { useTaskPeople } from "./people";
 import { AssigneeItems, LabelDot, LabelItems, PriorityItems, StatusItems } from "./pickers";
@@ -26,20 +29,23 @@ import {
   EMPTY_FILTERS,
   filterCount,
   GROUP_BY_OPTIONS,
+  LAYOUT_OPTIONS,
   readViewState,
   toggled,
   viewStateKey,
   writeViewState,
   type TaskFilters,
+  type TaskLayout,
   type TaskViewState,
 } from "./view-state";
 import "./TasksView.css";
 
 /*
- * A task list with its toolbar and docked panel: the whole company's tasks, or one project's. The
- * toolbar groups, filters and searches the list; each list keeps its grouping, filters and folded
- * groups (view-state.ts). Ticking rows brings up the selection bar, which changes every ticked task
- * at once.
+ * A task list with its toolbar and docked panel: the whole company's tasks, or one project's, as a
+ * list (board 1) or a board (board 4). The toolbar switches between them, groups, filters and
+ * searches; each list keeps its layout, grouping, filters and folded groups (view-state.ts). In a
+ * project the header's List and Board tabs choose the layout instead, so the page passes it in.
+ * Ticking rows or cards brings up the selection bar, which changes every ticked task at once.
  *
  * The open task lives in the URL (`?task=TES-3`), so it survives a reload and the back button closes
  * it. A task that isn't in the list (a subtask from another project, say) is looked up on its own.
@@ -56,7 +62,12 @@ export function useTaskList(scope: () => { projectId?: string } | null) {
   }));
 }
 
-export function TasksView(props: { projectId?: string; tasks: ReturnType<typeof useTaskList> }) {
+export function TasksView(props: {
+  projectId?: string;
+  tasks: ReturnType<typeof useTaskList>;
+  /** A layout the page sets, such as a project's Board tab; otherwise the saved one, with a switch. */
+  layout?: TaskLayout;
+}) {
   const company = useCompany();
   const commands = useCommands();
   const people = useTaskPeople();
@@ -99,8 +110,13 @@ export function TasksView(props: { projectId?: string; tasks: ReturnType<typeof 
   };
   const visible = createMemo(() => applyFilters(tasks(), view().filters, search()));
   const groups = createMemo(() => buildTaskGroups(visible(), people.liveIssueIds(), { groupBy: view().groupBy, names }));
-  const collapseKey = (group: TaskGroup) => `${view().groupBy}:${group.key}`;
-  const isOpen = (group: TaskGroup) => !(view().collapsed[collapseKey(group)] ?? startsCollapsed(group));
+  const layout = () => props.layout ?? view().layout;
+  const columns = createMemo(() => boardColumns(groups(), view().groupBy, view().filters));
+  // The board folds its columns apart from the list's groups, with its own defaults.
+  const collapseKey = (group: TaskGroup) =>
+    layout() === "board" ? boardCollapseKey(view().groupBy, group) : `${view().groupBy}:${group.key}`;
+  const isOpen = (group: TaskGroup) =>
+    !(view().collapsed[collapseKey(group)] ?? (layout() === "board" ? boardStartsCollapsed(group) : startsCollapsed(group)));
   const toggleGroup = (group: TaskGroup, open: boolean) =>
     changeView({ collapsed: { ...view().collapsed, [collapseKey(group)]: !open } });
 
@@ -119,12 +135,12 @@ export function TasksView(props: { projectId?: string; tasks: ReturnType<typeof 
   }));
   const openTask = () => fromList() ?? (looked.data && openRef() ? looked.data : undefined);
 
-  // Previous and next follow the list's order: groups as shown, then rows within them. Grouped by
-  // label, a task can show more than once; it counts where it first appears.
+  // Previous and next follow the list's order: groups (or columns) as shown, then rows within them.
+  // Grouped by label, a task can show more than once; it counts where it first appears.
   const order = createMemo(() => {
     const seen = new Set<string>();
     const list: CompactIssue[] = [];
-    for (const group of groups()) {
+    for (const group of layout() === "board" ? columns() : groups()) {
       for (const row of group.rows) {
         if (seen.has(row.task.id)) continue;
         seen.add(row.task.id);
@@ -149,6 +165,14 @@ export function TasksView(props: { projectId?: string; tasks: ReturnType<typeof 
   return (
     <>
       <div class="tv-toolbar" role="toolbar" aria-label="Task list">
+        <Show when={!props.layout}>
+          <Segmented
+            label="Layout"
+            options={LAYOUT_OPTIONS}
+            value={view().layout}
+            onChange={(next) => changeView({ layout: next })}
+          />
+        </Show>
         <Menu>
           <Menu.Trigger as={Button}>
             {view().groupBy === "none" ? "No grouping" : `Group: ${groupLabel()}`}
@@ -236,18 +260,36 @@ export function TasksView(props: { projectId?: string; tasks: ReturnType<typeof 
                 </section>
               }
             >
-              <TaskList
-                groups={groups()}
-                people={people}
-                updates={updates}
-                selectedId={openTask()?.id ?? null}
-                onOpen={open}
-                projectId={props.projectId}
-                isOpen={isOpen}
-                onToggleGroup={toggleGroup}
-                checked={checked()}
-                onCheckedChange={setChecked}
-              />
+              <Show
+                when={layout() === "board"}
+                fallback={
+                  <TaskList
+                    groups={groups()}
+                    people={people}
+                    updates={updates}
+                    selectedId={openTask()?.id ?? null}
+                    onOpen={open}
+                    projectId={props.projectId}
+                    isOpen={isOpen}
+                    onToggleGroup={toggleGroup}
+                    checked={checked()}
+                    onCheckedChange={setChecked}
+                  />
+                }
+              >
+                <BoardView
+                  columns={columns()}
+                  people={people}
+                  updates={updates}
+                  selectedId={openTask()?.id ?? null}
+                  onOpen={open}
+                  projectId={props.projectId}
+                  isOpen={isOpen}
+                  onToggleGroup={toggleGroup}
+                  checked={checked()}
+                  onCheckedChange={setChecked}
+                />
+              </Show>
             </Show>
             <Show when={openTask()}>
               {(task) => <TaskPanel task={task()} onClose={close} onOpenTask={open} onPrevious={step(-1)} onNext={step(1)} />}

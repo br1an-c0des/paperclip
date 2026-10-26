@@ -43,12 +43,12 @@ function readPin() {
   }
 }
 
-function plainClick(event: MouseEvent) {
+export function plainClick(event: MouseEvent) {
   return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 }
 
 /** A menu or popover owns the keyboard while it's open. */
-function hasOpenLayer() {
+export function hasOpenLayer() {
   return document.querySelector('[data-layer="menu"], [data-layer="popover"]') !== null;
 }
 
@@ -56,7 +56,7 @@ function hasOpenLayer() {
  * The latest value of a keyed item. While a removed group or row is being torn down its lookup comes
  * back empty for a moment, so this keeps the last value it had.
  */
-function latest<T>(get: () => T | undefined): () => T {
+export function latest<T>(get: () => T | undefined): () => T {
   let last: T | undefined;
   return () => {
     const value = get();
@@ -343,14 +343,7 @@ export function TaskList(props: {
                           onClose={() => setAdding(null)}
                           onMore={(title) => {
                             setAdding(null);
-                            const value = group().value;
-                            commands.openNewTask({
-                              ...(props.projectId ? { projectId: props.projectId } : {}),
-                              ...(value?.field === "status" ? { status: value.status } : {}),
-                              ...(value?.field === "assignee" && value.agentId ? { assigneeAgentId: value.agentId } : {}),
-                              ...(value?.field === "parent" && value.parentId ? { parentId: value.parentId } : {}),
-                              ...(title ? { title } : {}),
-                            });
+                            openMoreOptions(commands, props.projectId, group().value, title);
                           }}
                         />
                       </Show>
@@ -366,7 +359,18 @@ export function TaskList(props: {
   );
 }
 
-function GroupMarkView(props: { mark: GroupMark; people: TaskPeople }) {
+/** "More options" from a quick add: the new-task dialog, with the group's value and the title so far. */
+export function openMoreOptions(commands: ReturnType<typeof useCommands>, projectId: string | undefined, value: GroupValue, title: string) {
+  commands.openNewTask({
+    ...(projectId ? { projectId } : {}),
+    ...(value?.field === "status" ? { status: value.status } : {}),
+    ...(value?.field === "assignee" && value.agentId ? { assigneeAgentId: value.agentId } : {}),
+    ...(value?.field === "parent" && value.parentId ? { parentId: value.parentId } : {}),
+    ...(title ? { title } : {}),
+  });
+}
+
+export function GroupMarkView(props: { mark: GroupMark; people: TaskPeople }) {
   return (
     <span class="tl-mark">
       <Switch fallback={<Capsule gradient="ash" size="group" grain />}>
@@ -535,14 +539,17 @@ function Row(props: {
 
 /**
  * Typing a title at a group's foot adds a task with the group's value (its status, assignee,
- * priority, label or parent). The field stays open for the next one; Esc closes it.
+ * priority, label or parent). The field stays open for the next one; Esc closes it. The board's
+ * columns use it too, with their own class and without the hint.
  */
-function QuickAdd(props: {
+export function QuickAdd(props: {
   group: TaskGroup;
   updates: TaskUpdates;
   projectId?: string;
   onClose: () => void;
   onMore: (title: string) => void;
+  class?: string;
+  hideHint?: boolean;
 }) {
   let input: HTMLInputElement | undefined;
   const [title, setTitle] = createSignal("");
@@ -565,7 +572,7 @@ function QuickAdd(props: {
   };
 
   return (
-    <form class="tl-bar tl-quick" onSubmit={submit}>
+    <form class={props.class ?? "tl-bar tl-quick"} onSubmit={submit}>
       <Plus size={14} aria-hidden="true" />
       <TextInput
         ref={(element) => {
@@ -588,7 +595,9 @@ function QuickAdd(props: {
         aria-label={`New task title, in ${props.group.label}`}
         readOnly={saving()}
       />
-      <span class="tl-quick-hint">Enter to add · Esc to close</span>
+      <Show when={!props.hideHint}>
+        <span class="tl-quick-hint">Enter to add · Esc to close</span>
+      </Show>
       <button type="button" class="btn btn--quiet btn--compact" onClick={() => props.onMore(title().trim())}>
         More options
       </button>

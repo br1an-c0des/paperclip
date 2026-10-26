@@ -10,8 +10,9 @@ import { PlannedNote } from "./Planned";
 import { OPEN_STATUSES } from "./Tasks";
 
 /*
- * A project's pages under its header card (board 1). The List tab is the project's tasks with the
- * docked panel; Board comes later in M2, and Agent workload, Docs and Settings in M4.
+ * A project's pages under its header card (board 1). The List and Board tabs are the project's
+ * tasks as a list (board 1) or a board (board 4), with the docked panel; the tab sets the layout, so
+ * the task view leaves out its own switch. Agent workload, Docs and Settings come in M4.
  */
 
 const PROJECT_TABS = [
@@ -71,12 +72,9 @@ export function ProjectPage() {
         }
         tabs={<Tabs label="Project" items={PROJECT_TABS.map((item) => ({ label: item.label, href: `${base()}${item.path}`, end: item.path === "" }))} />}
       />
-      <Show
-        when={tab() === ""}
-        fallback={<PlannedNote milestone={tab() === "board" ? "M2" : "M4"}>This tab is still to come.</PlannedNote>}
-      >
+      <Show when={tab() === "" || tab() === "board"} fallback={<PlannedNote milestone="M4">This tab is still to come.</PlannedNote>}>
         <Show when={project()} fallback={<PlannedNote milestone="M2">Loading the project…</PlannedNote>}>
-          {(found) => <TasksView projectId={found().id} tasks={tasks} />}
+          {(found) => <TasksView projectId={found().id} tasks={tasks} layout={tab() === "board" ? "board" : "list"} />}
         </Show>
       </Show>
     </>

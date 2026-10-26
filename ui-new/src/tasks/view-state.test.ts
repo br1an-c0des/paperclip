@@ -1,7 +1,17 @@
 import type { CompactIssue } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import { applyUpdate } from "./task-updates";
-import { applyFilters, DEFAULT_VIEW_STATE, EMPTY_FILTERS, filterCount, parseViewState, toggled } from "./view-state";
+import {
+  applyFilters,
+  DEFAULT_VIEW_STATE,
+  EMPTY_FILTERS,
+  filterCount,
+  parseViewState,
+  readViewState,
+  toggled,
+  viewStateKey,
+  writeViewState,
+} from "./view-state";
 
 function task(id: string, extra: Partial<CompactIssue> = {}) {
   return {
@@ -31,10 +41,30 @@ describe("parseViewState", () => {
   it("keeps a saved grouping and folded groups", () => {
     const saved = { groupBy: "assignee", filters: EMPTY_FILTERS, collapsed: { "assignee:none": true, bad: "yes" } };
     expect(parseViewState(JSON.stringify(saved))).toEqual({
+      layout: "list",
       groupBy: "assignee",
       filters: EMPTY_FILTERS,
       collapsed: { "assignee:none": true },
     });
+  });
+});
+
+describe("the layout switch", () => {
+  it("starts as a list and keeps a saved board", () => {
+    expect(DEFAULT_VIEW_STATE.layout).toBe("list");
+    expect(parseViewState(JSON.stringify({ layout: "board", groupBy: "priority" }))).toMatchObject({ layout: "board", groupBy: "priority" });
+  });
+
+  it("falls back to the list for an unknown layout", () => {
+    expect(parseViewState(JSON.stringify({ layout: "calendar" })).layout).toBe("list");
+  });
+
+  it("saves the layout with the rest of the view, per list", () => {
+    const key = viewStateKey("company", "project");
+    writeViewState(key, { ...DEFAULT_VIEW_STATE, layout: "board", collapsed: { "board:status:done": false } });
+    expect(readViewState(key)).toMatchObject({ layout: "board", collapsed: { "board:status:done": false } });
+    expect(readViewState(viewStateKey("company")).layout).toBe("list");
+    localStorage.removeItem(key);
   });
 });
 

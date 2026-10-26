@@ -1,14 +1,22 @@
 import type { CompactIssue, IssuePriority, IssueStatus } from "@paperclipai/shared";
 
 /*
- * How a task list is arranged: what it's grouped by, what it's filtered to, and which groups are
- * collapsed. Each list (the company's, each project's) keeps its own, in localStorage, after the old
+ * How a task list is arranged: as a list or a board, what it's grouped by, what it's filtered to,
+ * and which groups are collapsed. Each list (the company's, each project's) keeps its own, in localStorage, after the old
  * list's per-scope view state (ui/src/components/IssuesList.tsx). Search is left out on purpose: it
  * lasts for the visit only.
  *
  * Assignees are keyed `agent:<id>`, `user:<id>` or `none`; labels by id, or `none` for tasks with no
  * label.
  */
+
+/** List (board 1) or board (board 4). */
+export type TaskLayout = "list" | "board";
+
+export const LAYOUT_OPTIONS: { value: TaskLayout; label: string }[] = [
+  { value: "list", label: "List" },
+  { value: "board", label: "Board" },
+];
 
 export type GroupBy = "status" | "assignee" | "priority" | "label" | "parent" | "none";
 
@@ -29,15 +37,19 @@ export type TaskFilters = {
 };
 
 export type TaskViewState = {
+  layout: TaskLayout;
   groupBy: GroupBy;
   filters: TaskFilters;
-  /** Groups the viewer opened or closed, keyed `<groupBy>:<group key>`; others use the default. */
+  /**
+   * Groups the viewer opened or closed, keyed `<groupBy>:<group key>` on the list and
+   * `board:<groupBy>:<group key>` on the board; others use the default.
+   */
   collapsed: Record<string, boolean>;
 };
 
 export const EMPTY_FILTERS: TaskFilters = { statuses: [], priorities: [], assignees: [], labels: [] };
 
-export const DEFAULT_VIEW_STATE: TaskViewState = { groupBy: "status", filters: EMPTY_FILTERS, collapsed: {} };
+export const DEFAULT_VIEW_STATE: TaskViewState = { layout: "list", groupBy: "status", filters: EMPTY_FILTERS, collapsed: {} };
 
 export function viewStateKey(companyId: string, projectId?: string) {
   return `ui-new:tasks:view:${companyId}:${projectId ?? "all"}`;
@@ -60,6 +72,7 @@ export function parseViewState(raw: string | null): TaskViewState {
       for (const [key, closed] of Object.entries(value.collapsed)) if (typeof closed === "boolean") collapsed[key] = closed;
     }
     return {
+      layout: value.layout === "board" ? "board" : "list",
       groupBy: GROUP_BY_VALUES.has(value.groupBy as GroupBy) ? (value.groupBy as GroupBy) : "status",
       filters: {
         statuses: strings(filters.statuses) as IssueStatus[],
