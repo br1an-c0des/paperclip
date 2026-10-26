@@ -697,6 +697,123 @@ describeEmbeddedPostgres("issue list routes assigneeAgentId filter", () => {
     expect(second.headers["x-paperclip-request-cache"]).toBe("hit");
   });
 
+  it("refetches the compact issue list after an issue changes within the cache lifetime", async () => {
+    const companyId = randomUUID();
+    const issueId = randomUUID();
+    let computeCount = 0;
+
+    await db.insert(companies).values({
+      id: companyId,
+      name: "Paperclip",
+      issuePrefix: uniqueIssuePrefix(),
+      requireBoardApprovalForNewAgents: false,
+    });
+    await seedCloudTenantMember(companyId);
+    await db.insert(issues).values({
+      id: issueId,
+      companyId,
+      title: "Before",
+      status: "todo",
+      priority: "medium",
+    });
+
+    const app = createApp(companyId, {
+      issueListDiagnostics: {
+        onComputeStart() {
+          computeCount += 1;
+        },
+      },
+    });
+    const first = await request(app)
+      .get(`/api/companies/${companyId}/issues`)
+      .query({ view: "compact", limit: "20" });
+    expect(first.status, JSON.stringify(first.body)).toBe(200);
+    expect(first.body[0].title).toBe("Before");
+
+    const patched = await request(app)
+      .patch(`/api/issues/${issueId}`)
+      .send({ title: "After", priority: "high" });
+    expect(patched.status, JSON.stringify(patched.body)).toBe(200);
+
+    const second = await request(app)
+      .get(`/api/companies/${companyId}/issues`)
+      .query({ view: "compact", limit: "20" });
+    expect(second.status, JSON.stringify(second.body)).toBe(200);
+    expect(second.headers["x-paperclip-request-cache"]).toBe("miss");
+    expect(second.body[0]).toMatchObject({ title: "After", priority: "high" });
+    expect(computeCount).toBe(2);
+  });
+
+  it("does not cache a compact issue list computed while an issue changes", async () => {
+    const companyId = randomUUID();
+    const issueId = randomUUID();
+    let computeCount = 0;
+    let releaseFirstCompute!: () => void;
+    const firstComputeReleased = new Promise<void>((resolve) => {
+      releaseFirstCompute = resolve;
+    });
+    let markFirstComputeStarted!: () => void;
+    const firstComputeStarted = new Promise<void>((resolve) => {
+      markFirstComputeStarted = resolve;
+    });
+
+    await db.insert(companies).values({
+      id: companyId,
+      name: "Paperclip",
+      issuePrefix: uniqueIssuePrefix(),
+      requireBoardApprovalForNewAgents: false,
+    });
+    await seedCloudTenantMember(companyId);
+    await db.insert(issues).values({
+      id: issueId,
+      companyId,
+      title: "Before",
+      status: "todo",
+      priority: "medium",
+    });
+
+    const app = createApp(companyId, {
+      issueListDiagnostics: {
+        async onComputeStart() {
+          computeCount += 1;
+          if (computeCount === 1) {
+            markFirstComputeStarted();
+            await firstComputeReleased;
+          }
+        },
+      },
+    });
+    const firstRequest = request(app)
+      .get(`/api/companies/${companyId}/issues`)
+      .query({ view: "compact", limit: "20" })
+      .then((res) => res);
+    await firstComputeStarted;
+
+    const patched = await request(app)
+      .patch(`/api/issues/${issueId}`)
+      .send({ title: "After" });
+    expect(patched.status, JSON.stringify(patched.body)).toBe(200);
+
+    const concurrent = request(app)
+      .get(`/api/companies/${companyId}/issues`)
+      .query({ view: "compact", limit: "20" })
+      .then((res) => res);
+    releaseFirstCompute();
+    const [first, second] = await Promise.all([firstRequest, concurrent]);
+    expect(first.status, JSON.stringify(first.body)).toBe(200);
+    expect(second.status, JSON.stringify(second.body)).toBe(200);
+    expect(second.headers["x-paperclip-request-cache"]).toBe("miss");
+    expect(second.body[0].title).toBe("After");
+
+    const third = await request(app)
+      .get(`/api/companies/${companyId}/issues`)
+      .query({ view: "compact", limit: "20" });
+    expect(third.status, JSON.stringify(third.body)).toBe(200);
+    expect(third.headers["x-paperclip-request-cache"]).toBe("hit");
+    expect(third.body[0].title).toBe("After");
+    expect(computeCount).toBe(2);
+  });
+
   it("bounds compact issue-list server cache entries", async () => {
     const companyId = randomUUID();
     const issueId = randomUUID();
