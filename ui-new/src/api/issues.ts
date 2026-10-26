@@ -9,13 +9,14 @@ import type {
   IssueDocumentSummary,
   IssueLabel,
   IssueWorkProduct,
+  TaskInterruptionPresentation,
 } from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
  * Tasks (issues), as ui/src/api/issues.ts uses them: the compact list behind the task views, one
- * task's full record, creating and updating tasks, attachments, labels, and a small search for the
- * palette and the new-task pickers.
+ * task's full record, creating and updating tasks, retrying an interrupted one, attachments, labels,
+ * and a small search for the palette and the new-task pickers.
  */
 
 export type IssueSearch = { q?: string; limit?: number; status?: string };
@@ -68,6 +69,13 @@ export const issuesApi = {
   /** One task by id or identifier (`TRA-41`), with its project, goal, relations and documents. */
   get: (ref: string, signal?: AbortSignal) => api.get<Issue>(`/issues/${encodeURIComponent(ref)}`, { signal }),
   update: (id: string, data: Record<string, unknown>) => api.patch<Issue>(`/issues/${id}`, data),
+  /**
+   * Asks for another attempt at an interrupted task (`POST /issues/:id/retry`). The idempotency key
+   * makes a resent request land once; `observedRunId` is the run the viewer saw fail, and the server
+   * answers `stale` when the task has moved on since.
+   */
+  retry: (id: string, body: { idempotencyKey: string; observedRunId: string | null }) =>
+    api.post<TaskRetryReceipt>(`/issues/${id}/retry`, body),
   search: (companyId: string, filters: IssueSearch, signal?: AbortSignal) => {
     const qs = searchParams(filters);
     return api.get<Issue[]>(`/companies/${companyId}/issues${qs ? `?${qs}` : ""}`, { signal });
@@ -98,6 +106,14 @@ export const issuesApi = {
     api.get<IssueDocument>(`/issues/${id}/documents/${encodeURIComponent(key)}`, { signal }),
   listAttachments: (id: string, signal?: AbortSignal) => api.get<IssueAttachment[]>(`/issues/${id}/attachments`, { signal }),
   listWorkProducts: (id: string, signal?: AbortSignal) => api.get<IssueWorkProduct[]>(`/issues/${id}/work-products`, { signal }),
+};
+
+/** What `POST /issues/:id/retry` answers, as ui/src/api/issues.ts types it. */
+export type TaskRetryReceipt = {
+  requestId: string | null;
+  accepted: boolean;
+  stale: boolean;
+  presentation: TaskInterruptionPresentation | null;
 };
 
 /**
