@@ -283,7 +283,7 @@ claimed for the pending case, and stale prior-run leases cannot authorize cleanu
 isolation, last-sync-wins edits and deletions, terminal cleanup, link rejection, old-head
 adoption, stable prompt digests, warm ownership transfer, concurrent stale claims,
 and stop-proved recovery. `agent-directory-probe.test.ts` covers stable snapshots,
-unsafe paths, mutation races and bounded child failures; composed native executor
+long paths, unsafe paths, mutation races and bounded child failures; composed native executor
 tests cover retained roots and retirement before collection. The legacy
 working-copy and native-tool suites exercise compatibility. Workspace merge tests exercise preflight and
 interrupted replay.
