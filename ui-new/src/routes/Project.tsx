@@ -23,7 +23,7 @@ const PROJECT_TABS = [
 ];
 
 export function ProjectPage() {
-  const params = useParams<{ projectKey: string; "*"?: string }>();
+  const params = useParams<{ projectKey: string; tab?: string }>();
   const company = useCompany();
   const projects = useProjectsQuery();
   const liveRuns = useLiveRunsQuery();
@@ -32,7 +32,7 @@ export function ProjectPage() {
   );
   const tasks = useTaskList(() => (project() ? { projectId: project()!.id } : null));
   const base = () => `/${company().issuePrefix}/projects/${params.projectKey}`;
-  const tab = () => (params["*"] ?? "").replace(/\/$/, "");
+  const tab = () => (params.tab ?? "").replace(/\/$/, "");
 
   const list = () => (project() ? (tasks.data ?? []) : []);
   const open = () => list().filter((task) => OPEN_STATUSES.has(task.status as IssueStatus)).length;

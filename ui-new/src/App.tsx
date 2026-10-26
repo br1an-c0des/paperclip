@@ -52,7 +52,7 @@ export function App() {
             <Route path="/inbox/*" component={InboxPage} />
             <Route path="/issues" component={TasksPage} />
             <Route path="/issues/:issueRef/*" component={TaskPage} />
-            <Route path="/projects/:projectKey/*" component={ProjectPage} />
+            <Route path="/projects/:projectKey/*tab" component={ProjectPage} />
             <Route path="/agents/:agentKey/*" component={AgentPage} />
             <Route path="/company/settings/*" component={SettingsPage} />
             <Route path="/*rest" component={NotBuiltYet} />
