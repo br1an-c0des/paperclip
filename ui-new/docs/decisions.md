@@ -882,7 +882,10 @@ Both are handled in `ui-new` for now.
   keys, while feed dismissals use `attention:…` keys. Clearing an approval in the Inbox doesn't lower
   the badge. The feed's own `deskBadgeCount` matches Needs you; switching the nav to it means reading
   the feed in the nav. **Decided 2026-10-27:** the badge counts what's waiting on you, matching Needs
-  you (the feed's count), not `sidebar-badges`.
+  you (the feed's count), not `sidebar-badges`. Built: the count is what Needs you lists (active, not
+  cleared or snoozed, not alerts). The feed's `deskBadgeCount` measures something else (items that
+  arrived or are due today, alerts and snoozed included), so the nav reads the whole feed on every
+  page. `sidebar-badges` is no longer shown anywhere but is still invalidated in places.
 - **Stalled reviews have no inline action yet.** `POST /issues/:id/stalled-review-decision` exists
   but isn't ported; stalled reviews open the task.
 - **Sign-offs act through the task's status.** The current reviewer approves with `done` and a
