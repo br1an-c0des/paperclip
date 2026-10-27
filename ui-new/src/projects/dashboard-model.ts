@@ -9,6 +9,8 @@ import type {
   WorkspaceOverviewItem,
 } from "@paperclipai/shared";
 import type { LiveRun } from "@/api/heartbeats";
+import { isAlert, placement } from "@/inbox/inbox-model";
+import { itemTask } from "@/inbox/use-inbox";
 import type { Request, RequestKind } from "@/requests/request-model";
 import { PRIORITY_META } from "@/ui/status-meta";
 
@@ -19,7 +21,7 @@ import { PRIORITY_META } from "@/ui/status-meta";
  *   meter and the month's pace. A lifetime budget compares all-time spend instead.
  * - Agents at work: every agent with a live run on one of the project's tasks or open work assigned
  *   in it, with what it's on now.
- * - Waiting on you: which of the project's tasks the attention feed says need you, so only their
+ * - Waiting on you: which of the project's tasks the Inbox's feed says need you, so only their
  *   requests are loaded, and the open requests that come back, filtered by kind.
  * - Stuck work: open tasks that wait on someone without a request to answer, such as a blocked task,
  *   a failed run, a stalled review, work nobody is assigned to, or work that stopped moving.
@@ -237,10 +239,6 @@ export function crewSummary(members: readonly CrewMember[]) {
 /** Attention feed sources that are requests: answered with a request card. */
 const REQUEST_SOURCES = new Set(["issue_thread_interaction", "approval", "decision"]);
 
-function attentionIssueId(item: AttentionItem) {
-  return item.relatedIssue?.id ?? (item.subject.kind === "issue" ? item.subject.id : null);
-}
-
 export type WaitingTargets = {
   /** Tasks with a request waiting on you; their interactions and approvals are loaded. */
   requestTaskIds: string[];
@@ -249,20 +247,36 @@ export type WaitingTargets = {
 };
 
 /**
- * What the attention feed says waits on you in this project. An item belongs to it when it names
- * the project or one of its tasks; items you dismissed or snoozed stay out, as in the Inbox.
+ * What the Inbox's feed says waits on you in this project. It reads the same feed as the Inbox
+ * (`useInbox`, dismissed items included) and keeps what the Inbox's Needs you tab keeps: items you
+ * haven't cleared or snoozed, and not alerts (`placement`, `isAlert`). An item belongs to the
+ * project when it names the project or one of its tasks. The feed leaves an approval's tasks out,
+ * so `approvalTasks` (from `/approvals/:id/issues`, as the Inbox reads them) fills them in.
  */
-export function waitingTargets(items: readonly AttentionItem[] | undefined, projectId: string, taskIds: ReadonlySet<string>): WaitingTargets {
+export function waitingTargets(
+  items: readonly AttentionItem[] | undefined,
+  projectId: string,
+  taskIds: ReadonlySet<string>,
+  approvalTasks: ReadonlyMap<string, readonly string[]> = new Map(),
+): WaitingTargets {
   const requests = new Set<string>();
   const signoffs = new Map<string, WaitingTargets["signoffs"][number]>();
   for (const item of items ?? []) {
-    if (item.dismissal?.isActive || item.archivedAt) continue;
-    const issueId = attentionIssueId(item);
-    if (!issueId || (item.project?.id !== projectId && !taskIds.has(issueId))) continue;
-    if (REQUEST_SOURCES.has(item.sourceKind)) requests.add(issueId);
-    else if (item.sourceKind === "review" && !signoffs.has(issueId)) signoffs.set(issueId, { taskId: issueId, whyNow: item.whyNow, since: item.activityAt });
+    if (placement(item) !== "active" || isAlert(item) || item.archivedAt) continue;
+    const related = itemTask(item)?.id ?? null;
+    const issueIds = related ? [related] : item.sourceKind === "approval" ? [...(approvalTasks.get(item.subject.id) ?? [])] : [];
+    for (const issueId of issueIds) {
+      if (item.project?.id !== projectId && !taskIds.has(issueId)) continue;
+      if (REQUEST_SOURCES.has(item.sourceKind)) requests.add(issueId);
+      else if (item.sourceKind === "review" && !signoffs.has(issueId)) signoffs.set(issueId, { taskId: issueId, whyNow: item.whyNow, since: item.activityAt });
+    }
   }
   return { requestTaskIds: [...requests], signoffs: [...signoffs.values()] };
+}
+
+/** Approvals in the feed, whose linked tasks are read apart. */
+export function feedApprovalIds(items: readonly AttentionItem[] | undefined) {
+  return [...new Set((items ?? []).flatMap((item) => (item.sourceKind === "approval" && !item.relatedIssue && placement(item) === "active" ? [item.subject.id] : [])))];
 }
 
 export type RequestFilter = "all" | RequestKind;

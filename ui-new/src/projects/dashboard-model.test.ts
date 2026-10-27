@@ -7,6 +7,7 @@ import {
   codeView,
   crew,
   crewSummary,
+  feedApprovalIds,
   formatCents,
   openRequests,
   projectSpend,
@@ -207,6 +208,23 @@ describe("waitingTargets", () => {
     );
     expect(targets.requestTaskIds).toEqual(["t1", "t2"]);
     expect(targets.signoffs).toEqual([{ taskId: "t3", whyNow: "Review it", since: NOW.toISOString() }]);
+  });
+
+  it("leaves out snoozed items and finds an approval's tasks from its linked issues", () => {
+    const approval = item({ sourceKind: "approval", subject: { kind: "approval", id: "ap1" } as never, relatedIssue: null, project: null });
+    const otherApproval = item({ sourceKind: "approval", subject: { kind: "approval", id: "ap2" } as never, relatedIssue: null, project: null });
+    const snoozed = item({ relatedIssue: { kind: "issue", id: "t6" } as never, dismissal: { isActive: true, kind: "snooze", snoozedUntil: "2026-10-16" } as never });
+    const targets = waitingTargets(
+      [approval, otherApproval, snoozed],
+      "p1",
+      new Set(["t6", "t7"]),
+      new Map([
+        ["ap1", ["t7"]],
+        ["ap2", ["elsewhere"]],
+      ]),
+    );
+    expect(targets.requestTaskIds).toEqual(["t7"]);
+    expect(feedApprovalIds([approval, otherApproval, approval, snoozed])).toEqual(["ap1", "ap2"]);
   });
 });
 

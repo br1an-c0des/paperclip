@@ -7,6 +7,7 @@ import { approvalsApi } from "@/api/approvals";
 import { costsApi } from "@/api/costs";
 import { interactionsApi } from "@/api/interactions";
 import { issuesApi } from "@/api/issues";
+import { inboxApi } from "@/api/inbox";
 import { projectsApi } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
 import { useCommands } from "@/lib/commands";
@@ -31,6 +32,7 @@ import {
   crew,
   crewSummary,
   formatCents,
+  feedApprovalIds,
   monthWindow,
   openRequests,
   projectSpend,
@@ -51,8 +53,9 @@ import "./ProjectDashboard.css";
  *   spend against the project's budget, with the month's pace) and Code (repositories, open task
  *   checkouts and their dev servers). Below a divider, Agents at work: each agent on the project's
  *   tasks, with what it's on and, on hover, its run to watch.
- * - Waiting on you: request cards from the project's tasks that the attention feed says need you,
- *   with a kind filter, and tasks waiting on your sign-off.
+ * - Waiting on you: request cards from the project's tasks that the Inbox's Needs you tab holds,
+ *   with a kind filter, and tasks waiting on your sign-off. It shares the Inbox's feed query, so
+ *   clearing or snoozing in the Inbox, and the Inbox's live refresh, reach it too.
  * - Stuck work: open tasks waiting on someone without a request to answer.
  *
  * Not drawn from the board, because the API has no source for them: the AI brief with its revisions
@@ -84,13 +87,24 @@ export function ProjectDashboard(props: { project: Project; tasks: Tasks; base: 
   const openTask = (task: Pick<ProjectTask, "id" | "identifier" | "title">) =>
     commands.openTaskModal({ id: task.id, identifier: task.identifier, title: task.title, projectId: props.project.id });
 
-  // Waiting on you: the attention feed names the tasks; their requests come from the task.
+  // Waiting on you: the Inbox's feed (the same query and cache) names the tasks; their requests
+  // come from the task. An approval's tasks are read apart, as the Inbox reads them.
   const attention = createQuery(() => ({
-    queryKey: queryKeys.attention(company().id),
-    queryFn: ({ signal }) => projectsApi.attention(company().id, signal),
-    staleTime: 30_000,
+    queryKey: queryKeys.inbox.feed(company().id),
+    queryFn: ({ signal }) => inboxApi.feed(company().id, signal),
+    refetchOnWindowFocus: true,
   }));
-  const targets = createMemo(() => waitingTargets(attention.data?.items, props.project.id, new Set(taskById().keys())));
+  const approvalIds = createMemo(() => feedApprovalIds(attention.data?.items));
+  const approvalIssues = createQueries(() => ({
+    queries: approvalIds().map((approvalId) => ({
+      queryKey: queryKeys.inbox.approvalIssues(company().id, approvalId),
+      queryFn: ({ signal }: { signal: AbortSignal }) => inboxApi.approvalIssues(approvalId, signal),
+    })),
+  }));
+  const approvalTasks = createMemo(
+    () => new Map(approvalIds().map((approvalId, index) => [approvalId, (approvalIssues[index]?.data ?? []).map((issue) => issue.id)] as const)),
+  );
+  const targets = createMemo(() => waitingTargets(attention.data?.items, props.project.id, new Set(taskById().keys()), approvalTasks()));
   const requestSources = createQueries(() => ({
     queries: targets().requestTaskIds.flatMap((taskId) => [
       {
@@ -129,7 +143,8 @@ export function ProjectDashboard(props: { project: Project; tasks: Tasks; base: 
   const filters = createMemo(() => requestFilters(waiting(), signoffs().length));
   const shownRequests = () => waiting().filter((entry) => kind() === "all" || entry.request.kind === kind());
   const shownSignoffs = () => (kind() === "all" || kind() === "signoff" ? signoffs() : []);
-  const waitingLoading = () => attention.isPending || requestSources.some((query) => query.isPending);
+  const waitingLoading = () =>
+    attention.isPending || approvalIssues.some((query) => query.isPending) || requestSources.some((query) => query.isPending);
 
   const liveTaskIds = createMemo(() => new Set((liveRuns.data ?? []).flatMap((run) => (run.issueId ? [run.issueId] : []))));
   const stuck = createMemo(() =>

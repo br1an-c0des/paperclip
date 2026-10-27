@@ -1,4 +1,4 @@
-import type { AttentionFeed, Project, ProjectRepositoryOptions, WorkspaceOverviewResponse } from "@paperclipai/shared";
+import type { Project, ProjectRepositoryOptions, WorkspaceOverviewResponse } from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
@@ -11,8 +11,7 @@ import { api } from "./client";
  * company's connections (`/project-repositories`).
  *
  * The project dashboard (board 8) also reads the project's task checkouts with their dev servers
- * (`/workspace-overview?projectId=`) and the attention feed the Inbox is built on, which it filters
- * to the project's tasks.
+ * (`/workspace-overview?projectId=`).
  */
 
 export const projectsApi = {
@@ -28,9 +27,6 @@ export const projectsApi = {
       `/companies/${encodeURIComponent(companyId)}/workspace-overview?projectId=${encodeURIComponent(projectId)}`,
       { signal },
     ),
-  /** The whole attention feed for the signed-in person (`all=true`), as the Inbox reads it. */
-  attention: (companyId: string, signal?: AbortSignal) =>
-    api.get<AttentionFeed>(`/companies/${encodeURIComponent(companyId)}/attention?all=true`, { signal }),
 };
 
 /** Projects that aren't archived, by name. */

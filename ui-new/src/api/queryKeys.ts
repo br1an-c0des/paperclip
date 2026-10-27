@@ -105,13 +105,11 @@ export const queryKeys = {
   },
 
   /*
-   * The project pages (M4): the dashboard's spend, checkouts and attention feed, the Docs tab's
+   * The project pages (M4): the dashboard's spend and checkouts, the Docs tab's
    * artifacts, and New project's repositories. Shapes follow ui/src/lib/queryKeys.ts.
    */
   /** Spend by project in a range; no range is all time. */
   costs: (companyId: string, from?: string, to?: string) => ["costs", companyId, from ?? "all", to ?? "now"] as const,
-  /** The attention feed the Inbox reads; the dashboard filters it to one project. */
-  attention: (companyId: string) => ["attention", companyId] as const,
   workspaceOverview: (companyId: string, projectId: string) => ["workspace-overview", companyId, projectId] as const,
   projectRepositories: (companyId: string) => ["project-repositories", companyId] as const,
   artifacts: {
