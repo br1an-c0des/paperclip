@@ -1,0 +1,56 @@
+/* Health notices at the top of an open task */
+.tn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 0;
+}
+
+.tn-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--r-inner);
+  background: var(--tone-bg);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.tn-row[data-tone="red"] { --tone-bg: var(--red-bg); --tone-fg: var(--red-fg); }
+.tn-row[data-tone="amber"] { --tone-bg: var(--amber-bg); --tone-fg: var(--amber-fg); }
+.tn-row[data-tone="green"] { --tone-bg: var(--green-bg); --tone-fg: var(--green-fg); }
+.tn-row[data-tone="neutral"] { --tone-bg: var(--well); --tone-fg: var(--body); }
+
+.tn-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 1px;
+  color: var(--tone-fg);
+}
+
+.tn-text {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--body);
+}
+
+.tn-text b {
+  color: var(--tone-fg);
+  font-weight: 700;
+}
+
+.tn-action {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.tn-action .btn {
+  background: var(--card);
+}

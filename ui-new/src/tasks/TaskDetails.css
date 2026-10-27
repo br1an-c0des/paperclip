@@ -327,6 +327,34 @@ a.td-chip:hover {
   color: var(--muted);
 }
 
+.td-relation-remove {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  margin-right: -6px;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.td-relation-remove:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: var(--text);
+}
+
+/* The live run in the top row opens the run modal */
+.td-run {
+  display: inline-flex;
+  padding: 0;
+  border-radius: var(--r-pill);
+}
+
+.td-props dd {
+  flex-wrap: wrap;
+  min-height: 36px;
+}
+
 /* A narrow panel stacks the property labels over their values */
 @container panel (width < 480px) {
   .td-main {

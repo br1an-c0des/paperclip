@@ -24,6 +24,8 @@ import { AssigneeItems, LabelDot, LabelItems, PriorityItems, StatusItems } from 
 import { useTaskRetry } from "./retry";
 import { useTaskUpdates } from "./task-updates";
 import { TaskList } from "./TaskList";
+import { TaskModal } from "./TaskModal";
+import { opensAs, taskOpenMode } from "./task-open-mode";
 import { TaskPanel } from "./TaskPanel";
 import {
   applyFilters,
@@ -50,6 +52,7 @@ import "./TasksView.css";
  *
  * The open task lives in the URL (`?task=TES-3`), so it survives a reload and the back button closes
  * it. A task that isn't in the list (a subtask from another project, say) is looked up on its own.
+ * It opens docked beside the list, or as a modal over it when that setting is on (task-open-mode.ts).
  */
 
 /** The tasks for a list. A null scope waits, such as while a project is still being looked up. */
@@ -296,7 +299,14 @@ export function TasksView(props: {
               </Show>
             </Show>
             <Show when={openTask()}>
-              {(task) => <TaskPanel task={task()} onClose={close} onOpenTask={open} onPrevious={step(-1)} onNext={step(1)} />}
+              {(task) => (
+                <Show
+                  when={opensAs(taskOpenMode(), true) === "modal"}
+                  fallback={<TaskPanel task={task()} onClose={close} onOpenTask={open} onPrevious={step(-1)} onNext={step(1)} />}
+                >
+                  <TaskModal task={task()} onClose={close} onOpenTask={open} onPrevious={step(-1)} onNext={step(1)} canDock />
+                </Show>
+              )}
             </Show>
           </Dock>
         </Match>

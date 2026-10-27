@@ -1,20 +1,25 @@
 import type { CompactIssue } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
-import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-solid";
+import { AppWindow, ChevronLeft, ChevronRight, Maximize2 } from "lucide-solid";
 import { Show } from "solid-js";
 import { issuePath } from "@/api/issues";
 import { Panel } from "@/layout/Panel";
 import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
 import { InitialsDisc } from "@/ui/Avatar";
+import { TaskHeaderActions } from "./TaskActions";
+import { setTaskOpenMode } from "./task-open-mode";
 import { TaskSections } from "./TaskSections";
 import "./TaskPanel.css";
 
 /*
  * A task opened beside the list (boards 2, 3 and 5), inside the list's <Dock>. The toolbar steps
- * to the previous and next task in the list, names the project and task, and opens the full page.
- * The modal (boards 6 and 7) comes later in M2, with a setting to choose between the two
- * (build plan, decision B).
+ * to the previous and next task in the list, names the project and task, and holds the task's
+ * actions (privacy and the More menu), "Open as modal" and "Open full page".
+ *
+ * "Open as modal" is the setting that chooses between this panel and the modal (boards 6 and 7,
+ * build plan decision B): it switches every list to the modal, and the modal's "Dock to side
+ * panel" switches back. The choice is kept in local storage (task-open-mode.ts).
  */
 
 export function TaskPanel(props: {
@@ -58,9 +63,21 @@ export function TaskPanel(props: {
         </div>
       }
       actions={
-        <A class="btn btn--icon btn--ghost btn--compact" href={issuePath(company().issuePrefix, props.task)} aria-label="Open full page" title="Open full page">
-          <Maximize2 size={15} aria-hidden="true" />
-        </A>
+        <div class="tp-actions">
+          <TaskHeaderActions taskId={props.task.id} onHidden={props.onClose} />
+          <button
+            type="button"
+            class="btn btn--icon btn--ghost btn--compact"
+            aria-label="Open as modal"
+            title="Open as modal: open tasks over the list instead of beside it"
+            onClick={() => setTaskOpenMode("modal")}
+          >
+            <AppWindow size={15} aria-hidden="true" />
+          </button>
+          <A class="btn btn--icon btn--ghost btn--compact" href={issuePath(company().issuePrefix, props.task)} aria-label="Open full page" title="Open full page">
+            <Maximize2 size={15} aria-hidden="true" />
+          </A>
+        </div>
       }
     >
       <TaskSections taskId={props.task.id} title={props.task.title} onOpenTask={props.onOpenTask} />

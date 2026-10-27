@@ -1,0 +1,472 @@
+/* The editable parts of the Details section (board 2) */
+
+.te-muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.te-hint {
+  margin-right: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.te-note {
+  margin: 0;
+  padding: 6px 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.te-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.te-wrap {
+  flex-wrap: wrap;
+}
+
+.te-list--short {
+  max-height: 200px;
+  padding: 0;
+}
+
+.te-color {
+  width: 38px;
+  height: 38px;
+  padding: 2px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-field);
+  background: var(--ground);
+}
+
+.te-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.te-row .input {
+  flex: 1;
+}
+
+.te-ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A property's value as a button: the value, then a muted caret */
+.te-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 32px;
+  margin-left: -8px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+}
+
+.te-trigger:hover,
+.te-trigger[data-expanded] {
+  background: var(--hover);
+}
+
+.te-trigger--muted {
+  margin-left: 0;
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.te-trigger--wrap {
+  white-space: normal;
+  line-height: 1.35;
+  padding-block: 4px;
+}
+
+.te-trigger--icon {
+  margin-left: 0;
+  width: 28px;
+  min-height: 28px;
+  justify-content: center;
+  padding: 0;
+  color: var(--muted);
+}
+
+.te-caret {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.te-trigger .assignee-name {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.te-assignee,
+.te-review {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+/* Status: the pill opens the menu; ▸ steps it on; ✓ marks it done */
+.te-status-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.te-status {
+  display: inline-flex;
+  height: 28px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--tone-bg);
+  color: var(--tone-fg);
+}
+
+.te-status[data-tone="run"] { --tone-bg: var(--run-bg); --tone-fg: var(--run-fg); }
+.te-status[data-tone="violet"] { --tone-bg: var(--violet-bg); --tone-fg: var(--violet-fg); }
+.te-status[data-tone="amber"] { --tone-bg: var(--amber-bg); --tone-fg: var(--amber-fg); }
+.te-status[data-tone="red"] { --tone-bg: var(--red-bg); --tone-fg: var(--red-fg); }
+.te-status[data-tone="green"] { --tone-bg: var(--green-bg); --tone-fg: var(--green-fg); }
+.te-status[data-tone="neutral"] { --tone-bg: var(--pri-off); --tone-fg: var(--text); }
+
+.te-status-main {
+  padding: 0 10px;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.te-status-step {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  color: inherit;
+  border-left: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.te-status-main:hover,
+.te-status-step:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.te-status-main:focus-visible,
+.te-status-step:focus-visible {
+  outline-offset: -2px;
+}
+
+.te-done {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+  color: var(--body);
+}
+
+.te-done:hover {
+  background: var(--green-bg);
+  color: var(--green-fg);
+}
+
+/* Labels: each with a remove button, then add */
+.te-labels {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 32px;
+}
+
+.te-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.te-x {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.te-x:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.te-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 28px;
+  height: 28px;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.te-add:hover,
+.te-add[data-expanded] {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.te-add--row {
+  align-self: flex-start;
+  height: 32px;
+}
+
+.te-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 12px;
+}
+
+.te-chip:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* Title */
+.te-title {
+  display: block;
+  width: calc(100% + 12px);
+  margin: -2px -6px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.te-title:hover {
+  background: var(--row-hover);
+}
+
+.te-title-input.input {
+  display: block;
+  width: calc(100% + 20px);
+  min-height: 0;
+  margin: -6px -10px;
+  padding: 4px 10px;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  resize: none;
+  field-sizing: content;
+}
+
+/* Description */
+.te-desc {
+  position: relative;
+  min-width: 0;
+}
+
+.te-desc > .md {
+  padding-right: 40px;
+}
+
+.te-desc-edit {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  color: var(--muted);
+}
+
+.te-desc-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  margin-left: -10px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+}
+
+.te-desc-empty:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.te-desc-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.te-desc-input.input {
+  min-height: 180px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+  field-sizing: content;
+  max-height: 60vh;
+}
+
+.te-desc-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Popovers: model and effort, the stage editor, billing code */
+.te-run {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  max-height: 360px;
+}
+
+.te-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.te-radios + .te-radios {
+  border-left: 1px solid var(--line);
+}
+
+.te-radio,
+.te-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+}
+
+.te-radio {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+}
+
+.te-radio small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.te-radio:hover,
+.te-option:hover {
+  background: var(--hover);
+}
+
+.te-radio[aria-checked="true"],
+.te-option[aria-checked="true"] {
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+}
+
+.te-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.te-pop-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.te-stage-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 8px 8px 0;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+}
+
+.te-stage-tabs button {
+  flex: 1;
+  height: 30px;
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 13px;
+}
+
+.te-stage-tabs button[aria-pressed="true"] {
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.te-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  padding: 0 6px 6px;
+  overflow-y: auto;
+}
+
+.te-list .input {
+  margin-bottom: 4px;
+  background: var(--well);
+}
+
+.te-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 12px 0;
+}
+
+.te-form .te-note {
+  padding: 0 2px;
+}
+
+.te-form .te-pop-foot {
+  margin: 4px -12px 0;
+}
