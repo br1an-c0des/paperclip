@@ -67,12 +67,15 @@ for the new-project dialog and memberships. Upstream recipes: `maps/feature-map/
   - *Env:* environment variables, with values from company secrets (create a secret inline) or user
     secret definitions.
   - *Environment:* which execution environment runs the project's work (flag `enableEnvironments`).
-  - *Codebase:* repositories (`PUT /repositories`) or a local folder; clear local folder.
+  - *Codebase:* repositories (`PUT /repositories`) or a local folder; clear local folder. Git
+    authorization (since the 2026-10-26 sync): which connection grant background project Git work
+    uses, chosen and authorized by a person (`ProjectGitAuthorization.tsx`).
   - *Execution workspaces:* enable isolated task checkouts, git worktree settings (base ref, branch
     template, worktree parent directory), provision / runtime provision / teardown commands, shared
     workspace concurrency.
   - *Access:* add and remove project members for private projects.
 - **Requests:** `GET|PATCH /api/projects/:id`, `PUT /api/projects/:id/repositories`,
+  `GET|PUT /api/projects/:id/git-authorization`,
   `GET|POST /api/companies/:companyId/secrets`, `GET /api/companies/:companyId/user-secret-definitions`,
   `GET /api/companies/:companyId/environments`, `GET|POST /api/projects/:id/access-members`,
   `DELETE /api/projects/:id/access-members/:memberId`, `POST /api/companies/:companyId/assets/images`.

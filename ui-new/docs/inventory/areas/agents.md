@@ -80,6 +80,10 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   `GET /api/companies/:companyId/environments` (+ `/capabilities`), `GET /api/companies/:companyId/secrets`,
   `GET /api/companies/:companyId/me/user-secrets`; AI connection and adapter-login requests in the app
   shell (`/ai-connections/*`, `/adapters/:type/login-sessions/*`, `/adapters/:type/test-environment`).
+  Since the 2026-10-26 sync, `POST /api/agents/:id/lifecycle/retry`: setup prepares the saved draft
+  agent's execution environment before the model connection test, and keeps the chosen model account
+  when the environment changes. The harness list no longer shows a second ACP agent selector or
+  "Coming soon" harnesses.
 - **Notes:** a hire that needs a formal approval shows "pending approval" until approved
   (`POST /api/agents/:id/approve`). Codex hires default to Paperclip Runner on a qualified target (flag
   `enableNativeRunner`). Since the 2026-10-22 sync, the setup flow saves a paused agent record as soon as
@@ -202,8 +206,8 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   provider trace (view, reveal frame, download, delete), tool decisions, recovery actions; live
   transcript while running. Actions: cancel, resume, retry, rerun with provider trace, reset sessions for
   touched tasks, reconcile the workspace branch.
-- **Requests:** `GET /api/heartbeat-runs/:runId` (+ `/events`, `/log`, `/issues`,
-  `/workspace-operations`, `/provider-trace*`), `GET /api/workspace-operations/:operationId/log`,
+- **Requests:** `GET /api/heartbeat-runs/:runId` (+ `/events`, `/events?view=conversation`, `/log`
+  with optional `alignStartToRecord=true`, `/issues`, `/workspace-operations`, `/provider-trace*`), `GET /api/workspace-operations/:operationId/log`,
   `POST /api/heartbeat-runs/:runId/cancel`, `POST /api/agents/:id/wakeup`,
   `POST /api/issues/:id/recovery-actions/resolve`, `POST /api/execution-workspaces/:id/reconcile-branch`,
   `WS /api/companies/:companyId/events/ws`.

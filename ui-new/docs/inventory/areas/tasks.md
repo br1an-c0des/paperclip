@@ -133,7 +133,11 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
 - **Requests:** `GET /api/issues/:id`, `/comments` (paged), `/interactions`, `/approvals`,
   `/api/issues/:issueId/activity`, `/runs`, `/live-runs`, `/active-run`, `GET /api/heartbeat-runs/:runId`,
   `/events`, `/log`; live transcript over `WS /api/companies/:companyId/events/ws`.
-- **Notes:** opening a task marks it read (`POST /api/issues/:id/read`).
+  For a fast first paint, `GET /api/issues/:id?view=core`, `GET /api/issues/:id/recent-comments` (the
+  latest comments, with `hasMore`), `/activity?view=recent`, `/activity?view=comment-inputs&commentIds=`
+  (in batches of 100), `/runs?view=recent`, and `GET /api/heartbeat-runs/:runId/events?view=conversation`.
+- **Notes:** opening a task marks it read (`POST /api/issues/:id/read`). Since the 2026-10-26 sync the
+  old UI shows the recent conversation first and loads the full history behind it.
 
 ### `tasks/discussion`: Comment and reassign
 
