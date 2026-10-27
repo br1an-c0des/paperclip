@@ -734,6 +734,13 @@ result, or propose richer results upstream.
 best-matching snippet, no author; documents without a revision number. No extra requests per result.
 If authors or revisions turn out to matter, propose richer results upstream later.
 
+**Found building it.** A task that matches directly and through a comment shows only its title and
+description snippets, even in the Comments view. In All, a task matched by its title and a document
+counts under Tasks and Docs but shows once (under Tasks), so Docs can have a count and no row; the
+page says so. A kind's view only gets that kind's count, so the other tabs reuse All's counts when
+cached rather than spend a second request (60 searches a minute per person). Agents and projects
+count 0 while any task filter is set. The API takes one assignee, project and label at a time.
+
 ### 18. The phone layouts assume push notifications
 
 - **Status:** Open
