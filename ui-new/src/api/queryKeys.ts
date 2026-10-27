@@ -27,11 +27,28 @@ export const queryKeys = {
     detail: (companyId: string) => ["companies", companyId] as const,
     stats: ["companies", "stats"] as const,
   },
+  /*
+   * Agents. The live events refresh `detail(agentId)` on any agent change, so everything about one
+   * agent (its settings sections, runtime state, sessions, keys…) sits under that key and refreshes
+   * with it. The project-access key is the one the task notices already use.
+   */
   agents: {
     list: (companyId: string) => ["agents", companyId] as const,
     detail: (agentId: string) => ["agents", "detail", agentId] as const,
+    /** One part of an agent: "runtime-state", "task-sessions", "keys", "config-revisions", "skills"… */
+    part: (agentId: string, part: string, ...rest: string[]) => ["agents", "detail", agentId, part, ...rest] as const,
+    projectAccess: (agentId: string) => ["agents", "detail", agentId, "project-access"] as const,
+    instructionsBundle: (agentId: string) => ["agents", "detail", agentId, "instructions-bundle"] as const,
+    instructionsFile: (agentId: string, path: string) => ["agents", "detail", agentId, "instructions-bundle", "file", path] as const,
+    instructionHistory: (agentId: string, path: string) => ["agents", "detail", agentId, "instructions-bundle", "history", path] as const,
+    instructionCandidates: (agentId: string) => ["agents", "detail", agentId, "instructions-bundle", "candidates"] as const,
+    runs: (companyId: string, agentId: string) => ["heartbeat-runs", companyId, "agent", agentId] as const,
+    costs: (companyId: string, from: string, to: string) => ["costs", companyId, "by-agent", from, to] as const,
+    costsByModel: (companyId: string, from: string, to: string) => ["costs", companyId, "by-agent-model", from, to] as const,
+    adapters: (companyId: string, environmentId: string | null) => ["adapters", "availability", companyId, environmentId ?? "__default__"] as const,
     adapterModels: (companyId: string, adapterType: string) =>
       ["agents", companyId, "adapter-models", adapterType] as const,
+    primary: (companyId: string) => ["primary-agent", companyId, "me"] as const,
   },
   issues: {
     /** Prefix for every task list in a company. */
