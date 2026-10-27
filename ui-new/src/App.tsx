@@ -12,7 +12,8 @@ import { CompanyLayout } from "./routes/CompanyLayout";
 import { ConnectorsPage } from "./connectors/ConnectorsPage";
 import { NotBuiltYet, NotFound } from "./routes/NotFound";
 import { InboxPage } from "./inbox/InboxPage";
-import { AgentPage, SettingsPage } from "./routes/Planned";
+import { AgentPage } from "./agents/AgentPage";
+import { SettingsPage } from "./routes/Planned";
 import { ProjectPage } from "./routes/Project";
 import { RoutineRedirect } from "./recurring/RoutineRedirect";
 import { SignIn } from "./routes/SignIn";
@@ -60,7 +61,7 @@ export function App() {
             <Route path="/routines/:routineId?/*" component={RoutineRedirect} />
             <Route path="/projects/:projectKey/*tab" component={ProjectPage} />
             <Route path="/agents/:agentKey/runs/:runId" component={RunRoute} />
-            <Route path="/agents/:agentKey/*" component={AgentPage} />
+            <Route path="/agents/:agentKey/*rest" component={AgentPage} />
             <Route path="/company/settings/*" component={SettingsPage} />
             <Route path="/connectors" component={ConnectorsPage} />
             <Route path="/search" component={SearchPage} />

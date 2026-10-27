@@ -7,7 +7,7 @@ import { runPath, runsApi } from "@/api/runs";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
-import { AgentPage } from "@/routes/Planned";
+import { AgentPage } from "@/agents/AgentPage";
 
 /*
  * A run's link: the old UI's run route, `/:companyPrefix/agents/:agentKey/runs/:runId`, which agents,
