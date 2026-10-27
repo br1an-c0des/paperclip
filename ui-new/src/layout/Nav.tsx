@@ -22,7 +22,7 @@ import "./Nav.css";
  * settings at the bottom. The item owning the current page is raised with the --sel pill: the
  * router marks it `.active` for every page under it, and `aria-current` on the exact page.
  *
- * New project (the + beside "Projects") waits for M4, where the new-project dialog is designed.
+ * The + beside "Projects" opens New project (board N1).
  */
 
 function OrgIcon() {
@@ -191,8 +191,16 @@ export function Nav() {
       </div>
 
       <div class="nav-group">
-        <div class="nav-head">
+        <div class="nav-head nav-head--action">
           <h2>Projects</h2>
+          <button
+            type="button"
+            class={buttonClass({ variant: "icon", size: "compact", ghost: true }) + " nav-head-add"}
+            aria-label="New project"
+            onClick={() => commands.openNewProject()}
+          >
+            <Plus size={14} stroke-width={2.2} aria-hidden="true" />
+          </button>
         </div>
         <A class="navi navi--disc" href={`${base()}/issues`}>
           <span class="navi-all" aria-hidden="true" />

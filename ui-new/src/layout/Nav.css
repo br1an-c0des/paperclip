@@ -178,3 +178,15 @@
   color: var(--body);
   font-weight: 600;
 }
+
+/* "Projects" with the New project + (board 1): the button sits in the heading's row. */
+.nav-head--action {
+  padding-right: 6px;
+  padding-bottom: 2px;
+}
+
+.nav-head-add.btn {
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+}
