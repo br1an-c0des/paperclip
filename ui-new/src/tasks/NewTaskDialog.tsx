@@ -972,7 +972,7 @@ function AssigneeMenu(props: {
     enabled: overridable(),
     staleTime: 5 * 60_000,
   }));
-  const efforts = () => (agent() ? effortOptions(agent()!.adapterType, props.model ?? defaults().model) : []);
+  const efforts = () => (agent() ? effortOptions(agent()!.adapterType, props.model ?? defaults().model, agent()!.adapterConfig) : []);
   const isAssignee = (kind: Principal["kind"], id: string) => props.assignee?.kind === kind && props.assignee.id === id;
 
   return (

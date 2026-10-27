@@ -1,4 +1,5 @@
 import type { IssuePriority, IssueReviewPolicy, IssueStatus, IssueWorkMode, Project } from "@paperclipai/shared";
+import { buildAdapterOverrides } from "./run-overrides";
 
 /*
  * The new-task dialog's model (board 7b): the draft, and the `POST /companies/:id/issues` payload
@@ -7,9 +8,8 @@ import type { IssuePriority, IssueReviewPolicy, IssueStatus, IssueWorkMode, Proj
  *
  * - Reviewer and approver become one-person `review` and `approval` stages in `executionPolicy`
  *   (ui/src/lib/issue-execution-policy.ts). With neither, no policy is sent.
- * - Model and effort overrides apply only to claude_local, codex_local and opencode_local agents,
- *   with each adapter's effort key, and nothing is sent at "Agent default" (decision 7,
- *   ui/src/lib/issue-assignee-overrides.ts).
+ * - Model and effort overrides use the table in run-overrides.ts, shared with the composer, with
+ *   each adapter's effort key; nothing is sent at "Agent default" (decisions 7 and 13).
  * - The workspace choice is sent only when the project has execution workspaces on and the instance
  *   has `enableIsolatedWorkspaces` (decision 12: follows the setting).
  * - Review policy "Anyone approves" is the server's default, sent as nothing.
@@ -83,83 +83,9 @@ export function draftHasContent(draft: NewTaskDraft) {
   return draft.title.trim().length > 0 || draft.description.trim().length > 0;
 }
 
-/** Adapters whose runs a task can override (decision 7). */
-export const OVERRIDE_ADAPTERS = new Set(["claude_local", "codex_local", "opencode_local"]);
-
-export function supportsOverrides(adapterType: string | null | undefined) {
-  return !!adapterType && OVERRIDE_ADAPTERS.has(adapterType);
-}
-
-export function effortKeyFor(adapterType: string) {
-  if (adapterType === "codex_local") return "modelReasoningEffort";
-  if (adapterType === "opencode_local") return "variant";
-  return "effort";
-}
-
-export type EffortOption = { value: string; label: string };
-
-const EFFORT_LABELS: Record<string, string> = {
-  minimal: "Minimal",
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  xhigh: "X-High",
-  max: "Max",
-  ultra: "Ultra",
-};
-
-/*
- * Codex's efforts depend on the model (codexLocalReasoningEffortsForModel in
- * packages/adapters/codex-local/src/index.ts). That's runtime code in an adapter package, so it's
- * mirrored here; the upstream sync's typecheck won't catch a change, so check it when the adapter
- * changes.
- */
-const CODEX_DEFAULT = ["minimal", "low", "medium", "high", "xhigh"];
-const CODEX_MAX = ["low", "medium", "high", "xhigh", "max"];
-const CODEX_ULTRA = [...CODEX_MAX, "ultra"];
-const CODEX_BY_MODEL: Record<string, string[]> = {
-  "gpt-6-astra": CODEX_ULTRA,
-  "gpt-6.1-sol": CODEX_ULTRA,
-  "gpt-6-sol": CODEX_ULTRA,
-  "gpt-5.6-sol": CODEX_ULTRA,
-  "gpt-5.6-terra": CODEX_ULTRA,
-  "gpt-6-luna": CODEX_MAX,
-  "gpt-5.6-luna": CODEX_MAX,
-};
-
-const EFFORTS_BY_ADAPTER: Record<string, string[]> = {
-  claude_local: ["low", "medium", "high"],
-  opencode_local: ["minimal", "low", "medium", "high", "xhigh", "max"],
-};
-
-/** The effort choices for an adapter and model, after `thinkingEffortOptionsFor` in the old UI. */
-export function effortOptions(adapterType: string, model: string | null): EffortOption[] {
-  const values =
-    adapterType === "codex_local"
-      ? (CODEX_BY_MODEL[(model ?? "").trim().toLowerCase()] ?? CODEX_DEFAULT)
-      : (EFFORTS_BY_ADAPTER[adapterType] ?? EFFORTS_BY_ADAPTER.claude_local!);
-  return values.map((value) => ({ value, label: EFFORT_LABELS[value] ?? value }));
-}
-
-/** The agent's own model and effort, as its adapter config states them. */
-export function agentRunDefaults(adapterType: string, adapterConfig: Record<string, unknown>) {
-  const read = (key: string) => (typeof adapterConfig[key] === "string" ? (adapterConfig[key] as string) : null);
-  const effort =
-    adapterType === "codex_local"
-      ? (read("modelReasoningEffort") ?? read("reasoningEffort") ?? read("effort"))
-      : adapterType === "opencode_local"
-        ? read("variant")
-        : read("effort");
-  return { model: read("model"), effort };
-}
-
-export function buildAdapterOverrides(adapterType: string | null | undefined, model: string | null, effort: string | null) {
-  if (!adapterType || !supportsOverrides(adapterType)) return null;
-  const adapterConfig: Record<string, unknown> = {};
-  if (model) adapterConfig.model = model;
-  if (effort) adapterConfig[effortKeyFor(adapterType)] = effort;
-  return Object.keys(adapterConfig).length > 0 ? { adapterConfig } : null;
-}
+// Model and effort overrides come from the table New task shares with the composer (decision 13).
+export { agentRunDefaults, buildAdapterOverrides, effortKeyFor, effortOptions, OVERRIDE_ADAPTERS, supportsOverrides } from "./run-overrides";
+export type { EffortOption } from "./run-overrides";
 
 /** A v4 UUID. `randomUUID` only exists in secure contexts, and the board may be served over plain HTTP. */
 export function newId() {
