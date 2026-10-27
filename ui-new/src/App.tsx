@@ -14,7 +14,8 @@ import { InboxPage } from "./inbox/InboxPage";
 import { OrgDashboard, OrgRedirect } from "./org/OrgDashboard";
 import { AgentsTabRedirect, OrgAgents } from "./org/OrgAgents";
 import { LEGACY_AGENT_TABS } from "./org/org-model";
-import { AgentPage, SettingsPage } from "./routes/Planned";
+import { AgentPage } from "./agents/AgentPage";
+import { SettingsPage } from "./routes/Planned";
 import { ProjectPage } from "./routes/Project";
 import { RoutineRedirect } from "./recurring/RoutineRedirect";
 import { SignIn } from "./routes/SignIn";
@@ -66,7 +67,7 @@ export function App() {
             <Route path="/agents" component={OrgAgents} />
             <Route path="/agents/:tab" matchFilters={{ tab: LEGACY_AGENT_TABS }} component={AgentsTabRedirect} />
             <Route path="/agents/:agentKey/runs/:runId" component={RunRoute} />
-            <Route path="/agents/:agentKey/*" component={AgentPage} />
+            <Route path="/agents/:agentKey/*rest" component={AgentPage} />
             <Route path="/company/settings/*" component={SettingsPage} />
             <Route path="/connectors" component={ConnectorsPage} />
             <Route path="/search" component={SearchPage} />
