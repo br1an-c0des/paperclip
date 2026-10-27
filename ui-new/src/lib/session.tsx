@@ -1,6 +1,6 @@
 import type { AuthSession } from "@paperclipai/shared";
-import { Navigate, useLocation } from "@solidjs/router";
-import { createQuery } from "@tanstack/solid-query";
+import { Navigate, useLocation, useNavigate } from "@solidjs/router";
+import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createContext, createEffect, createSignal, Match, Show, Switch, useContext, type ParentProps } from "solid-js";
 import { accessApi } from "@/api/access";
 import { authApi } from "@/api/auth";
@@ -40,6 +40,24 @@ export function useSession() {
   const context = useContext(SessionContext);
   if (!context) throw new Error("useSession must be used inside <SessionGate>");
   return context;
+}
+
+/** The signed-in person's display name: name, then email; "Local board" without sign-in. */
+export function useYouName() {
+  const session = useSession();
+  return () =>
+    session.isAuthenticatedMode() ? (session.session()?.user.name ?? session.session()?.user.email ?? "You") : "Local board";
+}
+
+/** Signs out, drops every cached query, and goes to the sign-in page. */
+export function useSignOut() {
+  const client = useQueryClient();
+  const navigate = useNavigate();
+  return async () => {
+    await authApi.signOut();
+    client.clear();
+    navigate("/auth", { replace: true });
+  };
 }
 
 /** A path from `?next=` that's safe to send the user back to after sign-in. */

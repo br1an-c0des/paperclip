@@ -38,7 +38,7 @@ src/
   lib/             query client, session gate, company selection, live-events socket and toasts,
                    shared company queries, the commands context, keyboard shortcuts, theme
   layout/          breakpoints (the only place they're defined), the shell grid, the left nav,
-                   the side panel
+                   the phone's floating dock and its Tasks switcher sheet, the side panel
   shell/           the command palette and the shortcuts cheatsheet
   tasks/           the new-task dialog and its payload rules (new-task.ts)
   ui/              shared components: buttons, status capsules and pills, fields, switch,

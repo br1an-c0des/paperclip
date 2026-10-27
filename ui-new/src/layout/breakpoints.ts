@@ -11,9 +11,9 @@ import { createSignal, onCleanup } from "solid-js";
  *
  * Components inside the shell respond to their container (`@container`), not to these.
  *
- * The boards are drawn at 1440px only, so for now "desktop" is the only layout that is designed.
- * "tablet" and "phone" exist so the structural switches (nav as a drawer, panels and dialogs as
- * full-screen sheets) have a place to hang until mobile wireframes arrive.
+ * The desktop boards are drawn at 1440px and the phone boards at 390px (design/mobile.md). "phone"
+ * carries the structural switches: the floating dock in place of the left nav, panels as
+ * full-screen pages, and dialogs and menus as sheets. "tablet" keeps the desktop layout for now.
  */
 
 export type Viewport = "phone" | "tablet" | "desktop";

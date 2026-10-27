@@ -1,6 +1,4 @@
-import { useLocation } from "@solidjs/router";
-import { Menu as MenuIcon, X } from "lucide-solid";
-import { createContext, createEffect, createSignal, on, Show, useContext, type JSX, type ParentProps } from "solid-js";
+import { Show, type JSX, type ParentProps } from "solid-js";
 import { isCompact } from "./breakpoints";
 import "./Shell.css";
 
@@ -9,72 +7,31 @@ import "./Shell.css";
  * 248px nav column is the only fixed track, and main is `minmax(0, 1fr)`. Side panels dock beside
  * the list they were opened from, inside main (<Dock> in Panel.tsx).
  *
- * On a phone-sized viewport the grid drops to one column: the nav becomes a drawer opened from a
- * top bar, and panels become full-screen sheets. That switch lives in Shell.css under
- * `:root[data-viewport="phone"]`; components inside the shell don't change.
+ * On a phone-sized viewport the grid drops to one column and the left nav gives way to the floating
+ * dock (design/mobile.md, N1; PhoneDock.tsx), which floats over the foot of main; panels become
+ * full-screen pages (Panel.tsx). Only the shell switches; components inside it don't change.
  *
  * `main` is a size container named `main`, so content responds to the space it's given with
  * `@container main (...)`, not to the viewport.
  */
 
-type ShellContextValue = {
-  closeNav: () => void;
-};
-
-const ShellContext = createContext<ShellContextValue>();
-
-/** The surrounding shell, or undefined outside one (the style guide). */
-export function useShell() {
-  return useContext(ShellContext);
-}
-
 export function Shell(
   props: ParentProps<{
+    /** The left nav, on tablet and desktop. */
     nav: JSX.Element;
-    /** Shown in the phone top bar, beside the menu button. */
-    title?: JSX.Element;
+    /** The floating dock that replaces the nav on a phone. */
+    dock?: JSX.Element;
   }>,
 ) {
-  const [navOpen, setNavOpen] = createSignal(false);
-  const location = useLocation();
-
-  // Following a link in the drawer closes it.
-  createEffect(on(() => location.pathname, () => setNavOpen(false), { defer: true }));
-  // Leaving the phone layout closes it too, so it isn't open when the viewport shrinks again.
-  createEffect(() => {
-    if (!isCompact()) setNavOpen(false);
-  });
-
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Escape" && navOpen()) setNavOpen(false);
-  };
-
   return (
-    <ShellContext.Provider value={{ closeNav: () => setNavOpen(false) }}>
-      <div class="shell" data-nav-open={navOpen() ? "" : undefined} onKeyDown={onKeyDown}>
-        <header class="shell-bar">
-          <button
-            type="button"
-            class="btn btn--icon btn--ghost"
-            aria-label={navOpen() ? "Close navigation" : "Open navigation"}
-            aria-expanded={navOpen()}
-            aria-controls="shell-nav"
-            onClick={() => setNavOpen(!navOpen())}
-          >
-            <Show when={navOpen()} fallback={<MenuIcon size={18} aria-hidden="true" />}>
-              <X size={18} aria-hidden="true" />
-            </Show>
-          </button>
-          <div class="shell-bar-title">{props.title}</div>
-        </header>
-        <Show when={navOpen()}>
-          <div class="shell-nav-scrim" aria-hidden="true" onClick={() => setNavOpen(false)} />
-        </Show>
-        <nav id="shell-nav" class="shell-nav" aria-label="Main">
+    <div class="shell">
+      <Show when={!isCompact()}>
+        <nav class="shell-nav" aria-label="Main">
           {props.nav}
         </nav>
-        <main class="shell-main">{props.children}</main>
-      </div>
-    </ShellContext.Provider>
+      </Show>
+      <main class="shell-main">{props.children}</main>
+      <Show when={isCompact()}>{props.dock}</Show>
+    </div>
   );
 }

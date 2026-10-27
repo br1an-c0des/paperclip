@@ -16,10 +16,6 @@
   background: var(--ground);
 }
 
-.shell-bar {
-  display: none;
-}
-
 .shell-nav {
   grid-area: nav;
   position: sticky;
@@ -43,67 +39,19 @@
   padding: var(--main-pad-top) var(--main-pad-end) 48px 4px;
 }
 
-.shell-nav-scrim {
-  display: none;
-}
-
-/* Phone: one column. The nav is a drawer (panels become sheets in Panel.css). */
+/*
+ * Phone: one column and no left nav. The floating dock (PhoneDock.css) sits over the foot of main,
+ * so main leaves room for it: the dock's 56px, its 18px gap to the edge, a little air, and the
+ * safe area below (the home indicator).
+ */
 :root[data-viewport="phone"] .shell {
+  --main-pad-top: 12px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-template-areas:
-    "bar"
-    "main";
-}
-
-:root[data-viewport="phone"] .shell-bar {
-  grid-area: bar;
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--ground);
-  border-bottom: 1px solid var(--line);
-}
-
-.shell-bar-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 800;
+  grid-template-areas: "main";
 }
 
 :root[data-viewport="phone"] .shell-main {
-  padding: 12px 16px 40px;
-}
-
-:root[data-viewport="phone"] .shell-nav {
-  position: fixed;
-  inset: 0 auto 0 0;
-  z-index: var(--z-overlay);
-  width: min(var(--nav-w), 86vw);
-  height: 100dvh;
-  background: var(--ground);
-  box-shadow: var(--shadow-lg);
-  transform: translateX(-105%);
-  visibility: hidden;
-  transition: transform 0.18s ease, visibility 0s linear 0.18s;
-}
-
-:root[data-viewport="phone"] .shell[data-nav-open] .shell-nav {
-  transform: none;
-  visibility: visible;
-  transition: transform 0.18s ease;
-}
-
-:root[data-viewport="phone"] .shell-nav-scrim {
-  display: block;
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--z-overlay) - 1);
-  background: var(--scrim);
+  gap: 12px;
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
+    calc(104px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
 }

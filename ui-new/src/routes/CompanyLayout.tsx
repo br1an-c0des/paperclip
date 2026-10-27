@@ -1,6 +1,7 @@
 import { A, useNavigate, useParams, type RouteSectionProps } from "@solidjs/router";
 import { createEffect, Match, Switch, type ParentProps } from "solid-js";
 import { Nav } from "@/layout/Nav";
+import { PhoneDock } from "@/layout/PhoneDock";
 import { Shell } from "@/layout/Shell";
 import { CommandsProvider, useCommands } from "@/lib/commands";
 import { CompanyProvider, findCompanyByPrefix, rememberCompany, useCompaniesQuery, useCompany } from "@/lib/company";
@@ -16,7 +17,7 @@ import { Splash } from "./Splash";
 
 /*
  * `/:companyPrefix/*`: resolves the company from the URL, opens its live-events socket, and draws
- * the shell: the nav, and the dialogs any page can open (new task, command palette, shortcuts and
+ * the shell: the nav (the dock on a phone), and the dialogs any page can open (new task, command palette, shortcuts and
  * the run modal).
  */
 
@@ -48,7 +49,7 @@ function CompanyShell(props: ParentProps) {
   });
 
   return (
-    <Shell nav={<Nav />} title={company().name}>
+    <Shell nav={<Nav />} dock={<PhoneDock />}>
       {props.children}
       <CommandPalette />
       <ShortcutsDialog />
