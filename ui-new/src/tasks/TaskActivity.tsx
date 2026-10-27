@@ -1,20 +1,28 @@
 import type { IssueComment, IssueStatus } from "@paperclipai/shared";
-import { createInfiniteQuery, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Search, Square, X } from "lucide-solid";
+import { createInfiniteQuery, createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
+import { Ellipsis, Search, Square, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
+import { approvalsApi } from "@/api/approvals";
+import { commentsApi } from "@/api/comments";
 import { heartbeatsApi } from "@/api/heartbeats";
+import { interactionsApi } from "@/api/interactions";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useLiveRunsQuery } from "@/lib/company-data";
+import { RequestCard } from "@/requests/RequestCard";
+import { taskRequests } from "@/requests/request-model";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
-import { TextArea, TextInput } from "@/ui/Field";
-import { Markdown } from "@/ui/Markdown";
+import { TextInput } from "@/ui/Field";
+import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
+import { Composer } from "./composer/Composer";
+import { QueuedMessages, queuedIds, useQueuedComments } from "./composer/QueuedMessages";
+import { MessageBody } from "./MessageBody";
 import { useTaskPeople } from "./people";
 import { StatusChip } from "./TaskDetails";
 import { buildThread, duration, stampLabel, type ThreadFilter } from "./thread-model";
@@ -22,10 +30,12 @@ import "./TaskActivity.css";
 
 /*
  * The task panel's Activity section (board 3): the thread, oldest first, with comments as cards,
- * changes and finished runs as compact lines between them, and the live run as a card at the foot
- * with Stop. Runs open in the run modal ("View run"). Older comments load in pages. A plain comment box sits under the thread; the full
- * composer (mentions, attachments, work modes, queued messages, steer and interrupt) and request
- * cards come with the thread-and-composer slice of M2.
+ * changes and finished runs as compact lines between them, agents' requests and the task's
+ * approvals as request cards (board 15), and the live run as a card at the foot with Stop. Runs
+ * open in the run modal ("View run"). Older comments load in pages.
+ *
+ * Under the thread: the messages queued for the agent's next turn, with steer and interrupt, then
+ * the composer (mentions, files, work mode, reassigning, run settings, reopening).
  */
 
 const COMMENT_PAGE_SIZE = 50;
@@ -61,24 +71,52 @@ export function TaskActivity(props: { taskId: string; title?: string }) {
     queryKey: queryKeys.issues.section(props.taskId, "runs"),
     queryFn: ({ signal }) => issuesApi.runs(props.taskId, signal),
   }));
+  const task = createQuery(() => ({
+    queryKey: queryKeys.issues.detail(props.taskId),
+    queryFn: ({ signal }) => issuesApi.get(props.taskId, signal),
+  }));
+  const interactions = createQuery(() => ({
+    queryKey: queryKeys.issues.section(props.taskId, "interactions"),
+    queryFn: ({ signal }) => interactionsApi.list(props.taskId, signal),
+    // While a request waits on its workspace, poll until it can be answered (as the old UI does).
+    refetchInterval: (query) => (query.state.data?.some((item) => item.status === "pending" && item.acceptanceBlocker) ? 2_000 : false),
+  }));
+  const approvals = createQuery(() => ({
+    queryKey: queryKeys.issues.section(props.taskId, "approvals"),
+    queryFn: ({ signal }) => approvalsApi.forIssue(props.taskId, signal),
+  }));
+  const live = createMemo(() => (liveRuns.data ?? []).filter((run) => run.issueId === props.taskId));
+  const queue = useQueuedComments(() => props.taskId, () => live().length > 0 || !!task.data?.assigneeAgentId);
 
   const names = {
     agent: (id: string) => people.agent(id)?.name,
     person: (id: string) => people.personName(id),
     youId: () => people.youId(),
   };
+  const requests = createMemo(() =>
+    taskRequests(
+      { interactions: interactions.data ?? [], approvals: approvals.data ?? [] },
+      {
+        youId: people.youId(),
+        agentName: (id) => people.agent(id)?.name,
+        personName: (id) => people.personName(id),
+        task: task.data ? { id: task.data.id, identifier: task.data.identifier, title: task.data.title } : null,
+      },
+    ),
+  );
   const thread = createMemo(() =>
     buildThread({
       comments: comments.data?.pages.flat() ?? [],
       events: events.data ?? [],
       runs: runs.data ?? [],
+      requests: requests(),
+      hiddenCommentIds: queuedIds(queue.data),
       names,
       moreComments: comments.hasNextPage,
       filter: filter(),
       search: search(),
     }),
   );
-  const live = createMemo(() => (liveRuns.data ?? []).filter((run) => run.issueId === props.taskId));
   const loading = () => comments.isPending || events.isPending || runs.isPending;
 
   // Opening the section, and new entries arriving, keep the newest in view.
@@ -188,7 +226,8 @@ export function TaskActivity(props: { taskId: string; title?: string }) {
                       </ul>
                     )}
                   </Match>
-                  <Match when={item.kind === "comment" && item}>{(entry) => <Comment comment={entry().comment} people={people} />}</Match>
+                  <Match when={item.kind === "comment" && item}>{(entry) => <Comment taskId={props.taskId} comment={entry().comment} people={people} />}</Match>
+                  <Match when={item.kind === "request" && item}>{(entry) => <RequestCard request={entry().request} taskId={props.taskId} people={people} inThread />}</Match>
                 </Switch>
               )}
             </For>
@@ -213,15 +252,28 @@ export function TaskActivity(props: { taskId: string; title?: string }) {
                 </article>
               )}
             </For>
+            <Show when={queue.data}>{(found) => <QueuedMessages taskId={props.taskId} queue={found()} />}</Show>
           </Match>
         </Switch>
       </div>
-      <CommentBox taskId={props.taskId} />
+      <Show when={task.data}>
+        {(found) => (
+          <div class="ta-compose">
+            <Composer task={found()} liveRunId={live()[0]?.id ?? null} />
+          </div>
+        )}
+      </Show>
     </section>
   );
 }
 
-function Comment(props: { comment: IssueComment; people: ReturnType<typeof useTaskPeople> }) {
+function Comment(props: { taskId: string; comment: IssueComment; people: ReturnType<typeof useTaskPeople> }) {
+  const client = useQueryClient();
+  const remove = createMutation(() => ({
+    mutationFn: () => commentsApi.remove(props.taskId, props.comment.id),
+    onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.issues.section(props.taskId, "comments") }),
+    onError: (error: Error) => pushToast({ tone: "error", title: "Couldn't delete the comment", body: error.message }),
+  }));
   const agentId = () => props.comment.authorAgentId ?? props.comment.derivedAuthorAgentId ?? null;
   const agent = () => props.people.agent(agentId());
   const userId = () => props.comment.authorUserId;
@@ -247,65 +299,22 @@ function Comment(props: { comment: IssueComment; people: ReturnType<typeof useTa
         <time class="ta-time" datetime={new Date(props.comment.createdAt).toISOString()}>
           {stampLabel(props.comment.createdAt)}
         </time>
+        <Show when={you() && !props.comment.deletedAt}>
+          <Menu placement="bottom-end">
+            <Menu.Trigger class="ta-comment-menu" aria-label="Comment actions" disabled={remove.isPending}>
+              <Ellipsis size={15} aria-hidden="true" />
+            </Menu.Trigger>
+            <Menu.Content label="Comment actions" width={200}>
+              <Menu.Item danger onSelect={() => remove.mutate()}>
+                Delete comment
+              </Menu.Item>
+            </Menu.Content>
+          </Menu>
+        </Show>
       </div>
       <Show when={!props.comment.deletedAt} fallback={<p class="ta-muted">This comment was deleted.</p>}>
-        <Markdown source={props.comment.body} />
+        <MessageBody source={props.comment.body} />
       </Show>
     </article>
-  );
-}
-
-/** A plain comment box until the full composer arrives. Cmd/Ctrl+Enter sends. */
-function CommentBox(props: { taskId: string }) {
-  const client = useQueryClient();
-  const [body, setBody] = createSignal("");
-  const [sending, setSending] = createSignal(false);
-  let requestId = crypto.randomUUID();
-
-  const send = async () => {
-    const text = body().trim();
-    if (!text || sending()) return;
-    setSending(true);
-    try {
-      await issuesApi.addComment(props.taskId, text, requestId);
-      requestId = crypto.randomUUID();
-      setBody("");
-      void client.invalidateQueries({ queryKey: queryKeys.issues.detail(props.taskId) });
-    } catch (error) {
-      pushToast({ tone: "error", title: "Couldn't post the comment", body: error instanceof Error ? error.message : String(error) });
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <form
-      class="ta-compose"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void send();
-      }}
-    >
-      <label class="sr-only" for={`comment-${props.taskId}`}>
-        Comment
-      </label>
-      <TextArea
-        id={`comment-${props.taskId}`}
-        rows={2}
-        value={body()}
-        onInput={(event) => setBody(event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault();
-            void send();
-          }
-        }}
-        placeholder="Comment"
-        readOnly={sending()}
-      />
-      <Button type="submit" variant="primary" size="compact" disabled={!body().trim() || sending()}>
-        {sending() ? "Sending…" : "Comment"}
-      </Button>
-    </form>
   );
 }

@@ -12,6 +12,8 @@ import { runsApi } from "@/api/runs";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
+import { Composer } from "@/tasks/composer/Composer";
+import { QueuedMessages, useQueuedComments } from "@/tasks/composer/QueuedMessages";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
@@ -58,8 +60,8 @@ import "./RunModal.css";
  * - Six stats: model, start, duration, tokens, cost, and the session or exit.
  * - Four views: the transcript (live while the run is going), what the agent was sent, the raw
  *   output, and the provider trace (instance admins only, decision 4).
- * - While the run is going, a footer says the transcript is following new output. That's also where
- *   the composer's steer, queue and interrupt controls will go (a later slice of M2).
+ * - While the run is going, a footer says the transcript is following new output, and holds the
+ *   task's queued messages and the composer, to queue, steer or interrupt.
  *
  * The dialog goes through ui/Dialog, so it turns into a full-screen sheet on a phone.
  */
@@ -107,6 +109,7 @@ function RunView(props: { runId: string }) {
     queryFn: ({ signal }) => issuesApi.get(issueId()!, signal),
     enabled: !!issueId(),
   }));
+  const queue = useQueuedComments(() => issueId() ?? "", () => active() && !!issueId());
   const taskRuns = createQuery(() => ({
     queryKey: queryKeys.issues.section(issueId() ?? "", "runs"),
     queryFn: ({ signal }) => issuesApi.runs(issueId()!, signal),
@@ -471,32 +474,42 @@ function RunView(props: { runId: string }) {
 
               <Show when={active()}>
                 {/*
-                  The live footer. The composer's steer, queue and interrupt controls go here in the
-                  thread-and-composer slice of M2; until then it says how to reach the agent.
+                  The live footer: what the transcript is doing, the task's queued messages, and
+                  the composer, sending into this task's run (queue, steer now, or interrupt).
                 */}
-                <footer class="rm-foot" role="status">
-                  <span class="rm-pulse" aria-hidden="true" />
-                  <span>
-                    <b>Live</b>
-                    <span class="rm-foot-meta">
-                      {" "}· {following() ? "following new output" : "paused"}
-                      <Show when={log.lastOutputAt()}>{(at) => <> · last output {agoLabel(at(), now())}</>}</Show>
+                <footer class="rm-foot">
+                  <div class="rm-foot-status" role="status">
+                    <span class="rm-pulse" aria-hidden="true" />
+                    <span>
+                      <b>Live</b>
+                      <span class="rm-foot-meta">
+                        {" "}· {following() ? "following new output" : "paused"}
+                        <Show when={log.lastOutputAt()}>{(at) => <> · last output {agoLabel(at(), now())}</>}</Show>
+                      </span>
                     </span>
-                  </span>
+                    <Show when={task.data}>
+                      {(found) => <span class="rm-foot-hint">Messages go to {found().identifier ?? "the task"}</span>}
+                    </Show>
+                    <Button
+                      size="compact"
+                      class="rm-foot-follow"
+                      onClick={() => {
+                        const next = !following();
+                        setFollowing(next);
+                        if (next) toBottom();
+                      }}
+                    >
+                      {following() ? "Pause following" : "Follow"}
+                    </Button>
+                  </div>
                   <Show when={task.data}>
-                    {(found) => <span class="rm-foot-hint">Comments you post on {found().identifier ?? "the task"} reach the agent on its next turn</span>}
+                    {(found) => (
+                      <>
+                        <Show when={queue.data}>{(current) => <QueuedMessages taskId={found().id} queue={current()} />}</Show>
+                        <Composer task={found()} liveRunId={props.runId} compact />
+                      </>
+                    )}
                   </Show>
-                  <Button
-                    size="compact"
-                    class="rm-foot-follow"
-                    onClick={() => {
-                      const next = !following();
-                      setFollowing(next);
-                      if (next) toBottom();
-                    }}
-                  >
-                    {following() ? "Pause following" : "Follow"}
-                  </Button>
                 </footer>
               </Show>
             </>
