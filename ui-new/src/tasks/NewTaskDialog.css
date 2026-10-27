@@ -559,3 +559,77 @@ button.nt-pill:hover,
     justify-content: flex-end;
   }
 }
+
+/* Repeat (boards N4–N7): the pill, tinted while the task repeats, and its menu */
+.nt-repeat {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.nt-pill--repeat {
+  border-style: dashed;
+}
+
+.nt-pill--repeat:hover {
+  color: var(--text);
+}
+
+.nt-pill--repeat-on {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--run-fg) 50%, transparent);
+  background: var(--run-bg);
+  color: var(--run-fg);
+  font-weight: 700;
+}
+
+.nt-pill--repeat-on:hover {
+  color: var(--run-fg);
+}
+
+.popover.nt-repeat-menu {
+  padding: 0;
+}
+
+/* A recurring task's assignee menu has agents only, in one column */
+.nt-who-grid--single {
+  grid-template-columns: 1fr;
+}
+
+.nt-who-grid--single .nt-who-run {
+  border-left: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 var(--r-card) var(--r-card);
+}
+
+/* A recurring task's placeholders, each with the default a scheduled run fills in */
+.nt-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px 14px;
+  flex-wrap: wrap;
+  padding: 0 24px 14px;
+  font-size: 13px;
+}
+
+.nt-input-default {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nt-input-default .input {
+  width: 160px;
+  padding-block: 5px;
+  font-size: 13px;
+}
+
+/* "First one Mon Oct 26, 09:00", beside the create button */
+.nt-first {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}

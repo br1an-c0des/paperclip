@@ -49,6 +49,8 @@ import {
   type TaskViewState,
 } from "./view-state";
 import { useWorkspaceSummaries, workspaceLookup } from "./workspaces";
+import { RecurringView } from "@/recurring/RecurringView";
+import { ShowSwitch, showsRecurring } from "@/recurring/ShowSwitch";
 import "./TasksView.css";
 
 /*
@@ -65,6 +67,9 @@ import "./TasksView.css";
  * closes it. A task that isn't in the list (a subtask from another project, say) is looked up on
  * its own. It opens docked beside the list, or as a modal over it when that setting is on
  * (task-open-mode.ts).
+ *
+ * Show: Tasks or Recurring starts the toolbar (board R1). `?show=recurring` swaps the list for the
+ * Recurring view (src/recurring/), which replaces the old Routines page.
  */
 
 type ListScope = { projectId?: string };
@@ -109,8 +114,9 @@ export function TasksView(props: {
   const updates = useTaskUpdates();
   const retry = useTaskRetry();
   const location = useLocation();
-  const [params, setParams] = useSearchParams<{ task?: string; section?: string }>();
+  const [params, setParams] = useSearchParams<{ task?: string; section?: string; show?: string }>();
   const tasks = () => props.tasks.data ?? [];
+  const recurring = () => showsRecurring(params.show);
 
   // What the URL says: the search, and pre-filters that replace the saved view's.
   const url = createMemo(() => parseListUrl(location.search, people.youId()));
@@ -311,8 +317,9 @@ export function TasksView(props: {
   };
 
   return (
-    <>
+    <Show when={!recurring()} fallback={<RecurringView projectId={props.projectId} tasks={props.tasks} />}>
       <div class="tv-toolbar" role="toolbar" aria-label="Task list">
+        <ShowSwitch projectId={props.projectId} />
         <Show when={!props.layout}>
           <Segmented
             label="Layout"
@@ -519,7 +526,7 @@ export function TasksView(props: {
           </Dock>
         </Match>
       </Switch>
-    </>
+    </Show>
   );
 }
 

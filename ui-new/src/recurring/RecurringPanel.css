@@ -1,0 +1,502 @@
+/*
+ * The recurring task's panel (boards R2–R4). It uses the task panel's frame and rail
+ * (TaskPanel.css, TaskSections.css) and the task details' property list (TaskDetails.css).
+ */
+
+/* In the dock it keeps its full height, like a task's panel */
+.panel:has(> .panel-body > .rpn) {
+  height: calc(100dvh - 2 * var(--main-pad-top, 14px));
+}
+
+.dialog.rpn-modal .tsec-body {
+  overflow: hidden;
+}
+
+.rpn-note {
+  margin: 0;
+  padding: 22px 24px;
+}
+
+.rpn-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 4px;
+  color: var(--run-fg);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.rpn-run {
+  gap: 6px;
+}
+
+.rpn-muted {
+  color: var(--muted);
+}
+
+.rpn-head-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rpn-head-end {
+  margin-left: auto;
+}
+
+/* Details */
+.rpn-details {
+  gap: 20px;
+}
+
+.rpn-state {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.rpn-state .switch-label {
+  font-weight: 700;
+}
+
+.rpn-next {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.rpn-archived {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px 6px 14px;
+  border-radius: var(--r-pill);
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-weight: 600;
+}
+
+.input.rpn-title {
+  margin: -4px 0 0 -10px;
+  padding: 4px 10px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.input.rpn-title:hover {
+  border-color: var(--edge);
+}
+
+.rpn-cell {
+  gap: 8px;
+  font-size: 14px;
+}
+
+.rpn-desc {
+  margin: 0;
+  color: var(--body);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rpn-chip {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--run-bg);
+  color: var(--run-fg);
+  font-size: 12.5px;
+}
+
+.rpn-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.rpn-section {
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+/* Triggers */
+.rpn-trigger {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.rpn-trigger--edit {
+  gap: 12px;
+}
+
+.rpn-trigger-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rpn-trigger-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--run-bg);
+  color: var(--run-fg);
+}
+
+.rpn-trigger--off .rpn-trigger-icon {
+  background: var(--well);
+  color: var(--muted);
+}
+
+.rpn-trigger-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rpn-trigger-sub {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rpn-trigger-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-left: 44px;
+}
+
+.rpn-trigger-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.rpn-trigger-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 44px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rpn-secret {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--amber-fg) 40%, transparent);
+  border-radius: 12px;
+  background: var(--amber-bg);
+  font-size: 13px;
+}
+
+.rpn-secret-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rpn-secret-row code {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+/* Inputs */
+.rpn-inputs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rpn-input {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) 110px minmax(0, 1.4fr) 86px;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  border-top: 1px solid var(--row-line);
+  font-size: 13px;
+}
+
+.rpn-input:first-child {
+  border-top: 0;
+}
+
+.rpn-input-default {
+  padding-block: 5px;
+  font-size: 13px;
+}
+
+.rpn-required-toggle {
+  justify-self: end;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rpn-required-toggle[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--well);
+  color: var(--text);
+}
+
+/* Secrets */
+.rpn-secrets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rpn-secrets h2 {
+  margin-right: 6px;
+}
+
+.rpn-secret-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  font-size: 12px;
+}
+
+.rpn-popover-note {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.rpn-secret-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  margin-top: 8px;
+  overflow-y: auto;
+}
+
+/* Run policy */
+.rpn-policy {
+  grid-template-columns: 210px minmax(0, 1fr);
+}
+
+.rpn-policy dt {
+  height: auto;
+  min-height: 40px;
+  color: var(--body);
+  gap: 4px;
+}
+
+.rpn-select {
+  min-width: 220px;
+}
+
+.rpn-gate {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Runs */
+.rpn-runs,
+.rpn-revisions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rpn-run-row {
+  display: grid;
+  grid-template-columns: 150px 110px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  border-top: 1px solid var(--row-line);
+  font-size: 13px;
+}
+
+.rpn-run-row:first-child {
+  border-top: 0;
+}
+
+.rpn-run-when {
+  color: var(--body);
+  white-space: nowrap;
+}
+
+.rpn-run-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.rpn-run-out {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.rpn-run-out[data-tone="muted"] {
+  color: var(--muted);
+}
+
+.rpn-run-out[data-tone="red"] {
+  color: var(--red-fg);
+}
+
+.rpn-run-out[data-tone="run"] {
+  color: var(--run-fg);
+}
+
+.rpn-older {
+  align-self: flex-start;
+}
+
+/* Run now */
+.rpn-runnow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rpn-runnow-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.rpn-runnow-row > label,
+.rpn-runnow-row > span {
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+
+.rpn-runnow-row .input {
+  padding-block: 6px;
+}
+
+.rpn-required {
+  color: var(--red-fg);
+  margin-left: 2px;
+}
+
+.rpn-assign {
+  gap: 8px;
+}
+
+.rpn-error {
+  margin: 0;
+  color: var(--red-fg);
+  font-size: 13px;
+}
+
+.rpn-runnow-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+/* History */
+.rpn-revision {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+}
+
+.rpn-revision--current {
+  background: var(--well);
+}
+
+.rpn-revision-who {
+  flex-shrink: 0;
+}
+
+.rpn-revision-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.rpn-revision-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--muted);
+}
+
+.rpn-revision-top b {
+  color: var(--text);
+}
+
+.rpn-revision ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--body);
+}
+
+.rpn-confirm {
+  display: inline-flex;
+  gap: 6px;
+}
+
+@container panel (width < 520px) {
+  .rpn-input {
+    grid-template-columns: minmax(0, 1fr) 96px;
+  }
+
+  .rpn-policy {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rpn-run-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .rpn-run-out {
+    grid-column: 1 / -1;
+  }
+}
