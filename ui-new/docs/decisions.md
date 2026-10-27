@@ -935,3 +935,19 @@ Both are handled in `ui-new` for now.
   Task checkouts for that reason.
 - **No endpoints** for board 10's member roles, the shared-checkout count it draws, or runtime
   services that are configured but never started.
+
+### 27. Gaps found building recurring tasks
+
+- **Status:** Open
+- **Area:** `routines/*`
+- **Found in:** recurring tasks (M4, boards R1–R4, N4–N7).
+
+- **A schedule needs defaults.** `POST /routines/:id/triggers` answers 422 "Scheduled routines
+  require defaults for required variables" while a placeholder has no default, so New task asks for
+  them and the panel warns before adding a schedule.
+- **No atomic create.** A recurring task and its triggers take several requests, and creating a
+  routine takes no idempotency key; a failed trigger leaves the recurring task without it (a
+  warning toast says so).
+- **No delete.** Routines can only be archived.
+- **One input per placeholder.** The server derives inputs from the description, so an input is
+  added by writing a placeholder.

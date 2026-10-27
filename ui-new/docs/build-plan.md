@@ -292,6 +292,10 @@ Connectors page ([decision 23](decisions.md#23-gaps-found-building-the-temporary
 
 Covers `inbox-search/triage`, `decisions/*`, `approvals/*`, `tasks/approvals`, `tasks/interactions`.
 
+Progress (2026-10-27): the Inbox's first slice is built (Needs you, Updates, Alerts, Snoozed,
+Cleared, keyboard triage, sign-offs, the needs-you badge). Left: proposals with a change preview,
+budget resolution, queues and the aging shelf, and the audience settings (M6).
+
 #### M4: Projects
 
 - Project dashboard (board 8): brief, budget, code, agents at work, waiting on you, stuck work.
@@ -309,6 +313,9 @@ Covers `inbox-search/triage`, `decisions/*`, `approvals/*`, `tasks/approvals`, `
 - New project.
 
 Covers `projects/*`, `workspaces/*`, `goals/*`, `routines/*`, `documents-artifacts/library`.
+
+Progress (2026-10-27): built except Agent workload (boards 31, 32): the dashboard, Docs, settings
+with goals and Git authorization, recurring tasks, and New project.
 
 #### M5: Agents and the organization
 
