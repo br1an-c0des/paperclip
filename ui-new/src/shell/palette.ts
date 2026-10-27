@@ -32,6 +32,28 @@ export function matchScore(command: PaletteCommand, query: string): number | nul
   return 2;
 }
 
+export const SEARCH_HANDOFF_ID = "search-everything";
+
+/**
+ * The hand-off to the Search page, drawn last: "Search everything", or "Search everything for
+ * “…”" with what's typed. It's always there, so a query that matches no command still leads
+ * somewhere; Shift+Enter runs it from anywhere in the list.
+ */
+export function searchHandOff(query: string, open: (query: string) => void): PaletteGroup {
+  const term = query.trim().replace(/\s+/g, " ");
+  return {
+    title: "Search",
+    commands: [
+      {
+        id: SEARCH_HANDOFF_ID,
+        label: term ? `Search everything for “${term}”` : "Search everything",
+        hint: "Shift Enter",
+        run: () => open(term),
+      },
+    ],
+  };
+}
+
 /** The groups to show for a query, each filtered, ranked and capped; empty groups are dropped. */
 export function filterPalette(groups: PaletteGroup[], query: string): PaletteGroup[] {
   const searching = query.trim().length > 0;
