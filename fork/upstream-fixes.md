@@ -38,7 +38,7 @@ until one becomes a concrete fix.
 | # | Fix | Status | Branch | Pull request | Found | Submitted | Merged |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | [Clear the compact issue-list cache when an issue changes](#1-clear-the-compact-issue-list-cache-when-an-issue-changes) | submitted | `fix/issue-list-cache-invalidation` | [#17828](https://github.com/paperclipai/paperclip/pull/17828) | 2026-10-26 | 2026-10-26 | |
-| 2 | [Don't crash on Windows when an agent directory path is longer than 260 characters](#2-dont-crash-on-windows-when-an-agent-directory-path-is-longer-than-260-characters) | submitted | `fix/agent-directory-probe-long-cwd` | [#17691](https://github.com/paperclipai/paperclip/pull/17691) | | 2026-10-26 | |
+| 2 | [Don't crash on Windows when an agent directory path is longer than 260 characters](#2-dont-crash-on-windows-when-an-agent-directory-path-is-longer-than-260-characters) | closed | `fix/agent-directory-probe-long-cwd` | [#17691](https://github.com/paperclipai/paperclip/pull/17691) | | 2026-10-26 | |
 | 3 | [Let a pause finish after a restart stopped a legacy run during preparation](#3-let-a-pause-finish-after-a-restart-stopped-a-legacy-run-during-preparation) | submitted | `fix/pause-after-restart-during-preparation` | [#17692](https://github.com/paperclipai/paperclip/pull/17692) | | 2026-10-26 | |
 | 4 | [Link the plugin SDK on Windows without symlink rights](#4-link-the-plugin-sdk-on-windows-without-symlink-rights) | candidate | | | 2026-10-24 | | |
 | 5 | [Start `pnpm dev` on Windows when the native runner is enabled](#5-start-pnpm-dev-on-windows-when-the-native-runner-is-enabled) | candidate | | | 2026-10-26 | | |
@@ -68,6 +68,9 @@ until one becomes a concrete fix.
   stops the server.
 - **Fix:** start the child process from the drive root and pass the directory as an argument.
 - **Files:** `server/src/services/agent-directory-probe.ts`, its test, and `doc/agent-files.md`.
+
+- **Closed 2026-10-27** without merging: Windows isn't a supported server platform, so the fix
+  isn't worth a slot in upstream's review queue.
 
 ### 3. Let a pause finish after a restart stopped a legacy run during preparation
 
