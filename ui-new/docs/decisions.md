@@ -840,3 +840,17 @@ Each is handled in `ui-new` for now. They're possible upstream proposals if they
   yet" until the M5 agent pages.
 - **Some response types aren't exported** from the shared package (the tree-control state, the
   adapter model entry). Declared locally, as in [decision 10](#10-some-response-types-arent-exported-from-the-shared-package).
+
+### 23. Gaps found building the temporary Connectors page
+
+- **Status:** Open
+- **Area:** Apps and tools (AI connections)
+- **Found in:** the temporary Connectors page, built ahead of M6 to test agent runs end to end.
+
+Both are handled in `ui-new` for now.
+
+- **The list doesn't say who created a shared connection.** `GET /api/companies/:companyId/ai-connections`
+  returns `ownerUserId` only for personal connections, but only the creator may reconnect a shared
+  one. Reconnect is offered to every manager, and the server's 403 has the last word.
+- **`localAiLoginSupported` isn't in `ui-new`'s `HealthStatus` type.** The page reads it through a
+  local type extension, falling back to `deploymentMode === "local_trusted"` as the old UI does.
