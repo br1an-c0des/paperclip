@@ -1,0 +1,81 @@
+import { createQuery, useQueryClient } from "@tanstack/solid-query";
+import { createEffect, createMemo, on } from "solid-js";
+import { queryKeys } from "@/api/queryKeys";
+import { WORKLOAD_RUN_LIMIT, workloadApi } from "@/api/workload";
+import { useCompany } from "@/lib/company";
+import { useAgentsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
+import { useSession } from "@/lib/session";
+import type { WorkloadInput, WorkloadScope, WorkloadTask } from "./workload-model";
+
+/*
+ * The data agent workload reads, in one place for the project tab and the company page: the shared
+ * agent, project and live-run lists, the company's run history, and the scope's tasks (passed in,
+ * since both pages already hold their task list).
+ *
+ * The history isn't on the live events' `heartbeats` key, which every run's progress refreshes;
+ * it refetches when a run starts, queues or finishes, which changes the live list.
+ */
+
+export function useWorkload(props: { scope: () => WorkloadScope; tasks: () => readonly WorkloadTask[] | undefined }) {
+  const company = useCompany();
+  const client = useQueryClient();
+  const session = useSession();
+  const agents = useAgentsQuery();
+  const projects = useProjectsQuery();
+  const liveRuns = useLiveRunsQuery();
+  const runs = createQuery(() => ({
+    queryKey: queryKeys.workload.runs(company().id),
+    queryFn: ({ signal }) => workloadApi.runs(company().id, signal),
+    staleTime: 30_000,
+  }));
+  const builtIn = createQuery(() => ({
+    queryKey: queryKeys.workload.builtInAgents(company().id),
+    queryFn: ({ signal }) => workloadApi.builtInAgentIds(company().id, signal),
+    enabled: props.scope().kind === "company",
+    staleTime: 5 * 60_000,
+  }));
+
+  const liveSignature = createMemo(() =>
+    (liveRuns.data ?? [])
+      .map((run) => `${run.id}:${run.status}`)
+      .sort()
+      .join(","),
+  );
+  createEffect(
+    on(
+      liveSignature,
+      () => {
+        void client.invalidateQueries({ queryKey: queryKeys.workload.runs(company().id) });
+      },
+      { defer: true },
+    ),
+  );
+
+  // TODO(clock): switch to the shared useNow(). Until then, "now" moves when the data does.
+  const now = createMemo(() => {
+    void runs.dataUpdatedAt;
+    void liveRuns.dataUpdatedAt;
+    void agents.dataUpdatedAt;
+    return Date.now();
+  });
+
+  const input = createMemo<WorkloadInput>(() => ({
+    scope: props.scope(),
+    agents: agents.data ?? [],
+    tasks: props.tasks() ?? [],
+    runs: runs.data ?? [],
+    runsTruncated: (runs.data?.length ?? 0) >= WORKLOAD_RUN_LIMIT,
+    liveRuns: liveRuns.data ?? [],
+    projects: projects.data ?? [],
+    youId: session.youId(),
+    now: now(),
+  }));
+
+  return {
+    input,
+    agents,
+    builtInIds: createMemo(() => new Set(builtIn.data ?? [])),
+    ready: () => agents.isSuccess && runs.isSuccess && props.tasks() !== undefined,
+    error: () => (runs.error ?? agents.error) as Error | null,
+  };
+}
