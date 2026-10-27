@@ -45,6 +45,10 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 16 | [Cases don't store the structure the case boards draw](#16-cases-dont-store-the-structure-the-case-boards-draw) | `cases/*`, `tasks/views` | Open | Oct 26, 2026 |
 | 17 | [Search results are shaped differently from board S1](#17-search-results-are-shaped-differently-from-board-s1) | `inbox-search/search` | Open | Oct 26, 2026 |
 | 18 | [The phone layouts assume push notifications](#18-the-phone-layouts-assume-push-notifications) | phone navigation, `inbox-search/triage` | Open | Oct 26, 2026 |
+| 19 | [The document editor is CodeMirror 6, loaded on demand](#19-the-document-editor-is-codemirror-6-loaded-on-demand) | `documents-artifacts/documents`, `tasks/workspace` | Decided | Oct 26, 2026 |
+| 20 | [More shared code the task screens need at runtime](#20-more-shared-code-the-task-screens-need-at-runtime) | `documents-artifacts/annotations`, `tasks/discussion`, `tasks/approvals` | Decided | Oct 26, 2026 |
+| 21 | [Open questions from the phone shell](#21-open-questions-from-the-phone-shell) | `shell/navigation`, `shell/company`, design system | Open | Oct 26, 2026 |
+| 22 | [Smaller API gaps found building M2's task screens](#22-smaller-api-gaps-found-building-m2s-task-screens) | `tasks/*`, `steering/*`, `documents-artifacts/*` | Open | Oct 26, 2026 |
 
 ## Entries
 
@@ -741,3 +745,98 @@ layouts' morning brief (M10) also depends on build plan [3.13](build-plan.md#313
 upstream, or build it as a fork plugin (stage 3).
 
 **Decision.** Open.
+
+### 19. The document editor is CodeMirror 6, loaded on demand
+
+- **Status:** Decided
+- **Area:** `documents-artifacts/documents`, `tasks/workspace`
+- **Found in:** building the document editor and the workspace file viewer (M2, `src/documents/`,
+  `src/files/`).
+
+**What we found.** The old UI's editor is React. `ui-new` needs one that works in Solid, and the
+main chunk was already past Vite's 500 KB warning ([decision 15](#15-run-transcripts-use-the-adapter-packages-parsers-at-runtime)).
+
+**Options.**
+
+1. **CodeMirror 6**, framework-agnostic. Its packages were already in the lockfile through the old UI.
+2. **A textarea with a live preview.** Smallest, but no highlighting, search or list continuation.
+
+**Decision.** Option 1, loaded only when needed. The editor uses `@lezer/markdown` directly
+rather than `@codemirror/lang-markdown`, which would pull in the HTML, CSS and JavaScript grammars.
+
+- **Costs, gzipped:** the editor is about 115 KB on first edit. The code viewer is about 107 KB on the
+  first source file, plus 5–20 KB per language; the two share about 97 KB of CodeMirror core.
+- **Main chunk:** it doesn't grow (619 KB raw, 187 KB gzipped).
+
+Documents save explicitly (Save, or Ctrl/Cmd+S) on the revision the edit started from, instead of
+the old UI's autosave. That avoids a revision every second and makes conflicts predictable. A
+conflict keeps the draft and offers the differences, their version, or overwrite.
+
+### 20. More shared code the task screens need at runtime
+
+- **Status:** Decided
+- **Area:** `documents-artifacts/annotations`, `tasks/discussion`, `tasks/approvals`
+- **Found in:** the M2 composer, document editor and Details slices.
+
+**What we found.**
+
+- **Comment anchors.** Comments on a document's text must anchor the way the server re-anchors them.
+  The helpers are in `@paperclipai/shared/document-anchors`.
+- **Mention links.** The composer writes `agent://`, `user://` and `/issues/REF` links, whose formats
+  live in the shared package's `project-mentions.ts`.
+- **Execution policy.** The old UI validates a task's review stages with the shared zod schema
+  `issueExecutionPolicySchema`.
+
+**Decision.**
+
+- **Comment anchors:** imported at runtime (`src/documents/anchor.ts`), as a third exception to
+  `import type` after decisions 9 and 15. Copying them would drift from the server's re-anchoring.
+- **Mention formats:** copied locally, in the style of decision 10. They're small and stable.
+- **Execution policy:** the shape is checked by hand. A policy the editor doesn't recognise is
+  shown as unreadable and never overwritten. Switching to the shared schema at runtime would be
+  more faithful; revisit if the hand check drifts.
+
+### 21. Open questions from the phone shell
+
+- **Status:** Open
+- **Area:** `shell/navigation`, `shell/company`, design system
+- **Found in:** building the floating dock ([design/mobile.md](design/mobile.md)).
+
+1. **A System theme.** The You sheet offers Light, Dark and System, which loosens the design
+   system's "light and dark" line. Built that way; confirm or drop System.
+2. **The dock on detail pages.** It stays on task and agent pages for now. The phone boards (M2,
+   M9, M11) hide it and use a back control, which those pages don't have yet. Hide it once they do.
+3. **The Org dashboard on phones.** It isn't one of the dock's places. Either phones land on the
+   Inbox, or the dashboard goes in the Tasks switcher.
+4. **The agents list URL.** There's no agents list page yet. The old UI's `/agents/all` would be
+   read as an agent called "all". Decide the URL before M5.
+5. **Needs-you counts for other companies.** The company list shows them only for the current
+   company; others would need one sidebar-badges request each.
+
+### 22. Smaller API gaps found building M2's task screens
+
+- **Status:** Open
+- **Area:** `tasks/*`, `steering/*`, `documents-artifacts/*`
+- **Found in:** the M2 composer, document editor and Details slices.
+
+Each is handled in `ui-new` for now. They're possible upstream proposals if they start to matter.
+
+- **No watchers and no private comments.** The old UI has neither on the thread, and the comments
+  API has no field for privacy. Private comments are dropped.
+- **Steering takes three requests.** There's no "post and steer": the composer posts, reads the
+  queue, then steers with `{queueId, revision, targetRunId}`. A 409 shows a retry message.
+- **Run settings stay on the task.** The composer's model and effort go to `PATCH /issues/:id` as
+  `assigneeAdapterOverrides`, so they apply until changed, as in the old UI. There's no per-message
+  override.
+- **Approval events don't refresh a task's approvals.** They invalidate the company's approvals, so
+  the card refreshes the task's section itself after acting.
+- **No editing presence on documents.** A lock is a freeze, not an edit session, and only board
+  users can lock. The UI says "Locked by X", not board 5's "X is editing".
+- **Comment counts per document** take one request per row.
+- **The changed-file count** on "Browse workspace files" runs a git scan (`list?mode=changed`,
+  cached 30 s). The file-resources endpoints are board-only and rate-limited, and can't list a
+  task's candidate workspaces.
+- **The project access notice** links to `/agents/:agentKey/permissions`, which shows "not built
+  yet" until the M5 agent pages.
+- **Some response types aren't exported** from the shared package (the tree-control state, the
+  adapter model entry). Declared locally, as in [decision 10](#10-some-response-types-arent-exported-from-the-shared-package).
