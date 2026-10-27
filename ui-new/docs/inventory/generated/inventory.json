@@ -1,5 +1,5 @@
 {
-  "upstreamCommit": "5c3dce09b5cb80911a65a03ec09d20bf8fbf78dd",
+  "upstreamCommit": "baec3abd67a310a2a9ac2cda34154972f374be46",
   "routes": [
     {
       "path": "/oauth-handoff",
@@ -4846,7 +4846,6 @@
           "components/SidebarProjects.tsx",
           "context/LiveUpdatesProvider.tsx",
           "hooks/useAgentChatNavigation.ts",
-          "hooks/useInboxBadge.ts",
           "hooks/usePrimaryAgent.ts",
           "plugins/bridge-init.ts",
           "plugins/launchers.tsx",
@@ -5365,8 +5364,6 @@
         "via": [
           "components/CommandPalette.tsx",
           "components/NewIssueDialog.tsx",
-          "hooks/useInboxBadge.ts",
-          "hooks/useIssueHierarchyContext.ts",
           "plugins/bridge-init.ts"
         ]
       },
@@ -5421,7 +5418,8 @@
           }
         ],
         "via": [
-          "components/CompanySettingsSidebar.tsx"
+          "components/CompanySettingsSidebar.tsx",
+          "hooks/useInboxBadge.ts"
         ]
       },
       {
@@ -5588,7 +5586,9 @@
         ],
         "via": [
           "components/IssuesList.tsx",
-          "components/LegacyIssuesList.tsx"
+          "components/LegacyIssuesList.tsx",
+          "hooks/useIssueHierarchyContext.ts",
+          "hooks/useIssueRowDetails.ts"
         ]
       },
       {
@@ -5621,7 +5621,6 @@
           "components/MarkdownBody.tsx",
           "components/NewIssueDialog.tsx",
           "components/SidebarRecentTasks.tsx",
-          "hooks/useIssueHierarchyContext.ts",
           "lib/issueDetailCache.ts"
         ]
       },
@@ -6492,54 +6491,6 @@
         ],
         "via": [
           "hooks/useCompanyOrder.ts"
-        ]
-      },
-      {
-        "key": "api/access.ts::accessApi.listJoinRequests",
-        "requests": [
-          {
-            "method": "GET",
-            "path": "/api/companies/:companyId/join-requests"
-          }
-        ],
-        "via": [
-          "hooks/useInboxBadge.ts"
-        ]
-      },
-      {
-        "key": "api/approvals.ts::approvalsApi.list",
-        "requests": [
-          {
-            "method": "GET",
-            "path": "/api/companies/:companyId/approvals"
-          }
-        ],
-        "via": [
-          "hooks/useInboxBadge.ts"
-        ]
-      },
-      {
-        "key": "api/dashboard.ts::dashboardApi.summary",
-        "requests": [
-          {
-            "method": "GET",
-            "path": "/api/companies/:companyId/dashboard"
-          }
-        ],
-        "via": [
-          "hooks/useInboxBadge.ts"
-        ]
-      },
-      {
-        "key": "api/heartbeats.ts::heartbeatsApi.list",
-        "requests": [
-          {
-            "method": "GET",
-            "path": "/api/companies/:companyId/heartbeat-runs"
-          }
-        ],
-        "via": [
-          "hooks/useInboxBadge.ts"
         ]
       },
       {
@@ -10169,6 +10120,18 @@
             {
               "method": "GET",
               "path": "/api/companies/:companyId/agents"
+            }
+          ],
+          "via": [
+            "components/new-agent/NewAgentSetup.tsx"
+          ]
+        },
+        {
+          "key": "api/agents.ts::agentsApi.retryLifecycle",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/agents/:id/lifecycle/retry"
             }
           ],
           "via": [
@@ -17368,6 +17331,7 @@
           ],
           "via": [
             "components/IssueRunLedger.tsx",
+            "hooks/useTaskPluginPanels.ts",
             "pages/IssueDetail.tsx"
           ]
         },
@@ -17973,6 +17937,18 @@
           ]
         },
         {
+          "key": "api/heartbeats.ts::heartbeatsApi.conversationEvents",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/heartbeat-runs/:runId/events"
+            }
+          ],
+          "via": [
+            "components/transcript/useNativeRunTranscripts.ts"
+          ]
+        },
+        {
           "key": "api/chatEndpoints.ts::chatEndpointsApi.list",
           "requests": [
             {
@@ -18242,6 +18218,31 @@
           ]
         },
         {
+          "key": "api/issues.ts::issuesApi.listComments",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:id/comments"
+            }
+          ],
+          "via": [
+            "hooks/useIssueHistoryWindow.ts",
+            "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.recentComments",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:id/recent-comments"
+            }
+          ],
+          "via": [
+            "hooks/useIssueHistoryWindow.ts"
+          ]
+        },
+        {
           "key": "api/issues.ts::issuesApi.listWorkProducts",
           "requests": [
             {
@@ -18336,6 +18337,42 @@
           ],
           "via": [
             "pages/AgentChat.tsx"
+          ]
+        },
+        {
+          "key": "api/activity.ts::activityApi.inputFactsForIssue",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/activity"
+            }
+          ],
+          "via": [
+            "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/activity.ts::activityApi.recentForIssue",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/activity"
+            }
+          ],
+          "via": [
+            "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/activity.ts::activityApi.recentRunsForIssue",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/runs"
+            }
+          ],
+          "via": [
+            "pages/IssueDetail.tsx"
           ]
         },
         {
@@ -18603,6 +18640,18 @@
           ]
         },
         {
+          "key": "api/issues.ts::issuesApi.getCore",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:id"
+            }
+          ],
+          "via": [
+            "pages/IssueDetail.tsx"
+          ]
+        },
+        {
           "key": "api/issues.ts::issuesApi.getCostSummary",
           "requests": [
             {
@@ -18672,18 +18721,6 @@
             {
               "method": "GET",
               "path": "/api/issues/:id/approvals"
-            }
-          ],
-          "via": [
-            "pages/IssueDetail.tsx"
-          ]
-        },
-        {
-          "key": "api/issues.ts::issuesApi.listComments",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/issues/:id/comments"
             }
           ],
           "via": [
@@ -24742,6 +24779,7 @@
           ],
           "via": [
             "components/IssueRunLedger.tsx",
+            "hooks/useTaskPluginPanels.ts",
             "pages/IssueDetail.tsx"
           ]
         },
@@ -25345,6 +25383,18 @@
           ]
         },
         {
+          "key": "api/heartbeats.ts::heartbeatsApi.conversationEvents",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/heartbeat-runs/:runId/events"
+            }
+          ],
+          "via": [
+            "components/transcript/useNativeRunTranscripts.ts"
+          ]
+        },
+        {
           "key": "api/chatEndpoints.ts::chatEndpointsApi.list",
           "requests": [
             {
@@ -25613,6 +25663,31 @@
           ]
         },
         {
+          "key": "api/issues.ts::issuesApi.listComments",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:id/comments"
+            }
+          ],
+          "via": [
+            "hooks/useIssueHistoryWindow.ts",
+            "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.recentComments",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:id/recent-comments"
+            }
+          ],
+          "via": [
+            "hooks/useIssueHistoryWindow.ts"
+          ]
+        },
+        {
           "key": "api/issues.ts::issuesApi.listWorkProducts",
           "requests": [
             {
@@ -25682,6 +25757,42 @@
           ],
           "via": [
             "lib/issue-thread-queries.ts",
+            "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/activity.ts::activityApi.inputFactsForIssue",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/activity"
+            }
+          ],
+          "via": [
+            "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/activity.ts::activityApi.recentForIssue",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/activity"
+            }
+          ],
+          "via": [
+            "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/activity.ts::activityApi.recentRunsForIssue",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/runs"
+            }
+          ],
+          "via": [
             "pages/IssueDetail.tsx"
           ]
         },
@@ -25950,6 +26061,18 @@
           ]
         },
         {
+          "key": "api/issues.ts::issuesApi.getCore",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:id"
+            }
+          ],
+          "via": [
+            "pages/IssueDetail.tsx"
+          ]
+        },
+        {
           "key": "api/issues.ts::issuesApi.getCostSummary",
           "requests": [
             {
@@ -26019,18 +26142,6 @@
             {
               "method": "GET",
               "path": "/api/issues/:id/approvals"
-            }
-          ],
-          "via": [
-            "pages/IssueDetail.tsx"
-          ]
-        },
-        {
-          "key": "api/issues.ts::issuesApi.listComments",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/issues/:id/comments"
             }
           ],
           "via": [
@@ -26780,6 +26891,30 @@
           ],
           "via": [
             "components/ProjectAccessMembers.tsx"
+          ]
+        },
+        {
+          "key": "api/projects.ts::projectsApi.gitAuthorization",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/projects/:id/git-authorization"
+            }
+          ],
+          "via": [
+            "components/ProjectGitAuthorization.tsx"
+          ]
+        },
+        {
+          "key": "api/projects.ts::projectsApi.setGitAuthorization",
+          "requests": [
+            {
+              "method": "PUT",
+              "path": "/api/projects/:id/git-authorization"
+            }
+          ],
+          "via": [
+            "components/ProjectGitAuthorization.tsx"
           ]
         },
         {
@@ -30132,7 +30267,6 @@
         }
       ],
       "usedBy": [
-        "App shell",
         "pages/CompanyAccess.tsx",
         "pages/Inbox.tsx",
         "pages/Issues.tsx",
@@ -30292,6 +30426,19 @@
       ],
       "referenced": true
     },
+    "api/activity.ts::activityApi.inputFactsForIssue": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/issues/:issueId/activity"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
     "api/activity.ts::activityApi.issuesForRun": {
       "requests": [
         {
@@ -30315,6 +30462,32 @@
         "App shell",
         "pages/BoardChat.tsx",
         "pages/Dashboard.tsx"
+      ],
+      "referenced": true
+    },
+    "api/activity.ts::activityApi.recentForIssue": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/issues/:issueId/activity"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
+    "api/activity.ts::activityApi.recentRunsForIssue": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/issues/:issueId/runs"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/IssueDetail.tsx"
       ],
       "referenced": true
     },
@@ -31227,7 +31400,8 @@
         }
       ],
       "usedBy": [
-        "pages/AgentDetailPage.tsx"
+        "pages/AgentDetailPage.tsx",
+        "pages/NewAgent.tsx"
       ],
       "referenced": true
     },
@@ -31783,7 +31957,6 @@
         }
       ],
       "usedBy": [
-        "App shell",
         "pages/Approvals.tsx",
         "pages/Inbox.tsx",
         "pages/Issues.tsx"
@@ -34093,7 +34266,6 @@
         }
       ],
       "usedBy": [
-        "App shell",
         "pages/Dashboard.tsx",
         "pages/Inbox.tsx",
         "pages/Issues.tsx"
@@ -36000,6 +36172,19 @@
       ],
       "referenced": true
     },
+    "api/heartbeats.ts::heartbeatsApi.conversationEvents": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/heartbeat-runs/:runId/events"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
     "api/heartbeats.ts::heartbeatsApi.deleteProviderTrace": {
       "requests": [
         {
@@ -36079,7 +36264,6 @@
         }
       ],
       "usedBy": [
-        "App shell",
         "pages/AgentDetailPage.tsx",
         "pages/Inbox.tsx",
         "pages/Issues.tsx",
@@ -36787,6 +36971,19 @@
       ],
       "referenced": true
     },
+    "api/issues.ts::issuesApi.getCore": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/issues/:id"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
     "api/issues.ts::issuesApi.getCostSummary": {
       "requests": [
         {
@@ -37217,6 +37414,19 @@
         {
           "method": "GET",
           "path": "/api/issues/:id/privacy-constraints"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
+    "api/issues.ts::issuesApi.recentComments": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/issues/:id/recent-comments"
         }
       ],
       "usedBy": [
@@ -38075,6 +38285,18 @@
       ],
       "referenced": true
     },
+    "api/projects.ts::projectsApi.gitAuthorization": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/projects/:id/git-authorization"
+        }
+      ],
+      "usedBy": [
+        "pages/ProjectDetail.tsx"
+      ],
+      "referenced": true
+    },
     "api/projects.ts::projectsApi.list": {
       "requests": [
         {
@@ -38180,6 +38402,18 @@
       "usedBy": [
         "App shell",
         "pages/apps/chat/ChatEndpointSetup.tsx"
+      ],
+      "referenced": true
+    },
+    "api/projects.ts::projectsApi.setGitAuthorization": {
+      "requests": [
+        {
+          "method": "PUT",
+          "path": "/api/projects/:id/git-authorization"
+        }
+      ],
+      "usedBy": [
+        "pages/ProjectDetail.tsx"
       ],
       "referenced": true
     },
