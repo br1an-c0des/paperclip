@@ -1,6 +1,17 @@
 import type { IssueExecutionPolicy, IssueExecutionState } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { buildPolicy, executionStatus, nextRunnableStage, readPolicy, reviewSentence, stageKeys, toggleKey } from "./review-stages";
+import {
+  boardMonitor,
+  buildPolicy,
+  executionStatus,
+  nextRunnableStage,
+  readPolicy,
+  reviewSentence,
+  stageKeys,
+  toDateTimeLocal,
+  toggleKey,
+  withMonitor,
+} from "./review-stages";
 
 const names: Record<string, string> = { "agent:sam": "Sam", "agent:alex": "Alex", "user:lee": "Lee", "user:me": "You" };
 const nameOf = (key: string) => names[key] ?? key;
@@ -117,6 +128,34 @@ describe("nextRunnableStage", () => {
   it("offers nothing while a stage is pending, or without stages", () => {
     expect(nextRunnableStage(policy, state({}))).toBeNull();
     expect(nextRunnableStage(null, null)).toBeNull();
+  });
+});
+
+describe("monitor", () => {
+  const monitor = { nextCheckAt: "2026-10-27T10:00:00.000Z", notes: "Check the deploy", scheduledBy: "board" as const };
+
+  it("adds a monitor beside the stages, keeping their ids", () => {
+    const next = withMonitor(policy, monitor, ids());
+    expect(next?.monitor).toEqual(monitor);
+    expect(next?.stages.map((stage) => stage.id)).toEqual(["stage-r", "stage-a"]);
+  });
+
+  it("starts a policy for a monitor alone, and clears it when the monitor goes", () => {
+    expect(withMonitor(null, monitor, ids())).toEqual({ mode: "normal", commentRequired: true, stages: [], monitor });
+    expect(withMonitor({ mode: "normal", commentRequired: true, stages: [], monitor }, null, ids())).toBeNull();
+    expect(withMonitor({ ...policy, monitor }, null, ids())).not.toHaveProperty("monitor");
+  });
+
+  it("builds a board monitor from the form", () => {
+    expect(boardMonitor({ at: "", notes: "", service: "" })).toBeNull();
+    const built = boardMonitor({ at: "2026-10-27T10:00", notes: " Re-check ", service: " Vercel " });
+    expect(built).toMatchObject({ notes: "Re-check", scheduledBy: "board", kind: "external_service", serviceName: "Vercel", externalRef: null });
+    expect(boardMonitor({ at: "2026-10-27T10:00", notes: "", service: "" })).toMatchObject({ kind: null, serviceName: null, notes: null });
+  });
+
+  it("formats a date for a datetime-local field", () => {
+    expect(toDateTimeLocal(new Date(2026, 9, 27, 9, 5))).toBe("2026-10-27T09:05");
+    expect(toDateTimeLocal(null)).toBe("");
   });
 });
 

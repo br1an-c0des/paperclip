@@ -111,6 +111,46 @@ export function buildPolicy(
   };
 }
 
+export type MonitorPolicy = NonNullable<IssueExecutionPolicy["monitor"]>;
+
+/**
+ * The policy with this monitor (a scheduled re-check, such as on an external service), or without
+ * one, keeping the stages; null when nothing is left. After `updateMonitor` in the old panel.
+ */
+export function withMonitor(existing: unknown, monitor: MonitorPolicy | null, makeId: () => string = newId): IssueExecutionPolicy | null {
+  const read = readPolicy(existing);
+  if (!read.ok) throw new Error("This task's execution policy can't be read, so its monitor can't be changed here.");
+  const withoutMonitor = read.policy ? { ...read.policy, monitor: null } : null;
+  const base = buildPolicy(withoutMonitor, stageKeys(existing, "review"), stageKeys(existing, "approval"), makeId);
+  if (base) delete base.monitor;
+  if (!monitor) return base;
+  return { ...(base ?? { mode: "normal", commentRequired: true, stages: [] }), monitor };
+}
+
+/** A monitor the board schedules: when, what to re-check, and an optional external service. */
+export function boardMonitor(input: { at: string; notes: string; service: string }): MonitorPolicy | null {
+  const when = new Date(input.at);
+  if (!input.at || Number.isNaN(when.getTime())) return null;
+  const serviceName = input.service.trim() || null;
+  return {
+    nextCheckAt: when.toISOString(),
+    notes: input.notes.trim() || null,
+    scheduledBy: "board",
+    kind: serviceName ? "external_service" : null,
+    serviceName,
+    externalRef: null,
+  };
+}
+
+/** A date as a `datetime-local` field's value, in local time. */
+export function toDateTimeLocal(value: Date | string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 /** Names a participant key: "You", an agent's or a person's name. */
 export type NameOf = (key: string) => string;
 

@@ -5,6 +5,7 @@ import {
   Calendar,
   ChevronDown,
   CircleDot,
+  Clock,
   CornerDownRight,
   Eye,
   FileText,
@@ -14,6 +15,8 @@ import {
   Hash,
   ListTree,
   Plus,
+  RotateCcw,
+  ShieldCheck,
   Tag,
   Target,
   UserRound,
@@ -46,6 +49,7 @@ import {
   useTaskChange,
   WorkspaceControl,
 } from "./TaskEditors";
+import { MonitorControl, ScheduledRetryControl, WatchdogControl } from "./TaskExecution";
 import "./TaskDetails.css";
 
 /*
@@ -163,6 +167,27 @@ export function TaskDetails(props: {
       label: "Workspace",
       empty: (current) => !current.currentExecutionWorkspace && !workspaceEditable(current),
       value: () => <WorkspaceControl task={t()} onChange={change} />,
+    },
+    {
+      key: "watchdog",
+      icon: <ShieldCheck size={15} />,
+      label: "Watchdog",
+      empty: (current) => !current.watchdog,
+      value: () => <WatchdogControl task={t()} people={people} onOpenTask={props.onOpenTask} />,
+    },
+    {
+      key: "monitor",
+      icon: <Clock size={15} />,
+      label: "Monitor",
+      empty: (current) => !current.executionPolicy?.monitor && !current.executionState?.monitor?.nextCheckAt && !current.monitorNextCheckAt,
+      value: () => <MonitorControl task={t()} onChange={change} />,
+    },
+    {
+      key: "retry",
+      icon: <RotateCcw size={15} />,
+      label: "Scheduled retry",
+      empty: (current) => current.scheduledRetry?.status !== "scheduled_retry",
+      value: () => <ScheduledRetryControl task={t()} />,
     },
     { key: "billing", icon: <Hash size={15} />, label: "Billing code", empty: (current) => !current.billingCode, value: () => <BillingControl task={t()} onChange={change} /> },
   ];
