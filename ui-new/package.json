@@ -14,9 +14,17 @@
     "inventory": "node scripts/ui-inventory.mjs"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.11.0",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/language-data": "^6.5.2",
+    "@codemirror/search": "^6.6.0",
+    "@codemirror/state": "^6.7.2",
+    "@codemirror/view": "^6.43.11",
     "@fontsource-variable/hanken-grotesk": "^5.3.0",
     "@fontsource/fragment-mono": "^5.3.0",
     "@kobalte/core": "^0.13.14",
+    "@lezer/highlight": "^1.2.3",
+    "@lezer/markdown": "^1.7.2",
     "@paperclipai/adapter-claude-local": "workspace:*",
     "@paperclipai/adapter-codex-local": "workspace:*",
     "@paperclipai/adapter-cursor-local": "workspace:*",

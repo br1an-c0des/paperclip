@@ -1,0 +1,251 @@
+/* One document: header, banners, the text or editor, comments beside it */
+.dv-head {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.dv-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.dv-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dv-meta {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dv-head .tsec-head-tools {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.dv-comments-btn {
+  gap: 6px;
+}
+
+.dv-menu-note {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dv-scroll {
+  container: doc / inline-size;
+}
+
+/* Banners: the lock, an earlier revision, a conflict */
+.dv-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  font-size: 13px;
+}
+
+.dv-banner--amber {
+  border: 1px solid color-mix(in srgb, var(--amber-fg) 35%, transparent);
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+}
+
+.dv-banner--stack {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.dv-banner-text {
+  flex: 1;
+  min-width: 200px;
+  color: var(--text);
+}
+
+.dv-banner-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dv-failure {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--r-inner);
+  background: var(--red-bg);
+  color: var(--red-fg);
+  font-size: 13px;
+}
+
+/* The text with the comments panel beside it, or above it when the panel is narrow */
+.dv-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.dv-grid > .dc {
+  order: -1;
+}
+
+@container doc (width >= 760px) {
+  .dv-grid[data-comments] {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+    align-items: start;
+  }
+
+  .dv-grid[data-comments] > .dc {
+    order: 0;
+    position: sticky;
+    top: 0;
+    max-height: 75dvh;
+    overflow-y: auto;
+  }
+}
+
+.dv-main {
+  min-width: 0;
+}
+
+.dv-text {
+  position: relative;
+}
+
+.dv-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dv-editor .mde {
+  min-height: min(60vh, 520px);
+}
+
+.dv-preview {
+  min-height: 260px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+}
+
+.dv-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 24px;
+  border-top: 1px solid var(--line);
+}
+
+.dv-foot-note {
+  margin-right: auto;
+}
+
+/* Line diff */
+.dv-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dv-diff-legend {
+  margin: 0;
+}
+
+.dv-diff-add {
+  color: var(--green-fg);
+}
+
+.dv-diff-del {
+  color: var(--red-fg);
+}
+
+.dv-diff-rows {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.dv-diff-row {
+  display: grid;
+  grid-template-columns: 3.5ch 3.5ch 2ch minmax(0, 1fr);
+  min-width: max-content;
+}
+
+.dv-diff-row[data-kind="added"] {
+  background: color-mix(in srgb, var(--green-fg) 14%, transparent);
+}
+
+.dv-diff-row[data-kind="removed"] {
+  background: color-mix(in srgb, var(--red-fg) 14%, transparent);
+}
+
+.dv-diff-num {
+  padding-right: 6px;
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+}
+
+.dv-diff-sign {
+  color: var(--muted);
+  user-select: none;
+}
+
+.dv-diff-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@container panel (width < 480px) {
+  .dv-head {
+    flex-wrap: wrap;
+  }
+
+  .dv-foot {
+    padding: 10px 16px;
+  }
+}
+
+/* New document */
+.nd-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.nd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.nd-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.nd-error {
+  color: var(--red-fg);
+}
+
+@container doc (width < 480px) {
+  .nd-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

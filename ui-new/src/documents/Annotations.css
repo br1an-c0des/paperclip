@@ -1,0 +1,152 @@
+/* Comments on a document's text: highlights and the comments panel */
+::highlight(doc-annotation) {
+  background-color: color-mix(in srgb, var(--amber-fg) 22%, transparent);
+}
+
+::highlight(doc-annotation-focus) {
+  background-color: color-mix(in srgb, var(--amber-fg) 45%, transparent);
+}
+
+::highlight(doc-annotation-pending) {
+  background-color: color-mix(in srgb, var(--run-fg) 30%, transparent);
+}
+
+.dc {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--r-card);
+  background: var(--card);
+}
+
+.dc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dc-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.dc-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.dc-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dc-quote {
+  margin: 0;
+  padding: 4px 8px;
+  border-left: 2px solid var(--amber-fg);
+  background: var(--well);
+  border-radius: 0 6px 6px 0;
+  color: var(--body);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.dc-quote--button {
+  width: 100%;
+  cursor: pointer;
+}
+
+.dc-quote--button:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 2px;
+}
+
+.dc-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dc-threads {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dc-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--ground);
+  scroll-margin: 8px;
+}
+
+.dc-thread[data-focused] {
+  border-color: var(--run-fg);
+  box-shadow: 0 0 0 1px var(--run-fg);
+}
+
+.dc-thread[data-status="resolved"] .dc-quote {
+  border-left-color: var(--muted);
+}
+
+.dc-comments {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dc-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dc-comment-by {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.dc-comment-by strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.dc-comment-body {
+  font-size: 13px;
+}
+
+.dc-more {
+  align-self: flex-start;
+  color: var(--run-fg);
+  font-size: 12px;
+}
+
+/* The Comment button that appears under a text selection */
+.dc-float {
+  position: absolute;
+  z-index: 2;
+  box-shadow: var(--shadow);
+}
