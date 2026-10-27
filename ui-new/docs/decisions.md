@@ -881,7 +881,8 @@ Both are handled in `ui-new` for now.
   approvals, failed runs, join requests and unread Mine tasks, with `approval:<id>`-style dismissal
   keys, while feed dismissals use `attention:…` keys. Clearing an approval in the Inbox doesn't lower
   the badge. The feed's own `deskBadgeCount` matches Needs you; switching the nav to it means reading
-  the feed in the nav. Open: which count the badge should show.
+  the feed in the nav. **Decided 2026-10-27:** the badge counts what's waiting on you, matching Needs
+  you (the feed's count), not `sidebar-badges`.
 - **Stalled reviews have no inline action yet.** `POST /issues/:id/stalled-review-decision` exists
   but isn't ported; stalled reviews open the task.
 - **Sign-offs act through the task's status.** The current reviewer approves with `done` and a
