@@ -1,0 +1,438 @@
+/* Board 14's Inbox: header with the view tabs, a filter bar, then the stack or the rows. */
+.ibx {
+  container: ibx / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ibx-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 8px 0 2px;
+}
+
+.ibx-head h1 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.ibx-tabs {
+  flex-wrap: nowrap;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ibx-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.ibx-count--hot {
+  color: var(--run-fg);
+}
+
+.ibx-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.ibx-kinds button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ibx-glyph {
+  width: 5px;
+  height: 12px;
+  border-radius: var(--r-pill);
+}
+
+.ibx-kind-count {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.ibx-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ibx-keys {
+  margin-left: auto;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ibx-keys kbd {
+  font-family: inherit;
+  color: var(--body);
+}
+
+.ibx-keys kbd + kbd {
+  margin-left: 3px;
+}
+
+.ibx-empty {
+  margin: 0;
+  padding: 18px 22px;
+  color: var(--muted);
+  list-style: none;
+}
+
+.ibx-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* An item: the card, and the context column beside it (below it on a narrow inbox). */
+.ibx-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  border-radius: var(--r-card);
+  outline: none;
+}
+
+.ibx-item--selected > .ibx-main > .rq,
+.ibx-item:focus-visible > .ibx-main > .rq {
+  box-shadow: var(--shadow), 0 0 0 2px var(--primary);
+}
+
+@container ibx (min-width: 860px) {
+  .ibx-item {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 18px;
+  }
+}
+
+.ibx-main {
+  min-width: 0;
+}
+
+.ibx-loading {
+  min-height: 120px;
+  justify-content: center;
+}
+
+.rq[data-kind="alert"]::before {
+  background: var(--g-flare);
+}
+
+.rq[data-kind="alert"] .rq-kind {
+  background: var(--red-bg);
+  color: var(--red-fg);
+}
+
+.ibx-excerpt {
+  margin: 0;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ibx-ctx {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 6px 0 0 18px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ibx-ctx-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ibx-ctx h4 {
+  margin: 0;
+  flex: 1;
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--muted);
+}
+
+.ibx-menu {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.ibx-menu:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.ibx-rel {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-card);
+  background: var(--ground);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.ibx-rel:hover {
+  border-color: var(--dashed);
+}
+
+.ibx-rel-glyph {
+  width: 6px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: var(--r-pill);
+  background: var(--dashed);
+}
+
+.ibx-rel-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ibx-rel-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ibx-rel-top .mono {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.ibx-rel-title {
+  font-weight: 500;
+  min-width: 0;
+}
+
+.ibx-rel-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ibx-why {
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* Below 860px the context column is the card's footer, as on the phone board (M7). */
+@container ibx (max-width: 859px) {
+  .ibx-ctx {
+    padding: 0 0 0 38px;
+    border-left: 0;
+  }
+
+  .ibx-why {
+    display: none;
+  }
+}
+
+/* The sign-off card's stages (board 14). */
+.ibx-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ibx-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+}
+
+.ibx-step--now {
+  border-color: color-mix(in srgb, var(--green-fg) 65%, transparent);
+  background: var(--green-bg);
+  color: var(--green-fg);
+}
+
+/* Rows: Updates, Snoozed, Cleared. */
+.ibx-sub {
+  margin: 8px 0 0;
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.ibx-rows {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.ibx-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 10px;
+  border-radius: var(--r-inner);
+  outline: none;
+  font-size: 13px;
+}
+
+.ibx-row + .ibx-row {
+  border-top: 1px solid var(--row-line);
+}
+
+.ibx-row:hover {
+  background: var(--row-hover);
+}
+
+.ibx-row--selected,
+.ibx-row:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+
+.ibx-row-kind {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ibx-row-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+.ibx-row-task {
+  flex-shrink: 0;
+  color: var(--body);
+  font-size: 12px;
+}
+
+.ibx-row-task:hover {
+  text-decoration: underline;
+}
+
+.ibx-row-when {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ibx-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.ibx-task--unread .ibx-dot {
+  background: var(--run-fg);
+}
+
+.ibx-task-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  text-align: left;
+}
+
+.ibx-task-open .mono {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ibx-task--unread .ibx-row-title {
+  font-weight: 700;
+}
+
+.ibx-task-meta {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ibx-row-acts {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+@container ibx (max-width: 640px) {
+  .ibx-keys,
+  .ibx-task-meta {
+    display: none;
+  }
+
+  .ibx-kinds {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .ibx-row-kind {
+    display: none;
+  }
+}
+
+@media (hover: none) {
+  .ibx-keys {
+    display: none;
+  }
+}
