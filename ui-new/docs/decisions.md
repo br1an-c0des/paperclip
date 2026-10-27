@@ -49,6 +49,12 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 20 | [More shared code the task screens need at runtime](#20-more-shared-code-the-task-screens-need-at-runtime) | `documents-artifacts/annotations`, `tasks/discussion`, `tasks/approvals` | Decided | Oct 26, 2026 |
 | 21 | [Open questions from the phone shell](#21-open-questions-from-the-phone-shell) | `shell/navigation`, `shell/company`, design system | Open | Oct 26, 2026 |
 | 22 | [Smaller API gaps found building M2's task screens](#22-smaller-api-gaps-found-building-m2s-task-screens) | `tasks/*`, `steering/*`, `documents-artifacts/*` | Open | Oct 26, 2026 |
+| 23 | [Gaps found building the temporary Connectors page](#23-gaps-found-building-the-temporary-connectors-page) | Apps and tools (AI connections) | Open | Oct 26, 2026 |
+| 24 | [Gaps found building the Inbox](#24-gaps-found-building-the-inbox) | `inbox-search/triage`, `approvals/*`, `decisions/*` | Open | Oct 27, 2026 |
+| 25 | [Gaps found building the project dashboard and Docs](#25-gaps-found-building-the-project-dashboard-and-docs) | `projects/*`, `documents-artifacts/library` | Open | Oct 27, 2026 |
+| 26 | [Gaps found building project settings](#26-gaps-found-building-project-settings) | `projects/*`, `workspaces/*`, `goals/*` | Open | Oct 27, 2026 |
+| 27 | [Gaps found building recurring tasks](#27-gaps-found-building-recurring-tasks) | `routines/*` | Open | Oct 27, 2026 |
+| 28 | [Gaps found building agent workload](#28-gaps-found-building-agent-workload) | `projects/task-context`, `agents/roster` | Open | Oct 27, 2026 |
 
 ## Entries
 
@@ -951,3 +957,29 @@ Both are handled in `ui-new` for now.
 - **No delete.** Routines can only be archived.
 - **One input per placeholder.** The server derives inputs from the description, so an input is
   added by writing a placeholder.
+
+### 28. Gaps found building agent workload
+
+- **Status:** Open
+- **Area:** `projects/task-context`, `agents/roster`
+- **Found in:** agent workload (M4, boards 31–33): the project's Agent workload tab and the company
+  page at `/:prefix/workload`. There's no workload API; both are worked out from run history, live
+  runs and task assignments (`ui-new/src/workload/`).
+
+- **Run history has no date range or project filter.**
+  `GET /companies/:id/heartbeat-runs?summary=true&limit=1000` returns only the latest 1000 runs, so a
+  busy company's 30-day view is cut short. The view marks the days it couldn't load and says so.
+- **No issue status history.** Past blocked time can't be known, so the heatmap has no blocked
+  cells and no "Most time blocked" marker. Today's blocked stretch is approximate: it starts at the
+  task's last update, or after the agent's last run today.
+- **Cost has no time or per-project breakdown per agent.** Spend comes from each run's `costUsd`
+  and is hidden when no run reported one, as with subscription runs.
+- **No teams.** The company view groups agents by role (Leadership, Product, Research, Engineering,
+  General), with built-in agents last.
+- **No estimates or suggestions in the API.** "About 2h left at this pace" is left out, and the
+  "1 suggestion" pill (the oldest urgent unassigned task for the free agent with the least open
+  work) is worked out in the UI.
+- **Only heartbeat schedules are drawn** as scheduled bars; routine schedules aren't.
+- **Built-in agents** (`GET /companies/:id/built-in-agents`) answer 404 while `enableBuiltInAgents`
+  is off, so the request is only made when it's on.
+
