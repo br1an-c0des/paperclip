@@ -14,6 +14,8 @@ import { queryKeys } from "@/api/queryKeys";
  * - While the tab is hidden the socket is closed; coming back refreshes active queries.
  * - Each event invalidates the query keys it affects (`invalidateForEvent`), then goes to
  *   subscribers (`useLiveEvent`), so a subscriber sees fresh data.
+ * - Task lists and tasks are fetched once more after a burst of task events settles
+ *   (`createTrailingRefetch`): the refetch an event starts can come back with the task as it was.
  *
  * The old UI also patches caches in place and raises toasts from events. Those come with the screens
  * that need them (toasts in M1, run state in M2); this module is where they plug in.
@@ -21,6 +23,14 @@ import { queryKeys } from "@/api/queryKeys";
 
 const DISCONNECTED_POLL_INTERVAL_MS = 15_000;
 const MAX_RECONNECT_DELAY_MS = 15_000;
+
+/**
+ * How long a task list fetched just after a change can still show the old values. The server answers
+ * repeated compact task-list requests from a 2-second cache that a write doesn't clear
+ * (ISSUE_LIST_SERVER_CACHE_TTL_MS in server/src/routes/issues.ts); this is a little longer, so a
+ * fetch made once it has passed sees the change.
+ */
+export const LIST_CACHE_HOLD_MS = 2_500;
 
 export type LiveConnection = "connecting" | "open" | "reconnecting" | "paused";
 
@@ -132,10 +142,51 @@ export function keysForEvent(companyId: string, event: LiveEvent): QueryKey[] {
   }
 }
 
-function invalidateForEvent(client: QueryClient, companyId: string, event: LiveEvent) {
-  for (const queryKey of keysForEvent(companyId, event)) {
+function invalidateForEvent(client: QueryClient, companyId: string, event: LiveEvent, trailing: TrailingRefetch) {
+  const keys = keysForEvent(companyId, event);
+  for (const queryKey of keys) {
     void client.invalidateQueries({ queryKey }, { cancelRefetch: false });
   }
+  trailing.add(keys);
+}
+
+export type TrailingRefetch = { add: (keys: readonly QueryKey[]) => void; cancel: () => void };
+
+/**
+ * One more fetch of the task lists and tasks an event burst touched, `delayMs` after its last event.
+ *
+ * The refetch an event starts can come back with the task as it was. An agent usually comments and
+ * then changes the status a moment later: the status event's refetch either joins the comment's
+ * refetch still in flight (`cancelRefetch: false`), or is answered from the server's list cache that
+ * the comment's refetch filled (see LIST_CACHE_HOLD_MS). Either way it carries the old status, and
+ * no later event comes to correct it. So each event pushes the trailing fetch back, and a burst of
+ * events costs one fetch. Only task keys get one: other lists aren't cached that way.
+ */
+export function createTrailingRefetch(client: QueryClient, delayMs = LIST_CACHE_HOLD_MS): TrailingRefetch {
+  const keys = new Map<string, QueryKey>();
+  let timer: number | undefined;
+  const run = () => {
+    timer = undefined;
+    const due = [...keys.values()];
+    keys.clear();
+    // A list keeps the prefix (it covers every filtered view); a task is refetched on its own,
+    // since its comments, runs and other sections aren't behind the list cache.
+    for (const queryKey of due) void client.invalidateQueries({ queryKey, exact: queryKey[1] === "detail" });
+  };
+  return {
+    add: (eventKeys) => {
+      const tasks = eventKeys.filter((key) => key[0] === "issues");
+      if (tasks.length === 0) return;
+      for (const key of tasks) keys.set(JSON.stringify(key), key);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(run, delayMs);
+    },
+    cancel: () => {
+      window.clearTimeout(timer);
+      timer = undefined;
+      keys.clear();
+    },
+  };
 }
 
 function socketUrl(companyId: string) {
@@ -177,6 +228,8 @@ export function LiveEventsProvider(props: ParentProps<{ companyId: string | null
     let socket: WebSocket | null = null;
     let reconnectTimer: number | undefined;
     let pollTimer: number | undefined;
+    // Per company: switching company drops the burst in progress with the socket.
+    const trailing = createTrailingRefetch(client);
 
     const startPolling = () => {
       if (pollTimer === undefined) pollTimer = window.setInterval(refreshActive, DISCONNECTED_POLL_INTERVAL_MS);
@@ -225,7 +278,7 @@ export function LiveEventsProvider(props: ParentProps<{ companyId: string | null
           return;
         }
         if (event.companyId !== companyId) return;
-        invalidateForEvent(client, companyId, event);
+        invalidateForEvent(client, companyId, event, trailing);
         for (const subscriber of subscribers) {
           if (!subscriber.types || subscriber.types.has(event.type)) subscriber.handler(event);
         }
@@ -247,6 +300,7 @@ export function LiveEventsProvider(props: ParentProps<{ companyId: string | null
       closed = true;
       window.clearTimeout(reconnectTimer);
       stopPolling();
+      trailing.cancel();
       const active = socket;
       socket = null;
       if (active && active.readyState <= WebSocket.OPEN) active.close(1000, "provider_unmount");
