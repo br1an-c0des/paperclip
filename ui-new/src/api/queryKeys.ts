@@ -147,4 +147,14 @@ export const queryKeys = {
     revisions: (routineId: string) => ["routines", "revisions", routineId] as const,
     folders: (companyId: string) => ["routines", "folders", companyId] as const,
   },
+
+  /*
+   * Agent workload (M4 and M5, boards 31–33). The run history sits apart from `heartbeats`, which
+   * the live events refresh on every run's progress; the workload views refetch it when a run
+   * starts, queues or finishes instead (src/workload/use-workload.ts).
+   */
+  workload: {
+    runs: (companyId: string) => ["workload", companyId, "runs"] as const,
+    builtInAgents: (companyId: string) => ["workload", companyId, "built-in-agents"] as const,
+  },
 };

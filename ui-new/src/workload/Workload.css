@@ -1,0 +1,779 @@
+/* Agent workload (boards 31–33). Class names follow the boards' `wl-*`. */
+.wl {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.wl-empty {
+  margin: 0;
+  padding: 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.wl-quiet,
+.wl-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.wl-note {
+  padding: 0 18px 12px;
+}
+
+.wl-ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wl-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding-bottom: 10px;
+}
+
+.wl-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.wl-sub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.wl-push {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* The top frame: chains on the left, open work on the right. */
+.wl-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+}
+
+.wl-top-col {
+  min-width: 0;
+  padding: 14px 22px 12px 18px;
+}
+
+.wl-top-col--load {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 18px 16px 22px;
+  border-left: 1px solid var(--line);
+}
+
+.wl-chains {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wl-chains li {
+  padding: 12px 0;
+  border-top: 1px solid var(--row-line);
+}
+
+.wl-chain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-radius: var(--r-pill);
+  outline: none;
+}
+
+.wl-chain:focus-visible {
+  box-shadow: 0 0 0 2px var(--run-fg);
+}
+
+.wl-arrow {
+  flex-shrink: 0;
+  color: var(--dashed);
+}
+
+.wl-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px 0 5px;
+  box-sizing: border-box;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.wl-node--held {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red-fg) 55%, transparent);
+}
+
+.wl-node small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wl-nobody {
+  width: 24px;
+  height: 24px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.5px dashed var(--dashed);
+}
+
+.wl-load-list {
+  list-style: none;
+  margin: 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--row-line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wl-load-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 54px;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.wl-load-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wl-load {
+  display: flex;
+  height: 12px;
+  min-width: 4px;
+  gap: 2px;
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  background: var(--well);
+}
+
+.wl-load--none {
+  min-width: 0;
+}
+
+.wl-load-total {
+  text-align: right;
+  color: var(--muted);
+}
+
+.wl-load-total b {
+  color: var(--text);
+}
+
+.wl-load-key {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.wl-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wl-key .mono {
+  font-family: var(--font-mono);
+}
+
+.wl-key-bar {
+  width: 16px;
+  height: 8px;
+  box-sizing: border-box;
+  border-radius: var(--r-pill);
+}
+
+.wl-key-bar--dashed {
+  border: 1.5px dashed var(--dashed);
+}
+
+.wl-key-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+/* The suggestion: a proposal request card in the popover. */
+.wl-tip-pop {
+  padding: 0;
+}
+
+.wl-tip {
+  border: none;
+  box-shadow: none;
+}
+
+.wl-tip-subj {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wl-tip-subj:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.wl-tip-body {
+  margin: 0;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.wl-pc {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+/* The range card: Today lanes or the heatmap. */
+.wl-lanes {
+  overflow: hidden;
+}
+
+.wl-lanes-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 18px;
+}
+
+.wl-lanes-head h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.wl-legend {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.wl-grid {
+  display: grid;
+  grid-template-columns: 212px minmax(0, 1fr) 250px;
+}
+
+.wl-grid--heat {
+  grid-template-columns: 244px minmax(0, 1fr) 250px;
+}
+
+.wl-grid--head {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wl-col-head {
+  padding: 0 18px 8px;
+}
+
+.wl-row {
+  border-top: 1px solid var(--line);
+}
+
+.wl-row > * {
+  min-width: 0;
+  padding: 14px 18px;
+}
+
+.wl-group {
+  padding: 12px 18px 6px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.wl-cell-agent {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.wl-agent {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.wl-agent-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.wl-agent-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.wl-agent-name:hover {
+  text-decoration: underline;
+}
+
+.wl-agent-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.wl-agent-sum {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wl-agent-sum b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Today: the hour grid. */
+.wl-ticks {
+  position: relative;
+  height: 22px;
+}
+
+.wl-ticks > span {
+  position: absolute;
+  transform: translateX(-50%);
+  font-variant-numeric: tabular-nums;
+}
+
+.wl-now-pill {
+  top: -2px;
+  height: 20px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--r-pill);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.wl-row > .wl-track {
+  position: relative;
+  height: 52px;
+  padding: 0;
+  margin: 0;
+  background-image: repeating-linear-gradient(90deg, var(--row-line) 0 1px, transparent 1px 16.6667%);
+}
+
+.wl-bar {
+  position: absolute;
+  top: 16px;
+  height: 20px;
+  min-width: 5px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: none;
+  border-radius: var(--r-pill);
+  color: #111113;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: default;
+}
+
+button.wl-bar {
+  cursor: pointer;
+}
+
+.wl-bar:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 2px;
+}
+
+button.wl-bar:hover {
+  filter: brightness(1.08);
+}
+
+.wl-bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wl-bar--live {
+  box-shadow: 0 0 0 3px color-mix(in srgb, #8b2cf0 30%, transparent), 0 0 18px rgba(139, 44, 240, 0.55);
+}
+
+.wl-bar--scheduled,
+.wl-bar--queued {
+  border: 1.5px dashed var(--dashed);
+  background: transparent;
+  color: var(--muted);
+}
+
+.wl-bar--blocked {
+  border: 1px solid color-mix(in srgb, var(--red-fg) 40%, transparent);
+  background: repeating-linear-gradient(135deg, var(--red-bg) 0 6px, transparent 6px 12px);
+  color: var(--red-fg);
+}
+
+.wl-bar--paused {
+  border: 1px solid var(--line);
+  background: repeating-linear-gradient(135deg, var(--well) 0 6px, transparent 6px 12px);
+  color: var(--muted);
+}
+
+.wl-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--primary);
+  pointer-events: none;
+}
+
+.wl-q {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.wl-q-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--body);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wl-q-item:hover .wl-ellipsis {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.wl-q-item:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.wl-q-id {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wl-q-tag {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 7px;
+  border-radius: var(--r-pill);
+  background: var(--run-bg);
+  color: var(--run-fg);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.wl-q-note {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 7 and 30 days: the heatmap. */
+.wl-hm {
+  display: grid;
+  align-items: center;
+}
+
+.wl-row > .wl-hm {
+  padding: 14px 0;
+}
+
+.wl-hm--head {
+  padding: 0 0 8px;
+}
+
+.wl-hm-col {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wl-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 26px;
+  border-radius: 6px;
+}
+
+.wl-cell--ahead,
+.wl-cell--unloaded {
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.wl-cell--unloaded {
+  background: repeating-linear-gradient(90deg, var(--row-line) 0 1px, transparent 1px 4px);
+}
+
+.wl-cell--paused {
+  box-shadow: inset 0 0 0 1px var(--line);
+  background: repeating-linear-gradient(135deg, var(--dashed) 0 1.5px, transparent 1.5px 6px);
+}
+
+.wl-hm-day {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.wl-hm-day--start {
+  text-align: left;
+}
+
+/* "Today" is wider than its one-day column: it hangs left from the column's right edge. */
+.wl-hm-day--start.wl-hm-day--today {
+  direction: rtl;
+  text-align: right;
+}
+
+.wl-hm-day--today {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.wl-heat-side {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wl-heat-side b {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.wl-budget-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wl-budget {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  overflow: hidden;
+}
+
+.wl-budget span {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+}
+
+.wl-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.wl-row--total {
+  background: var(--well);
+}
+
+.wl-total-who {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wl-total-who b {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.wl-flag {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: help;
+  transition: transform 0.12s ease;
+}
+
+.wl-flag:hover,
+.wl-flag:focus-visible {
+  transform: scale(1.12);
+}
+
+.wl-flag:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-flag {
+    transition: none;
+  }
+}
+
+/* Narrower than the board: the side columns tighten, then each row stacks. */
+@container main (max-width: 1100px) {
+  .wl-grid {
+    grid-template-columns: 190px minmax(0, 1fr) 200px;
+  }
+
+  .wl-grid--heat {
+    grid-template-columns: 210px minmax(0, 1fr) 170px;
+  }
+}
+
+@container main (max-width: 820px) {
+  .wl-top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wl-top-col--load {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+
+  .wl-legend {
+    margin-left: 0;
+  }
+
+  .wl-grid,
+  .wl-grid--heat {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wl-grid--head > .wl-col-head {
+    display: none;
+  }
+
+  .wl-grid--head {
+    padding: 0 18px;
+  }
+
+  .wl-row > * {
+    padding: 8px 18px;
+  }
+
+  .wl-row > .wl-cell-agent {
+    padding-top: 14px;
+  }
+
+  .wl-row > .wl-track {
+    margin: 0 18px;
+  }
+
+  .wl-row > .wl-hm {
+    padding: 4px 18px;
+  }
+
+  .wl-row > :last-child {
+    padding-bottom: 14px;
+  }
+
+  .wl-load-row {
+    grid-template-columns: 120px minmax(0, 1fr) 54px;
+  }
+
+  .wl-hm-col {
+    gap: 1px;
+  }
+
+  .wl-cell {
+    height: 20px;
+    border-radius: 4px;
+  }
+}
