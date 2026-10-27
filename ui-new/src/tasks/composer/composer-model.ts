@@ -124,7 +124,7 @@ export function planSend(
     data.assigneeAdapterOverrides = state.runSettings && target.agentId ? mergeRunOverrides(task.assigneeAdapterOverrides, adapterType, state.runSettings, !!reassignment) : null;
     if (state.reopen) data.status = "todo";
     if (interrupt) data.interrupt = true;
-    return { ok: true, workMode, request: { via: "patch", data }, steer: false };
+    return { ok: true, workMode, request: { via: "patch", data }, steer: context.mode === "steer" };
   }
 
   const data: CommentPost = { body, clientRequestId: context.clientRequestId };

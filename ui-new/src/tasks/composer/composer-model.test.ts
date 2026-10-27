@@ -69,6 +69,7 @@ describe("planSend", () => {
     expect(same.ok && same.request.data).not.toHaveProperty("assigneeAgentId");
     const moved = planSend(state({ assignee: { agentId: "a2", userId: null }, runSettings: { model: null, effort: "high" } }), context);
     expect(moved).toMatchObject({ request: { data: { assigneeAgentId: "a2", assigneeAdapterOverrides: { adapterConfig: { modelReasoningEffort: "high" } } } } });
+    expect(planSend(state({ runSettings: { model: "m", effort: null } }), { ...context, mode: "steer" })).toMatchObject({ request: { via: "patch" }, steer: true });
   });
 
   it("treats picking the current assignee as no change", () => {

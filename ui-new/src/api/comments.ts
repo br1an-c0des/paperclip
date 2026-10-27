@@ -27,4 +27,6 @@ export const commentsApi = {
   /** `PATCH /issues/:id` with a comment; the response is the task with the comment it made. */
   updateWithComment: (issueId: string, data: Record<string, unknown>) =>
     api.patch<Issue & { comment?: IssueComment | null }>(`/issues/${issueId}`, data),
+  /** Deletes your own comment; the thread keeps a "deleted" marker. */
+  remove: (issueId: string, commentId: string) => api.delete<IssueComment>(`/issues/${issueId}/comments/${commentId}`),
 };
