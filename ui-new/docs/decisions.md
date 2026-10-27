@@ -55,6 +55,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 26 | [Gaps found building project settings](#26-gaps-found-building-project-settings) | `projects/*`, `workspaces/*`, `goals/*` | Open | Oct 27, 2026 |
 | 27 | [Gaps found building recurring tasks](#27-gaps-found-building-recurring-tasks) | `routines/*` | Open | Oct 27, 2026 |
 | 28 | [Gaps found building agent workload](#28-gaps-found-building-agent-workload) | `projects/task-context`, `agents/roster` | Open | Oct 27, 2026 |
+| 29 | [Gaps found building the agent page](#29-gaps-found-building-the-agent-page) | `agents/*`, `runs-adapters/runs` | Open | Oct 27, 2026 |
 
 ## Entries
 
@@ -982,4 +983,27 @@ Both are handled in `ui-new` for now.
 - **Only heartbeat schedules are drawn** as scheduled bars; routine schedules aren't.
 - **Built-in agents** (`GET /companies/:id/built-in-agents`) answer 404 while `enableBuiltInAgents`
   is off, so the request is only made when it's on.
+
+### 29. Gaps found building the agent page
+
+- **Status:** Open
+- **Area:** `agents/*`, `runs-adapters/runs`
+- **Found in:** the agent page and agent settings (M5, boards 26, 27 and the board 30 outline).
+
+- **Costs can't be filtered by agent.** `/costs/by-agent` and `/costs/by-agent-model` take no
+  agent, so the page fetches the whole company and filters. Wanted: `?agentId=`.
+- **Task sessions and live runs carry only an issue id.** Naming the task needs another request
+  (`issues?participantAgentId=`), and the header can't say "Working on TES-x". Wanted: the task's
+  identifier and title embedded.
+- **Revisions have no number.** The page counts them from the list; the board user shows as
+  `local-board`. Wanted: `revisionNumber`.
+- **No "download all"** for an instructions bundle.
+- **Project access `canManage` is true only for low-trust agents,** so adding projects is offered
+  only for them.
+- **Claude auto memory isn't in the API.** The Memory section infers it from the harness, the
+  runner and `CLAUDE_CODE_DISABLE_AUTO_MEMORY`; memory connectors are recognised only by
+  `config.sourceTemplateKey`.
+- **Chat routes answer 404 while `enableAgentChat` is off** ([decision 2](#2-agent-chat-is-off-unless-the-instance-turns-it-on)).
+- **Runner on-disk state** (sandbox state, the ACP state folder, runner logs) isn't exposed; the page
+  shows runtime state, task sessions, qualification and usage. Recorded for build plan 3.11.
 
