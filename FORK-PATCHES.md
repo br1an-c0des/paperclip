@@ -37,6 +37,25 @@ upstream could use as upstream pull requests instead (see
 
 ## Code patches
 
+### runner-libc-probe-sync
+
+- **Files:** `server/src/lib/agent-runner-platform.ts`, `server/src/__tests__/agent-runner-platform.test.ts`,
+  `doc/DEVELOPING.md`
+- **What:** the startup glibc probe uses `execFileSync` instead of an asynchronous `execFile`
+  behind a top-level await, so slow module loading can't use up its 1 s timeout and cache
+  `libc: "unknown"`. A copy of upstream PR [#17905](https://github.com/paperclipai/paperclip/pull/17905)
+  (branch `fix/runner-libc-probe-startup`, commit `6f5737fd5`), plus the `FORK:` comment.
+- **Why:** temporary. Without it the server offers only the Legacy runner on this machine, so
+  Paperclip Runner can't be tested ([upstream-fixes 6](fork/upstream-fixes.md#6-detect-glibc-reliably-at-server-startup-so-paperclip-runner-is-offered-on-linux)).
+  Added 2026-10-27 at the user's request, as an exception to keeping fix branches out of `new-ui`.
+- **Depends on:** `detectLocalRunnerTarget` and `localAgentRunnerTarget` in that file, and
+  `supportsLinuxLibc` in `packages/shared/src/agent-runner.ts`.
+- **If upstream changes this:** if #17905 is merged, take upstream's version of all three files
+  and delete this entry. If upstream fixes it another way, take upstream's version and delete the
+  entry once a sync shows `supportedRunners` including `paperclip` here. If upstream rewrites the
+  probe without fixing it, keep the synchronous call and the comment.
+
+
 ### workspace-ui-new
 
 - **Files:** `pnpm-workspace.yaml`
