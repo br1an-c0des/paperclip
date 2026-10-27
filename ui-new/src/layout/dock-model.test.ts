@@ -1,5 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { companySummary, dockHiddenAfterScroll, dockPlace, tapTasks, tasksScope, toggleCompanies } from "./dock-model";
+import { companySummary, dockHiddenAfterScroll, dockPlace, isOrgPage, tapTasks, tasksScope, toggleCompanies } from "./dock-model";
+
+describe("isOrgPage", () => {
+  it("covers the dashboard, the roster and the org tabs", () => {
+    expect(isOrgPage("/TST/dashboard", "TST")).toBe(true);
+    expect(isOrgPage("/TST/agents", "TST")).toBe(true);
+    expect(isOrgPage("/TST/agents/", "TST")).toBe(true);
+    expect(isOrgPage("/TST/agents/paused", "TST")).toBe(true);
+    expect(isOrgPage("/TST/workload", "TST")).toBe(true);
+    expect(isOrgPage("/TST/activity/runs", "TST")).toBe(true);
+    expect(isOrgPage("/tst/org", "TST")).toBe(true);
+  });
+
+  it("leaves an agent's own page, settings and other places out", () => {
+    expect(isOrgPage("/TST/agents/ceo", "TST")).toBe(false);
+    expect(isOrgPage("/TST/agents/ceo/settings", "TST")).toBe(false);
+    expect(isOrgPage("/TST/company/settings", "TST")).toBe(false);
+    expect(isOrgPage("/TST/issues", "TST")).toBe(false);
+    expect(isOrgPage("/TST/dashboards", "TST")).toBe(false);
+    expect(isOrgPage("/OTHER/dashboard", "TST")).toBe(false);
+  });
+});
 
 describe("dockPlace", () => {
   it("gives each page under the company to its dock place", () => {

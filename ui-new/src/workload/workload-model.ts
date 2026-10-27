@@ -1,6 +1,7 @@
 import type { Agent, CompactIssue, IssuePriority, IssueStatus, Project } from "@paperclipai/shared";
 import type { LiveRun } from "@/api/heartbeats";
 import type { WorkloadRun } from "@/api/workload";
+import { isAgentBlocked } from "@/lib/agent-state";
 import { discGradient } from "@/ui/Avatar";
 import { STATUS_META, gradientVar } from "@/ui/status-meta";
 
@@ -527,8 +528,8 @@ function nowState(
     const task = queued.issueId ? tasks.get(queued.issueId) : undefined;
     return { key: "queued", label: task ? `Queued ${taskLabel(task)}` : "Queued", runId: queued.id, taskId: task?.id ?? null };
   }
-  const blocked = assigned.find((task) => task.status === "blocked");
-  if (blocked) return { key: "blocked", label: "Blocked", runId: null, taskId: blocked.id };
+  // The shared rule (lib/agent-state.ts): blocked only when every open assigned task is blocked.
+  if (isAgentBlocked(assigned, false)) return { key: "blocked", label: "Blocked", runId: null, taskId: assigned[0]!.id };
   return { key: "idle", label: lastFinished === null ? "Idle" : `Idle since ${sinceLabel(lastFinished, now)}`, runId: null, taskId: null };
 }
 

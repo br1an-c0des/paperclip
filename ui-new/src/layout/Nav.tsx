@@ -1,4 +1,4 @@
-import { A, useNavigate } from "@solidjs/router";
+import { A, useLocation, useNavigate } from "@solidjs/router";
 import { Building2, ChevronDown, Keyboard, LogOut, Moon, Palette, Plug, Plus, Search, Sun } from "lucide-solid";
 import { createMemo, For, Show } from "solid-js";
 import { activeAgents } from "@/api/agents";
@@ -7,6 +7,7 @@ import { agentState, runningAgentIds, sortAgentsForNav } from "@/lib/agent-state
 import { useCommands } from "@/lib/commands";
 import { useCompaniesQuery, useCompany } from "@/lib/company";
 import { useNeedsYouCount } from "@/inbox/needs-you";
+import { isOrgPage } from "./dock-model";
 import { useAgentsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
 import { useSession, useSignOut, useYouName } from "@/lib/session";
 import { theme, toggleTheme } from "@/lib/theme";
@@ -23,7 +24,8 @@ import "./Nav.css";
  * with their task counts; agents with their live state; you and settings at the bottom. The item owning the current page is raised with the --sel pill: the
  * router marks it `.active` for every page under it, and `aria-current` on the exact page.
  *
- * The + beside "Projects" opens New project (board N1).
+ * "Org dashboard" stays raised on every organization page (the roster at `/agents`, workload and the
+ * org tabs; `isOrgPage`), as boards 20 and 33 draw it. The + beside "Projects" opens New project (board N1).
  */
 
 function OrgIcon() {
@@ -145,7 +147,11 @@ export function Nav() {
   const agents = useAgentsQuery();
   const liveRuns = useLiveRunsQuery();
 
+  const location = useLocation();
+
   const base = () => `/${company().issuePrefix}`;
+  /** Every organization page (the roster, workload, the org tabs) raises "Org dashboard". */
+  const orgPage = () => isOrgPage(location.pathname, company().issuePrefix);
   const running = createMemo(() => runningAgentIds(liveRuns.data));
   const navAgents = createMemo(() => sortAgentsForNav(activeAgents(agents.data), running()));
   const runningCount = () => navAgents().filter((agent) => agentState(agent, running()).key === "running").length;
@@ -176,7 +182,7 @@ export function Nav() {
       </div>
 
       <div class="nav-group">
-        <A class="navi" href={`${base()}/dashboard`}>
+        <A class="navi" href={`${base()}/dashboard`} classList={{ active: orgPage() }}>
           <OrgIcon />
           Org dashboard
         </A>

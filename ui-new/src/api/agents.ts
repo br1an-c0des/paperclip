@@ -18,6 +18,7 @@ import type {
   AgentTaskSession,
   AdapterEnvironmentTestResult,
   AgentRuntimeSettingsPatch,
+  AiRuntimeConnectionBinding,
   EnvironmentProbeResult,
   ResolveAgentInstructionCandidate,
   ResourceMembershipUpdateResult,
@@ -38,6 +39,30 @@ import { api } from "./client";
 
 /** One entry in an adapter's model catalog. The type lives in the old UI, not the shared package. */
 export type AdapterModel = { id: string; label: string };
+
+/**
+ * What narrows a harness's model catalog: the provider (OpenRouter, ACPX), the ACPX agent (Copilot),
+ * the AI connection and agent it's for, and the environment the models are probed in.
+ */
+export type AdapterModelOptions = {
+  provider?: string;
+  acpxAgent?: string;
+  aiConnection?: AiRuntimeConnectionBinding;
+  agentId?: string;
+  environmentId?: string | null;
+  refresh?: boolean;
+};
+
+/**
+ * The options that change a catalog, for its query key (`queryKeys.agents.adapterModels`): empty
+ * ones are left out and `refresh` doesn't count, so no options and `{}` share the harness's key.
+ */
+export function adapterModelKeyOptions(options: AdapterModelOptions | undefined): Record<string, unknown> | undefined {
+  const entries = Object.entries(options ?? {})
+    .filter(([name, value]) => name !== "refresh" && value !== undefined && value !== null && value !== "")
+    .sort(([a], [b]) => a.localeCompare(b));
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
 
 /** An agent's API key as the list returns it (ui/src/api/agents.ts `AgentKey`); the token is shown only once, on creation. */
 export type AgentKey = { id: string; name: string; scope: AgentApiKeyScope; createdAt: string; revokedAt: string | null };
@@ -108,14 +133,14 @@ function agentPath(id: string, companyId?: string, suffix = "") {
 
 export const agentsApi = {
   list: (companyId: string) => api.get<Agent[]>(`/companies/${companyId}/agents`),
-  adapterModels: (
-    companyId: string,
-    adapterType: string,
-    options?: { provider?: string; environmentId?: string | null; refresh?: boolean },
-  ) => {
+  /** A harness's model catalog, narrowed by the options as ui/src/api/agents.ts `adapterModels` does. */
+  adapterModels: (companyId: string, adapterType: string, options?: AdapterModelOptions) => {
     const params = new URLSearchParams();
     if (options?.refresh) params.set("refresh", "1");
     if (options?.provider) params.set("provider", options.provider);
+    if (options?.acpxAgent) params.set("acpxAgent", options.acpxAgent);
+    if (options?.aiConnection) params.set("aiConnection", JSON.stringify(options.aiConnection));
+    if (options?.agentId) params.set("agentId", options.agentId);
     if (options?.environmentId) params.set("environmentId", options.environmentId);
     return api.get<AdapterModel[]>(
       `/companies/${encodeURIComponent(companyId)}/adapters/${encodeURIComponent(adapterType)}/models${params.size ? `?${params}` : ""}`,

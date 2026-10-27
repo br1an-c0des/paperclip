@@ -305,6 +305,11 @@ describe("todayLanes", () => {
     expect(agentStates(data, ["fe", "ml"]).get("ml")!.key).toBe("blocked");
   });
 
+  it("doesn't call an agent blocked while it has open work it can do", () => {
+    const mixed = input({ agents, tasks: [...tasks, task("t7", { status: "todo", assigneeAgentId: "ml" })], runs });
+    expect(agentStates(mixed, ["ml"]).get("ml")!.key).toBe("idle");
+  });
+
   it("puts queued runs at the now line, and says when an agent is busy on another project", () => {
     const result = todayLanes(
       input({ agents, tasks, runs: [], liveRuns: [live("q1", "ml", "t2", "queued", at(27, 16, 20)), live("l2", "fe", "other", "running", at(27, 16))] }),
