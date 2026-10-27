@@ -1,0 +1,354 @@
+/* New project (board N1). The header, fields, pills and footer are New task's (`.nt-*`); these are its own parts. */
+.np-head {
+  padding-left: 24px;
+}
+
+.np-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.np-name {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The tile: a disc with the name's first letter or an icon, on the chosen color. */
+.np-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: #111113;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.np-tile-button {
+  position: relative;
+  flex-shrink: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--edge);
+}
+
+.np-tile-caret {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--muted);
+}
+
+.popover.np-tile-pop {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.np-tile-pop .lbl {
+  padding: 0 4px;
+}
+
+.np-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 4px 4px;
+}
+
+.np-color {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.np-color[aria-checked="true"] {
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--text);
+}
+
+.np-icons {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.np-icon {
+  display: grid;
+  place-items: center;
+  height: 36px;
+  border-radius: 10px;
+  color: var(--body);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.np-icon:hover {
+  background: var(--hover);
+}
+
+.np-icon[aria-checked="true"] {
+  background: var(--well);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--edge);
+}
+
+.np-fields {
+  padding-top: 12px;
+}
+
+.np-pill-value {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.nt-pill.np-pill--disc {
+  padding-left: 4px;
+}
+
+.np-pill--disc .agent-avatar img {
+  width: 22px;
+  height: 22px;
+}
+
+.np-disc {
+  width: 22px;
+  height: 22px;
+}
+
+.popover.np-date-pop {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.np-date-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.np-date-actions .nt-done {
+  margin: 0;
+}
+
+/* A private project's members. */
+.np-members {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 24px 0;
+}
+
+.np-member {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 10px 0 4px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.np-member:has(.nt-icon) {
+  padding-right: 4px;
+}
+
+.np-member .agent-avatar img {
+  width: 22px;
+  height: 22px;
+}
+
+.np-add-member {
+  border-style: dashed;
+}
+
+/* Code: GitHub repositories, a local folder, or none. */
+.np-code {
+  margin: 16px 24px 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--well);
+}
+
+.np-code-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 10px 10px 16px;
+}
+
+.np-code-head h3 {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.np-code-head .seg {
+  margin-left: auto;
+  background: var(--card);
+}
+
+.np-code-note {
+  margin: 0;
+  padding: 0 16px 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.np-repos {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  list-style: none;
+}
+
+.np-repo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 6px 0 12px;
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--muted);
+}
+
+.np-repo-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.np-primary {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--run-bg);
+  color: var(--run-fg);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.np-repo-remove {
+  margin-left: auto;
+}
+
+.np-repo-add {
+  padding: 8px 8px 10px;
+}
+
+.np-repo-add .np-code-note {
+  padding: 0 8px 4px;
+}
+
+.popover.np-repo-pop {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+}
+
+.np-repo-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  margin-bottom: 2px;
+  padding: 0 10px;
+  border-radius: 12px;
+  background: var(--well);
+  color: var(--muted);
+}
+
+.np-repo-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.np-repo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.np-check {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--edge);
+  border-radius: 5px;
+  color: var(--on-primary);
+}
+
+[aria-selected="true"] > .np-check {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.np-link {
+  color: var(--run-fg);
+  font-weight: 600;
+}
+
+.np-folder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin: 0 8px 10px;
+  padding: 0 12px;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--muted);
+}
+
+.np-folder input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.np-foot {
+  margin-top: 18px;
+  background: var(--ground);
+  border-radius: 0 0 var(--r-modal) var(--r-modal);
+}

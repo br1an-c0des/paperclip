@@ -1,13 +1,16 @@
 import type { IssueStatus } from "@paperclipai/shared";
-import { createContext, createSignal, useContext, type ParentProps } from "solid-js";
+import { createContext, createSignal, lazy, Show, useContext, type ParentProps } from "solid-js";
 
 /*
  * The shell's global actions, after ui/src/context/DialogContext.tsx: any page, the nav, the command
- * palette and the keyboard shortcuts open the same new-task dialog, palette and cheatsheet through
- * here, anything that shows a run opens it in the run modal with `openRunModal(runId)`, and pages
+ * palette and the keyboard shortcuts open the same new-task and new-project dialogs, palette and
+ * cheatsheet through here, anything that shows a run opens it in the run modal with `openRunModal(runId)`, and pages
  * without a task list open a task in the task modal with `openTaskModal(task)`. The
- * dialogs themselves are mounted once, in CompanyLayout.
+ * dialogs themselves are mounted once, in CompanyLayout, except New project, which the provider
+ * mounts itself (loaded the first time it opens).
  */
+
+const NewProjectDialog = lazy(() => import("@/projects/NewProjectDialog").then((module) => ({ default: module.NewProjectDialog })));
 
 /** What a new task starts with when it's opened from somewhere specific, such as a project. */
 export type NewTaskDefaults = {
@@ -24,6 +27,10 @@ type CommandsValue = {
   newTask: () => NewTaskDefaults | null;
   openNewTask: (defaults?: NewTaskDefaults) => void;
   closeNewTask: () => void;
+  /** Whether the new-project dialog (board N1) is open. */
+  newProject: () => boolean;
+  openNewProject: () => void;
+  closeNewProject: () => void;
   paletteOpen: () => boolean;
   setPaletteOpen: (open: boolean) => void;
   shortcutsOpen: () => boolean;
@@ -47,6 +54,9 @@ const CommandsContext = createContext<CommandsValue>();
 
 export function CommandsProvider(props: ParentProps) {
   const [newTask, setNewTask] = createSignal<NewTaskDefaults | null>(null);
+  const [newProject, setNewProject] = createSignal(false);
+  // Mounted on first open and kept, so closing animates and returns focus like the other dialogs.
+  const [projectDialog, setProjectDialog] = createSignal(false);
   const [paletteOpen, setPaletteOpen] = createSignal(false);
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
   const [runModal, setRunModal] = createSignal<string | null>(null);
@@ -58,6 +68,13 @@ export function CommandsProvider(props: ParentProps) {
       setNewTask(defaults);
     },
     closeNewTask: () => setNewTask(null),
+    newProject,
+    openNewProject: () => {
+      setPaletteOpen(false);
+      setProjectDialog(true);
+      setNewProject(true);
+    },
+    closeNewProject: () => setNewProject(false),
     paletteOpen,
     setPaletteOpen,
     shortcutsOpen,
@@ -75,7 +92,14 @@ export function CommandsProvider(props: ParentProps) {
     },
     closeTaskModal: () => setTaskModal(null),
   };
-  return <CommandsContext.Provider value={value}>{props.children}</CommandsContext.Provider>;
+  return (
+    <CommandsContext.Provider value={value}>
+      {props.children}
+      <Show when={projectDialog()}>
+        <NewProjectDialog />
+      </Show>
+    </CommandsContext.Provider>
+  );
 }
 
 export function useCommands() {

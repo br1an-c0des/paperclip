@@ -103,4 +103,18 @@ export const queryKeys = {
     all: (companyId: string) => ["company-search", companyId] as const,
     results: (companyId: string, request: string) => ["company-search", companyId, request] as const,
   },
+
+  /*
+   * The project pages (M4): the dashboard's spend and checkouts, the Docs tab's
+   * artifacts, and New project's repositories. Shapes follow ui/src/lib/queryKeys.ts.
+   */
+  /** Spend by project in a range; no range is all time. */
+  costs: (companyId: string, from?: string, to?: string) => ["costs", companyId, from ?? "all", to ?? "now"] as const,
+  workspaceOverview: (companyId: string, projectId: string) => ["workspace-overview", companyId, projectId] as const,
+  projectRepositories: (companyId: string) => ["project-repositories", companyId] as const,
+  artifacts: {
+    /** A project's artifacts grouped by task, or one task's group in full. */
+    project: (companyId: string, projectId: string, groupIssueId?: string) =>
+      ["artifacts", companyId, "project", projectId, groupIssueId ?? "__groups__"] as const,
+  },
 };
