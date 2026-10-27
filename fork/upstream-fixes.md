@@ -42,6 +42,7 @@ until one becomes a concrete fix.
 | 3 | [Let a pause finish after a restart stopped a legacy run during preparation](#3-let-a-pause-finish-after-a-restart-stopped-a-legacy-run-during-preparation) | submitted | `fix/pause-after-restart-during-preparation` | [#17692](https://github.com/paperclipai/paperclip/pull/17692) | | 2026-10-26 | |
 | 4 | [Link the plugin SDK on Windows without symlink rights](#4-link-the-plugin-sdk-on-windows-without-symlink-rights) | candidate | | | 2026-10-24 | | |
 | 5 | [Start `pnpm dev` on Windows when the native runner is enabled](#5-start-pnpm-dev-on-windows-when-the-native-runner-is-enabled) | candidate | | | 2026-10-26 | | |
+| 6 | [Detect glibc reliably at server startup so Paperclip Runner is offered on Linux](#6-detect-glibc-reliably-at-server-startup-so-paperclip-runner-is-offered-on-linux) | candidate | | | 2026-10-26 | | |
 
 ## Details
 
@@ -109,3 +110,27 @@ until one becomes a concrete fix.
 - **Fork workaround:** keep `enableNativeRunner` off in local instances on this machine
   (`PATCH /api/instance/settings/experimental`). Found when the `~/.paperclip-test` instance
   wouldn't start after the 2026-10-26 sync.
+
+### 6. Detect glibc reliably at server startup so Paperclip Runner is offered on Linux
+
+- **Problem:** `server/src/lib/agent-runner-platform.ts` probes libc with
+  `execFile("getconf", ["GNU_LIBC_VERSION"], { timeout: 1_000, killSignal: "SIGKILL" })` from a
+  top-level await, so the probe starts while the module graph is still loading. The rest of the
+  server's imports then load synchronously for several seconds (about 7 s under tsx), so the 1 s
+  timeout fires before the child's exit callback. Node answers with no error and empty stdout, the
+  version regex doesn't match, and the target is cached as `libc: "unknown"`. `supportsLinuxLibc`
+  rejects that, so `agentRunnerAvailability` reports `supportedRunners: ["legacy"]` for every
+  Runner harness on glibc Linux: "Upgrade to Paperclip Runner" never appears and the Runner can't be
+  chosen. It came in with #16335 ("probe libc asynchronously before serving requests"), whose test
+  delays the subprocess rather than the event loop. No existing issue or pull request covers it.
+- **Likely fix, one of:**
+  - probe with `execFileSync` and a timeout (`getconf` answers in about 5 ms, and a synchronous
+    call can't be starved by module loading);
+  - or start the async probe after imports finish, during startup before the listener binds;
+  - or retry once when the result is empty or unknown instead of caching it.
+  Test: block the event loop for more than 1 s after the probe starts and expect `glibc`.
+- **Files:** `server/src/lib/agent-runner-platform.ts` and its test.
+- **Evidence:** reproduced on this machine (WSL2 Ubuntu, x64, glibc 2.39) by importing
+  `server/src/app.ts` (two of two runs `unknown`) and by a minimal script: a `getconf` call blocked
+  for 1.2 s or more returns `''` with no error, and under 1 s returns `glibc 2.39`.
+- **Fork workaround:** none. Agents on this machine use the Legacy runner until it's fixed.
