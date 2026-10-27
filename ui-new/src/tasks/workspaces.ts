@@ -1,6 +1,7 @@
 import type { CompactIssue, ExecutionWorkspaceSummary, Project } from "@paperclipai/shared";
 import { createQuery } from "@tanstack/solid-query";
-import { api } from "@/api/client";
+import { executionWorkspacesApi } from "@/api/execution-workspaces";
+import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 
 /*
@@ -11,7 +12,7 @@ import { useCompany } from "@/lib/company";
  *
  * Names come from the projects list (project workspaces) and the company's execution workspace
  * summaries (`GET /api/companies/:companyId/execution-workspaces?summary=true`), which the old list
- * also reads. That request is made here rather than in api/ because it only serves this slice.
+ * also reads.
  */
 
 export type WorkspaceSummary = Pick<ExecutionWorkspaceSummary, "id" | "name" | "mode" | "projectWorkspaceId">;
@@ -70,9 +71,8 @@ export function workspaceLookup(projects: readonly Project[], executions: readon
 export function useWorkspaceSummaries(enabled: () => boolean) {
   const company = useCompany();
   return createQuery(() => ({
-    queryKey: ["execution-workspaces", company().id, "summaries"] as const,
-    queryFn: ({ signal }) =>
-      api.get<WorkspaceSummary[]>(`/companies/${encodeURIComponent(company().id)}/execution-workspaces?summary=true`, { signal }),
+    queryKey: queryKeys.executionWorkspaces.summaryList(company().id),
+    queryFn: ({ signal }) => executionWorkspacesApi.listSummaries(company().id, signal),
     enabled: enabled(),
     staleTime: 60_000,
   }));

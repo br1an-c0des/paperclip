@@ -3,8 +3,7 @@ import { useLocation, useSearchParams } from "@solidjs/router";
 import { createQuery, keepPreviousData } from "@tanstack/solid-query";
 import { ArrowUpDown, ChevronDown, CircleCheck, CornerDownRight, ListFilter, Plus, Search, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
-import { api } from "@/api/client";
-import { ISSUE_LIST_PAGE_SIZE, issuesApi } from "@/api/issues";
+import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { Dock } from "@/layout/Panel";
 import { useCommands } from "@/lib/commands";
@@ -71,33 +70,9 @@ import "./TasksView.css";
 type ListScope = { projectId?: string };
 
 /**
- * Every page of the tasks an agent took part in. The server filters those (`participantAgentId`),
- * which issuesApi's list filters don't carry yet, so the request is built here, as issuesApi.listAll
- * builds its own.
- */
-async function listParticipantTasks(companyId: string, scope: ListScope, agentId: string, signal: AbortSignal) {
-  const tasks: CompactIssue[] = [];
-  for (let offset = 0; ; offset += ISSUE_LIST_PAGE_SIZE) {
-    const params = new URLSearchParams({
-      view: "compact",
-      sortField: "updated",
-      sortDir: "desc",
-      participantAgentId: agentId,
-      includeBlockedBy: "true",
-      includeRoutineExecutions: "true",
-      limit: String(ISSUE_LIST_PAGE_SIZE),
-      offset: String(offset),
-    });
-    if (scope.projectId) params.set("projectId", scope.projectId);
-    const page = await api.get<CompactIssue[]>(`/companies/${companyId}/issues?${params}`, { signal });
-    tasks.push(...page);
-    if (page.length < ISSUE_LIST_PAGE_SIZE) return tasks;
-  }
-}
-
-/**
  * The tasks for a list. A null scope waits, such as while a project is still being looked up. A
- * `?participantAgentId=` in the URL narrows it to the tasks that agent took part in.
+ * `?participantAgentId=` in the URL narrows it to the tasks that agent took part in, which the
+ * server filters; only then does the query key change.
  */
 export function useTaskList(scope: () => ListScope | null) {
   const company = useCompany();
@@ -109,9 +84,11 @@ export function useTaskList(scope: () => ListScope | null) {
     return {
       queryKey: agentId ? [...key, "participant", agentId] : key,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        agentId
-          ? listParticipantTasks(company().id, scope() ?? {}, agentId, signal)
-          : issuesApi.listAll(company().id, { ...scope(), includeBlockedBy: true, includeRoutineExecutions: true }, signal),
+        issuesApi.listAll(
+          company().id,
+          { ...scope(), includeBlockedBy: true, includeRoutineExecutions: true, ...(agentId ? { participantAgentId: agentId } : {}) },
+          signal,
+        ),
       enabled: scope() !== null,
       placeholderData: keepPreviousData,
     };

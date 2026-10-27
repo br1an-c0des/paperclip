@@ -56,6 +56,10 @@ export const queryKeys = {
   goals: {
     list: (companyId: string) => ["goals", companyId] as const,
   },
+  executionWorkspaces: {
+    /** The company's execution workspaces in brief, for the task list's workspace filter and groups. */
+    summaryList: (companyId: string) => ["execution-workspaces", companyId, "summary", {}] as const,
+  },
   activity: (companyId: string) => ["activity", companyId] as const,
   dashboard: (companyId: string) => ["dashboard", companyId] as const,
   org: (companyId: string) => ["org", companyId] as const,
