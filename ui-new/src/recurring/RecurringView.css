@@ -1,0 +1,215 @@
+/*
+ * The Recurring view (board R1). It borrows the task list's group cards (TaskList.css: `.tl-card`,
+ * `.tl-frame`, `.tl-bar`, pinned `.tl-pin-col`) with its own columns: Name, Assignee, When, Last
+ * run and On.
+ */
+.rv {
+  --tl-cols: minmax(0, 1fr) 170px 220px 210px 64px;
+}
+
+.rv .tl-sheet {
+  min-width: 980px;
+}
+
+.rv-toolbar .tv-new {
+  margin-left: 0;
+}
+
+.rv-folder-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.rv-cols-name {
+  padding-left: 52px;
+}
+
+.rv-row {
+  min-height: 56px;
+}
+
+.rv-name {
+  gap: 8px;
+  padding-left: 10px;
+}
+
+.rv-expand,
+.rv-expand-space {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.rv-expand:hover {
+  background: var(--well);
+  color: var(--text);
+}
+
+.rv-expand svg {
+  transition: transform 0.15s ease;
+}
+
+.rv-expand[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+.rv-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: var(--run-bg);
+  color: var(--run-fg);
+}
+
+.rv-row--off .rv-icon {
+  background: var(--well);
+  color: var(--muted);
+}
+
+.rv-row--off .tl-title {
+  color: var(--muted);
+}
+
+.rv-badge {
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.rv-cell {
+  min-width: 0;
+  padding-right: 12px;
+}
+
+.rv-cell .assignee-name {
+  font-size: 13px;
+}
+
+.rv-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rv-when,
+.rv-last {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rv-kind {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.rv-ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rv-sub {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rv-last[data-tone="muted"] {
+  color: var(--muted);
+}
+
+.rv-last[data-tone="red"] {
+  color: var(--red-fg);
+}
+
+.rv-last[data-tone="run"] {
+  color: var(--run-fg);
+}
+
+.rv-id {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.rv-id:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.rv-on {
+  display: flex;
+  align-items: center;
+}
+
+/* A recurring task's tasks, unfolded under its row */
+.rv-kids {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rv-kid {
+  min-height: 40px;
+}
+
+.rv-kid-name {
+  gap: 8px;
+  padding-left: 66px;
+}
+
+.rv-kids-foot {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding-left: 66px;
+  border-top: 1px solid var(--row-line);
+}
+
+.rv-all-runs {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.rv-all-runs:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.rv-empty {
+  margin: 0;
+  padding: 14px 20px 16px 52px;
+  border-top: 1px solid var(--row-line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.rv-dialog-note {
+  margin: 0;
+  color: var(--body);
+}

@@ -133,4 +133,18 @@ export const queryKeys = {
     environments: (companyId: string) => ["environments", companyId] as const,
     memberships: (companyId: string) => ["resource-memberships", companyId, "me"] as const,
   },
+
+  /*
+   * Recurring tasks (routines, M4). Everything sits under `["routines"]`, which the live events
+   * refresh on any routine, trigger or run activity, as in the old UI; folders too, since moving a
+   * recurring task changes both. The company's secrets use `projectSettings.secrets`.
+   */
+  routines: {
+    all: ["routines"] as const,
+    list: (companyId: string, projectId?: string) => ["routines", "list", companyId, projectId ?? "__all__"] as const,
+    detail: (routineId: string) => ["routines", "detail", routineId] as const,
+    runs: (routineId: string) => ["routines", "runs", routineId] as const,
+    revisions: (routineId: string) => ["routines", "revisions", routineId] as const,
+    folders: (companyId: string) => ["routines", "folders", companyId] as const,
+  },
 };

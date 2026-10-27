@@ -14,6 +14,7 @@ import { NotBuiltYet, NotFound } from "./routes/NotFound";
 import { InboxPage } from "./inbox/InboxPage";
 import { AgentPage, SettingsPage } from "./routes/Planned";
 import { ProjectPage } from "./routes/Project";
+import { RoutineRedirect } from "./recurring/RoutineRedirect";
 import { SignIn } from "./routes/SignIn";
 import { TaskPage, TasksPage } from "./routes/Tasks";
 import { RunRoute } from "./runs/RunRoute";
@@ -56,6 +57,7 @@ export function App() {
             <Route path="/inbox/*rest" component={InboxPage} />
             <Route path="/issues" component={TasksPage} />
             <Route path="/issues/:issueRef/*" component={TaskPage} />
+            <Route path="/routines/:routineId?/*" component={RoutineRedirect} />
             <Route path="/projects/:projectKey/*tab" component={ProjectPage} />
             <Route path="/agents/:agentKey/runs/:runId" component={RunRoute} />
             <Route path="/agents/:agentKey/*" component={AgentPage} />

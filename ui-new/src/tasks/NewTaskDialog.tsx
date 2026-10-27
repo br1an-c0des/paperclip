@@ -2,6 +2,7 @@ import type { Agent, IssuePriority, IssueReviewPolicy, IssueStatus } from "@pape
 import { useLocation, useNavigate } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import {
+  CalendarClock,
   Check,
   ChevronDown,
   Eye,
@@ -11,6 +12,7 @@ import {
   Paperclip,
   Plus,
   Receipt,
+  Repeat,
   ShieldCheck,
   SlidersHorizontal,
   Target,
@@ -24,6 +26,8 @@ import { activeAgents, agentsApi } from "@/api/agents";
 import { issuePath, issuesApi } from "@/api/issues";
 import { openProjects } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
+import { routinesApi } from "@/api/routines";
+import { isCompact } from "@/layout/breakpoints";
 import { agentState, runningAgentIds } from "@/lib/agent-state";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
@@ -45,12 +49,21 @@ import { Popover } from "@/ui/Popover";
 import { Capsule, LabelPill, PriorityBars, StatusCapsule } from "@/ui/Status";
 import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
+import { ConnectWebhook, type ConnectTarget } from "@/recurring/ConnectWebhook";
+import { recurringPath, refreshRecurring } from "@/recurring/queries";
+import { templatePlaceholders } from "@/recurring/recurring-model";
+import { InfoTip, RepeatMenu } from "@/recurring/RepeatMenu";
+import { defaultRepeat, describeCron, formatFire, nextFires, repeatLabel, scheduleCron } from "@/recurring/schedule";
 import {
   agentRunDefaults,
   buildCreatePayload,
+  buildRoutinePayload,
+  buildTriggerPayloads,
   clearDraft,
   defaultWorkspaceMode,
   draftProblem,
+  draftRepeats,
+  recurringDraftProblem,
   effortOptions,
   emptyDraft,
   loadDraft,
@@ -80,6 +93,13 @@ import "./NewTaskDialog.css";
  *
  * The draft is kept per company in local storage, so closing the dialog by accident loses nothing;
  * Cancel discards it. The payload rules live in new-task.ts.
+ *
+ * Repeat (boards N4–N7) turns it into "New recurring task": the Repeat pill's menu sets a schedule,
+ * a webhook or both, and what happens if the last one is still open. Only what a recurring task
+ * copies to each occurrence stays (title, description, agent, project, priority, goal, parent);
+ * Create makes the routine and its triggers. With a webhook, the dialog then turns into "Connect
+ * your app" (board N7), with the URL and secret the API returns once. Repeat isn't offered on a
+ * phone, where setting up recurring tasks stays on desktop (mobile.md).
  *
  * Not yet: "Open as full page" (there's no full-page editor until M2's task page), @-mentions in
  * the description (the M2 composer), reusing another task's worktree (needs the workspace list).
@@ -127,24 +147,29 @@ function formatSize(bytes: number) {
 export function NewTaskDialog() {
   const commands = useCommands();
   const open = () => commands.newTask() !== null;
+  // After a recurring task with a webhook is created, the dialog shows "Connect your app" (N7).
+  const [connect, setConnect] = createSignal<{ target: ConnectTarget; crumb: string } | null>(null);
+  createEffect(on(open, (isOpen) => !isOpen && setConnect(null), { defer: true }));
   return (
     <Dialog
       open={open()}
       onOpenChange={(next) => !next && commands.closeNewTask()}
-      title="New task"
+      title={connect() ? "Connect the webhook" : "New task"}
       titleHidden
       hideClose
-      width={760}
+      width={connect() ? 640 : 760}
       initialFocus={() => document.getElementById("nt-title")}
     >
       <Show when={open()}>
-        <NewTaskForm />
+        <Show when={connect()} fallback={<NewTaskForm onConnect={setConnect} />}>
+          {(current) => <ConnectWebhook target={current().target} crumb={current().crumb} onClose={() => commands.closeNewTask()} />}
+        </Show>
       </Show>
     </Dialog>
   );
 }
 
-function NewTaskForm() {
+function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: string }) => void }) {
   const commands = useCommands();
   const company = useCompany();
   const session = useSession();
@@ -176,10 +201,22 @@ function NewTaskForm() {
   if (defaults.assigneeAgentId) start.assignee = { kind: "agent", id: defaults.assigneeAgentId };
   if (defaults.status) start.status = defaults.status;
   if (defaults.title) start.title = defaults.title;
+  // "+ Recurring task" opens it with Repeat on; a person can't be a recurring task's assignee.
+  if (defaults.repeat && !start.repeat?.schedule && !start.repeat?.webhook) {
+    start.repeat = defaultRepeat();
+    if (start.assignee?.kind === "user") start.assignee = null;
+  }
   const [draft, setDraft] = createStore<NewTaskDraft>(start);
   const [files, setFiles] = createSignal<File[]>([]);
   const [error, setError] = createSignal<string | null>(null);
   const [whoOpen, setWhoOpen] = createSignal(false);
+  const [repeatOpen, setRepeatOpen] = createSignal(false);
+  const [creatingRecurring, setCreatingRecurring] = createSignal(false);
+  // Repeat isn't offered on a phone; a draft that repeats still shows as one there.
+  const repeating = () => draftRepeats(draft);
+  // A schedule fills each {{placeholder}} with a default, since no one's there to type it.
+  const placeholders = createMemo(() => templatePlaceholders(draft.title, draft.description));
+  const pending = () => create.isPending || creatingRecurring();
   // A retry of the same submission reuses its key, so the server makes one task.
   let submission: { fingerprint: string; key: string } | null = null;
 
@@ -260,7 +297,83 @@ function NewTaskForm() {
     },
   }));
 
+  /**
+   * Creates the routine, then its triggers, then (from the Create menu) its first run. A trigger
+   * that fails leaves the recurring task without it, said in a toast; with a webhook, the dialog
+   * moves on to connecting it.
+   */
+  const submitRecurring = async (startNow: boolean) => {
+    const problem = recurringDraftProblem(draft);
+    if (problem) return setError(problem);
+    setError(null);
+    const base = unwrap(draft);
+    const repeat = base.repeat!;
+    setCreatingRecurring(true);
+    try {
+      const routine = await routinesApi.create(company().id, buildRoutinePayload(base));
+      const failed: string[] = [];
+      let webhook: { id: string; url: string | null; secret: string | null } | null = null;
+      for (const payload of buildTriggerPayloads(repeat)) {
+        try {
+          const response = await routinesApi.createTrigger(routine.id, payload);
+          if (response.trigger.kind === "webhook") {
+            webhook = {
+              id: response.trigger.id,
+              url: response.secretMaterial?.webhookUrl ?? response.trigger.webhookUrl ?? null,
+              secret: response.secretMaterial?.webhookSecret ?? null,
+            };
+          }
+        } catch (caught) {
+          failed.push(`${payload.kind === "schedule" ? "the schedule" : "the webhook"} (${caught instanceof Error ? caught.message : "error"})`);
+        }
+      }
+      let runFailed: string | null = null;
+      if (startNow) {
+        try {
+          await routinesApi.run(routine.id, { source: "manual" });
+        } catch (caught) {
+          runFailed = caught instanceof Error ? caught.message : "it couldn't start";
+        }
+      }
+      clearDraft(company().id);
+      refreshRecurring(client, company().id, startNow);
+      const href = recurringPath(company().issuePrefix, routine.id);
+      if (failed.length > 0) {
+        pushToast({ tone: "warn", title: "Created the recurring task, but not all its triggers", body: `Couldn't add ${failed.join(" or ")}.`, action: { label: "Open it", href } });
+      } else if (runFailed) {
+        pushToast({ tone: "warn", title: "Created the recurring task, but the first one didn't start", body: runFailed, action: { label: "Open it", href } });
+      } else {
+        pushToast({
+          tone: "success",
+          title: startNow ? "Created the recurring task and started the first one" : "Created the recurring task",
+          body: routine.status === "active" ? routine.title : `${routine.title}. It's paused until it has an agent.`,
+          action: { label: "Open it", href },
+        });
+      }
+      if (webhook) {
+        props.onConnect({
+          crumb: project()?.name ?? company().name,
+          target: {
+            routineId: routine.id,
+            title: routine.title,
+            triggerId: webhook.id,
+            url: webhook.url,
+            secret: webhook.secret,
+            scheduleLabel: repeat.schedule && !failed.some((entry) => entry.startsWith("the schedule")) ? describeCron(scheduleCron(repeat)) : null,
+          },
+        });
+      } else {
+        commands.closeNewTask();
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Couldn't create the recurring task.");
+    } finally {
+      setCreatingRecurring(false);
+    }
+  };
+
   const submit = async (openAfter: boolean) => {
+    if (repeating()) return submitRecurring(openAfter);
     const problem = draftProblem(draft);
     if (problem) return setError(problem);
     setError(null);
@@ -296,6 +409,24 @@ function NewTaskForm() {
   const cancel = () => {
     clearDraft(company().id);
     commands.closeNewTask();
+  };
+
+  // Opening Repeat turns it on (weekdays at 09:00) and drops a person as assignee: only an agent
+  // can work a recurring task.
+  const toggleRepeat = (next: boolean) => {
+    batch(() => {
+      if (next && !draft.repeat) setDraft("repeat", defaultRepeat());
+      else if (next && !repeating()) setDraft("repeat", "schedule", true);
+      if (next && draft.assignee?.kind === "user") setDraft("assignee", null);
+    });
+    setRepeatOpen(next);
+  };
+  const firstLabel = () => {
+    const repeat = draft.repeat;
+    if (!repeat || !repeating()) return "";
+    if (!repeat.schedule) return "First one when a webhook arrives";
+    const [first] = nextFires(scheduleCron(repeat), 1, { timeZone: repeat.timezone });
+    return first ? `First one ${formatFire(first, repeat.timezone)}` : "";
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -359,32 +490,34 @@ function NewTaskForm() {
         <span class="nt-slash" aria-hidden="true">
           /
         </span>
-        <h2 class="nt-title-label disp">New task</h2>
+        <h2 class="nt-title-label disp">{repeating() ? "New recurring task" : "New task"}</h2>
         <button type="button" class="nt-icon nt-close" aria-label="Close" onClick={() => commands.closeNewTask()}>
           <X size={16} aria-hidden="true" />
         </button>
       </header>
 
       <div class="nt-fields">
-        <Menu>
-          <Menu.Trigger class="nt-pill" aria-label={`Status: ${STATUS_META[draft.status].label}`}>
-            <StatusCapsule status={draft.status} size="tiny" />
-            {STATUS_META[draft.status].label}
-          </Menu.Trigger>
-          <Menu.Content label="Status" width={220}>
-            <For each={STATUSES}>
-              {(status) => (
-                <Menu.Item
-                  onSelect={() => setDraft("status", status)}
-                  icon={<StatusCapsule status={status} size="row" />}
-                  hint={status === draft.status ? <Check size={14} /> : undefined}
-                >
-                  {STATUS_META[status].label}
-                </Menu.Item>
-              )}
-            </For>
-          </Menu.Content>
-        </Menu>
+        <Show when={!repeating()}>
+          <Menu>
+            <Menu.Trigger class="nt-pill" aria-label={`Status: ${STATUS_META[draft.status].label}`}>
+              <StatusCapsule status={draft.status} size="tiny" />
+              {STATUS_META[draft.status].label}
+            </Menu.Trigger>
+            <Menu.Content label="Status" width={220}>
+              <For each={STATUSES}>
+                {(status) => (
+                  <Menu.Item
+                    onSelect={() => setDraft("status", status)}
+                    icon={<StatusCapsule status={status} size="row" />}
+                    hint={status === draft.status ? <Check size={14} /> : undefined}
+                  >
+                    {STATUS_META[status].label}
+                  </Menu.Item>
+                )}
+              </For>
+            </Menu.Content>
+          </Menu>
+        </Show>
 
         <Menu>
           <Menu.Trigger class="nt-pill" aria-label={`Priority: ${PRIORITY_META[draft.priority].label}`}>
@@ -406,6 +539,43 @@ function NewTaskForm() {
           </Menu.Content>
         </Menu>
 
+        <Show when={!isCompact() || repeating()}>
+          <span class="nt-repeat">
+            <Popover open={repeatOpen()} onOpenChange={toggleRepeat}>
+              <Popover.Trigger
+                class="nt-pill nt-pill--repeat"
+                classList={{ "nt-pill--repeat-on": repeating() }}
+                aria-label={repeating() && draft.repeat ? `Repeat: ${repeatLabel(draft.repeat)}` : "Repeat: does not repeat"}
+              >
+                <Repeat size={14} aria-hidden="true" />
+                {repeating() && draft.repeat ? repeatLabel(draft.repeat) : "Repeat"}
+              </Popover.Trigger>
+              <Popover.Content label="Repeat" width={440} hideClose class="nt-repeat-menu">
+                <Show when={draft.repeat}>
+                  {(repeat) => (
+                    <RepeatMenu
+                      value={repeat()}
+                      onChange={(patch) => setDraft("repeat", (current) => ({ ...current!, ...patch }))}
+                      onStop={() => {
+                        setDraft("repeat", null);
+                        setRepeatOpen(false);
+                      }}
+                      onDone={() => setRepeatOpen(false)}
+                    />
+                  )}
+                </Show>
+              </Popover.Content>
+            </Popover>
+            <Show when={repeating()}>
+              <InfoTip
+                label="What each occurrence gets"
+                text="Each time, a new task is made from this one's title, description, assignee, project, priority, goal and parent. Labels, files, reviewers and run settings aren't copied."
+              />
+            </Show>
+          </span>
+        </Show>
+
+        <Show when={!repeating()}>
         <span class="nt-pill nt-pill--labels">
           <For each={draft.labelIds} fallback={<span class="nt-muted">Labels</span>}>
             {(id) => {
@@ -438,6 +608,7 @@ function NewTaskForm() {
             </Menu.Content>
           </Menu>
         </span>
+        </Show>
 
         <Show when={has("parent")}>
           <ExtraPill field="parent" value={draft.parentId ? (draft.names[draft.parentId] ?? "Picked") : null} onRemove={() => toggleExtra("parent")}>
@@ -469,7 +640,7 @@ function NewTaskForm() {
             onRemove={() => toggleExtra("goal")}
           />
         </Show>
-        <Show when={has("blocked")}>
+        <Show when={has("blocked") && !repeating()}>
           <ExtraPill
             field="blocked"
             value={
@@ -496,7 +667,7 @@ function NewTaskForm() {
             )}
           </ExtraPill>
         </Show>
-        <Show when={has("billing")}>
+        <Show when={has("billing") && !repeating()}>
           <ExtraPill field="billing" value={draft.billingCode.trim() || null} onRemove={() => toggleExtra("billing")}>
 {() => (
             <TextInput
@@ -509,7 +680,7 @@ function NewTaskForm() {
             )}
           </ExtraPill>
         </Show>
-        <Show when={has("private")}>
+        <Show when={has("private") && !repeating()}>
           <span class="nt-pill nt-pill--extra">
             <Lock size={13} aria-hidden="true" />
             <span class="nt-muted">Private</span>
@@ -526,7 +697,13 @@ function NewTaskForm() {
             More fields
           </Menu.Trigger>
           <Menu.Content label="More fields" width={300}>
-            <For each={[["Plan", ["parent", "goal", "blocked"]], ["Admin", ["billing", "private"]]] as const}>
+            <For
+              each={
+                repeating()
+                  ? ([["Plan", ["parent", "goal"]]] as const)
+                  : ([["Plan", ["parent", "goal", "blocked"]], ["Admin", ["billing", "private"]]] as const)
+              }
+            >
               {([title, fields]) => (
                 <Menu.Group label={title}>
                   <For each={fields}>
@@ -575,6 +752,26 @@ function NewTaskForm() {
         />
       </div>
 
+      <Show when={repeating() && draft.repeat?.schedule && placeholders().length > 0}>
+        <div class="nt-inputs" role="group" aria-label="Defaults for scheduled runs">
+          <span class="nt-muted">Defaults for scheduled runs</span>
+          <For each={placeholders()}>
+            {(name) => (
+              <label class="nt-input-default">
+                <span class="mono">{name}</span>
+                <TextInput
+                  aria-label={`Default for ${name}`}
+                  placeholder="Value"
+                  value={draft.repeat?.defaults?.[name] ?? ""}
+                  onInput={(event) => setDraft("repeat", (current) => ({ ...current!, defaults: { ...(current!.defaults ?? {}), [name]: event.currentTarget.value } }))}
+                />
+              </label>
+            )}
+          </For>
+        </div>
+      </Show>
+
+      <Show when={!repeating()}>
       <div class="nt-files">
         <For each={files()}>
           {(file, index) => (
@@ -608,6 +805,7 @@ function NewTaskForm() {
           }}
         />
       </div>
+      </Show>
 
       <div class="nt-assign">
         <Popover open={whoOpen()} onOpenChange={setWhoOpen}>
@@ -616,7 +814,7 @@ function NewTaskForm() {
             aria-label={
               draft.assignee
                 ? `Assignee: ${principalName(draft.assignee)}${
-                    supportsOverrides(assigneeAgent()?.adapterType)
+                    supportsOverrides(assigneeAgent()?.adapterType) && !repeating()
                       ? `. Model: ${shownModel() ?? "agent default"}. Effort: ${shownEffort() ?? "agent default"}`
                       : ""
                   }`
@@ -629,7 +827,7 @@ function NewTaskForm() {
               {(agent) => (
                 <>
                   <Capsule gradient={agentState(agent(), running()).key === "running" ? "ion" : "ash"} size="tiny" live={agentState(agent(), running()).key === "running"} />
-                  <Show when={supportsOverrides(agent().adapterType)}>
+                  <Show when={supportsOverrides(agent().adapterType) && !repeating()}>
                     <span class="nt-capsule-rule" aria-hidden="true" />
                     <span class="nt-capsule-run" classList={{ "nt-capsule-run--set": !!draft.model }} aria-hidden="true">
                       {shownModel() ?? "Default model"}
@@ -644,8 +842,9 @@ function NewTaskForm() {
               )}
             </Show>
           </Popover.Trigger>
-          <Popover.Content label="Assignee and run settings" width={620} hideClose class="nt-who">
+          <Popover.Content label={repeating() ? "Assignee" : "Assignee and run settings"} width={repeating() ? 320 : 620} hideClose class="nt-who">
             <AssigneeMenu
+              agentsOnly={repeating()}
               agents={agentList()}
               people={personList()}
               running={running()}
@@ -668,6 +867,7 @@ function NewTaskForm() {
           </Popover.Content>
         </Popover>
 
+        <Show when={!repeating()}>
         <RolePill
           verb="Review"
           value={draft.reviewer}
@@ -722,9 +922,11 @@ function NewTaskForm() {
             </Menu.Group>
           </Menu.Content>
         </Menu>
+        </Show>
       </div>
 
       <footer class="nt-foot">
+        <Show when={!repeating()}>
         <ChoicePill
           label="Work mode"
           icon={<SlidersHorizontal size={13} />}
@@ -748,6 +950,13 @@ function NewTaskForm() {
           options={REVIEW_POLICIES}
           onPick={(value) => setDraft("reviewPolicy", value)}
         />
+        </Show>
+        <Show when={firstLabel()}>
+          <span class="nt-first">
+            <CalendarClock size={14} aria-hidden="true" />
+            {firstLabel()}
+          </span>
+        </Show>
         <div class="nt-foot-end">
           <Show when={error()}>
             <span class="nt-error" role="alert">
@@ -758,16 +967,24 @@ function NewTaskForm() {
             Cancel
           </button>
           <div class="nt-create">
-            <button type="button" class="nt-create-main" disabled={create.isPending} onClick={() => void submit(false)}>
-              {create.isPending ? "Creating…" : "Create task"}
+            <button type="button" class="nt-create-main" disabled={pending()} onClick={() => void submit(false)}>
+              {pending() ? "Creating…" : repeating() ? "Create recurring task" : "Create task"}
               <kbd aria-hidden="true">{/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘↵" : "Ctrl ↵"}</kbd>
             </button>
             <Menu placement="top-end">
-              <Menu.Trigger class="nt-create-more" aria-label="Create options: create and open, save draft and close" disabled={create.isPending}>
+              <Menu.Trigger
+                class="nt-create-more"
+                aria-label={
+                  repeating()
+                    ? "Create options: create and start the first one now, save draft and close"
+                    : "Create options: create and open, save draft and close"
+                }
+                disabled={pending()}
+              >
                 <ChevronDown size={14} aria-hidden="true" />
               </Menu.Trigger>
-              <Menu.Content label="Create options" width={240}>
-                <Menu.Item onSelect={() => void submit(true)}>Create and open</Menu.Item>
+              <Menu.Content label="Create options" width={repeating() ? 300 : 240}>
+                <Menu.Item onSelect={() => void submit(true)}>{repeating() ? "Create and start the first one now" : "Create and open"}</Menu.Item>
                 <Menu.Item onSelect={() => commands.closeNewTask()} description="Kept until you create or cancel it">
                   Save draft and close
                 </Menu.Item>
@@ -946,6 +1163,8 @@ function ChoicePill<T extends string>(props: {
  * right. It stays open until Done, since it offers several picks (design-system.md).
  */
 function AssigneeMenu(props: {
+  /** A recurring task: agents only, and no per-task model or effort. */
+  agentsOnly?: boolean;
   agents: Agent[];
   people: Person[];
   running: ReadonlySet<string>;
@@ -976,7 +1195,7 @@ function AssigneeMenu(props: {
   const isAssignee = (kind: Principal["kind"], id: string) => props.assignee?.kind === kind && props.assignee.id === id;
 
   return (
-    <div class="nt-who-grid">
+    <div class="nt-who-grid" classList={{ "nt-who-grid--single": props.agentsOnly }}>
       <div class="nt-who-list" role="listbox" aria-label="Assignee">
         <TextInput
           type="search"
@@ -1011,7 +1230,7 @@ function AssigneeMenu(props: {
             );
           }}
         </For>
-        <Show when={props.people.some((person) => matches(person.name))}>
+        <Show when={!props.agentsOnly && props.people.some((person) => matches(person.name))}>
           <div class="mh">People</div>
           <For each={props.people.filter((person) => matches(person.name))}>
             {(person) => (
@@ -1030,12 +1249,14 @@ function AssigneeMenu(props: {
         </Show>
       </div>
 
-      <div class="nt-who-run">
+      <div class="nt-who-run" classList={{ "nt-who-run--done-only": props.agentsOnly }}>
         <Show
-          when={overridable()}
+          when={overridable() && !props.agentsOnly}
           fallback={
             <p class="nt-menu-note">
-              {props.assignee?.kind === "user"
+              {props.agentsOnly
+                ? "A recurring task goes to an agent, which runs each one on its own model and effort."
+                : props.assignee?.kind === "user"
                 ? "People don't run on a model, so there's nothing to set here."
                 : agent()
                   ? "This agent's runner doesn't take a model or effort per task. It uses its own settings."

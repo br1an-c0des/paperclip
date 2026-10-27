@@ -21,6 +21,8 @@ export type NewTaskDefaults = {
   status?: IssueStatus;
   /** A title typed into the list's quick add before "More options". */
   title?: string;
+  /** Opens it with Repeat on, as a recurring task ("+ Recurring task"). */
+  repeat?: boolean;
 };
 
 type CommandsValue = {
