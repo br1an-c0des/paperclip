@@ -56,6 +56,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 27 | [Gaps found building recurring tasks](#27-gaps-found-building-recurring-tasks) | `routines/*` | Open | Oct 27, 2026 |
 | 28 | [Gaps found building agent workload](#28-gaps-found-building-agent-workload) | `projects/task-context`, `agents/roster` | Open | Oct 27, 2026 |
 | 29 | [Gaps found building the agent page](#29-gaps-found-building-the-agent-page) | `agents/*`, `runs-adapters/runs` | Open | Oct 27, 2026 |
+| 30 | [Gaps found building the org pages](#30-gaps-found-building-the-org-pages) | `agents/roster`, `agents/organization`, `agents/built-in` | Open | Oct 27, 2026 |
 
 ## Entries
 
@@ -1006,4 +1007,24 @@ Both are handled in `ui-new` for now.
 - **Chat routes answer 404 while `enableAgentChat` is off** ([decision 2](#2-agent-chat-is-off-unless-the-instance-turns-it-on)).
 - **Runner on-disk state** (sandbox state, the ACP state folder, runner logs) isn't exposed; the page
   shows runtime state, task sessions, qualification and usage. Recorded for build plan 3.11.
+
+### 30. Gaps found building the org pages
+
+- **Status:** Open
+- **Area:** `agents/roster`, `agents/organization`, `agents/built-in`
+- **Found in:** the Org dashboard and Manage agents (M5, boards 19 and 20).
+
+- **No per-agent run counts.** The pages count from the company run list
+  (`heartbeat-runs?summary=true&limit=1000`, shared with workload), so a busy company's counts can
+  be cut short ([decision 28](#28-gaps-found-building-agent-workload)).
+- **"Blocked" isn't an agent status.** It's worked out from tasks with one rule for every page
+  (`isAgentBlocked` in `ui-new/src/lib/agent-state.ts`): not running, and every open assigned task
+  is blocked. On a project's workload tab, "assigned" means assigned in that project.
+- **`spendMonthUtc` is missing from the shared `Agent` type**, so it's read through a widened type.
+- **Pause and resume answer with the old state,** since they finish after the response; the UI
+  refreshes again after 1.5 s.
+- **`GET /companies/:id/org` leaves out agents whose managers form a loop.** The UI adds them back.
+- **Built-in agents** answer 404 unless `enableBuiltInAgents` is on (as in decision 28).
+- **Open question:** the agent page says "Run now" and Manage agents says "Wake now" for the same
+  request (`POST /agents/:id/heartbeat/invoke`). Settle on one label.
 
