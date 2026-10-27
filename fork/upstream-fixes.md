@@ -24,6 +24,8 @@ submitted and merged. How to build and send one is in
 - **Fill in the branch, the pull request and the date** of each step, and note in its section any
   fork workaround to remove once it's merged.
 - Before building one, search upstream for a duplicate pull request, as upstream's PR template asks.
+- Build a fix only once the user has signed off on it, with the `upstream-fix` skill
+  ([.claude/skills/upstream-fix/SKILL.md](../.claude/skills/upstream-fix/SKILL.md)).
 
 Larger ideas and features that need agreement in upstream's `#dev` channel stay in the
 [build plan](../ui-new/docs/build-plan.md#stage-2-small-upstream-contributions) and the proposals

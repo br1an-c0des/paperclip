@@ -26,6 +26,7 @@ can check what upstream changed against what the fork depends on.
 | `deploy/` | Production deployment ([deploy/README.md](deploy/README.md)) |
 | `fork/` | Fork records, such as upstream sync reports and the upstream fixes list |
 | `.claude/skills/upstream-sync/` | The upstream sync skill |
+| `.claude/skills/upstream-fix/` | The skill for building a small fix to send upstream |
 | `packages/plugins/fork-*/` | Plugins the fork adds (see below). Already in the pnpm workspace through `packages/plugins/*`. |
 
 The upstream files the fork edits are listed in [FORK-PATCHES.md](FORK-PATCHES.md). So far that is
@@ -101,6 +102,12 @@ that a database has already applied breaks that database.
 Small server or documentation fixes found while building the UI go to `paperclipai/paperclip` as
 pull requests instead of fork patches. Once upstream merges one, it reaches the fork through the
 normal sync.
+
+Build each one with the `upstream-fix` skill (`/upstream-fix`,
+[.claude/skills/upstream-fix/SKILL.md](.claude/skills/upstream-fix/SKILL.md)), once the user has
+signed off on that fix. The skill covers the duplicate search, upstream's rules, a testing budget
+(the targeted test with and without the fix, plus `tsc`; the full suite is left to CI), and the PR
+description, and it stops before anything is pushed. The commands below are the outline.
 
 ```bash
 git sync-master                                  # start from an up-to-date master

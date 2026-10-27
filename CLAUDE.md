@@ -52,6 +52,7 @@ or package code.
 | [FORK-PATCHES.md](FORK-PATCHES.md) | Every change the fork makes to upstream files: what, why, what it depends on, how to resolve conflicts. |
 | [fork/upstream-fixes.md](fork/upstream-fixes.md) | Small fixes for upstream: candidates to build, and each one's branch, pull request and status until it's merged. |
 | [.claude/skills/upstream-sync/SKILL.md](.claude/skills/upstream-sync/SKILL.md) | The upstream sync procedure and conflict-resolution policy. Reports go to `fork/sync-reports/`. |
+| [.claude/skills/upstream-fix/SKILL.md](.claude/skills/upstream-fix/SKILL.md) | Building one signed-off fix for upstream: duplicate search, upstream's rules, the testing budget, the PR description, and stopping before anything is pushed. |
 | [ui-new/README.md](ui-new/README.md) | Running and building the SolidJS app; layout; lockfile-conflict fix. |
 | [deploy/README.md](deploy/README.md) | Production deployment: Docker image on top of upstream's, Compose with bind mounts, Tailscale or Caddy. |
 | [ui-new/docs/build-plan.md](ui-new/docs/build-plan.md) | The build plan: every redesign idea sorted into UI-only, small upstream PRs and experimental features, stage 1 milestones, decisions to make, and open questions. |
