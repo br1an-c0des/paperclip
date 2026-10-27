@@ -117,4 +117,20 @@ export const queryKeys = {
     project: (companyId: string, projectId: string, groupIssueId?: string) =>
       ["artifacts", companyId, "project", projectId, groupIssueId ?? "__groups__"] as const,
   },
+
+  /*
+   * Project settings (M4, boards 10 and 11), in the old UI's shapes so its live-event rules apply:
+   * a project by id or URL key (archived ones aren't in the list), its private-project members and
+   * Git authorization, the company's budgets, secrets and environments, and your memberships.
+   */
+  projectSettings: {
+    detail: (key: string) => ["projects", "detail", key] as const,
+    accessMembers: (projectId: string) => ["projects", "access-members", projectId] as const,
+    gitAuthorization: (companyId: string, projectId: string) => ["project-git-authorization", companyId, projectId] as const,
+    budgets: (companyId: string) => ["budgets", "overview", companyId] as const,
+    secrets: (companyId: string) => ["secrets", companyId] as const,
+    userSecretDefinitions: (companyId: string) => ["user-secret-definitions", companyId] as const,
+    environments: (companyId: string) => ["environments", companyId] as const,
+    memberships: (companyId: string) => ["resource-memberships", companyId, "me"] as const,
+  },
 };
