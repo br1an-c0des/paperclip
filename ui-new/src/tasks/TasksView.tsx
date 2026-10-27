@@ -1,6 +1,6 @@
 import type { CompactIssue, IssuePriority, IssueStatus } from "@paperclipai/shared";
 import { useLocation, useSearchParams } from "@solidjs/router";
-import { createQuery, keepPreviousData } from "@tanstack/solid-query";
+import { createQuery, keepPreviousData, useQueryClient } from "@tanstack/solid-query";
 import { ArrowUpDown, ChevronDown, CircleCheck, CornerDownRight, ListFilter, Plus, Search, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
 import { issuesApi } from "@/api/issues";
@@ -98,6 +98,37 @@ export function useTaskList(scope: () => ListScope | null) {
       placeholderData: keepPreviousData,
     };
   });
+}
+
+/**
+ * One task by the reference a URL carries: its identifier (`TES-3`) or its id. The reference is
+ * looked up once, and the task is then read under `queryKeys.issues.detail(id)`, seeded by that
+ * lookup so it isn't fetched twice. That id key is the one live events refresh and task changes
+ * patch; a copy kept under the identifier would miss both. `ref` null leaves it idle.
+ */
+export function useTaskByRef(ref: () => string | null) {
+  const client = useQueryClient();
+  const lookup = createQuery(() => ({
+    queryKey: ["issues", "ref", ref() ?? ""] as const,
+    queryFn: async ({ queryKey, signal }: { queryKey: readonly string[]; signal: AbortSignal }) => {
+      const task = await issuesApi.get(queryKey[2]!, signal);
+      client.setQueryData(queryKeys.issues.detail(task.id), task);
+      return task.id;
+    },
+    enabled: ref() !== null,
+    // A reference keeps naming the same task; the task itself is refreshed under its id.
+    staleTime: Infinity,
+  }));
+  const id = () => (ref() !== null ? lookup.data : undefined);
+  const task = createQuery(() => ({
+    queryKey: queryKeys.issues.detail(id() ?? ""),
+    queryFn: ({ signal }) => issuesApi.get(id()!, signal),
+    enabled: !!id(),
+  }));
+  return {
+    task: () => (id() ? task.data : undefined),
+    error: () => (ref() !== null ? (lookup.error ?? (id() ? task.error : null)) : null),
+  };
 }
 
 export function TasksView(props: {
@@ -275,12 +306,8 @@ export function TasksView(props: {
     const ref = openRef();
     return ref ? tasks().find((task) => task.identifier === ref || task.id === ref) : undefined;
   });
-  const looked = createQuery(() => ({
-    queryKey: queryKeys.issues.detail(openRef() ?? ""),
-    queryFn: ({ signal }) => issuesApi.get(openRef()!, signal),
-    enabled: openRef() !== null && !fromList() && props.tasks.isSuccess,
-  }));
-  const openTask = () => fromList() ?? (looked.data && openRef() ? looked.data : undefined);
+  const looked = useTaskByRef(() => (!fromList() && props.tasks.isSuccess ? openRef() : null));
+  const openTask = () => fromList() ?? looked.task();
 
   // Previous and next follow the list's order: groups (or columns) as shown, then rows within them,
   // with unfolded subtasks under their parent on the list. Grouped by label, a task can show more

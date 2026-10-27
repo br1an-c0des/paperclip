@@ -314,8 +314,9 @@ budget resolution, queues and the aging shelf, and the audience settings (M6).
 
 Covers `projects/*`, `workspaces/*`, `goals/*`, `routines/*`, `documents-artifacts/library`.
 
-Progress (2026-10-27): built except Agent workload (boards 31, 32): the dashboard, Docs, settings
-with goals and Git authorization, recurring tasks, and New project.
+Progress (2026-10-27): built: the dashboard, Docs, settings with goals and Git authorization,
+recurring tasks, New project, and Agent workload (boards 31, 32, plus the company view, board 33, at
+`/:prefix/workload`; gaps in [decision 28](decisions.md#28-gaps-found-building-agent-workload)).
 
 #### M5: Agents and the organization
 

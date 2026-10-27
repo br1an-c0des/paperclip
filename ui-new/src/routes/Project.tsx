@@ -16,6 +16,7 @@ import { buttonClass } from "@/ui/Button";
 import { HeaderNumber, PageHeader, Tabs } from "@/ui/PageHeader";
 import { Capsule, TonePill } from "@/ui/Status";
 import type { Gradient } from "@/ui/status-meta";
+import { WorkloadView } from "@/workload/Workload";
 import { PlannedNote } from "./Planned";
 import { OPEN_STATUSES } from "./Tasks";
 
@@ -23,9 +24,10 @@ import { OPEN_STATUSES } from "./Tasks";
  * A project's pages under its header card (boards 1 and 8). The project's address is its dashboard
  * (board 8), which the header's title links to; the tabs below are the project's tasks as a list
  * (board 1, `/issues` as in the old UI) or a board (board 4), with the docked panel, then Docs
- * (board 9), and Settings (boards 10 and 11, a section per URL under `/settings`). On the task tabs
- * the tab sets the layout, so the task view leaves out its own switch. Agent workload comes next in
- * M4. `/overview` is the old UI's name for the project's home and opens the dashboard too.
+ * (board 9), Agent workload (boards 31 and 32, `/workload`, with `?range=week|month`), and Settings
+ * (boards 10 and 11, a section per URL under `/settings`). On the task tabs the tab sets the layout,
+ * so the task view leaves out its own switch. `/overview` is the old UI's name for the project's home
+ * and opens the dashboard too.
  *
  * The project list leaves archived projects out, so a key it doesn't know is looked up on its own;
  * that way an archived project's pages (and its settings, to restore it) still open.
@@ -47,12 +49,13 @@ const PROJECT_STATUS: Record<Project["status"], { label: string; gradient: Gradi
   cancelled: { label: "Cancelled", gradient: "ash" },
 };
 
-type View = "dashboard" | "list" | "board" | "docs" | "settings" | "later";
+type View = "dashboard" | "list" | "board" | "workload" | "docs" | "settings" | "later";
 
 function viewFor(tab: string): View {
   if (tab === "" || tab === "overview") return "dashboard";
   if (tab === "issues" || tab.startsWith("issues/")) return "list";
   if (tab === "board") return "board";
+  if (tab === "workload") return "workload";
   if (tab === "docs") return "docs";
   if (tab === "settings" || tab.startsWith("settings/")) return "settings";
   return "later";
@@ -155,6 +158,9 @@ export function ProjectPage() {
             </Match>
             <Match when={view() === "list" || view() === "board"}>
               <TasksView projectId={found().id} tasks={tasks} layout={view() === "board" ? "board" : "list"} />
+            </Match>
+            <Match when={view() === "workload"}>
+              <WorkloadView scope={{ kind: "project", projectId: found().id }} tasks={() => (tasks.isSuccess ? (tasks.data ?? []) : undefined)} scopeName={found().name} />
             </Match>
             <Match when={view() === "docs"}>
               <ProjectDocs project={found()} tasks={tasks} />
