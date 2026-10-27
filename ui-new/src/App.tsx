@@ -7,11 +7,13 @@ import { SessionGate } from "@/lib/session";
 import { GrainFilter } from "@/ui/Grain";
 import { ToastViewport } from "@/ui/Toast";
 import { Companies, CompanyRootRedirect } from "./routes/Companies";
-import { CompanyHome } from "./routes/CompanyHome";
 import { CompanyLayout } from "./routes/CompanyLayout";
 import { ConnectorsPage } from "./connectors/ConnectorsPage";
 import { NotBuiltYet, NotFound } from "./routes/NotFound";
 import { InboxPage } from "./inbox/InboxPage";
+import { OrgDashboard } from "./org/OrgDashboard";
+import { AgentsTabRedirect, OrgAgents } from "./org/OrgAgents";
+import { LEGACY_AGENT_TABS } from "./org/org-model";
 import { AgentPage, SettingsPage } from "./routes/Planned";
 import { ProjectPage } from "./routes/Project";
 import { RoutineRedirect } from "./recurring/RoutineRedirect";
@@ -53,12 +55,15 @@ export function App() {
           <Route path="/companies" component={Companies} />
           <Route path="/:companyPrefix" component={CompanyLayout}>
             <Route path="/" component={() => <Navigate href="dashboard" />} />
-            <Route path="/dashboard" component={CompanyHome} />
+            <Route path="/dashboard" component={OrgDashboard} />
+            <Route path="/org" component={() => <Navigate href="../dashboard" />} />
             <Route path="/inbox/*rest" component={InboxPage} />
             <Route path="/issues" component={TasksPage} />
             <Route path="/issues/:issueRef/*" component={TaskPage} />
             <Route path="/routines/:routineId?/*" component={RoutineRedirect} />
             <Route path="/projects/:projectKey/*tab" component={ProjectPage} />
+            <Route path="/agents" component={OrgAgents} />
+            <Route path="/agents/:tab" matchFilters={{ tab: LEGACY_AGENT_TABS }} component={AgentsTabRedirect} />
             <Route path="/agents/:agentKey/runs/:runId" component={RunRoute} />
             <Route path="/agents/:agentKey/*" component={AgentPage} />
             <Route path="/company/settings/*" component={SettingsPage} />

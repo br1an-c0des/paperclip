@@ -40,6 +40,21 @@ export function dockPlace(pathname: string, prefix: string): DockPlace | null {
   return null;
 }
 
+/**
+ * The organization's pages, which the nav's "Org dashboard" item owns (boards 19, 20, 33): the
+ * dashboard, the agents roster (not an agent's own page), workload, and the org tabs' other pages.
+ * Settings has its own nav button.
+ */
+const ORG_PAGES = /^\/(?:dashboard|org|agents|workload|skills|apps|activity)(?:\/|$)/;
+
+export function isOrgPage(pathname: string, prefix: string): boolean {
+  const path = companyPath(pathname, prefix);
+  if (!path || !ORG_PAGES.test(path)) return false;
+  // `/agents/:key` is that agent's page; only the roster itself (and its old tab addresses) is org.
+  const agentPage = /^\/agents\/([^/]+)/.exec(path);
+  return !agentPage || ["all", "active", "paused", "error", "builtin"].includes(agentPage[1]!.toLowerCase());
+}
+
 /** The tasks scope of a task list page, or null for anything else (a single task, other pages). */
 export function tasksScope(pathname: string, prefix: string): TasksScope | null {
   const path = companyPath(pathname, prefix);

@@ -62,7 +62,20 @@ export const queryKeys = {
   },
   activity: (companyId: string) => ["activity", companyId] as const,
   dashboard: (companyId: string) => ["dashboard", companyId] as const,
-  org: (companyId: string) => ["org", companyId] as const,
+  /**
+   * The organization pages (boards 19, 20). Called as a function it's the reporting tree, which the
+   * live events refresh with the agents. The rest sit under prefixes the live events already reach:
+   * runs under `["heartbeats", companyId]`, activity under `["activity", companyId]`, the bulk edit's
+   * catalogs under the tree's own key.
+   */
+  org: Object.assign((companyId: string) => ["org", companyId] as const, {
+    recentRuns: (companyId: string) => ["heartbeats", companyId, "org-recent"] as const,
+    activity: (companyId: string) => ["activity", companyId, "org"] as const,
+    builtInAgents: (companyId: string) => ["built-in-agents", companyId] as const,
+    primaryAgent: (companyId: string) => ["primary-agent", companyId] as const,
+    bulkCatalog: (companyId: string, agentIds: readonly string[], binding: string | null) =>
+      ["org", companyId, "bulk-catalog", agentIds.join(","), binding ?? "current"] as const,
+  }),
   liveRuns: (companyId: string) => ["live-runs", companyId] as const,
   /**
    * One run, for the run modal. The live-events socket refreshes `["heartbeat-run", runId]` on
