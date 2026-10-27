@@ -4,6 +4,7 @@ import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { useLabelsQuery } from "@/lib/company-data";
+import { LIST_CACHE_HOLD_MS } from "@/lib/live-events";
 import { pushToast } from "@/ui/Toast";
 
 /*
@@ -56,7 +57,7 @@ function patchCaches(client: QueryClient, companyId: string, ids: ReadonlySet<st
 }
 
 /** Longer than the server's list cache lives, so a fetch after the hold sees the change. */
-const HOLD_MS = 2_500;
+const HOLD_MS = LIST_CACHE_HOLD_MS;
 
 /**
  * A task's changes in flight: the values they set, how many there are, and the last one's request.
