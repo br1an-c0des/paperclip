@@ -43,6 +43,7 @@ until one becomes a concrete fix.
 | 4 | [Link the plugin SDK on Windows without symlink rights](#4-link-the-plugin-sdk-on-windows-without-symlink-rights) | closed | | | 2026-10-24 | | |
 | 5 | [Start `pnpm dev` on Windows when the native runner is enabled](#5-start-pnpm-dev-on-windows-when-the-native-runner-is-enabled) | closed | | | 2026-10-26 | | |
 | 6 | [Detect glibc reliably at server startup so Paperclip Runner is offered on Linux](#6-detect-glibc-reliably-at-server-startup-so-paperclip-runner-is-offered-on-linux) | submitted | `fix/runner-libc-probe-startup` | [#17905](https://github.com/paperclipai/paperclip/pull/17905) | 2026-10-26 | 2026-10-27 | |
+| 7 | [Accept `env: null` when updating a project](#7-accept-env-null-when-updating-a-project) | candidate | | | 2026-10-27 | | |
 
 ## Details
 
@@ -148,3 +149,19 @@ until one becomes a concrete fix.
 - **Built 2026-10-27:** `execFileSync` with the same timeout, kill signal and output limit, and no
   top-level await; a test that blocks the event loop for 1.2 s after a real probe; `doc/DEVELOPING.md`
   updated. Targeted tests pass (16, plus 221 in the probe's consumers) and the server typechecks.
+
+### 7. Accept `env: null` when updating a project
+
+- **Problem:** `PATCH /api/projects/:id` with `{ "env": null }` answers 422 "env must be an object".
+  `updateProjectSchema` allows `env` to be null, but the route (`server/src/routes/projects.ts`,
+  around line 517) passes any value other than `undefined` to
+  `secretsSvc.normalizeEnvBindingsForPersistence`, and `normalizeEnvConfig`
+  (`server/src/services/secrets.ts`, around line 1897) rejects anything that isn't an object. The
+  old UI's project properties send `env: null` when the variables are cleared
+  (`ui/src/components/ProjectProperties.tsx`, around line 530), so clearing them fails there too.
+  The create path (around line 402) has the same check.
+- **Likely fix:** skip normalization when `env` is null and store null (or `{}`), in both the
+  create and update paths; add a route test for clearing with null. Check first how agents' `env`
+  handles null, to match.
+- **Files:** `server/src/routes/projects.ts` and its test.
+- **Fork workaround to revisit once merged:** `ui-new`'s project settings send `{}` to clear.
