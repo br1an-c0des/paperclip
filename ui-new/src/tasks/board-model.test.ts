@@ -118,4 +118,34 @@ describe("neighbourColumn", () => {
     expect(neighbourColumn(columns, 2, -1)).toBe(0);
     expect(neighbourColumn(columns, 0, -1)).toBeNull();
   });
+
+  it("skips workspace columns, which don't take drops", () => {
+    const columns = [
+      { value: { field: "workspace", workspaceId: "w1", defaults: {} } },
+      { value: { field: "workspace", workspaceId: null, defaults: {} } },
+    ] as const;
+    expect(neighbourColumn(columns, 0, 1)).toBeNull();
+  });
+});
+
+describe("the Closed switch", () => {
+  it("takes the Done and Cancelled columns off the board", () => {
+    const groups = buildTaskGroups([task("a", "todo"), task("b", "cancelled")], new Set());
+    expect(boardColumns(groups, "status", EMPTY_FILTERS, true).map((column) => column.key)).toEqual([
+      "backlog",
+      "todo",
+      "in_progress",
+      "in_review",
+      "blocked",
+      "done",
+      "cancelled",
+    ]);
+    expect(boardColumns(groups, "status", EMPTY_FILTERS, false).map((column) => column.key)).toEqual([
+      "backlog",
+      "todo",
+      "in_progress",
+      "in_review",
+      "blocked",
+    ]);
+  });
 });

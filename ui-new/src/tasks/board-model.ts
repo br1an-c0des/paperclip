@@ -1,6 +1,6 @@
 import type { IssuePriority, IssueStatus } from "@paperclipai/shared";
 import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
-import { PRIORITY_ORDER, type TaskGroup } from "./list-model";
+import { PRIORITY_ORDER, takesDrops, type TaskGroup } from "./list-model";
 import type { GroupBy, TaskFilters } from "./view-state";
 
 /*
@@ -10,7 +10,8 @@ import type { GroupBy, TaskFilters } from "./view-state";
  * columns to the values it lets through. Other groupings show the groups the tasks make.
  *
  * Columns run in the order work moves (Backlog to Done, Critical to Low). Done and Cancelled start
- * collapsed, as on board 4; the board keeps its own folds, apart from the list's.
+ * collapsed, as on board 4; the board keeps its own folds, apart from the list's. Board 4's "Closed"
+ * switch takes them, and closed tasks, off the board altogether.
  */
 
 /** Status columns in the order work moves through them. Cancelled shows only when it has tasks. */
@@ -54,11 +55,24 @@ function fixedColumns<T extends string>(
   return [...columns, ...groups.filter((group) => !known.has(group.key))];
 }
 
-/** The board's columns for the list's groups. */
-export function boardColumns(groups: readonly TaskGroup[], groupBy: GroupBy, filters?: TaskFilters): TaskGroup[] {
+/** Done and Cancelled: the statuses board 4's "Closed" switch takes off the board. */
+export const CLOSED_STATUSES: ReadonlySet<string> = new Set<IssueStatus>(["done", "cancelled"]);
+
+/**
+ * The board's columns for the list's groups. With `closed` off the board leaves out the Done and
+ * Cancelled columns; the caller leaves closed tasks out of the groups.
+ */
+export function boardColumns(groups: readonly TaskGroup[], groupBy: GroupBy, filters?: TaskFilters, closed = true): TaskGroup[] {
   switch (groupBy) {
     case "status":
-      return fixedColumns(groups, BOARD_STATUSES, filters?.statuses ?? [], emptyStatusGroup);
+      return closed
+        ? fixedColumns(groups, BOARD_STATUSES, filters?.statuses ?? [], emptyStatusGroup)
+        : fixedColumns(
+            groups.filter((group) => !CLOSED_STATUSES.has(group.key)),
+            BOARD_STATUSES.filter((status) => !CLOSED_STATUSES.has(status)),
+            filters?.statuses ?? [],
+            emptyStatusGroup,
+          );
     case "priority":
       return fixedColumns(groups, PRIORITY_ORDER, filters?.priorities ?? [], emptyPriorityGroup);
     default:
@@ -112,7 +126,10 @@ export function moveCursor(grid: readonly (readonly string[])[], at: Cursor | nu
 /** The column a card moved with Shift+←/→ goes to: the next one that takes drops, or null. */
 export function neighbourColumn(columns: readonly Pick<TaskGroup, "value">[], from: number, step: 1 | -1): number | null {
   for (let col = from + step; col >= 0 && col < columns.length; col += step) {
-    if (columns[col]!.value !== null) return col;
+    if (takesDrops(columns[col]!.value)) return col;
   }
   return null;
 }
+
+/** The subtasks a card lists when "Show subtasks on cards" is on: the first few, and how many more. */
+export const CARD_SUBTASKS = 5;

@@ -1,6 +1,16 @@
 import type { CompactIssue } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { buildTaskGroups, groupDefaults, moveUpdate, startsCollapsed, updatedLabel, type GroupNames } from "./list-model";
+import {
+  buildTaskGroups,
+  groupDefaults,
+  moveUpdate,
+  rowsById,
+  shownRows,
+  startsCollapsed,
+  takesDrops,
+  updatedLabel,
+  type GroupNames,
+} from "./list-model";
 
 function task(id: string, status: string, extra: Partial<CompactIssue> = {}) {
   return { id, identifier: id.toUpperCase(), title: id, status, parentId: null, blockedBy: [], ...extra } as unknown as CompactIssue;
@@ -27,6 +37,37 @@ describe("buildTaskGroups", () => {
     const parent = groups[0]!.rows[0]!;
     expect(parent).toMatchObject({ subtasks: 2, subtasksDone: 1, live: true });
     expect(groups.flatMap((group) => group.rows.map((row) => row.task.id))).toEqual(["parent", "orphan"]);
+  });
+
+  it("hangs subtasks under their parent, all the way down, and unfolds the ones asked for", () => {
+    const [group] = buildTaskGroups(
+      [
+        task("p", "todo"),
+        task("k1", "todo", { parentId: "p" }),
+        task("g1", "done", { parentId: "k1" }),
+        task("k2", "todo", { parentId: "p" }),
+      ],
+      new Set(),
+    );
+    const parent = group!.rows[0]!;
+    expect(group!.rows).toHaveLength(1);
+    expect(parent.children.map((row) => row.task.id)).toEqual(["k1", "k2"]);
+    expect(parent.children[0]).toMatchObject({ subtasks: 1, subtasksDone: 1 });
+    expect(shownRows(group!.rows, new Set()).map(({ row, depth }) => [row.task.id, depth])).toEqual([["p", 0]]);
+    expect(shownRows(group!.rows, new Set(["p"])).map(({ row, depth }) => [row.task.id, depth])).toEqual([
+      ["p", 0],
+      ["k1", 1],
+      ["k2", 1],
+    ]);
+    expect(shownRows(group!.rows, new Set(["p", "k1"])).map(({ row, depth }) => [row.task.id, depth])).toEqual([
+      ["p", 0],
+      ["k1", 1],
+      ["g1", 2],
+      ["k2", 1],
+    ]);
+    // Unfolding a subtask whose parent is folded shows nothing more.
+    expect(shownRows(group!.rows, new Set(["k1"]))).toHaveLength(1);
+    expect([...rowsById(group!.rows).keys()]).toEqual(["p", "k1", "g1", "k2"]);
   });
 
   it("notes what a blocked task waits on", () => {
@@ -94,6 +135,40 @@ describe("buildTaskGroups, other groupings", () => {
     expect(groups[0]!.rows[0]).toMatchObject({ subtasks: 0 });
   });
 
+  it("groups by project by name, with No project last", () => {
+    const withProjects: GroupNames = {
+      ...names,
+      project: (id) => ({ p1: { name: "Zebra", color: "#0f0" }, p2: { name: "Apollo", color: null } })[id],
+    };
+    const groups = buildTaskGroups(
+      [task("a", "todo", { projectId: "p1" }), task("b", "todo", { projectId: null }), task("c", "todo", { projectId: "p2" })],
+      new Set(),
+      { groupBy: "project", names: withProjects },
+    );
+    expect(groups.map((group) => group.label)).toEqual(["Apollo", "Zebra", "No project"]);
+    expect(groups[1]).toMatchObject({ mark: { kind: "project", color: "#0f0" }, value: { field: "project", projectId: "p1" } });
+  });
+
+  it("groups by the workspace the lookup resolves, with the default workspace last", () => {
+    const withWorkspaces: GroupNames = {
+      ...names,
+      workspace: {
+        of: (each) => each.executionWorkspaceId ?? null,
+        name: (id) => (id === "w1" ? "feature/login" : undefined),
+        defaults: (id) => ({ executionWorkspaceId: id }),
+      },
+    };
+    const groups = buildTaskGroups(
+      [task("a", "todo", { executionWorkspaceId: "w1" }), task("b", "todo"), task("c", "todo", { executionWorkspaceId: "w2abcdefgh" })],
+      new Set(),
+      { groupBy: "workspace", names: withWorkspaces },
+    );
+    expect(groups.map((group) => group.label)).toEqual(["feature/login", "Workspace w2abcdef", "Default workspace"]);
+    expect(groups[0]!.value).toEqual({ field: "workspace", workspaceId: "w1", defaults: { executionWorkspaceId: "w1" } });
+    expect(groupDefaults(groups[0]!.value)).toEqual({ executionWorkspaceId: "w1" });
+    expect(groups.map((group) => takesDrops(group.value))).toEqual([false, false, false]);
+  });
+
   it("puts everything in one group with no grouping", () => {
     const groups = buildTaskGroups([task("a", "todo"), task("b", "done")], new Set(), { groupBy: "none", names });
     expect(groups).toHaveLength(1);
@@ -119,6 +194,15 @@ describe("moveUpdate and groupDefaults", () => {
     expect(moveUpdate(a, { field: "label", labelId: "bug" }, { field: "label", labelId: "ui" })).toEqual({ labelIds: ["x", "ui"] });
     expect(moveUpdate(a, undefined, { field: "label", labelId: null })).toEqual({ labelIds: [] });
     expect(moveUpdate(a, undefined, { field: "label", labelId: "x" })).toBeNull();
+  });
+
+  it("moves a task between projects", () => {
+    expect(moveUpdate({ ...a, projectId: "p1" }, undefined, { field: "project", projectId: "p1" })).toBeNull();
+    expect(moveUpdate({ ...a, projectId: "p1" }, undefined, { field: "project", projectId: null })).toEqual({ projectId: null });
+    expect(groupDefaults({ field: "project", projectId: "p2" })).toEqual({ projectId: "p2" });
+    expect(moveUpdate(a, undefined, { field: "workspace", workspaceId: "w", defaults: {} })).toBeNull();
+    expect(takesDrops({ field: "project", projectId: null })).toBe(true);
+    expect(takesDrops(null)).toBe(false);
   });
 
   it("never makes a task its own parent", () => {
