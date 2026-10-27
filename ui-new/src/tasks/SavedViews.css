@@ -1,0 +1,36 @@
+/* The Views menu's trigger and the dialog that renames and deletes saved views */
+
+.sv-label {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sv-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sv-row .input {
+  flex: 1;
+  padding-block: 7px;
+}
+
+.sv-row .btn--icon {
+  color: var(--muted);
+}
+
+.sv-row .btn--icon:hover {
+  color: var(--red-fg);
+}

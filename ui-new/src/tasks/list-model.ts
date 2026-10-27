@@ -1,13 +1,17 @@
 import type { CompactIssue, IssuePriority, IssueStatus } from "@paperclipai/shared";
 import { PRIORITY_META, STATUS_META, STATUS_ORDER } from "@/ui/status-meta";
 import type { GroupBy } from "./view-state";
+import type { WorkspaceLookup } from "./workspaces";
 
 /*
  * The task list's view model (board 1): tasks in groups, by status in the board's order unless the
  * viewer picks another grouping, with each row's subtask count, live state and note. Subtasks whose
- * parent is in the same list are counted on the parent's row instead of getting their own; a subtask
- * whose parent isn't loaded (another project, say) stands on its own. Grouped by parent task, every
- * task gets its own row instead.
+ * parent is in the same list hang under the parent's row (`children`, which the list can unfold)
+ * instead of getting their own; a subtask whose parent isn't loaded (another project, or filtered
+ * out) stands on its own. Grouped by parent task, every task gets its own row instead.
+ *
+ * Rows keep the order of the tasks passed in (task-sort.ts sorts them first), within each group and
+ * under each parent.
  *
  * Each group also says what its tasks have in common (`value`), which is what a task dropped into
  * the group, or added from it, is given.
@@ -19,6 +23,8 @@ export type TaskRow = {
   task: CompactIssue;
   subtasks: number;
   subtasksDone: number;
+  /** The subtasks in the list, as rows of their own, with theirs under them. */
+  children: TaskRow[];
   live: boolean;
   note: RowNote | null;
 };
@@ -32,20 +38,27 @@ export type GroupMark =
   | { kind: "unassigned" }
   | { kind: "label"; color: string | null }
   | { kind: "task"; status: IssueStatus | null }
+  | { kind: "project"; color: string | null }
+  | { kind: "workspace" }
   | { kind: "none" };
 
-/** What the group's tasks have in common. Null for an ungrouped list. */
+/**
+ * What the group's tasks have in common. Null for an ungrouped list. A workspace group gives tasks
+ * added from it its workspace (`defaults`), but tasks can't be dragged into it (takesDrops).
+ */
 export type GroupValue =
   | { field: "status"; status: IssueStatus }
   | { field: "priority"; priority: IssuePriority }
   | { field: "assignee"; agentId: string | null; userId: string | null }
   | { field: "label"; labelId: string | null }
+  | { field: "project"; projectId: string | null }
+  | { field: "workspace"; workspaceId: string | null; defaults: Record<string, unknown> }
   | { field: "parent"; parentId: string | null }
   | null;
 
 export type TaskGroup = { key: string; label: string; mark: GroupMark; value: GroupValue; rows: TaskRow[] };
 
-/** Names for group headings, from the company's agents, people, labels and tasks. */
+/** Names for group headings, from the company's agents, people, labels, projects, workspaces and tasks. */
 export type GroupNames = {
   agent: (id: string) => string | undefined;
   person: (id: string) => string;
@@ -53,7 +66,18 @@ export type GroupNames = {
   label: (id: string) => { name: string; color: string | null } | undefined;
   /** A task by id, for parent groups; looked up in the whole list, not just the filtered rows. */
   task: (id: string) => Pick<CompactIssue, "identifier" | "title" | "status"> | undefined;
+  project?: (id: string) => { name: string; color: string | null } | undefined;
+  /** Each task's workspace and the workspaces' names (workspaces.ts). */
+  workspace?: Pick<WorkspaceLookup, "of" | "name" | "defaults">;
 };
+
+/**
+ * Whether tasks dragged into a group change to fit it. Moving a task to another workspace is more
+ * than a field change (its files stay where they are), so workspace groups don't take drops.
+ */
+export function takesDrops(value: GroupValue) {
+  return value !== null && value.field !== "workspace";
+}
 
 /** Status groups that start collapsed, as on board 1. */
 export const COLLAPSED_BY_DEFAULT: ReadonlySet<IssueStatus> = new Set(["backlog", "done", "cancelled"]);
@@ -123,6 +147,24 @@ function slotsFor(task: CompactIssue, groupBy: GroupBy, names: GroupNames | unde
         return slot(id, found?.name ?? "Unknown label", { kind: "label", color: found?.color ?? null }, { field: "label", labelId: id }, 0);
       });
     }
+    // Projects by name, then No project.
+    case "project": {
+      const id = task.projectId;
+      if (!id) return [slot("none", "No project", { kind: "none" }, { field: "project", projectId: null }, 1)];
+      const project = names?.project?.(id);
+      const mark: GroupMark = { kind: "project", color: project?.color ?? null };
+      return [slot(id, project?.name ?? "Unknown project", mark, { field: "project", projectId: id }, 0)];
+    }
+    // Workspaces by name, then the tasks on their project's default workspace.
+    case "workspace": {
+      const id = names?.workspace?.of(task) ?? null;
+      if (!id) {
+        const value: GroupValue = { field: "workspace", workspaceId: null, defaults: {} };
+        return [slot("none", "Default workspace", { kind: "none" }, value, 1)];
+      }
+      const value: GroupValue = { field: "workspace", workspaceId: id, defaults: names?.workspace?.defaults(id) ?? {} };
+      return [slot(id, names?.workspace?.name(id) ?? `Workspace ${id.slice(0, 8)}`, { kind: "workspace" }, value, 0)];
+    }
     case "parent": {
       const id = task.parentId;
       if (!id) return [slot("none", "No parent task", { kind: "none" }, { field: "parent", parentId: null }, 1, 0)];
@@ -166,18 +208,26 @@ export function buildTaskGroups(
       children.set(task.parentId, list);
     }
   }
+  // A task and its subtasks under it. `seen` stops a parent loop (which the server refuses) from
+  // going round forever.
+  const seen = new Set<string>();
+  const rowFor = (task: CompactIssue): TaskRow => {
+    seen.add(task.id);
+    const kids = (children.get(task.id) ?? []).filter((kid) => !seen.has(kid.id));
+    return {
+      task,
+      subtasks: kids.length,
+      subtasksDone: kids.filter((kid) => kid.status === "done").length,
+      children: kids.map(rowFor),
+      live: liveIssueIds.has(task.id),
+      note: rowNote(task),
+    };
+  };
   const slots = new Map<string, Slot>();
   const rows = new Map<string, TaskRow[]>();
   for (const task of tasks) {
     if (nest && task.parentId && ids.has(task.parentId)) continue;
-    const kids = children.get(task.id) ?? [];
-    const row: TaskRow = {
-      task,
-      subtasks: kids.length,
-      subtasksDone: kids.filter((kid) => kid.status === "done").length,
-      live: liveIssueIds.has(task.id),
-      note: rowNote(task),
-    };
+    const row = rowFor(task);
     for (const slot of slotsFor(task, groupBy, options.names, order)) {
       if (!slots.has(slot.key)) slots.set(slot.key, slot);
       const list = rows.get(slot.key) ?? [];
@@ -209,6 +259,10 @@ export function moveUpdate(task: CompactIssue, from: GroupValue | undefined, to:
       const kept = from?.field === "label" && from.labelId ? ids.filter((id) => id !== from.labelId) : ids;
       return { labelIds: [...kept, to.labelId] };
     }
+    case "project":
+      return (task.projectId ?? null) === to.projectId ? null : { projectId: to.projectId };
+    case "workspace":
+      return null;
     case "parent":
       if ((task.parentId ?? null) === to.parentId || to.parentId === task.id) return null;
       return { parentId: to.parentId };
@@ -227,9 +281,32 @@ export function groupDefaults(value: GroupValue): Record<string, unknown> {
       return value.agentId ? { assigneeAgentId: value.agentId } : value.userId ? { assigneeUserId: value.userId } : {};
     case "label":
       return value.labelId ? { labelIds: [value.labelId] } : {};
+    case "project":
+      return value.projectId ? { projectId: value.projectId } : {};
+    case "workspace":
+      return value.defaults;
     case "parent":
       return value.parentId ? { parentId: value.parentId } : {};
   }
+}
+
+export type ShownRow = { row: TaskRow; depth: number };
+
+/** Rows in the order they show, with the subtasks of each unfolded row under it, indented. */
+export function shownRows(rows: readonly TaskRow[], expanded: ReadonlySet<string>, depth = 0): ShownRow[] {
+  return rows.flatMap((row) => [
+    { row, depth },
+    ...(expanded.has(row.task.id) ? shownRows(row.children, expanded, depth + 1) : []),
+  ]);
+}
+
+/** Every row and the rows under it, by task id. */
+export function rowsById(rows: readonly TaskRow[], into = new Map<string, TaskRow>()): Map<string, TaskRow> {
+  for (const row of rows) {
+    into.set(row.task.id, row);
+    rowsById(row.children, into);
+  }
+  return into;
 }
 
 const MINUTE = 60_000;

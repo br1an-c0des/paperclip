@@ -1,4 +1,4 @@
-import type { CompactIssue, IssuePriority } from "@paperclipai/shared";
+import type { CompactIssue, IssuePriority, IssueStatus } from "@paperclipai/shared";
 import { ChevronLeft, ChevronRight, CornerDownRight, Plus } from "lucide-solid";
 import { createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { issuePath } from "@/api/issues";
@@ -7,10 +7,10 @@ import { useCompany } from "@/lib/company";
 import { hasOpenDialog, isTextInputTarget } from "@/lib/shortcuts";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Menu } from "@/ui/Menu";
-import { Capsule, LabelPill, PriorityBars, RunningPill, TonePill } from "@/ui/Status";
+import { Capsule, LabelPill, PriorityBars, RunningPill, StatusCapsule, TonePill } from "@/ui/Status";
 import { PRIORITY_META } from "@/ui/status-meta";
-import { columnTone, COLUMN_PAGE, moveCursor, neighbourColumn, type CursorMove } from "./board-model";
-import { moveUpdate, type GroupValue, type TaskGroup, type TaskRow } from "./list-model";
+import { CARD_SUBTASKS, columnTone, COLUMN_PAGE, moveCursor, neighbourColumn, type CursorMove } from "./board-model";
+import { moveUpdate, takesDrops, type GroupValue, type TaskGroup, type TaskRow } from "./list-model";
 import { assigneeName, type TaskPeople } from "./people";
 import { AssigneeItems, LabelItems, PriorityItems } from "./pickers";
 import { RetryMark, type TaskRetry } from "./retry";
@@ -28,7 +28,8 @@ import "./BoardView.css";
  * to the full page, ⌘/Ctrl-click and shift-click tick cards for the selection bar, dragging a card
  * into another column changes the grouped field (through the same update path as the list's drag
  * between groups), and each column adds tasks at its foot. A card's assignee, priority and labels
- * are menus, as the list's cells are, so they can change without a drag or a pointer.
+ * are menus, as the list's cells are, so they can change without a drag or a pointer. With "Show
+ * subtasks on cards" on, a parent's card lists its first subtasks under its progress line.
  *
  * Keys: j/k or ↓/↑ move between cards in a column, h/l or ←/→ between columns, Enter or o opens
  * the card, x ticks it, Shift+←/→ moves it into the next column, Esc clears the ticks.
@@ -51,6 +52,8 @@ export function BoardView(props: {
   /** Ticked tasks, by id. */
   checked: ReadonlySet<string>;
   onCheckedChange: (ids: Set<string>) => void;
+  /** Board 4's "Show subtasks on cards": each card lists its subtasks. */
+  showSubtasks?: boolean;
 }) {
   const company = useCompany();
   const commands = useCommands();
@@ -68,7 +71,7 @@ export function BoardView(props: {
     () => new Map(props.columns.map((group) => [group.key, new Map(group.rows.map((row) => [row.task.id, row] as const))] as const)),
   );
   const tasksById = createMemo(() => new Map(props.columns.flatMap((group) => group.rows.map((row) => [row.task.id, row.task] as const))));
-  const canDrag = () => props.columns.some((group) => group.value !== null);
+  const canDrag = () => props.columns.some((group) => takesDrops(group.value));
   const limitOf = (group: TaskGroup) => limits()[group.key] ?? COLUMN_PAGE;
   const shownRows = (group: TaskGroup) => group.rows.slice(0, limitOf(group));
   // The cards in the order they're shown, for shift-click ranges. Folded columns are skipped.
@@ -102,7 +105,7 @@ export function BoardView(props: {
 
   /** Moves tasks into a column: a ticked card carries every ticked task with it. */
   const moveInto = (ids: readonly string[], from: GroupValue, to: TaskGroup) => {
-    if (to.value === null) return;
+    if (!takesDrops(to.value)) return;
     const changes = ids.flatMap((id) => {
       const task = tasksById().get(id);
       const data = task ? moveUpdate(task, from, to.value) : null;
@@ -124,7 +127,7 @@ export function BoardView(props: {
     setDropKey(null);
   };
   const onDragOver = (event: DragEvent, group: TaskGroup) => {
-    if (!drag() || group.value === null) return;
+    if (!drag() || !takesDrops(group.value)) return;
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
     setDropKey(group.key);
@@ -137,7 +140,7 @@ export function BoardView(props: {
   const onDrop = (event: DragEvent, group: TaskGroup) => {
     const current = drag();
     endDrag();
-    if (!current || group.value === null) return;
+    if (!current || !takesDrops(group.value)) return;
     event.preventDefault();
     moveInto(current.ids, current.from, group);
   };
@@ -339,6 +342,8 @@ export function BoardView(props: {
                             checked={props.checked.has(row().task.id)}
                             draggable={canDrag()}
                             href={issuePath(company().issuePrefix, row().task)}
+                            hrefFor={(task) => issuePath(company().issuePrefix, task)}
+                            showSubtasks={props.showSubtasks ?? false}
                             onOpen={props.onOpen}
                             onCheck={(mode) => check(row().task.id, mode)}
                             onDragStart={(event) => onDragStart(event, group(), row().task)}
@@ -413,6 +418,8 @@ function Card(props: {
   checked: boolean;
   draggable: boolean;
   href: string;
+  hrefFor: (task: CompactIssue) => string;
+  showSubtasks: boolean;
   onOpen: (task: CompactIssue) => void;
   onCheck: (mode: "toggle" | "range") => void;
   onDragStart: (event: DragEvent) => void;
@@ -537,6 +544,33 @@ function Card(props: {
             <span style={{ width: `${percent()}%` }} />
           </span>
         </div>
+        <Show when={props.showSubtasks}>
+          <ul class="bv-subtask-list" aria-label={`Subtasks of ${task().identifier ?? task().title}`}>
+            <For each={props.row.children.slice(0, CARD_SUBTASKS)}>
+              {(child) => (
+                <li class="bv-subtask">
+                  <StatusCapsule status={child.task.status as IssueStatus} size="row" />
+                  <span class="mono bv-subtask-id">{child.task.identifier}</span>
+                  <a
+                    class="bv-subtask-title"
+                    href={props.hrefFor(child.task)}
+                    draggable={false}
+                    onClick={(event) => {
+                      if (!plainClick(event)) return;
+                      event.preventDefault();
+                      props.onOpen(child.task);
+                    }}
+                  >
+                    {child.task.title}
+                  </a>
+                </li>
+              )}
+            </For>
+            <Show when={props.row.children.length > CARD_SUBTASKS}>
+              <li class="bv-subtask bv-subtask--more">{props.row.children.length - CARD_SUBTASKS} more</li>
+            </Show>
+          </ul>
+        </Show>
       </Show>
     </article>
   );

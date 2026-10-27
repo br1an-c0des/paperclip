@@ -43,6 +43,8 @@ export type IssueListFilters = {
   includeBlockedBy?: boolean;
   /** Tasks that routine runs created, which the server leaves out unless asked. The old list asks. */
   includeRoutineExecutions?: boolean;
+  /** Only the tasks this agent took part in, as agent pages link to them (`?participantAgentId=`). */
+  participantAgentId?: string;
   limit?: number;
   offset?: number;
 };
@@ -51,6 +53,7 @@ function listParams(filters: IssueListFilters) {
   const params = new URLSearchParams({ view: "compact", sortField: "updated", sortDir: "desc" });
   if (filters.projectId) params.set("projectId", filters.projectId);
   if (filters.parentId) params.set("parentId", filters.parentId);
+  if (filters.participantAgentId) params.set("participantAgentId", filters.participantAgentId);
   if (filters.includeBlockedBy) params.set("includeBlockedBy", "true");
   if (filters.includeRoutineExecutions) params.set("includeRoutineExecutions", "true");
   if (filters.limit) params.set("limit", String(filters.limit));

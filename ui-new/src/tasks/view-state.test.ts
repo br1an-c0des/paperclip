@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import { applyUpdate } from "./task-updates";
 import {
   applyFilters,
+  creatorKey,
+  DEFAULT_SORT,
   DEFAULT_VIEW_STATE,
   EMPTY_FILTERS,
   filterCount,
+  isAgentCreated,
   parseViewState,
   readViewState,
   toggled,
@@ -41,11 +44,41 @@ describe("parseViewState", () => {
   it("keeps a saved grouping and folded groups", () => {
     const saved = { groupBy: "assignee", filters: EMPTY_FILTERS, collapsed: { "assignee:none": true, bad: "yes" } };
     expect(parseViewState(JSON.stringify(saved))).toEqual({
-      layout: "list",
+      ...DEFAULT_VIEW_STATE,
       groupBy: "assignee",
-      filters: EMPTY_FILTERS,
       collapsed: { "assignee:none": true },
     });
+  });
+
+  it("fills in the filters, sort and display options an older saved state lacks", () => {
+    const saved = { groupBy: "status", filters: { statuses: ["todo"], assignees: [], labels: [], priorities: [] } };
+    const state = parseViewState(JSON.stringify(saved));
+    expect(state.filters).toEqual({ ...EMPTY_FILTERS, statuses: ["todo"] });
+    expect(state.sort).toEqual(DEFAULT_SORT);
+    expect(state.board).toEqual({ subtasks: false, closed: true });
+    expect(state.savedViewId).toBeNull();
+  });
+
+  it("keeps the new filters, a sort, the board's options and the picked view", () => {
+    const saved = {
+      groupBy: "workspace",
+      filters: { ...EMPTY_FILTERS, creators: ["agent:a"], projects: ["p1", 3], workspaces: ["none"], liveOnly: true, hideAgentCreated: "yes" },
+      sort: { field: "priority", dir: "asc" },
+      board: { subtasks: true, closed: false },
+      savedViewId: "v1",
+    };
+    expect(parseViewState(JSON.stringify(saved))).toMatchObject({
+      groupBy: "workspace",
+      filters: { creators: ["agent:a"], projects: ["p1"], workspaces: ["none"], liveOnly: true, hideAgentCreated: false },
+      sort: { field: "priority", dir: "asc" },
+      board: { subtasks: true, closed: false },
+      savedViewId: "v1",
+    });
+  });
+
+  it("drops a sort it doesn't know", () => {
+    expect(parseViewState(JSON.stringify({ sort: { field: "random", dir: "asc" } })).sort).toEqual(DEFAULT_SORT);
+    expect(parseViewState(JSON.stringify({ sort: { field: "title", dir: "sideways" } })).sort).toEqual({ field: "title", dir: "desc" });
   });
 });
 
@@ -92,8 +125,46 @@ describe("applyFilters", () => {
 
   it("counts and toggles filter values", () => {
     expect(filterCount({ ...EMPTY_FILTERS, statuses: ["todo"], labels: ["bug", "none"] })).toBe(3);
+    expect(filterCount({ ...EMPTY_FILTERS, creators: ["user:me"], projects: ["p"], workspaces: ["w"], liveOnly: true, hideAgentCreated: true })).toBe(5);
     expect(toggled(["a", "b"], "a")).toEqual(["b"]);
     expect(toggled(["a"], "b")).toEqual(["a", "b"]);
+  });
+});
+
+describe("applyFilters, creator, project, workspace and the switches", () => {
+  const tasks = [
+    task("mine", { createdByUserId: "me", originKind: "manual", projectId: "p1", projectWorkspaceId: "w1" }),
+    task("bot", { createdByAgentId: "ada", projectId: "p1" }),
+    task("routine", { createdByUserId: "me", originKind: "routine_execution", projectId: null }),
+    task("system", { createdByUserId: null, createdByAgentId: null, projectId: "p2" }),
+  ];
+  const ids = (list: CompactIssue[]) => list.map((each) => each.id);
+
+  it("keys creators as assignees are keyed", () => {
+    expect(tasks.map(creatorKey)).toEqual(["user:me", "agent:ada", "user:me", "none"]);
+    expect(ids(applyFilters(tasks, { ...EMPTY_FILTERS, creators: ["agent:ada", "none"] }))).toEqual(["bot", "system"]);
+  });
+
+  it("filters by project, with none for tasks outside any", () => {
+    expect(ids(applyFilters(tasks, { ...EMPTY_FILTERS, projects: ["p1"] }))).toEqual(["mine", "bot"]);
+    expect(ids(applyFilters(tasks, { ...EMPTY_FILTERS, projects: ["none", "p2"] }))).toEqual(["routine", "system"]);
+  });
+
+  it("filters by the workspace the context resolves, with none for the default", () => {
+    const workspaceOf = (each: CompactIssue) => each.projectWorkspaceId ?? null;
+    expect(ids(applyFilters(tasks, { ...EMPTY_FILTERS, workspaces: ["w1"] }, "", { workspaceOf }))).toEqual(["mine"]);
+    expect(ids(applyFilters(tasks, { ...EMPTY_FILTERS, workspaces: ["none"] }, "", { workspaceOf }))).toEqual(["bot", "routine", "system"]);
+  });
+
+  it("keeps only running tasks when live only is on", () => {
+    expect(ids(applyFilters(tasks, { ...EMPTY_FILTERS, liveOnly: true }, "", { liveIssueIds: new Set(["bot"]) }))).toEqual(["bot"]);
+    expect(ids(applyFilters(tasks, { ...EMPTY_FILTERS, liveOnly: true }))).toEqual([]);
+  });
+
+  it("hides what agents, routines and the system created, as shared's isAgentCreatedIssue decides", () => {
+    expect(tasks.map(isAgentCreated)).toEqual([false, true, true, true]);
+    expect(isAgentCreated({ createdByUserId: "me", createdByAgentId: null, originKind: "onboarding_first_task" } as CompactIssue)).toBe(false);
+    expect(ids(applyFilters(tasks, { ...EMPTY_FILTERS, hideAgentCreated: true }))).toEqual(["mine"]);
   });
 });
 
