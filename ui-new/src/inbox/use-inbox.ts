@@ -1,26 +1,29 @@
-import type { AttentionItem, AttentionSubject, CompactIssue } from "@paperclipai/shared";
+import type { AttentionFeed, AttentionItem, AttentionSubject, CompactIssue } from "@paperclipai/shared";
 import { createMutation, createQueries, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createMemo, createSignal } from "solid-js";
 import { inboxApi } from "@/api/inbox";
 import { interactionsApi } from "@/api/interactions";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
-import { requestFromApproval, requestFromInteraction, type Request } from "@/requests/request-model";
+import { requestFromApproval, requestFromInteraction, requestFromReview, type Request } from "@/requests/request-model";
+import { useReviewTasks } from "@/requests/review-tasks";
 import type { TaskPeople } from "@/tasks/people";
 import { pushToast } from "@/ui/Toast";
-import { archivedTasks, groupFeed, snoozeLabel, unreadCount, type Pending } from "./inbox-model";
+import { archivedTasks, groupFeed, snoozeLabel, unreadCount, withStep, type Pending } from "./inbox-model";
+import { useAttentionFeed } from "./needs-you";
 
 /*
  * The Inbox's data and triage (board 14):
  *
  * - The attention feed, whole and with your cleared and snoozed items, sorted into tabs.
  * - Each request's card source: a task's interactions (the same query as the task's thread, so an
- *   answer here shows there) and each approval by id.
+ *   answer here shows there), each approval by id, and the task behind each review for its sign-off.
  * - Clear, snooze and restore, shown at once and undone from the toast. A step stays shown until a
- *   feed fetched after it lands.
+ *   feed fetched after it lands. It also patches the feed's cache, which the nav's Inbox count reads
+ *   (`needs-you.ts`), so the count moves with it; a failed step puts the item back.
  * - Your tasks for Updates, with read state and the inbox archive.
  *
- * Every step refreshes the nav's counts (`sidebar-badges`) along with the feed or the task list.
+ * Every step refreshes the feed or the task list, and `sidebar-badges`, which other counts still read.
  */
 
 type PendingEntry = Pending & { settledAt?: number };
@@ -36,11 +39,7 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
   const client = useQueryClient();
   const companyId = () => company().id;
 
-  const feed = createQuery(() => ({
-    queryKey: queryKeys.inbox.feed(companyId()),
-    queryFn: ({ signal }) => inboxApi.feed(companyId(), signal),
-    refetchOnWindowFocus: true,
-  }));
+  const feed = useAttentionFeed();
 
   const [pending, setPending] = createSignal<ReadonlyMap<string, PendingEntry>>(new Map());
   const setStep = (id: string, step: PendingEntry | null) =>
@@ -62,6 +61,24 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
     void client.invalidateQueries({ queryKey: queryKeys.sidebarBadges(companyId()) });
   };
 
+  /** Replaces one item in the cached feed; returns it as it was. */
+  const patchItem = (id: string, change: (item: AttentionItem) => AttentionItem) => {
+    let before: AttentionItem | undefined;
+    client.setQueryData<AttentionFeed>(queryKeys.inbox.feed(companyId()), (current) =>
+      current
+        ? {
+            ...current,
+            items: current.items.map((item) => {
+              if (item.id !== id) return item;
+              before = item;
+              return change(item);
+            }),
+          }
+        : current,
+    );
+    return before;
+  };
+
   const triage = createMutation(() => ({
     mutationFn: (input: { item: AttentionItem; step: Pending }): Promise<unknown> => {
       const key = input.item.dismissalKey;
@@ -69,13 +86,20 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
       if (input.step.action === "snooze") return inboxApi.snooze(companyId(), key, input.step.until);
       return inboxApi.restore(companyId(), key);
     },
-    onMutate: (input) => setStep(input.item.id, input.step),
+    onMutate: async (input) => {
+      setStep(input.item.id, input.step);
+      // A fetch already on its way would land without the step; the refresh after it brings it back.
+      await client.cancelQueries({ queryKey: queryKeys.inbox.feed(companyId()) });
+      const before = patchItem(input.item.id, (item) => withStep(item, input.step));
+      return { before };
+    },
     onSuccess: (_result, input) => {
       setStep(input.item.id, { ...input.step, settledAt: Date.now() });
       refreshFeed();
     },
-    onError: (error: Error, input) => {
+    onError: (error: Error, input, context) => {
       setStep(input.item.id, null);
+      if (context?.before) patchItem(input.item.id, () => context.before!);
       pushToast({ tone: "error", title: "Couldn't update the inbox", body: error.message });
     },
   }));
@@ -113,6 +137,10 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
     ),
   ]);
   const approvalIds = createMemo(() => [...new Set((feed.data?.items ?? []).flatMap((item) => (item.sourceKind === "approval" ? [item.subject.id] : [])))]);
+  const reviewTaskIds = createMemo(() => [
+    ...new Set((feed.data?.items ?? []).flatMap((item) => (item.sourceKind === "review" && itemTask(item) ? [itemTask(item)!.id] : []))),
+  ]);
+  const reviews = useReviewTasks(reviewTaskIds);
   const interactions = createQueries(() => ({
     queries: interactionTaskIds().map((taskId) => ({
       queryKey: queryKeys.issues.section(taskId, "interactions"),
@@ -175,6 +203,10 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
       } else if (item.sourceKind === "approval") {
         const approval = approvalById.get(item.subject.id);
         if (approval) result.set(item.id, requestFromApproval(approval, ctx));
+      } else if (item.sourceKind === "review" && task) {
+        const reviewed = reviews.task(task.id);
+        const stalled = item.subject.metadata?.reviewAttentionState === "stalled";
+        if (reviewed) result.set(item.id, requestFromReview(reviewed, ctx, { stalled, whyNow: item.whyNow, since: item.activityAt }));
       }
     }
     return result;
@@ -183,6 +215,7 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
   const sourceFailed = (item: AttentionItem) => {
     if (item.sourceKind === "approval") return approvals[approvalIds().indexOf(item.subject.id)]?.isError ?? false;
     const task = itemTask(item);
+    if (item.sourceKind === "review") return task ? reviews.failed(task.id) : false;
     return task ? (interactions[interactionTaskIds().indexOf(task.id)]?.isError ?? false) : false;
   };
 

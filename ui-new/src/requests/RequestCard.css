@@ -103,6 +103,20 @@
   text-overflow: ellipsis;
 }
 
+.rq-subj .mono {
+  margin-right: 2px;
+  color: var(--muted);
+}
+
+.rq-subj--link {
+  text-decoration: none;
+}
+
+.rq-subj--link:hover .rq-subj-title,
+.rq-subj--link:focus-visible .rq-subj-title {
+  text-decoration: underline;
+}
+
 .rq-life {
   margin-left: auto;
   display: inline-flex;
@@ -115,7 +129,10 @@
   color: var(--red-fg);
 }
 
+/* The "…" menu ends the top row; after the lifetime, which already pushes right, it just follows. */
 .rq-menu {
+  margin-left: auto;
+  flex-shrink: 0;
   width: 26px;
   height: 26px;
   display: grid;
@@ -126,6 +143,11 @@
 
 .rq-menu:hover {
   background: var(--hover);
+}
+
+.rq-life + .rq-menu,
+.rq-aside .rq-menu {
+  margin-left: 0;
 }
 
 .rq-ask {
@@ -553,4 +575,77 @@
   .rq-life {
     margin-left: 0;
   }
+}
+
+/* The context column (board 14): beside the body on a wide card, under it on a narrow one. */
+.rq-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.rq-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.rq--compact .rq-main {
+  gap: 10px;
+}
+
+.rq--settled .rq-main {
+  gap: 8px;
+}
+
+.rq-ctx {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@container rq (width >= 760px) {
+  .rq-split {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 28px;
+    align-items: start;
+  }
+
+  .rq-ctx {
+    padding: 0 0 0 22px;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+  }
+}
+
+/* A sign-off's stages. */
+.rq-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rq-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+}
+
+.rq-step--now {
+  border-color: color-mix(in srgb, var(--green-fg) 65%, transparent);
+  background: var(--green-bg);
+  color: var(--green-fg);
 }

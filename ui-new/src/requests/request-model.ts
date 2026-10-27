@@ -1,10 +1,11 @@
-import type { Approval, IssueThreadInteraction } from "@paperclipai/shared";
+import type { Approval, IssueExecutionStagePrincipal, IssueExecutionState, IssueStatus, IssueThreadInteraction } from "@paperclipai/shared";
 
 /*
  * The request view model (proposals/unifying-requests.md, "Proposed model: requests"): anything
  * waiting on someone's response, described by the same properties whatever table it lives in.
- * Board 15 draws it. This module builds requests from a task's interactions and approvals; the
- * Inbox (M3) adds the attention feed's other kinds.
+ * Board 15 draws it. This module builds requests from a task's interactions and approvals, and
+ * from a task waiting on a review stage's sign-off; the Inbox draws the attention feed's other kinds
+ * as plain cards.
  *
  * - kind: question (the answer goes back to the agent), proposal (approving applies a change),
  *   approval (a formal request with its own discussion), sign-off (a review stage's turn).
@@ -26,7 +27,8 @@ export type RequestShape =
   | "suggested_tasks"
   | "tool_call"
   | "connection"
-  | "approval";
+  | "approval"
+  | "signoff";
 
 export type RequestOutcome = "return" | "apply" | "apply_and_remember";
 
@@ -35,7 +37,8 @@ export type RequestAudience = {
   label: string;
 };
 
-export type RequestSubject = { kind: "task" | "tasks" | "agent" | "budget" | "company"; label: string; issueId?: string };
+/** `label` is the identifier for a task, with its `title` beside it when there is one. */
+export type RequestSubject = { kind: "task" | "tasks" | "agent" | "budget" | "company"; label: string; title?: string; issueId?: string };
 
 export type RequestState = "open" | "set_aside" | "settled";
 
@@ -43,7 +46,8 @@ export type Tone = "ok" | "bad" | "mid" | "muted";
 
 export type RequestSource =
   | { type: "interaction"; interaction: IssueThreadInteraction }
-  | { type: "approval"; approval: Approval };
+  | { type: "approval"; approval: Approval }
+  | { type: "review"; issueId: string; identifier: string; signoff: Signoff; stalled: boolean };
 
 export type Request = {
   key: string;
@@ -57,6 +61,7 @@ export type Request = {
   formal: boolean;
   /** Approving runs something (a tool call, a secret write), so the card is marked "Acts". */
   acts: boolean;
+  /** Empty `name` when nobody asked: a review nobody handed over. The card leaves the line out. */
   asker: { agentId: string | null; userId: string | null; name: string };
   /** "asks you", "suggests 3 tasks", "requests approval"… */
   askVerb: string;
@@ -104,6 +109,10 @@ export function expiryLabel(at: Date, now: Date): { text: string; soon: boolean 
   const hours = Math.round(minutes / 60);
   if (hours < 48) return { text: `Expires in ${plural(hours, "hour")}`, soon: false };
   return { text: `Expires in ${plural(Math.round(hours / 24), "day")}`, soon: false };
+}
+
+function taskSubject(task: NonNullable<RequestContext["task"]>): RequestSubject {
+  return task.identifier ? { kind: "task", label: task.identifier, title: task.title || undefined, issueId: task.id } : { kind: "task", label: task.title, issueId: task.id };
 }
 
 function audienceOf(interaction: IssueThreadInteraction, ctx: RequestContext): RequestAudience {
@@ -346,7 +355,7 @@ export function requestFromInteraction(interaction: IssueThreadInteraction, ctx:
     source: { type: "interaction", interaction },
     ...classified,
     audience: audienceOf(interaction, ctx),
-    subject: ctx.task ? { kind: "task", label: ctx.task.identifier ?? ctx.task.title, issueId: ctx.task.id } : null,
+    subject: ctx.task ? taskSubject(ctx.task) : null,
     formal: false,
     asker: { agentId: interaction.createdByAgentId ?? null, userId: interaction.createdByUserId ?? null, name: askerName },
     next: nextLine(classified, interaction, askerName, ctx),
@@ -408,7 +417,7 @@ export function requestFromApproval(approval: Approval, ctx: RequestContext): Re
       : budget
         ? { kind: "budget", label: `Budget: ${text(payload.scopeName) ?? "a scope"}` }
         : ctx.task
-          ? { kind: "task", label: ctx.task.identifier ?? ctx.task.title, issueId: ctx.task.id }
+          ? taskSubject(ctx.task)
           : { kind: "company", label: "The company" },
     formal: true,
     acts: false,
@@ -424,6 +433,154 @@ export function requestFromApproval(approval: Approval, ctx: RequestContext): Re
     verdict: open ? null : { ...(verdicts[approval.status] ?? { text: approval.status, tone: "muted" }), at: date(approval.decidedAt ?? approval.updatedAt) },
     result: !open && approval.decisionNote ? { text: approval.decisionNote, tone: "muted" } : null,
     createdAt: new Date(approval.createdAt),
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Sign-offs: a review stage's turn (proposal items 8 and 9)
+
+export type Principal = Pick<IssueExecutionStagePrincipal, "type" | "agentId" | "userId">;
+
+/** "agent:<id>" or "user:<id>", as task assignees and stage participants are keyed. */
+export function principalKey(principal: Principal) {
+  return principal.type === "agent" ? `agent:${principal.agentId}` : `user:${principal.userId}`;
+}
+
+export type SignoffStep = { type: "review" | "approval"; label: string; now: boolean };
+
+export type Signoff = {
+  steps: SignoffStep[];
+  /** "Returns to Strategy Engineer if sent back · round 2 of 3". */
+  returns: string | null;
+  /** Whether the stage waits on you, so you can sign here. */
+  yours: boolean;
+  /** Who it waits on, when it isn't you. */
+  waitingOn: string | null;
+};
+
+type StagePolicy = { stages?: { id: string; type: "review" | "approval"; participants: Principal[] }[]; maxReviewRounds?: number | null } | null;
+
+/**
+ * Where a task's review stages stand: the stages in order with the current one marked, where the
+ * task returns if it's sent back, and whether it's your turn.
+ */
+export function signoffOf(
+  task: { executionPolicy?: unknown; executionState?: IssueExecutionState | null; assigneeUserId?: string | null },
+  youId: string | null,
+  nameOf: (key: string) => string,
+): Signoff {
+  const policy = (task.executionPolicy ?? null) as StagePolicy;
+  const state = task.executionState ?? null;
+  const pending = state?.status === "pending" ? state : null;
+  const stages = Array.isArray(policy?.stages) ? policy.stages : [];
+  const steps = stages.map((stage): SignoffStep => {
+    const now = pending?.currentStageId === stage.id;
+    const who = now && pending?.currentParticipant ? [pending.currentParticipant] : stage.participants;
+    const names = who.map((participant) => {
+      const name = nameOf(principalKey(participant));
+      return name === "You" ? "you" : name;
+    });
+    return { type: stage.type, label: `${stage.type === "review" ? "Review" : "Approval"} · ${names.join(" or ") || "nobody yet"}`, now };
+  });
+  const current = pending?.currentParticipant ?? null;
+  const yours = current ? current.type === "user" && current.userId === youId : !!youId && task.assigneeUserId === youId;
+  const waitingOn = current && !yours ? nameOf(principalKey(current)) : null;
+  let returns: string | null = null;
+  if (state?.returnAssignee) {
+    const rounds = policy?.maxReviewRounds ?? 3;
+    const round = (state.changesRequestedCount ?? 0) + 1;
+    returns = `Returns to ${nameOf(principalKey(state.returnAssignee))} if sent back · round ${Math.min(round, rounds)} of ${rounds}`;
+  }
+  return { steps, returns, yours, waitingOn };
+}
+
+export type ReviewTask = {
+  id: string;
+  identifier: string | null;
+  title: string;
+  status: IssueStatus | string;
+  executionPolicy?: unknown;
+  executionState?: IssueExecutionState | null;
+  assigneeUserId?: string | null;
+  updatedAt: Date | string;
+};
+
+/** Where a review sits, from the attention feed: stalled when nobody can review it, and why now. */
+export type ReviewContext = { stalled?: boolean; whyNow?: string | null; since?: Date | string | null };
+
+/**
+ * A task waiting on a review stage, as a sign-off request. On your turn you approve or send it back
+ * with the comment the server asks for (`issue-execution-policy.ts`): approving moves the task to
+ * done, sending back to in progress, both through `PATCH /issues/:id`. Once the task leaves review,
+ * the request is settled with the stage's last decision.
+ */
+export function requestFromReview(task: ReviewTask, ctx: RequestContext, review: ReviewContext = {}): Request {
+  const nameOf = (key: string) => {
+    const [kind, id] = [key.slice(0, key.indexOf(":")), key.slice(key.indexOf(":") + 1)];
+    return kind === "agent" ? who(ctx, id, null) : who(ctx, null, id);
+  };
+  const signoff = signoffOf(task, ctx.youId, nameOf);
+  const identifier = task.identifier ?? "the task";
+  const stalled = review.stalled === true;
+  const open = task.status === "in_review";
+  const returnTo = task.executionState?.returnAssignee ?? null;
+  const asker = returnTo
+    ? { agentId: returnTo.type === "agent" ? (returnTo.agentId ?? null) : null, userId: returnTo.type === "user" ? (returnTo.userId ?? null) : null, name: nameOf(principalKey(returnTo)) }
+    : { agentId: null, userId: null, name: "" };
+  const steps = signoff.steps;
+  const after = steps[steps.findIndex((step) => step.now) + 1];
+  const canSign = open && !stalled && signoff.yours;
+
+  const title = stalled
+    ? `${identifier} is in review with nobody to review it`
+    : canSign
+      ? "Your sign-off is needed: approve, or send back"
+      : signoff.waitingOn
+        ? `Review pending with ${signoff.waitingOn}`
+        : `Review ${task.title || identifier}`;
+  const next = stalled
+    ? (review.whyNow ?? "Nobody is set to review it. Choose a review path from the task.")
+    : canSign
+      ? after && steps.some((step) => step.now)
+        ? `Approving moves ${identifier} to its next stage: ${after.label.toLowerCase()}.`
+        : `Approving finishes ${identifier}.`
+      : `Open ${identifier} to see the review.`;
+
+  const outcome = task.executionState?.lastDecisionOutcome;
+  const verdict: Request["verdict"] = open
+    ? null
+    : outcome === "approved" || task.status === "done"
+      ? { text: "Approved", tone: "ok", at: date(task.updatedAt) }
+      : outcome === "changes_requested"
+        ? { text: "Sent back with notes", tone: "muted", at: date(task.updatedAt) }
+        : { text: "Left review", tone: "muted", at: date(task.updatedAt) };
+
+  return {
+    key: `review:${task.id}`,
+    source: { type: "review", issueId: task.id, identifier, signoff, stalled },
+    kind: "signoff",
+    shape: "signoff",
+    outcome: "apply",
+    audience: signoff.yours ? { kind: "named", label: "You" } : signoff.waitingOn ? { kind: "named", label: `Only ${signoff.waitingOn}` } : { kind: "people_only", label: "People only" },
+    subject: taskSubject({ id: task.id, identifier: task.identifier, title: task.title }),
+    formal: false,
+    acts: false,
+    asker,
+    askVerb: canSign ? "handed this to you for review" : "is waiting on a review",
+    title,
+    body: null,
+    next,
+    lifetime: "Open until answered",
+    lifetimeSoon: false,
+    state: open ? "open" : "settled",
+    respond: !open
+      ? { allowed: false, reason: null }
+      : canSign
+        ? { allowed: true, reason: null }
+        : { allowed: false, reason: stalled ? null : signoff.waitingOn ? `Waiting on ${signoff.waitingOn.replace(/\.$/, "")}.` : null },
+    verdict,
+    result: null,
+    createdAt: new Date(review.since ?? task.updatedAt),
   };
 }
 
