@@ -1,15 +1,13 @@
 import { A, useNavigate } from "@solidjs/router";
-import { useQueryClient } from "@tanstack/solid-query";
 import { Building2, ChevronDown, Keyboard, LogOut, Moon, Palette, Plus, Search, Sun } from "lucide-solid";
 import { createMemo, For, Show } from "solid-js";
 import { activeAgents } from "@/api/agents";
-import { authApi } from "@/api/auth";
 import { openProjects } from "@/api/projects";
 import { agentState, runningAgentIds, sortAgentsForNav } from "@/lib/agent-state";
 import { useCommands } from "@/lib/commands";
 import { useCompaniesQuery, useCompany } from "@/lib/company";
 import { useAgentsQuery, useLiveRunsQuery, useProjectsQuery, useSidebarBadgesQuery } from "@/lib/company-data";
-import { useSession } from "@/lib/session";
+import { useSession, useSignOut, useYouName } from "@/lib/session";
 import { theme, toggleTheme } from "@/lib/theme";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { buttonClass } from "@/ui/Button";
@@ -99,14 +97,9 @@ function YouRow() {
   const session = useSession();
   const company = useCompany();
   const commands = useCommands();
-  const client = useQueryClient();
   const navigate = useNavigate();
-  const name = () => (session.isAuthenticatedMode() ? (session.session()?.user.name ?? session.session()?.user.email ?? "You") : "Local board");
-  const signOut = async () => {
-    await authApi.signOut();
-    client.clear();
-    navigate("/auth", { replace: true });
-  };
+  const name = useYouName();
+  const signOut = useSignOut();
   return (
     <div class="nav-you">
       <Menu placement="top-start">
