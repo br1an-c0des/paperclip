@@ -1,5 +1,5 @@
 import type { CompactIssue, IssuePriority, IssueStatus } from "@paperclipai/shared";
-import { Check, ChevronDown, CornerDownRight, Pin, Plus } from "lucide-solid";
+import { Check, ChevronDown, ChevronRight, CornerDownRight, FolderGit2, Pin, Plus } from "lucide-solid";
 import { createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { issuePath } from "@/api/issues";
 import { useCommands } from "@/lib/commands";
@@ -11,7 +11,18 @@ import { Menu } from "@/ui/Menu";
 import { Capsule, LabelPill, PriorityBars, RunningPill, StatusCapsule, TonePill } from "@/ui/Status";
 import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
-import { groupDefaults, moveUpdate, updatedLabel, type GroupMark, type GroupValue, type TaskGroup, type TaskRow } from "./list-model";
+import {
+  groupDefaults,
+  moveUpdate,
+  rowsById,
+  shownRows,
+  takesDrops,
+  updatedLabel,
+  type GroupMark,
+  type GroupValue,
+  type TaskGroup,
+  type TaskRow,
+} from "./list-model";
 import { Assignee, assigneeName, type TaskPeople } from "./people";
 import { AssigneeItems, LabelDot, LabelItems, PriorityItems, StatusItems } from "./pickers";
 import { RetryMark, type TaskRetry } from "./retry";
@@ -29,10 +40,12 @@ import "./TaskList.css";
  * `onOpen` instead, which opens the panel. The status, assignee, priority and labels cells are menus
  * that change the task in place. Rows can be ticked (shift-click ticks a range, ⌘/Ctrl-click one
  * more), dragged into another group, and added to a group by typing a title at its foot. An
- * interrupted task shows its state, with Retry when the server allows one (retry.tsx).
+ * interrupted task shows its state, with Retry when the server allows one (retry.tsx). A parent's
+ * subtask count unfolds its subtasks under it, indented, as full rows of their own.
  *
  * Keys, after the old list: j/k or the arrows move between group headings and rows, Enter or o
- * opens a row, x ticks it, ←/→ fold and unfold a group, Esc clears the ticks.
+ * opens a row, x ticks it, → unfolds a row's subtasks or a group, ← folds them again (from a
+ * subtask, it goes to the parent), Esc clears the ticks.
  */
 
 const PIN_KEY = "ui-new:tasks:pin-name";
@@ -84,6 +97,9 @@ export function TaskList(props: {
   /** Ticked tasks, by id. */
   checked: ReadonlySet<string>;
   onCheckedChange: (ids: Set<string>) => void;
+  /** Rows whose subtasks are unfolded, by task id. */
+  expanded: ReadonlySet<string>;
+  onToggleExpanded: (id: string, open: boolean) => void;
 }) {
   const company = useCompany();
   const commands = useCommands();
@@ -96,17 +112,23 @@ export function TaskList(props: {
 
   const groupKeys = createMemo(() => props.groups.map((group) => group.key));
   const groupsByKey = createMemo(() => new Map(props.groups.map((group) => [group.key, group] as const)));
-  const rowsByKey = createMemo(
-    () => new Map(props.groups.map((group) => [group.key, new Map(group.rows.map((row) => [row.task.id, row] as const))] as const)),
+  // Each group's rows as shown, unfolded subtasks included, by task id.
+  const shownByKey = createMemo(
+    () =>
+      new Map(
+        props.groups.map((group) => [group.key, new Map(shownRows(group.rows, props.expanded).map((shown) => [shown.row.task.id, shown] as const))] as const),
+      ),
   );
-  const rowIds = (group: TaskGroup) => group.rows.map((row) => row.task.id);
+  const rowIds = (key: string) => [...(shownByKey().get(key)?.keys() ?? [])];
 
-  const canDrag = () => props.groups.some((group) => group.value !== null);
-  const tasksById = createMemo(() => new Map(props.groups.flatMap((group) => group.rows.map((row) => [row.task.id, row.task] as const))));
+  const canDrag = () => props.groups.some((group) => takesDrops(group.value));
+  const tasksById = createMemo(
+    () => new Map(props.groups.flatMap((group) => [...rowsById(group.rows).values()].map((row) => [row.task.id, row.task] as const))),
+  );
   // The rows in the order they're shown, for shift-click ranges. Folded groups are skipped.
   const shownIds = createMemo(() => {
     const seen = new Set<string>();
-    for (const group of props.groups) if (props.isOpen(group)) for (const row of group.rows) seen.add(row.task.id);
+    for (const group of props.groups) if (props.isOpen(group)) for (const id of rowIds(group.key)) seen.add(id);
     return [...seen];
   });
 
@@ -156,7 +178,7 @@ export function TaskList(props: {
   };
   const onDragOver = (event: DragEvent, group: TaskGroup) => {
     const current = drag();
-    if (!current || group.value === null) return;
+    if (!current || !takesDrops(group.value)) return;
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
     setDropKey(group.key);
@@ -169,7 +191,7 @@ export function TaskList(props: {
   const onDrop = (event: DragEvent, group: TaskGroup) => {
     const current = drag();
     endDrag();
-    if (!current || group.value === null) return;
+    if (!current || !takesDrops(group.value)) return;
     event.preventDefault();
     const changes = current.ids.flatMap((id) => {
       const task = tasksById().get(id);
@@ -231,9 +253,18 @@ export function TaskList(props: {
       check(task.id, event.shiftKey ? "range" : "toggle");
     } else if (key === "ArrowLeft" && group) {
       event.preventDefault();
+      // An unfolded row folds its subtasks; a subtask goes to its parent; otherwise the group folds.
+      if (task && props.expanded.has(task.id)) return props.onToggleExpanded(task.id, false);
+      const parentId = current.dataset.parent;
+      if (task && parentId) return focusItem(items.find((item) => item.dataset.task === parentId && item.dataset.group === group.key));
       if (props.isOpen(group)) props.onToggleGroup(group, false);
       queueMicrotask(() => focusItem(navItems().find((item) => item.dataset.head === group.key)));
-    } else if (key === "ArrowRight" && group && !task && !props.isOpen(group)) {
+    } else if (key === "ArrowRight" && group && task) {
+      const row = shownByKey().get(group.key)?.get(task.id)?.row;
+      if (!row?.children.length || props.expanded.has(task.id)) return;
+      event.preventDefault();
+      props.onToggleExpanded(task.id, true);
+    } else if (key === "ArrowRight" && group && !props.isOpen(group)) {
       event.preventDefault();
       props.onToggleGroup(group, true);
     }
@@ -309,12 +340,16 @@ export function TaskList(props: {
                         <span>Labels</span>
                         <span>Updated</span>
                       </div>
-                      <For each={rowIds(group())}>
+                      <For each={rowIds(key)}>
                         {(id) => {
-                          const row = latest(() => rowsByKey().get(key)?.get(id));
+                          const shown = latest(() => shownByKey().get(key)?.get(id));
+                          const row = () => shown().row;
                           return (
                             <Row
                               row={row()}
+                              depth={shown().depth}
+                              expanded={props.expanded.has(id)}
+                              onToggleExpanded={(open) => props.onToggleExpanded(id, open)}
                               group={group()}
                               people={props.people}
                               updates={props.updates}
@@ -370,6 +405,8 @@ export function openMoreOptions(commands: ReturnType<typeof useCommands>, projec
     ...(value?.field === "status" ? { status: value.status } : {}),
     ...(value?.field === "assignee" && value.agentId ? { assigneeAgentId: value.agentId } : {}),
     ...(value?.field === "parent" && value.parentId ? { parentId: value.parentId } : {}),
+    ...(value?.field === "project" && value.projectId ? { projectId: value.projectId } : {}),
+    ...(value?.field === "workspace" && typeof value.defaults.projectId === "string" ? { projectId: value.defaults.projectId } : {}),
     ...(title ? { title } : {}),
   });
 }
@@ -396,6 +433,10 @@ export function GroupMarkView(props: { mark: GroupMark; people: TaskPeople }) {
           <span class="assignee-none tl-mark-disc" aria-hidden="true" />
         </Match>
         <Match when={props.mark.kind === "label" && props.mark}>{(mark) => <LabelDot color={mark().color} />}</Match>
+        <Match when={props.mark.kind === "project" && props.mark}>{(mark) => <LabelDot color={mark().color} />}</Match>
+        <Match when={props.mark.kind === "workspace"}>
+          <FolderGit2 size={18} aria-hidden="true" class="tl-mark-icon" />
+        </Match>
         <Match when={props.mark.kind === "task" && props.mark}>
           {(mark) => <Show when={mark().status} fallback={<Capsule gradient="ash" size="row" />}>{(status) => <StatusCapsule status={status()} size="row" />}</Show>}
         </Match>
@@ -406,6 +447,10 @@ export function GroupMarkView(props: { mark: GroupMark; people: TaskPeople }) {
 
 function Row(props: {
   row: TaskRow;
+  /** How far under its parent the row is unfolded: 0 for a row of its own. */
+  depth: number;
+  expanded: boolean;
+  onToggleExpanded: (open: boolean) => void;
   group: TaskGroup;
   people: TaskPeople;
   updates: TaskUpdates;
@@ -447,12 +492,16 @@ function Row(props: {
       data-nav
       data-task={task().id}
       data-group={props.group.key}
+      data-parent={props.depth > 0 ? (task().parentId ?? undefined) : undefined}
       draggable={props.draggable}
       onDragStart={(event) => props.onDragStart(event)}
       onDragEnd={() => props.onDragEnd()}
       onClick={openFromRow}
     >
-      <div class="tl-pin-col tl-name">
+      <div class="tl-pin-col tl-name" classList={{ "tl-name--sub": props.depth > 0 }} style={{ "--tl-depth": props.depth }}>
+        <Show when={props.depth > 0}>
+          <CornerDownRight size={13} aria-hidden="true" class="tl-branch" />
+        </Show>
         <button
           type="button"
           role="checkbox"
@@ -485,10 +534,17 @@ function Row(props: {
           {task().title}
         </a>
         <Show when={props.row.subtasks > 0}>
-          <span class="tl-subtasks" title={`${props.row.subtasksDone} of ${props.row.subtasks} subtasks done`}>
-            <CornerDownRight size={13} aria-hidden="true" />
+          <button
+            type="button"
+            class="tl-subtasks"
+            aria-expanded={props.expanded}
+            aria-label={`${props.expanded ? "Hide" : "Show"} ${props.row.subtasks} ${props.row.subtasks === 1 ? "subtask" : "subtasks"}, ${props.row.subtasksDone} done`}
+            title={`${props.row.subtasksDone} of ${props.row.subtasks} subtasks done`}
+            onClick={() => props.onToggleExpanded(!props.expanded)}
+          >
+            <ChevronRight size={12} stroke-width={2.4} aria-hidden="true" class="tl-subtasks-chevron" />
             {props.row.subtasks}
-          </span>
+          </button>
         </Show>
         <Show when={props.row.live}>
           <RunningPill compact />

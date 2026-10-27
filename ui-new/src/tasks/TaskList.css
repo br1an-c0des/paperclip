@@ -289,14 +289,47 @@
   text-decoration-color: var(--edge);
 }
 
+/* The subtask count, which unfolds the subtasks under the row */
 .tl-subtasks {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   flex-shrink: 0;
+  height: 22px;
+  padding: 0 7px 0 4px;
+  border-radius: var(--r-pill);
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
+}
+
+.tl-subtasks:hover,
+.tl-subtasks[aria-expanded="true"] {
+  background: var(--well);
+  color: var(--text);
+}
+
+.tl-subtasks-chevron {
+  transition: transform 0.15s ease;
+}
+
+.tl-subtasks[aria-expanded="true"] .tl-subtasks-chevron {
+  transform: rotate(90deg);
+}
+
+/* An unfolded subtask, indented under its parent by its depth */
+.tl-name--sub {
+  padding-left: calc(18px + (var(--tl-depth) - 1) * 22px);
+}
+
+.tl-branch {
+  flex-shrink: 0;
+  margin-right: -6px;
+  color: var(--dashed);
+}
+
+.tl-mark-icon {
+  color: var(--body);
 }
 
 .tl-name .tone-pill {
