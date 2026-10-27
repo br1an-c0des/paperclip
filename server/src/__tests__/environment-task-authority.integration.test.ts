@@ -111,6 +111,12 @@ databaseSuite("environment task lease authority", () => {
     const retryLeaseId = randomUUID();
     await db.insert(environmentLeases).values({ id: retryLeaseId, companyId, environmentId, heartbeatRunId: thirdRunId,
       status: "active", provider: prior.provider, providerLeaseId: "retry-task", metadata: pin });
+    const retryIdentity = { ...checkpointIdentity, runId: thirdRunId, turnId: "turn", itemId: "item" };
+    await expect(resolvePluginTaskResume(db, { companyId, leaseId: retryLeaseId,
+      priorIdentity: retryIdentity })).resolves.toBe("third-task");
+    await expect(runtime.task({ companyId, leaseId: retryLeaseId, operation: {
+      kind: "read_state", identity: retryIdentity, resumeFrom: "third-task",
+    } })).resolves.toMatchObject({ kind: "state", state: { ...retryIdentity, lifecycle: "suspended" } });
     await expect(runtime.task({ companyId, leaseId: retryLeaseId, operation: { ...submit, projectIds: [], resumeFrom: "third-task" } })).resolves.toMatchObject({ kind: "accepted" });
     const [retry] = await db.select().from(environmentLeases).where(eq(environmentLeases.id, retryLeaseId));
     await db.update(environmentLeases).set({ status: "released", cleanupStatus: "success", releasedAt: new Date(),

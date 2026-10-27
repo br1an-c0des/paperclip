@@ -730,7 +730,16 @@ recovery path with the specific scan cause and an operator action. Generic
 stranded-work recovery must not grant another budget for these errors. This
 does not automatically replay historical generic `setup_failed` runs.
 
-### ACP startup handshake bound
+### Runner authentication and ACP startup handshake bounds
+
+The native Runner waits up to the ten-second connection setup budget for the
+authenticated welcome. The current execution or reconnect deadline can shorten
+that wait. Controller admission and durable lease persistence happen before the
+welcome, so a short internal response limit must not discard an otherwise valid
+bootstrap ticket during that work. A failed welcome still makes the one-use
+ticket unsafe to replay. Authentication proofs, credential expiry, and identity
+checks remain required. Steady-state reads return to their 250 ms polling bound
+after the welcome.
 
 An adapter-backed live path also requires that the ACP startup handshake itself cannot hang forever. The engine bounds the handshake with a fixed startup deadline and a poll of the duplex control-channel disposition. Either condition ends the handshake and reports a closed, typed code, so the issue can reach a settled disposition instead of staying `in_progress` with no observable next action.
 
@@ -1293,6 +1302,14 @@ recording the proof and successor lineage. Retained provider files are not edite
 
 Bootstrap retries, exact-checkpoint resumes, and fresh replacement sessions share three total provider attempts, including the original attempt. Linked run IDs, controller restarts, and duplicate wakes do not reset this budget. Automatic attempts retain the 30-second delay. Replacement scheduling and predecessor lineage commit together, with one successor per predecessor and admission through the normal task locks, authorization, pause, approval, and budget gates.
 
+When a same-run retry acquires a replacement plugin task lease, the executor
+reloads the prior task's durable Runner checkpoint before checking local
+lifecycle evidence. This includes retries after a provider turn omitted its
+completion result. The existing lease-transfer policy must verify the company,
+agent, workspace, retained session, and termination of prior execution. The
+checkpoint must match the exact Runner, lease, run, session, turn, and item.
+A missing restart claim does not remove these checks or authorize a fresh session.
+
 A prepared remote workspace interrupted before the executor's first durable
 claim may resume its untouched bootstrap on the same run. This requires attempt
 and controller generation zero, no prior owner, and no process, provider session,
@@ -1326,6 +1343,21 @@ terminal behavior. This continuation uses the already charged restart attempt an
 does not reset the provider-attempt budget.
 
 Provider execution and control-plane finalization have different clocks. A healthy provider can think or execute a long tool without output. Once execution settles, recovery and finalization control steps have a 60-second deadline, checked on startup and every 15 seconds. With a healthy database and scheduler, an abandoned transition must be repaired or surfaced within 90 seconds. Terminal persistence must not wait on provider cleanup or publication; a late finalizer cannot change a reassigned or closed task or release another run's locks. Historical ambiguous runs are never automatically replayed after an upgrade.
+
+When that deadline fails a native run with a prepared workspace, the same
+transaction records the exact source's file-preservation obligation. Existing
+stop-and-retain recovery contains the provider and saves the files before
+ordinary Retry can continue. Finalized workspaces, mismatched sources and
+accepted results keep their existing settlement paths. Reassignment does not
+discard the stopped run's files or grant authority over the new assignee.
+
+For older failed native runs that lack this bookkeeping, a deliberate Retry
+registers preservation from the exact prepared workspace descriptor and assigns
+the existing bounded maintenance owner. A live finalization owner or mismatched
+source cannot be adopted. Registration does not prove termination or authorize
+replay: the provider stop receipt, saved-file receipt, current execution authority
+and effect fences still control successor admission. Repeated clicks retain the
+same recovery generation and request.
 
 Every continuation carries the triggering request, ordered user direction, interaction outcomes, completed work, and explicit history coverage. A delivered message remains part of the task's request after its connection or approval resolves. The original title is background; a completed Notion read does not satisfy a later Gmail request. Author and source-trust boundaries survive rendering into both native and legacy prompts. Missing required history must be fetched before dispatch rather than described as complete.
 
@@ -1376,14 +1408,25 @@ accepted native result. A successful `workspace_recovery` operation and matching
 recovery record prove persistence; adapter output or a user repair note cannot.
 The failed run and unknown external effects remain historical facts.
 
-Startup and periodic recovery discover these obligations through the retained
-workspace index. Two background exports per server keep unrelated recovery
-responsive. Automatic file recovery has three total attempts with a 30-second
-delay. An idempotent board request through
+Startup and the retained-workspace sweep reconstruct these obligations through
+the retained workspace index. Committed Retry, recovery admission, and recovery
+progress writes wake a separate preservation worker. It follows the persisted
+retry deadline and becomes idle when no eligible recovery remains. Two background
+exports per server keep unrelated execution finalization responsive. A resolved
+exact-source files-only obligation remains eligible; unrelated resolved or
+cancelled recovery history does not keep this worker active. The persisted
+attempt budget applies across restarts. An idempotent board request through
 `POST /api/issues/:id/recovery-actions/recover-workspace` admits one additional
 attempt after a transient failure. It requires task mutation access, accepts no
 infrastructure certification, and grants no agent or provider execution authority.
-Restarts do not reset the attempt limit. Missing stop or descriptor proof keeps
+Each completed export frees its own slot and wakes the next scan. A slow export
+does not hold a free slot. Completed cleanup and saved-input obligations receive
+one bounded pass through unvisited sources. The pass stops at its tail so paused
+input does not keep the worker active; a committed change starts a fresh pass.
+Shutdown joins this worker's exports before closing the database. Repeated Retry
+during physical preservation binds the canonical intent
+without changing the attempt's generation or revision. Progress writes preserve
+that newer intent so its fenced completion can still commit. Missing stop or descriptor proof keeps
 the source allocated and exposes the specific service blocker.
 
 File recovery alone never requests another agent turn. Existing saved human
@@ -1676,12 +1719,48 @@ waiting for provider startup. An abrupt controller exit during session opening
 can then recover through the same exact process-identity checks as an active turn.
 
 Both graceful and hot restarts detach the old controller from native sessions.
+Remote Runner processes use their authenticated connection lease as the bound
+on disconnected lifetime. The controller's shorter connection-recovery budget
+limits its own attempt; it must not terminate the remote owner while another
+controller is starting or classifying runs. Lease expiry still shuts down the
+provider, and exact identity, authentication, Stop and revocation checks remain
+required before any recovery or new execution.
+Native ACPX semantic tool calls wait on their durable PRP invocation across a
+controller outage. Their provider-side MCP bridge does not impose a separate
+request deadline that could make the provider retry an already queued write.
+Runner lease expiry, turn cancellation and bridge closure still end those waits.
+Ordinary bridge callers retain their request deadline. Repeating the same call
+identity returns its one retained result; it does not execute the operation again.
+The native Claude sidecar also sets its HTTP MCP client budget to one hour,
+matching the Runner connection lease budget. This prevents Claude's default
+60-second HTTP deadline from aborting an otherwise pending durable request.
+The setting applies to that native Claude session's MCP client; other provider
+sessions and ordinary bridge deadlines remain unchanged. Explicit cancellation
+and Runner shutdown still take precedence over that client budget.
+An adopted transport can receive authenticated queued semantic calls before
+the driver publishes its recovered session and tool handler. It holds those
+calls until the handler is installed, then rechecks the original authority and
+turn epoch before dispatch. Transport failure, close or controller detachment
+ends that wait without invoking a late handler. Missing startup wiring is not
+reported to the provider as the result of an external operation.
 If shutdown begins while a provider session is opening, its eventual publication
 honors the pending detachment before dispatching a turn. Once detached, an old
 execution finalizer cannot suspend or signal the durable runner: the next
 controller must recover it through the authenticated ownership checks. This
 preserves active work and queued messages without treating a server restart as
 user cancellation.
+
+During controller shutdown, already registered provider startups share one
+30-second sweep deadline to finish read-only run admission and publish their exact
+sessions for detachment. Its company, run, session, runner and completion-contract binding
+must still match persisted authority. The draining controller cannot checkpoint,
+publish events, submit a turn or settle the run. A new startup after the shutdown
+fence, or admission after the window expires, remains rejected. A Stop pending
+before or after session publication keeps cancellation and cleanup with the
+current owner. Shutdown waits for that owner only until the same sweep deadline;
+it does not detach the session or submit a prompt while Stop is pending. An
+unsettled owner remains explicitly pending for reconciliation. Its timeout does
+not abort detachment of healthy sessions or trigger a global graceful drain.
 
 Recovery restores a structured result proposal from the durable run events when
 its append survived but the active turn's session checkpoint did not. Advancing
@@ -1760,6 +1839,24 @@ Only a matching ownership marker and confirmed process exit permit automatic
 replacement. Missing or conflicting identity evidence, failed reads, and an
 exhausted probe budget retain the existing ownership and recovery safeguards.
 They must not launch a competing listener or overwrite the original marker.
+
+Remote process verification uses one Node probe for liveness, command identity,
+and the saved Linux boot identity and start ticks. If metadata disappears during
+the probe, only a fresh `ESRCH` response confirms exit. A zombie also confirms
+exit when its generation matches the saved marker. Permission errors, unreadable
+metadata, and changed generations remain uncertain. Adopted-runner checks reject
+that uncertainty rather than returning the same `false` value as a confirmed
+exit. Launch checks that Node can run the probe before creating launch state or
+detaching the process. These receipts do not release historical recovery holds
+or prove that workspace files and provider state have been saved.
+The transport propagates rejected adopted-process checks through close and
+command waits. It must not turn a rejected check into a positive exit observation.
+When a process check rejects close, the transport retires its local controller,
+timers and notification queue without signalling the remote Runner or replacing
+its checkpoint. Repeated close retains the same failed ownership result.
+Copilot profile 62 binds this shared transport implementation. Profile 61 remains
+decodable for recovery, but exact launch admission uses the current profile and
+digest. Earlier live qualification results keep their original profile identity.
 
 Healthy native warm turns retain their runner and provider processes. After a
 controller crash, continuation can recover a completed remote session from its
@@ -1957,6 +2054,25 @@ and during fresh discovery. A name with conflicting schemas, risk, or source
 bindings remains an error; distinct names retain separate tools. Discovery does
 not grant execution authority: calls still use the existing gateway policy,
 approval, revocation, and audit paths.
+
+
+Native OpenCode sessions use the server-owned assigned-tool relay for local and
+remote execution. The provider receives only bounded search and call schemas,
+even when its protocol can fit the full catalog. This bounds provider grammar
+compilation independently of the transport's tool-count and byte limits. Search
+returns pinned tool aliases and schemas, intersects fresh grants, and respects
+planning/ask restrictions. OpenCode discovery pages use a 32 KiB budget; larger
+schemas use 16K-character chunks so JSON escaping and the result envelope fit
+its HTTP MCP bridge. Other harnesses keep the existing PRP discovery budgets.
+Calls retain the original gateway binding and its
+argument validation, approvals, revocation, and audit rules; prompt arguments
+cannot choose a gateway or credential. Assigned gateway launch credentials stay
+on the controller. The MCP bridge preserves exact declared operation names,
+including names that start with `paperclip_`; only a catalog-bound transport
+prefix may resolve to that declared name. Shortened or unknown names do not
+gain authority. OpenCode sessions with the former direct catalog rotate their
+provider checkpoint before reuse; other providers retain their existing tool
+contract fingerprints.
 
 
 ### Use real connection requests (2026-09-14)
