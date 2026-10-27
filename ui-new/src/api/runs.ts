@@ -1,10 +1,18 @@
-import type { AgentWakeupResponse, HeartbeatRun, HeartbeatRunEvent, ProviderTraceFrame, ProviderTraceMetadata } from "@paperclipai/shared";
+import type {
+  AgentWakeupResponse,
+  ChatFailedRunRetryResponse,
+  HeartbeatRun,
+  HeartbeatRunEvent,
+  ProviderTraceFrame,
+  ProviderTraceMetadata,
+} from "@paperclipai/shared";
 import { api, ApiError, errorMessage, readApiJson, type RequestOptions } from "./client";
 
 /*
  * One run, for the run modal (boards 16–18): the run itself, its events (the `adapter.invoke` event
- * holds what Paperclip sent the harness), its stored log, and its provider trace. The calls mirror
- * ui/src/api/heartbeats.ts; the live list and Stop stay in heartbeats.ts.
+ * holds what Paperclip sent the harness), its stored log, its provider trace, and waking the agent
+ * again (Retry, Resume, Rerun with trace). The calls mirror ui/src/api/heartbeats.ts and agents.ts;
+ * the live list and Stop stay in heartbeats.ts.
  */
 
 /**
@@ -93,15 +101,43 @@ export const runsApi = {
     for (const key of ["issueId", "taskId", "taskKey"] as const) {
       if (typeof context[key] === "string" && context[key]) payload[key] = context[key];
     }
-    return api.post<AgentWakeupResponse>(
-      `/agents/${encodeURIComponent(run.agentId)}/wakeup?companyId=${encodeURIComponent(run.companyId)}`,
-      {
-        source: "on_demand",
-        triggerDetail: "manual",
-        reason: "rerun_with_provider_trace",
-        payload,
-        debug: { providerTrace: "raw" },
-      },
-    );
+    return api.post<AgentWakeupResponse>(wakeupPath(run), {
+      source: "on_demand",
+      triggerDetail: "manual",
+      reason: "rerun_with_provider_trace",
+      payload,
+      debug: { providerTrace: "raw" },
+    });
   },
+  /**
+   * Retries a failed or timed-out run with the same request, as the old UI's Retry does. A task can
+   * accept the retry before a run exists (`actionId`, no `runId` yet).
+   */
+  retry: (run: Pick<RunDetail, "id" | "agentId" | "companyId">) =>
+    api.post<AgentWakeupResponse | ChatFailedRunRetryResponse>(wakeupPath(run), {
+      source: "on_demand",
+      triggerDetail: "manual",
+      reason: "retry_failed_run",
+      failedRunId: run.id,
+    }),
+  /** Picks up a run whose process was lost (run-model.ts `resumePayload` builds the payload). */
+  resume: (run: Pick<RunDetail, "agentId" | "companyId">, payload: Record<string, string>) =>
+    api.post<AgentWakeupResponse>(wakeupPath(run), {
+      source: "on_demand",
+      triggerDetail: "manual",
+      reason: "resume_process_lost_run",
+      payload,
+    }),
 };
+
+function wakeupPath(run: Pick<RunDetail, "agentId" | "companyId">) {
+  return `/agents/${encodeURIComponent(run.agentId)}/wakeup?companyId=${encodeURIComponent(run.companyId)}`;
+}
+
+/**
+ * The URL path of a run, under the company prefix: the old UI's run route
+ * (`/:companyPrefix/agents/:agentId/runs/:runId`), which ui-new opens as the run modal.
+ */
+export function runPath(prefix: string, agentKey: string, runId: string) {
+  return `/${prefix}/agents/${encodeURIComponent(agentKey)}/runs/${runId}`;
+}

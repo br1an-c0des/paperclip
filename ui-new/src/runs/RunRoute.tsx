@@ -1,0 +1,68 @@
+import { useNavigate, useParams } from "@solidjs/router";
+import { createQuery } from "@tanstack/solid-query";
+import { createEffect, on, onCleanup } from "solid-js";
+import { issuePath } from "@/api/issues";
+import { queryKeys } from "@/api/queryKeys";
+import { runPath, runsApi } from "@/api/runs";
+import { useCommands } from "@/lib/commands";
+import { useCompany } from "@/lib/company";
+import { useAgentsQuery } from "@/lib/company-data";
+import { AgentPage } from "@/routes/Planned";
+
+/*
+ * A run's link: the old UI's run route, `/:companyPrefix/agents/:agentKey/runs/:runId`, which agents,
+ * emails and the run modal's "Copy link" point to. It opens the run modal over the agent's page, as
+ * the old UI shows a run inside its agent.
+ *
+ * While the route is open the URL follows the modal: stepping to the task's previous or next run,
+ * or to a retry, changes it. Closing the modal goes to the run's task, where its runs live in
+ * ui-new, or to the agent when the run had no task. Leaving the route another way (Back) closes it.
+ */
+
+export function RunRoute() {
+  const params = useParams<{ agentKey: string; runId: string }>();
+  const commands = useCommands();
+  const company = useCompany();
+  const navigate = useNavigate();
+  const agents = useAgentsQuery();
+  /** The route has been left: nothing more to navigate. */
+  let left = false;
+
+  // The run the modal shows, to name it in the URL by its own agent.
+  const shown = createQuery(() => ({
+    queryKey: queryKeys.runs.detail(commands.runModal() ?? params.runId),
+    queryFn: ({ signal }) => runsApi.get(commands.runModal() ?? params.runId, signal),
+  }));
+  const agentKey = (agentId: string) => agents.data?.find((agent) => agent.id === agentId)?.urlKey ?? agentId;
+
+  createEffect(on(() => params.runId, (runId) => commands.openRunModal(runId)));
+
+  createEffect(() => {
+    const run = shown.data;
+    if (!run || run.id !== commands.runModal() || run.id === params.runId) return;
+    navigate(runPath(company().issuePrefix, agentKey(run.agentId), run.id), { replace: true });
+  });
+
+  createEffect(
+    on(
+      commands.runModal,
+      (open, before) => {
+        if (open || !before) return;
+        const run = shown.data;
+        const next = run?.issueId ? issuePath(company().issuePrefix, { id: run.issueId, identifier: null }) : `/${company().issuePrefix}/agents/${params.agentKey}`;
+        // After the click that closed it, in case that click was a link going somewhere already.
+        window.setTimeout(() => !left && navigate(next, { replace: true }));
+      },
+      { defer: true },
+    ),
+  );
+
+  // Back, or another way out: the modal closes with the route. The effects are gone by now, so
+  // closing doesn't navigate again.
+  onCleanup(() => {
+    left = true;
+    if (commands.runModal()) commands.closeRunModal();
+  });
+
+  return <AgentPage />;
+}

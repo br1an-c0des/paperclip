@@ -259,3 +259,79 @@ export function harnessName(adapterType: string | null | undefined) {
 export function supportsProviderTrace(adapterType: string | null | undefined, adapterConfig: Record<string, unknown> | null | undefined) {
   return adapterType !== "paperclip_runner" || adapterConfig?.provider !== "muse";
 }
+
+/*
+ * Retry and Resume, as the old UI's run detail offers them (ui/src/pages/AgentDetail.tsx): Resume
+ * for a run whose process was lost, Retry for a failed or timed-out run that recovery hasn't taken
+ * over and that hasn't been followed up already. A run offers one or the other, Resume first.
+ */
+
+type Rerunnable = {
+  id: string;
+  status: string;
+  errorCode: string | null;
+  execution?: { phase: string; successorRunId: string | null } | null;
+  contextSnapshot: Record<string, unknown> | null;
+};
+
+export function canResumeRun(run: Pick<Rerunnable, "status" | "errorCode">) {
+  return run.status === "failed" && run.errorCode === "process_lost";
+}
+
+export function canRetryRun(run: Pick<Rerunnable, "status" | "errorCode" | "execution">) {
+  return (
+    (run.status === "failed" || run.status === "timed_out") &&
+    run.execution?.phase !== "recovery_needed" &&
+    !run.execution?.successorRunId &&
+    !canResumeRun(run)
+  );
+}
+
+const text = (value: unknown) => (typeof value === "string" && value.trim() ? value : null);
+
+/** The task a run worked on, from its context, to wake the agent on it again. */
+export function runTaskPayload(run: Pick<Rerunnable, "contextSnapshot">) {
+  const context = run.contextSnapshot ?? {};
+  const payload: Record<string, string> = {};
+  for (const key of ["issueId", "taskId", "taskKey"] as const) {
+    const value = text(context[key]);
+    if (value) payload[key] = value;
+  }
+  return payload;
+}
+
+/** What Resume sends: the lost run to pick up from, its task, and the comment that woke it. */
+export function resumePayload(run: Pick<Rerunnable, "id" | "contextSnapshot">) {
+  const context = run.contextSnapshot ?? {};
+  const payload: Record<string, string> = { resumeFromRunId: run.id, ...runTaskPayload(run) };
+  const commentId = text(context.wakeCommentId) ?? text(context.commentId);
+  if (commentId) payload.commentId = commentId;
+  return payload;
+}
+
+/** The ways a wakeup for Retry can answer (`POST /agents/:id/wakeup` with `failedRunId`). */
+export type RetryAnswer =
+  | { id: string; status: string }
+  | { actionId: string; issueId: string; runId: string | null; status: string }
+  | { status: "skipped"; message: string | null; reason?: string };
+
+/**
+ * What a Retry came to, as the old UI reads it (ui/src/api/agents.ts `retryFailedRun`): the new
+ * run, a retry the task will start when it's ready (no run yet), or why it didn't start.
+ */
+export function retryOutcome(answer: RetryAnswer): { runId: string | null; issueId: string | null } | { error: string } {
+  if ("id" in answer) {
+    // Retries are idempotent: a repeated click can answer with a successor that already stopped.
+    if (["failed", "timed_out", "cancelled", "interrupted"].includes(answer.status)) {
+      return { error: "The previous retry has already stopped. Refresh the task and retry its latest failed run." };
+    }
+    return { runId: answer.id, issueId: null };
+  }
+  if ("actionId" in answer) {
+    if (answer.status === "failed" || answer.status === "cancelled") {
+      return { error: "This retry couldn't start. Open the task to review its access and recovery state." };
+    }
+    return { runId: answer.runId, issueId: answer.issueId };
+  }
+  return { error: answer.message ?? "Retry was skipped." };
+}

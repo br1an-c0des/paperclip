@@ -1,0 +1,105 @@
+/* "Find in run" (board 16): a pill field at the end of the run modal's tool bar */
+.rm-find {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  width: 190px;
+  padding: 0 8px 0 9px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rm-find:focus-within {
+  box-shadow: 0 0 0 2px var(--run-fg);
+}
+
+.rm-find--on {
+  width: 290px;
+  padding-right: 3px;
+}
+
+.rm-find-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+
+/* The ring goes round the whole pill instead */
+.rm-find-input:focus-visible {
+  outline: none;
+}
+
+.rm-find-input::placeholder {
+  color: var(--muted);
+}
+
+.rm-kbd {
+  margin-left: auto;
+  padding: 1px 5px;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.rm-find-count {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rm-find-btn {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+}
+
+.rm-find-btn:hover:not(:disabled) {
+  background: var(--well);
+  color: var(--text);
+}
+
+.rm-find-btn:disabled {
+  opacity: 0.45;
+}
+
+/* The matches, drawn with the CSS Custom Highlight API (find-in-run.ts) */
+::highlight(run-find) {
+  background-color: color-mix(in srgb, var(--amber-fg) 28%, transparent);
+  color: inherit;
+}
+
+::highlight(run-find-current) {
+  background-color: var(--amber-fg);
+  color: var(--card);
+}
+
+@container rm (max-width: 560px) {
+  .rm-find,
+  .rm-find--on {
+    width: 100%;
+  }
+}
+
+/* At the end of the bar, or just after the transcript's Show chips */
+.rm-bar > .rm-find {
+  margin-left: auto;
+}
+
+.rm-bar > .rm-tools + .rm-find {
+  margin-left: 6px;
+}
