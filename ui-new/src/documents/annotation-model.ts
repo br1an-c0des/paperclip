@@ -1,20 +1,13 @@
-import type { DocumentAnnotationAnchorSelector, DocumentAnnotationThread } from "@paperclipai/shared";
-import {
-  createDocumentAnchorSelector,
-  normalizeAnchorText,
-  projectMarkdownToText,
-  resolveProjectionRange,
-} from "@paperclipai/shared/document-anchors";
+import type { DocumentAnnotationThread } from "@paperclipai/shared";
 
 /*
  * Annotation threads on a document's text, as the old UI shows them
  * (ui/src/components/IssueDocumentAnnotations.tsx and DocumentAnnotationPanel.tsx): which threads
- * to list and in what order, the open count, when a new comment can't be anchored, and turning a
- * text selection in the rendered document into the anchor the server stores.
- *
- * The anchor helpers come from `@paperclipai/shared/document-anchors` at runtime, like ClipLab
- * (decision 9): the server re-anchors threads with the same code, so the two must agree.
+ * to list and in what order, the open count, when a new comment can't be anchored, and where a
+ * passage sits in the rendered text. Turning a selection into an anchor is in anchor.ts.
  */
+
+const squash = (value: string) => value.replace(/s+/g, " ").trim();
 
 type ThreadLike = Pick<DocumentAnnotationThread, "status" | "anchorState" | "normalizedStart" | "markdownStart" | "createdAt">;
 
@@ -49,35 +42,6 @@ export function newCommentBlock(input: { editing: boolean; viewingHistory: boole
   return null;
 }
 
-export type SelectionAnchor = { selector: DocumentAnnotationAnchorSelector; selectedText: string };
-
-/**
- * The anchor for a passage selected in the rendered document. The rendered text and the Markdown
- * source differ (formatting, list markers), so the selection is matched against the Markdown's text
- * projection; when it occurs more than once, the occurrence at the same relative position wins.
- *
- * `renderedText` is the container's whole text and `renderedStart` where the selection begins in it.
- */
-export function anchorForSelection(input: {
-  markdown: string;
-  renderedText: string;
-  renderedStart: number;
-  selectedText: string;
-}): SelectionAnchor | null {
-  const projection = projectMarkdownToText(input.markdown);
-  const needle = normalizeAnchorText(input.selectedText);
-  if (!needle) return null;
-  const occurrences: number[] = [];
-  for (let at = projection.text.indexOf(needle); at !== -1; at = projection.text.indexOf(needle, at + 1)) occurrences.push(at);
-  if (occurrences.length === 0) return null;
-  const ratio = input.renderedStart / Math.max(1, normalizeAnchorText(input.renderedText).length);
-  const expected = Math.round(ratio * Math.max(1, projection.text.length));
-  const start = occurrences.reduce((best, at) => (Math.abs(at - expected) < Math.abs(best - expected) ? at : best));
-  const range = resolveProjectionRange(projection, start, start + needle.length);
-  if (!range || normalizeAnchorText(range.text) !== needle) return null;
-  return { selector: createDocumentAnchorSelector(projection, range), selectedText: range.text };
-}
-
 /** "Quoted passage…", cut at a word near `max` characters. */
 export function quote(text: string, max = 140) {
   const flat = text.replace(/\s+/g, " ").trim();
@@ -92,7 +56,7 @@ export function quote(text: string, max = 140) {
  * highlight. Whitespace is squashed on both sides before matching, as the anchors are.
  */
 export function rawSpanFor(containerText: string, passage: string): { start: number; end: number } | null {
-  const needle = normalizeAnchorText(passage);
+  const needle = squash(passage);
   if (!needle) return null;
   // Map each normalized character back to its raw index.
   const map: number[] = [];

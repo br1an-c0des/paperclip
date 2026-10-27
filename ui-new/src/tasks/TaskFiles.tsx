@@ -24,12 +24,11 @@ import {
   Upload,
   X,
 } from "lucide-solid";
-import { createMemo, createSignal, For, Match, Show, Switch, type JSX } from "solid-js";
+import { createMemo, createSignal, For, lazy, Match, Show, Suspense, Switch, type JSX } from "solid-js";
 import { documentsApi } from "@/api/documents";
 import { fileResourcesApi, WORKSPACE_FILE_PAGE_SIZE } from "@/api/file-resources";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
-import { useThreads } from "@/documents/Annotations";
 import { openThreadCount } from "@/documents/annotation-model";
 import { ConfirmDialog } from "@/documents/ConfirmDialog";
 import {
@@ -42,12 +41,10 @@ import {
   sortDocuments,
   titleFromFilename,
 } from "@/documents/document-model";
-import { DocumentView } from "@/documents/DocumentView";
 import { documentKeys, type DocumentHost } from "@/documents/host";
-import { NewDocument } from "@/documents/NewDocument";
+import { useThreads } from "@/documents/queries";
 import { fileOpenFor, workspaceFileRef, type FileOpen } from "@/files/file-ref";
 import { fileSize } from "@/files/preview";
-import { WorkspaceFiles } from "@/files/WorkspaceFiles";
 import { viewport } from "@/layout/breakpoints";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
@@ -94,6 +91,11 @@ function byWhom(people: TaskPeople, agentId: string | null | undefined, userId: 
 }
 
 const words = (value: string) => value.replace(/_/g, " ");
+
+// The editor and the file viewer load when first opened, not with the task panel.
+const DocumentView = lazy(() => import("@/documents/DocumentView").then((module) => ({ default: module.DocumentView })));
+const NewDocument = lazy(() => import("@/documents/NewDocument").then((module) => ({ default: module.NewDocument })));
+const WorkspaceFiles = lazy(() => import("@/files/WorkspaceFiles").then((module) => ({ default: module.WorkspaceFiles })));
 
 export function TaskFiles(props: { taskId: string }) {
   const company = useCompany();
@@ -198,221 +200,223 @@ export function TaskFiles(props: { taskId: string }) {
   const backToList = () => setView({ kind: "list" });
 
   return (
-    <Switch>
-      <Match when={view().kind === "doc" && (view() as Extract<View, { kind: "doc" }>)}>
-        {(open) => (
-          <DocumentView
+    <Suspense fallback={<p class="tsec-muted tf-loading">Loading…</p>}>
+      <Switch>
+        <Match when={view().kind === "doc" && (view() as Extract<View, { kind: "doc" }>)}>
+          {(open) => (
+            <DocumentView
+              host={host()}
+              docKey={open().key}
+              editOnOpen={open().edit}
+              backLabel="Back to docs and files"
+              onBack={backToList}
+              onDeleted={backToList}
+            />
+          )}
+        </Match>
+        <Match when={view().kind === "new"}>
+          <NewDocument
             host={host()}
-            docKey={open().key}
-            editOnOpen={open().edit}
+            existingKeys={(documents.data ?? []).map((doc) => doc.key)}
             backLabel="Back to docs and files"
             onBack={backToList}
-            onDeleted={backToList}
+            onCreated={(key) => setView({ kind: "doc", key, edit: false })}
           />
-        )}
-      </Match>
-      <Match when={view().kind === "new"}>
-        <NewDocument
-          host={host()}
-          existingKeys={(documents.data ?? []).map((doc) => doc.key)}
-          backLabel="Back to docs and files"
-          onBack={backToList}
-          onCreated={(key) => setView({ kind: "doc", key, edit: false })}
-        />
-      </Match>
-      <Match when={view().kind === "files" && (view() as Extract<View, { kind: "files" }>)}>
-        {(open) => <WorkspaceFiles taskId={props.taskId} open={open().open} backLabel="Back to docs and files" onBack={backToList} />}
-      </Match>
-      <Match when={true}>
-        <section
-          class="tf"
-          classList={{ "tf--dragging": dragging() }}
-          aria-label="Docs and files"
-          onDragOver={(event) => {
-            if (phone() || !event.dataTransfer?.types.includes("Files")) return;
-            event.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
-          }}
-          onDrop={(event) => {
-            if (!event.dataTransfer?.files.length) return;
-            event.preventDefault();
-            setDragging(false);
-            void upload(event.dataTransfer.files);
-          }}
-        >
-          <div class="tsec-head">
-            <h2 class="disp">{loading() ? "Docs and files" : `${total()} item${total() === 1 ? "" : "s"}`}</h2>
-            <div class="tsec-head-tools">
-              <button
-                type="button"
-                class="btn btn--icon btn--ghost btn--compact"
-                aria-label={searching() ? "Close search" : "Search docs and files"}
-                aria-pressed={searching()}
-                onClick={() => {
-                  setSearching(!searching());
-                  if (!searching()) setSearch("");
-                }}
-              >
-                {searching() ? <X size={15} aria-hidden="true" /> : <Search size={15} aria-hidden="true" />}
-              </button>
-              <Button size="compact" icon={<Upload size={14} aria-hidden="true" />} disabled={uploading() > 0} onClick={() => picker?.click()}>
-                {uploading() > 0 ? "Uploading…" : "Upload"}
-              </Button>
-              <input
-                ref={picker}
-                type="file"
-                multiple
-                hidden
-                onChange={(event) => {
-                  void upload(event.currentTarget.files);
-                  event.currentTarget.value = "";
-                }}
-              />
+        </Match>
+        <Match when={view().kind === "files" && (view() as Extract<View, { kind: "files" }>)}>
+          {(open) => <WorkspaceFiles taskId={props.taskId} open={open().open} backLabel="Back to docs and files" onBack={backToList} />}
+        </Match>
+        <Match when={true}>
+          <section
+            class="tf"
+            classList={{ "tf--dragging": dragging() }}
+            aria-label="Docs and files"
+            onDragOver={(event) => {
+              if (phone() || !event.dataTransfer?.types.includes("Files")) return;
+              event.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+            }}
+            onDrop={(event) => {
+              if (!event.dataTransfer?.files.length) return;
+              event.preventDefault();
+              setDragging(false);
+              void upload(event.dataTransfer.files);
+            }}
+          >
+            <div class="tsec-head">
+              <h2 class="disp">{loading() ? "Docs and files" : `${total()} item${total() === 1 ? "" : "s"}`}</h2>
+              <div class="tsec-head-tools">
+                <button
+                  type="button"
+                  class="btn btn--icon btn--ghost btn--compact"
+                  aria-label={searching() ? "Close search" : "Search docs and files"}
+                  aria-pressed={searching()}
+                  onClick={() => {
+                    setSearching(!searching());
+                    if (!searching()) setSearch("");
+                  }}
+                >
+                  {searching() ? <X size={15} aria-hidden="true" /> : <Search size={15} aria-hidden="true" />}
+                </button>
+                <Button size="compact" icon={<Upload size={14} aria-hidden="true" />} disabled={uploading() > 0} onClick={() => picker?.click()}>
+                  {uploading() > 0 ? "Uploading…" : "Upload"}
+                </Button>
+                <input
+                  ref={picker}
+                  type="file"
+                  multiple
+                  hidden
+                  onChange={(event) => {
+                    void upload(event.currentTarget.files);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </div>
             </div>
-          </div>
-          <Show when={searching()}>
-            <div class="tf-search">
-              <TextInput
-                type="search"
-                value={search()}
-                ref={(element) => queueMicrotask(() => element.focus())}
-                onInput={(event) => setSearch(event.currentTarget.value)}
-                placeholder="Search docs and files"
-                aria-label="Search docs and files"
-              />
-            </div>
-          </Show>
+            <Show when={searching()}>
+              <div class="tf-search">
+                <TextInput
+                  type="search"
+                  value={search()}
+                  ref={(element) => queueMicrotask(() => element.focus())}
+                  onInput={(event) => setSearch(event.currentTarget.value)}
+                  placeholder="Search docs and files"
+                  aria-label="Search docs and files"
+                />
+              </div>
+            </Show>
 
-          <div class="tsec-scroll">
-            <Segmented
-              label="Show"
-              options={[
-                { value: "all", label: `All ${total()}` },
-                { value: "documents", label: `Documents ${docs().length}` },
-                { value: "attachments", label: `Attachments ${files().length}` },
-                { value: "outputs", label: `Outputs ${made().length}` },
-              ]}
-              value={kind()}
-              onChange={setKind}
-            />
-            <Switch>
-              <Match when={loading()}>
-                <p class="tsec-muted">Loading…</p>
-              </Match>
-              <Match when={documents.isError || attachments.isError || outputs.isError}>
-                <p class="tsec-muted">
-                  Some of this task's files couldn't be loaded: {((documents.error ?? attachments.error ?? outputs.error) as Error).message}
-                </p>
-              </Match>
-              <Match when={true}>
-                <Show when={show("documents")}>
-                  <FileGroup
-                    title="Documents"
-                    count={docs().length}
-                    empty="No documents."
-                    tools={
-                      <Show when={!phone()}>
-                        <Button size="compact" variant="quiet" disabled={uploading() > 0} onClick={() => importer?.click()}>
-                          Import .md
-                        </Button>
-                        <input
-                          ref={importer}
-                          type="file"
-                          accept=".md,.markdown,text/markdown"
-                          multiple
-                          hidden
-                          onChange={(event) => {
-                            void upload(event.currentTarget.files, { asDocuments: true });
-                            event.currentTarget.value = "";
-                          }}
-                        />
-                        <Button size="compact" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setView({ kind: "new" })}>
-                          New document
-                        </Button>
-                      </Show>
-                    }
-                  >
-                    <div class="card tf-docs">
-                      <For each={docs()}>
-                        {(doc) => (
-                          <DocumentRow
-                            doc={doc}
-                            host={host()}
-                            people={people}
-                            phone={phone()}
-                            onOpen={(edit) => setView({ kind: "doc", key: doc.key, edit })}
-                            onChanged={() => void refreshDocuments()}
+            <div class="tsec-scroll">
+              <Segmented
+                label="Show"
+                options={[
+                  { value: "all", label: `All ${total()}` },
+                  { value: "documents", label: `Documents ${docs().length}` },
+                  { value: "attachments", label: `Attachments ${files().length}` },
+                  { value: "outputs", label: `Outputs ${made().length}` },
+                ]}
+                value={kind()}
+                onChange={setKind}
+              />
+              <Switch>
+                <Match when={loading()}>
+                  <p class="tsec-muted">Loading…</p>
+                </Match>
+                <Match when={documents.isError || attachments.isError || outputs.isError}>
+                  <p class="tsec-muted">
+                    Some of this task's files couldn't be loaded: {((documents.error ?? attachments.error ?? outputs.error) as Error).message}
+                  </p>
+                </Match>
+                <Match when={true}>
+                  <Show when={show("documents")}>
+                    <FileGroup
+                      title="Documents"
+                      count={docs().length}
+                      empty="No documents."
+                      tools={
+                        <Show when={!phone()}>
+                          <Button size="compact" variant="quiet" disabled={uploading() > 0} onClick={() => importer?.click()}>
+                            Import .md
+                          </Button>
+                          <input
+                            ref={importer}
+                            type="file"
+                            accept=".md,.markdown,text/markdown"
+                            multiple
+                            hidden
+                            onChange={(event) => {
+                              void upload(event.currentTarget.files, { asDocuments: true });
+                              event.currentTarget.value = "";
+                            }}
                           />
-                        )}
-                      </For>
-                    </div>
-                  </FileGroup>
-                </Show>
-                <Show when={show("attachments")}>
-                  <FileGroup title="Attachments" count={files().length} empty="No attachments. Drop files here to add them.">
-                    <div class="tf-tiles">
-                      <For each={files()}>
-                        {(file) => (
-                          <AttachmentTile
-                            file={file}
-                            people={people}
-                            canDelete={!phone()}
-                            onDeleted={() => void client.invalidateQueries({ queryKey: queryKeys.issues.section(props.taskId, "attachments") })}
-                          />
-                        )}
-                      </For>
-                    </div>
-                  </FileGroup>
-                </Show>
-                <Show when={show("outputs")}>
-                  <FileGroup title="Outputs" count={made().length} empty="Nothing produced yet: pull requests, branches and previews from runs show here.">
-                    <div class="tf-outputs">
-                      <For each={made()}>
-                        {(output) => <OutputCard output={output} onOpenFile={(open) => setView({ kind: "files", open })} />}
-                      </For>
-                    </div>
-                  </FileGroup>
-                </Show>
-                <Show when={kind() === "all" || kind() === "outputs"}>
-                  <button type="button" class="tf-browse" onClick={() => setView({ kind: "files", open: null })}>
-                    <span class="tf-output-icon">
-                      <FolderGit2 size={16} aria-hidden="true" />
-                    </span>
-                    <span class="tf-browse-text">
-                      <span class="tf-browse-title">Browse workspace files</span>
-                      <span class="tsec-muted">
-                        <Show when={workspace()} fallback={hasWorkspace() ? "The task's workspace" : "No workspace yet"}>
-                          {(current) => <span class="mono">{current().branchName ?? current().name}</span>}
+                          <Button size="compact" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setView({ kind: "new" })}>
+                            New document
+                          </Button>
                         </Show>
-                        <Show when={changed.data?.state === "available" && changed.data}>
-                          {(list) => (
-                            <>
-                              {" "}
-                              · {list().items.length}
-                              {list().truncated ? "+" : ""} changed file{list().items.length === 1 ? "" : "s"}
-                            </>
+                      }
+                    >
+                      <div class="card tf-docs">
+                        <For each={docs()}>
+                          {(doc) => (
+                            <DocumentRow
+                              doc={doc}
+                              host={host()}
+                              people={people}
+                              phone={phone()}
+                              onOpen={(edit) => setView({ kind: "doc", key: doc.key, edit })}
+                              onChanged={() => void refreshDocuments()}
+                            />
                           )}
-                        </Show>
+                        </For>
+                      </div>
+                    </FileGroup>
+                  </Show>
+                  <Show when={show("attachments")}>
+                    <FileGroup title="Attachments" count={files().length} empty="No attachments. Drop files here to add them.">
+                      <div class="tf-tiles">
+                        <For each={files()}>
+                          {(file) => (
+                            <AttachmentTile
+                              file={file}
+                              people={people}
+                              canDelete={!phone()}
+                              onDeleted={() => void client.invalidateQueries({ queryKey: queryKeys.issues.section(props.taskId, "attachments") })}
+                            />
+                          )}
+                        </For>
+                      </div>
+                    </FileGroup>
+                  </Show>
+                  <Show when={show("outputs")}>
+                    <FileGroup title="Outputs" count={made().length} empty="Nothing produced yet: pull requests, branches and previews from runs show here.">
+                      <div class="tf-outputs">
+                        <For each={made()}>
+                          {(output) => <OutputCard output={output} onOpenFile={(open) => setView({ kind: "files", open })} />}
+                        </For>
+                      </div>
+                    </FileGroup>
+                  </Show>
+                  <Show when={kind() === "all" || kind() === "outputs"}>
+                    <button type="button" class="tf-browse" onClick={() => setView({ kind: "files", open: null })}>
+                      <span class="tf-output-icon">
+                        <FolderGit2 size={16} aria-hidden="true" />
                       </span>
-                    </span>
-                    <ChevronRight size={16} aria-hidden="true" class="tf-browse-chevron" />
-                  </button>
-                </Show>
-              </Match>
-            </Switch>
-          </div>
-          <Show when={dragging()}>
-            <div class="tf-drop" aria-hidden="true">
-              <Upload size={20} />
-              Drop to attach to this task
+                      <span class="tf-browse-text">
+                        <span class="tf-browse-title">Browse workspace files</span>
+                        <span class="tsec-muted">
+                          <Show when={workspace()} fallback={hasWorkspace() ? "The task's workspace" : "No workspace yet"}>
+                            {(current) => <span class="mono">{current().branchName ?? current().name}</span>}
+                          </Show>
+                          <Show when={changed.data?.state === "available" && changed.data}>
+                            {(list) => (
+                              <>
+                                {" "}
+                                · {list().items.length}
+                                {list().truncated ? "+" : ""} changed file{list().items.length === 1 ? "" : "s"}
+                              </>
+                            )}
+                          </Show>
+                        </span>
+                      </span>
+                      <ChevronRight size={16} aria-hidden="true" class="tf-browse-chevron" />
+                    </button>
+                  </Show>
+                </Match>
+              </Switch>
             </div>
-          </Show>
-        </section>
-      </Match>
-    </Switch>
+            <Show when={dragging()}>
+              <div class="tf-drop" aria-hidden="true">
+                <Upload size={20} />
+                Drop to attach to this task
+              </div>
+            </Show>
+          </section>
+        </Match>
+      </Switch>
+    </Suspense>
   );
 }
 

@@ -1,5 +1,5 @@
 import type { DocumentAnnotationThreadWithComments } from "@paperclipai/shared";
-import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
+import { createMutation, useQueryClient } from "@tanstack/solid-query";
 import { Check, MessageSquarePlus, RotateCcw, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type Accessor } from "solid-js";
 import { documentsApi } from "@/api/documents";
@@ -9,7 +9,8 @@ import { TextArea } from "@/ui/Field";
 import { Markdown } from "@/ui/Markdown";
 import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
-import { anchorForSelection, newCommentBlock, openThreadCount, quote, rawSpanFor, visibleThreads, type SelectionAnchor, type ThreadFilter } from "./annotation-model";
+import { anchorForSelection, type SelectionAnchor } from "./anchor";
+import { quote, rawSpanFor, visibleThreads, type ThreadFilter } from "./annotation-model";
 import { documentKeys, type DocumentHost } from "./host";
 import "./Annotations.css";
 
@@ -21,16 +22,6 @@ import "./Annotations.css";
  */
 
 type Thread = DocumentAnnotationThreadWithComments;
-
-export function useThreads(host: Accessor<DocumentHost>, docKey: Accessor<string>) {
-  return createQuery(() => ({
-    queryKey: documentKeys.annotations(host(), docKey()),
-    queryFn: ({ signal }) => documentsApi.annotations.list(host().owner, docKey(), { status: "all", includeComments: true }, signal),
-    staleTime: 30_000,
-  }));
-}
-
-export { openThreadCount };
 
 // Highlights in the rendered document ---------------------------------------------------------------
 
@@ -417,4 +408,3 @@ function ThreadCard(props: {
   );
 }
 
-export { newCommentBlock };

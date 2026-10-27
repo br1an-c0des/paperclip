@@ -25,8 +25,9 @@ import { Markdown } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
-import { CommentsPanel, newCommentBlock, openThreadCount, useAnnotationLayer, useThreads, type PendingComment } from "./Annotations";
-import type { SelectionAnchor } from "./annotation-model";
+import { CommentsPanel, useAnnotationLayer, type PendingComment } from "./Annotations";
+import type { SelectionAnchor } from "./anchor";
+import { newCommentBlock, openThreadCount } from "./annotation-model";
 import { ConfirmDialog } from "./ConfirmDialog";
 import {
   classifySaveError,
@@ -48,6 +49,7 @@ import {
 } from "./document-model";
 import { documentKeys, type DocumentHost } from "./host";
 import { MarkdownEditor } from "./MarkdownEditor";
+import { useThreads } from "./queries";
 import "./DocumentView.css";
 
 /*

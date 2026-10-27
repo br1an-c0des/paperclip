@@ -335,3 +335,7 @@ a.tf-output-title:hover {
     display: none;
   }
 }
+
+.tf-loading {
+  padding: 18px 24px;
+}

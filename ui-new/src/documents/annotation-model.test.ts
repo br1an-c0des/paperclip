@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { anchorForSelection, newCommentBlock, openThreadCount, quote, rawSpanFor, visibleThreads } from "./annotation-model";
+import { anchorForSelection } from "./anchor";
+import { newCommentBlock, openThreadCount, quote, rawSpanFor, visibleThreads } from "./annotation-model";
 
 type Thread = Parameters<typeof visibleThreads>[0][number] & { id: string };
 
