@@ -16,6 +16,7 @@ import { ProjectPage } from "./routes/Project";
 import { SignIn } from "./routes/SignIn";
 import { TaskPage, TasksPage } from "./routes/Tasks";
 import { RunRoute } from "./runs/RunRoute";
+import { SearchPage } from "./search/SearchPage";
 
 const StyleGuide = lazy(() => import("./routes/StyleGuide").then((m) => ({ default: m.StyleGuide })));
 
@@ -59,6 +60,7 @@ export function App() {
             <Route path="/agents/:agentKey/*" component={AgentPage} />
             <Route path="/company/settings/*" component={SettingsPage} />
             <Route path="/connectors" component={ConnectorsPage} />
+            <Route path="/search" component={SearchPage} />
             <Route path="/*rest" component={NotBuiltYet} />
           </Route>
         </Route>

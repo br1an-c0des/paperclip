@@ -82,4 +82,12 @@ export const queryKeys = {
       ["ai-connections", companyId, connectionId, "active-runs"] as const,
   },
   sidebarBadges: (companyId: string) => ["sidebar-badges", companyId] as const,
+  /**
+   * The Search page (src/search/). The old UI keys company search `["company-search", companyId, …]`;
+   * the rest of the key is the request, filters and sort included, without the page offset.
+   */
+  search: {
+    all: (companyId: string) => ["company-search", companyId] as const,
+    results: (companyId: string, request: string) => ["company-search", companyId, request] as const,
+  },
 };

@@ -1,0 +1,605 @@
+/* The Search page (boards S1–S3; phone M14) */
+.sx {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Header card: the big search pill, then the kind tabs below a divider */
+.sx-head {
+  padding: 18px 22px 0;
+}
+
+.sx-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 10px 0 18px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--muted);
+}
+
+.sx-box:focus-within {
+  border-color: var(--run-fg);
+  box-shadow: 0 0 0 1px var(--run-fg);
+}
+
+.sx-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.sx-input::placeholder {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.sx-clear {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.sx-clear:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.sx-scope-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px -22px 0;
+  padding: 12px 22px;
+  border-top: 1px solid var(--line);
+}
+
+.sx-scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+}
+
+.sx-scopes button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px 0 14px;
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sx-scopes button:hover {
+  color: var(--text);
+}
+
+.sx-scopes button[aria-pressed="true"] {
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.sx-scopes small {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.sx-in {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Results beside the "Narrow tasks" column */
+.sx-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.sx-grid--facets {
+  grid-template-columns: minmax(0, 1fr) 270px;
+}
+
+.sx-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.sx-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sx-tools .sx-sort {
+  margin-left: auto;
+}
+
+.sx-filter {
+  border-style: dashed;
+}
+
+.sx-sort b,
+.sx-fchip b {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sx-busy {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sx-fchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 4px 0 12px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.sx-fchip-x {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.sx-fchip-x:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.sx-info {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--muted);
+  cursor: help;
+}
+
+.sx-info:hover,
+.sx-info:focus-visible {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* A card per kind */
+.sx-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sx-section {
+  overflow: hidden;
+}
+
+.sx-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 50px;
+  padding: 0 14px 0 20px;
+}
+
+.sx-section-head h2 {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.sx-section-n {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.sx-all {
+  margin-left: auto;
+}
+
+.sx-section-note {
+  padding: 11px 20px 14px;
+  border-top: 1px solid var(--row-line);
+  font-size: 13px;
+}
+
+/* One result */
+.sx-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 11px 18px 12px 20px;
+  border-top: 1px solid var(--row-line);
+  color: inherit;
+  text-decoration: none;
+  outline: none;
+}
+
+.sx-row:hover {
+  background: var(--row-hover);
+}
+
+.sx-row:focus-visible {
+  background: var(--row-hover);
+  box-shadow: inset 3px 0 0 var(--text);
+}
+
+.sx-lead {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.sx-tile {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--well);
+  color: var(--body);
+}
+
+.sx-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  object-fit: cover;
+  background: var(--well);
+}
+
+.sx-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sx-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sx-id {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sx-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sx-chip {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--body);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sx-snip {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--body);
+}
+
+.sx-snip-label {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.sx-mark {
+  padding: 0 2px;
+  border-radius: 4px;
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+}
+
+.sx-snip .sx-mark {
+  font-weight: 600;
+}
+
+.sx-where {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sx-end {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.sx-when {
+  min-width: 54px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.sx-more {
+  display: flex;
+  justify-content: center;
+}
+
+.sx-cap {
+  text-align: center;
+  font-size: 13px;
+}
+
+/* "Narrow tasks" */
+.sx-facets {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 10px 10px;
+}
+
+.sx-facets-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 0 4px 8px;
+}
+
+.sx-facets-head h2 {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.sx-facets-head .btn {
+  margin-left: auto;
+}
+
+.sx-facets-none {
+  padding: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sx-facet {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 0 6px;
+  border-top: 1px solid var(--line);
+}
+
+.sx-facet-h {
+  padding: 0 8px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.sx-facet-opt {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.sx-facet-opt:hover {
+  background: var(--hover);
+}
+
+.sx-tick {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--dashed);
+  border-radius: 5px;
+  color: var(--on-primary);
+}
+
+.sx-tick--on {
+  border: 0;
+  background: var(--primary);
+}
+
+.sx-facet-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.sx-facet-n {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Empty, idle, loading and error cards */
+.sx-empty,
+.sx-idle,
+.sx-note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 28px 28px 26px;
+}
+
+.sx-empty h2,
+.sx-note h2 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.sx-empty p,
+.sx-note p {
+  margin-bottom: 10px;
+  color: var(--body);
+}
+
+.sx-ways,
+.sx-recent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.sx-way {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 14px 0 12px;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sx-way:hover {
+  background: var(--hover);
+}
+
+.sx-way .muted {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.sx-idle .lbl:not(:first-child) {
+  margin-top: 14px;
+}
+
+.sx-tips {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--body);
+  line-height: 1.7;
+}
+
+.sx-tips code {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: var(--code);
+  font-size: 12.5px;
+}
+
+/* Narrow: the Filter menu alone narrows tasks; the facet column goes */
+@container main (max-width: 860px) {
+  .sx-grid--facets {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sx-facets,
+  .sx-in {
+    display: none;
+  }
+}
+
+/* Phone (M14): a smaller box and tighter rows */
+:root[data-viewport="phone"] .sx-head {
+  padding: 14px 14px 0;
+}
+
+:root[data-viewport="phone"] .sx-box {
+  height: 48px;
+  padding-left: 14px;
+}
+
+:root[data-viewport="phone"] .sx-input {
+  font-size: 18px;
+}
+
+:root[data-viewport="phone"] .sx-scope-row {
+  margin: 12px -14px 0;
+  padding: 10px 14px;
+  overflow-x: auto;
+}
+
+:root[data-viewport="phone"] .sx-scopes {
+  flex-wrap: nowrap;
+}
+
+:root[data-viewport="phone"] .sx-row {
+  padding: 10px 14px;
+}
+
+:root[data-viewport="phone"] .sx-end > :not(.sx-when) {
+  display: none;
+}
