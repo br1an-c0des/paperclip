@@ -1,13 +1,15 @@
 import type { ActivityEvent, Agent, CompactIssue, DashboardRunActivityDay } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import type { LiveRun } from "@/api/heartbeats";
-import type { OrgNode, RunSummary } from "@/api/org";
+import type { OrgNode } from "@/api/org";
+import type { RunSummary } from "@/api/runs";
 import {
   activityLine,
   agentDetail,
   buildOrgTree,
   chartMax,
   filterCounts,
+  harnessAndModel,
   legacyFilter,
   liveRunByAgent,
   managerChoices,
@@ -178,11 +180,11 @@ describe("runs and spend", () => {
   const now = new Date("2026-10-27T12:00:00Z");
 
   it("counts each agent's runs in the window and its success rate", () => {
-    const runs: RunSummary[] = [
-      { id: "1", agentId: "a", status: "succeeded", createdAt: "2026-10-26T00:00:00Z", startedAt: null, finishedAt: null },
-      { id: "2", agentId: "a", status: "failed", createdAt: "2026-10-25T00:00:00Z", startedAt: null, finishedAt: null },
-      { id: "3", agentId: "a", status: "running", createdAt: "2026-10-27T00:00:00Z", startedAt: null, finishedAt: null },
-      { id: "4", agentId: "a", status: "succeeded", createdAt: "2026-10-01T00:00:00Z", startedAt: null, finishedAt: null },
+    const runs: Pick<RunSummary, "agentId" | "status" | "createdAt">[] = [
+      { agentId: "a", status: "succeeded", createdAt: "2026-10-26T00:00:00Z" },
+      { agentId: "a", status: "failed", createdAt: "2026-10-25T00:00:00Z" },
+      { agentId: "a", status: "running", createdAt: "2026-10-27T00:00:00Z" },
+      { agentId: "a", status: "succeeded", createdAt: "2026-10-01T00:00:00Z" },
     ];
     const counts = runCountsByAgent(runs, new Date("2026-10-13T12:00:00Z")).get("a");
     expect(counts).toEqual({ total: 3, succeeded: 1, failed: 1 });
@@ -266,5 +268,14 @@ describe("activityLine", () => {
 
   it("falls back to the action's words", () => {
     expect(activityLine(event({ action: "secret.rotated", entityType: "secret", details: { name: "API_KEY" } }), names)).toMatchObject({ verb: "rotated", target: "API_KEY" });
+  });
+});
+
+describe("harness and model", () => {
+  it("names the harness and runner as the agent page does", () => {
+    const runner = { adapterType: "paperclip_runner", adapterConfig: { provider: "acpx", acpxAgent: "claude", model: "claude-opus-5-5" } };
+    expect(harnessAndModel(runner)).toEqual({ harness: "Claude Code · Paperclip Runner", model: "claude-opus-5-5" });
+    expect(harnessAndModel({ adapterType: "claude_local", adapterConfig: {} })).toEqual({ harness: "Claude Code · Legacy runner", model: "Harness default" });
+    expect(harnessAndModel({ adapterType: "process", adapterConfig: {} })).toEqual({ harness: "Process", model: "Managed externally" });
   });
 });

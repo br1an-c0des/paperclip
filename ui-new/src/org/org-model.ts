@@ -1,8 +1,11 @@
 import type { ActivityEvent, Agent, CompactIssue, DashboardRunActivityDay } from "@paperclipai/shared";
 import type { LiveRun } from "@/api/heartbeats";
-import type { OrgNode, RunSummary } from "@/api/org";
+import type { OrgNode } from "@/api/org";
+import type { RunSummary } from "@/api/runs";
+import { runtimeIdentity } from "@/agents/agent-model";
+import { isAgentBlocked } from "@/lib/agent-state";
 import type { Gradient } from "@/ui/status-meta";
-import { agentDefaultModel, bulkHarness, harnessLabel } from "./bulk-model";
+import { agentDefaultModel } from "./bulk-model";
 
 /*
  * The organization pages' view model (boards 19 and 20), kept apart from the components so it can be
@@ -56,8 +59,7 @@ export function orgState(agent: Pick<Agent, "id" | "status">, live: ReadonlyMap<
   if (agent.status === "paused") return "paused";
   if (agent.status === "error") return "error";
   if (live.has(agent.id) || agent.status === "running") return "running";
-  const open = tasks.byAgent.get(agent.id) ?? [];
-  if (open.length > 0 && open.every((task) => task.status === "blocked")) return "blocked";
+  if (isAgentBlocked(tasks.byAgent.get(agent.id) ?? [], false)) return "blocked";
   return "idle";
 }
 
@@ -135,11 +137,13 @@ export function roleTitle(agent: Pick<Agent, "title" | "role">) {
   return agent.title?.trim() || (role.length <= 3 ? role.toUpperCase() : role.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()));
 }
 
-/** "Claude Code" and "Opus 5.5"-style model, for the Harness and model column. */
+/**
+ * The Harness and model column: what runs the agent as its agent page names it ("Claude Code ·
+ * Paperclip Runner", "Codex · Legacy runner", "Process"), and its default model.
+ */
 export function harnessAndModel(agent: Pick<Agent, "adapterType" | "adapterConfig">) {
-  const harness = bulkHarness(agent);
   const external = ["process", "http"].includes(agent.adapterType);
-  return { harness: harnessLabel(harness), model: external ? "Managed externally" : (agentDefaultModel(agent) ?? "Harness default") };
+  return { harness: runtimeIdentity(agent).label, model: external ? "Managed externally" : (agentDefaultModel(agent) ?? "Harness default") };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -322,7 +326,7 @@ export type RunCounts = { total: number; succeeded: number; failed: number };
 const FAILED = new Set(["failed", "timed_out", "interrupted", "error"]);
 
 /** Runs per agent created since `since`, from the recent runs list. */
-export function runCountsByAgent(runs: readonly RunSummary[] | undefined, since: Date) {
+export function runCountsByAgent(runs: readonly Pick<RunSummary, "agentId" | "status" | "createdAt">[] | undefined, since: Date) {
   const map = new Map<string, RunCounts>();
   for (const run of runs ?? []) {
     if (new Date(run.createdAt).getTime() < since.getTime()) continue;

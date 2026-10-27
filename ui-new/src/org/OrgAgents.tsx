@@ -18,7 +18,7 @@ import { Capsule } from "@/ui/Status";
 import { gradientVar } from "@/ui/status-meta";
 import { actionTargets, useAgentActions } from "./actions";
 import { BulkEditDialog } from "./BulkEditDialog";
-import { bulkDisabledReason, harnessGroups, harnessLabel } from "./bulk-model";
+import { bulkDisabledReason, harnessGroups } from "./bulk-model";
 import { OrgHeader } from "./OrgHeader";
 import {
   filterCounts,
@@ -68,7 +68,7 @@ export function OrgAgents() {
   const [query, setQuery] = createSignal("");
   const [sort, setSort] = createSignal<OrgSort>("status");
   const [selected, setSelected] = createSignal<ReadonlySet<string>>(new Set());
-  const [editing, setEditing] = createSignal<{ harness: string; agents: Agent[] } | null>(null);
+  const [editing, setEditing] = createSignal<{ harness: string; label: string; agents: Agent[] } | null>(null);
   const [budgetOpen, setBudgetOpen] = createSignal(false);
 
   const counts = createMemo(() => filterCounts(data.rows()));
@@ -233,7 +233,7 @@ export function OrgAgents() {
           <For each={editGroups()}>
             {(group) => (
               <Button size="compact" icon={<Pencil size={14} aria-hidden="true" />} onClick={() => setEditing(group)}>
-                {editGroups().length === 1 ? "Edit connection and model" : `Edit ${group.agents.length} ${harnessLabel(group.harness)}`}
+                {editGroups().length === 1 ? "Edit connection and model" : `Edit ${group.agents.length} ${group.label}`}
               </Button>
             )}
           </For>
@@ -295,6 +295,7 @@ export function OrgAgents() {
         {(group) => (
           <BulkEditDialog
             harness={group().harness}
+            harnessLabel={group().label}
             agents={group().agents}
             totalSelected={selectedRows().length}
             onClose={(updatedIds) => {
@@ -382,7 +383,7 @@ function AgentRow(props: { row: OrgAgent; data: ReturnType<typeof useOrgData>; c
       </div>
       <span class="org-col-wide org-ellipsis org-body">{manager()}</span>
       <div class="org-col-wide org-hm">
-        <div class="org-body org-ellipsis">{props.row.harness}</div>
+        <div class="org-body org-ellipsis" title={props.row.harness}>{props.row.harness}</div>
         <div class="org-muted org-ellipsis">{props.row.model}</div>
       </div>
       <div class="org-col-wide org-num">

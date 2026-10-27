@@ -30,6 +30,18 @@ export function agentState(agent: Pick<Agent, "id" | "status">, running: Readonl
   return STATES.idle;
 }
 
+/**
+ * Whether an agent is blocked, one rule for the org pages and workload. "Blocked" isn't an agent
+ * status; it comes from its tasks. An agent is blocked when it isn't running and every open task
+ * assigned to it is blocked, with at least one such task. An agent that still has open work it can
+ * do isn't blocked. Done and cancelled tasks don't count.
+ */
+export function isAgentBlocked(assignedTasks: readonly { status: string }[], running: boolean) {
+  if (running) return false;
+  const open = assignedTasks.filter((task) => task.status !== "done" && task.status !== "cancelled");
+  return open.length > 0 && open.every((task) => task.status === "blocked");
+}
+
 /** Running agents first, then by name. */
 export function sortAgentsForNav<T extends Pick<Agent, "id" | "name" | "status">>(agents: readonly T[], running: ReadonlySet<string>) {
   const isRunning = (agent: T) => agentState(agent, running).key === "running";

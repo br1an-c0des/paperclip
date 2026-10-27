@@ -1,9 +1,12 @@
 import type { Agent } from "@paperclipai/shared";
-import { createQuery } from "@tanstack/solid-query";
-import { createMemo } from "solid-js";
+import { createQuery, useQueryClient } from "@tanstack/solid-query";
+import { createEffect, createMemo, on } from "solid-js";
+import { agentsApi } from "@/api/agents";
 import { issuesApi } from "@/api/issues";
 import { orgApi } from "@/api/org";
 import { queryKeys } from "@/api/queryKeys";
+import { runsApi } from "@/api/runs";
+import { WORKLOAD_RUN_LIMIT } from "@/api/workload";
 import { useNow } from "@/lib/clock";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useExperimentalSettingsQuery, useLiveRunsQuery } from "@/lib/company-data";
@@ -25,8 +28,9 @@ import {
 /*
  * The data both organization pages read, from the caches the rest of the app shares where it can:
  * the agents list and live runs (the nav's), the company task list (All tasks' own query, so opening
- * either fills the other), and the org pages' own tree, recent runs, built-in agents and your
- * primary agent. The live events keep all of them fresh (lib/live-events.tsx).
+ * either fills the other), the company run history (workload's), your primary agent (the agent
+ * page's), and the org pages' own tree and built-in agents. The live events keep them fresh
+ * (lib/live-events.tsx); the run history is refetched when a live run changes.
  */
 
 /** How far back the run counts go, as the boards draw them ("Runs, 14 days"). */
@@ -49,6 +53,7 @@ export type OrgAgent = {
 
 export function useOrgData() {
   const company = useCompany();
+  const client = useQueryClient();
   const agents = useAgentsQuery();
   const liveRuns = useLiveRunsQuery();
   const experimental = useExperimentalSettingsQuery();
@@ -62,9 +67,10 @@ export function useOrgData() {
     queryKey: queryKeys.org(company().id),
     queryFn: ({ signal }) => orgApi.tree(company().id, signal),
   }));
+  // The company's run history, the request (and cache) workload reads: the latest runs, newest first.
   const recentRuns = createQuery(() => ({
-    queryKey: queryKeys.org.recentRuns(company().id),
-    queryFn: ({ signal }) => orgApi.recentRuns(company().id, signal),
+    queryKey: queryKeys.workload.runs(company().id),
+    queryFn: ({ signal }) => runsApi.list(company().id, { limit: WORKLOAD_RUN_LIMIT, summary: true }, signal),
     staleTime: 30_000,
   }));
   const builtIns = createQuery(() => ({
@@ -74,11 +80,21 @@ export function useOrgData() {
     retry: false,
   }));
   const primary = createQuery(() => ({
-    queryKey: queryKeys.org.primaryAgent(company().id),
-    queryFn: ({ signal }) => orgApi.primaryAgent(company().id, signal),
+    queryKey: queryKeys.agents.primary(company().id),
+    queryFn: ({ signal }) => agentsApi.primaryAgent(company().id, signal),
     retry: false,
     staleTime: 60_000,
   }));
+
+  // The run list isn't under the live events' run keys, so look again when a run starts, queues or
+  // finishes, as workload does (src/workload/use-workload.ts).
+  const liveSignature = createMemo(() =>
+    (liveRuns.data ?? [])
+      .map((run) => `${run.id}:${run.status}`)
+      .sort()
+      .join(","),
+  );
+  createEffect(on(liveSignature, () => void client.invalidateQueries({ queryKey: queryKeys.workload.runs(company().id) }), { defer: true }));
 
   const live = createMemo(() => liveRunByAgent(liveRuns.data));
   const index = createMemo(() => taskIndex(tasks.data));

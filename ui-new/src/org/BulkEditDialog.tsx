@@ -3,8 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ArrowRight, Check } from "lucide-solid";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { aiConnectionsApi } from "@/api/ai-connections";
-import type { AdapterModel } from "@/api/agents";
-import { orgApi } from "@/api/org";
+import { adapterModelKeyOptions, agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { AgentAvatar } from "@/ui/Avatar";
@@ -21,7 +20,6 @@ import {
   commonModels,
   connectionChoices,
   connectionName,
-  harnessLabel,
   mapBulk,
   modelProblems,
   providerForHarness,
@@ -46,6 +44,8 @@ type Catalog = ModelCatalog & { accounts: AiConnectionList };
 
 export function BulkEditDialog(props: {
   harness: string;
+  /** The harness as the agent page names it ("Claude Code"). */
+  harnessLabel: string;
   agents: Agent[];
   /** How many agents are selected in all, so the dialog can say how many it leaves alone. */
   totalSelected: number;
@@ -53,7 +53,7 @@ export function BulkEditDialog(props: {
 }) {
   const company = useCompany();
   const client = useQueryClient();
-  const label = () => harnessLabel(props.harness);
+  const label = () => props.harnessLabel;
   const provider = () => providerForHarness(props.harness);
 
   const [changeConnection, setChangeConnection] = createSignal(false);
@@ -88,21 +88,26 @@ export function BulkEditDialog(props: {
       retry: false,
       staleTime: 60_000,
       queryFn: async () => {
-        const requests = new Map<string, Promise<AdapterModel[]>>();
+        // Each part is the request other screens make, under its own key: agents with the same
+        // catalog share one fetch, and a catalog another screen loaded is reused.
+        const companyId = company().id;
         const results = await mapBulk(targets(), async (agent): Promise<Catalog> => {
-          const list = await aiConnectionsApi.list(company().id, agent.id);
+          const list = await client.fetchQuery({
+            queryKey: [...queryKeys.aiConnections.list(companyId), "agent", agent.id],
+            queryFn: () => aiConnectionsApi.list(companyId, agent.id),
+            staleTime: 60_000,
+          });
           const current = agentConnection(agent);
           const effective = chosen ?? (current?.mode !== "router" ? current : undefined);
           const routing = resolveConnection(effective, list)?.routing;
           const plan = catalogPlan({ harness: props.harness, binding: effective, routing, agent });
           if (plan.kind === "fixed") return { agentId: agent.id, models: plan.models, restricted: true, accounts: list };
-          const key = JSON.stringify([plan.type, plan.options]);
-          let request = requests.get(key);
-          if (!request) {
-            request = orgApi.adapterModels(company().id, plan.type, plan.options as Parameters<typeof orgApi.adapterModels>[2]);
-            requests.set(key, request);
-          }
-          let models = await request;
+          const options = plan.options;
+          let models = await client.fetchQuery({
+            queryKey: queryKeys.agents.adapterModels(companyId, plan.type, adapterModelKeyOptions(options)),
+            queryFn: () => agentsApi.adapterModels(companyId, plan.type, options),
+            staleTime: 60_000,
+          });
           if (plan.stripOpenRouter) models = models.map((entry) => ({ ...entry, id: entry.id.replace(/^openrouter\//, "") }));
           return { agentId: agent.id, models, restricted: plan.restricted, accounts: list };
         });
@@ -162,10 +167,10 @@ export function BulkEditDialog(props: {
     const results = await mapBulk(list, async (agent) => {
       // A lost response may hide a save that landed: re-read before sending again.
       if (retrying) {
-        const latest = await orgApi.get(agent.id, company().id);
+        const latest = await agentsApi.get(agent.id, company().id);
         if (alreadyApplied(latest, props.harness, next)) return latest;
       }
-      return orgApi.updateRuntimeSettings(agent.id, runtimePatch(agent, next)!, company().id);
+      return agentsApi.updateRuntimeSettings(agent.id, runtimePatch(agent, next)!, company().id);
     });
     const successes: Agent[] = [];
     const nextFailures: Failure[] = [];

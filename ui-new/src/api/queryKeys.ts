@@ -46,8 +46,11 @@ export const queryKeys = {
     costs: (companyId: string, from: string, to: string) => ["costs", companyId, "by-agent", from, to] as const,
     costsByModel: (companyId: string, from: string, to: string) => ["costs", companyId, "by-agent-model", from, to] as const,
     adapters: (companyId: string, environmentId: string | null) => ["adapters", "availability", companyId, environmentId ?? "__default__"] as const,
-    adapterModels: (companyId: string, adapterType: string) =>
-      ["agents", companyId, "adapter-models", adapterType] as const,
+    /** A harness's model catalog; narrowed catalogs (`adapterModelKeyOptions`) sit under the harness's key. */
+    adapterModels: (companyId: string, adapterType: string, options?: Record<string, unknown>) =>
+      options
+        ? (["agents", companyId, "adapter-models", adapterType, options] as const)
+        : (["agents", companyId, "adapter-models", adapterType] as const),
     primary: (companyId: string) => ["primary-agent", companyId, "me"] as const,
   },
   issues: {
@@ -81,15 +84,14 @@ export const queryKeys = {
   dashboard: (companyId: string) => ["dashboard", companyId] as const,
   /**
    * The organization pages (boards 19, 20). Called as a function it's the reporting tree, which the
-   * live events refresh with the agents. The rest sit under prefixes the live events already reach:
-   * runs under `["heartbeats", companyId]`, activity under `["activity", companyId]`, the bulk edit's
-   * catalogs under the tree's own key.
+   * live events refresh with the agents. Activity sits under `["activity", companyId]`, which the
+   * live events reach. The run history is the company run list workload reads
+   * (`workload.runs`), and your primary agent is `agents.primary`. The bulk edit's catalogs sit under
+   * the tree's key; each is put together from `agents.adapterModels` and AI-connection requests.
    */
   org: Object.assign((companyId: string) => ["org", companyId] as const, {
-    recentRuns: (companyId: string) => ["heartbeats", companyId, "org-recent"] as const,
     activity: (companyId: string) => ["activity", companyId, "org"] as const,
     builtInAgents: (companyId: string) => ["built-in-agents", companyId] as const,
-    primaryAgent: (companyId: string) => ["primary-agent", companyId] as const,
     bulkCatalog: (companyId: string, agentIds: readonly string[], binding: string | null) =>
       ["org", companyId, "bulk-catalog", agentIds.join(","), binding ?? "current"] as const,
   }),

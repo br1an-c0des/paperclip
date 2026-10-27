@@ -8,7 +8,8 @@ import type {
   AiProviderRouting,
   AiRuntimeConnectionBinding,
 } from "@paperclipai/shared";
-import type { AdapterModel } from "@/api/agents";
+import type { AdapterModel, AdapterModelOptions } from "@/api/agents";
+import { runtimeIdentity } from "@/agents/agent-model";
 
 /*
  * The roster's bulk edit of AI connection and default model (board 20), ported from upstream's
@@ -90,32 +91,6 @@ export function providerForHarness(harness: string): AiProvider | undefined {
     gemini_local: "google",
     hermes_local: "openrouter",
   } as Record<string, AiProvider>)[harness];
-}
-
-/** Harness names as people know them. */
-const HARNESS_LABELS: Record<string, string> = {
-  claude_local: "Claude Code",
-  codex_local: "Codex",
-  gemini_local: "Gemini CLI",
-  grok_local: "Grok",
-  opencode_local: "OpenCode",
-  pi_local: "Pi",
-  hermes_local: "Hermes",
-  hermes_gateway: "Hermes Gateway",
-  cursor_local: "Cursor",
-  cursor_cloud: "Cursor Cloud",
-  copilot_runtime: "GitHub Copilot",
-  kimi_local: "Kimi",
-  openclaw_gateway: "OpenClaw",
-  paperclip_runner: "Paperclip Runner",
-  process: "Process",
-  http: "HTTP",
-};
-
-export function harnessLabel(harness: string) {
-  if (HARNESS_LABELS[harness]) return HARNESS_LABELS[harness]!;
-  const words = harness.replace(/^acpx:/, "").replace(/_local$/, "").replace(/[_-]+/g, " ");
-  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /** The connection a binding points to in the agent's connection list. */
@@ -202,9 +177,10 @@ export function harnessGroups<T extends Pick<Agent, "adapterType" | "adapterConf
     const harness = bulkHarness(agent);
     groups.set(harness, [...(groups.get(harness) ?? []), agent]);
   }
+  // Named as the agent page names the harness (agents/agent-model.ts), whichever runner carries it.
   return [...groups.entries()]
-    .map(([harness, members]) => ({ harness, agents: members }))
-    .sort((a, b) => harnessLabel(a.harness).localeCompare(harnessLabel(b.harness)));
+    .map(([harness, members]) => ({ harness, label: runtimeIdentity(members[0]!).harnessLabel, agents: members }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 /** What the person chose to change. `undefined` keeps the agent's current value. */
@@ -250,7 +226,7 @@ export function catalogPlan(input: {
   agent: Pick<Agent, "id" | "defaultEnvironmentId">;
 }):
   | { kind: "fixed"; models: AdapterModel[]; restricted: true }
-  | { kind: "request"; type: string; options: Record<string, unknown>; restricted: boolean; stripOpenRouter: boolean } {
+  | { kind: "request"; type: string; options: AdapterModelOptions; restricted: boolean; stripOpenRouter: boolean } {
   const { harness, binding, routing } = input;
   if (routing?.models.length) {
     const prefix = routing.kind === "openrouter" ? "openrouter" : "paperclip";

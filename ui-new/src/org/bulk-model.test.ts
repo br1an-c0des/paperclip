@@ -10,7 +10,6 @@ import {
   connectionChoices,
   connectionName,
   harnessGroups,
-  harnessLabel,
   mapBulk,
   modelProblems,
   runtimeHarness,
@@ -56,8 +55,18 @@ describe("runtimeHarness", () => {
     expect(runtimeHarness("paperclip_runner", { provider: "acpx", acpxAgent: "copilot" })).toBe("copilot_runtime");
     expect(runtimeHarness("paperclip_runner", {})).toBe("codex_local");
     expect(runtimeHarness("paperclip_runner", { provider: "opencode" })).toBe("opencode_local");
-    expect(harnessLabel("claude_local")).toBe("Claude Code");
-    expect(harnessLabel("acpx:foo_bar")).toBe("Foo bar");
+  });
+
+  it("names a group as the agent page names its harness, whichever runner carries it", () => {
+    const groups = harnessGroups([
+      agent({ id: "r", adapterType: "paperclip_runner", adapterConfig: { provider: "acpx", acpxAgent: "claude" } }),
+      agent({ id: "l", adapterType: "claude_local" }),
+      agent({ id: "c", adapterType: "codex_local" }),
+    ]);
+    expect(groups.map((group) => [group.label, group.agents.map((entry) => entry.id)])).toEqual([
+      ["Claude Code", ["r", "l"]],
+      ["Codex", ["c"]],
+    ]);
   });
 });
 

@@ -2,7 +2,7 @@ import type { Agent } from "@paperclipai/shared";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createSignal } from "solid-js";
 import { budgetsApi } from "@/api/budgets";
-import { orgApi } from "@/api/org";
+import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { pushToast } from "@/ui/Toast";
@@ -53,7 +53,7 @@ export function useAgentActions() {
 
   const refresh = () => {
     const id = company().id;
-    for (const key of [queryKeys.agents.list(id), queryKeys.org(id), queryKeys.liveRuns(id), queryKeys.dashboard(id), queryKeys.projectSettings.budgets(id)])
+    for (const key of [queryKeys.agents.list(id), queryKeys.org(id), queryKeys.liveRuns(id), queryKeys.workload.runs(id), queryKeys.dashboard(id), queryKeys.projectSettings.budgets(id)])
       void client.invalidateQueries({ queryKey: key });
   };
 
@@ -89,11 +89,12 @@ export function useAgentActions() {
   const companyId = () => company().id;
   return {
     busy,
-    pause: (agents: readonly Agent[]) => run("pause", agents, (agent) => orgApi.pause(agent.id, companyId())),
-    resume: (agents: readonly Agent[]) => run("resume", agents, (agent) => orgApi.resume(agent.id, companyId())),
-    wake: (agents: readonly Agent[]) => run("wake", agents, (agent) => orgApi.wakeup(agent.id, companyId())),
+    pause: (agents: readonly Agent[]) => run("pause", agents, (agent) => agentsApi.pause(agent.id, companyId())),
+    resume: (agents: readonly Agent[]) => run("resume", agents, (agent) => agentsApi.resume(agent.id, companyId())),
+    /** Starts a run now (`/heartbeat/invoke`), as the agent page's Run now and the old UI's do. */
+    wake: (agents: readonly Agent[]) => run("wake", agents, (agent) => agentsApi.invoke(agent.id, companyId())),
     setManager: (agents: readonly Agent[], managerId: string | null) =>
-      run("manager", agents, (agent) => orgApi.update(agent.id, { reportsTo: managerId }, companyId())),
+      run("manager", agents, (agent) => agentsApi.update(agent.id, { reportsTo: managerId }, companyId())),
     /** Upserts each agent's monthly budget policy (billed cents, UTC calendar month); 0 turns it off. */
     setBudget: (agents: readonly Agent[], cents: number) =>
       run("budget", agents, (agent) =>
