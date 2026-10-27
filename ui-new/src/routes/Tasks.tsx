@@ -1,14 +1,12 @@
 import type { IssueStatus } from "@paperclipai/shared";
 import { useNavigate, useParams } from "@solidjs/router";
-import { createQuery } from "@tanstack/solid-query";
 import { Match, Show, Switch } from "solid-js";
-import { issuePath, issuesApi } from "@/api/issues";
-import { queryKeys } from "@/api/queryKeys";
+import { issuePath } from "@/api/issues";
 import { useCompany } from "@/lib/company";
 import { TaskHeaderActions } from "@/tasks/TaskActions";
 import { TitleEditor, useTaskChange } from "@/tasks/TaskEditors";
 import { TaskSections } from "@/tasks/TaskSections";
-import { TasksView, useTaskList } from "@/tasks/TasksView";
+import { TasksView, useTaskByRef, useTaskList } from "@/tasks/TasksView";
 import { HeaderNumber, PageHeader } from "@/ui/PageHeader";
 import "./Tasks.css";
 
@@ -48,21 +46,18 @@ export function TaskPage() {
   const params = useParams<{ issueRef: string }>();
   const company = useCompany();
   const navigate = useNavigate();
-  const task = createQuery(() => ({
-    queryKey: queryKeys.issues.detail(params.issueRef),
-    queryFn: ({ signal }) => issuesApi.get(params.issueRef, signal),
-  }));
-  // Edits patch every cached copy of the task, including this one read by reference (TRA-41).
-  const change = useTaskChange(() => task.data);
+  // Read under the task's id, so live events refresh the page and edits patch it (TRA-41).
+  const task = useTaskByRef(() => params.issueRef);
+  const change = useTaskChange(task.task);
   return (
     <Switch>
-      <Match when={task.isError}>
+      <Match when={task.error()}>
         <PageHeader crumbs={<span>Task</span>} title={<span class="mono">{params.issueRef}</span>} />
         <section class="card task-page-note">
-          <p>This task couldn't be loaded: {(task.error as Error).message}</p>
+          <p>This task couldn't be loaded: {(task.error() as Error).message}</p>
         </section>
       </Match>
-      <Match when={task.data}>
+      <Match when={task.task()}>
         {(found) => (
           <>
             <PageHeader
