@@ -42,7 +42,7 @@ until one becomes a concrete fix.
 | 3 | [Let a pause finish after a restart stopped a legacy run during preparation](#3-let-a-pause-finish-after-a-restart-stopped-a-legacy-run-during-preparation) | submitted | `fix/pause-after-restart-during-preparation` | [#17692](https://github.com/paperclipai/paperclip/pull/17692) | | 2026-10-26 | |
 | 4 | [Link the plugin SDK on Windows without symlink rights](#4-link-the-plugin-sdk-on-windows-without-symlink-rights) | closed | | | 2026-10-24 | | |
 | 5 | [Start `pnpm dev` on Windows when the native runner is enabled](#5-start-pnpm-dev-on-windows-when-the-native-runner-is-enabled) | closed | | | 2026-10-26 | | |
-| 6 | [Detect glibc reliably at server startup so Paperclip Runner is offered on Linux](#6-detect-glibc-reliably-at-server-startup-so-paperclip-runner-is-offered-on-linux) | building | `fix/runner-libc-probe-startup` | | 2026-10-26 | | |
+| 6 | [Detect glibc reliably at server startup so Paperclip Runner is offered on Linux](#6-detect-glibc-reliably-at-server-startup-so-paperclip-runner-is-offered-on-linux) | ready | `fix/runner-libc-probe-startup` | | 2026-10-26 | | |
 
 ## Details
 
@@ -143,3 +143,6 @@ until one becomes a concrete fix.
   `server/src/app.ts` (two of two runs `unknown`) and by a minimal script: a `getconf` call blocked
   for 1.2 s or more returns `''` with no error, and under 1 s returns `glibc 2.39`.
 - **Fork workaround:** none. Agents on this machine use the Legacy runner until it's fixed.
+- **Built 2026-10-27:** `execFileSync` with the same timeout, kill signal and output limit, and no
+  top-level await; a test that blocks the event loop for 1.2 s after a real probe; `doc/DEVELOPING.md`
+  updated. Targeted tests pass (16, plus 221 in the probe's consumers) and the server typechecks.
