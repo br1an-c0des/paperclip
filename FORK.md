@@ -27,6 +27,7 @@ can check what upstream changed against what the fork depends on.
 | `fork/` | Fork records, such as upstream sync reports and the upstream fixes list |
 | `.claude/skills/upstream-sync/` | The upstream sync skill |
 | `.claude/skills/upstream-fix/` | The skill for building a small fix to send upstream |
+| `.claude/skills/pm/` | The `/pm` skill: run a session as the redesign's project manager |
 | `packages/plugins/fork-*/` | Plugins the fork adds (see below). Already in the pnpm workspace through `packages/plugins/*`. |
 
 The upstream files the fork edits are listed in [FORK-PATCHES.md](FORK-PATCHES.md). So far that is
