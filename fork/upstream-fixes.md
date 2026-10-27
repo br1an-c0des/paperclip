@@ -41,6 +41,7 @@ until one becomes a concrete fix.
 | 2 | [Don't crash on Windows when an agent directory path is longer than 260 characters](#2-dont-crash-on-windows-when-an-agent-directory-path-is-longer-than-260-characters) | submitted | `fix/agent-directory-probe-long-cwd` | [#17691](https://github.com/paperclipai/paperclip/pull/17691) | | 2026-10-26 | |
 | 3 | [Let a pause finish after a restart stopped a legacy run during preparation](#3-let-a-pause-finish-after-a-restart-stopped-a-legacy-run-during-preparation) | submitted | `fix/pause-after-restart-during-preparation` | [#17692](https://github.com/paperclipai/paperclip/pull/17692) | | 2026-10-26 | |
 | 4 | [Link the plugin SDK on Windows without symlink rights](#4-link-the-plugin-sdk-on-windows-without-symlink-rights) | candidate | | | 2026-10-24 | | |
+| 5 | [Start `pnpm dev` on Windows when the native runner is enabled](#5-start-pnpm-dev-on-windows-when-the-native-runner-is-enabled) | candidate | | | 2026-10-26 | | |
 
 ## Details
 
@@ -87,3 +88,24 @@ until one becomes a concrete fix.
 - **Likely fix:** on Windows, create a directory junction (`fs.symlinkSync(target, path, "junction")`),
   which needs no special rights, or fall back to one when the symlink fails with `EPERM`.
 - **Fork workaround to revisit once merged:** none in the code. This machine has Developer Mode on.
+
+### 5. Start `pnpm dev` on Windows when the native runner is enabled
+
+- **Problem:** with the instance setting `enableNativeRunner` on, `pnpm dev` builds the Rust runner
+  (`scripts/dev-runner.ts`, `getNativeRunnerRequired`). On Windows the crate doesn't compile:
+  `VerifiedProcessLaunch::spawn_stdio` in
+  `packages/paperclip-runner/runner/crates/runner-core/src/process_supervisor.rs` calls
+  `inherited_command()`, which exists only under `#[cfg(any(target_os = "linux", target_os = "macos"))]`
+  (error E0599). The dev runner then exits, so the server never starts. Windows isn't a supported
+  runner platform (`localPaperclipRunnerSupported()` is false, and verified process snapshots are
+  Linux and macOS only), but the flag alone forces the build.
+- **Likely fix, one of:**
+  - in the dev runner, when the platform can't run the native runner, warn and start without it
+    instead of building (unless `PAPERCLIP_RUNNER_BINARY` is set);
+  - or give `spawn_stdio` (or `inherited_command`) a non-Unix version that returns
+    `LocalRunnerError::invalid(...)`, so the crate compiles everywhere and fails only at run time.
+  Check first whether upstream wants Windows dev to work with the flag on, or prefers that the flag
+  be refused on Windows.
+- **Fork workaround:** keep `enableNativeRunner` off in local instances on this machine
+  (`PATCH /api/instance/settings/experimental`). Found when the `~/.paperclip-test` instance
+  wouldn't start after the 2026-10-26 sync.
