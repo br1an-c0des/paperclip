@@ -125,8 +125,13 @@ function ManageViewsDialog(props: {
   onRename: (view: SavedView, name: string) => void;
   onDelete: (view: SavedView) => void;
 }) {
-  // A name is saved when its field loses focus or Enter is pressed; an empty one goes back.
-  const commit = (view: SavedView, input: HTMLInputElement) => {
+  // A name is saved when its field loses focus or Enter is pressed; an empty one goes back. Rows are
+  // keyed by id and read the view afresh, so a rename doesn't remount the row (which swallowed the
+  // next click) and a late blur compares against the name as it is now.
+  const byId = (id: string) => props.views.find((view) => view.id === id);
+  const commit = (id: string, input: HTMLInputElement) => {
+    const view = byId(id);
+    if (!view) return;
     const name = input.value.trim();
     if (!name) input.value = view.name;
     else if (name !== view.name) props.onRename(view, name);
@@ -144,24 +149,36 @@ function ManageViewsDialog(props: {
       }
     >
       <ul class="sv-list">
-        <For each={props.views} fallback={<li class="muted">No saved views.</li>}>
-          {(view) => (
-            <li class="sv-row">
-              <TextInput
-                value={view.name}
-                aria-label={`Name of the view ${view.name}`}
-                onBlur={(event) => commit(view, event.currentTarget)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter") return;
-                  event.preventDefault();
-                  commit(view, event.currentTarget);
-                }}
-              />
-              <Button variant="icon" ghost size="compact" aria-label={`Delete the view ${view.name}`} onClick={() => props.onDelete(view)}>
-                <Trash2 size={15} aria-hidden="true" />
-              </Button>
-            </li>
-          )}
+        <For each={props.views.map((view) => view.id)} fallback={<li class="muted">No saved views.</li>}>
+          {(id) => {
+            const name = () => byId(id)?.name ?? "";
+            return (
+              <li class="sv-row">
+                <TextInput
+                  value={name()}
+                  aria-label={`Name of the view ${name()}`}
+                  onBlur={(event) => commit(id, event.currentTarget)}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter") return;
+                    event.preventDefault();
+                    commit(id, event.currentTarget);
+                  }}
+                />
+                <Button
+                  variant="icon"
+                  ghost
+                  size="compact"
+                  aria-label={`Delete the view ${name()}`}
+                  onClick={() => {
+                    const view = byId(id);
+                    if (view) props.onDelete(view);
+                  }}
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                </Button>
+              </li>
+            );
+          }}
         </For>
       </ul>
     </Dialog>
