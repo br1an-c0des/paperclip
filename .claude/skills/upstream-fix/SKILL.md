@@ -35,11 +35,11 @@ requests in the description.
 
 ## 2. Set up the worktree
 
-Work in a worktree under `C:\Users\brian\coding\paperclip-fixes\`, never in the main checkout:
+Work in a worktree under `~/coding/paperclip-fixes/` (WSL), never in the main checkout:
 
 ```bash
 git fetch upstream master:master      # fast-forwards master without checking it out
-git worktree add C:/Users/brian/coding/paperclip-fixes/<slug> -b fix/<short-description> master
+git worktree add ~/coding/paperclip-fixes/<slug> -b fix/<short-description> master
 ```
 
 - `git sync-master` also pushes `origin/master` and needs `master` checked out in the main
@@ -95,16 +95,16 @@ minutes, and the last run hung on an integration test. Don't repeat that.
 - Rerun the same command unchanged. Rerun only after changing something, or once, without the fix,
   to show a failure isn't caused by it.
 
-**Every test command gets a time limit:** wrap it in `timeout 15m` (Git Bash) or run it in the
+**Every test command gets a time limit:** wrap it in `timeout 15m` or run it in the
 background and check on it. If a run prints nothing new for 10 minutes, it has hung:
 
-- kill its process tree (`taskkill //PID <pid> //T //F`);
-- kill any embedded Postgres it started (data folders under `%TEMP%\paperclip-*`);
-- never kill the long-running Postgres on port 54329 (`~\.paperclip-test\instances\default\db`) or
+- kill its process tree (`pkill -TERM -P <pid>`, then `kill <pid>`);
+- kill any embedded Postgres it started (data folders under `/tmp/paperclip-*`);
+- never kill the long-running Postgres on port 54329 (`~/.paperclip-test/instances/default/db`, if that instance is used on WSL) or
   one from another worktree;
 - record the hang in the report, and don't start the run again.
 
-**Known Windows problems, not caused by your fix:**
+**Known problems from the old Windows setup, not caused by your fix.** They are not yet confirmed on WSL; check with a run on `master` before relying on them:
 
 | Problem | What to do |
 | --- | --- |
