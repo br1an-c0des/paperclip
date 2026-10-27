@@ -2,8 +2,9 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createMemo, on } from "solid-js";
 import { queryKeys } from "@/api/queryKeys";
 import { WORKLOAD_RUN_LIMIT, workloadApi } from "@/api/workload";
+import { useNow } from "@/lib/clock";
 import { useCompany } from "@/lib/company";
-import { useAgentsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
+import { useAgentsQuery, useExperimentalSettingsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
 import { useSession } from "@/lib/session";
 import type { WorkloadInput, WorkloadScope, WorkloadTask } from "./workload-model";
 
@@ -14,6 +15,10 @@ import type { WorkloadInput, WorkloadScope, WorkloadTask } from "./workload-mode
  *
  * The history isn't on the live events' `heartbeats` key, which every run's progress refreshes;
  * it refetches when a run starts, queues or finishes, which changes the live list.
+ *
+ * Two clocks: `input().now` moves when the data does, which is enough for chains, open work and
+ * the heatmap; `liveNow()` ticks every second while an agent is running, for today's lanes (the
+ * live bar, busy time and the "now" line).
  */
 
 export function useWorkload(props: { scope: () => WorkloadScope; tasks: () => readonly WorkloadTask[] | undefined }) {
@@ -23,6 +28,7 @@ export function useWorkload(props: { scope: () => WorkloadScope; tasks: () => re
   const agents = useAgentsQuery();
   const projects = useProjectsQuery();
   const liveRuns = useLiveRunsQuery();
+  const experimental = useExperimentalSettingsQuery();
   const runs = createQuery(() => ({
     queryKey: queryKeys.workload.runs(company().id),
     queryFn: ({ signal }) => workloadApi.runs(company().id, signal),
@@ -31,7 +37,8 @@ export function useWorkload(props: { scope: () => WorkloadScope; tasks: () => re
   const builtIn = createQuery(() => ({
     queryKey: queryKeys.workload.builtInAgents(company().id),
     queryFn: ({ signal }) => workloadApi.builtInAgentIds(company().id, signal),
-    enabled: props.scope().kind === "company",
+    // The server only answers while the instance has built-in agents on (`enableBuiltInAgents`).
+    enabled: props.scope().kind === "company" && experimental.data?.enableBuiltInAgents === true,
     staleTime: 5 * 60_000,
   }));
 
@@ -51,7 +58,7 @@ export function useWorkload(props: { scope: () => WorkloadScope; tasks: () => re
     ),
   );
 
-  // TODO(clock): switch to the shared useNow(). Until then, "now" moves when the data does.
+  const liveNow = useNow(() => (liveRuns.data ?? []).some((run) => run.status === "running"));
   const now = createMemo(() => {
     void runs.dataUpdatedAt;
     void liveRuns.dataUpdatedAt;
@@ -73,6 +80,7 @@ export function useWorkload(props: { scope: () => WorkloadScope; tasks: () => re
 
   return {
     input,
+    liveNow,
     agents,
     builtInIds: createMemo(() => new Set(builtIn.data ?? [])),
     ready: () => agents.isSuccess && runs.isSuccess && props.tasks() !== undefined,

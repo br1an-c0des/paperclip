@@ -174,6 +174,10 @@
   background: var(--well);
 }
 
+.wl-load--none {
+  min-width: 0;
+}
+
 .wl-load-total {
   text-align: right;
   color: var(--muted);
@@ -231,13 +235,23 @@
 }
 
 .wl-tip-subj {
+  flex: 1 1 0;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   padding: 0;
   background: none;
   border: none;
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.wl-tip-subj:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .wl-tip-body {
@@ -594,7 +608,9 @@ button.wl-bar:hover {
   text-align: left;
 }
 
+/* "Today" is wider than its one-day column: it hangs left from the column's right edge. */
 .wl-hm-day--start.wl-hm-day--today {
+  direction: rtl;
   text-align: right;
 }
 

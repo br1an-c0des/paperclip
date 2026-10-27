@@ -9,8 +9,8 @@ import { api } from "./client";
  *   old UI's run lists read them. The endpoint takes an agent and a limit (at most 1000), but no
  *   date range or project, so the views ask for the most and say when the oldest days aren't loaded.
  * - `builtInAgentIds`: which agents are built in (`GET /companies/:id/built-in-agents`), for the
- *   company view's "Built in" group. The endpoint answers with an error when the instance has built-in
- *   agents turned off, which means there are none.
+ *   company view's "Built in" group. The endpoint answers 404 while the instance has built-in agents
+ *   turned off (`enableBuiltInAgents`), which means there are none.
  */
 
 /** The run list's row with `summary=true`: the run without its log, usage or result. */

@@ -1,7 +1,7 @@
 import { A, useSearchParams } from "@solidjs/router";
 import { useQueryClient } from "@tanstack/solid-query";
 import { ArrowRight, Ban, Clock, CornerDownRight, Lightbulb, Plus, Sparkles, Users, X, Zap } from "lucide-solid";
-import { createMemo, createSignal, For, Show, type JSX } from "solid-js";
+import { createMemo, createSignal, For, Index, Show, type JSX } from "solid-js";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useCommands } from "@/lib/commands";
@@ -21,6 +21,7 @@ import {
   formatDuration,
   formatHours,
   formatUsd,
+  agentStates,
   groupAgents,
   heatmap,
   openWork,
@@ -39,6 +40,7 @@ import {
   type HeatRange,
   type Lane,
   type LaneBar,
+  type NowState,
   type NowStateKey,
   type WorkloadAgent,
   type WorkloadScope,
@@ -118,8 +120,10 @@ export function WorkloadView(props: { scope: WorkloadScope; tasks: () => readonl
   const work = createMemo(() => openWork(data.input(), roster()));
   const tip = createMemo(() => suggestion(data.input(), roster()));
 
-  const today = createMemo(() => (range() === "today" ? todayLanes(data.input(), roster()) : null));
+  // Ticks every second while an agent runs; the rows below are <Index>ed so they update in place.
+  const today = createMemo(() => (range() === "today" ? todayLanes({ ...data.input(), now: data.liveNow() }, roster()) : null));
   const heat = createMemo(() => (range() === "today" ? null : heatmap(data.input(), roster(), range() as HeatRange)));
+  const states = createMemo(() => (range() === "today" ? null : agentStates(data.input(), roster())));
 
   const rangeSub = () => {
     if (range() === "today") return props.scope.kind === "project" ? `Runs, schedules and blocked time for agents on ${props.scopeName}` : "Every agent in the company, coloured by project";
@@ -215,7 +219,7 @@ export function WorkloadView(props: { scope: WorkloadScope; tasks: () => readonl
               {(found) => <TodayGrid window={found().window} lanes={found().lanes} groups={groups()} agentById={agentById()} prefix={company().issuePrefix} />}
             </Show>
             <Show when={heat()}>
-              {(found) => <HeatGrid map={found()} groups={groups()} agentById={agentById()} prefix={company().issuePrefix} budgets={props.scope.kind === "company"} />}
+              {(found) => <HeatGrid map={found()} states={states() ?? new Map()} groups={groups()} agentById={agentById()} prefix={company().issuePrefix} budgets={props.scope.kind === "company"} />}
             </Show>
           </Show>
         </Show>
@@ -291,7 +295,7 @@ function ChainNodeView(props: { node: ChainNode; agent: WorkloadAgent | undefine
   const label = () => props.node.label || name();
   return (
     <span class="wl-node" classList={{ "wl-node--held": props.node.held }} title={`${name()} · ${label()} · ${props.node.note}`}>
-      <Show when={props.node.kind === "agent"} fallback={props.node.kind === "nobody" ? <span class="wl-nobody" aria-hidden="true" /> : <InitialsDisc name={name()} seed={props.node.userId ?? name()} size={24} you={props.node.kind === "you"} />}>
+      <Show when={props.node.kind === "agent"} fallback={props.node.kind === "nobody" ? <span class="wl-nobody" aria-hidden="true" /> : <InitialsDisc name={props.node.userId ? people.personName(props.node.userId) : name()} seed={props.node.userId ?? name()} size={24} you={props.node.kind === "you"} />}>
         <AgentMark agent={props.agent} id={props.node.agentId!} size={24} />
       </Show>
       <span classList={{ mono: props.node.mono }}>{label()}</span>
@@ -322,7 +326,7 @@ function OpenWork(props: {
                   <AgentMark agent={agent()} id={row.agentId} size={24} />
                   <span class="wl-ellipsis">{agent()?.name ?? "Agent"}</span>
                 </span>
-                <span class="wl-load" style={{ width: `${(row.total / max()) * 100}%` }} role="img" aria-label={row.segments.map((segment) => `${segment.label}: ${segment.count}`).join(", ") || "Nothing open"}>
+                <span class="wl-load" classList={{ "wl-load--none": row.total === 0 }} style={{ width: `${(row.total / max()) * 100}%` }} role="img" aria-label={row.segments.map((segment) => `${segment.label}: ${segment.count}`).join(", ") || "Nothing open"}>
                   <For each={row.segments}>{(segment) => <span title={`${segment.label}: ${segment.count}`} style={{ flex: `${segment.count} 1 0px`, background: segment.gradient }} />}</For>
                 </span>
                 <span class="wl-load-total">
@@ -486,7 +490,6 @@ function TodayGrid(props: { window: DayWindow; lanes: Lane[]; groups: Group[]; a
         <div class="wl-col-head">Agent</div>
         <div class="wl-ticks">
           <For each={ticks()}>{(tick) => <span style={{ left: `${windowFraction(props.window, tick.at) * 100}%` }}>{tick.label}</span>}</For>
-          {/* TODO(clock): the "now" line and label move with useNow(). */}
           <span class="wl-now-pill" style={{ left: nowLeft() }}>
             Now {formatClock(props.window.now).replace(/ (am|pm)$/, "")}
           </span>
@@ -499,9 +502,9 @@ function TodayGrid(props: { window: DayWindow; lanes: Lane[]; groups: Group[]; a
             <Show when={group.label}>
               <div class="wl-group">{group.label}</div>
             </Show>
-            <For each={ordered(group)}>
-              {(lane) => <LaneRow lane={lane} window={props.window} agent={props.agentById.get(lane.agentId)} prefix={props.prefix} nowLeft={nowLeft()} />}
-            </For>
+            <Index each={ordered(group)}>
+              {(lane) => <LaneRow lane={lane()} window={props.window} agent={props.agentById.get(lane().agentId)} prefix={props.prefix} nowLeft={nowLeft()} />}
+            </Index>
           </>
         )}
       </For>
@@ -516,32 +519,31 @@ function LaneRow(props: { lane: Lane; window: DayWindow; agent: WorkloadAgent | 
       <div class="wl-cell-agent">
         <AgentCell agent={props.agent} id={props.lane.agentId} prefix={props.prefix} state={props.lane.state} />
         <div class="wl-agent-sum">
-          {/* TODO(clock): a live run's share of this total grows with useNow(). */}
           <b>{formatDuration(props.lane.busyMs)}</b> busy
           <Show when={props.lane.spendUsd !== null}> · {formatUsd(props.lane.spendUsd!)} today</Show>
         </div>
       </div>
       <div class="wl-track" role="list" aria-label={`${props.agent?.name ?? "Agent"} today`}>
-        <For each={props.lane.bars}>{(bar) => <Bar bar={bar} window={props.window} />}</For>
+        <Index each={props.lane.bars}>{(bar) => <Bar bar={bar()} window={props.window} />}</Index>
         <span class="wl-now" style={{ left: props.nowLeft }} aria-hidden="true" />
       </div>
       <div class="wl-cell-queue">
         <Show when={props.lane.queue.length > 0}>
           <ol class="wl-q">
-            <For each={props.lane.queue.slice(0, QUEUE_SHOWN)}>
+            <Index each={props.lane.queue.slice(0, QUEUE_SHOWN)}>
               {(item) => (
                 <li>
-                  <button type="button" class="wl-q-item" onClick={() => openTask(item.task)}>
-                    <PriorityBars priority={item.task.priority} />
-                    <span class="mono wl-q-id">{item.task.identifier}</span>
-                    <span class="wl-ellipsis">{item.task.title}</span>
-                    <Show when={item.queued}>
+                  <button type="button" class="wl-q-item" onClick={() => openTask(item().task)}>
+                    <PriorityBars priority={item().task.priority} />
+                    <span class="mono wl-q-id">{item().task.identifier}</span>
+                    <span class="wl-ellipsis">{item().task.title}</span>
+                    <Show when={item().queued}>
                       <span class="wl-q-tag">queued</span>
                     </Show>
                   </button>
                 </li>
               )}
-            </For>
+            </Index>
           </ol>
         </Show>
         <Show when={props.lane.queueNote}>
@@ -598,7 +600,7 @@ function Bar(props: { bar: LaneBar; window: DayWindow }) {
 // ---------------------------------------------------------------------------------------------
 // 7 and 30 days
 
-function HeatGrid(props: { map: ReturnType<typeof heatmap>; groups: Group[]; agentById: ReadonlyMap<string, WorkloadAgent>; prefix: string; budgets: boolean }) {
+function HeatGrid(props: { map: ReturnType<typeof heatmap>; states: ReadonlyMap<string, NowState>; groups: Group[]; agentById: ReadonlyMap<string, WorkloadAgent>; prefix: string; budgets: boolean }) {
   const rowById = createMemo(() => new Map(props.map.rows.map((row) => [row.agentId, row] as const)));
   const columns = () => ({ "grid-template-columns": `repeat(${props.map.days.length}, minmax(0, 1fr))`, gap: props.map.range === "week" ? "8px" : "3px" });
   const totalDays = () => props.map.days.length;
@@ -633,6 +635,7 @@ function HeatGrid(props: { map: ReturnType<typeof heatmap>; groups: Group[]; age
                         agent={agent()}
                         id={row.agentId}
                         prefix={props.prefix}
+                        state={props.states.get(row.agentId)}
                         aside={<For each={row.flags}>{(flag) => <Flag flag={flag} />}</For>}
                       />
                     </div>

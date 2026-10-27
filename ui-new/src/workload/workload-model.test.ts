@@ -10,6 +10,7 @@ import {
   heatDays,
   heatLevel,
   heatmap,
+  agentStates,
   openWork,
   rosterIds,
   suggestion,
@@ -272,6 +273,14 @@ describe("todayLanes", () => {
     expect(qr.queueNote).toBe("");
   });
 
+  it("starts a blocked stretch after the agent's last run today, when that ended later", () => {
+    const result = todayLanes(input({ agents, tasks, runs: [run("m1", "ml", "t2", at(27, 12), at(27, 13))] }), ["ml"]);
+    expect(result.lanes[0]!.bars.map((bar) => [bar.kind, bar.start])).toEqual([
+      ["run", at(27, 12)],
+      ["blocked", at(27, 13)],
+    ]);
+  });
+
   it("shows a blocked agent waiting from its task's last update, and a paused one", () => {
     const ml = lane("ml");
     expect(ml.state.key).toBe("blocked");
@@ -289,6 +298,11 @@ describe("todayLanes", () => {
     expect(fe.state).toEqual({ key: "idle", label: "Idle since 3:30 pm", runId: null, taskId: null });
     expect(fe.bars.map((bar) => bar.runId)).toEqual(["r2"]);
     expect(fe.queueNote).toBe("Queue is empty · T3 is in review with you");
+  });
+
+  it("gives the same state line on its own, for the heatmap rows", () => {
+    expect(agentStates(data, ["fe", "ml"]).get("fe")!.label).toBe("Idle since 3:30 pm");
+    expect(agentStates(data, ["fe", "ml"]).get("ml")!.key).toBe("blocked");
   });
 
   it("puts queued runs at the now line, and says when an agent is busy on another project", () => {
@@ -354,6 +368,12 @@ describe("heatmap", () => {
     expect(map.rows[0]!.flags).toEqual([{ kind: "busiest", title: "Busiest", body: "4h of runs this week, 2.3× the average agent." }]);
     expect(map.rows[1]!.flags).toEqual([{ kind: "spare", title: "Most spare capacity", body: "Only 0.3h busy this week. Nothing open is assigned to it." }]);
     expect(map.rows[2]!.flags).toEqual([]);
+  });
+
+  it("leaves markers off when nobody was busy for long", () => {
+    const short = [run("r1", "a", "t1", at(27, 8), at(27, 8, 20)), run("r2", "b", "t2", at(27, 9), at(27, 9, 1))];
+    const map = heatmap(input({ agents, tasks, runs: short }), ["a", "b"], "week");
+    expect(map.rows.flatMap((row) => row.flags)).toEqual([]);
   });
 
   it("says which days are older than the loaded runs", () => {

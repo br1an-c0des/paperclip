@@ -200,7 +200,7 @@ function seriesPalette(input: Pick<WorkloadInput, "scope" | "projects">, tasks: 
       return entry;
     }
     const projectId = task?.projectId ?? null;
-    const key = projectId ?? "none";
+    const key = projectId ?? (task ? "no-project" : "none");
     let entry = seen.get(key);
     if (!entry) {
       const project = projectId ? projects.get(projectId) : undefined;
@@ -546,13 +546,40 @@ function queueFor(assigned: readonly WorkloadTask[], queuedTaskIds: ReadonlySet<
     );
 }
 
+/** When each agent last finished a run anywhere in the company, for "Idle since". */
+function lastFinishedByAgent(runs: readonly WorkloadRun[]) {
+  const lastFinished = new Map<string, number>();
+  for (const run of runs) {
+    const finished = time(run.finishedAt);
+    if (!Number.isNaN(finished) && finished > (lastFinished.get(run.agentId) ?? -Infinity)) lastFinished.set(run.agentId, finished);
+  }
+  return lastFinished;
+}
+
+/** What each listed agent is doing now, as the lanes' state line says it; the heatmap rows show it too. */
+export function agentStates(input: WorkloadInput, agentIds: readonly string[]): Map<string, NowState> {
+  const tasks = scopeTasks(input);
+  const taskIds = new Set(tasks.keys());
+  const lastFinished = lastFinishedByAgent(input.runs);
+  const agentById = new Map(input.agents.map((agent) => [agent.id, agent] as const));
+  const states = new Map<string, NowState>();
+  for (const agentId of agentIds) {
+    const agent = agentById.get(agentId);
+    if (!agent) continue;
+    const assigned = [...tasks.values()].filter((task) => task.assigneeAgentId === agentId && isOpenTask(task));
+    states.set(agentId, nowState(agent, input.liveRuns, taskIds, tasks, assigned, lastFinished.get(agentId) ?? null, input.now));
+  }
+  return states;
+}
+
 /**
  * Today's lanes (board 31, Today): for each listed agent, its runs in the scope as bars (the live
  * one glowing, up to `now`), a blocked stretch while its task waits on another, a paused stretch,
  * queued runs and scheduled heartbeats as dashed bars after the "now" line, and its queue.
  *
  * The API keeps no status history, so a blocked stretch starts at the task's last update (or the
- * window's start), which is when it most likely became blocked.
+ * window's start), which is when it most likely became blocked, or after the agent's last run today
+ * if that ended later.
  */
 export function todayLanes(input: WorkloadInput, agentIds: readonly string[]): { window: DayWindow; lanes: Lane[]; legend: SeriesKey[] } {
   const now = input.now;
@@ -570,12 +597,7 @@ export function todayLanes(input: WorkloadInput, agentIds: readonly string[]): {
   });
   const window = dayWindow(now, spans.length ? Math.min(...spans.map((span) => span.start)) : undefined);
 
-  // When each agent last finished a run anywhere in the company, for "Idle since".
-  const lastFinished = new Map<string, number>();
-  for (const run of input.runs) {
-    const finished = time(run.finishedAt);
-    if (!Number.isNaN(finished) && finished > (lastFinished.get(run.agentId) ?? -Infinity)) lastFinished.set(run.agentId, finished);
-  }
+  const lastFinished = lastFinishedByAgent(input.runs);
 
   const lanes: Lane[] = [];
   for (const agentId of agentIds) {
@@ -632,7 +654,9 @@ export function todayLanes(input: WorkloadInput, agentIds: readonly string[]): {
     if (state.key === "blocked" && state.taskId) {
       const task = tasks.get(state.taskId)!;
       const blocker = (task.blockedBy ?? []).find((candidate) => !RESOLVED.has(candidate.status));
-      const since = Math.min(now, Math.max(window.start, time(task.updatedAt) || window.start));
+      // From its last update, but not over a run it made after that.
+      const lastRunEnd = Math.max(window.start, ...bars.filter((bar) => bar.kind === "run").map((bar) => bar.end));
+      const since = Math.min(now, Math.max(lastRunEnd, time(task.updatedAt) || window.start));
       bars.push({
         kind: "blocked",
         start: since,
@@ -880,17 +904,22 @@ export function heatmap(input: WorkloadInput, agentIds: readonly string[], range
   };
 }
 
+/** Below this much busy time on average, nobody is busy enough for markers to mean anything. */
+const FLAG_FLOOR_MS = 30 * 60_000;
+
 /**
  * Row markers (board 31 at 7 and 30 days): the busiest agent, and the one with the most room among
- * those that can take work (not paused or in error). Only with two agents or more, and only when
- * they differ from the average.
+ * those that can take work (not paused or in error). Only with two agents or more, once the
+ * average reaches half an hour, and only when they stand out: the busiest at 1.25× the average or
+ * more, the most spare at three quarters of it or less.
  */
 function markFlags(rows: HeatRow[], agents: ReadonlyMap<string, WorkloadAgent>, range: HeatRange) {
   if (rows.length < 2) return;
   const span = range === "week" ? "this week" : "in 30 days";
   const average = rows.reduce((sum, row) => sum + row.busyMs, 0) / rows.length;
+  if (average < FLAG_FLOOR_MS) return;
   const busiest = rows.slice().sort((a, b) => b.busyMs - a.busyMs)[0]!;
-  if (busiest.busyMs > 0 && busiest.busyMs > average) {
+  if (busiest.busyMs >= average * 1.25) {
     busiest.flags.push({
       kind: "busiest",
       title: "Busiest",
@@ -899,7 +928,7 @@ function markFlags(rows: HeatRow[], agents: ReadonlyMap<string, WorkloadAgent>, 
   }
   const pool = rows.filter((row) => row !== busiest && !["paused", "error"].includes(agents.get(row.agentId)?.status ?? ""));
   const spare = pool.sort((a, b) => a.busyMs - b.busyMs || a.openCount - b.openCount)[0];
-  if (spare && spare.busyMs < average) {
+  if (spare && spare.busyMs <= average * 0.75) {
     const assigned = spare.openCount === 0 ? "Nothing open is assigned to it." : `It has ${spare.openCount} open ${spare.openCount === 1 ? "task" : "tasks"}.`;
     spare.flags.push({ kind: "spare", title: "Most spare capacity", body: `Only ${formatHours(spare.busyMs)} busy ${span}. ${assigned}` });
   }
