@@ -4,6 +4,7 @@ import { createMemo, For, Match, Show, Switch } from "solid-js";
 import { heartbeatsApi } from "@/api/heartbeats";
 import { issuesApi, type RunForIssue } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
+import { useNow } from "@/lib/clock";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { AgentAvatar } from "@/ui/Avatar";
@@ -76,6 +77,8 @@ export function TaskRuns(props: { taskId: string }) {
   const ordered = createMemo(() =>
     [...(runs.data ?? [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
   );
+  // Ticks the running times while a run is going.
+  const now = useNow(() => ordered().some((run) => ACTIVE.has(run.status)));
 
   const stop = async (run: RunForIssue) => {
     try {
@@ -153,7 +156,7 @@ export function TaskRuns(props: { taskId: string }) {
                         </div>
                         <span class="tsec-muted">
                           {SOURCES[run.invocationSource] ?? words(run.invocationSource)} · {stampLabel(run.startedAt ?? run.createdAt)}
-                          <Show when={duration(run.startedAt, run.finishedAt ?? (active() ? new Date() : null))}>
+                          <Show when={duration(run.startedAt, run.finishedAt ?? (active() ? new Date(now()) : null))}>
                             {(took) => <> · {took()}</>}
                           </Show>
                           <Show when={!active() && run.livenessState && run.livenessState !== "completed"}>

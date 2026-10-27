@@ -8,6 +8,7 @@ import { heartbeatsApi } from "@/api/heartbeats";
 import { interactionsApi } from "@/api/interactions";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
+import { useNow } from "@/lib/clock";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useLiveRunsQuery } from "@/lib/company-data";
@@ -183,6 +184,8 @@ export function TaskActivity(props: { taskId: string; title?: string }) {
     queryFn: ({ signal }) => approvalsApi.forIssue(props.taskId, signal),
   }));
   const live = createMemo(() => (liveRuns.data ?? []).filter((run) => run.issueId === props.taskId));
+  // Ticks the live runs' running times.
+  const now = useNow(() => live().length > 0);
   const queue = useQueuedComments(() => props.taskId, () => live().length > 0 || !!task()?.assigneeAgentId);
 
   const names = {
@@ -369,7 +372,7 @@ export function TaskActivity(props: { taskId: string; title?: string }) {
                   </span>
                   <span class="ta-muted">
                     Run {run.id.slice(0, 8)}
-                    <Show when={run.startedAt}>{(start) => <> · {duration(start(), new Date())}</>}</Show>
+                    <Show when={run.startedAt}>{(start) => <> · {duration(start(), new Date(now()))}</>}</Show>
                   </span>
                   <Button size="compact" class="ta-live-view" onClick={() => commands.openRunModal(run.id)}>
                     View run
