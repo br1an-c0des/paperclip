@@ -40,8 +40,8 @@ until one becomes a concrete fix.
 | 1 | [Clear the compact issue-list cache when an issue changes](#1-clear-the-compact-issue-list-cache-when-an-issue-changes) | submitted | `fix/issue-list-cache-invalidation` | [#17828](https://github.com/paperclipai/paperclip/pull/17828) | 2026-10-26 | 2026-10-26 | |
 | 2 | [Don't crash on Windows when an agent directory path is longer than 260 characters](#2-dont-crash-on-windows-when-an-agent-directory-path-is-longer-than-260-characters) | closed | `fix/agent-directory-probe-long-cwd` | [#17691](https://github.com/paperclipai/paperclip/pull/17691) | | 2026-10-26 | |
 | 3 | [Let a pause finish after a restart stopped a legacy run during preparation](#3-let-a-pause-finish-after-a-restart-stopped-a-legacy-run-during-preparation) | submitted | `fix/pause-after-restart-during-preparation` | [#17692](https://github.com/paperclipai/paperclip/pull/17692) | | 2026-10-26 | |
-| 4 | [Link the plugin SDK on Windows without symlink rights](#4-link-the-plugin-sdk-on-windows-without-symlink-rights) | candidate | | | 2026-10-24 | | |
-| 5 | [Start `pnpm dev` on Windows when the native runner is enabled](#5-start-pnpm-dev-on-windows-when-the-native-runner-is-enabled) | candidate | | | 2026-10-26 | | |
+| 4 | [Link the plugin SDK on Windows without symlink rights](#4-link-the-plugin-sdk-on-windows-without-symlink-rights) | closed | | | 2026-10-24 | | |
+| 5 | [Start `pnpm dev` on Windows when the native runner is enabled](#5-start-pnpm-dev-on-windows-when-the-native-runner-is-enabled) | closed | | | 2026-10-26 | | |
 | 6 | [Detect glibc reliably at server startup so Paperclip Runner is offered on Linux](#6-detect-glibc-reliably-at-server-startup-so-paperclip-runner-is-offered-on-linux) | building | `fix/runner-libc-probe-startup` | | 2026-10-26 | | |
 
 ## Details
@@ -93,6 +93,9 @@ until one becomes a concrete fix.
   which needs no special rights, or fall back to one when the symlink fails with `EPERM`.
 - **Fork workaround to revisit once merged:** none in the code. This machine has Developer Mode on.
 
+- **Closed 2026-10-27** without building: Windows isn't a supported server platform, so the fix
+  isn't worth a slot in upstream's review queue.
+
 ### 5. Start `pnpm dev` on Windows when the native runner is enabled
 
 - **Problem:** with the instance setting `enableNativeRunner` on, `pnpm dev` builds the Rust runner
@@ -113,6 +116,9 @@ until one becomes a concrete fix.
 - **Fork workaround:** keep `enableNativeRunner` off in local instances on this machine
   (`PATCH /api/instance/settings/experimental`). Found when the `~/.paperclip-test` instance
   wouldn't start after the 2026-10-26 sync.
+
+- **Closed 2026-10-27** without building: Windows isn't a supported server platform, so the fix
+  isn't worth a slot in upstream's review queue.
 
 ### 6. Detect glibc reliably at server startup so Paperclip Runner is offered on Linux
 
