@@ -95,4 +95,12 @@ export const queryKeys = {
     tasks: (companyId: string) => ["issues", companyId, "inbox", "mine"] as const,
     tasksWithArchived: (companyId: string) => ["issues", companyId, "inbox", "with-archived"] as const,
   },
+  /**
+   * The Search page (src/search/). The old UI keys company search `["company-search", companyId, …]`;
+   * the rest of the key is the request, filters and sort included, without the page offset.
+   */
+  search: {
+    all: (companyId: string) => ["company-search", companyId] as const,
+    results: (companyId: string, request: string) => ["company-search", companyId, request] as const,
+  },
 };
