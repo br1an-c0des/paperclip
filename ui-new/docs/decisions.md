@@ -719,7 +719,7 @@ is still changing cases, so check its direction first.
 
 ### 17. Search results are shaped differently from board S1
 
-- **Status:** Open
+- **Status:** Decided 2026-10-27
 - **Area:** `inbox-search/search`
 - **Found in:** boards S1 to S3, checked against the search API.
 
@@ -730,7 +730,9 @@ snippet and no author, and document results without a revision.
 **Options.** Draw results as the API returns them (a task with its best snippet), or fetch more per
 result, or propose richer results upstream.
 
-**Decision.** Open, needed by the search screen.
+**Decision.** Draw results as the API returns them: a comment match is a row for its task with the
+best-matching snippet, no author; documents without a revision number. No extra requests per result.
+If authors or revisions turn out to matter, propose richer results upstream later.
 
 ### 18. The phone layouts assume push notifications
 
