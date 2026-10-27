@@ -838,6 +838,11 @@ Each is handled in `ui-new` for now. They're possible upstream proposals if they
   task's candidate workspaces.
 - **The project access notice** links to `/agents/:agentKey/permissions`, which shows "not built
   yet" until the M5 agent pages.
+- **The recent windows don't say where they end.** `/recent-comments` mixes picked-out comments
+  with the latest run of comments, and `/activity?view=recent` (50) and `/runs?view=recent` (2) have
+  no `hasMore`. `ui-new` mirrors the server's limits (the 4 newest comments, a full page means more),
+  so the gap marker lands in the wrong place if upstream changes them.
+- **No server-side log search.** Find in run only covers the log that's loaded and drawn.
 - **Some response types aren't exported** from the shared package (the tree-control state, the
   adapter model entry). Declared locally, as in [decision 10](#10-some-response-types-arent-exported-from-the-shared-package).
 
