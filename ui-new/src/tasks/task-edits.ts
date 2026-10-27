@@ -104,7 +104,8 @@ export function runOverridesEdit(
   }
   if ("effort" in change) {
     for (const key of EFFORT_KEYS) delete config[key];
-    if (change.effort) config[effortKeyFor(agent.adapterType)] = change.effort;
+    const effortKey = effortKeyFor(agent.adapterType);
+    if (change.effort && effortKey) config[effortKey] = change.effort;
   }
   const adapterConfig = compact(config);
   const next = compact({
