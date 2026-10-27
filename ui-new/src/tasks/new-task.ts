@@ -1,4 +1,6 @@
 import type { IssuePriority, IssueReviewPolicy, IssueStatus, IssueWorkMode, Project } from "@paperclipai/shared";
+import { templatePlaceholders } from "@/recurring/recurring-model";
+import { isRepeating, repeatProblem, scheduleCron, type RepeatDraft } from "@/recurring/schedule";
 import { buildAdapterOverrides } from "./run-overrides";
 
 /*
@@ -14,6 +16,12 @@ import { buildAdapterOverrides } from "./run-overrides";
  *   has `enableIsolatedWorkspaces` (decision 12: follows the setting).
  * - Review policy "Anyone approves" is the server's default, sent as nothing.
  * - Tasks have no due date (decision 6).
+ *
+ * With Repeat on (boards N4–N7) the draft becomes a recurring task: `POST /companies/:id/routines`
+ * with the fields a routine copies to each occurrence (title, description, agent, project,
+ * priority, goal, parent), then one `POST /routines/:id/triggers` per trigger, as the old Routines
+ * page and its trigger setup do. A webhook starts with `setupPending`, so test events only check the
+ * connection until it's turned on.
  */
 
 export type Principal = { kind: "agent" | "user"; id: string };
@@ -46,6 +54,8 @@ export type NewTaskDraft = {
   extras: ExtraField[];
   /** Display names for picked tasks and goals ("TRA-41"), so a restored draft can show them. */
   names: Record<string, string>;
+  /** Repeat (board N4): null, or how the recurring task repeats. */
+  repeat: RepeatDraft | null;
 };
 
 export type ExtraField = "parent" | "goal" | "blocked" | "billing" | "private" | "approver" | "watchdog";
@@ -74,6 +84,7 @@ export function emptyDraft(overrides: Partial<NewTaskDraft> = {}): NewTaskDraft 
     reviewPolicy: "anyone",
     extras: [],
     names: {},
+    repeat: null,
     ...overrides,
   };
 }
@@ -192,7 +203,67 @@ export function draftProblem(draft: NewTaskDraft): string | null {
   return null;
 }
 
-const DRAFT_KEY = (companyId: string) => `paperclip.ui-new.new-task-draft.${companyId}`;
+/** Whether the draft is a recurring task: Repeat is on, with a schedule or a webhook. */
+export function draftRepeats(draft: Pick<NewTaskDraft, "repeat">): boolean {
+  return isRepeating(draft.repeat);
+}
+
+/** Why a recurring draft can't be created yet, or null. A routine needs a title. */
+export function recurringDraftProblem(draft: NewTaskDraft): string | null {
+  if (!draft.title.trim()) return "Give the recurring task a title.";
+  if (!draft.repeat) return null;
+  const problem = repeatProblem(draft.repeat);
+  if (problem) return problem;
+  const missing = draft.repeat.schedule ? missingDefaults(draft) : [];
+  return missing.length > 0 ? `A schedule needs a default for ${missing.join(", ")}.` : null;
+}
+
+/** The placeholders a scheduled draft has no default for. */
+export function missingDefaults(draft: Pick<NewTaskDraft, "title" | "description" | "repeat">): string[] {
+  const defaults = draft.repeat?.defaults ?? {};
+  return templatePlaceholders(draft.title, draft.description).filter((name) => !defaults[name]?.trim());
+}
+
+/**
+ * `POST /companies/:id/routines` for a recurring draft. Only an agent can be its assignee; without
+ * one the server saves it paused, as the old UI's drafts.
+ */
+export function buildRoutinePayload(draft: NewTaskDraft): Record<string, unknown> {
+  const has = (field: ExtraField) => draft.extras.includes(field);
+  const description = draft.description.trim();
+  const defaults = draft.repeat?.defaults ?? {};
+  // Each placeholder becomes a required text input with its default, if it has one.
+  const variables = templatePlaceholders(draft.title, description).map((name) => ({
+    name,
+    type: "text",
+    defaultValue: defaults[name]?.trim() || null,
+    required: true,
+  }));
+  return {
+    title: draft.title.trim(),
+    description: description || null,
+    projectId: draft.projectId,
+    assigneeAgentId: draft.assignee?.kind === "agent" ? draft.assignee.id : null,
+    priority: draft.priority,
+    goalId: has("goal") ? draft.goalId : null,
+    parentIssueId: has("parent") ? draft.parentId : null,
+    concurrencyPolicy: draft.repeat?.policy ?? "coalesce_if_active",
+    catchUpPolicy: "skip_missed",
+    ...(variables.length > 0 ? { variables } : {}),
+  };
+}
+
+/** The triggers to add once the routine exists: the schedule, then the webhook. */
+export function buildTriggerPayloads(repeat: RepeatDraft): Record<string, unknown>[] {
+  const triggers: Record<string, unknown>[] = [];
+  if (repeat.schedule) triggers.push({ kind: "schedule", cronExpression: scheduleCron(repeat), timezone: repeat.timezone || "UTC" });
+  if (repeat.webhook) {
+    triggers.push({ kind: "webhook", signingMode: repeat.sender === "github" ? "github_hmac" : "app_webhook", setupPending: true });
+  }
+  return triggers;
+}
+
+const DRAFT_KEY =(companyId: string) => `paperclip.ui-new.new-task-draft.${companyId}`;
 
 export function loadDraft(companyId: string): NewTaskDraft | null {
   try {

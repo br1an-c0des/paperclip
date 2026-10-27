@@ -72,7 +72,9 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
     case "routine":
     case "routine_trigger":
     case "routine_run":
-      keys.push(["routines"]);
+      keys.push(queryKeys.routines.all);
+      // A run can make or join a task, which the Recurring view groups under its recurring task.
+      if (entityType === "routine_run") keys.push(queryKeys.issues.list(companyId));
       break;
     case "cost_event":
       keys.push(["costs", companyId]);

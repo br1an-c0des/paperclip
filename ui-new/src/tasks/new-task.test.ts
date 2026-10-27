@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { defaultRepeat } from "@/recurring/schedule";
 import {
   buildCreatePayload,
+  buildRoutinePayload,
+  buildTriggerPayloads,
   clearDraft,
   draftProblem,
+  draftRepeats,
   effortOptions,
   emptyDraft,
   loadDraft,
+  missingDefaults,
+  recurringDraftProblem,
   saveDraft,
   type PayloadContext,
 } from "./new-task";
@@ -88,5 +94,86 @@ describe("drafts", () => {
     expect(loadDraft("c1")?.title).toBe("Half written");
     saveDraft("c1", emptyDraft());
     expect(loadDraft("c1")).toBeNull();
+  });
+});
+
+describe("Repeat (boards N4–N7)", () => {
+  const repeat = { ...defaultRepeat("America/Chicago"), frequency: "weekly" as const, days: [1, 4], time: "09:00" };
+  const draft = emptyDraft({
+    title: "  Funding rate snapshot for {{date}}  ",
+    description: "Pull the last 24 hours.",
+    projectId: "p1",
+    priority: "high",
+    assignee: { kind: "agent", id: "a1" },
+    labelIds: ["l1"],
+    reviewer: { kind: "user", id: "u1" },
+    parentId: "parent",
+    goalId: "goal",
+    blockedByIssueIds: ["b1"],
+    extras: ["parent", "goal", "blocked"],
+    repeat,
+  });
+
+  it("is a recurring task only with a schedule or a webhook", () => {
+    expect(draftRepeats(emptyDraft())).toBe(false);
+    expect(draftRepeats(draft)).toBe(true);
+    expect(draftRepeats({ repeat: { ...repeat, schedule: false } })).toBe(false);
+    expect(draftRepeats({ repeat: { ...repeat, schedule: false, webhook: true } })).toBe(true);
+  });
+
+  it("sends only what a routine copies to each occurrence", () => {
+    expect(buildRoutinePayload(draft)).toEqual({
+      title: "Funding rate snapshot for {{date}}",
+      description: "Pull the last 24 hours.",
+      projectId: "p1",
+      assigneeAgentId: "a1",
+      priority: "high",
+      goalId: "goal",
+      parentIssueId: "parent",
+      concurrencyPolicy: "coalesce_if_active",
+      catchUpPolicy: "skip_missed",
+    });
+  });
+
+  it("drops a person as assignee, empty text and fields that aren't shown", () => {
+    const payload = buildRoutinePayload({ ...draft, description: "  ", assignee: { kind: "user", id: "u1" }, extras: [], repeat: { ...repeat, policy: "skip_if_active" } });
+    expect(payload).toMatchObject({ description: null, assigneeAgentId: null, goalId: null, parentIssueId: null, concurrencyPolicy: "skip_if_active" });
+  });
+
+  it("adds the schedule, then the webhook still being set up", () => {
+    expect(buildTriggerPayloads(repeat)).toEqual([{ kind: "schedule", cronExpression: "0 9 * * 1,4", timezone: "America/Chicago" }]);
+    expect(buildTriggerPayloads({ ...repeat, webhook: true, sender: "github" })).toEqual([
+      { kind: "schedule", cronExpression: "0 9 * * 1,4", timezone: "America/Chicago" },
+      { kind: "webhook", signingMode: "github_hmac", setupPending: true },
+    ]);
+    expect(buildTriggerPayloads({ ...repeat, schedule: false, webhook: true })).toEqual([{ kind: "webhook", signingMode: "app_webhook", setupPending: true }]);
+  });
+
+  it("needs a title and a schedule that works", () => {
+    expect(recurringDraftProblem({ ...draft, title: " " })).toMatch(/title/);
+    expect(recurringDraftProblem({ ...draft, repeat: { ...repeat, days: [] } })).toMatch(/day/);
+    expect(recurringDraftProblem({ ...draft, repeat: { ...repeat, frequency: "custom", cron: "every day" } })).toMatch(/5 fields/);
+    expect(recurringDraftProblem(draft)).toBeNull();
+  });
+
+  it("gives each placeholder a default, which a schedule needs", () => {
+    const withInputs = { ...draft, description: "Pull {{exchanges}} for {{lookback\\_hours}} hours on {{date}}." };
+    expect(missingDefaults(withInputs)).toEqual(["exchanges", "lookback_hours"]);
+    expect(recurringDraftProblem(withInputs)).toBe("A schedule needs a default for exchanges, lookback_hours.");
+    const filled = { ...withInputs, repeat: { ...repeat, defaults: { exchanges: "Binance", lookback_hours: " 24 " } } };
+    expect(recurringDraftProblem(filled)).toBeNull();
+    expect(buildRoutinePayload(filled).variables).toEqual([
+      { name: "exchanges", type: "text", defaultValue: "Binance", required: true },
+      { name: "lookback_hours", type: "text", defaultValue: "24", required: true },
+    ]);
+    // A webhook fills them from its JSON, so it doesn't need defaults.
+    expect(recurringDraftProblem({ ...withInputs, repeat: { ...repeat, schedule: false, webhook: true } })).toBeNull();
+  });
+
+  it("keeps Repeat in a saved draft", () => {
+    saveDraft("c2", draft);
+    expect(loadDraft("c2")?.repeat).toEqual(repeat);
+    clearDraft("c2");
+    expect(emptyDraft().repeat).toBeNull();
   });
 });
