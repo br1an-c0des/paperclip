@@ -1,39 +1,71 @@
-import type { IssueStatus } from "@paperclipai/shared";
-import { useParams } from "@solidjs/router";
-import { createMemo, Show } from "solid-js";
+import type { IssueStatus, Project } from "@paperclipai/shared";
+import { A, useParams } from "@solidjs/router";
+import { CalendarDays, Globe, Lock, Pencil } from "lucide-solid";
+import { createMemo, Match, Show, Switch } from "solid-js";
+import { findProject } from "@/api/projects";
 import { useCompany } from "@/lib/company";
 import { useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
+import { ProjectDashboard } from "@/projects/ProjectDashboard";
+import { ProjectDocs } from "@/projects/ProjectDocs";
 import { updatedLabel } from "@/tasks/list-model";
 import { TasksView, useTaskList } from "@/tasks/TasksView";
+import { buttonClass } from "@/ui/Button";
 import { HeaderNumber, PageHeader, Tabs } from "@/ui/PageHeader";
+import { Capsule, TonePill } from "@/ui/Status";
+import type { Gradient } from "@/ui/status-meta";
 import { PlannedNote } from "./Planned";
 import { OPEN_STATUSES } from "./Tasks";
 
 /*
- * A project's pages under its header card (board 1). The List and Board tabs are the project's
- * tasks as a list (board 1) or a board (board 4), with the docked panel; the tab sets the layout, so
- * the task view leaves out its own switch. Agent workload, Docs and Settings come in M4.
+ * A project's pages under its header card (boards 1 and 8). The project's address is its dashboard
+ * (board 8), which the header's title links to; the tabs below are the project's tasks as a list
+ * (board 1, `/issues` as in the old UI) or a board (board 4), with the docked panel, then Docs
+ * (board 9). On the task tabs the tab sets the layout, so the task view leaves out its own switch.
+ * Agent workload and Settings come next in M4. `/overview` is the old UI's name for the project's
+ * home and opens the dashboard too.
  */
 
 const PROJECT_TABS = [
-  { label: "List", path: "" },
+  { label: "List", path: "/issues" },
   { label: "Board", path: "/board" },
   { label: "Agent workload", path: "/workload" },
   { label: "Docs", path: "/docs" },
   { label: "Settings", path: "/settings" },
 ];
 
+const PROJECT_STATUS: Record<Project["status"], { label: string; gradient: Gradient; tone?: "run" | "amber" | "green" }> = {
+  backlog: { label: "Backlog", gradient: "ash" },
+  planned: { label: "Planned", gradient: "ember", tone: "amber" },
+  in_progress: { label: "In progress", gradient: "ion", tone: "run" },
+  completed: { label: "Completed", gradient: "lagoon", tone: "green" },
+  cancelled: { label: "Cancelled", gradient: "ash" },
+};
+
+type View = "dashboard" | "list" | "board" | "docs" | "later";
+
+function viewFor(tab: string): View {
+  if (tab === "" || tab === "overview") return "dashboard";
+  if (tab === "issues" || tab.startsWith("issues/")) return "list";
+  if (tab === "board") return "board";
+  if (tab === "docs") return "docs";
+  return "later";
+}
+
+function targetLabel(value: string) {
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
+}
+
 export function ProjectPage() {
   const params = useParams<{ projectKey: string; tab?: string }>();
   const company = useCompany();
   const projects = useProjectsQuery();
   const liveRuns = useLiveRunsQuery();
-  const project = createMemo(() =>
-    projects.data?.find((candidate) => candidate.urlKey === params.projectKey || candidate.id === params.projectKey),
-  );
+  const project = createMemo(() => findProject(projects.data, params.projectKey));
   const tasks = useTaskList(() => (project() ? { projectId: project()!.id } : null));
   const base = () => `/${company().issuePrefix}/projects/${params.projectKey}`;
-  const tab = () => (params.tab ?? "").replace(/\/$/, "");
+  const view = () => viewFor((params.tab ?? "").replace(/\/$/, ""));
 
   const list = () => (project() ? (tasks.data ?? []) : []);
   const open = () => list().filter((task) => OPEN_STATUSES.has(task.status as IssueStatus)).length;
@@ -67,16 +99,74 @@ export function ProjectPage() {
             <Show when={blocked() > 0}>
               <HeaderNumber value={blocked()} label="blocked" tone="red" />
             </Show>
-            <Show when={updated()}>{(label) => <span class="muted">Updated {label() === "Just now" ? "just now" : label()}</span>}</Show>
+            <Show when={updated()}>
+              {(label) => <span class="muted">Updated {label() === "Just now" || label() === "Yesterday" ? label().toLowerCase() : label()}</span>}
+            </Show>
           </Show>
         }
-        tabs={<Tabs label="Project" items={PROJECT_TABS.map((item) => ({ label: item.label, href: `${base()}${item.path}`, end: item.path === "" }))} />}
-      />
-      <Show when={tab() === "" || tab() === "board"} fallback={<PlannedNote milestone="M4">This tab is still to come.</PlannedNote>}>
-        <Show when={project()} fallback={<PlannedNote milestone="M2">Loading the project…</PlannedNote>}>
-          {(found) => <TasksView projectId={found().id} tasks={tasks} layout={tab() === "board" ? "board" : "list"} />}
-        </Show>
+        actions={
+          <Show when={view() === "dashboard" && project()}>
+            <A class={buttonClass({ size: "compact" })} href={`${base()}/settings`}>
+              <Pencil size={14} aria-hidden="true" />
+              Edit project
+            </A>
+          </Show>
+        }
+        tabs={<Tabs label="Project" items={PROJECT_TABS.map((item) => ({ label: item.label, href: `${base()}${item.path}` }))} />}
+      >
+        <Show when={view() === "dashboard" && project()}>{(found) => <ProjectFacts project={found()} />}</Show>
+      </PageHeader>
+      <Show when={project()} fallback={<p class="card pd-empty">{projects.isPending ? "Loading the project…" : "There's no project with this address, or you can't open it."}</p>}>
+        {(found) => (
+          <Switch fallback={<PlannedNote milestone="M4">This tab is still to come.</PlannedNote>}>
+            <Match when={view() === "dashboard"}>
+              <ProjectDashboard project={found()} tasks={tasks} base={base()} />
+            </Match>
+            <Match when={view() === "list" || view() === "board"}>
+              <TasksView projectId={found().id} tasks={tasks} layout={view() === "board" ? "board" : "list"} />
+            </Match>
+            <Match when={view() === "docs"}>
+              <ProjectDocs project={found()} tasks={tasks} />
+            </Match>
+          </Switch>
+        )}
       </Show>
     </>
+  );
+}
+
+/** The dashboard's header line: status, target date and who can see the project (board 8). */
+function ProjectFacts(props: { project: Project }) {
+  const status = () => PROJECT_STATUS[props.project.status] ?? PROJECT_STATUS.backlog;
+  return (
+    <div class="ph-numbers project-facts">
+      <Show
+        when={status().tone}
+        fallback={
+          <span class="project-status">
+            <Capsule gradient={status().gradient} size="tiny" />
+            {status().label}
+          </span>
+        }
+      >
+        {(tone) => (
+          <TonePill tone={tone()} compact icon={<Capsule gradient={status().gradient} size="tiny" live={props.project.status === "in_progress"} />}>
+            {status().label}
+          </TonePill>
+        )}
+      </Show>
+      <Show when={props.project.targetDate}>
+        {(target) => (
+          <span class="project-fact">
+            <CalendarDays size={14} aria-hidden="true" />
+            Target {targetLabel(target())}
+          </span>
+        )}
+      </Show>
+      <span class="project-fact">
+        {props.project.visibility === "private" ? <Lock size={14} aria-hidden="true" /> : <Globe size={14} aria-hidden="true" />}
+        {props.project.visibility === "private" ? "Private" : "Open"}
+      </span>
+    </div>
   );
 }
