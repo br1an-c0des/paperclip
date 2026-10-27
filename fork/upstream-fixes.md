@@ -57,9 +57,15 @@ until one becomes a concrete fix.
 - **Likely fix:** clear the company's cached list entries on issue writes (create, `PATCH`,
   delete, and other routes that change fields the list shows), with a server test that changes an
   issue and lists it again within the cache's lifetime.
-- **Fork workaround to revisit once merged:** `ui-new/src/tasks/task-updates.ts` holds changed
-  values for `HOLD_MS` (2.5 seconds) and then refetches the lists. The hold can be shortened or
-  removed.
+- **Fork workaround to revisit once merged:** `LIST_CACHE_HOLD_MS` (2.5 seconds) in
+  `ui-new/src/lib/live-events.tsx`, used twice:
+  - `ui-new/src/tasks/task-updates.ts` holds the user's own changed values that long, then refetches
+    the lists;
+  - live events refetch the task lists once more that long after a burst of task events
+    (`createTrailingRefetch`). Without it, an agent's status change made just after its comment came
+    back from the cache unchanged and stayed stale.
+
+  Both can be shortened or removed.
 
 ### 2. Don't crash on Windows when an agent directory path is longer than 260 characters
 

@@ -1,7 +1,8 @@
 import type { LiveEvent } from "@paperclipai/shared";
-import { describe, expect, it } from "vitest";
+import { QueryClient } from "@tanstack/solid-query";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryKeys } from "@/api/queryKeys";
-import { keysForEvent } from "./live-events";
+import { createTrailingRefetch, keysForEvent, LIST_CACHE_HOLD_MS } from "./live-events";
 
 const event = (type: LiveEvent["type"], payload: Record<string, unknown>): LiveEvent => ({
   id: 1,
@@ -58,5 +59,50 @@ describe("keysForEvent", () => {
   it("ignores ids that aren't strings", () => {
     const keys = keysForEvent("c1", event("agent.status", { agentId: 42 }));
     expect(keys).not.toContainEqual(queryKeys.agents.detail("42"));
+  });
+});
+
+describe("createTrailingRefetch", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const setup = () => {
+    const client = new QueryClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries").mockResolvedValue();
+    return { invalidate, trailing: createTrailingRefetch(client) };
+  };
+  const taskEvent = (action: string) => keysForEvent("c1", event("activity.logged", { entityType: "issue", entityId: "i1", action }));
+
+  it("fetches the tasks once, after the last event of a burst has had time to clear the list cache", () => {
+    const { invalidate, trailing } = setup();
+    // An agent comments, then changes the status a second later.
+    trailing.add(taskEvent("issue.comment_added"));
+    vi.advanceTimersByTime(1_000);
+    trailing.add(taskEvent("issue.updated"));
+    vi.advanceTimersByTime(LIST_CACHE_HOLD_MS - 1);
+    expect(invalidate).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(invalidate.mock.calls.map(([filters]) => filters)).toEqual([
+      { queryKey: queryKeys.issues.list("c1"), exact: false },
+      { queryKey: queryKeys.issues.detail("i1"), exact: true },
+    ]);
+    vi.advanceTimersByTime(LIST_CACHE_HOLD_MS * 4);
+    expect(invalidate).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves events that don't touch tasks alone", () => {
+    const { invalidate, trailing } = setup();
+    trailing.add(keysForEvent("c1", event("agent.status", { agentId: "a1" })));
+    vi.advanceTimersByTime(LIST_CACHE_HOLD_MS * 2);
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  it("drops a burst in progress when cancelled", () => {
+    const { invalidate, trailing } = setup();
+    trailing.add(taskEvent("issue.updated"));
+    trailing.cancel();
+    vi.advanceTimersByTime(LIST_CACHE_HOLD_MS * 2);
+    expect(invalidate).not.toHaveBeenCalled();
   });
 });
