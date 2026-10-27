@@ -1,6 +1,6 @@
 # ui-new build plan
 
-Oct 24, 2026 · built against upstream `5c3dce09b5` ([sync 2026-10-24](../../fork/sync-reports/2026-10-24.md))
+Oct 26, 2026 · built against upstream `baec3abd67` ([sync 2026-10-26](../../fork/sync-reports/2026-10-26.md))
 
 How the redesign gets built, and in what order. It sorts every idea in
 [paperclip-redesign-ideas.md](paperclip-redesign-ideas.md) into three stages and lays out stage 1 as
@@ -262,6 +262,9 @@ Covers `shell/*` except plugins. Done when you can move around the app and creat
 - The workspace file viewer: browse and preview a task's workspace files, built in rather than
   behind `enableExperimentalFileViewer` ([decision 12](decisions.md#12-what-happens-to-each-experimental-flag)).
 - Recovery and interruption state with Retry, and the project access notice from the 2026-10-24 sync.
+- Faster task opening from the 2026-10-26 sync: the latest comments, the core task, and recent activity
+  and runs first (`GET /api/issues/:id/recent-comments`, `?view=core`, `?view=recent`), then the full
+  history.
 
 Covers `tasks/*`, `steering/*`, `task-coordination/*`, `documents-artifacts/documents`,
 `documents-artifacts/attachments`, `runs-adapters/runs`. Done when a task can go from created to done
@@ -292,7 +295,8 @@ Covers `inbox-search/triage`, `decisions/*`, `approvals/*`, `tasks/approvals`, `
   The project section waits for project documents (decision D).
 - Agent workload (boards 31, 32), built from runs, live runs and assignments.
 - Settings (boards 10, 11): details, members, repositories, workspaces, task checkouts, environment,
-  variables, budget, archive, and goals.
+  variables, budget, archive, goals, and Git authorization (`GET|PUT /api/projects/:id/git-authorization`,
+  since the 2026-10-26 sync).
 - Goals folded into projects: the project's goals in settings and the task's goal in its properties,
   with no Goals page. Lists are on hold ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)).
 - Recurring tasks replace Routines: Repeat in the new-task dialog, a Recurring view, and every routine
@@ -343,7 +347,8 @@ These are large areas: Apps and tools alone reaches about 60 requests per page. 
 
 #### M7: Ready to replace the old UI
 
-- Plugin hosting (decision G).
+- Plugin hosting (decision G), including plugin panels in the task side panel (since the 2026-10-26
+  sync).
 - Parity audit: every row in [capabilities.md](inventory/capabilities.md) is `done` or `dropped` with
   a reason.
 - The responsive pass: mobile layouts for every screen not folded in earlier (decision H). And an
