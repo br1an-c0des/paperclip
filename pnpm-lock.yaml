@@ -1358,6 +1358,24 @@ importers:
 
   ui-new:
     dependencies:
+      '@codemirror/commands':
+        specifier: ^6.11.0
+        version: 6.11.0
+      '@codemirror/language':
+        specifier: ^6.12.4
+        version: 6.12.4
+      '@codemirror/language-data':
+        specifier: ^6.5.2
+        version: 6.5.2
+      '@codemirror/search':
+        specifier: ^6.6.0
+        version: 6.6.0
+      '@codemirror/state':
+        specifier: ^6.7.2
+        version: 6.7.6
+      '@codemirror/view':
+        specifier: ^6.43.11
+        version: 6.43.11
       '@fontsource-variable/hanken-grotesk':
         specifier: ^5.3.0
         version: 5.3.0
@@ -1367,6 +1385,12 @@ importers:
       '@kobalte/core':
         specifier: ^0.13.14
         version: 0.13.14(solid-js@1.9.17)
+      '@lezer/highlight':
+        specifier: ^1.2.3
+        version: 1.2.3
+      '@lezer/markdown':
+        specifier: ^1.7.2
+        version: 1.7.2
       '@paperclipai/adapter-claude-local':
         specifier: workspace:*
         version: link:../packages/adapters/claude-local

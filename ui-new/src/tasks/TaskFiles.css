@@ -17,6 +17,20 @@
   gap: 8px;
 }
 
+.tf-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tf-group-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .tf-group-title {
   margin: 4px 0 0;
   color: var(--text);
@@ -34,9 +48,9 @@
 .tf-doc {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 46px;
-  padding: 6px 14px;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px 12px;
   font-size: 13px;
 }
 
@@ -45,8 +59,65 @@
 }
 
 .tf-doc-icon {
-  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--well);
   color: var(--muted);
+}
+
+.tf-doc-icon[data-plan] {
+  background: var(--run-bg);
+  color: var(--run-fg);
+}
+
+.tf-doc-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tf-doc-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.tf-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tf-pill--run {
+  background: var(--run-bg);
+  color: var(--run-fg);
+}
+
+.tf-pill--amber {
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+}
+
+.tf-doc-comments {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .tf-doc-title {
@@ -64,24 +135,9 @@
   text-decoration: underline;
 }
 
-.tf-doc-key {
-  color: var(--muted);
-  font-size: 12px;
-}
-
 .tf-doc-by {
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-.tf-lock {
-  display: inline-flex;
-  color: var(--amber-fg);
-}
-
-.tf-doc-heading {
-  min-width: 0;
   overflow: hidden;
+  font-size: 12px;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -122,7 +178,7 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  padding: 8px 40px 10px 12px;
+  padding: 8px 72px 10px 12px;
 }
 
 .tf-tile-name {
@@ -134,10 +190,11 @@
   text-overflow: ellipsis;
 }
 
-.tf-tile-download {
+.tf-tile-actions {
   position: absolute;
-  right: 6px;
-  bottom: 8px;
+  right: 4px;
+  bottom: 6px;
+  display: flex;
 }
 
 /* Outputs */
@@ -189,6 +246,64 @@ a.tf-output-title:hover {
   text-decoration: underline;
 }
 
+.tf-output-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.tf-output-path {
+  max-width: 28ch;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Browse workspace files */
+.tf-browse {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  color: var(--body);
+  text-align: left;
+}
+
+.tf-browse:hover {
+  background: var(--row-hover);
+}
+
+.tf-browse:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 2px;
+}
+
+.tf-browse-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tf-browse-text .tsec-muted {
+  font-size: 12px;
+}
+
+.tf-browse-title {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.tf-browse-chevron {
+  color: var(--muted);
+}
+
 .tf-output-summary {
   margin: 4px 0 0;
   color: var(--body);
@@ -216,12 +331,11 @@ a.tf-output-title:hover {
     padding: 0 16px 10px;
   }
 
-  .tf-doc {
-    flex-wrap: wrap;
+  .tf-doc-icon {
+    display: none;
   }
+}
 
-  .tf-doc-by {
-    margin-left: 26px;
-    flex-basis: 100%;
-  }
+.tf-loading {
+  padding: 18px 24px;
 }

@@ -1,0 +1,42 @@
+/* The Markdown source editor (CodeMirror, with a textarea until it loads) */
+.mde {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 260px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+  background: var(--ground);
+}
+
+.mde:focus-within {
+  border-color: var(--run-fg);
+  box-shadow: 0 0 0 1px var(--run-fg);
+}
+
+.mde-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mde-host > .cm-editor {
+  flex: 1;
+  min-height: 260px;
+}
+
+.mde-fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--text);
+  font: 13px/1.6 var(--font-mono);
+  resize: none;
+  outline: none;
+}

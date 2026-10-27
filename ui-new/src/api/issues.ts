@@ -105,6 +105,7 @@ export const issuesApi = {
   getDocument: (id: string, key: string, signal?: AbortSignal) =>
     api.get<IssueDocument>(`/issues/${id}/documents/${encodeURIComponent(key)}`, { signal }),
   listAttachments: (id: string, signal?: AbortSignal) => api.get<IssueAttachment[]>(`/issues/${id}/attachments`, { signal }),
+  deleteAttachment: (attachmentId: string) => api.delete<{ ok: true }>(`/attachments/${encodeURIComponent(attachmentId)}`),
   listWorkProducts: (id: string, signal?: AbortSignal) => api.get<IssueWorkProduct[]>(`/issues/${id}/work-products`, { signal }),
 };
 
