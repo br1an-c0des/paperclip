@@ -1,12 +1,15 @@
 import type { IssueStatus, Project } from "@paperclipai/shared";
-import { A, useParams } from "@solidjs/router";
+import { A, useNavigate, useParams } from "@solidjs/router";
 import { CalendarDays, Globe, Lock, Pencil } from "lucide-solid";
-import { createMemo, Match, Show, Switch } from "solid-js";
-import { findProject } from "@/api/projects";
+import { createEffect, createMemo, Match, Show, Switch } from "solid-js";
+import { createQuery } from "@tanstack/solid-query";
+import { findProject, projectsApi } from "@/api/projects";
+import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
 import { ProjectDashboard } from "@/projects/ProjectDashboard";
 import { ProjectDocs } from "@/projects/ProjectDocs";
+import { ProjectSettings } from "@/projects/settings/ProjectSettings";
 import { updatedLabel } from "@/tasks/list-model";
 import { TasksView, useTaskList } from "@/tasks/TasksView";
 import { buttonClass } from "@/ui/Button";
@@ -20,9 +23,12 @@ import { OPEN_STATUSES } from "./Tasks";
  * A project's pages under its header card (boards 1 and 8). The project's address is its dashboard
  * (board 8), which the header's title links to; the tabs below are the project's tasks as a list
  * (board 1, `/issues` as in the old UI) or a board (board 4), with the docked panel, then Docs
- * (board 9). On the task tabs the tab sets the layout, so the task view leaves out its own switch.
- * Agent workload and Settings come next in M4. `/overview` is the old UI's name for the project's
- * home and opens the dashboard too.
+ * (board 9), and Settings (boards 10 and 11, a section per URL under `/settings`). On the task tabs
+ * the tab sets the layout, so the task view leaves out its own switch. Agent workload comes next in
+ * M4. `/overview` is the old UI's name for the project's home and opens the dashboard too.
+ *
+ * The project list leaves archived projects out, so a key it doesn't know is looked up on its own;
+ * that way an archived project's pages (and its settings, to restore it) still open.
  */
 
 const PROJECT_TABS = [
@@ -41,13 +47,14 @@ const PROJECT_STATUS: Record<Project["status"], { label: string; gradient: Gradi
   cancelled: { label: "Cancelled", gradient: "ash" },
 };
 
-type View = "dashboard" | "list" | "board" | "docs" | "later";
+type View = "dashboard" | "list" | "board" | "docs" | "settings" | "later";
 
 function viewFor(tab: string): View {
   if (tab === "" || tab === "overview") return "dashboard";
   if (tab === "issues" || tab.startsWith("issues/")) return "list";
   if (tab === "board") return "board";
   if (tab === "docs") return "docs";
+  if (tab === "settings" || tab.startsWith("settings/")) return "settings";
   return "later";
 }
 
@@ -62,7 +69,31 @@ export function ProjectPage() {
   const company = useCompany();
   const projects = useProjectsQuery();
   const liveRuns = useLiveRunsQuery();
-  const project = createMemo(() => findProject(projects.data, params.projectKey));
+  const listed = createMemo(() => findProject(projects.data, params.projectKey));
+  const single = createQuery(() => ({
+    queryKey: [...queryKeys.projectSettings.detail(params.projectKey), company().id],
+    queryFn: ({ signal }) => projectsApi.get(params.projectKey, company().id, signal),
+    enabled: projects.isSuccess && !listed(),
+    retry: false,
+  }));
+  const project = createMemo(() => listed() ?? (single.data?.companyId === company().id ? single.data : undefined));
+  // A project's URL key follows its name, so a rename (here in settings, or elsewhere) moves the
+  // page to the new address instead of losing the project.
+  const navigate = useNavigate();
+  let shown: { id: string; key: string } | undefined;
+  createEffect(() => {
+    const current = project();
+    if (current) {
+      shown = { id: current.id, key: params.projectKey };
+      return;
+    }
+    // Only when this address showed the project a moment ago; not after following a link elsewhere.
+    if (!shown || shown.key !== params.projectKey) return;
+    const moved = projects.data?.find((candidate) => candidate.id === shown!.id);
+    if (moved && moved.urlKey !== params.projectKey) {
+      navigate(`/${company().issuePrefix}/projects/${moved.urlKey}${params.tab ? `/${params.tab}` : ""}`, { replace: true });
+    }
+  });
   const tasks = useTaskList(() => (project() ? { projectId: project()!.id } : null));
   const base = () => `/${company().issuePrefix}/projects/${params.projectKey}`;
   const view = () => viewFor((params.tab ?? "").replace(/\/$/, ""));
@@ -116,7 +147,7 @@ export function ProjectPage() {
       >
         <Show when={view() === "dashboard" && project()}>{(found) => <ProjectFacts project={found()} />}</Show>
       </PageHeader>
-      <Show when={project()} fallback={<p class="card pd-empty">{projects.isPending ? "Loading the project…" : "There's no project with this address, or you can't open it."}</p>}>
+      <Show when={project()} fallback={<p class="card pd-empty">{projects.isPending || single.isFetching ? "Loading the project…" : "There's no project with this address, or you can't open it."}</p>}>
         {(found) => (
           <Switch fallback={<PlannedNote milestone="M4">This tab is still to come.</PlannedNote>}>
             <Match when={view() === "dashboard"}>
@@ -127,6 +158,9 @@ export function ProjectPage() {
             </Match>
             <Match when={view() === "docs"}>
               <ProjectDocs project={found()} tasks={tasks} />
+            </Match>
+            <Match when={view() === "settings"}>
+              <ProjectSettings project={found()} base={base()} rest={(params.tab ?? "").replace(/^settings\/?/, "")} />
             </Match>
           </Switch>
         )}
