@@ -10,13 +10,14 @@ import {
   kindCounts,
   placement,
   selectionAfterRemoval,
-  signoffOf,
   snoozeLabel,
   stepSelection,
   tabFromPath,
   unreadCount,
+  withStep,
   type Pending,
 } from "./inbox-model";
+import { needsYouCount } from "./needs-you";
 
 function item(id: string, sourceKind: AttentionSourceKind, extra: Partial<AttentionItem> = {}): AttentionItem {
   return {
@@ -126,6 +127,30 @@ describe("placement", () => {
   });
 });
 
+describe("the nav's count", () => {
+  it("counts what Needs you holds: active requests, not alerts, snoozed or cleared", () => {
+    const items = [
+      item("question", "issue_thread_interaction"),
+      item("review", "review"),
+      item("run", "failed_run"),
+      item("later", "approval", { dismissal: snoozed("2026-10-29T09:00:00.000Z") }),
+      item("gone", "approval", { dismissal: cleared("2026-10-26T09:00:00.000Z") }),
+      item("back", "approval", { dismissal: { ...snoozed("2026-10-01T00:00:00.000Z"), isActive: false } }),
+    ];
+    expect(needsYouCount(items)).toBe(3);
+  });
+
+  it("moves with a triage step patched into the cached feed", () => {
+    const now = new Date("2026-10-27T12:00:00.000Z");
+    const question = item("question", "issue_thread_interaction");
+    const snoozedNow = withStep(question, { action: "snooze", until: "2026-10-28T09:00:00.000Z" }, now);
+    expect(snoozedNow.dismissal).toEqual({ kind: "snooze", dismissedAt: now.toISOString(), snoozedUntil: "2026-10-28T09:00:00.000Z", isActive: true });
+    expect(needsYouCount([snoozedNow])).toBe(0);
+    expect(placement(withStep(question, { action: "clear" }, now))).toBe("cleared");
+    expect(needsYouCount([withStep(snoozedNow, { action: "restore" }, now)])).toBe(1);
+  });
+});
+
 describe("kinds and the kind filter", () => {
   it("reads a kind from the feed until the card loads", () => {
     expect(feedKind(item("a", "approval"))).toBe("approval");
@@ -199,52 +224,5 @@ describe("Updates", () => {
     expect(unreadCount([{ isUnreadForMe: true }, { isUnreadForMe: false }, {}])).toBe(1);
     expect(unreadCount(undefined)).toBe(0);
     expect(archivedTasks([{ id: "a" }, { id: "b" }, { id: "c" }], [{ id: "b" }]).map((task) => task.id)).toEqual(["a", "c"]);
-  });
-});
-
-describe("signoffOf", () => {
-  const nameOf = (key: string) => ({ "user:me": "You", "user:sam": "Sam", "agent:se": "Strategy Engineer", "user:ceo": "CEO" })[key] ?? key;
-  const policy = {
-    stages: [
-      { id: "s1", type: "review", participants: [{ type: "user", userId: "me", agentId: null }] },
-      { id: "s2", type: "approval", participants: [{ type: "user", userId: "ceo", agentId: null }] },
-    ],
-  };
-  const state = (participant: string, extra: object = {}) => ({
-    status: "pending" as const,
-    currentStageId: "s1",
-    currentStageIndex: 0,
-    currentStageType: "review" as const,
-    currentParticipant: { type: "user" as const, userId: participant, agentId: null },
-    returnAssignee: { type: "agent" as const, agentId: "se", userId: null },
-    reviewRequest: null,
-    completedStageIds: [],
-    lastDecisionId: null,
-    lastDecisionOutcome: null,
-    ...extra,
-  });
-
-  it("marks the current stage, where the task returns, and that it's your turn", () => {
-    const result = signoffOf({ executionPolicy: policy, executionState: state("me") }, "me", nameOf);
-    expect(result.steps).toEqual([
-      { type: "review", label: "Review · you", now: true },
-      { type: "approval", label: "Approval · CEO", now: false },
-    ]);
-    expect(result.returns).toBe("Returns to Strategy Engineer if sent back · round 1 of 3");
-    expect(result.yours).toBe(true);
-    expect(result.waitingOn).toBeNull();
-  });
-
-  it("says who it waits on when it isn't you, and counts rounds", () => {
-    const result = signoffOf({ executionPolicy: { ...policy, maxReviewRounds: 2 }, executionState: state("sam", { changesRequestedCount: 1 }) }, "me", nameOf);
-    expect(result.yours).toBe(false);
-    expect(result.waitingOn).toBe("Sam");
-    expect(result.steps[0]!.label).toBe("Review · Sam");
-    expect(result.returns).toBe("Returns to Strategy Engineer if sent back · round 2 of 2");
-  });
-
-  it("treats a task in review assigned to you, without stages, as yours", () => {
-    const result = signoffOf({ executionPolicy: null, executionState: null, assigneeUserId: "me" }, "me", nameOf);
-    expect(result).toEqual({ steps: [], returns: null, yours: true, waitingOn: null });
   });
 });

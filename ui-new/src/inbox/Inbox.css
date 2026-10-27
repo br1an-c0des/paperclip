@@ -103,11 +103,8 @@
   gap: 14px;
 }
 
-/* An item: the card, and the context column beside it (below it on a narrow inbox). */
+/* An item: one request card, its context column inside it (RequestCard.css, `.rq-split`). */
 .ibx-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
   border-radius: var(--r-card);
   outline: none;
 }
@@ -115,13 +112,6 @@
 .ibx-item--selected > .ibx-main > .rq,
 .ibx-item:focus-visible > .ibx-main > .rq {
   box-shadow: var(--shadow), 0 0 0 2px var(--primary);
-}
-
-@container ibx (min-width: 860px) {
-  .ibx-item {
-    grid-template-columns: minmax(0, 1fr) 280px;
-    gap: 18px;
-  }
 }
 
 .ibx-main {
@@ -149,45 +139,13 @@
   line-height: 1.5;
 }
 
-.ibx-ctx {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-  padding: 6px 0 0 18px;
-  border-left: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.ibx-ctx-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ibx-ctx h4 {
+.ibx-ctx-h {
   margin: 0;
-  flex: 1;
   font-family: var(--display);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: -0.01em;
   color: var(--muted);
-}
-
-.ibx-menu {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--muted);
-}
-
-.ibx-menu:hover {
-  background: var(--hover);
-  color: var(--text);
 }
 
 .ibx-rel {
@@ -255,42 +213,11 @@
   line-height: 1.45;
 }
 
-/* Below 860px the context column is the card's footer, as on the phone board (M7). */
-@container ibx (max-width: 859px) {
-  .ibx-ctx {
-    padding: 0 0 0 38px;
-    border-left: 0;
-  }
-
-  .ibx-why {
+/* On a narrow card the context column sits under the body, where "why" beside the task would repeat the card. */
+@container rq (width < 760px) {
+  .ibx-rel + .ibx-why {
     display: none;
   }
-}
-
-/* The sign-off card's stages (board 14). */
-.ibx-stage {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.ibx-step {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 9px;
-  border: 1px solid var(--edge);
-  border-radius: var(--r-pill);
-}
-
-.ibx-step--now {
-  border-color: color-mix(in srgb, var(--green-fg) 65%, transparent);
-  background: var(--green-bg);
-  color: var(--green-fg);
 }
 
 /* Rows: Updates, Snoozed, Cleared. */

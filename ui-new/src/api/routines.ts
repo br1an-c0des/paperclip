@@ -1,5 +1,4 @@
 import type {
-  CompanySecret,
   FolderListResult,
   Routine,
   RoutineDetail,
@@ -14,8 +13,8 @@ import { api } from "./client";
 
 /*
  * Routines, which the redesign shows as recurring tasks (M4, boards N4–N7 and R1–R4). The requests
- * follow ui/src/api/routines.ts, plus the routine folders (ui/src/api/folders.ts, kind "routine")
- * and the company's secrets list, which only the recurring task's panel uses so far.
+ * follow ui/src/api/routines.ts, plus the routine folders (ui/src/api/folders.ts, kind "routine").
+ * The company's secrets come from api/secrets.ts.
  *
  * A routine is the template; each time one of its triggers fires the server makes a run, and the
  * run usually makes a task (an occurrence) with `originKind: "routine_execution"` and
@@ -70,6 +69,4 @@ export const routinesApi = {
   deleteFolder: (companyId: string, folderId: string) => api.delete<unknown>(`/companies/${companyId}/folders/${folderId}`),
   moveToFolder: (companyId: string, routineId: string, folderId: string | null) =>
     api.post<unknown>(`/companies/${companyId}/folders/items/move`, { kind: "routine", itemId: routineId, folderId }),
-
-  secrets: (companyId: string, signal?: AbortSignal) => api.get<CompanySecret[]>(`/companies/${companyId}/secrets`, { signal }),
 };

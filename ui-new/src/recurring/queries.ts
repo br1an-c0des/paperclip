@@ -49,20 +49,3 @@ export function recurringPath(prefix: string, routineId?: string, section?: "run
   if (section) params.set("section", section);
   return `/${prefix}/issues?${params.toString()}`;
 }
-
-/*
- * "+ Recurring task" opens New task with Repeat already on. The command's defaults don't carry
- * Repeat (lib/commands.tsx belongs to the shell), so the request waits here until the dialog
- * takes it.
- */
-let repeatRequested = false;
-
-export function requestRepeat() {
-  repeatRequested = true;
-}
-
-export function takeRepeatRequest() {
-  const requested = repeatRequested;
-  repeatRequested = false;
-  return requested;
-}

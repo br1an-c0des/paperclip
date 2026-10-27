@@ -242,8 +242,8 @@ const REQUEST_SOURCES = new Set(["issue_thread_interaction", "approval", "decisi
 export type WaitingTargets = {
   /** Tasks with a request waiting on you; their interactions and approvals are loaded. */
   requestTaskIds: string[];
-  /** Tasks in review waiting on your sign-off, which has no request card yet. */
-  signoffs: { taskId: string; whyNow: string; since: string }[];
+  /** Tasks in review waiting on your sign-off, drawn as sign-off request cards; stalled when nobody can review. */
+  signoffs: { taskId: string; whyNow: string; since: string; stalled: boolean }[];
 };
 
 /**
@@ -268,7 +268,8 @@ export function waitingTargets(
     for (const issueId of issueIds) {
       if (item.project?.id !== projectId && !taskIds.has(issueId)) continue;
       if (REQUEST_SOURCES.has(item.sourceKind)) requests.add(issueId);
-      else if (item.sourceKind === "review" && !signoffs.has(issueId)) signoffs.set(issueId, { taskId: issueId, whyNow: item.whyNow, since: item.activityAt });
+      else if (item.sourceKind === "review" && !signoffs.has(issueId))
+        signoffs.set(issueId, { taskId: issueId, whyNow: item.whyNow, since: item.activityAt, stalled: item.subject.metadata?.reviewAttentionState === "stalled" });
     }
   }
   return { requestTaskIds: [...requests], signoffs: [...signoffs.values()] };

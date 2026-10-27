@@ -882,7 +882,10 @@ Both are handled in `ui-new` for now.
   keys, while feed dismissals use `attention:…` keys. Clearing an approval in the Inbox doesn't lower
   the badge. The feed's own `deskBadgeCount` matches Needs you; switching the nav to it means reading
   the feed in the nav. **Decided 2026-10-27:** the badge counts what's waiting on you, matching Needs
-  you (the feed's count), not `sidebar-badges`.
+  you (the feed's count), not `sidebar-badges`. Built: the count is what Needs you lists (active, not
+  cleared or snoozed, not alerts). The feed's `deskBadgeCount` measures something else (items that
+  arrived or are due today, alerts and snoozed included), so the nav reads the whole feed on every
+  page. `sidebar-badges` is no longer shown anywhere but is still invalidated in places.
 - **Stalled reviews have no inline action yet.** `POST /issues/:id/stalled-review-decision` exists
   but isn't ported; stalled reviews open the task.
 - **Sign-offs act through the task's status.** The current reviewer approves with `done` and a
@@ -912,3 +915,23 @@ Both are handled in `ui-new` for now.
 - **Phone links that assume a project's base URL is its task list:** the phone switcher
   (`TasksSheet.tsx`) and the dock's task-list detection (`dock-model.ts`) still treat any
   `/projects/:key/...` path as a task list. To fix in the follow-up slice.
+
+### 26. Gaps found building project settings
+
+- **Status:** Open
+- **Area:** `projects/*`, `workspaces/*`, `goals/*`
+- **Found in:** project settings (M4, boards 10 and 11).
+
+- **Clearing a project's variables with `null` fails.** `PATCH /api/projects/:id` with
+  `{ env: null }` answers 422 "env must be an object", although the schema allows null: the route
+  passes anything but `undefined` to `normalizeEnvConfig` (`server/src/routes/projects.ts`,
+  `services/secrets.ts`). The old UI sends null too. `ui-new` sends `{}`. Upstream fix candidate 7.
+- **A rename changes the project's URL key**, so `GET /projects/:oldKey` fails afterwards; the page
+  follows the project by id.
+- **The project list leaves archived projects out** unless asked (`includeArchived=true`); the page
+  reads an archived project on its own.
+- **`executionWorkspacePolicy.environmentId` only applies to isolated checkouts**: where a run
+  executes is decided from the task, agent, instance and default. The environment picker sits in
+  Task checkouts for that reason.
+- **No endpoints** for board 10's member roles, the shared-checkout count it draws, or runtime
+  services that are configured but never started.

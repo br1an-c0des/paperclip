@@ -207,7 +207,7 @@ describe("waitingTargets", () => {
       new Set(["t1", "t2", "t3", "t4", "t5"]),
     );
     expect(targets.requestTaskIds).toEqual(["t1", "t2"]);
-    expect(targets.signoffs).toEqual([{ taskId: "t3", whyNow: "Review it", since: NOW.toISOString() }]);
+    expect(targets.signoffs).toEqual([{ taskId: "t3", whyNow: "Review it", since: NOW.toISOString(), stalled: false }]);
   });
 
   it("leaves out snoozed items and finds an approval's tasks from its linked issues", () => {

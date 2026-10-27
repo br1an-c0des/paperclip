@@ -21,6 +21,7 @@ import { activeAgents } from "@/api/agents";
 import { openProjects } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
 import { routinesApi } from "@/api/routines";
+import { secretsApi } from "@/api/secrets";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useGoalsQuery, useProjectsQuery } from "@/lib/company-data";
 import { copyText } from "@/tasks/TaskActions";
@@ -800,8 +801,8 @@ function Secrets(props: { routine: RoutineDetail; save: Save }) {
   const [open, setOpen] = createSignal(false);
   const [name, setName] = createSignal("");
   const secrets = createQuery(() => ({
-    queryKey: queryKeys.secrets(company().id),
-    queryFn: ({ signal }) => routinesApi.secrets(company().id, signal),
+    queryKey: queryKeys.projectSettings.secrets(company().id),
+    queryFn: ({ signal }) => secretsApi.list(company().id, signal),
     enabled: open() || Object.keys(props.routine.env ?? {}).length > 0,
   }));
   const env = () => (props.routine.env ?? {}) as Record<string, EnvBinding>;

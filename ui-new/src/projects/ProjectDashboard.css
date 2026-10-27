@@ -449,47 +449,6 @@ a.pd-well-aside {
   font-size: 14px;
 }
 
-.pd-signoff {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px 20px 18px 38px;
-}
-
-.pd-signoff::before {
-  content: "";
-  position: absolute;
-  top: 15px;
-  bottom: 15px;
-  left: 15px;
-  width: 7px;
-  border-radius: var(--r-pill);
-  background: var(--g-lagoon);
-}
-
-.pd-signoff-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.pd-signoff-when {
-  margin-left: auto;
-}
-
-.pd-signoff h3 {
-  font-size: 17px;
-  font-weight: 800;
-}
-
-.pd-signoff p {
-  margin: 0;
-  color: var(--body);
-}
-
 /* Stuck work. */
 .pd-stuck {
   padding: 14px 18px 8px;

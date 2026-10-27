@@ -1,6 +1,6 @@
 import { Dialog as KDialog } from "@kobalte/core/dialog";
 import { X } from "lucide-solid";
-import { createRenderEffect, on, Show, type JSX, type ParentProps } from "solid-js";
+import { createContext, createRenderEffect, on, Show, useContext, type JSX, type ParentProps } from "solid-js";
 import { layerMode, SheetOnly, useLayerMount } from "./layer";
 import "./Dialog.css";
 
@@ -15,6 +15,17 @@ import "./Dialog.css";
  *
  *   <Dialog trigger={(p) => <Button {...p}>Open</Button>} title="…">…</Dialog>
  */
+
+const InDialogContext = createContext(false);
+
+/**
+ * Whether this is inside a dialog. A modal dialog hides everything outside it from screen readers,
+ * including layers portalled out of it later; a popover inside one uses this to stay reachable
+ * (Popover.tsx). Menus are modal themselves, which takes them out of the dialog's hiding.
+ */
+export function useInDialog() {
+  return useContext(InDialogContext);
+}
 
 export type DialogProps = ParentProps<{
   open?: boolean;
@@ -88,10 +99,12 @@ export function Dialog(props: DialogProps) {
                 <X size={16} aria-hidden="true" />
               </KDialog.CloseButton>
             </Show>
-            <div class="dialog-body">{props.children}</div>
-            <Show when={props.footer}>
-              <footer class="dialog-foot">{props.footer}</footer>
-            </Show>
+            <InDialogContext.Provider value={true}>
+              <div class="dialog-body">{props.children}</div>
+              <Show when={props.footer}>
+                <footer class="dialog-foot">{props.footer}</footer>
+              </Show>
+            </InDialogContext.Provider>
           </KDialog.Content>
         </div>
       </KDialog.Portal>

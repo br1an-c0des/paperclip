@@ -14,8 +14,8 @@ import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useLiveRunsQuery } from "@/lib/company-data";
 import { RequestCard } from "@/requests/RequestCard";
-import { taskRequests } from "@/requests/request-model";
-import { updatedLabel } from "@/tasks/list-model";
+import { requestFromReview, taskRequests, type Request } from "@/requests/request-model";
+import { useReviewTasks } from "@/requests/review-tasks";
 import { useTaskPeople } from "@/tasks/people";
 import { AssigneeItems } from "@/tasks/pickers";
 import type { useTaskList } from "@/tasks/TasksView";
@@ -54,8 +54,8 @@ import "./ProjectDashboard.css";
  *   checkouts and their dev servers). Below a divider, Agents at work: each agent on the project's
  *   tasks, with what it's on and, on hover, its run to watch.
  * - Waiting on you: request cards from the project's tasks that the Inbox's Needs you tab holds,
- *   with a kind filter, and tasks waiting on your sign-off. It shares the Inbox's feed query, so
- *   clearing or snoozing in the Inbox, and the Inbox's live refresh, reach it too.
+ *   with a kind filter, and sign-off cards for tasks waiting on your review. It shares the Inbox's
+ *   feed query, so clearing or snoozing in the Inbox, and the Inbox's live refresh, reach it too.
  * - Stuck work: open tasks waiting on someone without a request to answer.
  *
  * Not drawn from the board, because the API has no source for them: the AI brief with its revisions
@@ -143,8 +143,26 @@ export function ProjectDashboard(props: { project: Project; tasks: Tasks; base: 
   const filters = createMemo(() => requestFilters(waiting(), signoffs().length));
   const shownRequests = () => waiting().filter((entry) => kind() === "all" || entry.request.kind === kind());
   const shownSignoffs = () => (kind() === "all" || kind() === "signoff" ? signoffs() : []);
+  // Sign-offs read their task for its review stages, as the Inbox does.
+  const reviewTasks = useReviewTasks(() => signoffs().map((entry) => entry.taskId));
+  const signoffRequests = createMemo(() => {
+    const result = new Map<string, Request>();
+    for (const entry of signoffs()) {
+      const task = reviewTasks.task(entry.taskId);
+      if (!task) continue;
+      result.set(
+        entry.taskId,
+        requestFromReview(
+          task,
+          { youId: people.youId(), agentName: (id) => people.agent(id)?.name, personName: (id) => people.personName(id) },
+          { stalled: entry.stalled, whyNow: entry.whyNow, since: entry.since },
+        ),
+      );
+    }
+    return result;
+  });
   const waitingLoading = () =>
-    attention.isPending || approvalIssues.some((query) => query.isPending) || requestSources.some((query) => query.isPending);
+    attention.isPending || approvalIssues.some((query) => query.isPending) || requestSources.some((query) => query.isPending) || reviewTasks.loading();
 
   const liveTaskIds = createMemo(() => new Set((liveRuns.data ?? []).flatMap((run) => (run.issueId ? [run.issueId] : []))));
   const stuck = createMemo(() =>
@@ -198,31 +216,21 @@ export function ProjectDashboard(props: { project: Project; tasks: Tasks; base: 
                 {(entry) => <RequestCard request={entry.request} taskId={entry.taskId} people={people} />}
               </For>
               <For each={shownSignoffs()}>
-                {(entry) => {
-                  const task = () => taskById().get(entry.taskId);
-                  return (
-                    <Show when={task()}>
-                      {(found) => (
-                        <article class="card pd-signoff" aria-label={`Sign-off for ${found().identifier ?? found().title}`}>
-                          <div class="pd-signoff-top">
-                            <TonePill tone="green" compact>
-                              Sign-off
-                            </TonePill>
-                            <span class="mono">{found().identifier}</span>
-                            <span class="pd-signoff-when">{updatedLabel(entry.since)}</span>
-                          </div>
-                          <h3 class="disp">{found().title}</h3>
-                          <p>{entry.whyNow}</p>
-                          <div>
-                            <Button size="compact" variant="primary" onClick={() => openTask(found())}>
-                              Review
-                            </Button>
-                          </div>
-                        </article>
-                      )}
-                    </Show>
-                  );
-                }}
+                {(entry) => (
+                  <Show when={signoffRequests().get(entry.taskId)}>
+                    {(request) => (
+                      <RequestCard
+                        request={request()}
+                        taskId={entry.taskId}
+                        people={people}
+                        onOpenSubject={() => {
+                          const task = taskById().get(entry.taskId);
+                          if (task) openTask(task);
+                        }}
+                      />
+                    )}
+                  </Show>
+                )}
               </For>
               <Show when={waitingLoading()}>
                 <p class="cap">Loading requests…</p>

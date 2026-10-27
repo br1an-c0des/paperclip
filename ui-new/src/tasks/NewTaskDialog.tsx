@@ -50,7 +50,7 @@ import { Capsule, LabelPill, PriorityBars, StatusCapsule } from "@/ui/Status";
 import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
 import { ConnectWebhook, type ConnectTarget } from "@/recurring/ConnectWebhook";
-import { recurringPath, refreshRecurring, takeRepeatRequest } from "@/recurring/queries";
+import { recurringPath, refreshRecurring } from "@/recurring/queries";
 import { templatePlaceholders } from "@/recurring/recurring-model";
 import { InfoTip, RepeatMenu } from "@/recurring/RepeatMenu";
 import { defaultRepeat, describeCron, formatFire, nextFires, repeatLabel, scheduleCron } from "@/recurring/schedule";
@@ -202,7 +202,7 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
   if (defaults.status) start.status = defaults.status;
   if (defaults.title) start.title = defaults.title;
   // "+ Recurring task" opens it with Repeat on; a person can't be a recurring task's assignee.
-  if (takeRepeatRequest() && !start.repeat?.schedule && !start.repeat?.webhook) {
+  if (defaults.repeat && !start.repeat?.schedule && !start.repeat?.webhook) {
     start.repeat = defaultRepeat();
     if (start.assignee?.kind === "user") start.assignee = null;
   }

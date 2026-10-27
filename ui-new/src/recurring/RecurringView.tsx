@@ -24,7 +24,7 @@ import { Capsule, StatusCapsule } from "@/ui/Status";
 import { Switch } from "@/ui/Switch";
 import { STATUS_META } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
-import { refreshRecurring, requestRepeat, useRoutineFoldersQuery, useRoutinesQuery } from "./queries";
+import { refreshRecurring, useRoutineFoldersQuery, useRoutinesQuery } from "./queries";
 import {
   groupRoutines,
   matchesSearch,
@@ -161,8 +161,7 @@ export function RecurringView(props: { projectId?: string; tasks: TaskListQuery 
   };
 
   const newRecurring = () => {
-    requestRepeat();
-    commands.openNewTask(props.projectId ? { projectId: props.projectId } : {});
+    commands.openNewTask(props.projectId ? { projectId: props.projectId, repeat: true } : { repeat: true });
   };
 
   return (

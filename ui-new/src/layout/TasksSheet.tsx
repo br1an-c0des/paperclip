@@ -5,11 +5,12 @@ import { companiesApi, statsFor } from "@/api/companies";
 import { activeAgents } from "@/api/agents";
 import { openProjects } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
-import { useCommands } from "@/lib/commands";
 import { useCompaniesQuery, useCompany } from "@/lib/company";
-import { useAgentsQuery, useProjectsQuery, useSidebarBadgesQuery } from "@/lib/company-data";
+import { useNeedsYouCount } from "@/inbox/needs-you";
+import { useAgentsQuery, useProjectsQuery } from "@/lib/company-data";
 import { useSession, useSignOut, useYouName } from "@/lib/session";
 import { setTheme, themePreference, type ThemePreference } from "@/lib/theme";
+import { searchPath } from "@/search/search-url";
 import { InitialsDisc } from "@/ui/Avatar";
 import { Segmented } from "@/ui/Segmented";
 import { Switch } from "@/ui/Switch";
@@ -20,8 +21,8 @@ import { TasksIcon } from "./dock-icons";
  * The Tasks switcher (design/mobile.md, N1), opened by tapping Tasks while in Tasks. It rises from
  * the foot of the screen under the dock and has three views:
  *
- * - projects: All tasks and each open project with its task count, then Search everything (the
- *   command palette, until search M14 is built);
+ * - projects: All tasks and each open project with its task count (each opens the project's task
+ *   list, not its dashboard), then Search everything (the Search page);
  * - companies: the company name at the top is the company dropdown; it swaps the projects for every
  *   company you can enter. Adding a company happens on desktop;
  * - you: your avatar in the top-right corner: profile, theme (light, dark, system), push settings,
@@ -48,9 +49,8 @@ export function TasksSheet(props: {
   const companies = useCompaniesQuery();
   const projects = useProjectsQuery();
   const agents = useAgentsQuery();
-  const badges = useSidebarBadgesQuery();
+  const needsYou = useNeedsYouCount();
   const stats = createQuery(() => ({ queryKey: queryKeys.companies.stats, queryFn: companiesApi.stats }));
-  const commands = useCommands();
   const session = useSession();
   const youName = useYouName();
   const signOut = useSignOut();
@@ -141,7 +141,7 @@ export function TasksSheet(props: {
                       const current = () =>
                         props.scope?.kind === "project" && (props.scope.key === project.urlKey || props.scope.key === project.id);
                       return (
-                        <a class="tsheet-row" href={`${base()}/projects/${project.urlKey}`} aria-current={current() ? "page" : undefined}>
+                        <a class="tsheet-row" href={`${base()}/projects/${project.urlKey}/issues`} aria-current={current() ? "page" : undefined}>
                           <span class="tsheet-sq" aria-hidden="true">
                             <InitialsDisc name={project.name.slice(0, 1)} seed={project.id} size={30} />
                           </span>
@@ -159,17 +159,10 @@ export function TasksSheet(props: {
                     }}
                   </For>
                   <div class="tsheet-actions">
-                    <button
-                      type="button"
-                      class="tsheet-pill"
-                      onClick={() => {
-                        props.onClose(false);
-                        commands.setPaletteOpen(true);
-                      }}
-                    >
+                    <a class="tsheet-pill" href={searchPath(company().issuePrefix)}>
                       <Search size={15} aria-hidden="true" />
                       Search everything
-                    </button>
+                    </a>
                   </div>
                 </>
               }
@@ -184,7 +177,7 @@ export function TasksSheet(props: {
                       ? companySummary({
                           projects: projects.data ? sheetProjects().length : undefined,
                           agents: agents.data ? activeAgents(agents.data).length : undefined,
-                          needsYou: badges.data?.inbox,
+                          needsYou: needsYou(),
                         })
                       : companySummary({ agents: counts()?.agentCount, tasks: counts()?.issueCount });
                   return (

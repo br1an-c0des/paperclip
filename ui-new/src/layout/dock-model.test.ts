@@ -8,6 +8,8 @@ describe("dockPlace", () => {
     expect(dockPlace("/TST/issues", "TST")).toBe("tasks");
     expect(dockPlace("/TST/issues/TST-41", "TST")).toBe("tasks");
     expect(dockPlace("/TST/projects/trading/board", "TST")).toBe("tasks");
+    expect(dockPlace("/TST/projects/trading/issues", "TST")).toBe("tasks");
+    expect(dockPlace("/TST/projects/trading/issues/TST-41", "TST")).toBe("tasks");
     expect(dockPlace("/TST/agents", "TST")).toBe("agents");
     expect(dockPlace("/TST/agents/ceo/chat", "TST")).toBe("agents");
   });
@@ -17,6 +19,14 @@ describe("dockPlace", () => {
     expect(dockPlace("/TST/company/settings", "TST")).toBeNull();
     expect(dockPlace("/TST", "TST")).toBeNull();
     expect(dockPlace("/TSTX/issues", "TST")).toBeNull();
+  });
+
+  it("doesn't count a project's dashboard, Docs or settings as Tasks", () => {
+    expect(dockPlace("/TST/projects/trading", "TST")).toBeNull();
+    expect(dockPlace("/TST/projects/trading/overview", "TST")).toBeNull();
+    expect(dockPlace("/TST/projects/trading/docs", "TST")).toBeNull();
+    expect(dockPlace("/TST/projects/trading/settings", "TST")).toBeNull();
+    expect(dockPlace("/TST/projects/trading/boards", "TST")).toBeNull();
   });
 
   it("matches the prefix without case and ignores a trailing slash", () => {
@@ -29,7 +39,13 @@ describe("tasksScope", () => {
     expect(tasksScope("/TST/issues", "TST")).toEqual({ kind: "all" });
     expect(tasksScope("/TST/projects/trading%20bench/board", "TST")).toEqual({ kind: "project", key: "trading bench" });
     expect(tasksScope("/TST/issues/TST-41", "TST")).toBeNull();
+    expect(tasksScope("/TST/projects/trading/issues", "TST")).toEqual({ kind: "project", key: "trading" });
     expect(tasksScope("/TST/inbox", "TST")).toBeNull();
+  });
+
+  it("leaves a project's dashboard and Docs out, so Tasks never goes back to them", () => {
+    expect(tasksScope("/TST/projects/trading", "TST")).toBeNull();
+    expect(tasksScope("/TST/projects/trading/docs", "TST")).toBeNull();
   });
 });
 

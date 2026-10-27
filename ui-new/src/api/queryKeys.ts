@@ -119,9 +119,25 @@ export const queryKeys = {
   },
 
   /*
+   * Project settings (M4, boards 10 and 11), in the old UI's shapes so its live-event rules apply:
+   * a project by id or URL key (archived ones aren't in the list), its private-project members and
+   * Git authorization, the company's budgets, secrets and environments, and your memberships.
+   */
+  projectSettings: {
+    detail: (key: string) => ["projects", "detail", key] as const,
+    accessMembers: (projectId: string) => ["projects", "access-members", projectId] as const,
+    gitAuthorization: (companyId: string, projectId: string) => ["project-git-authorization", companyId, projectId] as const,
+    budgets: (companyId: string) => ["budgets", "overview", companyId] as const,
+    secrets: (companyId: string) => ["secrets", companyId] as const,
+    userSecretDefinitions: (companyId: string) => ["user-secret-definitions", companyId] as const,
+    environments: (companyId: string) => ["environments", companyId] as const,
+    memberships: (companyId: string) => ["resource-memberships", companyId, "me"] as const,
+  },
+
+  /*
    * Recurring tasks (routines, M4). Everything sits under `["routines"]`, which the live events
    * refresh on any routine, trigger or run activity, as in the old UI; folders too, since moving a
-   * recurring task changes both.
+   * recurring task changes both. The company's secrets use `projectSettings.secrets`.
    */
   routines: {
     all: ["routines"] as const,
@@ -131,5 +147,4 @@ export const queryKeys = {
     revisions: (routineId: string) => ["routines", "revisions", routineId] as const,
     folders: (companyId: string) => ["routines", "folders", companyId] as const,
   },
-  secrets: (companyId: string) => ["secrets", companyId] as const,
 };
