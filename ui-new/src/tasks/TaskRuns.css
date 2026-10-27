@@ -111,3 +111,20 @@
   font-size: 13px;
   overflow-wrap: anywhere;
 }
+
+/* What the run says comes next, from its execution projection */
+.tr-next {
+  margin: 6px 0 0;
+  padding: 6px 9px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.tr-next b {
+  color: var(--text);
+  font-weight: 600;
+}

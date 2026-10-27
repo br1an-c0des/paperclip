@@ -51,6 +51,15 @@ export function tokenCount(count: number) {
   return String(count);
 }
 
+/**
+ * What the run says comes next. A run with an execution projection speaks through it, even when it
+ * has no next action; the run's own `nextAction` is for runs without one (as the old UI's run
+ * ledger reads them since upstream f0877a9c7).
+ */
+export function runNextAction(run: Pick<RunForIssue, "execution" | "nextAction">) {
+  return (run.execution ? run.execution.nextAction : run.nextAction) ?? null;
+}
+
 export function TaskRuns(props: { taskId: string }) {
   const company = useCompany();
   const commands = useCommands();
@@ -154,6 +163,13 @@ export function TaskRuns(props: { taskId: string }) {
                         <Show when={run.error}>{(error) => <p class="tr-error">{error()}</p>}</Show>
                         <Show when={run.scheduledRetryAt}>
                           {(at) => <p class="tsec-muted">Retries {stampLabel(at())}</p>}
+                        </Show>
+                        <Show when={runNextAction(run)}>
+                          {(next) => (
+                            <p class="tr-next">
+                              <b>Next action:</b> {next()}
+                            </p>
+                          )}
                         </Show>
                       </div>
                       <div class="tr-actions">

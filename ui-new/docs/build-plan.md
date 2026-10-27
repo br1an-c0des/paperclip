@@ -270,6 +270,11 @@ Covers `tasks/*`, `steering/*`, `task-coordination/*`, `documents-artifacts/docu
 `documents-artifacts/attachments`, `runs-adapters/runs`. Done when a task can go from created to done
 in `ui-new` alone, including answering an agent's question and watching its run.
 
+Progress (2026-10-26): everything above is built except the list and board leftovers (sorting, more
+filters, saved views, inline subtasks), which are in progress. Details and the task header still
+read the full task first. The end-to-end test of the done condition is next, using the temporary
+Connectors page ([decision 23](decisions.md#23-gaps-found-building-the-temporary-connectors-page)).
+
 #### M3: Inbox and requests
 
 - Inbox (board 14): Needs you, Updates, Alerts, Snoozed, Cleared, with kind filters and keyboard

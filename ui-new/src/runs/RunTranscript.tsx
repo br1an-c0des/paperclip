@@ -20,7 +20,7 @@ import type { RunDetail } from "@/api/runs";
 import { Markdown } from "@/ui/Markdown";
 import type { RunInvocation } from "./invocation";
 import { capitalize, costLabel, elapsedLabel, formatBytes, formatDuration, tokenCount, triggerLabel } from "./run-model";
-import { visibleItems, type DiffLine, type ShownItem, type StepKind, type TranscriptItem } from "./transcript-model";
+import { transcriptSteps, visibleItems, type DiffLine, type ShownItem, type StepKind, type TranscriptItem } from "./transcript-model";
 import "./RunTranscript.css";
 
 /*
@@ -59,16 +59,19 @@ export function RunTranscript(props: {
   plainLines: boolean;
   onRetry: () => void;
   onShowInput: () => void;
+  /** Folds opened for Find in run, because they hide a match (find-model.ts `foldsToReveal`). */
+  reveal?: ReadonlySet<string>;
 }) {
   const [expanded, setExpanded] = createSignal<ReadonlySet<string>>(new Set());
   createEffect(on(() => props.run.id, () => setExpanded(new Set<string>()), { defer: true }));
 
   const outcomes = createMemo(() => props.items.filter((item): item is Extract<TranscriptItem, { kind: "outcome" }> => item.kind === "outcome"));
   const shown = createMemo(() =>
-    visibleItems(
-      props.items.filter((item) => item.kind !== "outcome"),
-      { thinking: props.showThinking, tools: props.showTools, expanded: expanded() },
-    ),
+    visibleItems(transcriptSteps(props.items), {
+      thinking: props.showThinking,
+      tools: props.showTools,
+      expanded: props.reveal?.size ? new Set([...expanded(), ...props.reveal]) : expanded(),
+    }),
   );
   // Reconciled by key, so streaming updates change items in place and open details stay open.
   const [store, setStore] = createStore<{ items: ShownItem[] }>({ items: [] });

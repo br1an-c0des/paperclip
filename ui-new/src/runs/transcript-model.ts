@@ -413,6 +413,11 @@ export function stepCount(items: readonly TranscriptItem[]) {
   return items.filter((item) => item.kind !== "started" && item.kind !== "finished" && item.kind !== "outcome").length;
 }
 
+/** The items the Transcript view draws in time order: all but the outcome, which leads the view. */
+export function transcriptSteps(items: readonly TranscriptItem[]) {
+  return items.filter((item) => item.kind !== "outcome");
+}
+
 export type ShowOptions = {
   thinking: boolean;
   tools: boolean;

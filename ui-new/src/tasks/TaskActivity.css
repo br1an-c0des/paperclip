@@ -169,6 +169,15 @@
   line-height: 20px;
 }
 
+/* What a comment did to the run ("steered the run"), opening that run */
+.ta-tag--run {
+  color: var(--run-fg);
+}
+
+.ta-tag--run:hover {
+  background: var(--edge);
+}
+
 .ta-comment-head .ta-time {
   margin-left: auto;
 }

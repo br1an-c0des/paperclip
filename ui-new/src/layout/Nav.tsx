@@ -1,5 +1,5 @@
 import { A, useNavigate } from "@solidjs/router";
-import { Building2, ChevronDown, Keyboard, LogOut, Moon, Palette, Plus, Search, Sun } from "lucide-solid";
+import { Building2, ChevronDown, Keyboard, LogOut, Moon, Palette, Plug, Plus, Search, Sun } from "lucide-solid";
 import { createMemo, For, Show } from "solid-js";
 import { activeAgents } from "@/api/agents";
 import { openProjects } from "@/api/projects";
@@ -239,6 +239,14 @@ export function Nav() {
             );
           }}
         </For>
+      </div>
+
+      <div class="nav-group">
+        {/* Temporary: the Connectors page stands in for M6's Apps and tools. */}
+        <A class="navi" href={`${base()}/connectors`}>
+          <Plug size={16} aria-hidden="true" />
+          Connectors
+        </A>
       </div>
 
       <YouRow />

@@ -8,7 +8,9 @@ import type {
   IssueDocument,
   IssueDocumentSummary,
   IssueLabel,
+  IssueRecentComments,
   IssueWorkProduct,
+  ExecutionProjection,
   TaskInterruptionPresentation,
 } from "@paperclipai/shared";
 import { api } from "./client";
@@ -17,6 +19,11 @@ import { api } from "./client";
  * Tasks (issues), as ui/src/api/issues.ts uses them: the compact list behind the task views, one
  * task's full record, creating and updating tasks, retrying an interrupted one, attachments, labels,
  * and a small search for the palette and the new-task pickers.
+ *
+ * Opening a task reads small windows first, as the old UI does since the 2026-10-26 sync: the task
+ * row alone (`?view=core`), the latest comments (`/recent-comments`), the latest 50 activity rows
+ * and the latest 2 runs (`?view=recent`), and the facts behind the comments shown
+ * (`?view=comment-inputs`). The full history is read when the reader asks for it.
  */
 
 export type IssueSearch = { q?: string; limit?: number; status?: string };
@@ -68,6 +75,11 @@ export const issuesApi = {
   },
   /** One task by id or identifier (`TRA-41`), with its project, goal, relations and documents. */
   get: (ref: string, signal?: AbortSignal) => api.get<Issue>(`/issues/${encodeURIComponent(ref)}`, { signal }),
+  /**
+   * The task row alone, without the project, goal, relations, documents and recovery state the full
+   * read joins in. Enough for the thread and the composer, and much quicker to answer.
+   */
+  getCore: (ref: string, signal?: AbortSignal) => api.get<Issue>(`/issues/${encodeURIComponent(ref)}?view=core`, { signal }),
   update: (id: string, data: Record<string, unknown>) => api.patch<Issue>(`/issues/${id}`, data),
   /**
    * Asks for another attempt at an interrupted task (`POST /issues/:id/retry`). The idempotency key
@@ -89,17 +101,42 @@ export const issuesApi = {
   listLabels: (companyId: string) => api.get<IssueLabel[]>(`/companies/${companyId}/labels`),
 
   // The task panel's sections (boards 3 and 5, and the Runs and Workspace sections).
-  /** A page of comments, newest first. `after` is the last comment of the previous page. */
-  listComments: (id: string, page: { limit: number; after?: string }, signal?: AbortSignal) => {
-    const params = new URLSearchParams({ order: "desc", limit: String(page.limit) });
+  /**
+   * A page of comments, newest first (or oldest first with `order: "asc"`). `after` is the last
+   * comment of the previous page.
+   */
+  listComments: (id: string, page: { limit: number; after?: string; order?: "asc" | "desc" }, signal?: AbortSignal) => {
+    const params = new URLSearchParams({ order: page.order ?? "desc", limit: String(page.limit) });
     if (page.after) params.set("after", page.after);
     return api.get<IssueComment[]>(`/issues/${id}/comments?${params}`, { signal });
   },
   /** Posts a comment. The client request id makes a retried post land once. */
   addComment: (id: string, body: string, clientRequestId: string) =>
     api.post<IssueComment>(`/issues/${id}/comments`, { body, clientRequestId }),
+  /**
+   * The cold-open window of comments: the latest four, plus the latest from a person and, when the
+   * task has no description, the first instruction. `hasMore` says older comments exist.
+   */
+  recentComments: (id: string, signal?: AbortSignal) => api.get<IssueRecentComments>(`/issues/${id}/recent-comments`, { signal }),
   activity: (id: string, signal?: AbortSignal) => api.get<ActivityEvent[]>(`/issues/${id}/activity`, { signal }),
+  /** The latest 50 activity rows, newest first. */
+  recentActivity: (id: string, signal?: AbortSignal) => api.get<ActivityEvent[]>(`/issues/${id}/activity?view=recent`, { signal }),
+  /**
+   * What happened to some comments as they were sent (`issue.comment_added` and
+   * `issue.queued_comment_steered` rows: stopped a run, reopened the task, steered a run), however
+   * old. The server takes 100 ids a request.
+   */
+  commentInputs: async (id: string, commentIds: readonly string[], signal?: AbortSignal) => {
+    const batches: Promise<ActivityEvent[]>[] = [];
+    for (let start = 0; start < commentIds.length; start += 100) {
+      const params = new URLSearchParams({ view: "comment-inputs", commentIds: commentIds.slice(start, start + 100).join(",") });
+      batches.push(api.get<ActivityEvent[]>(`/issues/${id}/activity?${params}`, { signal }));
+    }
+    return (await Promise.all(batches)).flat();
+  },
   runs: (id: string, signal?: AbortSignal) => api.get<RunForIssue[]>(`/issues/${id}/runs`, { signal }),
+  /** The latest 2 runs, newest first. */
+  recentRuns: (id: string, signal?: AbortSignal) => api.get<RunForIssue[]>(`/issues/${id}/runs?view=recent`, { signal }),
   costSummary: (id: string, signal?: AbortSignal) => api.get<IssueCostSummary>(`/issues/${id}/cost-summary`, { signal }),
   listDocuments: (id: string, signal?: AbortSignal) => api.get<IssueDocumentSummary[]>(`/issues/${id}/documents`, { signal }),
   getDocument: (id: string, key: string, signal?: AbortSignal) =>
@@ -139,6 +176,9 @@ export type RunForIssue = {
   livenessState?: string | null;
   livenessReason?: string | null;
   lastUsefulActionAt?: string | null;
+  /** What the run is doing or waiting on now. Its `nextAction` replaces the run's own when present. */
+  execution?: ExecutionProjection | null;
+  nextAction?: string | null;
 };
 
 /** The URL path of a task, under the company prefix. */

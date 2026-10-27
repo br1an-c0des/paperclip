@@ -20,10 +20,14 @@ export type ActivityLine = {
   status?: { from: IssueStatus | null; to: IssueStatus };
 };
 
-/** Events the thread leaves out: comments show as cards, and reads are noise. */
+/**
+ * Events the thread leaves out: comments show as cards (with what they did to the run, from
+ * `commentInputs`), and reads are noise.
+ */
 const HIDDEN = new Set([
   "issue.comment_added",
   "issue.commented",
+  "issue.queued_comment_steered",
   "issue.read_marked",
   "issue.read_unmarked",
   "issue.feedback_vote_saved",
@@ -232,4 +236,33 @@ export function activityLine(event: Pick<ActivityEvent, "action" | "details" | "
     return { actor, text: `${LABELS[event.action] ?? words(event.action.replace(/^issue\./, ""))}${service}` };
   }
   return { actor, text: LABELS[event.action] ?? words(event.action.replace(/^issue\./, "").replace(/\./g, " ")) };
+}
+
+/** What a comment did as it was sent: stopped a run, reopened the task, or steered a run in place. */
+export type CommentInput = { interruptedRunId?: string; reopened?: boolean; steeredRunId?: string };
+
+/**
+ * What each comment did, by comment id, from its `issue.comment_added` and
+ * `issue.queued_comment_steered` rows (the full activity, or `?view=comment-inputs` for the comments
+ * shown). A replayed steer is marked `duplicate` and doesn't count.
+ */
+export function commentInputs(events: readonly Pick<ActivityEvent, "action" | "details">[]): Map<string, CommentInput> {
+  const inputs = new Map<string, CommentInput>();
+  for (const event of events) {
+    const details = event.details ?? {};
+    const commentId = typeof details.commentId === "string" ? details.commentId : null;
+    if (!commentId) continue;
+    const input = inputs.get(commentId) ?? {};
+    if (event.action === "issue.comment_added") {
+      if (typeof details.interruptedRunId === "string") input.interruptedRunId = details.interruptedRunId;
+      if (details.reopened === true) input.reopened = true;
+    } else if (event.action === "issue.queued_comment_steered") {
+      if (details.duplicate === true || typeof details.targetRunId !== "string") continue;
+      input.steeredRunId ??= details.targetRunId;
+    } else {
+      continue;
+    }
+    if (Object.keys(input).length > 0) inputs.set(commentId, input);
+  }
+  return inputs;
 }
