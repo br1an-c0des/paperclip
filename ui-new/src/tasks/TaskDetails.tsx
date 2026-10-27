@@ -25,6 +25,7 @@ import {
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch, type JSX } from "solid-js";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
+import { useNow } from "@/lib/clock";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery, useLiveRunsQuery } from "@/lib/company-data";
@@ -81,9 +82,12 @@ function shortDate(value: Date | string | null | undefined) {
   return date.getFullYear() === new Date().getFullYear() ? day : `${day}, ${date.getFullYear()}`;
 }
 
-function elapsed(since: string | null) {
+/** "45s", "4m", "1h 5m": how long a run has been going. */
+function elapsed(since: string | Date | null, now: number) {
   if (!since) return "";
-  const minutes = Math.max(0, Math.floor((Date.now() - new Date(since).getTime()) / 60_000));
+  const seconds = Math.max(0, Math.floor((now - new Date(since).getTime()) / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
   return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
@@ -126,6 +130,7 @@ export function TaskDetails(props: {
   const task = () => query.data;
   const change = useTaskChange(task);
   const run = createMemo(() => (liveRuns.data ?? []).find((candidate) => candidate.issueId === props.taskId));
+  const now = useNow(() => !!run());
   const kids = () => subtasks.data ?? [];
   const kidsDone = () => kids().filter((kid) => kid.status === "done").length;
 
@@ -228,7 +233,7 @@ export function TaskDetails(props: {
                 <Show when={run()}>
                   {(live) => (
                     <button type="button" class="td-run" onClick={() => commands.openRunModal(live().id)}>
-                      <RunningPill compact label={`Running · ${elapsed(live().startedAt ?? live().createdAt)}`} />
+                      <RunningPill compact label={`Running · ${elapsed(live().startedAt ?? live().createdAt, now())}`} />
                     </button>
                   )}
                 </Show>

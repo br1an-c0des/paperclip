@@ -2,10 +2,11 @@ import type { Issue } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ArrowRight, EyeOff, PauseCircle, RotateCcw, ShieldCheck, ShieldX, TriangleAlert } from "lucide-solid";
-import { createMemo, createSignal, For, Match, onCleanup, Show, Switch, type JSX } from "solid-js";
+import { createMemo, createSignal, For, Match, Show, Switch, type JSX } from "solid-js";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { taskActionsApi } from "@/api/task-actions";
+import { useNow } from "@/lib/clock";
 import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
 import { Button } from "@/ui/Button";
@@ -112,14 +113,6 @@ export function TaskNotices(props: { taskId: string }) {
   );
 }
 
-/** A second-by-second clock while a countdown is on screen. */
-function useNow(active: () => boolean) {
-  const [now, setNow] = createSignal(Date.now());
-  const timer = window.setInterval(() => active() && setNow(Date.now()), 1000);
-  onCleanup(() => window.clearInterval(timer));
-  return now;
-}
-
 function Notice(props: {
   notice: TaskNotice;
   task: Issue;
@@ -132,6 +125,7 @@ function Notice(props: {
   onResumeTree: () => void;
 }) {
   const company = useCompany();
+  // A second-by-second clock while the retry countdown is on screen.
   const now = useNow(() => props.notice.kind === "interrupted" && props.notice.state === "retry_scheduled");
   const retryButton = (label = "Retry") => (
     <Button size="compact" icon={<RotateCcw size={14} aria-hidden="true" />} disabled={props.retrying} onClick={() => props.onRetry()}>

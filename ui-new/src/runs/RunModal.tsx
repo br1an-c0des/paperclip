@@ -9,6 +9,7 @@ import { instanceSettingsApi } from "@/api/instance-settings";
 import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { runPath, runsApi } from "@/api/runs";
+import { useNow } from "@/lib/clock";
 import { useCommands } from "@/lib/commands";
 import { Menu } from "@/ui/Menu";
 import { clearMatches, findRanges, paintMatches, revealMatch } from "./find-in-run";
@@ -104,7 +105,6 @@ function RunView(props: { runId: string }) {
   const [showThinking, setShowThinking] = createSignal(true);
   const [showTools, setShowTools] = createSignal(true);
   const [following, setFollowing] = createSignal(true);
-  const [now, setNow] = createSignal(new Date());
   let body: HTMLDivElement | undefined;
 
   const run = createQuery(() => ({
@@ -174,11 +174,8 @@ function RunView(props: { runId: string }) {
   const trace = () => traceMeta.data?.[0] ?? null;
 
   // A clock for durations and "last output 2s ago", ticking only while the run is going.
-  createEffect(() => {
-    if (!active()) return;
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
-    onCleanup(() => window.clearInterval(timer));
-  });
+  const clock = useNow(active);
+  const now = () => new Date(clock());
 
   // Another run starts at the transcript, following.
   createEffect(
