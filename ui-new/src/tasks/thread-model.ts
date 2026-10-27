@@ -1,5 +1,6 @@
 import type { ActivityEvent, IssueComment } from "@paperclipai/shared";
 import type { RunForIssue } from "@/api/issues";
+import type { Request } from "@/requests/request-model";
 import { activityLine, type ActivityLine, type ActivityNames } from "./activity-format";
 
 /*
@@ -7,7 +8,10 @@ import { activityLine, type ActivityLine, type ActivityNames } from "./activity-
  * time order, oldest first like a chat. Runs of events between comments become one compact list.
  * Comments are paged from the newest; while older pages are left to load, events and runs from
  * before the oldest loaded comment are held back too, so the timeline has no gaps. The same change
- * made several times in a row by the same actor shows once, with a count.
+ * made several times in a row by the same actor shows once, with a count. Requests (agent
+ * questions, suggested tasks, approvals) sit in time order like comments; settled ones from before
+ * the oldest loaded comment wait with it, open ones always show. Comments still waiting in the
+ * queue are left out, since the queue shows them.
  */
 
 export type ThreadFilter = "all" | "comments" | "changes";
@@ -20,7 +24,8 @@ export type ThreadLine = ActivityLine & { key: string; at: Date; tone?: "red" | 
 
 export type ThreadItem =
   | { kind: "lines"; key: string; lines: ThreadLine[] }
-  | { kind: "comment"; key: string; at: Date; comment: IssueComment };
+  | { kind: "comment"; key: string; at: Date; comment: IssueComment }
+  | { kind: "request"; key: string; at: Date; request: Request };
 
 /** Runs still going show as the live card instead. */
 const ACTIVE_RUN = new Set(["queued", "running", "scheduled_retry"]);
@@ -59,6 +64,9 @@ export function buildThread(input: {
   comments: readonly IssueComment[];
   events: readonly ActivityEvent[];
   runs: readonly RunForIssue[];
+  requests?: readonly Request[];
+  /** Comments to leave out, such as those still queued for the agent's next turn. */
+  hiddenCommentIds?: ReadonlySet<string>;
   names: ActivityNames & { agent: (id: string) => string | undefined };
   /** True while older comment pages are left to load. */
   moreComments?: boolean;
@@ -72,12 +80,18 @@ export function buildThread(input: {
     ? Math.min(...input.comments.map((comment) => new Date(comment.createdAt).getTime()))
     : -Infinity;
 
-  type Entry = { at: Date; line?: ThreadLine; comment?: IssueComment };
+  type Entry = { at: Date; line?: ThreadLine; comment?: IssueComment; request?: Request };
   const entries: Entry[] = [];
   if (filter !== "changes") {
     for (const comment of input.comments) {
+      if (input.hiddenCommentIds?.has(comment.id)) continue;
       if (words.length > 0 && !matches(comment.body)) continue;
       entries.push({ at: new Date(comment.createdAt), comment });
+    }
+    for (const request of input.requests ?? []) {
+      if (request.state === "settled" && request.createdAt.getTime() < oldest) continue;
+      if (words.length > 0 && !matches(`${request.title} ${request.asker.name}`)) continue;
+      entries.push({ at: request.createdAt, request });
     }
   }
   if (filter !== "comments") {
@@ -102,6 +116,10 @@ export function buildThread(input: {
 
   const items: ThreadItem[] = [];
   for (const entry of entries) {
+    if (entry.request) {
+      items.push({ kind: "request", key: entry.request.key, at: entry.at, request: entry.request });
+      continue;
+    }
     if (entry.comment) {
       items.push({ kind: "comment", key: `comment:${entry.comment.id}`, at: entry.at, comment: entry.comment });
       continue;

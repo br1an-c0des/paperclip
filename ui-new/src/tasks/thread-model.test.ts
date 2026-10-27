@@ -2,6 +2,7 @@ import type { ActivityEvent, IssueComment } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import type { RunForIssue } from "@/api/issues";
 import { activityLine } from "./activity-format";
+import type { Request } from "@/requests/request-model";
 import { buildThread, duration, stampLabel } from "./thread-model";
 
 const names = {
@@ -57,7 +58,7 @@ describe("buildThread", () => {
       runs: [run("r1", "succeeded", "2026-10-01T11:10:00Z", "2026-10-01T11:12:30Z"), run("r2", "running", "2026-10-01T12:30:00Z", null)],
       names,
     });
-    expect(items.map((item) => (item.kind === "comment" ? item.comment.id : item.lines.map((line) => line.key)))).toEqual([
+    expect(items.map((item) => (item.kind === "comment" ? item.comment.id : item.kind === "lines" ? item.lines.map((line) => line.key) : item.key))).toEqual([
       ["event:e1"],
       "c1",
       ["event:e2", "run:r1"],
@@ -127,5 +128,34 @@ describe("duration and stampLabel", () => {
     expect(stampLabel(new Date(2026, 9, 25, 21, 2), now)).toBe("Yesterday, 9:02 pm");
     expect(stampLabel(new Date(2026, 9, 12, 9, 14), now)).toBe("Oct 12, 9:14 am");
     expect(stampLabel(new Date(2025, 0, 3, 12, 0), now)).toBe("Jan 3, 2025, 12:00 pm");
+  });
+});
+
+describe("requests and queued comments in the thread", () => {
+  const request = (key: string, at: string, state: "open" | "settled") => ({ key, createdAt: new Date(at), state, title: key, asker: { name: "Ada" } }) as unknown as Request;
+
+  it("places requests in time order and leaves queued comments out", () => {
+    const items = buildThread({
+      comments: [comment("c1", "2026-10-26T10:00:00Z"), comment("c2", "2026-10-26T12:00:00Z")],
+      events: [],
+      runs: [],
+      requests: [request("interaction:r1", "2026-10-26T11:00:00Z", "open")],
+      hiddenCommentIds: new Set(["c2"]),
+      names,
+    });
+    expect(items.map((item) => item.key)).toEqual(["comment:c1", "interaction:r1"]);
+  });
+
+  it("holds back older settled requests while comments are paged, but never open ones", () => {
+    const items = buildThread({
+      comments: [comment("c1", "2026-10-26T10:00:00Z")],
+      events: [],
+      runs: [],
+      requests: [request("old-settled", "2026-10-25T10:00:00Z", "settled"), request("old-open", "2026-10-25T11:00:00Z", "open")],
+      names,
+      moreComments: true,
+    });
+    expect(items.map((item) => item.key)).toEqual(["old-open", "comment:c1"]);
+    expect(buildThread({ comments: [], events: [], runs: [], requests: [request("r", "2026-10-25T10:00:00Z", "open")], names, filter: "changes" })).toEqual([]);
   });
 });
