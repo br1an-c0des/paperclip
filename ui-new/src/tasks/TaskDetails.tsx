@@ -1,4 +1,4 @@
-import type { CompactIssue, Issue, IssuePriority, IssueRelationIssueSummary, IssueStatus } from "@paperclipai/shared";
+import type { CompactIssue, Issue, IssueRelationIssueSummary, IssueStatus } from "@paperclipai/shared";
 import { createQuery } from "@tanstack/solid-query";
 import {
   Box,
@@ -6,6 +6,7 @@ import {
   ChevronDown,
   CircleDot,
   CornerDownRight,
+  Eye,
   FileText,
   Flag,
   FolderGit2,
@@ -16,18 +17,35 @@ import {
   Tag,
   Target,
   UserRound,
+  X,
 } from "lucide-solid";
-import { createMemo, createSignal, For, Match, Show, Switch, type JSX } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch, type JSX } from "solid-js";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
-import { useLiveRunsQuery } from "@/lib/company-data";
-import { InitialsDisc } from "@/ui/Avatar";
-import { Markdown } from "@/ui/Markdown";
-import { Capsule, LabelPill, PriorityBars, RunningPill } from "@/ui/Status";
+import { useExperimentalSettingsQuery, useLiveRunsQuery } from "@/lib/company-data";
+import { Capsule, RunningPill } from "@/ui/Status";
 import { STATUS_META } from "@/ui/status-meta";
 import { Assignee, useTaskPeople } from "./people";
+import { stageKeys } from "./review-stages";
+import { blockerIds, blockersEdit, workspacePickerAvailable } from "./task-edits";
+import {
+  AddBlocker,
+  AssigneeControl,
+  BillingControl,
+  DescriptionEditor,
+  GoalControl,
+  LabelsControl,
+  ParentControl,
+  PriorityControl,
+  ProjectControl,
+  ReviewControl,
+  StatusControl,
+  TitleEditor,
+  useTaskChange,
+  WorkspaceControl,
+} from "./TaskEditors";
 import "./TaskDetails.css";
 
 /*
@@ -35,7 +53,9 @@ import "./TaskDetails.css";
  * the task's documents and work products, subtasks and dependencies. TaskSections puts it beside
  * the rail with the other sections.
  *
- * Read-only for now: the inline edits come with the list's interactions.
+ * Everything is edited in place (TaskEditors.tsx): the title and description, each property through
+ * the same menus as the task list, the review stages, blockers and subtasks. Fields with no value
+ * fold under "Show N empty fields", as on the board.
  */
 
 const STATUS_TONE: Record<IssueStatus, string> = {
@@ -46,14 +66,6 @@ const STATUS_TONE: Record<IssueStatus, string> = {
   backlog: "neutral",
   done: "green",
   cancelled: "neutral",
-};
-
-const WORKSPACE_MODES: Record<string, string> = {
-  shared_workspace: "shared workspace",
-  isolated_workspace: "isolated worktree",
-  operator_branch: "operator branch",
-  adapter_managed: "managed by the adapter",
-  cloud_sandbox: "cloud sandbox",
 };
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -71,16 +83,6 @@ function elapsed(since: string | null) {
   return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
-/** The model and effort a task overrides for its agent, as "Opus 5.5, high effort". */
-function overrideSummary(task: Issue) {
-  const config = task.assigneeAdapterOverrides?.adapterConfig;
-  if (!config) return null;
-  const model = typeof config.model === "string" ? config.model : null;
-  const effortValue = config.effort ?? config.reasoningEffort ?? config.modelReasoningEffort ?? config.thinking;
-  const effort = typeof effortValue === "string" ? `${effortValue} effort` : null;
-  return [model, effort].filter(Boolean).join(", ") || null;
-}
-
 export function StatusChip(props: { status: IssueStatus; small?: boolean }) {
   return (
     <span class="td-status" classList={{ "td-status--small": props.small }} data-tone={STATUS_TONE[props.status]}>
@@ -89,7 +91,8 @@ export function StatusChip(props: { status: IssueStatus; small?: boolean }) {
   );
 }
 
-type Property = { key: string; icon: JSX.Element; label: string; value: JSX.Element | null };
+/** One property row. `empty` folds it under "Show N empty fields" until it has a value. */
+type Property = { key: string; icon: JSX.Element; label: string; empty: (task: Issue) => boolean; value: () => JSX.Element };
 
 export function TaskDetails(props: {
   taskId: string;
@@ -103,6 +106,7 @@ export function TaskDetails(props: {
   const commands = useCommands();
   const people = useTaskPeople();
   const liveRuns = useLiveRunsQuery();
+  const settings = useExperimentalSettingsQuery();
   const [showEmpty, setShowEmpty] = createSignal(false);
 
   const query = createQuery(() => ({
@@ -116,92 +120,68 @@ export function TaskDetails(props: {
   }));
 
   const task = () => query.data;
+  const change = useTaskChange(task);
   const run = createMemo(() => (liveRuns.data ?? []).find((candidate) => candidate.issueId === props.taskId));
   const kids = () => subtasks.data ?? [];
   const kidsDone = () => kids().filter((kid) => kid.status === "done").length;
-  const parent = () => {
-    const current = task();
-    if (!current?.parentId) return undefined;
-    return current.ancestors?.find((ancestor) => ancestor.id === current.parentId);
-  };
 
-  const properties = createMemo<Property[]>(() => {
+  // The rows are made once and read the task reactively, so an open menu (labels, the stage editor)
+  // stays open while the change it made comes back.
+  const t = () => task()!;
+  const dates = () =>
+    [
+      `Created ${shortDate(t().createdAt)}`,
+      t().startedAt ? `Started ${shortDate(t().startedAt)}` : null,
+      t().completedAt ? `Done ${shortDate(t().completedAt)}` : null,
+      t().cancelledAt ? `Cancelled ${shortDate(t().cancelledAt)}` : null,
+    ]
+      .filter((part): part is string => part !== null)
+      .join("  →  ");
+  const hasStages = (current: Issue) =>
+    stageKeys(current.executionPolicy, "review").length + stageKeys(current.executionPolicy, "approval").length > 0 ||
+    !!current.executionState?.currentStageType;
+  const workspaceEditable = (current: Issue) => workspacePickerAvailable(current.project, settings.data?.enableIsolatedWorkspaces === true);
+  const properties: Property[] = [
+    { key: "status", icon: <CircleDot size={15} />, label: "Status", empty: () => false, value: () => <StatusControl status={t().status} onChange={change} /> },
+    { key: "assignee", icon: <UserRound size={15} />, label: "Assignee", empty: () => false, value: () => <AssigneeControl task={t()} people={people} onChange={change} /> },
+    { key: "review", icon: <Eye size={15} />, label: "Review", empty: (current) => !hasStages(current), value: () => <ReviewControl task={t()} people={people} onChange={change} /> },
+    { key: "priority", icon: <Flag size={15} />, label: "Priority", empty: () => false, value: () => <PriorityControl priority={t().priority} onChange={change} /> },
+    { key: "project", icon: <Box size={15} />, label: "Project", empty: (current) => !current.projectId, value: () => <ProjectControl task={t()} onChange={change} /> },
+    {
+      key: "parent",
+      icon: <CornerDownRight size={15} />,
+      label: "Parent",
+      empty: (current) => !current.parentId,
+      value: () => <ParentControl task={t()} onOpenTask={props.onOpenTask} onChange={change} />,
+    },
+    { key: "goal", icon: <Target size={15} />, label: "Goal", empty: (current) => !current.goalId, value: () => <GoalControl task={t()} onChange={change} /> },
+    { key: "labels", icon: <Tag size={15} />, label: "Labels", empty: (current) => !(current.labels?.length ?? 0), value: () => <LabelsControl task={t()} onChange={change} /> },
+    { key: "dates", icon: <Calendar size={15} />, label: "Dates", empty: () => false, value: () => <span class="td-dates">{dates()}</span> },
+    {
+      key: "workspace",
+      icon: <FolderGit2 size={15} />,
+      label: "Workspace",
+      empty: (current) => !current.currentExecutionWorkspace && !workspaceEditable(current),
+      value: () => <WorkspaceControl task={t()} onChange={change} />,
+    },
+    { key: "billing", icon: <Hash size={15} />, label: "Billing code", empty: (current) => !current.billingCode, value: () => <BillingControl task={t()} onChange={change} /> },
+  ];
+  // A row that has had a value stays put until another task opens, so clearing it (the last label,
+  // say) doesn't whisk the row and its open menu away.
+  const [pinned, setPinned] = createSignal<ReadonlySet<string>>(new Set());
+  createEffect(on(() => props.taskId, () => setPinned(new Set<string>())));
+  createEffect(() => {
     const current = task();
-    if (!current) return [];
-    const overrides = overrideSummary(current);
-    const workspace = current.currentExecutionWorkspace;
-    const dates = [
-      `Created ${shortDate(current.createdAt)}`,
-      current.startedAt ? `Started ${shortDate(current.startedAt)}` : null,
-      current.completedAt ? `Done ${shortDate(current.completedAt)}` : null,
-      current.cancelledAt ? `Cancelled ${shortDate(current.cancelledAt)}` : null,
-    ].filter((part): part is string => part !== null);
-    return [
-      { key: "status", icon: <CircleDot size={15} />, label: "Status", value: <StatusChip status={current.status as IssueStatus} /> },
-      {
-        key: "assignee",
-        icon: <UserRound size={15} />,
-        label: "Assignee",
-        value: (
-          <span class="td-assignee">
-            <Assignee task={current} people={people} size={20} />
-            <Show when={overrides}>
-              <span class="td-muted">· {overrides}</span>
-            </Show>
-          </span>
-        ),
-      },
-      { key: "priority", icon: <Flag size={15} />, label: "Priority", value: <PriorityBars priority={current.priority as IssuePriority} withLabel /> },
-      {
-        key: "project",
-        icon: <Box size={15} />,
-        label: "Project",
-        value: current.project ? (
-          <span class="td-inline">
-            <InitialsDisc name={current.project.name.slice(0, 1)} seed={current.project.id} size={18} />
-            {current.project.name}
-          </span>
-        ) : null,
-      },
-      {
-        key: "parent",
-        icon: <CornerDownRight size={15} />,
-        label: "Parent",
-        value: parent() ? (
-          <button type="button" class="td-link" onClick={() => props.onOpenTask(parent()!)}>
-            <span class="mono td-id">{parent()!.identifier}</span>
-            {parent()!.title}
-          </button>
-        ) : null,
-      },
-      { key: "goal", icon: <Target size={15} />, label: "Goal", value: current.goal ? <span>{current.goal.title}</span> : null },
-      {
-        key: "labels",
-        icon: <Tag size={15} />,
-        label: "Labels",
-        value: current.labels?.length ? (
-          <span class="td-inline td-wrap">
-            <For each={current.labels}>{(label) => <LabelPill name={label.name} color={label.color} />}</For>
-          </span>
-        ) : null,
-      },
-      { key: "dates", icon: <Calendar size={15} />, label: "Dates", value: <span class="td-dates">{dates.join("  →  ")}</span> },
-      {
-        key: "workspace",
-        icon: <FolderGit2 size={15} />,
-        label: "Workspace",
-        value: workspace ? (
-          <span class="td-inline">
-            <span class="mono td-ellipsis">{workspace.branchName ?? workspace.name}</span>
-            <span class="td-muted">{WORKSPACE_MODES[workspace.mode] ?? workspace.mode.replace(/_/g, " ")}</span>
-          </span>
-        ) : null,
-      },
-      { key: "billing", icon: <Hash size={15} />, label: "Billing code", value: current.billingCode ? <span class="mono">{current.billingCode}</span> : null },
-    ];
+    if (!current) return;
+    const keys = properties.filter((property) => !property.empty(current) && !pinned().has(property.key)).map((property) => property.key);
+    if (keys.length > 0) setPinned((before) => new Set([...before, ...keys]));
   });
-  const filled = () => properties().filter((property) => property.value !== null);
-  const empty = () => properties().filter((property) => property.value === null);
+  const isEmpty = (property: Property) => {
+    const current = task();
+    return !!current && property.empty(current) && !pinned().has(property.key);
+  };
+  const shown = createMemo(() => (task() ? properties.filter((property) => showEmpty() || !isEmpty(property)) : []));
+  const empty = createMemo(() => (task() ? properties.filter(isEmpty) : []));
 
   return (
     <div class="td-main">
@@ -220,7 +200,13 @@ export function TaskDetails(props: {
                   <Capsule gradient="ash" size="tiny" />
                   Task
                 </span>
-                <Show when={run()}>{(live) => <RunningPill compact label={`Running · ${elapsed(live().startedAt ?? live().createdAt)}`} />}</Show>
+                <Show when={run()}>
+                  {(live) => (
+                    <button type="button" class="td-run" onClick={() => commands.openRunModal(live().id)}>
+                      <RunningPill compact label={`Running · ${elapsed(live().startedAt ?? live().createdAt)}`} />
+                    </button>
+                  )}
+                </Show>
                 <Show when={kids().length > 0}>
                   <span class="td-muted">
                     {kidsDone()} of {kids().length} subtasks done
@@ -229,18 +215,20 @@ export function TaskDetails(props: {
               </div>
 
               <Show when={!props.hideTitle}>
-                <h1 class="disp td-title">{current().title}</h1>
+                <h1 class="disp td-title">
+                  <TitleEditor title={current().title} onChange={change} />
+                </h1>
               </Show>
 
               <dl class="td-props">
-                <For each={showEmpty() ? properties() : filled()}>
+                <For each={shown()}>
                   {(property) => (
                     <>
                       <dt>
                         <span aria-hidden="true">{property.icon}</span>
                         {property.label}
                       </dt>
-                      <dd>{property.value ?? <span class="td-muted">None</span>}</dd>
+                      <dd>{property.value()}</dd>
                     </>
                   )}
                 </For>
@@ -257,9 +245,7 @@ export function TaskDetails(props: {
               </Show>
 
               <section class="td-section td-description" aria-label="Description">
-                <Show when={current().description?.trim()} fallback={<p class="td-muted">No description.</p>}>
-                  {(text) => <Markdown source={text()} />}
-                </Show>
+                <DescriptionEditor task={current()} onChange={change} />
                 <Show when={(current().documentSummaries?.length ?? 0) + (current().workProducts?.length ?? 0) > 0}>
                   <div class="td-chips">
                     <For each={current().documentSummaries ?? []}>
@@ -348,17 +334,24 @@ export function TaskDetails(props: {
                 <h2 class="disp td-section-title" id={`td-deps-${props.taskId}`}>
                   Dependencies
                 </h2>
-                <Show
-                  when={(current().blockedBy?.length ?? 0) + (current().blocks?.length ?? 0) > 0}
-                  fallback={<p class="td-muted">Nothing blocks this task, and it blocks nothing.</p>}
-                >
-                  <For each={current().blockedBy ?? []}>
-                    {(blocker) => <Relation kind="blocked-by" relation={blocker} people={people} onOpen={props.onOpenTask} />}
-                  </For>
-                  <For each={current().blocks ?? []}>
-                    {(blocked) => <Relation kind="blocking" relation={blocked} people={people} onOpen={props.onOpenTask} />}
-                  </For>
+                <Show when={(current().blockedBy?.length ?? 0) + (current().blocks?.length ?? 0) === 0}>
+                  <p class="td-muted">Nothing blocks this task, and it blocks nothing.</p>
                 </Show>
+                <For each={current().blockedBy ?? []}>
+                  {(blocker) => (
+                    <Relation
+                      kind="blocked-by"
+                      relation={blocker}
+                      people={people}
+                      onOpen={props.onOpenTask}
+                      onRemove={() => change(blockersEdit(current(), blocker.id, false))}
+                    />
+                  )}
+                </For>
+                <For each={current().blocks ?? []}>
+                  {(blocked) => <Relation kind="blocking" relation={blocked} people={people} onOpen={props.onOpenTask} />}
+                </For>
+                <AddBlocker task={current()} selected={blockerIds(current())} onPick={(id) => change(blockersEdit(current(), id, true))} />
               </section>
             </>
           )}
@@ -373,6 +366,7 @@ function Relation(props: {
   relation: IssueRelationIssueSummary;
   people: ReturnType<typeof useTaskPeople>;
   onOpen: (task: { id: string; identifier: string | null }) => void;
+  onRemove?: () => void;
 }) {
   const waiter = () => {
     const agent = props.people.agent(props.relation.assigneeAgentId);
@@ -393,6 +387,17 @@ function Relation(props: {
           <Show when={waiter()}>{(name) => <>{name()} {name() === "You" ? "wait" : "waits"} on this</>}</Show>
         </Show>
       </span>
+      <Show when={props.onRemove}>
+        <button
+          type="button"
+          class="td-relation-remove"
+          aria-label={`Stop ${props.relation.identifier ?? props.relation.title} blocking this task`}
+          title="Remove this blocker"
+          onClick={() => props.onRemove?.()}
+        >
+          <X size={14} aria-hidden="true" />
+        </button>
+      </Show>
     </div>
   );
 }
