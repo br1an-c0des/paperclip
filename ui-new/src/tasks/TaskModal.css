@@ -1,0 +1,83 @@
+/* The task modal (boards 6 and 7). The card comes from ui/Dialog; the modal lays out its own body. */
+.dialog.tmodal {
+  height: calc(100dvh - 2 * clamp(24px, 6vh, 72px));
+  overflow: hidden;
+  border-radius: var(--r-card);
+  font-size: 14px;
+}
+
+.dialog.tmodal[data-mode="sheet"] {
+  height: 100dvh;
+  border-radius: 0;
+}
+
+.dialog.tmodal .dialog-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+}
+
+.tmodal-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tmodal-head > .btn--icon {
+  color: var(--muted);
+}
+
+.tmodal-head .btn--icon:disabled {
+  opacity: 0.4;
+}
+
+.tmodal-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-left: 6px;
+  color: var(--body);
+}
+
+.tmodal-project-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
+.tmodal-sep {
+  color: var(--dashed);
+}
+
+.tmodal-id {
+  font-size: 13px;
+  color: var(--body);
+}
+
+.tmodal-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.tmodal-actions .btn--icon {
+  color: var(--muted);
+}
+
+.tmodal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  container: panel / inline-size;
+}
+
+[data-mode="sheet"] .tmodal-project-name {
+  display: none;
+}

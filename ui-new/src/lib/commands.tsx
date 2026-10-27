@@ -4,7 +4,8 @@ import { createContext, createSignal, useContext, type ParentProps } from "solid
 /*
  * The shell's global actions, after ui/src/context/DialogContext.tsx: any page, the nav, the command
  * palette and the keyboard shortcuts open the same new-task dialog, palette and cheatsheet through
- * here, and anything that shows a run opens it in the run modal with `openRunModal(runId)`. The
+ * here, anything that shows a run opens it in the run modal with `openRunModal(runId)`, and pages
+ * without a task list open a task in the task modal with `openTaskModal(task)`. The
  * dialogs themselves are mounted once, in CompanyLayout.
  */
 
@@ -31,7 +32,16 @@ type CommandsValue = {
   runModal: () => string | null;
   openRunModal: (runId: string) => void;
   closeRunModal: () => void;
+  /**
+   * The task shown in the task modal (boards 6 and 7) by pages without a task list, such as the
+   * Inbox, chat and dashboards (build plan, decision B). Lists open their own.
+   */
+  taskModal: () => TaskModalTarget | null;
+  openTaskModal: (task: TaskModalTarget) => void;
+  closeTaskModal: () => void;
 };
+
+export type TaskModalTarget = { id: string; identifier: string | null; title: string; projectId: string | null };
 
 const CommandsContext = createContext<CommandsValue>();
 
@@ -40,6 +50,7 @@ export function CommandsProvider(props: ParentProps) {
   const [paletteOpen, setPaletteOpen] = createSignal(false);
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
   const [runModal, setRunModal] = createSignal<string | null>(null);
+  const [taskModal, setTaskModal] = createSignal<TaskModalTarget | null>(null);
   const value: CommandsValue = {
     newTask,
     openNewTask: (defaults = {}) => {
@@ -57,6 +68,12 @@ export function CommandsProvider(props: ParentProps) {
       setRunModal(runId);
     },
     closeRunModal: () => setRunModal(null),
+    taskModal,
+    openTaskModal: (task) => {
+      setPaletteOpen(false);
+      setTaskModal(task);
+    },
+    closeTaskModal: () => setTaskModal(null),
   };
   return <CommandsContext.Provider value={value}>{props.children}</CommandsContext.Provider>;
 }

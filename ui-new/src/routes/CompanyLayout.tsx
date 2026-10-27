@@ -11,13 +11,14 @@ import { RunModal } from "@/runs/RunModal";
 import { CommandPalette } from "@/shell/CommandPalette";
 import { ShortcutsDialog } from "@/shell/ShortcutsDialog";
 import { NewTaskDialog } from "@/tasks/NewTaskDialog";
+import { GlobalTaskModal } from "@/tasks/TaskModal";
 import { buttonClass } from "@/ui/Button";
 import { Splash } from "./Splash";
 
 /*
  * `/:companyPrefix/*`: resolves the company from the URL, opens its live-events socket, and draws
- * the shell: the nav, and the dialogs any page can open (new task, command palette, shortcuts and
- * the run modal).
+ * the shell: the nav, and the dialogs any page can open (new task, command palette, shortcuts, the
+ * task modal for pages without a list, and the run modal).
  */
 
 /** The parts of the shell that need the company and the commands: shortcuts, toasts, dialogs. */
@@ -53,6 +54,7 @@ function CompanyShell(props: ParentProps) {
       <CommandPalette />
       <ShortcutsDialog />
       <NewTaskDialog />
+      <GlobalTaskModal />
       <RunModal />
     </Shell>
   );
