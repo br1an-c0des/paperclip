@@ -153,7 +153,7 @@ function classify(interaction: IssueThreadInteraction): Classified {
         outcome: "return",
         acts: false,
         askVerb: questions.length > 1 ? `asks you ${questions.length} questions` : "asks you",
-        title: interaction.payload.title?.trim() || titled(single?.prompt ?? "A question"),
+        title: interaction.payload.title?.trim() || titled(single?.prompt ?? `Answer ${questions.length} questions`),
         body: interaction.summary ?? null,
       };
     }
