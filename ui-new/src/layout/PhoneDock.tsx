@@ -5,7 +5,8 @@ import { activeAgents } from "@/api/agents";
 import { agentState, runningAgentIds } from "@/lib/agent-state";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
-import { useAgentsQuery, useLiveRunsQuery, useProjectsQuery, useSidebarBadgesQuery } from "@/lib/company-data";
+import { useNeedsYouCount } from "@/inbox/needs-you";
+import { useAgentsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
 import { InitialsDisc } from "@/ui/Avatar";
 import { dockHiddenAfterScroll, dockPlace, tapTasks, tasksScope, type SheetView } from "./dock-model";
 import { AgentsIcon, InboxIcon, TasksIcon } from "./dock-icons";
@@ -27,7 +28,7 @@ export function PhoneDock() {
   const commands = useCommands();
   const location = useLocation();
   const navigate = useNavigate();
-  const badges = useSidebarBadgesQuery();
+  const needsYou = useNeedsYouCount();
   const agents = useAgentsQuery();
   const liveRuns = useLiveRunsQuery();
   const projects = useProjectsQuery();
@@ -41,7 +42,7 @@ export function PhoneDock() {
     return projects.data?.find((project) => project.urlKey === current.key || project.id === current.key);
   });
 
-  const inboxCount = () => badges.data?.inbox ?? 0;
+  const inboxCount = () => needsYou() ?? 0;
   const running = createMemo(() => {
     const ids = runningAgentIds(liveRuns.data);
     return activeAgents(agents.data).filter((agent) => agentState(agent, ids).key === "running").length;
