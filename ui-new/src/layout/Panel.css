@@ -115,13 +115,58 @@
   box-shadow: var(--shadow-lg);
 }
 
-/* Phone: the panel floats as a full-screen sheet (Panel.tsx) */
-:root[data-viewport="phone"] .panel--floating {
+/*
+ * Phone: the panel is a full-screen page over everything but layers, the dock included, with a
+ * back control first in its header (Panel.tsx). Safe areas keep the header clear of the notch and
+ * the body's end clear of the home indicator.
+ */
+.panel--page {
+  position: fixed;
   inset: 0;
-  width: auto;
+  z-index: calc(var(--z-overlay) - 2);
   max-height: none;
+  border: 0;
   border-radius: 0;
-  animation-name: sheet-in;
+  box-shadow: none;
+  animation-name: page-in;
+}
+
+/* Fills the screen even when its content sets the docked panel's fixed height (TaskSections.css) */
+:root[data-viewport] .panel.panel--page {
+  height: auto;
+}
+
+.panel--page:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--run-fg);
+}
+
+.panel--page .panel-head {
+  padding-top: max(10px, env(safe-area-inset-top, 0px));
+  padding-left: max(8px, env(safe-area-inset-left, 0px));
+  padding-right: max(12px, env(safe-area-inset-right, 0px));
+}
+
+.panel--page .panel-body {
+  overscroll-behavior: contain;
+  padding: 16px max(16px, env(safe-area-inset-right, 0px)) max(22px, env(safe-area-inset-bottom, 0px))
+    max(16px, env(safe-area-inset-left, 0px));
+}
+
+.panel--page .panel-body--flush {
+  padding: 0 0 env(safe-area-inset-bottom, 0px);
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
 }
 
 @keyframes panel-in {

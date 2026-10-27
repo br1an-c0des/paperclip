@@ -1,4 +1,4 @@
-import { X } from "lucide-solid";
+import { ChevronLeft, X } from "lucide-solid";
 import { createContext, createSignal, onCleanup, onMount, Show, useContext, type JSX, type ParentProps } from "solid-js";
 import { Portal } from "solid-js/web";
 import { useLayerMount } from "@/ui/layer";
@@ -7,8 +7,9 @@ import "./Panel.css";
 
 /*
  * Every side panel goes through this wrapper (build plan, decision H). Inside a <Dock> it renders
- * into the dock's own column, beside the list it was opened from (boards 2, 3 and 5), and becomes
- * a full-screen sheet on a phone-sized viewport. It isn't modal: the list beside it stays usable.
+ * into the dock's own column, beside the list it was opened from (boards 2, 3 and 5). On a
+ * phone-sized viewport it becomes a full-screen page over everything, the dock included, with a
+ * back control in place of the close button (build plan, "Desktop first, ready for mobile"). It isn't modal: the list beside it stays usable.
  * Escape closes it, and focus moves into it when it opens and back to where it was when it closes.
  *
  *   <Dock>
@@ -74,6 +75,7 @@ export function Panel(
   // Inside a dock the panel goes to the dock's column. Elsewhere, and on a phone, it floats over
   // the page: the dock is a size container, so a fixed sheet inside it would cover only the dock.
   const docked = () => Boolean(dock) && !isCompact();
+  const page = () => isCompact();
   const host = () => (docked() ? dock?.() : mount() ?? document.body);
 
   return (
@@ -83,23 +85,36 @@ export function Panel(
           <aside
             ref={aside}
             class="panel"
-            classList={{ "panel--floating": !docked() }}
+            classList={{ "panel--floating": !docked() && !page(), "panel--page": page() }}
             aria-label={props.label}
             tabindex="-1"
             onKeyDown={onKeyDown}
           >
             <header class="panel-head" classList={{ "panel-head--toolbar": props.toolbar }}>
+              <Show when={page()}>
+                <button
+                  type="button"
+                  class="btn btn--icon btn--ghost panel-back"
+                  classList={{ "btn--compact": props.toolbar }}
+                  aria-label="Back"
+                  onClick={() => props.onClose()}
+                >
+                  <ChevronLeft size={18} aria-hidden="true" />
+                </button>
+              </Show>
               <div class="panel-head-main">{props.header}</div>
               {props.actions}
-              <button
-                type="button"
-                class="btn btn--icon btn--ghost"
-                classList={{ "btn--compact": props.toolbar }}
-                aria-label="Close"
-                onClick={() => props.onClose()}
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
+              <Show when={!page()}>
+                <button
+                  type="button"
+                  class="btn btn--icon btn--ghost"
+                  classList={{ "btn--compact": props.toolbar }}
+                  aria-label="Close"
+                  onClick={() => props.onClose()}
+                >
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </Show>
             </header>
             <div class="panel-body" classList={{ "panel-body--flush": props.flush }}>
               {props.children}
