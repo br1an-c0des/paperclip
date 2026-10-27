@@ -185,6 +185,16 @@ the original agent, without showing success on the new page or redirecting back.
 Focused coverage: [save receipt](../../ui/src/pages/AgentRunnerUpgrade.test.tsx)
 and [configuration form](../../ui/src/components/AgentConfigForm.render.test.tsx).
 
+For an existing native agent on a Daytona snapshot or immutable sandbox image,
+use **Test** in its saved Harness or Runtime configuration after a managed
+computer update. This action qualifies the saved computer under the existing
+agent configuration permission before testing the runtime. A current proof must
+remain unchanged. A missing proof requires a real successful probe and verified
+cleanup. Failed qualification must stop the runtime test. Unsaved configuration
+or a different computer must not qualify a draft target. A company owner must not
+need instance-admin permission, and the generic environment probe must remain
+restricted. Existing runs retain their recorded allocation and snapshot binding.
+
 Storybook: [Runner upgrade](../../ui/storybook/stories/agents/codex-runner/upgrade.stories.tsx)
 mounts the production page and shell with mutable HTTP fixtures for both harnesses,
 pending, failure/retry, incompatible settings, repair, native/unsupported states,

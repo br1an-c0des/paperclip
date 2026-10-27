@@ -123,7 +123,7 @@ API: `present` — representative operation IDs:
   receives `canManage: false`. Saving never creates a run or wakeup.
 - `PUT /api/agents/{id}/instructions-bundle/file`.
 - `PATCH /api/agents/{id}` with an explicit `runner: "paperclip"` upgrade.
-- `POST /api/agents/{id}/qualify-runner` to qualify the saved effective sandbox before upgrading.
+- `POST /api/agents/{id}/qualify-runner` to qualify the saved effective sandbox before upgrading or testing an existing native runner.
 - `PATCH /api/agents/{id}` with `runtimeSettings: { harness, model?, aiConnection?, expected: { model, aiConnection } }` for a narrow roster edit. Each request handles one agent; the UI batches at most four writes and collects per-agent outcomes.
 
 Agent access: `available` — Native read/update/history/restore instruction tools; REST /
@@ -149,7 +149,11 @@ authorization as saving the upgrade. The server resolves the saved computer;
 `expectedEnvironmentId` rejects stale state and cannot select another computer.
 Qualification checks company binding, returns only its receipt, and audits within
 the agent's company. General instance environment probes still require instance
-admin. No probe runs merely on page load. Operator browser evidence does not
+admin. An existing native agent's clean configuration Test uses the same
+saved-computer qualification before its runtime test. A current proof is reused;
+a missing or stale proof requires a real successful probe and verified cleanup.
+Draft settings and target changes do not qualify another computer. No probe runs
+merely on page load. Operator browser evidence does not
 qualify the agent permission paths for this operation.
 
 Evidence: `source-only` — [implementation](../../server/src/routes/agents.ts#L1395) at
