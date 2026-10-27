@@ -26,3 +26,22 @@
   font-size: 13px;
   color: var(--body);
 }
+
+.tp-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tp-actions .btn--icon {
+  color: var(--muted);
+}
+
+/* A narrow panel keeps the privacy pill to its icon */
+@container panel (width < 520px) {
+  .tp-actions .ta-privacy {
+    padding: 0 8px;
+    font-size: 0;
+    gap: 0;
+  }
+}

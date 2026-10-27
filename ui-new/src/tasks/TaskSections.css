@@ -18,6 +18,27 @@
   height: calc(100dvh - 2 * var(--main-pad-top, 14px));
 }
 
+/* The modal (boards 6 and 7): Details on the left, the chosen section on --code beside it */
+.tsec--split .tsec-details {
+  flex: 3 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  container: panel / inline-size;
+}
+
+.tsec--split .tsec-details .td-main {
+  padding: 26px 36px 40px;
+}
+
+.tsec--split .tsec-side {
+  flex: 2 1 0;
+  background: var(--code);
+  container: panel / inline-size;
+}
+
 .tsec-rail {
   flex: 0 0 52px;
   display: flex;

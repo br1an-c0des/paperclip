@@ -5,6 +5,8 @@ import { Match, Show, Switch } from "solid-js";
 import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
+import { TaskHeaderActions } from "@/tasks/TaskActions";
+import { TitleEditor, useTaskChange } from "@/tasks/TaskEditors";
 import { TaskSections } from "@/tasks/TaskSections";
 import { TasksView, useTaskList } from "@/tasks/TasksView";
 import { HeaderNumber, PageHeader } from "@/ui/PageHeader";
@@ -50,6 +52,8 @@ export function TaskPage() {
     queryKey: queryKeys.issues.detail(params.issueRef),
     queryFn: ({ signal }) => issuesApi.get(params.issueRef, signal),
   }));
+  // Edits patch every cached copy of the task, including this one read by reference (TRA-41).
+  const change = useTaskChange(() => task.data);
   return (
     <Switch>
       <Match when={task.isError}>
@@ -69,7 +73,8 @@ export function TaskPage() {
                   <span class="mono">{found().identifier}</span>
                 </>
               }
-              title={found().title}
+              title={<TitleEditor title={found().title} onChange={change} />}
+              actions={<TaskHeaderActions taskId={found().id} onHidden={() => navigate(`/${company().issuePrefix}/issues`)} />}
             />
             <section class="card task-page">
               <TaskSections

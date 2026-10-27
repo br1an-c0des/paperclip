@@ -1,19 +1,25 @@
 import type { Issue } from "@paperclipai/shared";
 import { useSearchParams } from "@solidjs/router";
 import { Activity, FileText, FolderGit2, Layers, Play } from "lucide-solid";
-import { For, Match, Switch, type JSX } from "solid-js";
+import { For, Match, Show, Switch, type JSX } from "solid-js";
 import { TaskActivity } from "./TaskActivity";
 import { TaskDetails } from "./TaskDetails";
 import { TaskFiles } from "./TaskFiles";
+import { TaskNotices } from "./TaskNotices";
 import { TaskRuns } from "./TaskRuns";
 import { TaskWorkspace } from "./TaskWorkspace";
 import "./TaskSections.css";
 
 /*
- * One task's sections, in the docked panel and on the full page: the open section beside the rail
- * of section buttons on the right (boards 2, 3 and 5). The open section is kept in the URL
+ * One task's sections, in the docked panel, the modal and on the full page: the open section beside
+ * the rail of section buttons on the right (boards 2, 3 and 5). The open section is kept in the URL
  * (`?section=`), so stepping to the next task, reloading, or sharing the link keeps it; Details
  * is the default and leaves the URL alone.
+ *
+ * The modal (boards 6 and 7) lays them out side by side instead (`layout="split"`): Details stays on
+ * the left, and the rail picks what's beside it, Activity by default.
+ *
+ * The task's health notices (TaskNotices) sit above whichever section is open.
  */
 
 export type TaskSection = "details" | "activity" | "files" | "runs" | "workspace";
@@ -35,35 +41,57 @@ export function TaskSections(props: {
   hideTitle?: boolean;
   /** The task's title, for the headings of the other sections. */
   title?: string;
+  /** "rail" (the panel and the full page) or "split" (the modal: Details beside another section). */
+  layout?: "rail" | "split";
   onOpenTask: (task: { id: string; identifier: string | null }) => void;
 }) {
   const [params, setParams] = useSearchParams<{ section?: string }>();
-  const section = (): TaskSection => (params.section && IDS.has(params.section) ? (params.section as TaskSection) : "details");
+  const split = () => props.layout === "split";
+  const requested = (): TaskSection => (params.section && IDS.has(params.section) ? (params.section as TaskSection) : "details");
+  // Split, Details is always shown, so the other pane shows Activity unless something else is asked for.
+  const section = (): TaskSection => (split() && requested() === "details" ? "activity" : requested());
   const choose = (next: TaskSection) => setParams({ section: next === "details" ? undefined : next }, { replace: true });
+  const rail = () => (split() ? SECTIONS.filter((entry) => entry.id !== "details") : SECTIONS);
+
+  const details = () => <TaskDetails taskId={props.taskId} initial={props.initial} hideTitle={props.hideTitle} onOpenTask={props.onOpenTask} />;
+  const other = () => (
+    <Switch>
+      <Match when={section() === "activity"}>
+        <TaskActivity taskId={props.taskId} title={props.hideTitle || split() ? undefined : props.title} />
+      </Match>
+      <Match when={section() === "files"}>
+        <TaskFiles taskId={props.taskId} />
+      </Match>
+      <Match when={section() === "runs"}>
+        <TaskRuns taskId={props.taskId} />
+      </Match>
+      <Match when={section() === "workspace"}>
+        <TaskWorkspace taskId={props.taskId} />
+      </Match>
+    </Switch>
+  );
 
   return (
-    <div class="tsec" data-section={section()}>
-      <div class="tsec-body">
-        <Switch>
-          <Match when={section() === "details"}>
-            <TaskDetails taskId={props.taskId} initial={props.initial} hideTitle={props.hideTitle} onOpenTask={props.onOpenTask} />
-          </Match>
-          <Match when={section() === "activity"}>
-            <TaskActivity taskId={props.taskId} title={props.hideTitle ? undefined : props.title} />
-          </Match>
-          <Match when={section() === "files"}>
-            <TaskFiles taskId={props.taskId} />
-          </Match>
-          <Match when={section() === "runs"}>
-            <TaskRuns taskId={props.taskId} />
-          </Match>
-          <Match when={section() === "workspace"}>
-            <TaskWorkspace taskId={props.taskId} />
-          </Match>
-        </Switch>
-      </div>
+    <div class="tsec" classList={{ "tsec--split": split() }} data-section={section()}>
+      <Show
+        when={split()}
+        fallback={
+          <div class="tsec-body">
+            <TaskNotices taskId={props.taskId} />
+            <Show when={section() === "details"} fallback={other()}>
+              {details()}
+            </Show>
+          </div>
+        }
+      >
+        <div class="tsec-details">
+          <TaskNotices taskId={props.taskId} />
+          {details()}
+        </div>
+        <div class="tsec-body tsec-side">{other()}</div>
+      </Show>
       <nav class="tsec-rail" aria-label="Task sections">
-        <For each={SECTIONS}>
+        <For each={rail()}>
           {(entry) => (
             <button
               type="button"
