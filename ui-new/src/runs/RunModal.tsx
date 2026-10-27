@@ -1,15 +1,19 @@
 import { Tabs } from "@kobalte/core/tabs";
 import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { ChevronLeft, ChevronRight, Download, Square } from "lucide-solid";
+import { ChevronDown, ChevronLeft, ChevronRight, Download, Link2, RotateCcw, Square } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { accessApi } from "@/api/access";
 import { heartbeatsApi } from "@/api/heartbeats";
 import { instanceSettingsApi } from "@/api/instance-settings";
 import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
-import { runsApi } from "@/api/runs";
+import { runPath, runsApi } from "@/api/runs";
 import { useCommands } from "@/lib/commands";
+import { Menu } from "@/ui/Menu";
+import { clearMatches, findRanges, paintMatches, revealMatch } from "./find-in-run";
+import { foldsToReveal, stepMatch } from "./find-model";
+import { RunFind } from "./RunFind";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
 import { Composer } from "@/tasks/composer/Composer";
@@ -26,6 +30,8 @@ import { logAsText } from "./run-log";
 import { createRunLog } from "./run-log-source";
 import {
   agoLabel,
+  canResumeRun,
+  canRetryRun,
   capitalize,
   clockTime,
   costLabel,
@@ -35,6 +41,8 @@ import {
   harnessName,
   isActiveRun,
   plural,
+  resumePayload,
+  retryOutcome,
   runDurationMs,
   runPosition,
   runStatusLabel,
@@ -56,10 +64,13 @@ import "./RunModal.css";
  * The run modal (boards 16–18): one run, opened from anywhere through `openRunModal(runId)`.
  *
  * - The header names the agent, the task and why the run started, with its status, a Stop button
- *   while it's going, and the task's other runs either side.
+ *   while it's going, Rerun once it's over (Retry or Resume, as the old UI offers them, and Rerun
+ *   with a provider trace), the task's other runs either side, and a copy of the run's link (the
+ *   old UI's `/:companyPrefix/agents/:agentId/runs/:runId`, which RunRoute opens here).
  * - Six stats: model, start, duration, tokens, cost, and the session or exit.
  * - Four views: the transcript (live while the run is going), what the agent was sent, the raw
- *   output, and the provider trace (instance admins only, decision 4).
+ *   output, and the provider trace (instance admins only, decision 4). Find in run searches the
+ *   view that's open, opening folded steps that hide a match.
  * - While the run is going, a footer says the transcript is following new output, and holds the
  *   task's queued messages and the composer, to queue, steer or interrupt.
  *
@@ -104,11 +115,18 @@ function RunView(props: { runId: string }) {
   const active = () => !!run.data && isActiveRun(run.data.status);
   const agent = () => agents.data?.find((candidate) => candidate.id === run.data?.agentId);
   const issueId = () => run.data?.issueId ?? null;
-  const task = createQuery(() => ({
+  // The task row is all the header and the composer need; the full task is used when it's cached.
+  const fullTask = createQuery(() => ({
     queryKey: queryKeys.issues.detail(issueId() ?? ""),
     queryFn: ({ signal }) => issuesApi.get(issueId()!, signal),
-    enabled: !!issueId(),
+    enabled: false,
   }));
+  const coreTask = createQuery(() => ({
+    queryKey: queryKeys.issues.section(issueId() ?? "", "core"),
+    queryFn: ({ signal }) => issuesApi.getCore(issueId()!, signal),
+    enabled: !!issueId() && !fullTask.data,
+  }));
+  const task = () => fullTask.data ?? coreTask.data;
   const queue = useQueuedComments(() => issueId() ?? "", () => active() && !!issueId());
   const taskRuns = createQuery(() => ({
     queryKey: queryKeys.issues.section(issueId() ?? "", "runs"),
@@ -197,6 +215,118 @@ function RunView(props: { runId: string }) {
     onError: (error: Error) => pushToast({ tone: "error", title: "Couldn't rerun with a trace", body: error.message }),
   }));
 
+  // Retry and Resume, as the old UI's run detail offers them (run-model.ts has the rules).
+  const afterRerun = () => {
+    void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
+    if (issueId()) void client.invalidateQueries({ queryKey: queryKeys.issues.detail(issueId()!) });
+  };
+  const retry = createMutation(() => ({
+    mutationFn: async () => {
+      const outcome = retryOutcome(await runsApi.retry(run.data!));
+      if ("error" in outcome) throw new Error(outcome.error);
+      return outcome;
+    },
+    onSuccess: (outcome) => {
+      afterRerun();
+      if (outcome.runId) {
+        pushToast({ tone: "success", title: "Retrying the run" });
+        commands.openRunModal(outcome.runId);
+      } else {
+        pushToast({ tone: "success", title: "Retry queued", body: "The same request will retry when the task is ready." });
+      }
+    },
+    onError: (error: Error) => pushToast({ tone: "error", title: "Couldn't retry the run", body: error.message }),
+  }));
+  const resume = createMutation(() => ({
+    mutationFn: async () => {
+      const result = await runsApi.resume(run.data!, resumePayload(run.data!));
+      if (!("id" in result)) throw new Error(result.message ?? "The resume request was skipped.");
+      return result;
+    },
+    onSuccess: (resumed) => {
+      afterRerun();
+      pushToast({ tone: "success", title: "Resuming the run" });
+      commands.openRunModal(resumed.id);
+    },
+    onError: (error: Error) => pushToast({ tone: "error", title: "Couldn't resume the run", body: error.message }),
+  }));
+  const canTrace = () => isAdmin() && supportsProviderTrace(adapterType(), agent()?.adapterConfig);
+  const reruns = () => {
+    const current = run.data;
+    if (!current || active()) return { resume: false, retry: false, trace: false };
+    return { resume: canResumeRun(current), retry: canRetryRun(current), trace: canTrace() };
+  };
+  const rerunning = () => retry.isPending || resume.isPending || rerun.isPending;
+
+  const copyLink = async () => {
+    const current = run.data;
+    if (!current) return;
+    const path = runPath(company().issuePrefix, agent()?.urlKey ?? current.agentId, current.id);
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+      pushToast({ tone: "success", title: "Link to this run copied" });
+    } catch {
+      pushToast({ tone: "error", title: "Couldn't copy the link", body: path });
+    }
+  };
+
+  // Find in run: matches in the open view, the current one opened and scrolled to.
+  const [query, setQuery] = createSignal("");
+  const [matches, setMatches] = createSignal<Range[]>([]);
+  const [matchIndex, setMatchIndex] = createSignal(-1);
+  let findInput: HTMLInputElement | undefined;
+  const findable = () => view() === "transcript" || view() === "raw";
+  const reveal = createMemo(() =>
+    view() === "transcript" ? foldsToReveal(items(), { thinking: showThinking(), tools: showTools() }, query()) : new Set<string>(),
+  );
+  const goTo = (index: number, found = matches()) => {
+    setFollowing(false);
+    setMatchIndex(index);
+    revealMatch(found[index]!);
+  };
+  // A new search goes to its first match, as a browser's find does.
+  let jump = false;
+  createEffect(on(query, () => (jump = true), { defer: true }));
+  // Matches are read from the drawn view once it has settled after each change.
+  createEffect(
+    on([query, view, items, () => log.chunks().length, reveal, () => run.data?.id], () => {
+      if (!query().trim()) {
+        if (matches().length > 0) setMatches([]);
+        setMatchIndex(-1);
+        return;
+      }
+      const frame = requestAnimationFrame(() => {
+        const found = body && findable() ? findRanges(body, query()) : [];
+        setMatches(found);
+        if (jump && found.length > 0) {
+          jump = false;
+          goTo(0, found);
+        } else {
+          setMatchIndex((index) => (found.length === 0 ? -1 : Math.min(index, found.length - 1)));
+        }
+      });
+      onCleanup(() => cancelAnimationFrame(frame));
+    }),
+  );
+  createEffect(() => paintMatches(matches(), matchIndex()));
+  onCleanup(clearMatches);
+  const step = (direction: 1 | -1) => {
+    const next = stepMatch(matchIndex(), direction, matches().length);
+    if (next >= 0) goTo(next);
+  };
+  // "/" or Ctrl/⌘ F anywhere in the modal goes to the field.
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (!findable() || !findInput) return;
+    const target = event.target as HTMLElement | null;
+    const typing = !!target?.closest("input, textarea, select, [contenteditable='true']");
+    const mod = (event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "f";
+    if (mod || (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey && !event.altKey)) {
+      event.preventDefault();
+      findInput.focus();
+      findInput.select();
+    }
+  };
+
   const download = () => {
     const blob = new Blob([logAsText(log.chunks())], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -280,7 +410,7 @@ function RunView(props: { runId: string }) {
   });
 
   return (
-    <div class="rm-shell">
+    <div class="rm-shell" onKeyDown={onKeyDown}>
       <Show
         when={run.data}
         fallback={
@@ -311,7 +441,7 @@ function RunView(props: { runId: string }) {
                   </div>
                   <p class="rm-sub">
                     <b>{agent()?.name ?? "An agent"}</b>
-                    <Show when={task.data}>
+                    <Show when={task()}>
                       {(found) => (
                         <>
                           {" "}on{" "}
@@ -358,6 +488,41 @@ function RunView(props: { runId: string }) {
                       {stop.isPending ? "Stopping…" : "Stop run"}
                     </Button>
                   </Show>
+                  <Show when={reruns().resume || reruns().retry || reruns().trace}>
+                    <Menu placement="bottom-end">
+                      <Menu.Trigger as={Button} size="compact" disabled={rerunning()}>
+                        <RotateCcw size={13} aria-hidden="true" />
+                        {rerunning() ? "Starting…" : "Rerun"}
+                        <ChevronDown size={12} aria-hidden="true" />
+                      </Menu.Trigger>
+                      <Menu.Content label="Rerun" width={300}>
+                        <Show when={reruns().resume}>
+                          <Menu.Item onSelect={() => resume.mutate()} description="The process was lost. Pick up from where this run stopped.">
+                            Resume
+                          </Menu.Item>
+                        </Show>
+                        <Show when={reruns().retry}>
+                          <Menu.Item onSelect={() => retry.mutate()} description="Send the same request again as a new run.">
+                            Retry
+                          </Menu.Item>
+                        </Show>
+                        <Show when={reruns().trace}>
+                          <Menu.Item onSelect={() => rerun.mutate()} description="Wake the agent on this task again, recording what the model receives.">
+                            Rerun with provider trace
+                          </Menu.Item>
+                        </Show>
+                      </Menu.Content>
+                    </Menu>
+                  </Show>
+                  <button
+                    type="button"
+                    class="btn btn--icon btn--ghost btn--compact"
+                    aria-label="Copy link to this run"
+                    title="Copy link to this run"
+                    onClick={() => void copyLink()}
+                  >
+                    <Link2 size={15} aria-hidden="true" />
+                  </button>
                   <button
                     type="button"
                     class="btn btn--icon btn--ghost btn--compact"
@@ -420,6 +585,16 @@ function RunView(props: { runId: string }) {
                       </button>
                     </div>
                   </Show>
+                  <Show when={findable()}>
+                    <RunFind
+                      ref={(input) => (findInput = input)}
+                      query={query()}
+                      onQuery={setQuery}
+                      count={matches().length}
+                      current={matchIndex()}
+                      onStep={step}
+                    />
+                  </Show>
                 </div>
                 <div class="rm-body" ref={body} onScroll={onScroll}>
                   <Tabs.Content value="transcript">
@@ -438,6 +613,7 @@ function RunView(props: { runId: string }) {
                       plainLines={showsPlainLines(adapterType(), current().runtimeMode)}
                       onRetry={log.retry}
                       onShowInput={() => setView("input")}
+                      reveal={reveal()}
                     />
                   </Tabs.Content>
                   <Tabs.Content value="input">
@@ -487,7 +663,7 @@ function RunView(props: { runId: string }) {
                         <Show when={log.lastOutputAt()}>{(at) => <> · last output {agoLabel(at(), now())}</>}</Show>
                       </span>
                     </span>
-                    <Show when={task.data}>
+                    <Show when={task()}>
                       {(found) => <span class="rm-foot-hint">Messages go to {found().identifier ?? "the task"}</span>}
                     </Show>
                     <Button
@@ -502,7 +678,7 @@ function RunView(props: { runId: string }) {
                       {following() ? "Pause following" : "Follow"}
                     </Button>
                   </div>
-                  <Show when={task.data}>
+                  <Show when={task()}>
                     {(found) => (
                       <>
                         <Show when={queue.data}>{(current) => <QueuedMessages taskId={found().id} queue={current()} />}</Show>
