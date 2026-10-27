@@ -1,5 +1,6 @@
 import type { Agent, AgentConfigRevision, AgentRole, AgentRunner, BudgetOverview, BudgetPolicySummary, BudgetPolicyUpsertInput, Environment } from "@paperclipai/shared";
-import type { AdapterInfo, AgentRunSummary } from "@/api/agents";
+import type { AdapterInfo } from "@/api/agents";
+import type { RunSummary } from "@/api/runs";
 import { parseDollars, type BudgetDraft } from "@/projects/settings/settings-model";
 import { effortKeyFor, effortOptions, type EffortOption } from "@/tasks/run-overrides";
 
@@ -703,7 +704,7 @@ export function skillToggle(desired: readonly { key: string; versionId: string |
 const OPEN_RUN = new Set(["queued", "running", "scheduled_retry"]);
 
 /** Spend and tokens in the agent's recent runs, newest first, from the run list. */
-export function runUsage(runs: readonly AgentRunSummary[] | undefined) {
+export function runUsage(runs: readonly RunSummary[] | undefined) {
   const list = runs ?? [];
   let input = 0;
   let cached = 0;

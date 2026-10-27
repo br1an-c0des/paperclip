@@ -18,8 +18,6 @@ import type {
   AgentTaskSession,
   AdapterEnvironmentTestResult,
   AgentRuntimeSettingsPatch,
-  CostByAgent,
-  CostByAgentModel,
   EnvironmentProbeResult,
   ResolveAgentInstructionCandidate,
   ResourceMembershipUpdateResult,
@@ -77,28 +75,6 @@ export type AdapterInfo = {
 /** `GET /companies/:id/primary-agent/me` (ui/src/api/primaryAgent.ts). */
 export type PrimaryAgentPreference = { companyId: string; userId: string; primaryAgentId: string | null; initialized: boolean };
 
-/**
- * A row of `GET /companies/:id/heartbeat-runs?agentId=` with `summary=true`. The server returns the
- * run row with token counts as strings; these are the fields ui-new reads.
- */
-export type AgentRunSummary = {
-  id: string;
-  agentId: string;
-  issueId: string | null;
-  status: string;
-  invocationSource: string;
-  triggerDetail: string | null;
-  startedAt: string | null;
-  finishedAt: string | null;
-  createdAt: string;
-  error: string | null;
-  inputTokens: string | number | null;
-  cachedInputTokens: string | number | null;
-  outputTokens: string | number | null;
-  costUsd: string | number | null;
-  contextSnapshot?: Record<string, unknown> | null;
-};
-
 /** A page of `GET /companies/:id/audit/agent-actions` (ui/src/api/audit.ts): the fields ui-new reads. */
 export type AgentActionsPage = {
   items: {
@@ -128,14 +104,6 @@ function withCompany(path: string, companyId?: string) {
 
 function agentPath(id: string, companyId?: string, suffix = "") {
   return withCompany(`/agents/${encodeURIComponent(id)}${suffix}`, companyId);
-}
-
-function rangeQuery(from?: string, to?: string) {
-  const params = new URLSearchParams();
-  if (!from && !to) params.set("period", "all");
-  if (from) params.set("from", from);
-  if (to) params.set("to", to);
-  return `?${params}`;
 }
 
 export const agentsApi = {
@@ -197,17 +165,6 @@ export const agentsApi = {
     adapterType: string,
     data: { adapterConfig: Record<string, unknown>; agentId?: string; environmentId?: string | null; aiConnection?: unknown },
   ) => api.post<AdapterEnvironmentTestResult>(`/companies/${companyId}/adapters/${adapterType}/test-environment`, data),
-  /** The agent's recent runs, newest first. */
-  runs: (companyId: string, agentId: string, limit = 50, signal?: AbortSignal) =>
-    api.get<AgentRunSummary[]>(
-      `/companies/${encodeURIComponent(companyId)}/heartbeat-runs?agentId=${encodeURIComponent(agentId)}&limit=${limit}&summary=true`,
-      { signal },
-    ),
-  /** Spend per agent (`/costs/by-agent`), and per agent and model (`/costs/by-agent-model`), in a range. */
-  costsByAgent: (companyId: string, from?: string, to?: string, signal?: AbortSignal) =>
-    api.get<CostByAgent[]>(`/companies/${encodeURIComponent(companyId)}/costs/by-agent${rangeQuery(from, to)}`, { signal }),
-  costsByAgentModel: (companyId: string, from?: string, to?: string, signal?: AbortSignal) =>
-    api.get<CostByAgentModel[]>(`/companies/${encodeURIComponent(companyId)}/costs/by-agent-model${rangeQuery(from, to)}`, { signal }),
 
   // Instructions
   instructionsBundle: (id: string, companyId?: string, signal?: AbortSignal) =>

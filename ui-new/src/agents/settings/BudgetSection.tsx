@@ -4,10 +4,10 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Check, PauseCircle } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { agentsApi } from "@/api/agents";
 import { budgetsApi } from "@/api/budgets";
+import { costsApi } from "@/api/costs";
 import { queryKeys } from "@/api/queryKeys";
-import { runPath } from "@/api/runs";
+import { runPath, runsApi } from "@/api/runs";
 import { budgetDirty, budgetDraft, budgetProblem, currentPolicy, parseDollars, WARN_OPTIONS, windowLabel, type BudgetDraft } from "@/projects/settings/settings-model";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
@@ -188,17 +188,17 @@ function UsageCard(props: { agent: AgentDetail }) {
   const range = monthRange();
   const byAgent = createQuery(() => ({
     queryKey: queryKeys.agents.costs(company().id, range.from.slice(0, 10), "now"),
-    queryFn: ({ signal }) => agentsApi.costsByAgent(company().id, range.from, undefined, signal),
+    queryFn: ({ signal }) => costsApi.byAgent(company().id, range.from, undefined, signal),
     retry: false,
   }));
   const byModel = createQuery(() => ({
     queryKey: queryKeys.agents.costsByModel(company().id, range.from.slice(0, 10), "now"),
-    queryFn: ({ signal }) => agentsApi.costsByAgentModel(company().id, range.from, undefined, signal),
+    queryFn: ({ signal }) => costsApi.byAgentModel(company().id, range.from, undefined, signal),
     retry: false,
   }));
   const runs = createQuery(() => ({
     queryKey: queryKeys.agents.runs(company().id, props.agent.id),
-    queryFn: ({ signal }) => agentsApi.runs(company().id, props.agent.id, 20, signal),
+    queryFn: ({ signal }) => runsApi.list(company().id, { agentId: props.agent.id, limit: 20, summary: true }, signal),
     retry: false,
   }));
   const mine = createMemo(() => (byAgent.data ?? []).find((row) => row.agentId === props.agent.id));

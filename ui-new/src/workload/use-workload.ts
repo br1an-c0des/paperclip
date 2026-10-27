@@ -1,6 +1,7 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createMemo, on } from "solid-js";
 import { queryKeys } from "@/api/queryKeys";
+import { runsApi } from "@/api/runs";
 import { WORKLOAD_RUN_LIMIT, workloadApi } from "@/api/workload";
 import { useNow } from "@/lib/clock";
 import { useCompany } from "@/lib/company";
@@ -31,7 +32,7 @@ export function useWorkload(props: { scope: () => WorkloadScope; tasks: () => re
   const experimental = useExperimentalSettingsQuery();
   const runs = createQuery(() => ({
     queryKey: queryKeys.workload.runs(company().id),
-    queryFn: ({ signal }) => workloadApi.runs(company().id, signal),
+    queryFn: ({ signal }) => runsApi.list(company().id, { limit: WORKLOAD_RUN_LIMIT, summary: true }, signal),
     staleTime: 30_000,
   }));
   const builtIn = createQuery(() => ({
