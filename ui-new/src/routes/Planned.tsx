@@ -1,10 +1,7 @@
-import { useParams } from "@solidjs/router";
-import { createMemo, Show, type JSX } from "solid-js";
-import { activeAgents } from "@/api/agents";
+import { type JSX } from "solid-js";
 import { useCompany } from "@/lib/company";
-import { useAgentsQuery, useProjectsQuery } from "@/lib/company-data";
-import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
-import { HeaderNumber, PageHeader, RailLayout, SectionRail, Tabs } from "@/ui/PageHeader";
+import { InitialsDisc } from "@/ui/Avatar";
+import { PageHeader, RailLayout, SectionRail } from "@/ui/PageHeader";
 import "./Planned.css";
 
 /*
@@ -19,25 +16,6 @@ export function PlannedNote(props: { milestone: string; children: JSX.Element })
       <p class="cap">Arrives in {props.milestone}</p>
       <p>{props.children}</p>
     </section>
-  );
-}
-
-export function AgentPage() {
-  const params = useParams<{ agentKey: string }>();
-  const agents = useAgentsQuery();
-  const agent = createMemo(() =>
-    activeAgents(agents.data).find((candidate) => candidate.urlKey === params.agentKey || candidate.id === params.agentKey),
-  );
-  return (
-    <>
-      <PageHeader
-        crumbs={<span>Agents</span>}
-        title={agent()?.name ?? params.agentKey}
-        mark={<Show when={agent()}>{(found) => <AgentAvatar agent={found()} size={64} />}</Show>}
-        numbers={<Show when={agent()?.title}>{(title) => <span>{title()}</span>}</Show>}
-      />
-      <PlannedNote milestone="M5">The agent's chat, activity and settings.</PlannedNote>
-    </>
   );
 }
 

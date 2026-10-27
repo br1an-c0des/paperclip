@@ -60,8 +60,46 @@ export type ProviderTraceEntry = Record<string, unknown> & {
   exactAvailable?: boolean;
 };
 
+/**
+ * A row of the company's run list (`GET /companies/:id/heartbeat-runs`). With `summary=true` the
+ * server leaves out the log and trims the result to its summary; the usage and cost fields come
+ * from that result, as numeric strings, or null when the harness reported none. Fields the server
+ * redacts for a run the viewer can't read are optional.
+ */
+export type RunSummary = Pick<HeartbeatRun, "id" | "agentId" | "status" | "invocationSource"> & {
+  issueId?: string | null;
+  triggerDetail?: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  error?: string | null;
+  inputTokens?: string | number | null;
+  cachedInputTokens?: string | number | null;
+  outputTokens?: string | number | null;
+  costUsd?: string | number | null;
+  contextSnapshot?: Record<string, unknown> | null;
+};
+
+export type RunListOptions = {
+  /** Only this agent's runs. */
+  agentId?: string;
+  /** At most this many, newest first; the server caps it at 1000 and defaults to its own limit. */
+  limit?: number;
+  /** Rows without their logs (`summary=true`), as every run list in ui-new reads them. */
+  summary?: boolean;
+};
+
 export const runsApi = {
-  get: (runId: string, signal?: AbortSignal) => api.get<RunDetail>(`/heartbeat-runs/${runId}`, { signal }),
+  /** The company's latest runs, newest first. */
+  list: (companyId: string, options: RunListOptions = {}, signal?: AbortSignal) => {
+    const params = new URLSearchParams();
+    if (options.agentId) params.set("agentId", options.agentId);
+    if (options.limit !== undefined) params.set("limit", String(options.limit));
+    if (options.summary) params.set("summary", "true");
+    const query = params.toString();
+    return api.get<RunSummary[]>(`/companies/${encodeURIComponent(companyId)}/heartbeat-runs${query ? `?${query}` : ""}`, { signal });
+  },
+  get:(runId: string, signal?: AbortSignal) => api.get<RunDetail>(`/heartbeat-runs/${runId}`, { signal }),
   events: (runId: string, afterSeq = 0, limit = 200, options?: RequestOptions) =>
     api.get<HeartbeatRunEvent[]>(`/heartbeat-runs/${runId}/events?afterSeq=${afterSeq}&limit=${limit}`, options),
   log: (runId: string, offset = 0, limitBytes = 256_000, options?: RequestOptions) =>

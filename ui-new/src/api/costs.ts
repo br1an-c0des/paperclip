@@ -1,4 +1,4 @@
-import type { CostByProject } from "@paperclipai/shared";
+import type { CostByAgent, CostByAgentModel, CostByProject } from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
@@ -17,4 +17,10 @@ function rangeQuery(from?: string, to?: string) {
 export const costsApi = {
   byProject: (companyId: string, from?: string, to?: string, signal?: AbortSignal) =>
     api.get<CostByProject[]>(`/companies/${encodeURIComponent(companyId)}/costs/by-project${rangeQuery(from, to)}`, { signal }),
+  /** Spend per agent. There's no agent filter, so an agent's page reads every agent's and picks its own. */
+  byAgent: (companyId: string, from?: string, to?: string, signal?: AbortSignal) =>
+    api.get<CostByAgent[]>(`/companies/${encodeURIComponent(companyId)}/costs/by-agent${rangeQuery(from, to)}`, { signal }),
+  /** Spend per agent and model, likewise for every agent. */
+  byAgentModel: (companyId: string, from?: string, to?: string, signal?: AbortSignal) =>
+    api.get<CostByAgentModel[]>(`/companies/${encodeURIComponent(companyId)}/costs/by-agent-model${rangeQuery(from, to)}`, { signal }),
 };
