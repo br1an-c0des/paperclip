@@ -1,0 +1,297 @@
+/* The temporary Connectors page and its setup dialog. No board: design-system parts and tokens only. */
+
+.cx-card {
+  min-width: 0;
+}
+
+.cx-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px;
+  color: var(--body);
+}
+
+.cx-rows {
+  list-style: none;
+}
+
+.cx-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--row-line);
+}
+
+.cx-row:first-child {
+  border-top: 0;
+}
+
+.cx-row-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cx-row-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.cx-row-name {
+  font-weight: 800;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.cx-row-meta {
+  font-size: 13px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.cx-row-reason {
+  font-size: 13px;
+  color: var(--amber-fg);
+}
+
+.cx-row-runs {
+  font-size: 13px;
+  color: var(--run-fg);
+}
+
+.cx-row-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.cx-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+@media (max-width: 640px) {
+  .cx-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cx-row-side {
+    align-items: flex-start;
+  }
+
+  .cx-row-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* Usage, under a row */
+.cx-usage {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+}
+
+.cx-usage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cx-limits {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cx-limit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cx-limit-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--body);
+}
+
+.cx-meter {
+  display: block;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--pri-off);
+  overflow: hidden;
+}
+
+.cx-meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--g-ion);
+}
+
+.cx-meter i.hot {
+  background: var(--g-flare);
+}
+
+/* Setup dialog */
+.cx-setup,
+.cx-setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.cx-agents {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cx-options {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.cx-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+  cursor: pointer;
+}
+
+.cx-option:hover {
+  background: var(--row-hover);
+}
+
+.cx-option--on {
+  border-color: var(--run-fg);
+  background: var(--run-bg);
+}
+
+.cx-option input {
+  accent-color: var(--run-fg);
+}
+
+.cx-option-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cx-option-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cx-static {
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.cx-note {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.cx-note--warn {
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+}
+
+.cx-note--error {
+  color: var(--red-fg);
+}
+
+.cx-ok {
+  color: var(--green-fg);
+  font-weight: 700;
+}
+
+.cx-link {
+  align-self: flex-start;
+  color: var(--body);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.cx-signin {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.cx-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-left: 20px;
+  list-style: decimal;
+  color: var(--body);
+}
+
+.cx-steps li {
+  line-height: 1.5;
+}
+
+.cx-steps li > * + * {
+  margin-top: 8px;
+}
+
+.cx-steps li > span {
+  display: block;
+}
+
+.cx-code {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.cx-code .input {
+  flex: 1;
+}
+
+.cx-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 4px;
+}
