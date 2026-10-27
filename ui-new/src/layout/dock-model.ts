@@ -22,13 +22,20 @@ function companyPath(pathname: string, prefix: string) {
   return rest === "" ? "/" : rest;
 }
 
+/**
+ * A project's task list or board: `/projects/:key/issues` (with a task open in its panel too) or
+ * `/projects/:key/board`. The project's own address is its dashboard, which, like Docs, isn't a task
+ * list.
+ */
+const PROJECT_TASKS = /^\/projects\/([^/]+)\/(?:issues(?:\/|$)|board$)/;
+
 /** The dock place that owns `pathname`, or null. */
 export function dockPlace(pathname: string, prefix: string): DockPlace | null {
   const path = companyPath(pathname, prefix);
   if (!path) return null;
   if (path === "/inbox" || path.startsWith("/inbox/")) return "inbox";
   if (path === "/issues" || path.startsWith("/issues/")) return "tasks";
-  if (path.startsWith("/projects/")) return "tasks";
+  if (PROJECT_TASKS.test(path)) return "tasks";
   if (path === "/agents" || path.startsWith("/agents/")) return "agents";
   return null;
 }
@@ -37,7 +44,7 @@ export function dockPlace(pathname: string, prefix: string): DockPlace | null {
 export function tasksScope(pathname: string, prefix: string): TasksScope | null {
   const path = companyPath(pathname, prefix);
   if (path === "/issues") return { kind: "all" };
-  const project = path ? /^\/projects\/([^/]+)/.exec(path) : null;
+  const project = path ? PROJECT_TASKS.exec(path) : null;
   return project ? { kind: "project", key: decodeURIComponent(project[1]!) } : null;
 }
 

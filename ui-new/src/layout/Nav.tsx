@@ -6,7 +6,8 @@ import { openProjects } from "@/api/projects";
 import { agentState, runningAgentIds, sortAgentsForNav } from "@/lib/agent-state";
 import { useCommands } from "@/lib/commands";
 import { useCompaniesQuery, useCompany } from "@/lib/company";
-import { useAgentsQuery, useLiveRunsQuery, useProjectsQuery, useSidebarBadgesQuery } from "@/lib/company-data";
+import { useNeedsYouCount } from "@/inbox/needs-you";
+import { useAgentsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
 import { useSession, useSignOut, useYouName } from "@/lib/session";
 import { theme, toggleTheme } from "@/lib/theme";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
@@ -18,8 +19,8 @@ import "./Nav.css";
 
 /*
  * The left nav (board 1, on every board): company switcher with search and new task; Org dashboard
- * and Inbox with its badge; projects with their task counts; agents with their live state; you and
- * settings at the bottom. The item owning the current page is raised with the --sel pill: the
+ * and Inbox with its badge (what's waiting on you, as the Inbox's Needs you tab counts it); projects
+ * with their task counts; agents with their live state; you and settings at the bottom. The item owning the current page is raised with the --sel pill: the
  * router marks it `.active` for every page under it, and `aria-current` on the exact page.
  *
  * The + beside "Projects" opens New project (board N1).
@@ -139,7 +140,7 @@ function YouRow() {
 export function Nav() {
   const company = useCompany();
   const commands = useCommands();
-  const badges = useSidebarBadgesQuery();
+  const needsYou = useNeedsYouCount();
   const projects = useProjectsQuery();
   const agents = useAgentsQuery();
   const liveRuns = useLiveRunsQuery();
@@ -148,7 +149,7 @@ export function Nav() {
   const running = createMemo(() => runningAgentIds(liveRuns.data));
   const navAgents = createMemo(() => sortAgentsForNav(activeAgents(agents.data), running()));
   const runningCount = () => navAgents().filter((agent) => agentState(agent, running()).key === "running").length;
-  const inboxCount = () => badges.data?.inbox ?? 0;
+  const inboxCount = () => needsYou() ?? 0;
 
   return (
     <>

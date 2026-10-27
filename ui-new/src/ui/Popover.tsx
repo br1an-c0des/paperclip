@@ -1,6 +1,7 @@
 import { Popover as KPopover } from "@kobalte/core/popover";
 import { X } from "lucide-solid";
 import { Show, splitProps, type ComponentProps, type JSX, type ParentProps } from "solid-js";
+import { useInDialog } from "./Dialog";
 import { layerMode, SheetOnly, useLayerMount } from "./layer";
 import "./Popover.css";
 
@@ -8,6 +9,11 @@ import "./Popover.css";
  * Every popover goes through this wrapper (build plan, decision H): a request or detail card floated
  * under a pill button, `role="dialog"`, closed by an outside click, Escape, ✕ or a "Not now" inside
  * it (design-system.md). On a phone-sized viewport it becomes a bottom sheet (layer.tsx).
+ *
+ * Inside a dialog it's marked as a top layer (`data-kb-top-layer`). The dialog is modal: Kobalte
+ * sets `aria-hidden` on whatever is added outside it while it's open, which would include this
+ * popover's portal. A top layer stays visible to screen readers, as Kobalte's toasts do, and focus
+ * and clicks in it don't count as leaving the dialog.
  *
  *   <Popover>
  *     <Popover.Trigger as={Button} variant="suggestion">1 suggestion</Popover.Trigger>
@@ -36,12 +42,14 @@ export type PopoverContentProps = ParentProps<{
 
 function Content(props: PopoverContentProps) {
   const mount = useLayerMount();
+  const inDialog = useInDialog();
   const [local] = splitProps(props, ["label", "title", "width", "hideClose", "class", "children"]);
   return (
     <KPopover.Portal mount={mount()}>
       <KPopover.Content
         data-layer="popover"
         data-mode={layerMode()}
+        data-kb-top-layer={inDialog ? "" : undefined}
         class={`popover ${local.class ?? ""}`}
         aria-label={local.title ? undefined : local.label}
         style={{ width: layerMode() === "anchored" ? `${local.width ?? 500}px` : undefined }}

@@ -1,6 +1,6 @@
 import type { Approval, IssueThreadInteraction } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { expiryLabel, requestFromApproval, requestFromInteraction, taskRequests, type RequestContext } from "./request-model";
+import { expiryLabel, requestFromApproval, requestFromInteraction, requestFromReview, signoffOf, taskRequests, type RequestContext } from "./request-model";
 
 const ctx: RequestContext = {
   youId: "me",
@@ -50,7 +50,7 @@ describe("interactions as requests", () => {
       askVerb: "asks you",
       lifetime: "Ends if you comment instead",
       audience: { kind: "anyone", label: "Anyone" },
-      subject: { kind: "task", label: "TRA-41" },
+      subject: { kind: "task", label: "TRA-41", title: "H4 download" },
       respond: { allowed: true },
     });
     expect(request.asker.name).toBe("Quant Researcher");
@@ -161,5 +161,112 @@ describe("expiryLabel", () => {
     expect(expiryLabel(new Date("2026-11-01T12:00:00Z"), now)).toEqual({ text: "Expires in 6 days", soon: false });
     expect(expiryLabel(new Date("2026-10-26T15:00:00Z"), now)).toEqual({ text: "Expires in 3 hours", soon: false });
     expect(expiryLabel(new Date("2026-10-26T11:00:00Z"), now)).toEqual({ text: "Expired", soon: true });
+  });
+});
+
+describe("signoffOf", () => {
+  const nameOf = (key: string) => ({ "user:me": "You", "user:sam": "Sam", "agent:se": "Strategy Engineer", "user:ceo": "CEO" })[key] ?? key;
+  const policy = {
+    stages: [
+      { id: "s1", type: "review", participants: [{ type: "user", userId: "me", agentId: null }] },
+      { id: "s2", type: "approval", participants: [{ type: "user", userId: "ceo", agentId: null }] },
+    ],
+  };
+  const state = (participant: string, extra: object = {}) => ({
+    status: "pending" as const,
+    currentStageId: "s1",
+    currentStageIndex: 0,
+    currentStageType: "review" as const,
+    currentParticipant: { type: "user" as const, userId: participant, agentId: null },
+    returnAssignee: { type: "agent" as const, agentId: "se", userId: null },
+    reviewRequest: null,
+    completedStageIds: [],
+    lastDecisionId: null,
+    lastDecisionOutcome: null,
+    ...extra,
+  });
+
+  it("marks the current stage, where the task returns, and that it's your turn", () => {
+    const result = signoffOf({ executionPolicy: policy, executionState: state("me") }, "me", nameOf);
+    expect(result.steps).toEqual([
+      { type: "review", label: "Review · you", now: true },
+      { type: "approval", label: "Approval · CEO", now: false },
+    ]);
+    expect(result.returns).toBe("Returns to Strategy Engineer if sent back · round 1 of 3");
+    expect(result.yours).toBe(true);
+    expect(result.waitingOn).toBeNull();
+  });
+
+  it("says who it waits on when it isn't you, and counts rounds", () => {
+    const result = signoffOf({ executionPolicy: { ...policy, maxReviewRounds: 2 }, executionState: state("sam", { changesRequestedCount: 1 }) }, "me", nameOf);
+    expect(result.yours).toBe(false);
+    expect(result.waitingOn).toBe("Sam");
+    expect(result.steps[0]!.label).toBe("Review · Sam");
+    expect(result.returns).toBe("Returns to Strategy Engineer if sent back · round 2 of 2");
+  });
+
+  it("treats a task in review assigned to you, without stages, as yours", () => {
+    const result = signoffOf({ executionPolicy: null, executionState: null, assigneeUserId: "me" }, "me", nameOf);
+    expect(result).toEqual({ steps: [], returns: null, yours: true, waitingOn: null });
+  });
+});
+
+describe("review sign-offs as requests", () => {
+  const policy = {
+    stages: [
+      { id: "s1", type: "review", participants: [{ type: "user", userId: "me", agentId: null }] },
+      { id: "s2", type: "approval", participants: [{ type: "agent", agentId: "a2", userId: null }] },
+    ],
+  };
+  const pending = (userId: string) => ({
+    status: "pending" as const,
+    currentStageId: "s1",
+    currentStageIndex: 0,
+    currentStageType: "review" as const,
+    currentParticipant: { type: "user" as const, userId, agentId: null },
+    returnAssignee: { type: "agent" as const, agentId: "a1", userId: null },
+    reviewRequest: null,
+    completedStageIds: [],
+    lastDecisionId: null,
+    lastDecisionOutcome: null,
+  });
+  const task = { id: "t1", identifier: "TRA-44", title: "Liquidation sweep", status: "in_review", executionPolicy: policy, updatedAt: "2026-10-26T11:00:00Z" };
+
+  it("asks you to sign when the stage waits on you", () => {
+    const request = requestFromReview({ ...task, executionState: pending("me") }, ctx, { since: "2026-10-26T11:30:00Z" });
+    expect(request).toMatchObject({
+      key: "review:t1",
+      kind: "signoff",
+      shape: "signoff",
+      state: "open",
+      title: "Your sign-off is needed: approve, or send back",
+      askVerb: "handed this to you for review",
+      audience: { kind: "named", label: "You" },
+      subject: { kind: "task", label: "TRA-44", title: "Liquidation sweep", issueId: "t1" },
+      respond: { allowed: true },
+    });
+    expect(request.asker).toEqual({ agentId: "a1", userId: null, name: "Quant Researcher" });
+    expect(request.next).toBe("Approving moves TRA-44 to its next stage: approval · ceo.");
+    expect(request.createdAt.toISOString()).toBe("2026-10-26T11:30:00.000Z");
+    expect(request.source.type === "review" && request.source.signoff.steps.map((step) => step.label)).toEqual(["Review · you", "Approval · CEO"]);
+  });
+
+  it("waits on someone else, or on a review path when it's stalled", () => {
+    const theirs = requestFromReview({ ...task, executionState: pending("u2") }, ctx);
+    expect(theirs.title).toBe("Review pending with Sam K.");
+    expect(theirs.respond).toEqual({ allowed: false, reason: "Waiting on Sam K." });
+
+    const stalled = requestFromReview({ ...task, executionState: pending("me") }, ctx, { stalled: true, whyNow: "Nobody can review it" });
+    expect(stalled.title).toBe("TRA-44 is in review with nobody to review it");
+    expect(stalled.next).toBe("Nobody can review it");
+    expect(stalled.respond.allowed).toBe(false);
+  });
+
+  it("settles once the task leaves review", () => {
+    const approved = requestFromReview({ ...task, status: "done", executionState: { ...pending("me"), status: "completed", lastDecisionOutcome: "approved" } }, ctx);
+    expect(approved.state).toBe("settled");
+    expect(approved.verdict).toMatchObject({ text: "Approved", tone: "ok" });
+    const sentBack = requestFromReview({ ...task, status: "in_progress", executionState: { ...pending("me"), lastDecisionOutcome: "changes_requested" } }, ctx);
+    expect(sentBack.verdict).toMatchObject({ text: "Sent back with notes" });
   });
 });

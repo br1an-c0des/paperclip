@@ -1,4 +1,4 @@
-import type { AttentionItem, AttentionSourceKind, CompactIssue, IssueExecutionStagePrincipal, IssueExecutionState } from "@paperclipai/shared";
+import type { AttentionItem, AttentionSourceKind, CompactIssue } from "@paperclipai/shared";
 import type { Request, RequestKind } from "@/requests/request-model";
 
 /*
@@ -45,6 +45,17 @@ export function isAlert(item: Pick<AttentionItem, "sourceKind">) {
 export type Pending = { action: "clear" } | { action: "snooze"; until: string } | { action: "restore" };
 
 export type Placement = "active" | "snoozed" | "cleared";
+
+/** An item as a step taken here leaves it, for the cached feed until the server's next feed lands. */
+export function withStep(item: AttentionItem, step: Pending, now: Date = new Date()): AttentionItem {
+  if (step.action === "restore") return { ...item, dismissal: null, snoozedUntil: null };
+  const until = step.action === "snooze" ? step.until : null;
+  return {
+    ...item,
+    dismissal: { kind: step.action === "snooze" ? "snooze" : "dismiss", dismissedAt: now.toISOString(), snoozedUntil: until, isActive: true },
+    snoozedUntil: until,
+  };
+}
 
 /** Where an item sits: in its tab, snoozed, or cleared. A step taken here wins over the feed. */
 export function placement(item: Pick<AttentionItem, "dismissal">, pending?: Pending): Placement {
@@ -220,59 +231,4 @@ export function unreadCount(tasks: readonly Pick<CompactIssue, "isUnreadForMe">[
 export function archivedTasks<T extends Pick<CompactIssue, "id">>(withArchived: readonly T[], unarchived: readonly T[]): T[] {
   const kept = new Set(unarchived.map((task) => task.id));
   return withArchived.filter((task) => !kept.has(task.id));
-}
-
-export type Principal = Pick<IssueExecutionStagePrincipal, "type" | "agentId" | "userId">;
-
-/** "agent:<id>" or "user:<id>", as task assignees and stage participants are keyed. */
-export function principalKey(principal: Principal) {
-  return principal.type === "agent" ? `agent:${principal.agentId}` : `user:${principal.userId}`;
-}
-
-export type SignoffStep = { type: "review" | "approval"; label: string; now: boolean };
-
-export type Signoff = {
-  steps: SignoffStep[];
-  /** "Returns to Strategy Engineer if sent back · round 2 of 3". */
-  returns: string | null;
-  /** Whether the stage waits on you, so you can sign here. */
-  yours: boolean;
-  /** Who it waits on, when it isn't you. */
-  waitingOn: string | null;
-};
-
-type StagePolicy = { stages?: { id: string; type: "review" | "approval"; participants: Principal[] }[]; maxReviewRounds?: number | null } | null;
-
-/**
- * A review stage's turn as a sign-off request (proposal items 8 and 9): the stages in order with the
- * current one marked, where the task returns if it's sent back, and whether it's your turn.
- */
-export function signoffOf(
-  task: { executionPolicy?: unknown; executionState?: IssueExecutionState | null; assigneeUserId?: string | null },
-  youId: string | null,
-  nameOf: (key: string) => string,
-): Signoff {
-  const policy = (task.executionPolicy ?? null) as StagePolicy;
-  const state = task.executionState ?? null;
-  const pending = state?.status === "pending" ? state : null;
-  const stages = Array.isArray(policy?.stages) ? policy.stages : [];
-  const steps = stages.map((stage): SignoffStep => {
-    const now = pending?.currentStageId === stage.id;
-    const who = now && pending?.currentParticipant ? [pending.currentParticipant] : stage.participants;
-    const names = who.map((participant) => {
-      const name = nameOf(principalKey(participant));
-      return name === "You" ? "you" : name;
-    });
-    return { type: stage.type, label: `${stage.type === "review" ? "Review" : "Approval"} · ${names.join(" or ") || "nobody yet"}`, now };
-  });
-  const current = pending?.currentParticipant ?? null;
-  const yours = current ? current.type === "user" && current.userId === youId : !!youId && task.assigneeUserId === youId;
-  const waitingOn = current && !yours ? nameOf(principalKey(current)) : null;
-  let returns: string | null = null;
-  if (state?.returnAssignee) {
-    const rounds = policy?.maxReviewRounds ?? 3;
-    const round = (state.changesRequestedCount ?? 0) + 1;
-    returns = `Returns to ${nameOf(principalKey(state.returnAssignee))} if sent back · round ${Math.min(round, rounds)} of ${rounds}`;
-  }
-  return { steps, returns, yours, waitingOn };
 }

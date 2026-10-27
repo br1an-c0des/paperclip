@@ -62,6 +62,19 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     ],
   },
   {
+    title: "Inbox",
+    items: [
+      { keys: ["J", "K"], label: "Next or previous" },
+      { keys: ["Enter"], label: "Open the task" },
+      { keys: ["Y"], label: "Clear (archive in Updates)" },
+      { keys: ["S"], label: "Snooze until tomorrow" },
+      { keys: ["A"], label: "Answer" },
+      { keys: ["R"], label: "Mark read" },
+      { keys: ["Shift", "U"], label: "Mark unread" },
+      { keys: ["U"], label: "Restore" },
+    ],
+  },
+  {
     title: "In dialogs",
     items: [
       { keys: [MOD, "Enter"], label: "Create or send" },

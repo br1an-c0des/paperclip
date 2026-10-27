@@ -12,8 +12,9 @@ const companies = [
   { id: "c2", name: "Northline Studio", issuePrefix: "NOR" },
 ] as Company[];
 
+vi.mock("@/inbox/needs-you", () => ({ useNeedsYouCount: () => () => 3 }));
+
 vi.mock("@/lib/company-data", () => ({
-  useSidebarBadgesQuery: () => ({ data: { inbox: 3 } }),
   useAgentsQuery: () => ({ data: [{ id: "a1", name: "Quill", status: "idle", urlKey: "quill" }] }),
   useLiveRunsQuery: () => ({ data: [] }),
   useProjectsQuery: () => ({
@@ -84,7 +85,7 @@ describe("PhoneDock", () => {
   });
 
   it("opens the switcher from Tasks and closes it again", async () => {
-    renderDock("/TST/projects/trading-bench");
+    renderDock("/TST/projects/trading-bench/issues");
     const tasks = screen.getByRole("button", { name: /Tasks/ });
     expect(tasks.getAttribute("aria-current")).toBe("page");
     expect(tasks.getAttribute("aria-expanded")).toBe("false");
@@ -132,7 +133,16 @@ describe("PhoneDock", () => {
     const history = renderDock("/TST/issues");
     fireEvent.click(screen.getByRole("button", { name: /Tasks/ }));
     fireEvent.click(screen.getByRole("link", { name: /Trading bench/ }));
-    await waitFor(() => expect(history.get()).toBe("/TST/projects/trading-bench"));
+    await waitFor(() => expect(history.get()).toBe("/TST/projects/trading-bench/issues"));
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("leaves Tasks unmarked on a project's dashboard, and searches from the sheet", () => {
+    renderDock("/TST/projects/trading-bench");
+    expect(screen.getByRole("link", { name: "Tasks" }).hasAttribute("aria-current")).toBe(false);
+    cleanup();
+    renderDock("/TST/issues");
+    fireEvent.click(screen.getByRole("button", { name: /Tasks/ }));
+    expect(screen.getByRole("link", { name: "Search everything" }).getAttribute("href")).toBe("/TST/search");
   });
 });
