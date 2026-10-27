@@ -290,6 +290,11 @@ function RunView(props: { runId: string }) {
   // Matches are read from the drawn view once it has settled after each change.
   createEffect(
     on([query, view, items, () => log.chunks().length, reveal, () => run.data?.id], () => {
+      if (!query().trim()) {
+        if (matches().length > 0) setMatches([]);
+        setMatchIndex(-1);
+        return;
+      }
       const frame = requestAnimationFrame(() => {
         const found = body && findable() ? findRanges(body, query()) : [];
         setMatches(found);
