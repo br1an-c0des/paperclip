@@ -2,7 +2,7 @@
  * Floating layers: menus, popovers and dialogs. Each wrapper sets `data-layer` (menu, popover,
  * dialog) and `data-mode` (anchored, sheet) on its content; this file draws both modes.
  *
- * Stacking: menus and popovers open from inside dialogs and the phone nav drawer too, so they sit
+ * Stacking: menus and popovers open from inside dialogs and the phone's switcher sheet too, so they sit
  * above --z-overlay (tokens.css puts --z-popover below it, which suits only page-level layers).
  */
 

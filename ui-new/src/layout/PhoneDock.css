@@ -1,0 +1,413 @@
+/*
+ * The phone dock and the Tasks switcher sheet, measured from the N1 board
+ * (design/mobile/NavDock.dc.html). Stacking, under every layer (--z-overlay and up) and under a
+ * panel opened as a full-screen page (Panel.css): the sheet's scrim, then the sheet, then the dock,
+ * which stays usable over the sheet.
+ */
+
+.pdock {
+  --pdock-z: calc(var(--z-overlay) - 4);
+}
+
+.pdock-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--pdock-z);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 34px max(16px, env(safe-area-inset-right, 0px)) max(18px, env(safe-area-inset-bottom, 0px))
+    max(16px, env(safe-area-inset-left, 0px));
+  background: linear-gradient(180deg, transparent, var(--ground) 62%);
+  pointer-events: none;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* Over the open sheet the dock drops its fade, as on the board */
+.pdock[data-sheet] .pdock-bar {
+  background: none;
+}
+
+.pdock[data-hidden] .pdock-bar {
+  transform: translateY(calc(100% - 8px));
+  opacity: 0;
+}
+
+.pdock-pill {
+  pointer-events: auto;
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  padding: 5px;
+  border-radius: var(--r-pill);
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--shadow-lg);
+}
+
+.pdock-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 50px;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pdock-item[aria-current="page"] {
+  min-width: 0;
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.pdock-label {
+  min-width: 0;
+}
+
+/* The current project's name, while the switcher is open, can be long */
+.pdock-label--scope {
+  max-width: 44vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pdock-caret {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.pdock-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(135deg, #ff2bd6, #f7b52f);
+  color: #111113;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.pdock-live {
+  width: 4px;
+  height: 11px;
+  border-radius: var(--r-pill);
+  background: var(--g-ion);
+}
+
+.pdock-new {
+  pointer-events: auto;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: var(--shadow-lg);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: hover) {
+  .pdock-item:not([aria-current="page"]):hover {
+    background: var(--hover);
+  }
+}
+
+/* Toasts rise above the dock instead of covering it */
+:root[data-viewport="phone"]:has(.pdock) .toasts {
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---- The switcher sheet ---- */
+
+.tsheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--pdock-z) - 2);
+  background: var(--scrim);
+  animation: fade-in 0.15s ease-out;
+}
+
+.tsheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: calc(var(--pdock-z) - 1);
+  display: flex;
+  flex-direction: column;
+  max-height: 88dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 max(10px, env(safe-area-inset-right, 0px)) calc(104px + env(safe-area-inset-bottom, 0px))
+    max(10px, env(safe-area-inset-left, 0px));
+  border-radius: 26px 26px 0 0;
+  background: var(--card);
+  border-top: 1px solid var(--card-edge);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  outline: none;
+  animation: sheet-in 0.16s ease-out;
+}
+
+.tsheet-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 2px 8px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tsheet-top--you {
+  gap: 10px;
+  padding: 2px 6px 10px 0;
+}
+
+.tsheet-company {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 10px;
+  border-radius: 16px;
+  text-align: left;
+}
+
+.tsheet-company[aria-expanded="true"] {
+  background: var(--well);
+}
+
+.tsheet-company-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tsheet-company-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.tsheet-company-name svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.tsheet-meta {
+  display: block;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.tsheet-you {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.tsheet-sq {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* Project discs are drawn square in the sheet */
+.tsheet-sq .disc-avatar {
+  border-radius: 10px;
+}
+
+.tsheet-sq--primary {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.tsheet-sq--well {
+  background: var(--well);
+  color: var(--body);
+}
+
+.tsheet-h {
+  padding: 12px 14px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tsheet-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 4px 14px;
+  border-radius: 16px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+}
+
+.tsheet-row[aria-current="page"],
+.tsheet-row[aria-current="true"] {
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+  font-weight: 800;
+}
+
+.tsheet-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tsheet-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tsheet-count {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tsheet-check {
+  flex-shrink: 0;
+  color: var(--run-fg);
+}
+
+.tsheet-row--note {
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 16px 16px;
+  font-size: 14px;
+  color: var(--body);
+}
+
+.tsheet-row--danger {
+  font-size: 14px;
+  color: var(--red-fg);
+}
+
+.tsheet-row--danger .tsheet-sq {
+  background: var(--red-bg);
+  color: var(--red-fg);
+}
+
+.tsheet-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 6px 0;
+}
+
+.tsheet-pill {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tsheet-profile {
+  flex: 1;
+  min-width: 0;
+}
+
+.tsheet-profile-name {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.tsheet-theme {
+  padding: 0 4px;
+}
+
+/* The board's theme control spans the sheet, with 38px segments */
+.tsheet-theme .seg {
+  display: flex;
+  padding: 4px;
+}
+
+.tsheet-theme .seg button {
+  flex: 1 1 0;
+  height: 38px;
+}
+
+.tsheet-push {
+  padding: 4px 14px 10px;
+}
+
+.tsheet-sep {
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+@media (hover: hover) {
+  .tsheet-company:hover,
+  .tsheet-you:hover {
+    background: var(--hover);
+  }
+
+  a.tsheet-row:not([aria-current]):hover,
+  button.tsheet-row:hover {
+    background: var(--row-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pdock-bar {
+    transition: none;
+  }
+
+  .tsheet,
+  .tsheet-scrim {
+    animation: none;
+  }
+}
