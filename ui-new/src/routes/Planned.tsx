@@ -22,15 +22,6 @@ export function PlannedNote(props: { milestone: string; children: JSX.Element })
   );
 }
 
-export function InboxPage() {
-  return (
-    <>
-      <PageHeader title="Inbox" crumbs={<span>Everything waiting on you</span>} />
-      <PlannedNote milestone="M3">Questions, proposals, approvals and suggested tasks, as one stack of request cards.</PlannedNote>
-    </>
-  );
-}
-
 export function AgentPage() {
   const params = useParams<{ agentKey: string }>();
   const agents = useAgentsQuery();

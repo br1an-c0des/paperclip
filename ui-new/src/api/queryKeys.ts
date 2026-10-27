@@ -82,4 +82,17 @@ export const queryKeys = {
       ["ai-connections", companyId, connectionId, "active-runs"] as const,
   },
   sidebarBadges: (companyId: string) => ["sidebar-badges", companyId] as const,
+  /**
+   * The Inbox (board 14). The feed keeps the old UI's `["attention", companyId]` prefix; an approval
+   * sits under `["approvals", companyId]`, which answering a card and the live events refresh; your
+   * tasks sit under the company's task lists, so task changes refresh Updates.
+   */
+  inbox: {
+    attention: (companyId: string) => ["attention", companyId] as const,
+    feed: (companyId: string) => ["attention", companyId, "with-dismissed"] as const,
+    approval: (companyId: string, approvalId: string) => ["approvals", companyId, "detail", approvalId] as const,
+    approvalIssues: (companyId: string, approvalId: string) => ["approvals", companyId, "detail", approvalId, "issues"] as const,
+    tasks: (companyId: string) => ["issues", companyId, "inbox", "mine"] as const,
+    tasksWithArchived: (companyId: string) => ["issues", companyId, "inbox", "with-archived"] as const,
+  },
 };

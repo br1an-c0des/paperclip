@@ -37,13 +37,22 @@ function readString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-/** Query keys an `activity.logged` event affects, by the entity it's about. */
-function activityKeys(companyId: string, entityType: string | null, entityId: string | null): QueryKey[] {
+/** Actions on a task that can add, answer or end an item in the Inbox's attention feed. */
+function changesAttention(action: string | null) {
+  return action !== null && (action.startsWith("issue.thread_interaction_") || action === "issue.updated");
+}
+
+/** Query keys an `activity.logged` event affects, by the entity it's about and what was done. */
+function activityKeys(companyId: string, entityType: string | null, entityId: string | null, action: string | null): QueryKey[] {
   const keys: QueryKey[] = [queryKeys.activity(companyId), queryKeys.dashboard(companyId), queryKeys.sidebarBadges(companyId)];
   switch (entityType) {
     case "issue":
       keys.push(queryKeys.issues.list(companyId), queryKeys.companies.stats);
       if (entityId) keys.push(queryKeys.issues.detail(entityId));
+      if (changesAttention(action)) keys.push(queryKeys.inbox.attention(companyId));
+      break;
+    case "decision":
+      keys.push(queryKeys.inbox.attention(companyId));
       break;
     case "agent":
       keys.push(queryKeys.agents.list(companyId), queryKeys.org(companyId), queryKeys.companies.stats);
@@ -58,7 +67,7 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
       if (entityId) keys.push(["goals", "detail", entityId]);
       break;
     case "approval":
-      keys.push(["approvals", companyId]);
+      keys.push(["approvals", companyId], queryKeys.inbox.attention(companyId));
       break;
     case "routine":
     case "routine_trigger":
@@ -108,7 +117,7 @@ export function keysForEvent(companyId: string, event: LiveEvent): QueryKey[] {
     case "agent.session.goal.changed":
       return agentId ? [queryKeys.agents.detail(agentId)] : [];
     case "activity.logged":
-      return activityKeys(companyId, readString(payload.entityType), readString(payload.entityId));
+      return activityKeys(companyId, readString(payload.entityType), readString(payload.entityId), readString(payload.action));
     case "plugin.ui.updated":
     case "plugin.worker.crashed":
     case "plugin.worker.restarted":
