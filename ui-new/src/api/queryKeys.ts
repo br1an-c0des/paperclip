@@ -71,5 +71,11 @@ export const queryKeys = {
     providerTraceMetadata: (companyId: string, runId: string) => ["provider-traces", companyId, runId] as const,
   },
   heartbeats: (companyId: string) => ["heartbeats", companyId] as const,
+  /** The old UI's live events invalidate `["ai-connections", companyId]`, which reaches both. */
+  aiConnections: {
+    list: (companyId: string) => ["ai-connections", companyId] as const,
+    activeRuns: (companyId: string, connectionId: string) =>
+      ["ai-connections", companyId, connectionId, "active-runs"] as const,
+  },
   sidebarBadges: (companyId: string) => ["sidebar-badges", companyId] as const,
 };
