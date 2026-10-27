@@ -1,12 +1,11 @@
+import type { CompactIssue } from "@paperclipai/shared";
 import { A, useSearchParams } from "@solidjs/router";
-import { useQueryClient } from "@tanstack/solid-query";
 import { ArrowRight, Ban, Clock, CornerDownRight, Lightbulb, Plus, Sparkles, Users, X, Zap } from "lucide-solid";
 import { createMemo, createSignal, For, Index, Show, type JSX } from "solid-js";
-import { issuesApi } from "@/api/issues";
-import { queryKeys } from "@/api/queryKeys";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useTaskPeople } from "@/tasks/people";
+import { useTaskUpdates } from "@/tasks/task-updates";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Popover } from "@/ui/Popover";
@@ -99,7 +98,7 @@ function parseRange(value: string | undefined): WorkloadRange {
   return value === "week" || value === "month" ? value : "today";
 }
 
-export function WorkloadView(props: { scope: WorkloadScope; tasks: () => readonly WorkloadTask[] | undefined; scopeName: string }) {
+export function WorkloadView(props: { scope: WorkloadScope; tasks: () => readonly CompactIssue[] | undefined; scopeName: string }) {
   const company = useCompany();
   const [params, setParams] = useSearchParams<{ range?: string }>();
   const range = () => parseRange(params.range);
@@ -149,7 +148,7 @@ export function WorkloadView(props: { scope: WorkloadScope; tasks: () => readonl
               Open work
             </h2>
             <span class="wl-sub">{props.scope.kind === "project" ? "Tasks assigned in this project" : "Tasks assigned, by project"}</span>
-            <Show when={tip()}>{(found) => <SuggestionPill suggestion={found()} agentById={agentById()} />}</Show>
+            <Show when={tip()}>{(found) => <SuggestionPill suggestion={found()} agentById={agentById()} findTask={(id) => props.tasks()?.find((task) => task.id === id)} />}</Show>
           </div>
           <OpenWork rows={work().rows} legend={work().key} agentById={agentById()} ready={data.ready()} />
         </section>
@@ -354,21 +353,28 @@ function OpenWork(props: {
 // ---------------------------------------------------------------------------------------------
 // The suggestion
 
-function SuggestionPill(props: { suggestion: NonNullable<ReturnType<typeof suggestion>>; agentById: ReadonlyMap<string, WorkloadAgent> }) {
-  const company = useCompany();
-  const client = useQueryClient();
+function SuggestionPill(props: {
+  suggestion: NonNullable<ReturnType<typeof suggestion>>;
+  agentById: ReadonlyMap<string, WorkloadAgent>;
+  /** The task as the scope's list holds it, for the shared task updates. */
+  findTask: (id: string) => CompactIssue | undefined;
+}) {
+  const updates = useTaskUpdates();
   const openTask = useOpenTask();
   const [busy, setBusy] = createSignal(false);
   const agentName = () => props.agentById.get(props.suggestion.agentId)?.name ?? "the agent";
+  // Through the shared task updates, as the task list's edits go: optimistic, tracked while in
+  // flight, refreshed once the server's list cache has caught up. A refusal raises its own toast.
   const assign = async (close: () => void) => {
+    const task = props.findTask(props.suggestion.task.id);
+    if (!task) return;
     setBusy(true);
     try {
-      await issuesApi.update(props.suggestion.task.id, { assigneeAgentId: props.suggestion.agentId, assigneeUserId: null });
-      void client.invalidateQueries({ queryKey: queryKeys.issues.list(company().id) });
-      pushToast({ tone: "success", title: `${props.suggestion.task.identifier ?? "The task"} is with ${agentName()}` });
-      close();
-    } catch (error) {
-      pushToast({ tone: "error", title: "Couldn't assign the task", body: error instanceof Error ? error.message : String(error) });
+      const failed = await updates.update([{ task, data: { assigneeAgentId: props.suggestion.agentId, assigneeUserId: null } }]);
+      if (failed === 0) {
+        pushToast({ tone: "success", title: `${task.identifier ?? "The task"} is with ${agentName()}` });
+        close();
+      }
     } finally {
       setBusy(false);
     }
