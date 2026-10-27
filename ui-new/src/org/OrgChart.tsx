@@ -13,7 +13,7 @@ import { gradientVar } from "@/ui/status-meta";
 import type { AgentActions } from "./actions";
 import { buildOrgTree, directReports, ORG_STATE, roleTitle, shortAgo, spendMeter, taskRef, treeSize, type OrgTreeNode } from "./org-model";
 import type { OrgAgent, OrgData } from "./queries";
-import { RUN_WINDOW_DAYS } from "./queries";
+import { RUN_WINDOW_DAYS, useMinute } from "./queries";
 
 /*
  * Board 19's org chart card: the reporting tree under you (the board), each agent a button that
@@ -35,8 +35,8 @@ function StateDot(props: { row: OrgAgent }) {
 }
 
 /** The short status under a node's title: "TRA-38 · 14m", "Idle · 2h", "Blocked · TRA-45". */
-function nodeLine(row: OrgAgent, now: Date) {
-  if (row.state === "running") return row.detail.text;
+function nodeLine(row: OrgAgent, now: Date, data: OrgData) {
+  if (row.state === "running") return data.detailAt(row, now.getTime()).text;
   if (row.state === "blocked" && row.detail.task) return `Blocked · ${taskRef(row.detail.task)}`;
   if (row.state === "idle") return row.agent.lastHeartbeatAt ? `Idle · ${shortAgo(row.agent.lastHeartbeatAt, now)}` : "Idle";
   return ORG_STATE[row.state].label;
@@ -77,7 +77,7 @@ export function OrgChartCard(props: { data: OrgData; actions: AgentActions }) {
       .join(" · ");
   });
 
-  const now = () => new Date();
+  const minute = useMinute();
 
   const Node = (nodeProps: { node: OrgTreeNode<{ id: string }> }) => {
     const row = () => props.data.byId().get(nodeProps.node.agent.id);
@@ -98,7 +98,7 @@ export function OrgChartCard(props: { data: OrgData; actions: AgentActions }) {
               <span class="onode-name">{r().agent.name}</span>
               <span class="onode-sub">{roleTitle(r().agent)}</span>
               <span class="onode-line" style={{ color: r().state === "idle" ? undefined : ORG_STATE[r().state].fg }}>
-                {nodeLine(r(), now())}
+                {nodeLine(r(), new Date(minute()), props.data)}
               </span>
             </button>
           )}
@@ -226,6 +226,8 @@ function Inspector(props: { row: OrgAgent; data: OrgData; actions: AgentActions 
   const open = () => props.data.index().byAgent.get(props.row.agent.id) ?? [];
   const meter = () => spendMeter(props.row.spendCents, props.row.budgetCents);
   const paused = () => props.row.agent.status === "paused";
+  const minute = useMinute();
+  const detail = () => props.data.detailAt(props.row, minute());
 
   return (
     <aside class="org-insp" aria-label="Selected agent">
@@ -258,7 +260,7 @@ function Inspector(props: { row: OrgAgent; data: OrgData; actions: AgentActions 
           <Capsule gradient={meta().gradient} size="tiny" live={props.row.state === "running"} />
           {meta().label}
         </span>
-        <span class="org-insp-detail">{props.row.detail.text}</span>
+        <span class="org-insp-detail">{detail().text}</span>
       </div>
       <Show when={props.row.state === "running" && props.row.detail.runId}>
         <div class="org-now">

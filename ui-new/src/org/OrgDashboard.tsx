@@ -1,5 +1,5 @@
 import type { AttentionItem } from "@paperclipai/shared";
-import { A } from "@solidjs/router";
+import { A, Navigate } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
 import { ArrowRightLeft, BadgeCheck, CircleHelp, Pause, Play, ShieldCheck, Sparkles, UserPlus, type LucideProps } from "lucide-solid";
 import { createMemo, For, Show, type JSX } from "solid-js";
@@ -33,7 +33,7 @@ import {
   topSpenders,
   type ActivityLine,
 } from "./org-model";
-import { useOrgData } from "./queries";
+import { useMinute, useOrgData } from "./queries";
 import "./Org.css";
 
 /*
@@ -45,6 +45,12 @@ import "./Org.css";
  * the company budget, 14 days of runs), the attention feed the Inbox reads, company activity, the
  * org tree, recent runs, the company task list, this month's spend by project, and budgets.
  */
+
+/** The old UI's `/:prefix/org` (its org chart page): the chart lives on the dashboard now. */
+export function OrgRedirect() {
+  const company = useCompany();
+  return <Navigate href={`/${company().issuePrefix}/dashboard`} />;
+}
 
 const ACTIVITY_LIMIT = 30;
 const ACTIVITY_SHOWN = 7;
@@ -335,7 +341,7 @@ function RecentActivity(props: { data: ReturnType<typeof useOrgData> }) {
     const names = { agent: (id: string) => agentsById.get(id), person: people.personName, youId: people.youId() };
     return (activity.data ?? []).flatMap((event) => activityLine(event, names) ?? []).slice(0, ACTIVITY_SHOWN);
   });
-  const now = () => new Date();
+  const minute = useMinute();
   return (
     <section class="card org-card" aria-labelledby="org-activity-h">
       <div class="org-card-row">
@@ -366,7 +372,7 @@ function RecentActivity(props: { data: ReturnType<typeof useOrgData> }) {
                   </Show>
                 </div>
                 <time class="org-muted" datetime={line.at}>
-                  {shortAgo(line.at, now())}
+                  {shortAgo(line.at, new Date(minute()))}
                 </time>
               </li>
             );

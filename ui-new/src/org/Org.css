@@ -1553,7 +1553,9 @@ a.org-act-target:hover {
 
 :root[data-viewport="phone"] .org-toolbar {
   flex-direction: column;
+  flex-wrap: nowrap;
   align-items: stretch;
+  min-width: 0;
 }
 
 :root[data-viewport="phone"] .org-filters {
@@ -1565,9 +1567,23 @@ a.org-act-target:hover {
   margin-left: 0;
 }
 
+:root[data-viewport="phone"] .org-toolbar-end {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
 :root[data-viewport="phone"] .org-search {
-  flex: 1;
+  flex: 1 1 0;
   width: auto;
+  min-width: 0;
+}
+
+:root[data-viewport="phone"] .org-search input {
+  width: 100%;
+}
+
+:root[data-viewport="phone"] .org-filters {
+  min-width: 0;
 }
 
 /* ------------------------------------------------------------------------------------------- */

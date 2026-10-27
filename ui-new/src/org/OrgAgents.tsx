@@ -36,7 +36,7 @@ import {
   type OrgFilter,
   type OrgSort,
 } from "./org-model";
-import { useOrgData, RUN_WINDOW_DAYS, type OrgAgent } from "./queries";
+import { useMinute, useOrgData, RUN_WINDOW_DAYS, type OrgAgent } from "./queries";
 import "./Org.css";
 
 /*
@@ -324,6 +324,8 @@ function AgentRow(props: { row: OrgAgent; data: ReturnType<typeof useOrgData>; c
   };
   const meter = () => spendMeter(props.row.spendCents, props.row.budgetCents);
   const paused = () => agent().status === "paused";
+  const minute = useMinute();
+  const detail = () => props.data.detailAt(props.row, minute());
 
   return (
     <div class="org-tr org-arow" classList={{ "org-arow--checked": props.checked }} role="row">
@@ -370,10 +372,10 @@ function AgentRow(props: { row: OrgAgent; data: ReturnType<typeof useOrgData>; c
         <div class="org-status-label" style={{ color: meta().fg }}>
           {meta().label}
         </div>
-        <Show when={props.row.detail.href} fallback={<span class="org-muted org-ellipsis">{props.row.detail.text}</span>}>
+        <Show when={detail().href} fallback={<span class="org-muted org-ellipsis">{detail().text}</span>}>
           {(link) => (
             <A class="org-muted org-ellipsis org-detail-link" href={`${base()}${link()}`}>
-              {props.row.detail.text}
+              {detail().text}
             </A>
           )}
         </Show>

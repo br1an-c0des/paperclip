@@ -11,7 +11,7 @@ import { CompanyLayout } from "./routes/CompanyLayout";
 import { ConnectorsPage } from "./connectors/ConnectorsPage";
 import { NotBuiltYet, NotFound } from "./routes/NotFound";
 import { InboxPage } from "./inbox/InboxPage";
-import { OrgDashboard } from "./org/OrgDashboard";
+import { OrgDashboard, OrgRedirect } from "./org/OrgDashboard";
 import { AgentsTabRedirect, OrgAgents } from "./org/OrgAgents";
 import { LEGACY_AGENT_TABS } from "./org/org-model";
 import { AgentPage, SettingsPage } from "./routes/Planned";
@@ -57,7 +57,7 @@ export function App() {
           <Route path="/:companyPrefix" component={CompanyLayout}>
             <Route path="/" component={() => <Navigate href="dashboard" />} />
             <Route path="/dashboard" component={OrgDashboard} />
-            <Route path="/org" component={() => <Navigate href="../dashboard" />} />
+            <Route path="/org" component={OrgRedirect} />
             <Route path="/inbox/*rest" component={InboxPage} />
             <Route path="/issues" component={TasksPage} />
             <Route path="/issues/:issueRef/*" component={TaskPage} />

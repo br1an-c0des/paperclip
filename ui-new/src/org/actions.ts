@@ -40,6 +40,8 @@ const FAILED: Record<AgentAction, string> = {
   budget: "set the budget of",
 };
 
+const LIFECYCLE_SETTLE_MS = 1_500;
+
 function agentsWord(count: number) {
   return `${count} ${count === 1 ? "agent" : "agents"}`;
 }
@@ -78,6 +80,9 @@ export function useAgentActions() {
     } finally {
       setBusy(null);
       refresh();
+      // Pause and resume finish after the request answers (the agent comes back still "pausing"),
+      // so look again shortly; the live events usually get there first.
+      if (action === "pause" || action === "resume") setTimeout(refresh, LIFECYCLE_SETTLE_MS);
     }
   }
 

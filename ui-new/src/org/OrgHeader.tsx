@@ -8,13 +8,15 @@ import { useAgentsQuery, usePeopleQuery, useProjectsQuery } from "@/lib/company-
 import { InitialsDisc } from "@/ui/Avatar";
 import { buttonClass } from "@/ui/Button";
 import { PageHeader, Tabs } from "@/ui/PageHeader";
+import "./Org.css";
 
 /*
  * The organization's header (boards 19, 20, 33): the company, how many agents, people and projects
  * it has, Invite people and Hire agent, and the organization's tabs in a track under the card.
  *
- * Workload is board 33 (`src/workload/`, its own milestone work). Skills, Apps, Activity and
- * Settings are M6 pages; until they're built the tabs open the shell's "not built yet" page.
+ * Workload is board 33 (`src/workload/CompanyWorkload.tsx`), which draws this header too. Skills,
+ * Apps and Activity are M6 pages; until they're built those tabs open the shell's "not built yet"
+ * page.
  */
 
 function count(value: number | undefined, one: string, many: string) {

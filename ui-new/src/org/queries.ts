@@ -4,6 +4,7 @@ import { createMemo } from "solid-js";
 import { issuesApi } from "@/api/issues";
 import { orgApi } from "@/api/org";
 import { queryKeys } from "@/api/queryKeys";
+import { useNow } from "@/lib/clock";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useExperimentalSettingsQuery, useLiveRunsQuery } from "@/lib/company-data";
 import {
@@ -115,7 +116,19 @@ export function useOrgData() {
   });
   const byId = createMemo(() => new Map(rows().map((row) => [row.agent.id, row])));
 
-  return { agents, liveRuns, tasks, tree, recentRuns, builtIns, builtInIds, builtInsAvailable, index, rows, byId };
+  /** A row's detail line at `now`, for labels that age ("18m", "Last run 2h ago"). */
+  const detailAt = (row: OrgAgent, now: number) => agentDetail(row.agent, row.state, live(), index(), new Date(now));
+
+  return { agents, liveRuns, tasks, tree, recentRuns, builtIns, builtInIds, builtInsAvailable, index, rows, byId, detailAt };
+}
+
+/**
+ * The shared clock (lib/clock.ts) to the minute: labels like "18m" move on once a minute, and the
+ * rows that read it don't re-render every second.
+ */
+export function useMinute() {
+  const now = useNow();
+  return createMemo(() => Math.floor(now() / 60_000) * 60_000);
 }
 
 export type OrgData = ReturnType<typeof useOrgData>;
