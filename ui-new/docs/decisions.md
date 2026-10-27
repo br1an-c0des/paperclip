@@ -888,3 +888,26 @@ Both are handled in `ui-new` for now.
   comment, or sends back with another status and a comment (`issue-execution-policy.ts`); there's no
   separate review endpoint. The Inbox draws sign-offs with its own card until the request model
   gains a review-stage source.
+
+### 25. Gaps found building the project dashboard and Docs
+
+- **Status:** Open
+- **Area:** `projects/*`, `documents-artifacts/library`
+- **Found in:** the project dashboard, Docs tab and New project (M4, boards 8, 9, N1).
+
+- **The artifacts list leaves out what people wrote.** `GET /api/companies/:id/artifacts` lists only
+  documents an agent created or updated and attachments an agent uploaded
+  (`server/src/services/company-artifacts.ts`). A project's Docs tab misses documents its people
+  wrote. Possible upstream proposal.
+- **Grouped artifacts are thin.** Groups carry no task status or assignee (joined from the project's
+  task list) and three previews; a larger group costs one more request; 100 groups a page.
+- **No daily spend per project.** `costs/by-project` gives totals for a range, so the budget block
+  has no daily bars; the pace is estimated from the month's total.
+- **Waiting on you is filtered in the browser.** The attention feed has no project filter, so the
+  dashboard reads the Inbox's feed (one shared cache) and keeps the project's items, then loads each
+  task's interactions and approvals. Approvals not linked to a task don't show.
+- **New project:** the lead can only be an agent (`leadAgentId`), the repository list has no branch,
+  and board N1's chart icon isn't an allowed project icon.
+- **Phone links that assume a project's base URL is its task list:** the phone switcher
+  (`TasksSheet.tsx`) and the dock's task-list detection (`dock-model.ts`) still treat any
+  `/projects/:key/...` path as a task list. To fix in the follow-up slice.
