@@ -31,6 +31,26 @@ describe("keysForEvent", () => {
     );
   });
 
+  it("refreshes the Inbox's feed when a request on a task is added, answered or ends", () => {
+    const keys = keysForEvent("c1", event("activity.logged", { entityType: "issue", entityId: "i1", action: "issue.thread_interaction_accepted" }));
+    expect(keys).toContainEqual(queryKeys.inbox.attention("c1"));
+    expect(keysForEvent("c1", event("activity.logged", { entityType: "issue", entityId: "i1", action: "issue.updated" }))).toContainEqual(
+      queryKeys.inbox.attention("c1"),
+    );
+  });
+
+  it("leaves the Inbox's feed alone for other task activity", () => {
+    const keys = keysForEvent("c1", event("activity.logged", { entityType: "issue", entityId: "i1", action: "issue.comment_added" }));
+    expect(keys).not.toContainEqual(queryKeys.inbox.attention("c1"));
+  });
+
+  it("refreshes the Inbox's feed on decision and approval activity", () => {
+    for (const entityType of ["decision", "approval"]) {
+      const keys = keysForEvent("c1", event("activity.logged", { entityType, entityId: "x1", action: `${entityType}.created` }));
+      expect(keys).toContainEqual(queryKeys.inbox.attention("c1"));
+    }
+  });
+
   it("leaves streamed run output to subscribers", () => {
     expect(keysForEvent("c1", event("heartbeat.run.log", { runId: "r1" }))).toEqual([]);
   });

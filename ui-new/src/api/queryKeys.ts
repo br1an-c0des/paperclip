@@ -82,6 +82,27 @@ export const queryKeys = {
       ["ai-connections", companyId, connectionId, "active-runs"] as const,
   },
   sidebarBadges: (companyId: string) => ["sidebar-badges", companyId] as const,
+  /**
+   * The Inbox (board 14). The feed keeps the old UI's `["attention", companyId]` prefix; an approval
+   * sits under `["approvals", companyId]`, which answering a card and the live events refresh; your
+   * tasks sit under the company's task lists, so task changes refresh Updates.
+   */
+  inbox: {
+    attention: (companyId: string) => ["attention", companyId] as const,
+    feed: (companyId: string) => ["attention", companyId, "with-dismissed"] as const,
+    approval: (companyId: string, approvalId: string) => ["approvals", companyId, "detail", approvalId] as const,
+    approvalIssues: (companyId: string, approvalId: string) => ["approvals", companyId, "detail", approvalId, "issues"] as const,
+    tasks: (companyId: string) => ["issues", companyId, "inbox", "mine"] as const,
+    tasksWithArchived: (companyId: string) => ["issues", companyId, "inbox", "with-archived"] as const,
+  },
+  /**
+   * The Search page (src/search/). The old UI keys company search `["company-search", companyId, …]`;
+   * the rest of the key is the request, filters and sort included, without the page offset.
+   */
+  search: {
+    all: (companyId: string) => ["company-search", companyId] as const,
+    results: (companyId: string, request: string) => ["company-search", companyId, request] as const,
+  },
 
   /*
    * The project pages (M4): the dashboard's spend, checkouts and attention feed, the Docs tab's

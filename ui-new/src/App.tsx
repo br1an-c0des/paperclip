@@ -11,11 +11,13 @@ import { CompanyHome } from "./routes/CompanyHome";
 import { CompanyLayout } from "./routes/CompanyLayout";
 import { ConnectorsPage } from "./connectors/ConnectorsPage";
 import { NotBuiltYet, NotFound } from "./routes/NotFound";
-import { AgentPage, InboxPage, SettingsPage } from "./routes/Planned";
+import { InboxPage } from "./inbox/InboxPage";
+import { AgentPage, SettingsPage } from "./routes/Planned";
 import { ProjectPage } from "./routes/Project";
 import { SignIn } from "./routes/SignIn";
 import { TaskPage, TasksPage } from "./routes/Tasks";
 import { RunRoute } from "./runs/RunRoute";
+import { SearchPage } from "./search/SearchPage";
 
 const StyleGuide = lazy(() => import("./routes/StyleGuide").then((m) => ({ default: m.StyleGuide })));
 
@@ -51,7 +53,7 @@ export function App() {
           <Route path="/:companyPrefix" component={CompanyLayout}>
             <Route path="/" component={() => <Navigate href="dashboard" />} />
             <Route path="/dashboard" component={CompanyHome} />
-            <Route path="/inbox/*" component={InboxPage} />
+            <Route path="/inbox/*rest" component={InboxPage} />
             <Route path="/issues" component={TasksPage} />
             <Route path="/issues/:issueRef/*" component={TaskPage} />
             <Route path="/projects/:projectKey/*tab" component={ProjectPage} />
@@ -59,6 +61,7 @@ export function App() {
             <Route path="/agents/:agentKey/*" component={AgentPage} />
             <Route path="/company/settings/*" component={SettingsPage} />
             <Route path="/connectors" component={ConnectorsPage} />
+            <Route path="/search" component={SearchPage} />
             <Route path="/*rest" component={NotBuiltYet} />
           </Route>
         </Route>

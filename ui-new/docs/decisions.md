@@ -734,6 +734,13 @@ result, or propose richer results upstream.
 best-matching snippet, no author; documents without a revision number. No extra requests per result.
 If authors or revisions turn out to matter, propose richer results upstream later.
 
+**Found building it.** A task that matches directly and through a comment shows only its title and
+description snippets, even in the Comments view. In All, a task matched by its title and a document
+counts under Tasks and Docs but shows once (under Tasks), so Docs can have a count and no row; the
+page says so. A kind's view only gets that kind's count, so the other tabs reuse All's counts when
+cached rather than spend a second request (60 searches a minute per person). Agents and projects
+count 0 while any task filter is set. The API takes one assignee, project and label at a time.
+
 ### 18. The phone layouts assume push notifications
 
 - **Status:** Open
@@ -861,3 +868,23 @@ Both are handled in `ui-new` for now.
   one. Reconnect is offered to every manager, and the server's 403 has the last word.
 - **`localAiLoginSupported` isn't in `ui-new`'s `HealthStatus` type.** The page reads it through a
   local type extension, falling back to `deploymentMode === "local_trusted"` as the old UI does.
+
+### 24. Gaps found building the Inbox
+
+- **Status:** Open
+- **Area:** `inbox-search/triage`, `approvals/*`, `decisions/*`
+- **Found in:** the Inbox's first slice (M3, board 14).
+
+- **Approvals in the attention feed have no linked task.** `relatedIssue` is null even when the
+  approval is linked to one, so the Inbox reads `GET /api/approvals/:id/issues` per approval.
+- **The nav's Inbox badge counts something else.** `GET /companies/:id/sidebar-badges` adds up
+  approvals, failed runs, join requests and unread Mine tasks, with `approval:<id>`-style dismissal
+  keys, while feed dismissals use `attention:…` keys. Clearing an approval in the Inbox doesn't lower
+  the badge. The feed's own `deskBadgeCount` matches Needs you; switching the nav to it means reading
+  the feed in the nav. Open: which count the badge should show.
+- **Stalled reviews have no inline action yet.** `POST /issues/:id/stalled-review-decision` exists
+  but isn't ported; stalled reviews open the task.
+- **Sign-offs act through the task's status.** The current reviewer approves with `done` and a
+  comment, or sends back with another status and a comment (`issue-execution-policy.ts`); there's no
+  separate review endpoint. The Inbox draws sign-offs with its own card until the request model
+  gains a review-stage source.

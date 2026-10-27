@@ -12,7 +12,8 @@ import { useAgentsQuery, useProjectsQuery } from "@/lib/company-data";
 import { theme, toggleTheme } from "@/lib/theme";
 import { Dialog } from "@/ui/Dialog";
 import { STATUS_META } from "@/ui/status-meta";
-import { filterPalette, type PaletteGroup } from "./palette";
+import { searchPath } from "@/search/search-url";
+import { filterPalette, searchHandOff, type PaletteGroup } from "./palette";
 import "./CommandPalette.css";
 
 /*
@@ -20,6 +21,9 @@ import "./CommandPalette.css";
  * ui/src/components/CommandPalette.tsx: actions, pages, projects, agents, and a task search as you
  * type. Arrow keys move, Enter runs, Escape closes. The input is a combobox that owns the listbox
  * through `aria-activedescendant`, so focus stays in the field.
+ *
+ * The last entry hands what's typed to the Search page (`/:prefix/search?q=…`, boards S1–S3), which
+ * looks through comments, documents, files, agents and projects too; Shift+Enter runs it directly.
  *
  * There's no board for it yet ("Design still coming"); it uses the dialog and menu styles.
  */
@@ -140,10 +144,17 @@ export function CommandPalette() {
     };
   });
 
+  const handOff = createMemo(() =>
+    searchHandOff(query(), (term) => {
+      close();
+      navigate(searchPath(company().issuePrefix, { q: term }));
+    }),
+  );
+
   const visible = createMemo(() => {
     const filtered = filterPalette(groups(), query());
     const found = taskGroup();
-    return found ? [...filtered, found] : filtered;
+    return [...filtered, ...(found ? [found] : []), handOff()];
   });
   const flat = createMemo(() => visible().flatMap((group) => group.commands));
 
@@ -171,7 +182,8 @@ export function CommandPalette() {
       setActive((index) => (index + step + count) % count);
     } else if (event.key === "Enter" && !event.isComposing) {
       event.preventDefault();
-      flat()[active()]?.run();
+      if (event.shiftKey) handOff().commands[0]!.run();
+      else flat()[active()]?.run();
     }
   };
 
@@ -252,6 +264,10 @@ export function CommandPalette() {
           </span>
           <span>
             <kbd>Enter</kbd> open
+          </span>
+          <span>
+            <kbd>Shift</kbd>
+            <kbd>Enter</kbd> search everything
           </span>
           <span>
             <kbd>Esc</kbd> close

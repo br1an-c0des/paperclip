@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterPalette, matchScore, type PaletteCommand, type PaletteGroup } from "./palette";
+import { filterPalette, matchScore, searchHandOff, type PaletteCommand, type PaletteGroup } from "./palette";
 
 const command = (label: string, keywords?: string): PaletteCommand => ({ id: label, label, keywords, run: () => {} });
 
@@ -32,5 +32,19 @@ describe("filterPalette", () => {
     const result = filterPalette(groups, "set");
     expect(result).toHaveLength(1);
     expect(result[0]!.commands.map((entry) => entry.label)).toEqual(["Settings", "Company settings", "Reset view"]);
+  });
+});
+
+describe("searchHandOff", () => {
+  it("hands what's typed to the Search page, tidied", () => {
+    let opened: string | null = null;
+    const group = searchHandOff("  flaky   login ", (query) => (opened = query));
+    expect(group.commands.map((entry) => entry.label)).toEqual(["Search everything for “flaky login”"]);
+    group.commands[0]!.run();
+    expect(opened).toBe("flaky login");
+  });
+
+  it("offers plain Search everything with nothing typed", () => {
+    expect(searchHandOff("", () => {}).commands[0]!.label).toBe("Search everything");
   });
 });
