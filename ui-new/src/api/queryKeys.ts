@@ -146,6 +146,24 @@ export const queryKeys = {
     /** One part of a connection: "catalog", "installs", "grants". */
     connectionPart: (companyId: string, connectionId: string, part: string) =>
       ["tools", companyId, "connection", connectionId, part] as const,
+    /** Saved AgentMail accounts, and what one can reach (src/apps/chat/EmailSetup.tsx). */
+    emailCredentials: (companyId: string) => ["tools", companyId, "email-credentials"] as const,
+    emailInspection: (companyId: string, connectionId: string) => ["tools", companyId, "email-inspection", connectionId] as const,
+  },
+  /**
+   * Chat endpoints (src/apps/chat/, the agent's channels): an agent in Slack, GitHub, Teams, a voice
+   * persona or an AgentMail inbox. Everything sits under `["chat-endpoints", companyId]`, so the
+   * live events refresh it with one prefix on `chat_*` activity. A task's chat binding, email thread
+   * and browsers are task sections (`issues.section(taskId, "chat-binding" | "email-thread" |
+   * "browsers")`).
+   */
+  chatEndpoints: {
+    all: (companyId: string) => ["chat-endpoints", companyId] as const,
+    list: (companyId: string) => ["chat-endpoints", companyId, "list"] as const,
+    detail: (companyId: string, endpointId: string) => ["chat-endpoints", companyId, "endpoint", endpointId] as const,
+    /** One part of an endpoint: "resources", "principals", "conversations", "activity", "reviews", "voice-…". */
+    part: (companyId: string, endpointId: string, part: string, ...rest: string[]) =>
+      ["chat-endpoints", companyId, "endpoint", endpointId, part, ...rest] as const,
   },
   sidebarBadges: (companyId: string) => ["sidebar-badges", companyId] as const,
   /**

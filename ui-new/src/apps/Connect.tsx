@@ -38,6 +38,10 @@ import {
   type ConnectDraft,
 } from "./apps-model";
 import { AgentAccessPicker, AppLogo, StateTag, useApplications, useConnections, useGallery, useRefreshTools } from "./shared";
+import { channelMethod, chatConnectHref } from "./chat/chat-model";
+import { AggregatorConnect } from "./setups/AggregatorConnect";
+import { setupExtras, type GalleryExtras } from "./setups/SetupExtras";
+import { isAggregator } from "./setups/setups-model";
 
 /*
  * Connecting an app (the old UI's AppsConnect and ConnectionSetupFlow, on a page):
@@ -51,9 +55,11 @@ import { AgentAccessPicker, AppLogo, StateTag, useApplications, useConnections, 
  *   signs in (a key, headers, or your own OAuth app).
  * - `/apps/app/:applicationId`: an app the company has, with its accounts and a way to add one.
  *
- * Not here yet: Google Workspace's service picker, aggregators (Composio, Arcade), email inboxes,
- * Vercel Connect credentials, personal ("just me") and per-agent identities, and the agent
- * instructions some apps offer. Paperclip Cloud sign-in hand-offs are refused with a message.
+ * Composio and Arcade have their own form (src/apps/setups/AggregatorConnect.tsx); chat apps
+ * (AgentMail, Telegram…) go to their chat setup (src/apps/chat/); Google Workspace's services and
+ * whose account a connection is come from src/apps/setups/SetupExtras.tsx.
+ *
+ * Not here yet: Vercel Connect credentials and the agent instructions some apps offer. Paperclip Cloud sign-in hand-offs are refused with a message.
  */
 
 type ConnectOutcome = { kind: "done"; connectionId: string } | { kind: "redirect" };
@@ -136,6 +142,12 @@ export function GalleryConnect(props: { source: string | null; resume: string | 
       <Match when={isAi()}>
         <Navigate href={`/${company().issuePrefix}/apps/ai`} />
       </Match>
+      <Match when={app() && methods().length === 0 && channelMethod(app()!)}>
+        {(method) => <Navigate href={chatConnectHref(`/${company().issuePrefix}/apps`, method().provider)} />}
+      </Match>
+      <Match when={app() && isAggregator(app()!.slug) && app()}>
+        {(entry) => <AggregatorConnect app={entry()} id={entry().slug as "composio" | "arcade"} resume={props.resume} />}
+      </Match>
       <Match when={!app() || SPECIAL_SETUP_APPS.has(app()!.slug) || methods().length === 0}>
         <section class="card ap-later">
           <h2 class="disp">{app() ? `${app()!.name} can't be connected here yet` : "Unknown app"}</h2>
@@ -148,17 +160,27 @@ export function GalleryConnect(props: { source: string | null; resume: string | 
         </section>
       </Match>
       <Match when={app()} keyed>
-        {(entry) => <GalleryForm app={entry} methods={methods()} resume={props.resume} applicationId={props.applicationId} />}
+        {(entry) => (
+          <GalleryForm app={entry} methods={methods()} resume={props.resume} applicationId={props.applicationId} extras={(method) => setupExtras(entry, method)} />
+        )}
       </Match>
     </Switch>
   );
 }
 
-function GalleryForm(props: { app: AppDefinition; methods: ConnectionMethodDef[]; resume: string | null; applicationId: string | null }) {
+function GalleryForm(props: {
+  app: AppDefinition;
+  methods: ConnectionMethodDef[];
+  resume: string | null;
+  applicationId: string | null;
+  /** Fields some apps add (src/apps/setups/): whose account it is, Google's services. */
+  extras?: (method: () => ConnectionMethodDef | null) => GalleryExtras;
+}) {
   const company = useCompany();
   const gallery = useGallery();
   const [methodKey, setMethodKey] = createSignal(recommendedMethod(props.methods)?.key ?? null);
   const method = createMemo(() => props.methods.find((candidate) => candidate.key === methodKey()) ?? null);
+  const extras = props.extras?.(method);
   const [draft, setDraft] = createStore<ConnectDraft>(newConnectDraft(props.app, method()));
   const [failure, setFailure] = createSignal<string | null>(null);
   const [ownClient, setOwnClient] = createSignal(false);
@@ -184,18 +206,19 @@ function GalleryForm(props: { app: AppDefinition; methods: ConnectionMethodDef[]
   });
 
   const flow = useConnectFlow(setFailure);
-  const problem = () => connectProblem(method(), draft);
+  const problem = () => connectProblem(method(), draft) ?? extras?.problem() ?? null;
   const submit = (event: Event) => {
     event.preventDefault();
     const current = method();
     if (!current || problem()) return;
     setFailure(null);
     const withClient = ownClient() ? draft : { ...draft, oauthClientId: "", oauthClientSecret: "" };
+    const payload = connectPayload(props.app, current, withClient, {
+      applicationId: props.applicationId ?? undefined,
+      resumeConnectionId: props.resume ?? undefined,
+    });
     flow.mutate({
-      payload: connectPayload(props.app, current, withClient, {
-        applicationId: props.applicationId ?? undefined,
-        resumeConnectionId: props.resume ?? undefined,
-      }),
+      payload: extras ? extras.apply(payload) : payload,
       access: draft.access,
     });
   };
@@ -356,6 +379,8 @@ function GalleryForm(props: { app: AppDefinition; methods: ConnectionMethodDef[]
                 </div>
               </Show>
             </Show>
+
+            {extras?.element}
 
             <Field label="Which agents can use it">
               <AgentAccessPicker

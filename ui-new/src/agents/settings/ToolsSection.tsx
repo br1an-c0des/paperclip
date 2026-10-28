@@ -7,6 +7,7 @@ import { useCompany } from "@/lib/company";
 import { SettingsCard } from "@/ui/Field";
 import { TonePill } from "@/ui/Status";
 import { failure, OutlineCard, SectionTitle } from "../shared";
+import { ChannelsPanel } from "./ChannelsPanel";
 
 /*
  * Tools and channels (board 30's outline). This slice lists what the agent's runs get, read-only,
@@ -53,12 +54,12 @@ export function ToolsSection(props: { agent: AgentDetail }) {
           </For>
         </ul>
       </SettingsCard>
+      <ChannelsPanel agent={props.agent} />
       <OutlineCard
         rows={[
           { name: "Apps and MCP servers", text: "Connections the agent may use; add or remove them." },
           { name: "Tool profile", text: "Which tools a run gets, and the policies that apply." },
           { name: "Recent decisions", text: "Tool calls that were allowed, asked about, or blocked." },
-          { name: "Channels", text: "Slack, GitHub and other chat channels connected to the agent." },
         ]}
         was="Tools, Channels"
         note="Changing these isn't built yet. This section will also hold:"

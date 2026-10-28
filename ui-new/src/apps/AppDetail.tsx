@@ -40,6 +40,7 @@ import {
   type DetailTab,
 } from "./apps-model";
 import { ReviewQueue } from "./Review";
+import { ConnectionExtras } from "./identities/Identities";
 import { AgentAccessPicker, AppLogo, failureText, StateTag, useApplications, useGallery, usePendingRequests, useRefreshTools } from "./shared";
 
 /*
@@ -57,8 +58,10 @@ import { AgentAccessPicker, AppLogo, failureText, StateTag, useApplications, use
  * A connection that needs attention offers to sign in again or replace its key. The OAuth return
  * (`?success=1`, `?oauth=failed`) lands here, as the server sends it.
  *
- * Not here yet: personal and per-agent identities and their audiences (`/grants` is read only for
- * what you may change), agent-specific tool profiles, the test-an-action dialog, connection
+ * Who it acts as (personal, per-agent and organization identities, audiences, delegations) and an
+ * aggregator's accounts sit above Permissions (src/apps/identities/, src/apps/setups/).
+ *
+ * Not here yet: agent-specific tool profiles, the test-an-action dialog, connection
  * activity (in the company's activity), and app-specific panels (Browser Use, Railway, Honcho,
  * email inboxes, aggregators).
  */
@@ -180,6 +183,7 @@ export function AppDetail(props: { connectionId: string; tab: DetailTab; success
                       An AI account. Its sign-in, default and usage are in <A href={`${base()}/ai`}>AI connections</A>.
                     </p>
                   </Show>
+                  <ConnectionExtras connection={connection()} canConfigure={canConfigure()} />
                   <Permissions connection={connection()} canConfigure={canConfigure()} editable={grants.data?.capabilities.editableAgentIds} />
                 </Match>
                 <Match when={props.tab === "review"}>
