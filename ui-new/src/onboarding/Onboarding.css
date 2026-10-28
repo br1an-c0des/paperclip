@@ -1,0 +1,130 @@
+/* Onboarding: New agent's header, steps and cards (NewAgent.css), as a page of its own. */
+
+.ob {
+  container: na / inline-size;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: clamp(24px, 6vh, 56px) 16px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ob-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px 24px;
+  padding: 18px 22px;
+}
+
+.ob-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ob-head h1 {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* The steps aren't buttons here: onboarding moves forward only. */
+.ob-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px 0 5px;
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ob-steps li[aria-current="step"] .ob-step {
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.ob-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.ob-body--aside {
+  grid-template-columns: minmax(0, 1fr) 340px;
+}
+
+.ob-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.ob-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 22px 0;
+}
+
+.ob-form .na-foot {
+  margin: 0 -22px;
+}
+
+.ob-lede {
+  color: var(--body);
+  line-height: 1.55;
+}
+
+.ob-blocked {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ob-leave {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ob-task-ready {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+@container na (max-width: 860px) {
+  .ob-body--aside {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .ob-head {
+    padding: 14px 16px;
+  }
+
+  .ob-head h1 {
+    font-size: 26px;
+  }
+
+  .ob-steps {
+    margin: 0;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+
+  .ob-step {
+    padding: 0 10px 0 5px;
+    white-space: nowrap;
+  }
+}

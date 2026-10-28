@@ -29,6 +29,13 @@ import { CompanyWorkload } from "./workload/CompanyWorkload";
 import { ActivityPage } from "./activity/ActivityPage";
 import { LegacyActivityRedirect, UnprefixedCompanyRedirect } from "./activity/redirects";
 import { SkillsPage } from "./skills/SkillsPage";
+import { BoardClaimPage } from "./auth/BoardClaim";
+import { ChatIdentityPage } from "./auth/ChatIdentity";
+import { CliAuthPage } from "./auth/CliAuth";
+import { InvitePage } from "./auth/Invite";
+import { AssistantConnectionsPage, McpConnectPage, McpDevicePage } from "./auth/McpConnect";
+import { OAuthHandoffPage } from "./auth/OAuthHandoff";
+import { OnboardingPage } from "./onboarding/OnboardingPage";
 
 const StyleGuide = lazy(() => import("./routes/StyleGuide").then((m) => ({ default: m.StyleGuide })));
 
@@ -37,8 +44,11 @@ const StyleGuide = lazy(() => import("./routes/StyleGuide").then((m) => ({ defau
  * …): agents, Slack messages and emails link to them. Pages that don't exist yet render
  * <NotBuiltYet> inside the shell rather than a 404.
  *
- * `/style-guide` and `/auth` sit outside the session gate; everything else needs a session (or a
- * local_trusted instance).
+ * `/style-guide`, sign-in and the other pages someone may open before they belong to a company sit
+ * outside the session gate, as in the old UI: board claim, CLI approval, invites, MCP connect, the
+ * Cloud sign-in handoff and chat-identity linking (which checks the session itself, since a
+ * non-member may ask for access there). Each decides what needs a session. Everything else needs a
+ * session (or a local_trusted instance), onboarding included.
  */
 
 function Root(props: RouteSectionProps) {
@@ -58,9 +68,20 @@ export function App() {
       <Router root={Root}>
         <Route path="/style-guide" component={StyleGuide} />
         <Route path="/auth" component={SignIn} />
+        <Route path="/board-claim/:token" component={BoardClaimPage} />
+        <Route path="/cli-auth/:id" component={CliAuthPage} />
+        <Route path="/invite/:token" component={InvitePage} />
+        <Route path="/mcp-connect/:id" component={() => <McpConnectPage />} />
+        <Route path="/dot-connect/:id" component={() => <McpConnectPage agentPairingOnly />} />
+        <Route path="/mcp-device" component={McpDevicePage} />
+        <Route path="/assistant-connections" component={AssistantConnectionsPage} />
+        <Route path="/oauth-handoff" component={OAuthHandoffPage} />
+        <Route path="/chat-identity/confirm" component={ChatIdentityPage} />
         <Route path="/" component={SessionGate}>
           <Route path="/" component={CompanyRootRedirect} />
           <Route path="/companies" component={Companies} />
+          {/* Standalone pages outside the company shell; `/:prefix/onboarding` outranks the layout route. */}
+          <Route path={["/onboarding", "/:companyPrefix/onboarding"]} component={OnboardingPage} />
           {/* The old UI's unprefixed hire link opens New agent in the last company. */}
           <Route path="/agents/new" component={UnprefixedNewAgent} />
           {/* The old UI's unprefixed skills, activity and costs links open in the last company. */}
