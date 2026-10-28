@@ -1,0 +1,351 @@
+/*
+ * The Workspaces tab and the close dialog. There's no board for it: it follows the org pages' look
+ * (Org.css, loaded with OrgHeader), the task Workspace section's tags (TaskWorkspace.css) and the
+ * design system's cards. Layout responds to main's width with `@container main`.
+ */
+
+.ws-page {
+  gap: 18px;
+}
+
+.ws-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ws-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ws-toolbar-note {
+  flex-basis: 100%;
+}
+
+.ws-empty {
+  padding: 24px;
+  color: var(--body);
+  font-size: 14px;
+  box-shadow: none;
+}
+
+.ws-empty p {
+  margin: 0;
+}
+
+.ws-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ws-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ws-group-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.ws-group-head a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.ws-group-head a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ws-subhead {
+  margin: 6px 0 0;
+  color: var(--red-fg);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ws-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 12px;
+}
+
+@container main (width < 560px) {
+  .ws-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ws-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+  box-shadow: none;
+}
+
+.ws-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ws-name {
+  min-width: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.ws-updated {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.ws-tag {
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--r-pill);
+  background: var(--tone-bg, var(--well));
+  color: var(--tone-fg, var(--body));
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.ws-tag[data-tone="green"] { --tone-bg: var(--green-bg); --tone-fg: var(--green-fg); }
+.ws-tag[data-tone="amber"] { --tone-bg: var(--amber-bg); --tone-fg: var(--amber-fg); }
+.ws-tag[data-tone="red"] { --tone-bg: var(--red-bg); --tone-fg: var(--red-fg); }
+
+.ws-props {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.ws-props dt {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.ws-props dd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin: 0;
+  color: var(--body);
+}
+
+.ws-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ws-copy {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.ws-copy:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.ws-url {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+
+.ws-url--live {
+  color: var(--green-fg);
+}
+
+.ws-url:hover {
+  text-decoration: underline;
+}
+
+.ws-tasks {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ws-task {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--body);
+  font-size: 12px;
+}
+
+.ws-task:hover {
+  background: var(--edge);
+  color: var(--text);
+}
+
+.ws-task-title {
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ws-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.ws-more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.ws-spin {
+  animation: ws-spin 0.9s linear infinite;
+  vertical-align: -2px;
+}
+
+@keyframes ws-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* The close dialog */
+.ws-close {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ws-callout {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  background: var(--tone-bg, var(--well));
+  color: var(--tone-fg, var(--body));
+  font-size: 13px;
+}
+
+.ws-callout[data-tone="green"] { --tone-bg: var(--green-bg); --tone-fg: var(--green-fg); }
+.ws-callout[data-tone="amber"] { --tone-bg: var(--amber-bg); --tone-fg: var(--amber-fg); }
+.ws-callout[data-tone="red"] { --tone-bg: var(--red-bg); --tone-fg: var(--red-fg); }
+
+.ws-close-part {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ws-close-part h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ws-reasons {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--body);
+  font-size: 13px;
+}
+
+.ws-reasons[data-tone="red"] li::marker { color: var(--red-fg); }
+.ws-reasons[data-tone="amber"] li::marker { color: var(--amber-fg); }
+
+.ws-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.ws-lines li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--body);
+}
+
+.ws-command {
+  flex-basis: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--well);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.ws-link {
+  color: var(--run-fg);
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+.ws-link:hover {
+  text-decoration: underline;
+}
+
+.ws-git {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.ws-git dt {
+  color: var(--muted);
+}
+
+.ws-git dd {
+  margin: 0;
+  color: var(--body);
+  overflow-wrap: anywhere;
+}

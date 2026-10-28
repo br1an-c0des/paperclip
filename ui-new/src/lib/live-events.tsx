@@ -109,6 +109,12 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
     case "cost_event":
       keys.push(["costs", companyId]);
       break;
+    // Closing a workspace, reconciling its branch or controlling its services (the Workspaces tab,
+    // a project's Code block and a task's Workspace section).
+    case "execution_workspace":
+      keys.push(["workspace-overview", companyId]);
+      if (entityId) keys.push(queryKeys.workspaces.closeReadiness(entityId));
+      break;
     // Installing, turning on or off, upgrading, configuring or removing a plugin is logged on every
     // company (server/src/routes/plugins.ts); refresh the plugin list and what plugins add to the
     // UI. The `plugin.ui.updated` event below says the same, but it's instance-wide and never
