@@ -15,6 +15,7 @@ import { OrgDashboard, OrgRedirect } from "./org/OrgDashboard";
 import { AgentsTabRedirect, OrgAgents } from "./org/OrgAgents";
 import { LEGACY_AGENT_TABS } from "./org/org-model";
 import { AgentPage } from "./agents/AgentPage";
+import { ChatRedirect, ChatsHomeRedirect } from "./chat/ChatRedirect";
 import { NewAgentPage, UnprefixedNewAgent } from "./agents/new/NewAgentPage";
 import { SettingsPage } from "./routes/Planned";
 import { ProjectPage } from "./routes/Project";
@@ -73,6 +74,9 @@ export function App() {
             <Route path="/agents/:tab" matchFilters={{ tab: LEGACY_AGENT_TABS }} component={AgentsTabRedirect} />
             <Route path="/agents/:agentKey/runs/:runId" component={RunRoute} />
             <Route path="/agents/:agentKey/*rest" component={AgentPage} />
+            {/* The old UI's chat addresses open the chat at the agent's address. */}
+            <Route path="/chats" component={ChatsHomeRedirect} />
+            <Route path="/chats/:agentRef/*" component={ChatRedirect} />
             <Route path="/company/settings/*" component={SettingsPage} />
             <Route path="/connectors" component={ConnectorsPage} />
             <Route path="/search" component={SearchPage} />

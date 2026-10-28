@@ -1,10 +1,11 @@
 import type { CompactIssue } from "@paperclipai/shared";
-import { A, useLocation } from "@solidjs/router";
+import { A, useLocation, useNavigate } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
 import { ChevronLeft, ChevronRight, Maximize2, PanelRight, X } from "lucide-solid";
 import { createEffect, createSignal, on, onCleanup, Show } from "solid-js";
 import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
+import { useChatIndex } from "@/chat/chat-index";
 import { isCompact } from "@/layout/breakpoints";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
@@ -42,9 +43,24 @@ export function GlobalTaskModal() {
     queryFn: ({ signal }) => issuesApi.get(target()!.id, signal),
     enabled: target() !== null,
   }));
+  // One of your chats (a hidden task, decision 8) opens as the chat, at the agent's address.
+  const chats = useChatIndex();
+  const navigate = useNavigate();
+  const chatAgent = () => {
+    const current = target();
+    if (!current) return undefined;
+    return chats.agentIdFor(current.id) ?? (detail.data?.id === current.id ? chats.chatAgentOf(detail.data) : undefined);
+  };
+  createEffect(
+    on(chatAgent, (agentId) => {
+      if (!agentId) return;
+      commands.closeTaskModal();
+      navigate(chats.href(agentId));
+    }),
+  );
   const task = () => {
     const current = target();
-    if (!current) return null;
+    if (!current || chatAgent()) return null;
     const found = detail.data;
     return found ? { id: found.id, identifier: found.identifier, title: found.title, projectId: found.projectId } : current;
   };

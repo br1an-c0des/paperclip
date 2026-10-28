@@ -1,4 +1,4 @@
-import type { CompanySearchResult, IssueStatus } from "@paperclipai/shared";
+import type { Agent, CompanySearchResult, IssueStatus } from "@paperclipai/shared";
 import { FileText, FolderKanban, MessageSquare, Paperclip } from "lucide-solid";
 import { For, Match, Show, Switch } from "solid-js";
 import { updatedLabel } from "@/tasks/list-model";
@@ -6,7 +6,7 @@ import type { TaskPeople } from "@/tasks/people";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { StatusCapsule } from "@/ui/Status";
 import { STATUS_META } from "@/ui/status-meta";
-import { documentTitle, rowSnippet, snippetLabel, titleSegments, highlightSegments, type ResultKind, type Segment } from "./results-model";
+import { chatWhere, documentTitle, rowSnippet, snippetLabel, titleSegments, highlightSegments, type ResultKind, type Segment } from "./results-model";
 
 /*
  * One search result (board S1): a leading mark per kind (status capsule, avatar, icon or
@@ -15,6 +15,9 @@ import { documentTitle, rowSnippet, snippetLabel, titleSegments, highlightSegmen
  *
  * The row is a link to the result's own URL, so a middle or modified click opens it in a new tab;
  * a plain click calls `onOpen`, which opens task-shaped results in the task modal.
+ *
+ * A result from one of your chats (`chatAgent`) is drawn as the chat: the agent's avatar, "Your
+ * chat with Bob" where the task's project would be, no task ID or status, and a link to the chat.
  */
 
 const STATUS_TONE: Partial<Record<IssueStatus, string>> = {
@@ -70,6 +73,9 @@ export function SearchRow(props: {
   people: TaskPeople;
   projectName: (id: string | null) => string | undefined;
   onOpen: (result: CompanySearchResult) => void;
+  /** The agent, when the result is in one of your chats; `chatHref` is the chat's address. */
+  chatAgent?: Agent;
+  chatHref?: string;
 }) {
   const issue = () => props.result.issue;
   const agent = () => (props.kind === "agent" ? props.people.agent(props.result.id) : undefined);
@@ -89,6 +95,7 @@ export function SearchRow(props: {
   };
   const where = () => {
     const result = props.result;
+    if (props.chatAgent) return chatWhere(props.kind, props.chatAgent.name);
     switch (props.kind) {
       case "task":
         return props.projectName(issue()?.projectId ?? null) ?? "No project";
@@ -118,9 +125,10 @@ export function SearchRow(props: {
   };
 
   return (
-    <a class="sx-row" href={props.result.href} data-result-row onClick={onClick}>
+    <a class="sx-row" href={props.chatHref ?? props.result.href} data-result-row onClick={onClick}>
       <span class="sx-lead" aria-hidden="true">
         <Switch fallback={<IconTile kind={props.kind} />}>
+          <Match when={props.kind === "task" && props.chatAgent}>{(found) => <AgentAvatar agent={found()} size={32} />}</Match>
           <Match when={props.kind === "task" && issue()}>
             {(found) => <StatusCapsule status={found().status} size="pill" live={live()} />}
           </Match>
@@ -135,13 +143,13 @@ export function SearchRow(props: {
       </span>
       <span class="sx-main">
         <span class="sx-title-line">
-          <Show when={(props.kind === "task" || props.kind === "comment" || props.kind === "document") && identifier()}>
+          <Show when={!props.chatAgent && (props.kind === "task" || props.kind === "comment" || props.kind === "document") && identifier()}>
             {(id) => <span class="sx-id mono">{id()}</span>}
           </Show>
           <span class="sx-title">
             <Marked segments={title()} />
           </span>
-          <Show when={props.kind === "task" && issue()}>{(found) => <StatusChip status={found().status} />}</Show>
+          <Show when={!props.chatAgent && props.kind === "task" && issue()}>{(found) => <StatusChip status={found().status} />}</Show>
         </span>
         <Show when={snippet()}>
           {(found) => (
@@ -154,7 +162,7 @@ export function SearchRow(props: {
         <span class="sx-where">{where()}</span>
       </span>
       <span class="sx-end">
-        <Show when={props.kind === "task" || props.kind === "comment" || props.kind === "document"}>
+        <Show when={!props.chatAgent && (props.kind === "task" || props.kind === "comment" || props.kind === "document")}>
           <Switch>
             <Match when={assigneeAgent()}>
               {(found) => (

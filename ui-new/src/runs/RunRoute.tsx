@@ -1,5 +1,6 @@
 import { useNavigate, useParams } from "@solidjs/router";
-import { createQuery } from "@tanstack/solid-query";
+import type { Issue } from "@paperclipai/shared";
+import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, on, onCleanup } from "solid-js";
 import { issuePath } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
@@ -16,7 +17,8 @@ import { AgentPage } from "@/agents/AgentPage";
  *
  * While the route is open the URL follows the modal: stepping to the task's previous or next run,
  * or to a retry, changes it. Closing the modal goes to the run's task, where its runs live in
- * ui-new, or to the agent when the run had no task. Leaving the route another way (Back) closes it.
+ * ui-new, or to the agent when the run had no task or was a reply in the agent's chat (board 18).
+ * Leaving the route another way (Back) closes it.
  */
 
 export function RunRoute() {
@@ -25,6 +27,10 @@ export function RunRoute() {
   const company = useCompany();
   const navigate = useNavigate();
   const agents = useAgentsQuery();
+  const client = useQueryClient();
+  /** Whether a task is a chat, from what the run modal has already read. */
+  const isChat = (issueId: string) =>
+    !!(client.getQueryData<Issue>(queryKeys.issues.detail(issueId)) ?? client.getQueryData<Issue>(queryKeys.issues.section(issueId, "core")))?.conversationAgentId;
   /** The route has been left: nothing more to navigate. */
   let left = false;
 
@@ -43,17 +49,28 @@ export function RunRoute() {
     navigate(runPath(company().issuePrefix, agentKey(run.agentId), run.id), { replace: true });
   });
 
+  // Whether the modal has been open on this route. Not a deferred `on`'s previous value: it skips its
+  // first run without recording it, and by then the effect above has already opened the modal, so
+  // the close looked like it came from nothing and the URL stayed on the run.
+  let opened = false;
   createEffect(
     on(
       commands.runModal,
-      (open, before) => {
-        if (open || !before) return;
+      (open) => {
+        if (open) {
+          opened = true;
+          return;
+        }
+        if (!opened) return;
+        opened = false;
         const run = shown.data;
-        const next = run?.issueId ? issuePath(company().issuePrefix, { id: run.issueId, identifier: null }) : `/${company().issuePrefix}/agents/${params.agentKey}`;
+        const next =
+          run?.issueId && !isChat(run.issueId)
+            ? issuePath(company().issuePrefix, { id: run.issueId, identifier: null })
+            : `/${company().issuePrefix}/agents/${params.agentKey}`;
         // After the click that closed it, in case that click was a link going somewhere already.
         window.setTimeout(() => !left && navigate(next, { replace: true }));
       },
-      { defer: true },
     ),
   );
 

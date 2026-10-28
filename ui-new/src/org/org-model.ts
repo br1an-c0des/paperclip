@@ -490,7 +490,13 @@ export type ActivityLine = {
   at: string;
 };
 
-export type ActivityNames = { agent: (id: string) => Pick<Agent, "name" | "urlKey"> | undefined; person: (id: string) => string; youId: string | null };
+export type ActivityNames = {
+  agent: (id: string) => Pick<Agent, "name" | "urlKey"> | undefined;
+  person: (id: string) => string;
+  youId: string | null;
+  /** The agent, when a task is one of your chats (a hidden task, decision 8), which opens as the chat. */
+  chatAgent?: (issueId: string) => string | undefined;
+};
 
 function str(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
@@ -519,7 +525,12 @@ export function activityLine(event: ActivityEvent, names: ActivityNames): Activi
 
   let target = "";
   let href: string | undefined;
-  if (event.entityType === "issue") {
+  const chatWith = event.entityType === "issue" ? names.chatAgent?.(event.entityId) : undefined;
+  if (chatWith) {
+    const agent = names.agent(chatWith);
+    target = agent ? `your chat with ${agent.name}` : "your chat";
+    href = `/agents/${agent?.urlKey ?? chatWith}`;
+  } else if (event.entityType === "issue") {
     const identifier = str(details?.identifier);
     target = identifier ?? str(details?.issueTitle) ?? "a task";
     href = `/issues/${identifier ?? event.entityId}`;

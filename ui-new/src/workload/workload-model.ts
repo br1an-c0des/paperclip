@@ -50,6 +50,11 @@ export type WorkloadInput = {
   runsTruncated: boolean;
   liveRuns: readonly LiveRun[];
   projects?: readonly WorkloadProject[];
+  /**
+   * Your chats' task ids (decision 8). A chat is a hidden task, so it isn't among `tasks`; its runs
+   * are replies, which read "Chat" across the company rather than as a nameless run.
+   */
+  chatIds?: ReadonlySet<string>;
   youId: string | null;
   now: number;
 };
@@ -150,6 +155,11 @@ function ageLabel(ms: number) {
 function scopeTasks(input: Pick<WorkloadInput, "scope" | "tasks">) {
   const tasks = input.scope.kind === "project" ? input.tasks.filter((task) => task.projectId === (input.scope as { projectId: string }).projectId) : input.tasks;
   return new Map(tasks.map((task) => [task.id, task] as const));
+}
+
+/** The chats whose runs the scope shows as "Chat": the company's, since no project holds a chat. */
+function scopeChats(input: Pick<WorkloadInput, "scope" | "chatIds">): ReadonlySet<string> {
+  return input.scope.kind === "company" ? (input.chatIds ?? new Set()) : new Set();
 }
 
 /** Runs the scope counts: on the project's tasks, or every run in the company. */
@@ -511,13 +521,15 @@ function nowState(
   assigned: readonly WorkloadTask[],
   lastFinished: number | null,
   now: number,
+  chatIds: ReadonlySet<string> = new Set(),
 ): NowState {
   const mine = live.filter((run) => run.agentId === agent.id);
-  const inScope = (run: LiveRun) => !run.issueId || scopeTaskIds.has(run.issueId);
+  const inScope = (run: LiveRun) => !run.issueId || scopeTaskIds.has(run.issueId) || chatIds.has(run.issueId);
   const runningHere = mine.find((run) => run.status === "running" && inScope(run));
   if (runningHere) {
     const task = runningHere.issueId ? tasks.get(runningHere.issueId) : undefined;
-    return { key: "running", label: task ? `Running ${taskLabel(task)}` : "Running", runId: runningHere.id, taskId: task?.id ?? null };
+    const label = task ? `Running ${taskLabel(task)}` : runningHere.issueId && chatIds.has(runningHere.issueId) ? "Replying in a chat" : "Running";
+    return { key: "running", label, runId: runningHere.id, taskId: task?.id ?? null };
   }
   const runningElsewhere = mine.find((run) => run.status === "running");
   if (runningElsewhere) return { key: "elsewhere", label: "Running elsewhere", runId: runningElsewhere.id, taskId: null };
@@ -526,7 +538,8 @@ function nowState(
   const queued = mine.find((run) => inScope(run));
   if (queued) {
     const task = queued.issueId ? tasks.get(queued.issueId) : undefined;
-    return { key: "queued", label: task ? `Queued ${taskLabel(task)}` : "Queued", runId: queued.id, taskId: task?.id ?? null };
+    const label = task ? `Queued ${taskLabel(task)}` : queued.issueId && chatIds.has(queued.issueId) ? "Chat reply queued" : "Queued";
+    return { key: "queued", label, runId: queued.id, taskId: task?.id ?? null };
   }
   // The shared rule (lib/agent-state.ts): blocked only when every open assigned task is blocked.
   if (isAgentBlocked(assigned, false)) return { key: "blocked", label: "Blocked", runId: null, taskId: assigned[0]!.id };
@@ -568,7 +581,7 @@ export function agentStates(input: WorkloadInput, agentIds: readonly string[]): 
     const agent = agentById.get(agentId);
     if (!agent) continue;
     const assigned = [...tasks.values()].filter((task) => task.assigneeAgentId === agentId && isOpenTask(task));
-    states.set(agentId, nowState(agent, input.liveRuns, taskIds, tasks, assigned, lastFinished.get(agentId) ?? null, input.now));
+    states.set(agentId, nowState(agent, input.liveRuns, taskIds, tasks, assigned, lastFinished.get(agentId) ?? null, input.now, scopeChats(input)));
   }
   return states;
 }
@@ -591,6 +604,8 @@ export function todayLanes(input: WorkloadInput, agentIds: readonly string[]): {
   const liveIds = new Set(input.liveRuns.map((run) => run.id));
   const runs = scopeRuns(input.scope, input.runs, taskIds).filter((run) => !(liveIds.has(run.id) && run.status === "queued"));
   const agentById = new Map(input.agents.map((agent) => [agent.id, agent] as const));
+  const chats = scopeChats(input);
+  const isChat = (issueId: string | null | undefined) => !!issueId && chats.has(issueId);
 
   const spans = runs.flatMap((run) => {
     const span = runSpan(run, liveIds, now);
@@ -605,7 +620,7 @@ export function todayLanes(input: WorkloadInput, agentIds: readonly string[]): {
     const agent = agentById.get(agentId);
     if (!agent) continue;
     const assigned = [...tasks.values()].filter((task) => task.assigneeAgentId === agentId && isOpenTask(task));
-    const state = nowState(agent, input.liveRuns, taskIds, tasks, assigned, lastFinished.get(agentId) ?? null, now);
+    const state = nowState(agent, input.liveRuns, taskIds, tasks, assigned, lastFinished.get(agentId) ?? null, now, chats);
     const bars: LaneBar[] = [];
     let busyMs = 0;
     let spend: number | null = null;
@@ -619,12 +634,13 @@ export function todayLanes(input: WorkloadInput, agentIds: readonly string[]): {
       if (cost !== null) spend = (spend ?? 0) + cost;
       const series = palette.forTask(span.run.issueId);
       const task = span.run.issueId ? tasks.get(span.run.issueId) : undefined;
-      const what = task ? `${taskLabel(task)} · ` : "";
+      const chat = isChat(span.run.issueId);
+      const what = task ? `${taskLabel(task)} · ` : chat ? "Chat · " : "";
       bars.push({
         kind: live ? "live" : "run",
         start: Math.max(span.start, window.start),
         end: Math.max(end, Math.max(span.start, window.start)),
-        label: task ? taskLabel(task) : "Run",
+        label: task ? taskLabel(task) : chat ? "Chat" : "Run",
         tip: live ? `${what}running ${formatDuration(now - span.start)}` : `${what}${formatClock(span.start)} · ${formatDuration(end - span.start)}`,
         series,
         runId: span.run.id,
@@ -635,17 +651,18 @@ export function todayLanes(input: WorkloadInput, agentIds: readonly string[]): {
     // The live list also carries runs the history hasn't caught up with yet.
     for (const run of input.liveRuns) {
       if (run.agentId !== agentId || run.status !== "running" || bars.some((bar) => bar.runId === run.id)) continue;
-      if (run.issueId ? !taskIds.has(run.issueId) : input.scope.kind === "project") continue;
+      if (run.issueId ? !taskIds.has(run.issueId) && !isChat(run.issueId) : input.scope.kind === "project") continue;
       const start = time(run.startedAt ?? run.createdAt);
       if (Number.isNaN(start)) continue;
       busyMs += overlap(start, now, midnight, now);
       const task = run.issueId ? tasks.get(run.issueId) : undefined;
+      const chat = isChat(run.issueId);
       bars.push({
         kind: "live",
         start: Math.max(start, window.start),
         end: now,
-        label: task ? taskLabel(task) : "Run",
-        tip: `${task ? `${taskLabel(task)} · ` : ""}running ${formatDuration(now - start)}`,
+        label: task ? taskLabel(task) : chat ? "Chat" : "Run",
+        tip: `${task ? `${taskLabel(task)} · ` : chat ? "Chat · " : ""}running ${formatDuration(now - start)}`,
         series: palette.forTask(run.issueId),
         runId: run.id,
         taskId: task?.id ?? null,

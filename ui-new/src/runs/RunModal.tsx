@@ -7,6 +7,7 @@ import { accessApi } from "@/api/access";
 import { heartbeatsApi } from "@/api/heartbeats";
 import { instanceSettingsApi } from "@/api/instance-settings";
 import { issuePath, issuesApi } from "@/api/issues";
+import { chatPath } from "@/chat/chat-model";
 import { queryKeys } from "@/api/queryKeys";
 import { runPath, runsApi } from "@/api/runs";
 import { useNow } from "@/lib/clock";
@@ -114,6 +115,11 @@ function RunView(props: { runId: string }) {
   }));
   const active = () => !!run.data && isActiveRun(run.data.status);
   const agent = () => agents.data?.find((candidate) => candidate.id === run.data?.agentId);
+  // A chat is a task underneath, but it opens as the chat (decision 8), never as a task page.
+  const taskHref = (found: { id: string; identifier: string | null; conversationAgentId?: string | null }) => {
+    const chatAgent = found.conversationAgentId ? agents.data?.find((candidate) => candidate.id === found.conversationAgentId) : undefined;
+    return found.conversationAgentId ? chatPath(company().issuePrefix, chatAgent?.urlKey ?? found.conversationAgentId) : issuePath(company().issuePrefix, found);
+  };
   const issueId = () => run.data?.issueId ?? null;
   // The task row is all the header and the composer need; the full task is used when it's cached.
   const fullTask = createQuery(() => ({
@@ -442,8 +448,10 @@ function RunView(props: { runId: string }) {
                       {(found) => (
                         <>
                           {" "}on{" "}
-                          <A class="rm-task" href={issuePath(company().issuePrefix, found())} onClick={() => commands.closeRunModal()}>
-                            <span class="mono">{found().identifier}</span>
+                          <A class="rm-task" href={taskHref(found())} onClick={() => commands.closeRunModal()}>
+                            <Show when={!found().conversationAgentId}>
+                              <span class="mono">{found().identifier}</span>
+                            </Show>
                             <span class="rm-task-title">{found().title}</span>
                           </A>
                         </>
@@ -661,7 +669,7 @@ function RunView(props: { runId: string }) {
                       </span>
                     </span>
                     <Show when={task()}>
-                      {(found) => <span class="rm-foot-hint">Messages go to {found().identifier ?? "the task"}</span>}
+                      {(found) => <span class="rm-foot-hint">Messages go to {found().conversationAgentId ? "the chat" : (found().identifier ?? "the task")}</span>}
                     </Show>
                     <Button
                       size="compact"

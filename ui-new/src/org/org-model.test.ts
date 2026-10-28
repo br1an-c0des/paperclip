@@ -257,6 +257,15 @@ describe("activityLine", () => {
     });
   });
 
+  it("names and links one of your chats as the chat", () => {
+    const withChats = { ...names, chatAgent: (id: string) => (id === "chat1" ? "a1" : undefined) };
+    expect(activityLine(event({ action: "issue.comment_added", entityId: "chat1", details: { identifier: "TES-13" } }), withChats)).toMatchObject({
+      target: "your chat with Quant Researcher",
+      href: "/agents/quant",
+    });
+    expect(activityLine(event({ details: { identifier: "TES-4" } }), withChats)?.href).toBe("/issues/TES-4");
+  });
+
   it("says what a status change did", () => {
     expect(activityLine(event({ action: "issue.updated", details: { identifier: "TES-4", changes: { status: { from: "todo", to: "done" } } } }), names)).toMatchObject({ verb: "finished", tone: "green" });
   });

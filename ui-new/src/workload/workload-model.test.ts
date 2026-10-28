@@ -321,6 +321,25 @@ describe("todayLanes", () => {
     expect(result.lanes[1]!.state).toEqual({ key: "elsewhere", label: "Running elsewhere", runId: "l2", taskId: null });
     expect(result.lanes[1]!.bars).toEqual([]);
   });
+
+  it("labels chat replies as chat across the company, and leaves them out of a project", () => {
+    const chatRuns = [run("c1", "qr", "chat", at(27, 15), at(27, 15, 10)), run("c2", "qr", "chat", at(27, 16, 20), null)];
+    const liveChat = [live("c2", "qr", "chat", "running", at(27, 16, 20))];
+    const company = todayLanes(
+      input({ scope: { kind: "company" }, agents: [agent("qr")], tasks: [], runs: chatRuns, liveRuns: liveChat, chatIds: new Set(["chat"]) }),
+      ["qr"],
+    ).lanes[0]!;
+    expect(company.state).toEqual({ key: "running", label: "Replying in a chat", runId: "c2", taskId: null });
+    expect(company.bars.map((bar) => [bar.kind, bar.label, bar.taskId])).toEqual([
+      ["run", "Chat", null],
+      ["live", "Chat", null],
+    ]);
+    expect(company.bars[0]!.tip).toBe("Chat · 3 pm · 10m");
+
+    const project = todayLanes(input({ agents: [agent("qr")], runs: chatRuns, liveRuns: liveChat, chatIds: new Set(["chat"]) }), ["qr"]).lanes[0]!;
+    expect(project.state.key).toBe("elsewhere");
+    expect(project.bars).toEqual([]);
+  });
 });
 
 describe("heatmap", () => {
