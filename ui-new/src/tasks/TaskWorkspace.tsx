@@ -205,7 +205,7 @@ export function TaskWorkspace(props: { taskId: string }) {
                     </div>
                   </Show>
                 </section>
-                <WorkspacePlugins kind="execution_workspace" workspaceId={current().id} projectId={current().projectId} />
+                <WorkspacePlugins kind="execution_workspace" workspaceId={current().id} projectId={current().projectId ?? task.data?.projectId} />
               </>
             )}
           </Match>

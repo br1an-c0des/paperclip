@@ -1,6 +1,6 @@
 import type { Agent } from "@paperclipai/shared";
 import { A, useLocation, useNavigate } from "@solidjs/router";
-import { Building2, ChevronDown, Keyboard, LogOut, Moon, Palette, Plug, Plus, Search, Settings2, Star, Sun } from "lucide-solid";
+import { Building2, ChevronDown, Keyboard, LogOut, Moon, Palette, Plug, Plus, Search, Settings2, Sun } from "lucide-solid";
 import { createMemo, For, Show } from "solid-js";
 import { activeAgents } from "@/api/agents";
 import { openProjects } from "@/api/projects";
@@ -262,9 +262,7 @@ export function Nav() {
       <Show when={starred().length > 0}>
         <div class="nav-group" role="group" aria-labelledby="nav-starred-h">
           <div class="nav-head">
-            <h2 id="nav-starred-h">
-              <Star size={11} aria-hidden="true" fill="currentColor" /> Starred
-            </h2>
+            <h2 id="nav-starred-h">Starred</h2>
           </div>
           <For each={starred()}>{(agent) => <NavAgent agent={agent} base={base()} running={running()} />}</For>
         </div>
