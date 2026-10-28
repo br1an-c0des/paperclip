@@ -1,4 +1,4 @@
-/* The temporary Connectors page and its setup dialog. No board: design-system parts and tokens only. */
+/* AI connection rows and the Connect Claude dialog (Apps → AI connections, New agent), and the agent picker Apps reuses. No board: design-system parts and tokens only. */
 
 .cx-card {
   min-width: 0;

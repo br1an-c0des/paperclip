@@ -63,15 +63,15 @@ vi.mock("@/api/health", () => ({ healthApi: { get: async () => ({ status: "ok", 
 vi.mock("@/lib/company", () => ({ useCompany: () => () => ({ id: "co1", issuePrefix: "TRA" }) }));
 vi.mock("@/lib/company-data", () => ({ useAgentsQuery: () => ({ data: [], isPending: false, isError: false }) }));
 
-const { ConnectorsPage } = await import("./ConnectorsPage");
+const { AiConnections } = await import("./AiConnections");
 
-describe("ConnectorsPage", () => {
+describe("AiConnections", () => {
   it("lists connections with their status, owner and actions", async () => {
     api.list.mockResolvedValue(list);
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(() => (
       <QueryClientProvider client={client}>
-        <ConnectorsPage />
+        <AiConnections />
       </QueryClientProvider>
     ));
     expect(await screen.findByText("Company Claude subscription")).toBeTruthy();

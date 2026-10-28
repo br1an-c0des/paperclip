@@ -593,7 +593,7 @@ export function NewAgentPage() {
                           <Show
                             when={provider() === "anthropic" && connections.data}
                             fallback={
-                              <A class="ps-link" href={`${base()}/connectors`}>
+                              <A class="ps-link" href={`${base()}/apps/ai`}>
                                 Manage connections
                               </A>
                             }

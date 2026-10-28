@@ -8,7 +8,6 @@ import { GrainFilter } from "@/ui/Grain";
 import { ToastViewport } from "@/ui/Toast";
 import { Companies, CompanyRootRedirect } from "./routes/Companies";
 import { CompanyLayout } from "./routes/CompanyLayout";
-import { ConnectorsPage } from "./connectors/ConnectorsPage";
 import { NotBuiltYet, NotFound } from "./routes/NotFound";
 import { InboxPage } from "./inbox/InboxPage";
 import { OrgDashboard, OrgRedirect } from "./org/OrgDashboard";
@@ -29,6 +28,7 @@ import { CompanyWorkload } from "./workload/CompanyWorkload";
 import { ActivityPage } from "./activity/ActivityPage";
 import { LegacyActivityRedirect, UnprefixedCompanyRedirect } from "./activity/redirects";
 import { SkillsPage } from "./skills/SkillsPage";
+import { AppsPage, ConnectorsRedirect } from "./apps/AppsPage";
 
 const StyleGuide = lazy(() => import("./routes/StyleGuide").then((m) => ({ default: m.StyleGuide })));
 
@@ -65,6 +65,8 @@ export function App() {
           <Route path="/agents/new" component={UnprefixedNewAgent} />
           {/* The old UI's unprefixed skills, activity and costs links open in the last company. */}
           <Route path={["/skills/*", "/activity/*", "/audit/*", "/costs", "/budgets"]} component={UnprefixedCompanyRedirect} />
+          {/* The old UI's unprefixed apps links (and OAuth returns) open in the last company too. */}
+          <Route path="/apps/*" component={UnprefixedCompanyRedirect} />
           {/* The old UI's unprefixed instance-settings addresses open App settings in the last company. */}
           {/* `/instance/settings/*` must outrank the company's `/:companyPrefix/instance/*`. */}
           <Route path={["/instance", "/instance/settings/*rest", "/settings/*rest"]} component={UnprefixedSettingsRedirect} />
@@ -89,7 +91,9 @@ export function App() {
             <Route path="/company/settings/*rest" component={CompanySettingsPage} />
             <Route path="/company/export/*" component={() => <CompanyTransferRedirect kind="export" />} />
             <Route path="/company/import" component={() => <CompanyTransferRedirect kind="import" />} />
-            <Route path="/connectors" component={ConnectorsPage} />
+            {/* Apps and tools; the temporary Connectors page became Apps → AI connections. */}
+            <Route path="/apps/*rest" component={AppsPage} />
+            <Route path="/connectors" component={ConnectorsRedirect} />
             <Route path="/search" component={SearchPage} />
             <Route path="/workload" component={CompanyWorkload} />
             <Route path="/skills/*rest" component={SkillsPage} />

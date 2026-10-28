@@ -26,6 +26,8 @@ import {
   type SetupDraft,
 } from "./connection-model";
 import { createLocalLogin } from "./local-login";
+// Its own styles: New agent opens this dialog too, without the Apps pages.
+import "./Connectors.css";
 
 /*
  * Connect (or reconnect) a Claude account. Two steps for a subscription: the details (name, who can

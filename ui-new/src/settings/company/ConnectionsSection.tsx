@@ -51,7 +51,7 @@ export function ConnectionsSection() {
       <TelemetryCard />
       <p class="cs-muted cs-after">
         Agents' own model connections live in{" "}
-        <A class="ps-link" href={`/${company().issuePrefix}/connectors`}>
+        <A class="ps-link" href={`/${company().issuePrefix}/apps/ai`}>
           Connections for agents
         </A>
         .
