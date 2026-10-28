@@ -1,6 +1,6 @@
 import type { AgentDetail, AgentDesiredSkillEntry, AgentSkillEntry } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Match, Show, Switch as SolidSwitch } from "solid-js";
 import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
@@ -8,7 +8,7 @@ import { SettingsCard } from "@/ui/Field";
 import { Switch } from "@/ui/Switch";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
-import { skillToggle } from "../agent-model";
+import { builtInSkill, PAPERCLIP_CORE_SKILL_KEY, recommendedForLeads, skillToggle } from "../agent-model";
 import { CardNote, failure, SectionTitle } from "../shared";
 
 /*
@@ -16,6 +16,10 @@ import { CardNote, failure, SectionTitle } from "../shared";
  * should have. Saving replaces the agent's list (`POST /agents/:id/skills/sync`, mode replace) and
  * keeps the versions already pinned. Choosing a version per skill isn't offered yet; skills
  * installed outside Paperclip are listed read-only.
+ *
+ * The core `paperclip` skill has no switch (agent-model.ts, builtInSkill): Paperclip Runner agents
+ * never get it, since the Runner carries the same contract itself, and legacy harnesses always
+ * mount it (with the feedback skills). The other bundled skills are noted as meant for leads.
  */
 
 const STATE_LABEL: Partial<Record<AgentSkillEntry["state"], string>> = {
@@ -36,10 +40,19 @@ export function SkillsSection(props: { agent: AgentDetail }) {
     queryFn: ({ signal }) => agentsApi.skills(props.agent.id, company().id, signal),
     retry: false,
   }));
+  const builtIn = (entry: AgentSkillEntry) => builtInSkill(props.agent.adapterType, entry.key);
+  // What comes with the runner first (the core skill leading), then what's assigned, then the rest by name.
+  const rank = (entry: AgentSkillEntry) => (builtIn(entry) === null ? 0 : entry.key.trim().toLowerCase() === PAPERCLIP_CORE_SKILL_KEY ? 2 : 1);
   const entries = createMemo(() =>
-    [...(skills.data?.entries ?? [])].sort((a, b) => Number(b.desired) - Number(a.desired) || (a.runtimeName ?? a.key).localeCompare(b.runtimeName ?? b.key)),
+    [...(skills.data?.entries ?? [])].sort(
+      (a, b) =>
+        rank(b) - rank(a) ||
+        Number(b.desired) - Number(a.desired) ||
+        (a.runtimeName ?? a.key).localeCompare(b.runtimeName ?? b.key),
+    ),
   );
-  const assigned = () => entries().filter((entry) => entry.desired).length;
+  const choosable = () => entries().filter((entry) => builtIn(entry) === null);
+  const assigned = () => choosable().filter((entry) => entry.desired).length;
   const desired = (): AgentDesiredSkillEntry[] =>
     skills.data?.desiredSkillEntries ?? (skills.data?.desiredSkills ?? []).map((key) => ({ key, versionId: null }));
 
@@ -76,7 +89,7 @@ export function SkillsSection(props: { agent: AgentDetail }) {
             }
           >
             <SettingsCard
-              title={`${assigned()} of ${entries().length} assigned`}
+              title={`${assigned()} of ${choosable().length} assigned`}
               description={
                 <CardNote state={busy() ? "saving" : error() ? "error" : "idle"} error={error()}>
                   {snapshot().mode === "ephemeral" ? "Given to each run as it starts." : "Installed in the harness."} Changes save at once.
@@ -91,27 +104,49 @@ export function SkillsSection(props: { agent: AgentDetail }) {
               <ul class="ps-list ag-skills">
                 <For each={entries()} fallback={<li class="ps-list-note">The library has no skills yet.</li>}>
                   {(entry) => (
-                    <li class="ps-list-row">
-                      <span class="ps-list-name">
-                        <b>{entry.runtimeName ?? entry.key}</b>
-                        <span class="ps-list-meta">
-                          {entry.originLabel ?? (entry.managed ? "Managed by Paperclip" : "Your library")}
-                          {entry.detail ? ` · ${entry.detail}` : ""}
-                        </span>
-                      </span>
-                      <Show when={entry.desired && STATE_LABEL[entry.state]}>
-                        <TonePill tone={entry.state === "missing" || entry.state === "stale" ? "amber" : "green"} compact>
-                          {STATE_LABEL[entry.state]}
-                        </TonePill>
-                      </Show>
-                      <Switch
-                        checked={entry.desired}
-                        disabled={busy() !== null || entry.readOnly === true || entry.state === "external"}
-                        label={`${entry.desired ? "Remove" : "Add"} ${entry.runtimeName ?? entry.key}`}
-                        labelHidden
-                        onChange={(checked) => void toggle(entry, checked)}
-                      />
-                    </li>
+                    <SolidSwitch>
+                      <Match when={builtIn(entry)}>
+                        {(kind) => (
+                          <li class="ps-list-row">
+                            <span class="ps-list-name">
+                              <b>{entry.runtimeName ?? entry.key}</b>
+                              <span class="ps-list-meta">
+                                {kind() === "runner"
+                                  ? `The Runner gives ${props.agent.name} Paperclip's tools and rules directly.`
+                                  : "Paperclip adds it to every run in this harness."}
+                              </span>
+                            </span>
+                            <TonePill tone={kind() === "runner" ? "violet" : "green"} compact>
+                              {kind() === "runner" ? "Built into the Paperclip Runner" : "Always on"}
+                            </TonePill>
+                          </li>
+                        )}
+                      </Match>
+                      <Match when={true}>
+                        <li class="ps-list-row">
+                          <span class="ps-list-name">
+                            <b>{entry.runtimeName ?? entry.key}</b>
+                            <span class="ps-list-meta">
+                              {entry.originLabel ?? (entry.managed ? "Managed by Paperclip" : "Your library")}
+                              {recommendedForLeads(entry.key) ? " · Recommended for agents that lead others" : ""}
+                              {entry.detail ? ` · ${entry.detail}` : ""}
+                            </span>
+                          </span>
+                          <Show when={entry.desired && STATE_LABEL[entry.state]}>
+                            <TonePill tone={entry.state === "missing" || entry.state === "stale" ? "amber" : "green"} compact>
+                              {STATE_LABEL[entry.state]}
+                            </TonePill>
+                          </Show>
+                          <Switch
+                            checked={entry.desired}
+                            disabled={busy() !== null || entry.readOnly === true || entry.state === "external"}
+                            label={`${entry.desired ? "Remove" : "Add"} ${entry.runtimeName ?? entry.key}`}
+                            labelHidden
+                            onChange={(checked) => void toggle(entry, checked)}
+                          />
+                        </li>
+                      </Match>
+                    </SolidSwitch>
                   )}
                 </For>
               </ul>
