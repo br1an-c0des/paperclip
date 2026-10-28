@@ -18,6 +18,7 @@ import { pushToast } from "@/ui/Toast";
 import { headerSummary, harnessType, modelLabel } from "./agent-model";
 import { isSetupDraft } from "./new/new-agent-model";
 import { failure, refreshAgent } from "./shared";
+import { AgentStarButton } from "./AgentStar";
 
 /*
  * The agent's header card (boards 12 and 26): avatar with its state, name, the primary-agent crown,
@@ -103,6 +104,7 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
               </span>
             </Show>
             <StatePill agent={props.agent} running={Boolean(run())} queued={queued()} />
+            <AgentStarButton agent={props.agent} />
           </>
         }
         numbers={<span>{summary()}</span>}

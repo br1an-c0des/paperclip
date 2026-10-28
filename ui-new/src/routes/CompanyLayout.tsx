@@ -9,7 +9,10 @@ import { LiveEventsProvider } from "@/lib/live-events";
 import { useLiveToasts } from "@/lib/live-toasts";
 import { useGlobalShortcuts } from "@/lib/shortcuts";
 import { RunModal } from "@/runs/RunModal";
+import { AppShellOverlays } from "@/plugins/ShellPlugins";
+import { Announcements } from "@/shell/Announcements";
 import { CommandPalette } from "@/shell/CommandPalette";
+import { DevBanners } from "@/shell/DevBanners";
 import { ShortcutsDialog } from "@/shell/ShortcutsDialog";
 import { NewTaskDialog } from "@/tasks/NewTaskDialog";
 import { GlobalTaskModal } from "@/tasks/TaskModal";
@@ -19,7 +22,9 @@ import { Splash } from "./Splash";
 /*
  * `/:companyPrefix/*`: resolves the company from the URL, opens its live-events socket, and draws
  * the shell: the nav (the dock on a phone), and the dialogs any page can open (new task, command
- * palette, shortcuts, the task modal for pages without a list, and the run modal).
+ * palette, shortcuts, the task modal for pages without a list, and the run modal). Around every
+ * page: the development banners at the top of main, Paperclip's announcement card, and plugins'
+ * app-shell overlays.
  */
 
 /** The parts of the shell that need the company and the commands: shortcuts, toasts, dialogs. */
@@ -51,7 +56,10 @@ function CompanyShell(props: ParentProps) {
 
   return (
     <Shell nav={<Nav />} dock={<PhoneDock />}>
+      <DevBanners />
       {props.children}
+      <Announcements />
+      <AppShellOverlays />
       <CommandPalette />
       <ShortcutsDialog />
       <NewTaskDialog />
