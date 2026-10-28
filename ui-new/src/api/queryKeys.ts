@@ -232,6 +232,8 @@ export const queryKeys = {
     secretProposals: (companyId: string) => ["secret-proposals", companyId, "pending"] as const,
     exportFidelity: (companyId: string) => ["companies", companyId, "export-fidelity"] as const,
     pluginPages: ["plugins", "ui-contributions"] as const,
+    /** The whole instance settings (`GET /instance/settings`), for the instance-wide default environment. */
+    instanceSettings: ["instance", "settings"] as const,
   },
 
   /*

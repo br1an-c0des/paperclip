@@ -1,4 +1,4 @@
-import { Navigate, useLocation, useParams } from "@solidjs/router";
+import { A, Navigate, useLocation, useParams } from "@solidjs/router";
 import { createEffect, createMemo, Match, on, Switch } from "solid-js";
 import { useCompany } from "@/lib/company";
 import { RailLayout, SectionRail, type RailEntry } from "@/ui/PageHeader";
@@ -26,7 +26,8 @@ import "./CompanySettings.css";
  *
  * "From plugins" lists the settings pages installed plugins add, at the old UI's address
  * (`/company/settings/<routePath>`); the pages themselves come with plugin hosting. App (instance)
- * settings are a page of their own.
+ * settings are a page of their own at `/company/settings/instance/*`, whose route outranks this
+ * one; it sends the old instance Environments addresses here.
  */
 
 /** The overview of plugin pages; the segment no plugin is expected to claim. */
@@ -80,7 +81,11 @@ export function CompanySettingsPage() {
           </Match>
           <Match when={route().kind === "instance"}>
             <SectionTitle title="App settings">This address belongs to app settings, which apply to every organization on this Paperclip instance.</SectionTitle>
-            <CardNoteLine>Open app settings from the settings button next to your name in the sidebar.</CardNoteLine>
+            <CardNoteLine>
+              <A class="cs-link-button" href={`${base()}/instance`}>
+                Open app settings
+              </A>
+            </CardNoteLine>
           </Match>
           <Match when={route().kind === "plugin" && (route() as { routePath: string }).routePath === PLUGINS_PATH}>
             <PluginsOverview pages={plugins.pages()} loading={plugins.query.isLoading} error={plugins.query.isError} base={base()} />

@@ -1,6 +1,6 @@
 import type { Environment, EnvironmentDeleteBlastRadius } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { deleteSummary, driverLabel, isInstanceDefault, sortEnvironments } from "./environments-model";
+import { defaultPatchId, deleteSummary, driverLabel, effectiveDefaultId, sortEnvironments } from "./environments-model";
 
 function env(overrides: Partial<Environment>): Environment {
   return {
@@ -42,14 +42,27 @@ function radius(overrides: Partial<EnvironmentDeleteBlastRadius>): EnvironmentDe
 
 describe("environments", () => {
   it("puts the default first and archived last", () => {
-    const sorted = sortEnvironments([
-      env({ id: "b", name: "Box" }),
-      env({ id: "old", name: "Aardvark", status: "archived" }),
-      env({ id: "local", name: "Local", driver: "local", metadata: { defaultForInstance: true } }),
-    ]);
+    const sorted = sortEnvironments(
+      [env({ id: "b", name: "Box" }), env({ id: "old", name: "Aardvark", status: "archived" }), env({ id: "local", name: "Local", driver: "local" })],
+      "local",
+    );
     expect(sorted.map((entry) => entry.id)).toEqual(["local", "b", "old"]);
-    expect(isInstanceDefault(sorted[0]!)).toBe(true);
     expect(driverLabel("local")).toBe("This machine");
+  });
+
+  it("reads the instance-wide default, falling back to the local environment", () => {
+    const environments = [
+      env({ id: "box", name: "Box", driver: "ssh" }),
+      env({ id: "mine", name: "Mine", driver: "local" }),
+      env({ id: "local", name: "Local", driver: "local", metadata: { managedByPaperclip: true } }),
+    ];
+    expect(effectiveDefaultId("box", environments)).toBe("box");
+    expect(effectiveDefaultId(null, environments)).toBe("local");
+    // Another organization's environment: this one still runs locally.
+    expect(effectiveDefaultId("elsewhere", environments)).toBe("local");
+    expect(effectiveDefaultId(null, [env({ id: "box", name: "Box", driver: "ssh" })])).toBeNull();
+    expect(defaultPatchId({ id: "box", driver: "ssh" })).toBe("box");
+    expect(defaultPatchId({ id: "local", driver: "local" })).toBeNull();
   });
 
   it("explains a blocked delete", () => {

@@ -48,8 +48,7 @@ export const adminApi = {
   /** Every organization on the instance, archived ones too (the unscoped `GET /companies`). */
   companies: () => api.get<Company[]>("/companies"),
   createCompany: (data: { name: string; description?: string | null }) => api.post<Company>("/companies", data),
-  updateCompany: (companyId: string, data: Partial<Pick<Company, "name" | "status">>) =>
-    api.patch<Company>(`/companies/${encodeURIComponent(companyId)}`, data),
+  // Renaming and unarchiving use `companiesApi.update` (api/companies.ts), the one `PATCH /companies/:id`.
   /** Only when the server allows it (`features.companyDeletionEnabled` in `/health`). */
   deleteCompany: (companyId: string) => api.delete<{ ok: true }>(`/companies/${encodeURIComponent(companyId)}`),
 };

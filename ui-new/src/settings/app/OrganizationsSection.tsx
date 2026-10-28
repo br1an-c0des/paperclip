@@ -79,7 +79,7 @@ export function OrganizationsSection(props: { accessibleIds: readonly string[] }
     } else if (current.kind === "rename") {
       const name = renameEdit(current.company.name, draft());
       if (!name) return setDialog(null);
-      if (await run(() => adminApi.updateCompany(current.company.id, { name }), "Couldn't rename the organization.")) setDialog(null);
+      if (await run(() => companiesApi.update(current.company.id, { name }), "Couldn't rename the organization.")) setDialog(null);
     } else {
       if (draft().trim() !== current.company.name) return setProblem("Type the organization's name to confirm.");
       if (await run(() => adminApi.deleteCompany(current.company.id), "Couldn't delete the organization.")) {
@@ -91,7 +91,7 @@ export function OrganizationsSection(props: { accessibleIds: readonly string[] }
 
   const unarchive = async (company: Company) => {
     try {
-      await adminApi.updateCompany(company.id, { status: "active" });
+      await companiesApi.update(company.id, { status: "active" });
       await refresh();
       pushToast({ tone: "success", title: `${company.name} is active again` });
     } catch (caught) {

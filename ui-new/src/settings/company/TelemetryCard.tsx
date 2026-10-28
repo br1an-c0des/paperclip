@@ -250,7 +250,7 @@ export function TelemetryCard() {
             </SettingsRow>
           </Show>
         </Show>
-        <Show when={query.data?.canManage}>
+        <Show when={query.data?.canManage && (settings() || dirty() || problem() || conflict())}>
           <footer class="cfoot">
             <Show when={settings()}>
               <Button size="compact" disabled={!!busy() || dirty() || conflict()} onClick={() => void test()}>

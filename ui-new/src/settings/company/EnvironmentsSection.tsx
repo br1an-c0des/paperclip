@@ -4,6 +4,7 @@ import { Ellipsis, Server } from "lucide-solid";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 import { environmentsApi } from "@/api/environments";
+import { instanceSettingsApi } from "@/api/instance-settings";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
@@ -11,14 +12,15 @@ import { Dialog } from "@/ui/Dialog";
 import { Menu } from "@/ui/Menu";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
-import { deleteSummary, driverLabel, isInstanceDefault, isManaged, sortEnvironments } from "./environments-model";
+import { defaultPatchId, deleteSummary, driverLabel, effectiveDefaultId, isManaged, sortEnvironments } from "./environments-model";
 import { CardHead, CardNoteLine, failure, OutlineCard, SectionTitle } from "./shared";
 
 /*
  * Environments (board 30's outline): where this organization's agents run. The API is per company,
  * so this moved here from instance settings. Each environment can be probed (what it can do, and on
  * a sandbox the qualification the Paperclip Runner needs), archived or restored, and deleted once
- * nothing depends on it.
+ * nothing depends on it. The default is the instance's (`PATCH /instance/settings`), so making one
+ * the default reaches every organization; the section says so where it's shown and set.
  *
  * Creating and editing environments (SSH hosts, sandbox providers and their settings), custom
  * sandbox images and the terminal aren't here yet: they're outlined below, and stay in the classic
@@ -32,7 +34,10 @@ export function EnvironmentsSection() {
     queryKey: queryKeys.projectSettings.environments(company().id),
     queryFn: ({ signal }) => environmentsApi.list(company().id, signal),
   }));
-  const list = createMemo(() => sortEnvironments(environments.data));
+  const instance = createQuery(() => ({ queryKey: queryKeys.companySettings.instanceSettings, queryFn: instanceSettingsApi.settings }));
+  const defaultId = createMemo(() => effectiveDefaultId(instance.data?.defaultEnvironmentId, environments.data));
+  const isDefault = (environment: Environment) => environment.id === defaultId();
+  const list = createMemo(() => sortEnvironments(environments.data, defaultId()));
   const [probes, setProbes] = createStore<Record<string, EnvironmentProbeResult | "running" | { error: string }>>({});
   const [deleting, setDeleting] = createSignal<Environment | null>(null);
   const refresh = () => client.invalidateQueries({ queryKey: queryKeys.projectSettings.environments(company().id) });
@@ -55,11 +60,25 @@ export function EnvironmentsSection() {
     }
   };
 
+  const makeDefault = async (environment: Environment) => {
+    try {
+      await instanceSettingsApi.update({ defaultEnvironmentId: defaultPatchId(environment) });
+      await client.invalidateQueries({ queryKey: queryKeys.companySettings.instanceSettings });
+      pushToast({ tone: "success", title: `${environment.name} is the default`, body: "For every organization on this instance." });
+    } catch (caught) {
+      pushToast({ tone: "error", title: "Couldn't change the default", body: failure(caught, "") || undefined });
+    }
+  };
+
   return (
     <>
       <SectionTitle title="Environments">Where this organization's agents run.</SectionTitle>
       <section class="card settings-card" aria-labelledby="cs-envs">
         <CardHead id="cs-envs" title="Environments" note={environments.data ? `${list().filter((entry) => entry.status === "active").length} active` : "Loading…"} />
+        <CardNoteLine>
+          The default is instance-wide: agents in every organization on this instance that haven't picked an environment run
+          there.
+        </CardNoteLine>
         <Show when={environments.isError}>
           <CardNoteLine alert>Couldn't load the environments. {failure(environments.error, "")}</CardNoteLine>
         </Show>
@@ -75,8 +94,10 @@ export function EnvironmentsSection() {
                   <span class="cs-person-text">
                     <span class="cs-strong">
                       {environment.name}
-                      <Show when={isInstanceDefault(environment)}>
-                        <span class="cs-pill">Default</span>
+                      <Show when={isDefault(environment)}>
+                        <span class="cs-pill" title="The default for every organization on this instance">
+                          Instance default
+                        </span>
                       </Show>
                       <Show when={environment.status === "archived"}>
                         <span class="cs-pill">Archived</span>
@@ -104,26 +125,36 @@ export function EnvironmentsSection() {
                   <Button size="compact" disabled={result() === "running" || environment.status === "archived"} onClick={() => void probe(environment)}>
                     Probe
                   </Button>
-                  <Show when={!isManaged(environment)}>
+                  <Show when={!isManaged(environment) || (!isDefault(environment) && environment.status === "active")}>
                     <Menu placement="bottom-end">
                       <Menu.Trigger as={Button} variant="icon" ghost size="compact" aria-label={`More actions for ${environment.name}`}>
                         <Ellipsis size={16} aria-hidden="true" />
                       </Menu.Trigger>
-                      <Menu.Content label="Environment actions" width={240}>
-                        <Show
-                          when={environment.status === "archived"}
-                          fallback={
-                            <Menu.Item disabled={isInstanceDefault(environment)} onSelect={() => void setStatus(environment, "archived")} description="Agents can't pick it until it's restored">
-                              Archive
-                            </Menu.Item>
-                          }
-                        >
-                          <Menu.Item onSelect={() => void setStatus(environment, "active")}>Restore</Menu.Item>
+                      <Menu.Content label="Environment actions" width={260}>
+                        <Show when={!isDefault(environment) && environment.status === "active"}>
+                          <Menu.Item onSelect={() => void makeDefault(environment)} description="For every organization on this instance">
+                            Make the default
+                          </Menu.Item>
                         </Show>
-                        <Menu.Separator />
-                        <Menu.Item danger onSelect={() => setDeleting(environment)}>
-                          Delete…
-                        </Menu.Item>
+                        <Show when={!isManaged(environment)}>
+                          <Show when={!isDefault(environment) && environment.status === "active"}>
+                            <Menu.Separator />
+                          </Show>
+                          <Show
+                            when={environment.status === "archived"}
+                            fallback={
+                              <Menu.Item disabled={isDefault(environment)} onSelect={() => void setStatus(environment, "archived")} description="Agents can't pick it until it's restored">
+                                Archive
+                              </Menu.Item>
+                            }
+                          >
+                            <Menu.Item onSelect={() => void setStatus(environment, "active")}>Restore</Menu.Item>
+                          </Show>
+                          <Menu.Separator />
+                          <Menu.Item danger onSelect={() => setDeleting(environment)}>
+                            Delete…
+                          </Menu.Item>
+                        </Show>
                       </Menu.Content>
                     </Menu>
                   </Show>
