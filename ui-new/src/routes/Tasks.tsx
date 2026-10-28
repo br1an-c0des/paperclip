@@ -1,5 +1,5 @@
 import type { IssueStatus } from "@paperclipai/shared";
-import { Navigate, useNavigate, useParams } from "@solidjs/router";
+import { Navigate, useLocation, useNavigate, useParams } from "@solidjs/router";
 import { Match, Show, Switch } from "solid-js";
 import { issuePath } from "@/api/issues";
 import { useChatIndex } from "@/chat/chat-index";
@@ -51,11 +51,13 @@ export function TaskPage() {
   // Read under the task's id, so live events refresh the page and edits patch it (TRA-41).
   const task = useTaskByRef(() => params.issueRef);
   const change = useTaskChange(task.task);
-  // A link to one of your chats (a hidden task, decision 8) opens the chat at the agent's address.
+  // A link to one of your chats (a hidden task, decision 8) opens the chat at the agent's address,
+  // keeping the fragment: `#document-<key>` opens that document over the chat.
+  const location = useLocation();
   const chatAgent = () => chats.agentIdForRef(params.issueRef) ?? (task.task() ? chats.chatAgentOf(task.task()!) : undefined);
   return (
     <Switch>
-      <Match when={chatAgent()}>{(agentId) => <Navigate href={chats.href(agentId())} />}</Match>
+      <Match when={chatAgent()}>{(agentId) => <Navigate href={`${chats.href(agentId())}${location.hash}`} />}</Match>
       <Match when={task.error()}>
         <PageHeader crumbs={<span>Task</span>} title={<span class="mono">{params.issueRef}</span>} />
         <section class="card task-page-note">

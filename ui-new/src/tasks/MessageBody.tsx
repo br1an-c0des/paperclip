@@ -16,13 +16,16 @@ export function MessageBody(props: { source: string; class?: string }) {
   const html = createMemo(() => renderMarkdown(decorateMentions(props.source, company().issuePrefix)));
   let root: HTMLDivElement | undefined;
 
-  // Task links point at this board's task page and stay in the tab.
+  // Task links point at this board's task page and stay in the tab. A fragment such as
+  // `#document-plan` is kept, so the page (or the chat it redirects to) can open the document.
   createEffect(() => {
     html();
     for (const link of root?.querySelectorAll<HTMLAnchorElement>("a[href]") ?? []) {
-      const ref = taskRefFromHref(link.getAttribute("href"));
+      const href = link.getAttribute("href");
+      const ref = taskRefFromHref(href);
       if (!ref) continue;
-      link.setAttribute("href", `/${company().issuePrefix}/issues/${ref}`);
+      const hash = href!.includes("#") ? href!.slice(href!.indexOf("#")) : "";
+      link.setAttribute("href", `/${company().issuePrefix}/issues/${ref}${hash}`);
       link.removeAttribute("target");
       link.classList.add("task-link");
     }

@@ -1,5 +1,5 @@
 import { A, useLocation, useNavigate } from "@solidjs/router";
-import { Building2, ChevronDown, Keyboard, LogOut, Moon, Palette, Plug, Plus, Search, Sun } from "lucide-solid";
+import { Building2, ChevronDown, Keyboard, LogOut, Moon, Palette, Plug, Plus, Search, Settings2, Sun } from "lucide-solid";
 import { createMemo, For, Show } from "solid-js";
 import { activeAgents } from "@/api/agents";
 import { openProjects } from "@/api/projects";
@@ -111,6 +111,9 @@ function YouRow() {
           <span class="nav-you-name">{name()}</span>
         </Menu.Trigger>
         <Menu.Content label="Account and appearance" width={240}>
+          <Menu.Item onSelect={() => navigate(`/${company().issuePrefix}/company/settings/instance`)} icon={<Settings2 size={16} />}>
+            App settings
+          </Menu.Item>
           <Menu.Item onSelect={toggleTheme} icon={theme() === "dark" ? <Sun size={16} /> : <Moon size={16} />}>
             {theme() === "dark" ? "Use light theme" : "Use dark theme"}
           </Menu.Item>

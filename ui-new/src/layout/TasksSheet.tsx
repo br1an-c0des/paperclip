@@ -1,5 +1,5 @@
 import { createQuery } from "@tanstack/solid-query";
-import { Check, ChevronDown, ChevronLeft, ChevronUp, LogOut, Monitor, Plus, Search } from "lucide-solid";
+import { Check, ChevronDown, ChevronLeft, ChevronUp, LogOut, Monitor, Plus, Search, Settings2 } from "lucide-solid";
 import { createEffect, For, Match, on, Show, Switch as SwitchFlow } from "solid-js";
 import { companiesApi, statsFor } from "@/api/companies";
 import { activeAgents } from "@/api/agents";
@@ -248,6 +248,15 @@ export function TasksSheet(props: {
                 <span class="tsheet-meta tsheet-ellipsis">Company, secrets, plugins, routines, activity</span>
               </span>
               <small class="tsheet-count">On desktop</small>
+            </a>
+            <a class="tsheet-row" href={`${base()}/company/settings/instance`}>
+              <span class="tsheet-sq tsheet-sq--well" aria-hidden="true">
+                <Settings2 size={16} />
+              </span>
+              <span class="tsheet-row-main">
+                <span>App settings</span>
+                <span class="tsheet-meta tsheet-ellipsis">Your profile, this instance, harnesses, plugins</span>
+              </span>
             </a>
             <Show when={session.isAuthenticatedMode()}>
               <button type="button" class="tsheet-row tsheet-row--danger" onClick={() => void signOut()}>

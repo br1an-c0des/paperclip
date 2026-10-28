@@ -58,6 +58,8 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 29 | [Gaps found building the agent page](#29-gaps-found-building-the-agent-page) | `agents/*`, `runs-adapters/runs` | Open | Oct 27, 2026 |
 | 30 | [Gaps found building the org pages](#30-gaps-found-building-the-org-pages) | `agents/roster`, `agents/organization`, `agents/built-in` | Open | Oct 27, 2026 |
 | 31 | [Gaps found building agent chat](#31-gaps-found-building-agent-chat) | `agent-chat/*`, `inbox-search/search` | Open | Oct 27, 2026 |
+| 32 | [Gaps found building app settings](#32-gaps-found-building-app-settings) | Instance settings, experimental flags | Open | Oct 27, 2026 |
+| 33 | [Gaps found building company settings](#33-gaps-found-building-company-settings) | Company settings | Open | Oct 27, 2026 |
 
 ## Entries
 
@@ -1062,4 +1064,40 @@ Both are handled in `ui-new` for now.
 - **Live runs:** a run's status event could join a live-runs refetch in flight and come back still
   running; live runs are now fetched once more 1.5 s after the last run event
   (`createTrailingRefetch`).
+
+### 32. Gaps found building app settings
+
+- **Status:** Open
+- **Area:** Tier 2 "Instance settings", experimental flags ([decision 12](#12-what-happens-to-each-experimental-flag))
+- **Found in:** App settings (M6, boards 28, 29 and the board 30 outline).
+
+- **No Experimental page** (board 30). Each flag in `GET /api/instance/settings/experimental` was
+  sorted under decision 12: dropped (UI-only flags of the old shell), built in, or follows the
+  setting. Server-enforced flags someone may still want to change (cases, public MCP, isolated
+  workspaces, managed-sandbox-only, native runner, built-in agents, connector and agent-type flags,
+  and runtime flags) have no switch in `ui-new` yet; the classic UI's Experimental page covers them
+  until decided. Proposed: one "Features" card in General with plain switches for only those flags.
+  Waiting on the user.
+- **Board 28's public URL, "auth secret is set" and "invite used by"** aren't in `GET /api/health`.
+- **No instance-wide harness usage count.** Counts come from each organization's agents the viewer
+  can open.
+- **npm's latest version** has no API; the browser asks `registry.npmjs.org`, as the old UI does.
+- **No organization owners** in `GET /api/companies`, and **no request to leave an organization**.
+- **Avatars** are stored in one organization's storage; there's no per-user storage.
+- **`defaultEnvironmentId` is instance-level** while environments are per organization.
+
+### 33. Gaps found building company settings
+
+- **Status:** Open
+- **Area:** Tier 2 "Company settings"
+- **Found in:** company settings (M6, boards 21–25 and the board 30 outline).
+
+- **Invite links can't be fetched after creation:** the list carries no token, so a link is shown
+  once.
+- **The prompt-injection fallback can't be configured;** it's always pattern matching.
+- **The decision model's last test result and this month's calls and cost aren't stored.**
+- **Fast responses stay off until an admin turns on `enableFastResponses`** (see decision 32).
+- **The default environment is instance-wide** (`defaultEnvironmentId` in `PATCH /instance/settings`)
+  while environments belong to organizations; the page says so where it's set.
+- **Plugin settings pages need plugin hosting** (M7).
 

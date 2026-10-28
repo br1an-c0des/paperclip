@@ -111,6 +111,7 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | Agents message you first: a morning briefing, scheduled reports, reports after milestones | 1, then 3 and 2b | Raised in discussion on Oct 24, 2026. A recurring task does the work, and the result reaches your chat through a fork plugin tool, later through "report to chat" upstream ([3.13](#313-briefings-and-reports), [2b-14](#2b-small-features-ask-upstream-first)). |
 | A "fast mode" for meetings | 2b | Codex agents already have a `fastMode` setting (`codex_local`). `claude_local` has none ([2b-11](#2b-small-features-ask-upstream-first)). A fast model or low effort per message works today. |
 | A core skill add-on for new behaviour | 3 | [3.10](#310-core-skill-add-on). Fork-owned, with no conflict. |
+| A `COMPANY.md`: company-wide instructions every run in the company receives, like an agent's `AGENTS.md` | Idea, then 2b or 3 | Raised Oct 27, 2026 ([3.14](#314-company-instructions-companymd)). Not designed yet. |
 
 ## Stage 1: the new UI
 
@@ -367,6 +368,15 @@ Follow-ups from using chat with Bob (2026-10-27):
   its own after 10–20 seconds or on other events. Likely cause: `ChatView.tsx` scrolls to the bottom
   whenever `state.loading()` turns false, without checking the reader's position, and a refetch
   may also swap the thread for the loading card.
+
+Done 2026-10-27: all three. The scroll cause was an agent-record refetch resetting the chat's
+"loaded" flag (and a background error replacing the thread); the chat now jumps only on first open
+and when you send, and otherwise follows only while you're at the bottom. Documents show in the
+Activity column, as cards in the thread and, for the plan, a header button; they open over the chat
+and `#document-<key>` links (including old task links) land on them. Skills show `paperclip` as
+"Built into the Paperclip Runner" or "Always on", and for legacy agents `complain` and
+`suggestion-box` as "Always on" too (mounted on every legacy run). Left: search results for a chat
+drop `#document-` (`SearchPage.tsx`).
 
 #### M6: Settings and everything else
 
@@ -667,6 +677,37 @@ plugins added as needed. This is its own feature, added to the built-in chat as 
 
   Meetings (3.9) use the same delivery for their reminder and agenda.
 - **Risk:** low for the plugin, with the caveat in step 2.
+
+### 3.14 Company instructions (COMPANY.md)
+
+An idea raised Oct 27, 2026; not designed or scheduled yet.
+
+- **The idea:** a `COMPANY.md` document that behaves like an agent's `AGENTS.md`, but for the whole
+  company: it's sent with, or referenced by, every new run in that company, whichever agent runs it.
+  It would hold what every agent should know: the company's mission and context, house rules and
+  conventions, who to ask for what, tone, and shared links.
+- **Have today:**
+  - each agent's own instructions bundle (`AGENTS.md` plus sibling files), added to the system
+    prompt on a fresh session; on the Paperclip Runner, after the Runner's own rules
+    (`PAPERCLIP_EXECUTION_PROMPT`);
+  - company skills, which agents only get when each one is assigned the skill;
+  - the company description, which isn't put into runs.
+  - The name already exists in the Agent Companies package format: `COMPANY.md` is the company
+    manifest that export and import read and write (`server/src/services/company-portability.ts`).
+    Its body could be the natural home for these instructions, so an exported company carries them.
+- **Missing:** no company-level text reaches a run. Getting the same guidance to every agent means
+  copying it into each `AGENTS.md`.
+- **Ways it could work, to explore:**
+  1. **Upstream (2b):** the server stores a company instructions document and adds it to every run's
+     prompt, next to the agent's instructions, for both runners. The cleanest, and it needs
+     agreement upstream first.
+  2. **Fork, without server changes:** a company document edited in `ui-new` (company settings), with
+     every agent's `AGENTS.md` given a standard line that points at it, or a fork plugin that keeps a
+     shared section of each agent's instructions in sync. Works now, but it's a copy, not one source.
+  3. **A company skill assigned to every agent.** Easy, but a skill is read on demand, not always in
+     context, and Runner agents treat skills differently.
+- **Questions:** how it interacts with an agent's own instructions (which wins on conflict), size
+  limits (it would be in every run's prompt), whether chats get it too, and who may edit it.
 
 ## Questions for you
 

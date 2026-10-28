@@ -26,6 +26,7 @@ import { messageTime } from "./chat-model";
  * - Right now: replying in this chat, working on a task (with Watch run and Stop), or idle (with
  *   Run now). Runs come from the company's live runs.
  * - Up next: its assigned tasks waiting to start (`status=todo`).
+ * - Documents: the chat's own, the plan first, once it has any (ChatDocuments.tsx).
  * - The timeline: its activity (`/activity?agentId=`), worded as the Org dashboard words it, with
  *   this chat's own entries called "this chat".
  *
@@ -51,6 +52,8 @@ export function ChatActivity(props: {
   replyRuns: readonly LiveRun[];
   otherRuns: readonly LiveRun[];
   people: TaskPeople;
+  /** The chat's documents (ChatDocuments.tsx), under Up next. */
+  documents?: JSX.Element;
   /** On a phone: shown as a sheet, with a close button. */
   sheet?: boolean;
   onClose?: () => void;
@@ -217,6 +220,8 @@ export function ChatActivity(props: {
           </For>
         </ul>
       </section>
+
+      {props.documents}
 
       <div class="ch-side-sec ch-tl">
         <For each={days()} fallback={<p class="ch-muted">{activity.isPending ? "Loading activity…" : "No activity yet."}</p>}>

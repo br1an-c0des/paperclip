@@ -17,13 +17,14 @@ import { LEGACY_AGENT_TABS } from "./org/org-model";
 import { AgentPage } from "./agents/AgentPage";
 import { ChatRedirect, ChatsHomeRedirect } from "./chat/ChatRedirect";
 import { NewAgentPage, UnprefixedNewAgent } from "./agents/new/NewAgentPage";
-import { SettingsPage } from "./routes/Planned";
+import { CompanySettingsPage, CompanyTransferRedirect } from "./settings/company/CompanySettingsPage";
 import { ProjectPage } from "./routes/Project";
 import { RoutineRedirect } from "./recurring/RoutineRedirect";
 import { SignIn } from "./routes/SignIn";
 import { TaskPage, TasksPage } from "./routes/Tasks";
 import { RunRoute } from "./runs/RunRoute";
 import { SearchPage } from "./search/SearchPage";
+import { AppSettingsPage, CompanySettingsRedirect, UnprefixedSettingsRedirect } from "./settings/app/AppSettingsPage";
 import { CompanyWorkload } from "./workload/CompanyWorkload";
 import { ActivityPage } from "./activity/ActivityPage";
 import { LegacyActivityRedirect, UnprefixedCompanyRedirect } from "./activity/redirects";
@@ -64,6 +65,9 @@ export function App() {
           <Route path="/agents/new" component={UnprefixedNewAgent} />
           {/* The old UI's unprefixed skills, activity and costs links open in the last company. */}
           <Route path={["/skills/*", "/activity/*", "/audit/*", "/costs", "/budgets"]} component={UnprefixedCompanyRedirect} />
+          {/* The old UI's unprefixed instance-settings addresses open App settings in the last company. */}
+          {/* `/instance/settings/*` must outrank the company's `/:companyPrefix/instance/*`. */}
+          <Route path={["/instance", "/instance/settings/*rest", "/settings/*rest"]} component={UnprefixedSettingsRedirect} />
           <Route path="/:companyPrefix" component={CompanyLayout}>
             <Route path="/" component={() => <Navigate href="dashboard" />} />
             <Route path="/dashboard" component={OrgDashboard} />
@@ -82,7 +86,9 @@ export function App() {
             {/* The old UI's chat addresses open the chat at the agent's address. */}
             <Route path="/chats" component={ChatsHomeRedirect} />
             <Route path="/chats/:agentRef/*" component={ChatRedirect} />
-            <Route path="/company/settings/*" component={SettingsPage} />
+            <Route path="/company/settings/*rest" component={CompanySettingsPage} />
+            <Route path="/company/export/*" component={() => <CompanyTransferRedirect kind="export" />} />
+            <Route path="/company/import" component={() => <CompanyTransferRedirect kind="import" />} />
             <Route path="/connectors" component={ConnectorsPage} />
             <Route path="/search" component={SearchPage} />
             <Route path="/workload" component={CompanyWorkload} />
@@ -90,6 +96,10 @@ export function App() {
             {/* Activity's tabs; the old audit, runs, costs, budgets and timeline pages land on them. */}
             <Route path={["/activity/budgets", "/activity/timeline", "/audit/*", "/runs", "/costs", "/budgets", "/timeline"]} component={LegacyActivityRedirect} />
             <Route path="/activity/*tab" component={ActivityPage} />
+            {/* App settings, at the old UI's instance-settings address (outranks /company/settings/*). */}
+            <Route path="/company/settings/instance/*rest" component={AppSettingsPage} />
+            <Route path="/instance/*rest" component={() => <CompanySettingsRedirect kind="instance" />} />
+            <Route path="/settings/*rest" component={() => <CompanySettingsRedirect kind="settings" />} />
             <Route path="/*rest" component={NotBuiltYet} />
           </Route>
         </Route>

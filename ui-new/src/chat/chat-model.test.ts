@@ -1,7 +1,7 @@
 import type { IssueComment } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import type { Request } from "@/requests/request-model";
-import { buildChat, quietRunText, shownReplies, statusTag, yourChatAgent, type ChatEntry, type ChatTask } from "./chat-model";
+import { buildChat, chatDocumentLink, documentHash, documentKeyFromHash, quietRunText, shownReplies, statusTag, yourChatAgent, type ChatEntry, type ChatTask } from "./chat-model";
 
 const NOW = new Date("2026-10-27T15:00:00");
 
@@ -123,6 +123,57 @@ describe("buildChat", () => {
       now: NOW,
     });
     expect(kinds(entries)).toEqual(["M:c2"]);
+  });
+
+  it("draws the chat's documents where they were first saved, inside the loaded history", () => {
+    const doc = (id: string, createdAt: string) => ({
+      id,
+      key: id,
+      title: null,
+      latestRevisionNumber: 1,
+      createdByAgentId: "a1",
+      createdByUserId: null,
+      createdAt,
+      updatedAt: "2026-10-27T12:00:00",
+    });
+    const entries = buildChat({
+      comments: [message("c1", "2026-10-27T10:00:00", { user: "u1" }), message("c2", "2026-10-27T10:10:00", { agent: "a1" })],
+      documents: [doc("plan", "2026-10-27T10:05:00"), doc("old", "2026-10-26T09:00:00")],
+      moreHistory: true,
+      youId: "u1",
+      now: NOW,
+    });
+    expect(kinds(entries)).toEqual(["day:Today", "M:c1", "document", "M:c2"]);
+    expect(entries.find((entry) => entry.kind === "document")?.key).toBe("document:plan");
+    expect(kinds(buildChat({ comments: [message("c1", "2026-10-27T10:00:00", { user: "u1" })], documents: [doc("plan", "2026-10-27T10:05:00")], search: "c1", youId: "u1", now: NOW }))).toEqual(["M:c1"]);
+  });
+});
+
+describe("document links", () => {
+  const chat = { id: "44d8a512-9877-4d79-a5e7-a7e79d199795", identifier: "TES-13" };
+
+  it("reads and writes the #document- fragment", () => {
+    expect(documentHash("plan")).toBe("#document-plan");
+    expect(documentKeyFromHash("#document-paperclip-context-reference")).toBe("paperclip-context-reference");
+    expect(documentKeyFromHash(documentHash("a b"))).toBe("a b");
+    expect(documentKeyFromHash("#comment-1")).toBeNull();
+    expect(documentKeyFromHash("#document-")).toBeNull();
+    expect(documentKeyFromHash("")).toBeNull();
+  });
+
+  it("knows links to the chat's own documents", () => {
+    expect(chatDocumentLink("/TES/issues/TES-13#document-paperclip-context-reference", chat)).toBe("paperclip-context-reference");
+    expect(chatDocumentLink("/issues/tes-13#document-plan", chat)).toBe("plan");
+    expect(chatDocumentLink(`http://localhost:3100/TES/issues/${chat.id}#document-plan`, chat)).toBe("plan");
+    expect(chatDocumentLink("#document-plan", chat)).toBe("plan");
+  });
+
+  it("leaves other links alone", () => {
+    expect(chatDocumentLink("/TES/issues/TES-14#document-plan", chat)).toBeNull();
+    expect(chatDocumentLink("/TES/issues/TES-13", chat)).toBeNull();
+    expect(chatDocumentLink("/TES/issues/TES-13#comment-1", chat)).toBeNull();
+    expect(chatDocumentLink("/TES/projects/x#document-plan", chat)).toBeNull();
+    expect(chatDocumentLink("/TES/issues/TES-13#document-plan", null)).toBeNull();
   });
 });
 
