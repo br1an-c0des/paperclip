@@ -407,6 +407,14 @@ Decided: decision queues are dropped; the Inbox is the one triage surface. Task 
 
 #### M7: Ready to replace the old UI
 
+Audit (Oct 28): [audit/m7-parity.md](audit/m7-parity.md) sorts every leftover in the 72 rows not yet
+done or dropped into build (101 small, 23 medium), drop (24), API change (12), decide (11 questions)
+and already done (29 stale notes), lists what the checklist misses, and proposes five rounds (A: old
+links, shell and deploy; B: requests and Inbox; C: task panel, thread, documents and runs; D:
+projects, agents, org, goals and recurring; E: Tier 2 depth), then the responsive pass. It also found
+that `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` isn't in `deploy/docker-compose.yml` yet (see the memory
+row above), and that `ui-new` has no way to turn on `enableAgentChat`.
+
 - Plugin hosting (decision G): built in M6 rounds 2 and 3. Left: the `organizationSwitcher` slot
   and choosing a plugin's local folders.
 - Parity audit: every row in [capabilities.md](inventory/capabilities.md) is `done` or `dropped` with
