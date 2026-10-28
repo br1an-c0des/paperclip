@@ -68,7 +68,8 @@ describe("sections and addresses", () => {
     expect(appSettingsRoute("/access")).toEqual({ kind: "redirect", to: "/company/settings/instance/admins" });
     expect(appSettingsRoute("/adapters")).toEqual({ kind: "redirect", to: "/company/settings/instance/harnesses" });
     expect(appSettingsRoute("/experimental")).toEqual({ kind: "redirect", to: "/company/settings/instance/general" });
-    expect(appSettingsRoute("/plugins/123")).toEqual({ kind: "redirect", to: "/company/settings/instance/plugins" });
+    expect(appSettingsRoute("/plugins/123")).toEqual({ kind: "redirect", to: "/company/settings/instance/plugins?plugin=123" });
+    expect(appSettingsRoute("/plugins/Acme.Wiki/extra")).toEqual({ kind: "redirect", to: "/company/settings/instance/plugins?plugin=Acme.Wiki" });
     expect(appSettingsRoute("/environments/abc/edit")).toEqual({ kind: "redirect", to: "/company/settings/environments" });
     expect(appSettingsRoute("/nope")).toEqual({ kind: "default" });
   });

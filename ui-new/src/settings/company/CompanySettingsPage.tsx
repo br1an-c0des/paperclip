@@ -25,7 +25,7 @@ import "./CompanySettings.css";
  * `/company/import` on Import and export.
  *
  * "From plugins" lists the settings pages installed plugins add, at the old UI's address
- * (`/company/settings/<routePath>`); the pages themselves come with plugin hosting. App (instance)
+ * (`/company/settings/<routePath>`), where each plugin draws its own page. App (instance)
  * settings are a page of their own at `/company/settings/instance/*`, whose route outranks this
  * one; it sends the old instance Environments addresses here.
  */

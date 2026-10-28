@@ -47,7 +47,8 @@ export function AppSettingsPage() {
     return value.kind === "section" && shown().has(value.section) ? value.section : null;
   };
   const fallback = () => defaultSection(sections());
-  const keepQuery = () => `${location.search}${location.hash}`;
+  /** The address's query and hash, after a redirect target that may carry its own query. */
+  const keepQuery = (to: string) => `${to.includes("?") && location.search ? `&${location.search.slice(1)}` : location.search}${location.hash}`;
 
   return (
     <>
@@ -85,7 +86,7 @@ export function AppSettingsPage() {
           }
         >
           <Match when={route().kind === "redirect" && (route() as { to: string }).to}>
-            {(to) => <Navigate href={`/${company().issuePrefix}${to()}${keepQuery()}`} />}
+            {(to) => <Navigate href={`/${company().issuePrefix}${to()}${keepQuery(to())}`} />}
           </Match>
           <Match when={current()}>
             {(section) => (
@@ -99,7 +100,7 @@ export function AppSettingsPage() {
                     <Show when={isAdmin()}>
                       <div class="as-rail-note">
                         <span class="as-rail-note-title">No Experimental page</span>
-                        The new UI settles each experimental switch instead of offering it as a toggle.
+                        The switches still worth changing are under General → Features.
                       </div>
                     </Show>
                   </div>
