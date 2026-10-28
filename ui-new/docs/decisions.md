@@ -1147,6 +1147,14 @@ Both are handled in `ui-new` for now.
   `humanizeConnectionDisplayName` and others) are copied into `apps-model.ts`, in the style of
   [decision 10](#10-some-response-types-arent-exported-from-the-shared-package), rather than imported at
   run time.
+- **(M6 round 3.) Gateway and token changes aren't logged as activity,** so gateway pages refetch
+  after each change instead of refreshing live.
+- **An archived gateway can't be listed or deleted, but still holds its access profile,** so that
+  profile can only be archived: deleting it answers 500. The delete dialog says to archive instead.
+- **No company-wide tool catalog;** it's read per connection (`GET /tool-connections/:id/catalog`).
+- **Pasting an MCP config can only turn it on for every agent,** as in the old UI.
+- **Profiles an app's setup creates (`app:` keys) come back with the others;** the UI groups them
+  apart.
 
 ### 36. Gaps found building onboarding and the pages outside a company
 

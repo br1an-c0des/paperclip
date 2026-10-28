@@ -403,7 +403,7 @@ Round 3 (started Oct 28): Apps connections part 2 (assistant connection, gateway
 tools), Apps channels and special setups (chat endpoints, agent channels, task integrations,
 aggregators, identities), the remaining plugin spots and shell leftovers, and task and workspace
 leftovers (runner goal, feedback votes, a Workspaces tab in the org header, branch reconcile).
-Decided: decision queues are dropped; the Inbox is the one triage surface. Task and workspace leftovers are merged ([decision 38](decisions.md#38-gaps-found-building-task-and-workspace-leftovers)). Plugin spots and shell leftovers are merged: the remaining plugin mount points, the plugin config form and status, Create organization, starred agents, announcements and the development banners.
+Decided: decision queues are dropped; the Inbox is the one triage surface. Task and workspace leftovers are merged ([decision 38](decisions.md#38-gaps-found-building-task-and-workspace-leftovers)). Plugin spots and shell leftovers are merged: the remaining plugin mount points, the plugin config form and status, Create organization, starred agents, announcements and the development banners. Apps connections part 2 is merged: Assistants, Gateways, Advanced and the agent's Tools section.
 
 #### M7: Ready to replace the old UI
 
