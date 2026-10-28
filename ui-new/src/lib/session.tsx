@@ -7,6 +7,7 @@ import { authApi } from "@/api/auth";
 import { isTemporaryApiError } from "@/api/client";
 import { healthApi, type HealthStatus } from "@/api/health";
 import { queryKeys } from "@/api/queryKeys";
+import { BootstrapPending } from "@/auth/BootstrapPending";
 import { Button } from "@/ui/Button";
 import { Splash } from "@/routes/Splash";
 
@@ -161,9 +162,11 @@ export function SessionGate(props: ParentProps) {
         <Splash title="Paperclip is starting">This page opens as soon as the server is ready.</Splash>
       </Match>
       <Match when={isBootstrapPending()}>
-        <Splash title="This instance isn't set up yet">
-          The first admin hasn't been claimed. Finish setup in the classic UI, then come back.
-        </Splash>
+        <BootstrapPending
+          claimAvailable={health.data?.deploymentExposure === "private"}
+          activeInvite={health.data?.bootstrapInviteActive}
+          session={session.data}
+        />
       </Match>
       <Match when={isAuthenticatedMode() && !session.data}>
         <Navigate href={`/auth?next=${encodeURIComponent(location.pathname + location.search)}`} />

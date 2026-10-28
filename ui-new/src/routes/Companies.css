@@ -99,3 +99,16 @@
 .companies-error {
   color: var(--red-fg);
 }
+
+.companies-title {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.companies-empty .btn {
+  align-self: flex-start;
+  margin-top: 4px;
+}
