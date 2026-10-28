@@ -200,7 +200,24 @@ export function hostContextFor(context: PluginSlotContext, userId: string | null
 // Navigation from plugin links (ui/src/plugins/bridge.ts, ui/src/lib/company-routes.ts)
 
 /** First path segments that live outside a company and never take its prefix. */
-const GLOBAL_ROOTS = new Set(["auth", "invite", "board-claim", "cli-auth", "mcp-connect", "dot-connect", "assistant-connections", "docs", "instance", "companies", "style-guide", "settings"]);
+const GLOBAL_ROOTS = new Set([
+  "auth",
+  "invite",
+  "board-claim",
+  "cli-auth",
+  "mcp-connect",
+  "dot-connect",
+  "mcp-device",
+  "assistant-connections",
+  "oauth-handoff",
+  "chat-identity",
+  "onboarding",
+  "docs",
+  "instance",
+  "companies",
+  "style-guide",
+  "settings",
+]);
 
 export function splitPath(path: string): { pathname: string; search: string; hash: string } {
   const match = path.match(/^([^?#]*)(\?[^#]*)?(#.*)?$/);
