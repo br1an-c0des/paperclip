@@ -397,12 +397,13 @@ and the Skills and Activity tabs; gaps in decisions [32](decisions.md#32-gaps-fo
 The experimental flags were decided on Oct 28 (decision 32): the sorting stands, and App settings
 gets a Features card. Round 2 (started Oct 28): Apps and tools (replacing the temporary Connectors
 page), onboarding and the pages outside a company, plugin hosting (brought forward from M7), and the
-Features card. The Features card is merged (22 switches; the rest of the flags are dropped or built in). Apps and tools is merged: Browse, AI connections, Connect, a connection's page and Review ([decision 35](decisions.md#35-gaps-found-building-apps-and-tools)); Assistant connection, Gateways, Advanced and Chat endpoints are left for round 3. Onboarding and the pages outside a company are merged: sign-up, board claim, CLI auth, invites, MCP connect, chat identity, the Cloud handoff and a four-step onboarding ([decision 36](decisions.md#36-gaps-found-building-onboarding-and-the-pages-outside-a-company)).
+Features card. The Features card is merged (22 switches; the rest of the flags are dropped or built in). Apps and tools is merged: Browse, AI connections, Connect, a connection's page and Review ([decision 35](decisions.md#35-gaps-found-building-apps-and-tools)); Assistant connection, Gateways, Advanced and Chat endpoints are left for round 3. Onboarding and the pages outside a company are merged: sign-up, board claim, CLI auth, invites, MCP connect, chat identity, the Cloud handoff and a four-step onboarding ([decision 36](decisions.md#36-gaps-found-building-onboarding-and-the-pages-outside-a-company)). Plugin hosting is merged ([decision 37](decisions.md#37-gaps-found-building-plugin-hosting)); round 2 is complete.
 
 #### M7: Ready to replace the old UI
 
-- Plugin hosting (decision G), including plugin panels in the task side panel (since the 2026-10-26
-  sync).
+- Plugin hosting (decision G): built in M6 round 2. Left: dashboard widgets, global toolbar
+  buttons, app-shell overlays, comment annotations and menus, workspace tabs, and App settings'
+  generated plugin config form.
 - Parity audit: every row in [capabilities.md](inventory/capabilities.md) is `done` or `dropped` with
   a reason.
 - The responsive pass: mobile layouts for every screen not folded in earlier (decision H). And an

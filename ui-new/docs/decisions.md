@@ -63,6 +63,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 34 | [Gaps found building Skills and Activity](#34-gaps-found-building-skills-and-activity) | Skills, Activity and costs | Open | Oct 27, 2026 |
 | 35 | [Gaps found building Apps and tools](#35-gaps-found-building-apps-and-tools) | Apps and tools | Open | Oct 28, 2026 |
 | 36 | [Gaps found building onboarding and the pages outside a company](#36-gaps-found-building-onboarding-and-the-pages-outside-a-company) | Companies and onboarding, sign-in and connect flows | Open | Oct 28, 2026 |
+| 37 | [Gaps found building plugin hosting](#37-gaps-found-building-plugin-hosting) | `shell/plugins` | Open | Oct 28, 2026 |
 
 ## Entries
 
@@ -1162,3 +1163,22 @@ Both are handled in `ui-new` for now.
 - **Response types for invites, chat-identity links, board claims and CLI auth challenges** aren't in
   `@paperclipai/shared`; they're declared in the new API modules
   ([decision 10](#10-some-response-types-arent-exported-from-the-shared-package)).
+
+### 37. Gaps found building plugin hosting
+
+- **Status:** Open
+- **Area:** `shell/plugins` (build plan decision G)
+- **Found in:** plugin hosting (M6 round 2).
+
+- **Plugins styled with the old UI's Tailwind classes lose that styling.** `ui-new` has no Tailwind.
+  Inside plugin areas the old UI's colour variables (`--border`, `--muted-foreground` and others) are
+  mapped to `ui-new`'s tokens; class-only styling doesn't apply.
+- **`plugin.ui.updated` never reaches a company's live socket** (it's published instance-wide).
+  Plugin changes are also logged as activity for each company, so `ui-new` refreshes on
+  `activity.logged` with `entityType: "plugin"`.
+- **The SDK's package exports point at an unbuilt `dist`,** so `ui-new/tsconfig.json` maps
+  `@paperclipai/plugin-sdk/ui` to its source for types. Only types are imported.
+- **`usePluginStream` answers 501** ("Plugin stream bridge is not enabled") on an instance without
+  the stream bridge; that's server configuration.
+- **The old host's `react-dom` shim returned no `createRoot`** under React 19 (it lives only in
+  `react-dom/client`); `ui-new`'s shim merges both.
