@@ -23,17 +23,8 @@ import { gradientVar, type Gradient } from "@/ui/status-meta";
 import { useAgentActions } from "./actions";
 import { OrgChartCard } from "./OrgChart";
 import { OrgHeader } from "./OrgHeader";
-import {
-  activityLine,
-  chartMax,
-  projectProgress,
-  runDayBars,
-  runTotals,
-  shortAgo,
-  taskRef,
-  topSpenders,
-  type ActivityLine,
-} from "./org-model";
+import { activityLine, type ActivityLine } from "@/activity/activity-line";
+import { chartMax, projectProgress, runDayBars, runTotals, shortAgo, taskRef, topSpenders } from "./org-model";
 import { useMinute, useOrgData } from "./queries";
 import "./Org.css";
 
