@@ -111,7 +111,7 @@ function AgentSettings(props: { agent: AgentDetail; base: string; section: Agent
             ...AGENT_SECTIONS.map((entry) =>
               "heading" in entry
                 ? entry
-                : { label: entry.label, href: `${props.base}/${entry.key}`, tag: entry.key === "tools" ? "outline" : undefined },
+                : { label: entry.label, href: `${props.base}/${entry.key}` },
             ),
             ...(plugins.slots().length > 0 ? [{ heading: "From plugins" }] : []),
             ...plugins.slots().map((slot) => ({ label: slot.displayName, href: `${props.base}/${pluginTabValue(slot)}`, tag: "plugin" })),

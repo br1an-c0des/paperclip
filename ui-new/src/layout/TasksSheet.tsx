@@ -16,6 +16,7 @@ import { Segmented } from "@/ui/Segmented";
 import { Switch } from "@/ui/Switch";
 import { companySummary, toggleCompanies, type SheetView, type TasksScope } from "./dock-model";
 import { TasksIcon } from "./dock-icons";
+import { GlobalToolbarPlugins } from "@/plugins/ShellPlugins";
 
 /*
  * The Tasks switcher (design/mobile.md, N1), opened by tapping Tasks while in Tasks. It rises from
@@ -238,6 +239,7 @@ export function TasksSheet(props: {
               />
             </div>
 
+            <GlobalToolbarPlugins class="tsheet-plugins" heading={<h3 class="tsheet-h">From plugins</h3>} />
             <div class="tsheet-sep" />
             <a class="tsheet-row" href={`${base()}/company/settings`}>
               <span class="tsheet-sq tsheet-sq--well" aria-hidden="true">

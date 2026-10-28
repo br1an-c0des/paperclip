@@ -18,6 +18,11 @@
   border-color: color-mix(in srgb, var(--amber-fg) 45%, transparent);
 }
 
+/* Setting a runner goal instead of sending a message */
+.cmp.cmp--goal {
+  border-color: color-mix(in srgb, var(--run-fg) 45%, transparent);
+}
+
 .cmp--drop {
   outline: 2px dashed var(--run-fg);
   outline-offset: 2px;

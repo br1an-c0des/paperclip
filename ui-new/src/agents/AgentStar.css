@@ -1,0 +1,9 @@
+/* The agent star (AgentStar.tsx): quiet until it's on. */
+.agent-star {
+  color: var(--muted);
+}
+
+.agent-star--on,
+.agent-star--on:hover {
+  color: var(--amber-fg);
+}

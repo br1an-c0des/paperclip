@@ -397,6 +397,9 @@ function CodeWell(props: { project: Project; settingsHref: string }) {
               <b>{plural(view().checkouts.count)}</b> open
               <Show when={view().checkouts.tasks.length > 0}>: {view().checkouts.tasks.join(", ")}</Show>
             </span>
+            <A class="pd-link pd-push" href={`/${company().issuePrefix}/workspaces`}>
+              All workspaces
+            </A>
           </li>
         </Show>
         <For each={view().services}>

@@ -25,6 +25,7 @@ import { RunRoute } from "./runs/RunRoute";
 import { SearchPage } from "./search/SearchPage";
 import { AppSettingsPage, CompanySettingsRedirect, UnprefixedSettingsRedirect } from "./settings/app/AppSettingsPage";
 import { CompanyWorkload } from "./workload/CompanyWorkload";
+import { WorkspacesPage } from "./workspaces/WorkspacesPage";
 import { ActivityPage } from "./activity/ActivityPage";
 import { LegacyActivityRedirect, UnprefixedCompanyRedirect } from "./activity/redirects";
 import { SkillsPage } from "./skills/SkillsPage";
@@ -89,6 +90,7 @@ export function App() {
           <Route path={["/skills/*", "/activity/*", "/audit/*", "/costs", "/budgets"]} component={UnprefixedCompanyRedirect} />
           {/* The old UI's unprefixed apps links (and OAuth returns) open in the last company too. */}
           <Route path="/apps/*" component={UnprefixedCompanyRedirect} />
+          <Route path="/workspaces" component={UnprefixedCompanyRedirect} />
           {/* The old UI's unprefixed instance-settings addresses open App settings in the last company. */}
           {/* `/instance/settings/*` must outrank the company's `/:companyPrefix/instance/*`. */}
           <Route path={["/instance", "/instance/settings/*rest", "/settings/*rest"]} component={UnprefixedSettingsRedirect} />
@@ -118,6 +120,7 @@ export function App() {
             <Route path="/connectors" component={ConnectorsRedirect} />
             <Route path="/search" component={SearchPage} />
             <Route path="/workload" component={CompanyWorkload} />
+            <Route path="/workspaces" component={WorkspacesPage} />
             <Route path="/skills/*rest" component={SkillsPage} />
             {/* Activity's tabs; the old audit, runs, costs, budgets and timeline pages land on them. */}
             <Route path={["/activity/budgets", "/activity/timeline", "/audit/*", "/runs", "/costs", "/budgets", "/timeline"]} component={LegacyActivityRedirect} />

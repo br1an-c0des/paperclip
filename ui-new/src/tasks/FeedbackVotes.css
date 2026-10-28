@@ -1,0 +1,75 @@
+/* Thumbs up and down under an agent's comment */
+.fbv {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: -2px;
+}
+
+.fbv-btn {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.fbv-btn:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.fbv-btn:disabled {
+  opacity: 0.6;
+}
+
+.fbv-btn[data-on="up"] {
+  background: var(--green-bg);
+  color: var(--green-fg);
+}
+
+.fbv-btn[data-on="down"] {
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+}
+
+.fbv-shared {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.fbv-note {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fbv-note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.fbv-terms {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--body);
+  font-size: 14px;
+}
+
+.fbv-terms p {
+  margin: 0;
+}
+
+.fbv-terms b {
+  color: var(--text);
+}
+
+.fbv-terms a {
+  color: var(--run-fg);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

@@ -67,6 +67,10 @@ export const queryKeys = {
     section: (issueId: string, section: string, ...rest: string[]) => ["issues", "detail", issueId, section, ...rest] as const,
     search: (companyId: string, q: string, limit: number) => ["issues", companyId, "search", q, limit] as const,
     labels: (companyId: string) => ["issues", companyId, "labels"] as const,
+    /** The runner goal for the task's assignee, or for the agent the composer is about to hand it to. */
+    runnerGoal: (issueId: string, agentId: string | null) => ["issues", "detail", issueId, "runner-goal", agentId ?? "__assignee__"] as const,
+    /** Your thumbs up and down on the task's agent output. */
+    feedbackVotes: (issueId: string) => ["issues", "detail", issueId, "feedback-votes"] as const,
   },
   projects: {
     /** Prefix for every project query in a company. */
@@ -146,6 +150,12 @@ export const queryKeys = {
     /** One part of a connection: "catalog", "installs", "grants". */
     connectionPart: (companyId: string, connectionId: string, part: string) =>
       ["tools", companyId, "connection", connectionId, part] as const,
+    gateways: (companyId: string) => ["tools", companyId, "gateways"] as const,
+    /** The tool-call audit, filtered (a gateway's or an agent's calls). */
+    activity: (companyId: string, filter: string) => ["tools", companyId, "activity", filter] as const,
+    /** The profiles, tools and installed connections an agent's runs get. */
+    effective: (companyId: string, agentId: string) => ["tools", companyId, "effective", agentId] as const,
+    profileNewTools: (companyId: string, profileId: string) => ["tools", companyId, "profile-new-tools", profileId] as const,
     /** Saved AgentMail accounts, and what one can reach (src/apps/chat/EmailSetup.tsx). */
     emailCredentials: (companyId: string) => ["tools", companyId, "email-credentials"] as const,
     emailInspection: (companyId: string, connectionId: string) => ["tools", companyId, "email-inspection", connectionId] as const,
@@ -164,6 +174,11 @@ export const queryKeys = {
     /** One part of an endpoint: "resources", "principals", "conversations", "activity", "reviews", "voice-…". */
     part: (companyId: string, endpointId: string, part: string, ...rest: string[]) =>
       ["chat-endpoints", companyId, "endpoint", endpointId, part, ...rest] as const,
+  },
+  /** Paperclip's MCP endpoint for outside assistants (src/auth/McpConnect.tsx, Apps → Assistants). */
+  mcp: {
+    setup: ["mcp-setup"] as const,
+    connections: ["mcp-connections"] as const,
   },
   sidebarBadges: (companyId: string) => ["sidebar-badges", companyId] as const,
   /**
@@ -195,6 +210,15 @@ export const queryKeys = {
   /** Spend by project in a range; no range is all time. */
   costs: (companyId: string, from?: string, to?: string) => ["costs", companyId, from ?? "all", to ?? "now"] as const,
   workspaceOverview: (companyId: string, projectId: string) => ["workspace-overview", companyId, projectId] as const,
+  /**
+   * The Workspaces tab (src/workspaces/): every workspace in the company, open or closed, under the
+   * same `["workspace-overview", companyId]` prefix as a project's, so one invalidation reaches both.
+   * A workspace's close readiness (and git state) sits apart, by workspace.
+   */
+  workspaces: {
+    overview: (companyId: string, view: "open" | "closed") => ["workspace-overview", companyId, "__all__", view] as const,
+    closeReadiness: (workspaceId: string) => ["execution-workspaces", "close-readiness", workspaceId] as const,
+  },
   projectRepositories: (companyId: string) => ["project-repositories", companyId] as const,
   artifacts: {
     /** A project's artifacts grouped by task, or one task's group in full. */
@@ -332,5 +356,14 @@ export const queryKeys = {
     /** Whether a plugin's task side panel is available for the agent running a task. */
     panelAvailability: (pluginId: string, slotId: string, agentId: string, runId: string) =>
       ["plugins", "panel-availability", pluginId, slotId, agentId, runId] as const,
+    /** One plugin's record, health, runtime dashboard, logs and configuration in a company (App settings → Plugins). */
+    detail: (pluginId: string) => ["plugins", "detail", pluginId] as const,
+    health: (pluginId: string) => ["plugins", "detail", pluginId, "health"] as const,
+    dashboard: (pluginId: string) => ["plugins", "detail", pluginId, "dashboard"] as const,
+    logs: (pluginId: string) => ["plugins", "detail", pluginId, "logs"] as const,
+    config: (pluginId: string, companyId: string) => ["plugins", "detail", pluginId, "config", companyId] as const,
   },
+
+  /** The current Paperclip announcement for a signed-in person (src/shell/Announcements.tsx). */
+  announcement: (userId: string) => ["announcements", "current", userId] as const,
 };
