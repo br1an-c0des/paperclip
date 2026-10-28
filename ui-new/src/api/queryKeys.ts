@@ -303,4 +303,16 @@ export const queryKeys = {
     /** The latest version of an npm package, for an installed harness's Update button. */
     npmLatest: (packageName: string) => ["npm-latest-version", packageName] as const,
   },
+
+  /*
+   * Plugin hosting (src/plugins/, decision G). Everything sits under `["plugins"]`, which the live
+   * events refresh when a plugin is installed, turned on or off, upgraded or removed. The UI
+   * contributions are the same entry company settings' plugin pages read.
+   */
+  plugins: {
+    uiContributions: ["plugins", "ui-contributions"] as const,
+    /** Whether a plugin's task side panel is available for the agent running a task. */
+    panelAvailability: (pluginId: string, slotId: string, agentId: string, runId: string) =>
+      ["plugins", "panel-availability", pluginId, slotId, agentId, runId] as const,
+  },
 };

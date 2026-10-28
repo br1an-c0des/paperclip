@@ -8,6 +8,7 @@ import { useCommands } from "@/lib/commands";
 import { useCompaniesQuery, useCompany } from "@/lib/company";
 import { useNeedsYouCount } from "@/inbox/needs-you";
 import { isOrgPage } from "./dock-model";
+import { NavPlugins, NavProjectPlugins } from "@/plugins/NavPlugins";
 import { useAgentsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
 import { useSession, useSignOut, useYouName } from "@/lib/session";
 import { theme, toggleTheme } from "@/lib/theme";
@@ -221,15 +222,18 @@ export function Nav() {
           {(project) => {
             const href = () => `${base()}/projects/${project.urlKey}`;
             return (
-              <A class="navi navi--disc" href={href()}>
-                <InitialsDisc name={project.name.slice(0, 1)} seed={project.id} size={24} />
-                <span class="navi-label">{project.name}</span>
-                <Show when={project.taskCount !== undefined}>
-                  <span class="navi-count" aria-label={`${project.taskCount} tasks`}>
-                    {project.taskCount}
-                  </span>
-                </Show>
-              </A>
+              <>
+                <A class="navi navi--disc" href={href()}>
+                  <InitialsDisc name={project.name.slice(0, 1)} seed={project.id} size={24} />
+                  <span class="navi-label">{project.name}</span>
+                  <Show when={project.taskCount !== undefined}>
+                    <span class="navi-count" aria-label={`${project.taskCount} tasks`}>
+                      {project.taskCount}
+                    </span>
+                  </Show>
+                </A>
+                <NavProjectPlugins project={project} />
+              </>
             );
           }}
         </For>
@@ -258,6 +262,8 @@ export function Nav() {
           }}
         </For>
       </div>
+
+      <NavPlugins />
 
       <div class="nav-group">
         {/* Was the temporary Connectors page; Apps and tools (the org's Apps tab) took its place. */}

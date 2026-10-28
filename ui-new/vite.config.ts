@@ -91,6 +91,8 @@ const apiProxy: Record<string, ProxyOptions> = {
       });
     },
   },
+  // Plugin UI bundles (plugin hosting, src/plugins/loader.ts), served by the server next to /api.
+  "/_plugins": { target: apiTarget },
 };
 
 export default defineConfig({

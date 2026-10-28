@@ -1424,6 +1424,9 @@ importers:
       '@paperclipai/hermes-paperclip-adapter':
         specifier: workspace:*
         version: link:../packages/adapters/hermes
+      '@paperclipai/plugin-sdk':
+        specifier: workspace:*
+        version: link:../packages/plugins/sdk
       '@paperclipai/shared':
         specifier: workspace:*
         version: link:../packages/shared
@@ -1442,6 +1445,12 @@ importers:
       marked:
         specifier: ^16.4.2
         version: 16.4.2
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
       solid-js:
         specifier: ^1.9.17
         version: 1.9.17
@@ -1458,6 +1467,12 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.5
+        version: 19.2.5(@types/react@19.2.18)
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1(@noble/hashes@2.4.0)

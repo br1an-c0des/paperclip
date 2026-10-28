@@ -1,6 +1,6 @@
 import type { Issue } from "@paperclipai/shared";
 import { useSearchParams } from "@solidjs/router";
-import { Activity, FileText, FolderGit2, Layers, Play } from "lucide-solid";
+import { Activity, FileText, FolderGit2, Layers, Play, Puzzle } from "lucide-solid";
 import { For, Match, Show, Switch, type JSX } from "solid-js";
 import { TaskActivity } from "./TaskActivity";
 import { TaskDetails } from "./TaskDetails";
@@ -8,6 +8,8 @@ import { TaskFiles } from "./TaskFiles";
 import { TaskNotices } from "./TaskNotices";
 import { TaskRuns } from "./TaskRuns";
 import { TaskWorkspace } from "./TaskWorkspace";
+import { isPluginTab } from "@/plugins/model";
+import { TaskPluginExtras, TaskPluginSectionView, useTaskPluginSections } from "@/plugins/TaskPlugins";
 import "./TaskSections.css";
 
 /*
@@ -19,7 +21,9 @@ import "./TaskSections.css";
  * The modal (boards 6 and 7) lays them out side by side instead (`layout="split"`): Details stays on
  * the left, and the rail picks what's beside it, Activity by default.
  *
- * The task's health notices (TaskNotices) sit above whichever section is open.
+ * The task's health notices (TaskNotices) sit above whichever section is open, then what plugins
+ * add to tasks (toolbar buttons, launchers, detail blocks). Plugins' task tabs and agent side panels
+ * join the rail as sections of their own (`?section=plugin:<pluginKey>:<slotId>`; src/plugins/).
  */
 
 export type TaskSection = "details" | "activity" | "files" | "runs" | "workspace";
@@ -47,10 +51,12 @@ export function TaskSections(props: {
 }) {
   const [params, setParams] = useSearchParams<{ section?: string }>();
   const split = () => props.layout === "split";
+  const pluginSections = useTaskPluginSections(() => props.taskId);
+  const pluginSection = () => (isPluginTab(params.section) ? params.section : null);
   const requested = (): TaskSection => (params.section && IDS.has(params.section) ? (params.section as TaskSection) : "details");
   // Split, Details is always shown, so the other pane shows Activity unless something else is asked for.
-  const section = (): TaskSection => (split() && requested() === "details" ? "activity" : requested());
-  const choose = (next: TaskSection) => setParams({ section: next === "details" ? undefined : next }, { replace: true });
+  const section = (): TaskSection | "plugin" => (pluginSection() ? "plugin" : split() && requested() === "details" ? "activity" : requested());
+  const choose = (next: string) => setParams({ section: next === "details" ? undefined : next }, { replace: true });
   const rail = () => (split() ? SECTIONS.filter((entry) => entry.id !== "details") : SECTIONS);
 
   const details = () => <TaskDetails taskId={props.taskId} initial={props.initial} hideTitle={props.hideTitle} onOpenTask={props.onOpenTask} />;
@@ -68,6 +74,7 @@ export function TaskSections(props: {
       <Match when={section() === "workspace"}>
         <TaskWorkspace taskId={props.taskId} />
       </Match>
+      <Match when={pluginSection()}>{(id) => <TaskPluginSectionView sections={pluginSections()} id={id()} />}</Match>
     </Switch>
   );
 
@@ -78,6 +85,7 @@ export function TaskSections(props: {
         fallback={
           <div class="tsec-body">
             <TaskNotices taskId={props.taskId} />
+            <TaskPluginExtras taskId={props.taskId} />
             <Show when={section() === "details"} fallback={other()}>
               {details()}
             </Show>
@@ -86,6 +94,7 @@ export function TaskSections(props: {
       >
         <div class="tsec-details">
           <TaskNotices taskId={props.taskId} />
+          <TaskPluginExtras taskId={props.taskId} />
           {details()}
         </div>
         <div class="tsec-body tsec-side">{other()}</div>
@@ -102,6 +111,20 @@ export function TaskSections(props: {
               onClick={() => choose(entry.id)}
             >
               {entry.icon()}
+            </button>
+          )}
+        </For>
+        <For each={pluginSections()}>
+          {(entry) => (
+            <button
+              type="button"
+              class="tsec-rail-btn"
+              aria-current={pluginSection() === entry.id ? "page" : undefined}
+              aria-label={`${entry.label} (plugin)`}
+              title={`${entry.label} (from ${entry.slot.pluginDisplayName})`}
+              onClick={() => choose(entry.id)}
+            >
+              <Puzzle size={16} aria-hidden="true" />
             </button>
           )}
         </For>

@@ -1,0 +1,348 @@
+/*
+ * Host chrome around plugin areas (Capsule Stack tokens): the slot wrapper, its quiet placeholder
+ * and error lines, plugin pages, launcher overlays, and the nav's plugin entries.
+ *
+ * Plugins written for the old UI style themselves with its shadcn variables (`var(--border)`,
+ * `var(--muted-foreground)`…). Inside a plugin area those names point at ui-new's tokens, so such
+ * plugins pick up the current theme. The old UI's Tailwind classes have no equivalent here.
+ */
+
+.plugin-slot {
+  --pc-text-muted: var(--muted);
+  min-width: 0;
+}
+
+.plugin-area {
+  --border: var(--edge);
+  --input: var(--edge);
+  --ring: var(--run-fg);
+  --foreground: var(--text);
+  --background: var(--ground);
+  --card-foreground: var(--text);
+  --popover: var(--card);
+  --popover-foreground: var(--text);
+  --muted: var(--well);
+  --muted-foreground: var(--pc-text-muted);
+  --accent: var(--hover);
+  --accent-foreground: var(--text);
+  --secondary: var(--well);
+  --secondary-foreground: var(--text);
+  --primary-foreground: var(--on-primary);
+  --destructive: var(--red-fg);
+  --destructive-foreground: var(--on-primary);
+  --radius: var(--r-inner);
+  min-width: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.plugin-area[hidden] {
+  display: none;
+}
+
+.plugin-placeholder {
+  padding: 6px 10px;
+  border: 1px dashed var(--dashed);
+  border-radius: var(--r-inner);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.plugin-error {
+  padding: 6px 10px;
+  border-radius: var(--r-inner);
+  background: var(--red-bg);
+  color: var(--red-fg);
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.plugin-note {
+  padding: 16px 20px;
+  color: var(--body);
+}
+
+.plugin-note--alert {
+  color: var(--red-fg);
+}
+
+/* A plugin's detail tab, task section or settings page: the plugin draws inside a plain card. */
+.plugin-tab {
+  display: block;
+}
+
+.card > .plugin-tab,
+.plugin-tab-card {
+  padding: 18px 22px;
+}
+
+/* Full plugin pages */
+.plugin-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.plugin-page-mark {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--body);
+}
+
+.plugin-page-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.plugin-page-body--sidebar {
+  grid-template-columns: 248px minmax(0, 1fr);
+  align-items: start;
+}
+
+.plugin-route-sidebar {
+  position: sticky;
+  top: 14px;
+  padding: 10px;
+}
+
+.plugin-page-main {
+  min-height: 200px;
+}
+
+@media (max-width: 760px) {
+  .plugin-page-body--sidebar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .plugin-route-sidebar {
+    position: static;
+  }
+}
+
+/* Nav: plugin entries sit with the other links; panels below them. */
+.plugin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Old-UI sidebar entries are Tailwind-styled links with an icon; draw them as nav items. */
+.plugin-nav .plugin-area a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.plugin-nav .plugin-area svg,
+.plugin-project-items .plugin-area svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.plugin-nav .plugin-area a:hover {
+  background: var(--hover);
+}
+
+.plugin-nav .plugin-area a[aria-current="page"] {
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+  color: var(--text);
+  font-weight: 800;
+}
+
+button.plugin-launcher-navi {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.plugin-launcher-mark {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border: 1.8px solid currentColor;
+  border-radius: 5px;
+  opacity: 0.8;
+}
+
+.plugin-nav-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 4px;
+}
+
+.plugin-nav-panel {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--card);
+  font-size: 12px;
+}
+
+.plugin-project-items {
+  padding-left: 34px;
+  font-size: 12px;
+}
+
+.plugin-project-items .plugin-area a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  color: var(--pc-text-muted);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.plugin-project-items .plugin-area a:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* Toolbars and blocks on tasks and projects */
+.plugin-task-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.plugin-toolbar,
+.plugin-toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.plugin-toolbar:empty {
+  display: none;
+}
+
+.plugin-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plugin-block {
+  padding: 12px 14px;
+}
+
+/* Launcher overlays: a modal, a drawer from the right, or a popover under its button. */
+.plugin-scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+}
+
+.plugin-scrim--clear {
+  background: transparent;
+}
+
+.plugin-launcher-panel {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--edge);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+}
+
+.plugin-launcher-panel:focus-visible {
+  outline: 2px solid var(--run-fg);
+}
+
+.plugin-launcher-panel--openModal {
+  left: 50%;
+  top: 50%;
+  max-height: calc(100vh - 2rem);
+  transform: translate(-50%, -50%);
+  border-radius: var(--r-modal);
+}
+
+.plugin-launcher-panel--openDrawer {
+  right: 0;
+  top: 0;
+  height: 100%;
+  max-width: min(44rem, 100vw);
+  border-radius: var(--r-modal) 0 0 var(--r-modal);
+}
+
+.plugin-launcher-panel--openPopover {
+  border-radius: var(--r-card);
+}
+
+.plugin-launcher-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.plugin-launcher-titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.plugin-launcher-titles h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.plugin-launcher-sub {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.plugin-launcher-body {
+  overflow: auto;
+  padding: 16px 18px;
+  flex: 1;
+}
+
+/* A plugin's settings in App settings */
+.plugin-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.plugin-settings > a {
+  align-self: flex-start;
+}
+
+.plugin-iframe {
+  width: 100%;
+  min-height: 24rem;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+  background: var(--ground);
+}

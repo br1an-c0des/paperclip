@@ -8,6 +8,9 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
 import { ChatHeaderActions, ChatView, createChatControls } from "@/chat/ChatView";
 import { RailLayout, SectionRail } from "@/ui/PageHeader";
+import { usePluginSlots } from "@/plugins/contributions";
+import { isPluginTab, pluginTabValue } from "@/plugins/model";
+import { PluginDetailTab } from "@/plugins/PluginSlot";
 import { AgentHeader } from "./AgentHeader";
 import { AGENT_SECTIONS, agentView, type AgentSectionKey } from "./agent-model";
 import { BudgetSection } from "./settings/BudgetSection";
@@ -33,6 +36,9 @@ import "./Agent.css";
  * and its settings (board 26), reached with "Manage agent" and left with "Open chat". Settings
  * sections have their own addresses, using the old UI's tab names (`/instructions`,
  * `/configuration`, `/permissions?fromTask=…`) so its links keep working.
+ *
+ * Plugins' agent tabs (`detailTab` slots for agents) sit in the settings rail under "From plugins",
+ * at the old UI's addresses, `/agents/:agentKey/plugin:<pluginKey>:<slotId>`.
  */
 
 export function AgentPage() {
@@ -48,7 +54,11 @@ export function AgentPage() {
     retry: false,
   }));
   const agent = createMemo(() => (detail.data?.companyId === company().id ? detail.data : undefined));
-  const view = createMemo(() => agentView(params.rest ?? ""));
+  const pluginTab = () => {
+    const first = (params.rest ?? "").replace(/^\/+/, "").split("/")[0];
+    return isPluginTab(first) ? first : null;
+  };
+  const view = createMemo(() => (pluginTab() ? ({ view: "settings", section: "profile" } as const) : agentView(params.rest ?? "")));
   const base = () => `/${company().issuePrefix}/agents/${agent()?.urlKey ?? params.agentKey}`;
   const chatControls = createChatControls();
 
@@ -78,7 +88,7 @@ export function AgentPage() {
                   <ChatView agent={found()} base={base()} controls={chatControls} />
                 </Match>
                 <Match when={current().view === "settings" && (current() as { section: AgentSectionKey }).section}>
-                  {(section) => <AgentSettings agent={found()} base={base()} section={section()} />}
+                  {(section) => <AgentSettings agent={found()} base={base()} section={section()} pluginTab={pluginTab()} />}
                 </Match>
               </Switch>
             </>
@@ -89,21 +99,37 @@ export function AgentPage() {
   );
 }
 
-function AgentSettings(props: { agent: AgentDetail; base: string; section: AgentSectionKey }) {
+function AgentSettings(props: { agent: AgentDetail; base: string; section: AgentSectionKey; pluginTab: string | null }) {
+  const company = useCompany();
+  const plugins = usePluginSlots(() => ({ slotTypes: ["detailTab"], entityType: "agent" }));
   return (
     <RailLayout
       rail={
         <SectionRail
           label="Agent settings"
-          entries={AGENT_SECTIONS.map((entry) =>
-            "heading" in entry
-              ? entry
-              : { label: entry.label, href: `${props.base}/${entry.key}`, tag: entry.key === "tools" ? "outline" : undefined },
-          )}
+          entries={[
+            ...AGENT_SECTIONS.map((entry) =>
+              "heading" in entry
+                ? entry
+                : { label: entry.label, href: `${props.base}/${entry.key}`, tag: entry.key === "tools" ? "outline" : undefined },
+            ),
+            ...(plugins.slots().length > 0 ? [{ heading: "From plugins" }] : []),
+            ...plugins.slots().map((slot) => ({ label: slot.displayName, href: `${props.base}/${pluginTabValue(slot)}`, tag: "plugin" })),
+          ]}
         />
       }
     >
       <Switch>
+        <Match when={props.pluginTab}>
+          {(tab) => (
+            <PluginDetailTab
+              slots={plugins.slots()}
+              tab={tab()}
+              loading={plugins.query.isLoading}
+              context={{ companyId: company().id, companyPrefix: company().issuePrefix, entityId: props.agent.id, entityType: "agent" }}
+            />
+          )}
+        </Match>
         <Match when={props.section === "profile"}>
           <ProfileSection agent={props.agent} base={props.base} />
         </Match>

@@ -1,5 +1,5 @@
 import type { IssueStatus, Project } from "@paperclipai/shared";
-import { A, useNavigate, useParams } from "@solidjs/router";
+import { A, Navigate, useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { CalendarDays, Globe, Lock, Pencil } from "lucide-solid";
 import { createEffect, createMemo, Match, Show, Switch } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
@@ -17,6 +17,10 @@ import { HeaderNumber, PageHeader, Tabs } from "@/ui/PageHeader";
 import { Capsule, TonePill } from "@/ui/Status";
 import type { Gradient } from "@/ui/status-meta";
 import { WorkloadView } from "@/workload/Workload";
+import { usePluginSlots } from "@/plugins/contributions";
+import { isPluginTab, pluginTabValue } from "@/plugins/model";
+import { PluginLauncherOutlet } from "@/plugins/PluginLaunchers";
+import { PluginDetailTab, PluginSlotOutlet } from "@/plugins/PluginSlot";
 import { PlannedNote } from "./Planned";
 import { OPEN_STATUSES } from "./Tasks";
 
@@ -28,6 +32,10 @@ import { OPEN_STATUSES } from "./Tasks";
  * (boards 10 and 11, a section per URL under `/settings`). On the task tabs the tab sets the layout,
  * so the task view leaves out its own switch. `/overview` is the old UI's name for the project's home
  * and opens the dashboard too.
+ *
+ * Plugins' project tabs (`detailTab` slots for projects) follow, at `/plugin:<pluginKey>:<slotId>`
+ * (the old UI's `?tab=plugin:…` lands there too), and their toolbar buttons and launchers sit in
+ * the header's actions.
  *
  * The project list leaves archived projects out, so a key it doesn't know is looked up on its own;
  * that way an archived project's pages (and its settings, to restore it) still open.
@@ -49,7 +57,7 @@ const PROJECT_STATUS: Record<Project["status"], { label: string; gradient: Gradi
   cancelled: { label: "Cancelled", gradient: "ash" },
 };
 
-type View = "dashboard" | "list" | "board" | "workload" | "docs" | "settings" | "later";
+type View = "dashboard" | "list" | "board" | "workload" | "docs" | "settings" | "plugin" | "later";
 
 function viewFor(tab: string): View {
   if (tab === "" || tab === "overview") return "dashboard";
@@ -58,6 +66,7 @@ function viewFor(tab: string): View {
   if (tab === "workload") return "workload";
   if (tab === "docs") return "docs";
   if (tab === "settings" || tab.startsWith("settings/")) return "settings";
+  if (isPluginTab(tab)) return "plugin";
   return "later";
 }
 
@@ -100,6 +109,16 @@ export function ProjectPage() {
   const tasks = useTaskList(() => (project() ? { projectId: project()!.id } : null));
   const base = () => `/${company().issuePrefix}/projects/${params.projectKey}`;
   const view = () => viewFor((params.tab ?? "").replace(/\/$/, ""));
+  const [search] = useSearchParams<{ tab?: string }>();
+  const plugins = usePluginSlots(() => ({ slotTypes: ["detailTab"], entityType: "project" }));
+  const pluginContext = (found: Project) => ({
+    companyId: company().id,
+    companyPrefix: company().issuePrefix,
+    projectId: found.id,
+    projectRef: found.urlKey,
+    entityId: found.id,
+    entityType: "project" as const,
+  });
 
   const list = () => (project() ? (tasks.data ?? []) : []);
   const open = () => list().filter((task) => OPEN_STATUSES.has(task.status as IssueStatus)).length;
@@ -139,20 +158,41 @@ export function ProjectPage() {
           </Show>
         }
         actions={
-          <Show when={view() === "dashboard" && project()}>
-            <A class={buttonClass({ size: "compact" })} href={`${base()}/settings`}>
-              <Pencil size={14} aria-hidden="true" />
-              Edit project
-            </A>
-          </Show>
+          <>
+            <Show when={project()}>
+              {(found) => (
+                <>
+                  <PluginSlotOutlet slotTypes={["toolbarButton", "contextMenuItem"]} context={pluginContext(found())} class="plugin-toolbar" errorBehavior="hidden" />
+                  <PluginLauncherOutlet placementZones={["toolbarButton"]} context={pluginContext(found())} class="plugin-toolbar" errorBehavior="hidden" />
+                </>
+              )}
+            </Show>
+            <Show when={view() === "dashboard" && project()}>
+              <A class={buttonClass({ size: "compact" })} href={`${base()}/settings`}>
+                <Pencil size={14} aria-hidden="true" />
+                Edit project
+              </A>
+            </Show>
+          </>
         }
-        tabs={<Tabs label="Project" items={PROJECT_TABS.map((item) => ({ label: item.label, href: `${base()}${item.path}` }))} />}
+        tabs={
+          <Tabs
+            label="Project"
+            items={[
+              ...PROJECT_TABS.map((item) => ({ label: item.label, href: `${base()}${item.path}` })),
+              ...plugins.slots().map((slot) => ({ label: slot.displayName, href: `${base()}/${pluginTabValue(slot)}` })),
+            ]}
+          />
+        }
       >
         <Show when={view() === "dashboard" && project()}>{(found) => <ProjectFacts project={found()} />}</Show>
       </PageHeader>
       <Show when={project()} fallback={<p class="card pd-empty">{projects.isPending || single.isFetching ? "Loading the project…" : "There's no project with this address, or you can't open it."}</p>}>
         {(found) => (
           <Switch fallback={<PlannedNote milestone="M4">This tab is still to come.</PlannedNote>}>
+            <Match when={view() === "dashboard" && isPluginTab(search.tab) && search.tab}>
+              {(tab) => <Navigate href={`${base()}/${tab()}`} />}
+            </Match>
             <Match when={view() === "dashboard"}>
               <ProjectDashboard project={found()} tasks={tasks} base={base()} />
             </Match>
@@ -164,6 +204,9 @@ export function ProjectPage() {
             </Match>
             <Match when={view() === "docs"}>
               <ProjectDocs project={found()} tasks={tasks} />
+            </Match>
+            <Match when={view() === "plugin"}>
+              <PluginDetailTab slots={plugins.slots()} tab={(params.tab ?? "").replace(/\/$/, "")} loading={plugins.query.isLoading} context={pluginContext(found())} />
             </Match>
             <Match when={view() === "settings"}>
               <ProjectSettings project={found()} base={base()} rest={(params.tab ?? "").replace(/^settings\/?/, "")} />

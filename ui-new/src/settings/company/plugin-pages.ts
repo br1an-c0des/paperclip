@@ -1,25 +1,13 @@
-import type { PluginUiSlotDeclaration } from "@paperclipai/shared";
-import { createQuery } from "@tanstack/solid-query";
-import { api } from "@/api/client";
-import { queryKeys } from "@/api/queryKeys";
+import type { PluginUiContribution } from "@/api/plugins";
+import { usePluginContributions } from "@/plugins/contributions";
 
 /*
  * Settings pages that plugins add (board 30's "From plugins"): each ready plugin's
  * `companySettingsPage` slots, from `GET /api/plugins/ui-contributions`, as the old UI's
  * CompanySettingsPluginPage reads them. A page lives at `/company/settings/<routePath>`.
  *
- * Drawing a plugin's page needs plugin hosting (decision G, M7). Until then the section names the
- * plugin and says so. This reads the contributions directly rather than through an api/ module,
- * since the plugin API module comes with plugin hosting.
+ * The plugin draws the page itself, through plugin hosting (src/plugins/, decision G).
  */
-
-type PluginUiContribution = {
-  pluginId: string;
-  pluginKey: string;
-  displayName: string;
-  version: string;
-  slots: PluginUiSlotDeclaration[];
-};
 
 export type PluginSettingsPage = {
   pluginId: string;
@@ -31,7 +19,7 @@ export type PluginSettingsPage = {
 };
 
 /** The company settings pages plugins declare, in their order, then by name. */
-export function pluginSettingsPages(contributions: readonly PluginUiContribution[] | undefined): PluginSettingsPage[] {
+export function pluginSettingsPages(contributions: readonly Pick<PluginUiContribution, "pluginId" | "displayName" | "version" | "slots">[] | undefined): PluginSettingsPage[] {
   const pages: (PluginSettingsPage & { order: number })[] = [];
   for (const contribution of contributions ?? []) {
     for (const slot of contribution.slots) {
@@ -53,11 +41,6 @@ export function pluginSettingsPages(contributions: readonly PluginUiContribution
 }
 
 export function usePluginSettingsPages() {
-  const query = createQuery(() => ({
-    queryKey: queryKeys.companySettings.pluginPages,
-    queryFn: ({ signal }) => api.get<PluginUiContribution[]>("/plugins/ui-contributions", { signal }),
-    staleTime: 60_000,
-    retry: false,
-  }));
+  const query = usePluginContributions();
   return { query, pages: () => pluginSettingsPages(query.data) };
 }

@@ -1,4 +1,4 @@
-import type { PluginRecord } from "@paperclipai/shared";
+import type { PluginLauncherDeclaration, PluginLauncherRenderContextSnapshot, PluginRecord, PluginUiSlotDeclaration } from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
@@ -6,9 +6,26 @@ import { api } from "./client";
  * the plugins bundled with this checkout, install from npm or a local folder, enable, disable,
  * upgrade and uninstall. Instance admins only.
  *
- * A plugin's own settings page, panels and full pages are drawn by the plugin, which needs plugin
- * hosting (build plan, decision G, M7); their bridge requests aren't ported yet.
+ * Plugin hosting (src/plugins/, decision G) adds what plugin UI needs: the UI contributions of the
+ * ready plugins, and the bridge requests a plugin component's `usePluginData` and
+ * `usePluginAction` make to its worker.
  */
+
+/**
+ * A ready plugin's UI (`GET /plugins/ui-contributions`): its slots, its launchers (from the manifest's
+ * `ui.launchers` and the older top-level `launchers`), and its UI bundle's entry file, served at
+ * `/_plugins/:pluginId/ui/:uiEntryFile`.
+ */
+export type PluginUiContribution = {
+  pluginId: string;
+  pluginKey: string;
+  displayName: string;
+  version: string;
+  updatedAt?: string;
+  uiEntryFile: string;
+  slots: PluginUiSlotDeclaration[];
+  launchers: PluginLauncherDeclaration[];
+};
 
 /** A plugin that ships with this checkout (`GET /plugins/examples`). */
 export type BundledPlugin = {
@@ -31,4 +48,37 @@ export const pluginsApi = {
   /** Upgrades to the latest version on npm. */
   upgrade: (pluginId: string) => api.post<{ ok: boolean }>(`/plugins/${encodeURIComponent(pluginId)}/upgrade`, {}),
   uninstall: (pluginId: string) => api.delete<{ ok: boolean }>(`/plugins/${encodeURIComponent(pluginId)}`),
+  uiContributions: (signal?: AbortSignal) => api.get<PluginUiContribution[]>("/plugins/ui-contributions", { signal }),
+  /** `usePluginData(key, params)`: the worker's `getData` handler. Errors carry `{ code, message, details }`. */
+  bridgeGetData: (
+    pluginId: string,
+    key: string,
+    params: Record<string, unknown> | undefined,
+    companyId: string | null,
+    renderEnvironment: PluginLauncherRenderContextSnapshot | null,
+  ) =>
+    api.post<{ data: unknown }>(`/plugins/${encodeURIComponent(pluginId)}/data/${encodeURIComponent(key)}`, {
+      companyId: companyId ?? undefined,
+      params,
+      renderEnvironment: renderEnvironment ?? undefined,
+    }),
+  /** `usePluginAction(key)` and `performAction` launchers: the worker's `performAction` handler. */
+  bridgePerformAction: (
+    pluginId: string,
+    key: string,
+    params: Record<string, unknown> | undefined,
+    companyId: string | null,
+    renderEnvironment: PluginLauncherRenderContextSnapshot | null = null,
+  ) =>
+    api.post<{ data: unknown }>(`/plugins/${encodeURIComponent(pluginId)}/actions/${encodeURIComponent(key)}`, {
+      companyId: companyId ?? undefined,
+      params,
+      renderEnvironment: renderEnvironment ?? undefined,
+    }),
+  /**
+   * Whether a task side panel is available for a running agent: the plugin's own route,
+   * `/plugins/:pluginId/api<availabilityPath>` with `:entityId` filled in (useTaskPluginPanels.ts).
+   */
+  panelAvailability: (pluginId: string, availabilityPath: string, entityId: string, signal?: AbortSignal) =>
+    api.get<{ available: boolean }>(`/plugins/${encodeURIComponent(pluginId)}/api${availabilityPath.replace(":entityId", encodeURIComponent(entityId))}`, { signal }),
 };

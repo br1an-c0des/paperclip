@@ -85,7 +85,7 @@ export type AppSettingsRoute =
 /**
  * What the address after `/company/settings/instance` opens. The old UI's addresses keep working:
  * `/profile`, `/access`, `/adapters` and `/experimental` move to their sections here, a plugin's
- * settings page (`/plugins/:id`) opens Plugins, and Environments moves to organization settings,
+ * settings page (`/plugins/:id`) opens it under Plugins (`?plugin=:id`), and Environments moves to organization settings,
  * since the API keeps environments per organization (board 30).
  */
 export function appSettingsRoute(rest: string): AppSettingsRoute {
@@ -93,6 +93,10 @@ export function appSettingsRoute(rest: string): AppSettingsRoute {
   const first = segments[0];
   if (!first) return { kind: "default" };
   if (first === "environments") return { kind: "redirect", to: "/company/settings/environments" };
+  if (first === "plugins" && segments.length > 1) {
+    const pluginId = rest.split("/").filter(Boolean)[1]!;
+    return { kind: "redirect", to: `${APP_SETTINGS_PATH}/plugins?plugin=${encodeURIComponent(pluginId)}` };
+  }
   if (SECTION_KEYS.has(first as AppSectionKey)) {
     return segments.length === 1
       ? { kind: "section", section: first as AppSectionKey }

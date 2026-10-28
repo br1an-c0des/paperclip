@@ -28,6 +28,7 @@ import { CompanyWorkload } from "./workload/CompanyWorkload";
 import { ActivityPage } from "./activity/ActivityPage";
 import { LegacyActivityRedirect, UnprefixedCompanyRedirect } from "./activity/redirects";
 import { SkillsPage } from "./skills/SkillsPage";
+import { PluginPageRoute } from "./plugins/PluginPage";
 import { AppsPage, ConnectorsRedirect } from "./apps/AppsPage";
 import { BoardClaimPage } from "./auth/BoardClaim";
 import { ChatIdentityPage } from "./auth/ChatIdentity";
@@ -125,7 +126,8 @@ export function App() {
             <Route path="/company/settings/instance/*rest" component={AppSettingsPage} />
             <Route path="/instance/*rest" component={() => <CompanySettingsRedirect kind="instance" />} />
             <Route path="/settings/*rest" component={() => <CompanySettingsRedirect kind="settings" />} />
-            <Route path="/*rest" component={NotBuiltYet} />
+            {/* A plugin's page when a plugin owns the address (`/<routePath>/*`, `/plugins/:id`), else Not built yet. */}
+            <Route path="/*rest" component={() => <PluginPageRoute notFound={NotBuiltYet} />} />
           </Route>
         </Route>
         <Route path="*404" component={NotFound} />
