@@ -1,7 +1,7 @@
-import type { AgentDetail, AgentRole } from "@paperclipai/shared";
+import type { AgentDetail } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Check, ChevronDown } from "lucide-solid";
-import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, on, Show } from "solid-js";
 import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { resourceMembershipsApi } from "@/api/resource-memberships";
@@ -9,11 +9,11 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
-import { FieldButton, SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
-import { Menu } from "@/ui/Menu";
+import { SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
 import { Popover } from "@/ui/Popover";
 import { pushToast } from "@/ui/Toast";
-import { AGENT_PALETTES, AGENT_ROLE_OPTIONS, managerCandidates, paletteLabel, roleLabel, textEdit } from "../agent-model";
+import { managerCandidates, roleLabel, textEdit } from "../agent-model";
+import { ManagerMenu, PaletteGrid, paletteAppearance, RoleMenu } from "./fields";
 import { CardNote, dateTime, failure, refreshAgent, SectionTitle, shortDate, SwitchRow, useAgentSaver } from "../shared";
 
 /*
@@ -64,30 +64,7 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
               </span>
             </Popover.Trigger>
             <Popover.Content title="Avatar" width={360}>
-              <div class="ag-palettes" role="radiogroup" aria-label="Avatar palette">
-                <For each={AGENT_PALETTES}>
-                  {(palette) => (
-                    <button
-                      type="button"
-                      role="radio"
-                      class="ag-palette"
-                      aria-checked={paletteId() === palette}
-                      aria-label={paletteLabel(palette)}
-                      title={paletteLabel(palette)}
-                      onClick={() => {
-                        if (paletteId() === palette) return;
-                        void saver.save({ appearance: { schemaVersion: 1, characterVersion: "cap-v1", paletteId: palette } });
-                      }}
-                    >
-                      <AgentAvatar
-                        agent={{ id: props.agent.id, name: props.agent.name, appearance: { schemaVersion: 1, characterVersion: "cap-v1", paletteId: palette } }}
-                        size={40}
-                        ring={false}
-                      />
-                    </button>
-                  )}
-                </For>
-              </div>
+              <PaletteGrid agent={props.agent} value={paletteId()} onPick={(palette) => void saver.save({ appearance: paletteAppearance(palette) })} />
             </Popover.Content>
           </Popover>
         </SettingsRow>
@@ -108,23 +85,7 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
           />
         </SettingsRow>
         <SettingsRow label="Role">
-          <Menu>
-            <Menu.Trigger as={FieldButton} class="ps-field-240" aria-label={`Role: ${roleLabel(props.agent.role)}`}>
-              {roleLabel(props.agent.role)}
-            </Menu.Trigger>
-            <Menu.Content label="Role" width={220}>
-              <For each={AGENT_ROLE_OPTIONS}>
-                {(option) => (
-                  <Menu.Item
-                    onSelect={() => void saver.save(option.value === props.agent.role ? null : { role: option.value as AgentRole })}
-                    hint={option.value === props.agent.role ? <Check size={14} /> : undefined}
-                  >
-                    {option.label}
-                  </Menu.Item>
-                )}
-              </For>
-            </Menu.Content>
-          </Menu>
+          <RoleMenu value={props.agent.role} onChange={(role) => void saver.save({ role })} />
         </SettingsRow>
         <SettingsRow label="Title" help="Shown in place of the role, such as “Quant Researcher”." for="ag-title">
           <TextInput
@@ -148,33 +109,12 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
           />
         </SettingsRow>
         <SettingsRow label="Reports to" help="Its manager in the org chart.">
-          <Menu>
-            <Menu.Trigger
-              as={FieldButton}
-              class="ps-field-360"
-              aria-label={`Reports to ${manager()?.name ?? "nobody"}`}
-              icon={<Show when={manager()}>{(found) => <AgentAvatar agent={found()} size={20} ring={false} />}</Show>}
-            >
-              {manager()?.name ?? "Nobody: top of the org"}
-            </Menu.Trigger>
-            <Menu.Content label="Reports to" width={280}>
-              <For each={candidates()} fallback={<p class="nt-menu-note">No other agents to report to.</p>}>
-                {(agent) => (
-                  <Menu.Item
-                    onSelect={() => void saver.save(agent.id === props.agent.reportsTo ? null : { reportsTo: agent.id })}
-                    icon={<AgentAvatar agent={agent} size={24} ring={false} />}
-                    hint={agent.id === props.agent.reportsTo ? <Check size={14} /> : undefined}
-                  >
-                    {agent.name}
-                  </Menu.Item>
-                )}
-              </For>
-              <Menu.Separator />
-              <Menu.Item onSelect={() => void saver.save(props.agent.reportsTo ? { reportsTo: null } : null)} hint={props.agent.reportsTo ? undefined : <Check size={14} />}>
-                Nobody
-              </Menu.Item>
-            </Menu.Content>
-          </Menu>
+          <ManagerMenu
+            candidates={candidates()}
+            manager={manager()}
+            value={props.agent.reportsTo}
+            onChange={(reportsTo) => void saver.save({ reportsTo })}
+          />
           <Show when={props.agent.orgChainHealth && props.agent.orgChainHealth.status !== "healthy"}>
             <p class="fhelp ag-warn">{props.agent.orgChainHealth?.repairGuidance ?? "Its chain of command needs attention."}</p>
           </Show>
