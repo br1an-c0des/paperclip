@@ -1,0 +1,789 @@
+/*
+ * Agent chat (boards 12, 13; phone M9). The page scrolls as a whole: the thread flows down, the
+ * composer stays at the foot (sticky), and on desktop the Activity column stays in view beside it.
+ * On a phone the column is a sheet, and the composer sits above the floating dock.
+ */
+
+.ch {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.ch-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  /* Short conversations sit at the foot, by the composer, as in a chat. */
+  min-height: calc(100dvh - 200px);
+}
+
+.ch-muted {
+  color: var(--muted);
+}
+
+.ch-center {
+  text-align: center;
+}
+
+.ch-ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ch-push {
+  margin-left: auto;
+}
+
+.ch-link {
+  color: var(--run-fg);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ch-link:hover {
+  text-decoration: underline;
+}
+
+.ch-note {
+  padding: 20px 22px;
+}
+
+/* Search this conversation */
+.ch-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto 4px;
+  padding: 0 28px;
+  box-sizing: border-box;
+}
+
+.ch-search > :first-child {
+  flex: 1;
+}
+
+/* The thread */
+.ch-log {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 18px;
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 20px 28px 14px;
+  box-sizing: border-box;
+}
+
+.ch-more {
+  align-self: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ch-more:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--body);
+}
+
+.ch-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: auto auto 12px;
+  max-width: 440px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.ch-empty .disp {
+  margin: 6px 0 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.ch-empty p {
+  margin: 0;
+}
+
+.ch-sep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ch-sep::before,
+.ch-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--well);
+}
+
+.ch-sep--session::before,
+.ch-sep--session::after {
+  background: repeating-linear-gradient(90deg, var(--pri-off) 0 4px, transparent 4px 8px);
+}
+
+.ch-sep--session {
+  text-align: center;
+}
+
+/* One message: avatar column, then name and time, then the text and any cards */
+.ch-msg {
+  display: flex;
+  gap: 12px;
+}
+
+.ch-msg--cont {
+  margin-top: -12px;
+}
+
+.ch-av {
+  flex: 0 0 32px;
+  width: 32px;
+  display: flex;
+  justify-content: center;
+}
+
+.ch-msg-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ch-msg-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.ch-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ch-tag {
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--edge);
+  color: var(--muted);
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ch-msg-body .md {
+  color: var(--body);
+  line-height: 1.55;
+}
+
+.ch-msg--notice .ch-msg-body .md {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ch-msg--card > :last-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.ch-request {
+  max-width: 560px;
+}
+
+/* A linked task (hand-off or report) */
+.ch-task {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 540px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-card);
+  background: var(--ground);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.ch-task:hover {
+  border-color: var(--dashed);
+  background: var(--hover);
+}
+
+.ch-task-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ch-task-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--violet-fg);
+}
+
+.ch-task-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  min-width: 0;
+}
+
+.ch-task-title .mono {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.ch-task-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ch-task-status {
+  margin-left: auto;
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* The live reply (board 13) */
+.ch-live {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--run-fg) 50%, transparent);
+  border-radius: var(--r-card);
+  background: var(--run-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ch-live--done {
+  border-color: var(--edge);
+  background: var(--card);
+}
+
+.ch-live-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ch-live-who {
+  font-weight: 600;
+  color: var(--run-fg);
+}
+
+.ch-live--done .ch-live-who {
+  color: var(--text);
+}
+
+.ch-live-head .ch-muted {
+  font-size: 13px;
+}
+
+.ch-live-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.ch-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--body);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ch-pill-btn:hover {
+  background: var(--hover);
+}
+
+.ch-pill-btn--stop {
+  color: var(--red-fg);
+}
+
+.ch-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ch-step {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ch-step-mark {
+  flex: 0 0 10px;
+}
+
+.ch-step[data-state="done"] .ch-step-mark {
+  color: var(--green-fg);
+}
+
+.ch-step[data-state="error"] .ch-step-mark {
+  color: var(--red-fg);
+}
+
+.ch-step[data-state="running"] {
+  color: var(--run-fg);
+}
+
+.ch-step-label {
+  flex-shrink: 0;
+  min-width: 52px;
+  color: var(--muted);
+}
+
+.ch-step-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ch-step--more {
+  opacity: 0.8;
+}
+
+.ch-live-text {
+  color: var(--body);
+  line-height: 1.6;
+}
+
+.ch-live-text--caret > :last-child::after {
+  content: "▍";
+  color: var(--run-fg);
+  animation: ch-caret 1s steps(2, start) infinite;
+}
+
+@keyframes ch-caret {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ch-live-text--caret > :last-child::after {
+    animation: none;
+  }
+}
+
+/* Under the thread: the work strip and the composer */
+.ch-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 8px 28px 18px;
+  box-sizing: border-box;
+  background: linear-gradient(to bottom, transparent, var(--ground) 18px);
+}
+
+.ch-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--run-fg) 50%, transparent);
+  border-radius: var(--r-card);
+  background: var(--run-bg);
+  color: var(--run-fg);
+  font-size: 13px;
+}
+
+.ch-strip strong {
+  font-weight: 600;
+}
+
+.ch-cmp-hint {
+  min-width: 0;
+  padding-left: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The Activity column */
+.ch-side {
+  flex: 0 0 340px;
+  min-width: 0;
+  position: sticky;
+  top: 14px;
+  max-height: calc(100dvh - 28px);
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ch-side-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 12px;
+}
+
+.ch-side-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.ch-now {
+  margin: 0 12px;
+  padding: 12px 16px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--line);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ch-now--live {
+  border-color: color-mix(in srgb, var(--run-fg) 50%, transparent);
+  background: var(--run-bg);
+}
+
+.ch-now-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.ch-now--live .ch-now-kicker {
+  color: var(--run-fg);
+}
+
+.ch-now-title {
+  color: var(--text);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+button.ch-now-title {
+  font: inherit;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.ch-now .ch-muted {
+  font-size: 13px;
+}
+
+.ch-now-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.ch-side-sec {
+  padding: 16px 16px 4px;
+}
+
+.ch-side-sec h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+  letter-spacing: -0.01em;
+}
+
+.ch-next {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.ch-next-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 0 6px;
+  margin: 0 -6px;
+  border: 0;
+  border-radius: var(--r-inner);
+  background: transparent;
+  color: var(--body);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ch-next-row:hover {
+  background: var(--hover);
+}
+
+.ch-next-row .mono {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.ch-tl {
+  flex: 1;
+  padding-top: 8px;
+}
+
+.ch-tl section + section {
+  padding-top: 10px;
+}
+
+.ch-tl ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ch-tl li {
+  display: flex;
+  gap: 10px;
+  padding: 7px 0;
+}
+
+.ch-tl-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--well);
+  color: var(--muted);
+}
+
+.ch-tl-icon--run {
+  background: var(--run-bg);
+  color: var(--run-fg);
+}
+
+.ch-tl-icon--green {
+  background: var(--green-bg);
+  color: var(--green-fg);
+}
+
+.ch-tl-icon--amber {
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+}
+
+.ch-tl-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.ch-tl-target {
+  color: var(--body);
+}
+
+a.ch-tl-target {
+  color: var(--run-fg);
+  text-decoration: none;
+}
+
+.ch-tl time {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ch-side-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* Off on this instance (decision 2) */
+.ch-off {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 22px;
+  line-height: 1.5;
+  color: var(--body);
+}
+
+.ch-off p {
+  margin: 0;
+  max-width: 640px;
+}
+
+.ch-off-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 4px !important;
+}
+
+.ch-off-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--well);
+  color: var(--muted);
+}
+
+.ch-off-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* A reply run that ended without a message */
+.ch-quiet {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ch-quiet--failed > span:first-child {
+  color: var(--red-fg);
+}
+
+/* Tablet and phone: the Activity column is a sheet */
+.ch-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: color-mix(in srgb, black 35%, transparent);
+}
+
+.ch-side--sheet {
+  position: fixed;
+  z-index: 41;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: min(380px, calc(100vw - 24px));
+  max-height: none;
+}
+
+:root[data-viewport="phone"] .ch-side--sheet {
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-height: 80dvh;
+  border-radius: 24px 24px 0 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+:root[data-viewport="phone"] .ch-main {
+  min-height: calc(100dvh - 210px);
+}
+
+:root[data-viewport="phone"] .ch-log {
+  padding: 12px 0 10px;
+  gap: 14px;
+}
+
+:root[data-viewport="phone"] .ch-search {
+  padding: 0;
+}
+
+:root[data-viewport="phone"] .ch-foot {
+  /* Above the floating dock. */
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 0 8px;
+}
+
+:root[data-viewport="phone"] .ch-msg {
+  gap: 8px;
+}
+
+:root[data-viewport="phone"] .ch-av {
+  flex-basis: 28px;
+  width: 28px;
+}
+
+:root[data-viewport="phone"] .ch-cmp-hint {
+  display: none;
+}

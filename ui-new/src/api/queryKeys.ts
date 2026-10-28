@@ -189,4 +189,22 @@ export const queryKeys = {
     runs: (companyId: string) => ["workload", companyId, "runs"] as const,
     builtInAgents: (companyId: string) => ["workload", companyId, "built-in-agents"] as const,
   },
+
+  /*
+   * Agent chat (M5, boards 12, 13; src/chat/). Your chats sit under `["agent-chats", companyId]`,
+   * as in the old UI. The chat itself is a task, so its messages, requests and queue use
+   * `issues.section(chatId, …)` and refresh with the task. Hand-offs, reports and Up next are task
+   * lists, under `issues.list(companyId)`, which every task event refreshes; the agent's activity
+   * sits under `activity(companyId)`, which every activity event refreshes.
+   */
+  chat: {
+    list: (companyId: string) => ["agent-chats", companyId, "list"] as const,
+    detail: (companyId: string, agentId: string) => ["agent-chats", companyId, "agent", agentId] as const,
+    handoffs: (companyId: string, chatId: string) => ["issues", companyId, "chat-handoffs", chatId] as const,
+    reports: (companyId: string, agentId: string) => ["issues", companyId, "agent-reports", agentId] as const,
+    upNext: (companyId: string, agentId: string) => ["issues", companyId, "agent-up-next", agentId] as const,
+    activity: (companyId: string, agentId: string) => ["activity", companyId, "agent", agentId] as const,
+    /** A chat reply's run events, as the live reply reads them. */
+    replyEvents: (runId: string) => ["heartbeat-run", runId, "chat-reply-events"] as const,
+  },
 };

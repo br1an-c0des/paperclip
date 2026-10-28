@@ -2,7 +2,7 @@ import type { AgentDetail } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Crown, Eye, MessageCircle, MoreHorizontal, Pause, Play, SlidersHorizontal } from "lucide-solid";
-import { createMemo, createSignal, Show } from "solid-js";
+import { createMemo, createSignal, Show, type JSX } from "solid-js";
 import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { runPath } from "@/api/runs";
@@ -22,10 +22,11 @@ import { failure, refreshAgent } from "./shared";
  * The agent's header card (boards 12 and 26): avatar with its state, name, the primary-agent crown,
  * a state pill, and one line saying what it is and how it runs ("General · Claude Code · Paperclip
  * Runner · Claude Opus 5.5 · $0.00 spent this month"). On the settings view the actions are Watch
- * run (while it runs), Open chat, Pause or Resume and a More menu; on the chat view, Manage agent.
+ * run (while it runs), Open chat, Pause or Resume and a More menu; on the chat view, the chat's own
+ * buttons (`chatActions`: search, New session) and Manage agent.
  */
 
-export function AgentHeader(props: { agent: AgentDetail; base: string; view: "chat" | "settings" }) {
+export function AgentHeader(props: { agent: AgentDetail; base: string; view: "chat" | "settings"; chatActions?: JSX.Element }) {
   const company = useCompany();
   const client = useQueryClient();
   const agents = useAgentsQuery();
@@ -106,10 +107,13 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
           <Show
             when={props.view === "settings"}
             fallback={
-              <A class={buttonClass({ size: "compact" })} href={`${props.base}/profile`}>
-                <SlidersHorizontal size={14} aria-hidden="true" />
-                Manage agent
-              </A>
+              <>
+                {props.chatActions}
+                <A class={buttonClass({ size: "compact" })} href={`${props.base}/profile`}>
+                  <SlidersHorizontal size={14} aria-hidden="true" />
+                  Manage agent
+                </A>
+              </>
             }
           >
             <Show when={run()}>
@@ -120,7 +124,7 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
                 </A>
               )}
             </Show>
-            <A class={buttonClass({ size: "compact" })} href={props.base} title="Chat arrives in the next part of M5">
+            <A class={buttonClass({ size: "compact" })} href={props.base}>
               <MessageCircle size={14} aria-hidden="true" />
               Open chat
             </A>

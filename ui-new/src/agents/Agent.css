@@ -24,38 +24,6 @@
   white-space: nowrap;
 }
 
-/* Chat placeholder (board 12's place) */
-.ag-chat-next {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 20px 22px;
-  line-height: 1.5;
-  color: var(--body);
-}
-
-.ag-chat-next .cap {
-  color: var(--muted);
-}
-
-.ag-chat-next-icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--run-bg);
-  color: var(--run-fg);
-}
-
-.ag-chat-next-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
 /* Section title (board 26's .sec-title) */
 .ag-sec-title {
   display: flex;
