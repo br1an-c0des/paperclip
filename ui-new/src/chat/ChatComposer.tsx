@@ -46,6 +46,8 @@ export function ChatComposer(props: {
   /** Why sending is off, such as a paused agent. */
   disabledReason?: string | null;
   ref?: (api: { focus: () => void; send: (body: string) => Promise<boolean> }) => void;
+  /** A message went, so the thread can take you to the foot. */
+  onSent?: () => void;
 }) {
   const company = useCompany();
   const client = useQueryClient();
@@ -134,6 +136,7 @@ export function ChatComposer(props: {
         );
       void client.invalidateQueries({ queryKey: queryKeys.issues.detail(chat.id) });
       void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
+      props.onSent?.();
       return true;
     } catch (error) {
       setProblem(error instanceof Error ? error.message : String(error));

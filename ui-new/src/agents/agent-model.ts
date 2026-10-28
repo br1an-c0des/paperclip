@@ -57,6 +57,7 @@ const HARNESS_LABELS: Record<string, string> = {
   cursor_cloud: "Cursor Cloud",
   openclaw_gateway: "OpenClaw Gateway",
   acpx_local: "ACPX (retired)",
+  paperclip_runner: "Paperclip Runner",
   process: "Process",
   http: "HTTP",
   copilot: "GitHub Copilot",
@@ -696,6 +697,43 @@ export function skillToggle(desired: readonly { key: string; versionId: string |
   if (!on) return rest.map((entry) => ({ ...entry }));
   const existing = desired.find((entry) => entry.key === key);
   return [...rest.map((entry) => ({ ...entry })), existing ? { ...existing } : { key, versionId: null }];
+}
+
+/** The core Paperclip skill: how to work in Paperclip (PAPERCLIP_OPERATIONAL_SKILL_KEY on the server). */
+export const PAPERCLIP_CORE_SKILL_KEY = "paperclipai/paperclip/paperclip";
+
+/** Skills legacy harnesses mount on every run besides the core one (PAPERCLIP_FEEDBACK_SKILL_KEYS). */
+const LEGACY_ALWAYS_ON_SKILL_KEYS: ReadonlySet<string> = new Set(["paperclipai/paperclip/complain", "paperclipai/paperclip/suggestion-box"]);
+
+/** The rest of Paperclip's core set, which lead agents get (PAPERCLIP_CORE_SKILL_KEYS in server/src/services/company-skills.ts). */
+const LEAD_SKILL_KEYS: ReadonlySet<string> = new Set([
+  "paperclipai/paperclip/paperclip-board",
+  "paperclipai/paperclip/paperclip-converting-plans-to-tasks",
+  "paperclipai/paperclip/paperclip-create-agent",
+  "paperclipai/paperclip/para-memory-files",
+]);
+
+const skillKey = (key: string) => key.trim().toLowerCase();
+
+/**
+ * Whether a skill comes with the runner rather than being chosen, so it shows without a switch:
+ *
+ * - `runner`: the Paperclip Runner gives its agents Paperclip's tools and rules through its protocol,
+ *   so it never mounts the core skill and the server strips it from their saved set
+ *   (`normalizePaperclipOperationalSkillPreference`).
+ * - `always`: legacy harnesses mount the core skill and the feedback skills on every run, whatever
+ *   the saved set says (`resolveLegacyPaperclipDesiredSkillNames`).
+ * - null: an ordinary skill, on or off by choice.
+ */
+export function builtInSkill(adapterType: string, key: string): "runner" | "always" | null {
+  const normalized = skillKey(key);
+  if (agentRunner(adapterType) === "paperclip") return normalized === PAPERCLIP_CORE_SKILL_KEY ? "runner" : null;
+  return normalized === PAPERCLIP_CORE_SKILL_KEY || LEGACY_ALWAYS_ON_SKILL_KEYS.has(normalized) ? "always" : null;
+}
+
+/** One of Paperclip's bundled skills for agents that lead others: the board, plans to tasks, hiring, memory. */
+export function recommendedForLeads(key: string) {
+  return LEAD_SKILL_KEYS.has(skillKey(key));
 }
 
 // ---------------------------------------------------------------------------------------------

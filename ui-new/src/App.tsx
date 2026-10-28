@@ -24,6 +24,7 @@ import { SignIn } from "./routes/SignIn";
 import { TaskPage, TasksPage } from "./routes/Tasks";
 import { RunRoute } from "./runs/RunRoute";
 import { SearchPage } from "./search/SearchPage";
+import { AppSettingsPage, CompanySettingsRedirect, UnprefixedSettingsRedirect } from "./settings/app/AppSettingsPage";
 import { CompanyWorkload } from "./workload/CompanyWorkload";
 
 const StyleGuide = lazy(() => import("./routes/StyleGuide").then((m) => ({ default: m.StyleGuide })));
@@ -59,6 +60,9 @@ export function App() {
           <Route path="/companies" component={Companies} />
           {/* The old UI's unprefixed hire link opens New agent in the last company. */}
           <Route path="/agents/new" component={UnprefixedNewAgent} />
+          {/* The old UI's unprefixed instance-settings addresses open App settings in the last company. */}
+          {/* `/instance/settings/*` must outrank the company's `/:companyPrefix/instance/*`. */}
+          <Route path={["/instance", "/instance/settings/*rest", "/settings/*rest"]} component={UnprefixedSettingsRedirect} />
           <Route path="/:companyPrefix" component={CompanyLayout}>
             <Route path="/" component={() => <Navigate href="dashboard" />} />
             <Route path="/dashboard" component={OrgDashboard} />
@@ -83,6 +87,10 @@ export function App() {
             <Route path="/connectors" component={ConnectorsPage} />
             <Route path="/search" component={SearchPage} />
             <Route path="/workload" component={CompanyWorkload} />
+            {/* App settings, at the old UI's instance-settings address (outranks /company/settings/*). */}
+            <Route path="/company/settings/instance/*rest" component={AppSettingsPage} />
+            <Route path="/instance/*rest" component={() => <CompanySettingsRedirect kind="instance" />} />
+            <Route path="/settings/*rest" component={() => <CompanySettingsRedirect kind="settings" />} />
             <Route path="/*rest" component={NotBuiltYet} />
           </Route>
         </Route>

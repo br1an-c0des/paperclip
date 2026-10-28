@@ -595,6 +595,45 @@ button.ch-now-title {
   flex-shrink: 0;
 }
 
+/* The chat's documents (ChatDocuments.tsx): rows in the Activity column, cards in the thread */
+.ch-doc-row {
+  text-decoration: none;
+}
+
+.ch-doc-row time {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.ch-doc-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--well);
+  color: var(--muted);
+}
+
+.ch-doc-icon--card {
+  width: 32px;
+  height: 32px;
+}
+
+.ch-doc-icon--plan {
+  background: var(--violet-bg);
+  color: var(--violet-fg);
+}
+
+.ch-doc-card .ch-task-kicker {
+  color: var(--muted);
+}
+
+.ch-doc-card:has(.ch-doc-icon--plan) .ch-task-kicker {
+  color: var(--violet-fg);
+}
+
 .ch-tl {
   flex: 1;
   padding-top: 8px;

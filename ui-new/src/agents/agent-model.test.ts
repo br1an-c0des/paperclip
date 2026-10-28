@@ -4,6 +4,7 @@ import type { AdapterInfo } from "@/api/agents";
 import {
   agentBudgetRequests,
   agentView,
+  builtInSkill,
   buildRuntimePatch,
   canQualifyRunnerEnvironment,
   changedKeyLabel,
@@ -15,6 +16,7 @@ import {
   managerCandidates,
   memoryFor,
   probeQualified,
+  recommendedForLeads,
   revisionConfigChanges,
   runnerOffer,
   runtimeDraft,
@@ -318,6 +320,24 @@ describe("skills and runs", () => {
     expect(skillToggle(desired, "c", true)).toEqual([...desired, { key: "c", versionId: null }]);
     expect(skillToggle(desired, "a", false)).toEqual([{ key: "b", versionId: null }]);
     expect(skillToggle(desired, "a", true)).toEqual([{ key: "b", versionId: null }, { key: "a", versionId: "v1" }]);
+  });
+
+  it("knows which skills come with the runner instead of a switch", () => {
+    expect(builtInSkill("paperclip_runner", "paperclipai/paperclip/paperclip")).toBe("runner");
+    expect(builtInSkill("paperclip_runner", " PaperclipAI/paperclip/paperclip ")).toBe("runner");
+    expect(builtInSkill("paperclip_runner", "paperclipai/paperclip/complain")).toBeNull();
+    expect(builtInSkill("paperclip_runner", "paperclipai/paperclip/paperclip-board")).toBeNull();
+    expect(builtInSkill("claude_local", "paperclipai/paperclip/paperclip")).toBe("always");
+    expect(builtInSkill("claude_local", "paperclipai/paperclip/suggestion-box")).toBe("always");
+    expect(builtInSkill("claude_local", "paperclipai/paperclip/para-memory-files")).toBeNull();
+    expect(builtInSkill("claude_local", "acme/skills/review")).toBeNull();
+  });
+
+  it("marks the bundled skills meant for lead agents", () => {
+    expect(recommendedForLeads("paperclipai/paperclip/paperclip-board")).toBe(true);
+    expect(recommendedForLeads("paperclipai/paperclip/para-memory-files")).toBe(true);
+    expect(recommendedForLeads("paperclipai/paperclip/paperclip")).toBe(false);
+    expect(recommendedForLeads("paperclipai/paperclip/first-task")).toBe(false);
   });
 
   it("adds up run usage", () => {

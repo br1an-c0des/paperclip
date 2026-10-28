@@ -1,7 +1,7 @@
 import type { AgentDetail, IssueStatus } from "@paperclipai/shared";
-import { A } from "@solidjs/router";
+import { A, useLocation, useNavigate } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
-import { Activity, MessageCircleOff, RotateCcw, Search, SlidersHorizontal, X } from "lucide-solid";
+import { Activity, MessageCircleOff, NotebookPen, RotateCcw, Search, SlidersHorizontal, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch } from "solid-js";
 import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
@@ -12,6 +12,7 @@ import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
 import { useYouName } from "@/lib/session";
 import { isSetupDraft } from "@/agents/new/new-agent-model";
+import { documentName, isPlanKey } from "@/documents/document-model";
 import { RequestCard } from "@/requests/RequestCard";
 import { QueuedMessages } from "@/tasks/composer/QueuedMessages";
 import { MessageBody } from "@/tasks/MessageBody";
@@ -22,8 +23,20 @@ import { Capsule } from "@/ui/Status";
 import { STATUS_META } from "@/ui/status-meta";
 import { ChatActivity } from "./ChatActivity";
 import { ChatComposer } from "./ChatComposer";
-import { messageTime, quietRunText, shortDate, statusTag, type ChatEntry, type ChatTask } from "./chat-model";
+import { ChatDocumentCard, ChatDocumentDialog, ChatDocumentList, chatDocumentHost } from "./ChatDocuments";
+import {
+  chatDocumentLink,
+  documentHash,
+  documentKeyFromHash,
+  messageTime,
+  quietRunText,
+  shortDate,
+  statusTag,
+  type ChatEntry,
+  type ChatTask,
+} from "./chat-model";
 import { LiveReply } from "./LiveReply";
+import { atFoot, shouldFollow, type FollowCause } from "./scroll-model";
 import { useChat } from "./use-chat";
 import "./Chat.css";
 
@@ -45,7 +58,9 @@ export function createChatControls() {
   const [searching, setSearching] = createSignal(false);
   const [activityOpen, setActivityOpen] = createSignal(false);
   const [available, setAvailable] = createSignal(false);
+  const [hasPlan, setHasPlan] = createSignal(false);
   let newSession: () => void = () => undefined;
+  let openPlan: () => void = () => undefined;
   return {
     searching,
     setSearching,
@@ -58,13 +73,26 @@ export function createChatControls() {
     bindNewSession: (run: () => void) => {
       newSession = run;
     },
+    /** Whether the chat has a `plan` document, so the header offers it. */
+    hasPlan,
+    setHasPlan,
+    openPlan: () => openPlan(),
+    bindOpenPlan: (run: () => void) => {
+      openPlan = run;
+    },
   };
 }
 
-/** The header's chat buttons (board 12): search the conversation, New session, and Activity on a phone. */
+/** The header's chat buttons (board 12): search the conversation, the plan, New session, and Activity on a phone. */
 export function ChatHeaderActions(props: { controls: ChatControls }) {
   return (
     <Show when={props.controls.available()}>
+      {/* A phone's header has no room for it; the plan heads the Activity sheet's Documents. */}
+      <Show when={props.controls.hasPlan() && viewport() !== "phone"}>
+        <Button size="compact" title="The plan document for this chat" icon={<NotebookPen size={14} aria-hidden="true" />} onClick={() => props.controls.openPlan()}>
+          Plan
+        </Button>
+      </Show>
       <Button
         variant="icon"
         ghost
@@ -87,8 +115,18 @@ export function ChatHeaderActions(props: { controls: ChatControls }) {
   );
 }
 
-export function ChatView(props: { agent: AgentDetail; base: string; controls: ChatControls }) {
-  const company = useCompany();
+type ChatViewProps = { agent: AgentDetail; base: string; controls: ChatControls };
+
+/** One agent's chat. Going to another agent's chat starts it afresh: its loading, place and draft. */
+export function ChatView(props: ChatViewProps) {
+  return (
+    <Show when={props.agent.id} keyed>
+      {(_id) => <ChatThread {...props} />}
+    </Show>
+  );
+}
+
+function ChatThread(props: ChatViewProps) {
   const commands = useCommands();
   const youName = useYouName();
   const projects = useProjectsQuery();
@@ -124,20 +162,81 @@ export function ChatView(props: { agent: AgentDetail; base: string; controls: Ch
           ? `${props.agent.name} is paused. Resume it to chat.`
           : null;
 
-  // Keep the newest in view: on opening, and when something arrives at the foot while the reader
-  // is near it. Older pages loading above don't move the reader.
-  const atBottom = () => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160;
-  const toBottom = () => requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight }));
-  createEffect(on(() => state.loading(), (loading) => !loading && toBottom()));
-  let wasAtBottom = true;
-  const footKey = createMemo(() => {
-    const entries = state.entries();
-    return `${entries[entries.length - 1]?.key ?? ""}:${state.replies().map((turn) => turn.runId).join(",")}:${state.queue.data?.entries.length ?? 0}`;
-  });
-  createEffect(on(footKey, () => wasAtBottom && toBottom(), { defer: true }));
-  const onScroll = () => (wasAtBottom = atBottom());
+  // Where the reader is (scroll-model.ts): the chat opens at the foot and sending takes you there;
+  // otherwise it follows what arrives only while you're at the foot, so reading further up survives
+  // refetches. Growth is watched with a ResizeObserver, which also catches the live reply streaming
+  // in and images loading. Paging back stops following until you scroll to the foot again.
+  let following = true;
+  const metrics = () => ({ scrollY: window.scrollY, viewHeight: window.innerHeight, contentHeight: document.documentElement.scrollHeight });
+  const follow = (cause: FollowCause) => {
+    if (!shouldFollow(cause, following)) return;
+    following = true;
+    // After layout; by then the reader may have scrolled away.
+    requestAnimationFrame(() => following && window.scrollTo({ top: document.documentElement.scrollHeight }));
+  };
+  const onScroll = () => (following = atFoot(metrics()));
   window.addEventListener("scroll", onScroll, { passive: true });
   onCleanup(() => window.removeEventListener("scroll", onScroll));
+  const shown = createMemo(() => !state.off() && !state.loading() && !state.error());
+  createEffect(on(shown, (open) => open && follow("opened")));
+  const watchGrowth = (element: HTMLElement) => {
+    const observer = new ResizeObserver(() => follow("grew"));
+    observer.observe(element);
+    onCleanup(() => observer.disconnect());
+  };
+
+  // The open document lives in the address (`#document-<key>`; ChatDocuments.tsx). Opening one adds
+  // a history entry, so Back closes it; neither moves the page.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const openKey = createMemo(() => documentKeyFromHash(location.hash));
+  const documentHref = (key: string) => `${location.pathname}${location.search}${documentHash(key)}`;
+  let pushedDocument = false;
+  const openDocument = (key: string) => {
+    if (openKey() === key) return;
+    pushedDocument = openKey() === null;
+    navigate(documentHref(key), { scroll: false, replace: openKey() !== null });
+  };
+  const closeDocument = () => {
+    if (openKey() === null) return;
+    if (pushedDocument) {
+      pushedDocument = false;
+      navigate(-1);
+    } else navigate(`${location.pathname}${location.search}`, { scroll: false, replace: true });
+  };
+  const documentHost = createMemo(() => {
+    const id = state.chatId();
+    return id ? chatDocumentHost(id, state.people) : null;
+  });
+  const openTitle = () => {
+    const key = openKey();
+    const doc = key ? state.documents.data?.find((candidate) => candidate.key === key) : undefined;
+    return doc ? documentName(doc) : "Document";
+  };
+  const plan = () => state.documents.data?.find((doc) => isPlanKey(doc.key));
+  createEffect(() => props.controls.setHasPlan(!!plan()));
+  onCleanup(() => props.controls.setHasPlan(false));
+  props.controls.bindOpenPlan(() => {
+    const found = plan();
+    if (found) openDocument(found.key);
+  });
+  // Links in the thread to the chat's own documents (agents post `/TES/issues/TES-13#document-…`)
+  // open them here. This listens before MessageBody's link handling, which would leave the chat for
+  // the task's address and back.
+  const catchDocumentLinks = (element: HTMLElement) => {
+    const onClick = (event: MouseEvent) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = (event.target as Element | null)?.closest?.("a[href]");
+      const current = state.chat();
+      const key = link ? chatDocumentLink(link.getAttribute("href"), current ? { id: current.id, identifier: current.identifier } : null) : null;
+      if (!key) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openDocument(key);
+    };
+    element.addEventListener("click", onClick, true);
+    onCleanup(() => element.removeEventListener("click", onClick, true));
+  };
 
   const oldestLoaded = () => {
     const pages = state.comments.data?.pages;
@@ -153,6 +252,17 @@ export function ChatView(props: { agent: AgentDetail; base: string; controls: Ch
       replyRuns={state.replyRuns()}
       otherRuns={state.otherRuns()}
       people={state.people}
+      documents={
+        <ChatDocumentList
+          documents={state.documents.data ?? []}
+          href={documentHref}
+          onOpen={(key) => {
+            if (sheet) props.controls.setActivityOpen(false);
+            openDocument(key);
+          }}
+          headingId={`ch-docs-${props.agent.id}${sheet ? "-sheet" : ""}`}
+        />
+      }
       sheet={sheet}
       onClose={() => props.controls.setActivityOpen(false)}
     />
@@ -177,7 +287,7 @@ export function ChatView(props: { agent: AgentDetail; base: string; controls: Ch
       </Match>
       <Match when={true}>
         <div class="ch">
-          <div class="ch-main">
+          <div class="ch-main" ref={watchGrowth}>
             <Show when={props.controls.searching()}>
               <div class="ch-search">
                 <TextInput
@@ -195,10 +305,22 @@ export function ChatView(props: { agent: AgentDetail; base: string; controls: Ch
               </div>
             </Show>
 
-            <div class="ch-log" role="log" aria-label={`Conversation with ${props.agent.name}`}>
+            <div class="ch-log" ref={catchDocumentLinks} role="log" aria-label={`Conversation with ${props.agent.name}`}>
               <Show when={state.comments.hasNextPage}>
-                <button type="button" class="ch-more" disabled={state.comments.isFetchingNextPage} onClick={() => void state.comments.fetchNextPage()}>
-                  {state.comments.isFetchingNextPage ? "Loading earlier messages…" : `Load earlier messages${oldestLoaded() ? ` · before ${shortDate(oldestLoaded()!)}` : ""}`}
+                <button
+                  type="button"
+                  class="ch-more"
+                  disabled={state.comments.isFetchingNextPage}
+                  onClick={() => {
+                    following = false;
+                    void state.comments.fetchNextPage();
+                  }}
+                >
+                  {state.comments.isFetchingNextPage
+                    ? "Loading earlier messages…"
+                    : state.comments.isFetchNextPageError
+                      ? "Couldn't load earlier messages. Try again"
+                      : `Load earlier messages${oldestLoaded() ? ` · before ${shortDate(oldestLoaded()!)}` : ""}`}
                 </button>
               </Show>
               <Show when={state.entries().length === 0 && state.replies().length === 0}>
@@ -227,6 +349,8 @@ export function ChatView(props: { agent: AgentDetail; base: string; controls: Ch
                     youName={youName()}
                     projectName={projectName}
                     people={state.people}
+                    documentHref={documentHref}
+                    openDocument={openDocument}
                   />
                 )}
               </For>
@@ -260,6 +384,7 @@ export function ChatView(props: { agent: AgentDetail; base: string; controls: Ch
                 replyRunId={replyRunId()}
                 disabledReason={disabledReason()}
                 ref={(api) => (composer = api)}
+                onSent={() => follow("sent")}
               />
             </div>
           </div>
@@ -267,6 +392,7 @@ export function ChatView(props: { agent: AgentDetail; base: string; controls: Ch
           <Show when={viewport() === "desktop"} fallback={<Show when={props.controls.activityOpen()}>{<div class="ch-scrim" onClick={() => props.controls.setActivityOpen(false)} />}{activity(true)}</Show>}>
             {activity(false)}
           </Show>
+          <ChatDocumentDialog host={documentHost()} docKey={openKey()} title={openTitle()} onClose={closeDocument} />
         </div>
       </Match>
     </Switch>
@@ -280,6 +406,8 @@ function Entry(props: {
   youName: string;
   projectName: (id: string | null) => string | undefined;
   people: ReturnType<typeof useChat>["people"];
+  documentHref: (key: string) => string;
+  openDocument: (key: string) => void;
 }) {
   return (
     <Switch>
@@ -344,6 +472,19 @@ function Entry(props: {
             </div>
           );
         }}
+      </Match>
+      <Match when={props.entry.kind === "document" && props.entry}>
+        {(entry) => (
+          <div class="ch-msg ch-msg--card">
+            <span class="ch-av" aria-hidden="true" />
+            <ChatDocumentCard
+              document={entry().document}
+              people={props.people}
+              href={props.documentHref(entry().document.key)}
+              onOpen={() => props.openDocument(entry().document.key)}
+            />
+          </div>
+        )}
       </Match>
       <Match when={props.entry.kind === "request" && props.entry}>
         {(request) => (

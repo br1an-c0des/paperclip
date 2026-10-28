@@ -368,6 +368,15 @@ Follow-ups from using chat with Bob (2026-10-27):
   whenever `state.loading()` turns false, without checking the reader's position, and a refetch
   may also swap the thread for the loading card.
 
+Done 2026-10-27: all three. The scroll cause was an agent-record refetch resetting the chat's
+"loaded" flag (and a background error replacing the thread); the chat now jumps only on first open
+and when you send, and otherwise follows only while you're at the bottom. Documents show in the
+Activity column, as cards in the thread and, for the plan, a header button; they open over the chat
+and `#document-<key>` links (including old task links) land on them. Skills show `paperclip` as
+"Built into the Paperclip Runner" or "Always on", and for legacy agents `complain` and
+`suggestion-box` as "Always on" too (mounted on every legacy run). Left: search results for a chat
+drop `#document-` (`SearchPage.tsx`).
+
 #### M6: Settings and everything else
 
 Tier 2, ported mostly as is into the new layout:
