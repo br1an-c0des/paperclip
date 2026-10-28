@@ -1079,7 +1079,10 @@ Both are handled in `ui-new` for now.
   and runtime flags) have no switch in `ui-new` yet. **Decided Oct 28:** the sorting stands (about
   11 dropped, 4 built in, the rest following the setting), and App settings → General gets one
   "Features" card with plain switches for only the server-enforced flags someone may still want to
-  change (M6 round 2).
+  change (M6 round 2). Built: 22 switches in five groups. Beyond the first list it includes
+  Simplified English requests and Plan the first task, which the server enforces and the old UI
+  switches. `enableAgentChat` isn't shown (always on, decision A). `features-model.ts` records every
+  left-out flag with its reason, and its test fails when upstream adds a flag that isn't sorted.
 - **Board 28's public URL, "auth secret is set" and "invite used by"** aren't in `GET /api/health`.
 - **No instance-wide harness usage count.** Counts come from each organization's agents the viewer
   can open.
