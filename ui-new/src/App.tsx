@@ -15,6 +15,7 @@ import { OrgDashboard, OrgRedirect } from "./org/OrgDashboard";
 import { AgentsTabRedirect, OrgAgents } from "./org/OrgAgents";
 import { LEGACY_AGENT_TABS } from "./org/org-model";
 import { AgentPage } from "./agents/AgentPage";
+import { NewAgentPage, UnprefixedNewAgent } from "./agents/new/NewAgentPage";
 import { SettingsPage } from "./routes/Planned";
 import { ProjectPage } from "./routes/Project";
 import { RoutineRedirect } from "./recurring/RoutineRedirect";
@@ -55,6 +56,8 @@ export function App() {
         <Route path="/" component={SessionGate}>
           <Route path="/" component={CompanyRootRedirect} />
           <Route path="/companies" component={Companies} />
+          {/* The old UI's unprefixed hire link opens New agent in the last company. */}
+          <Route path="/agents/new" component={UnprefixedNewAgent} />
           <Route path="/:companyPrefix" component={CompanyLayout}>
             <Route path="/" component={() => <Navigate href="dashboard" />} />
             <Route path="/dashboard" component={OrgDashboard} />
@@ -65,6 +68,8 @@ export function App() {
             <Route path="/routines/:routineId?/*" component={RoutineRedirect} />
             <Route path="/projects/:projectKey/*tab" component={ProjectPage} />
             <Route path="/agents" component={OrgAgents} />
+            {/* Before the agent routes, so "new" isn't taken for an agent's key. */}
+            <Route path="/agents/new" component={NewAgentPage} />
             <Route path="/agents/:tab" matchFilters={{ tab: LEGACY_AGENT_TABS }} component={AgentsTabRedirect} />
             <Route path="/agents/:agentKey/runs/:runId" component={RunRoute} />
             <Route path="/agents/:agentKey/*rest" component={AgentPage} />

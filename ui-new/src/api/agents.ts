@@ -17,6 +17,7 @@ import type {
   AgentSkillSnapshot,
   AgentTaskSession,
   AdapterEnvironmentTestResult,
+  Approval,
   AgentRuntimeSettingsPatch,
   AiRuntimeConnectionBinding,
   EnvironmentProbeResult,
@@ -86,6 +87,8 @@ export type AdapterInfo = {
   label: string;
   source: "builtin" | "external";
   disabled: boolean;
+  /** False when the harness's package failed to load on the server. */
+  loaded?: boolean;
   overriddenBuiltin?: boolean;
   supportedRunners?: AgentRunner[];
   defaultRunner?: AgentRunner;
@@ -113,6 +116,9 @@ export type AgentActionsPage = {
   }[];
   nextCursor?: string | null;
 };
+
+/** `POST /companies/:id/agent-hires`: the hired agent, and its approval when the organization approves new agents first. */
+export type AgentHireResponse = { agent: Agent; approval: Approval | null; idempotent?: boolean };
 
 export type AgentWakeRequest = {
   source?: "timer" | "assignment" | "on_demand" | "automation";
@@ -153,6 +159,13 @@ export const agentsApi = {
     return api.get<AdapterInfo[]>(`/adapters?${params}`, { signal });
   },
 
+  // Hiring (ui/src/components/new-agent): a paused setup draft first, then the hire on that record.
+  /** `POST /companies/:id/agents`; with `setupId` it saves a paused setup draft that can't run yet. */
+  create: (companyId: string, data: Record<string, unknown>) => api.post<Agent>(`/companies/${encodeURIComponent(companyId)}/agents`, data),
+  /** `POST /companies/:id/agent-hires`; with `setupAgentId` it finishes that draft, or asks for approval first. */
+  hire: (companyId: string, data: Record<string, unknown>) =>
+    api.post<AgentHireResponse>(`/companies/${encodeURIComponent(companyId)}/agent-hires`, data),
+
   // The agent itself
   get: (id: string, companyId?: string, signal?: AbortSignal) => api.get<AgentDetail>(agentPath(id, companyId), { signal }),
   update: (id: string, patch: Record<string, unknown>, companyId?: string) => api.patch<Agent>(agentPath(id, companyId), patch),
@@ -188,7 +201,13 @@ export const agentsApi = {
   testEnvironment: (
     companyId: string,
     adapterType: string,
-    data: { adapterConfig: Record<string, unknown>; agentId?: string; environmentId?: string | null; aiConnection?: unknown },
+    data: {
+      adapterConfig: Record<string, unknown>;
+      agentId?: string;
+      environmentId?: string | null;
+      aiConnection?: unknown;
+      runner?: "auto" | "paperclip" | "legacy";
+    },
   ) => api.post<AdapterEnvironmentTestResult>(`/companies/${companyId}/adapters/${adapterType}/test-environment`, data),
 
   // Instructions
