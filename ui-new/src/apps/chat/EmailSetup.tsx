@@ -214,7 +214,7 @@ export function EmailSetup(props: { app: AppDefinition | null; agentId: string |
                 label="AgentMail API key"
                 for="ch-email-key"
                 help={
-                  <a href="https://console.agentmail.to/dashboard/api-keys" target="_blank" rel="noopener noreferrer">
+                  <a class="ch-link" href="https://console.agentmail.to/dashboard/api-keys" target="_blank" rel="noopener noreferrer">
                     Get a key <ExternalLink size={11} aria-hidden="true" />
                   </a>
                 }
@@ -328,7 +328,7 @@ export function EmailSetup(props: { app: AppDefinition | null; agentId: string |
                     onChange={setReceive}
                   />
                 </Field>
-                <a href="https://docs.agentmail.to/custom-domains" target="_blank" rel="noopener noreferrer">
+                <a class="ch-link" href="https://docs.agentmail.to/custom-domains" target="_blank" rel="noopener noreferrer">
                   Use your own domain <ExternalLink size={11} aria-hidden="true" />
                 </a>
               </div>

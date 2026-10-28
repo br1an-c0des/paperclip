@@ -62,6 +62,7 @@ export function AppsPage() {
   const chat = createMemo(() => chatRoute(params.rest ?? ""));
   const tab = () => {
     if (more()) return moreAppsTab(more()!);
+    if (chat()) return "browse";
     const section = view().section;
     // A connection and the connect pages sit under Browse, where they're reached from.
     return section === "ai" || section === "review" ? section : section === "later" ? null : "browse";

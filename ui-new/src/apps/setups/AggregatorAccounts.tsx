@@ -212,7 +212,7 @@ function ComposioConnectApp(props: { connection: ToolConnection; onDone: () => v
           {(url) => (
             <p class="cx-note">
               Finish connecting it in Composio, then come back:{" "}
-              <a href={url()} target="_blank" rel="noopener noreferrer">
+              <a class="ch-link" href={url()} target="_blank" rel="noopener noreferrer">
                 connect {toolkit().trim()} in Composio <ExternalLink size={11} aria-hidden="true" />
               </a>
             </p>

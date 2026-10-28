@@ -380,3 +380,10 @@
     max-width: none;
   }
 }
+
+/* A text link with its external-link icon kept on the same line */
+.ch-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
