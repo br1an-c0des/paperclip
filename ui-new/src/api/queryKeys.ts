@@ -207,4 +207,30 @@ export const queryKeys = {
     /** A chat reply's run events, as the live reply reads them. */
     replyEvents: (runId: string) => ["heartbeat-run", runId, "chat-reply-events"] as const,
   },
+
+  /*
+   * Company settings (M6, boards 21–25 and 30; src/settings/company/), in the old UI's shapes so
+   * its live-event rules apply. The company itself is `companies.all`; secrets, user secret
+   * definitions, budgets and environments share `projectSettings`' keys. Plugin pages sit under
+   * `["plugins"]`, which the live events refresh on any plugin change.
+   */
+  companySettings: {
+    members: (companyId: string) => ["access", "company-members", companyId] as const,
+    invites: (companyId: string) => ["access", "invites", "paginated-v1", companyId] as const,
+    joinRequests: (companyId: string) => ["access", "join-requests", companyId, "pending_approval"] as const,
+    decisionModel: (companyId: string) => ["decision-model", companyId] as const,
+    fastResponse: (companyId: string) => ["fast-response", companyId] as const,
+    fastResponseModels: (companyId: string, connectionId: string) => ["fast-response-models", companyId, connectionId] as const,
+    promptInjection: (companyId: string) => ["prompt-injection-prevention", companyId] as const,
+    promptInjectionModels: (companyId: string, connectionId: string) => ["prompt-injection-models", companyId, connectionId] as const,
+    observability: (companyId: string) => ["agent-observability", companyId] as const,
+    secretUsage: (secretId: string) => ["secrets", "usage", secretId] as const,
+    secretProviders: (companyId: string) => ["secret-providers", companyId] as const,
+    secretProviderConfigs: (companyId: string) => ["secret-provider-configs", companyId] as const,
+    userSecretCoverage: (companyId: string, definitionId: string) => ["user-secret-definitions", companyId, definitionId, "coverage"] as const,
+    mySecrets: (companyId: string) => ["my-user-secrets", companyId] as const,
+    secretProposals: (companyId: string) => ["secret-proposals", companyId, "pending"] as const,
+    exportFidelity: (companyId: string) => ["companies", companyId, "export-fidelity"] as const,
+    pluginPages: ["plugins", "ui-contributions"] as const,
+  },
 };
