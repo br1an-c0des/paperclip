@@ -399,9 +399,13 @@ already exists on the server; what's left is how the UI presents a chat.
 
 **Decision.** Option 1, in stage 1 (M5). Option 2 was first kept as an optional exploration, then
 dropped on Oct 24, 2026: Paperclip's MCP connection gives a fluid conversation outside tasks without
-it ([build plan 3.12](build-plan.md#312-chat-outside-tasks-dropped)). A run per message is the
+it ([build plan 3.12](build-plan.md#312-chat-outside-tasks-dropped-kept-as-a-long-term-idea)). A run per message is the
 expected default, not a stopgap. Agent-initiated messages, such as briefings, are added to this chat separately
 ([build plan 3.13](build-plan.md#313-briefings-and-reports)).
+
+**Revisited Oct 27, 2026.** Option 1 stands for stage 1. After using the chat, the long-term view is
+that chat should eventually leave the task system and become its own tailored flow. That's kept as a
+long-term idea in [build plan 3.12](build-plan.md#312-chat-outside-tasks-dropped-kept-as-a-long-term-idea), not scheduled.
 
 ### 9. Agent avatars need a runtime import from the shared package
 

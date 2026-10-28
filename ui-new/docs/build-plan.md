@@ -66,7 +66,7 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | --- | --- | --- |
 | Clicking an agent opens one endless chat | 1 | Board 12, on `GET\|POST /api/companies/:companyId/chats/:agentRef`. The server only serves chat with `enableAgentChat` on ([decision 2](decisions.md#2-agent-chat-is-off-unless-the-instance-turns-it-on)). |
 | The chat shows runs in progress, or is ready for input | 1 | Board 12's states (busy, replying, idle) and its activity timeline ([decision 3](decisions.md#3-agents-can-work-on-several-things-at-once)). |
-| Tasks separated from agent chats and runs | 1 | Underneath, each chat is a hidden task, and the server already keeps it out of task lists ([decision 8](decisions.md#8-agent-chats-are-tasks-underneath)). Stage 1 builds on that: the chat is drawn as a conversation, never a task page, and work it hands off shows as linked tasks. A run per message is a fine default. For a fluid conversation outside tasks, connect Claude Code through Paperclip's MCP connection ([3.12](#312-chat-outside-tasks-dropped)). |
+| Tasks separated from agent chats and runs | 1 | Underneath, each chat is a hidden task, and the server already keeps it out of task lists ([decision 8](decisions.md#8-agent-chats-are-tasks-underneath)). Stage 1 builds on that: the chat is drawn as a conversation, never a task page, and work it hands off shows as linked tasks. A run per message is a fine default. For a fluid conversation outside tasks, connect Claude Code through Paperclip's MCP connection; taking chat out of tasks entirely is kept as a long-term idea ([3.12](#312-chat-outside-tasks-dropped-kept-as-a-long-term-idea)). |
 | A task's progress as short notes in the right sidebar | 1 | Board 3, from `GET /api/issues/:issueId/activity`, comments and runs. |
 | "Go to" the run, then interrupt, add context or start over | 1 | The run modal (boards 16–18) with steer, queue and interrupt (`/queued-comments/*`, `POST /api/heartbeat-runs/:runId/cancel`). "New session" is the chat's `/new`, or `POST /api/agents/:id/runtime-state/reset-session`. |
 | Task runs open as separate windows, to talk to the agent about that run | 1 | Same run modal. A message sent from it is queued or steered into that task's run. |
@@ -352,6 +352,22 @@ mentions in chat, and the gaps in decision [31](decisions.md#31-gaps-found-build
 [29](decisions.md#29-gaps-found-building-the-agent-page) and
 [30](decisions.md#30-gaps-found-building-the-org-pages).
 
+Follow-ups from using chat with Bob (2026-10-27):
+
+- **A chat's documents.** Task links to a chat now open the chat, and the chat view shows none of the
+  task's documents, so its `plan` document and anything the agent saves there (for example
+  `paperclip-context-reference` on TES-13) can't be opened in `ui-new`. Show them in the chat, for
+  example in the Activity column or as cards where they were saved.
+- **The core skill in the Skills section.** Paperclip Runner agents don't get the `paperclip` skill:
+  the Runner carries the same contract through its protocol and the server strips the skill from
+  their saved set (`normalizePaperclipOperationalSkillPreference`). Legacy agents always get it,
+  even with an empty set (`PAPERCLIP_OPERATIONAL_SKILL_KEY`). Show it as "Built into the Paperclip
+  Runner" or "Always on" instead of a switch.
+- **Chat scroll jumps to the bottom.** Reading earlier messages, the view returns to the bottom on
+  its own after 10–20 seconds or on other events. Likely cause: `ChatView.tsx` scrolls to the bottom
+  whenever `state.loading()` turns false, without checking the reader's position, and a refetch
+  may also swap the thread for the loading card.
+
 #### M6: Settings and everything else
 
 Tier 2, ported mostly as is into the new layout:
@@ -362,7 +378,7 @@ Tier 2, ported mostly as is into the new layout:
 - Skills, Apps and tools, Activity and costs.
 - Onboarding, and the sign-in and connect pages outside a company. These include the pages where you
   approve an MCP connection (`/mcp-connect/:id`, `/mcp-device`, `/assistant-connections`), which only
-  work with `enablePublicMcp` on ([3.12](#312-chat-outside-tasks-dropped)).
+  work with `enablePublicMcp` on ([3.12](#312-chat-outside-tasks-dropped-kept-as-a-long-term-idea)).
 
 These are large areas: Apps and tools alone reaches about 60 requests per page. Plan a few iterations.
 
@@ -580,7 +596,15 @@ Tabled Oct 24, 2026, and may be dropped. The sketch below is kept as a record, n
 - **Approach:** M5 lists exactly what's still missing. Then propose exposing it upstream (2b), since
   plugins can't read runs.
 
-### 3.12 Chat outside tasks (dropped)
+### 3.12 Chat outside tasks (dropped, kept as a long-term idea)
+
+Kept as a long-term idea on Oct 27, 2026, after using the built-in chat: ultimately, agent chat should
+be taken out of the task system and built as its own flow, designed for conversation rather than
+adapted from a task (its own storage, turns, documents and memory, instead of a hidden task with
+comments). It's a long way off and would mean a large change in upstream's server, so it stays here
+as an idea to develop or propose upstream later; stage 1 keeps building on hidden tasks
+([decision 8](decisions.md#8-agent-chats-are-tasks-underneath)). The notes below are the earlier
+research.
 
 Dropped Oct 24, 2026. What it was for, a fluid conversation that isn't a task underneath, is covered
 by Paperclip's MCP connection instead ([doc/public-mcp.md](../../doc/public-mcp.md)):
@@ -650,7 +674,7 @@ All answered Oct 24, 2026.
 
 1. ~~**"Tasks become separated from agent chats/runs."**~~ Stage 1 builds on the hidden chat tasks. A
    chat outside tasks was dropped in favor of the MCP connection
-   ([3.12](#312-chat-outside-tasks-dropped)).
+   ([3.12](#312-chat-outside-tasks-dropped-kept-as-a-long-term-idea)).
 2. ~~**Lists and sprints.**~~ A project's lists were to be its goals. Reopened Oct 26, 2026: lists are
    on hold until they have their own storage ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold), [3.3](#33-lists-and-sprints-on-hold)).
 3. ~~**Custom statuses.**~~ Each custom status maps onto one of the seven built-in ones
