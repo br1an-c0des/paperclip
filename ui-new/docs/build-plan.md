@@ -399,6 +399,12 @@ gets a Features card. Round 2 (started Oct 28): Apps and tools (replacing the te
 page), onboarding and the pages outside a company, plugin hosting (brought forward from M7), and the
 Features card. The Features card is merged (22 switches; the rest of the flags are dropped or built in). Apps and tools is merged: Browse, AI connections, Connect, a connection's page and Review ([decision 35](decisions.md#35-gaps-found-building-apps-and-tools)); Assistant connection, Gateways, Advanced and Chat endpoints are left for round 3. Onboarding and the pages outside a company are merged: sign-up, board claim, CLI auth, invites, MCP connect, chat identity, the Cloud handoff and a four-step onboarding ([decision 36](decisions.md#36-gaps-found-building-onboarding-and-the-pages-outside-a-company)). Plugin hosting is merged ([decision 37](decisions.md#37-gaps-found-building-plugin-hosting)); round 2 is complete.
 
+Round 3 (started Oct 28): Apps connections part 2 (assistant connection, gateways, advanced, agent
+tools), Apps channels and special setups (chat endpoints, agent channels, task integrations,
+aggregators, identities), the remaining plugin spots and shell leftovers, and task and workspace
+leftovers (runner goal, feedback votes, a Workspaces tab in the org header, branch reconcile).
+Decided: decision queues are dropped; the Inbox is the one triage surface.
+
 #### M7: Ready to replace the old UI
 
 - Plugin hosting (decision G): built in M6 round 2. Left: dashboard widgets, global toolbar
