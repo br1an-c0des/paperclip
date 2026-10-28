@@ -1,0 +1,553 @@
+/*
+ * The Skills tab (library, sources, Studio). No board: it follows the org pages and the Activity
+ * tab (Activity.css: section links, toolbar, list card), with a detail card beside the list as the
+ * docked panels do. Layout responds to main's width with `@container main`.
+ */
+
+/* Library: the list, and the open skill's detail beside it. */
+.sk-library {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.sk-library--open {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
+}
+
+.sk-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 90px;
+  align-items: center;
+  gap: 12px;
+  min-height: 54px;
+  padding: 8px 18px;
+  border-top: 1px solid var(--row-line);
+  color: inherit;
+  text-decoration: none;
+}
+
+.act-list > li:first-child > .sk-row {
+  border-top: 0;
+}
+
+.sk-row:hover {
+  background: var(--row-hover);
+}
+
+.sk-row--selected,
+.sk-row--selected:hover {
+  background: var(--run-bg);
+}
+
+.sk-library--open .sk-row {
+  grid-template-columns: minmax(0, 1fr) 100px;
+}
+
+.sk-library--open .sk-row-num {
+  display: none;
+}
+
+.sk-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sk-row-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sk-row-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sk-row-num {
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sk-core {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* The detail card */
+.sk-detail {
+  position: sticky;
+  top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: calc(100vh - 28px);
+  overflow-y: auto;
+  padding: 18px 20px;
+}
+
+.sk-detail-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.sk-detail-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sk-detail-title h2 {
+  font-size: 22px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.sk-key {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.sk-desc {
+  margin: 0;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.sk-note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--r-inner);
+  background: var(--amber-bg);
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sk-note p {
+  margin: 0;
+}
+
+.sk-note svg {
+  display: inline;
+  vertical-align: -2px;
+  color: var(--amber-fg);
+}
+
+.sk-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.sk-block-head {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sk-agents,
+.sk-files,
+.sk-versions,
+.sk-chips,
+.sk-candidates {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sk-agents {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sk-agent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: var(--r-inner);
+  color: var(--body);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.sk-agent:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.sk-facts {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.sk-facts dt {
+  color: var(--muted);
+}
+
+.sk-facts dd {
+  margin: 0;
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+
+.sk-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--r-inner);
+  background: transparent;
+  color: var(--body);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sk-file > .org-muted {
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.sk-file:hover {
+  background: var(--hover);
+}
+
+.sk-file[aria-current="true"] {
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.sk-versions li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 13px;
+}
+
+.sk-versions li + li {
+  border-top: 1px solid var(--row-line);
+}
+
+.sk-version-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sk-version-text .org-muted {
+  font-size: 11px;
+}
+
+.sk-file-view {
+  max-height: 65vh;
+  overflow: auto;
+}
+
+/* Sources */
+.sk-source {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 14px 18px;
+}
+
+.sk-source + .sk-source {
+  border-top: 1px solid var(--row-line);
+}
+
+.sk-source--selected {
+  background: var(--run-bg);
+}
+
+.sk-source-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.sk-source-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.sk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sk-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.sk-chip:hover {
+  border-color: var(--text);
+  color: var(--text);
+}
+
+.sk-error {
+  margin: 0;
+  color: var(--red-fg);
+  font-size: 12px;
+}
+
+.sk-warning {
+  margin: 0;
+  color: var(--amber-fg);
+  font-size: 12px;
+}
+
+.sk-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sk-candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.sk-candidate {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sk-candidate[aria-checked="true"] {
+  border-color: var(--run-fg);
+  background: var(--run-bg);
+}
+
+.sk-candidate:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.sk-candidate .org-cbox {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.sk-candidate[aria-checked="true"] .org-cbox {
+  border-color: var(--run-fg);
+  background: var(--run-fg);
+  color: var(--on-primary);
+}
+
+.sk-candidate-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.sk-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sk-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sk-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sk-option[aria-checked="true"] {
+  border-color: var(--run-fg);
+  background: var(--run-bg);
+}
+
+/* Studio */
+.sk-new {
+  max-width: 720px;
+}
+
+.sk-new .sk-form {
+  padding: 4px 22px 18px;
+}
+
+.sk-studio {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sk-studio-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+}
+
+.sk-studio-body {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.sk-studio-files {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 12px;
+}
+
+.sk-studio-files .org-card-row {
+  padding: 0 6px;
+}
+
+.sk-versions-head {
+  margin-top: 10px;
+  padding-top: 12px !important;
+  border-top: 1px solid var(--line);
+}
+
+.sk-studio-files .sk-versions {
+  padding: 0 6px;
+}
+
+.sk-editor {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 480px;
+  overflow: hidden;
+}
+
+.sk-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sk-editor-note {
+  padding: 20px;
+}
+
+.sk-editor .mde {
+  flex: 1;
+  min-height: 420px;
+}
+
+@container main (max-width: 1000px) {
+  .sk-library--open {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sk-library--open .sk-list {
+    display: none;
+  }
+
+  .sk-detail {
+    position: static;
+    max-height: none;
+  }
+
+  .sk-studio-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container main (max-width: 620px) {
+  .sk-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .sk-row-num {
+    display: none;
+  }
+
+  .sk-source {
+    flex-direction: column;
+  }
+
+  .sk-source-actions {
+    justify-content: flex-start;
+  }
+}
