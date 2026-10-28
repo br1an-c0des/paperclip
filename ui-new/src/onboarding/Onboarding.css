@@ -10,6 +10,20 @@
   gap: 16px;
 }
 
+.ob--narrow {
+  width: min(820px, 100%);
+}
+
+/* Narrow, the steps sit under the title rather than wrapping to the far edge. */
+.ob--narrow .ob-head {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.ob--narrow .ob-steps {
+  margin: 0;
+}
+
 .ob-head {
   display: flex;
   align-items: center;

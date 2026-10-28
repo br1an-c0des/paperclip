@@ -9,7 +9,7 @@ import "./Onboarding.css";
 export function OnboardingFrame(props: ParentProps<{ step: OnboardingStep; title: JSX.Element; organization?: string; aside?: JSX.Element; leave?: JSX.Element }>) {
   const index = () => ONBOARDING_STEPS.findIndex((entry) => entry.key === props.step);
   return (
-    <main class="ob">
+    <main class="ob" classList={{ "ob--narrow": !props.aside }}>
       <header class="card ob-head">
         <div class="ob-head-text">
           <span class="mono cap">{props.organization ? `Onboarding · ${props.organization}` : "Onboarding"}</span>

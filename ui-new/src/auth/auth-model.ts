@@ -340,14 +340,15 @@ export function inviteView(input: {
   const { invite } = input;
   const status = invite.joinRequestStatus ?? null;
   const completable = invite.joinRequestType === "human" && (status === "pending_approval" || status === "approved");
-  if (input.signedIn && invite.companyId && !input.companyIds) return { kind: "checking" };
-  const member = !!invite.companyId && !!input.companyIds?.includes(invite.companyId);
+  const agentOnly = invite.inviteType !== "bootstrap_ceo" && invite.allowedJoinTypes === "agent";
+  if (input.signedIn && invite.companyId && !input.companyIds && !agentOnly) return { kind: "checking" };
+  // An agent's invite is about the agent, so the person's own membership doesn't matter.
+  const member = !agentOnly && !!invite.companyId && !!input.companyIds?.includes(invite.companyId);
   if (member) return { kind: "member" };
   if (status === "pending_approval" && !completable) return { kind: "awaiting_approval" };
   if (status && !completable) {
     return { kind: "unavailable", reason: status === "rejected" ? "This join request wasn't approved." : "This invite has already been used." };
   }
-  const agentOnly = invite.inviteType !== "bootstrap_ceo" && invite.allowedJoinTypes === "agent";
   if (agentOnly) return { kind: "agent_form" };
   if (input.authenticated && !input.signedIn) return { kind: "account" };
   return { kind: "accept", auto: input.signedIn && invite.inviteType !== "bootstrap_ceo" };

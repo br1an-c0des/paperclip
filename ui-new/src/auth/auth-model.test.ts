@@ -192,6 +192,9 @@ describe("inviteView", () => {
 
   it("shows the agent form for an agent-only invite", () => {
     expect(inviteView({ invite: invite({ allowedJoinTypes: "agent" }), authenticated: true, signedIn: false, companyIds: [] })).toEqual({ kind: "agent_form" });
+    // A member setting up an agent still gets the form.
+    expect(inviteView({ invite: invite({ allowedJoinTypes: "agent" }), authenticated: true, signedIn: true, companyIds: ["co1"] })).toEqual({ kind: "agent_form" });
+    expect(inviteView({ invite: invite({ allowedJoinTypes: "agent" }), authenticated: true, signedIn: true, companyIds: undefined })).toEqual({ kind: "agent_form" });
   });
 
   it("reports join requests that wait, were rejected or are used", () => {
