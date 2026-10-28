@@ -62,6 +62,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 33 | [Gaps found building company settings](#33-gaps-found-building-company-settings) | Company settings | Open | Oct 27, 2026 |
 | 34 | [Gaps found building Skills and Activity](#34-gaps-found-building-skills-and-activity) | Skills, Activity and costs | Open | Oct 27, 2026 |
 | 35 | [Gaps found building Apps and tools](#35-gaps-found-building-apps-and-tools) | Apps and tools | Open | Oct 28, 2026 |
+| 36 | [Gaps found building onboarding and the pages outside a company](#36-gaps-found-building-onboarding-and-the-pages-outside-a-company) | Companies and onboarding, sign-in and connect flows | Open | Oct 28, 2026 |
 
 ## Entries
 
@@ -1144,3 +1145,20 @@ Both are handled in `ui-new` for now.
   `humanizeConnectionDisplayName` and others) are copied into `apps-model.ts`, in the style of
   [decision 10](#10-some-response-types-arent-exported-from-the-shared-package), rather than imported at
   run time.
+
+### 36. Gaps found building onboarding and the pages outside a company
+
+- **Status:** Open
+- **Area:** Tier 2 "Companies and onboarding", "Sign-in and connect flows (outside a company)"
+- **Found in:** onboarding, sign-up, claims, CLI auth, invites and MCP connect (M6 round 2).
+
+- **Only an instance admin or a local board can create an organization** (`POST /api/companies`
+  answers 403 otherwise). Onboarding and New organization say so rather than offering it.
+- **Whether sign-up is allowed isn't exposed** (`PAPERCLIP_AUTH_DISABLE_SIGN_UP` isn't in
+  `GET /api/health`). As in the old UI, the form is always offered and the server's refusal shown.
+- **The MCP routes aren't mounted without a public URL** (`PAPERCLIP_PUBLIC_URL`); they answer 404
+  "API route not found", and 503 `temporarily_unavailable` when `enablePublicMcp` is off. No request
+  says why, so the page infers it from those answers.
+- **Response types for invites, chat-identity links, board claims and CLI auth challenges** aren't in
+  `@paperclipai/shared`; they're declared in the new API modules
+  ([decision 10](#10-some-response-types-arent-exported-from-the-shared-package)).

@@ -397,7 +397,7 @@ and the Skills and Activity tabs; gaps in decisions [32](decisions.md#32-gaps-fo
 The experimental flags were decided on Oct 28 (decision 32): the sorting stands, and App settings
 gets a Features card. Round 2 (started Oct 28): Apps and tools (replacing the temporary Connectors
 page), onboarding and the pages outside a company, plugin hosting (brought forward from M7), and the
-Features card. The Features card is merged (22 switches; the rest of the flags are dropped or built in). Apps and tools is merged: Browse, AI connections, Connect, a connection's page and Review ([decision 35](decisions.md#35-gaps-found-building-apps-and-tools)); Assistant connection, Gateways, Advanced and Chat endpoints are left for round 3.
+Features card. The Features card is merged (22 switches; the rest of the flags are dropped or built in). Apps and tools is merged: Browse, AI connections, Connect, a connection's page and Review ([decision 35](decisions.md#35-gaps-found-building-apps-and-tools)); Assistant connection, Gateways, Advanced and Chat endpoints are left for round 3. Onboarding and the pages outside a company are merged: sign-up, board claim, CLI auth, invites, MCP connect, chat identity, the Cloud handoff and a four-step onboarding ([decision 36](decisions.md#36-gaps-found-building-onboarding-and-the-pages-outside-a-company)).
 
 #### M7: Ready to replace the old UI
 
