@@ -1076,9 +1076,10 @@ Both are handled in `ui-new` for now.
   sorted under decision 12: dropped (UI-only flags of the old shell), built in, or follows the
   setting. Server-enforced flags someone may still want to change (cases, public MCP, isolated
   workspaces, managed-sandbox-only, native runner, built-in agents, connector and agent-type flags,
-  and runtime flags) have no switch in `ui-new` yet; the classic UI's Experimental page covers them
-  until decided. Proposed: one "Features" card in General with plain switches for only those flags.
-  Waiting on the user.
+  and runtime flags) have no switch in `ui-new` yet. **Decided Oct 28:** the sorting stands (about
+  11 dropped, 4 built in, the rest following the setting), and App settings → General gets one
+  "Features" card with plain switches for only the server-enforced flags someone may still want to
+  change (M6 round 2).
 - **Board 28's public URL, "auth secret is set" and "invite used by"** aren't in `GET /api/health`.
 - **No instance-wide harness usage count.** Counts come from each organization's agents the viewer
   can open.
