@@ -3,8 +3,20 @@ import type {
   AiConnectionLoginIntent,
   AiConnectionUsage,
   CreateAiConnection,
+  DecisionConnectionChoice,
+  DecisionModelSettings,
+  DecisionResult,
+  FastResponseSettings,
+  FastResponseSettingsResponse,
+  FastResponseTestResult,
   LocalAiLoginAttempt,
   LocalAiLoginStatus,
+  PromptInjectionPreventionSettings,
+  PromptInjectionPreventionSettingsResponse,
+  PromptInjectionTestResult,
+  UpdateDecisionModel,
+  UpdateFastResponse,
+  UpdatePromptInjectionPrevention,
 } from "@paperclipai/shared";
 import { api } from "./client";
 
@@ -42,4 +54,44 @@ export const aiConnectionsApi = {
     api.delete<{ ok: true }>(`${base(companyId)}/local/attempts/${encodeURIComponent(sessionId)}`),
   connectLocal: (companyId: string, input: AiConnectionLoginIntent & { localSessionId?: string }) =>
     api.post<AiConnectionResult>(`${base(companyId)}/local`, input),
+};
+
+/*
+ * The models Paperclip itself runs on a shared AI connection, set in company settings →
+ * Connections (board 23; ui/src/api/decision-models.ts, fast-responses.ts and
+ * prompt-injection-prevention.ts). Each answers its settings with the connections it can use
+ * (`choices`); a test runs a small sample and is charged to the connection.
+ */
+
+export type DecisionSettingsResponse = { canManage: boolean; settings: DecisionModelSettings | null; choices: DecisionConnectionChoice[] };
+export type ModelSuggestion = { id: string; label?: string };
+
+const companyPath = (companyId: string, rest: string) => `/companies/${encodeURIComponent(companyId)}/${rest}`;
+
+export const paperclipModelsApi = {
+  decisionModel: (companyId: string, signal?: AbortSignal) =>
+    api.get<DecisionSettingsResponse>(companyPath(companyId, "decision-model"), { signal }),
+  updateDecisionModel: (companyId: string, input: UpdateDecisionModel) =>
+    api.put<DecisionModelSettings>(companyPath(companyId, "decision-model"), input),
+  testDecisionModel: (companyId: string) => api.post<DecisionResult>(companyPath(companyId, "decision-model/test"), {}),
+
+  fastResponse: (companyId: string, signal?: AbortSignal) =>
+    api.get<FastResponseSettingsResponse>(companyPath(companyId, "fast-response"), { signal }),
+  updateFastResponse: (companyId: string, input: UpdateFastResponse) =>
+    api.put<FastResponseSettings>(companyPath(companyId, "fast-response"), input),
+  fastResponseModels: (companyId: string, connectionId: string, signal?: AbortSignal) =>
+    api.get<ModelSuggestion[]>(companyPath(companyId, `fast-response/models?connectionId=${encodeURIComponent(connectionId)}`), { signal }),
+  testFastResponse: (companyId: string) => api.post<FastResponseTestResult>(companyPath(companyId, "fast-response/test"), {}),
+
+  promptInjection: (companyId: string, signal?: AbortSignal) =>
+    api.get<PromptInjectionPreventionSettingsResponse>(companyPath(companyId, "prompt-injection-prevention"), { signal }),
+  updatePromptInjection: (companyId: string, input: UpdatePromptInjectionPrevention) =>
+    api.put<PromptInjectionPreventionSettings>(companyPath(companyId, "prompt-injection-prevention"), input),
+  promptInjectionModels: (companyId: string, connectionId: string, signal?: AbortSignal) =>
+    api.get<ModelSuggestion[]>(
+      companyPath(companyId, `prompt-injection-prevention/models?connectionId=${encodeURIComponent(connectionId)}`),
+      { signal },
+    ),
+  testPromptInjection: (companyId: string) =>
+    api.post<PromptInjectionTestResult>(companyPath(companyId, "prompt-injection-prevention/test"), {}),
 };

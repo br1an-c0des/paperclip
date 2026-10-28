@@ -1,0 +1,463 @@
+/*
+ * Company settings (boards 21–25). Settings rows, cards, the save line, money fields and meters
+ * come from the project settings (ProjectSettings.css); the section title, switch rows and outline
+ * cards from the agent settings (Agent.css). This adds the boards' tables (`.thead`, `.trow`),
+ * list rows (`.lrow`), card headers with actions, and a few small pieces.
+ */
+
+.cs-page {
+  min-width: 0;
+}
+
+/* Text */
+.cs-strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.cs-muted {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cs-small {
+  font-size: 12px;
+}
+
+.cs-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.cs-ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-ok {
+  color: var(--green-fg);
+  font-size: 13px;
+}
+
+.cs-bad {
+  color: var(--red-fg);
+  font-size: 13px;
+}
+
+.cs-static {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  color: var(--body);
+}
+
+.cs-after {
+  padding: 0 4px;
+}
+
+.cs-note {
+  padding: 14px 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.cs-note[role="alert"] {
+  color: var(--red-fg);
+}
+
+.rail-content > .cs-note {
+  padding: 0 4px;
+}
+
+/* Layout helpers */
+.cs-grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cs-inline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cs-min34 {
+  min-height: 34px;
+}
+
+.cs-self-start {
+  align-self: flex-start;
+}
+
+.cs-field-120 {
+  max-width: 120px;
+}
+
+.cs-field-160 {
+  width: 160px;
+  max-width: 160px;
+}
+
+.cs-field-200 {
+  max-width: 220px;
+}
+
+.cs-field-360 {
+  max-width: 360px;
+}
+
+.cs-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cs-dialog-body p {
+  color: var(--body);
+  line-height: 1.5;
+}
+
+.cs-bullets {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--body);
+  line-height: 1.6;
+}
+
+/* Card header with a note and actions at its end (board 22). */
+.cs-chead {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.cs-chead-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.cs-chead-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cs-danger {
+  border-color: color-mix(in srgb, var(--red-fg) 45%, transparent);
+}
+
+.cs-card-green {
+  border-color: color-mix(in srgb, var(--green-fg) 45%, transparent);
+}
+
+/* Small grey pill, for "Not set up", "Default" and the like. */
+.cs-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  margin-left: 6px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.cs-lrow > .cs-pill {
+  margin-left: 0;
+}
+
+.cs-pill--red {
+  background: var(--red-bg);
+  color: var(--red-fg);
+}
+
+/* List rows (the boards' `.lrow`). */
+.cs-lrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.chead + .cs-lrow {
+  border-top: 0;
+}
+
+.cs-lrow--wrap {
+  flex-wrap: wrap;
+}
+
+.cs-lrow--quiet {
+  opacity: 0.6;
+}
+
+.cs-new-invite {
+  align-items: flex-end;
+  background: color-mix(in srgb, var(--run-bg) 40%, transparent);
+}
+
+.cs-new-invite .input {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+/* A person or a thing: a disc, then a name over a muted line. */
+.cs-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cs-person-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cs-conn-mark {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--well);
+  color: var(--body);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* Tables (the boards' `.thead` and `.trow`). Columns per table below. */
+.cs-table {
+  display: flex;
+  flex-direction: column;
+}
+
+.cs-thead,
+.cs-trow {
+  display: grid;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  border-top: 1px solid var(--line);
+}
+
+.chead + .cs-table .cs-thead {
+  border-top: 0;
+}
+
+.cs-thead {
+  height: 34px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cs-trow {
+  min-height: 50px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-size: 13px;
+}
+
+.cs-trow--quiet {
+  opacity: 0.65;
+}
+
+.cs-tgroup {
+  padding: 12px 20px 6px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cs-cell-end {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cs-table--requests .cs-thead,
+.cs-table--requests .cs-trow {
+  grid-template-columns: 150px minmax(0, 1fr) 250px;
+}
+
+.cs-table--people .cs-thead,
+.cs-table--people .cs-trow {
+  grid-template-columns: minmax(0, 1fr) 180px 36px;
+}
+
+.cs-table--secrets .cs-thead,
+.cs-table--secrets .cs-trow {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 110px 80px 36px;
+}
+
+.cs-table--budgets .cs-thead,
+.cs-table--budgets .cs-trow {
+  grid-template-columns: minmax(0, 1fr) 130px 170px 190px;
+}
+
+.cs-spend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cs-spend .ps-meter {
+  height: 4px;
+}
+
+.cs-logo-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.cs-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* The connection box on board 23. */
+.cs-conn {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+  background: var(--ground);
+}
+
+.cs-frow-wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Run telemetry headers and content switches */
+.cs-headers {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.cs-header-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 32px;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+.cs-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+/* Where a secret is used */
+.cs-link-button {
+  color: var(--run-fg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cs-link-button:hover {
+  text-decoration: underline;
+}
+
+.cs-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cs-usage li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cs-files {
+  max-height: 240px;
+  overflow: auto;
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-field);
+  background: var(--code);
+  font-size: 12px;
+  line-height: 1.6;
+  list-style: none;
+}
+
+/* Narrow cards: tables stack their cells. */
+@container (max-width: 640px) {
+  .cs-thead {
+    display: none;
+  }
+
+  .cs-table .cs-trow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .cs-table .cs-trow > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .cs-table--requests .cs-trow > :nth-child(2) {
+    grid-column: 1 / -1;
+  }
+
+  .cs-table--secrets .cs-trow > :nth-child(4) {
+    display: none;
+  }
+
+  .cs-lrow {
+    flex-wrap: wrap;
+  }
+
+  .cs-chead {
+    flex-wrap: wrap;
+  }
+
+  .cs-chead-actions {
+    justify-content: flex-start;
+  }
+
+  .cs-header-row {
+    grid-template-columns: minmax(0, 1fr) 32px;
+  }
+
+  .cs-header-row > :nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+}
