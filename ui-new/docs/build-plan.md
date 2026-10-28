@@ -375,8 +375,8 @@ and when you send, and otherwise follows only while you're at the bottom. Docume
 Activity column, as cards in the thread and, for the plan, a header button; they open over the chat
 and `#document-<key>` links (including old task links) land on them. Skills show `paperclip` as
 "Built into the Paperclip Runner" or "Always on", and for legacy agents `complain` and
-`suggestion-box` as "Always on" too (mounted on every legacy run). Left: search results for a chat
-drop `#document-` (`SearchPage.tsx`).
+`suggestion-box` as "Always on" too (mounted on every legacy run). Search results found in a chat's
+document now open that document (fixed in M6 round 2).
 
 #### M6: Settings and everything else
 
@@ -397,7 +397,7 @@ and the Skills and Activity tabs; gaps in decisions [32](decisions.md#32-gaps-fo
 The experimental flags were decided on Oct 28 (decision 32): the sorting stands, and App settings
 gets a Features card. Round 2 (started Oct 28): Apps and tools (replacing the temporary Connectors
 page), onboarding and the pages outside a company, plugin hosting (brought forward from M7), and the
-Features card.
+Features card. The Features card is merged (22 switches; the rest of the flags are dropped or built in).
 
 #### M7: Ready to replace the old UI
 

@@ -5,6 +5,7 @@ import type {
   CompanySearchScope,
   CompanySearchSnippet,
 } from "@paperclipai/shared";
+import { chatPath, documentHash, documentKeyFromHash } from "@/chat/chat-model";
 
 /*
  * How search results are drawn (board S1, decision 17): grouped by kind, each row as the API
@@ -219,6 +220,17 @@ export function enterTarget(results: readonly CompanySearchResult[], query: stri
 /** The task a task-shaped result belongs to, to look up whether it's a chat. */
 export function resultIssueId(result: CompanySearchResult): string | null {
   return result.issue?.id ?? result.artifact?.issueId ?? null;
+}
+
+/**
+ * Where a result from one of your chats opens: the agent's chat, with the document open when the
+ * result was found in one (`#document-<key>`, which the chat view reads; ChatDocuments.tsx). The
+ * chat doesn't follow other fragments, such as `#comment-<id>`, so they're left off.
+ */
+export function chatResultHref(prefix: string, agentKey: string, result: CompanySearchResult) {
+  const at = result.href.indexOf("#");
+  const key = at === -1 ? null : documentKeyFromHash(result.href.slice(at));
+  return `${chatPath(prefix, agentKey)}${key ? documentHash(key) : ""}`;
 }
 
 /** Where a chat result lives, in place of the task's project or identifier. */
