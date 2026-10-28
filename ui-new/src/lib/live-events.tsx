@@ -109,6 +109,10 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
     case "cost_event":
       keys.push(["costs", companyId]);
       break;
+    // An outside assistant connected to Paperclip's MCP endpoint, or revoked (Apps → Assistants).
+    case "mcp_connection":
+      keys.push(queryKeys.mcp.connections);
+      break;
     // Installing, turning on or off, upgrading, configuring or removing a plugin is logged on every
     // company (server/src/routes/plugins.ts); refresh the plugin list and what plugins add to the
     // UI. The `plugin.ui.updated` event below says the same, but it's instance-wide and never
