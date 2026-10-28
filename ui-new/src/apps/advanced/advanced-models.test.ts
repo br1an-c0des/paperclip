@@ -9,8 +9,11 @@ import {
   assignedLabel,
   assignmentChanges,
   assignmentDraft,
+  assignmentKind,
+  assignmentLabel,
   buildEntries,
   countAllowed,
+  deleteBlocker,
   groupCatalogByApp,
   newToolsAppLabel,
   parseEntries,
@@ -127,6 +130,24 @@ describe("profile selections", () => {
     const parsed = parseEntries([gmail], entries.map((input, index) => entry({ ...input, id: `e${index}` } as Partial<ToolProfileEntry>)));
     expect(parsed.selections).toEqual({ "app-1": { kind: "all_except", excluded: ["c"] } });
     expect(parsed.rules).toEqual([{ id: "e2", kind: "tool_name", value: "search_*", effect: "include" }]);
+  });
+
+  it("reads a connection entry as its whole app, never as a tool rule", () => {
+    const parsed = parseEntries([gmail], [entry({ id: "e0", selectorType: "connection", effect: "include", connectionId: gmail.connectionId })]);
+    expect(parsed.selections).toEqual({ "app-1": { kind: "all" } });
+    expect(parsed.rules).toEqual([]);
+  });
+
+  it("names a gateway's assignment and keeps its profile from being deleted", () => {
+    const names = { agents: new Map(), projects: new Map(), routines: new Map(), gateways: new Map([["g1", "Cursor gateway"]]) };
+    expect(assignmentLabel({ targetType: "gateway", targetId: "g1" }, "co", names)).toBe("Cursor gateway");
+    expect(assignmentLabel({ targetType: "gateway", targetId: "gone" }, "co", names)).toBe("An archived gateway");
+    expect(assignmentKind("gateway")).toMatch(/^Gateway/);
+    const profile = (targetType: string, isCompanyDefault = false) =>
+      ({ bindings: [{ targetType, targetId: "x" }], summary: { isCompanyDefault } }) as unknown as ToolProfileWithDetails;
+    expect(deleteBlocker(profile("agent"))).toBeNull();
+    expect(deleteBlocker(profile("gateway"))).toBe("gateway");
+    expect(deleteBlocker(profile("agent", true))).toBe("default");
   });
 
   it("stores only opt-outs when new tools are allowed", () => {

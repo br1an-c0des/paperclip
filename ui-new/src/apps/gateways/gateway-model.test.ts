@@ -54,7 +54,8 @@ describe("tokens", () => {
         token({ revokedAt: "2026-10-01" }),
       ] as never,
     });
-    expect(tokensLabel(g, NOW)).toBe("2 active · 1 expiring");
+    expect(tokensLabel(g, NOW)).toBe("2 active tokens (1 expiring)");
+    expect(tokensLabel({ ...g, tokens: [] }, NOW)).toBe("no active tokens");
     expect(lastUsed(g)).toBe("2026-10-27T00:00:00.000Z");
   });
 

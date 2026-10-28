@@ -62,7 +62,8 @@ export function tokenCounts(gateway: ToolMcpGatewayWithTokens, now = Date.now())
 
 export function tokensLabel(gateway: ToolMcpGatewayWithTokens, now = Date.now()) {
   const { active, expiring } = tokenCounts(gateway, now);
-  return `${active} active${expiring > 0 ? ` · ${expiring} expiring` : ""}`;
+  if (active === 0) return "no active tokens";
+  return `${active} active ${active === 1 ? "token" : "tokens"}${expiring > 0 ? ` (${expiring} expiring)` : ""}`;
 }
 
 /** When any of its tokens was last used. */

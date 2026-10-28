@@ -5,6 +5,8 @@ import { useCompany } from "@/lib/company";
 import { OrgHeader } from "@/org/OrgHeader";
 import { AiConnections } from "./AiConnections";
 import { AppDetail } from "./AppDetail";
+import { MoreApps } from "./advanced/MoreApps";
+import { moreAppsTab, moreAppsView } from "./advanced/routes-model";
 import { appsView, type AppsView } from "./apps-model";
 import { Browse } from "./Browse";
 import { ApplicationPage, ByoConnect, GalleryConnect } from "./Connect";
@@ -26,8 +28,10 @@ import "./Apps.css";
  * - A connection (`/apps/:connectionId/:tab`): its tools and who may use them, its review queue, and
  *   its settings.
  *
- * The old UI's assistant connection, gateways, advanced (tool profiles, custom servers) and chat
- * endpoint pages aren't here yet; their addresses say so.
+ * - Assistants (`/apps/assistant-connection`), Gateways (`/apps/gateways/*`) and Advanced
+ *   (`/apps/advanced/*`: pasting an MCP config, access profiles): src/apps/advanced/MoreApps.tsx.
+ *
+ * The old UI's chat endpoint pages aren't here yet; their addresses say so.
  */
 
 /** `/:prefix/connectors`, the temporary Connectors page's address: its content is AI connections now. */
@@ -42,6 +46,7 @@ export function AppsPage() {
   const company = useCompany();
   const base = () => `/${company().issuePrefix}/apps`;
   const view = createMemo(() => appsView(params.rest ?? ""));
+  const more = createMemo(() => moreAppsView(params.rest ?? ""));
   const pending = usePendingRequests();
   const pendingCount = () => pending.data?.actionRequests.length ?? 0;
   const pick = <S extends AppsView["section"]>(name: S) => {
@@ -53,6 +58,7 @@ export function AppsPage() {
   const application = createMemo(() => pick("application"));
   const later = createMemo(() => pick("later"));
   const tab = () => {
+    if (more()) return moreAppsTab(more()!);
     const section = view().section;
     // A connection and the connect pages sit under Browse, where they're reached from.
     return section === "ai" || section === "review" ? section : section === "later" ? null : "browse";
@@ -79,8 +85,18 @@ export function AppsPage() {
               <span class="ap-count">{pendingCount()}</span>
             </Show>
           </A>
+          <A href={`${base()}/assistant-connection`} activeClass="" inactiveClass="" classList={{ active: tab() === "assistant" }} aria-current={tab() === "assistant" ? "page" : undefined}>
+            Assistants
+          </A>
+          <A href={`${base()}/gateways`} activeClass="" inactiveClass="" classList={{ active: tab() === "gateways" }} aria-current={tab() === "gateways" ? "page" : undefined}>
+            Gateways
+          </A>
+          <A href={`${base()}/advanced`} activeClass="" inactiveClass="" classList={{ active: tab() === "advanced" }} aria-current={tab() === "advanced" ? "page" : undefined}>
+            Advanced
+          </A>
         </nav>
         <Switch>
+          <Match when={more()}>{(found) => <MoreApps view={found()} />}</Match>
           <Match when={view().section === "browse"}>
             <Browse />
           </Match>

@@ -221,8 +221,8 @@ export function parseEntries(groups: readonly AppGroup[], entries: readonly Tool
     }
     if (entry.effect === "include" && entry.selectorType === "connection" && entry.connectionId) {
       const group = byConnection.get(entry.connectionId);
-      if (group && !group.applicationId) appOn.add(group.appKey);
-      else rules.push({ id: entry.id, kind: "catalog_entry", value: entry.connectionId, effect: "include" });
+      // An app's tools are grouped by application, so its one connection stands for the whole app.
+      if (group) appOn.add(group.appKey);
       continue;
     }
     if (entry.selectorType === "catalog_entry" && entry.catalogEntryId) {
@@ -374,6 +374,8 @@ export type Names = {
   agents: Map<string, string>;
   projects: Map<string, string>;
   routines: Map<string, string>;
+  /** Gateways the list still returns; archived ones are left out by the server. */
+  gateways: Map<string, string>;
 };
 
 export function assignmentLabel(binding: Pick<ToolProfileBinding, "targetType" | "targetId">, companyId: string, names: Names) {
@@ -381,6 +383,7 @@ export function assignmentLabel(binding: Pick<ToolProfileBinding, "targetType" |
   if (binding.targetType === "agent") return names.agents.get(binding.targetId) ?? "Unknown agent";
   if (binding.targetType === "project") return names.projects.get(binding.targetId) ?? "Unknown project";
   if (binding.targetType === "routine") return names.routines.get(binding.targetId) ?? "Unknown routine";
+  if (binding.targetType === "gateway") return names.gateways.get(binding.targetId) ?? "An archived gateway";
   if (binding.targetId === companyId) return "Organization";
   return binding.targetId;
 }
@@ -390,7 +393,19 @@ export function assignmentKind(type: ToolProfileBinding["targetType"]) {
   if (type === "agent") return "Agent";
   if (type === "project") return "Project";
   if (type === "routine") return "Recurring task";
+  if (type === "gateway") return "Gateway";
+  if (type === "issue") return "Task";
   return "Scoped assignment";
+}
+
+/**
+ * Why a profile can't be deleted, if it can't. A gateway keeps a hard reference to its profile,
+ * and archived gateways can't be deleted, so a profile a gateway ever used can only be archived.
+ */
+export function deleteBlocker(profile: Pick<ToolProfileWithDetails, "bindings" | "summary">): "default" | "gateway" | null {
+  if (profile.summary.isCompanyDefault) return "default";
+  if (profile.bindings.some((binding) => binding.targetType === "gateway")) return "gateway";
+  return null;
 }
 
 /** Whether a stored entry covers a tool. */
