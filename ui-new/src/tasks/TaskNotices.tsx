@@ -16,6 +16,7 @@ import { pauseDetail, retryCountdown, taskNotices, WAITING_TEXT, type TaskNotice
 import { useTaskRetry } from "./retry";
 import { TreeControlDialog, useTreeControlState } from "./TaskActions";
 import "./TaskNotices.css";
+import { TaskIntegrations } from "./integrations/TaskIntegrations";
 
 /*
  * Health notices at the top of an open task (`tasks/recovery`), in every section of the panel, the
@@ -81,6 +82,7 @@ export function TaskNotices(props: { taskId: string }) {
   };
 
   return (
+    <>
     <Show when={notices().length > 0 && task()}>
       {(current) => (
         <div class="tn" role="region" aria-label="Task health">
@@ -110,6 +112,8 @@ export function TaskNotices(props: { taskId: string }) {
         </div>
       )}
     </Show>
+    <TaskIntegrations taskId={props.taskId} />
+    </>
   );
 }
 

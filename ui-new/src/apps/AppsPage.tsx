@@ -11,6 +11,8 @@ import { appsView, type AppsView } from "./apps-model";
 import { Browse } from "./Browse";
 import { ApplicationPage, ByoConnect, GalleryConnect } from "./Connect";
 import { ReviewPage } from "./Review";
+import { ChatRoutes } from "./chat/ChatRoutes";
+import { chatRoute } from "./chat/chat-model";
 import { usePendingRequests } from "./shared";
 import "@/activity/Activity.css";
 import "@/connectors/Connectors.css";
@@ -57,8 +59,10 @@ export function AppsPage() {
   const detail = createMemo(() => pick("detail"));
   const application = createMemo(() => pick("application"));
   const later = createMemo(() => pick("later"));
+  const chat = createMemo(() => chatRoute(params.rest ?? ""));
   const tab = () => {
     if (more()) return moreAppsTab(more()!);
+    if (chat()) return "browse";
     const section = view().section;
     // A connection and the connect pages sit under Browse, where they're reached from.
     return section === "ai" || section === "review" ? section : section === "later" ? null : "browse";
@@ -96,6 +100,7 @@ export function AppsPage() {
           </A>
         </nav>
         <Switch>
+          <Match when={chat()}>{(route) => <ChatRoutes route={route()} />}</Match>
           <Match when={more()}>{(found) => <MoreApps view={found()} />}</Match>
           <Match when={view().section === "browse"}>
             <Browse />

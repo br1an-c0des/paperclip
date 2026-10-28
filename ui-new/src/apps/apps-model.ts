@@ -89,8 +89,11 @@ export function appsView(rest: string): AppsView {
 /** The shared package's ownership defaults for an app without `ownershipAvailability`. */
 const DEFAULT_OWNERSHIP = { platform_shared: false, platform_provisioned: false, customer: true, dcr: true } as const;
 
-/** Apps whose setup ui-new doesn't have yet: aggregators, Google's service picker, email inboxes. */
-export const SPECIAL_SETUP_APPS = new Set(["composio", "arcade", "google-workspace", "agentmail"]);
+/**
+ * Apps whose setup ui-new doesn't have yet, hidden from the gallery. Empty since M6 round 3:
+ * aggregators, Google Workspace and AgentMail have theirs (src/apps/setups/, src/apps/chat/).
+ */
+export const SPECIAL_SETUP_APPS = new Set<string>();
 
 const TOOL_TRANSPORTS = new Set(["mcp_remote", "rest_api"]);
 

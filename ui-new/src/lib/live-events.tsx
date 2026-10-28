@@ -62,6 +62,11 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
   if (action?.startsWith("ai_connection.") || action?.startsWith("connection_grant.")) {
     keys.push(queryKeys.aiConnections.list(companyId), queryKeys.tools.all(companyId));
   }
+  // A connection's identities (grants, their audiences and delegations) are logged on `connection_grant`.
+  if (entityType === "connection_grant") keys.push(queryKeys.tools.all(companyId));
+  // Chat endpoints (src/apps/chat/): the endpoint, its deliveries, publications and actions are
+  // logged on `chat_*` entities. Provider callbacks don't always log, so open pages also poll.
+  if (entityType?.startsWith("chat_")) keys.push(queryKeys.chatEndpoints.all(companyId));
   switch (entityType) {
     case "issue":
       keys.push(queryKeys.issues.list(companyId), queryKeys.companies.stats);

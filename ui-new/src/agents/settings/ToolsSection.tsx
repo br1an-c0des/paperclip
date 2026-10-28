@@ -18,7 +18,8 @@ import { Button, buttonClass } from "@/ui/Button";
 import { SettingsCard } from "@/ui/Field";
 import { Switch as Toggle } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
-import { OutlineCard, SectionTitle } from "../shared";
+import { SectionTitle } from "../shared";
+import { ChannelsPanel } from "./ChannelsPanel";
 import "@/apps/Apps.css";
 import "@/connectors/Connectors.css";
 
@@ -36,7 +37,7 @@ import "@/connectors/Connectors.css";
  * - GitHub identity: the agent's own GitHub account, or the responsible person's.
  * - Recent tool calls from the audit.
  *
- * Chat channels come from another part of the board; their line stays until then.
+ * - Its chat channels (ChannelsPanel).
  */
 
 const ALLOWED_SHOWN = 40;
@@ -348,7 +349,7 @@ export function ToolsSection(props: { agent: AgentDetail }) {
         <ToolActivity filter={{ agent: props.agent.id, window: "7d" }} pageSize={10} empty={`${props.agent.name} hasn't called any app tools in the last 7 days.`} />
       </section>
 
-      <OutlineCard rows={[{ name: "Channels", text: "Slack, GitHub and other chat channels connected to the agent." }]} was="Channels" note="Not built yet. This section will also hold:" />
+      <ChannelsPanel agent={props.agent} />
 
       <CheckAccessDialog open={checking()} onOpenChange={setChecking} agentId={props.agent.id} />
     </>

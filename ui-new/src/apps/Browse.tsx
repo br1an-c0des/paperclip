@@ -21,6 +21,8 @@ import {
   type ConnectionRow,
 } from "./apps-model";
 import { AppLogo, StateTag, useApplications, useConnections, useGallery, usePendingRequests } from "./shared";
+import { ChatEndpointGroup } from "./chat/ChatRoutes";
+import { chatConnectHref, galleryChatProvider, withChatApps } from "./chat/chat-model";
 
 /*
  * Browse (`/apps`): the company's connections, then the gallery. Connections are grouped as the old
@@ -35,7 +37,6 @@ export function Browse() {
   const gallery = useGallery();
   const connections = useConnections();
   const applications = useApplications();
-  const flags = useExperimentalSettingsQuery();
   const pending = usePendingRequests();
   const inboxes = createQuery(() => ({
     queryKey: queryKeys.tools.emailInboxes(company().id),
@@ -48,10 +49,8 @@ export function Browse() {
   const rows = createMemo(() =>
     connectionRows(connections.data?.connections ?? [], applications.data?.applications ?? [], gallery.data?.apps ?? []),
   );
-  const chatOn = () => flags.data?.enableChatConnectors === true;
   const tools = () => rows().filter((row) => connectionGroup(row.connection) === "tools");
   const ai = () => rows().filter((row) => connectionGroup(row.connection) === "ai");
-  const channels = () => (chatOn() ? rows().filter((row) => connectionGroup(row.connection) === "channels") : []);
   const counts = createMemo(() => connectionCounts(rows()));
   const pendingCount = () => pending.data?.actionRequests.length ?? 0;
 
@@ -99,7 +98,7 @@ export function Browse() {
           <Match when={true}>
             <ConnectionGroup title="Tools and MCP servers" rows={tools()} base={base()} />
             <ConnectionGroup title="AI accounts" rows={ai()} base={base()} hrefFor={() => `${base()}/ai`} note="Managed in AI connections." />
-            <ConnectionGroup title="Chat endpoints" rows={channels()} base={base()} />
+            <ChatEndpointGroup />
             <Show when={(inboxes.data?.length ?? 0) > 0}>
               <div class="ap-group">
                 <h4 class="ap-group-title">Email inboxes</h4>
@@ -111,7 +110,7 @@ export function Browse() {
                           <Mail size={18} />
                         </span>
                         <div class="ap-row-main">
-                          <span class="ap-row-name">{inbox.address ?? "Inbox being set up"}</span>
+                          <A class="ap-row-name" href={`${base()}/chat/${inbox.id}/settings`}>{inbox.address ?? "Inbox being set up"}</A>
                           <span class="ap-row-meta">
                             Answered by {agentName(inbox.assignedAgentId)} · {inbox.receiveMode === "webhook" ? "Webhook" : "Live connection"}
                             {inbox.lastError ? ` · ${inbox.lastError}` : ""}
@@ -183,7 +182,7 @@ function Gallery(props: { counts: Map<string, number> }) {
   const flags = useExperimentalSettingsQuery();
   const [query, setQuery] = createSignal("");
   const [category, setCategory] = createSignal<AppCategory | null>(null);
-  const apps = createMemo(() => galleryApps(gallery.data?.apps ?? [], flags.data));
+  const apps = createMemo(() => withChatApps(galleryApps(gallery.data?.apps ?? [], flags.data), gallery.data?.apps ?? [], flags.data));
   const categories = createMemo(() => categoriesIn(apps()));
   const shown = createMemo(() => apps().filter((app) => matchesApp(app, query(), category())));
 
@@ -264,7 +263,7 @@ function Gallery(props: { counts: Map<string, number> }) {
                         </span>
                       }
                     >
-                      <A class={buttonClass({ size: "compact" })} href={`${base()}/connect?source=${encodeURIComponent(app.slug)}`}>
+                      <A class={buttonClass({ size: "compact" })} href={galleryChatProvider(app, flags.data) ? chatConnectHref(base(), galleryChatProvider(app, flags.data)!) : `${base()}/connect?source=${encodeURIComponent(app.slug)}`}>
                         {count() > 0 ? "Add account" : "Connect"}
                       </A>
                     </Show>
