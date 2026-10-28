@@ -346,8 +346,8 @@ Covers `agents/*`, `agent-chat/*`.
 Progress (2026-10-27): first slices built: the agent page with its settings (boards 26, 27 and the
 board 30 outline; harness and runner shown together, Memory, Runner state and sessions), the Org
 dashboard (board 19), Manage agents with bulk edit (board 20), and company workload (board 33, with
-M4's workload). Left: Agent chat (boards 12, 13), New agent (N2, N3; Hire agent links to it), and the
-remaining settings sections (tools and channels, trust presets). Gaps in decisions
+M4's workload), and New agent (N2, N3). Left: Agent chat (boards 12, 13, 18) and the remaining
+settings sections (tools and channels, trust presets). Gaps in decisions
 [29](decisions.md#29-gaps-found-building-the-agent-page) and
 [30](decisions.md#30-gaps-found-building-the-org-pages).
 
