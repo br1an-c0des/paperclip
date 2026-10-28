@@ -59,6 +59,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 30 | [Gaps found building the org pages](#30-gaps-found-building-the-org-pages) | `agents/roster`, `agents/organization`, `agents/built-in` | Open | Oct 27, 2026 |
 | 31 | [Gaps found building agent chat](#31-gaps-found-building-agent-chat) | `agent-chat/*`, `inbox-search/search` | Open | Oct 27, 2026 |
 | 32 | [Gaps found building app settings](#32-gaps-found-building-app-settings) | Instance settings, experimental flags | Open | Oct 27, 2026 |
+| 33 | [Gaps found building company settings](#33-gaps-found-building-company-settings) | Company settings | Open | Oct 27, 2026 |
 
 ## Entries
 
@@ -1084,4 +1085,19 @@ Both are handled in `ui-new` for now.
 - **No organization owners** in `GET /api/companies`, and **no request to leave an organization**.
 - **Avatars** are stored in one organization's storage; there's no per-user storage.
 - **`defaultEnvironmentId` is instance-level** while environments are per organization.
+
+### 33. Gaps found building company settings
+
+- **Status:** Open
+- **Area:** Tier 2 "Company settings"
+- **Found in:** company settings (M6, boards 21–25 and the board 30 outline).
+
+- **Invite links can't be fetched after creation:** the list carries no token, so a link is shown
+  once.
+- **The prompt-injection fallback can't be configured;** it's always pattern matching.
+- **The decision model's last test result and this month's calls and cost aren't stored.**
+- **Fast responses stay off until an admin turns on `enableFastResponses`** (see decision 32).
+- **The default environment is instance-wide** (`defaultEnvironmentId` in `PATCH /instance/settings`)
+  while environments belong to organizations; the page says so where it's set.
+- **Plugin settings pages need plugin hosting** (M7).
 
