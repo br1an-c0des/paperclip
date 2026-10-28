@@ -3,6 +3,7 @@ import { createEffect, createMemo, on } from "solid-js";
 import { queryKeys } from "@/api/queryKeys";
 import { runsApi } from "@/api/runs";
 import { WORKLOAD_RUN_LIMIT, workloadApi } from "@/api/workload";
+import { useChatIndex } from "@/chat/chat-index";
 import { useNow } from "@/lib/clock";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useExperimentalSettingsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
@@ -11,8 +12,8 @@ import type { WorkloadInput, WorkloadScope, WorkloadTask } from "./workload-mode
 
 /*
  * The data agent workload reads, in one place for the project tab and the company page: the shared
- * agent, project and live-run lists, the company's run history, and the scope's tasks (passed in,
- * since both pages already hold their task list).
+ * agent, project and live-run lists, the company's run history, your chats (whose runs read "Chat"),
+ * and the scope's tasks (passed in, since both pages already hold their task list).
  *
  * The history isn't on the live events' `heartbeats` key, which every run's progress refreshes;
  * it refetches when a run starts, queues or finishes, which changes the live list.
@@ -30,6 +31,7 @@ export function useWorkload(props: { scope: () => WorkloadScope; tasks: () => re
   const projects = useProjectsQuery();
   const liveRuns = useLiveRunsQuery();
   const experimental = useExperimentalSettingsQuery();
+  const chats = useChatIndex();
   const runs = createQuery(() => ({
     queryKey: queryKeys.workload.runs(company().id),
     queryFn: ({ signal }) => runsApi.list(company().id, { limit: WORKLOAD_RUN_LIMIT, summary: true }, signal),
@@ -75,6 +77,7 @@ export function useWorkload(props: { scope: () => WorkloadScope; tasks: () => re
     runsTruncated: (runs.data?.length ?? 0) >= WORKLOAD_RUN_LIMIT,
     liveRuns: liveRuns.data ?? [],
     projects: projects.data ?? [],
+    chatIds: chats.ids(),
     youId: session.youId(),
     now: now(),
   }));

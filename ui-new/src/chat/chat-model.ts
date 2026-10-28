@@ -256,3 +256,17 @@ export function shortDate(value: string | Date, now: Date = new Date()) {
 export function chatPath(prefix: string, agentKey: string) {
   return `/${prefix}/agents/${agentKey}`;
 }
+
+/** A task as far as telling a chat apart goes: full task responses carry the chat's fields. */
+export type ChatLike = { id: string; conversationAgentId?: string | null; createdByUserId?: string | null };
+
+/**
+ * The agent a task is your chat with, or undefined when it's a task (or someone else's chat, which
+ * the agent's address can't show: it opens your own). Your chats list says; a task loaded on its
+ * own says too, since you started the chat.
+ */
+export function yourChatAgent(task: ChatLike, listed: ReadonlyMap<string, string>, youId: string | null): string | undefined {
+  const known = listed.get(task.id);
+  if (known) return known;
+  return task.conversationAgentId && youId && task.createdByUserId === youId ? task.conversationAgentId : undefined;
+}

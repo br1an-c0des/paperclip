@@ -11,6 +11,7 @@ import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
 import { useYouName } from "@/lib/session";
+import { isSetupDraft } from "@/agents/new/new-agent-model";
 import { RequestCard } from "@/requests/RequestCard";
 import { QueuedMessages } from "@/tasks/composer/QueuedMessages";
 import { MessageBody } from "@/tasks/MessageBody";
@@ -117,9 +118,11 @@ export function ChatView(props: { agent: AgentDetail; base: string; controls: Ch
   const disabledReason = () =>
     props.agent.status === "terminated"
       ? `${props.agent.name} is retired, so it can't reply.`
-      : props.agent.status === "paused"
-        ? `${props.agent.name} is paused. Resume it to chat.`
-        : null;
+      : isSetupDraft(props.agent)
+        ? `${props.agent.name} isn't set up yet. Finish setup to chat.`
+        : props.agent.status === "paused"
+          ? `${props.agent.name} is paused. Resume it to chat.`
+          : null;
 
   // Keep the newest in view: on opening, and when something arrives at the foot while the reader
   // is near it. Older pages loading above don't move the reader.

@@ -1,7 +1,7 @@
 import type { IssueComment } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import type { Request } from "@/requests/request-model";
-import { buildChat, quietRunText, shownReplies, statusTag, type ChatEntry, type ChatTask } from "./chat-model";
+import { buildChat, quietRunText, shownReplies, statusTag, yourChatAgent, type ChatEntry, type ChatTask } from "./chat-model";
 
 const NOW = new Date("2026-10-27T15:00:00");
 
@@ -148,5 +148,20 @@ describe("shownReplies", () => {
 describe("statusTag", () => {
   it("writes the status the way the card does", () => {
     expect(statusTag("in_progress")).toBe("IN PROGRESS");
+  });
+});
+
+describe("yourChatAgent", () => {
+  const listed = new Map([["chat1", "bob"]]);
+
+  it("finds your chats in the list, or from a task's own fields when you started it", () => {
+    expect(yourChatAgent({ id: "chat1" }, listed, "me")).toBe("bob");
+    expect(yourChatAgent({ id: "chat2", conversationAgentId: "ada", createdByUserId: "me" }, listed, "me")).toBe("ada");
+  });
+
+  it("leaves tasks, and other people's chats, as tasks", () => {
+    expect(yourChatAgent({ id: "t1", conversationAgentId: null, createdByUserId: "me" }, listed, "me")).toBeUndefined();
+    expect(yourChatAgent({ id: "chat3", conversationAgentId: "ada", createdByUserId: "maya" }, listed, "me")).toBeUndefined();
+    expect(yourChatAgent({ id: "chat3", conversationAgentId: "ada", createdByUserId: null }, listed, null)).toBeUndefined();
   });
 });

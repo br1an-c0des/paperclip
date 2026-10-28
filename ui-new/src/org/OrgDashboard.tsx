@@ -8,6 +8,7 @@ import { costsApi } from "@/api/costs";
 import { orgApi } from "@/api/org";
 import { openProjects } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
+import { useChatIndex } from "@/chat/chat-index";
 import { groupFeed, feedKind } from "@/inbox/inbox-model";
 import { useAttentionFeed } from "@/inbox/needs-you";
 import { useCompany } from "@/lib/company";
@@ -332,13 +333,14 @@ function RecentActivity(props: { data: ReturnType<typeof useOrgData> }) {
   const company = useCompany();
   const base = () => `/${company().issuePrefix}`;
   const people = useTaskPeople();
+  const chats = useChatIndex();
   const activity = createQuery(() => ({
     queryKey: queryKeys.org.activity(company().id),
     queryFn: ({ signal }) => orgApi.activity(company().id, ACTIVITY_LIMIT, signal),
   }));
   const lines = createMemo(() => {
     const agentsById = new Map((props.data.agents.data ?? []).map((agent) => [agent.id, agent]));
-    const names = { agent: (id: string) => agentsById.get(id), person: people.personName, youId: people.youId() };
+    const names = { agent: (id: string) => agentsById.get(id), person: people.personName, youId: people.youId(), chatAgent: chats.agentIdFor };
     return (activity.data ?? []).flatMap((event) => activityLine(event, names) ?? []).slice(0, ACTIVITY_SHOWN);
   });
   const minute = useMinute();

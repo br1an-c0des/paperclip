@@ -24,7 +24,7 @@ import { messageTime } from "./chat-model";
  * next, and what it did lately, by day.
  *
  * - Right now: replying in this chat, working on a task (with Watch run and Stop), or idle (with
- *   Wake now). Runs come from the company's live runs.
+ *   Run now). Runs come from the company's live runs.
  * - Up next: its assigned tasks waiting to start (`status=todo`).
  * - The timeline: its activity (`/activity?agentId=`), worded as the Org dashboard words it, with
  *   this chat's own entries called "this chat".
@@ -102,13 +102,13 @@ export function ChatActivity(props: {
       pushToast({ tone: "error", title: "Couldn't stop the run", body: error instanceof Error ? error.message : String(error) });
     }
   };
-  const wake = async () => {
+  const runNow = async () => {
     try {
       await agentsApi.invoke(props.agent.id, company().id);
       void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
-      pushToast({ tone: "success", title: `Woke ${props.agent.name}` });
+      pushToast({ tone: "success", title: `Started a run for ${props.agent.name}` });
     } catch (error) {
-      pushToast({ tone: "error", title: "Couldn't wake the agent", body: error instanceof Error ? error.message : String(error) });
+      pushToast({ tone: "error", title: "Couldn't start a run", body: error instanceof Error ? error.message : String(error) });
     }
   };
   const since = (run: LiveRun) => (run.startedAt ? formatDuration(now() - new Date(run.startedAt).getTime()) : null);
@@ -140,12 +140,12 @@ export function ChatActivity(props: {
                 </span>
                 <span class="ch-now-title">Nothing running</span>
                 <span class="ch-muted">
-                  {props.agent.status === "paused" ? "Resume it under Manage agent to chat." : "Wakes on new messages and assignments."}
+                  {props.agent.status === "paused" ? "Resume it under Manage agent to chat." : "Runs on new messages and assignments."}
                 </span>
                 <Show when={props.agent.status !== "paused" && props.agent.status !== "terminated"}>
                   <div class="ch-now-actions">
-                    <button type="button" class="ch-pill-btn" onClick={() => void wake()}>
-                      Wake now
+                    <button type="button" class="ch-pill-btn" onClick={() => void runNow()}>
+                      Run now
                     </button>
                   </div>
                 </Show>

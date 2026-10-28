@@ -7,6 +7,7 @@ import { agentsApi } from "@/api/agents";
 import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { runPath } from "@/api/runs";
+import { useChatIndex } from "@/chat/chat-index";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
 import { SettingsCard, SettingsRow } from "@/ui/Field";
@@ -37,6 +38,7 @@ export function RunnerStateCard(props: { agent: AgentDetail }) {
   const company = useCompany();
   const client = useQueryClient();
   const [busy, setBusy] = createSignal<string | null>(null);
+  const chats = useChatIndex();
   const state = createQuery(() => ({
     queryKey: queryKeys.agents.part(props.agent.id, "runtime-state"),
     queryFn: ({ signal }) => agentsApi.runtimeState(props.agent.id, company().id, signal),
@@ -135,19 +137,37 @@ export function RunnerStateCard(props: { agent: AgentDetail }) {
           </>
         )}
       </Show>
-      <SettingsRow label="Task sessions" help="One provider session per task. The newest first.">
+      <SettingsRow label="Task sessions" help="One provider session per task, and one for your chat with it. The newest first.">
         <Show when={sortedSessions().length > 0} fallback={<span class="ag-static-text">{sessions.isLoading ? "Loading…" : "No task sessions."}</span>}>
           <ul class="ps-list ag-sessions">
             <For each={sortedSessions()}>
               {(session) => {
                 const task = () => taskById().get(session.taskKey);
+                // A session on your chat with this agent: it reads "Chat" and leads to the chat.
+                const chat = () => chats.agentIdFor(session.taskKey);
                 return (
                   <li class="ps-list-row">
                     <span class="ps-list-name">
-                      <A class="ps-link" href={issuePath(company().issuePrefix, { id: session.taskKey, identifier: task()?.identifier ?? null })}>
-                        {task()?.identifier ?? "Task"}
-                      </A>{" "}
-                      <span class="ag-session-title">{task()?.title ?? ""}</span>
+                      <Show
+                        when={chat()}
+                        fallback={
+                          <>
+                            <A class="ps-link" href={issuePath(company().issuePrefix, { id: session.taskKey, identifier: task()?.identifier ?? null })}>
+                              {task()?.identifier ?? "Task"}
+                            </A>{" "}
+                            <span class="ag-session-title">{task()?.title ?? ""}</span>
+                          </>
+                        }
+                      >
+                        {(agentId) => (
+                          <>
+                            <A class="ps-link" href={chats.href(agentId())}>
+                              Chat
+                            </A>{" "}
+                            <span class="ag-session-title">Your chat with {props.agent.name}</span>
+                          </>
+                        )}
+                      </Show>
                       <span class="ps-list-meta">
                         Session <span class="mono">{sessionLabel(session.sessionDisplayId ?? (session.sessionParamsJson?.sessionId as string | undefined))}</span> · updated {dateTime(session.updatedAt)}
                         {session.lastError ? ` · ${session.lastError}` : ""}

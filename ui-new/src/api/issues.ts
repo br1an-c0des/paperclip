@@ -91,9 +91,15 @@ export const issuesApi = {
    */
   retry: (id: string, body: { idempotencyKey: string; observedRunId: string | null }) =>
     api.post<TaskRetryReceipt>(`/issues/${id}/retry`, body),
-  search: (companyId: string, filters: IssueSearch, signal?: AbortSignal) => {
+  /**
+   * Task search for pickers and the command palette (`?q=`). Chats are hidden tasks the search still
+   * returns (decision 8); they're left out here, by the `conversationAgentId` full responses carry,
+   * so a picker can't offer one as a task. The Search page shows them as chats.
+   */
+  search: async (companyId: string, filters: IssueSearch, signal?: AbortSignal) => {
     const qs = searchParams(filters);
-    return api.get<Issue[]>(`/companies/${companyId}/issues${qs ? `?${qs}` : ""}`, { signal });
+    const found = await api.get<Issue[]>(`/companies/${companyId}/issues${qs ? `?${qs}` : ""}`, { signal });
+    return found.filter((task) => !task.conversationAgentId);
   },
   create: (companyId: string, data: Record<string, unknown>) => api.post<Issue>(`/companies/${companyId}/issues`, data),
   uploadAttachment: (companyId: string, issueId: string, file: File) => {
