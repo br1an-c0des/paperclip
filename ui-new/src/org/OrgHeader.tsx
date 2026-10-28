@@ -15,8 +15,7 @@ import "./Org.css";
  * it has, Invite people and Hire agent, and the organization's tabs in a track under the card.
  *
  * Workload is board 33 (`src/workload/CompanyWorkload.tsx`), which draws this header too, as do
- * Skills (`src/skills/`) and Activity (`src/activity/`). Apps is an M6 page; until it's built that
- * tab opens the shell's "not built yet" page.
+ * Skills (`src/skills/`), Apps (`src/apps/`) and Activity (`src/activity/`).
  */
 
 function count(value: number | undefined, one: string, many: string) {

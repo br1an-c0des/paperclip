@@ -1,0 +1,690 @@
+/*
+ * Apps and tools (src/apps/). No board: settings cards and rows (boards 21–29), option rows and the
+ * org tabs' section links, in the Capsule Stack tokens. The AI connection rows and the agent picker
+ * reuse the Connectors styles (src/connectors/Connectors.css).
+ */
+
+.ap-page .card {
+  min-width: 0;
+}
+
+/* Card header with its actions at the end */
+.ap-chead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ap-chead > div {
+  flex: 1;
+  min-width: 220px;
+}
+
+.ap-card-body {
+  padding: 16px 20px;
+}
+
+.ap-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px;
+  color: var(--body);
+  font-size: 14px;
+}
+
+.ap-later {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 22px;
+}
+
+.ap-later h2 {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.ap-later p {
+  color: var(--body);
+}
+
+.ap-later a,
+.ap-flash a,
+.cx-note a {
+  color: var(--run-fg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ap-flash {
+  padding: 12px 18px;
+}
+
+.ap-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ap-actions-end {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.ap-inline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ap-inline .input {
+  flex: 1;
+  min-width: 180px;
+}
+
+/* "3 app calls are waiting for your OK" */
+.ap-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.ap-banner span {
+  flex: 1;
+}
+
+.ap-banner:hover {
+  filter: brightness(1.05);
+}
+
+.ap-banner--inline {
+  margin: 12px 20px 0;
+  border-radius: var(--r-inner);
+  font-size: 13px;
+}
+
+/* Logos */
+.ap-logo {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--well);
+  border: 1px solid var(--edge);
+  overflow: hidden;
+}
+
+.ap-logo img {
+  display: block;
+  object-fit: contain;
+}
+
+.ap-logo--initial {
+  border: 0;
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+}
+
+.ap-logo--icon {
+  width: 36px;
+  height: 36px;
+  color: var(--body);
+}
+
+/* State: a dot and a label */
+.ap-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.ap-state i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--g-ash);
+}
+
+.ap-state--connected {
+  color: var(--green-fg);
+}
+
+.ap-state--connected i {
+  background: var(--g-lagoon);
+}
+
+.ap-state--attention,
+.ap-state--draft {
+  color: var(--amber-fg);
+}
+
+.ap-state--attention i,
+.ap-state--draft i {
+  background: var(--g-ember);
+}
+
+/* Grouped rows */
+.ap-group + .ap-group {
+  border-top: 1px solid var(--line);
+}
+
+.ap-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-right: 20px;
+}
+
+.ap-group-title {
+  padding: 14px 20px 4px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ap-group-title span {
+  margin-left: 6px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.ap-rows,
+.ap-grid {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+}
+
+.ap-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--row-line);
+}
+
+.ap-group-title + .ap-rows > .ap-row:first-child,
+.ap-group-head + .ap-rows > .ap-action:first-child {
+  border-top: 0;
+}
+
+.ap-row--link:hover {
+  background: var(--row-hover);
+}
+
+.ap-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ap-row-name {
+  font-weight: 800;
+  color: var(--text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+a.ap-row-name:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ap-row-meta {
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* Gallery */
+.ap-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px 4px;
+}
+
+.ap-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 280px;
+  min-width: 180px;
+}
+
+.ap-search svg {
+  position: absolute;
+  left: 12px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.ap-search .input {
+  width: 100%;
+  padding-left: 34px;
+}
+
+.ap-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ap-chip {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--body);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ap-chip:hover {
+  background: var(--hover);
+}
+
+.ap-chip[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.ap-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 12px;
+  padding: 14px 20px 20px;
+}
+
+.ap-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+  background: var(--ground);
+}
+
+.ap-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+}
+
+.ap-tile-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ap-tile-name {
+  font-weight: 800;
+  color: var(--text);
+}
+
+.ap-tile-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green-fg);
+}
+
+.ap-tile-desc {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--body);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ap-tile-off {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Connect forms */
+.ap-connect {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 760px;
+  padding: 20px 22px;
+}
+
+.ap-connect-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.ap-connect-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.ap-connect-title h2 {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.ap-connect-title p {
+  margin-top: 4px;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ap-connect .ap-rows {
+  margin: 0 -22px -20px;
+}
+
+.ap-page .cx-options {
+  padding: 0;
+}
+
+.ap-method {
+  align-items: flex-start;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.ap-method input {
+  margin-top: 3px;
+}
+
+.ap-method-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ap-method-text .cx-option-name {
+  white-space: normal;
+}
+
+.ap-guidance {
+  padding: 12px 14px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+  font-size: 13px;
+}
+
+.ap-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 10px 28px;
+  border-radius: var(--r-inner);
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ap-field-help {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ap-field-help p {
+  margin: 0;
+}
+
+.ap-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--body);
+  cursor: pointer;
+}
+
+.ap-check input {
+  margin-top: 3px;
+  accent-color: var(--run-fg);
+}
+
+.ap-more summary {
+  cursor: pointer;
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ap-more-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 12px;
+}
+
+.ap-oauth-client {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px dashed var(--dashed);
+  border-radius: var(--r-inner);
+}
+
+.ap-code {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--code);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.ap-headers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.ap-header-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Review */
+.ap-request {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--row-line);
+}
+
+.ap-rows > .ap-request:first-child {
+  border-top: 0;
+}
+
+.ap-request-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--amber-fg);
+}
+
+.ap-request-head svg {
+  align-self: center;
+}
+
+.ap-request-title {
+  font-weight: 800;
+  color: var(--text);
+}
+
+.ap-request-body {
+  font-size: 14px;
+  color: var(--body);
+}
+
+.ap-request-preview {
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+  font-size: 13px;
+}
+
+.ap-request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ap-request-link {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--run-fg);
+}
+
+/* Actions on a connection */
+.ap-action {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--row-line);
+}
+
+.ap-action-desc {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--body);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ap-setall {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.ap-setall .input {
+  height: 30px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+.ap-reconnect {
+  border: 1px solid color-mix(in srgb, var(--amber-fg) 40%, transparent);
+}
+
+.ap-reconnect-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  container-type: inline-size;
+  width: 100%;
+}
+
+.ap-reconnect-form .frow {
+  width: 100%;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.ap-danger {
+  border: 1px solid color-mix(in srgb, var(--red-fg) 45%, transparent);
+}
+
+.ap-danger .chead {
+  border-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .ap-action {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .ap-row {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .ap-connect {
+    padding: 16px;
+  }
+
+  .ap-connect .ap-rows {
+    margin: 0 -16px -16px;
+  }
+
+  .ap-header-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .ap-header-row > :nth-child(2) {
+    grid-column: 1;
+  }
+}

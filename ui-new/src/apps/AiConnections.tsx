@@ -7,7 +7,6 @@ import { healthApi } from "@/api/health";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
-import { HeaderNumber, PageHeader } from "@/ui/PageHeader";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import {
@@ -22,21 +21,21 @@ import {
   usageLimitValue,
   usagePercent,
   type Connection,
-} from "./connection-model";
-import { ConnectionSetup } from "./ConnectionSetup";
-import "./Connectors.css";
+} from "@/connectors/connection-model";
+import { ConnectionSetup } from "@/connectors/ConnectionSetup";
 
 /*
- * `/:companyPrefix/connectors`: a plain, temporary page for the company's AI connections, so a
- * Claude account can be set up and agents can run. It stands in for M6's Apps and tools page and has
- * no board; it's built from the design system's components.
+ * Apps → AI connections (`/:prefix/apps/ai`): the company's AI accounts, which agents run on. This
+ * was the temporary Connectors page (decision 23), folded into Apps; `/:prefix/connectors` sends you
+ * here. There's no board: it's built from the design system's components.
  *
  * Lists every connection you can use (`GET ai-connections`), lets you make your own personal one
  * your default (`PUT default`), checks usage where the provider reports it (`GET :id/usage`), shows
- * runs using it (`GET :id/active-runs`), and adds or reconnects a Claude account (ConnectionSetup).
+ * runs using it (`GET :id/active-runs`), and adds or reconnects a Claude account (ConnectionSetup,
+ * which New agent uses too).
  */
 
-export function ConnectorsPage() {
+export function AiConnections() {
   const company = useCompany();
   const client = useQueryClient();
   const list = createQuery(() => ({
@@ -64,36 +63,24 @@ export function ConnectorsPage() {
 
   return (
     <>
-      <PageHeader
-        crumbs={
-          <>
-            <span>Company</span>
-            <span aria-hidden="true">/</span>
-            <span>Connectors</span>
-          </>
-        }
-        title="Connectors"
-        numbers={
-          <Show when={list.data}>
-            <HeaderNumber value={connectedCount()} label="connected" />
-            <Show when={attentionCount() > 0}>
-              <HeaderNumber value={attentionCount()} label="need attention" tone="amber" />
-            </Show>
-          </Show>
-        }
-        actions={
-          <Button variant="primary" disabled={!list.data} onClick={() => openSetup()}>
+      <section class="card cx-card" aria-labelledby="cx-ai-title">
+        <header class="chead ap-chead">
+          <div>
+            <h3 id="cx-ai-title" class="disp">
+              AI connections
+            </h3>
+            <p>
+              The accounts agents run on.
+              <Show when={list.data && connections().length > 0}>
+                {" "}
+                {connectedCount()} connected
+                <Show when={attentionCount() > 0}>, {attentionCount()} need attention</Show>.
+              </Show>
+            </p>
+          </div>
+          <Button variant="primary" size="compact" disabled={!list.data} onClick={() => openSetup()}>
             Connect Claude
           </Button>
-        }
-      />
-
-      <section class="card cx-card" aria-labelledby="cx-ai-title">
-        <header class="chead">
-          <h3 id="cx-ai-title" class="disp">
-            AI connections
-          </h3>
-          <p>The accounts agents run on. Apps and tools replaces this page later.</p>
         </header>
         <Switch>
           <Match when={list.isPending}>
