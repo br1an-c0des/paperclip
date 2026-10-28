@@ -199,13 +199,14 @@ export function useChat(agent: () => AgentDetail) {
     }),
   );
 
-  // Only the first load counts: a chat created by the first message mustn't swap the view (and its
-  // composer, mid-send) for a loading note.
+  // Only the first load counts. A refetch (live events, the reconnect poll, window focus) or a chat
+  // created by the first message mustn't swap the thread, and its composer mid-send, for a loading
+  // note: that loses the reader's place. ChatView mounts afresh for each agent, so the latch never
+  // needs resetting; resetting it on `agent().id` fired whenever the agent's row refetched.
   const [ready, setReady] = createSignal(false);
   const firstLoading = () => settings.isPending || chatQuery.isPending || (!!chatId() && comments.isPending);
   createEffect(() => !ready() && !firstLoading() && setReady(true));
-  createEffect(on(() => agent().id, () => setReady(false), { defer: true }));
-  const loading = () => !ready() && firstLoading();
+  const loading = createMemo(() => !ready() && firstLoading());
 
   const refresh = () =>
     batch(() => {
@@ -217,7 +218,13 @@ export function useChat(agent: () => AgentDetail) {
   return {
     off,
     loading,
-    error: () => (off() ? null : ((chatQuery.error ?? comments.error) as Error | null)),
+    /** Only when there's nothing to show: a refetch that fails keeps the thread on screen. */
+    error: (): Error | null => {
+      if (off()) return null;
+      if (chatQuery.error && chatQuery.data === undefined) return chatQuery.error as Error;
+      if (comments.error && comments.data === undefined) return comments.error as Error;
+      return null;
+    },
     chat,
     chatId,
     ensure,

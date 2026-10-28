@@ -24,6 +24,7 @@ import { ChatActivity } from "./ChatActivity";
 import { ChatComposer } from "./ChatComposer";
 import { messageTime, quietRunText, shortDate, statusTag, type ChatEntry, type ChatTask } from "./chat-model";
 import { LiveReply } from "./LiveReply";
+import { atFoot, shouldFollow, type FollowCause } from "./scroll-model";
 import { useChat } from "./use-chat";
 import "./Chat.css";
 
@@ -87,8 +88,18 @@ export function ChatHeaderActions(props: { controls: ChatControls }) {
   );
 }
 
-export function ChatView(props: { agent: AgentDetail; base: string; controls: ChatControls }) {
-  const company = useCompany();
+type ChatViewProps = { agent: AgentDetail; base: string; controls: ChatControls };
+
+/** One agent's chat. Going to another agent's chat starts it afresh: its loading, place and draft. */
+export function ChatView(props: ChatViewProps) {
+  return (
+    <Show when={props.agent.id} keyed>
+      {(_id) => <ChatThread {...props} />}
+    </Show>
+  );
+}
+
+function ChatThread(props: ChatViewProps) {
   const commands = useCommands();
   const youName = useYouName();
   const projects = useProjectsQuery();
@@ -124,20 +135,28 @@ export function ChatView(props: { agent: AgentDetail; base: string; controls: Ch
           ? `${props.agent.name} is paused. Resume it to chat.`
           : null;
 
-  // Keep the newest in view: on opening, and when something arrives at the foot while the reader
-  // is near it. Older pages loading above don't move the reader.
-  const atBottom = () => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160;
-  const toBottom = () => requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight }));
-  createEffect(on(() => state.loading(), (loading) => !loading && toBottom()));
-  let wasAtBottom = true;
-  const footKey = createMemo(() => {
-    const entries = state.entries();
-    return `${entries[entries.length - 1]?.key ?? ""}:${state.replies().map((turn) => turn.runId).join(",")}:${state.queue.data?.entries.length ?? 0}`;
-  });
-  createEffect(on(footKey, () => wasAtBottom && toBottom(), { defer: true }));
-  const onScroll = () => (wasAtBottom = atBottom());
+  // Where the reader is (scroll-model.ts): the chat opens at the foot and sending takes you there;
+  // otherwise it follows what arrives only while you're at the foot, so reading further up survives
+  // refetches. Growth is watched with a ResizeObserver, which also catches the live reply streaming
+  // in and images loading. Paging back stops following until you scroll to the foot again.
+  let following = true;
+  const metrics = () => ({ scrollY: window.scrollY, viewHeight: window.innerHeight, contentHeight: document.documentElement.scrollHeight });
+  const follow = (cause: FollowCause) => {
+    if (!shouldFollow(cause, following)) return;
+    following = true;
+    // After layout; by then the reader may have scrolled away.
+    requestAnimationFrame(() => following && window.scrollTo({ top: document.documentElement.scrollHeight }));
+  };
+  const onScroll = () => (following = atFoot(metrics()));
   window.addEventListener("scroll", onScroll, { passive: true });
   onCleanup(() => window.removeEventListener("scroll", onScroll));
+  const shown = createMemo(() => !state.off() && !state.loading() && !state.error());
+  createEffect(on(shown, (open) => open && follow("opened")));
+  const watchGrowth = (element: HTMLElement) => {
+    const observer = new ResizeObserver(() => follow("grew"));
+    observer.observe(element);
+    onCleanup(() => observer.disconnect());
+  };
 
   const oldestLoaded = () => {
     const pages = state.comments.data?.pages;
@@ -177,7 +196,7 @@ export function ChatView(props: { agent: AgentDetail; base: string; controls: Ch
       </Match>
       <Match when={true}>
         <div class="ch">
-          <div class="ch-main">
+          <div class="ch-main" ref={watchGrowth}>
             <Show when={props.controls.searching()}>
               <div class="ch-search">
                 <TextInput
@@ -197,8 +216,20 @@ export function ChatView(props: { agent: AgentDetail; base: string; controls: Ch
 
             <div class="ch-log" role="log" aria-label={`Conversation with ${props.agent.name}`}>
               <Show when={state.comments.hasNextPage}>
-                <button type="button" class="ch-more" disabled={state.comments.isFetchingNextPage} onClick={() => void state.comments.fetchNextPage()}>
-                  {state.comments.isFetchingNextPage ? "Loading earlier messages…" : `Load earlier messages${oldestLoaded() ? ` · before ${shortDate(oldestLoaded()!)}` : ""}`}
+                <button
+                  type="button"
+                  class="ch-more"
+                  disabled={state.comments.isFetchingNextPage}
+                  onClick={() => {
+                    following = false;
+                    void state.comments.fetchNextPage();
+                  }}
+                >
+                  {state.comments.isFetchingNextPage
+                    ? "Loading earlier messages…"
+                    : state.comments.isFetchNextPageError
+                      ? "Couldn't load earlier messages. Try again"
+                      : `Load earlier messages${oldestLoaded() ? ` · before ${shortDate(oldestLoaded()!)}` : ""}`}
                 </button>
               </Show>
               <Show when={state.entries().length === 0 && state.replies().length === 0}>
@@ -260,6 +291,7 @@ export function ChatView(props: { agent: AgentDetail; base: string; controls: Ch
                 replyRunId={replyRunId()}
                 disabledReason={disabledReason()}
                 ref={(api) => (composer = api)}
+                onSent={() => follow("sent")}
               />
             </div>
           </div>
