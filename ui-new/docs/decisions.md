@@ -57,6 +57,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 28 | [Gaps found building agent workload](#28-gaps-found-building-agent-workload) | `projects/task-context`, `agents/roster` | Open | Oct 27, 2026 |
 | 29 | [Gaps found building the agent page](#29-gaps-found-building-the-agent-page) | `agents/*`, `runs-adapters/runs` | Open | Oct 27, 2026 |
 | 30 | [Gaps found building the org pages](#30-gaps-found-building-the-org-pages) | `agents/roster`, `agents/organization`, `agents/built-in` | Open | Oct 27, 2026 |
+| 31 | [Gaps found building agent chat](#31-gaps-found-building-agent-chat) | `agent-chat/*`, `inbox-search/search` | Open | Oct 27, 2026 |
 
 ## Entries
 
@@ -1032,4 +1033,29 @@ Both are handled in `ui-new` for now.
   does, the draft starts on `process` with `setupAdapterPending`. A reopened draft can't record that
   the runner was left on auto (the server resolves it at once). `GET /api/adapters` labels are raw
   type names, so `ui-new` keeps its own harness names.
+
+### 31. Gaps found building agent chat
+
+- **Status:** Open
+- **Area:** `agent-chat/*`, `inbox-search/search`
+- **Found in:** agent chat (M5, boards 12, 13 and 18). `enableAgentChat` was turned on for the local
+  instance on Oct 27, 2026, as decision A says.
+
+- **Live text depends on the runner's log.** Run-event messages on the socket carry no payload for
+  Paperclip Runner and native runs, and none for `item.delta`; the chat reads the runner's
+  `paperclip.prp.event` lines from the run log, and re-reads stored events for native runs. Short
+  replies arrive whole (Bob: text on screen 13.2 s after sending, saved message at 15.6 s); longer
+  ones stream word by word.
+- **Search doesn't mark or leave out chats.** Results carry no `conversationAgentId`, so another
+  person's chat shows as a task, and the search page's facet counts include chats. Task search for
+  pickers (`/issues?q=`) is filtered in the UI by the `conversationAgentId` full responses carry.
+- **Only your own chat has an address.** Another person's chat still opens as a task.
+- **No report or briefing marker.** Routines can't label the tasks they create, so every task a
+  recurring task makes for the agent shows as a report card.
+- **No hand-off API** (`chatTaskHandoffs`); hand-offs come from `createdFromIssueId` and run
+  provenance.
+- **A chat still takes a task number** (TES-13), which shows in activity and old routes.
+- **Live runs:** a run's status event could join a live-runs refetch in flight and come back still
+  running; live runs are now fetched once more 1.5 s after the last run event
+  (`createTrailingRefetch`).
 
