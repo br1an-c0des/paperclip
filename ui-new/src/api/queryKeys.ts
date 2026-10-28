@@ -80,7 +80,21 @@ export const queryKeys = {
     /** The company's execution workspaces in brief, for the task list's workspace filter and groups. */
     summaryList: (companyId: string) => ["execution-workspaces", companyId, "summary", {}] as const,
   },
-  activity: (companyId: string) => ["activity", companyId] as const,
+  /**
+   * Company activity. Called as a function it's the prefix the live events refresh on every
+   * `activity.logged`, which also reaches the Activity page's log (src/activity/). The page's costs
+   * sit under `["costs", companyId]`, which cost events refresh; the by-project and by-agent spend
+   * reuse `costs` and `agents.costs` so the project and agent pages share them. Commentary isn't
+   * pushed by the live events, so it's refetched on focus.
+   */
+  activity: Object.assign((companyId: string) => ["activity", companyId] as const, {
+    log: (companyId: string, filters: string) => ["activity", companyId, "log", filters] as const,
+    commentary: (companyId: string, filters: string) => ["agent-commentary", companyId, "list", filters] as const,
+    commentaryEntry: (companyId: string, id: string) => ["agent-commentary", companyId, "detail", id] as const,
+    costSummary: (companyId: string, from?: string, to?: string) => ["costs", companyId, "summary", from ?? "all", to ?? "now"] as const,
+    /** Apart from `heartbeats`, which every run's progress refreshes; refetched when a live run changes. */
+    runs: (companyId: string, agentId: string | null) => ["activity-runs", companyId, agentId ?? "__all__"] as const,
+  }),
   dashboard: (companyId: string) => ["dashboard", companyId] as const,
   /**
    * The organization pages (boards 19, 20). Called as a function it's the reporting tree, which the
@@ -197,6 +211,20 @@ export const queryKeys = {
    * lists, under `issues.list(companyId)`, which every task event refreshes; the agent's activity
    * sits under `activity(companyId)`, which every activity event refreshes.
    */
+  /*
+   * The skill library (M6, src/skills/), in the old UI's `["company-skills", companyId]` shape. A
+   * skill's detail, versions and files sit under its id so editing a file refreshes them together.
+   * Sources sit apart; syncing or removing one refreshes the library too.
+   */
+  skills: {
+    all: (companyId: string) => ["company-skills", companyId] as const,
+    list: (companyId: string) => ["company-skills", companyId, "list"] as const,
+    detail: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId] as const,
+    versions: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId, "versions"] as const,
+    file: (companyId: string, skillId: string, path: string) => ["company-skills", companyId, "skill", skillId, "file", path] as const,
+    sources: (companyId: string) => ["skill-sources", companyId] as const,
+  },
+
   chat: {
     list: (companyId: string) => ["agent-chats", companyId, "list"] as const,
     detail: (companyId: string, agentId: string) => ["agent-chats", companyId, "agent", agentId] as const,

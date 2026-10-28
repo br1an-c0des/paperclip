@@ -1,4 +1,4 @@
-import type { ActivityEvent, Agent, CompactIssue, DashboardRunActivityDay } from "@paperclipai/shared";
+import type { Agent, CompactIssue, DashboardRunActivityDay } from "@paperclipai/shared";
 import type { LiveRun } from "@/api/heartbeats";
 import type { OrgNode } from "@/api/org";
 import type { RunSummary } from "@/api/runs";
@@ -435,122 +435,8 @@ export function topSpenders<R extends { spendCents: number; agent: { name: strin
 // ---------------------------------------------------------------------------------------------
 // Recent activity
 
-/** Events the dashboard leaves out: reads and inbox housekeeping are noise at company level. */
-const QUIET = new Set([
-  "issue.read_marked",
-  "issue.read_unmarked",
-  "issue.inbox_archived",
-  "issue.inbox_unarchived",
-  "issue.feedback_vote_saved",
-  "issue.checked_out",
-  "issue.released",
-]);
-
-const VERBS: Record<string, string> = {
-  "issue.created": "created",
-  "issue.updated": "updated",
-  "issue.comment_added": "commented on",
-  "issue.commented": "commented on",
-  "issue.deleted": "deleted",
-  "issue.attachment_added": "attached a file to",
-  "issue.document_created": "created a document for",
-  "issue.document_updated": "updated a document on",
-  "issue.interaction_created": "asked a question on",
-  "issue.interaction_answered": "answered a question on",
-  "agent.created": "hired",
-  "agent.hire_created": "asked to hire",
-  "agent.updated": "updated",
-  "agent.paused": "paused",
-  "agent.resumed": "resumed",
-  "agent.terminated": "retired",
-  "agent.approved": "approved the hire of",
-  "agent.budget_updated": "set the budget for",
-  "approval.created": "asked for approval on",
-  "approval.approved": "approved",
-  "approval.rejected": "rejected",
-  "approval.revision_requested": "asked for changes to",
-  "project.created": "created the project",
-  "project.updated": "updated the project",
-  "routine.created": "created the recurring task",
-  "routine.run_triggered": "ran the recurring task",
-  "company.updated": "updated the organization",
-  "heartbeat.invoked": "started a run for",
-};
-
-export type ActivityTone = "run" | "green" | "amber" | "gray";
-
-export type ActivityLine = {
-  id: string;
-  who: string;
-  verb: string;
-  target: string;
-  /** Relative to the company. */
-  href?: string;
-  tone: ActivityTone;
-  at: string;
-};
-
-export type ActivityNames = {
-  agent: (id: string) => Pick<Agent, "name" | "urlKey"> | undefined;
-  person: (id: string) => string;
-  youId: string | null;
-  /** The agent, when a task is one of your chats (a hidden task, decision 8), which opens as the chat. */
-  chatAgent?: (issueId: string) => string | undefined;
-};
-
-function str(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function statusVerb(details: Record<string, unknown> | null) {
-  const change = (details?.changes as Record<string, { to?: unknown }> | undefined)?.status;
-  const to = str(change?.to);
-  if (!to) return null;
-  return to === "done" ? "finished" : to === "blocked" ? "marked blocked" : to === "in_review" ? "sent for review" : to === "cancelled" ? "cancelled" : to === "in_progress" ? "started" : `moved to ${to.replace(/_/g, " ")}`;
-}
-
-/** One activity event in words, or null for the ones the dashboard leaves out. */
-export function activityLine(event: ActivityEvent, names: ActivityNames): ActivityLine | null {
-  if (QUIET.has(event.action) || event.action.startsWith("provider_trace.")) return null;
-  const details = event.details;
-  const actorAgent = event.actorType === "agent" ? names.agent(event.actorId) : undefined;
-  const who =
-    event.actorType === "agent"
-      ? (actorAgent?.name ?? "An agent")
-      : event.actorType === "user"
-        ? event.actorId === names.youId
-          ? "You"
-          : names.person(event.actorId)
-        : "Paperclip";
-
-  let target = "";
-  let href: string | undefined;
-  const chatWith = event.entityType === "issue" ? names.chatAgent?.(event.entityId) : undefined;
-  if (chatWith) {
-    const agent = names.agent(chatWith);
-    target = agent ? `your chat with ${agent.name}` : "your chat";
-    href = `/agents/${agent?.urlKey ?? chatWith}`;
-  } else if (event.entityType === "issue") {
-    const identifier = str(details?.identifier);
-    target = identifier ?? str(details?.issueTitle) ?? "a task";
-    href = `/issues/${identifier ?? event.entityId}`;
-  } else if (event.entityType === "agent") {
-    const agent = names.agent(event.entityId);
-    target = agent?.name ?? str(details?.name) ?? "an agent";
-    if (agent) href = `/agents/${agent.urlKey}`;
-  } else {
-    target = str(details?.title) ?? str(details?.name) ?? str(details?.identifier) ?? "";
-  }
-
-  const verb = (event.action === "issue.updated" ? statusVerb(details) : null) ?? VERBS[event.action] ?? event.action.replace(/^[a-z_]+\./, "").replace(/[._]/g, " ");
-  const tone: ActivityTone = /paused|blocked|rejected|terminated|retired/.test(verb)
-    ? "gray"
-    : /hire|approval|asked/.test(verb)
-      ? "amber"
-      : /finished|approved|sign|hired|resumed/.test(verb)
-        ? "green"
-        : /started|run/.test(verb)
-          ? "run"
-          : "gray";
-  return { id: event.id, who, verb, target, href, tone, at: String(event.createdAt) };
-}
+/*
+ * Activity in words lives in src/activity/activity-line.ts, shared with the Activity page's log and
+ * the agent chat's Activity column. Re-exported here for the pages that read it from the org model.
+ */
+export { activityLine, isQuietAction, type ActivityLine, type ActivityNames, type ActivityTone } from "@/activity/activity-line";

@@ -1,10 +1,9 @@
-import type { ActivityEvent, Agent, CompactIssue, DashboardRunActivityDay } from "@paperclipai/shared";
+import type { Agent, CompactIssue, DashboardRunActivityDay } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import type { LiveRun } from "@/api/heartbeats";
 import type { OrgNode } from "@/api/org";
 import type { RunSummary } from "@/api/runs";
 import {
-  activityLine,
   agentDetail,
   buildOrgTree,
   chartMax,
@@ -221,62 +220,6 @@ describe("runs and spend", () => {
   it("counts a project's done tasks, leaving cancelled ones out", () => {
     const tasks = [task("1", null, "done", { projectId: "p" }), task("2", null, "todo", { projectId: "p" }), task("3", null, "cancelled", { projectId: "p" }), task("4", null, "done", { projectId: "q" })];
     expect(projectProgress(tasks, "p")).toEqual({ done: 1, total: 2, open: 1, percent: 50 });
-  });
-});
-
-describe("activityLine", () => {
-  const names = {
-    agent: (id: string) => (id === "a1" ? { name: "Quant Researcher", urlKey: "quant" } : undefined),
-    person: (id: string) => (id === "u2" ? "Maya R." : "Someone"),
-    youId: "u1",
-  };
-  const event = (extra: Partial<ActivityEvent>): ActivityEvent => ({
-    id: "e",
-    companyId: "c",
-    actorType: "user",
-    actorId: "u1",
-    action: "issue.created",
-    entityType: "issue",
-    entityId: "i1",
-    agentId: null,
-    runId: null,
-    details: null,
-    createdAt: new Date("2026-10-27T10:00:00Z"),
-    ...extra,
-  });
-
-  it("names you, people and agents, and links the task", () => {
-    expect(activityLine(event({ details: { identifier: "TES-4" } }), names)).toMatchObject({ who: "You", verb: "created", target: "TES-4", href: "/issues/TES-4" });
-    expect(activityLine(event({ actorId: "u2", action: "issue.comment_added", details: { identifier: "TES-4" } }), names)?.who).toBe("Maya R.");
-    expect(activityLine(event({ actorType: "agent", actorId: "a1", action: "agent.paused", entityType: "agent", entityId: "a1" }), names)).toMatchObject({
-      who: "Quant Researcher",
-      verb: "paused",
-      target: "Quant Researcher",
-      href: "/agents/quant",
-      tone: "gray",
-    });
-  });
-
-  it("names and links one of your chats as the chat", () => {
-    const withChats = { ...names, chatAgent: (id: string) => (id === "chat1" ? "a1" : undefined) };
-    expect(activityLine(event({ action: "issue.comment_added", entityId: "chat1", details: { identifier: "TES-13" } }), withChats)).toMatchObject({
-      target: "your chat with Quant Researcher",
-      href: "/agents/quant",
-    });
-    expect(activityLine(event({ details: { identifier: "TES-4" } }), withChats)?.href).toBe("/issues/TES-4");
-  });
-
-  it("says what a status change did", () => {
-    expect(activityLine(event({ action: "issue.updated", details: { identifier: "TES-4", changes: { status: { from: "todo", to: "done" } } } }), names)).toMatchObject({ verb: "finished", tone: "green" });
-  });
-
-  it("leaves out reads and inbox housekeeping", () => {
-    expect(activityLine(event({ action: "issue.read_marked" }), names)).toBeNull();
-    expect(activityLine(event({ action: "issue.inbox_archived" }), names)).toBeNull();
-  });
-
-  it("falls back to the action's words", () => {
-    expect(activityLine(event({ action: "secret.rotated", entityType: "secret", details: { name: "API_KEY" } }), names)).toMatchObject({ verb: "rotated", target: "API_KEY" });
   });
 });
 

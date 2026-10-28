@@ -66,7 +66,20 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
       break;
     case "agent":
       keys.push(queryKeys.agents.list(companyId), queryKeys.org(companyId), queryKeys.companies.stats);
+      // The agent's detail key covers its parts, its skills among them (agents.part(id, "skills")).
       if (entityId) keys.push(queryKeys.agents.detail(entityId), queryKeys.heartbeats(companyId));
+      // Turning an agent's skills on or off changes how many agents each skill has in the library.
+      if (action === "agent.skills_synced") keys.push(queryKeys.skills.all(companyId));
+      break;
+    // The skill library (src/skills/): a skill, its files and versions, its sources. The prefix key
+    // covers the list, each skill's detail, versions and files. Agents' own skill lists are
+    // refreshed by `agent.skills_synced` above; a skill edit doesn't say which agents use it.
+    case "company_skill":
+    case "company_skill_version":
+      keys.push(queryKeys.skills.all(companyId));
+      break;
+    case "company_skill_source":
+      keys.push(queryKeys.skills.all(companyId), queryKeys.skills.sources(companyId));
       break;
     case "project":
       keys.push(queryKeys.projects.all(companyId));
@@ -91,6 +104,8 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
       break;
     case "company":
       keys.push(queryKeys.companies.all);
+      // Imports and scans (`company.skills_imported`, `company.skills_scanned`…) are logged on the company.
+      if (action?.startsWith("company.skill")) keys.push(queryKeys.skills.all(companyId), queryKeys.skills.sources(companyId));
       break;
   }
   return keys;

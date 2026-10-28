@@ -52,6 +52,28 @@ describe("keysForEvent", () => {
     }
   });
 
+  it("refreshes the skill library on skill, version and source activity", () => {
+    const skill = keysForEvent("c1", event("activity.logged", { entityType: "company_skill", entityId: "s1", action: "company.skill_file_updated" }));
+    expect(skill).toContainEqual(queryKeys.skills.all("c1"));
+    expect(skill).not.toContainEqual(queryKeys.skills.sources("c1"));
+    const version = keysForEvent("c1", event("activity.logged", { entityType: "company_skill_version", entityId: "v1", action: "company.skill_version_created" }));
+    expect(version).toContainEqual(queryKeys.skills.all("c1"));
+    const source = keysForEvent("c1", event("activity.logged", { entityType: "company_skill_source", entityId: "src1", action: "skill_source.refreshed" }));
+    expect(source).toEqual(expect.arrayContaining([queryKeys.skills.all("c1"), queryKeys.skills.sources("c1")]));
+    const imported = keysForEvent("c1", event("activity.logged", { entityType: "company", entityId: "c1", action: "company.skills_imported" }));
+    expect(imported).toEqual(expect.arrayContaining([queryKeys.skills.all("c1"), queryKeys.skills.sources("c1")]));
+    expect(keysForEvent("c1", event("activity.logged", { entityType: "company", entityId: "c1", action: "company.updated" }))).not.toContainEqual(queryKeys.skills.all("c1"));
+  });
+
+  it("refreshes an agent's skills and the library's counts when its skills are synced", () => {
+    const keys = keysForEvent("c1", event("activity.logged", { entityType: "agent", entityId: "a1", action: "agent.skills_synced" }));
+    // The detail key is a prefix of the agent page's skills query, so it refreshes too.
+    expect(keys).toContainEqual(queryKeys.agents.detail("a1"));
+    expect(queryKeys.agents.part("a1", "skills").slice(0, 3)).toEqual([...queryKeys.agents.detail("a1")]);
+    expect(keys).toContainEqual(queryKeys.skills.all("c1"));
+    expect(keysForEvent("c1", event("activity.logged", { entityType: "agent", entityId: "a1", action: "agent.updated" }))).not.toContainEqual(queryKeys.skills.all("c1"));
+  });
+
   it("leaves streamed run output to subscribers", () => {
     expect(keysForEvent("c1", event("heartbeat.run.log", { runId: "r1" }))).toEqual([]);
   });

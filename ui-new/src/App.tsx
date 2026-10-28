@@ -26,6 +26,9 @@ import { RunRoute } from "./runs/RunRoute";
 import { SearchPage } from "./search/SearchPage";
 import { AppSettingsPage, CompanySettingsRedirect, UnprefixedSettingsRedirect } from "./settings/app/AppSettingsPage";
 import { CompanyWorkload } from "./workload/CompanyWorkload";
+import { ActivityPage } from "./activity/ActivityPage";
+import { LegacyActivityRedirect, UnprefixedCompanyRedirect } from "./activity/redirects";
+import { SkillsPage } from "./skills/SkillsPage";
 
 const StyleGuide = lazy(() => import("./routes/StyleGuide").then((m) => ({ default: m.StyleGuide })));
 
@@ -60,6 +63,8 @@ export function App() {
           <Route path="/companies" component={Companies} />
           {/* The old UI's unprefixed hire link opens New agent in the last company. */}
           <Route path="/agents/new" component={UnprefixedNewAgent} />
+          {/* The old UI's unprefixed skills, activity and costs links open in the last company. */}
+          <Route path={["/skills/*", "/activity/*", "/audit/*", "/costs", "/budgets"]} component={UnprefixedCompanyRedirect} />
           {/* The old UI's unprefixed instance-settings addresses open App settings in the last company. */}
           {/* `/instance/settings/*` must outrank the company's `/:companyPrefix/instance/*`. */}
           <Route path={["/instance", "/instance/settings/*rest", "/settings/*rest"]} component={UnprefixedSettingsRedirect} />
@@ -87,6 +92,10 @@ export function App() {
             <Route path="/connectors" component={ConnectorsPage} />
             <Route path="/search" component={SearchPage} />
             <Route path="/workload" component={CompanyWorkload} />
+            <Route path="/skills/*rest" component={SkillsPage} />
+            {/* Activity's tabs; the old audit, runs, costs, budgets and timeline pages land on them. */}
+            <Route path={["/activity/budgets", "/activity/timeline", "/audit/*", "/runs", "/costs", "/budgets", "/timeline"]} component={LegacyActivityRedirect} />
+            <Route path="/activity/*tab" component={ActivityPage} />
             {/* App settings, at the old UI's instance-settings address (outranks /company/settings/*). */}
             <Route path="/company/settings/instance/*rest" component={AppSettingsPage} />
             <Route path="/instance/*rest" component={() => <CompanySettingsRedirect kind="instance" />} />
