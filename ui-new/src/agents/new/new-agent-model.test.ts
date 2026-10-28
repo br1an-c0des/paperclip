@@ -17,6 +17,7 @@ import {
   profileProblem,
   provisionalAdapter,
   resolveRunner,
+  runnerSwitch,
   selectedSignIn,
   setupAdapterConfig,
   setupEffortOptions,
@@ -120,6 +121,16 @@ describe("runner defaulting", () => {
     expect(resolveRunner("claude_local", "auto", undefined)).toMatchObject({ runner: "legacy", recommended: undefined, alternative: null });
     const off = ADAPTERS.map((entry) => (entry.type === "paperclip_runner" ? { ...entry, disabled: true } : entry));
     expect(resolveRunner("claude_local", "auto", off)).toMatchObject({ runner: "legacy", recommended: "legacy", alternative: null });
+  });
+
+  it("offers the other runner while on the recommended one, and a way back when off it", () => {
+    const claude = resolveRunner("claude_local", "auto", ADAPTERS);
+    expect(runnerSwitch("auto", claude)).toEqual({ recommended: true, offer: { kind: "runner", runner: "legacy" } });
+    // A resumed draft that names the recommended runner reads as recommended, not as a detour.
+    expect(runnerSwitch("paperclip", resolveRunner("claude_local", "paperclip", ADAPTERS))).toEqual({ recommended: true, offer: { kind: "runner", runner: "legacy" } });
+    expect(runnerSwitch("legacy", resolveRunner("claude_local", "legacy", ADAPTERS))).toEqual({ recommended: false, offer: { kind: "recommended" } });
+    const only = ADAPTERS.map((entry) => (entry.type === "claude_local" ? { ...entry, supportedRunners: ["paperclip" as const] } : entry));
+    expect(runnerSwitch("auto", resolveRunner("claude_local", "auto", only))).toEqual({ recommended: true, offer: null });
   });
 
   it("has no runner for harnesses only the legacy runner carries", () => {

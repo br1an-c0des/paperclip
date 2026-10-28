@@ -129,6 +129,20 @@ export function resolveRunner(harness: string, choice: RunnerChoice, adapters: r
 }
 
 /**
+ * What the Runner row offers beside the runner: on the recommended runner (left on "auto", or a
+ * resumed draft that names it), "Recommended here" and the other runner when it can carry the
+ * harness; off it, a way back to the recommended one.
+ */
+export function runnerSwitch(
+  choice: RunnerChoice,
+  resolution: Pick<RunnerResolution, "recommended" | "alternative">,
+): { recommended: boolean; offer: { kind: "runner"; runner: AgentRunner } | { kind: "recommended" } | null } {
+  const onRecommended = choice === "auto" || choice === resolution.recommended;
+  if (!onRecommended) return { recommended: false, offer: { kind: "recommended" } };
+  return { recommended: !!resolution.recommended, offer: resolution.alternative ? { kind: "runner", runner: resolution.alternative } : null };
+}
+
+/**
  * Whether Test must first qualify the environment for the Paperclip Runner, as the old UI's
  * `needsClaudeSetupQualification`: Claude Code left on "auto", on a sandbox whose image can be
  * qualified, where the server doesn't recommend the Runner yet.

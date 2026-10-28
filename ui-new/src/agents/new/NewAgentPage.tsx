@@ -1,4 +1,4 @@
-import type { AdapterEnvironmentTestResult, Agent, AgentDetail } from "@paperclipai/shared";
+import type { AdapterEnvironmentTestResult, Agent, AgentDetail, AgentRunner } from "@paperclipai/shared";
 import { A, Navigate, useNavigate, useSearchParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ArrowLeft, Check, Info, Plus, RotateCw } from "lucide-solid";
@@ -55,6 +55,7 @@ import {
   qualificationProblem,
   requiresProviderModel,
   resolveRunner,
+  runnerSwitch,
   selectedSignIn,
   setupAdapterConfig,
   setupEffortOptions,
@@ -397,8 +398,7 @@ export function NewAgentPage() {
 
   // ---- View ---------------------------------------------------------------------------------
   const working = () => busy() !== null || testing();
-  // A resumed draft names its runner; when that's the one recommended here, it reads as recommended.
-  const onRecommendedRunner = () => setup.runner === "auto" || setup.runner === runner().recommended;
+  const runnerRow = createMemo(() => runnerSwitch(setup.runner, runner()));
   const resuming = () => !!draftId() && !draft() && !detail.isError;
   const effortLabel = () => efforts().find((option) => option.value === setup.effort)?.label ?? "Auto";
   const previewRows = createMemo(() => {
@@ -647,25 +647,23 @@ export function NewAgentPage() {
                             <TonePill tone={runner().runner === "paperclip" ? "run" : "violet"} compact>
                               {runnerLabel(runner().runner)}
                             </TonePill>
-                            <Show when={onRecommendedRunner() && runner().recommended}>
+                            <Show when={runnerRow().recommended}>
                               <span class="ps-muted-line">Recommended here</span>
                             </Show>
-                            <Show
-                              when={onRecommendedRunner()}
-                              fallback={
+                            <Switch>
+                              <Match when={runnerRow().offer?.kind === "recommended"}>
                                 <button type="button" class="ps-link" onClick={() => setSetup("runner", "auto")}>
                                   Use the recommended runner
                                 </button>
-                              }
-                            >
-                              <Show when={runner().alternative}>
+                              </Match>
+                              <Match when={runnerRow().offer?.kind === "runner" && (runnerRow().offer as { runner: AgentRunner }).runner}>
                                 {(other) => (
                                   <button type="button" class="ps-link" onClick={() => setSetup("runner", other())}>
                                     Use the {other() === "paperclip" ? "Paperclip Runner" : "legacy runner"}
                                   </button>
                                 )}
-                              </Show>
-                            </Show>
+                              </Match>
+                            </Switch>
                           </div>
                         </SettingsRow>
                       </Show>
