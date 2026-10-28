@@ -150,6 +150,17 @@ export const queryKeys = {
     /** One part of a connection: "catalog", "installs", "grants". */
     connectionPart: (companyId: string, connectionId: string, part: string) =>
       ["tools", companyId, "connection", connectionId, part] as const,
+    gateways: (companyId: string) => ["tools", companyId, "gateways"] as const,
+    /** The tool-call audit, filtered (a gateway's or an agent's calls). */
+    activity: (companyId: string, filter: string) => ["tools", companyId, "activity", filter] as const,
+    /** The profiles, tools and installed connections an agent's runs get. */
+    effective: (companyId: string, agentId: string) => ["tools", companyId, "effective", agentId] as const,
+    profileNewTools: (companyId: string, profileId: string) => ["tools", companyId, "profile-new-tools", profileId] as const,
+  },
+  /** Paperclip's MCP endpoint for outside assistants (src/auth/McpConnect.tsx, Apps → Assistants). */
+  mcp: {
+    setup: ["mcp-setup"] as const,
+    connections: ["mcp-connections"] as const,
   },
   sidebarBadges: (companyId: string) => ["sidebar-badges", companyId] as const,
   /**

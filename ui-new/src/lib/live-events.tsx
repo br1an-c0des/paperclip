@@ -109,6 +109,10 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
     case "cost_event":
       keys.push(["costs", companyId]);
       break;
+    // An outside assistant connected to Paperclip's MCP endpoint, or revoked (Apps → Assistants).
+    case "mcp_connection":
+      keys.push(queryKeys.mcp.connections);
+      break;
     // Closing a workspace, reconciling its branch or controlling its services (the Workspaces tab,
     // a project's Code block and a task's Workspace section).
     case "execution_workspace":
