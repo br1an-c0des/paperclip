@@ -1,7 +1,7 @@
 import type { AgentDetail, IssueStatus } from "@paperclipai/shared";
-import { A } from "@solidjs/router";
+import { A, useLocation, useNavigate } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
-import { Activity, MessageCircleOff, RotateCcw, Search, SlidersHorizontal, X } from "lucide-solid";
+import { Activity, MessageCircleOff, NotebookPen, RotateCcw, Search, SlidersHorizontal, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch } from "solid-js";
 import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
@@ -12,6 +12,7 @@ import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
 import { useYouName } from "@/lib/session";
 import { isSetupDraft } from "@/agents/new/new-agent-model";
+import { documentName, isPlanKey } from "@/documents/document-model";
 import { RequestCard } from "@/requests/RequestCard";
 import { QueuedMessages } from "@/tasks/composer/QueuedMessages";
 import { MessageBody } from "@/tasks/MessageBody";
@@ -22,7 +23,18 @@ import { Capsule } from "@/ui/Status";
 import { STATUS_META } from "@/ui/status-meta";
 import { ChatActivity } from "./ChatActivity";
 import { ChatComposer } from "./ChatComposer";
-import { messageTime, quietRunText, shortDate, statusTag, type ChatEntry, type ChatTask } from "./chat-model";
+import { ChatDocumentCard, ChatDocumentDialog, ChatDocumentList, chatDocumentHost } from "./ChatDocuments";
+import {
+  chatDocumentLink,
+  documentHash,
+  documentKeyFromHash,
+  messageTime,
+  quietRunText,
+  shortDate,
+  statusTag,
+  type ChatEntry,
+  type ChatTask,
+} from "./chat-model";
 import { LiveReply } from "./LiveReply";
 import { atFoot, shouldFollow, type FollowCause } from "./scroll-model";
 import { useChat } from "./use-chat";
@@ -46,7 +58,9 @@ export function createChatControls() {
   const [searching, setSearching] = createSignal(false);
   const [activityOpen, setActivityOpen] = createSignal(false);
   const [available, setAvailable] = createSignal(false);
+  const [hasPlan, setHasPlan] = createSignal(false);
   let newSession: () => void = () => undefined;
+  let openPlan: () => void = () => undefined;
   return {
     searching,
     setSearching,
@@ -59,13 +73,26 @@ export function createChatControls() {
     bindNewSession: (run: () => void) => {
       newSession = run;
     },
+    /** Whether the chat has a `plan` document, so the header offers it. */
+    hasPlan,
+    setHasPlan,
+    openPlan: () => openPlan(),
+    bindOpenPlan: (run: () => void) => {
+      openPlan = run;
+    },
   };
 }
 
-/** The header's chat buttons (board 12): search the conversation, New session, and Activity on a phone. */
+/** The header's chat buttons (board 12): search the conversation, the plan, New session, and Activity on a phone. */
 export function ChatHeaderActions(props: { controls: ChatControls }) {
   return (
     <Show when={props.controls.available()}>
+      {/* A phone's header has no room for it; the plan heads the Activity sheet's Documents. */}
+      <Show when={props.controls.hasPlan() && viewport() !== "phone"}>
+        <Button size="compact" title="The plan document for this chat" icon={<NotebookPen size={14} aria-hidden="true" />} onClick={() => props.controls.openPlan()}>
+          Plan
+        </Button>
+      </Show>
       <Button
         variant="icon"
         ghost
@@ -158,6 +185,59 @@ function ChatThread(props: ChatViewProps) {
     onCleanup(() => observer.disconnect());
   };
 
+  // The open document lives in the address (`#document-<key>`; ChatDocuments.tsx). Opening one adds
+  // a history entry, so Back closes it; neither moves the page.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const openKey = createMemo(() => documentKeyFromHash(location.hash));
+  const documentHref = (key: string) => `${location.pathname}${location.search}${documentHash(key)}`;
+  let pushedDocument = false;
+  const openDocument = (key: string) => {
+    if (openKey() === key) return;
+    pushedDocument = openKey() === null;
+    navigate(documentHref(key), { scroll: false, replace: openKey() !== null });
+  };
+  const closeDocument = () => {
+    if (openKey() === null) return;
+    if (pushedDocument) {
+      pushedDocument = false;
+      navigate(-1);
+    } else navigate(`${location.pathname}${location.search}`, { scroll: false, replace: true });
+  };
+  const documentHost = createMemo(() => {
+    const id = state.chatId();
+    return id ? chatDocumentHost(id, state.people) : null;
+  });
+  const openTitle = () => {
+    const key = openKey();
+    const doc = key ? state.documents.data?.find((candidate) => candidate.key === key) : undefined;
+    return doc ? documentName(doc) : "Document";
+  };
+  const plan = () => state.documents.data?.find((doc) => isPlanKey(doc.key));
+  createEffect(() => props.controls.setHasPlan(!!plan()));
+  onCleanup(() => props.controls.setHasPlan(false));
+  props.controls.bindOpenPlan(() => {
+    const found = plan();
+    if (found) openDocument(found.key);
+  });
+  // Links in the thread to the chat's own documents (agents post `/TES/issues/TES-13#document-…`)
+  // open them here. This listens before MessageBody's link handling, which would leave the chat for
+  // the task's address and back.
+  const catchDocumentLinks = (element: HTMLElement) => {
+    const onClick = (event: MouseEvent) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = (event.target as Element | null)?.closest?.("a[href]");
+      const current = state.chat();
+      const key = link ? chatDocumentLink(link.getAttribute("href"), current ? { id: current.id, identifier: current.identifier } : null) : null;
+      if (!key) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openDocument(key);
+    };
+    element.addEventListener("click", onClick, true);
+    onCleanup(() => element.removeEventListener("click", onClick, true));
+  };
+
   const oldestLoaded = () => {
     const pages = state.comments.data?.pages;
     const last = pages?.[pages.length - 1];
@@ -172,6 +252,17 @@ function ChatThread(props: ChatViewProps) {
       replyRuns={state.replyRuns()}
       otherRuns={state.otherRuns()}
       people={state.people}
+      documents={
+        <ChatDocumentList
+          documents={state.documents.data ?? []}
+          href={documentHref}
+          onOpen={(key) => {
+            if (sheet) props.controls.setActivityOpen(false);
+            openDocument(key);
+          }}
+          headingId={`ch-docs-${props.agent.id}${sheet ? "-sheet" : ""}`}
+        />
+      }
       sheet={sheet}
       onClose={() => props.controls.setActivityOpen(false)}
     />
@@ -214,7 +305,7 @@ function ChatThread(props: ChatViewProps) {
               </div>
             </Show>
 
-            <div class="ch-log" role="log" aria-label={`Conversation with ${props.agent.name}`}>
+            <div class="ch-log" ref={catchDocumentLinks} role="log" aria-label={`Conversation with ${props.agent.name}`}>
               <Show when={state.comments.hasNextPage}>
                 <button
                   type="button"
@@ -258,6 +349,8 @@ function ChatThread(props: ChatViewProps) {
                     youName={youName()}
                     projectName={projectName}
                     people={state.people}
+                    documentHref={documentHref}
+                    openDocument={openDocument}
                   />
                 )}
               </For>
@@ -299,6 +392,7 @@ function ChatThread(props: ChatViewProps) {
           <Show when={viewport() === "desktop"} fallback={<Show when={props.controls.activityOpen()}>{<div class="ch-scrim" onClick={() => props.controls.setActivityOpen(false)} />}{activity(true)}</Show>}>
             {activity(false)}
           </Show>
+          <ChatDocumentDialog host={documentHost()} docKey={openKey()} title={openTitle()} onClose={closeDocument} />
         </div>
       </Match>
     </Switch>
@@ -312,6 +406,8 @@ function Entry(props: {
   youName: string;
   projectName: (id: string | null) => string | undefined;
   people: ReturnType<typeof useChat>["people"];
+  documentHref: (key: string) => string;
+  openDocument: (key: string) => void;
 }) {
   return (
     <Switch>
@@ -376,6 +472,19 @@ function Entry(props: {
             </div>
           );
         }}
+      </Match>
+      <Match when={props.entry.kind === "document" && props.entry}>
+        {(entry) => (
+          <div class="ch-msg ch-msg--card">
+            <span class="ch-av" aria-hidden="true" />
+            <ChatDocumentCard
+              document={entry().document}
+              people={props.people}
+              href={props.documentHref(entry().document.key)}
+              onOpen={() => props.openDocument(entry().document.key)}
+            />
+          </div>
+        )}
       </Match>
       <Match when={props.entry.kind === "request" && props.entry}>
         {(request) => (

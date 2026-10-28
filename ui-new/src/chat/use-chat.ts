@@ -26,7 +26,7 @@ import { buildChat, shownReplies, type ChatTask, type ReplyTurn } from "./chat-m
  *   task's (`issues.section(id, "core")`), so live task events keep its state fresh.
  * - Messages, newest page first, 50 at a time, with "Load earlier messages". The live events
  *   refresh them through the task's detail key.
- * - Hand-offs, reports, the agent's requests and approvals on the chat, and the queue.
+ * - Hand-offs, reports, the agent's requests and approvals on the chat, its documents, and the queue.
  * - Reply turns: the agent's runs on the chat. A run that leaves the live list is kept as finished
  *   until its message arrives (`shownReplies`).
  */
@@ -110,6 +110,13 @@ export function useChat(agent: () => AgentDetail) {
     queryFn: ({ signal }) => issuesApi.runs(chatId()!, signal),
     enabled: !!chatId(),
   }));
+  // The chat task's documents (its plan, and whatever the agent saves), under the same key as the
+  // task panel's Docs and files, so the document editor and live task events keep it fresh.
+  const documents = createQuery(() => ({
+    queryKey: queryKeys.issues.section(chatId() ?? "", "documents"),
+    queryFn: ({ signal }) => issuesApi.listDocuments(chatId()!, signal),
+    enabled: !!chatId(),
+  }));
   const approvals = createQuery(() => ({
     queryKey: queryKeys.issues.section(chatId() ?? "", "approvals"),
     queryFn: ({ signal }) => approvalsApi.forIssue(chatId()!, signal),
@@ -190,6 +197,7 @@ export function useChat(agent: () => AgentDetail) {
       reports: (reports.data ?? []) as ChatTask[],
       requests: requests(),
       runs: runs.data ?? [],
+      documents: documents.data ?? [],
       liveRunIds: new Set(replies().map((turn) => turn.runId)),
       hiddenCommentIds: queuedIds(queue.data),
       youId: people.youId(),
@@ -231,6 +239,7 @@ export function useChat(agent: () => AgentDetail) {
     entries,
     comments,
     handoffs,
+    documents,
     replies,
     replyRuns,
     otherRuns,
