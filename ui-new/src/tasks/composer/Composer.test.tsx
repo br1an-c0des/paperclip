@@ -12,6 +12,26 @@ vi.mock("@/api/comments", () => ({ commentsApi: { post: (id: string, data: { bod
 vi.mock("@/api/issues", () => ({ issuesApi: { search: vi.fn(async () => []), update: vi.fn(), uploadAttachment: vi.fn() } }));
 vi.mock("@/api/queued-comments", () => ({ queuedCommentsApi: { get: vi.fn() } }));
 vi.mock("@/api/agents", () => ({ agentsApi: { adapterModels: vi.fn(async () => []) } }));
+let goalAvailability: "available" | "unsupported" = "unsupported";
+const goalProjection = () => ({
+  issueId: "t1",
+  agentId: "a1",
+  adapterType: "paperclip_runner",
+  sessionId: null,
+  capability: { availability: goalAvailability, actions: ["set", "pause", "resume", "clear"], autonomousUpdates: true, persistentAcrossResume: true, maxObjectiveChars: 4000, tokenBudgetControl: false, usageReporting: false, reason: goalAvailability === "available" ? null : "Unsupported here." },
+  goal: null,
+  workingNow: false,
+  activeRunId: null,
+  pendingAction: null,
+  revision: 2,
+  observedAt: null,
+});
+const actOnGoal = vi.fn(async (_taskId: string, request: { objective?: string }) => ({
+  requestId: "r",
+  status: "accepted",
+  projection: { ...goalProjection(), revision: 3, goal: { objective: request.objective, status: "active", tokenBudget: null, tokensUsed: 0, elapsedSeconds: 0, iterations: 0, lastReason: null, createdAt: null, updatedAt: null, completedAt: null, workingNow: true } },
+}));
+vi.mock("@/api/runner-goal", () => ({ runnerGoalApi: { get: vi.fn(async () => goalProjection()), act: (taskId: string, request: { objective?: string }) => actOnGoal(taskId, request) } }));
 vi.mock("../people", () => {
   const agent = { id: "a1", name: "Quant Researcher", adapterType: "http", adapterConfig: {}, status: "idle" };
   return {
@@ -42,6 +62,8 @@ function mount() {
 describe("Composer", () => {
   beforeEach(() => {
     post.mockClear();
+    actOnGoal.mockClear();
+    goalAvailability = "unsupported";
     localStorage.clear();
   });
 
@@ -81,5 +103,40 @@ describe("Composer", () => {
     first.unmount();
     mount();
     expect((screen.getByRole("combobox", { name: "Comment" }) as HTMLTextAreaElement).value).toBe("Half written");
+  });
+
+  it("offers no Goal pill when the agent's runner doesn't support goals", async () => {
+    mount();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).toBeTruthy());
+    expect(screen.queryByRole("button", { name: /^Goal/ })).toBeNull();
+  });
+
+  it("sets a goal with the Goal pill instead of sending a message, and shows its card", async () => {
+    goalAvailability = "available";
+    mount();
+    const pill = await screen.findByRole("button", { name: "Goal" });
+    fireEvent.click(pill);
+    expect(pill.getAttribute("aria-pressed")).toBe("true");
+    const box = screen.getByRole("combobox", { name: "Comment" }) as HTMLTextAreaElement;
+    box.value = "Keep the tests green";
+    fireEvent.input(box);
+    fireEvent.click(screen.getByRole("button", { name: "Set goal" }));
+    await waitFor(() => expect(actOnGoal).toHaveBeenCalledWith("t1", expect.objectContaining({ action: "create", objective: "Keep the tests green", agentId: "a1", expectedRevision: 2 })));
+    expect(post).not.toHaveBeenCalled();
+    const card = await screen.findByRole("region", { name: "Goal" });
+    expect(card.textContent).toContain("Keep the tests green");
+    expect(card.textContent).toContain("Pursuing");
+    await waitFor(() => expect(box.value).toBe(""));
+  });
+
+  it("reads /goal typed in the message", async () => {
+    goalAvailability = "available";
+    mount();
+    await screen.findByRole("button", { name: "Goal" });
+    const box = screen.getByRole("combobox", { name: "Comment" }) as HTMLTextAreaElement;
+    box.value = "/goal Ship the release";
+    fireEvent.input(box);
+    fireEvent.keyDown(box, { key: "Enter", ctrlKey: true });
+    await waitFor(() => expect(actOnGoal).toHaveBeenCalledWith("t1", expect.objectContaining({ action: "create", objective: "Ship the release" })));
   });
 });

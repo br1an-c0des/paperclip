@@ -304,6 +304,12 @@ a.tf-output-title:hover {
   color: var(--muted);
 }
 
+/* A run found the workspace's branch out of step (the Workspace section reconciles it) */
+.tf-diverged {
+  color: var(--amber-fg);
+  font-weight: 600;
+}
+
 .tf-output-summary {
   margin: 4px 0 0;
   color: var(--body);

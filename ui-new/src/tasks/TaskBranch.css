@@ -1,0 +1,126 @@
+/* The Git part of a task's Workspace section (tags and headings from TaskWorkspace.css) */
+.tb {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  box-shadow: none;
+}
+
+.tb-branch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.tb-branch svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.tb-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--body);
+  font-size: 13px;
+}
+
+/* A run found the branch out of step with the recorded one */
+.tb-diverged {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--r-inner);
+  background: var(--amber-bg);
+  color: var(--body);
+}
+
+.tb-diverged-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--amber-fg);
+  font-size: 14px;
+}
+
+.tb-diverged-head b {
+  color: var(--text);
+}
+
+.tb-text {
+  margin: 0;
+  font-size: 13px;
+}
+
+.tb-held {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tb-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tb-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.tb-facts dt {
+  color: var(--muted);
+}
+
+.tb-facts dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+
+.tb-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--body);
+  font-size: 14px;
+}
+
+.tb-confirm p {
+  margin: 0;
+}
+
+.tb-confirm b {
+  color: var(--text);
+}
+
+.tb-paths {
+  max-height: 140px;
+  margin: 0;
+  padding: 8px 10px 8px 26px;
+  overflow-y: auto;
+  border-radius: 8px;
+  background: var(--well);
+  font-size: 12px;
+}

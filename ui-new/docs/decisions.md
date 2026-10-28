@@ -64,6 +64,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 35 | [Gaps found building Apps and tools](#35-gaps-found-building-apps-and-tools) | Apps and tools | Open | Oct 28, 2026 |
 | 36 | [Gaps found building onboarding and the pages outside a company](#36-gaps-found-building-onboarding-and-the-pages-outside-a-company) | Companies and onboarding, sign-in and connect flows | Open | Oct 28, 2026 |
 | 37 | [Gaps found building plugin hosting](#37-gaps-found-building-plugin-hosting) | `shell/plugins` | Open | Oct 28, 2026 |
+| 38 | [Gaps found building task and workspace leftovers](#38-gaps-found-building-task-and-workspace-leftovers) | `tasks/runner-goal`, `tasks/feedback`, `workspaces/*` | Open | Oct 28, 2026 |
 
 ## Entries
 
@@ -1182,3 +1183,18 @@ Both are handled in `ui-new` for now.
   the stream bridge; that's server configuration.
 - **The old host's `react-dom` shim returned no `createRoot`** under React 19 (it lives only in
   `react-dom/client`); `ui-new`'s shim merges both.
+
+### 38. Gaps found building task and workspace leftovers
+
+- **Status:** Open
+- **Area:** `tasks/runner-goal`, `tasks/feedback`, `workspaces/overview`, `workspaces/files-git`
+- **Found in:** M6 round 3.
+
+- **The Workspaces tab shows whatever `enableIsolatedWorkspaces` says.** The old page appears only
+  with the flag on, but the server doesn't gate `GET /companies/:id/workspace-overview`, and shared
+  project checkouts are worth seeing too, so `ui-new` keeps one tab rather than another switch.
+- **No request reopens a closed workspace.** The server reopens one only when its task gets a new
+  message or is resumed; the Closed view says so.
+- **A branch's ahead and behind state comes only from `GET /execution-workspaces/:id/close-readiness`**,
+  which runs git on each call; the Workspace section caches it for 30 seconds. Folders that aren't
+  git repositories report a blocking reason there.
