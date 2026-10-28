@@ -2,7 +2,7 @@ import type { LiveEvent } from "@paperclipai/shared";
 import { QueryClient } from "@tanstack/solid-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryKeys } from "@/api/queryKeys";
-import { createTrailingRefetch, keysForEvent, LIST_CACHE_HOLD_MS } from "./live-events";
+import { createTrailingRefetch, keysForEvent, LIST_CACHE_HOLD_MS, LIVE_RUNS_HOLD_MS } from "./live-events";
 
 const event = (type: LiveEvent["type"], payload: Record<string, unknown>): LiveEvent => ({
   id: 1,
@@ -91,6 +91,33 @@ describe("createTrailingRefetch", () => {
     expect(invalidate).toHaveBeenCalledTimes(2);
   });
 
+  it("fetches the live runs once more after a run changes state, sooner than the tasks", () => {
+    const { invalidate, trailing } = setup();
+    // A run starts, and finishes a moment later: the second refetch can join the first in flight.
+    trailing.add(keysForEvent("c1", event("heartbeat.run.status", { agentId: "a1", runId: "r1", status: "running" })));
+    vi.advanceTimersByTime(500);
+    trailing.add(keysForEvent("c1", event("heartbeat.run.status", { agentId: "a1", runId: "r1", status: "succeeded" })));
+    vi.advanceTimersByTime(LIVE_RUNS_HOLD_MS - 1);
+    expect(invalidate).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(invalidate.mock.calls.map(([filters]) => filters)).toEqual([{ queryKey: queryKeys.liveRuns("c1"), exact: true }]);
+    vi.advanceTimersByTime(LIST_CACHE_HOLD_MS * 4);
+    expect(invalidate).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives a run event on a task both fetches, each on its own delay", () => {
+    const { invalidate, trailing } = setup();
+    trailing.add(keysForEvent("c1", event("heartbeat.run.status", { agentId: "a1", issueId: "i1", runId: "r1" })));
+    vi.advanceTimersByTime(LIVE_RUNS_HOLD_MS);
+    expect(invalidate.mock.calls.map(([filters]) => filters)).toEqual([{ queryKey: queryKeys.liveRuns("c1"), exact: true }]);
+    vi.advanceTimersByTime(LIST_CACHE_HOLD_MS - LIVE_RUNS_HOLD_MS);
+    expect(invalidate.mock.calls.map(([filters]) => filters)).toEqual([
+      { queryKey: queryKeys.liveRuns("c1"), exact: true },
+      { queryKey: queryKeys.issues.detail("i1"), exact: true },
+    ]);
+  });
+
   it("leaves events that don't touch tasks alone", () => {
     const { invalidate, trailing } = setup();
     trailing.add(keysForEvent("c1", event("agent.status", { agentId: "a1" })));
@@ -101,6 +128,7 @@ describe("createTrailingRefetch", () => {
   it("drops a burst in progress when cancelled", () => {
     const { invalidate, trailing } = setup();
     trailing.add(taskEvent("issue.updated"));
+    trailing.add(keysForEvent("c1", event("heartbeat.run.status", { agentId: "a1", runId: "r1" })));
     trailing.cancel();
     vi.advanceTimersByTime(LIST_CACHE_HOLD_MS * 2);
     expect(invalidate).not.toHaveBeenCalled();

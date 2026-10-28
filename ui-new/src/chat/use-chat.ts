@@ -1,6 +1,6 @@
 import type { AgentDetail, Issue, IssueComment } from "@paperclipai/shared";
 import { createInfiniteQuery, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { batch, createEffect, createMemo, createSignal, on, onCleanup, untrack } from "solid-js";
+import { batch, createEffect, createMemo, createSignal, on, untrack } from "solid-js";
 import { approvalsApi } from "@/api/approvals";
 import { chatApi } from "@/api/chat";
 import { ApiError } from "@/api/client";
@@ -122,13 +122,18 @@ export function useChat(agent: () => AgentDetail) {
   const otherRuns = createMemo(() => agentRuns().filter((run) => run.issueId !== chatId()));
 
   // Reply turns seen while the chat is open; one that leaves the live list is finished from then.
+  // Another chat starts afresh, in the same effect: a separate reset could run after this one and
+  // drop a reply already running when the chat opens.
   const [turns, setTurns] = createSignal<ReplyTurn[]>([]);
-  createEffect(on(chatId, () => setTurns([])));
+  let turnsChat: string | null = null;
   createEffect(
     on(replyRuns, (live) => {
       const liveIds = new Set(live.map((run) => run.id));
+      const chat = untrack(chatId);
+      const fresh = chat !== turnsChat;
+      turnsChat = chat;
       setTurns((previous) => {
-        const next: ReplyTurn[] = previous.map((turn) =>
+        const next: ReplyTurn[] = (fresh ? [] : previous).map((turn) =>
           liveIds.has(turn.runId) || turn.finishedAt ? turn : { ...turn, status: "finished", finishedAt: new Date().toISOString() },
         );
         for (const run of live) {
@@ -140,20 +145,16 @@ export function useChat(agent: () => AgentDetail) {
       });
     }),
   );
-  // A run's end comes as a status event. The live-runs refetch it starts can join one already in
-  // flight and come back with the run still going, so the event itself ends the turn, and the live
-  // runs are read once more a moment later.
-  let settleTimer: number | undefined;
+  // A run's end comes as a status event. The live-runs refetch it starts can come back with the run
+  // still going until the trailing refetch (lib/live-events.tsx) lands, so the event itself ends
+  // the turn.
   useLiveEvent(["heartbeat.run.status"], (event) => {
     const runId = event.payload?.runId;
     const status = event.payload?.status;
     if (typeof runId !== "string" || typeof status !== "string" || isActiveRun(status)) return;
     if (!untrack(turns).some((turn) => turn.runId === runId && !turn.finishedAt)) return;
     setTurns((previous) => previous.map((turn) => (turn.runId === runId && !turn.finishedAt ? { ...turn, status, finishedAt: new Date().toISOString() } : turn)));
-    window.clearTimeout(settleTimer);
-    settleTimer = window.setTimeout(() => void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) }), 1_500);
   });
-  onCleanup(() => window.clearTimeout(settleTimer));
   const ticking = () => turns().some((turn) => turn.finishedAt !== null) || replyRuns().length > 0;
   const now = useNow(ticking);
   const replies = createMemo(() => shownReplies(turns(), allComments(), new Date(now())));

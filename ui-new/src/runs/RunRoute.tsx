@@ -49,11 +49,20 @@ export function RunRoute() {
     navigate(runPath(company().issuePrefix, agentKey(run.agentId), run.id), { replace: true });
   });
 
+  // Whether the modal has been open on this route. Not a deferred `on`'s previous value: it skips its
+  // first run without recording it, and by then the effect above has already opened the modal, so
+  // the close looked like it came from nothing and the URL stayed on the run.
+  let opened = false;
   createEffect(
     on(
       commands.runModal,
-      (open, before) => {
-        if (open || !before) return;
+      (open) => {
+        if (open) {
+          opened = true;
+          return;
+        }
+        if (!opened) return;
+        opened = false;
         const run = shown.data;
         const next =
           run?.issueId && !isChat(run.issueId)
@@ -62,7 +71,6 @@ export function RunRoute() {
         // After the click that closed it, in case that click was a link going somewhere already.
         window.setTimeout(() => !left && navigate(next, { replace: true }));
       },
-      { defer: true },
     ),
   );
 

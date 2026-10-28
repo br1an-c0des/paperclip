@@ -14,8 +14,8 @@ import { queryKeys } from "@/api/queryKeys";
  * - While the tab is hidden the socket is closed; coming back refreshes active queries.
  * - Each event invalidates the query keys it affects (`invalidateForEvent`), then goes to
  *   subscribers (`useLiveEvent`), so a subscriber sees fresh data.
- * - Task lists and tasks are fetched once more after a burst of task events settles
- *   (`createTrailingRefetch`): the refetch an event starts can come back with the task as it was.
+ * - Task lists, tasks and the live runs are fetched once more after a burst of events settles
+ *   (`createTrailingRefetch`): the refetch an event starts can come back with them as they were.
  *
  * The old UI also patches caches in place and raises toasts from events. Those come with the screens
  * that need them (toasts in M1, run state in M2); this module is where they plug in.
@@ -153,31 +153,59 @@ function invalidateForEvent(client: QueryClient, companyId: string, event: LiveE
 export type TrailingRefetch = { add: (keys: readonly QueryKey[]) => void; cancel: () => void };
 
 /**
- * One more fetch of the task lists and tasks an event burst touched, `delayMs` after its last event.
- *
- * The refetch an event starts can come back with the task as it was. An agent usually comments and
- * then changes the status a moment later: the status event's refetch either joins the comment's
- * refetch still in flight (`cancelRefetch: false`), or is answered from the server's list cache that
- * the comment's refetch filled (see LIST_CACHE_HOLD_MS). Either way it carries the old status, and
- * no later event comes to correct it. So each event pushes the trailing fetch back, and a burst of
- * events costs one fetch. Only task keys get one: other lists aren't cached that way.
+ * How long after a run event the live runs are fetched once more. The server doesn't cache them,
+ * but a run's status event can join a live-runs refetch still in flight from the event before it
+ * (`cancelRefetch: false`) and come back with the run still running.
  */
-export function createTrailingRefetch(client: QueryClient, delayMs = LIST_CACHE_HOLD_MS): TrailingRefetch {
+export const LIVE_RUNS_HOLD_MS = 1_500;
+
+/**
+ * One more fetch of what an event burst touched, a moment after its last event.
+ *
+ * - Task lists and tasks, `delayMs` after the last event. The refetch an event starts can come back
+ *   with the task as it was. An agent usually comments and then changes the status a moment later:
+ *   the status event's refetch either joins the comment's refetch still in flight
+ *   (`cancelRefetch: false`), or is answered from the server's list cache that the comment's
+ *   refetch filled (see LIST_CACHE_HOLD_MS). Either way it carries the old status, and no later
+ *   event comes to correct it.
+ * - The live runs, `liveRunsDelayMs` after the last run event, for the same in-flight join: a run
+ *   that finishes soon after it was queued or started would otherwise stay running.
+ *
+ * Each event pushes its group's fetch back, so a burst of events costs one fetch per group. Other
+ * keys get none.
+ */
+export function createTrailingRefetch(client: QueryClient, delayMs = LIST_CACHE_HOLD_MS, liveRunsDelayMs = LIVE_RUNS_HOLD_MS): TrailingRefetch {
+  const groups = [
+    // A list keeps the prefix (it covers every filtered view); a task is refetched on its own,
+    // since its comments, runs and other sections aren't behind the list cache.
+    trailingGroup(client, delayMs, (key) => key[0] === "issues", (key) => key[1] === "detail"),
+    trailingGroup(client, liveRunsDelayMs, (key) => key[0] === "live-runs", () => true),
+  ];
+  return {
+    add: (eventKeys) => groups.forEach((group) => group.add(eventKeys)),
+    cancel: () => groups.forEach((group) => group.cancel()),
+  };
+}
+
+function trailingGroup(
+  client: QueryClient,
+  delayMs: number,
+  takes: (key: QueryKey) => boolean,
+  exact: (key: QueryKey) => boolean,
+): TrailingRefetch {
   const keys = new Map<string, QueryKey>();
   let timer: number | undefined;
   const run = () => {
     timer = undefined;
     const due = [...keys.values()];
     keys.clear();
-    // A list keeps the prefix (it covers every filtered view); a task is refetched on its own,
-    // since its comments, runs and other sections aren't behind the list cache.
-    for (const queryKey of due) void client.invalidateQueries({ queryKey, exact: queryKey[1] === "detail" });
+    for (const queryKey of due) void client.invalidateQueries({ queryKey, exact: exact(queryKey) });
   };
   return {
     add: (eventKeys) => {
-      const tasks = eventKeys.filter((key) => key[0] === "issues");
-      if (tasks.length === 0) return;
-      for (const key of tasks) keys.set(JSON.stringify(key), key);
+      const taken = eventKeys.filter(takes);
+      if (taken.length === 0) return;
+      for (const key of taken) keys.set(JSON.stringify(key), key);
       window.clearTimeout(timer);
       timer = window.setTimeout(run, delayMs);
     },
