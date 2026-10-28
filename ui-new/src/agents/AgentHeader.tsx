@@ -1,7 +1,7 @@
 import type { AgentDetail } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Crown, Eye, MessageCircle, MoreHorizontal, Pause, Play, SlidersHorizontal } from "lucide-solid";
+import { Crown, Eye, MessageCircle, MoreHorizontal, Pause, Play, SlidersHorizontal, Wrench } from "lucide-solid";
 import { createMemo, createSignal, Show, type JSX } from "solid-js";
 import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
@@ -16,6 +16,7 @@ import { PageHeader } from "@/ui/PageHeader";
 import { RunningPill, TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { headerSummary, harnessType, modelLabel } from "./agent-model";
+import { isSetupDraft } from "./new/new-agent-model";
 import { failure, refreshAgent } from "./shared";
 
 /*
@@ -73,6 +74,8 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
   };
   const paused = () => props.agent.status === "paused";
   const retired = () => props.agent.status === "terminated";
+  // A setup draft saved by New agent can't run until it's hired, so finishing setup is all it offers.
+  const draft = () => isSetupDraft(props.agent);
 
   return (
     <>
@@ -104,6 +107,7 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
         }
         numbers={<span>{summary()}</span>}
         actions={
+          <Show when={!draft()} fallback={<DraftActions agent={props.agent} onRetire={() => setRetireOpen(true)} />}>
           <Show
             when={props.view === "settings"}
             fallback={
@@ -205,6 +209,7 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
               </Menu.Content>
             </Menu>
           </Show>
+          </Show>
         }
       />
       <Dialog
@@ -237,7 +242,38 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
   );
 }
 
+/** A setup draft's actions: Finish setup on New agent, and discarding the draft from More. */
+function DraftActions(props: { agent: AgentDetail; onRetire: () => void }) {
+  const company = useCompany();
+  return (
+    <>
+      <A class={buttonClass({ variant: "primary", size: "compact" })} href={`/${company().issuePrefix}/agents/new?setupAgentId=${encodeURIComponent(props.agent.id)}`}>
+        <Wrench size={14} aria-hidden="true" />
+        Finish setup
+      </A>
+      <Menu placement="bottom-end">
+        <Menu.Trigger as={Button} variant="icon" ghost size="compact" aria-label="More actions">
+          <MoreHorizontal size={16} aria-hidden="true" />
+        </Menu.Trigger>
+        <Menu.Content label="Agent actions" width={260}>
+          <Menu.Item danger description="Discards the unfinished agent" onSelect={props.onRetire}>
+            Retire draft…
+          </Menu.Item>
+        </Menu.Content>
+      </Menu>
+    </>
+  );
+}
+
 function StatePill(props: { agent: AgentDetail; running: boolean; queued: boolean }) {
+  return (
+    <Show when={!isSetupDraft(props.agent)} fallback={<TonePill tone="amber" compact>Draft: setup not finished</TonePill>}>
+      <StateOf agent={props.agent} running={props.running} queued={props.queued} />
+    </Show>
+  );
+}
+
+function StateOf(props: { agent: AgentDetail; running: boolean; queued: boolean }) {
   return (
     <Show when={!props.running} fallback={<RunningPill compact label="Working" />}>
       <Show

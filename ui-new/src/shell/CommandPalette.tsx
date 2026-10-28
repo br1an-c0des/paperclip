@@ -77,6 +77,7 @@ export function CommandPalette() {
       commands: [
         { id: "new-task", label: "New task", hint: "C", keywords: "create add issue", run: () => commands.openNewTask() },
         { id: "new-project", label: "New project", keywords: "create add", run: () => commands.openNewProject() },
+        { id: "new-agent", label: "New agent", keywords: "hire create add agent", run: go(`${base()}/agents/new`) },
         {
           id: "theme",
           label: theme() === "dark" ? "Use light theme" : "Use dark theme",

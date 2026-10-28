@@ -1025,6 +1025,11 @@ Both are handled in `ui-new` for now.
   refreshes again after 1.5 s.
 - **`GET /companies/:id/org` leaves out agents whose managers form a loop.** The UI adds them back.
 - **Built-in agents** answer 404 unless `enableBuiltInAgents` is on (as in decision 28).
-- **Open question:** the agent page says "Run now" and Manage agents says "Wake now" for the same
-  request (`POST /agents/:id/heartbeat/invoke`). Settle on one label.
+- **One label for starting a run:** the agent page said "Run now" and Manage agents "Wake now" for
+  the same request (`POST /agents/:id/heartbeat/invoke`). Decided Oct 27, 2026: **Run now**
+  everywhere.
+- **Hiring:** there's no endpoint that saves a draft before a harness is chosen, so, as upstream
+  does, the draft starts on `process` with `setupAdapterPending`. A reopened draft can't record that
+  the runner was left on auto (the server resolves it at once). `GET /api/adapters` labels are raw
+  type names, so `ui-new` keeps its own harness names.
 

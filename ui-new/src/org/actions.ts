@@ -10,13 +10,13 @@ import { mapBulk } from "./bulk-model";
 
 /*
  * Lifecycle and reporting actions for one agent or a selection (board 20's toolbar, board 19's
- * inspector): pause, resume, wake now, change manager and set the monthly budget. Each agent's
+ * inspector): pause, resume, run now, change manager and set the monthly budget. Each agent's
  * request stands alone; a toast says how many worked and names the ones that didn't.
  */
 
 export type AgentAction = "pause" | "resume" | "wake" | "manager" | "budget";
 
-/** Which of the agents an action applies to: you can't pause a paused agent, or wake a pending hire. */
+/** Which of the agents an action applies to: you can't pause a paused agent, or run a pending hire. */
 export function actionTargets<A extends Pick<Agent, "status">>(action: AgentAction, agents: readonly A[]) {
   if (action === "pause") return agents.filter((agent) => agent.status !== "paused" && agent.status !== "pending_approval");
   if (action === "resume") return agents.filter((agent) => agent.status === "paused");
@@ -27,7 +27,7 @@ export function actionTargets<A extends Pick<Agent, "status">>(action: AgentActi
 const DONE: Record<AgentAction, string> = {
   pause: "Paused",
   resume: "Resumed",
-  wake: "Woke",
+  wake: "Started a run for",
   manager: "Changed the manager of",
   budget: "Set the budget of",
 };
@@ -35,7 +35,7 @@ const DONE: Record<AgentAction, string> = {
 const FAILED: Record<AgentAction, string> = {
   pause: "pause",
   resume: "resume",
-  wake: "wake",
+  wake: "start a run for",
   manager: "change the manager of",
   budget: "set the budget of",
 };
