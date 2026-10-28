@@ -1155,6 +1155,12 @@ Both are handled in `ui-new` for now.
 - **Pasting an MCP config can only turn it on for every agent,** as in the old UI.
 - **Profiles an app's setup creates (`app:` keys) come back with the others;** the UI groups them
   apart.
+- **(Channels.) The chat endpoint type isn't exported from `@paperclipai/shared`,** and Slack's
+  manifest helpers and the browser viewport presets are runtime values there, so they're declared
+  or copied locally ([decision 10](#10-some-response-types-arent-exported-from-the-shared-package)).
+  Composio's catalog is runtime JSON too, so Composio is one tile rather than its catalog's rows.
+- **Grant changes are logged as `connection_grant` activity;** `ui-new` now refreshes on it and on
+  `chat_*` activity.
 
 ### 36. Gaps found building onboarding and the pages outside a company
 
