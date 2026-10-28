@@ -1183,6 +1183,12 @@ Both are handled in `ui-new` for now.
   the stream bridge; that's server configuration.
 - **The old host's `react-dom` shim returned no `createRoot`** under React 19 (it lives only in
   `react-dom/client`); `ui-new`'s shim merges both.
+- **The generated config form lists fields in the stored manifest's key order,** not the author's;
+  the old form does the same, and the stored JSON seems to reorder keys (M6 round 3).
+- **The `organizationSwitcher` slot isn't mounted:** its `renderIcon` prop must return React
+  elements.
+- **The worktree banner shows only when the server serves `ui-new`'s `index.html`** and fills in its
+  branding markers; not under Vite or a static host.
 
 ### 38. Gaps found building task and workspace leftovers
 
