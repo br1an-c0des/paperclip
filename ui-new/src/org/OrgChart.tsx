@@ -247,7 +247,7 @@ function Inspector(props: { row: OrgAgent; data: OrgData; actions: AgentActions 
           </Menu.Trigger>
           <Menu.Content label={`${props.row.agent.name} actions`} width={220}>
             <Menu.Item onSelect={() => void props.actions.wake([props.row.agent])} disabled={paused() || props.row.state === "pending"}>
-              Wake now
+              Run now
             </Menu.Item>
             <Menu.Item onSelect={() => void (paused() ? props.actions.resume([props.row.agent]) : props.actions.pause([props.row.agent]))} disabled={props.row.state === "pending"}>
               {paused() ? "Resume" : "Pause"}

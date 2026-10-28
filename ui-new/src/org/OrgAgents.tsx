@@ -42,7 +42,7 @@ import "./Org.css";
 /*
  * `/:prefix/agents`, Manage agents (board 20): every agent in a table with filters (all, working,
  * needs attention, paused, idle, built-in), search and sort, and a toolbar for the selection: pause,
- * resume, wake now, change manager, set budget, and upstream's bulk edit of AI connection and
+ * resume, run now, change manager, set budget, and upstream's bulk edit of AI connection and
  * default model. Rows link to the agent's page. On a phone it's board M8: this month's spend, the
  * filters, and one stacked row per agent.
  *
@@ -208,7 +208,7 @@ export function OrgAgents() {
             Resume
           </Button>
           <Button size="compact" disabled={actions.busy() !== null || actionTargets("wake", selectedAgents()).length === 0} onClick={() => void actions.wake(selectedAgents())}>
-            Wake now
+            Run now
           </Button>
           <Menu>
             <Menu.Trigger class={buttonClass({ size: "compact" })} disabled={actions.busy() !== null}>
@@ -420,7 +420,7 @@ function AgentRow(props: { row: OrgAgent; data: ReturnType<typeof useOrgData>; c
               }
             >
               <Menu.Item onSelect={() => void props.actions.wake([agent()])} disabled={paused()}>
-                Wake now
+                Run now
               </Menu.Item>
               <Menu.Item onSelect={() => void (paused() ? props.actions.resume([agent()]) : props.actions.pause([agent()]))}>{paused() ? "Resume" : "Pause"}</Menu.Item>
               <Menu.Separator />
