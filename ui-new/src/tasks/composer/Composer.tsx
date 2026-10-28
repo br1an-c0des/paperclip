@@ -1,6 +1,6 @@
 import type { Issue, IssueWorkMode } from "@paperclipai/shared";
 import { createQuery, keepPreviousData, useQueryClient } from "@tanstack/solid-query";
-import { ArrowUp, AtSign, Check, ChevronDown, LoaderCircle, Paperclip, RotateCcw, TriangleAlert, X } from "lucide-solid";
+import { ArrowUp, AtSign, Check, ChevronDown, LoaderCircle, Paperclip, RotateCcw, Target, TriangleAlert, X } from "lucide-solid";
 import { batch, createEffect, createMemo, createSignal, For, on, onCleanup, Show, untrack } from "solid-js";
 import { agentsApi } from "@/api/agents";
 import { commentsApi } from "@/api/comments";
@@ -15,7 +15,7 @@ import { Popover } from "@/ui/Popover";
 import { pushToast } from "@/ui/Toast";
 import { newId } from "../new-task";
 import { useTaskPeople, type TaskPeople } from "../people";
-import { agentRunDefaults, agentSupportsOverrides, effortOptions, readRunSettings, type RunSettings } from "../run-overrides";
+import { agentRunDefaults, agentSupportsOverrides, effortOptions, mergeRunOverrides, readRunSettings, type RunSettings } from "../run-overrides";
 import {
   clearComposerDraft,
   loadComposerDraft,
@@ -29,6 +29,8 @@ import {
   type SendMode,
 } from "./composer-model";
 import { activeMention, insertMention, matchesQuery, type ActiveMention, type MentionTarget } from "./mentions";
+import { createRunnerGoal, RunnerGoalCard } from "./RunnerGoal";
+import { goalFromComposer, type GoalCommand } from "./runner-goal-model";
 import "./Composer.css";
 
 /*
@@ -41,6 +43,9 @@ import "./Composer.css";
  *   (decision 13), and reopening a closed task.
  * - Cmd/Ctrl+Enter sends. While a run is going the message queues for the next turn; the send menu
  *   steers it into the current turn or interrupts the run instead.
+ * - For runners that support it, the Goal pill ("Goal: keep pursuing", or `/goal …` typed) sets a
+ *   goal the agent keeps working toward instead of sending a message; its card sits above the
+ *   composer (RunnerGoal.tsx).
  * - The draft is saved per task.
  *
  * `compact` (the run modal) keeps the text, files and send controls only.
@@ -73,6 +78,7 @@ export function Composer(props: {
   const [pickerIndex, setPickerIndex] = createSignal(0);
   const [pickerClosedAt, setPickerClosedAt] = createSignal<number | null>(null);
   const [dragging, setDragging] = createSignal(false);
+  const [goalMode, setGoalMode] = createSignal(false);
   let requestId = newId();
 
   // Each task keeps its own draft: switching tasks saves this one and loads the next.
@@ -89,6 +95,7 @@ export function Composer(props: {
           setRunSettings(null);
           setReopenChoice(null);
           setProblem(null);
+          setGoalMode(false);
           setWorkMode(props.task.workMode);
         });
         requestId = newId();
@@ -119,6 +126,7 @@ export function Composer(props: {
   const closed = () => ["done", "cancelled", "blocked"].includes(props.task.status);
   const reopen = () => closed() && (reopenChoice() ?? reopensByDefault(props.task.status, target()));
   const live = () => !!props.liveRunId;
+  const goal = createRunnerGoal({ taskId: () => props.task.id, agentId: () => target().agentId ?? null, enabled: () => !props.compact });
 
   const queue = createQuery(() => ({
     queryKey: queryKeys.issues.section(props.task.id, "queued-comments"),
@@ -228,6 +236,8 @@ export function Composer(props: {
 
   const send = async (mode: SendMode) => {
     if (sending()) return;
+    const goalSend = props.compact ? null : goalFromComposer({ body: body(), goalMode: goalMode(), attachmentCount: attachments().length });
+    if (goalSend) return sendGoal(goalSend);
     const plan = planSend(
       { body: body(), attachments: attachments(), workMode: workMode(), assignee: assignee(), runSettings: runSettings(), reopen: reopen() },
       { task: props.task, mode, clientRequestId: requestId, adapterTypeOf: (id) => people.agent(id)?.adapterType },
@@ -258,6 +268,53 @@ export function Composer(props: {
       void client.invalidateQueries({ queryKey: queryKeys.issues.detail(props.task.id) });
       void client.invalidateQueries({ queryKey: queryKeys.issues.list(company().id) });
       void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
+    } catch (error) {
+      setProblem(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  /**
+   * Sets or acts on the runner goal instead of sending a message. A goal for another agent hands the
+   * task over first, without waking anyone (`deferWakeForGoal`): the goal starts the run.
+   */
+  const sendGoal = async (plan: { ok: true; command: GoalCommand } | { ok: false; problem: string }) => {
+    if (!plan.ok) {
+      setProblem(plan.problem);
+      return;
+    }
+    const reassignment = assignee();
+    if (reassignment && plan.command.action !== "focus" && !reassignment.agentId) {
+      setProblem("Pick an agent for the goal: goals are for agents.");
+      return;
+    }
+    setProblem(null);
+    setSending(true);
+    try {
+      if (reassignment && plan.command.action !== "focus") {
+        const adapterType = people.agent(reassignment.agentId)?.adapterType ?? null;
+        const settings = runSettings();
+        await issuesApi.update(props.task.id, {
+          assigneeAgentId: reassignment.agentId,
+          assigneeUserId: null,
+          assigneeAdapterOverrides: settings ? mergeRunOverrides(props.task.assigneeAdapterOverrides, adapterType, settings, true) : null,
+          deferWakeForGoal: true,
+        });
+        batch(() => {
+          setAssignee(null);
+          setRunSettings(null);
+        });
+        void client.invalidateQueries({ queryKey: queryKeys.issues.detail(props.task.id) });
+        void client.invalidateQueries({ queryKey: queryKeys.issues.list(company().id) });
+      }
+      await goal.run(plan.command);
+      batch(() => {
+        setBody("");
+        setGoalMode(false);
+      });
+      clearComposerDraft(props.task.id);
+      queueMicrotask(resize);
     } catch (error) {
       setProblem(error instanceof Error ? error.message : String(error));
     } finally {
@@ -307,14 +364,20 @@ export function Composer(props: {
     }
   };
 
-  const placeholder = () => (props.compact ? (live() ? "Message the agent. It waits for the next turn unless you steer it in" : "Comment") : placeholderFor(workMode(), targetAgent() ? targetName() : null));
+  const placeholder = () =>
+    goalMode() ? `What should ${targetAgent()?.name ?? "the agent"} keep working toward? It keeps going across turns until it's done` : basePlaceholder();
+  const basePlaceholder = () => (props.compact ? (live() ? "Message the agent. It waits for the next turn unless you steer it in" : "Comment") : placeholderFor(workMode(), targetAgent() ? targetName() : null));
   const optionId = (index: number) => `cmp-${props.task.id}-opt-${index}`;
   const fieldId = () => `cmp-${props.task.id}${props.compact ? "-run" : ""}`;
 
   return (
+    <>
+    <Show when={!props.compact}>
+      <RunnerGoalCard control={goal} agentName={targetAgent()?.name ?? null} />
+    </Show>
     <form
       class="cmp"
-      classList={{ "cmp--compact": props.compact, "cmp--drop": dragging() }}
+      classList={{ "cmp--compact": props.compact, "cmp--drop": dragging(), "cmp--goal": goalMode() }}
       data-mode={workMode()}
       aria-busy={sending()}
       onSubmit={(event) => {
@@ -480,7 +543,24 @@ export function Composer(props: {
           />
         </Show>
 
-        <Show when={closed()}>
+        <Show when={!props.compact && (goal.available() || goalMode())}>
+          <button
+            type="button"
+            class="cmp-pill"
+            aria-pressed={goalMode()}
+            title={goal.projection()?.capability.reason ?? "Set a goal the agent keeps pursuing across turns"}
+            onClick={() => {
+              setGoalMode(!goalMode());
+              setProblem(null);
+              textarea?.focus();
+            }}
+          >
+            <Target size={13} aria-hidden="true" />
+            {goalMode() ? "Goal: keep pursuing" : "Goal"}
+          </button>
+        </Show>
+
+        <Show when={closed() && !goalMode()}>
           <button
             type="button"
             class="cmp-pill"
@@ -498,9 +578,9 @@ export function Composer(props: {
             <Show when={sending()} fallback={<ArrowUp size={14} aria-hidden="true" />}>
               <LoaderCircle size={14} class="cmp-spin" aria-hidden="true" />
             </Show>
-            {live() ? "Queue" : "Send"}
+            {goalMode() ? "Set goal" : live() ? "Queue" : "Send"}
           </Button>
-          <Show when={live()}>
+          <Show when={live() && !goalMode()}>
             <Menu placement="top-end">
               <Menu.Trigger class="btn btn--primary btn--compact cmp-send-more" aria-label="Send options: steer now, interrupt and send" disabled={sending()}>
                 <ChevronDown size={14} aria-hidden="true" />
@@ -525,6 +605,7 @@ export function Composer(props: {
         </div>
       </div>
     </form>
+    </>
   );
 }
 
