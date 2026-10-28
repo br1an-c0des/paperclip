@@ -403,7 +403,7 @@ Round 3 (started Oct 28): Apps connections part 2 (assistant connection, gateway
 tools), Apps channels and special setups (chat endpoints, agent channels, task integrations,
 aggregators, identities), the remaining plugin spots and shell leftovers, and task and workspace
 leftovers (runner goal, feedback votes, a Workspaces tab in the org header, branch reconcile).
-Decided: decision queues are dropped; the Inbox is the one triage surface.
+Decided: decision queues are dropped; the Inbox is the one triage surface. Task and workspace leftovers are merged ([decision 38](decisions.md#38-gaps-found-building-task-and-workspace-leftovers)).
 
 #### M7: Ready to replace the old UI
 
