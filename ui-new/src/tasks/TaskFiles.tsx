@@ -52,6 +52,7 @@ import { TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
+import { readDivergence } from "./branch-reconcile";
 import { useTaskPeople, type TaskPeople } from "./people";
 import { stampLabel } from "./thread-model";
 import "./TaskFiles.css";
@@ -398,6 +399,10 @@ export function TaskFiles(props: { taskId: string }) {
                                 {list().truncated ? "+" : ""} changed file{list().items.length === 1 ? "" : "s"}
                               </>
                             )}
+                          </Show>
+                          <Show when={readDivergence(task.data?.activeRecoveryAction)}>
+                            {" "}
+                            · <span class="tf-diverged">branch out of step: see Workspace</span>
                           </Show>
                         </span>
                       </span>

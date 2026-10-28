@@ -1,3 +1,4 @@
+import type { Agent } from "@paperclipai/shared";
 import { A, useLocation, useNavigate } from "@solidjs/router";
 import { Building2, ChevronDown, Keyboard, LogOut, Moon, Palette, Plug, Plus, Search, Settings2, Sun } from "lucide-solid";
 import { createMemo, For, Show } from "solid-js";
@@ -9,6 +10,10 @@ import { useCompaniesQuery, useCompany } from "@/lib/company";
 import { useNeedsYouCount } from "@/inbox/needs-you";
 import { isOrgPage } from "./dock-model";
 import { NavPlugins, NavProjectPlugins } from "@/plugins/NavPlugins";
+import { GlobalToolbarPlugins } from "@/plugins/ShellPlugins";
+import { useAgentStars } from "@/agents/AgentStar";
+import { starredAgents } from "@/agents/star-model";
+import { useCanCreateCompany } from "@/onboarding/can-create";
 import { useAgentsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
 import { useSession, useSignOut, useYouName } from "@/lib/session";
 import { theme, toggleTheme } from "@/lib/theme";
@@ -27,6 +32,10 @@ import "./Nav.css";
  *
  * "Org dashboard" stays raised on every organization page (the roster at `/agents`, workload and the
  * org tabs; `isOrgPage`), as boards 20 and 33 draw it. The + beside "Projects" opens New project (board N1).
+ *
+ * Agents you've starred (on their page or roster row) get their own Starred group above Agents.
+ * Plugins' global toolbar buttons sit under the company switcher; the switcher offers Create
+ * organization (the onboarding page) when you may create one.
  */
 
 function OrgIcon() {
@@ -64,6 +73,7 @@ function CompanySwitcher() {
   const company = useCompany();
   const companies = useCompaniesQuery();
   const navigate = useNavigate();
+  const canCreate = useCanCreateCompany();
   return (
     <Menu>
       <Menu.Trigger class="company-switch" aria-label={`Company: ${company().name}. Switch company`}>
@@ -92,6 +102,11 @@ function CompanySwitcher() {
         <Menu.Item onSelect={() => navigate("/companies")} icon={<Building2 size={16} />}>
           All companies
         </Menu.Item>
+        <Show when={canCreate().allowed}>
+          <Menu.Item onSelect={() => navigate("/onboarding")} icon={<Plus size={16} />}>
+            Create organization
+          </Menu.Item>
+        </Show>
       </Menu.Content>
     </Menu>
   );
@@ -157,7 +172,11 @@ export function Nav() {
   /** Every organization page (the roster, workload, the org tabs) raises "Org dashboard". */
   const orgPage = () => isOrgPage(location.pathname, company().issuePrefix);
   const running = createMemo(() => runningAgentIds(liveRuns.data));
+  const stars = useAgentStars();
+  const starred = createMemo(() => starredAgents(stars.memberships.data, activeAgents(agents.data)));
+  const starredIds = createMemo(() => new Set(starred().map((agent) => agent.id)));
   const navAgents = createMemo(() => sortAgentsForNav(activeAgents(agents.data), running()));
+  const otherAgents = createMemo(() => navAgents().filter((agent) => !starredIds().has(agent.id)));
   const runningCount = () => navAgents().filter((agent) => agentState(agent, running()).key === "running").length;
   const inboxCount = () => needsYou() ?? 0;
 
@@ -184,6 +203,7 @@ export function Nav() {
           <Plus size={16} stroke-width={2.2} aria-hidden="true" />
         </button>
       </div>
+      <GlobalToolbarPlugins />
 
       <div class="nav-group">
         <A class="navi" href={`${base()}/dashboard`} classList={{ active: orgPage() }}>
@@ -239,6 +259,15 @@ export function Nav() {
         </For>
       </div>
 
+      <Show when={starred().length > 0}>
+        <div class="nav-group" role="group" aria-labelledby="nav-starred-h">
+          <div class="nav-head">
+            <h2 id="nav-starred-h">Starred</h2>
+          </div>
+          <For each={starred()}>{(agent) => <NavAgent agent={agent} base={base()} running={running()} />}</For>
+        </div>
+      </Show>
+
       <div class="nav-group">
         <div class="nav-head">
           <h2>Agents</h2>
@@ -246,20 +275,8 @@ export function Nav() {
             <span class="nav-head-note">{runningCount()} running</span>
           </Show>
         </div>
-        <For each={navAgents()} fallback={<p class="nav-empty">No agents yet.</p>}>
-          {(agent) => {
-            const href = () => `${base()}/agents/${agent.urlKey}`;
-            const state = () => agentState(agent, running());
-            return (
-              <A class="navi navi--agent" href={href()}>
-                <AgentAvatar agent={agent} size={24} ring={state().key === "running"} />
-                <span class="navi-label">{agent.name}</span>
-                <span class="navi-state" style={{ color: state().tone }}>
-                  {state().label}
-                </span>
-              </A>
-            );
-          }}
+        <For each={otherAgents()} fallback={<Show when={navAgents().length === 0}><p class="nav-empty">No agents yet.</p></Show>}>
+          {(agent) => <NavAgent agent={agent} base={base()} running={running()} />}
         </For>
       </div>
 
@@ -275,5 +292,18 @@ export function Nav() {
 
       <YouRow />
     </>
+  );
+}
+
+function NavAgent(props: { agent: Agent; base: string; running: ReadonlySet<string> }) {
+  const state = () => agentState(props.agent, props.running);
+  return (
+    <A class="navi navi--agent" href={`${props.base}/agents/${props.agent.urlKey}`}>
+      <AgentAvatar agent={props.agent} size={24} ring={state().key === "running"} />
+      <span class="navi-label">{props.agent.name}</span>
+      <span class="navi-state" style={{ color: state().tone }}>
+        {state().label}
+      </span>
+    </A>
   );
 }

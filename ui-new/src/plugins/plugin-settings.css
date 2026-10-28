@@ -1,0 +1,350 @@
+/*
+ * A plugin's settings in App settings → Plugins: the form generated from its settings schema
+ * (SchemaForm.tsx, `sf-`) and its status (PluginStatus.tsx, `ps-`).
+ */
+
+.plugin-settings-about {
+  margin: 0;
+  color: var(--body);
+  font-size: 14px;
+}
+
+.plugin-note--quiet {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Generated form */
+.sf-card-body {
+  padding: 16px 20px;
+}
+
+.sf {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+
+.sf-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sf-required {
+  color: var(--red-fg);
+}
+
+.sf-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.sf-select {
+  max-width: 420px;
+}
+
+.sf-const {
+  color: var(--body);
+}
+
+.sf-box {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+}
+
+.sf-box > legend {
+  padding: 0 4px;
+}
+
+.sf-object > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.sf-object > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sf-chevron {
+  flex: none;
+  color: var(--muted);
+  transition: transform 120ms ease;
+}
+
+.sf-object[open] > summary .sf-chevron,
+.sf-disclosure[aria-expanded="true"] .sf-chevron {
+  transform: rotate(90deg);
+}
+
+.sf-object[open] > summary {
+  margin-bottom: 8px;
+}
+
+.sf-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.sf-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.sf-empty {
+  padding: 4px 0;
+}
+
+.sf-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 1px dashed var(--dashed);
+  border-radius: var(--r-inner);
+}
+
+.sf-disclosure {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sf-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sf-group-title {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sf-secret {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sf-secret-raw {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 420px;
+}
+
+.sf-link {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sf-link:hover {
+  color: var(--text);
+}
+
+.sf-result {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sf-result--ok {
+  color: var(--green-fg);
+}
+
+/* Status */
+.ps-status {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 20px;
+}
+
+.ps-status-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ps-checks,
+.ps-runs,
+.ps-caps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.ps-checks li,
+.ps-runs li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ps-ok {
+  color: var(--green-fg);
+}
+
+.ps-bad {
+  color: var(--red-fg);
+}
+
+.ps-error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-inner);
+  background: var(--red-bg);
+  color: var(--red-fg);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ps-props {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.ps-props dt {
+  color: var(--muted);
+}
+
+.ps-props dd {
+  margin: 0;
+}
+
+.ps-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.ps-dot[data-status="succeeded"],
+.ps-dot[data-status="success"],
+.ps-dot[data-status="processed"] {
+  background: var(--green-fg);
+}
+
+.ps-dot[data-status="failed"],
+.ps-dot[data-status="error"] {
+  background: var(--red-fg);
+}
+
+.ps-dot[data-status="running"],
+.ps-dot[data-status="queued"] {
+  background: var(--run-fg);
+}
+
+.ps-push {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.ps-caps li {
+  padding: 6px 10px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.ps-logs {
+  max-height: 260px;
+  margin: 0;
+  padding: 10px 20px 14px;
+  overflow-y: auto;
+  list-style: none;
+  font-size: 12px;
+}
+
+.ps-logs li {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  padding: 2px 0;
+  color: var(--body);
+}
+
+.ps-logs li[data-level="error"] {
+  color: var(--red-fg);
+}
+
+.ps-logs li[data-level="warn"] {
+  color: var(--amber-fg);
+}
+
+.ps-logs li[data-level="debug"] {
+  color: var(--muted);
+}
+
+.ps-logs time {
+  flex: none;
+  color: var(--muted);
+}
+
+.ps-level {
+  flex: none;
+  min-width: 40px;
+  font-weight: 700;
+}
+
+.ps-message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container main (max-width: 560px) {
+  .ps-runs li {
+    flex-wrap: wrap;
+  }
+  .ps-push {
+    margin-left: 0;
+  }
+}

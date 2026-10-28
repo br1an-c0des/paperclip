@@ -7,12 +7,15 @@ import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { Button } from "@/ui/Button";
 import { pushToast } from "@/ui/Toast";
+import { WorkspacePlugins } from "@/plugins/WorkspacePlugins";
+import { TaskBranch } from "./TaskBranch";
 import { stampLabel } from "./thread-model";
 import "./TaskWorkspace.css";
 
 /*
  * The task panel's Workspace section: the execution workspace the task's runs use (where it is,
- * which branch, its state), and the services running in it, which can be started, stopped and
+ * which branch, its state), its git state with branch reconcile when a run found the branch out of
+ * step (TaskBranch.tsx), and the services running in it, which can be started, stopped and
  * restarted. Browsing the workspace's files comes with the file viewer slice of M2.
  */
 
@@ -139,6 +142,8 @@ export function TaskWorkspace(props: { taskId: string }) {
                   </dl>
                 </div>
 
+                <TaskBranch task={task.data!} workspaceId={current().id} />
+
                 <section class="tw-services" aria-label="Services">
                   <h3 class="tw-heading">Services</h3>
                   <Show
@@ -204,6 +209,7 @@ export function TaskWorkspace(props: { taskId: string }) {
                     </div>
                   </Show>
                 </section>
+                <WorkspacePlugins kind="execution_workspace" workspaceId={current().id} projectId={current().projectId ?? task.data?.projectId} />
               </>
             )}
           </Match>

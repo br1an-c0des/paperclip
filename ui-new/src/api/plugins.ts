@@ -1,4 +1,4 @@
-import type { PluginLauncherDeclaration, PluginLauncherRenderContextSnapshot, PluginRecord, PluginUiSlotDeclaration } from "@paperclipai/shared";
+import type { PluginConfig, PluginLauncherDeclaration, PluginLauncherRenderContextSnapshot, PluginRecord, PluginUiSlotDeclaration } from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
@@ -27,6 +27,39 @@ export type PluginUiContribution = {
   launchers: PluginLauncherDeclaration[];
 };
 
+/** `GET /plugins/:id/health`: the plugin's health checks (ui/src/api/plugins.ts). */
+export type PluginHealth = {
+  pluginId: string;
+  status: string;
+  healthy: boolean;
+  checks: { name: string; passed: boolean; message?: string }[];
+  lastError?: string;
+};
+
+/** `GET /plugins/:id/dashboard`: its worker, recent job runs and webhook deliveries, and health. */
+export type PluginDashboard = {
+  pluginId: string;
+  worker: {
+    status: string;
+    pid: number | null;
+    uptime: number | null;
+    consecutiveCrashes: number;
+    totalCrashes: number;
+    pendingRequests: number;
+    lastCrashAt: number | null;
+    nextRestartAt: number | null;
+  } | null;
+  recentJobRuns: { id: string; jobId: string; jobKey?: string; trigger: string; status: string; durationMs: number | null; error: string | null; createdAt: string }[];
+  recentWebhookDeliveries: { id: string; webhookKey: string; status: string; durationMs: number | null; error: string | null; createdAt: string }[];
+  health: PluginHealth;
+  checkedAt: string;
+};
+
+export type PluginLogEntry = { id: string; pluginId: string; level: string; message: string; meta: Record<string, unknown> | null; createdAt: string };
+
+/** `GET /plugins/:id`: the record, and whether its worker can test a configuration. */
+export type PluginDetail = PluginRecord & { supportsConfigTest?: boolean };
+
 /** A plugin that ships with this checkout (`GET /plugins/examples`). */
 export type BundledPlugin = {
   packageName: string;
@@ -48,6 +81,19 @@ export const pluginsApi = {
   /** Upgrades to the latest version on npm. */
   upgrade: (pluginId: string) => api.post<{ ok: boolean }>(`/plugins/${encodeURIComponent(pluginId)}/upgrade`, {}),
   uninstall: (pluginId: string) => api.delete<{ ok: boolean }>(`/plugins/${encodeURIComponent(pluginId)}`),
+  get: (pluginId: string, signal?: AbortSignal) => api.get<PluginDetail>(`/plugins/${encodeURIComponent(pluginId)}`, { signal }),
+  health: (pluginId: string, signal?: AbortSignal) => api.get<PluginHealth>(`/plugins/${encodeURIComponent(pluginId)}/health`, { signal }),
+  dashboard: (pluginId: string, signal?: AbortSignal) => api.get<PluginDashboard>(`/plugins/${encodeURIComponent(pluginId)}/dashboard`, { signal }),
+  logs: (pluginId: string, limit = 50, signal?: AbortSignal) =>
+    api.get<PluginLogEntry[]>(`/plugins/${encodeURIComponent(pluginId)}/logs?limit=${limit}`, { signal }),
+  /** The plugin's configuration in a company (`null` before it's saved). The server checks it against `instanceConfigSchema`. */
+  config: (pluginId: string, companyId: string, signal?: AbortSignal) =>
+    api.get<PluginConfig | null>(`/plugins/${encodeURIComponent(pluginId)}/config?companyId=${encodeURIComponent(companyId)}`, { signal }),
+  saveConfig: (pluginId: string, companyId: string, configJson: Record<string, unknown>) =>
+    api.post<PluginConfig>(`/plugins/${encodeURIComponent(pluginId)}/config`, { companyId, configJson }),
+  /** The worker's `validateConfig`, without saving. */
+  testConfig: (pluginId: string, companyId: string, configJson: Record<string, unknown>) =>
+    api.post<{ valid: boolean; message?: string }>(`/plugins/${encodeURIComponent(pluginId)}/config/test`, { companyId, configJson }),
   uiContributions: (signal?: AbortSignal) => api.get<PluginUiContribution[]>("/plugins/ui-contributions", { signal }),
   /** `usePluginData(key, params)`: the worker's `getData` handler. Errors carry `{ code, message, details }`. */
   bridgeGetData: (
