@@ -346,3 +346,99 @@ button.plugin-launcher-navi {
   border-radius: var(--r-inner);
   background: var(--ground);
 }
+
+/* Shell: global toolbar buttons under the company switcher; overlays stacked at the bottom right. */
+.plugin-global-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.plugin-global-toolbar:empty {
+  display: none;
+}
+
+/* In the phone's You sheet (TasksSheet.tsx), padded like its other blocks. */
+.plugin-global-toolbar.tsheet-plugins {
+  padding: 4px 14px 10px;
+}
+
+.plugin-shell-overlays {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  pointer-events: none;
+}
+
+.plugin-shell-overlay {
+  pointer-events: auto;
+}
+
+/* Above the floating dock, where PhoneDock.css puts what floats over it. */
+:root[data-viewport="phone"] .plugin-shell-overlays {
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Dashboard widgets: cards in a two-column grid that drops to one in a narrow main. */
+.plugin-widgets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.plugin-widget {
+  padding: 18px 22px;
+}
+
+@container main (max-width: 760px) {
+  .plugin-widgets {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Comments: plugin actions in the comment's head, annotations under its body. */
+.plugin-comment-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.plugin-comment-annotations {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Workspace views from plugins: a row of tabs, the open one below. */
+.plugin-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.plugin-workspace-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.plugin-workspace-tabs [aria-selected="true"] {
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+  color: var(--text);
+}
+
+.plugin-workspace-view {
+  padding: 14px 16px;
+}

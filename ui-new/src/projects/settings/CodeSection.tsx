@@ -8,6 +8,7 @@ import { projectsApi } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
+import { WorkspacePlugins } from "@/plugins/WorkspacePlugins";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { FieldButton, SettingsCard, SettingsRow, TextInput } from "@/ui/Field";
@@ -520,6 +521,7 @@ function WorkspaceRow(props: { project: Project; workspace: ProjectWorkspace; hi
           {problem()}
         </span>
       </Show>
+      <WorkspacePlugins kind="project_workspace" workspaceId={props.workspace.id} projectId={props.project.id} />
     </div>
   );
 }
