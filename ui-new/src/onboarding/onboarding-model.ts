@@ -158,7 +158,7 @@ export async function launchFirstTask(api: LaunchApi, input: { companyId: string
   return { issueRef: issue.identifier ?? issue.id, projectId: project.id };
 }
 
-/** The old wizard's step for a resumed company with an existing first task: the task's address. */
+/** Where onboarding ends: the first task's page, where the agent's conversation starts. */
 export function onboardingTaskHref(prefix: string, issueRef: string) {
   return `/${prefix}/issues/${encodeURIComponent(issueRef)}`;
 }
