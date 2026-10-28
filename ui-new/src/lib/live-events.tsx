@@ -102,6 +102,13 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
     case "cost_event":
       keys.push(["costs", companyId]);
       break;
+    // Installing, turning on or off, upgrading, configuring or removing a plugin is logged on every
+    // company (server/src/routes/plugins.ts); refresh the plugin list and what plugins add to the
+    // UI. The `plugin.ui.updated` event below says the same, but it's instance-wide and never
+    // reaches a company's socket.
+    case "plugin":
+      keys.push(["plugins"]);
+      break;
     case "company":
       keys.push(queryKeys.companies.all);
       // Imports and scans (`company.skills_imported`, `company.skills_scanned`…) are logged on the company.

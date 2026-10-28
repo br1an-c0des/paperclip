@@ -133,11 +133,24 @@
   gap: 2px;
 }
 
+/* Old-UI sidebar entries are Tailwind-styled links with an icon; draw them as nav items. */
 .plugin-nav .plugin-area a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 12px;
   border-radius: var(--r-pill);
   color: var(--body);
   font-weight: 600;
   text-decoration: none;
+}
+
+.plugin-nav .plugin-area svg,
+.plugin-project-items .plugin-area svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
 }
 
 .plugin-nav .plugin-area a:hover {
@@ -187,6 +200,23 @@ button.plugin-launcher-navi {
 .plugin-project-items {
   padding-left: 34px;
   font-size: 12px;
+}
+
+.plugin-project-items .plugin-area a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  color: var(--pc-text-muted);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.plugin-project-items .plugin-area a:hover {
+  background: var(--hover);
+  color: var(--text);
 }
 
 /* Toolbars and blocks on tasks and projects */
@@ -296,6 +326,17 @@ button.plugin-launcher-navi {
   overflow: auto;
   padding: 16px 18px;
   flex: 1;
+}
+
+/* A plugin's settings in App settings */
+.plugin-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.plugin-settings > a {
+  align-self: flex-start;
 }
 
 .plugin-iframe {

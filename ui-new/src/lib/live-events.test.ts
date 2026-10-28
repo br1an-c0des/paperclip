@@ -74,6 +74,15 @@ describe("keysForEvent", () => {
     expect(keysForEvent("c1", event("activity.logged", { entityType: "agent", entityId: "a1", action: "agent.updated" }))).not.toContainEqual(queryKeys.skills.all("c1"));
   });
 
+  it("refreshes the plugins and what they add to the UI when a plugin is installed, switched or removed", () => {
+    for (const action of ["plugin.installed", "plugin.enabled", "plugin.disabled", "plugin.upgraded", "plugin.uninstalled"]) {
+      const keys = keysForEvent("c1", event("activity.logged", { entityType: "plugin", entityId: "p1", action }));
+      expect(keys).toContainEqual(["plugins"]);
+      // A prefix of the UI contributions every plugin outlet reads.
+      expect(queryKeys.plugins.uiContributions.slice(0, 1)).toEqual(["plugins"]);
+    }
+  });
+
   it("leaves streamed run output to subscribers", () => {
     expect(keysForEvent("c1", event("heartbeat.run.log", { runId: "r1" }))).toEqual([]);
   });
