@@ -1,0 +1,233 @@
+/*
+ * The SDK's shared components (components.ts) in the Capsule Stack look. Loaded with the React
+ * runtime chunk, so it costs nothing on pages without plugins. Text colours use --pc-text-muted
+ * (set on .plugin-slot) because plugin areas repoint --muted at the old UI's meaning.
+ */
+
+.pcs-muted { color: var(--pc-text-muted, var(--muted)); font-size: 12px; }
+.pcs-strong { font-weight: 700; color: var(--text); }
+.pcs-warn { color: var(--amber-fg); font-size: 12px; }
+
+.pcs-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  border: 1px dashed var(--dashed);
+  border-radius: var(--r-inner);
+  color: var(--pc-text-muted, var(--muted));
+  font-size: 13px;
+}
+
+.pcs-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--r-inner);
+  background: var(--red-bg);
+  color: var(--red-fg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pcs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pcs-btn:hover:not(:disabled) { background: var(--hover); }
+.pcs-btn:disabled { opacity: 0.5; cursor: default; }
+.pcs-btn:focus-visible, .pcs-input:focus-visible, .pcs-select:focus-visible, .pcs-tree-name:focus-visible, .pcs-link-button:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 1px;
+}
+.pcs-btn--primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); font-weight: 800; }
+.pcs-btn--primary:hover:not(:disabled) { background: var(--primary); opacity: 0.9; }
+.pcs-btn--danger { border-color: var(--red-fg); color: var(--red-fg); }
+
+.pcs-link-button { border: 0; background: none; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+
+.pcs-input, .pcs-select {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-field);
+  background: var(--ground);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.pcs-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* MetricCard */
+.pcs-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--r-inner);
+  background: var(--well);
+}
+.pcs-metric-label { color: var(--pc-text-muted, var(--muted)); font-size: 12px; font-weight: 600; }
+.pcs-metric-value { display: flex; align-items: baseline; gap: 8px; font-family: var(--display); letter-spacing: var(--dtrack); font-size: 22px; font-weight: 800; }
+.pcs-metric-trend { font-family: var(--font-ui); letter-spacing: 0; font-size: 12px; font-weight: 700; }
+.pcs-metric-trend--up { color: var(--green-fg); }
+.pcs-metric-trend--down { color: var(--red-fg); }
+.pcs-metric-trend--flat { color: var(--pc-text-muted, var(--muted)); }
+.pcs-spark { width: 100%; height: 28px; }
+.pcs-spark polyline { stroke: var(--run-fg); stroke-width: 2; vector-effect: non-scaling-stroke; }
+
+/* StatusBadge and FileTree badges */
+.pcs-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pcs-badge--ok { background: var(--green-bg); color: var(--green-fg); }
+.pcs-badge--warning { background: var(--amber-bg); color: var(--amber-fg); }
+.pcs-badge--error { background: var(--red-bg); color: var(--red-fg); }
+.pcs-badge--info { background: var(--run-bg); color: var(--run-fg); }
+.pcs-badge--pending { background: var(--well); color: var(--body); }
+
+/* DataTable */
+.pcs-table { border: 1px solid var(--line); border-radius: var(--r-inner); overflow: hidden; }
+.pcs-table-head, .pcs-table-row { display: grid; gap: 12px; padding: 10px 14px; align-items: center; }
+.pcs-table-head { background: var(--well); color: var(--pc-text-muted, var(--muted)); font-size: 12px; font-weight: 700; }
+.pcs-table-row { border-top: 1px solid var(--row-line); font-size: 13px; }
+.pcs-table-row:hover { background: var(--row-hover); }
+.pcs-table-cell { min-width: 0; overflow-wrap: anywhere; }
+.pcs-table-cell-label { display: none; }
+.pcs-table-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 8px 14px; border-top: 1px solid var(--line); font-size: 12px; }
+@media (max-width: 640px) {
+  .pcs-table-head { display: none; }
+  .pcs-table-row { grid-template-columns: minmax(0, 1fr) !important; }
+  .pcs-table-cell-label { display: block; color: var(--pc-text-muted, var(--muted)); font-size: 11px; font-weight: 700; }
+}
+
+/* TimeseriesChart */
+.pcs-chart { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.pcs-chart-title { font-family: var(--display); font-weight: 800; font-size: 15px; letter-spacing: -0.01em; }
+.pcs-chart svg { width: 100%; }
+.pcs-chart polyline { stroke: var(--run-fg); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.pcs-chart rect { fill: var(--run-fg); opacity: 0.8; }
+.pcs-chart-axis { color: var(--pc-text-muted, var(--muted)); font-size: 12px; }
+
+/* MarkdownEditor */
+.pcs-editor { display: flex; }
+.pcs-editor-input {
+  width: 100%;
+  min-height: 140px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--r-field);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.pcs-editor--bordered .pcs-editor-input { border: 1px solid var(--edge); background: var(--ground); }
+.pcs-editor-input:focus-visible { outline: 2px solid var(--run-fg); }
+
+/* KeyValueList */
+.pcs-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0; font-size: 13px; }
+.pcs-kv dt { color: var(--pc-text-muted, var(--muted)); font-weight: 600; }
+.pcs-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+/* LogView and JsonTree */
+.pcs-log, .pcs-json {
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  background: var(--code);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.pcs-log-line { display: flex; gap: 10px; }
+.pcs-log-time { color: var(--pc-text-muted, var(--muted)); flex: none; }
+.pcs-log-level { flex: none; width: 3.5em; text-transform: uppercase; color: var(--pc-text-muted, var(--muted)); }
+.pcs-log-line--warn .pcs-log-level { color: var(--amber-fg); }
+.pcs-log-line--error .pcs-log-level, .pcs-log-line--error .pcs-log-message { color: var(--red-fg); }
+.pcs-log-message { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pcs-json { max-height: 20rem; }
+.pcs-json-node { padding-left: 12px; }
+.pcs-json > .pcs-json-node, .pcs-json > .pcs-json-leaf { padding-left: 0; }
+.pcs-json-node > summary { cursor: pointer; margin-left: -12px; }
+.pcs-json-leaf { padding-left: 12px; }
+.pcs-json-key { color: var(--violet-fg); }
+.pcs-json-string { color: var(--green-fg); }
+.pcs-json-number, .pcs-json-boolean { color: var(--run-fg); }
+.pcs-json-null { color: var(--pc-text-muted, var(--muted)); }
+
+/* Spinner */
+.pcs-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--edge);
+  border-top-color: var(--run-fg);
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: pcs-spin 0.8s linear infinite;
+}
+.pcs-spinner--sm { width: 12px; height: 12px; }
+.pcs-spinner--lg { width: 24px; height: 24px; border-width: 3px; }
+@keyframes pcs-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pcs-spinner { animation-duration: 2.4s; } }
+
+/* FileTree */
+.pcs-tree, .pcs-tree ul { list-style: none; margin: 0; padding: 0; }
+.pcs-tree { font-size: 13px; }
+.pcs-tree-row { display: flex; align-items: center; gap: 6px; min-height: 30px; padding-right: 8px; border-radius: var(--r-inner); }
+.pcs-tree-row:hover { background: var(--row-hover); }
+.pcs-tree-row--selected { background: var(--sel); box-shadow: var(--sel-shadow); font-weight: 700; }
+.pcs-tree-row--warning { color: var(--amber-fg); }
+.pcs-tree-row--error { color: var(--red-fg); }
+.pcs-tree-row--muted { color: var(--pc-text-muted, var(--muted)); }
+.pcs-tree-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; border: 0; background: none; padding: 4px 0; color: inherit; font: inherit; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcs-tree--wrap .pcs-tree-name { white-space: normal; overflow-wrap: anywhere; }
+.pcs-tree-caret { width: 12px; flex: none; color: var(--pc-text-muted, var(--muted)); }
+
+/* IssuesList */
+.pcs-issues { display: flex; flex-direction: column; gap: 10px; }
+.pcs-issue-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--r-inner); overflow: hidden; }
+.pcs-issue-list li + li { border-top: 1px solid var(--row-line); }
+.pcs-issue { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 14px; color: var(--text); text-decoration: none; font-size: 13px; }
+.pcs-issue:hover { background: var(--row-hover); }
+.pcs-issue-id { flex: none; color: var(--pc-text-muted, var(--muted)); font-size: 12px; }
+.pcs-issue-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.pcs-capsule { flex: none; width: 6px; height: 16px; border-radius: var(--r-pill); }
+.pcs-capsule--ion { background: var(--g-ion); }
+.pcs-capsule--orchid { background: var(--g-orchid); }
+.pcs-capsule--ember { background: var(--g-ember); }
+.pcs-capsule--flare { background: var(--g-flare); }
+.pcs-capsule--lagoon { background: var(--g-lagoon); }
+.pcs-capsule--ash { background: var(--g-ash); }
+
+/* ManagedRoutinesList */
+.pcs-routines { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--r-inner); }
+.pcs-routine { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 14px; }
+.pcs-routine + .pcs-routine { border-top: 1px solid var(--row-line); }
+.pcs-routine-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 12rem; }
+.pcs-routine-text a { color: var(--text); }
