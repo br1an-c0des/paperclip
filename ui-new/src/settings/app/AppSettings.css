@@ -1,0 +1,459 @@
+/* App settings (boards 28–30). Cards, rows and the rail are the shared settings pieces (Field.css, PageHeader.css); these are the parts inside them. */
+
+.as-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--well);
+  color: var(--body);
+}
+
+.as-admin-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* The rail column: the section links and, under them, the Experimental note */
+.as-rail-col {
+  flex: 0 0 210px;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 14px;
+  min-width: 0;
+}
+
+.as-rail-col .rail {
+  position: static;
+  flex: none;
+}
+
+.as-rail-note {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px dashed var(--edge);
+  border-radius: var(--r-card);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.as-rail-note-title {
+  display: block;
+  font-weight: 600;
+}
+
+@container rail-layout (max-width: 720px) {
+  .as-rail-col {
+    position: static;
+    flex: 1 1 100%;
+  }
+
+  .as-rail-note {
+    display: none;
+  }
+}
+
+.as-sec-title h2 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.as-sec-title p {
+  margin-top: 6px;
+  max-width: 70ch;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.as-empty {
+  padding: 18px 20px;
+  color: var(--muted);
+}
+
+.as-empty-line {
+  padding: 14px 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Save status beside a card's description */
+.as-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.as-save--ok {
+  color: var(--green-fg);
+}
+
+.as-save--error,
+.as-bad {
+  color: var(--red-fg);
+}
+
+.as-spin {
+  animation: as-spin 0.9s linear infinite;
+}
+
+@keyframes as-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .as-spin {
+    animation: none;
+  }
+}
+
+/* Rows and helpers */
+.frow.as-frow-switch {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.as-frow-switch .flabel {
+  padding-top: 0;
+}
+
+.as-inline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  min-width: 0;
+}
+
+.as-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.as-min-34 {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+}
+
+.as-muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.as-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--body);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.as-quiet-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.as-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--run-fg);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.as-link:hover {
+  text-decoration: underline;
+}
+
+.as-field-320 {
+  max-width: 320px;
+}
+
+.as-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 7px;
+  font-size: 13px;
+  list-style: none;
+}
+
+.as-checks li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--body);
+}
+
+.as-checks li svg {
+  flex-shrink: 0;
+  color: var(--green-fg);
+}
+
+.as-checks li.as-check--bad svg {
+  color: var(--red-fg);
+}
+
+.as-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.as-avatar--32,
+.as-logo {
+  width: 32px;
+  height: 32px;
+}
+
+.as-logo {
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Board 29's list row */
+.as-lrow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  min-height: 60px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.settings-rows > .as-lrow:first-child {
+  border-top: 0;
+}
+
+.as-lrow-mark {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.as-lrow-main {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.as-lrow-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+.as-lrow-name {
+  font-weight: 500;
+}
+
+.as-lrow-mono {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.as-lrow-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.as-lrow-end {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 10px;
+  margin-left: auto;
+}
+
+.as-row-note {
+  max-width: 220px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.as-error-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--red-fg);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.as-error-line:hover {
+  text-decoration: underline;
+}
+
+.as-pre {
+  margin: 0;
+  padding: 12px;
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-field);
+  background: var(--ground);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Board 29's grid of other built-in harnesses */
+.as-hgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr));
+  gap: 10px;
+  padding: 16px 20px;
+}
+
+.as-htile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.as-htile-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.as-htile-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.as-htile--off .as-htile-name {
+  color: var(--body);
+}
+
+.as-htile-type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* Install by npm name or folder path, in a card's footer */
+.as-install {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.as-install-field {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.as-install-problem {
+  flex-basis: 100%;
+}
+
+.as-foot-error {
+  margin-right: auto;
+}
+
+/* Admins */
+.as-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  color: var(--muted);
+}
+
+.as-search .input {
+  flex: 1;
+  max-width: 360px;
+}
+
+.as-search + .as-lrow,
+.as-search + p + .as-lrow {
+  border-top: 1px solid var(--line);
+}
+
+.as-access-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 50vh;
+  overflow: auto;
+}
+
+/* A dashed note for what isn't here yet */
+.as-later {
+  padding: 12px 16px;
+  border: 1px dashed var(--edge);
+  border-radius: var(--r-card);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.as-later-title {
+  display: block;
+  color: var(--body);
+  font-weight: 600;
+}
