@@ -127,6 +127,26 @@ export const queryKeys = {
     activeRuns: (companyId: string, connectionId: string) =>
       ["ai-connections", companyId, connectionId, "active-runs"] as const,
   },
+  /**
+   * Apps and tools (src/apps/). Everything sits under `["tools", companyId]`, one connection's
+   * parts under its `connection(companyId, id)` key, so the live events refresh the whole area
+   * with one prefix on any tool activity.
+   */
+  tools: {
+    all: (companyId: string) => ["tools", companyId] as const,
+    gallery: (companyId: string) => ["tools", companyId, "gallery"] as const,
+    applications: (companyId: string) => ["tools", companyId, "applications"] as const,
+    connections: (companyId: string) => ["tools", companyId, "connections"] as const,
+    attention: (companyId: string) => ["tools", companyId, "attention"] as const,
+    profiles: (companyId: string) => ["tools", companyId, "profiles"] as const,
+    policies: (companyId: string) => ["tools", companyId, "policies"] as const,
+    actionRequests: (companyId: string, status: string) => ["tools", companyId, "action-requests", status] as const,
+    emailInboxes: (companyId: string) => ["tools", companyId, "email-inboxes"] as const,
+    connection: (companyId: string, connectionId: string) => ["tools", companyId, "connection", connectionId] as const,
+    /** One part of a connection: "catalog", "installs", "grants". */
+    connectionPart: (companyId: string, connectionId: string, part: string) =>
+      ["tools", companyId, "connection", connectionId, part] as const,
+  },
   sidebarBadges: (companyId: string) => ["sidebar-badges", companyId] as const,
   /**
    * The Inbox (board 14). The feed keeps the old UI's `["attention", companyId]` prefix; an approval

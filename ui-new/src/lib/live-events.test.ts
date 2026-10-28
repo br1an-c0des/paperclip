@@ -83,6 +83,15 @@ describe("keysForEvent", () => {
     }
   });
 
+  it("refreshes Apps on tool activity and AI connections on their changes", () => {
+    const tool = keysForEvent("c1", event("activity.logged", { entityType: "tool_connection", entityId: "t1", action: "tool_gateway.approval_requested" }));
+    expect(tool).toContainEqual(queryKeys.tools.all("c1"));
+    expect(queryKeys.tools.connectionPart("c1", "t1", "catalog").slice(0, 2)).toEqual([...queryKeys.tools.all("c1")]);
+    const ai = keysForEvent("c1", event("activity.logged", { entityType: "company", entityId: "c1", action: "ai_connection.created" }));
+    expect(ai).toEqual(expect.arrayContaining([queryKeys.aiConnections.list("c1"), queryKeys.tools.all("c1")]));
+    expect(keysForEvent("c1", event("activity.logged", { entityType: "issue", entityId: "i1", action: "issue.updated" }))).not.toContainEqual(queryKeys.tools.all("c1"));
+  });
+
   it("leaves streamed run output to subscribers", () => {
     expect(keysForEvent("c1", event("heartbeat.run.log", { runId: "r1" }))).toEqual([]);
   });

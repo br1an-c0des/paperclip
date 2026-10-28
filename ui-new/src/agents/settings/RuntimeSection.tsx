@@ -417,7 +417,7 @@ function SignInRow(props: { agent: AgentDetail }) {
             </Show>
           </Show>
         </Show>
-        <A class="ps-link" href={`/${company().issuePrefix}/connectors`}>
+        <A class="ps-link" href={`/${company().issuePrefix}/apps/ai`}>
           Manage connections
         </A>
       </div>

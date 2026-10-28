@@ -55,6 +55,13 @@ function changesAttention(action: string | null) {
 /** Query keys an `activity.logged` event affects, by the entity it's about and what was done. */
 function activityKeys(companyId: string, entityType: string | null, entityId: string | null, action: string | null): QueryKey[] {
   const keys: QueryKey[] = [queryKeys.activity(companyId), queryKeys.dashboard(companyId), queryKeys.sidebarBadges(companyId)];
+  // Apps and tools (src/apps/): connections, their tools, profiles, policies and Ask-first requests
+  // are logged on `tool_*` entities; one prefix covers every Apps query for the company.
+  if (entityType?.startsWith("tool_")) keys.push(queryKeys.tools.all(companyId));
+  // AI connections (Apps → AI connections), as the old UI's live updates refresh them.
+  if (action?.startsWith("ai_connection.") || action?.startsWith("connection_grant.")) {
+    keys.push(queryKeys.aiConnections.list(companyId), queryKeys.tools.all(companyId));
+  }
   switch (entityType) {
     case "issue":
       keys.push(queryKeys.issues.list(companyId), queryKeys.companies.stats);

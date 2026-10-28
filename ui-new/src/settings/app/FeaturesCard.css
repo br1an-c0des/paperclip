@@ -1,0 +1,59 @@
+/* App settings → General → Features (FeaturesCard.tsx): grouped switch rows inside one settings card. */
+
+.ft-group + .ft-group {
+  border-top: 1px solid var(--line);
+}
+
+.ft-group-title {
+  padding: 14px 20px 0;
+}
+
+.ft-group .ft-row:first-of-type {
+  border-top: 0;
+  padding-top: 8px;
+}
+
+.ft-name {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.ft-managed {
+  gap: 4px;
+  color: var(--muted);
+}
+
+.ft-needs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.ft-need {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--green-bg);
+  color: var(--green-fg);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ft-need--off {
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+}
+
+.ft-note {
+  color: var(--body);
+}

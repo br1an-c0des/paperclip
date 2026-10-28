@@ -8,7 +8,6 @@ import { GrainFilter } from "@/ui/Grain";
 import { ToastViewport } from "@/ui/Toast";
 import { Companies, CompanyRootRedirect } from "./routes/Companies";
 import { CompanyLayout } from "./routes/CompanyLayout";
-import { ConnectorsPage } from "./connectors/ConnectorsPage";
 import { NotBuiltYet, NotFound } from "./routes/NotFound";
 import { InboxPage } from "./inbox/InboxPage";
 import { OrgDashboard, OrgRedirect } from "./org/OrgDashboard";
@@ -30,6 +29,14 @@ import { ActivityPage } from "./activity/ActivityPage";
 import { LegacyActivityRedirect, UnprefixedCompanyRedirect } from "./activity/redirects";
 import { SkillsPage } from "./skills/SkillsPage";
 import { PluginPageRoute } from "./plugins/PluginPage";
+import { AppsPage, ConnectorsRedirect } from "./apps/AppsPage";
+import { BoardClaimPage } from "./auth/BoardClaim";
+import { ChatIdentityPage } from "./auth/ChatIdentity";
+import { CliAuthPage } from "./auth/CliAuth";
+import { InvitePage } from "./auth/Invite";
+import { AssistantConnectionsPage, McpConnectPage, McpDevicePage } from "./auth/McpConnect";
+import { OAuthHandoffPage } from "./auth/OAuthHandoff";
+import { OnboardingPage } from "./onboarding/OnboardingPage";
 
 const StyleGuide = lazy(() => import("./routes/StyleGuide").then((m) => ({ default: m.StyleGuide })));
 
@@ -38,8 +45,11 @@ const StyleGuide = lazy(() => import("./routes/StyleGuide").then((m) => ({ defau
  * …): agents, Slack messages and emails link to them. Pages that don't exist yet render
  * <NotBuiltYet> inside the shell rather than a 404.
  *
- * `/style-guide` and `/auth` sit outside the session gate; everything else needs a session (or a
- * local_trusted instance).
+ * `/style-guide`, sign-in and the other pages someone may open before they belong to a company sit
+ * outside the session gate, as in the old UI: board claim, CLI approval, invites, MCP connect, the
+ * Cloud sign-in handoff and chat-identity linking (which checks the session itself, since a
+ * non-member may ask for access there). Each decides what needs a session. Everything else needs a
+ * session (or a local_trusted instance), onboarding included.
  */
 
 function Root(props: RouteSectionProps) {
@@ -59,13 +69,26 @@ export function App() {
       <Router root={Root}>
         <Route path="/style-guide" component={StyleGuide} />
         <Route path="/auth" component={SignIn} />
+        <Route path="/board-claim/:token" component={BoardClaimPage} />
+        <Route path="/cli-auth/:id" component={CliAuthPage} />
+        <Route path="/invite/:token" component={InvitePage} />
+        <Route path="/mcp-connect/:id" component={() => <McpConnectPage />} />
+        <Route path="/dot-connect/:id" component={() => <McpConnectPage agentPairingOnly />} />
+        <Route path="/mcp-device" component={McpDevicePage} />
+        <Route path="/assistant-connections" component={AssistantConnectionsPage} />
+        <Route path="/oauth-handoff" component={OAuthHandoffPage} />
+        <Route path="/chat-identity/confirm" component={ChatIdentityPage} />
         <Route path="/" component={SessionGate}>
           <Route path="/" component={CompanyRootRedirect} />
           <Route path="/companies" component={Companies} />
+          {/* Standalone pages outside the company shell; `/:prefix/onboarding` outranks the layout route. */}
+          <Route path={["/onboarding", "/:companyPrefix/onboarding"]} component={OnboardingPage} />
           {/* The old UI's unprefixed hire link opens New agent in the last company. */}
           <Route path="/agents/new" component={UnprefixedNewAgent} />
           {/* The old UI's unprefixed skills, activity and costs links open in the last company. */}
           <Route path={["/skills/*", "/activity/*", "/audit/*", "/costs", "/budgets"]} component={UnprefixedCompanyRedirect} />
+          {/* The old UI's unprefixed apps links (and OAuth returns) open in the last company too. */}
+          <Route path="/apps/*" component={UnprefixedCompanyRedirect} />
           {/* The old UI's unprefixed instance-settings addresses open App settings in the last company. */}
           {/* `/instance/settings/*` must outrank the company's `/:companyPrefix/instance/*`. */}
           <Route path={["/instance", "/instance/settings/*rest", "/settings/*rest"]} component={UnprefixedSettingsRedirect} />
@@ -90,7 +113,9 @@ export function App() {
             <Route path="/company/settings/*rest" component={CompanySettingsPage} />
             <Route path="/company/export/*" component={() => <CompanyTransferRedirect kind="export" />} />
             <Route path="/company/import" component={() => <CompanyTransferRedirect kind="import" />} />
-            <Route path="/connectors" component={ConnectorsPage} />
+            {/* Apps and tools; the temporary Connectors page became Apps → AI connections. */}
+            <Route path="/apps/*rest" component={AppsPage} />
+            <Route path="/connectors" component={ConnectorsRedirect} />
             <Route path="/search" component={SearchPage} />
             <Route path="/workload" component={CompanyWorkload} />
             <Route path="/skills/*rest" component={SkillsPage} />

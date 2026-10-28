@@ -61,6 +61,8 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 32 | [Gaps found building app settings](#32-gaps-found-building-app-settings) | Instance settings, experimental flags | Open | Oct 27, 2026 |
 | 33 | [Gaps found building company settings](#33-gaps-found-building-company-settings) | Company settings | Open | Oct 27, 2026 |
 | 34 | [Gaps found building Skills and Activity](#34-gaps-found-building-skills-and-activity) | Skills, Activity and costs | Open | Oct 27, 2026 |
+| 35 | [Gaps found building Apps and tools](#35-gaps-found-building-apps-and-tools) | Apps and tools | Open | Oct 28, 2026 |
+| 36 | [Gaps found building onboarding and the pages outside a company](#36-gaps-found-building-onboarding-and-the-pages-outside-a-company) | Companies and onboarding, sign-in and connect flows | Open | Oct 28, 2026 |
 
 ## Entries
 
@@ -1079,7 +1081,10 @@ Both are handled in `ui-new` for now.
   and runtime flags) have no switch in `ui-new` yet. **Decided Oct 28:** the sorting stands (about
   11 dropped, 4 built in, the rest following the setting), and App settings → General gets one
   "Features" card with plain switches for only the server-enforced flags someone may still want to
-  change (M6 round 2).
+  change (M6 round 2). Built: 22 switches in five groups. Beyond the first list it includes
+  Simplified English requests and Plan the first task, which the server enforces and the old UI
+  switches. `enableAgentChat` isn't shown (always on, decision A). `features-model.ts` records every
+  left-out flag with its reason, and its test fails when upstream adds a flag that isn't sorted.
 - **Board 28's public URL, "auth secret is set" and "invite used by"** aren't in `GET /api/health`.
 - **No instance-wide harness usage count.** Counts come from each organization's agents the viewer
   can open.
@@ -1119,3 +1124,41 @@ Both are handled in `ui-new` for now.
 - **Authored skills carry `sourceBadge: "paperclip"`** like bundled ones; the origin is worked out from
   the `company/` key or a fork.
 
+### 35. Gaps found building Apps and tools
+
+- **Status:** Open
+- **Area:** Tier 2 "Apps and tools" ([decision 23](#23-gaps-found-building-the-temporary-connectors-page) covers AI connections)
+- **Found in:** the org header's Apps tab (M6 round 2).
+
+- **App logos are served from the old UI's files.** The gallery's `branding.logoUrl` points at
+  `/brands/apps/*.svg` in `ui/public`. `ui-new`'s Vite config serves that folder in dev and preview
+  and copies it into `dist/brands` at build, so the deploy image has them; `ui/public/brands` stays
+  the one copy.
+- **No request lists a connection's tools, profiles and policies together.** A connection's page
+  loads the company's profiles and policies (`GET tools/profiles`, `GET tools/policies`) and filters
+  them in the browser.
+- **Who created a shared connection** comes only as `createdByUserId`, looked up in the company
+  directory (as in decision 23).
+- **Every permission save sends the whole set again** through `/finish`, as the old UI does; there's
+  no request to change one action.
+- **App-definition helpers** (`getRecommendedConnectionMethod`, `connectionMethodSupportsAutomaticOAuth`,
+  `humanizeConnectionDisplayName` and others) are copied into `apps-model.ts`, in the style of
+  [decision 10](#10-some-response-types-arent-exported-from-the-shared-package), rather than imported at
+  run time.
+
+### 36. Gaps found building onboarding and the pages outside a company
+
+- **Status:** Open
+- **Area:** Tier 2 "Companies and onboarding", "Sign-in and connect flows (outside a company)"
+- **Found in:** onboarding, sign-up, claims, CLI auth, invites and MCP connect (M6 round 2).
+
+- **Only an instance admin or a local board can create an organization** (`POST /api/companies`
+  answers 403 otherwise). Onboarding and New organization say so rather than offering it.
+- **Whether sign-up is allowed isn't exposed** (`PAPERCLIP_AUTH_DISABLE_SIGN_UP` isn't in
+  `GET /api/health`). As in the old UI, the form is always offered and the server's refusal shown.
+- **The MCP routes aren't mounted without a public URL** (`PAPERCLIP_PUBLIC_URL`); they answer 404
+  "API route not found", and 503 `temporarily_unavailable` when `enablePublicMcp` is off. No request
+  says why, so the page infers it from those answers.
+- **Response types for invites, chat-identity links, board claims and CLI auth challenges** aren't in
+  `@paperclipai/shared`; they're declared in the new API modules
+  ([decision 10](#10-some-response-types-arent-exported-from-the-shared-package)).

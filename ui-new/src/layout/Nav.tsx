@@ -266,10 +266,10 @@ export function Nav() {
       <NavPlugins />
 
       <div class="nav-group">
-        {/* Temporary: the Connectors page stands in for M6's Apps and tools. */}
-        <A class="navi" href={`${base()}/connectors`}>
+        {/* Was the temporary Connectors page; Apps and tools (the org's Apps tab) took its place. */}
+        <A class="navi" href={`${base()}/apps`}>
           <Plug size={16} aria-hidden="true" />
-          Connectors
+          Apps
         </A>
       </div>
 

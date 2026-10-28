@@ -11,7 +11,6 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useLabelsQuery, useProjectsQuery } from "@/lib/company-data";
 import { hasOpenDialog, isTextInputTarget } from "@/lib/shortcuts";
 import { useChatIndex } from "@/chat/chat-index";
-import { chatPath } from "@/chat/chat-model";
 import { useTaskPeople, type TaskPeople } from "@/tasks/people";
 import { Button } from "@/ui/Button";
 import {
@@ -31,7 +30,7 @@ import {
 } from "./filters";
 import { parseQuery, stripFilters, type ParserContext } from "./query-parser";
 import { loadRecent, pushRecent } from "./recent";
-import { enterTarget, groupResults, kindOfScope, resultIssueId, resultTask, scopeTabs, shownResults, type ResultSection } from "./results-model";
+import { chatResultHref, enterTarget, groupResults, kindOfScope, resultIssueId, resultTask, scopeTabs, shownResults, type ResultSection } from "./results-model";
 import { FacetColumn, FilterChips, FilterMenu, SortMenu, TypedFiltersTip } from "./SearchControls";
 import { SearchRow } from "./SearchRow";
 import { readSearchState, searchPath, type SearchState } from "./search-url";
@@ -49,7 +48,8 @@ import "./Search.css";
  * - With nothing found, the response's `zeroResults` offers filters to drop (S3).
  * - A task, a comment or document on a task, or a file opens its task in the task modal, as on
  *   other pages without a task list; agents and projects go to their pages. Results from your
- *   chats with agents show as chats and open the chat (decision 8).
+ *   chats with agents show as chats and open the chat (decision 8), with the document open when the
+ *   result was found in one.
  * - Keys: `/` focuses the box, ↓ moves into the results and ↑/↓ through them, Enter opens (from the
  *   box: the task whose ID was typed, or the first result), Escape clears the box.
  *
@@ -206,7 +206,7 @@ export function SearchPage() {
 
   const open = (result: CompanySearchResult) => {
     const agent = chatAgent(result);
-    if (agent) return navigate(chatPath(company().issuePrefix, agent.urlKey));
+    if (agent) return navigate(chatResultHref(company().issuePrefix, agent.urlKey, result));
     const task = resultTask(result);
     if (task) commands.openTaskModal(task);
     else navigate(result.href);
@@ -463,7 +463,7 @@ function ResultGroup(props: {
               projectName={props.projectName}
               onOpen={props.onOpen}
               chatAgent={props.chatAgent(result)}
-              chatHref={props.chatAgent(result) ? chatPath(company().issuePrefix, props.chatAgent(result)!.urlKey) : undefined}
+              chatHref={props.chatAgent(result) ? chatResultHref(company().issuePrefix, props.chatAgent(result)!.urlKey, result) : undefined}
             />
           )}
         </For>

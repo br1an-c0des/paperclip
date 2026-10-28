@@ -1,0 +1,252 @@
+/* Pages outside a company: the frame, facts, notes, the sign-in form and option rows. */
+
+.stand {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+}
+
+.stand-card {
+  width: min(460px, 100%);
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stand-card--wide {
+  width: min(560px, 100%);
+}
+
+.stand-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.stand-mark {
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+.stand-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.stand-head h1 {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.stand-lede {
+  margin-top: -4px;
+  color: var(--body);
+  line-height: 1.55;
+}
+
+.stand-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.stand-facts > div {
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+  min-width: 0;
+}
+
+.stand-facts dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.stand-facts dd {
+  margin: 3px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.stand-note {
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.stand-note[data-tone="run"] {
+  background: var(--run-bg);
+  color: var(--run-fg);
+}
+
+.stand-note[data-tone="amber"] {
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+}
+
+.stand-note[data-tone="red"] {
+  background: var(--red-bg);
+  color: var(--red-fg);
+}
+
+.stand-note[data-tone="green"] {
+  background: var(--green-bg);
+  color: var(--green-fg);
+}
+
+.stand-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.stand-actions--end {
+  justify-content: flex-end;
+}
+
+.stand-actions--split {
+  justify-content: space-between;
+}
+
+.stand-muted {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.stand-body {
+  color: var(--body);
+  line-height: 1.55;
+}
+
+.stand-code {
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  background: var(--code);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.stand-link {
+  color: var(--run-fg);
+  font-weight: 600;
+  text-decoration: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.stand-link:hover {
+  text-decoration: underline;
+}
+
+.stand-link:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.stand-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stand-switch {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Option rows: a radio or checkbox, chosen = run tone. */
+.stand-options {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stand-options legend {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.stand-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.stand-option:has(input:checked) {
+  background: var(--run-bg);
+  border-color: var(--run-fg);
+}
+
+.stand-option input {
+  accent-color: var(--run-fg);
+  margin: 0;
+}
+
+.stand-option:has(input:disabled) {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.stand-origin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.stand-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stand-item {
+  padding: 14px 16px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stand-item h2 {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.stand-select {
+  width: 100%;
+}

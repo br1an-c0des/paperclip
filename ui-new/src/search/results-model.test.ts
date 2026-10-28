@@ -5,6 +5,7 @@ import {
   enterTarget,
   groupResults,
   highlightSegments,
+  chatResultHref,
   chatWhere,
   resultIssueId,
   resultKind,
@@ -188,5 +189,15 @@ describe("chat results", () => {
     expect(resultIssueId({ ...issue("TES-13"), issue: undefined, artifact: { issueId: "chat-1" } } as unknown as CompanySearchResult)).toBe("chat-1");
     expect(chatWhere("comment", "Bob")).toBe("Message in your chat with Bob");
     expect(chatWhere("task", "Bob")).toBe("Your chat with Bob");
+  });
+
+  it("opens a chat at the document a result was found in, and drops other fragments", () => {
+    const doc = issue("TES-13", { href: "/TES/issues/TES-13#document-plan" });
+    expect(chatResultHref("TES", "bob", doc)).toBe("/TES/agents/bob#document-plan");
+    const encoded = issue("TES-13", { href: "/TES/issues/TES-13#document-release%20notes" });
+    expect(chatResultHref("TES", "bob", encoded)).toBe("/TES/agents/bob#document-release%20notes");
+    const comment = issue("TES-13", { href: "/TES/issues/TES-13#comment-c1" });
+    expect(chatResultHref("TES", "bob", comment)).toBe("/TES/agents/bob");
+    expect(chatResultHref("TES", "bob", issue("TES-13"))).toBe("/TES/agents/bob");
   });
 });

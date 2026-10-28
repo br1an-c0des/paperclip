@@ -17,13 +17,15 @@ import {
   signInChecks,
   type InstanceHealth,
 } from "./app-settings-model";
+import { FeaturesCard } from "./FeaturesCard";
 import { SaveNote, SectionTitle, StatePill, SwitchRow, useSaver } from "./shared";
 
 /*
- * General (board 28): how this instance is deployed, its privacy defaults and its backups.
- * Deployment and sign-in come from `GET /api/health` and are set in the server's configuration, so
- * they're read-only. Privacy and backups save as you change them
- * (`PATCH /api/instance/settings/general`). An operator can hide each card with
+ * General (board 28): how this instance is deployed, its privacy defaults, its backups and its
+ * features. Deployment and sign-in come from `GET /api/health` and are set in the server's
+ * configuration, so they're read-only. Privacy and backups save as you change them
+ * (`PATCH /api/instance/settings/general`). Features switches the server-enforced experimental
+ * flags (decision 32; FeaturesCard.tsx). An operator can hide each card, or each feature, with
  * `PAPERCLIP_HIDDEN_SETTINGS`, as in the old UI.
  */
 
@@ -52,7 +54,7 @@ export function GeneralSection() {
 
   return (
     <>
-      <SectionTitle title="General">How this instance is deployed, its privacy defaults, and its backups. They apply to every organization on this server.</SectionTitle>
+      <SectionTitle title="General">How this instance is deployed, its privacy defaults, its backups and its features. They apply to every organization on this server.</SectionTitle>
 
       <Show when={!hidden().has("instance.general.deploymentStatus")}>
         <SettingsCard title="Deployment and sign-in" description="Set in the server's configuration when it starts. Shown here so you can check it.">
@@ -161,6 +163,8 @@ export function GeneralSection() {
           </For>
         </SettingsCard>
       </Show>
+
+      <FeaturesCard hidden={hidden()} />
     </>
   );
 }
