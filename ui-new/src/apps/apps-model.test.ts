@@ -115,7 +115,8 @@ describe("gallery", () => {
       app({ slug: "composio", name: "Composio" }),
       app({ slug: "memory", name: "Memory", experimentalFeatureKey: "enableMemoryConnectors" as AppDefinition["experimentalFeatureKey"] }),
     ];
-    expect(galleryApps(apps, {}).map((entry) => entry.slug)).toEqual(["star", "alpha", "zeta"]);
+    // Composio, Arcade, Google Workspace and AgentMail have their setups since M6 round 3.
+    expect(galleryApps(apps, {}).map((entry) => entry.slug)).toEqual(["star", "alpha", "composio", "zeta"]);
     expect(galleryApps(apps, { enableMemoryConnectors: true }).map((entry) => entry.slug)).toContain("memory");
   });
 

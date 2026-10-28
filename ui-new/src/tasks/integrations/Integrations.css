@@ -1,0 +1,153 @@
+/* A task's chat conversation, email thread and browser (src/tasks/integrations/), on TaskNotices' rows */
+.ti .tn-row { align-items: flex-start; }
+.ti .tn-action { align-self: center; flex-wrap: wrap; }
+
+.ti-meta {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.ti-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--body);
+}
+.ti-note[data-tone="success"] { color: var(--green-fg); }
+.ti-note[data-tone="warn"] { color: var(--amber-fg); }
+.ti-note[data-tone="error"] { color: var(--red-fg); }
+
+/* Send to the chat conversation */
+.ti-compose {
+  flex: 1 0 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+}
+.ti-compose-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* Email thread */
+.ti-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ti-inbox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+  font-size: 13px;
+}
+.ti-inbox-actions { display: flex; gap: 6px; }
+
+.ti-mail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: var(--r-inner);
+  background: var(--card);
+  border: 1px solid var(--line);
+  font-size: 13px;
+}
+.ti-mail--send { border-style: dashed; }
+.ti-mail-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.ti-mail-head b { overflow-wrap: anywhere; }
+.ti-mail-subject { margin: 0; font-weight: 700; }
+.ti-mail-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.ti-mail-foot {
+  margin: 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+.ti-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--well);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.ti-tag[data-tone="amber"] { background: var(--amber-bg); color: var(--amber-fg); }
+.ti-files { display: flex; flex-wrap: wrap; gap: 6px; }
+.ti-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--r-inner);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--body);
+}
+.ti-details { font-size: 12px; color: var(--muted); }
+.ti-details summary { cursor: pointer; }
+.ti-details > * + * { margin-top: 8px; }
+.ti-break { overflow-wrap: anywhere; }
+
+/* Live browser */
+.ti-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ti-viewer-pane {
+  position: relative;
+  height: min(70vh, 720px);
+  border-radius: var(--r-inner);
+  background: var(--well);
+  overflow: hidden;
+}
+.ti-viewer-pane iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.ti-viewer-state {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.ti-viewer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.ti-viewer-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .ti-viewer-pane { height: 60vh; }
+  .ti-viewer-actions { margin-left: 0; }
+}
