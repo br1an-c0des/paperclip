@@ -10,7 +10,7 @@ import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Field, TextArea } from "@/ui/Field";
 import { pushToast } from "@/ui/Toast";
-import { branchStateLines, canManageRuntime, readDivergence, reconcileOptions, reconcileWorkspaceId, shortSha, VERDICT, type Divergence } from "./branch-reconcile";
+import { branchStateLines, canManageRuntime, readableGit, readDivergence, reconcileOptions, reconcileWorkspaceId, shortSha, VERDICT, type Divergence } from "./branch-reconcile";
 import "./TaskBranch.css";
 
 /*
@@ -34,7 +34,7 @@ export function TaskBranch(props: { task: Issue; workspaceId: string }) {
   const access = createQuery(() => ({ queryKey: queryKeys.access.currentBoardAccess, queryFn: accessApi.currentBoardAccess, retry: false }));
   const divergence = () => readDivergence(props.task.activeRecoveryAction);
   const options = () => (divergence() ? reconcileOptions(divergence()!, canManageRuntime(company().id, access.data)) : null);
-  const git = () => readiness.data?.git ?? null;
+  const git = () => readableGit(readiness.data?.git);
   const [confirming, setConfirming] = createSignal<Mode | null>(null);
   const [reason, setReason] = createSignal("");
   const [pending, setPending] = createSignal(false);

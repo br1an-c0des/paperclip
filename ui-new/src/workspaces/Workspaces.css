@@ -133,13 +133,15 @@
 .ws-props {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
+  line-height: 20px;
   gap: 6px 8px;
   margin: 0;
   font-size: 13px;
 }
 
 .ws-props dt {
+  height: 20px;
   display: grid;
   place-items: center;
   color: var(--muted);
@@ -147,9 +149,8 @@
 
 .ws-props dd {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
-  flex-wrap: wrap;
   min-width: 0;
   margin: 0;
   color: var(--body);
@@ -160,9 +161,14 @@
   overflow-wrap: anywhere;
 }
 
+.ws-props dd > span:not(.ws-value) {
+  flex-shrink: 0;
+}
+
 .ws-copy {
-  width: 22px;
-  height: 22px;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -175,6 +181,7 @@
 }
 
 .ws-url {
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 4px;

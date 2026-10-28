@@ -23,6 +23,13 @@ import "./FeedbackVotes.css";
 
 type Pending = { vote: FeedbackVoteValue; reason?: string; thenAskReason?: boolean };
 
+// The open question and note live outside the component, by comment: the thread redraws its
+// comments when its data refreshes, which would otherwise close them under the reader.
+const [askFor, setAskFor] = createSignal<{ commentId: string; pending: Pending } | null>(null);
+/** The note after a thumbs down, with the vote's sharing, which the note is saved with. */
+const [noteFor, setNoteFor] = createSignal<{ commentId: string; allowSharing: boolean } | null>(null);
+const [noteText, setNoteText] = createSignal("");
+
 export function FeedbackVotes(props: { taskId: string; commentId: string; youId: string | null }) {
   const client = useQueryClient();
   const company = useCompany();
@@ -40,11 +47,17 @@ export function FeedbackVotes(props: { taskId: string; commentId: string; youId:
   const preference = (): FeedbackDataSharingPreference => general.data?.feedbackDataSharingPreference ?? "prompt";
   const mine = () => votesByComment(votes.data).get(props.commentId) ?? null;
   const [saving, setSaving] = createSignal(false);
-  const [asking, setAsking] = createSignal<Pending | null>(null);
-  const [reasonOpen, setReasonOpen] = createSignal(false);
-  const [reason, setReason] = createSignal("");
-  // The sharing answer given for this comment's vote, reused when its note is saved.
-  const [sharing, setSharing] = createSignal<boolean | null>(null);
+  const asking = () => {
+    const open = askFor();
+    return open?.commentId === props.commentId ? open.pending : null;
+  };
+  const setAsking = (pending: Pending | null) => setAskFor(pending ? { commentId: props.commentId, pending } : null);
+  const reasonOpen = () => noteFor()?.commentId === props.commentId;
+  const setReasonOpen = (open: boolean) => {
+    if (!open) setNoteFor(null);
+  };
+  const reason = noteText;
+  const setReason = setNoteText;
 
   const save = async (vote: FeedbackVoteValue, allowSharing: boolean, note?: string) => {
     const key = queryKeys.issues.feedbackVotes(props.taskId);
@@ -60,7 +73,6 @@ export function FeedbackVotes(props: { taskId: string; commentId: string; youId:
         ...(note ? { reason: note } : {}),
         ...(allowSharing ? { allowSharing: true } : {}),
       });
-      setSharing(allowSharing);
       pushToast({ tone: "success", title: savedVoteTitle(atSubmit, allowSharing) });
       void client.invalidateQueries({ queryKey: key });
       // Answering the question saves the instance's setting; sharing can also turn the company's on.
@@ -76,21 +88,23 @@ export function FeedbackVotes(props: { taskId: string; commentId: string; youId:
     }
   };
 
-  /** Votes, asking about sharing first when the setting says to ask. */
+  /**
+   * Votes, asking about sharing first when the setting says to ask. A thumbs down then asks what
+   * could have been better, at once when nothing needs asking first.
+   */
   const vote = async (pending: Pending) => {
-    const known = sharing();
-    const rule = known === null ? voteSharing(preference()) : { allowSharing: known };
+    const rule = voteSharing(preference());
     if (rule === "ask") {
       setAsking(pending);
       return;
     }
-    const saved = await save(pending.vote, rule.allowSharing, pending.reason);
-    if (saved && pending.thenAskReason) openReason();
+    if (pending.thenAskReason) openReason(rule.allowSharing);
+    await save(pending.vote, rule.allowSharing, pending.reason);
   };
 
-  const openReason = () => {
+  const openReason = (allowSharing: boolean) => {
     setReason("");
-    setReasonOpen(true);
+    setNoteFor({ commentId: props.commentId, allowSharing });
   };
 
   const answer = async (allowSharing: boolean) => {
@@ -99,14 +113,15 @@ export function FeedbackVotes(props: { taskId: string; commentId: string; youId:
     const saved = await save(pending.vote, allowSharing, pending.reason);
     if (!saved) return;
     setAsking(null);
-    if (pending.thenAskReason) openReason();
+    if (pending.thenAskReason) openReason(allowSharing);
   };
 
   const saveNote = async () => {
     const note = reason().trim();
-    if (!note) return;
-    setReasonOpen(false);
-    await vote({ vote: "down", reason: note });
+    const open = noteFor();
+    if (!note || !open) return;
+    setNoteFor(null);
+    await save("down", open.allowSharing, note);
   };
 
   return (
@@ -137,7 +152,6 @@ export function FeedbackVotes(props: { taskId: string; commentId: string; youId:
           aria-pressed={mine()?.vote === "down"}
           aria-label="Needs work"
           title="Needs work"
-          disabled={saving()}
         >
           <ThumbsDown size={14} aria-hidden="true" />
         </Popover.Trigger>

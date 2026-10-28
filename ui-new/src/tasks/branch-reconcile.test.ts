@@ -1,6 +1,6 @@
 import type { ExecutionWorkspaceCloseGitReadiness, IssueRecoveryAction } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { branchStateLines, canManageRuntime, readDivergence, reconcileOptions, reconcileWorkspaceId } from "./branch-reconcile";
+import { branchStateLines, canManageRuntime, readableGit, readDivergence, reconcileOptions, reconcileWorkspaceId } from "./branch-reconcile";
 
 const action = (validation: Record<string, unknown>, overrides: Partial<IssueRecoveryAction> = {}) =>
   ({
@@ -94,6 +94,12 @@ describe("branchStateLines", () => {
     createdByRuntime: true,
     ...overrides,
   });
+  it("drops git state that couldn't be read", () => {
+    expect(readableGit(git({ repoRoot: null, branchName: null }))).toBeNull();
+    expect(readableGit(git())).not.toBeNull();
+    expect(readableGit(null)).toBeNull();
+  });
+
   it("says where the branch stands", () => {
     expect(branchStateLines(git())).toEqual(["2 ahead, 1 behind main", "No uncommitted changes"]);
     expect(branchStateLines(git({ aheadCount: 0, behindCount: 0, isMergedIntoBase: true, dirtyEntryCount: 1, untrackedEntryCount: 2 }))).toEqual([

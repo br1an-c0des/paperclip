@@ -130,6 +130,11 @@ export function canManageRuntime(companyId: string, access: unknown) {
   return membership.membershipRole !== "viewer" && membership.membershipRole != null;
 }
 
+/** The close check's git state, unless git couldn't be read there (no repository, no branch). */
+export function readableGit(git: ExecutionWorkspaceCloseGitReadiness | null | undefined) {
+  return git && (git.repoRoot || git.branchName) ? git : null;
+}
+
 /** The repository's state in a few words: ahead and behind its base, and uncommitted files. */
 export function branchStateLines(git: ExecutionWorkspaceCloseGitReadiness) {
   const lines: string[] = [];
