@@ -57,6 +57,7 @@ const HARNESS_LABELS: Record<string, string> = {
   cursor_cloud: "Cursor Cloud",
   openclaw_gateway: "OpenClaw Gateway",
   acpx_local: "ACPX (retired)",
+  paperclip_runner: "Paperclip Runner",
   process: "Process",
   http: "HTTP",
   copilot: "GitHub Copilot",

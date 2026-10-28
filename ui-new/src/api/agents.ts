@@ -89,7 +89,15 @@ export type AdapterInfo = {
   disabled: boolean;
   /** False when the harness's package failed to load on the server. */
   loaded?: boolean;
+  /** An external package registered under a built-in harness's type, replacing it. */
   overriddenBuiltin?: boolean;
+  /** For an override: paused, so the built-in harness runs instead. */
+  overridePaused?: boolean;
+  /** External harnesses: the npm package (or local folder) and its installed version. */
+  packageName?: string;
+  version?: string;
+  isLocalPath?: boolean;
+  modelsCount?: number;
   supportedRunners?: AgentRunner[];
   defaultRunner?: AgentRunner;
   capabilities: {
@@ -98,6 +106,31 @@ export type AdapterInfo = {
     supportsLocalAgentJwt: boolean;
     supportsAcp: boolean;
   };
+};
+
+/** `POST /adapters/install`: what the server registered. */
+export type AdapterInstallResult = { type: string; packageName: string; version?: string; installedAt: string };
+
+/**
+ * The instance's harnesses, as App settings manages them (ui/src/api/adapters.ts). Instance admins
+ * only. Turning a harness off hides it when hiring; agents already using it keep it. An external
+ * package that replaces a built-in harness is paused instead, which brings the built-in back.
+ */
+export const adaptersApi = {
+  /** Every registered harness, without a company's runner availability. */
+  list: (signal?: AbortSignal) => api.get<AdapterInfo[]>("/adapters", { signal }),
+  install: (params: { packageName: string; version?: string; isLocalPath?: boolean }) =>
+    api.post<AdapterInstallResult>("/adapters/install", params),
+  remove: (type: string) => api.delete<{ type: string; removed: boolean }>(`/adapters/${encodeURIComponent(type)}`),
+  setDisabled: (type: string, disabled: boolean) =>
+    api.patch<{ type: string; disabled: boolean; changed: boolean }>(`/adapters/${encodeURIComponent(type)}`, { disabled }),
+  setOverridePaused: (type: string, paused: boolean) =>
+    api.patch<{ type: string; paused: boolean; changed: boolean }>(`/adapters/${encodeURIComponent(type)}/override`, { paused }),
+  /** Loads the package again from disk, such as a local folder's new build. */
+  reload: (type: string) => api.post<{ type: string; version?: string; reloaded: boolean }>(`/adapters/${encodeURIComponent(type)}/reload`, {}),
+  /** Pulls the latest version from npm and swaps it in; agents use it from their next run. */
+  reinstall: (type: string) =>
+    api.post<{ type: string; version?: string; reinstalled: boolean }>(`/adapters/${encodeURIComponent(type)}/reinstall`, {}),
 };
 
 /** `GET /companies/:id/primary-agent/me` (ui/src/api/primaryAgent.ts). */

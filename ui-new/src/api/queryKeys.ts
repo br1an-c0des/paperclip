@@ -207,4 +207,24 @@ export const queryKeys = {
     /** A chat reply's run events, as the live reply reads them. */
     replyEvents: (runId: string) => ["heartbeat-run", runId, "chat-reply-events"] as const,
   },
+
+  /*
+   * App settings (M6, boards 28–30; src/settings/app/), in the old UI's shapes: harnesses under
+   * `["adapters"]`, which also reaches the hiring menus' availability (`agents.adapters`); plugins
+   * under `["plugins"]`, which the live events refresh; people under `["access"]`; the whole
+   * organization directory under `["companies"]`, so anything refreshing companies refreshes it.
+   * The general and experimental settings use `instance`, and harness usage counts each company's
+   * `agents.list`.
+   */
+  instanceSettings: {
+    adapters: ["adapters"] as const,
+    plugins: ["plugins"] as const,
+    bundledPlugins: ["plugins", "examples"] as const,
+    profile: ["auth", "profile"] as const,
+    adminUsers: (query: string) => ["access", "admin-users", query] as const,
+    userCompanyAccess: (userId: string) => ["access", "user-company-access", userId] as const,
+    companyDirectory: ["companies", "directory"] as const,
+    /** The latest version of an npm package, for an installed harness's Update button. */
+    npmLatest: (packageName: string) => ["npm-latest-version", packageName] as const,
+  },
 };
