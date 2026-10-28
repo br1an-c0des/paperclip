@@ -1,3 +1,4 @@
+import { builtInSkill, PAPERCLIP_CORE_SKILL_KEY, recommendedForLeads } from "@/agents/agent-model";
 import type { Agent, CompanySkillCreateRequest, CompanySkillFileInventoryEntry, CompanySkillListItem, CompanySkillVersion, SkillSource } from "@paperclipai/shared";
 
 /*
@@ -33,28 +34,17 @@ export function skillsView(rest: string): SkillsView {
 // Where a skill comes from
 
 /**
- * The core Paperclip skills, as the server lists them (`PAPERCLIP_CORE_SKILL_KEYS` in
- * server/src/services/company-skills.ts): what a lead agent needs to run the company with Paperclip.
- * New companies' first agent gets them.
+ * The core Paperclip skills (`PAPERCLIP_CORE_SKILL_KEYS` in server/src/services/company-skills.ts):
+ * the operating skill plus what a lead agent needs to run the company. The agent page's skills
+ * section marks the same ones, so both read agent-model's lists.
  */
-export const CORE_SKILL_KEYS = [
-  "paperclipai/paperclip/paperclip",
-  "paperclipai/paperclip/paperclip-board",
-  "paperclipai/paperclip/paperclip-converting-plans-to-tasks",
-  "paperclipai/paperclip/paperclip-create-agent",
-  "paperclipai/paperclip/para-memory-files",
-] as const;
-
-/** The operating skill itself. The Paperclip Runner carries it in its protocol, so its agents don't need it. */
-export const PAPERCLIP_SKILL_KEY = "paperclipai/paperclip/paperclip";
-
 export function isCoreSkill(key: string) {
-  return (CORE_SKILL_KEYS as readonly string[]).includes(key);
+  return key.trim().toLowerCase() === PAPERCLIP_CORE_SKILL_KEY || recommendedForLeads(key);
 }
 
-/** Whether an agent's harness already provides this skill. */
+/** Whether an agent's harness already provides this skill: the Paperclip Runner carries the operating skill. */
 export function providedByHarness(key: string, adapterType: string) {
-  return key === PAPERCLIP_SKILL_KEY && adapterType === "paperclip_runner";
+  return builtInSkill(adapterType, key) === "runner";
 }
 
 export type SkillOrigin = "bundled" | "imported" | "authored";

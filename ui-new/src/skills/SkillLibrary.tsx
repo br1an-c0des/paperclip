@@ -2,6 +2,7 @@ import type { CompanySkillDetail, CompanySkillListItem } from "@paperclipai/shar
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { FileText, Pencil, Plus, Search, Star, X } from "lucide-solid";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
+import { PAPERCLIP_CORE_SKILL_KEY } from "@/agents/agent-model";
 import { CodeView } from "@/files/CodeView";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
@@ -21,7 +22,6 @@ import {
   matchesLibrary,
   matchesQuery,
   ORIGIN_LABEL,
-  PAPERCLIP_SKILL_KEY,
   skillOrigin,
   sortedFiles,
   sortLibrary,
@@ -199,7 +199,7 @@ function SkillDetail(props: { skillId: string; closeHref: string }) {
                     <p>
                       <Star size={13} aria-hidden="true" /> <b>Recommended for lead agents.</b> It's one of Paperclip's core skills: how a lead agent works with tasks, the
                       board, plans and hiring.
-                      <Show when={skill().key === PAPERCLIP_SKILL_KEY}> Paperclip Runner agents don't need it: the Runner provides it.</Show>
+                      <Show when={skill().key === PAPERCLIP_CORE_SKILL_KEY}> Paperclip Runner agents don't need it: the Runner provides it.</Show>
                     </p>
                     <Show when={missing().length > 0}>
                       <p class="org-muted">Lead agents without it:</p>
