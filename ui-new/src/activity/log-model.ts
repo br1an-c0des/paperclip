@@ -192,7 +192,8 @@ export function legacyActivityHref(rest: string, search: string): string | null 
     case "budgets":
     case "audit/budgets":
     case "activity/budgets":
-      return `${withQuery("activity/costs")}#budgets`;
+      // The old Budgets tab set limits and resolved incidents: company settings → Budgets does both.
+      return "company/settings/budgets";
     case "timeline":
     case "audit/timeline":
     case "activity/timeline":

@@ -1,6 +1,6 @@
 import type { BudgetPolicySummary, CostByAgent, CostByAgentModel } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { agentCostRows, barPercent, budgetHref, budgetRows, costRange, formatTokens, pricingNote, projectCostRows } from "./costs-model";
+import { agentCostRows, barPercent, budgetRows, costRange, formatTokens, pricingNote, projectCostRows } from "./costs-model";
 
 describe("cost ranges", () => {
   const now = new Date(2026, 9, 27, 15, 30);
@@ -89,11 +89,6 @@ describe("budgets", () => {
     expect(rows[3]!.window).toBe("Lifetime");
   });
 
-  it("links each budget to where it's set", () => {
-    expect(budgetHref({ scope: "agent", scopeId: "a" }, () => "bob")).toBe("/agents/bob/settings/budget");
-    expect(budgetHref({ scope: "project", scopeId: "p" }, () => undefined)).toBe("/projects/p/settings/budget");
-    expect(budgetHref({ scope: "company", scopeId: "c" }, () => undefined)).toBe("/company/settings/budgets");
-  });
 
   it("says when the numbers aren't complete", () => {
     expect(pricingNote({ unpricedEventCount: 9, pendingRunCount: 1, eventCount: 15 })).toBe("9 of 15 usage reports have no price; 1 run is still being counted.");

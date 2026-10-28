@@ -1,7 +1,7 @@
-import { A, useLocation, useSearchParams } from "@solidjs/router";
+import { A, useSearchParams } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
 import { ChevronDown, ChevronRight } from "lucide-solid";
-import { createMemo, createSignal, For, Match, onMount, Show, Switch } from "solid-js";
+import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { budgetsApi } from "@/api/budgets";
 import { costsApi } from "@/api/costs";
 import { queryKeys } from "@/api/queryKeys";
@@ -16,7 +16,6 @@ import { TonePill } from "@/ui/Status";
 import {
   agentCostRows,
   barPercent,
-  budgetHref,
   budgetRows,
   costRange,
   formatTokens,
@@ -36,8 +35,8 @@ import {
  * open incidents (`/budgets/overview`). Ranges: this month, 7 or 30 days, this year, all time, or
  * custom days, kept in the address (`?range=`, `?from=`, `?to=`).
  *
- * Budgets are set where they apply (agent, project and company settings); the cards link there,
- * and incidents are resolved from the Inbox. Not ported from the old page: providers and billers,
+ * Budgets are viewed here and edited, with their incidents resolved, in company settings → Budgets
+ * (the old `/budgets` page's job, so its links land there). Not ported from the old page: providers and billers,
  * the finance ledger, subscriptions and quota windows, spend by person, data quality, and the
  * decision and fast-response histories.
  */
@@ -45,7 +44,6 @@ import {
 export function Costs() {
   const company = useCompany();
   const base = () => `/${company().issuePrefix}`;
-  const location = useLocation();
   const people = useTaskPeople();
   const minute = useMinute();
   const [search, setSearch] = useSearchParams<{ range?: string; from?: string; to?: string }>();
@@ -92,10 +90,7 @@ export function Costs() {
     return [api ? `${api} billed per request` : null, sub ? `${sub} on a subscription` : null].filter(Boolean).join(" · ") || "No runs in this range";
   };
   const companyBudget = () => summary.data?.budgetCents ?? 0;
-
-  onMount(() => {
-    if (location.hash === "#budgets") requestAnimationFrame(() => document.getElementById("budgets")?.scrollIntoView({ block: "start" }));
-  });
+  const budgetsHref = () => `${base()}/company/settings/budgets`;
 
   return (
     <section class="act-section" aria-label="Costs">
@@ -223,8 +218,8 @@ export function Costs() {
           <h2 class="disp" id="act-budgets">
             Budgets
           </h2>
-          <A class="org-link org-push" href={`${base()}/company/settings/budgets`}>
-            Company budget
+          <A class="org-link org-push" href={budgetsHref()}>
+            Edit budgets
           </A>
         </div>
         <Show when={(budgets.data?.activeIncidents.length ?? 0) > 0}>
@@ -233,8 +228,8 @@ export function Costs() {
               {budgets.data!.activeIncidents.length} open {budgets.data!.activeIncidents.length === 1 ? "incident" : "incidents"}
             </TonePill>{" "}
             {budgets.data!.activeIncidents.map((incident) => incident.scopeName).join(", ")} crossed a limit.{" "}
-            <A class="org-link" href={`${base()}/inbox`}>
-              Resolve in the Inbox
+            <A class="org-link" href={budgetsHref()}>
+              Resolve in budget settings
             </A>
           </p>
         </Show>
@@ -243,7 +238,7 @@ export function Costs() {
             <p class="org-muted org-pad">Loading…</p>
           </Match>
           <Match when={budgetList().length === 0}>
-            <p class="org-muted org-pad">No budgets set. Set one in an agent's or project's settings, or for the whole company.</p>
+            <p class="org-muted org-pad">No budgets set. <A class="org-link" href={budgetsHref()}>Set one</A> for the organization, an agent or a project.</p>
           </Match>
         </Switch>
         <ul class="act-cost-list act-budgets">
@@ -252,7 +247,7 @@ export function Costs() {
               <li class="act-cost-row">
                 <div class="act-cost-line">
                   <span class="act-budget-name">
-                    <A class="act-target org-ellipsis" href={`${base()}${budgetHref(row, (id) => people.agent(id)?.urlKey)}`}>
+                    <A class="act-target org-ellipsis" href={budgetsHref()}>
                       {row.name}
                     </A>
                     <span class="org-muted">

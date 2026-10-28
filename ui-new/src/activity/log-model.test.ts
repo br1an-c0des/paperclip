@@ -64,7 +64,7 @@ describe("old addresses", () => {
     expect(legacyActivityHref("audit/activity", "?agentId=a1")).toBe("activity?agentId=a1&mode=agents");
     expect(legacyActivityHref("runs", "?agentId=a1")).toBe("activity/runs?agentId=a1");
     expect(legacyActivityHref("costs", "")).toBe("activity/costs");
-    expect(legacyActivityHref("audit/budgets/", "")).toBe("activity/costs#budgets");
+    expect(legacyActivityHref("audit/budgets/", "")).toBe("company/settings/budgets");
     expect(legacyActivityHref("activity/timeline", "")).toBe("workload");
     expect(legacyActivityHref("activity", "")).toBeNull();
   });

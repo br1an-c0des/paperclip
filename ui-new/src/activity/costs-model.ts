@@ -184,13 +184,6 @@ export function budgetRows(policies: readonly BudgetPolicySummary[] | undefined)
     .sort((a, b) => (order[a.scope] ?? 9) - (order[b.scope] ?? 9) || b.percent - a.percent || a.name.localeCompare(b.name));
 }
 
-/** Where a budget's scope is edited: the agent's or project's budget settings, or the company's. */
-export function budgetHref(row: Pick<BudgetRow, "scope" | "scopeId">, agentKey: (id: string) => string | undefined) {
-  if (row.scope === "agent") return `/agents/${agentKey(row.scopeId) ?? row.scopeId}/settings/budget`;
-  if (row.scope === "project") return `/projects/${row.scopeId}/settings/budget`;
-  return "/company/settings/budgets";
-}
-
 /** The note under the range's spend when the numbers aren't complete. */
 export function pricingNote(summary: { unpricedEventCount: number; pendingRunCount: number; eventCount: number } | undefined) {
   if (!summary) return null;

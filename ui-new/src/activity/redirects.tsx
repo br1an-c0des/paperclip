@@ -7,7 +7,8 @@ import { legacyActivityHref } from "./log-model";
  * Where the old UI's addresses for these pages land.
  *
  * - Under a company: `/audit/*`, `/runs`, `/costs`, `/budgets`, `/timeline` and
- *   `/activity/budgets|timeline` go to the Activity tabs (`legacyActivityHref`).
+ *   `/activity/budgets|timeline` go to the Activity tabs, the budgets ones to company settings →
+ *   Budgets (`legacyActivityHref`).
  * - Without one (`/activity/*`, `/audit/*`, `/costs`, `/budgets`, `/skills/*`): the old UI sent these
  *   to the company you were last in, and so does this, keeping the rest of the address.
  */
