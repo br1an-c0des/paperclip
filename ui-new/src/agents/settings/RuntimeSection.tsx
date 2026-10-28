@@ -1,7 +1,7 @@
 import type { AdapterEnvironmentTestResult, AgentDetail } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Check, ChevronRight, History, Server, Zap } from "lucide-solid";
+import { Check, ChevronRight, History, Zap } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, Show, type JSX } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { accessApi } from "@/api/access";
@@ -34,6 +34,7 @@ import {
   type RuntimeDraft,
 } from "../agent-model";
 import { failure, FootError, refreshAgent, SectionTitle, shortDate, SwitchRow } from "../shared";
+import { EnvironmentMenu, HarnessDisc, instanceDefaultEnvironment, ModelMenu, TestChecks } from "./fields";
 import { RunnerStateCard } from "./RunnerStateCard";
 
 /*
@@ -67,11 +68,9 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
     queryKey: queryKeys.projectSettings.environments(company().id),
     queryFn: ({ signal }) => environmentsApi.list(company().id, signal),
   }));
-  const environment = createMemo(() => {
-    const list = environments.data ?? [];
-    const id = draft.environmentId;
-    return id ? list.find((entry) => entry.id === id) : list.find((entry) => (entry.metadata as Record<string, unknown> | null)?.defaultForInstance === true);
-  });
+  const environment = createMemo(() =>
+    draft.environmentId ? environments.data?.find((entry) => entry.id === draft.environmentId) : instanceDefaultEnvironment(environments.data),
+  );
   const adapters = createQuery(() => ({
     queryKey: queryKeys.agents.adapters(company().id, props.agent.defaultEnvironmentId ?? null),
     queryFn: ({ signal }) => agentsApi.adapters(company().id, props.agent.defaultEnvironmentId ?? null, signal),
@@ -215,23 +214,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
         <SignInRow agent={props.agent} />
         <Show when={fields().model}>
           <SettingsRow label="Model">
-            <Menu>
-              <Menu.Trigger as={FieldButton} class="ps-field-320" aria-label={`Model: ${modelLabel(draft.model, models.data) ?? "harness default"}`}>
-                {modelLabel(draft.model, models.data) ?? "Harness default"}
-              </Menu.Trigger>
-              <Menu.Content label="Model" width={320}>
-                <Show when={models.isLoading}>
-                  <p class="nt-menu-note">Loading models…</p>
-                </Show>
-                <For each={models.data ?? []} fallback={<Show when={!models.isLoading}><p class="nt-menu-note">This harness lists no models.</p></Show>}>
-                  {(model) => (
-                    <Menu.Item onSelect={() => setDraft("model", model.id)} hint={draft.model === model.id ? <Check size={14} /> : undefined}>
-                      {model.label}
-                    </Menu.Item>
-                  )}
-                </For>
-              </Menu.Content>
-            </Menu>
+            <ModelMenu models={models.data} loading={models.isLoading} value={draft.model} onChange={(model) => setDraft("model", model)} />
             <Show when={draft.model !== base().model}>
               <span class="ag-changed">Changed from {modelLabel(base().model, models.data) ?? "the default"}</span>
             </Show>
@@ -256,24 +239,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
 
       <SettingsCard title="Where it runs">
         <SettingsRow label="Environment" help="Uses the organization default unless you pick another.">
-          <Menu>
-            <Menu.Trigger as={FieldButton} class="ps-field-360" icon={<Server size={14} aria-hidden="true" />} aria-label="Environment">
-              {draft.environmentId ? (environment()?.name ?? "An environment you can't see") : `Organization default${environment() ? ` · ${environment()!.name}` : ""}`}
-            </Menu.Trigger>
-            <Menu.Content label="Environment" width={340}>
-              <Menu.Item onSelect={() => setDraft("environmentId", "")} hint={draft.environmentId ? undefined : <Check size={14} />} description="The instance's default environment">
-                Organization default
-              </Menu.Item>
-              <Menu.Separator />
-              <For each={(environments.data ?? []).filter((entry) => entry.status === "active")}>
-                {(entry) => (
-                  <Menu.Item onSelect={() => setDraft("environmentId", entry.id)} description={entry.description ?? entry.driver} hint={draft.environmentId === entry.id ? <Check size={14} /> : undefined}>
-                    {entry.name}
-                  </Menu.Item>
-                )}
-              </For>
-            </Menu.Content>
-          </Menu>
+          <EnvironmentMenu environments={environments.data} value={draft.environmentId} onChange={(id) => setDraft("environmentId", id)} />
         </SettingsRow>
         <Show when={fields().browser}>
           <SwitchRow label="Browser access" help="Lets the agent open and read web pages in a real browser (Chrome)." checked={draft.chrome} onChange={(value) => setDraft("chrome", value)} />
@@ -416,15 +382,6 @@ function runnerDetail(config: Record<string, unknown>) {
   return `Paperclip's runner, provider “${provider}”.`;
 }
 
-function HarnessDisc(props: { harness: string }) {
-  const text = () => (props.harness === "claude_local" ? "CC" : props.harness.replace(/^acpx:/, "").slice(0, 2).toUpperCase());
-  return (
-    <span class="ag-harness-disc" aria-hidden="true">
-      {text()}
-    </span>
-  );
-}
-
 /** The AI connection the harness signs in with, from the agent's binding and the company's connections. */
 function SignInRow(props: { agent: AgentDetail }) {
   const company = useCompany();
@@ -507,20 +464,7 @@ function TestEnvironment(props: { agent: AgentDetail; environmentId: string | nu
           )}
         </Show>
       </div>
-      <Show when={result()?.checks.length}>
-        <ul class="ag-checks">
-          <For each={result()!.checks}>
-            {(check) => (
-              <li data-level={check.level}>
-                <b>{check.message}</b>
-                <Show when={check.hint ?? check.detail}>
-                  <span>{check.hint ?? check.detail}</span>
-                </Show>
-              </li>
-            )}
-          </For>
-        </ul>
-      </Show>
+      <TestChecks result={result()} />
     </div>
   );
 }
