@@ -165,6 +165,7 @@
   flex: 0 0 32px;
   width: 32px;
   display: flex;
+  align-items: flex-start;
   justify-content: center;
 }
 
@@ -773,6 +774,12 @@ a.ch-tl-target {
   /* Above the floating dock. */
   bottom: calc(84px + env(safe-area-inset-bottom, 0px));
   padding: 6px 0 8px;
+  transition: bottom 0.2s ease;
+}
+
+/* The dock slides away while scrolling down; the composer follows it to the edge. */
+:root[data-viewport="phone"]:has(.pdock[data-hidden]) .ch-foot {
+  bottom: max(8px, env(safe-area-inset-bottom, 0px));
 }
 
 :root[data-viewport="phone"] .ch-msg {

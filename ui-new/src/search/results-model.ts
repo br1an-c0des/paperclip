@@ -211,3 +211,26 @@ export function enterTarget(results: readonly CompanySearchResult[], query: stri
   }
   return results[0];
 }
+
+// Chats (decision 8). A chat is a hidden task, and search neither leaves chats out nor marks them,
+// so a chat, its messages and its files come back as task-shaped results. The page recognises your
+// own chats by their task ids (`GET /chats`) and draws them as chats, opening the chat itself.
+
+/** The task a task-shaped result belongs to, to look up whether it's a chat. */
+export function resultIssueId(result: CompanySearchResult): string | null {
+  return result.issue?.id ?? result.artifact?.issueId ?? null;
+}
+
+/** Where a chat result lives, in place of the task's project or identifier. */
+export function chatWhere(kind: ResultKind, agentName: string) {
+  switch (kind) {
+    case "comment":
+      return `Message in your chat with ${agentName}`;
+    case "document":
+      return `Document in your chat with ${agentName}`;
+    case "file":
+      return `File in your chat with ${agentName}`;
+    default:
+      return `Your chat with ${agentName}`;
+  }
+}

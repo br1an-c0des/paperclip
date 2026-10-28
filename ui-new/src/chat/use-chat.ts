@@ -1,6 +1,6 @@
 import type { AgentDetail, Issue, IssueComment } from "@paperclipai/shared";
 import { createInfiniteQuery, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { batch, createEffect, createMemo, createSignal, on } from "solid-js";
+import { batch, createEffect, createMemo, createSignal, on, onCleanup, untrack } from "solid-js";
 import { approvalsApi } from "@/api/approvals";
 import { chatApi } from "@/api/chat";
 import { ApiError } from "@/api/client";
@@ -10,7 +10,9 @@ import { queryKeys } from "@/api/queryKeys";
 import { useNow } from "@/lib/clock";
 import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery, useLiveRunsQuery } from "@/lib/company-data";
+import { useLiveEvent } from "@/lib/live-events";
 import { taskRequests } from "@/requests/request-model";
+import { isActiveRun } from "@/runs/run-model";
 import { queuedIds, useQueuedComments } from "@/tasks/composer/QueuedMessages";
 import { useTaskPeople } from "@/tasks/people";
 import { buildChat, shownReplies, type ChatTask, type ReplyTurn } from "./chat-model";
@@ -132,12 +134,26 @@ export function useChat(agent: () => AgentDetail) {
         for (const run of live) {
           const at = next.findIndex((turn) => turn.runId === run.id);
           if (at === -1) next.push({ runId: run.id, status: run.status, finishedAt: null });
-          else if (next[at]!.status !== run.status) next[at] = { ...next[at]!, status: run.status };
+          else if (!next[at]!.finishedAt && next[at]!.status !== run.status) next[at] = { ...next[at]!, status: run.status };
         }
         return next;
       });
     }),
   );
+  // A run's end comes as a status event. The live-runs refetch it starts can join one already in
+  // flight and come back with the run still going, so the event itself ends the turn, and the live
+  // runs are read once more a moment later.
+  let settleTimer: number | undefined;
+  useLiveEvent(["heartbeat.run.status"], (event) => {
+    const runId = event.payload?.runId;
+    const status = event.payload?.status;
+    if (typeof runId !== "string" || typeof status !== "string" || isActiveRun(status)) return;
+    if (!untrack(turns).some((turn) => turn.runId === runId && !turn.finishedAt)) return;
+    setTurns((previous) => previous.map((turn) => (turn.runId === runId && !turn.finishedAt ? { ...turn, status, finishedAt: new Date().toISOString() } : turn)));
+    window.clearTimeout(settleTimer);
+    settleTimer = window.setTimeout(() => void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) }), 1_500);
+  });
+  onCleanup(() => window.clearTimeout(settleTimer));
   const ticking = () => turns().some((turn) => turn.finishedAt !== null) || replyRuns().length > 0;
   const now = useNow(ticking);
   const replies = createMemo(() => shownReplies(turns(), allComments(), new Date(now())));

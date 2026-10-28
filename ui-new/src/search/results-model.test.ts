@@ -5,6 +5,8 @@ import {
   enterTarget,
   groupResults,
   highlightSegments,
+  chatWhere,
+  resultIssueId,
   resultKind,
   resultTask,
   rowSnippet,
@@ -177,5 +179,14 @@ describe("rows", () => {
     expect(enterTarget(list, "tes-5")?.issue?.identifier).toBe("TES-5");
     expect(enterTarget(list, "login")?.issue?.identifier).toBe("TES-1");
     expect(enterTarget([], "login")).toBeUndefined();
+  });
+});
+
+describe("chat results", () => {
+  it("finds the task a result belongs to and says where a chat result lives", () => {
+    expect(resultIssueId(issue("TES-13"))).toBe("id-TES-13");
+    expect(resultIssueId({ ...issue("TES-13"), issue: undefined, artifact: { issueId: "chat-1" } } as unknown as CompanySearchResult)).toBe("chat-1");
+    expect(chatWhere("comment", "Bob")).toBe("Message in your chat with Bob");
+    expect(chatWhere("task", "Bob")).toBe("Your chat with Bob");
   });
 });
