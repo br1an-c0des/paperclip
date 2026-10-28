@@ -327,5 +327,14 @@ export const queryKeys = {
     /** Whether a plugin's task side panel is available for the agent running a task. */
     panelAvailability: (pluginId: string, slotId: string, agentId: string, runId: string) =>
       ["plugins", "panel-availability", pluginId, slotId, agentId, runId] as const,
+    /** One plugin's record, health, runtime dashboard, logs and configuration in a company (App settings → Plugins). */
+    detail: (pluginId: string) => ["plugins", "detail", pluginId] as const,
+    health: (pluginId: string) => ["plugins", "detail", pluginId, "health"] as const,
+    dashboard: (pluginId: string) => ["plugins", "detail", pluginId, "dashboard"] as const,
+    logs: (pluginId: string) => ["plugins", "detail", pluginId, "logs"] as const,
+    config: (pluginId: string, companyId: string) => ["plugins", "detail", pluginId, "config", companyId] as const,
   },
+
+  /** The current Paperclip announcement for a signed-in person (src/shell/Announcements.tsx). */
+  announcement: (userId: string) => ["announcements", "current", userId] as const,
 };

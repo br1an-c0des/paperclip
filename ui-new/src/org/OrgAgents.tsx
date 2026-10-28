@@ -16,6 +16,7 @@ import { TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { Capsule } from "@/ui/Status";
 import { gradientVar } from "@/ui/status-meta";
+import { AgentStarButton } from "@/agents/AgentStar";
 import { actionTargets, useAgentActions } from "./actions";
 import { BulkEditDialog } from "./BulkEditDialog";
 import { bulkDisabledReason, harnessGroups } from "./bulk-model";
@@ -405,6 +406,7 @@ function AgentRow(props: { row: OrgAgent; data: ReturnType<typeof useOrgData>; c
         </Show>
       </div>
       <div class="org-row-actions">
+        <AgentStarButton agent={agent()} />
         <A class={buttonClass({ variant: "icon", size: "compact", ghost: true })} href={href()} aria-label={`Chat with ${agent().name}`}>
           <MessageCircle size={15} aria-hidden="true" />
         </A>

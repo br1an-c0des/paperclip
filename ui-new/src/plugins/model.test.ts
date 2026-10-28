@@ -66,6 +66,58 @@ describe("resolveSlots", () => {
   });
 });
 
+describe("resolveSlots: the shell, dashboard, comment and workspace spots", () => {
+  const spots: PluginUiContribution = {
+    pluginId: "p-spots",
+    pluginKey: "acme.spots",
+    displayName: "Spots",
+    version: "1.0.0",
+    uiEntryFile: "index.js",
+    slots: [
+      { type: "dashboardWidget", id: "widget", displayName: "Widget", exportName: "Widget" },
+      { type: "globalToolbarButton", id: "global", displayName: "Global", exportName: "Global" },
+      { type: "appShellOverlay", id: "overlay", displayName: "Overlay", exportName: "Overlay" },
+      { type: "commentAnnotation", id: "note", displayName: "Note", exportName: "Note", entityTypes: ["comment"] },
+      { type: "commentContextMenuItem", id: "act", displayName: "Act", exportName: "Act", entityTypes: ["comment"] },
+      { type: "commentAnnotation", id: "wrong", displayName: "Wrong", exportName: "Wrong", entityTypes: ["issue"] },
+      { type: "detailTab", id: "ews", displayName: "Run files", exportName: "Ews", entityTypes: ["execution_workspace"] },
+      { type: "detailTab", id: "pws", displayName: "Checkout", exportName: "Pws", entityTypes: ["project_workspace", "execution_workspace"] },
+      { type: "toolbarButton", id: "ews-tool", displayName: "Tool", exportName: "Tool", entityTypes: ["execution_workspace"] },
+    ],
+    launchers: [{ id: "global-launch", displayName: "Open", placementZone: "globalToolbarButton", action: { type: "openDrawer", target: "Drawer" } }],
+  };
+  const ids = (filters: Parameters<typeof resolveSlots>[1]) => resolveSlots([spots], filters).map((slot) => slot.id);
+
+  it("shows global slots without an entity", () => {
+    expect(ids({ slotTypes: ["dashboardWidget"] })).toEqual(["widget"]);
+    expect(ids({ slotTypes: ["globalToolbarButton"] })).toEqual(["global"]);
+    expect(ids({ slotTypes: ["appShellOverlay"] })).toEqual(["overlay"]);
+    expect(resolveLaunchers([spots], { placementZones: ["globalToolbarButton"] }).map((launcher) => launcher.id)).toEqual(["global-launch"]);
+  });
+
+  it("needs the comment entity for comment slots", () => {
+    expect(ids({ slotTypes: ["commentAnnotation"] })).toEqual([]);
+    expect(ids({ slotTypes: ["commentAnnotation"], entityType: "comment" })).toEqual(["note"]);
+    expect(ids({ slotTypes: ["commentContextMenuItem"], entityType: "comment" })).toEqual(["act"]);
+  });
+
+  it("separates execution and project workspace tabs", () => {
+    expect(ids({ slotTypes: ["detailTab"], entityType: "execution_workspace" })).toEqual(["pws", "ews"]);
+    expect(ids({ slotTypes: ["detailTab"], entityType: "project_workspace" })).toEqual(["pws"]);
+    expect(ids({ slotTypes: ["toolbarButton"], entityType: "execution_workspace" })).toEqual(["ews-tool"]);
+    expect(ids({ slotTypes: ["toolbarButton"], entityType: "project_workspace" })).toEqual([]);
+  });
+
+  it("gives a comment's plugin the comment, with its task as the parent", () => {
+    expect(hostContextFor({ companyId: "c1", entityId: "cm1", entityType: "comment", parentEntityId: "t1", projectId: "p1" }, "u1")).toMatchObject({
+      entityId: "cm1",
+      entityType: "comment",
+      parentEntityId: "t1",
+      projectId: "p1",
+    });
+  });
+});
+
 describe("resolveLaunchers", () => {
   it("filters by zone and entity", () => {
     expect(resolveLaunchers([wiki, board], { placementZones: ["sidebar"] }).map((launcher) => launcher.id)).toEqual(["open"]);

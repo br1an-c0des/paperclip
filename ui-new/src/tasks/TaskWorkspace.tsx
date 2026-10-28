@@ -7,6 +7,7 @@ import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { Button } from "@/ui/Button";
 import { pushToast } from "@/ui/Toast";
+import { WorkspacePlugins } from "@/plugins/WorkspacePlugins";
 import { TaskBranch } from "./TaskBranch";
 import { stampLabel } from "./thread-model";
 import "./TaskWorkspace.css";
@@ -208,6 +209,7 @@ export function TaskWorkspace(props: { taskId: string }) {
                     </div>
                   </Show>
                 </section>
+                <WorkspacePlugins kind="execution_workspace" workspaceId={current().id} projectId={current().projectId ?? task.data?.projectId} />
               </>
             )}
           </Match>

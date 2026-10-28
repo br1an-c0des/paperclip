@@ -43,6 +43,7 @@ import { MessageBody } from "./MessageBody";
 import { useTaskPeople } from "./people";
 import { StatusChip } from "./TaskDetails";
 import { duration, stampLabel, type ThreadFilter } from "./thread-model";
+import { CommentPluginActions, CommentPluginAnnotations } from "@/plugins/CommentPlugins";
 import "./TaskActivity.css";
 
 /*
@@ -447,6 +448,7 @@ function Comment(props: { taskId: string; comment: IssueComment; input?: Comment
         <Show when={props.input?.reopened}>
           <span class="ta-tag">reopened the task</span>
         </Show>
+        <CommentPluginActions comment={props.comment} />
         <time class="ta-time" datetime={new Date(props.comment.createdAt).toISOString()}>
           {stampLabel(props.comment.createdAt)}
         </time>
@@ -466,6 +468,7 @@ function Comment(props: { taskId: string; comment: IssueComment; input?: Comment
       <Show when={!props.comment.deletedAt} fallback={<p class="ta-muted">This comment was deleted.</p>}>
         <MessageBody source={props.comment.body} />
       </Show>
+      <CommentPluginAnnotations comment={props.comment} />
       <Show when={agent() && !notice() && !props.comment.deletedAt}>
         <FeedbackVotes taskId={props.taskId} commentId={props.comment.id} youId={props.people.youId()} />
       </Show>
