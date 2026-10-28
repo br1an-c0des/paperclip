@@ -1,5 +1,5 @@
 import { A } from "@solidjs/router";
-import { Activity, AlignLeft, Gauge, LayoutGrid, Plus, Settings, Sparkles, UserPlus, Users } from "lucide-solid";
+import { Activity, AlignLeft, FolderGit2, Gauge, LayoutGrid, Plus, Settings, Sparkles, UserPlus, Users } from "lucide-solid";
 import type { JSX } from "solid-js";
 import { activeAgents } from "@/api/agents";
 import { openProjects } from "@/api/projects";
@@ -15,7 +15,7 @@ import "./Org.css";
  * it has, Invite people and Hire agent, and the organization's tabs in a track under the card.
  *
  * Workload is board 33 (`src/workload/CompanyWorkload.tsx`), which draws this header too, as do
- * Skills (`src/skills/`), Apps (`src/apps/`) and Activity (`src/activity/`).
+ * Workspaces (`src/workspaces/`), Skills (`src/skills/`), Apps (`src/apps/`) and Activity (`src/activity/`).
  */
 
 function count(value: number | undefined, one: string, many: string) {
@@ -67,6 +67,7 @@ export function OrgHeader(props: { actions?: JSX.Element }) {
             { label: "Dashboard", href: `${base()}/dashboard`, end: true, icon: <Gauge size={15} aria-hidden="true" /> },
             { label: "Agents", href: `${base()}/agents`, end: true, icon: <Users size={15} aria-hidden="true" /> },
             { label: "Workload", href: `${base()}/workload`, icon: <AlignLeft size={15} aria-hidden="true" /> },
+            { label: "Workspaces", href: `${base()}/workspaces`, icon: <FolderGit2 size={15} aria-hidden="true" /> },
             { label: "Skills", href: `${base()}/skills`, icon: <Sparkles size={15} aria-hidden="true" /> },
             { label: "Apps", href: `${base()}/apps`, icon: <LayoutGrid size={15} aria-hidden="true" /> },
             { label: "Activity", href: `${base()}/activity`, icon: <Activity size={15} aria-hidden="true" /> },

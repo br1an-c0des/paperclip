@@ -22,6 +22,7 @@ import { Segmented } from "@/ui/Segmented";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { commentInputs, type CommentInput } from "./activity-format";
+import { FeedbackVotes } from "./FeedbackVotes";
 import { Composer } from "./composer/Composer";
 import { QueuedMessages, queuedIds, useQueuedComments } from "./composer/QueuedMessages";
 import {
@@ -48,7 +49,7 @@ import "./TaskActivity.css";
  * The task panel's Activity section (board 3): the thread, oldest first, with comments as cards,
  * changes and finished runs as compact lines between them, agents' requests and the task's
  * approvals as request cards (board 15), and the live run as a card at the foot with Stop. Runs
- * open in the run modal ("View run").
+ * open in the run modal ("View run"). An agent's comment has thumbs up and down (FeedbackVotes.tsx).
  *
  * It opens on the latest of the task's history and the task row alone (history-window.ts), and
  * reads the rest when the reader asks: "Show earlier activity", a search, or a filter. From then on
@@ -464,6 +465,9 @@ function Comment(props: { taskId: string; comment: IssueComment; input?: Comment
       </div>
       <Show when={!props.comment.deletedAt} fallback={<p class="ta-muted">This comment was deleted.</p>}>
         <MessageBody source={props.comment.body} />
+      </Show>
+      <Show when={agent() && !notice() && !props.comment.deletedAt}>
+        <FeedbackVotes taskId={props.taskId} commentId={props.comment.id} youId={props.people.youId()} />
       </Show>
     </article>
   );
