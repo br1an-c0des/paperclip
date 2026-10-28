@@ -6,7 +6,6 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { pluginsApi } from "@/api/plugins";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
-import { usePluginSlots } from "@/plugins/contributions";
 import { PluginSettingsView } from "@/plugins/PluginSettingsView";
 import { InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
@@ -16,16 +15,16 @@ import { Menu } from "@/ui/Menu";
 import { Switch } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
 import { bundledRows, discName, isExperimentalPlugin, parseInstallTarget, PLUGIN_STATUS, pluginErrorSummary, pluginName, pluginOn } from "./app-settings-model";
-import { failure, LaterNote, ListRow, SectionTitle, StatePill } from "./shared";
+import { failure, ListRow, SectionTitle, StatePill } from "./shared";
 
 /*
  * Plugins (board 30's outline): the installed plugins with their status, turned on and off
  * (`POST /api/plugins/:id/enable|disable`), updated from npm and removed; the plugins bundled with
  * this checkout, installed from their folder; and install by npm name or folder path.
  *
- * A plugin's own settings page (its `settingsPage` slots, drawn by the plugin through plugin
- * hosting, src/plugins/) opens from its row at `?plugin=<id>`. Plugins configured only through a
- * form generated from their schema, local folders and logs stay in the classic UI for now.
+ * Each plugin's settings open from its row at `?plugin=<id>` (src/plugins/PluginSettingsView.tsx):
+ * its own settings page or the form generated from its schema, its health, runtime and logs. Local
+ * folders stay in the classic UI for now.
  */
 
 export function PluginsSection() {
@@ -41,8 +40,6 @@ export function PluginsSection() {
   const [details, setDetails] = createSignal<PluginRecord | null>(null);
   const [search, setSearch] = useSearchParams<{ plugin?: string }>();
   const company = useCompany();
-  const settingsPages = usePluginSlots(() => ({ slotTypes: ["settingsPage"] }));
-  const hasSettingsPage = (plugin: PluginRecord) => settingsPages.slots().some((slot) => slot.pluginId === plugin.id);
   const open = createMemo(() => (search.plugin ? installed.data?.find((plugin) => plugin.id === search.plugin || plugin.pluginKey === search.plugin) : undefined));
   const sectionHref = () => `/${company().issuePrefix}/company/settings/instance/plugins`;
 
@@ -103,10 +100,6 @@ export function PluginsSection() {
       }
     >
       <SectionTitle title="Plugins">Extensions that add pages, settings, tools and environments to this instance.</SectionTitle>
-      <LaterNote title="Some plugin settings are still in the classic UI">
-        A plugin with its own settings page opens it from its row. Plugins configured through a generated form, and plugin logs and local
-        folders, are still configured in the classic UI.
-      </LaterNote>
 
       <SettingsCard
         title="Installed"
@@ -181,11 +174,9 @@ export function PluginsSection() {
                   </Show>
                 }
               >
-                <Show when={hasSettingsPage(plugin)}>
-                  <Button size="compact" ghost icon={<Settings2 size={14} aria-hidden="true" />} onClick={() => setSearch({ plugin: plugin.id })}>
-                    Settings
-                  </Button>
-                </Show>
+                <Button size="compact" ghost icon={<Settings2 size={14} aria-hidden="true" />} onClick={() => setSearch({ plugin: plugin.id })}>
+                  Settings
+                </Button>
                 <StatePill label={status().label} tone={status().tone} />
                 <Switch
                   checked={pluginOn(plugin.status)}
