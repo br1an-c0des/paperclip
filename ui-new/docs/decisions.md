@@ -60,6 +60,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 31 | [Gaps found building agent chat](#31-gaps-found-building-agent-chat) | `agent-chat/*`, `inbox-search/search` | Open | Oct 27, 2026 |
 | 32 | [Gaps found building app settings](#32-gaps-found-building-app-settings) | Instance settings, experimental flags | Open | Oct 27, 2026 |
 | 33 | [Gaps found building company settings](#33-gaps-found-building-company-settings) | Company settings | Open | Oct 27, 2026 |
+| 34 | [Gaps found building Skills and Activity](#34-gaps-found-building-skills-and-activity) | Skills, Activity and costs | Open | Oct 27, 2026 |
 
 ## Entries
 
@@ -1100,4 +1101,20 @@ Both are handled in `ui-new` for now.
 - **The default environment is instance-wide** (`defaultEnvironmentId` in `PATCH /instance/settings`)
   while environments belong to organizations; the page says so where it's set.
 - **Plugin settings pages need plugin hosting** (M7).
+
+### 34. Gaps found building Skills and Activity
+
+- **Status:** Open
+- **Area:** Tier 2 "Skills" and "Activity and costs"
+- **Found in:** the org header's Skills and Activity tabs (M6).
+
+- **A skill edit doesn't name the agents using it,** so an open agent page doesn't refresh its skills
+  on a rename. The library refreshes on `company_skill`, `company_skill_version`,
+  `company_skill_source`, `company.skill*` and `agent.skills_synced` activity.
+- **Which agents use a skill** (`usedByAgents`) comes only with one skill's details; the list has a
+  count (`attachedAgentCount`).
+- **Filtering the audit log by one agent, responsible person or run needs full audit access** (403
+  otherwise); the page hides those filters.
+- **Authored skills carry `sourceBadge: "paperclip"`** like bundled ones; the origin is worked out from
+  the `company/` key or a fork.
 

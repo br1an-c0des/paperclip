@@ -392,6 +392,11 @@ Tier 2, ported mostly as is into the new layout:
 
 These are large areas: Apps and tools alone reaches about 60 requests per page. Plan a few iterations.
 
+Progress (2026-10-27): round 1 built: company settings (boards 21–25), App settings (boards 28, 29),
+and the Skills and Activity tabs; gaps in decisions [32](decisions.md#32-gaps-found-building-app-settings)–[34](decisions.md#34-gaps-found-building-skills-and-activity).
+Waiting on the user: the experimental flags (decision 32). Round 2: Apps and tools (replacing the
+temporary Connectors page), onboarding and the pages outside a company, and plugin hosting.
+
 #### M7: Ready to replace the old UI
 
 - Plugin hosting (decision G), including plugin panels in the task side panel (since the 2026-10-26
