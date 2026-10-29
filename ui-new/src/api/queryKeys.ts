@@ -76,6 +76,15 @@ export const queryKeys = {
     /** Prefix for every project query in a company. */
     all: (companyId: string) => ["projects", companyId] as const,
     list: (companyId: string) => ["projects", companyId, "list"] as const,
+    /*
+     * AI summaries (src/projects/summary/), in the old UI's shapes (`summarySlots`, `builtInAgents`)
+     * so its live-update rule for `summary_slot` activity ports one to one.
+     */
+    summary: (companyId: string, scopeKind: string, slotKey: string, scopeId?: string | null) =>
+      ["summary-slots", companyId, scopeKind, slotKey, scopeId ?? null] as const,
+    summaryRevisions: (companyId: string, scopeKind: string, slotKey: string, scopeId?: string | null) =>
+      ["summary-slots", companyId, scopeKind, slotKey, scopeId ?? null, "revisions"] as const,
+    builtInAgents: (companyId: string) => ["built-in-agents", companyId] as const,
   },
   goals: {
     list: (companyId: string) => ["goals", companyId] as const,
@@ -268,6 +277,8 @@ export const queryKeys = {
     detail: (routineId: string) => ["routines", "detail", routineId] as const,
     runs: (routineId: string) => ["routines", "runs", routineId] as const,
     revisions: (routineId: string) => ["routines", "revisions", routineId] as const,
+    /** The routine's activity, with its triggers' and recent runs'. */
+    activity: (routineId: string) => ["routines", "activity", routineId] as const,
     folders: (companyId: string) => ["routines", "folders", companyId] as const,
   },
 

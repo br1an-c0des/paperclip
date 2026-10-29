@@ -43,7 +43,7 @@ export function refreshRecurring(client: QueryClient, companyId: string, withTas
 }
 
 /** The Recurring view, optionally with one recurring task open (and a section of its panel). */
-export function recurringPath(prefix: string, routineId?: string, section?: "runs" | "history") {
+export function recurringPath(prefix: string, routineId?: string, section?: "runs" | "history" | "activity") {
   const params = new URLSearchParams({ show: "recurring" });
   if (routineId) params.set("recurring", routineId);
   if (section) params.set("section", section);

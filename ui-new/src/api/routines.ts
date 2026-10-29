@@ -1,4 +1,5 @@
 import type {
+  ActivityEvent,
   FolderListResult,
   Routine,
   RoutineDetail,
@@ -54,6 +55,21 @@ export const routinesApi = {
     api.post<RestoreRoutineRevisionResponse>(`/routines/${id}/revisions/${revisionId}/restore`, changeSummary ? { changeSummary } : {}),
   runs: (id: string, limit = 50, signal?: AbortSignal) => api.get<RoutineRunSummary[]>(`/routines/${id}/runs?limit=${limit}`, { signal }),
   run: (id: string, data: Record<string, unknown> = {}) => api.post<RoutineRun>(`/routines/${id}/run`, data),
+  /**
+   * The recurring task's activity, as the old routine page gathers it: the routine's own entries,
+   * each trigger's and each run's (`GET /companies/:id/activity?entityType=&entityId=`, one request
+   * each, since the log has no filter for "this routine and everything under it"), merged newest
+   * first by the caller.
+   */
+  activity: (companyId: string, routineId: string, related: { triggerIds: string[]; runIds: string[] }, signal?: AbortSignal) => {
+    const list = (entityType: string, entityId: string) =>
+      api.get<ActivityEvent[]>(`/companies/${companyId}/activity?${new URLSearchParams({ entityType, entityId })}`, { signal });
+    return Promise.all([
+      list("routine", routineId),
+      ...related.triggerIds.map((id) => list("routine_trigger", id)),
+      ...related.runIds.map((id) => list("routine_run", id)),
+    ]);
+  },
   createTrigger: (id: string, data: Record<string, unknown>) => api.post<RoutineTriggerResponse>(`/routines/${id}/triggers`, data),
   updateTrigger: (triggerId: string, data: Record<string, unknown>) => api.patch<RoutineTrigger>(`/routine-triggers/${triggerId}`, data),
   deleteTrigger: (triggerId: string) => api.delete<void>(`/routine-triggers/${triggerId}`),

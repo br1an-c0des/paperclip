@@ -1,7 +1,7 @@
 import type { RoutineDetail } from "@paperclipai/shared";
 import { useSearchParams } from "@solidjs/router";
 import { useQueryClient } from "@tanstack/solid-query";
-import { AppWindow, Archive, ArchiveRestore, ChevronLeft, ChevronRight, Ellipsis, Folder, History, Layers, Link, PanelRight, Play, Repeat, X } from "lucide-solid";
+import { Activity, AppWindow, Archive, ArchiveRestore, ChevronLeft, ChevronRight, Ellipsis, Folder, History, Layers, Link, PanelRight, Play, Repeat, X } from "lucide-solid";
 import { createSignal, For, Match, Show, Switch, type JSX } from "solid-js";
 import { routinesApi } from "@/api/routines";
 import { Panel } from "@/layout/Panel";
@@ -16,6 +16,7 @@ import { Popover } from "@/ui/Popover";
 import { pushToast } from "@/ui/Toast";
 import { recurringPath, refreshRecurring, useRoutineFoldersQuery, useRoutineQuery } from "./queries";
 import { RecurringDetails } from "./RecurringDetails";
+import { RecurringActivity } from "./RecurringActivity";
 import { RecurringHistory } from "./RecurringHistory";
 import { RecurringRuns, RunNowForm } from "./RecurringRuns";
 import "@/tasks/TaskDetails.css";
@@ -29,19 +30,20 @@ import "./RecurringPanel.css";
  * task's panel, or as a modal over it when tasks open as modals (the same setting, decision B).
  * The toolbar steps to the previous and next recurring task, names its project, and holds Run now,
  * the More menu (move to a folder, pause or turn on, archive or restore, copy the link) and the
- * panel-or-modal switch. The rail picks Details (R2), Runs (R3) or History (R4), kept in the URL as
- * `?section=`.
+ * panel-or-modal switch. The rail picks Details (R2), Runs (R3), History (R4) or Activity (the old
+ * routine page's activity log, which no board draws), kept in the URL as `?section=`.
  *
  * Routines can't be deleted through the API, so, as in the old UI, Archive is the way to put one
  * away; archived ones stop running and can be restored.
  */
 
-export type RecurringSection = "details" | "runs" | "history";
+export type RecurringSection = "details" | "runs" | "history" | "activity";
 
 const SECTIONS: { id: RecurringSection; label: string; icon: () => JSX.Element }[] = [
   { id: "details", label: "Details", icon: () => <Layers size={16} aria-hidden="true" /> },
   { id: "runs", label: "Runs", icon: () => <Play size={16} aria-hidden="true" /> },
   { id: "history", label: "History", icon: () => <History size={16} aria-hidden="true" /> },
+  { id: "activity", label: "Activity", icon: () => <Activity size={16} aria-hidden="true" /> },
 ];
 
 export function RecurringPanel(props: {
@@ -274,7 +276,7 @@ function PanelActions(props: { routine: RoutineDetail; modal: boolean; onClose: 
 
 function RecurringSections(props: { routine: RoutineDetail; onOpenTask: (task: { id: string; identifier: string | null }) => void }) {
   const [params, setParams] = useSearchParams<{ section?: string }>();
-  const section = (): RecurringSection => (params.section === "runs" || params.section === "history" ? params.section : "details");
+  const section = (): RecurringSection => (params.section === "runs" || params.section === "history" || params.section === "activity" ? params.section : "details");
   const choose = (next: RecurringSection) => setParams({ section: next === "details" ? undefined : next }, { replace: true });
   return (
     <div class="tsec rpn" data-section={section()}>
@@ -288,6 +290,9 @@ function RecurringSections(props: { routine: RoutineDetail; onOpenTask: (task: {
           </Match>
           <Match when={section() === "history"}>
             <RecurringHistory routine={props.routine} />
+          </Match>
+          <Match when={section() === "activity"}>
+            <RecurringActivity routine={props.routine} />
           </Match>
         </Switch>
       </div>
