@@ -1,4 +1,5 @@
-import type { CompanyPortabilityExportPreviewResult, CompanyPortabilityPreviewResult } from "@paperclipai/shared";
+import type { CompanyPortabilityCollisionStrategy, CompanyPortabilityExportPreviewResult, CompanyPortabilityPreviewResult } from "@paperclipai/shared";
+import type { CompanyImportTransferDeclaration } from "@paperclipai/shared/company-import-transfer";
 import { useNavigate } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Download, FileArchive, Upload } from "lucide-solid";
@@ -9,8 +10,22 @@ import { ConfirmDialog } from "@/documents/ConfirmDialog";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
 import { SettingsRow, TextInput } from "@/ui/Field";
+import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
-import { exportCounts, exportFileName, importPlanLines, packageProblem } from "./transfer-model";
+import {
+  COLLISION_OPTIONS,
+  exportCounts,
+  exportFileName,
+  importedFiles,
+  importPlanLines,
+  importTarget,
+  packageProblem,
+  transferDeclaration,
+  transferProgressLine,
+  uploadTransfer,
+  usesChunkedTransfer,
+  type ImportTarget,
+} from "./transfer-model";
 import { CardHead, failure, SectionTitle, SwitchRow } from "./shared";
 import { createZipArchive, downloadBytes } from "./zip";
 
@@ -20,12 +35,14 @@ import { createZipArchive, downloadBytes } from "./zip";
  * - Export builds the company package on the server (`POST /exports/preview`, then `/exports`),
  *   with or without tasks and skills, and zips it here for download. The fidelity report says what
  *   a package never carries (approvals, cost and activity history).
- * - Import uploads a .zip package, previews what it would create, and imports it as a new
- *   organization in the background (`/companies/import?async=1`, then the job's status).
+ * - Import uploads a .zip package, previews what it would do, and imports it in the background
+ *   (`/companies/import?async=1`, then the job's status): as a new organization, or into this one
+ *   with a rule for same-named agents, projects and skills (keep both, skip, replace). A package
+ *   over 48 MB goes up as a resumable transfer (`/companies/import/transfers`): content-addressed
+ *   parts, so a dropped upload resumes from the parts the server already has.
  *
- * Not here yet: picking single files to export, merging a package into an existing organization,
- * per-agent harness overrides and secret values at import, and resumable uploads for very large
- * packages. The classic UI's Export and Import pages keep those.
+ * Not here: picking single files to export or import, per-agent harness overrides and secret values
+ * at import, and importing from a GitHub address. The classic UI's Export and Import pages have them.
  */
 
 export function TransferSection() {
@@ -136,10 +153,14 @@ function ExportCard() {
 }
 
 function ImportCard() {
+  const company = useCompany();
   const client = useQueryClient();
   const navigate = useNavigate();
   const [file, setFile] = createSignal<File | null>(null);
+  const [target, setTarget] = createSignal<ImportTarget>("new");
   const [name, setName] = createSignal("");
+  const [collision, setCollision] = createSignal<CompanyPortabilityCollisionStrategy>("rename");
+  const [updateDetails, setUpdateDetails] = createSignal(false);
   const [preview, setPreview] = createSignal<CompanyPortabilityPreviewResult | null>(null);
   const [busy, setBusy] = createSignal<"preview" | "import" | null>(null);
   const [problem, setProblem] = createSignal<string | null>(null);
@@ -148,15 +169,36 @@ function ImportCard() {
   let input!: HTMLInputElement;
   let cancelled = false;
   onCleanup(() => (cancelled = true));
+  // A large zip is hashed once per file; the declaration resumes the same transfer for preview and import.
+  let declared: { file: File; declaration: CompanyImportTransferDeclaration } | null = null;
 
+  const into = () => target() === "existing";
   const previewMeta = (): CompanyImportPreviewMeta => ({
     include: { company: true, agents: true, projects: true, issues: true, skills: true },
-    target: { mode: "new_company", newCompanyName: name().trim() || null },
+    ...importTarget(target(), company().id, name(), collision()),
     agents: "all",
-    collisionStrategy: "rename",
   });
   // As the old Import page does by default, recurring tasks and triggers arrive paused.
-  const importMeta = (): CompanyImportMeta => ({ ...previewMeta(), pauseAutomations: true });
+  const importMeta = (): CompanyImportMeta => ({
+    ...previewMeta(),
+    selectedFiles: into() && preview() ? importedFiles(preview()!, updateDetails()) : undefined,
+    pauseAutomations: true,
+  });
+  const reset = () => {
+    setPreview(null);
+    setProblem(null);
+  };
+
+  /** Uploads (or resumes) a large package's transfer and returns its id. */
+  const transfer = async (chosen: File) => {
+    if (declared?.file !== chosen) {
+      setProgress("Reading the package…");
+      declared = { file: chosen, declaration: await transferDeclaration(await chosen.arrayBuffer()) };
+    }
+    return uploadTransfer(chosen, declared.declaration, { create: companiesApi.importTransferCreate, upload: companiesApi.importTransferUploadPart }, (step) =>
+      setProgress(`${transferProgressLine(step)} An interrupted upload picks up from the parts already sent.`),
+    );
+  };
 
   const runPreview = async () => {
     const found = packageProblem(file());
@@ -164,11 +206,17 @@ function ImportCard() {
     setBusy("preview");
     setProblem(null);
     try {
-      setPreview(await companiesApi.importPreviewPackage(file()!, previewMeta()));
+      const chosen = file()!;
+      setPreview(
+        usesChunkedTransfer(chosen)
+          ? await companiesApi.importTransferPreview(await transfer(chosen), previewMeta())
+          : await companiesApi.importPreviewPackage(chosen, previewMeta()),
+      );
     } catch (caught) {
       setProblem(failure(caught, "Couldn't read the package."));
     } finally {
       setBusy(null);
+      setProgress(null);
     }
   };
 
@@ -177,7 +225,10 @@ function ImportCard() {
     setProblem(null);
     setProgress("Uploading the package…");
     try {
-      const accepted = await companiesApi.importPackageAsync(file()!, importMeta());
+      const chosen = file()!;
+      const accepted = usesChunkedTransfer(chosen)
+        ? await companiesApi.importTransferApply(await transfer(chosen), importMeta())
+        : await companiesApi.importPackageAsync(chosen, importMeta());
       setProgress("Importing…");
       let wait = accepted.retryAfterMs ?? 2000;
       for (;;) {
@@ -186,18 +237,25 @@ function ImportCard() {
         const status = await companiesApi.importJob(accepted.job.id);
         if (status.job.status === "failed") throw new Error(status.job.error?.message ?? "The import failed.");
         if (status.job.status === "succeeded") {
-          const companyId = status.job.result?.companyId ?? status.job.importResult?.company.id;
-          await client.invalidateQueries({ queryKey: queryKeys.companies.all });
-          const companies = await companiesApi.list();
-          const created = companies.find((entry) => entry.id === companyId);
-          pushToast({
-            tone: "success",
-            title: created ? `Imported ${created.name}` : "Imported the organization",
-            action: created ? { label: "Open it", onClick: () => navigate(`/${created.issuePrefix}/dashboard`) } : undefined,
-          });
+          if (into()) {
+            // Everything in this organization may have changed.
+            await client.invalidateQueries();
+            pushToast({ tone: "success", title: `Imported into ${company().name}`, body: lines().slice(1).join(" · ") || undefined });
+          } else {
+            const companyId = status.job.result?.companyId ?? status.job.importResult?.company.id;
+            await client.invalidateQueries({ queryKey: queryKeys.companies.all });
+            const companies = await companiesApi.list();
+            const created = companies.find((entry) => entry.id === companyId);
+            pushToast({
+              tone: "success",
+              title: created ? `Imported ${created.name}` : "Imported the organization",
+              action: created ? { label: "Open it", onClick: () => navigate(`/${created.issuePrefix}/dashboard`) } : undefined,
+            });
+          }
           setPreview(null);
           setFile(null);
           setName("");
+          declared = null;
           return;
         }
         wait = status.retryAfterMs ?? 2000;
@@ -212,11 +270,17 @@ function ImportCard() {
 
   const lines = () => (preview() ? importPlanLines(preview()!.plan) : []);
   const errors = () => preview()?.errors ?? [];
+  const confirmBody = () => {
+    const what = lines().slice(1).join(", ").toLowerCase() || "the package's contents";
+    return into()
+      ? `This brings ${what} into ${company().name}${collision() === "replace" ? ", replacing same-named items" : ""}. Recurring tasks it adds start paused.`
+      : `This creates ${preview()?.targetCompanyName ?? "a new organization"} with ${what}. Its recurring tasks start paused until you turn them on.`;
+  };
 
   return (
     <section class="card settings-card" id="import" aria-labelledby="cs-import">
-      <CardHead id="cs-import" title="Import" note="Bring in a company package as a new organization. Preview it first: nothing is created until you import." />
-      <SettingsRow label="Package" help="A .zip exported from Paperclip, or any agentcompanies/v1 package.">
+      <CardHead id="cs-import" title="Import" note="Bring in a company package as a new organization or into this one. Preview it first: nothing changes until you import." />
+      <SettingsRow label="Package" help="A .zip exported from Paperclip, or any agentcompanies/v1 package. Large ones upload in resumable parts.">
         <div class="cs-inline">
           <input
             ref={input}
@@ -227,8 +291,7 @@ function ImportCard() {
             onChange={(event) => {
               setFile(event.currentTarget.files?.[0] ?? null);
               event.currentTarget.value = "";
-              setPreview(null);
-              setProblem(null);
+              reset();
             }}
           />
           <Button size="compact" icon={<FileArchive size={14} aria-hidden="true" />} disabled={!!busy()} onClick={() => input.click()}>
@@ -237,32 +300,75 @@ function ImportCard() {
           <Show when={file()}>{(chosen) => <span class="cs-muted mono cs-ellipsis">{chosen().name}</span>}</Show>
         </div>
       </SettingsRow>
-      <SettingsRow label="New organization's name" for="cs-import-name" help="Optional. The package's own name is used otherwise.">
-        <TextInput
-          id="cs-import-name"
-          value={name()}
-          disabled={!!busy()}
-          onInput={(event) => {
-            setName(event.currentTarget.value);
-            setPreview(null);
+      <SettingsRow label="Import into">
+        <Segmented
+          label="Import into"
+          options={[
+            { value: "new", label: "A new organization" },
+            { value: "existing", label: company().name },
+          ]}
+          value={target()}
+          onChange={(value) => {
+            if (busy()) return;
+            setTarget(value);
+            reset();
           }}
         />
       </SettingsRow>
+      <Show
+        when={into()}
+        fallback={
+          <SettingsRow label="New organization's name" for="cs-import-name" help="Optional. The package's own name is used otherwise.">
+            <TextInput
+              id="cs-import-name"
+              value={name()}
+              disabled={!!busy()}
+              onInput={(event) => {
+                setName(event.currentTarget.value);
+                setPreview(null);
+              }}
+            />
+          </SettingsRow>
+        }
+      >
+        <SettingsRow label="Same names" help={COLLISION_OPTIONS.find((option) => option.value === collision())?.help}>
+          <Segmented
+            label="When an agent, project or skill has the same name"
+            options={COLLISION_OPTIONS}
+            value={collision()}
+            onChange={(value) => {
+              if (busy()) return;
+              setCollision(value);
+              reset();
+            }}
+          />
+        </SettingsRow>
+      </Show>
       <Show when={preview()}>
         {(found) => (
-          <SettingsRow label="What it does">
-            <div class="cs-person-text">
-              <span class="cs-strong">{found().targetCompanyName ?? found().manifest.company?.name ?? "New organization"}</span>
-              <For each={lines()}>{(line) => <span class="cs-muted">{line}</span>}</For>
-              <Show when={found().envInputs.length}>
-                <span class="fhelp">
-                  {found().envInputs.length} environment variable{found().envInputs.length === 1 ? "" : "s"} will need values in the new organization.
-                </span>
-              </Show>
-              <For each={found().warnings}>{(warning) => <span class="fhelp">{warning}</span>}</For>
-              <For each={errors()}>{(error) => <span class="fhelp cs-bad">{error}</span>}</For>
-            </div>
-          </SettingsRow>
+          <>
+            <SettingsRow label="What it does">
+              <div class="cs-person-text">
+                <span class="cs-strong">{into() ? company().name : (found().targetCompanyName ?? found().manifest.company?.name ?? "New organization")}</span>
+                <For each={lines()}>{(line) => <span class="cs-muted">{line}</span>}</For>
+                <Show when={found().envInputs.length}>
+                  <span class="fhelp">
+                    {found().envInputs.length} environment variable{found().envInputs.length === 1 ? "" : "s"} will need values.
+                  </span>
+                </Show>
+                <For each={found().warnings}>{(warning) => <span class="fhelp">{warning}</span>}</For>
+                <For each={errors()}>{(error) => <span class="fhelp cs-bad">{error}</span>}</For>
+              </div>
+            </SettingsRow>
+            <Show when={into() && found().plan.companyAction === "update"}>
+              <SwitchRow
+                label="Update the organization's details"
+                help="Take the package's name, description and settings for this organization. Off: only its agents, projects, tasks and skills come in."
+                checked={updateDetails()}
+                onChange={setUpdateDetails}
+              />
+            </Show>
+          </>
         )}
       </Show>
       <footer class="cfoot">
@@ -287,16 +393,17 @@ function ImportCard() {
             disabled={!preview() || errors().length > 0 || !!busy()}
             onClick={() => setConfirm(true)}
           >
-            Import as a new organization
+            {into() ? `Import into ${company().name}` : "Import as a new organization"}
           </Button>
         </span>
       </footer>
       <ConfirmDialog
         open={confirm()}
         onOpenChange={setConfirm}
-        title="Import as a new organization?"
-        body={`This creates ${preview()?.targetCompanyName ?? "a new organization"} with ${lines().slice(1).join(", ").toLowerCase() || "the package's contents"}. Its recurring tasks start paused until you turn them on.`}
+        title={into() ? `Import into ${company().name}?` : "Import as a new organization?"}
+        body={confirmBody()}
         confirmLabel="Import"
+        danger={into() && collision() === "replace"}
         onConfirm={() => void runImport()}
       />
     </section>

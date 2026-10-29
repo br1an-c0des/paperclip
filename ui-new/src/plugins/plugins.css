@@ -4,7 +4,9 @@
  *
  * Plugins written for the old UI style themselves with its shadcn variables (`var(--border)`,
  * `var(--muted-foreground)`…). Inside a plugin area those names point at ui-new's tokens, so such
- * plugins pick up the current theme. The old UI's Tailwind classes have no equivalent here.
+ * plugins pick up the current theme. The old UI's Tailwind classes come from the compatibility
+ * sheet (scripts/plugin-tailwind.ts), scoped to `.plugin-area`; its colour utilities read these
+ * same variables.
  */
 
 .plugin-slot {
@@ -30,6 +32,21 @@
   --primary-foreground: var(--on-primary);
   --destructive: var(--red-fg);
   --destructive-foreground: var(--on-primary);
+  --muted-highlight: var(--hover);
+  --background-alt: var(--well);
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--text);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--on-primary);
+  --sidebar-accent: var(--hover);
+  --sidebar-accent-foreground: var(--text);
+  --sidebar-border: var(--edge);
+  --sidebar-ring: var(--run-fg);
+  --chart-1: var(--ash-a);
+  --chart-2: var(--ash-b);
+  --chart-3: var(--muted);
+  --chart-4: var(--body);
+  --chart-5: var(--text);
   --radius: var(--r-inner);
   min-width: 0;
   color: var(--text);
@@ -441,4 +458,16 @@ button.plugin-launcher-navi {
 
 .plugin-workspace-view {
   padding: 14px 16px;
+}
+
+/* An `organizationSwitcher` plugin takes the company switcher's place at the top of the nav. */
+.plugin-org-switcher {
+  flex: 1;
+  min-width: 0;
+}
+
+.plugin-company-logo {
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
 }

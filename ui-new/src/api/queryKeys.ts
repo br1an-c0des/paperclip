@@ -125,6 +125,12 @@ export const queryKeys = {
     commentary: (companyId: string, filters: string) => ["agent-commentary", companyId, "list", filters] as const,
     commentaryEntry: (companyId: string, id: string) => ["agent-commentary", companyId, "detail", id] as const,
     costSummary: (companyId: string, from?: string, to?: string) => ["costs", companyId, "summary", from ?? "all", to ?? "now"] as const,
+    /**
+     * One of the Costs tab's other reports ("by-user", "by-provider", "by-biller", "finance-summary",
+     * "subscriptions", "data-quality", "decision-history"…) over a range. Under `["costs", companyId]`,
+     * so cost events refresh them all; the decision and fast-response calls log cost events too.
+     */
+    costReport: (companyId: string, report: string, from?: string, to?: string) => ["costs", companyId, report, from ?? "all", to ?? "now"] as const,
     /** Apart from `heartbeats`, which every run's progress refreshes; refetched when a live run changes. */
     runs: (companyId: string, agentId: string | null) => ["activity-runs", companyId, agentId ?? "__all__"] as const,
   }),
@@ -190,6 +196,8 @@ export const queryKeys = {
     /** Saved AgentMail accounts, and what one can reach (src/apps/chat/EmailSetup.tsx). */
     emailCredentials: (companyId: string) => ["tools", companyId, "email-credentials"] as const,
     emailInspection: (companyId: string, connectionId: string) => ["tools", companyId, "email-inspection", connectionId] as const,
+    /** AI connection pools (src/apps/pools/), and one pool's usage inspection under it. */
+    pools: (companyId: string) => ["tools", companyId, "pools"] as const,
   },
   /**
    * Chat endpoints (src/apps/chat/, the agent's channels): an agent in Slack, GitHub, Teams, a voice
@@ -327,7 +335,16 @@ export const queryKeys = {
     detail: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId] as const,
     versions: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId, "versions"] as const,
     file: (companyId: string, skillId: string, path: string) => ["company-skills", companyId, "skill", skillId, "file", path] as const,
+    updateStatus: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId, "update-status"] as const,
+    forkPrecheck: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId, "fork-precheck"] as const,
+    folders: (companyId: string) => ["company-skills", companyId, "folders"] as const,
     sources: (companyId: string) => ["skill-sources", companyId] as const,
+    sourceBranches: (companyId: string, sourceId: string) => ["skill-sources", companyId, sourceId, "branches"] as const,
+    repositories: (companyId: string) => ["skill-sources", companyId, "repositories"] as const,
+    projectRepositories: (companyId: string) => ["skill-sources", companyId, "project-repositories"] as const,
+    /** Paperclip's catalog is the same for every company. */
+    catalog: ["skills-catalog"] as const,
+    catalogFile: (catalogId: string, path: string) => ["skills-catalog", catalogId, "file", path] as const,
   },
 
   chat: {
@@ -364,6 +381,9 @@ export const queryKeys = {
     mySecrets: (companyId: string) => ["my-user-secrets", companyId] as const,
     secretProposals: (companyId: string) => ["secret-proposals", companyId, "pending"] as const,
     exportFidelity: (companyId: string) => ["companies", companyId, "export-fidelity"] as const,
+    secretAccessEvents: (secretId: string) => ["secrets", "access-events", secretId] as const,
+    environmentCapabilities: (companyId: string) => ["environment-capabilities", companyId] as const,
+    environmentSecretRefs: (environmentId: string) => ["environment-secret-refs", environmentId] as const,
     pluginPages: ["plugins", "ui-contributions"] as const,
     /** The whole instance settings (`GET /instance/settings`), for the instance-wide default environment. */
     instanceSettings: ["instance", "settings"] as const,
@@ -387,6 +407,8 @@ export const queryKeys = {
     companyDirectory: ["companies", "directory"] as const,
     /** The latest version of an npm package, for an installed harness's Update button. */
     npmLatest: (packageName: string) => ["npm-latest-version", packageName] as const,
+    /** "Let agents tidy my inbox": your policy in one organization. */
+    inboxAgentPolicy: (companyId: string) => ["inbox-agent-policy", companyId, "me"] as const,
   },
 
   /*
@@ -405,6 +427,7 @@ export const queryKeys = {
     dashboard: (pluginId: string) => ["plugins", "detail", pluginId, "dashboard"] as const,
     logs: (pluginId: string) => ["plugins", "detail", pluginId, "logs"] as const,
     config: (pluginId: string, companyId: string) => ["plugins", "detail", pluginId, "config", companyId] as const,
+    localFolders: (pluginId: string, companyId: string) => ["plugins", "detail", pluginId, "local-folders", companyId] as const,
   },
 
   /** The current Paperclip announcement for a signed-in person (src/shell/Announcements.tsx). */

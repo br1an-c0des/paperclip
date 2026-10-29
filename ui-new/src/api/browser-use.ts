@@ -1,4 +1,4 @@
-import type { BrowserUseControl, BrowserUseViewportPreset, BrowserUseViewportRequest, BrowserUseViewportState, TaskBrowser } from "@paperclipai/shared";
+import type { BrowserUseControl, BrowserUseSettings, BrowserUseViewportPreset, BrowserUseViewportRequest, BrowserUseViewportState, TaskBrowser } from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
@@ -26,4 +26,18 @@ export const browserUseApi = {
     api.post<BrowserUseViewportState>(browser(issueId, browserId, "/viewport"), viewport),
   releaseViewport: (issueId: string, browserId: string, viewerId: string) =>
     api.post<unknown>(browser(issueId, browserId, "/viewport/release"), { viewerId }),
+
+  /*
+   * Browser Use Cloud settings for one credential (`/companies/:id/browser-use-cloud/grants/:grantId/*`),
+   * on its connection's page: the saved profiles agents may use and a cost cap per browser run.
+   */
+  cloudProfiles: (companyId: string, grantId: string, signal?: AbortSignal) =>
+    api.get<Array<{ id: string; name: string | null }>>(cloud(companyId, grantId, "/profiles"), { signal }),
+  cloudSettings: (companyId: string, grantId: string, signal?: AbortSignal) => api.get<BrowserUseSettings>(cloud(companyId, grantId, "/settings"), { signal }),
+  saveCloudSettings: (companyId: string, grantId: string, value: BrowserUseSettings) =>
+    api.put<BrowserUseSettings>(cloud(companyId, grantId, "/settings"), value),
 };
+
+function cloud(companyId: string, grantId: string, rest: string) {
+  return `/companies/${enc(companyId)}/browser-use-cloud/grants/${enc(grantId)}${rest}`;
+}

@@ -42,6 +42,11 @@ export type PluginExportMountProps = {
   missing?: "hidden" | "placeholder";
   /** Shown instead of the placeholder when the export can't be found. */
   fallback?: JSX.Element;
+  /**
+   * The plugin replaces a host surface (the `organizationSwitcher` slot): `fallback`, the host's own
+   * version, shows while the plugin loads and whenever it fails to load or render.
+   */
+  replaces?: boolean;
 };
 
 export function PluginExportMount(props: PluginExportMountProps) {
@@ -56,6 +61,8 @@ export function PluginExportMount(props: PluginExportMountProps) {
   let handle: MountHandle | null = null;
   let mounted: unknown = null;
   let disposed = false;
+  // A replacing plugin that threw stays replaced by the host's version until the component changes.
+  let failed: unknown = null;
 
   const clear = () => {
     handle?.unmount();
@@ -107,7 +114,14 @@ export function PluginExportMount(props: PluginExportMountProps) {
       component: registered.component,
       props: props.componentProps,
       hostContext: props.hostContext,
+      onError: props.replaces
+        ? () => {
+            failed = registered.component;
+            if (!disposed) setState({ status: "error", message: "failed to render" });
+          }
+        : undefined,
     };
+    if (failed === registered.component) return;
     setState({ status: "ready" });
     void loadReactRuntime().then((runtime) => {
       if (disposed) return;
@@ -124,6 +138,7 @@ export function PluginExportMount(props: PluginExportMountProps) {
   return (
     <div class={props.class ? `plugin-slot ${props.class}` : "plugin-slot"} data-plugin={props.pluginKey} data-export={props.exportName}>
       <Switch>
+        <Match when={props.replaces && state().status !== "ready"}>{props.fallback}</Match>
         <Match when={state().status === "error" && (state() as { message: string }).message}>
           {(message) => (
             <div class="plugin-error" role="alert" title={message()}>
@@ -157,6 +172,7 @@ export type PluginSlotMountProps = {
   /** Extra props for the component; `context` and `slot` are always the host's. */
   componentProps?: Record<string, unknown>;
   fallback?: JSX.Element;
+  replaces?: boolean;
 };
 
 export function PluginSlotMount(props: PluginSlotMountProps) {
@@ -175,6 +191,7 @@ export function PluginSlotMount(props: PluginSlotMountProps) {
       class={props.class}
       missing={props.missing}
       fallback={props.fallback}
+      replaces={props.replaces}
     />
   );
 }

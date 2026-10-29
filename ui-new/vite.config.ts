@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from "http";
 import path from "path";
 import { defineConfig, type Plugin, type ProxyOptions } from "vite";
 import solid from "vite-plugin-solid";
+import { pluginTailwind } from "./scripts/plugin-tailwind";
 
 // App and adapter logos (`/brands/apps/linear.svg`…), which the API's app gallery points at, and the
 // favicons and home-screen icons (decision 39, D11). The old UI's `ui/public` stays the one copy of
@@ -156,7 +157,7 @@ const apiProxy: Record<string, ProxyOptions> = {
 
 export default defineConfig({
   // Hot reload has no place in tests, and its runtime module breaks Vitest's loader.
-  plugins: [solid({ hot: !process.env.VITEST }), brands(), serviceWorkerBuildId()],
+  plugins: [solid({ hot: !process.env.VITEST }), brands(), serviceWorkerBuildId(), pluginTailwind()],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),

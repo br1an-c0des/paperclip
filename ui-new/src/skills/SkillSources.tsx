@@ -1,7 +1,7 @@
 import type { SkillSource, SkillSourceDiscovery } from "@paperclipai/shared";
 import { A, useNavigate } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Check, ExternalLink, GitBranch, Plus, RefreshCw } from "lucide-solid";
+import { ExternalLink, GitBranch, ListChecks, Plus, RefreshCw, Settings2 } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { queryKeys } from "@/api/queryKeys";
 import { skillsApi } from "@/api/skills";
@@ -14,18 +14,21 @@ import { pushToast } from "@/ui/Toast";
 import { failureText, useRefreshSkills } from "./queries";
 import { whenLabel } from "./SkillLibrary";
 import { repositoryProblem, repositoryUrl, syncLabel } from "./skills-model";
+import { CandidateList, ChooseSkillsDialog, ProjectRepositories, SourceSettingsDialog } from "./SourceExtras";
 
 /*
  * Skill sources (`/:prefix/skills/sources`): the Git repositories the library imports skills from
  * (`GET /companies/:id/skill-sources`). Each shows its branch, how its sync stands, and the skills
- * it brought in; Sync now reads it again (`POST …/:id/refresh`) and Remove disconnects it, keeping
- * its skills as copies or deleting them (`DELETE …/:id`).
+ * it brought in; Sync now reads it again (`POST …/:id/refresh`), Choose skills changes which are
+ * imported, Settings turns automatic updates and new-skill imports on or off and changes the
+ * branch, and Remove disconnects it, keeping its skills as copies or deleting them (`DELETE …/:id`).
+ * Project workspaces' repositories that aren't sources yet are offered below (SourceExtras.tsx).
  *
- * Add a source reads a repository first (`POST …/discover`) and lists the skills in it; the chosen
- * ones are imported from that exact commit (`POST …/skill-sources`). Private repositories need a
- * GitHub connection, which is set up under Apps; adopting a project's repository, choosing a
- * connection, changing the branch or the selection later, and automatic updates are still in the
- * old UI.
+ * Add a source reads a repository first (`POST …/discover`) and lists the skills in it, each with
+ * a preview; the chosen ones are imported from that exact commit (`POST …/skill-sources`). The
+ * repositories the company's GitHub connections can read are offered as picks. Private repositories
+ * need a GitHub connection, which is set up under Apps; picking a connection other than the one
+ * the server chooses isn't offered.
  */
 
 export function SkillSources(props: { sourceId: string | null }) {
@@ -36,6 +39,8 @@ export function SkillSources(props: { sourceId: string | null }) {
   }));
   const [adding, setAdding] = createSignal(false);
   const [removing, setRemoving] = createSignal<SkillSource | null>(null);
+  const [setting, setSetting] = createSignal<SkillSource | null>(null);
+  const [choosing, setChoosing] = createSignal<SkillSource | null>(null);
 
   createEffect(() => {
     const id = props.sourceId;
@@ -67,21 +72,35 @@ export function SkillSources(props: { sourceId: string | null }) {
           </Match>
         </Switch>
         <ul class="act-list">
-          <For each={sources.data ?? []}>{(source) => <SourceRow source={source} selected={props.sourceId === source.id} onRemove={() => setRemoving(source)} />}</For>
+          <For each={sources.data ?? []}>
+            {(source) => (
+              <SourceRow
+                source={source}
+                selected={props.sourceId === source.id}
+                onRemove={() => setRemoving(source)}
+                onSettings={() => setSetting(source)}
+                onChoose={() => setChoosing(source)}
+              />
+            )}
+          </For>
         </ul>
       </section>
+      <ProjectRepositories />
       <AddSourceDialog open={adding()} onOpenChange={setAdding} />
       <RemoveSourceDialog source={removing()} onClose={() => setRemoving(null)} />
+      <SourceSettingsDialog source={setting()} onClose={() => setSetting(null)} />
+      <ChooseSkillsDialog source={choosing()} onClose={() => setChoosing(null)} />
     </section>
   );
 }
 
-function SourceRow(props: { source: SkillSource; selected: boolean; onRemove: () => void }) {
+function SourceRow(props: { source: SkillSource; selected: boolean; onRemove: () => void; onSettings: () => void; onChoose: () => void }) {
   const company = useCompany();
   const client = useQueryClient();
   const refreshSkills = useRefreshSkills();
   const [syncing, setSyncing] = createSignal(false);
   const imported = () => props.source.entries.filter((entry) => entry.skillId);
+  const newCount = () => props.source.entries.filter((entry) => entry.selection === "new" && entry.present).length;
   const failing = () => Boolean(props.source.lastError);
 
   const sync = async () => {
@@ -127,9 +146,22 @@ function SourceRow(props: { source: SkillSource; selected: boolean; onRemove: ()
             )}
           </Show>
         </span>
+        <Show when={props.source.enabled && props.source.automaticUpdates === false}>
+          <span class="org-muted">Automatic updates are off.</span>
+        </Show>
+        <Show when={props.source.trackingActive === false}>
+          <span class="org-muted">No longer following the repository; its skills are kept.</span>
+        </Show>
+        <Show when={newCount() > 0}>
+          <button type="button" class="act-linkish sk-new-skills" onClick={props.onChoose}>
+            {newCount()} new {newCount() === 1 ? "skill" : "skills"} to choose from
+          </button>
+        </Show>
         <Show when={props.source.lastError}>
           <p class="sk-error" role="alert">
             {props.source.lastError}
+            <Show when={props.source.repairAction === "connection"}> Check the GitHub connection under Apps.</Show>
+            <Show when={props.source.repairAction === "branch"}> Pick another branch in Settings.</Show>
           </p>
         </Show>
         <Show when={imported().length > 0}>
@@ -150,8 +182,14 @@ function SourceRow(props: { source: SkillSource; selected: boolean; onRemove: ()
         <a class="org-link" href={props.source.repositoryUrl} target="_blank" rel="noreferrer">
           Repository <ExternalLink size={12} aria-hidden="true" />
         </a>
-        <Button size="compact" icon={<RefreshCw size={14} aria-hidden="true" />} disabled={syncing()} onClick={() => void sync()}>
+        <Button size="compact" icon={<RefreshCw size={14} aria-hidden="true" />} disabled={syncing() || !props.source.enabled} onClick={() => void sync()}>
           {syncing() ? "Syncing…" : "Sync now"}
+        </Button>
+        <Button size="compact" icon={<ListChecks size={14} aria-hidden="true" />} disabled={!props.source.enabled} onClick={props.onChoose}>
+          Choose skills
+        </Button>
+        <Button size="compact" icon={<Settings2 size={14} aria-hidden="true" />} disabled={!props.source.enabled} onClick={props.onSettings}>
+          Settings
         </Button>
         <Button size="compact" variant="danger" onClick={props.onRemove}>
           Remove
@@ -175,6 +213,18 @@ function AddSourceDialog(props: { open: boolean; onOpenChange: (open: boolean) =
   const [picked, setPicked] = createSignal<ReadonlySet<string>>(new Set());
   const problem = () => (url().trim() ? repositoryProblem(url()) : null);
   const usable = createMemo(() => (found()?.candidates ?? []).filter((candidate) => !candidate.error));
+  // Repositories the company's GitHub connections can read, as quick picks (none without a connection).
+  const repositories = createQuery(() => ({
+    queryKey: queryKeys.skills.repositories(company().id),
+    queryFn: ({ signal }) => skillsApi.repositories(company().id, signal),
+    enabled: props.open,
+    retry: false,
+    staleTime: 60_000,
+  }));
+  const suggestions = createMemo(() => {
+    const words = url().trim().toLowerCase();
+    return (repositories.data?.repositories ?? []).filter((repo) => !words || repo.fullName.toLowerCase().includes(words) || repo.url.toLowerCase() === words).slice(0, 8);
+  });
 
   const reset = () => {
     setUrl("");
@@ -282,6 +332,22 @@ function AddSourceDialog(props: { open: boolean; onOpenChange: (open: boolean) =
               <Field label="Branch" for="sk-source-branch" help="Leave empty for the repository's default branch.">
                 <TextInput id="sk-source-branch" value={branch()} placeholder="main" onInput={(event) => setBranch(event.currentTarget.value)} />
               </Field>
+              <Show when={suggestions().length > 0}>
+                <div class="sk-suggest">
+                  <span class="org-muted">Your GitHub connections can read:</span>
+                  <ul class="sk-chips">
+                    <For each={suggestions()}>
+                      {(repo) => (
+                        <li>
+                          <button type="button" class="sk-chip" aria-pressed={url() === repo.url} onClick={() => setUrl(repo.url)}>
+                            {repo.fullName}
+                          </button>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </div>
+              </Show>
             </>
           }
         >
@@ -305,41 +371,7 @@ function AddSourceDialog(props: { open: boolean; onOpenChange: (open: boolean) =
                   </button>
                 </div>
               </Show>
-              <ul class="sk-candidates">
-                <For each={discovery().candidates}>
-                  {(candidate) => (
-                    <li>
-                      <button
-                        type="button"
-                        role="checkbox"
-                        class="sk-candidate"
-                        aria-checked={picked().has(candidate.path)}
-                        disabled={Boolean(candidate.error)}
-                        onClick={() => toggle(candidate.path)}
-                      >
-                        <span class="org-cbox" aria-hidden="true">
-                          <Show when={picked().has(candidate.path)}>
-                            <Check size={11} stroke-width={3.2} />
-                          </Show>
-                        </span>
-                        <span class="sk-candidate-text">
-                          <span class="org-strong">{candidate.name}</span>
-                          <span class="mono org-muted">
-                            {candidate.path || "/"} · {candidate.fileCount} {candidate.fileCount === 1 ? "file" : "files"}
-                          </span>
-                          <Show when={candidate.description}>
-                            <span class="org-muted sk-clamp">{candidate.description}</span>
-                          </Show>
-                          <Show when={candidate.error}>
-                            <span class="sk-error">{candidate.error}</span>
-                          </Show>
-                          <For each={candidate.warnings}>{(warning) => <span class="sk-warning">{warning}</span>}</For>
-                        </span>
-                      </button>
-                    </li>
-                  )}
-                </For>
-              </ul>
+              <CandidateList discovery={discovery()} picked={picked()} onToggle={toggle} />
             </>
           )}
         </Show>

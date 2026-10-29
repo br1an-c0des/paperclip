@@ -1,4 +1,11 @@
-import type { PluginConfig, PluginLauncherDeclaration, PluginLauncherRenderContextSnapshot, PluginRecord, PluginUiSlotDeclaration } from "@paperclipai/shared";
+import type {
+  PluginConfig,
+  PluginLauncherDeclaration,
+  PluginLauncherRenderContextSnapshot,
+  PluginLocalFolderDeclaration,
+  PluginRecord,
+  PluginUiSlotDeclaration,
+} from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
@@ -8,7 +15,7 @@ import { api } from "./client";
  *
  * Plugin hosting (src/plugins/, decision G) adds what plugin UI needs: the UI contributions of the
  * ready plugins, and the bridge requests a plugin component's `usePluginData` and
- * `usePluginAction` make to its worker.
+ * `usePluginAction` make to its worker, and a plugin's local folders.
  */
 
 /**
@@ -72,6 +79,47 @@ export type BundledPlugin = {
   hasBuiltEntrypoints: boolean;
 };
 
+/*
+ * A plugin's company-scoped local folders (host folders the manifest's `localFolders` asks for). The
+ * status types aren't in @paperclipai/shared; they're declared as ui/src/api/plugins.ts has them
+ * (decision 10).
+ */
+export type PluginLocalFolderProblem = { code: string; message: string; path?: string };
+
+export type PluginLocalFolderStatus = {
+  folderKey: string;
+  configured: boolean;
+  path: string | null;
+  realPath: string | null;
+  access: "read" | "readWrite";
+  readable: boolean;
+  writable: boolean;
+  requiredDirectories: string[];
+  requiredFiles: string[];
+  missingDirectories: string[];
+  missingFiles: string[];
+  healthy: boolean;
+  problems: PluginLocalFolderProblem[];
+  checkedAt: string;
+};
+
+export type PluginLocalFoldersResponse = {
+  pluginId: string;
+  companyId: string;
+  declarations: PluginLocalFolderDeclaration[];
+  folders: PluginLocalFolderStatus[];
+};
+
+export type PluginLocalFolderSaveInput = {
+  path: string;
+  access?: "read" | "readWrite";
+  requiredDirectories?: string[];
+  requiredFiles?: string[];
+};
+
+const localFoldersPath = (pluginId: string, companyId: string) =>
+  `/plugins/${encodeURIComponent(pluginId)}/companies/${encodeURIComponent(companyId)}/local-folders`;
+
 export const pluginsApi = {
   list: () => api.get<PluginRecord[]>("/plugins"),
   bundled: () => api.get<BundledPlugin[]>("/plugins/examples"),
@@ -94,6 +142,12 @@ export const pluginsApi = {
   /** The worker's `validateConfig`, without saving. */
   testConfig: (pluginId: string, companyId: string, configJson: Record<string, unknown>) =>
     api.post<{ valid: boolean; message?: string }>(`/plugins/${encodeURIComponent(pluginId)}/config/test`, { companyId, configJson }),
+  /** The declared folders and each one's inspected status, in a company. */
+  localFolders: (pluginId: string, companyId: string, signal?: AbortSignal) =>
+    api.get<PluginLocalFoldersResponse>(localFoldersPath(pluginId, companyId), { signal }),
+  /** Saves a folder's path and answers with its inspected status (healthy or not). */
+  configureLocalFolder: (pluginId: string, companyId: string, folderKey: string, input: PluginLocalFolderSaveInput) =>
+    api.put<PluginLocalFolderStatus>(`${localFoldersPath(pluginId, companyId)}/${encodeURIComponent(folderKey)}`, input),
   uiContributions: (signal?: AbortSignal) => api.get<PluginUiContribution[]>("/plugins/ui-contributions", { signal }),
   /** `usePluginData(key, params)`: the worker's `getData` handler. Errors carry `{ code, message, details }`. */
   bridgeGetData: (

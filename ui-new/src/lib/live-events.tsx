@@ -101,6 +101,10 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
     case "company_skill_source":
       keys.push(queryKeys.skills.all(companyId), queryKeys.skills.sources(companyId));
       break;
+    // Skill and routine folders (the library's folder list sits under the skills prefix).
+    case "folder":
+      keys.push(queryKeys.skills.all(companyId), queryKeys.routines.folders(companyId));
+      break;
     case "project":
       keys.push(queryKeys.projects.all(companyId));
       if (entityId) keys.push(["projects", "detail", entityId]);

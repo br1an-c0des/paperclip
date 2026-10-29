@@ -35,7 +35,10 @@ import {
   tabsFor,
   type ChatTab,
 } from "./chat-model";
+import { GitHubAccess, GitHubSettings } from "./GitHubBot";
 import { Card, CopyValue, useChatEndpoint } from "./parts";
+import { SlackTestMessage, SlackTools } from "./SlackSetup";
+import { TaskDefaults } from "./TaskDefaults";
 
 /*
  * One chat endpoint (`/apps/chat/:endpointId/:tab`, the old UI's ChatEndpointDetail):
@@ -52,8 +55,12 @@ import { Card, CopyValue, useChatEndpoint } from "./parts";
  *   publication and provider action, with Replay for a failed one and Resolve for one Paperclip
  *   lost track of; a voice persona's calls join the first page.
  *
- * Not here: task defaults (project and workspace for new chat tasks), Slack's tools and personal
- * search, the GitHub bot's repository and review settings, and Speko's callback number.
+ * Settings also carry task defaults (the project and workspace new chat tasks get, for the
+ * endpoint and for each channel), Slack's test message, tools and personal search, a GitHub bot's
+ * repositories and review settings (Access: its people; src/apps/chat/GitHubBot.tsx), and a voice
+ * persona's "call my phone" number.
+ *
+ * Not here: Speko's in-browser call (it needs Speko's browser client, which ui-new doesn't bundle).
  */
 
 export function ChatEndpointPage(props: { endpointId: string; tab: ChatTab }) {
@@ -136,6 +143,9 @@ export function ChatEndpointPage(props: { endpointId: string; tab: ChatTab }) {
                 <Match when={props.tab === "settings"}>
                   <SettingsTab endpoint={endpoint()} />
                 </Match>
+                <Match when={props.tab === "access" && endpoint().provider === "github"}>
+                  <GitHubAccess endpoint={endpoint()} base={base()} />
+                </Match>
                 <Match when={props.tab === "access"}>
                   <AccessTab endpoint={endpoint()} />
                 </Match>
@@ -175,20 +185,137 @@ function useUpdateEndpoint(endpoint: () => ChatEndpoint) {
 // Settings
 
 function SettingsTab(props: { endpoint: ChatEndpoint }) {
+  const company = useCompany();
   return (
-    <Switch>
-      <Match when={props.endpoint.provider === "agentmail"}>
-        <InboxSettings endpoint={props.endpoint} />
-      </Match>
-      <Match when={props.endpoint.provider === "speko"}>
-        <PhoneLine endpoint={props.endpoint} />
-        <IncomingCalls endpoint={props.endpoint} />
-      </Match>
-      <Match when={true}>
-        <Destinations endpoint={props.endpoint} />
-        <Behaviour endpoint={props.endpoint} />
-      </Match>
-    </Switch>
+    <>
+      <Switch>
+        <Match when={props.endpoint.provider === "agentmail"}>
+          <InboxSettings endpoint={props.endpoint} />
+        </Match>
+        <Match when={props.endpoint.provider === "speko"}>
+          <Show when={props.endpoint.status === "active"}>
+            <CallMyPhone endpoint={props.endpoint} />
+          </Show>
+          <PhoneLine endpoint={props.endpoint} />
+          <IncomingCalls endpoint={props.endpoint} />
+        </Match>
+        <Match when={props.endpoint.provider === "github"}>
+          <GitHubSettings endpoint={props.endpoint} base={`/${company().issuePrefix}/apps`} />
+        </Match>
+        <Match when={true}>
+          <Show when={props.endpoint.provider === "slack"}>
+            <Card title="Check it works" description={`${props.endpoint.assignedAgentName} sends you a direct message in Slack.`}>
+              <SlackTestMessage endpoint={props.endpoint} />
+            </Card>
+          </Show>
+          <Destinations endpoint={props.endpoint} />
+          <Behaviour endpoint={props.endpoint} />
+          <Show when={props.endpoint.provider === "slack"}>
+            <SlackTools endpoint={props.endpoint} />
+          </Show>
+        </Match>
+      </Switch>
+      <EndpointTaskDefaults endpoint={props.endpoint} />
+    </>
+  );
+}
+
+/** The project and workspace new conversations' tasks get, for every channel. */
+function EndpointTaskDefaults(props: { endpoint: ChatEndpoint }) {
+  const company = useCompany();
+  const client = useQueryClient();
+  return (
+    <Card title="Task defaults" description="The project and workspace new conversations' tasks get. Existing tasks keep theirs.">
+      <TaskDefaults
+        value={props.endpoint.executionDefaults}
+        onSave={async (executionDefaults) => {
+          const next = await chatEndpointsApi.update(props.endpoint.id, { executionDefaults });
+          client.setQueryData(queryKeys.chatEndpoints.detail(company().id, next.id), next);
+        }}
+      />
+    </Card>
+  );
+}
+
+/** "Call my phone": your own number this persona may call about your tasks. */
+function CallMyPhone(props: { endpoint: ChatEndpoint }) {
+  const company = useCompany();
+  const client = useQueryClient();
+  const key = () => queryKeys.chatEndpoints.part(company().id, props.endpoint.id, "voice-callback");
+  const query = createQuery(() => ({
+    queryKey: key(),
+    queryFn: ({ signal }) => voiceApi.callback(company().id, props.endpoint.id, signal),
+    retry: false,
+  }));
+  const [phone, setPhone] = createSignal("");
+  const [enabled, setEnabled] = createSignal(false);
+  const [invalid, setInvalid] = createSignal(false);
+  createEffect(
+    on(
+      () => query.data,
+      (preference) => {
+        setPhone(preference?.phoneNumber ?? "");
+        setEnabled(preference?.enabled ?? false);
+      },
+    ),
+  );
+  const save = createMutation(() => ({
+    mutationFn: () => voiceApi.saveCallback(company().id, props.endpoint.id, { phoneNumber: phone().trim(), enabled: enabled() }),
+    onSuccess: (next) => {
+      client.setQueryData(key(), next);
+      pushToast({ tone: "success", title: "Callback setting saved" });
+    },
+    onError: (error) => pushToast({ tone: "error", title: "Couldn't save the callback number", body: failureText(error, "Try again.") }),
+  }));
+  return (
+    <Card title="Call my phone" description={`Your own number ${props.endpoint.assignedAgentName} may call about your tasks.`}>
+      <form
+        class="ch-step-body"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!/^\+[1-9]\d{6,14}$/.test(phone().trim())) {
+            setInvalid(true);
+            return;
+          }
+          setInvalid(false);
+          save.mutate();
+        }}
+      >
+        <label class="field-stack" for="ch-callback-phone">
+          <span class="field-label">Your callback number</span>
+          <TextInput
+            id="ch-callback-phone"
+            type="tel"
+            autocomplete="tel"
+            placeholder="+12015551234"
+            value={phone()}
+            disabled={query.isPending || save.isPending}
+            aria-invalid={invalid()}
+            onInput={(event) => {
+              setPhone(event.currentTarget.value);
+              setInvalid(false);
+            }}
+          />
+        </label>
+        <Show when={invalid()}>
+          <p class="cx-note cx-note--error" role="alert">
+            Use an international number: + and the country code first.
+          </p>
+        </Show>
+        <Toggle checked={enabled()} disabled={query.isPending || save.isPending} onChange={setEnabled} label="Allow this agent to call me about my tasks" />
+        <Show when={query.isError}>
+          <p class="cx-note cx-note--error" role="alert">
+            {failureText(query.error, "Couldn't load your callback setting.")}
+          </p>
+        </Show>
+        <div class="cx-actions">
+          <span />
+          <Button type="submit" size="compact" variant="primary" disabled={query.isPending || save.isPending}>
+            {save.isPending ? "Saving…" : "Save the phone setting"}
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }
 
@@ -255,6 +382,7 @@ function Destinations(props: { endpoint: ChatEndpoint }) {
                         .join(" · ") || undefined
                     }
                   />
+                  <ResourceDefaults endpoint={props.endpoint} resource={resource} onSaved={(next) => client.setQueryData(key(), next)} />
                 </li>
               )}
             </For>
@@ -262,6 +390,25 @@ function Destinations(props: { endpoint: ChatEndpoint }) {
         </Match>
       </Switch>
     </Card>
+  );
+}
+
+/** One channel's own task defaults, folded away behind a link. */
+function ResourceDefaults(props: { endpoint: ChatEndpoint; resource: ChatEndpointResource; onSaved: (next: ChatEndpointResource[]) => void }) {
+  const [open, setOpen] = createSignal(false);
+  return (
+    <div class="ch-resource-defaults">
+      <button type="button" class="cx-link ch-defaults-toggle" aria-expanded={open()} onClick={() => setOpen(!open())}>
+        Task defaults for {props.resource.label}
+      </button>
+      <Show when={open()}>
+        <TaskDefaults
+          value={props.resource.executionDefaults}
+          resource
+          onSave={async (executionDefaults) => props.onSaved(await chatEndpointsApi.updateResources(props.endpoint.id, [{ id: props.resource.id, executionDefaults }]))}
+        />
+      </Show>
+    </div>
   );
 }
 

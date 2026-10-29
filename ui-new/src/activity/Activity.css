@@ -532,6 +532,274 @@ a.act-target {
   font-size: 13px;
 }
 
+/* Costs' views and their reports (CostReports.tsx, CostExtras.tsx) */
+.act-cost-tabs {
+  flex-wrap: wrap;
+}
+
+.act-cost-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.act-amount {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.act-estimate {
+  color: var(--amber-fg);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.act-kpi-line {
+  display: block;
+}
+
+.act-kpi-link {
+  align-self: flex-start;
+  font-size: 12px;
+}
+
+.act-report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.act-report {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.act-report-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.act-report-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.act-report-title h2 {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.act-report-total {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.act-report-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.act-report-sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.act-report-model {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.act-cost-nums.act-report-model {
+  align-items: flex-end;
+}
+
+.act-report-models .act-cost-row {
+  padding: 6px 0;
+}
+
+.act-report-line {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* A model's share of tokens, with its share of spend drawn darker on top. */
+.act-share {
+  position: relative;
+}
+
+.act-share > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  opacity: 0.45;
+}
+
+.act-share > span.act-share-cost {
+  opacity: 1;
+}
+
+.act-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.act-meter-label {
+  min-width: 44px;
+  color: var(--body);
+  font-weight: 700;
+}
+
+.act-quota {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.act-quota + .act-quota {
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+
+.act-quota-note {
+  margin: 0;
+  font-size: 12px;
+}
+
+.act-fin-line {
+  flex-wrap: wrap;
+}
+
+.act-calls-note {
+  margin: 0;
+  padding: 10px 18px 0;
+  font-size: 12px;
+}
+
+.act-calls-scroll {
+  overflow-x: auto;
+}
+
+.act-calls {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.act-calls th {
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.act-calls td {
+  padding: 9px 12px;
+  border-top: 1px solid var(--row-line);
+  color: var(--body);
+  vertical-align: top;
+}
+
+.act-calls td > span {
+  display: block;
+}
+
+.act-calls td .org-muted {
+  font-size: 12px;
+}
+
+.act-calls .act-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.act-calls td.mono {
+  font-size: 12px;
+}
+
+.act-call-when {
+  white-space: nowrap;
+}
+
+.act-subs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.act-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.act-sub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.act-sub-link {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.act-quality {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.act-quality-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  font-size: 13px;
+}
+
+.act-quality-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.act-quality-group + .act-quality-group {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.act-quality-agent {
+  color: var(--text);
+}
+
 @container main (max-width: 960px) {
   .act-cost-grid {
     grid-template-columns: minmax(0, 1fr);

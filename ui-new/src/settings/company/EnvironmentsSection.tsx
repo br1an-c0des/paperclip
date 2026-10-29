@@ -1,6 +1,6 @@
 import type { Environment, EnvironmentDeleteBlastRadius, EnvironmentProbeResult } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Ellipsis, Server } from "lucide-solid";
+import { Ellipsis, Plus, Server } from "lucide-solid";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 import { environmentsApi } from "@/api/environments";
@@ -12,7 +12,8 @@ import { Dialog } from "@/ui/Dialog";
 import { Menu } from "@/ui/Menu";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
-import { defaultPatchId, deleteSummary, driverLabel, effectiveDefaultId, isManaged, sortEnvironments } from "./environments-model";
+import { EnvironmentDialog, type EnvironmentEdit } from "./EnvironmentDialog";
+import { defaultPatchId, deleteSummary, driverLabel, effectiveDefaultId, environmentSummary, isManaged, sortEnvironments } from "./environments-model";
 import { CardHead, CardNoteLine, failure, OutlineCard, SectionTitle } from "./shared";
 
 /*
@@ -22,9 +23,9 @@ import { CardHead, CardNoteLine, failure, OutlineCard, SectionTitle } from "./sh
  * nothing depends on it. The default is the instance's (`PATCH /instance/settings`), so making one
  * the default reaches every organization; the section says so where it's shown and set.
  *
- * Creating and editing environments (SSH hosts, sandbox providers and their settings), custom
- * sandbox images and the terminal aren't here yet: they're outlined below, and stay in the classic
- * UI meanwhile.
+ * New environment and Edit open a dialog (EnvironmentDialog.tsx): an SSH host or a sandbox
+ * provider's settings, and the variables runs there get. Custom sandbox images and the terminal are
+ * on hold (decision 39, D7).
  */
 
 export function EnvironmentsSection() {
@@ -40,6 +41,16 @@ export function EnvironmentsSection() {
   const list = createMemo(() => sortEnvironments(environments.data, defaultId()));
   const [probes, setProbes] = createStore<Record<string, EnvironmentProbeResult | "running" | { error: string }>>({});
   const [deleting, setDeleting] = createSignal<Environment | null>(null);
+  const [editing, setEditing] = createSignal<EnvironmentEdit | null>(null);
+  const capabilities = createQuery(() => ({
+    queryKey: queryKeys.companySettings.environmentCapabilities(company().id),
+    queryFn: ({ signal }) => environmentsApi.capabilities(company().id, signal),
+    retry: false,
+  }));
+  const providerName = (environment: Environment) => {
+    const key = typeof environment.config?.provider === "string" ? environment.config.provider : "";
+    return key ? (capabilities.data?.sandboxProviders?.[key]?.displayName ?? key) : undefined;
+  };
   const refresh = () => client.invalidateQueries({ queryKey: queryKeys.projectSettings.environments(company().id) });
 
   const probe = async (environment: Environment) => {
@@ -74,7 +85,16 @@ export function EnvironmentsSection() {
     <>
       <SectionTitle title="Environments">Where this organization's agents run.</SectionTitle>
       <section class="card settings-card" aria-labelledby="cs-envs">
-        <CardHead id="cs-envs" title="Environments" note={environments.data ? `${list().filter((entry) => entry.status === "active").length} active` : "Loading…"} />
+        <CardHead
+          id="cs-envs"
+          title="Environments"
+          note={environments.data ? `${list().filter((entry) => entry.status === "active").length} active` : "Loading…"}
+          actions={
+            <Button size="compact" variant="primary" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setEditing({ mode: "new" })}>
+              New environment
+            </Button>
+          }
+        />
         <CardNoteLine>
           The default is instance-wide: agents in every organization on this instance that haven't picked an environment run
           there.
@@ -103,7 +123,9 @@ export function EnvironmentsSection() {
                         <span class="cs-pill">Archived</span>
                       </Show>
                     </span>
-                    <span class="cs-muted">{[driverLabel(environment.driver), isManaged(environment) ? "managed by Paperclip" : null, environment.description].filter(Boolean).join(" · ")}</span>
+                    <span class="cs-muted">{[driverLabel(environment.driver), isManaged(environment) ? "managed by Paperclip" : null, environmentSummary(environment, providerName(environment)), environment.description]
+                        .filter(Boolean)
+                        .join(" · ")}</span>
                     <Show when={result()}>
                       {(found) => {
                         const value = found();
@@ -125,19 +147,24 @@ export function EnvironmentsSection() {
                   <Button size="compact" disabled={result() === "running" || environment.status === "archived"} onClick={() => void probe(environment)}>
                     Probe
                   </Button>
-                  <Show when={!isManaged(environment) || (!isDefault(environment) && environment.status === "active")}>
+                  <Show when={environment.status === "active" || !isManaged(environment)}>
                     <Menu placement="bottom-end">
                       <Menu.Trigger as={Button} variant="icon" ghost size="compact" aria-label={`More actions for ${environment.name}`}>
                         <Ellipsis size={16} aria-hidden="true" />
                       </Menu.Trigger>
                       <Menu.Content label="Environment actions" width={260}>
+                        <Show when={environment.status === "active"}>
+                          <Menu.Item onSelect={() => setEditing({ mode: "edit", environment })} description={isManaged(environment) ? "Its variables" : "Settings and variables"}>
+                            Edit…
+                          </Menu.Item>
+                        </Show>
                         <Show when={!isDefault(environment) && environment.status === "active"}>
                           <Menu.Item onSelect={() => void makeDefault(environment)} description="For every organization on this instance">
                             Make the default
                           </Menu.Item>
                         </Show>
                         <Show when={!isManaged(environment)}>
-                          <Show when={!isDefault(environment) && environment.status === "active"}>
+                          <Show when={environment.status === "active"}>
                             <Menu.Separator />
                           </Show>
                           <Show
@@ -165,15 +192,14 @@ export function EnvironmentsSection() {
         </For>
       </section>
       <OutlineCard
-        note="Not in this version yet. This section will also hold:"
+        note="On hold (decision 39, D7):"
         rows={[
-          { name: "New environment", text: "SSH hosts, sandbox providers and plugin environments, with a probe before saving." },
-          { name: "Edit", text: "Name, settings and environment variables of an environment." },
-          { name: "Custom images", text: "Build and test a sandbox image step by step, roll back or relink it." },
-          { name: "Terminal", text: "Open a terminal in an environment." },
+          { name: "Custom images", text: "Set up a sandbox by hand, capture it as an image, and boot later runs from it." },
+          { name: "Terminal", text: "Open a terminal in a sandbox environment." },
         ]}
         was="Instance settings → Environments"
       />
+      <EnvironmentDialog edit={editing()} onClose={() => setEditing(null)} onSaved={refresh} />
       <DeleteEnvironmentDialog environment={deleting()} onClose={() => setDeleting(null)} onDeleted={refresh} />
     </>
   );
