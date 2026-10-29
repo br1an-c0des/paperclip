@@ -7,6 +7,8 @@ import * as ReactJsxRuntime from "react/jsx-runtime";
 import { PluginBridgeContext, copyTextToClipboard, useHostContext, useHostLocation, useHostNavigation, usePluginAction, usePluginData, usePluginStream, usePluginToast } from "./bridge";
 import * as components from "./components";
 import "./sdk.css";
+// The old UI's Tailwind classes, scoped to plugin areas (scripts/plugin-tailwind.ts, decision 39 D10).
+import "virtual:paperclip-plugin-tailwind.css";
 
 /*
  * The React side of plugin hosting, loaded with a dynamic import (../runtime.ts) the first time a
