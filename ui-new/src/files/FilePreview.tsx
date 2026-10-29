@@ -1,6 +1,6 @@
 import { createQuery } from "@tanstack/solid-query";
 import { ArrowLeft, Check, Copy, Download, FileQuestion } from "lucide-solid";
-import { createEffect, createMemo, createSignal, Match, onCleanup, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch } from "solid-js";
 import { fileResourcesApi } from "@/api/file-resources";
 import { queryKeys } from "@/api/queryKeys";
 import { Markdown } from "@/ui/Markdown";
@@ -8,12 +8,14 @@ import { Segmented } from "@/ui/Segmented";
 import { CodeView } from "./CodeView";
 import type { FileOpen } from "./file-ref";
 import { basename } from "./file-tree";
+import { csvTable, htmlPreviewDocument } from "./html-preview";
 import { base64Bytes, detectPreview, fileSize, resourcePath } from "./preview";
 
 /*
- * One workspace file, previewed: Markdown rendered (its source a toggle away), code highlighted,
- * plain text with line numbers, images, video and PDF. Anything else, or anything too large, offers
- * the download instead.
+ * One workspace file, previewed: Markdown and HTML rendered and CSV as a table (each with its
+ * source a toggle away), code highlighted, plain text with line numbers, images, video and PDF.
+ * Anything else, or anything too large, offers the download instead. HTML renders in a sandboxed
+ * frame (html-preview.ts).
  */
 
 export function FilePreview(props: { taskId: string; file: FileOpen; onClose?: () => void }) {
@@ -31,8 +33,14 @@ export function FilePreview(props: { taskId: string; file: FileOpen; onClose?: (
   }));
   const [markdownView, setMarkdownView] = createSignal<"rendered" | "source">("rendered");
   const [copied, setCopied] = createSignal(false);
+  createEffect(on(() => props.file.path, () => setMarkdownView("rendered"), { defer: true }));
 
   const preview = createMemo(() => (content.data ? detectPreview(content.data.resource, content.data.content) : null));
+  // Markdown, HTML and CSV each show rendered, with the source a toggle away.
+  const rendered = () => {
+    const kind = preview()?.kind;
+    return kind === "markdown" || kind === "html" || kind === "csv";
+  };
   const path = () => (content.data ? resourcePath(content.data.resource) : props.file.path);
   const text = () => (content.data?.content.encoding === "utf8" ? content.data.content.data : "");
   const download = () => fileResourcesApi.downloadUrl(props.taskId, props.file);
@@ -74,11 +82,11 @@ export function FilePreview(props: { taskId: string; file: FileOpen; onClose?: (
           </span>
         </div>
         <div class="wf-preview-tools">
-          <Show when={preview()?.kind === "markdown"}>
+          <Show when={rendered()}>
             <Segmented
-              label="Markdown view"
+              label={preview()?.kind === "csv" ? "CSV view" : preview()?.kind === "html" ? "HTML view" : "Markdown view"}
               options={[
-                { value: "rendered", label: "Rendered" },
+                { value: "rendered", label: preview()?.kind === "csv" ? "Table" : "Rendered" },
                 { value: "source", label: "Source" },
               ]}
               value={markdownView()}
@@ -115,7 +123,21 @@ export function FilePreview(props: { taskId: string; file: FileOpen; onClose?: (
                     <Markdown source={text()} />
                   </div>
                 </Match>
-                <Match when={shown().kind === "markdown" || shown().kind === "code" || shown().kind === "text"}>
+                <Match when={shown().kind === "html" && markdownView() === "rendered"}>
+                  <iframe
+                    class="wf-html"
+                    title={`${basename(path())}, rendered`}
+                    srcdoc={htmlPreviewDocument(text())}
+                    // Never allow-same-origin: the opaque origin keeps the page away from ui-new's cookies, storage and DOM.
+                    sandbox="allow-scripts"
+                    referrerPolicy="no-referrer"
+                    allow="camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'; fullscreen 'none'"
+                  />
+                </Match>
+                <Match when={shown().kind === "csv" && markdownView() === "rendered"}>
+                  <CsvView text={text()} name={basename(path())} />
+                </Match>
+                <Match when={rendered() || shown().kind === "code" || shown().kind === "text"}>
                   <CodeView value={text()} filename={basename(path())} line={props.file.line ?? null} label={`Contents of ${path()}`} />
                 </Match>
                 <Match when={shown().kind === "image" && shown()}>
@@ -146,6 +168,61 @@ export function FilePreview(props: { taskId: string; file: FileOpen; onClose?: (
         </Switch>
       </div>
     </section>
+  );
+}
+
+/** A CSV file as a table, its first record the header (html-preview.ts `csvTable`). */
+function CsvView(props: { text: string; name: string }) {
+  const table = createMemo(() => csvTable(props.text));
+  const parsed = () => {
+    const found = table();
+    return "error" in found ? null : found;
+  };
+  const failure = () => {
+    const found = table();
+    return "error" in found ? found.error : "";
+  };
+  return (
+    <Show when={parsed()} fallback={<p class="tsec-muted" role="alert">{failure()}</p>}>
+      {(found) => (
+        <Show when={found().columnCount > 0} fallback={<p class="tsec-muted">The file is empty.</p>}>
+          <div class="wf-csv">
+            <p class="tsec-muted wf-csv-meta" role="status">
+              {found().rowCount.toLocaleString()} {found().rowCount === 1 ? "row" : "rows"} · {found().columnCount.toLocaleString()}{" "}
+              {found().columnCount === 1 ? "column" : "columns"}
+              <Show when={found().clipped}>
+                {" "}· showing the first {found().rows.length} rows and {found().header.length} columns; download it for the rest
+              </Show>
+            </p>
+            <div class="wf-csv-scroll" role="region" aria-label={`${props.name} as a table`} tabindex="0">
+              <table class="wf-csv-table">
+                <caption class="sr-only">{props.name}, its first record used as the column names</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" class="wf-csv-n">
+                      <span class="sr-only">Row</span>#
+                    </th>
+                    <For each={found().header}>{(name) => <th scope="col">{name}</th>}</For>
+                  </tr>
+                </thead>
+                <tbody>
+                  <For each={found().rows}>
+                    {(row, index) => (
+                      <tr>
+                        <th scope="row" class="wf-csv-n">
+                          {index() + 1}
+                        </th>
+                        <For each={row}>{(cell) => <td>{cell}</td>}</For>
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </Show>
+      )}
+    </Show>
   );
 }
 

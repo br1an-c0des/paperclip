@@ -141,6 +141,38 @@ button.wf-row:focus-visible {
   text-overflow: ellipsis;
 }
 
+.wf-folder {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* The workspace picker in the header: the task's own workspace, or a project's */
+.wf-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  height: 32px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wf-source:hover {
+  background: var(--well);
+  color: var(--text);
+}
+
+.wf-source-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .wf-size {
   margin-left: auto;
   padding-left: 8px;
@@ -246,6 +278,78 @@ button.wf-row:focus-visible {
   width: 100%;
   min-height: 60vh;
   border: 0;
+}
+
+/* An HTML file, rendered in its sandboxed frame on a white page, as a browser would show it */
+.wf-html {
+  flex: 1;
+  width: 100%;
+  min-height: 60vh;
+  border: 0;
+  background: #ffffff;
+}
+
+/* A CSV file as a table, the header row kept in view */
+.wf-csv {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wf-csv-meta {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.wf-csv-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.wf-csv-scroll:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: -2px;
+}
+
+.wf-csv-table {
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wf-csv-table th,
+.wf-csv-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--row-line);
+  text-align: left;
+  vertical-align: top;
+  white-space: pre-wrap;
+  color: var(--body);
+}
+
+.wf-csv-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--well);
+  color: var(--text);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.wf-csv-table tbody tr:hover {
+  background: var(--row-hover);
+}
+
+.wf-csv-table .wf-csv-n {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  text-align: right;
 }
 
 .wf-unavailable {
