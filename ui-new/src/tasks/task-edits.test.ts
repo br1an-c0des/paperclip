@@ -63,8 +63,9 @@ describe("blockersEdit", () => {
 
 describe("run overrides", () => {
   it("reads the model and whichever effort key the adapter uses", () => {
-    expect(runOverrides({ assigneeAdapterOverrides: { adapterConfig: { model: "m", modelReasoningEffort: "high" } } })).toEqual({ model: "m", effort: "high" });
-    expect(runOverrides({ assigneeAdapterOverrides: null })).toEqual({ model: null, effort: null });
+    expect(runOverrides({ assigneeAdapterOverrides: { adapterConfig: { model: "m", modelReasoningEffort: "high" } } })).toEqual({ model: "m", effort: "high", chrome: false });
+    expect(runOverrides({ assigneeAdapterOverrides: null })).toEqual({ model: null, effort: null, chrome: false });
+    expect(runOverrides({ assigneeAdapterOverrides: { adapterConfig: { chrome: true } } }).chrome).toBe(true);
   });
 
   it("sets a model, keeping other adapter options", () => {
@@ -72,6 +73,16 @@ describe("run overrides", () => {
     expect(runOverridesEdit(task, claude, { model: "claude-sonnet-5" })).toEqual({
       assigneeAdapterOverrides: { useProjectWorkspace: false, adapterConfig: { chrome: true, model: "claude-sonnet-5" } },
     });
+  });
+
+  it("turns Claude's browser access on and off, and only for Claude", () => {
+    expect(runOverridesEdit({ assigneeAdapterOverrides: null }, claude, { chrome: true })).toEqual({
+      assigneeAdapterOverrides: { adapterConfig: { chrome: true } },
+    });
+    expect(runOverridesEdit({ assigneeAdapterOverrides: { adapterConfig: { chrome: true, model: "m" } } }, claude, { chrome: false })).toEqual({
+      assigneeAdapterOverrides: { adapterConfig: { model: "m" } },
+    });
+    expect(runOverridesEdit({ assigneeAdapterOverrides: null }, codex, { chrome: true })).toBeNull();
   });
 
   it("writes the effort under the adapter's own key", () => {

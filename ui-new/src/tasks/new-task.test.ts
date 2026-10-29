@@ -70,6 +70,31 @@ describe("buildCreatePayload", () => {
       projectWorkspaceId: "w1",
     });
   });
+
+  it("reuses another task's worktree with its id, its mode and its project workspace", () => {
+    const project = {
+      id: "p1",
+      executionWorkspacePolicy: { enabled: true, defaultMode: "shared_workspace" },
+      workspaces: [{ id: "w1", isPrimary: true }],
+    } as unknown as PayloadContext["project"];
+    const reused = { id: "ew9", name: "TES-4 worktree", mode: "operator_branch", projectWorkspaceId: "w2" };
+    const draft = emptyDraft({ title: "T", workspace: "reuse_existing", reuseWorkspace: reused });
+    expect(buildCreatePayload(draft, { ...context, project, isolatedWorkspacesEnabled: true })).toMatchObject({
+      executionWorkspacePreference: "reuse_existing",
+      executionWorkspaceId: "ew9",
+      executionWorkspaceSettings: { mode: "operator_branch" },
+      projectWorkspaceId: "w2",
+    });
+    const adapterManaged = { ...reused, mode: "adapter_managed", projectWorkspaceId: null };
+    expect(
+      buildCreatePayload(emptyDraft({ title: "T", workspace: "reuse_existing", reuseWorkspace: adapterManaged }), {
+        ...context,
+        project,
+        isolatedWorkspacesEnabled: true,
+      }),
+    ).toMatchObject({ executionWorkspaceSettings: { mode: "agent_default" }, projectWorkspaceId: "w1" });
+    expect(draftProblem(emptyDraft({ title: "T", workspace: "reuse_existing" }))).toBe("Pick the workspace to reuse.");
+  });
 });
 
 describe("effortOptions", () => {

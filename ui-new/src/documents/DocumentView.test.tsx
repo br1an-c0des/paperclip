@@ -20,6 +20,12 @@ vi.mock("@/api/documents", () => ({
   },
 }));
 
+// Mentions need the company's people; this test has no company, and no "@" is typed.
+vi.mock("@/tasks/composer/MentionTextArea", () => ({
+  useMentionCandidates: () => ({ candidates: () => [], people: {} }),
+  MentionList: () => null,
+}));
+
 // CodeMirror needs real layout; the editor's textarea stand-in is enough here.
 vi.mock("./cm-editor", () => ({
   createMarkdownEditor: () => {

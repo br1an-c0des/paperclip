@@ -24,6 +24,13 @@ describe("feedback votes", () => {
   it("keys your votes by comment, leaving document votes out", () => {
     const map = votesByComment([vote(), vote({ id: "v2", targetType: "issue_document_revision", targetId: "d1" })]);
     expect([...map.keys()]).toEqual(["c1"]);
+    expect([...votesByComment([vote(), vote({ id: "v2", targetType: "issue_document_revision", targetId: "d1" })], "issue_document_revision").keys()]).toEqual(["d1"]);
+  });
+
+  it("records a vote on a document revision under its own target", () => {
+    const added = withVote([vote()], { taskId: "t1", commentId: "rev-1", vote: "up", targetType: "issue_document_revision" }, "me");
+    expect(added.find((each) => each.targetId === "rev-1")?.targetType).toBe("issue_document_revision");
+    expect(added).toHaveLength(2);
   });
 
   it("asks under 'Ask each time' and follows the setting otherwise", () => {
