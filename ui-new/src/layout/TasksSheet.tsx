@@ -1,5 +1,5 @@
 import { createQuery } from "@tanstack/solid-query";
-import { Check, ChevronDown, ChevronLeft, ChevronUp, LogOut, Monitor, Plus, Search, Settings2 } from "lucide-solid";
+import { Check, ChevronDown, ChevronLeft, ChevronUp, LogOut, Monitor, Plus, Search, Settings2, UserRound } from "lucide-solid";
 import { createEffect, For, Match, on, Show, Switch as SwitchFlow } from "solid-js";
 import { companiesApi, statsFor } from "@/api/companies";
 import { activeAgents } from "@/api/agents";
@@ -10,6 +10,7 @@ import { useNeedsYouCount } from "@/inbox/needs-you";
 import { useAgentsQuery, useProjectsQuery } from "@/lib/company-data";
 import { useSession, useSignOut, useYouName } from "@/lib/session";
 import { setTheme, themePreference, type ThemePreference } from "@/lib/theme";
+import { profilePath } from "@/profile/profile-model";
 import { searchPath } from "@/search/search-url";
 import { InitialsDisc } from "@/ui/Avatar";
 import { Segmented } from "@/ui/Segmented";
@@ -241,6 +242,15 @@ export function TasksSheet(props: {
 
             <GlobalToolbarPlugins class="tsheet-plugins" heading={<h3 class="tsheet-h">From plugins</h3>} />
             <div class="tsheet-sep" />
+            <a class="tsheet-row" href={profilePath(company().issuePrefix, { id: session.youId() })}>
+              <span class="tsheet-sq tsheet-sq--well" aria-hidden="true">
+                <UserRound size={16} />
+              </span>
+              <span class="tsheet-row-main">
+                <span>View profile</span>
+                <span class="tsheet-meta tsheet-ellipsis">Your work and what agents spent on it</span>
+              </span>
+            </a>
             <a class="tsheet-row" href={`${base()}/company/settings`}>
               <span class="tsheet-sq tsheet-sq--well" aria-hidden="true">
                 <Monitor size={16} />

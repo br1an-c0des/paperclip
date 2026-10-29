@@ -190,3 +190,127 @@
   height: 28px;
   color: var(--muted);
 }
+
+/* A section heading folds its section: the heading itself is the button, with a caret on hover. */
+.nav-fold {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: var(--r-pill);
+  color: inherit;
+  font: inherit;
+}
+
+.nav-fold:hover {
+  color: var(--text);
+}
+
+.nav-fold-caret {
+  opacity: 0;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.nav-fold:hover .nav-fold-caret,
+.nav-fold:focus-visible .nav-fold-caret,
+.nav-fold[aria-expanded="false"] .nav-fold-caret {
+  opacity: 1;
+}
+
+.nav-fold[aria-expanded="false"] .nav-fold-caret {
+  transform: rotate(-90deg);
+}
+
+/* A project or agent row with its "…" menu, which takes the trailing count's place on hover. */
+.nav-row {
+  position: relative;
+}
+
+.nav-row-menu {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  opacity: 0;
+}
+
+.nav-row-menu:hover {
+  background: var(--well);
+  color: var(--text);
+}
+
+.nav-row:hover .nav-row-menu,
+.nav-row:focus-within .nav-row-menu,
+.nav-row-menu[aria-expanded="true"] {
+  opacity: 1;
+}
+
+.nav-row:hover .navi > :last-child:not(.navi-label),
+.nav-row:focus-within .navi > :last-child:not(.navi-label),
+.nav-row:has(.nav-row-menu[aria-expanded="true"]) .navi > :last-child:not(.navi-label) {
+  visibility: hidden;
+}
+
+/* Touch screens have no hover: keep the menu showing. */
+@media (hover: none) {
+  .nav-row-menu {
+    opacity: 1;
+  }
+
+  .nav-row .navi > :last-child:not(.navi-label) {
+    visibility: hidden;
+  }
+}
+
+.navi--task {
+  padding-left: 16px;
+  font-size: 14px;
+}
+
+.navi--task .navi-note {
+  font-size: 11px;
+}
+
+/* The You menu's server details (enableServerInfoDebugView). */
+.nav-server {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 6px 6px;
+}
+
+.nav-server-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 8px;
+  color: var(--muted);
+}
+
+.nav-server-row svg {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.nav-server-row span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nav-server-row b {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nav-server-row small {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}

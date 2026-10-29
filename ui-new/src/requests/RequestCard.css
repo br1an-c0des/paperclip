@@ -649,3 +649,231 @@
   background: var(--green-bg);
   color: var(--green-fg);
 }
+
+/* Board 14's "New" pill: arrived since you last looked. */
+.rq-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--run-bg);
+  color: var(--run-fg);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.rq-new::before {
+  content: "";
+  width: 5px;
+  height: 10px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(180deg, var(--ion-a), var(--ion-b));
+}
+
+/* A proposal: what the picked option changes, now and after (board 15). */
+.rq-diff {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.rq-drow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 7px 10px;
+  border-top: 1px solid var(--line);
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+
+.rq-drow:first-child {
+  border-top: 0;
+  background: var(--code);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rq-drow--danger {
+  color: var(--red-fg);
+}
+
+.rq-was {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--dashed);
+}
+
+.rq-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--amber-fg) 50%, transparent);
+  border-radius: var(--r-inner);
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.rq-alert svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.rq-alert--danger {
+  border-color: color-mix(in srgb, var(--red-fg) 50%, transparent);
+  background: var(--red-bg);
+  color: var(--red-fg);
+}
+
+.rq-opt--danger {
+  border-color: color-mix(in srgb, var(--red-fg) 45%, transparent);
+}
+
+.rq-opt--danger[aria-checked="true"] {
+  border-color: var(--red-fg);
+  background: var(--red-bg);
+}
+
+.rq-opt .rq-tag {
+  margin-left: 8px;
+  vertical-align: 1px;
+}
+
+.rq-tag--warn {
+  border-color: color-mix(in srgb, var(--amber-fg) 55%, transparent);
+  color: var(--amber-fg);
+}
+
+.rq-body--quote {
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+  color: var(--muted);
+}
+
+.rq-results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rq-res-link {
+  color: var(--body);
+  font-size: 12px;
+}
+
+.rq-res-link:hover {
+  text-decoration: underline;
+}
+
+.rq-note:has(> svg),
+.rq-error:has(> svg) {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.rq-note > svg,
+.rq-error > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+/* A connection request: the app, and the tools an access request would grant. */
+.rq-app {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--body);
+  font-size: 13px;
+}
+
+.rq-app b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.rq-app small {
+  color: var(--muted);
+}
+
+.rq-logo {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--ground);
+}
+
+.rq-logo--initial {
+  border: 0;
+  background: linear-gradient(160deg, var(--orchid-a), var(--orchid-b));
+  color: var(--on-primary);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.rq-tools {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.rq-tools li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--body);
+}
+
+.rq-tools .mono {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rq-tools small {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+/* A join request: what an agent says it can do. */
+.rq-caps {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rq-kv dd.mono {
+  overflow-wrap: anywhere;
+}
+
+@container rq (width < 420px) {
+  .rq-drow {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .rq-drow > :first-child {
+    grid-column: 1 / -1;
+  }
+}

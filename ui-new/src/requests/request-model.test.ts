@@ -102,7 +102,7 @@ describe("interactions as requests", () => {
   it("knows who may answer", () => {
     expect(requestFromInteraction({ ...question, addresseeUserId: "u2" } as IssueThreadInteraction, ctx).respond).toEqual({
       allowed: false,
-      reason: "Waiting on Sam K.. Only Sam K. can answer this.",
+      reason: "Waiting on Sam K. Only Sam K. can answer this.",
     });
     expect(requestFromInteraction({ ...question, effectiveResolverPolicy: "not_creator", createdByAgentId: null, createdByUserId: "me" } as IssueThreadInteraction, ctx).respond.allowed).toBe(false);
     expect(requestFromInteraction({ ...question, addresseeUserId: "me" } as IssueThreadInteraction, ctx).audience.label).toBe("You");
@@ -251,15 +251,16 @@ describe("review sign-offs as requests", () => {
     expect(request.source.type === "review" && request.source.signoff.steps.map((step) => step.label)).toEqual(["Review · you", "Approval · CEO"]);
   });
 
-  it("waits on someone else, or on a review path when it's stalled", () => {
+  it("waits on someone else; a stalled review is any person's to decide", () => {
     const theirs = requestFromReview({ ...task, executionState: pending("u2") }, ctx);
     expect(theirs.title).toBe("Review pending with Sam K.");
     expect(theirs.respond).toEqual({ allowed: false, reason: "Waiting on Sam K." });
 
-    const stalled = requestFromReview({ ...task, executionState: pending("me") }, ctx, { stalled: true, whyNow: "Nobody can review it" });
+    const stalled = requestFromReview({ ...task, executionState: pending("u2") }, ctx, { stalled: true, whyNow: "Nobody can review it" });
     expect(stalled.title).toBe("TRA-44 is in review with nobody to review it");
-    expect(stalled.next).toBe("Nobody can review it");
-    expect(stalled.respond.allowed).toBe(false);
+    expect(stalled.next).toMatch(/^Nobody can review TRA-44, so you decide: approving marks it done/);
+    expect(stalled.respond).toEqual({ allowed: true, reason: null });
+    expect(stalled.source.type === "review" && stalled.source.stalled).toBe(true);
   });
 
   it("settles once the task leaves review", () => {

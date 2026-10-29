@@ -1,11 +1,13 @@
 import type {
   AskUserQuestionsAnswer,
   AskUserQuestionsInteraction,
+  ConnectionIntentInteraction,
   IssueThreadInteraction,
   RequestCheckboxConfirmationInteraction,
   RequestConfirmationInteraction,
   RequestItemVerdictsInteraction,
   RequestItemVerdictValue,
+  StalledReviewDecisionAction,
   SuggestTasksInteraction,
 } from "@paperclipai/shared";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
@@ -20,12 +22,12 @@ import {
   MessageSquare,
   ShieldCheck,
   Sparkles,
-  Users,
   X,
   Zap,
 } from "lucide-solid";
 import { createMemo, createSignal, For, Match, Show, Switch, type JSX } from "solid-js";
 import { approvalsApi } from "@/api/approvals";
+import { inboxApi } from "@/api/inbox";
 import { interactionsApi, type AcceptInteraction, type ItemVerdict } from "@/api/interactions";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
@@ -38,6 +40,10 @@ import { Menu } from "@/ui/Menu";
 import { pushToast } from "@/ui/Toast";
 import { stampLabel } from "@/tasks/thread-model";
 import type { TaskPeople } from "@/tasks/people";
+import { DeclineButton, Footer } from "./card-parts";
+import { ConnectionControls } from "./ConnectionControls";
+import { DecisionControls, DecisionResults } from "./DecisionControls";
+import { JoinControls } from "./JoinControls";
 import { KIND_LABEL, type Request, type RequestKind } from "./request-model";
 import "./RequestCard.css";
 
@@ -48,14 +54,19 @@ import "./RequestCard.css";
  *
  * - Open requests take an answer. Set-aside ones (dismissed) shrink to one line in the history and
  *   open again to answer. Settled ones collapse to the ask, the decision and its result, apart.
- * - Agent requests answer through `/issues/:id/interactions/:id/*`; approvals through
- *   `/approvals/:id/*`, with their own discussion under the card; sign-offs through the task's
- *   status with a comment (`PATCH /issues/:id`).
+ * - Agent requests answer through `/issues/:id/interactions/:id/*` (connection requests through
+ *   `/connection-intents/:id/*`, ConnectionControls.tsx); approvals through `/approvals/:id/*`,
+ *   with their own discussion under the card; sign-offs through the task's status with a comment
+ *   (`PATCH /issues/:id`), stalled ones through `/issues/:id/stalled-review-decision`; proposals
+ *   through `/decisions/:id/*` (DecisionControls.tsx); join requests through
+ *   `/companies/:id/join-requests/:id/*` (JoinControls.tsx).
+ * - A question you asked can be withdrawn from the "…" menu (`…/cancel`).
  * - `inThread` hides the subject, which would repeat the page.
  * - Slots for the pages that list cards (board 14): `triage` adds items to the "…" menu in the top
  *   row (the Inbox's snooze and clear); `aside` draws the context column beside the card's body,
  *   stacked under it on a narrow card; `onOpenSubject` opens the subject link in place;
- *   `onSettled` runs once an answer, a decision or setting it aside lands.
+ *   `onSettled` runs once an answer, a decision or setting it aside lands; `fresh` adds board 14's
+ *   "New" pill.
  */
 
 const KIND_ICON: Record<RequestKind, () => JSX.Element> = {
@@ -80,6 +91,8 @@ export type RequestCardProps = {
   onOpenSubject?: () => void;
   /** After an answer, a decision or setting it aside succeeds. */
   onSettled?: () => void;
+  /** Arrived since you last looked: draws the "New" pill. */
+  fresh?: boolean;
 };
 
 export function RequestCard(props: RequestCardProps) {
@@ -197,7 +210,7 @@ function Asker(props: { request: Request; people: TaskPeople }) {
   );
 }
 
-function Top(props: { request: Request; inThread?: boolean; menu?: JSX.Element; label?: JSX.Element; onOpenSubject?: () => void }) {
+function Top(props: { request: Request; inThread?: boolean; menu?: JSX.Element; label?: JSX.Element; onOpenSubject?: () => void; fresh?: boolean }) {
   return (
     <div class="rq-top">
       <span class="rq-kind">
@@ -215,6 +228,9 @@ function Top(props: { request: Request; inThread?: boolean; menu?: JSX.Element; 
       </Show>
       <Show when={props.request.subject && (!props.inThread || props.request.subject.kind !== "task") && props.request.subject}>
         {(subject) => <Subject subject={subject()} onOpen={props.onOpenSubject} />}
+      </Show>
+      <Show when={props.fresh}>
+        <span class="rq-new">New</span>
       </Show>
       <Show when={props.request.state !== "settled"}>
         <span class="rq-life" classList={{ "rq-life--soon": props.request.lifetimeSoon }}>
@@ -272,6 +288,9 @@ function SettledBody(props: { request: Request; people: TaskPeople }) {
           </div>
         )}
       </Show>
+      <Show when={props.request.source.type === "decision" && (props.request.source as Extract<Request["source"], { type: "decision" }>)}>
+        {(source) => <DecisionResults request={props.request} source={source()} />}
+      </Show>
       <Show when={props.request.source.type === "approval"}>
         <ApprovalDiscussion approvalId={(props.request.source as { type: "approval"; approval: { id: string } }).approval.id} people={props.people} />
       </Show>
@@ -294,20 +313,40 @@ function OpenCard(props: RequestCardProps) {
     onError: (error: Error) => pushToast({ tone: "error", title: "Couldn't update the request", body: error.message }),
   }));
 
+  const withdraw = createMutation(() => ({
+    mutationFn: () => interactionsApi.cancel(props.taskId, interaction()!.id),
+    onSuccess: refresh,
+    onError: (error: Error) => pushToast({ tone: "error", title: "Couldn't withdraw the question", body: error.message }),
+  }));
+  /** A question you asked, still open: you can withdraw it (the server cancels only question forms). */
+  const yours = () => {
+    const found = interaction();
+    return !!found && found.kind === "ask_user_questions" && !!found.createdByUserId && found.createdByUserId === props.people.youId();
+  };
+
   const ownItems = () => (
     <>
-      <Show when={props.request.state === "open"}>
-        <Menu.Item description="Keep it in the history to answer later" onSelect={() => aside.mutate("dismiss")}>
-          Set aside
+      <Show when={props.request.respond.allowed}>
+        <Show when={props.request.state === "open"}>
+          <Menu.Item description="Keep it in the history to answer later" onSelect={() => aside.mutate("dismiss")}>
+            Set aside
+          </Menu.Item>
+        </Show>
+        <Show when={interaction()?.kind !== "connection_intent"}>
+          <Menu.Item description="End it without an answer" onSelect={() => aside.mutate("skip")}>
+            Skip
+          </Menu.Item>
+        </Show>
+      </Show>
+      <Show when={yours()}>
+        <Menu.Item description="You asked it; take it back without an answer" onSelect={() => withdraw.mutate()}>
+          Withdraw the question
         </Menu.Item>
       </Show>
-      <Menu.Item description="End it without an answer" onSelect={() => aside.mutate("skip")}>
-        Skip
-      </Menu.Item>
     </>
   );
-  const hasOwn = () => !!interaction() && props.request.respond.allowed;
-  const menuLabel = () => (hasOwn() ? (props.triage ? "Request actions" : "Set aside or skip") : (props.triageLabel ?? "Request actions"));
+  const hasOwn = () => !!interaction() && (props.request.respond.allowed || yours());
+  const menuLabel = () => (hasOwn() ? (props.triage || yours() ? "Request actions" : "Set aside or skip") : (props.triageLabel ?? "Request actions"));
 
   return (
     <article class="rq" classList={{ "rq--compact": props.inThread }} data-kind={props.request.kind} aria-label={`${KIND_LABEL[props.request.kind]} from ${props.request.asker.name}`}>
@@ -315,6 +354,7 @@ function OpenCard(props: RequestCardProps) {
         request={props.request}
         inThread={props.inThread}
         onOpenSubject={props.onOpenSubject}
+        fresh={props.fresh}
         menu={<CardMenu label={menuLabel()} own={hasOwn() ? ownItems : undefined} triage={props.triage} />}
       />
       <Split aside={props.aside}>
@@ -342,36 +382,15 @@ function OpenCard(props: RequestCardProps) {
           <Match when={review()}>
             {(source) => <ReviewControls request={props.request} source={source()} onDone={refresh} onOpenTask={props.onOpenSubject} />}
           </Match>
+          <Match when={props.request.source.type === "decision" && (props.request.source as Extract<Request["source"], { type: "decision" }>)}>
+            {(source) => <DecisionControls request={props.request} source={source()} people={props.people} onDone={refresh} />}
+          </Match>
+          <Match when={props.request.source.type === "join" && (props.request.source as Extract<Request["source"], { type: "join" }>)}>
+            {(source) => <JoinControls request={props.request} source={source()} onDone={refresh} />}
+          </Match>
         </Switch>
       </Split>
     </article>
-  );
-}
-
-/** The "what happens next" line, the action row and who can answer. `extra` shows either way. */
-function Footer(props: { request: Request; children?: JSX.Element; extra?: JSX.Element; error?: string | null }) {
-  return (
-    <>
-      <div class="rq-next">
-        <CornerDownRight size={14} aria-hidden="true" />
-        <span>{props.request.next}</span>
-      </div>
-      <Show when={props.error}>
-        <p class="rq-error" role="alert">
-          {props.error}
-        </p>
-      </Show>
-      <div class="rq-acts">
-        <Show when={props.request.respond.allowed} fallback={<Show when={props.request.respond.reason}>{(reason) => <p class="rq-note">{reason()}</p>}</Show>}>
-          {props.children}
-        </Show>
-        {props.extra}
-        <span class="rq-who">
-          <Users size={13} aria-hidden="true" />
-          {props.request.audience.label}
-        </span>
-      </div>
-    </>
   );
 }
 
@@ -423,6 +442,9 @@ function InteractionControls(props: { request: Request; interaction: IssueThread
           onSubmit={(verdicts) => run(() => interactionsApi.verdicts(props.taskId, props.interaction.id, verdicts))}
         />
       </Match>
+      <Match when={props.interaction.kind === "connection_intent"}>
+        <ConnectionControls request={props.request} interaction={props.interaction as ConnectionIntentInteraction} onDone={props.onDone} />
+      </Match>
       <Match when={props.interaction.kind === "suggest_tasks"}>
         <SuggestedTasks
           request={props.request}
@@ -438,36 +460,6 @@ function InteractionControls(props: { request: Request; interaction: IssueThread
         <Footer request={props.request} error={error()} />
       </Match>
     </Switch>
-  );
-}
-
-/** A decline that may need a reason: the first press asks for one, the second sends it. */
-function DeclineButton(props: { label: string; needsReason: boolean; allowReason: boolean; placeholder?: string | null; busy: boolean; onReject: (reason?: string) => void }) {
-  const [asking, setAsking] = createSignal(false);
-  const [reason, setReason] = createSignal("");
-  return (
-    <Show
-      when={asking()}
-      fallback={
-        <Button size="compact" disabled={props.busy} onClick={() => (props.needsReason || props.allowReason ? setAsking(true) : props.onReject())}>
-          {props.label}
-        </Button>
-      }
-    >
-      <TextInput
-        aria-label="Reason"
-        placeholder={props.placeholder ?? (props.needsReason ? "Why? (required)" : "Why? (optional)")}
-        value={reason()}
-        onInput={(event) => setReason(event.currentTarget.value)}
-        ref={(element) => queueMicrotask(() => element.focus())}
-      />
-      <Button size="compact" variant="danger" disabled={props.busy || (props.needsReason && !reason().trim())} onClick={() => props.onReject(reason().trim() || undefined)}>
-        {props.label}
-      </Button>
-      <Button size="compact" variant="quiet" onClick={() => setAsking(false)}>
-        Back
-      </Button>
-    </Show>
   );
 }
 
@@ -935,13 +927,21 @@ function ApprovalControls(props: { request: Request; people: TaskPeople; onDone:
     onError: (failure: Error) => setError(failure.message),
   }));
   const busy = () => decide.isPending;
+  const company = useCompany();
+  const budgetLink = () => (
+    <Show when={approval().type === "budget_override_required"}>
+      <a class={buttonClass({ variant: "primary", size: "compact" })} href={budgetIncidentHref(company().issuePrefix)}>
+        Open the budget controls
+      </a>
+    </Show>
+  );
   return (
     <>
       <ApprovalPayload request={props.request} />
       <Show when={noting()}>
         <TextArea aria-label="Decision note" rows={2} placeholder="A note with your decision (optional)" value={note()} onInput={(event) => setNote(event.currentTarget.value)} />
       </Show>
-      <Footer request={props.request} error={error()}>
+      <Footer request={props.request} error={error()} extra={budgetLink()}>
         <Button size="compact" variant="primary" disabled={busy()} onClick={() => decide.mutate("approve")}>
           Approve
         </Button>
@@ -962,9 +962,22 @@ function ApprovalControls(props: { request: Request; people: TaskPeople; onDone:
   );
 }
 
+/** Where a budget stop is resolved: the incidents card in company settings → Budgets. */
+export function budgetIncidentHref(prefix: string) {
+  return `/${prefix}/company/settings/budgets#cs-incidents`;
+}
+
+const STALLED_DONE: Record<StalledReviewDecisionAction, string> = {
+  approve: "Approved: the task is done",
+  request_changes: "Changes requested: the task went back to its assignee",
+  send_back: "Sent back to work: the task went back to its assignee",
+};
+
 /**
  * A sign-off's controls: the stages with the current one marked and where the task returns, then,
- * on your turn, a note and Approve or Send back. The server asks for the note with either: approving
+ * on your turn, a note and Approve or Send back. A stalled review (nobody can review it) takes
+ * Approve, Request changes (the note is required) or Send back to work, through
+ * `POST /issues/:id/stalled-review-decision`. The server asks for the note with either: approving
  * moves the task to done, sending back to in progress, and the stage policy routes it from there.
  */
 function ReviewControls(props: { request: Request; source: Extract<Request["source"], { type: "review" }>; onDone: () => void; onOpenTask?: () => void }) {
@@ -981,8 +994,18 @@ function ReviewControls(props: { request: Request; source: Extract<Request["sour
     },
     onError: (failure: Error) => setError(failure.message),
   }));
+  const stalled = createMutation(() => ({
+    mutationFn: (action: StalledReviewDecisionAction) => inboxApi.decideStalledReview(props.source.issueId, action, note().trim() || undefined),
+    onSuccess: (_result, action) => {
+      setError(null);
+      setNote("");
+      pushToast({ tone: "success", title: STALLED_DONE[action] });
+      props.onDone();
+    },
+    onError: (failure: Error) => setError(failure.message),
+  }));
   const busy = () => decide.isPending || !note().trim();
-  const openLabel = () => (props.source.stalled ? "Choose a review path" : "Open the task");
+  const openLabel = () => "Open the task";
   const openVariant = () => (props.request.respond.allowed ? "quiet" : "primary");
   const openTask = () => (
     <Show
@@ -1018,15 +1041,38 @@ function ReviewControls(props: { request: Request; source: Extract<Request["sour
         </div>
       </Show>
       <Show when={props.request.respond.allowed}>
-        <TextArea aria-label="Sign-off note" rows={2} placeholder="What you checked, or what to change (required)" value={note()} onInput={(event) => setNote(event.currentTarget.value)} />
+        <TextArea
+          aria-label="Sign-off note"
+          rows={2}
+          placeholder={props.source.stalled ? "A note: required to request changes, optional otherwise" : "What you checked, or what to change (required)"}
+          value={note()}
+          onInput={(event) => setNote(event.currentTarget.value)}
+        />
       </Show>
       <Footer request={props.request} error={error()} extra={openTask()}>
-        <Button size="compact" variant="primary" disabled={busy()} onClick={() => decide.mutate("approve")}>
-          Approve
-        </Button>
-        <Button size="compact" disabled={busy()} onClick={() => decide.mutate("send_back")}>
-          Send back with notes
-        </Button>
+        <Show
+          when={props.source.stalled}
+          fallback={
+            <>
+              <Button size="compact" variant="primary" disabled={busy()} onClick={() => decide.mutate("approve")}>
+                Approve
+              </Button>
+              <Button size="compact" disabled={busy()} onClick={() => decide.mutate("send_back")}>
+                Send back with notes
+              </Button>
+            </>
+          }
+        >
+          <Button size="compact" variant="primary" disabled={stalled.isPending} onClick={() => stalled.mutate("approve")}>
+            Approve
+          </Button>
+          <Button size="compact" disabled={stalled.isPending || !note().trim()} title={note().trim() ? undefined : "Add a note to request changes"} onClick={() => stalled.mutate("request_changes")}>
+            Request changes
+          </Button>
+          <Button size="compact" disabled={stalled.isPending} onClick={() => stalled.mutate("send_back")}>
+            Send back to work
+          </Button>
+        </Show>
       </Footer>
     </>
   );

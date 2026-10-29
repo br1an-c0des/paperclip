@@ -5,10 +5,22 @@ import path from "path";
 import { defineConfig, type Plugin, type ProxyOptions } from "vite";
 import solid from "vite-plugin-solid";
 
-// App and adapter logos (`/brands/apps/linear.svg`…), which the API's app gallery points at. The old
-// UI's `ui/public/brands` stays the one copy: served from there in dev and preview, and copied into
-// `dist/brands` at build, so the production image (which builds from the whole repo) has them.
-const brandsDir = path.resolve(import.meta.dirname, "../ui/public/brands");
+// App and adapter logos (`/brands/apps/linear.svg`…), which the API's app gallery points at, and the
+// favicons and home-screen icons (decision 39, D11). The old UI's `ui/public` stays the one copy of
+// these: served from there in dev and preview, and copied into `dist` at build, so the production
+// image (which builds from the whole repo) has them. ui-new's own `public/` holds what differs: the
+// web app manifest and the service worker.
+const oldPublicDir = path.resolve(import.meta.dirname, "../ui/public");
+const brandsDir = path.join(oldPublicDir, "brands");
+export const SHARED_ICONS = [
+  "favicon.ico",
+  "favicon.svg",
+  "favicon-16x16.png",
+  "favicon-32x32.png",
+  "apple-touch-icon.png",
+  "android-chrome-192x192.png",
+  "android-chrome-512x512.png",
+];
 const BRAND_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
   ".png": "image/png",
@@ -20,8 +32,23 @@ const BRAND_TYPES: Record<string, string> = {
   ".md": "text/markdown; charset=utf-8",
 };
 
+function sendFile(res: ServerResponse, file: string) {
+  fs.stat(file, (error, stat) => {
+    if (error || !stat.isFile()) {
+      res.statusCode = 404;
+      return res.end();
+    }
+    res.setHeader("Content-Type", BRAND_TYPES[path.extname(file).toLowerCase()] ?? "text/plain; charset=utf-8");
+    res.setHeader("Content-Length", stat.size);
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    fs.createReadStream(file).pipe(res);
+  });
+}
+
 function serveBrand(req: IncomingMessage, res: ServerResponse, next: () => void) {
   const url = req.url ?? "";
+  const icon = url.split(/[?#]/)[0]!.slice(1);
+  if (SHARED_ICONS.includes(icon)) return sendFile(res, path.join(oldPublicDir, icon));
   if (!url.startsWith("/brands/")) return next();
   let rel: string;
   try {
@@ -36,16 +63,7 @@ function serveBrand(req: IncomingMessage, res: ServerResponse, next: () => void)
     res.statusCode = 404;
     return res.end();
   }
-  fs.stat(file, (error, stat) => {
-    if (error || !stat.isFile()) {
-      res.statusCode = 404;
-      return res.end();
-    }
-    res.setHeader("Content-Type", BRAND_TYPES[path.extname(file).toLowerCase()] ?? "text/plain; charset=utf-8");
-    res.setHeader("Content-Length", stat.size);
-    res.setHeader("Cache-Control", "public, max-age=3600");
-    fs.createReadStream(file).pipe(res);
-  });
+  sendFile(res, file);
 }
 
 function brands(): Plugin {
@@ -64,6 +82,47 @@ function brands(): Plugin {
     closeBundle() {
       if (process.env.VITEST || !fs.existsSync(brandsDir)) return;
       fs.cpSync(brandsDir, path.join(outDir, "brands"), { recursive: true });
+      for (const icon of SHARED_ICONS) fs.copyFileSync(path.join(oldPublicDir, icon), path.join(outDir, icon));
+    },
+  };
+}
+
+// The service worker (public/sw.js) carries a placeholder the production build replaces with an id
+// taken from the entry chunk's hash, as ui/src/lib/vite-sw-build-id.ts does for the old UI: each
+// deploy that changes the app changes sw.js byte for byte, so browsers install the new worker and
+// parked tabs reload onto the new build (src/shell/service-worker-updates.ts). Development serves
+// the placeholder, which tells the worker to stay out of the way.
+export const SW_BUILD_ID_PLACEHOLDER = "__PAPERCLIP_BUILD_ID__";
+
+export function stampServiceWorker(source: string, buildId: string) {
+  if (!source.includes(SW_BUILD_ID_PLACEHOLDER)) {
+    throw new Error(`public/sw.js is missing ${SW_BUILD_ID_PLACEHOLDER}; parked tabs would never pick up a deploy`);
+  }
+  if (!buildId) throw new Error("refusing to stamp the service worker with an empty build id");
+  return source.split(SW_BUILD_ID_PLACEHOLDER).join(buildId);
+}
+
+export function buildIdFromEntry(fileName: string) {
+  return path.basename(fileName).replace(/\.js$/, "").replace(/[^A-Za-z0-9_-]/g, "-") || "build";
+}
+
+function serviceWorkerBuildId(): Plugin {
+  let buildId = "build";
+  let outDir = "dist";
+  return {
+    name: "paperclip-sw-build-id",
+    apply: "build",
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    generateBundle(_options, bundle) {
+      const entry = Object.values(bundle).find((chunk) => chunk.type === "chunk" && chunk.isEntry);
+      if (entry) buildId = buildIdFromEntry(entry.fileName);
+    },
+    closeBundle() {
+      const file = path.join(outDir, "sw.js");
+      if (!fs.existsSync(file)) return;
+      fs.writeFileSync(file, stampServiceWorker(fs.readFileSync(file, "utf8"), buildId));
     },
   };
 }
@@ -97,7 +156,7 @@ const apiProxy: Record<string, ProxyOptions> = {
 
 export default defineConfig({
   // Hot reload has no place in tests, and its runtime module breaks Vitest's loader.
-  plugins: [solid({ hot: !process.env.VITEST }), brands()],
+  plugins: [solid({ hot: !process.env.VITEST }), brands(), serviceWorkerBuildId()],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),

@@ -50,6 +50,8 @@ until one becomes a concrete fix.
 | 11 | [Filter run summaries by date range and project](#11-filter-run-summaries-by-date-range-and-project) | candidate | | | 2026-10-28 | | |
 | 12 | [Say in `/api/health` whether sign-up is allowed](#12-say-in-apihealth-whether-sign-up-is-allowed) | candidate | | | 2026-10-28 | | |
 | 13 | [Include `executionBlocker` on compact issues](#13-include-executionblocker-on-compact-issues) | candidate | | | 2026-10-28 | | |
+| 14 | [Let Keep take an item off the attention feed's aging shelf](#14-let-keep-take-an-item-off-the-attention-feeds-aging-shelf) | candidate | | | 2026-10-28 | | |
+| 15 | [Don't return agent credentials in plain text from the join request list](#15-dont-return-agent-credentials-in-plain-text-from-the-join-request-list) | candidate | | | 2026-10-28 | | |
 
 ## Details
 
@@ -241,3 +243,29 @@ Found by the M7 parity audit (2026-10-28).
   Retry.
 - **Likely fix:** add the field to the compact pick and the compact list query, with a test.
 - **Fork workaround to revisit once merged:** Retry on list rows reads the interruption's run.
+
+### 14. Let Keep take an item off the attention feed's aging shelf
+
+Found building `ui-new`'s Inbox (M7 slice B, 2026-10-28).
+
+- **Problem:** `server/src/services/attention.ts` (around line 642) sets each item's `shelf` from its
+  idle time alone, ignoring `keep` from `decision_retention`. The old UI's Decisions page sorts items
+  by `shelf` (`attentionIsAging` in `ui/src/lib/attention.ts`), and its DecisionShelf comment says Keep
+  "clears the shelf flag server-side", so pressing Keep there changes nothing on screen.
+- **Likely fix:** `shelf: !keep && idle past retentionDays`, with a service test that keeps an aged
+  item and expects `shelf: false`. Check first whether upstream means `shelf` to stay raw and the UI
+  to combine them; if so, fix the old UI's filter instead.
+- **Fork workaround to revisit once merged:** `ui-new` treats `shelf && !keep` as on the shelf
+  ([decision 40](../ui-new/docs/decisions.md#40-gaps-found-building-requests-and-the-inbox)).
+
+### 15. Don't return agent credentials in plain text from the join request list
+
+Found building `ui-new`'s join request cards (M7 slice B, 2026-10-28).
+
+- **Problem:** `GET /api/companies/:companyId/join-requests` returns each agent request's
+  `agentDefaultsPayload` as submitted, so header credentials such as `headers.x-openclaw-token` come
+  back in plain text, while a Hermes `apiKey` is stored and returned as a secret reference.
+- **Likely fix:** store header credentials as secret references too, or redact them in the list
+  response, matching how the Hermes key is handled; with a route test. Check upstream's
+  `docs/specs` and OpenClaw onboarding docs first for whether the list is meant to carry them.
+- **Fork workaround:** none needed; `ui-new` only says that credentials were sent.

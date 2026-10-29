@@ -25,7 +25,8 @@
   line-height: 1;
 }
 
-.ibx-tabs {
+/* Outranks the shared `.tabs` (which wraps), whichever stylesheet loads last. */
+.ibx-head .ibx-tabs {
   flex-wrap: nowrap;
   max-width: 100%;
   overflow-x: auto;
@@ -362,4 +363,170 @@
   .ibx-keys {
     display: none;
   }
+}
+
+/* Search the inbox: the magnifier at the end of the header opens the box. */
+.ibx-head-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ibx-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 260px;
+  max-width: 100%;
+  height: 34px;
+  padding: 0 4px 0 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-field);
+  background: var(--ground);
+  color: var(--muted);
+}
+
+.ibx-search:focus-within {
+  box-shadow: 0 0 0 2px var(--run-fg);
+}
+
+.ibx-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.ibx-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.ibx-search-x {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.ibx-search-x:hover {
+  background: var(--row-hover);
+  color: var(--text);
+}
+
+/* Time groups (New today, Earlier; Updates by activity) and the aging shelf. */
+.ibx-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ibx-group > .ibx-sub {
+  margin: 0;
+}
+
+.ibx-sub-count {
+  margin-left: 4px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.ibx-aging {
+  margin-top: 4px;
+}
+
+.ibx-fold {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 2px;
+  text-align: left;
+}
+
+.ibx-fold .ibx-sub {
+  margin: 0;
+}
+
+.ibx-fold-icon {
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.ibx-fold[aria-expanded="true"] .ibx-fold-icon {
+  transform: rotate(90deg);
+}
+
+.ibx-fold:hover .ibx-sub {
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ibx-fold-icon {
+    transition: none;
+  }
+}
+
+/* Phone (M7, M10): the title and the magnifier on one line, the tabs and filters scroll sideways. */
+:root[data-viewport="phone"] .ibx-head {
+  gap: 10px;
+}
+
+:root[data-viewport="phone"] .ibx-head h1 {
+  order: 0;
+}
+
+:root[data-viewport="phone"] .ibx-head h1 svg {
+  display: none;
+}
+
+:root[data-viewport="phone"] .ibx-head-end {
+  order: 1;
+}
+
+:root[data-viewport="phone"] .ibx-head .ibx-tabs {
+  order: 2;
+  flex-basis: 100%;
+}
+
+:root[data-viewport="phone"] .ibx-head-end:has(.ibx-search) {
+  flex: 1 1 0;
+}
+
+:root[data-viewport="phone"] .ibx-search {
+  width: 100%;
+}
+
+:root[data-viewport="phone"] .ibx-bar {
+  gap: 8px 10px;
+}
+
+:root[data-viewport="phone"] .ibx-kinds {
+  flex-wrap: nowrap;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+:root[data-viewport="phone"] .ibx-row {
+  flex-wrap: wrap;
+  row-gap: 2px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+:root[data-viewport="phone"] .ibx-row-title {
+  flex: 1 1 60%;
 }

@@ -1,5 +1,5 @@
 import type { IssueStatus, Project } from "@paperclipai/shared";
-import { A, Navigate, useNavigate, useParams, useSearchParams } from "@solidjs/router";
+import { A, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { CalendarDays, Globe, Lock, Pencil } from "lucide-solid";
 import { createEffect, createMemo, Match, Show, Switch } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
@@ -21,8 +21,10 @@ import { usePluginSlots } from "@/plugins/contributions";
 import { isPluginTab, pluginTabValue } from "@/plugins/model";
 import { PluginLauncherOutlet } from "@/plugins/PluginLaunchers";
 import { PluginDetailTab, PluginSlotOutlet } from "@/plugins/PluginSlot";
+import { ProjectStarButton } from "@/layout/nav-prefs";
 import { PlannedNote } from "./Planned";
 import { OPEN_STATUSES } from "./Tasks";
+import { projectLegacyTab, withSearchAndHash } from "./legacy-model";
 
 /*
  * A project's pages under its header card (boards 1 and 8). The project's address is its dashboard
@@ -39,6 +41,10 @@ import { OPEN_STATUSES } from "./Tasks";
  *
  * The project list leaves archived projects out, so a key it doesn't know is looked up on its own;
  * that way an archived project's pages (and its settings, to restore it) still open.
+ *
+ * The old project tabs moved into settings: `/configuration` to Details, `/budget` to Budget, and
+ * `/workspaces` (and one workspace's page) to Code and workspaces. The star beside the title puts
+ * the project in your nav's Starred group.
  */
 
 const PROJECT_TABS = [
@@ -49,7 +55,7 @@ const PROJECT_TABS = [
   { label: "Settings", path: "/settings" },
 ];
 
-const PROJECT_STATUS: Record<Project["status"], { label: string; gradient: Gradient; tone?: "run" | "amber" | "green" }> = {
+export const PROJECT_STATUS: Record<Project["status"], { label: string; gradient: Gradient; tone?: "run" | "amber" | "green" }> = {
   backlog: { label: "Backlog", gradient: "ash" },
   planned: { label: "Planned", gradient: "ember", tone: "amber" },
   in_progress: { label: "In progress", gradient: "ion", tone: "run" },
@@ -57,10 +63,11 @@ const PROJECT_STATUS: Record<Project["status"], { label: string; gradient: Gradi
   cancelled: { label: "Cancelled", gradient: "ash" },
 };
 
-type View = "dashboard" | "list" | "board" | "workload" | "docs" | "settings" | "plugin" | "later";
+type View = "dashboard" | "list" | "board" | "workload" | "docs" | "settings" | "plugin" | "legacy" | "later";
 
 function viewFor(tab: string): View {
   if (tab === "" || tab === "overview") return "dashboard";
+  if (projectLegacyTab(tab)) return "legacy";
   if (tab === "issues" || tab.startsWith("issues/")) return "list";
   if (tab === "board") return "board";
   if (tab === "workload") return "workload";
@@ -110,6 +117,7 @@ export function ProjectPage() {
   const base = () => `/${company().issuePrefix}/projects/${params.projectKey}`;
   const view = () => viewFor((params.tab ?? "").replace(/\/$/, ""));
   const [search] = useSearchParams<{ tab?: string }>();
+  const location = useLocation();
   const plugins = usePluginSlots(() => ({ slotTypes: ["detailTab"], entityType: "project" }));
   const pluginContext = (found: Project) => ({
     companyId: company().id,
@@ -143,6 +151,7 @@ export function ProjectPage() {
         title={project()?.name ?? params.projectKey}
         titleHref={base()}
         titleHint="Project dashboard"
+        titleAside={<Show when={project() && !project()!.archivedAt}>{<ProjectStarButton project={project()!} size={17} />}</Show>}
         numbers={
           <Show when={project() && tasks.data}>
             <HeaderNumber value={open()} label="open" />
@@ -190,6 +199,9 @@ export function ProjectPage() {
       <Show when={project()} fallback={<p class="card pd-empty">{projects.isPending || single.isFetching ? "Loading the project…" : "There's no project with this address, or you can't open it."}</p>}>
         {(found) => (
           <Switch fallback={<PlannedNote milestone="M4">This tab is still to come.</PlannedNote>}>
+            <Match when={view() === "legacy" && projectLegacyTab(params.tab ?? "")}>
+              {(to) => <Navigate href={withSearchAndHash(`${base()}/${to()}`, location.search, location.hash)} />}
+            </Match>
             <Match when={view() === "dashboard" && isPluginTab(search.tab) && search.tab}>
               {(tab) => <Navigate href={`${base()}/${tab()}`} />}
             </Match>
