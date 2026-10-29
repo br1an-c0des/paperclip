@@ -543,6 +543,132 @@
   }
 }
 
+/* Invite an outside agent (decision 39, D2) */
+.na-invite-link {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.oa-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: var(--r-field);
+  background: var(--amber-bg);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.oa-warn > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--amber-fg);
+}
+
+.oa-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.oa-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.oa-preset:hover {
+  background: var(--hover);
+}
+
+.oa-preset:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 2px;
+}
+
+.oa-preset-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.oa-preset-name {
+  font-weight: 700;
+}
+
+.oa-preset-text {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.oa-status,
+.oa-wait {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.oa-status > svg,
+.oa-wait > svg {
+  flex: none;
+  margin-top: 3px;
+}
+
+.oa-wait {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: var(--r-field);
+  background: var(--well);
+}
+
+.oa-wait b {
+  color: var(--text);
+}
+
+.oa-prompt {
+  width: 100%;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.oa-foot-end {
+  display: inline-flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+@media (max-width: 560px) {
+  .oa-presets {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .na-harness {
     transition: none;

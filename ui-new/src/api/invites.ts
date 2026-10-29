@@ -1,5 +1,5 @@
 import type { AgentAdapterType, JoinRequest } from "@paperclipai/shared";
-import type { HumanCompanyRole } from "./access";
+import type { CompanyInviteCreated, HumanCompanyRole } from "./access";
 import { api } from "./client";
 
 /*
@@ -36,8 +36,35 @@ export type AgentJoinRequestAccepted = JoinRequest & {
 
 export type AcceptInviteResult = AgentJoinRequestAccepted | { bootstrapAccepted: true; userId: string };
 
+/*
+ * Inviting an outside agent (New agent → Invite an outside agent; decision 39, D2), as the old UI's
+ * ExternalAgentInviteDialog does it: an agent-only company invite, then its onboarding manifest for
+ * the addresses the agent may reach Paperclip at. The created invite carries its onboarding text's
+ * address; the manifest needs no session.
+ */
+
+export type AgentInviteCreated = CompanyInviteCreated & { onboardingTextPath?: string; onboardingTextUrl?: string };
+
+export type InviteOnboardingManifest = {
+  invite: InviteSummary;
+  onboarding: {
+    inviteMessage?: string | null;
+    connectivity?: {
+      guidance?: string;
+      connectionCandidates?: string[];
+      testResolutionEndpoint?: { method?: string; path?: string; url?: string };
+    };
+    textInstructions?: { url?: string };
+  };
+};
+
 export const invitesApi = {
   get: (token: string) => api.get<InviteSummary>(`/invites/${encodeURIComponent(token)}`),
   accept: (token: string, input: AcceptInviteInput) =>
     api.post<AcceptInviteResult>(`/invites/${encodeURIComponent(token)}/accept`, input),
+  /** An invite only agents can use (`allowedJoinTypes: "agent"`); its join request waits for approval. */
+  createForAgent: (companyId: string) =>
+    api.post<AgentInviteCreated>(`/companies/${encodeURIComponent(companyId)}/invites`, { allowedJoinTypes: "agent", humanRole: null, agentMessage: null }),
+  onboarding: (token: string, signal?: AbortSignal) =>
+    api.get<InviteOnboardingManifest>(`/invites/${encodeURIComponent(token)}/onboarding`, { signal }),
 };
