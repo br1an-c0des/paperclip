@@ -515,6 +515,201 @@
   min-height: 420px;
 }
 
+/* The detail's actions: star, Studio, fork and folder under the title. */
+.sk-detail-actions {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sk-star {
+  gap: 4px;
+}
+
+.sk-star--on svg {
+  color: var(--amber-fg);
+  fill: currentColor;
+}
+
+.sk-move {
+  gap: 4px;
+  max-width: 220px;
+}
+
+.sk-update {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--body);
+}
+
+.sk-update p {
+  flex: 1 1 220px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.sk-versions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Compare versions */
+.sk-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sk-compare-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.sk-compare-body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+
+.sk-compare-files {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.sk-diff .dv-diff-rows {
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.sk-change {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--amber-fg);
+}
+
+.sk-change[data-change="added"] {
+  color: var(--green-fg);
+}
+
+.sk-change[data-change="removed"] {
+  color: var(--red-fg);
+}
+
+/* Folders */
+.sk-folders {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sk-folders li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  font-size: 13px;
+}
+
+.sk-folders li + li {
+  border-top: 1px solid var(--line);
+}
+
+.sk-folder-actions {
+  display: flex;
+  gap: 2px;
+}
+
+/* The catalog's category groups */
+.sk-group + .sk-group {
+  border-top: 1px solid var(--line);
+}
+
+.sk-group-head {
+  margin: 0;
+  padding: 12px 18px 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sk-group .act-list > li:first-child > .sk-row {
+  border-top: 0;
+}
+
+/* Imports, scans and sources */
+.sk-rename {
+  padding: 6px 12px 4px 38px;
+}
+
+.sk-candidate-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.sk-browse {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sk-browse-path {
+  margin: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.sk-browse-list {
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.sk-browse-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sk-suggest {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.sk-chip[aria-pressed="true"] {
+  border-color: var(--run-fg);
+  background: var(--run-bg);
+}
+
+button.sk-chip {
+  font: inherit;
+  cursor: pointer;
+}
+
+.sk-new-skills {
+  align-self: flex-start;
+}
+
+.sk-pad {
+  padding: 12px 18px 4px;
+}
+
+.sk-preview-pick {
+  margin-bottom: 10px;
+}
+
 @container main (max-width: 1000px) {
   .sk-library--open {
     grid-template-columns: minmax(0, 1fr);
@@ -549,5 +744,22 @@
 
   .sk-source-actions {
     justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+}
+
+/* Dialogs are drawn outside main, so they follow the viewport. */
+@media (max-width: 640px) {
+  .sk-compare-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sk-compare-files {
+    max-height: 120px;
+  }
+
+  .sk-rename {
+    padding-left: 12px;
   }
 }
