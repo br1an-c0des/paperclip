@@ -5,14 +5,16 @@ import type {
   HeartbeatRunEvent,
   ProviderTraceFrame,
   ProviderTraceMetadata,
+  ToolRunDecisionLookup,
 } from "@paperclipai/shared";
 import { api, ApiError, errorMessage, readApiJson, type RequestOptions } from "./client";
 
 /*
  * One run, for the run modal (boards 16–18): the run itself, its events (the `adapter.invoke` event
- * holds what Paperclip sent the harness), its stored log, its provider trace, and waking the agent
- * again (Retry, Resume, Rerun with trace). The calls mirror ui/src/api/heartbeats.ts and agents.ts;
- * the live list and Stop stay in heartbeats.ts.
+ * holds what Paperclip sent the harness), its stored log, its provider trace, the tool-gateway
+ * decisions on its tool calls, and waking the agent again (Retry, Resume, Rerun with trace). The
+ * calls mirror ui/src/api/heartbeats.ts, agents.ts and tools.ts; the live list, Stop, watchdog
+ * decisions, runtime requests and workspace operations stay in heartbeats.ts.
  */
 
 /**
@@ -117,6 +119,12 @@ export const runsApi = {
   revealProviderTraceFrame: (runId: string, frameId: number) =>
     api.post<ProviderTraceFrame>(`/heartbeat-runs/${runId}/provider-trace/frames/${frameId}/reveal`, {}),
   deleteProviderTrace: (runId: string) => api.delete<{ ok: true }>(`/heartbeat-runs/${runId}/provider-trace`),
+  /**
+   * What the tool gateway decided about each of the run's tool calls (allowed, denied, waiting for
+   * approval), matched to the transcript's calls by invocation or action request id.
+   */
+  toolDecisions: (companyId: string, runId: string, signal?: AbortSignal) =>
+    api.get<ToolRunDecisionLookup>(`/companies/${encodeURIComponent(companyId)}/tools/runs/${runId}/decisions`, { signal }),
   /** The whole trace as NDJSON. */
   downloadProviderTrace: async (runId: string): Promise<Blob> => {
     const response = await fetch(`/api/heartbeat-runs/${runId}/provider-trace/download`, {

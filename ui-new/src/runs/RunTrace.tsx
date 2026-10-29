@@ -1,4 +1,5 @@
 import type { ProviderTraceMetadata } from "@paperclipai/shared";
+import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Copy, Download, Eye, RotateCcw, Trash2, Waypoints } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
@@ -31,6 +32,10 @@ export function RunTrace(props: {
   rerunning: boolean;
   onRerun: () => void;
   metaLine: string;
+  /** The agent's runtime settings, where "Capture raw provider traces" is. */
+  settingsHref: string | null;
+  /** Called on following the settings link, to close the modal. */
+  onNavigate?: () => void;
 }) {
   const company = useCompany();
   const client = useQueryClient();
@@ -123,7 +128,15 @@ export function RunTrace(props: {
                 : props.canRerun
                   ? ""
                   : "This harness can't record a provider trace. "}
-              To trace every run of {props.agentName}, turn on "Capture raw provider traces" under Debugging in the agent's settings.
+              To trace every run of {props.agentName}, turn on "Capture raw provider traces" under Debugging in{" "}
+              <Show when={props.settingsHref} fallback={<>the agent's settings</>}>
+                {(href) => (
+                  <A class="rx-link" href={href()} onClick={() => props.onNavigate?.()}>
+                    the agent's runtime settings
+                  </A>
+                )}
+              </Show>
+              .
             </span>
           </Show>
         </div>

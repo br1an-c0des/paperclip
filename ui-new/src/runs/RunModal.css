@@ -218,6 +218,29 @@
   overflow-wrap: anywhere;
 }
 
+/* The watchdog's warning on a quiet run, under the stats */
+.rm-watch {
+  padding: 10px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rm-watch:empty {
+  display: none;
+}
+
+/* The run's workspace operations, at the top of the transcript */
+.rm-ops {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rm-ops-head {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--body);
+}
+
 /* The tab bar, with the transcript's chips on the right */
 .rm-tabs-root {
   flex: 1;
@@ -521,7 +544,8 @@
 
   .rm-bar,
   .rm-foot,
-  .rm-alert {
+  .rm-alert,
+  .rm-watch {
     padding-inline: 16px;
   }
 }

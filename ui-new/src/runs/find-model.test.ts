@@ -18,6 +18,7 @@ function tool(key: string, title: string, output = ""): TranscriptItem {
     diff: null,
     added: 0,
     removed: 0,
+    refs: {},
   };
 }
 

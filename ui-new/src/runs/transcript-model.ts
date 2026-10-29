@@ -37,6 +37,15 @@ export type TranscriptItem =
       diff: DiffLine[] | null;
       added: number;
       removed: number;
+      /** The ids the tool gateway's decisions name the call by (tool-decisions.ts matches them). */
+      refs: ToolRefs;
+    }
+  | {
+      /** A harness asking for permission or input mid-turn; answered from the run modal. */
+      kind: "request";
+      key: string;
+      ts: string;
+      request: RuntimeRequest;
     }
   | { kind: "diff"; key: string; ts: string; file: string | null; lines: DiffLine[]; added: number; removed: number }
   | { kind: "note"; key: string; ts: string; tone: "info" | "warn" | "error"; label: string; lines: string[] }
@@ -62,6 +71,11 @@ export type TranscriptItem =
       artifacts: string[];
     }
   | { kind: "output"; key: string; ts: string; text: string };
+
+export type ToolRefs = { toolUseId?: string; invocationId?: string; actionRequestId?: string };
+
+/** The latest state of a runtime request: later entries for the same request replace earlier ones. */
+export type RuntimeRequest = Omit<Extract<TranscriptEntry, { kind: "runtime_request" }>, "kind" | "ts">;
 
 export type FoldItem = {
   kind: "fold";
@@ -162,6 +176,40 @@ export function editDiff(input: unknown): { lines: DiffLine[]; added: number; re
   return null;
 }
 
+/** The ids a tool call carries, with a call id found in its input as the old UI finds it. */
+function toolRefs(entry: Extract<TranscriptEntry, { kind: "tool_call" }>): ToolRefs {
+  const fields = record(entry.input);
+  const fromInput = fields
+    ? [fields.toolUseId, fields.tool_use_id, fields.callId, fields.call_id, fields.id].find((candidate): candidate is string => typeof candidate === "string" && !!candidate.trim())
+    : undefined;
+  const refs: ToolRefs = {};
+  const toolUseId = entry.toolUseId ?? fromInput;
+  if (toolUseId) refs.toolUseId = toolUseId;
+  if (entry.invocationId) refs.invocationId = entry.invocationId;
+  if (entry.actionRequestId) refs.actionRequestId = entry.actionRequestId;
+  return refs;
+}
+
+/**
+ * A runner tool-execution event as a step: its id, the tool, what it's doing ("Terminal: npm test"
+ * reads as the title "npm test"), and its output once there is some.
+ */
+export function toolExecution(entry: Extract<TranscriptEntry, { kind: "provider_activity" }>) {
+  const payload = entry.payload;
+  const id = typeof payload.executionId === "string" && payload.executionId ? payload.executionId : null;
+  if (!id) return null;
+  const name = typeof payload.name === "string" && payload.name ? payload.name : entry.summary || "Tool";
+  const progress = (typeof payload.progress === "string" ? payload.progress : "").replace(/ \(pending\)$/, "");
+  // "Terminal: npm test" reads as "npm test"; a bare name, or an MCP tool's full name, adds nothing.
+  const bare = progress === name || (/^mcp__[^_]+__/.test(progress) && progress.endsWith(`__${name}`));
+  const title = bare ? "" : progress.startsWith(`${name}: `) ? progress.slice(name.length + 2) : progress;
+  const rawOutput = typeof payload.output === "string" && payload.output !== "null" ? payload.output : null;
+  const exit = typeof payload.exitCode === "number" ? `exit_code: ${payload.exitCode}` : null;
+  const output = rawOutput ? (exit ? `${exit}\n${rawOutput}` : rawOutput) : null;
+  const input = payload.input === undefined || payload.input === null ? "" : pretty(payload.input);
+  return { id, name, title: truncate(compact(title), 140), input, output };
+}
+
 const DIFF_TYPES: Record<string, DiffLine["type"]> = {
   add: "add",
   remove: "remove",
@@ -177,6 +225,8 @@ const QUIET_SYSTEM = /^turn started$/i;
 export function buildItems(entries: readonly TranscriptEntry[], streaming: boolean): TranscriptItem[] {
   const items: TranscriptItem[] = [];
   const openTools = new Map<string, Extract<TranscriptItem, { kind: "tool" }>>();
+  // Tool-execution steps that a later call has already filled in.
+  const absorbed = new Set<string>();
   const counts = new Map<string, number>();
   // Keys from where an item starts, plus a counter for items that start at the same moment.
   const keyFor = (kind: string, ts: string) => {
@@ -219,12 +269,29 @@ export function buildItems(entries: readonly TranscriptEntry[], streaming: boole
         const open = id ? openTools.get(id) : undefined;
         // Streaming harnesses re-send a call as it progresses: fold the update in.
         if (open && open.status === "running") {
+          open.refs = { ...open.refs, ...toolRefs(entry) };
           if (entry.input !== null && entry.input !== undefined) {
             open.input = pretty(entry.input);
             open.title = toolTitle(open.name, entry.input) || open.title;
             const diff = editDiff(entry.input);
             if (diff) Object.assign(open, { diff: diff.lines, added: diff.added, removed: diff.removed });
           }
+          break;
+        }
+        // The runner reports an MCP call twice: as a tool execution, then as the call itself with its
+        // input. The call fills in the execution's step rather than adding another.
+        const execution = id
+          ? [...items].reverse().find(
+              (item): item is Extract<TranscriptItem, { kind: "tool" }> =>
+                item.kind === "tool" && item.key.startsWith("tool:exec:") && item.name === entry.name && !absorbed.has(item.key),
+            )
+          : undefined;
+        if (execution && id) {
+          absorbed.add(execution.key);
+          execution.input = pretty(entry.input);
+          execution.title = toolTitle(entry.name, entry.input) || execution.title;
+          execution.refs = { ...execution.refs, ...toolRefs(entry) };
+          openTools.set(id, execution);
           break;
         }
         const diff = editDiff(entry.input);
@@ -242,6 +309,7 @@ export function buildItems(entries: readonly TranscriptEntry[], streaming: boole
           diff: diff?.lines ?? null,
           added: diff?.added ?? 0,
           removed: diff?.removed ?? 0,
+          refs: toolRefs(entry),
         };
         items.push(item);
         if (id) openTools.set(id, item);
@@ -274,6 +342,7 @@ export function buildItems(entries: readonly TranscriptEntry[], streaming: boole
             diff: null,
             added: 0,
             removed: 0,
+            refs: entry.toolUseId ? { toolUseId: entry.toolUseId } : {},
           });
         }
         break;
@@ -309,6 +378,8 @@ export function buildItems(entries: readonly TranscriptEntry[], streaming: boole
         break;
       }
       case "result":
+        // The runner's running usage totals; the run's stats show the final ones.
+        if (entry.subtype === "paperclip.usage") break;
         if (entry.subtype === "transcript_parse_error") {
           items.push({ kind: "note", key: keyFor("note", entry.ts), ts: entry.ts, tone: "error", label: "Unreadable output", lines: [entry.text] });
           break;
@@ -345,16 +416,14 @@ export function buildItems(entries: readonly TranscriptEntry[], streaming: boole
           items.push({ kind: "note", key: keyFor("note", entry.ts), ts: entry.ts, tone: "error", label: "Run ended", lines: [entry.stopReason ?? `${entry.runState} · ${entry.disposition}`] });
         }
         break;
-      case "runtime_request":
-        items.push({
-          kind: "note",
-          key: `request:${entry.requestId}`,
-          ts: entry.ts,
-          tone: entry.status === "pending" ? "warn" : "info",
-          label: entry.requestType === "permission" ? "Asked for permission" : "Asked for input",
-          lines: [`${entry.prompt}${entry.status === "pending" ? "" : ` · ${entry.status}`}`],
-        });
+      case "runtime_request": {
+        // A request's later states (resolved, expired) update the item where it was first asked.
+        const { kind: _kind, ts: _ts, ...request } = entry;
+        const asked = items.find((item): item is Extract<TranscriptItem, { kind: "request" }> => item.kind === "request" && item.request.requestId === entry.requestId);
+        if (asked) asked.request = request;
+        else items.push({ kind: "request", key: `request:${entry.requestId}`, ts: entry.ts, request });
         break;
+      }
       case "workspace_change":
         items.push({
           kind: "note",
@@ -372,9 +441,45 @@ export function buildItems(entries: readonly TranscriptEntry[], streaming: boole
       case "workspace_file_reference":
         items.push({ kind: "note", key: `file:${entry.referenceId}`, ts: entry.ts, tone: "info", label: "File", lines: [entry.path] });
         break;
-      case "provider_activity":
+      case "provider_activity": {
+        // The runner reports each tool it runs as started, progressed and completed events: one step.
+        const execution = entry.family === "tool_execution" ? toolExecution(entry) : null;
+        if (execution) {
+          const existing = openTools.get(`exec:${execution.id}`);
+          const status = entry.status === "failed" ? "error" : entry.status === "running" ? "running" : "done";
+          if (existing) {
+            if (!absorbed.has(existing.key)) {
+              existing.title = execution.title || existing.title;
+              existing.input = execution.input || existing.input;
+            }
+            existing.output = execution.output ?? existing.output;
+            existing.status = status;
+            if (status !== "running") existing.endTs = entry.ts;
+          } else {
+            const item: Extract<TranscriptItem, { kind: "tool" }> = {
+              kind: "tool",
+              key: `tool:exec:${execution.id}`,
+              ts: entry.ts,
+              endTs: status === "running" ? null : entry.ts,
+              name: execution.name,
+              step: stepKind(execution.name, execution.input),
+              title: execution.title,
+              input: execution.input,
+              output: execution.output,
+              status,
+              diff: null,
+              added: 0,
+              removed: 0,
+              refs: { toolUseId: execution.id },
+            };
+            items.push(item);
+            openTools.set(`exec:${execution.id}`, item);
+          }
+          break;
+        }
         items.push({ kind: "note", key: keyFor("activity", entry.ts), ts: entry.ts, tone: entry.status === "failed" ? "error" : "info", label: entry.title || entry.family, lines: [entry.summary].filter(Boolean) });
         break;
+      }
     }
   }
   return items;

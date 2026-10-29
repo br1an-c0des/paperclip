@@ -479,6 +479,71 @@ details[open] > summary .rt-chev {
   justify-content: center;
 }
 
+/* A runtime request: amber while it waits for an answer */
+.rt-req[data-pending] {
+  border-color: color-mix(in srgb, var(--amber-fg) 45%, transparent);
+  background: var(--amber-bg);
+}
+
+.rt-req[data-pending] .rt-req-status {
+  color: var(--amber-fg);
+  font-weight: 600;
+}
+
+.rt-req-status {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.rt-req-prompt {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rt-req .rt-actions,
+.rt-req-form .rt-actions {
+  justify-content: flex-start;
+}
+
+.rt-req-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* The tool gateway's decision on a call: a word in the summary, the details inside */
+.rt-dec {
+  padding: 0 7px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--body);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.rt-dec[data-tone="green"] { background: var(--green-bg); color: var(--green-fg); }
+.rt-dec[data-tone="amber"] { background: var(--amber-bg); color: var(--amber-fg); }
+.rt-dec[data-tone="red"] { background: var(--red-bg); color: var(--red-fg); }
+
+.rt-decision {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--body);
+}
+
+.rt-decision p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 @container rt (max-width: 520px) {
   .rt-e {
     grid-template-columns: 38px minmax(0, 1fr);
