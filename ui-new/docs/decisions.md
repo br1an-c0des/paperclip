@@ -67,6 +67,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 38 | [Gaps found building task and workspace leftovers](#38-gaps-found-building-task-and-workspace-leftovers) | `tasks/runner-goal`, `tasks/feedback`, `workspaces/*` | Open | Oct 28, 2026 |
 | 39 | [Decisions from the M7 audit](#39-decisions-from-the-m7-audit) | M7, see [audit/m7-parity.md](audit/m7-parity.md#5-decisions-needed) | Decided | Oct 28, 2026 |
 | 40 | [Gaps found building requests and the Inbox](#40-gaps-found-building-requests-and-the-inbox) | `tasks/interactions`, `inbox-search/triage`, `decisions/feed` | Open | Oct 28, 2026 |
+| 41 | [Gaps found building old links, the shell and the installable app](#41-gaps-found-building-old-links-the-shell-and-the-installable-app) | `shell/*`, `approvals/governance`, User profile | Open | Oct 28, 2026 |
 
 ## Entries
 
@@ -1338,3 +1339,27 @@ Both are handled in `ui-new` for now.
   (localStorage, per company; the last 24 hours with no stored visit).
 - **Decision 24 follow-up:** stalled reviews are answered on the card, and join requests count as
   Approvals in the kind filter.
+
+### 41. Gaps found building old links, the shell and the installable app
+
+- **Status:** Open
+- **Area:** `shell/*`, `approvals/governance`, User profile, deploy
+- **Found in:** M7 slice A.
+
+- **Icons stay in `ui/public`:** the favicons and home-screen icons are served from there in dev and
+  copied into `dist` at build, as `/brands` is. `ui-new/public` holds only `site.webmanifest` and
+  `sw.js`. The Dockerfile now fails the build if the brands, icons, manifest or a stamped worker are
+  missing.
+- **The worker's build id is the entry chunk's name,** stamped at build; unstamped (Vite's dev
+  server) it handles nothing, and dev unregisters any worker. A parked tab reloads onto a new build
+  only while it's hidden, so a visible tab is never reloaded under you.
+- **The profile endpoint doesn't resolve `me`;** the client maps it to your user id.
+- **`GET /companies/:id/issues/summaries` takes at most 5 task ids,** so Recent tasks is the last 5,
+  kept per company and person in this browser.
+- **`DELETE /agents/:id` needs the agent terminated or rejected first;** a real rejected hire should
+  qualify, but only a synthetic one was tried (409).
+- **Links that wait on other work:** `/execution-workspaces/:id` → `workspaces?workspace=<id>` (slice
+  C2); `/cases/:id` falls back to a note while `enableCases` is off (D1, next round); status card
+  links land on a placeholder until D3.
+- **`]` and `y`, `g c`:** `]` remembers the closed panel per path; `y` and `g c` are handled in the
+  shell through the open task's DOM.
