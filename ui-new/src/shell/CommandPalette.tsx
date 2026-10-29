@@ -12,8 +12,10 @@ import { useAgentsQuery, useProjectsQuery } from "@/lib/company-data";
 import { theme, toggleTheme } from "@/lib/theme";
 import { Dialog } from "@/ui/Dialog";
 import { STATUS_META } from "@/ui/status-meta";
+import { profilePath } from "@/profile/profile-model";
 import { searchPath } from "@/search/search-url";
-import { filterPalette, searchHandOff, type PaletteGroup } from "./palette";
+import { useSession } from "@/lib/session";
+import { filterPalette, quickFilterGroup, searchHandOff, type PaletteGroup } from "./palette";
 import "./CommandPalette.css";
 
 /*
@@ -37,6 +39,7 @@ export function CommandPalette() {
   const navigate = useNavigate();
   const projects = useProjectsQuery();
   const agents = useAgentsQuery();
+  const session = useSession();
   const [query, setQuery] = createSignal("");
   const [searchTerm, setSearchTerm] = createSignal("");
   const [active, setActive] = createSignal(0);
@@ -101,11 +104,23 @@ export function CommandPalette() {
     },
     {
       title: "Pages",
+      idleLimit: 6,
       commands: [
         { id: "dashboard", label: "Org dashboard", hint: "G D", keywords: "home company", run: go(`${base()}/dashboard`) },
         { id: "inbox", label: "Inbox", hint: "G I", keywords: "requests approvals questions", run: go(`${base()}/inbox`) },
         { id: "issues", label: "All tasks", keywords: "issues list", run: go(`${base()}/issues`) },
+        { id: "search-page", label: "Search", hint: "/", keywords: "find comments documents files", run: go(searchPath(company().issuePrefix)) },
+        { id: "projects", label: "Projects", keywords: "list archived", run: go(`${base()}/projects`) },
+        { id: "agents", label: "Agents", keywords: "roster org team", run: go(`${base()}/agents`) },
+        { id: "workload", label: "Workload", keywords: "agents capacity heatmap", run: go(`${base()}/workload`) },
+        { id: "workspaces", label: "Workspaces", keywords: "worktrees branches services", run: go(`${base()}/workspaces`) },
+        { id: "apps", label: "Apps", keywords: "integrations connections tools mcp", run: go(`${base()}/apps`) },
+        { id: "skills", label: "Skills", keywords: "library studio sources", run: go(`${base()}/skills`) },
+        { id: "activity", label: "Activity", keywords: "log audit runs costs timeline", run: go(`${base()}/activity`) },
+        { id: "approvals", label: "Approvals", keywords: "history decided", run: go(`${base()}/approvals/all`) },
+        { id: "profile", label: "Your profile", keywords: "me user stats", run: go(profilePath(company().issuePrefix, { id: session.youId() })) },
         { id: "settings", label: "Settings", keywords: "company organization", run: go(`${base()}/company/settings`) },
+        { id: "app-settings", label: "App settings", keywords: "account instance harnesses plugins admins", run: go(`${base()}/company/settings/instance`) },
         { id: "companies", label: "All companies", keywords: "switch organization", run: go("/companies") },
       ],
     },
@@ -153,10 +168,14 @@ export function CommandPalette() {
     }),
   );
 
+  // Search operators added to what's typed (the old palette's quick filters); the Search page reads them.
+  const quickFilters = createMemo(() => quickFilterGroup(query(), (next) => setQuery(next)));
+
   const visible = createMemo(() => {
     const filtered = filterPalette(groups(), query());
     const found = taskGroup();
-    return [...filtered, ...(found ? [found] : []), handOff()];
+    const chips = quickFilters();
+    return [...filtered, ...(found ? [found] : []), ...(chips ? [chips] : []), handOff()];
   });
   const flat = createMemo(() => visible().flatMap((group) => group.commands));
 
@@ -243,10 +262,14 @@ export function CommandPalette() {
                         aria-selected={selected()}
                         data-highlighted={selected() ? "" : undefined}
                         onPointerMove={() => setActive(flat().findIndex((entry) => entry.id === command.id))}
+                        // Focus stays in the field, so a quick filter can be followed by more typing.
+                        onMouseDown={(event) => event.preventDefault()}
                         onClick={() => command.run()}
                       >
                         <span class="mi-text">
-                          <span class="mi-label">{command.label}</span>
+                          <span class="mi-label" classList={{ mono: command.id.startsWith("filter:") }}>
+                            {command.label}
+                          </span>
                         </span>
                         <Show when={command.hint}>
                           <small class="mi-hint">{command.hint}</small>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { companySummary, dockHiddenAfterScroll, dockPlace, isOrgPage, tapTasks, tasksScope, toggleCompanies } from "./dock-model";
+import { companySummary, desktopArea, detailParent, dockHiddenAfterScroll, dockPlace, isDetailPage, isOrgPage, tapTasks, tasksScope, toggleCompanies } from "./dock-model";
 
 describe("isOrgPage", () => {
   it("covers the dashboard, the roster and the org tabs", () => {
@@ -114,5 +114,48 @@ describe("companySummary", () => {
     expect(companySummary({ needsYou: 0 })).toBe("all quiet");
     expect(companySummary({ needsYou: 1 })).toBe("1 needs you");
     expect(companySummary({})).toBe("");
+  });
+});
+
+describe("isDetailPage", () => {
+  it("covers a task, an agent and an approval", () => {
+    expect(isDetailPage("/TST/issues/TST-1", "TST")).toBe(true);
+    expect(isDetailPage("/TST/agents/nova", "TST")).toBe(true);
+    expect(isDetailPage("/TST/agents/nova/runs", "TST")).toBe(true);
+    expect(isDetailPage("/TST/approvals/0b6f0c56-6f0a-4a4e-9d6c-1f6d2b6c7a10", "TST")).toBe(true);
+  });
+
+  it("leaves lists and the roster out", () => {
+    expect(isDetailPage("/TST/issues", "TST")).toBe(false);
+    expect(isDetailPage("/TST/issues/active", "TST")).toBe(false);
+    expect(isDetailPage("/TST/agents", "TST")).toBe(false);
+    expect(isDetailPage("/TST/agents/paused", "TST")).toBe(false);
+    expect(isDetailPage("/TST/agents/new", "TST")).toBe(false);
+    expect(isDetailPage("/TST/approvals/all", "TST")).toBe(false);
+    expect(isDetailPage("/TST/dashboard", "TST")).toBe(false);
+  });
+
+  it("knows where Back goes without history", () => {
+    expect(detailParent("/TST/issues/TST-1", "TST")).toBe("/TST/issues");
+    expect(detailParent("/TST/agents/nova", "TST")).toBe("/TST/agents");
+    expect(detailParent("/TST/approvals/x", "TST")).toBe("/TST/inbox");
+  });
+});
+
+describe("desktopArea", () => {
+  it("names the screens outside the phone's scope", () => {
+    expect(desktopArea("/TST/company/settings", "TST")).toBe("Settings");
+    expect(desktopArea("/TST/company/settings/instance/account", "TST")).toBe("App settings");
+    expect(desktopArea("/TST/projects/web/settings/budget", "TST")).toBe("Project settings");
+    expect(desktopArea("/TST/apps/advanced", "TST")).toBe("Apps");
+    expect(desktopArea("/TST/skills", "TST")).toBe("Skills");
+    expect(desktopArea("/TST/activity/runs", "TST")).toBe("Activity");
+  });
+
+  it("is null for the phone's own screens", () => {
+    expect(desktopArea("/TST/issues", "TST")).toBeNull();
+    expect(desktopArea("/TST/agents/nova", "TST")).toBeNull();
+    expect(desktopArea("/TST/projects/web", "TST")).toBeNull();
+    expect(desktopArea("/TST/inbox", "TST")).toBeNull();
   });
 });

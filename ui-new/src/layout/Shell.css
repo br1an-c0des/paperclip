@@ -39,6 +39,26 @@
   padding: var(--main-pad-top) var(--main-pad-end) 48px 4px;
 }
 
+/* The nav hidden (`[`): main takes the width, and a button at its top left brings the nav back. */
+.shell--bare {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "main";
+}
+
+.shell--bare .shell-main {
+  padding-left: 52px;
+}
+
+.shell-show-nav.btn {
+  position: fixed;
+  top: 16px;
+  left: 12px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  color: var(--muted);
+}
+
 /*
  * Phone: one column and no left nav. The floating dock (PhoneDock.css) sits over the foot of main,
  * so main leaves room for it: the dock's 56px, its 18px gap to the edge, a little air, and the
@@ -54,4 +74,9 @@
   gap: 12px;
   padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
     calc(104px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+}
+
+/* A detail page on a phone (no dock): only the safe area below. */
+:root[data-viewport="phone"] .shell--nodock .shell-main {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
 }

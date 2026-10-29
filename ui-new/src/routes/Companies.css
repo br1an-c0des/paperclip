@@ -28,6 +28,25 @@
   gap: 10px;
 }
 
+/* Each company with Move up and Move down beside it, for the order the switcher follows. */
+.companies-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.companies-item .company-card {
+  flex: 1;
+  min-width: 0;
+}
+
+.companies-order {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--muted);
+}
+
 .company-card {
   display: flex;
   align-items: center;
