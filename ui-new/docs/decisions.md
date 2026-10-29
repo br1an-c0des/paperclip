@@ -66,6 +66,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 37 | [Gaps found building plugin hosting](#37-gaps-found-building-plugin-hosting) | `shell/plugins` | Open | Oct 28, 2026 |
 | 38 | [Gaps found building task and workspace leftovers](#38-gaps-found-building-task-and-workspace-leftovers) | `tasks/runner-goal`, `tasks/feedback`, `workspaces/*` | Open | Oct 28, 2026 |
 | 39 | [Decisions from the M7 audit](#39-decisions-from-the-m7-audit) | M7, see [audit/m7-parity.md](audit/m7-parity.md#5-decisions-needed) | Decided | Oct 28, 2026 |
+| 40 | [Gaps found building requests and the Inbox](#40-gaps-found-building-requests-and-the-inbox) | `tasks/interactions`, `inbox-search/triage`, `decisions/feed` | Open | Oct 28, 2026 |
 
 ## Entries
 
@@ -1313,3 +1314,27 @@ Both are handled in `ui-new` for now.
   must serve a `sw.js` in any case: the old worker stays registered in every browser that opened the
   old UI, and a 404 doesn't remove it. The new worker is the base for push later
   ([decision 18](#18-the-phone-layouts-assume-push-notifications)).
+
+### 40. Gaps found building requests and the Inbox
+
+- **Status:** Open
+- **Area:** `tasks/interactions`, `inbox-search/triage`, `decisions/feed`
+- **Found in:** M7 slice B.
+
+- **Approving an agent's join request needs a CEO.** `POST /companies/:id/join-requests/:id/approve`
+  answers 409 "no active CEO" in a company without a `role: ceo` agent (upstream #11440 is the same
+  problem from the other side). The card shows the server's message; the outside-agent invite (D2)
+  should warn about it before the invite is created.
+- **The join request list returns the agent's whole `agentDefaultsPayload`,** header values such as
+  `headers.x-openclaw-token` included in plain text, while a Hermes `apiKey` comes back as a secret
+  reference. `ui-new` never displays them, only that credentials were sent. Upstream candidate 15.
+- **The feed's `shelf` flag ignores `keep`** (`server/src/services/attention.ts`, around line 642), so a
+  kept item still arrives with `shelf: true`, and in the old UI Keep has no visible effect. `ui-new`
+  treats `shelf && !keep` as on the shelf. Upstream candidate 14.
+- **A board user can't create a proposal or a connection request;** both come from agent runs. Those
+  two cards are covered by unit tests on stored shapes and mocked card tests, not checked live.
+- **D5 details:** shelved items are left out of the nav count; New today and the "New" pill use the
+  local day, not the UTC day the old badge used; "New" is relative to your last visit in this browser
+  (localStorage, per company; the last 24 hours with no stored visit).
+- **Decision 24 follow-up:** stalled reviews are answered on the card, and join requests count as
+  Approvals in the kind filter.
