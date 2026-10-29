@@ -139,6 +139,11 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
     case "plugin":
       keys.push(["plugins"]);
       break;
+    // Status cards (src/status-cards/): created, changed, archived, deleted, an update or rebuild
+    // asked for, and the agent writing the query or a summary are all logged on `status_card`.
+    case "status_card":
+      keys.push(queryKeys.statusCards.all);
+      break;
     case "company":
       keys.push(queryKeys.companies.all);
       // Imports and scans (`company.skills_imported`, `company.skills_scanned`…) are logged on the company.

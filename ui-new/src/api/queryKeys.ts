@@ -390,6 +390,18 @@ export const queryKeys = {
     list: (companyId: string) => ["approvals", companyId, "list"] as const,
   },
   userProfile: (companyId: string, slug: string) => ["user-profile", companyId, slug] as const,
+  /*
+   * Status cards (src/status-cards/), in the old UI's shapes. Everything sits under
+   * `["status-cards"]`, which the live events refresh on any `status_card` activity.
+   */
+  statusCards: {
+    all: ["status-cards"] as const,
+    list: (companyId: string, archived: boolean) => ["status-cards", companyId, archived ? "archived" : "active"] as const,
+    detail: (id: string) => ["status-cards", "detail", id] as const,
+    updates: (id: string) => ["status-cards", "detail", id, "updates"] as const,
+    summaryRevisions: (id: string) => ["status-cards", "detail", id, "summary-revisions"] as const,
+    dryRun: (id: string) => ["status-cards", "detail", id, "dry-run"] as const,
+  },
   recentTasks: (companyId: string, ids: readonly string[]) => ["issues", companyId, "summaries", ...ids] as const,
   sidebarPreferences: {
     companyOrder: (userId: string) => ["sidebar-preferences", "company-order", userId] as const,

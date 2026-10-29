@@ -15,6 +15,7 @@ import {
   Play,
   Plug,
   Plus,
+  Radar,
   Search,
   Settings2,
   Star,
@@ -39,7 +40,7 @@ import { useCanCreateCompany } from "@/onboarding/can-create";
 import { actionTargets, useAgentActions } from "@/org/actions";
 import { profilePath } from "@/profile/profile-model";
 import { ServerInfo } from "@/shell/ServerInfo";
-import { useAgentsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
+import { useAgentsQuery, useExperimentalSettingsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
 import { useSession, useSignOut, useYouName } from "@/lib/session";
 import { theme, toggleTheme } from "@/lib/theme";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
@@ -48,7 +49,7 @@ import { Grain } from "@/ui/Grain";
 import { Menu } from "@/ui/Menu";
 import { StatusCapsule } from "@/ui/Status";
 import { navSection, setNavHidden, useCompanyOrder, useProjectOrder, useProjectStars, useRecentTasks } from "./nav-prefs";
-import { visibleProjects } from "./nav-model";
+import { showStatusLink, visibleProjects } from "./nav-model";
 import "@/ui/nav.css";
 import "./Nav.css";
 
@@ -67,6 +68,9 @@ import "./Nav.css";
  * your nav); each agent's "…" runs it now, pauses or resumes it (org/actions.ts) and stars it. Every
  * section folds from its heading, and `[` hides the whole nav (the shell then offers it back). The
  * switcher lists companies in the order you gave them on the companies page.
+ *
+ * Status (status cards, decision 39, D3) sits under Inbox while the instance has `enableStatusCards`
+ * on, as in the old sidebar.
  *
  * Plugins' global toolbar buttons sit under the company switcher; the switcher offers Create
  * organization (the onboarding page) when you may create one. The You menu holds View profile and,
@@ -244,6 +248,7 @@ export function Nav() {
   const agents = useAgentsQuery();
   const liveRuns = useLiveRunsQuery();
   const recent = useRecentTasks();
+  const experimental = useExperimentalSettingsQuery();
 
   const location = useLocation();
 
@@ -313,6 +318,12 @@ export function Nav() {
             </span>
           </Show>
         </A>
+        <Show when={showStatusLink(experimental.data)}>
+          <A class="navi" href={`${base()}/status`}>
+            <Radar size={16} aria-hidden="true" />
+            Status
+          </A>
+        </Show>
       </div>
 
       <Show when={starred().length > 0 || starredProjects().length > 0}>

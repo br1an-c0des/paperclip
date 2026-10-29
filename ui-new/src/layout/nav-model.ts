@@ -1,12 +1,17 @@
-import type { IssueStatus, IssueSummary } from "@paperclipai/shared";
+import type { InstanceExperimentalSettings, IssueStatus, IssueSummary } from "@paperclipai/shared";
 
 /*
  * The nav's personal rules, kept apart from the components so they can be tested: the order you
  * gave projects and companies (`GET|PUT /sidebar-preferences/me` and
  * `/companies/:id/sidebar-preferences/me`, as the old sidebar keeps it), which projects show (you can
- * leave a project to drop it from your nav), the tasks you opened lately, and which task a page has
- * open.
+ * leave a project to drop it from your nav), the tasks you opened lately, which task a page has
+ * open, and which of the nav's switchable entries show.
  */
+
+/** Status (status cards) shows only while the instance has them on; hidden until the settings arrive. */
+export function showStatusLink(experimental: Pick<InstanceExperimentalSettings, "enableStatusCards"> | undefined): boolean {
+  return experimental?.enableStatusCards === true;
+}
 
 /**
  * Items in your order: the ones you placed first, as placed, then the rest in their incoming order

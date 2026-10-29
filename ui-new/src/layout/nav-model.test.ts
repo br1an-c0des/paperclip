@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inStoredOrder, moveId, openTaskRef, parseRecent, recordRecent, refreshRecent, visibleProjects, type RecentTask } from "./nav-model";
+import { inStoredOrder, moveId, openTaskRef, parseRecent, recordRecent, refreshRecent, showStatusLink, visibleProjects, type RecentTask } from "./nav-model";
 
 const items = [{ id: "a" }, { id: "b" }, { id: "c" }];
 
@@ -64,5 +64,13 @@ describe("openTaskRef", () => {
     expect(openTaskRef("/TES/issues", "", "TES")).toBeNull();
     expect(openTaskRef("/TES/issues/active", "", "TES")).toBeNull();
     expect(openTaskRef("/TES/dashboard", "", "TES")).toBeNull();
+  });
+});
+
+describe("showStatusLink", () => {
+  it("shows Status only while the instance has status cards on", () => {
+    expect(showStatusLink({ enableStatusCards: true })).toBe(true);
+    expect(showStatusLink({ enableStatusCards: false })).toBe(false);
+    expect(showStatusLink(undefined)).toBe(false);
   });
 });
