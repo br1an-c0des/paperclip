@@ -45,6 +45,17 @@ export type ToolGalleryResponse = {
   /** The OAuth callback address the server registers; missing when it has no browser origin. */
   oauthCallbackUrl?: string;
   capabilities: ToolConnectionCreateCapabilities;
+  /** Credentials kept outside Paperclip's vault; only Vercel Connect so far. */
+  credentialSources?: { vercelConnect: VercelConnectAvailability };
+};
+
+export type VercelConnectAvailability = {
+  available: boolean;
+  enabled: boolean;
+  authentication: "workload_oidc" | "access_token" | null;
+  manageUrl: string;
+  /** Why it's unavailable; null when it's available. */
+  reason: string | null;
 };
 
 export type AccessSelection = "all_agents" | { agentIds: string[] };

@@ -23,6 +23,7 @@ import {
   actionPermission,
   appProfile,
   askFirstIds,
+  connectHref,
   connectionRows,
   connectionSlug,
   DETAIL_TABS,
@@ -609,7 +610,7 @@ function ReconnectCard(props: { connection: ToolConnection; methods: ConnectionM
           <Match when={isDraft() && slug()}>
             <A
               class={buttonClass({ variant: "primary", size: "compact" })}
-              href={`/${company().issuePrefix}/apps/connect?source=${encodeURIComponent(slug()!)}&resume=${encodeURIComponent(props.connection.id)}`}
+              href={connectHref(`/${company().issuePrefix}/apps`, slug()!, { resume: props.connection.id }, props.connection.credentialSource)}
             >
               Finish setup
             </A>

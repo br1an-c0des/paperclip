@@ -4,7 +4,7 @@ import { createMutation } from "@tanstack/solid-query";
 import { ExternalLink, Plus, Trash2 } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Index, Match, on, Show, Switch } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import { toolsApi } from "@/api/tools";
+import { toolsApi, type VercelConnectAvailability } from "@/api/tools";
 import { useCompany } from "@/lib/company";
 import { Button, buttonClass } from "@/ui/Button";
 import { Field, TextArea, TextInput } from "@/ui/Field";
@@ -32,6 +32,7 @@ import {
   recommendedMethod,
   SPECIAL_SETUP_APPS,
   toolMethods,
+  vercelMethods,
   type AccessDraft,
   type ByoAuth,
   type ByoDraft,
@@ -54,13 +55,16 @@ import { NewPool } from "./pools/Pools";
  *   sign-in; the server sends you back to the connection's page.
  * - Your own MCP server (`/apps/byo`): paste its address; Paperclip probes it, or you say how it
  *   signs in (a key, headers, or your own OAuth app).
+ * - Vercel Connect (`/apps/vercel-connect?source=<slug>`): the apps Vercel has reviewed, connected
+ *   with a connector made in Vercel. Paperclip keeps only the connector's reference; the form asks
+ *   for its UID instead of a key, address or OAuth app.
  * - `/apps/app/:applicationId`: an app the company has, with its accounts and a way to add one.
  *
  * Composio and Arcade have their own form (src/apps/setups/AggregatorConnect.tsx); chat apps
  * (AgentMail, Telegram…) go to their chat setup (src/apps/chat/); Google Workspace's services and
  * whose account a connection is come from src/apps/setups/SetupExtras.tsx.
  *
- * Not here yet: Vercel Connect credentials and the agent instructions some apps offer. Paperclip Cloud sign-in hand-offs are refused with a message.
+ * Not here yet: the agent instructions some apps offer. Paperclip Cloud sign-in hand-offs are refused with a message.
  */
 
 type ConnectOutcome = { kind: "done"; connectionId: string } | { kind: "redirect" };
@@ -172,6 +176,94 @@ export function GalleryConnect(props: { source: string | null; resume: string | 
   );
 }
 
+// ---------------------------------------------------------------------------------------------
+
+/** Vercel Connect: the reviewed apps, then one app's form with a Vercel connector for credentials. */
+export function VercelConnect(props: { source: string | null; resume: string | null; applicationId: string | null }) {
+  const company = useCompany();
+  const base = () => `/${company().issuePrefix}/apps`;
+  const gallery = useGallery();
+  const availability = () => gallery.data?.credentialSources?.vercelConnect ?? null;
+  const reviewed = createMemo(() => (gallery.data?.apps ?? []).filter((entry) => vercelMethods(entry).length > 0));
+  const app = createMemo(() => reviewed().find((entry) => entry.slug === props.source) ?? null);
+  // A connection already set up through Vercel can still be finished while new ones can't.
+  const usable = () => availability()?.available === true || Boolean(props.resume);
+
+  return (
+    <Switch>
+      <Match when={gallery.isPending}>
+        <p class="ap-empty card" role="status">
+          Loading the apps…
+        </p>
+      </Match>
+      <Match when={gallery.isError}>
+        <div class="ap-empty card" role="alert">
+          <p>Could not load the app gallery: {(gallery.error as Error).message}</p>
+          <Button size="compact" onClick={() => void gallery.refetch()}>
+            Retry
+          </Button>
+        </div>
+      </Match>
+      <Match when={usable() ? app() : null} keyed>
+        {(entry) => (
+          <GalleryForm app={entry} methods={vercelMethods(entry)} resume={props.resume} applicationId={props.applicationId} vercel={availability()} />
+        )}
+      </Match>
+      <Match when={props.source && !app()}>
+        <section class="card ap-later">
+          <h2 class="disp">This app can't connect through Vercel</h2>
+          <p>
+            Vercel Connect hasn't been reviewed for "{props.source}" in this Paperclip.{" "}
+            <A href={`${base()}/connect?source=${encodeURIComponent(props.source!)}`}>Connect it directly</A>
+          </p>
+        </section>
+      </Match>
+      <Match when={true}>
+        <section class="card ap-connect">
+          <header class="ap-connect-head">
+            <div class="ap-connect-title">
+              <h2 class="disp">Connect through Vercel</h2>
+              <p>Create and manage the provider connector in Vercel. Paperclip stores its reference and applies agent access, policy, approval and audit controls here.</p>
+            </div>
+            <Show when={availability()?.manageUrl}>
+              {(url) => (
+                <a class={buttonClass({ size: "compact", variant: "quiet" })} href={url()} target="_blank" rel="noopener noreferrer">
+                  Open Vercel Connect
+                  <ExternalLink size={13} aria-hidden="true" />
+                </a>
+              )}
+            </Show>
+          </header>
+          <Show when={!usable()}>
+            <p class="cx-note cx-note--warn" role="status">
+              {availability()?.reason ?? "Vercel Connect is unavailable on this Paperclip."}
+            </p>
+          </Show>
+          <Show when={reviewed().length > 0} fallback={<p class="cx-note">No apps in this Paperclip's gallery can connect through Vercel.</p>}>
+            <ul class="ap-rows" aria-label="Apps Vercel can connect">
+              <For each={reviewed()}>
+                {(entry) => (
+                  <li class="ap-row" classList={{ "ap-row--link": usable() }}>
+                    <AppLogo app={entry} name={entry.name} />
+                    <div class="ap-row-main">
+                      <Show when={usable()} fallback={<span class="ap-row-name">{entry.name}</span>}>
+                        <A class="ap-row-name" href={`${base()}/vercel-connect?source=${encodeURIComponent(entry.slug)}`}>
+                          {entry.name}
+                        </A>
+                      </Show>
+                      <span class="ap-row-meta">{entry.description}</span>
+                    </div>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
+        </section>
+      </Match>
+    </Switch>
+  );
+}
+
 function GalleryForm(props: {
   app: AppDefinition;
   methods: ConnectionMethodDef[];
@@ -179,6 +271,8 @@ function GalleryForm(props: {
   applicationId: string | null;
   /** Fields some apps add (src/apps/setups/): whose account it is, Google's services. */
   extras?: (method: () => ConnectionMethodDef | null) => GalleryExtras;
+  /** Connecting through Vercel Connect: a connector reference instead of keys and sign-in. */
+  vercel?: VercelConnectAvailability | null;
 }) {
   const company = useCompany();
   const gallery = useGallery();
@@ -188,6 +282,8 @@ function GalleryForm(props: {
   const [draft, setDraft] = createStore<ConnectDraft>(newConnectDraft(props.app, method()));
   const [failure, setFailure] = createSignal<string | null>(null);
   const [ownClient, setOwnClient] = createSignal(false);
+  const [connector, setConnector] = createSignal("");
+  const viaVercel = props.vercel !== undefined;
   const canAll = () => gallery.data?.capabilities.canSetCompanyInstall !== false;
 
   // A different method has different fields: start them over, keeping the name and access.
@@ -210,7 +306,7 @@ function GalleryForm(props: {
   });
 
   const flow = useConnectFlow(setFailure);
-  const problem = () => connectProblem(method(), draft) ?? extras?.problem() ?? null;
+  const problem = () => connectProblem(method(), draft, viaVercel ? connector() : undefined) ?? extras?.problem() ?? null;
   const submit = (event: Event) => {
     event.preventDefault();
     const current = method();
@@ -220,6 +316,7 @@ function GalleryForm(props: {
     const payload = connectPayload(props.app, current, withClient, {
       applicationId: props.applicationId ?? undefined,
       resumeConnectionId: props.resume ?? undefined,
+      ...(viaVercel ? { vercelConnector: connector() } : {}),
     });
     flow.mutate({
       payload: extras ? extras.apply(payload) : payload,
@@ -236,7 +333,10 @@ function GalleryForm(props: {
       <header class="ap-connect-head">
         <AppLogo app={props.app} name={props.app.name} size={48} />
         <div class="ap-connect-title">
-          <h2 class="disp">{props.resume ? `Finish connecting ${props.app.name}` : `Connect ${props.app.name}`}</h2>
+          <h2 class="disp">
+            {props.resume ? `Finish connecting ${props.app.name}` : `Connect ${props.app.name}`}
+            {viaVercel ? " through Vercel" : ""}
+          </h2>
           <p>{props.app.description}</p>
         </div>
         <Show when={props.app.docsUrl}>
@@ -296,7 +396,35 @@ function GalleryForm(props: {
               <TextInput id="ap-name" value={draft.name} maxLength={160} onInput={(event) => setDraft("name", event.currentTarget.value)} />
             </Field>
 
-            <Show when={needsLink(current())}>
+            <Show when={viaVercel}>
+              <div class="ap-oauth-client">
+                <p class="cx-note">
+                  Paperclip doesn't copy Vercel's setup forms. Create or attach the connector in Vercel, then paste its UID here.
+                  <Show when={props.vercel?.manageUrl}>
+                    {(url) => (
+                      <>
+                        {" "}
+                        <a href={url()} target="_blank" rel="noopener noreferrer">
+                          Open Vercel Connect
+                        </a>
+                      </>
+                    )}
+                  </Show>
+                </p>
+                <Field label="Connector UID or ID" for="ap-vercel-connector" help="Paperclip checks the connector and keeps only its reference and redacted verification details.">
+                  <TextInput
+                    id="ap-vercel-connector"
+                    class="mono"
+                    autocomplete="off"
+                    placeholder="service/my-connector or scl_…"
+                    value={connector()}
+                    onInput={(event) => setConnector(event.currentTarget.value)}
+                  />
+                </Field>
+              </div>
+            </Show>
+
+            <Show when={!viaVercel && needsLink(current())}>
               <Field label="Server address" for="ap-link" help="The full MCP address the provider gave you. Paperclip keeps it as a secret.">
                 <TextInput
                   id="ap-link"
@@ -309,7 +437,7 @@ function GalleryForm(props: {
               </Field>
             </Show>
 
-            <For each={current().credentialFields ?? []}>
+            <For each={viaVercel ? [] : (current().credentialFields ?? [])}>
               {(field) => (
                 <FieldInput
                   field={field}
@@ -334,7 +462,7 @@ function GalleryForm(props: {
               </details>
             </Show>
 
-            <Show when={acceptsOwnOAuthClient(current())}>
+            <Show when={!viaVercel && acceptsOwnOAuthClient(current())}>
               <Show
                 when={ownClient()}
                 fallback={
@@ -418,7 +546,19 @@ function GalleryForm(props: {
             <span class="cx-note">{problem()}</span>
           </Show>
           <Button type="submit" variant="primary" disabled={Boolean(problem()) || flow.isPending}>
-            {flow.isPending ? (signsIn() ? "Opening sign-in…" : "Connecting…") : signsIn() ? `Sign in with ${props.app.name}` : "Connect"}
+            {flow.isPending
+              ? viaVercel
+                ? "Checking…"
+                : signsIn()
+                  ? "Opening sign-in…"
+                  : "Connecting…"
+              : viaVercel
+                ? signsIn()
+                  ? "Validate and continue"
+                  : "Validate and connect"
+                : signsIn()
+                  ? `Sign in with ${props.app.name}`
+                  : "Connect"}
           </Button>
         </span>
       </div>

@@ -20,6 +20,7 @@ import {
   canAlwaysAllow,
   categoriesIn,
   connectFailure,
+  connectHref,
   connectionRows,
   connectionState,
   connectPayload,
@@ -39,6 +40,7 @@ import {
   recommendedMethod,
   supportsAutomaticOAuth,
   toolMethods,
+  vercelMethods,
   withPermission,
 } from "./apps-model";
 
@@ -93,6 +95,7 @@ describe("appsView", () => {
     expect(appsView("review")).toEqual({ section: "review" });
     expect(appsView("byo")).toEqual({ section: "byo" });
     expect(appsView("connect")).toEqual({ section: "connect" });
+    expect(appsView("vercel-connect")).toEqual({ section: "vercel" });
     expect(appsView("connect/linear/key")).toEqual({ section: "redirect", to: "connect?source=linear" });
     expect(appsView("app/a1/permissions")).toEqual({ section: "application", applicationId: "a1" });
     expect(appsView("c1")).toEqual({ section: "redirect", to: "c1/permissions" });
@@ -237,6 +240,31 @@ describe("connecting", () => {
       configValues: { teamId: "team_abc" },
       resumeConnectionId: "c9",
     });
+  });
+
+  it("connects through Vercel with only the connector and settings", () => {
+    const review = { services: ["posthog"], principalModes: ["app" as const], scopes: [], header: { name: "Authorization", prefix: "Bearer" } };
+    const reviewed = method({ key: "vercel-ok", auth: "api_key", transport: "mcp_remote", defaults: {}, credentialSources: { vercelConnect: review }, credentialFields: vercel.credentialFields });
+    const entry = app({ slug: "posthog", name: "PostHog", methods: [vercel, reviewed] });
+    expect(vercelMethods(entry).map((candidate) => candidate.key)).toEqual(["vercel-ok"]);
+    const draft = newConnectDraft(entry, reviewed);
+    draft.link = "https://ignored.example";
+    draft.credentials.authorization = "ignored";
+    draft.oauthClientId = "ignored";
+    expect(connectProblem(reviewed, draft, " ")).toBe("Paste the connector's UID or ID from Vercel.");
+    expect(connectProblem(reviewed, draft, "posthog/paperclip")).toBeNull();
+    expect(connectPayload(entry, reviewed, draft, { vercelConnector: " posthog/paperclip " })).toEqual({
+      galleryKey: "posthog",
+      connectionMethodKey: "vercel-ok",
+      name: "PostHog",
+      credentialSource: "vercel_connect",
+      vercelConnect: { connector: "posthog/paperclip" },
+    });
+  });
+
+  it("sets a connection up again where its credentials come from", () => {
+    expect(connectHref("/TES/apps", "posthog", { resume: "c1" }, "vercel_connect")).toBe("/TES/apps/vercel-connect?source=posthog&resume=c1");
+    expect(connectHref("/TES/apps", "posthog", { resume: "c1" }, "paperclip_vault")).toBe("/TES/apps/connect?source=posthog&resume=c1");
   });
 
   it("asks for your own OAuth client only where it's needed", () => {

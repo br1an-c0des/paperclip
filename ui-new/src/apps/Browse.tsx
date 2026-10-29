@@ -78,6 +78,11 @@ export function Browse() {
           <A class={buttonClass({ size: "compact" })} href={`${base()}/byo`}>
             Connect your own server
           </A>
+          <Show when={gallery.data?.credentialSources?.vercelConnect.enabled}>
+            <A class={buttonClass({ size: "compact", variant: "quiet" })} href={`${base()}/vercel-connect`}>
+              Through Vercel
+            </A>
+          </Show>
         </header>
         <Switch>
           <Match when={connections.isPending}>
