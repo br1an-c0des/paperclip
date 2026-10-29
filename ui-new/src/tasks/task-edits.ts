@@ -78,7 +78,7 @@ export function runOverrides(task: Pick<Issue, "assigneeAdapterOverrides">) {
   const config = record(task.assigneeAdapterOverrides?.adapterConfig);
   const model = typeof config.model === "string" && config.model ? config.model : null;
   const effortValue = EFFORT_KEYS.map((key) => config[key]).find((value) => typeof value === "string" && value);
-  return { model, effort: (effortValue as string | undefined) ?? null };
+  return { model, effort: (effortValue as string | undefined) ?? null, chrome: config.chrome === true };
 }
 
 /**
@@ -89,7 +89,7 @@ export function runOverrides(task: Pick<Issue, "assigneeAdapterOverrides">) {
 export function runOverridesEdit(
   task: Pick<Issue, "assigneeAdapterOverrides">,
   agent: Pick<Agent, "adapterType" | "adapterConfig">,
-  change: { model?: string | null; effort?: string | null },
+  change: { model?: string | null; effort?: string | null; chrome?: boolean },
 ): Patch | null {
   if (!supportsOverrides(agent.adapterType)) return null;
   const existing = task.assigneeAdapterOverrides ?? null;
@@ -107,6 +107,8 @@ export function runOverridesEdit(
     const effortKey = effortKeyFor(agent.adapterType);
     if (change.effort && effortKey) config[effortKey] = change.effort;
   }
+  // Claude's browser access (`--chrome`), the old properties panel's "Enable Chrome".
+  if ("chrome" in change && agent.adapterType === "claude_local") config.chrome = change.chrome ? true : undefined;
   const adapterConfig = compact(config);
   const next = compact({
     useProjectWorkspace: existing?.useProjectWorkspace,
@@ -119,8 +121,8 @@ export function runOverridesEdit(
 
 /** "Opus 5.5, high effort", from the overrides and the model list's labels. Null with no overrides. */
 export function runSummary(task: Pick<Issue, "assigneeAdapterOverrides">, modelLabel: (id: string) => string = (id) => id) {
-  const { model, effort } = runOverrides(task);
-  const parts = [model ? modelLabel(model) : null, effort ? `${effort} effort` : null].filter(Boolean);
+  const { model, effort, chrome } = runOverrides(task);
+  const parts = [model ? modelLabel(model) : null, effort ? `${effort} effort` : null, chrome ? "Chrome" : null].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : null;
 }
 

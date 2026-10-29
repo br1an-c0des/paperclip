@@ -470,3 +470,20 @@
 .te-form .te-pop-foot {
   margin: 4px -12px 0;
 }
+
+/* The assignee menu's note while a run is going (AssigneeControl). */
+.te-running-note {
+  margin: 4px 4px 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--run-bg);
+  color: var(--run-fg);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Claude's browser access in the model and effort popover (RunSettings). */
+.te-run-switch {
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
