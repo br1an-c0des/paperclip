@@ -49,7 +49,14 @@ vi.mock("@/lib/company", () => ({ useCompany: () => () => ({ id: "co1", issuePre
 vi.mock("@/lib/commands", () => ({ useCommands: () => ({ openTaskModal }) }));
 vi.mock("@/lib/company-data", () => ({ useExperimentalSettingsQuery: () => ({ data: { enableManagedSandboxOnly: false } }) }));
 vi.mock("@/org/OrgHeader", () => ({ OrgHeader: () => <div>Org header</div> }));
-vi.mock("@/api/execution-workspaces", () => ({ executionWorkspacesApi: { controlRuntimeServices: (...args: unknown[]) => control(...(args as [])) } }));
+const getWorkspace = vi.fn(async (id: string) => {
+  if (id === "w1") return { id: "w1", name: "TES-7", status: "active" };
+  const { ApiError } = await import("@/api/client");
+  throw new ApiError("Not found", 404, null);
+});
+vi.mock("@/api/execution-workspaces", () => ({
+  executionWorkspacesApi: { controlRuntimeServices: (...args: unknown[]) => control(...(args as [])), get: (id: string) => getWorkspace(id) },
+}));
 vi.mock("@/api/workspaces", () => ({
   workspacesApi: {
     overview: (companyId: string, options: { status?: string[] }) => overview(companyId, options),
@@ -116,5 +123,26 @@ describe("WorkspacesPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Closed" }));
     expect(await screen.findByText("No closed workspaces.")).toBeTruthy();
     expect(overview).toHaveBeenLastCalledWith("co1", expect.objectContaining({ status: ["archived"] }));
+  });
+
+  describe("opened from a workspace link", () => {
+    afterEach(() => window.history.replaceState(null, "", "/"));
+
+    it("marks the workspace's card", async () => {
+      window.history.replaceState(null, "", "/TES/workspaces?workspace=w1");
+      mount();
+      const card = await screen.findByRole("article", { name: "TES-7" });
+      await waitFor(() => expect(card.getAttribute("aria-current")).toBe("true"));
+      expect(screen.queryByRole("status", { name: /wasn't found/ })).toBeNull();
+    });
+
+    it("says when the workspace isn't there", async () => {
+      window.history.replaceState(null, "", "/TES/workspaces?workspace=gone");
+      mount();
+      expect(await screen.findByText(/workspace from that link wasn't found/)).toBeTruthy();
+      expect(screen.getByRole("article", { name: "TES-7" }).getAttribute("aria-current")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+      await waitFor(() => expect(screen.queryByText(/wasn't found/)).toBeNull());
+    });
   });
 });
