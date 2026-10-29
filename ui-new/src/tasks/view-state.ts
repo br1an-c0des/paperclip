@@ -20,8 +20,9 @@ export const LAYOUT_OPTIONS: { value: TaskLayout; label: string }[] = [
   { value: "board", label: "Board" },
 ];
 
-export type GroupBy = "status" | "assignee" | "priority" | "label" | "project" | "workspace" | "parent" | "none";
+export type GroupBy = "status" | "assignee" | "priority" | "label" | "project" | "workspace" | "parent" | "case" | "none";
 
+/** Case is offered only while the instance has cases on (board C2); TasksView leaves it out otherwise. */
 export const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: "status", label: "Status" },
   { value: "assignee", label: "Assignee" },
@@ -30,6 +31,7 @@ export const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: "project", label: "Project" },
   { value: "workspace", label: "Workspace" },
   { value: "parent", label: "Parent task" },
+  { value: "case", label: "Case" },
   { value: "none", label: "No grouping" },
 ];
 
@@ -50,6 +52,8 @@ export type TaskFilters = {
   liveOnly: boolean;
   /** Leave out tasks agents created (isAgentCreated), which the old list hides by default. */
   hideAgentCreated: boolean;
+  /** Only tasks in a case (board C1's "In a case"), offered while cases are on. */
+  inCase: boolean;
 };
 
 /** The fields the old list sorts by (ui/src/components/IssuesList.tsx); task-sort.ts sorts. */
@@ -91,6 +95,7 @@ export const EMPTY_FILTERS: TaskFilters = {
   externalObjects: [],
   liveOnly: false,
   hideAgentCreated: false,
+  inCase: false,
 };
 
 /** The server's order: most recently updated first. */
@@ -141,6 +146,7 @@ export function parseFilters(value: unknown): TaskFilters {
     externalObjects: strings(filters.externalObjects),
     liveOnly: filters.liveOnly === true,
     hideAgentCreated: filters.hideAgentCreated === true,
+    inCase: filters.inCase === true,
   };
 }
 
@@ -223,7 +229,8 @@ export function filterCount(filters: TaskFilters) {
     filters.workspaces.length +
     filters.externalObjects.length +
     (filters.liveOnly ? 1 : 0) +
-    (filters.hideAgentCreated ? 1 : 0)
+    (filters.hideAgentCreated ? 1 : 0) +
+    (filters.inCase ? 1 : 0)
   );
 }
 
@@ -243,6 +250,8 @@ export type FilterContext = {
   workspaceOf?: (task: CompactIssue) => string | null;
   /** Whether a task's external objects match one external-object filter value; unset, that filter is off. */
   externalMatches?: (task: CompactIssue, value: string) => boolean;
+  /** Whether a task is in a case; unset (cases off, or still loading), the In a case filter is off. */
+  inCase?: (task: CompactIssue) => boolean;
 };
 
 /**
@@ -267,6 +276,7 @@ export function applyFilters(
   return tasks.filter((task) => {
     if (filters.liveOnly && !context.liveIssueIds?.has(task.id)) return false;
     if (filters.hideAgentCreated && isAgentCreated(task)) return false;
+    if (filters.inCase && context.inCase && !context.inCase(task)) return false;
     if (statuses.size > 0 && !statuses.has(task.status)) return false;
     if (priorities.size > 0 && !priorities.has(task.priority)) return false;
     if (assignees.size > 0 && !assignees.has(assigneeKey(task))) return false;

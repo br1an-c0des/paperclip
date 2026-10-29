@@ -69,6 +69,8 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 40 | [Gaps found building requests and the Inbox](#40-gaps-found-building-requests-and-the-inbox) | `tasks/interactions`, `inbox-search/triage`, `decisions/feed` | Open | Oct 28, 2026 |
 | 41 | [Gaps found building old links, the shell and the installable app](#41-gaps-found-building-old-links-the-shell-and-the-installable-app) | `shell/*`, `approvals/governance`, User profile | Open | Oct 28, 2026 |
 | 42 | [Gaps found building the task panel, runs and workspaces](#42-gaps-found-building-the-task-panel-runs-and-workspaces) | `tasks/*`, `runs-adapters/runs`, `workspaces/*` | Open | Oct 28, 2026 |
+| 43 | [Gaps found building cases into the task views](#43-gaps-found-building-cases-into-the-task-views) | `cases/*` | Open | Oct 29, 2026 |
+| 44 | [Status cards need an agent that can write them](#44-status-cards-need-an-agent-that-can-write-them) | Status cards | Open | Oct 29, 2026 |
 
 ## Entries
 
@@ -1399,3 +1401,82 @@ Both are handled in `ui-new` for now.
   run or workspace action with side effects (mocks only).
 - **M11's result card** (result text, changed files, pull request, outputs) isn't built: the run
   modal doesn't load that data yet.
+
+### 43. Gaps found building cases into the task views
+
+- **Status:** Open
+- **Area:** `cases/*`, the task list and panel
+- **Found in:** M7 cases (boards C1, C2, C5), with `enableCases` turned on on the test instance and left
+  on.
+
+- **Membership costs a request per case.** The case list doesn't carry linked tasks, so the task list
+  makes one `GET /cases/:id` per open case (cached for 60 seconds, refreshed by live events); closed
+  cases are fetched only under Group: Case. Fine at TES's size; revisit if a company has hundreds of
+  open cases.
+- **Phase ticks in the list come only from company workflows** (one `GET /workflows/:id` per distinct
+  workflow). Cases whose workflow is prose or a task document get ticks only in the panel's Case tab,
+  from the main task's `workflow` document. Mermaid phases worked as decision 16 planned, including
+  pseudo-states and `state "X" as Id` aliases; "Used by N" comes from the list's `workflowId`.
+- **No case page:** old `/cases/:id` links open the main task's Case tab, else the first linked
+  task's, else the list grouped by case; a 403 says cases are off.
+- **Left out because the API doesn't carry them:** a "waiting on you" strip, phase owners and a
+  default assignee in Start a case's preview, Retry hand-off. Also not built: case chips on board
+  cards, and carrying the case into More options from a case group's quick add (it needs a change in
+  `lib/commands`).
+- **Cancel hand-off in the list doesn't check `canControl`;** only the hand-offs list returns it (the
+  panel does check). The server still refuses what the user can't do.
+- **Case status stays `draft` after hand-offs start work.** Probably by design (the caller sets
+  status); noted, not a candidate.
+- **Upstream candidates 16 and 17:** a case created without a `key` overwrites another keyless case
+  of the same type, and on that path can be made its own parent; creating, editing and linking a case
+  write case events but no activity, so no live event fires (only hand-offs refresh other tabs).
+- **Test data:** "M7 test case agent (paused)", "M7 test case reviewer (paused)" (two hand-offs stay
+  queued to them; they'd be delivered if either is resumed), workflow "M7 test Strategy pipeline",
+  cases TES-C1 to TES-C4, tasks TES-19 to TES-22, TES-25, TES-26.
+- **Seen, not fixed:** the task list's phone toolbar (`.tv-toolbar--phone`) is about 4px wider than a
+  390px screen.
+
+### 44. Status cards need an agent that can write them
+
+- **Status:** Open
+- **Area:** Status cards ([decision 39](#39-decisions-from-the-m7-audit), D3)
+- **Found in:** M7 status cards, with `enableStatusCards` and `enableSummaries` turned on on the test
+  instance and left on.
+
+- **No card finished a real update on TES.** A card's setup task asks its agent to write the card's
+  query (`PUT /status-cards/:id/query`), and none of the agents the port was allowed to use could:
+  - the default, the built-in Summarizer, needs `enableBuiltInAgents` (off), so New card answers 422
+    `summarizer_not_configured`;
+  - an ordinary `claude_local` hire runs on the Paperclip Runner (`enableNativeRunner` is on), whose
+    semantic tools have no status-card operations ("semantic operation failed");
+  - the same agent on `runner: "legacy"` got no `PAPERCLIP_API_KEY`, because this dev server has no
+    local agent JWT secret.
+
+  Options: (a) turn on built-in agents on the test instance and try again; (b) warn in New card when
+  the chosen agent can't write cards; (c) an upstream fix so the runner can write cards. Not decided.
+- **Real runs spent:** five runs by "M7 test summarizer" (Claude Haiku 4.5), three of which used
+  tokens, about $0.45 in all; one was an automatic follow-up that stopped when the agent was paused. To
+  try to make it work the agent was bound to the company's Claude subscription connection (the one Bob
+  uses; Bob unchanged) and given the catalog skill `status-card-query`, installed into TES. It's
+  paused, `runner: legacy`, with a $1.50 monthly budget.
+- **A retried setup can stall:** Run setup again reopens the same task; if no run starts (the agent in
+  `error`), the card stays compiling with `generatingIssueId` set, and another rebuild is a no-op
+  unless the prompt changes. The page can't tell a stalled setup from a slow one. Upstream candidate
+  18.
+- **Old UI mismatches the port corrects:** an empty daily cap means 100k tokens on the server, not
+  "no cap"; Restore forces an update when the card has a query; `/refresh` and `/recompile` answer
+  `{card, generatingIssue, alreadyGenerating, enqueued}`, not a bare card. Runs that fail setup write
+  nothing to the card's ledger, so History stays empty and their cost shows only on the agent's runs.
+- **Polling:** the update engine changes card state without logging activity, so the page polls every
+  5 seconds while any card is setting up or updating. A stalled card keeps that polling going while
+  the page is open.
+- **Not built:** the summary streaming as it's written (the old tile reads `acpx.text_delta`, ACP
+  harnesses only), a Status entry in the phone dock, a Features switch for `enableStatusCards`.
+  `StatusPlaceholder` in `routes/Legacy.tsx` is now unused.
+- **First impressions** (the agent's): every card shows a next step and the panel's tabs are easy to
+  follow; setup is opaque while it runs and its failure reason shows only in the panel; the agent
+  picker offers agents that can't run a card; tiles are tall for short summaries; the cost preview is
+  rough, and manual updates aren't held by the daily cap.
+- **Test data:** cards 1d784e5f (archived, stalled setup) and 8f1d8233 "M7 test card 2" (setting up,
+  its task TES-24 left in progress), hidden setup tasks TES-23 and TES-24, the summarizer agent, the
+  `status-card-query` skill.

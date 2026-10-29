@@ -1,6 +1,7 @@
 import type { CompactIssue, IssuePriority, IssueStatus } from "@paperclipai/shared";
 import { Check, ChevronDown, ChevronRight, CornerDownRight, FolderGit2, Pin, Plus } from "lucide-solid";
-import { createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
+import { createMemo, createSignal, For, Match, onCleanup, Show, Switch, type JSX } from "solid-js";
+import { CaseIcon } from "@/cases/CaseChip";
 import { issuePath } from "@/api/issues";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
@@ -83,6 +84,8 @@ export function latest<T>(get: () => T | undefined): () => T {
 
 type DragState = { ids: string[]; from: GroupValue; groupKey: string };
 
+export type GroupDecor = { after?: JSX.Element; below?: JSX.Element };
+
 export function TaskList(props: {
   groups: readonly TaskGroup[];
   people: TaskPeople;
@@ -101,6 +104,12 @@ export function TaskList(props: {
   /** Rows whose subtasks are unfolded, by task id. */
   expanded: ReadonlySet<string>;
   onToggleExpanded: (id: string, open: boolean) => void;
+  /** Marks after a row's title, such as its case chips (board C1) or its role in the group's case (C2). */
+  rowExtra?: (task: CompactIssue, group: TaskGroup) => JSX.Element;
+  /** More for a group's heading: beside its count, and under its bar (a case's stats and strip, C2). */
+  groupDecor?: (group: TaskGroup) => GroupDecor | null;
+  /** After a task is added from a group's foot, such as linking it to the group's case. */
+  onAdded?: (task: { id: string }, group: TaskGroup) => void;
 }) {
   const company = useCompany();
   const commands = useCommands();
@@ -288,10 +297,13 @@ export function TaskList(props: {
               // remounting it (and closing any menu open in it).
               const group = latest(() => groupsByKey().get(key));
               const open = () => props.isOpen(group());
+              const decor = createMemo(() => props.groupDecor?.(group()) ?? null);
+              const depth = () => (group().mark.kind === "case" ? (group().mark as { depth: number }).depth : 0);
               return (
                 <section
                   class="tl-card"
-                  classList={{ "tl-card--drop": dropKey() === group().key && drag()?.groupKey !== group().key }}
+                  classList={{ "tl-card--drop": dropKey() === group().key && drag()?.groupKey !== group().key, "tl-card--nested": depth() > 0 }}
+                  style={depth() > 0 ? { "--tl-nest": Math.min(depth(), 3) } : undefined}
                   aria-label={group().label}
                   onDragOver={(event) => onDragOver(event, group())}
                   onDragLeave={(event) => onDragLeave(event, group())}
@@ -303,6 +315,7 @@ export function TaskList(props: {
                       <GroupMarkView mark={group().mark} people={props.people} />
                       <h2 class="disp">{group().label}</h2>
                       <span class="tl-count">{group().rows.length}</span>
+                      {decor()?.after}
                       <button
                         type="button"
                         class="btn btn--icon btn--ghost btn--compact tl-head-add"
@@ -322,8 +335,11 @@ export function TaskList(props: {
                         <ChevronDown size={14} stroke-width={2.2} aria-hidden="true" class="tl-chevron" classList={{ "tl-chevron--closed": !open() }} />
                       </button>
                     </div>
+                    <Show when={decor()?.below}>
+                      <div class="tl-bar tl-head-below">{decor()!.below}</div>
+                    </Show>
                     <Show when={open()}>
-                      <div class="tl-cols" role="presentation">
+                      <div class="tl-cols" classList={{ "tl-cols--empty": group().rows.length === 0 }} role="presentation">
                         <span class="tl-pin-col tl-cols-name">
                           Name
                           <button
@@ -364,6 +380,7 @@ export function TaskList(props: {
                               onCheck={(mode) => check(row().task.id, mode)}
                               onDragStart={(event) => onDragStart(event, group(), row().task)}
                               onDragEnd={endDrag}
+                              extra={props.rowExtra?.(row().task, group())}
                             />
                           );
                         }}
@@ -381,6 +398,7 @@ export function TaskList(props: {
                           group={group()}
                           updates={props.updates}
                           projectId={props.projectId}
+                          onAdded={(task) => props.onAdded?.(task, group())}
                           onClose={() => setAdding(null)}
                           onMore={(title) => {
                             setAdding(null);
@@ -439,6 +457,11 @@ export function GroupMarkView(props: { mark: GroupMark; people: TaskPeople }) {
         <Match when={props.mark.kind === "workspace"}>
           <FolderGit2 size={18} aria-hidden="true" class="tl-mark-icon" />
         </Match>
+        <Match when={props.mark.kind === "case"}>
+          <span class="tl-mark-case">
+            <CaseIcon size={16} />
+          </span>
+        </Match>
         <Match when={props.mark.kind === "task" && props.mark}>
           {(mark) => <Show when={mark().status} fallback={<Capsule gradient="ash" size="row" />}>{(status) => <StatusCapsule status={status()} size="row" />}</Show>}
         </Match>
@@ -465,6 +488,7 @@ function Row(props: {
   onCheck: (mode: "toggle" | "range") => void;
   onDragStart: (event: DragEvent) => void;
   onDragEnd: () => void;
+  extra?: JSX.Element;
 }) {
   const task = () => props.row.task;
   const status = () => task().status as IssueStatus;
@@ -535,6 +559,7 @@ function Row(props: {
         >
           {task().title}
         </a>
+        {props.extra}
         <Show when={props.row.subtasks > 0}>
           <button
             type="button"
@@ -612,6 +637,8 @@ export function QuickAdd(props: {
   projectId?: string;
   onClose: () => void;
   onMore: (title: string) => void;
+  /** After the task is made. */
+  onAdded?: (task: { id: string }) => void;
   class?: string;
   hideHint?: boolean;
 }) {
@@ -625,8 +652,9 @@ export function QuickAdd(props: {
     if (!text || saving()) return;
     setSaving(true);
     try {
-      await props.updates.create({ title: text, ...(props.projectId ? { projectId: props.projectId } : {}), ...groupDefaults(props.group.value) });
+      const created = await props.updates.create({ title: text, ...(props.projectId ? { projectId: props.projectId } : {}), ...groupDefaults(props.group.value) });
       setTitle("");
+      props.onAdded?.(created);
     } catch (error) {
       pushToast({ tone: "error", title: "Couldn't add the task", body: error instanceof Error ? error.message : String(error) });
     } finally {

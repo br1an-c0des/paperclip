@@ -228,3 +228,32 @@ describe("updatedLabel", () => {
     expect(updatedLabel(new Date(2025, 9, 11, 9, 0), now)).toBe("Oct 11, 2025");
   });
 });
+
+describe("Group: Case", () => {
+  const cases: GroupNames["cases"] = {
+    of: (taskId) => ({ a: ["c1"], b: ["c1", "c2"], c: ["closed"] })[taskId] ?? [],
+    order: [
+      { id: "c1", title: "Liquidation sweep", depth: 0, closed: false, empty: false },
+      { id: "c2", title: "15m layer", depth: 1, closed: false, empty: false },
+      { id: "draft", title: "BB squeeze", depth: 0, closed: false, empty: true },
+      { id: "closed", title: "Daily OHLCV", depth: 0, closed: true, empty: false },
+    ],
+  };
+  const names: GroupNames = { agent: () => undefined, person: (id) => id, youId: () => null, label: () => undefined, task: () => undefined, cases };
+
+  it("puts a task in each of its cases, in the cases' order, with Not in a case last", () => {
+    const groups = buildTaskGroups([task("a", "todo"), task("b", "todo"), task("c", "done"), task("d", "todo")], new Set(), { groupBy: "case", names });
+    expect(groups.map((group) => group.label)).toEqual(["Liquidation sweep", "15m layer", "BB squeeze", "Daily OHLCV", "Not in a case"]);
+    expect(groups.map((group) => group.rows.map((row) => row.task.id))).toEqual([["a", "b"], ["b"], [], ["c"], ["d"]]);
+    expect(groups[1]!.mark).toEqual({ kind: "case", caseId: "c2", depth: 1, closed: false });
+    expect(groups.map((group) => startsCollapsed(group))).toEqual([false, false, false, true, false]);
+  });
+
+  it("gives every task its own row, and case groups take no drops or defaults", () => {
+    const groups = buildTaskGroups([task("a", "todo"), task("kid", "todo", { parentId: "a" })], new Set(), { groupBy: "case", names });
+    expect(groups.flatMap((group) => group.rows.map((row) => row.task.id))).toContain("kid");
+    expect(takesDrops({ field: "case", caseId: "c1" })).toBe(false);
+    expect(groupDefaults({ field: "case", caseId: "c1" })).toEqual({});
+    expect(moveUpdate(task("a", "todo"), undefined, { field: "case", caseId: "c2" })).toBeNull();
+  });
+});
