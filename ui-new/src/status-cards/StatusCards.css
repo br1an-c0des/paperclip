@@ -1,0 +1,670 @@
+/*
+ * The Status page, its card tiles, the card panel and New card. No board draws them (decision 39,
+ * D3): they use the design system's cards, wells, capsules, options and rows until they're designed.
+ * The grid responds to main's width with `@container main`; the panel to its own with `@container panel`.
+ */
+
+.sc-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sc-page-note {
+  padding: 18px 22px;
+  color: var(--body);
+  font-size: 14px;
+}
+
+.sc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 28px;
+}
+
+.sc-empty h2 {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.sc-empty p {
+  max-width: 560px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Tiles: two columns on a wide main, one beside an open panel or on a phone */
+.sc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+@container main (max-width: 520px) {
+  .sc-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sc-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 300px;
+  padding: 16px 18px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sc-tile:hover {
+  border-color: var(--edge);
+}
+
+.sc-tile--setup {
+  border: 1px dashed var(--dashed);
+  box-shadow: none;
+}
+
+.sc-tile--selected {
+  outline: 2px solid var(--run-fg);
+  outline-offset: -1px;
+}
+
+.sc-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sc-tile-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.sc-tile-title button {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sc-tile-title button:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sc-state {
+  flex: none;
+  font-weight: 600;
+}
+
+/* A line for the card's state: a --well strip, tinted for stale (amber) and failed (red) */
+.sc-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 2px 4px 2px 12px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+  color: var(--body);
+  font-size: 13px;
+}
+
+.sc-banner--amber {
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+}
+
+.sc-banner--red {
+  background: var(--red-bg);
+  color: var(--red-fg);
+}
+
+.sc-banner .btn {
+  margin-left: auto;
+  color: inherit;
+}
+
+.sc-banner-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-tile-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* The summary fades out where the tile cuts it; the panel has the rest */
+.sc-tile-body::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 36px;
+  background: linear-gradient(to bottom, transparent, var(--card));
+  pointer-events: none;
+}
+
+.sc-tile-md {
+  font-size: 13px;
+}
+
+.sc-tile-empty {
+  font-size: 13px;
+}
+
+.sc-tile-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.sc-tile-meta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes sc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sc-spin {
+  animation: sc-spin 1s linear infinite;
+}
+
+/* Archived cards, folded under the tiles */
+.sc-archived {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.sc-archived-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sc-archived-toggle:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.sc-caret {
+  transition: transform 0.15s ease;
+  transform: rotate(-90deg);
+}
+
+.sc-archived-toggle[aria-expanded="true"] .sc-caret {
+  transform: none;
+}
+
+.sc-archived-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 18px;
+}
+
+.sc-archived-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 0;
+}
+
+.sc-archived-row + .sc-archived-row {
+  border-top: 1px solid var(--row-line);
+}
+
+.sc-archived-row--selected .sc-archived-title {
+  text-decoration: underline;
+}
+
+.sc-archived-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sc-archived-title {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* The card panel */
+.sc-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sc-panel-title {
+  min-width: 0;
+}
+
+.sc-panel-title h2 {
+  font-size: 20px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* On a narrow panel (a phone) the header's action keeps only its icon, leaving the title room */
+@container panel (max-width: 520px) {
+  .sc-btn-label {
+    display: none;
+  }
+}
+
+.sc-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sc-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.sc-rev-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sc-rev {
+  width: auto;
+}
+
+.sc-earlier {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+}
+
+.sc-note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px dashed var(--dashed);
+  border-radius: var(--r-inner);
+}
+
+.sc-note--red {
+  border: 0;
+  background: var(--red-bg);
+  color: var(--red-fg);
+}
+
+.sc-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sc-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.sc-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sc-rows > li + li {
+  border-top: 1px solid var(--row-line);
+}
+
+.sc-row-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  font-size: 13px;
+}
+
+.sc-task-id {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sc-task-id:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.sc-move,
+.sc-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sc-task {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--r-inner);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sc-task:hover {
+  background: var(--row-hover);
+}
+
+.sc-task-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-history {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 0;
+}
+
+.sc-history-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  flex-wrap: wrap;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.sc-history-when {
+  margin-left: auto;
+}
+
+.sc-history-note {
+  font-size: 13px;
+}
+
+.sc-watched-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+/* Settings */
+.sc-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sc-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.sc-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sc-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 6px 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+  cursor: pointer;
+}
+
+.sc-option:hover {
+  background: var(--row-hover);
+}
+
+.sc-option--on {
+  border-color: var(--run-fg);
+  background: var(--run-bg);
+}
+
+.sc-option input,
+.sc-check input {
+  accent-color: var(--run-fg);
+}
+
+.sc-option-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sc-option-name {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sc-row-label {
+  min-width: 120px;
+  font-weight: 600;
+}
+
+.sc-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.sc-num {
+  width: 84px;
+}
+
+.sc-num--wide {
+  width: 120px;
+}
+
+.sc-time {
+  width: 120px;
+}
+
+.sc-tz {
+  width: 180px;
+}
+
+.sc-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.sc-check input {
+  margin-top: 3px;
+}
+
+.sc-advanced,
+.sc-query {
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+}
+
+.sc-advanced summary,
+.sc-query summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sc-advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 14px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.sc-query > :not(summary) {
+  margin: 0 14px 12px;
+}
+
+.sc-code {
+  max-height: 260px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: var(--r-inner);
+  background: var(--code);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sc-cost {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sc-cost-value {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: underline dotted var(--muted);
+  text-underline-offset: 4px;
+  cursor: default;
+}
+
+.sc-settings-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+/* New card */
+.sc-new {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sc-examples {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sc-menu-note {
+  padding: 8px 12px;
+  font-size: 13px;
+}

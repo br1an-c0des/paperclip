@@ -42,12 +42,12 @@ import { ApprovalHistory } from "./approvals/ApprovalHistory";
 import { ApprovalPage } from "./approvals/ApprovalPage";
 import { ProfilePage } from "./profile/ProfilePage";
 import { ProjectsPage } from "./routes/Projects";
+import { StatusPage } from "./status-cards/StatusPage";
 import {
   CaseRedirect,
   CompanyLegacyRedirect,
   ExecutionWorkspaceRedirect,
   GoalRedirect,
-  StatusPlaceholder,
   UnprefixedIssueRedirect,
   UnprefixedRecordRedirect,
 } from "./routes/Legacy";
@@ -178,7 +178,8 @@ export function App() {
             <Route path="/approvals/all" component={ApprovalHistory} />
             <Route path="/approvals/:approvalId" component={ApprovalPage} />
             <Route path="/cases/:caseId/*" component={CaseRedirect} />
-            <Route path="/status/*" component={StatusPlaceholder} />
+            {/* Status cards (decision 39, D3), behind `enableStatusCards`; a card's panel at `/status/:cardId`. */}
+            <Route path="/status/:cardId?" component={StatusPage} />
             <Route path="/u/:slug" component={ProfilePage} />
             <Route path="/execution-workspaces/:workspaceId/*" component={ExecutionWorkspaceRedirect} />
             <Route path="/routines/:routineId?/*" component={RoutineRedirect} />
