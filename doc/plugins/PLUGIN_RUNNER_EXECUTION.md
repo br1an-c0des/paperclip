@@ -118,9 +118,18 @@ These operations do not accept paths. Core checks the active lease and retained
 source task before it calls the plugin. The existing Runner transport validates
 state identity and suspension before it rotates authority.
 
+For controller replacement, Core restores its encrypted PRP journal from Postgres
+and reuses the original active task lease. The task owner checks running status
+and exact Runner identity, then reacquires the connection. It does not call
+`prepare`, `submit`, or `stop`. The running artifact remains pinned even if
+`describe` reports a newer installed version. Launch preparation files on the
+old controller are not required to adopt an already running task.
+The five-minute outage contract and its prerequisites are described in the
+[continuity recipe](../testing-native-remote-continuity.md#replacing-the-main-server).
+
 Core checks company, agent, environment, workspace, driver, and termination
-receipts before it supplies `resumeFrom`. For same-run controller recovery, Core
-first stops and releases the old task. A failed stop prevents replacement.
+receipts before it supplies `resumeFrom`. Historical controller recovery without
+the durable journal first stops and releases the old task. A failed stop prevents replacement.
 A new run prepares its current assignments. Provider compatibility checks remain
 in the existing backends. Missing or incompatible retained state fails closed.
 
@@ -185,6 +194,10 @@ Project authorization is still checked for each new run.
 
 A Launcher task owns one Runner process, independently of Core heartbeat runs.
 Successful warm run completion retains the task and its mounts. The reuse
+policy is saved with the selected native runtime, independently of workspace
+copy-back records. Recovery uses that policy when no workspace-sync record exists,
+so it does not stop a Runner that foreground completion retains. Failed and
+cancelled runs still stop instead of staying warm. The reuse
 fingerprint includes the authorized project set; changing it retires the previous
 task before checkpoint recovery. Adoption and each warm handoff require a current,
 configuration-bound project-auth check against the exact retained mount scope. Core atomically
@@ -195,6 +208,11 @@ project authentication, prepares the new run's resources, and uses PRP
 allowing the new authority. The original ingress address remains unchanged.
 Runner accepts `connection: { mode: "external" }` on warm attachment to preserve
 the process owner's listener and TLS settings while rotating the run identity.
+
+Core permits connection refresh for the saved successful run while its warm task
+lease is retained, unexpired, and not retiring or stopped. PRP authentication
+still applies. A superseded lease cannot acquire a connection. Retention does
+not authorize preparation or submission of new work through the completed lease.
 
 Idle retirement suspends and stops Runner, saves its exact checkpoint, writes
 credentials through the durable lease handoff, then completes the provider task.
