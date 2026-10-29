@@ -1,11 +1,12 @@
 import type { CompactIssue, RoutineListItem } from "@paperclipai/shared";
 import { useSearchParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Braces, CalendarClock, ChevronDown, ChevronRight, Ellipsis, Folder, Plus, Repeat, Search, Webhook } from "lucide-solid";
+import { Braces, CalendarClock, ChevronDown, ChevronRight, Ellipsis, Folder, Monitor, Plus, Repeat, Search, Webhook } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch as Branch, type JSX } from "solid-js";
 import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { routinesApi } from "@/api/routines";
+import { isCompact } from "@/layout/breakpoints";
 import { Dock } from "@/layout/Panel";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
@@ -256,7 +257,15 @@ export function RecurringView(props: { projectId?: string; tasks: TaskListQuery 
                 </section>
               }
             >
-              <div class="tl tl--pinned rv">
+              <Show when={isCompact()}>
+                <p class="card on-desktop rv-on-desktop" role="note">
+                  <Monitor size={16} aria-hidden="true" />
+                  <span>
+                    <b>On desktop.</b> You can turn recurring tasks on or off and run them here; setting them up is easier on desktop.
+                  </span>
+                </p>
+              </Show>
+              <div class="tl rv" classList={{ "tl--pinned": !isCompact(), "tl--phone": isCompact() }}>
                 <div class="tl-scroll">
                   <div class="tl-sheet">
                     <For each={groups()}>

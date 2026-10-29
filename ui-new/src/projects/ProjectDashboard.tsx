@@ -10,6 +10,7 @@ import { issuesApi } from "@/api/issues";
 import { inboxApi } from "@/api/inbox";
 import { projectsApi } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
+import { isCompact } from "@/layout/breakpoints";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useLiveRunsQuery } from "@/lib/company-data";
@@ -44,12 +45,13 @@ import {
   type RequestFilter,
   type StuckItem,
 } from "./dashboard-model";
+import { SummaryBody, SummaryControls, useAiSummary } from "./summary/AiSummary";
 import "./ProjectDashboard.css";
 
 /*
  * The project dashboard (board 8), the project's home: the header card's title links here.
  *
- * - One card with three wells: Brief (the project's description and goals), Budget (this month's
+ * - One card with three wells: Brief (the AI brief or the project's description, and its goals), Budget (this month's
  *   spend against the project's budget, with the month's pace) and Code (repositories, open task
  *   checkouts and their dev servers). Below a divider, Agents at work: each agent on the project's
  *   tasks, with what it's on and, on hover, its run to watch.
@@ -57,13 +59,21 @@ import "./ProjectDashboard.css";
  *   with a kind filter, and sign-off cards for tasks waiting on your review. It shares the Inbox's
  *   feed query, so clearing or snoozing in the Inbox, and the Inbox's live refresh, reach it too.
  * - Stuck work: open tasks waiting on someone without a request to answer.
+ * - On a phone (M12) the parts stack in the phone board's order: the brief, waiting on you (the
+ *   first three, then a link to the Inbox), agents at work as rows, the budget, stuck work and the
+ *   code (ProjectDashboard.css).
  *
- * Not drawn from the board, because the API has no source for them: the AI brief with its revisions
- * (summaries sit behind an experimental flag), daily spend bars (costs come only as totals per
- * range), and each agent's recent activity on hover.
+ * The Brief is the Summarizer's AI brief with its revisions when the instance has summaries on
+ * (`enableSummaries`, summary/AiSummary.tsx), and the project's description otherwise.
+ *
+ * Not drawn from the board, because the API has no source for them: daily spend bars (costs come
+ * only as totals per range), and each agent's recent activity on hover.
  */
 
 type Tasks = ReturnType<typeof useTaskList>;
+
+/** Requests shown on a phone before "N more in the Inbox" (M12). */
+const PHONE_REQUESTS = 3;
 
 const POSE: Record<CrewMember["state"], CharacterState> = {
   running: "working",
@@ -161,6 +171,10 @@ export function ProjectDashboard(props: { project: Project; tasks: Tasks; base: 
     }
     return result;
   });
+  // On a phone (M12) the first few requests show, then a link to the rest in the Inbox.
+  const phoneRequests = () => (isCompact() ? shownRequests().slice(0, PHONE_REQUESTS) : shownRequests());
+  const phoneSignoffs = () => (isCompact() ? shownSignoffs().slice(0, Math.max(0, PHONE_REQUESTS - phoneRequests().length)) : shownSignoffs());
+  const hiddenOnPhone = () => shownRequests().length + shownSignoffs().length - phoneRequests().length - phoneSignoffs().length;
   const waitingLoading = () =>
     attention.isPending || approvalIssues.some((query) => query.isPending) || requestSources.some((query) => query.isPending) || reviewTasks.loading();
 
@@ -212,10 +226,10 @@ export function ProjectDashboard(props: { project: Project; tasks: Tasks; base: 
           </Match>
           <Match when={true}>
             <div class="pd-requests">
-              <For each={shownRequests()}>
+              <For each={phoneRequests()}>
                 {(entry) => <RequestCard request={entry.request} taskId={entry.taskId} people={people} />}
               </For>
-              <For each={shownSignoffs()}>
+              <For each={phoneSignoffs()}>
                 {(entry) => (
                   <Show when={signoffRequests().get(entry.taskId)}>
                     {(request) => (
@@ -234,6 +248,11 @@ export function ProjectDashboard(props: { project: Project; tasks: Tasks; base: 
               </For>
               <Show when={waitingLoading()}>
                 <p class="cap">Loading requests…</p>
+              </Show>
+              <Show when={hiddenOnPhone() > 0}>
+                <A class="card pd-more" href={`/${company().issuePrefix}/inbox`}>
+                  {hiddenOnPhone()} more in the Inbox
+                </A>
               </Show>
             </div>
           </Match>
@@ -261,7 +280,7 @@ export function ProjectDashboard(props: { project: Project; tasks: Tasks; base: 
 
 function Well(props: { id: string; title: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
-    <section class="pd-well" aria-labelledby={props.id}>
+    <section class={`pd-well pd-well--${props.id.replace(/^pd-/, "")}`} aria-labelledby={props.id}>
       <div class="pd-well-head">
         <h2 id={props.id} class="disp">
           {props.title}
@@ -273,11 +292,21 @@ function Well(props: { id: string; title: string; aside?: JSX.Element; children:
   );
 }
 
+/**
+ * The project's description and goals; with summaries on (`enableSummaries`), the Summarizer's AI
+ * brief instead, with Regenerate and History, and the description while there's no brief yet.
+ */
 function Brief(props: { project: Project }) {
+  const summary = useAiSummary(() => ({ scopeKind: "project", scopeId: props.project.id }));
+  const description = () => (
+    <Show when={props.project.description?.trim()} fallback={<p class="pd-note">No description yet. Agents read it before every task; add one in Settings.</p>}>
+      {(text) => <Markdown source={text()} class="pd-brief" />}
+    </Show>
+  );
   return (
-    <Well id="pd-brief" title="Brief">
-      <Show when={props.project.description?.trim()} fallback={<p class="pd-note">No description yet. Agents read it before every task; add one in Settings.</p>}>
-        {(text) => <Markdown source={text()} class="pd-brief" />}
+    <Well id="pd-brief" title="Brief" aside={<Show when={summary.enabled()}><SummaryControls summary={summary} label="brief" /></Show>}>
+      <Show when={summary.enabled()} fallback={description()}>
+        <SummaryBody summary={summary} label="brief" empty={description()} />
       </Show>
       <Show when={props.project.goals.length > 0}>
         <p class="pd-goals">

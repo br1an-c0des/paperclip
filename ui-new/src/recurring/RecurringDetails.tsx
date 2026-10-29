@@ -1,4 +1,5 @@
 import type { EnvBinding, RoutineDetail, RoutineTrigger, RoutineVariable } from "@paperclipai/shared";
+import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import {
   Braces,
@@ -11,8 +12,10 @@ import {
   GitBranch,
   KeyRound,
   Plus,
+  Puzzle,
   Target,
   User,
+  UserCheck,
   Webhook,
   X,
 } from "lucide-solid";
@@ -25,6 +28,7 @@ import { secretsApi } from "@/api/secrets";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useGoalsQuery, useProjectsQuery } from "@/lib/company-data";
 import { copyText } from "@/tasks/TaskActions";
+import { useTaskPeople } from "@/tasks/people";
 import { TaskPicker, taskName } from "@/tasks/TaskPicker";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
@@ -37,6 +41,7 @@ import { Switch } from "@/ui/Switch";
 import { PRIORITY_META } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
 import { ConnectWebhookDialog, type ConnectTarget } from "./ConnectWebhook";
+import { parseOptionLines, pluginDefaultDrift, replaceVariable, withOptions, withType } from "./details-model";
 import { refreshRecurring, useRoutineFoldersQuery } from "./queries";
 import {
   BUILT_IN_INPUTS,
@@ -54,14 +59,18 @@ import { triggerState, webhookSender } from "./webhook";
  * The recurring task's Details (board R2), edited in place:
  *
  * - On or paused, and the next run; archived ones say so.
- * - Title and properties: assignee (agents only), project, priority, goal, parent task, folder.
+ * - A recurring task a plugin manages says so, with what has moved from the plugin's defaults and a
+ *   link to the plugin's settings, where its own controls are (repair, reset).
+ * - Title and properties: assignee (agents only), project, priority, goal, parent task, folder, and
+ *   the person its runs act for (read only: the server sets it when the routine is made).
  * - The description, with its `{{placeholders}}` as chips.
  * - Triggers: each schedule, webhook and API trigger with a switch and when it last fired; a
  *   schedule edits with the Repeat menu's fields, a webhook copies its URL and rotates its secret
  *   (the new one is shown once), and one still being set up finishes in the connect dialog (N7).
  *   Add trigger offers the three kinds.
- * - Inputs: the placeholders' type, default and whether they're required, plus the built-ins the
- *   text uses. The server keeps one input per placeholder, so inputs come from the text.
+ * - Inputs: the placeholders' type, default and whether they're required, a Choice's options, plus
+ *   the built-ins the text uses. The server keeps one input per placeholder, so inputs come from the
+ *   text.
  * - Secrets: the company secrets bound into each run's environment.
  * - Run policy: if the last one is still open, missed runs, and "Only when something changed" (in
  *   this project or anywhere), which only applies to schedules.
@@ -116,6 +125,7 @@ export function RecurringDetails(props: { routine: RoutineDetail; onOpenTask: (t
           </span>
         </Show>
       </div>
+      <Show when={props.routine.managedByPlugin}>{(managed) => <PluginNotice routine={props.routine} managed={managed()} />}</Show>
       <TitleField routine={props.routine} save={save} />
       <Properties routine={props.routine} save={save} onOpenTask={props.onOpenTask} />
       <Description routine={props.routine} save={save} />
@@ -185,6 +195,8 @@ function Properties(props: { routine: RoutineDetail; save: Save; onOpenTask: (ta
   const goal = () => goals.data?.find((candidate) => candidate.id === props.routine.goalId);
   const folder = () => folders.data?.folders.find((candidate) => candidate.id === props.routine.folderId);
   const priority = () => (props.routine.priority in PRIORITY_META ? (props.routine.priority as (typeof PRIORITIES)[number]) : "medium");
+  const people = useTaskPeople();
+  const responsibleName = (id: string) => people.personName(id);
   const move = async (folderId: string | null) => {
     try {
       await routinesApi.moveToFolder(company().id, props.routine.id, folderId);
@@ -350,6 +362,22 @@ function Properties(props: { routine: RoutineDetail; save: Save; onOpenTask: (ta
             </Menu.Item>
           </Menu.Content>
         </Menu>
+      </Prop>
+      <Prop icon={<UserCheck size={15} />} label="Runs for">
+        <span class="td-inline rpn-responsible">
+          <Show when={props.routine.responsibleUserId} fallback={<span class="rpn-muted">Nobody yet</span>}>
+            {(id) => (
+              <>
+                <InitialsDisc name={responsibleName(id())} seed={id()} size={20} you={id() === people.youId()} />
+                {id() === people.youId() ? "You" : responsibleName(id())}
+              </>
+            )}
+          </Show>
+          <InfoTip
+            label="About who it runs for"
+            text="Its runs act for this person: they use their connections and count toward what they're allowed to do. Paperclip sets it when the recurring task is made, from the parent task's person or whoever made it."
+          />
+        </span>
       </Prop>
     </dl>
   );
@@ -702,13 +730,21 @@ function TriggerCard(props: { routine: RoutineDetail; trigger: RoutineTrigger; o
   );
 }
 
-const EDITABLE_TYPES: RoutineVariable["type"][] = ["text", "textarea", "number", "boolean", "date"];
+const EDITABLE_TYPES: Exclude<RoutineVariable["type"], "select">[] = ["text", "textarea", "number", "boolean", "date"];
 
 function Inputs(props: { routine: RoutineDetail; save: Save }) {
   const builtIns = () => builtInsUsed(props.routine.title, props.routine.description);
+  /** The input whose options are being set to turn it into a Choice. */
+  const [choosing, setChoosing] = createSignal<string | null>(null);
+  const put = (next: RoutineVariable) => props.save({ variables: replaceVariable(props.routine.variables, next) }, `Couldn't save the input ${next.name}`);
   const change = (name: string, patch: Partial<RoutineVariable>) => {
     const variables = props.routine.variables.map((variable) => (variable.name === name ? { ...variable, ...patch } : variable));
     void props.save({ variables }, `Couldn't save the input ${name}`);
+  };
+  const setOptions = async (variable: RoutineVariable, options: string[]) => {
+    const next = withOptions(variable, options);
+    if (!next) return pushToast({ tone: "warn", title: `${variable.name} needs at least one option` });
+    if (await put(next)) setChoosing(null);
   };
   const defaultText = (variable: RoutineVariable) => (variable.defaultValue == null ? "" : String(variable.defaultValue));
   const commitDefault = (variable: RoutineVariable, raw: string) => {
@@ -751,28 +787,61 @@ function Inputs(props: { routine: RoutineDetail; save: Save }) {
               <li class="rpn-input">
                 <span class="mono">{variable.name}</span>
                 <Menu>
-                  <Menu.Trigger class="tl-cell rpn-cell" aria-label={`Type of ${variable.name}: ${VARIABLE_TYPE_LABEL[variable.type]}`} disabled={variable.type === "select"}>
+                  <Menu.Trigger class="tl-cell rpn-cell" aria-label={`Type of ${variable.name}: ${VARIABLE_TYPE_LABEL[variable.type]}`}>
                     {VARIABLE_TYPE_LABEL[variable.type]}
                   </Menu.Trigger>
-                  <Menu.Content label={`Type of ${variable.name}`} width={200}>
+                  <Menu.Content label={`Type of ${variable.name}`} width={220}>
                     <For each={EDITABLE_TYPES}>
                       {(type) => (
-                        <Menu.Item hint={type === variable.type ? <Check size={14} /> : undefined} onSelect={() => change(variable.name, { type, defaultValue: null })}>
+                        <Menu.Item hint={type === variable.type ? <Check size={14} /> : undefined} onSelect={() => type !== variable.type && void put(withType(variable, type))}>
                           {VARIABLE_TYPE_LABEL[type]}
                         </Menu.Item>
                       )}
                     </For>
+                    <Menu.Item
+                      description="One of a list of options"
+                      hint={variable.type === "select" ? <Check size={14} /> : undefined}
+                      onSelect={() => variable.type !== "select" && setChoosing(variable.name)}
+                    >
+                      {VARIABLE_TYPE_LABEL.select}
+                    </Menu.Item>
                   </Menu.Content>
                 </Menu>
-                <TextInput
-                  class="rpn-input-default"
-                  aria-label={`Default for ${variable.name}`}
-                  placeholder="No default"
-                  type={variable.type === "number" ? "number" : variable.type === "date" ? "date" : "text"}
-                  value={defaultText(variable)}
-                  onBlur={(event) => commitDefault(variable, event.currentTarget.value)}
-                  onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
-                />
+                <Show
+                  when={variable.type === "select"}
+                  fallback={
+                    <TextInput
+                      class="rpn-input-default"
+                      aria-label={`Default for ${variable.name}`}
+                      placeholder="No default"
+                      type={variable.type === "number" ? "number" : variable.type === "date" ? "date" : "text"}
+                      value={defaultText(variable)}
+                      onBlur={(event) => commitDefault(variable, event.currentTarget.value)}
+                      onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
+                    />
+                  }
+                >
+                  <Menu>
+                    <Menu.Trigger class="field rpn-input-default" aria-label={`Default for ${variable.name}: ${defaultText(variable) || "no default"}`}>
+                      <span class="field-value" classList={{ "rpn-muted": !defaultText(variable) }}>
+                        {defaultText(variable) || "No default"}
+                      </span>
+                    </Menu.Trigger>
+                    <Menu.Content label={`Default for ${variable.name}`} width={240}>
+                      <Menu.Item hint={variable.defaultValue == null ? <Check size={14} /> : undefined} onSelect={() => variable.defaultValue != null && change(variable.name, { defaultValue: null })}>
+                        No default
+                      </Menu.Item>
+                      <Menu.Separator />
+                      <For each={variable.options}>
+                        {(option) => (
+                          <Menu.Item hint={option === variable.defaultValue ? <Check size={14} /> : undefined} onSelect={() => option !== variable.defaultValue && change(variable.name, { defaultValue: option })}>
+                            {option}
+                          </Menu.Item>
+                        )}
+                      </For>
+                    </Menu.Content>
+                  </Menu>
+                </Show>
                 <button
                   type="button"
                   class="rpn-required-toggle"
@@ -782,6 +851,16 @@ function Inputs(props: { routine: RoutineDetail; save: Save }) {
                 >
                   {variable.required ? "Required" : "Optional"}
                 </button>
+                <Show when={variable.type === "select" && choosing() !== variable.name}>
+                  <ChoiceOptions variable={variable} onChange={(options) => void setOptions(variable, options)} />
+                </Show>
+                <Show when={choosing() === variable.name}>
+                  <OptionsForm
+                    variable={variable}
+                    onCancel={() => setChoosing(null)}
+                    onSave={(options) => void setOptions(variable, options)}
+                  />
+                </Show>
               </li>
             )}
           </For>
@@ -964,6 +1043,102 @@ function RunPolicy(props: { routine: RoutineDetail; save: Save }) {
           </Show>
         </dd>
       </dl>
+    </section>
+  );
+}
+
+/** A Choice input's options as chips: remove one, or add one at the end. */
+function ChoiceOptions(props: { variable: RoutineVariable; onChange: (options: string[]) => void }) {
+  const [text, setText] = createSignal("");
+  const add = () => {
+    const next = text().trim();
+    if (!next) return;
+    if (props.variable.options.includes(next)) return pushToast({ tone: "warn", title: `${next} is already an option` });
+    setText("");
+    props.onChange([...props.variable.options, next]);
+  };
+  return (
+    <div class="rpn-options" role="group" aria-label={`Options for ${props.variable.name}`}>
+      <For each={props.variable.options}>
+        {(option) => (
+          <span class="rpn-option-chip">
+            {option}
+            <button
+              type="button"
+              class="nt-icon nt-icon--small"
+              aria-label={`Remove the option ${option}`}
+              title={props.variable.options.length === 1 ? "A Choice needs at least one option" : "Remove"}
+              disabled={props.variable.options.length === 1}
+              onClick={() => props.onChange(props.variable.options.filter((entry) => entry !== option))}
+            >
+              <X size={12} aria-hidden="true" />
+            </button>
+          </span>
+        )}
+      </For>
+      <TextInput
+        aria-label={`Add an option to ${props.variable.name}`}
+        placeholder="Add an option"
+        value={text()}
+        maxLength={120}
+        onInput={(event) => setText(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            add();
+          }
+        }}
+        onBlur={add}
+      />
+    </div>
+  );
+}
+
+/** Turning an input into a Choice: its options first, one per line, since a Choice needs one. */
+function OptionsForm(props: { variable: RoutineVariable; onCancel: () => void; onSave: (options: string[]) => void }) {
+  const [text, setText] = createSignal(props.variable.defaultValue != null ? String(props.variable.defaultValue) : "");
+  const options = () => parseOptionLines(text());
+  return (
+    <div class="rpn-options-form">
+      <label class="rpn-muted" for={`rpn-options-${props.variable.name}`}>
+        The options for {props.variable.name}, one per line. A run picks one.
+      </label>
+      <TextArea id={`rpn-options-${props.variable.name}`} rows={4} value={text()} onInput={(event) => setText(event.currentTarget.value)} autofocus />
+      <div class="rpn-actions">
+        <Button variant="quiet" size="compact" onClick={() => props.onCancel()}>
+          Cancel
+        </Button>
+        <Button variant="primary" size="compact" disabled={options().length === 0} onClick={() => props.onSave(options())}>
+          Make it a Choice
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A recurring task a plugin keeps (`managedByPlugin`): which plugin, its key for it, and what has
+ * moved from the plugin's defaults. Repairing or resetting it is the plugin's own control, on its
+ * page or in its settings; the board API has no request for it.
+ */
+function PluginNotice(props: { routine: RoutineDetail; managed: NonNullable<RoutineDetail["managedByPlugin"]> }) {
+  const company = useCompany();
+  const drift = () => pluginDefaultDrift(props.routine, props.managed.defaultsJson);
+  return (
+    <section class="rpn-plugin" aria-label="Managed by a plugin">
+      <div class="rpn-plugin-top">
+        <Puzzle size={14} aria-hidden="true" />
+        <span>
+          Managed by <b>{props.managed.pluginDisplayName}</b>
+        </span>
+        <code class="mono rpn-muted">{props.managed.resourceKey}</code>
+      </div>
+      <span class="rpn-muted">
+        <Show when={drift().length > 0} fallback={<>It matches the plugin's defaults. </>}>
+          Changed from the plugin's defaults: {drift().join(", ")}. The plugin may put them back.{" "}
+        </Show>
+        <A href={`/${company().issuePrefix}/company/settings/instance/plugins?plugin=${encodeURIComponent(props.managed.pluginId)}`}>Plugin settings</A>
+      </span>
     </section>
   );
 }

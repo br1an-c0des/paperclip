@@ -274,7 +274,7 @@ describe("webhooks", () => {
 describe("routineSection", () => {
   it("maps the old detail sections to the panel's", () => {
     expect(routineSection("runs")).toBe("runs");
-    expect(routineSection("activity")).toBe("runs");
+    expect(routineSection("activity")).toBe("activity");
     expect(routineSection("history")).toBe("history");
     expect(routineSection("triggers")).toBeUndefined();
     expect(routineSection(null)).toBeUndefined();

@@ -35,6 +35,7 @@ import {
   TestChecks,
 } from "../settings/fields";
 import { failure } from "../shared";
+import { OutsideAgentInvite } from "./OutsideAgentInvite";
 import {
   defaultBinding,
   defaultProfile,
@@ -114,6 +115,7 @@ export function NewAgentPage() {
   const draft = createMemo(() => (detail.data?.companyId === company().id && detail.data.id === draftId() ? detail.data : undefined));
 
   const [step, setStep] = createSignal<Step>(legacy.setupAgentId ? "model" : "profile");
+  const [inviting, setInviting] = createSignal(false);
   const [profile, setProfile] = createStore<ProfileDraft>(defaultProfile([], legacy.name ?? ""));
   const [setup, setSetup] = createStore<SetupDraft>(emptySetup());
   let profileTouched = false;
@@ -427,6 +429,9 @@ export function NewAgentPage() {
               <span aria-current="page">New agent</span>
             </nav>
             <h1 class="disp">New agent</h1>
+            <button type="button" class="ps-link na-invite-link" onClick={() => setInviting(true)}>
+              Or invite an outside agent
+            </button>
           </div>
           <ol class="na-steps" aria-label="Steps">
             <li>
@@ -765,6 +770,8 @@ export function NewAgentPage() {
             </dl>
           </aside>
         </div>
+
+        <OutsideAgentInvite open={inviting()} onOpenChange={setInviting} />
 
         <Show when={connections.data}>
           {(list) => (

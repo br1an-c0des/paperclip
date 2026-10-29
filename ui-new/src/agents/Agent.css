@@ -814,6 +814,161 @@
   align-self: flex-start;
 }
 
+/* Profile: the signing key */
+.ag-key-id {
+  font-size: 13px;
+}
+
+/* Permissions: containment and the policy */
+.ag-trust {
+  gap: 10px;
+}
+
+.ag-trust-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--r-field);
+  background: var(--amber-bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ag-trust-state[data-tone="red"] {
+  background: var(--red-bg);
+}
+
+.ag-trust-state > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--amber-fg);
+}
+
+.ag-trust-state[data-tone="red"] > svg {
+  color: var(--red-fg);
+}
+
+.ag-policy summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.ag-policy summary::-webkit-details-marker {
+  display: none;
+}
+
+.ag-policy[open] .ag-rot {
+  transform: rotate(90deg);
+}
+
+.ag-policy dl {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  gap: 6px 16px;
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+
+.ag-policy dt {
+  color: var(--muted);
+}
+
+.ag-policy dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* History: comparing two revisions */
+.ag-compare-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.ag-compare {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ag-compare th,
+.ag-compare td {
+  padding: 7px 10px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.ag-compare th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.ag-compare td:first-child {
+  width: 34%;
+}
+
+.ag-compare .ag-compare-before {
+  color: var(--red-fg);
+}
+
+.ag-compare .ag-compare-after {
+  color: var(--green-fg);
+}
+
+.ag-compare-wrap {
+  max-height: 60vh;
+  overflow: auto;
+}
+
+/* Model and runtime: changing the harness */
+.ag-change-notes {
+  margin: 14px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Instructions: bundle settings */
+.ag-bundle-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.ag-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+/* Model and runtime: a detected model */
+.ag-detected {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ag-rot {
     transition: none;

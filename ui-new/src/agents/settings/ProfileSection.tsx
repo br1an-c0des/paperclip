@@ -13,7 +13,9 @@ import { SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
 import { Popover } from "@/ui/Popover";
 import { pushToast } from "@/ui/Toast";
 import { managerCandidates, roleLabel, textEdit } from "../agent-model";
+import { BuiltInCard } from "./BuiltInCard";
 import { ManagerMenu, PaletteGrid, paletteAppearance, RoleMenu } from "./fields";
+import { IdentityCard } from "./IdentityCard";
 import { CardNote, dateTime, failure, refreshAgent, SectionTitle, shortDate, SwitchRow, useAgentSaver } from "../shared";
 
 /*
@@ -46,6 +48,7 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
   return (
     <>
       <SectionTitle title="Profile">Who {props.agent.name} is, where it sits in the organization, and its lifecycle.</SectionTitle>
+      <BuiltInCard agent={props.agent} />
       <SettingsCard
         title="Identity"
         description={
@@ -122,6 +125,7 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
       </SettingsCard>
 
       <ForYouCard agent={props.agent} />
+      <IdentityCard agent={props.agent} />
       <LifecycleCard agent={props.agent} />
     </>
   );

@@ -483,6 +483,136 @@
   gap: 6px;
 }
 
+/* Activity: who, what and when, with the details unfolding below */
+.rpn-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rpn-activity-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+}
+
+.rpn-activity-row:hover {
+  background: var(--well);
+}
+
+.rpn-activity-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.rpn-activity-summary {
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+
+.rpn-activity-details {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  max-height: 260px;
+  overflow: auto;
+  border-radius: var(--r-inner);
+  background: var(--well);
+  color: var(--body);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rpn-activity-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.rpn-activity-note {
+  margin-top: 8px;
+}
+
+/* A recurring task a plugin manages */
+.rpn-plugin {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+  background: var(--well);
+  font-size: 13px;
+}
+
+.rpn-plugin-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--body);
+}
+
+.rpn-plugin-top b {
+  color: var(--text);
+}
+
+.rpn-plugin a {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--edge);
+  text-underline-offset: 3px;
+}
+
+/* A Choice input's options */
+.rpn-options {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 4px;
+}
+
+.rpn-option-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 4px 0 10px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--body);
+  font-size: 12px;
+}
+
+.rpn-options .input {
+  width: 160px;
+  height: 28px;
+}
+
+.rpn-options-form {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+}
+
+/* Run now: where the run works */
+.rpn-runnow .field {
+  min-width: 0;
+}
+
 @container panel (width < 520px) {
   .rpn-input {
     grid-template-columns: minmax(0, 1fr) 96px;

@@ -52,6 +52,10 @@ export const queryKeys = {
         ? (["agents", companyId, "adapter-models", adapterType, options] as const)
         : (["agents", companyId, "adapter-models", adapterType] as const),
     primary: (companyId: string) => ["primary-agent", companyId, "me"] as const,
+    /** The model a harness's own settings name on the server's machine. */
+    detectModel: (companyId: string, adapterType: string) => ["agents", companyId, "detect-model", adapterType] as const,
+    /** A harness's declared settings, which don't change per company. */
+    configSchema: (adapterType: string) => ["adapters", "config-schema", adapterType] as const,
   },
   issues: {
     /** Prefix for every task list in a company. */
@@ -89,6 +93,15 @@ export const queryKeys = {
     /** Prefix for every project query in a company. */
     all: (companyId: string) => ["projects", companyId] as const,
     list: (companyId: string) => ["projects", companyId, "list"] as const,
+    /*
+     * AI summaries (src/projects/summary/), in the old UI's shapes (`summarySlots`, `builtInAgents`)
+     * so its live-update rule for `summary_slot` activity ports one to one.
+     */
+    summary: (companyId: string, scopeKind: string, slotKey: string, scopeId?: string | null) =>
+      ["summary-slots", companyId, scopeKind, slotKey, scopeId ?? null] as const,
+    summaryRevisions: (companyId: string, scopeKind: string, slotKey: string, scopeId?: string | null) =>
+      ["summary-slots", companyId, scopeKind, slotKey, scopeId ?? null, "revisions"] as const,
+    builtInAgents: (companyId: string) => ["built-in-agents", companyId] as const,
   },
   goals: {
     list: (companyId: string) => ["goals", companyId] as const,
@@ -281,6 +294,8 @@ export const queryKeys = {
     detail: (routineId: string) => ["routines", "detail", routineId] as const,
     runs: (routineId: string) => ["routines", "runs", routineId] as const,
     revisions: (routineId: string) => ["routines", "revisions", routineId] as const,
+    /** The routine's activity, with its triggers' and recent runs'. */
+    activity: (routineId: string) => ["routines", "activity", routineId] as const,
     folders: (companyId: string) => ["routines", "folders", companyId] as const,
   },
 

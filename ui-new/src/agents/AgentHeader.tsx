@@ -16,7 +16,9 @@ import { PageHeader } from "@/ui/PageHeader";
 import { RunningPill, TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { headerSummary, harnessType, modelLabel } from "./agent-model";
+import { builtInFor } from "./built-in-model";
 import { isSetupDraft } from "./new/new-agent-model";
+import { useBuiltInAgents } from "./settings/BuiltInCard";
 import { failure, refreshAgent } from "./shared";
 import { AgentStarButton } from "./AgentStar";
 
@@ -77,6 +79,9 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
   const retired = () => props.agent.status === "terminated";
   // A setup draft saved by New agent can't run until it's hired, so finishing setup is all it offers.
   const draft = () => isSetupDraft(props.agent);
+  // Built-in agents are reset rather than retired (their card in Profile), as in the old UI.
+  const builtIns = useBuiltInAgents();
+  const builtIn = () => !!builtInFor(builtIns.states(), props.agent.id);
 
   return (
     <>
@@ -202,7 +207,7 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
                 >
                   Reset all sessions
                 </Menu.Item>
-                <Show when={!retired()}>
+                <Show when={!retired() && !builtIn()}>
                   <Menu.Separator />
                   <Menu.Item danger onSelect={() => setRetireOpen(true)}>
                     Retire agent…

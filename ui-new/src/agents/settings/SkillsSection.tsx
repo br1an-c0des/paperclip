@@ -1,21 +1,28 @@
 import type { AgentDetail, AgentDesiredSkillEntry, AgentSkillEntry } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
+import { Check } from "lucide-solid";
 import { createMemo, createSignal, For, Match, Show, Switch as SolidSwitch } from "solid-js";
 import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
+import { skillsApi } from "@/api/skills";
 import { useCompany } from "@/lib/company";
-import { SettingsCard } from "@/ui/Field";
+import { useExperimentalSettingsQuery } from "@/lib/company-data";
+import { FieldButton, SettingsCard } from "@/ui/Field";
+import { Menu } from "@/ui/Menu";
 import { Switch } from "@/ui/Switch";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
-import { builtInSkill, PAPERCLIP_CORE_SKILL_KEY, recommendedForLeads, skillToggle } from "../agent-model";
+import { builtInSkill, PAPERCLIP_CORE_SKILL_KEY, recommendedForLeads, releaseLabel, skillPin, skillToggle } from "../agent-model";
 import { CardNote, failure, SectionTitle } from "../shared";
 
 /*
  * Skills (board 30's outline): the company library's skills, with a switch for each that the agent
  * should have. Saving replaces the agent's list (`POST /agents/:id/skills/sync`, mode replace) and
- * keeps the versions already pinned. Choosing a version per skill isn't offered yet; skills
- * installed outside Paperclip are listed read-only.
+ * keeps the versions already pinned. Skills installed outside Paperclip are listed read-only.
+ *
+ * With `enableBetaSkills`, the core skill offers its seeded releases (`releaseId` set): picking one
+ * pins the agent to that frozen version, Default returns it to the live skill, as the old UI's
+ * AgentSkillReleasePicker does.
  *
  * The core `paperclip` skill has no switch (agent-model.ts, builtInSkill): Paperclip Runner agents
  * never get it, since the Runner carries the same contract itself, and legacy harnesses always
@@ -55,6 +62,36 @@ export function SkillsSection(props: { agent: AgentDetail }) {
   const assigned = () => choosable().filter((entry) => entry.desired).length;
   const desired = (): AgentDesiredSkillEntry[] =>
     skills.data?.desiredSkillEntries ?? (skills.data?.desiredSkills ?? []).map((key) => ({ key, versionId: null }));
+
+  // Beta releases of the core skill, only while the flag is on.
+  const experimental = useExperimentalSettingsQuery();
+  const beta = () => experimental.data?.enableBetaSkills === true;
+  const library = createQuery(() => ({
+    queryKey: queryKeys.skills.list(company().id),
+    queryFn: ({ signal }) => skillsApi.list(company().id, signal),
+    enabled: beta(),
+  }));
+  const coreSkillId = () => library.data?.find((skill) => skill.key === PAPERCLIP_CORE_SKILL_KEY)?.id;
+  const versions = createQuery(() => ({
+    queryKey: queryKeys.skills.versions(company().id, coreSkillId() ?? "none"),
+    queryFn: ({ signal }) => skillsApi.versions(company().id, coreSkillId()!, signal),
+    enabled: beta() && !!coreSkillId(),
+  }));
+  const releases = createMemo(() => (beta() ? (versions.data ?? []).filter((version) => version.releaseId != null) : []));
+  const pinned = (key: string) => desired().find((entry) => entry.key === key)?.versionId ?? null;
+  const pin = async (entry: AgentSkillEntry, versionId: string | null) => {
+    setBusy(entry.key);
+    setError(null);
+    try {
+      const snapshot = await agentsApi.syncSkills(props.agent.id, skillPin(desired(), entry.key, versionId), "replace", company().id);
+      client.setQueryData(queryKeys.agents.part(props.agent.id, "skills"), snapshot);
+      pushToast({ tone: "success", title: versionId ? "Pinned the release" : "Back on the current version" });
+    } catch (caught) {
+      setError(failure(caught, "Couldn't change the version."));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const toggle = async (entry: AgentSkillEntry, on: boolean) => {
     setBusy(entry.key);
@@ -116,6 +153,29 @@ export function SkillsSection(props: { agent: AgentDetail }) {
                                   : "Paperclip adds it to every run in this harness."}
                               </span>
                             </span>
+                            <Show when={kind() === "always" && entry.key.trim().toLowerCase() === PAPERCLIP_CORE_SKILL_KEY && releases().length > 0}>
+                              <Menu>
+                                <Menu.Trigger as={FieldButton} class="ps-field-240" disabled={busy() !== null} aria-label="Skill release">
+                                  {(() => {
+                                    const release = releases().find((version) => version.id === pinned(entry.key));
+                                    return release ? `Beta · ${releaseLabel(release).split(" · ")[0]}` : "Default: current";
+                                  })()}
+                                </Menu.Trigger>
+                                <Menu.Content label="Skill release" width={320}>
+                                  <Menu.Item description="Recommended" hint={pinned(entry.key) ? undefined : <Check size={14} />} onSelect={() => pinned(entry.key) && void pin(entry, null)}>
+                                    Default: the current version
+                                  </Menu.Item>
+                                  <Menu.Separator />
+                                  <For each={releases()}>
+                                    {(release) => (
+                                      <Menu.Item description="Beta" hint={pinned(entry.key) === release.id ? <Check size={14} /> : undefined} onSelect={() => pinned(entry.key) !== release.id && void pin(entry, release.id)}>
+                                        {releaseLabel(release)}
+                                      </Menu.Item>
+                                    )}
+                                  </For>
+                                </Menu.Content>
+                              </Menu>
+                            </Show>
                             <TonePill tone={kind() === "runner" ? "violet" : "green"} compact>
                               {kind() === "runner" ? "Built into the Paperclip Runner" : "Always on"}
                             </TonePill>

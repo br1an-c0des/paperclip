@@ -1,7 +1,7 @@
 import type { AgentConfigRevision, AgentDetail } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createInfiniteQuery, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Download } from "lucide-solid";
+import { Check, Download, GitCompare } from "lucide-solid";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { agentsApi, type AgentActionsPage } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
@@ -10,16 +10,18 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { SettingsCard } from "@/ui/Field";
+import { FieldButton, SettingsCard } from "@/ui/Field";
+import { Menu } from "@/ui/Menu";
 import { pushToast } from "@/ui/Toast";
-import { changedKeyLabel, revisionConfigChanges } from "../agent-model";
+import { changedKeyLabel, configDifferences, configValueText, revisionConfigChanges } from "../agent-model";
 import { dateTime, failure, refreshAgent, SectionTitle } from "../shared";
 
 /*
  * History (board 30's outline): every saved change to the agent's configuration, newest first, with
  * what changed and a roll back to an earlier one (`POST /agents/:id/config-revisions/:id/rollback`
- * restores the settings that revision saved, as a new revision), and the agent's own actions from the audit log, a page at a time, with a CSV export.
- * Comparing two revisions side by side isn't built yet.
+ * restores the settings that revision saved, as a new revision), comparing any two revisions
+ * setting by setting (each revision stores the whole configuration it saved), and the agent's own
+ * actions from the audit log, a page at a time, with a CSV export.
  */
 
 export function HistorySection(props: { agent: AgentDetail; base: string }) {
@@ -34,6 +36,7 @@ export function HistorySection(props: { agent: AgentDetail; base: string }) {
   const sorted = createMemo(() => [...(revisions.data ?? [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
   const [rollback, setRollback] = createSignal<{ revision: AgentConfigRevision; number: number } | null>(null);
   const [busy, setBusy] = createSignal(false);
+  const [comparing, setComparing] = createSignal(false);
   const who = (revision: AgentConfigRevision) => {
     if (revision.createdByAgentId) return agents.data?.find((agent) => agent.id === revision.createdByAgentId)?.name ?? "an agent";
     if (revision.createdByUserId === "local-board") return "the board";
@@ -58,7 +61,17 @@ export function HistorySection(props: { agent: AgentDetail; base: string }) {
   return (
     <>
       <SectionTitle title="History">Every change to {props.agent.name}'s configuration, and everything it did.</SectionTitle>
-      <SettingsCard title="Revisions" description="Each save of the agent's settings is a revision. Rolling back to one restores the settings it saved, as a new revision.">
+      <SettingsCard
+        title="Revisions"
+        description="Each save of the agent's settings is a revision. Rolling back to one restores the settings it saved, as a new revision."
+        footer={
+          <Show when={sorted().length > 1}>
+            <Button size="compact" icon={<GitCompare size={14} aria-hidden="true" />} onClick={() => setComparing(true)}>
+              Compare revisions
+            </Button>
+          </Show>
+        }
+      >
         <Show when={revisions.isError}>
           <p class="ps-list-note" role="alert">
             Couldn't load the revisions. {failure(revisions.error, "")}
@@ -92,6 +105,9 @@ export function HistorySection(props: { agent: AgentDetail; base: string }) {
         </ul>
       </SettingsCard>
       <ActionsCard agent={props.agent} />
+      <Show when={comparing()}>
+        <CompareDialog revisions={sorted()} onClose={() => setComparing(false)} />
+      </Show>
       <Dialog
         open={Boolean(rollback())}
         onOpenChange={(open) => !open && setRollback(null)}
@@ -112,6 +128,76 @@ export function HistorySection(props: { agent: AgentDetail; base: string }) {
         {null}
       </Dialog>
     </>
+  );
+}
+
+/**
+ * Two revisions side by side, setting by setting: by default the one before the current and the
+ * current. `revisions` is newest first; a revision's number counts from the oldest.
+ */
+function CompareDialog(props: { revisions: AgentConfigRevision[]; onClose: () => void }) {
+  const number = (revision: AgentConfigRevision) => props.revisions.length - props.revisions.indexOf(revision);
+  const [fromId, setFromId] = createSignal(props.revisions[1]?.id ?? props.revisions[0]!.id);
+  const [toId, setToId] = createSignal(props.revisions[0]!.id);
+  const from = () => props.revisions.find((revision) => revision.id === fromId()) ?? props.revisions[0]!;
+  const to = () => props.revisions.find((revision) => revision.id === toId()) ?? props.revisions[0]!;
+  const differences = createMemo(() => configDifferences(from().afterConfig as Record<string, unknown>, to().afterConfig as Record<string, unknown>));
+  const pickMenu = (label: string, value: () => string, onPick: (id: string) => void) => (
+    <Menu>
+      <Menu.Trigger as={FieldButton} class="ps-field-220" aria-label={label}>
+        {(() => {
+          const revision = props.revisions.find((entry) => entry.id === value());
+          return revision ? `Revision ${number(revision)} · ${dateTime(revision.createdAt)}` : "Pick a revision";
+        })()}
+      </Menu.Trigger>
+      <Menu.Content label={label} width={300}>
+        <For each={props.revisions}>
+          {(revision, index) => (
+            <Menu.Item
+              description={revision.changedKeys.map(changedKeyLabel).join(", ") || undefined}
+              hint={revision.id === value() ? <Check size={14} /> : undefined}
+              onSelect={() => onPick(revision.id)}
+            >
+              Revision {props.revisions.length - index()} · {dateTime(revision.createdAt)}
+              {index() === 0 ? " (current)" : ""}
+            </Menu.Item>
+          )}
+        </For>
+      </Menu.Content>
+    </Menu>
+  );
+  return (
+    <Dialog open onOpenChange={(open) => !open && props.onClose()} title="Compare revisions" width={860}>
+      <div class="ag-compare-pick">
+        {pickMenu("Compare from", fromId, setFromId)}
+        <span class="ps-muted-line">to</span>
+        {pickMenu("Compare to", toId, setToId)}
+      </div>
+      <Show when={differences().length > 0} fallback={<p class="ps-list-note">{fromId() === toId() ? "Pick two different revisions." : "These two revisions saved the same settings."}</p>}>
+        <div class="ag-compare-wrap">
+          <table class="ag-compare">
+            <thead>
+              <tr>
+                <th scope="col">Setting</th>
+                <th scope="col">Revision {number(from())}</th>
+                <th scope="col">Revision {number(to())}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <For each={differences()}>
+                {(difference) => (
+                  <tr>
+                    <td class="mono">{difference.path}</td>
+                    <td class="mono ag-compare-before">{configValueText(difference.before)}</td>
+                    <td class="mono ag-compare-after">{configValueText(difference.after)}</td>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </div>
+      </Show>
+    </Dialog>
   );
 }
 

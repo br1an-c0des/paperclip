@@ -1,23 +1,27 @@
 import type { AdapterEnvironmentTestResult, AgentDetail } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Check, ChevronRight, History, Zap } from "lucide-solid";
-import { createEffect, createMemo, createSignal, For, on, Show, type JSX } from "solid-js";
+import { ArrowLeftRight, Check, ChevronRight, History, Wand2, Zap } from "lucide-solid";
+import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { accessApi } from "@/api/access";
-import { agentsApi } from "@/api/agents";
+import { adaptersApi, agentsApi } from "@/api/agents";
 import { aiConnectionsApi } from "@/api/ai-connections";
 import { environmentsApi } from "@/api/environments";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
+import { connectionChoices, providerForHarness } from "@/org/bulk-model";
 import { FieldButton, SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import {
+  bindingText,
   buildRuntimePatch,
+  harnessLabel,
+  harnessType,
   HEARTBEAT_INTERVALS,
   intervalLabel,
   latestRevision,
@@ -34,7 +38,9 @@ import {
   type RuntimeDraft,
 } from "../agent-model";
 import { failure, FootError, refreshAgent, SectionTitle, shortDate, SwitchRow } from "../shared";
+import { extrasChanges, extrasConfig, extrasDraft, fieldVisible, harnessFields, isSecretField, type ExtrasDraft, type ExtraValue, type HarnessField } from "../harness-model";
 import { EnvironmentMenu, HarnessDisc, instanceDefaultEnvironment, ModelMenu, TestChecks } from "./fields";
+import { HarnessChangeDialog } from "./HarnessChange";
 import { RunnerStateCard } from "./RunnerStateCard";
 
 /*
@@ -47,8 +53,13 @@ import { RunnerStateCard } from "./RunnerStateCard";
  * (`supportedRunners`, `defaultRunner`); switching is part of the same save (`runner` in the
  * patch), after qualifying a sandbox environment when it needs that.
  *
- * Left out for now: changing the harness itself, the AI connection and adapter sign-in flows, model
- * detection, and the per-harness extra fields (Codex search, ACP state directory and the like).
+ * The AI connection is part of the same save (`runtimeConfig.aiConnection`); a pool (router)
+ * binding is shown but not edited here. Harness settings come from the harness's own schema and the
+ * old UI's hand-written fields (harness-model.ts). Changing the harness itself is its own step (a
+ * dialog that saves at once), since the model, effort and harness settings all change with it. A
+ * local harness's configured model on this machine (`detect-model`) is offered next to Model.
+ *
+ * The old adapter sign-in flows are dropped (decision 39, D8): AI connections replace them.
  */
 
 export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
@@ -58,7 +69,20 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
   const fields = createMemo(() => runtimeFields(props.agent));
   const base = createMemo(() => runtimeDraft(props.agent));
   const [draft, setDraft] = createStore<RuntimeDraft>(runtimeDraft(props.agent));
-  const changes = createMemo(() => runtimeChanges(base(), draft));
+  // Harness settings: the schema's and hand-written fields, edited as text or switches.
+  const schema = createQuery(() => ({
+    queryKey: queryKeys.agents.configSchema(props.agent.adapterType),
+    queryFn: ({ signal }) => adaptersApi.configSchema(props.agent.adapterType, signal),
+    staleTime: 5 * 60_000,
+    retry: false,
+  }));
+  const extraFields = createMemo(() => harnessFields(props.agent.adapterType, schema.data));
+  const extrasBase = createMemo(() => extrasDraft(extraFields(), props.agent.adapterConfig as Record<string, unknown>));
+  const [extras, setExtras] = createStore<ExtrasDraft>(extrasBase());
+  const extraChanges = createMemo(() => extrasChanges(extrasBase(), extras));
+  const changes = createMemo(() => [...runtimeChanges(base(), draft), ...extraChanges()]);
+  createEffect(on(() => JSON.stringify(extrasBase()), () => extraChanges().length === 0 && setExtras(reconcile(extrasBase())), { defer: true }));
+  const [changingHarness, setChangingHarness] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [problem, setProblem] = createSignal<string | null>(null);
   // The saved settings replace the draft when they change, unless you're editing.
@@ -96,7 +120,9 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
   const save = async () => {
     const found = runtimeProblem(draft);
     if (found) return setProblem(found);
-    const patch = buildRuntimePatch(props.agent, { ...draft }, base());
+    const extra = extrasConfig(extraFields(), extrasBase(), { ...extras }, props.agent.adapterConfig as Record<string, unknown>);
+    if ("problem" in extra) return setProblem(extra.problem);
+    const patch = buildRuntimePatch(props.agent, { ...draft }, base(), extra.entries);
     if (!patch) return;
     setSaving(true);
     setProblem(null);
@@ -178,6 +204,16 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
               <HarnessDisc harness={identity().harness} />
               {identity().harnessLabel}
             </span>
+            <Button
+              size="compact"
+              variant="quiet"
+              icon={<ArrowLeftRight size={14} aria-hidden="true" />}
+              disabled={changes().length > 0}
+              title={changes().length > 0 ? "Save or discard your changes first" : undefined}
+              onClick={() => setChangingHarness(true)}
+            >
+              Change harness
+            </Button>
           </div>
         </SettingsRow>
         <SettingsRow label="Runner" help="What starts and supervises the harness for each run.">
@@ -211,13 +247,14 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
             </div>
           </Show>
         </SettingsRow>
-        <SignInRow agent={props.agent} />
+        <SignInRow agent={props.agent} value={draft.connection} saved={base().connection} onChange={(value) => setDraft("connection", value)} />
         <Show when={fields().model}>
           <SettingsRow label="Model">
             <ModelMenu models={models.data} loading={models.isLoading} value={draft.model} onChange={(model) => setDraft("model", model)} />
             <Show when={draft.model !== base().model}>
               <span class="ag-changed">Changed from {modelLabel(base().model, models.data) ?? "the default"}</span>
             </Show>
+            <DetectedModel agent={props.agent} harness={identity().harness} value={draft.model} onUse={(model) => setDraft("model", model)} />
           </SettingsRow>
         </Show>
         <Show when={fields().effort && effortOptions().length > 0}>
@@ -236,6 +273,14 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
           </SettingsRow>
         </Show>
       </SettingsCard>
+
+      <Show when={extraFields().length > 0}>
+        <SettingsCard title="Harness settings" description={`Options of ${identity().harnessLabel} itself. Saved with your other changes.`}>
+          <For each={extraFields().filter((field) => fieldVisible(field, extras, props.agent.adapterConfig as Record<string, unknown>))}>
+            {(field) => <ExtraFieldRow field={field} value={extras[field.key]} saved={(props.agent.adapterConfig as Record<string, unknown>)[field.key]} onChange={(value) => setExtras(field.key, value)} />}
+          </For>
+        </SettingsCard>
+      </Show>
 
       <SettingsCard title="Where it runs">
         <SettingsRow label="Environment" help="Uses the organization default unless you pick another.">
@@ -359,6 +404,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
               onClick={() => {
                 setProblem(null);
                 setDraft(reconcile(base()));
+                setExtras(reconcile(extrasBase()));
               }}
             >
               Discard
@@ -369,6 +415,9 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
           </Button>
         </span>
       </div>
+      <Show when={changingHarness()}>
+        <HarnessChangeDialog agent={props.agent} adapters={adapters.data} onClose={() => setChangingHarness(false)} />
+      </Show>
     </>
   );
 }
@@ -383,45 +432,165 @@ function runnerDetail(config: Record<string, unknown>) {
 }
 
 /** The AI connection the harness signs in with, from the agent's binding and the company's connections. */
-function SignInRow(props: { agent: AgentDetail }) {
+function SignInRow(props: { agent: AgentDetail; value: string; saved: string; onChange: (value: string) => void }) {
   const company = useCompany();
-  const binding = () => props.agent.runtimeConfig?.aiConnection as Record<string, unknown> | undefined;
+  const harness = () => harnessType(props.agent.adapterType, props.agent.adapterConfig as Record<string, unknown>);
+  const provider = () => providerForHarness(harness());
+  const binding = () => (props.value ? (JSON.parse(props.value) as Record<string, unknown>) : undefined);
   const connections = createQuery(() => ({
     queryKey: [...queryKeys.aiConnections.list(company().id), "agent", props.agent.id],
     queryFn: () => aiConnectionsApi.list(company().id, props.agent.id),
-    enabled: Boolean(binding()),
+    enabled: Boolean(binding()) || Boolean(provider()),
     retry: false,
   }));
+  const choices = createMemo(() => (provider() ? connectionChoices(connections.data, provider()!) : []));
   const connection = createMemo(() => {
     const current = binding();
     if (!current) return undefined;
     return connections.data?.connections.find((entry) => entry.id === current.connectionId || entry.grantId === current.grantId);
   });
   const mode = () => String(binding()?.mode ?? "");
+  const router = () => mode() === "router";
+  const label = () =>
+    !binding()
+      ? "Its own sign-in"
+      : connection()
+        ? `${connection()!.method === "subscription" ? "Subscription" : "API key"} · ${connection()!.name}`
+        : mode() === "responsible_user"
+          ? "The responsible person's connection"
+          : "An AI connection";
   return (
     <SettingsRow label="Sign-in" help="How the harness reaches the model.">
-      <div class="ps-inline ps-inline--spread">
-        <Show
-          when={binding()}
-          fallback={<span class="ag-static-text">No AI connection: the harness uses its own sign-in on the machine it runs on.</span>}
-        >
-          <Show
-            when={mode() !== "router"}
-            fallback={<TonePill tone="violet" compact>Routed through a connection pool</TonePill>}
-          >
-            <TonePill tone={connection()?.status === "connected" || !connection() ? "green" : "amber"} compact>
-              {connection() ? `${connection()!.method === "subscription" ? "Subscription" : "API key"} · ${connection()!.name}` : mode() === "responsible_user" ? "The responsible person's connection" : "An AI connection"}
-            </TonePill>
+      <div class="ps-stack">
+        <div class="ps-inline ps-inline--spread">
+          <Show when={!router()} fallback={<TonePill tone="violet" compact>Routed through a connection pool</TonePill>}>
+            <Show
+              when={provider()}
+              fallback={<span class="ag-static-text">{binding() ? label() : "No AI connection: the harness uses its own sign-in on the machine it runs on."}</span>}
+            >
+              <Menu>
+                <Menu.Trigger as={FieldButton} class="ps-field-320" aria-label={`Sign-in: ${label()}`}>
+                  {label()}
+                </Menu.Trigger>
+                <Menu.Content label="Sign-in" width={360}>
+                  <Menu.Item description="The harness's own login on the machine it runs on" hint={props.value ? undefined : <Check size={14} />} onSelect={() => props.onChange("")}>
+                    Its own sign-in
+                  </Menu.Item>
+                  <Menu.Separator />
+                  <Show when={connections.isLoading}>
+                    <p class="nt-menu-note">Loading connections…</p>
+                  </Show>
+                  <For each={choices()}>
+                    {(choice) => (
+                      <Menu.Item
+                        description={choice.description}
+                        disabled={choice.disabled}
+                        hint={bindingText(choice.binding) === props.value ? <Check size={14} /> : undefined}
+                        onSelect={() => props.onChange(bindingText(choice.binding))}
+                      >
+                        {choice.name}
+                      </Menu.Item>
+                    )}
+                  </For>
+                </Menu.Content>
+              </Menu>
+            </Show>
             <Show when={connection() && connection()!.status !== "connected"}>
               <span class="ag-changed">{connection()!.status}</span>
             </Show>
           </Show>
+          <A class="ps-link" href={`/${company().issuePrefix}/apps/ai`}>
+            Manage connections
+          </A>
+        </div>
+        <Show when={props.value !== props.saved}>
+          <span class="ag-changed">Changes when you save</span>
         </Show>
-        <A class="ps-link" href={`/${company().issuePrefix}/apps/ai`}>
-          Manage connections
-        </A>
       </div>
     </SettingsRow>
+  );
+}
+
+/**
+ * The model a local harness's own configuration names on the server's machine
+ * (`GET /companies/:id/adapters/:type/detect-model`), offered when it differs from the pick. Not
+ * asked for OpenCode (its models are `provider/model`) or Runner agents, as in the old form.
+ */
+function DetectedModel(props: { agent: AgentDetail; harness: string; value: string; onUse: (model: string) => void }) {
+  const company = useCompany();
+  const applies = () =>
+    props.agent.adapterType !== "paperclip_runner" && props.agent.adapterType !== "opencode_local" && runtimeFields(props.agent).command;
+  const detected = createQuery(() => ({
+    queryKey: queryKeys.agents.detectModel(company().id, props.agent.adapterType),
+    queryFn: ({ signal }) => agentsApi.detectModel(company().id, props.agent.adapterType, signal),
+    enabled: applies(),
+    staleTime: 5 * 60_000,
+    retry: false,
+  }));
+  return (
+    <Show when={applies() && detected.data?.model && detected.data.model !== props.value ? detected.data : null}>
+      {(found) => (
+        <span class="ag-detected">
+          <Wand2 size={13} aria-hidden="true" />
+          {found().source ? `This machine's ${harnessLabel(props.harness)} settings (${found().source}) use ` : `This machine's ${harnessLabel(props.harness)} settings use `}
+          <span class="mono">{found().model}</span>
+          <button type="button" class="ps-link" onClick={() => props.onUse(found().model)}>
+            Use it
+          </button>
+        </span>
+      )}
+    </Show>
+  );
+}
+
+/** One harness setting: a switch, a menu, or text. A secret shows masked and is sent only when retyped. */
+function ExtraFieldRow(props: { field: HarnessField; value: ExtraValue | undefined; saved: unknown; onChange: (value: ExtraValue) => void }) {
+  const id = `ag-extra-${props.field.key}`;
+  const help = () => (props.field.hint ? props.field.hint : undefined);
+  return (
+    <Switch>
+      <Match when={props.field.type === "toggle"}>
+        <SwitchRow label={props.field.label} help={help() ?? ""} checked={props.value === true} onChange={props.onChange} />
+      </Match>
+      <Match when={props.field.type === "select"}>
+        <SettingsRow label={props.field.label} help={help()}>
+          <Menu>
+            <Menu.Trigger as={FieldButton} class="ps-field-240" aria-label={`${props.field.label}: ${props.field.options?.find((option) => option.value === props.value)?.label ?? String(props.value ?? "")}`}>
+              {props.field.options?.find((option) => option.value === props.value)?.label ?? (String(props.value ?? "") || "Not set")}
+            </Menu.Trigger>
+            <Menu.Content label={props.field.label} width={260}>
+              <For each={props.field.options ?? []}>
+                {(option) => (
+                  <Menu.Item hint={option.value === props.value ? <Check size={14} /> : undefined} onSelect={() => props.onChange(option.value)}>
+                    {option.label}
+                  </Menu.Item>
+                )}
+              </For>
+            </Menu.Content>
+          </Menu>
+        </SettingsRow>
+      </Match>
+      <Match when={props.field.type === "textarea"}>
+        <SettingsRow label={props.field.label} help={help()} for={id}>
+          <TextArea id={id} class="mono" rows={4} spellcheck={false} value={String(props.value ?? "")} onInput={(event) => props.onChange(event.currentTarget.value)} />
+        </SettingsRow>
+      </Match>
+      <Match when={true}>
+        <SettingsRow label={props.field.label} help={help()} for={id}>
+          <TextInput
+            id={id}
+            class={props.field.type === "number" ? "ag-num" : "mono"}
+            type={isSecretField(props.field) ? "password" : "text"}
+            inputmode={props.field.type === "number" ? "decimal" : undefined}
+            spellcheck={false}
+            autocomplete={isSecretField(props.field) ? "new-password" : "off"}
+            placeholder={isSecretField(props.field) && props.saved ? "Saved. Type a new value to replace it" : props.field.default !== undefined && props.field.default !== "" ? String(props.field.default) : undefined}
+            value={String(props.value ?? "")}
+            onInput={(event) => props.onChange(event.currentTarget.value)}
+          />
+        </SettingsRow>
+      </Match>
+    </Switch>
   );
 }
 

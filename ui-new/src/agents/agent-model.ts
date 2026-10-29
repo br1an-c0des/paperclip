@@ -361,6 +361,8 @@ export type RuntimeDraft = {
   continueAttempts: string;
   continueDelaySec: string;
   providerTrace: boolean;
+  /** The AI connection binding as canonical JSON, or "" for the harness's own sign-in. */
+  connection: string;
   command: string;
   extraArgs: string;
   promptTemplate: string;
@@ -453,10 +455,17 @@ export function runtimeDraft(agent: Pick<Agent, "adapterType" | "adapterConfig" 
     continueAttempts: String(num(continuation.maxAttempts, 2)),
     continueDelaySec: String(Math.round(num(continuation.delayMs, 1000) / 1000)),
     providerTrace: record(runtime.debug).providerTrace === "raw",
+    connection: bindingText(runtime.aiConnection),
     command: typeof config.command === "string" ? config.command : "",
     extraArgs: argsText(config[argsKey(agent.adapterType)]),
     promptTemplate: typeof config.promptTemplate === "string" ? config.promptTemplate : "",
   };
+}
+
+/** An AI connection binding as canonical JSON (sorted keys), so equal bindings compare equal; "" for none. */
+export function bindingText(binding: unknown) {
+  if (!binding || typeof binding !== "object" || Array.isArray(binding)) return "";
+  return JSON.stringify(Object.fromEntries(Object.entries(binding as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))));
 }
 
 /** The fields that differ from the saved settings. */
@@ -503,11 +512,13 @@ export function buildRuntimePatch(
   agent: Pick<Agent, "adapterType" | "adapterConfig" | "runtimeConfig" | "defaultEnvironmentId">,
   draft: RuntimeDraft,
   base: RuntimeDraft = runtimeDraft(agent),
+  /** Harness settings to merge into the adapter config (harness-model.ts `extrasConfig`); undefined clears one. */
+  extraConfig: Record<string, unknown> = {},
 ): Record<string, unknown> | null {
   const changed = new Set(runtimeChanges(base, draft));
-  if (changed.size === 0) return null;
+  if (changed.size === 0 && Object.keys(extraConfig).length === 0) return null;
   const patch: Record<string, unknown> = {};
-  const config: Record<string, unknown> = {};
+  const config: Record<string, unknown> = { ...extraConfig };
   const effortKey = runtimeEffortKey(agent);
 
   if (changed.has("model")) config.model = draft.model.trim() || undefined;
@@ -542,8 +553,12 @@ export function buildRuntimePatch(
       delayMs: Number(draft.continueDelaySec) * 1000,
     };
   }
-  if (Object.keys(heartbeat).length > 0 || changed.has("providerTrace")) {
+  if (Object.keys(heartbeat).length > 0 || changed.has("providerTrace") || changed.has("connection")) {
     const runtime: Record<string, unknown> = { ...existingRuntime };
+    if (changed.has("connection")) {
+      if (draft.connection) runtime.aiConnection = JSON.parse(draft.connection) as unknown;
+      else delete runtime.aiConnection;
+    }
     if (Object.keys(heartbeat).length > 0) runtime.heartbeat = { ...existingHeartbeat, ...heartbeat };
     if (changed.has("providerTrace")) {
       const debug = omitUndefined({ ...record(existingRuntime.debug), providerTrace: draft.providerTrace ? "raw" : undefined });
@@ -692,6 +707,24 @@ export function agentBudgetRequests(agentId: string, policies: readonly BudgetPo
 // Skills
 
 /** The agent's desired skills with one added or removed; pinned versions stay as they are. */
+/**
+ * The desired skills with one skill pinned to a release (`versionId`), or back on the live skill
+ * (null). Pinning a skill that isn't listed adds it, as the old picker does for the core skill.
+ */
+export function skillPin(desired: readonly { key: string; versionId: string | null }[], key: string, versionId: string | null) {
+  const listed = desired.some((entry) => entry.key === key);
+  const next = desired.map((entry) => (entry.key === key ? { key, versionId } : { ...entry }));
+  return listed || !versionId ? next : [...next, { key, versionId }];
+}
+
+/** "V7, Roster champion · released 2026-07-21": a skill release in the picker. */
+export function releaseLabel(release: { releaseName: string | null; label: string | null; releaseId: string | null; releasedAt: Date | string | null }) {
+  const name = (release.releaseName ?? release.label ?? release.releaseId ?? "Release").replace(" — ", ", ");
+  if (!release.releasedAt) return name;
+  const raw = typeof release.releasedAt === "string" ? release.releasedAt : release.releasedAt.toISOString();
+  return `${name} · released ${/^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : raw.slice(0, 10)}`;
+}
+
 export function skillToggle(desired: readonly { key: string; versionId: string | null }[], key: string, on: boolean) {
   const rest = desired.filter((entry) => entry.key !== key);
   if (!on) return rest.map((entry) => ({ ...entry }));
@@ -757,4 +790,61 @@ export function runUsage(runs: readonly RunSummary[] | undefined) {
     if (run.status === "failed" || run.status === "timed_out") failed += 1;
   }
   return { count: list.length, open: list.filter((run) => OPEN_RUN.has(run.status)).length, failed, input, cached, output, costUsd };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Origin
+
+/**
+ * Who created the agent, as the old overview names them (ui/src/lib/agent-creator.ts): a person
+ * from the directory, the board, or a former member. Null when nobody is recorded.
+ */
+export function creatorLabel(
+  agent: Pick<Agent, "createdByUserId">,
+  users: readonly { principalId: string; user: { name: string | null; email: string | null } | null }[] | undefined,
+): string | null {
+  const id = agent.createdByUserId;
+  if (!id) return null;
+  if (id === "local-board") return "the board";
+  if (!users) return null;
+  const found = users.find((entry) => entry.principalId === id);
+  if (!found) return "a former member";
+  return found.user?.name?.trim() || found.user?.email || "a person";
+}
+
+// ---------------------------------------------------------------------------------------------
+// Comparing revisions
+
+/** One setting that differs between two saved configurations, by its dotted path. */
+export type ConfigDifference = { path: string; before: unknown; after: unknown };
+
+function flatten(value: unknown, prefix: string, out: Map<string, unknown>) {
+  if (value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length > 0) {
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) flatten(entry, prefix ? `${prefix}.${key}` : key, out);
+    return;
+  }
+  if (prefix) out.set(prefix, value);
+}
+
+/**
+ * The settings that differ between two configuration snapshots (a revision's `afterConfig`),
+ * flattened to dotted paths such as `adapterConfig.model`, sorted by path. Arrays and empty
+ * objects compare whole.
+ */
+export function configDifferences(before: Record<string, unknown>, after: Record<string, unknown>): ConfigDifference[] {
+  const a = new Map<string, unknown>();
+  const b = new Map<string, unknown>();
+  flatten(before, "", a);
+  flatten(after, "", b);
+  return [...new Set([...a.keys(), ...b.keys()])]
+    .sort()
+    .filter((path) => JSON.stringify(a.get(path)) !== JSON.stringify(b.get(path)))
+    .map((path) => ({ path, before: a.get(path), after: b.get(path) }));
+}
+
+/** A value in a revision comparison: "Not set", the string itself, or compact JSON. */
+export function configValueText(value: unknown) {
+  if (value === undefined || value === null || value === "") return "Not set";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value);
 }

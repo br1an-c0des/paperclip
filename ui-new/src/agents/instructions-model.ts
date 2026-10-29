@@ -1,8 +1,10 @@
-import type { AgentInstructionCandidate, AgentInstructionsFileSummary } from "@paperclipai/shared";
+import type { AgentInstructionCandidate, AgentInstructionsBundle, AgentInstructionsFileSummary } from "@paperclipai/shared";
+import type { InstructionsBundleUpdate } from "@/api/agents";
 
 /*
  * The Instructions section's pure parts (board 27): the file list as a tree with the entry file
- * first, a line diff for a change a run suggested, and the checks for a new file's path.
+ * first, a line diff for a change a run suggested, the checks for a new file's path, and the bundle
+ * settings' draft.
  */
 
 export type DiffLine = { kind: "same" | "add" | "remove"; text: string };
@@ -109,6 +111,31 @@ export function newFileProblem(path: string, existing: readonly { path: string }
   if (!/\.(md|markdown|txt|json|ya?ml)$/i.test(value)) return "Use a text file: .md, .txt, .json or .yaml.";
   if (existing.some((file) => file.path === value)) return `${value} already exists.`;
   return null;
+}
+
+export type BundleDraft = { mode: "managed" | "external"; rootPath: string; entryFile: string };
+
+/** The bundle settings as saved. A managed bundle's folder is Paperclip's own. */
+export function bundleDraft(bundle: Pick<AgentInstructionsBundle, "mode" | "rootPath" | "managedRootPath" | "entryFile">): BundleDraft {
+  const mode = bundle.mode ?? "managed";
+  return { mode, rootPath: mode === "external" ? (bundle.rootPath ?? "") : bundle.managedRootPath, entryFile: bundle.entryFile || "AGENTS.md" };
+}
+
+/** Why the draft can't be saved, or null. An external folder is an absolute path; the entry file is relative. */
+export function bundleProblem(draft: BundleDraft): string | null {
+  if (draft.mode === "external" && !/^(\/|[A-Za-z]:[\\/]|~\/)/.test(draft.rootPath.trim())) return "Give the folder as an absolute path, such as /srv/agents/prompts.";
+  const entry = draft.entryFile.trim();
+  if (!entry) return "Name the entry file, such as AGENTS.md.";
+  if (entry.startsWith("/") || entry.split("/").some((part) => part === ".." || part === "")) return "The entry file is a path inside the folder.";
+  return null;
+}
+
+/** The `PATCH /agents/:id/instructions-bundle` body, or null when nothing changed. */
+export function bundleUpdate(saved: BundleDraft, draft: BundleDraft): InstructionsBundleUpdate | null {
+  const entryFile = draft.entryFile.trim();
+  const rootPath = draft.rootPath.trim();
+  if (draft.mode === saved.mode && entryFile === saved.entryFile && (draft.mode === "managed" || rootPath === saved.rootPath)) return null;
+  return { mode: draft.mode, rootPath: draft.mode === "external" ? rootPath : null, entryFile };
 }
 
 /** Suggested changes a person can act on: the per-run preserved edits, not whole-folder failures. */

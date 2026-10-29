@@ -430,6 +430,41 @@ a.ps-list-meta {
   min-width: 0;
 }
 
+/* A workspace's commands JSON, folded under the form's fields. */
+.ps-commands {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ps-commands-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ps-commands-toggle[aria-expanded="false"] svg {
+  transform: rotate(-90deg);
+}
+
+.ps-commands-json {
+  min-height: 220px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+
 .ps-popover-form {
   display: flex;
   flex-direction: column;

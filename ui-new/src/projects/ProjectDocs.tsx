@@ -39,6 +39,8 @@ import "./ProjectDocs.css";
  *   documents or files yet, so it says so instead of offering New doc and Upload.
  * - A document opens in the document viewer and editor, over the page. An attachment or output with
  *   a file opens the file in a new tab; one without opens its task.
+ * - On a phone (M13) the filters scroll sideways, each task's head keeps its ID, title and count,
+ *   and its items are rows with Open task beneath them (ProjectDocs.css).
  */
 
 type Tasks = ReturnType<typeof useTaskList>;
@@ -222,7 +224,13 @@ function GroupCard(props: {
         <Show when={props.group.status}>
           {(status) => <span class={`pdocs-status pdocs-status--${status()}`}>{STATUS_META[status()].label}</span>}
         </Show>
-        <Show when={assignee()}>{(agent) => <AgentAvatar agent={agent()} size={24} ring={false} label={agent().name} />}</Show>
+        <Show when={assignee()}>
+          {(agent) => (
+            <span class="pdocs-assignee">
+              <AgentAvatar agent={agent()} size={24} ring={false} label={agent().name} />
+            </span>
+          )}
+        </Show>
         <span class="cap pdocs-count">{plural(props.group.count)}</span>
         <button type="button" class="pdocs-link" onClick={() => props.onOpenTask()}>
           Open task
@@ -235,6 +243,10 @@ function GroupCard(props: {
             <p class="cap pdocs-more">Loading the rest…</p>
           </Show>
         </div>
+        {/* On a phone (M13) the head keeps only the task and its count; Open task sits under the items. */}
+        <button type="button" class="pdocs-link pdocs-link--foot" onClick={() => props.onOpenTask()}>
+          Open task
+        </button>
       </Show>
     </div>
   );

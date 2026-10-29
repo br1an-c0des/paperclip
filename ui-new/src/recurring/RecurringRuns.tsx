@@ -1,13 +1,16 @@
-import type { RoutineDetail, RoutineVariable } from "@paperclipai/shared";
+import type { Project, RoutineDetail, RoutineVariable } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Braces, CalendarClock, Check, ChevronDown, Play, Webhook } from "lucide-solid";
+import { Braces, CalendarClock, Check, ChevronDown, GitBranch, Play, Server, Webhook } from "lucide-solid";
 import { createMemo, createSignal, For, Show, type JSX } from "solid-js";
 import { activeAgents } from "@/api/agents";
+import { environmentsApi } from "@/api/environments";
 import { issuePath } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { routinesApi } from "@/api/routines";
+import { taskActionsApi } from "@/api/task-actions";
 import { useCompany } from "@/lib/company";
-import { useAgentsQuery } from "@/lib/company-data";
+import { useAgentsQuery, useExperimentalSettingsQuery, useProjectsQuery } from "@/lib/company-data";
+import { workspaceChoiceAvailable, type ReusedWorkspace, type WorkspaceMode } from "@/tasks/new-task";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { TextArea, TextInput } from "@/ui/Field";
@@ -15,6 +18,7 @@ import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
+import { environmentChoiceAvailable, projectEnvironment, runWorkspacePayload } from "./details-model";
 import { refreshRecurring } from "./queries";
 import { filterRuns, RUN_SOURCE_LABEL, runOutcome, type RunFilter, type RunSource } from "./recurring-model";
 import { formatFire } from "./schedule";
@@ -23,8 +27,16 @@ import { formatFire } from "./schedule";
  * The recurring task's runs (board R3): each run's time, what started it (schedule, webhook, API,
  * Run now) and how it turned out: the task it made and that task's status, or skipped, added to the
  * open one, or failed with the reason. A filter for all runs, the ones that made a task, and the
- * ones that didn't. Run now takes the inputs and who to assign (`POST /routines/:id/run`).
+ * ones that didn't. Run now takes the inputs and who to assign (`POST /routines/:id/run`), and, as
+ * the old Run now dialog does, where the run works: the project's checkout, a new worktree or another
+ * task's (when the instance and the project have execution workspaces on), and the environment
+ * (when the instance has environments on). Routines don't store these, so each run picks them.
  */
+
+const WORKSPACES: { value: Exclude<WorkspaceMode, "reuse_existing">; label: string; description: string }[] = [
+  { value: "shared_workspace", label: "Shared workspace", description: "The project's main checkout" },
+  { value: "isolated_workspace", label: "New worktree", description: "A fresh branch just for this run" },
+];
 
 const SOURCE_ICON: Record<RunSource, () => JSX.Element> = {
   schedule: () => <CalendarClock size={14} aria-hidden="true" />,
@@ -133,6 +145,16 @@ export function RunNowForm(props: { routine: RoutineDetail; onDone: () => void; 
     Object.fromEntries(props.routine.variables.map((variable) => [variable.name, variable.defaultValue == null ? "" : String(variable.defaultValue)])),
   );
   const [agentId, setAgentId] = createSignal<string | null>(props.routine.assigneeAgentId);
+  const projects = useProjectsQuery();
+  const settings = useExperimentalSettingsQuery();
+  const project = () => projects.data?.find((candidate) => candidate.id === props.routine.projectId) ?? null;
+  const showWorkspace = () => workspaceChoiceAvailable(project(), settings.data?.enableIsolatedWorkspaces === true);
+  const showEnvironment = () => environmentChoiceAvailable(project(), settings.data?.enableEnvironments === true);
+  const [workspace, setWorkspace] = createSignal<WorkspaceMode>(
+    project()?.executionWorkspacePolicy?.defaultMode === "isolated_workspace" ? "isolated_workspace" : "shared_workspace",
+  );
+  const [reused, setReused] = createSignal<ReusedWorkspace | null>(null);
+  const [environmentId, setEnvironmentId] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const agentList = createMemo(() => activeAgents(agents.data));
@@ -142,6 +164,7 @@ export function RunNowForm(props: { routine: RoutineDetail; onDone: () => void; 
   const run = async () => {
     if (missing().length > 0) return setError(`Fill in ${missing().join(", ")}.`);
     if (!agentId()) return setError("Pick an agent to run it.");
+    if (showWorkspace() && workspace() === "reuse_existing" && !reused()) return setError("Pick the worktree to reuse.");
     setError(null);
     setBusy(true);
     try {
@@ -154,6 +177,7 @@ export function RunNowForm(props: { routine: RoutineDetail; onDone: () => void; 
         source: "manual",
         ...(Object.keys(variables).length > 0 ? { variables } : {}),
         ...(agentId() !== props.routine.assigneeAgentId ? { assigneeAgentId: agentId() } : {}),
+        ...runWorkspacePayload(project(), { workspace: workspace(), reused: reused(), environmentId: showEnvironment() ? environmentId() : null }, { workspaces: showWorkspace() }),
       });
       refreshRecurring(client, company().id, true);
       pushToast({
@@ -238,6 +262,30 @@ export function RunNowForm(props: { routine: RoutineDetail; onDone: () => void; 
           </Menu.Content>
         </Menu>
       </div>
+      <Show when={showWorkspace() && project()}>
+        {(found) => (
+          <div class="rpn-runnow-row">
+            <span>Workspace</span>
+            <RunWorkspaceMenu
+              projectId={found().id}
+              value={workspace()}
+              reused={reused()}
+              onPick={(value, workspace) => {
+                setWorkspace(value);
+                setReused(workspace ?? null);
+              }}
+            />
+          </div>
+        )}
+      </Show>
+      <Show when={showEnvironment() && project()}>
+        {(found) => (
+          <div class="rpn-runnow-row">
+            <span>Environment</span>
+            <RunEnvironmentMenu project={found()} value={environmentId()} onPick={setEnvironmentId} />
+          </div>
+        )}
+      </Show>
       <Show when={error()}>
         <p class="rpn-error" role="alert">
           {error()}
@@ -253,5 +301,103 @@ export function RunNowForm(props: { routine: RoutineDetail; onDone: () => void; 
         </Button>
       </div>
     </div>
+  );
+}
+
+/** Where the run works: the project's checkout, a new worktree, or another task's worktree to reuse. */
+function RunWorkspaceMenu(props: {
+  projectId: string;
+  value: WorkspaceMode;
+  reused: ReusedWorkspace | null;
+  onPick: (value: WorkspaceMode, reused?: ReusedWorkspace) => void;
+}) {
+  const company = useCompany();
+  const [open, setOpen] = createSignal(false);
+  const reusable = createQuery(() => ({
+    queryKey: ["execution-workspaces", company().id, "reusable", props.projectId],
+    queryFn: ({ signal }) => taskActionsApi.reusableWorkspaces(company().id, { projectId: props.projectId }, signal),
+    enabled: open(),
+    retry: false,
+  }));
+  const label = () =>
+    props.value === "reuse_existing"
+      ? props.reused
+        ? `Reuse ${props.reused.name}`
+        : "Reuse a worktree"
+      : (WORKSPACES.find((option) => option.value === props.value)?.label ?? "Workspace");
+  return (
+    <Menu open={open()} onOpenChange={setOpen}>
+      <Menu.Trigger class="field rpn-assign" aria-label={`Workspace: ${label()}`}>
+        <GitBranch size={14} aria-hidden="true" />
+        <span class="field-value">{label()}</span>
+        <ChevronDown size={14} aria-hidden="true" class="field-caret" />
+      </Menu.Trigger>
+      <Menu.Content label="Workspace" width={300}>
+        <Menu.Group label="Workspace">
+          <For each={WORKSPACES}>
+            {(option) => (
+              <Menu.Item onSelect={() => props.onPick(option.value)} description={option.description} hint={option.value === props.value ? <Check size={14} /> : undefined}>
+                {option.label}
+              </Menu.Item>
+            )}
+          </For>
+        </Menu.Group>
+        <Menu.Group label="Reuse another task's worktree">
+          <For
+            each={reusable.data ?? []}
+            fallback={<Menu.Item disabled>{reusable.isLoading ? "Loading worktrees…" : reusable.isError ? "Couldn't load the worktrees" : "None to reuse"}</Menu.Item>}
+          >
+            {(entry) => (
+              <Menu.Item
+                description={entry.branchName && entry.branchName !== entry.name ? entry.name : undefined}
+                hint={props.value === "reuse_existing" && props.reused?.id === entry.id ? <Check size={14} /> : undefined}
+                onSelect={() =>
+                  props.onPick("reuse_existing", { id: entry.id, name: entry.branchName ?? entry.name, mode: entry.mode, projectWorkspaceId: entry.projectWorkspaceId ?? null })
+                }
+              >
+                {entry.branchName ?? entry.name}
+              </Menu.Item>
+            )}
+          </For>
+        </Menu.Group>
+      </Menu.Content>
+    </Menu>
+  );
+}
+
+/** The environment the run works in: the project's, or another active one. */
+function RunEnvironmentMenu(props: { project: Project; value: string | null; onPick: (environmentId: string | null) => void }) {
+  const company = useCompany();
+  const environments = createQuery(() => ({
+    queryKey: queryKeys.projectSettings.environments(company().id),
+    queryFn: ({ signal }) => environmentsApi.list(company().id, signal),
+  }));
+  const fallback = () => projectEnvironment(props.project, environments.data);
+  const chosen = () => environments.data?.find((entry) => entry.id === props.value);
+  const label = () => (props.value ? (chosen()?.name ?? "An environment") : `Project default${fallback() ? ` · ${fallback()!.name}` : ""}`);
+  return (
+    <Menu>
+      <Menu.Trigger class="field rpn-assign" aria-label={`Environment: ${label()}`}>
+        <Server size={14} aria-hidden="true" />
+        <span class="field-value">{label()}</span>
+        <ChevronDown size={14} aria-hidden="true" class="field-caret" />
+      </Menu.Trigger>
+      <Menu.Content label="Environment" width={300}>
+        <Menu.Item onSelect={() => props.onPick(null)} description="Where the project's tasks run" hint={props.value ? undefined : <Check size={14} />}>
+          Project default
+        </Menu.Item>
+        <Menu.Separator />
+        <For
+          each={(environments.data ?? []).filter((entry) => entry.status === "active")}
+          fallback={<p class="nt-menu-note">{environments.isLoading ? "Loading environments…" : "No other environments."}</p>}
+        >
+          {(entry) => (
+            <Menu.Item onSelect={() => props.onPick(entry.id)} description={entry.description ?? entry.driver} hint={props.value === entry.id ? <Check size={14} /> : undefined}>
+              {entry.name}
+            </Menu.Item>
+          )}
+        </For>
+      </Menu.Content>
+    </Menu>
   );
 }

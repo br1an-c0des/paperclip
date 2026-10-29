@@ -1,7 +1,7 @@
 import type { Project, ProjectRepository, ProjectWorkspace, WorkspaceRuntimeService } from "@paperclipai/shared";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Book, Check, FolderOpen, Lock, Plus, Search, X } from "lucide-solid";
-import { batch, createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
+import { Book, Check, ChevronDown, FolderOpen, Lock, Plus, Search, X } from "lucide-solid";
+import { batch, createEffect, createMemo, createSignal, createUniqueId, For, Match, on, Show, Switch } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { environmentsApi } from "@/api/environments";
 import { projectsApi } from "@/api/projects";
@@ -11,7 +11,7 @@ import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { WorkspacePlugins } from "@/plugins/WorkspacePlugins";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { FieldButton, SettingsCard, SettingsRow, TextInput } from "@/ui/Field";
+import { FieldButton, SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { Popover } from "@/ui/Popover";
 import { Segmented } from "@/ui/Segmented";
@@ -35,6 +35,7 @@ import {
   type WorkspaceDraft,
 } from "./settings-model";
 import { CardNote, failure, FootError, refreshProject, useProjectSaver, useSaveRunner } from "./shared";
+import { COMMANDS_EXAMPLE, commandEntries, commandsRequest, commandsText, parseCommands } from "./workspace-commands";
 
 /*
  * Code and workspaces (board 11): the project's repositories and local folder, its workspaces with
@@ -44,7 +45,9 @@ import { CardNote, failure, FootError, refreshProject, useProjectSaver, useSaveR
  *   the first is the primary). Ones added by URL before the connection existed are listed and edited
  *   as workspaces. The local folder is the primary workspace's folder, as in the old UI.
  * - Workspaces (`/projects/:id/workspaces`): add, edit, remove, make one the default (primary), and
- *   start, stop or restart their services. A workspace's runtime command JSON stays in the old UI.
+ *   start, stop or restart their services. A workspace's commands JSON (its services and jobs,
+ *   `runtimeConfig.workspaceRuntime`) is edited in the workspace's form, checked before saving
+ *   (workspace-commands.ts).
  * - Task checkouts follow the instance's `enableIsolatedWorkspaces` (decision 12), and the folder
  *   paths hide under `enableManagedSandboxOnly`, as the old UI does.
  */
@@ -332,11 +335,15 @@ function WorkspacesCard(props: { project: Project; hideHostPaths: boolean }) {
   const [removing, setRemoving] = createSignal<ProjectWorkspace | null>(null);
   const workspaces = () => props.project.workspaces ?? [];
 
-  const create = async (draft: WorkspaceDraft) => {
-    if (await saver.run(() => projectsApi.createWorkspace(props.project.id, newWorkspacePayload(draft)), "Couldn't add the workspace.")) setEditing(null);
+  const create = async (draft: WorkspaceDraft, commands: string) => {
+    const extra = commandsRequest(undefined, commands);
+    const payload = { ...newWorkspacePayload(draft), ...(extra.kind === "set" ? extra.data : {}) };
+    if (await saver.run(() => projectsApi.createWorkspace(props.project.id, payload), "Couldn't add the workspace.")) setEditing(null);
   };
-  const update = async (workspace: ProjectWorkspace, draft: WorkspaceDraft) => {
-    const patch = workspacePatch(workspace, draft);
+  const update = async (workspace: ProjectWorkspace, draft: WorkspaceDraft, commands: string) => {
+    const extra = commandsRequest(workspace, commands);
+    const fields = workspacePatch(workspace, draft);
+    const patch = fields || extra.kind === "set" ? { ...fields, ...(extra.kind === "set" ? extra.data : {}) } : null;
     if (!patch) return setEditing(null);
     if (await saver.run(() => projectsApi.updateWorkspace(props.project.id, workspace.id, patch), "Couldn't save the workspace.")) setEditing(null);
   };
@@ -380,12 +387,28 @@ function WorkspacesCard(props: { project: Project; hideHostPaths: boolean }) {
                   />
                 }
               >
-                <WorkspaceForm initial={workspaceDraft(workspace)} hideHostPaths={props.hideHostPaths} busy={saver.state() === "saving"} submitLabel="Save workspace" onCancel={() => setEditing(null)} onSubmit={(draft) => void update(workspace, draft)} />
+                <WorkspaceForm
+                  initial={workspaceDraft(workspace)}
+                  initialCommands={commandsText(workspace)}
+                  hideHostPaths={props.hideHostPaths}
+                  busy={saver.state() === "saving"}
+                  submitLabel="Save workspace"
+                  onCancel={() => setEditing(null)}
+                  onSubmit={(draft, commands) => void update(workspace, draft, commands)}
+                />
               </Show>
             )}
           </For>
           <Show when={editing() === "new"}>
-            <WorkspaceForm initial={workspaceDraft()} hideHostPaths={props.hideHostPaths} busy={saver.state() === "saving"} submitLabel="Add workspace" onCancel={() => setEditing(null)} onSubmit={(draft) => void create(draft)} />
+            <WorkspaceForm
+              initial={workspaceDraft()}
+              initialCommands=""
+              hideHostPaths={props.hideHostPaths}
+              busy={saver.state() === "saving"}
+              submitLabel="Add workspace"
+              onCancel={() => setEditing(null)}
+              onSubmit={(draft, commands) => void create(draft, commands)}
+            />
           </Show>
           <Show when={workspaces().length === 0 && editing() !== "new"}>
             <p class="ps-list-note">No workspaces. Agents work in the folder Paperclip manages for the project.</p>
@@ -471,6 +494,11 @@ function WorkspaceRow(props: { project: Project; workspace: ProjectWorkspace; hi
           {props.workspace.repoUrl}
         </a>
       </Show>
+      <Show when={commandEntries(props.workspace).length > 0}>
+        <span class="ps-muted-line">
+          Commands: {commandEntries(props.workspace).map((entry) => (entry.kind === "job" ? `${entry.name} (job)` : entry.name)).join(", ")}
+        </span>
+      </Show>
       <Show when={services().length > 0 || hasRuntime()}>
         <div class="ps-list">
           <For each={services()}>
@@ -526,9 +554,22 @@ function WorkspaceRow(props: { project: Project; workspace: ProjectWorkspace; hi
   );
 }
 
-function WorkspaceForm(props: { initial: WorkspaceDraft; hideHostPaths: boolean; busy: boolean; submitLabel: string; onCancel: () => void; onSubmit: (draft: WorkspaceDraft) => void }) {
+function WorkspaceForm(props: {
+  initial: WorkspaceDraft;
+  /** The commands JSON as text; empty for none. */
+  initialCommands: string;
+  hideHostPaths: boolean;
+  busy: boolean;
+  submitLabel: string;
+  onCancel: () => void;
+  onSubmit: (draft: WorkspaceDraft, commands: string) => void;
+}) {
   const [draft, setDraft] = createStore<WorkspaceDraft>({ ...props.initial });
+  const [commands, setCommands] = createSignal(props.initialCommands);
+  const [commandsOpen, setCommandsOpen] = createSignal(props.initialCommands !== "");
+  const [commandsProblem, setCommandsProblem] = createSignal<string | null>(null);
   const [problem, setProblem] = createSignal<string | null>(null);
+  const commandsId = createUniqueId();
   const field = (key: keyof WorkspaceDraft, label: string, placeholder: string, mono = true) => (
     <label class="ps-form-field">
       <span class="field-label">{label}</span>
@@ -539,8 +580,14 @@ function WorkspaceForm(props: { initial: WorkspaceDraft; hideHostPaths: boolean;
     event.preventDefault();
     const found = workspaceProblem(draft);
     if (found) return setProblem(found);
+    const parsed = parseCommands(commands());
+    if (!parsed.ok) {
+      setCommandsOpen(true);
+      setCommandsProblem(parsed.error);
+      return setProblem("Fix the workspace commands before saving.");
+    }
     setProblem(null);
-    props.onSubmit({ ...draft });
+    props.onSubmit({ ...draft }, commands());
   };
   return (
     <form class="ps-goal-form ps-workspace-form" onSubmit={submit} onKeyDown={(event) => event.key === "Escape" && props.onCancel()}>
@@ -552,6 +599,44 @@ function WorkspaceForm(props: { initial: WorkspaceDraft; hideHostPaths: boolean;
         {field("defaultRef", "Default ref", "origin/main")}
         {field("setupCommand", "Setup command", "Runs when the workspace is set up")}
         {field("cleanupCommand", "Cleanup command", "Runs before a task checkout is torn down")}
+      </div>
+      <div class="ps-commands">
+        <button type="button" class="ps-commands-toggle" aria-expanded={commandsOpen()} aria-controls={commandsId} onClick={() => setCommandsOpen(!commandsOpen())}>
+          <ChevronDown size={14} aria-hidden="true" />
+          Workspace commands (JSON)
+        </button>
+        <Show when={commandsOpen()}>
+          <div id={commandsId} class="ps-form-field">
+            <span class="fhelp">
+              The services and jobs agents can run here: Paperclip lists them under the workspace and task checkouts inherit them. Use <code>commands</code> entries with a{" "}
+              <code>kind</code> of <code>service</code> or <code>job</code>; older <code>services</code> lists still work. Leave it empty for none.
+            </span>
+            <TextArea
+              class="mono ps-commands-json"
+              aria-label="Workspace commands JSON"
+              aria-describedby={commandsProblem() ? `${commandsId}-error` : undefined}
+              invalid={commandsProblem() !== null}
+              spellcheck={false}
+              rows={12}
+              placeholder={COMMANDS_EXAMPLE}
+              value={commands()}
+              onInput={(event) => {
+                setCommands(event.currentTarget.value);
+                setCommandsProblem(null);
+                setProblem(null);
+              }}
+              onBlur={() => {
+                const parsed = parseCommands(commands());
+                setCommandsProblem(parsed.ok ? null : parsed.error);
+              }}
+            />
+            <Show when={commandsProblem()}>
+              <span id={`${commandsId}-error`} class="field-error" role="alert">
+                {commandsProblem()}
+              </span>
+            </Show>
+          </div>
+        </Show>
       </div>
       <div class="ps-form-foot">
         <Show when={problem()}>

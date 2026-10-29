@@ -509,6 +509,118 @@ a.pd-well-aside {
   }
 }
 
+.pd-more {
+  display: block;
+  padding: 12px 18px;
+  color: var(--run-fg);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+
+/*
+ * Phone (M12): the overview card opens up so its parts stack in the board's order: the brief flat
+ * on the ground, waiting on you, agents at work as rows, then the budget, stuck work and the code,
+ * each a card of its own. Agents' hover cards have no hover to open them; a row opens the agent.
+ */
+:root[data-viewport="phone"] .pd {
+  gap: 14px;
+}
+
+:root[data-viewport="phone"] .pd-overview,
+:root[data-viewport="phone"] .pd-wells {
+  display: contents;
+}
+
+:root[data-viewport="phone"] .pd-well--brief {
+  order: 1;
+  padding: 2px 4px 0;
+  background: none;
+}
+
+:root[data-viewport="phone"] .pd-waiting {
+  order: 2;
+}
+
+:root[data-viewport="phone"] .pd-crew {
+  order: 3;
+}
+
+:root[data-viewport="phone"] .pd-well--budget {
+  order: 4;
+}
+
+:root[data-viewport="phone"] .pd-stuck {
+  order: 5;
+}
+
+:root[data-viewport="phone"] .pd-well--code {
+  order: 6;
+}
+
+:root[data-viewport="phone"] .pd-well--budget,
+:root[data-viewport="phone"] .pd-well--code,
+:root[data-viewport="phone"] .pd-crew {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+:root[data-viewport="phone"] .pd-stuck {
+  padding: 14px 16px 6px;
+}
+
+:root[data-viewport="phone"] .pd-waiting-head h2 {
+  font-size: 17px;
+}
+
+:root[data-viewport="phone"] .pd-crew-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+:root[data-viewport="phone"] .pd-crew-col {
+  background: none;
+  border-top: 1px solid var(--row-line);
+  border-radius: 0;
+}
+
+:root[data-viewport="phone"] .pd-crew-col:first-child {
+  border-top: 0;
+}
+
+:root[data-viewport="phone"] .pd-crew-top {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 2px;
+  padding: 10px 0;
+  text-align: left;
+}
+
+:root[data-viewport="phone"] .pd-crew-av {
+  grid-row: 1 / span 2;
+}
+
+:root[data-viewport="phone"] .pd-crew-av img {
+  width: 40px;
+  height: 40px;
+}
+
+:root[data-viewport="phone"] .pd-crew-name {
+  justify-content: flex-start;
+}
+
+:root[data-viewport="phone"] .pd-crew-pop {
+  display: none;
+}
+
 /* The dashboard's header line (board 8): status, target date, visibility. */
 .project-facts {
   gap: 16px;

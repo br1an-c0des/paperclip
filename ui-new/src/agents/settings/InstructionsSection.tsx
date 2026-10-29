@@ -1,6 +1,6 @@
-import type { AgentDetail, AgentInstructionCandidate, AgentInstructionsFileDetail } from "@paperclipai/shared";
+import type { AgentDetail, AgentInstructionCandidate, AgentInstructionsBundle, AgentInstructionsFileDetail } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Download, File, Folder, History, Plus, Trash2 } from "lucide-solid";
+import { ChevronRight, Copy, Download, File, Folder, History, Plus, Trash2 } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
 import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
@@ -9,12 +9,13 @@ import { useCompany } from "@/lib/company";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { TextInput } from "@/ui/Field";
+import { SettingsRow, TextInput } from "@/ui/Field";
 import { Markdown } from "@/ui/Markdown";
 import { Popover } from "@/ui/Popover";
 import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
-import { actionableCandidates, bundleSize, diffHunks, diffSummary, fileRows, lineDiff, newFileProblem } from "../instructions-model";
+import { copyText } from "@/tasks/TaskActions";
+import { actionableCandidates, bundleDraft, bundleProblem, bundleSize, bundleUpdate, diffHunks, diffSummary, fileRows, lineDiff, newFileProblem } from "../instructions-model";
 import { dateTime, failure, SectionTitle, shortDate, useAdapters } from "../shared";
 
 /*
@@ -24,7 +25,11 @@ import { dateTime, failure, SectionTitle, shortDate, useAdapters } from "../shar
  *
  * Saving sends the base the edit started from (the entry file's revision, other files' content
  * hash), so an edit made elsewhere in the meantime comes back as a conflict instead of being
- * overwritten. Bundle settings (external folders, a different entry file) stay in the old UI.
+ * overwritten.
+ *
+ * Bundle settings, folded under the files: whether Paperclip keeps the files (managed) or they live
+ * in a folder on disk (external), that folder, and the entry file (`PATCH /agents/:id/instructions-bundle`).
+ * A legacy prompt template still in use can be turned off there too.
  */
 
 export function InstructionsSection(props: { agent: AgentDetail }) {
@@ -127,6 +132,7 @@ export function InstructionsSection(props: { agent: AgentDetail }) {
             </section>
           )}
         </Show>
+        <Show when={bundle.data}>{(found) => <BundleSettings agent={props.agent} bundle={found()} onEntryChanged={() => setSelected(null)} />}</Show>
       </Show>
     </>
   );
@@ -471,5 +477,132 @@ function Suggestion(props: { agent: AgentDetail; candidate: AgentInstructionCand
         </div>
       </Show>
     </section>
+  );
+}
+
+/** Where the files live and which is read first, folded under the files; and turning off a legacy prompt template. */
+function BundleSettings(props: { agent: AgentDetail; bundle: AgentInstructionsBundle; onEntryChanged: () => void }) {
+  const company = useCompany();
+  const client = useQueryClient();
+  const saved = createMemo(() => bundleDraft(props.bundle));
+  const [mode, setMode] = createSignal<"managed" | "external">(saved().mode);
+  const [rootPath, setRootPath] = createSignal(saved().mode === "external" ? saved().rootPath : "");
+  const [entryFile, setEntryFile] = createSignal(saved().entryFile);
+  const [busy, setBusy] = createSignal(false);
+  const [problem, setProblem] = createSignal<string | null>(null);
+  createEffect(
+    on(saved, (next) => {
+      setMode(next.mode);
+      setRootPath(next.mode === "external" ? next.rootPath : "");
+      setEntryFile(next.entryFile);
+    }, { defer: true }),
+  );
+  const draft = () => ({ mode: mode(), rootPath: mode() === "external" ? rootPath() : saved().rootPath, entryFile: entryFile() });
+  const update = () => bundleUpdate(saved(), draft());
+  const legacy = () => props.bundle.legacyPromptTemplateActive || props.bundle.legacyBootstrapPromptTemplateActive;
+
+  const send = async (body: Parameters<typeof agentsApi.updateInstructionsBundle>[1], done: string) => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      const next = await agentsApi.updateInstructionsBundle(props.agent.id, body, company().id);
+      client.setQueryData(queryKeys.agents.instructionsBundle(props.agent.id), next);
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.agents.instructionsBundle(props.agent.id) }),
+        client.invalidateQueries({ queryKey: queryKeys.agents.detail(props.agent.id), exact: true }),
+      ]);
+      if (body.entryFile && body.entryFile !== saved().entryFile) props.onEntryChanged();
+      pushToast({ tone: "success", title: done });
+    } catch (caught) {
+      setProblem(failure(caught, "Couldn't save the bundle settings."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const save = () => {
+    const found = bundleProblem(draft());
+    if (found) return setProblem(found);
+    const body = update();
+    if (body) void send(body, "Saved the bundle settings");
+  };
+  const copyPath = async () => {
+    try {
+      await copyText(saved().rootPath);
+      pushToast({ tone: "success", title: "Copied the folder path" });
+    } catch {
+      pushToast({ tone: "error", title: "Couldn't copy the path" });
+    }
+  };
+
+  return (
+    <details class="card ag-advanced" open={legacy() || undefined}>
+      <summary>
+        <span class="ag-rot" aria-hidden="true">
+          <ChevronRight size={14} />
+        </span>
+        <b>Bundle settings</b>
+        <span>{saved().mode === "external" ? `A folder on disk · ${saved().entryFile}` : `Kept by Paperclip · ${saved().entryFile}`}</span>
+      </summary>
+      <div class="settings-rows">
+        <SettingsRow label="Where the files live" help="Managed: Paperclip keeps them, with revisions. External: a folder on the server's disk that you manage.">
+          <Segmented
+            label="Where the files live"
+            options={[
+              { value: "managed", label: "Managed" },
+              { value: "external", label: "External folder" },
+            ]}
+            value={mode()}
+            onChange={(value) => setMode(value as "managed" | "external")}
+          />
+        </SettingsRow>
+        <SettingsRow label="Folder" help={mode() === "external" ? "An absolute path on the machine Paperclip runs on." : "Paperclip's own folder for this agent."} for="ag-bundle-root">
+          <Show
+            when={mode() === "external"}
+            fallback={
+              <div class="ps-inline">
+                <span class="mono ag-static-text ag-path" title={saved().rootPath}>
+                  {props.bundle.managedRootPath}
+                </span>
+                <button type="button" class="nt-icon nt-icon--small" aria-label="Copy the folder path" onClick={() => void copyPath()}>
+                  <Copy size={13} aria-hidden="true" />
+                </button>
+              </div>
+            }
+          >
+            <TextInput id="ag-bundle-root" class="mono" spellcheck={false} autocomplete="off" placeholder="/absolute/path/to/agent/prompts" value={rootPath()} onInput={(event) => setRootPath(event.currentTarget.value)} />
+          </Show>
+        </SettingsRow>
+        <SettingsRow label="Entry file" help="The file the agent reads first. Usually AGENTS.md." for="ag-bundle-entry">
+          <TextInput id="ag-bundle-entry" class="mono ps-field-240" spellcheck={false} autocomplete="off" value={entryFile()} onInput={(event) => setEntryFile(event.currentTarget.value)} />
+        </SettingsRow>
+        <Show when={legacy()}>
+          <SettingsRow label="Prompt template" help="An older setting that still sends its own text at the start of every run, next to these files.">
+            <div class="ps-stack">
+              <span class="fhelp ag-warn">
+                {props.bundle.legacyPromptTemplateActive ? "A legacy prompt template is still in use." : "A legacy bootstrap prompt is still in use."} Move what it says into {saved().entryFile}, then turn it off.
+              </span>
+              <Button size="compact" disabled={busy()} onClick={() => void send({ clearLegacyPromptTemplate: true }, "Turned off the legacy prompt template")}>
+                Turn off the prompt template
+              </Button>
+            </div>
+          </SettingsRow>
+        </Show>
+      </div>
+      <div class="ag-bundle-foot">
+        <Show when={problem()}>
+          <span class="nt-error" role="alert">
+            {problem()}
+          </span>
+        </Show>
+        <Show when={update()}>
+          <Button size="compact" variant="quiet" disabled={busy()} onClick={() => (setMode(saved().mode), setRootPath(saved().mode === "external" ? saved().rootPath : ""), setEntryFile(saved().entryFile), setProblem(null))}>
+            Discard
+          </Button>
+        </Show>
+        <Button size="compact" variant="primary" disabled={busy() || !update()} onClick={save}>
+          {busy() ? "Saving…" : "Save bundle settings"}
+        </Button>
+      </div>
+    </details>
   );
 }

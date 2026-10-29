@@ -217,7 +217,7 @@ export function EnvironmentSection(props: { project: Project; base: string }) {
 }
 
 /** Creates a company secret and hands it back, so a variable can point to it. */
-function NewSecret(props: { onCreated: (secret: { id: string; name: string }) => void }) {
+export function NewSecret(props: { onCreated: (secret: { id: string; name: string }) => void }) {
   const company = useCompany();
   const [open, setOpen] = createSignal(false);
   const [name, setName] = createSignal("");
