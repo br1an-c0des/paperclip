@@ -31,7 +31,7 @@ vi.mock("@/lib/company", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/session", () => ({
-  useSession: () => ({ isAuthenticatedMode: () => true, session: () => ({ user: { email: "board@example.test" } }) }),
+  useSession: () => ({ isAuthenticatedMode: () => true, session: () => ({ user: { email: "board@example.test" } }), youId: () => "user-1" }),
   useYouName: () => () => "Board Owner",
   useSignOut: () => async () => {},
 }));
@@ -124,6 +124,7 @@ describe("PhoneDock", () => {
     expect(screen.getByRole("group", { name: "Theme" })).toBeTruthy();
     expect((screen.getByRole("switch") as HTMLInputElement).disabled).toBe(true);
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /View profile/ }).getAttribute("href")).toBe("/TST/u/user-1");
 
     fireEvent.click(screen.getByRole("button", { name: "Back to projects" }));
     screen.getByRole("dialog", { name: "Switch project" });

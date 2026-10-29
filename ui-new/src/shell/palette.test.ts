@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterPalette, matchScore, searchHandOff, type PaletteCommand, type PaletteGroup } from "./palette";
+import { filterPalette, matchScore, quickFilterGroup, QUICK_FILTERS, searchHandOff, type PaletteCommand, type PaletteGroup } from "./palette";
 
 const command = (label: string, keywords?: string): PaletteCommand => ({ id: label, label, keywords, run: () => {} });
 
@@ -46,5 +46,17 @@ describe("searchHandOff", () => {
 
   it("offers plain Search everything with nothing typed", () => {
     expect(searchHandOff("", () => {}).commands[0]!.label).toBe("Search everything");
+  });
+});
+
+describe("quickFilterGroup", () => {
+  it("adds a filter to what's typed and leaves out ones already there", () => {
+    let query = "";
+    const group = quickFilterGroup("login", (next) => (query = next))!;
+    expect(group.commands.map((entry) => entry.label)).toEqual([...QUICK_FILTERS]);
+    group.commands[0]!.run();
+    expect(query).toBe("login assignee:me ");
+    expect(quickFilterGroup("assignee:me is:open", () => {})!.commands.map((entry) => entry.label)).toEqual(["updated:>7d"]);
+    expect(quickFilterGroup(QUICK_FILTERS.join(" "), () => {})).toBeNull();
   });
 });

@@ -55,3 +55,15 @@ describe("hasOpenDialog", () => {
     expect(hasOpenDialog(root)).toBe(true);
   });
 });
+
+describe("shortcuts on an open task", () => {
+  it("needs a task for y and g c, and a panel to toggle for ]", () => {
+    expect(resolveShortcut(key("["), idle)).toBe("toggle-nav");
+    expect(resolveShortcut(key("]"), idle)).toBeNull();
+    expect(resolveShortcut(key("]"), { ...idle, panelToggle: true })).toBe("toggle-panel");
+    expect(resolveShortcut(key("y"), idle)).toBeNull();
+    expect(resolveShortcut(key("y"), { ...idle, taskOpen: true })).toBe("archive-task");
+    expect(resolveShortcut(key("c"), { ...idle, goArmed: true, taskOpen: true })).toBe("focus-composer");
+    expect(resolveShortcut(key("c"), { ...idle, taskOpen: true })).toBe("new-task");
+  });
+});

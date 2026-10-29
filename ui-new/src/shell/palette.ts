@@ -54,6 +54,29 @@ export function searchHandOff(query: string, open: (query: string) => void): Pal
   };
 }
 
+/** The old palette's quick filters (ui/src/lib/search-query-parser.ts): Search's operators. */
+export const QUICK_FILTERS = ["assignee:me", "is:open", "updated:>7d"] as const;
+
+/**
+ * Quick filters: picking one adds the operator to what's typed and keeps the palette open, so the
+ * hand-off below takes it to the Search page, which reads it. Ones already typed are left out; with
+ * all of them typed, there's no group.
+ */
+export function quickFilterGroup(query: string, setQuery: (next: string) => void): PaletteGroup | null {
+  const typed = new Set(query.trim().split(/\s+/).filter(Boolean));
+  const left = QUICK_FILTERS.filter((chip) => !typed.has(chip));
+  if (left.length === 0) return null;
+  return {
+    title: "Quick filters",
+    commands: left.map((chip) => ({
+      id: `filter:${chip}`,
+      label: chip,
+      hint: "Add",
+      run: () => setQuery(query.trim() ? `${query.trim()} ${chip} ` : `${chip} `),
+    })),
+  };
+}
+
 /** The groups to show for a query, each filtered, ranked and capped; empty groups are dropped. */
 export function filterPalette(groups: PaletteGroup[], query: string): PaletteGroup[] {
   const searching = query.trim().length > 0;
