@@ -366,4 +366,18 @@ export const queryKeys = {
 
   /** The current Paperclip announcement for a signed-in person (src/shell/Announcements.tsx). */
   announcement: (userId: string) => ["announcements", "current", userId] as const,
+
+  /*
+   * Slice A (M7): the approvals history (under `["approvals", companyId]`, which answering a card and
+   * the live events refresh), a person's profile, the nav's recent tasks and your nav order.
+   */
+  approvals: {
+    list: (companyId: string) => ["approvals", companyId, "list"] as const,
+  },
+  userProfile: (companyId: string, slug: string) => ["user-profile", companyId, slug] as const,
+  recentTasks: (companyId: string, ids: readonly string[]) => ["issues", companyId, "summaries", ...ids] as const,
+  sidebarPreferences: {
+    companyOrder: (userId: string) => ["sidebar-preferences", "company-order", userId] as const,
+    projectOrder: (companyId: string, userId: string) => ["sidebar-preferences", "project-order", companyId, userId] as const,
+  },
 };

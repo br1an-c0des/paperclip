@@ -1,0 +1,244 @@
+/* The approval page and the approvals history (no board draws them; Capsule Stack cards and rows). */
+
+.apv-note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 22px;
+  color: var(--body);
+}
+
+.apv-note a,
+.apv-link {
+  color: var(--run-fg);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.apv-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* The request card on the left, its linked tasks on the right; stacked when main is narrow. */
+.apv-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+
+@container main (max-width: 860px) {
+  .apv-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.apv-main,
+.apv-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.apv-h {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.apv-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  background: var(--green-bg);
+  color: var(--green-fg);
+  border-color: transparent;
+}
+
+.apv-banner > div {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.apv-banner p {
+  color: var(--body);
+  font-size: 13px;
+}
+
+.apv-follow {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 18px;
+}
+
+.apv-follow-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+}
+
+.apv-follow-row + .apv-follow-row {
+  border-top: 1px solid var(--line);
+}
+
+.apv-follow-row > div {
+  flex: 1 1 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.apv-follow-row p {
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.apv-follow-row a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.apv-raw {
+  padding: 4px 8px;
+}
+
+.apv-raw-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: var(--r-inner);
+  background: none;
+  color: var(--body);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.apv-raw-toggle:hover {
+  background: var(--hover);
+}
+
+.apv-raw-toggle .mono {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.apv-raw-caret {
+  transition: transform 0.15s ease;
+}
+
+.apv-raw-toggle[aria-expanded="true"] .apv-raw-caret {
+  transform: rotate(90deg);
+}
+
+.apv-raw-body {
+  margin: 0 10px 10px;
+  padding: 12px 14px;
+  max-height: 420px;
+  overflow: auto;
+  border-radius: var(--r-inner);
+  background: var(--code);
+  color: var(--body);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.apv-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+}
+
+.apv-task-list,
+.apv-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.apv-task,
+.apv-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: var(--r-inner);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.apv-task:hover,
+.apv-row:hover {
+  background: var(--row-hover);
+}
+
+.apv-task .mono {
+  font-size: 12px;
+}
+
+.apv-task-title,
+.apv-row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.apv-hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.apv-history {
+  padding: 10px 12px;
+}
+
+.apv-history > p {
+  padding: 10px;
+}
+
+.apv-row-meta {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+@container main (max-width: 640px) {
+  .apv-row {
+    flex-wrap: wrap;
+  }
+
+  .apv-row-meta {
+    flex-basis: 100%;
+    padding-left: 16px;
+    white-space: normal;
+  }
+}
