@@ -1,5 +1,6 @@
+import type { Issue } from "@paperclipai/shared";
 import { createQuery, keepPreviousData } from "@tanstack/solid-query";
-import { createEffect, createMemo, createSignal, createUniqueId, For, on, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, on, onCleanup, Show, type JSX } from "solid-js";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
@@ -9,37 +10,17 @@ import { activeMention, insertMention, matchesQuery, type ActiveMention, type Me
 import "./Composer.css";
 
 /*
- * A plain Markdown text area with the composer's @-mentions (mentions.ts): typing "@" and a name
- * lists agents, people and tasks, and picking one writes the mention link. New task's description
- * uses it (`tasks/create`). The composer keeps its own copy of the picker, wired into its sending.
+ * The composer's @-mentions (mentions.ts) for other fields: typing "@" and a name lists agents,
+ * people and tasks, and picking one writes the mention link. MentionTextArea is a plain Markdown
+ * text area with them (New task's description, `tasks/create`); the document editor uses the
+ * candidates and the list with CodeMirror (src/documents/MarkdownEditor.tsx). The composer keeps its
+ * own copy of the picker, wired into its sending.
  */
 
-export function MentionTextArea(props: {
-  value: string;
-  onInput: (value: string) => void;
-  id?: string;
-  class?: string;
-  rows?: number;
-  placeholder?: string;
-  /** Leave this task out of the task matches, such as the task being edited. */
-  excludeTaskId?: string;
-  /** Draw the list under the field instead of above it. */
-  below?: boolean;
-  onKeyDown?: (event: KeyboardEvent) => void;
-  "aria-label"?: string;
-}) {
+/** Who and what an "@query" can mention: up to five agents, four people and five tasks. */
+export function useMentionCandidates(mention: () => ActiveMention | null, excludeTaskId?: () => string | undefined) {
   const company = useCompany();
   const people = useTaskPeople();
-  const listId = createUniqueId();
-  let field: HTMLTextAreaElement | undefined;
-  const [caret, setCaret] = createSignal(0);
-  const [closedAt, setClosedAt] = createSignal<number | null>(null);
-  const [index, setIndex] = createSignal(0);
-
-  const mention = createMemo<ActiveMention | null>(() => {
-    const found = activeMention(props.value, caret());
-    return found && found.start !== closedAt() ? found : null;
-  });
   const [term, setTerm] = createSignal("");
   createEffect(
     on(
@@ -57,6 +38,11 @@ export function MentionTextArea(props: {
     enabled: !!mention() && term().length > 0,
     placeholderData: keepPreviousData,
   }));
+  // Read through an effect, which never suspends: a memo reading `tasks.data` would put the nearest
+  // <Suspense> (TaskFiles' document view) back on its fallback while a search loads, and the editor
+  // would lose focus mid-word.
+  const [matches, setMatches] = createSignal<Issue[]>([]);
+  createEffect(() => setMatches(tasks.data ?? []));
   const candidates = createMemo((): MentionTarget[] => {
     const at = mention();
     if (!at) return [];
@@ -71,15 +57,79 @@ export function MentionTextArea(props: {
       .slice(0, 4)
       .map((person): MentionTarget => ({ kind: "user", id: person.id, name: person.name }));
     const found = at.query
-      ? (tasks.data ?? [])
-          .filter((issue) => issue.identifier && issue.id !== props.excludeTaskId)
+      ? matches()
+          .filter((issue) => issue.identifier && issue.id !== excludeTaskId?.())
           .map((issue): MentionTarget => ({ kind: "task", id: issue.id, identifier: issue.identifier!, title: issue.title }))
       : [];
     return [...agents, ...users, ...found];
   });
+  return { candidates, people };
+}
+
+/** The list of mention candidates, grouped by kind, with the highlighted one marked. */
+export function MentionList(props: {
+  id: string;
+  candidates: MentionTarget[];
+  index: number;
+  people: TaskPeople;
+  onPick: (target: MentionTarget) => void;
+  class?: string;
+  style?: JSX.CSSProperties;
+}) {
+  return (
+    <div class={`cmp-picker ${props.class ?? ""}`} style={props.style} role="listbox" id={props.id} aria-label="Mention">
+      <For each={props.candidates}>
+        {(candidate, at) => (
+          <>
+            <Show when={at() === 0 || props.candidates[at() - 1]!.kind !== candidate.kind}>
+              <div class="mh" aria-hidden="true">
+                {candidate.kind === "agent" ? "Agents" : candidate.kind === "user" ? "People" : "Tasks"}
+              </div>
+            </Show>
+            <div
+              id={`${props.id}-opt-${at()}`}
+              class="cmp-option"
+              role="option"
+              aria-selected={at() === props.index}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => props.onPick(candidate)}
+            >
+              <MentionOption candidate={candidate} people={props.people} />
+            </div>
+          </>
+        )}
+      </For>
+    </div>
+  );
+}
+
+export function MentionTextArea(props: {
+  value: string;
+  onInput: (value: string) => void;
+  id?: string;
+  class?: string;
+  rows?: number;
+  placeholder?: string;
+  /** Leave this task out of the task matches, such as the task being edited. */
+  excludeTaskId?: string;
+  /** Draw the list under the field instead of above it. */
+  below?: boolean;
+  onKeyDown?: (event: KeyboardEvent) => void;
+  "aria-label"?: string;
+}) {
+  const listId = createUniqueId();
+  let field: HTMLTextAreaElement | undefined;
+  const [caret, setCaret] = createSignal(0);
+  const [closedAt, setClosedAt] = createSignal<number | null>(null);
+  const [index, setIndex] = createSignal(0);
+
+  const mention = createMemo<ActiveMention | null>(() => {
+    const found = activeMention(props.value, caret());
+    return found && found.start !== closedAt() ? found : null;
+  });
+  const { candidates, people } = useMentionCandidates(mention, () => props.excludeTaskId);
   createEffect(on(() => mention()?.start, () => setIndex(0)));
   const open = () => !!mention() && candidates().length > 0;
-  const optionId = (at: number) => `${listId}-opt-${at}`;
 
   const sync = () => field && setCaret(field.selectionStart ?? 0);
   const pick = (target: MentionTarget) => {
@@ -121,29 +171,7 @@ export function MentionTextArea(props: {
   return (
     <div class="cmp-field">
       <Show when={open()}>
-        <div class="cmp-picker" classList={{ "cmp-picker--below": props.below }} role="listbox" id={listId} aria-label="Mention">
-          <For each={candidates()}>
-            {(candidate, at) => (
-              <>
-                <Show when={at() === 0 || candidates()[at() - 1]!.kind !== candidate.kind}>
-                  <div class="mh" aria-hidden="true">
-                    {candidate.kind === "agent" ? "Agents" : candidate.kind === "user" ? "People" : "Tasks"}
-                  </div>
-                </Show>
-                <div
-                  id={optionId(at())}
-                  class="cmp-option"
-                  role="option"
-                  aria-selected={at() === index()}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => pick(candidate)}
-                >
-                  <MentionOption candidate={candidate} people={people} />
-                </div>
-              </>
-            )}
-          </For>
-        </div>
+        <MentionList id={listId} candidates={candidates()} index={index()} people={people} onPick={pick} class={props.below ? "cmp-picker--below" : ""} />
       </Show>
       <textarea
         id={props.id}
@@ -156,7 +184,7 @@ export function MentionTextArea(props: {
         role="combobox"
         aria-expanded={open()}
         aria-controls={open() ? listId : undefined}
-        aria-activedescendant={open() ? optionId(index()) : undefined}
+        aria-activedescendant={open() ? `${listId}-opt-${index()}` : undefined}
         aria-autocomplete="list"
         onInput={(event) => {
           props.onInput(event.currentTarget.value);

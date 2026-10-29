@@ -1,4 +1,4 @@
-import type { FeedbackDataSharingPreference, FeedbackVote, FeedbackVoteValue } from "@paperclipai/shared";
+import type { FeedbackDataSharingPreference, FeedbackTargetType, FeedbackVote, FeedbackVoteValue } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ThumbsDown, ThumbsUp } from "lucide-solid";
 import { createSignal, Show } from "solid-js";
@@ -15,7 +15,9 @@ import { FEEDBACK_TERMS_URL, savedVoteTitle, voteSharing, votesByComment, withVo
 import "./FeedbackVotes.css";
 
 /*
- * Thumbs up and down under an agent's comment in the task thread (`tasks/feedback`), with the
+ * Thumbs up and down under an agent's comment in the task thread, or on a document revision an
+ * agent wrote (`targetType: "issue_document_revision"`, the revision's id as `commentId`;
+ * `tasks/feedback`), with the
  * data-sharing question the old UI asks (feedback-model.ts). Your votes on the task are read once
  * and shared by every comment; the sharing setting is the instance's, which App settings → General
  * edits.
@@ -30,7 +32,15 @@ const [askFor, setAskFor] = createSignal<{ commentId: string; pending: Pending }
 const [noteFor, setNoteFor] = createSignal<{ commentId: string; allowSharing: boolean } | null>(null);
 const [noteText, setNoteText] = createSignal("");
 
-export function FeedbackVotes(props: { taskId: string; commentId: string; youId: string | null }) {
+export function FeedbackVotes(props: {
+  taskId: string;
+  /** The comment's id, or the document revision's. */
+  commentId: string;
+  youId: string | null;
+  targetType?: FeedbackTargetType;
+  label?: string;
+}) {
+  const targetType = () => props.targetType ?? "issue_comment";
   const client = useQueryClient();
   const company = useCompany();
   const votes = createQuery(() => ({
@@ -45,7 +55,7 @@ export function FeedbackVotes(props: { taskId: string; commentId: string; youId:
     staleTime: 60_000,
   }));
   const preference = (): FeedbackDataSharingPreference => general.data?.feedbackDataSharingPreference ?? "prompt";
-  const mine = () => votesByComment(votes.data).get(props.commentId) ?? null;
+  const mine = () => votesByComment(votes.data, targetType()).get(props.commentId) ?? null;
   const [saving, setSaving] = createSignal(false);
   const asking = () => {
     const open = askFor();
@@ -63,11 +73,11 @@ export function FeedbackVotes(props: { taskId: string; commentId: string; youId:
     const key = queryKeys.issues.feedbackVotes(props.taskId);
     const atSubmit = preference();
     const before = client.getQueryData<FeedbackVote[]>(key);
-    client.setQueryData<FeedbackVote[]>(key, withVote(before, { taskId: props.taskId, commentId: props.commentId, vote, reason: note }, props.youId));
+    client.setQueryData<FeedbackVote[]>(key, withVote(before, { taskId: props.taskId, commentId: props.commentId, vote, reason: note, targetType: targetType() }, props.youId));
     setSaving(true);
     try {
       await feedbackVotesApi.save(props.taskId, {
-        targetType: "issue_comment",
+        targetType: targetType(),
         targetId: props.commentId,
         vote,
         ...(note ? { reason: note } : {}),
@@ -125,7 +135,7 @@ export function FeedbackVotes(props: { taskId: string; commentId: string; youId:
   };
 
   return (
-    <div class="fbv" role="group" aria-label="Feedback on this reply">
+    <div class="fbv" role="group" aria-label={props.label ?? "Feedback on this reply"}>
       <button
         type="button"
         class="fbv-btn"

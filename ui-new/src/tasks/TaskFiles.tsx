@@ -43,6 +43,7 @@ import {
 } from "@/documents/document-model";
 import { documentKeys, type DocumentHost } from "@/documents/host";
 import { useThreads } from "@/documents/queries";
+import { SourceTrustBadge } from "@/documents/SourceTrustBadge";
 import { fileOpenFor, workspaceFileRef, type FileOpen } from "@/files/file-ref";
 import { fileSize } from "@/files/preview";
 import { viewport } from "@/layout/breakpoints";
@@ -93,6 +94,11 @@ function byWhom(people: TaskPeople, agentId: string | null | undefined, userId: 
 
 const words = (value: string) => value.replace(/_/g, " ");
 
+/** A pasted file read into memory first: the browser can drop a clipboard file's data once the paste is over. */
+async function copyFile(file: File) {
+  return new globalThis.File([await file.arrayBuffer()], file.name || "image.png", { type: file.type });
+}
+
 // The editor and the file viewer load when first opened, not with the task panel.
 const DocumentView = lazy(() => import("@/documents/DocumentView").then((module) => ({ default: module.DocumentView })));
 const NewDocument = lazy(() => import("@/documents/NewDocument").then((module) => ({ default: module.NewDocument })));
@@ -124,6 +130,13 @@ export function TaskFiles(props: { taskId: string; /** A document to open, from 
     root: queryKeys.issues.section(props.taskId, "documents"),
     nameOf: (agentId, userId) => byWhom(people, agentId, userId),
     youId: () => people.youId(),
+    // Images in a document are stored as the task's attachments, as the old editor does.
+    uploadImage: async (file: File) => {
+      const attachment = await issuesApi.uploadAttachment(company().id, props.taskId, await copyFile(file));
+      void client.invalidateQueries({ queryKey: queryKeys.issues.section(props.taskId, "attachments") });
+      return attachment.contentPath;
+    },
+    feedback: true,
   }));
 
   const task = createQuery(() => ({
@@ -506,6 +519,7 @@ function DocumentRow(props: {
           <Show when={isPlanKey(props.doc.key)}>
             <span class="tf-pill tf-pill--run">Task plan</span>
           </Show>
+          <SourceTrustBadge sourceTrust={props.doc.sourceTrust} />
           <Show when={lock().locked}>
             <span class="tf-pill tf-pill--amber">
               <Lock size={10} aria-hidden="true" />

@@ -40,6 +40,7 @@ import {
   type RunWindow,
 } from "./history-window";
 import { MessageBody } from "./MessageBody";
+import { SourceTrustBadge } from "@/documents/SourceTrustBadge";
 import { useTaskPeople } from "./people";
 import { StatusChip } from "./TaskDetails";
 import { duration, stampLabel, type ThreadFilter } from "./thread-model";
@@ -527,6 +528,7 @@ function Comment(props: {
           <span class="ta-tag">agent</span>
         </Show>
         <Show when={props.comment.presentation?.title}>{(title) => <span class="ta-tag">{title()}</span>}</Show>
+        <SourceTrustBadge sourceTrust={props.comment.sourceTrust} />
         <Show when={props.input?.steeredRunId}>
           {(runId) => (
             <button type="button" class="ta-tag ta-tag--run" title="Sent into the run while it was going. Open the run." onClick={() => commands.openRunModal(runId())}>

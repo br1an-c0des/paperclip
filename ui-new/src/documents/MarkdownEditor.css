@@ -40,3 +40,40 @@
   resize: none;
   outline: none;
 }
+
+/* The editor's insert tools: mention, image */
+.mde-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* The mention list under the "@", placed by CodeMirror's screen position */
+.cmp-picker.mde-mentions {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  width: 320px;
+}
+
+/* SourceTrustBadge: what a low-trust review agent wrote */
+.trust-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--r-pill);
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.trust-badge[data-promoted] {
+  background: var(--well);
+  color: var(--muted);
+}
