@@ -44,6 +44,12 @@ until one becomes a concrete fix.
 | 5 | [Start `pnpm dev` on Windows when the native runner is enabled](#5-start-pnpm-dev-on-windows-when-the-native-runner-is-enabled) | closed | | | 2026-10-26 | | |
 | 6 | [Detect glibc reliably at server startup so Paperclip Runner is offered on Linux](#6-detect-glibc-reliably-at-server-startup-so-paperclip-runner-is-offered-on-linux) | submitted | `fix/runner-libc-probe-startup` | [#17905](https://github.com/paperclipai/paperclip/pull/17905) | 2026-10-26 | 2026-10-27 | |
 | 7 | [Accept `env: null` when updating a project](#7-accept-env-null-when-updating-a-project) | candidate | | | 2026-10-27 | | |
+| 8 | [Let company search take several assignees, projects or labels](#8-let-company-search-take-several-assignees-projects-or-labels) | candidate | | | 2026-10-28 | | |
+| 9 | [Mark agent chats in company search results](#9-mark-agent-chats-in-company-search-results) | candidate | | | 2026-10-28 | | |
+| 10 | [Filter cost breakdowns by agent](#10-filter-cost-breakdowns-by-agent) | candidate | | | 2026-10-28 | | |
+| 11 | [Filter run summaries by date range and project](#11-filter-run-summaries-by-date-range-and-project) | candidate | | | 2026-10-28 | | |
+| 12 | [Say in `/api/health` whether sign-up is allowed](#12-say-in-apihealth-whether-sign-up-is-allowed) | candidate | | | 2026-10-28 | | |
+| 13 | [Include `executionBlocker` on compact issues](#13-include-executionblocker-on-compact-issues) | candidate | | | 2026-10-28 | | |
 
 ## Details
 
@@ -171,3 +177,67 @@ until one becomes a concrete fix.
   handles null, to match.
 - **Files:** `server/src/routes/projects.ts` and its test.
 - **Fork workaround to revisit once merged:** `ui-new`'s project settings send `{}` to clear.
+
+### 8. Let company search take several assignees, projects or labels
+
+Found by the [M7 parity audit](../ui-new/docs/audit/m7-parity.md#6-api-changes-needed) (2026-10-28).
+
+- **Problem:** `GET /api/companies/:companyId/search` (`server/src/routes/issues.ts`, around line
+  8231) takes one assignee, one project and one label, so a search page can't filter by several at
+  once.
+- **Likely fix:** accept repeated or comma-separated values for each filter, matching how the issue
+  list takes them, with a route test.
+- **Fork workaround to revisit once merged:** `ui-new`'s search filters take one value each
+  ([decision 17](../ui-new/docs/decisions.md#17-search-results-are-shaped-differently-from-board-s1)).
+
+### 9. Mark agent chats in company search results
+
+Found by the M7 parity audit (2026-10-28).
+
+- **Problem:** agent chats are hidden tasks underneath. Search results don't carry their
+  `conversationAgentId`, so a chat shows as an ordinary task, and facet counts include chats.
+- **Likely fix:** return `conversationAgentId` on task results, or leave chats out unless asked for.
+- **Fork workaround to revisit once merged:** search can't show chats as a section
+  ([decision 31](../ui-new/docs/decisions.md#31-gaps-found-building-agent-chat)).
+
+### 10. Filter cost breakdowns by agent
+
+Found by the M7 parity audit (2026-10-28).
+
+- **Problem:** `GET /api/companies/:companyId/costs/by-agent` and `/costs/by-agent-model`
+  (`server/src/routes/costs.ts`, around line 250) take no agent, so one agent's page fetches the whole
+  company's breakdown and filters it.
+- **Likely fix:** an optional `?agentId=` on both, with a route test.
+- **Fork workaround to revisit once merged:** the agent page filters the company breakdown
+  ([decision 29](../ui-new/docs/decisions.md#29-gaps-found-building-the-agent-page)).
+
+### 11. Filter run summaries by date range and project
+
+Found by the M7 parity audit (2026-10-28).
+
+- **Problem:** `GET /api/companies/:companyId/heartbeat-runs?summary=true&limit=1000`
+  (`server/src/routes/agents.ts`, around line 6905) has no date range or project filter, so workload
+  views fetch up to 1,000 runs and may still miss days.
+- **Likely fix:** optional `from`, `to` and `projectId`, with a route test.
+- **Fork workaround to revisit once merged:** workload marks the days it couldn't load
+  ([decision 28](../ui-new/docs/decisions.md#28-gaps-found-building-agent-workload)).
+
+### 12. Say in `/api/health` whether sign-up is allowed
+
+Found by the M7 parity audit (2026-10-28).
+
+- **Problem:** `PAPERCLIP_AUTH_DISABLE_SIGN_UP` (`server/src/config.ts`) isn't reported by
+  `/api/health`, so a sign-in page can't tell whether to offer sign-up.
+- **Likely fix:** add a boolean to the health response, next to the other auth fields, with a test.
+- **Fork workaround to revisit once merged:** `ui-new` always offers sign-up
+  ([decision 36](../ui-new/docs/decisions.md#36-gaps-found-building-onboarding-and-the-pages-outside-a-company)).
+
+### 13. Include `executionBlocker` on compact issues
+
+Found by the M7 parity audit (2026-10-28).
+
+- **Problem:** `CompactIssue` (`packages/shared/src/types/issue.ts`, around line 961) leaves out
+  `executionBlocker`, so a list row can't tell why an interrupted task is blocked before offering
+  Retry.
+- **Likely fix:** add the field to the compact pick and the compact list query, with a test.
+- **Fork workaround to revisit once merged:** Retry on list rows reads the interruption's run.
