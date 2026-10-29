@@ -38,6 +38,8 @@ const CLIENT_METHODS = {
   deleteWithBody: "DELETE",
 };
 const SOCKET_CALLEES = new Set(["WebSocket", "EventSource", "tryCreateWebSocket"]);
+// fetch wrappers that take the full "/api/..." path and a fetch init (apiFetch in ui/src/api/client.ts).
+const FETCH_CALLEES = new Set(["fetch", "apiFetch"]);
 
 // ---------------------------------------------------------------- files & AST
 
@@ -423,7 +425,7 @@ function requestsIn(fnNode, mod, seenHelpers = new Set(), topLevel = true) {
       }
       return;
     }
-    if (callee.type === "Identifier" && (callee.name === "fetch" || callee.name === "requestResponse") && node.arguments[0]) {
+    if (callee.type === "Identifier" && (FETCH_CALLEES.has(callee.name) || callee.name === "requestResponse") && node.arguments[0]) {
       const raw = renderUrl(node.arguments[0], ctx);
       const method = methodFromInit(node.arguments[1]);
       for (const p of normalizePaths(raw, { addApiPrefix: callee.name === "requestResponse" })) requests.push({ method, path: p });
@@ -674,7 +676,7 @@ function analyzeFile(file, apiModules) {
       const name = callee.type === "Identifier" ? callee.name : null;
       if (!name || !node.arguments[0]) return;
       const ctx = { mod, scopes, depth: 0, unwrapUnknownCalls: true };
-      if (name === "fetch") {
+      if (FETCH_CALLEES.has(name)) {
         for (const p of normalizePaths(renderUrl(node.arguments[0], ctx), { addApiPrefix: false })) {
           if (p.startsWith("/api")) direct.push({ method: methodFromInit(node.arguments[1]), path: p });
         }
