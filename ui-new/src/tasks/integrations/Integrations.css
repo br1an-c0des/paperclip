@@ -25,6 +25,31 @@
   gap: 8px;
   padding-top: 8px;
 }
+.ti-files {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.ti-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 10px 3px 8px;
+  border-radius: var(--r-pill, 999px);
+  background: var(--well);
+  font-size: 12px;
+  cursor: pointer;
+}
+.ti-file span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ti-file[data-refused] {
+  color: var(--red-fg);
+}
 .ti-compose-actions {
   display: flex;
   justify-content: flex-end;
@@ -129,11 +154,21 @@
 }
 .ti-viewer-state {
   display: grid;
-  place-items: center;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
   height: 100%;
   margin: 0;
   color: var(--muted);
   font-size: 13px;
+}
+.ti-viewer-state p {
+  margin: 0;
+}
+.ti-viewer-state--over {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, var(--well) 88%, transparent);
 }
 .ti-viewer-bar {
   display: flex;
