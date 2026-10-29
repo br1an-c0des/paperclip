@@ -250,7 +250,13 @@ a.tf-output-title:hover {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+  align-items: center;
   margin-top: 6px;
+}
+
+.tf-output-actions a.btn {
+  color: inherit;
+  text-decoration: none;
 }
 
 .tf-output-path {

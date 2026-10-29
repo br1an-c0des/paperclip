@@ -53,7 +53,9 @@ import { TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
+import { ApiError } from "@/api/client";
 import { readDivergence } from "./branch-reconcile";
+import { isReviewDocumentKey, markdownOutput, reviewDocumentKey, reviewProblem } from "./review-documents";
 import { useTaskPeople, type TaskPeople } from "./people";
 import { stampLabel } from "./thread-model";
 import "./TaskFiles.css";
@@ -171,7 +173,10 @@ export function TaskFiles(props: { taskId: string; /** A document to open, from 
     const haystack = texts.filter(Boolean).join(" ").toLowerCase();
     return terms.every((term) => haystack.includes(term));
   };
-  const docs = createMemo(() => sortDocuments((documents.data ?? []).filter((doc) => matches(doc.title, doc.key))));
+  // Review copies of Markdown outputs open from their output, not the Documents list.
+  const docs = createMemo(() =>
+    sortDocuments((documents.data ?? []).filter((doc) => !isReviewDocumentKey(doc.key) && matches(doc.title, doc.key))),
+  );
   const files = createMemo(() => (attachments.data ?? []).filter((file) => matches(file.originalFilename, file.contentType)));
   const made = createMemo(() => (outputs.data ?? []).filter((output) => matches(output.title, output.summary, output.provider)));
   const total = () => docs().length + files().length + made().length;
@@ -395,7 +400,15 @@ export function TaskFiles(props: { taskId: string; /** A document to open, from 
                     <FileGroup title="Outputs" count={made().length} empty="Nothing produced yet: pull requests, branches and previews from runs show here.">
                       <div class="tf-outputs">
                         <For each={made()}>
-                          {(output) => <OutputCard output={output} onOpenFile={(open) => setView({ kind: "files", open })} />}
+                          {(output) => (
+                            <OutputCard
+                              output={output}
+                              taskId={props.taskId}
+                              reviewReady={(documents.data ?? []).some((doc) => doc.key === reviewDocumentKey(output.id))}
+                              onOpenFile={(open) => setView({ kind: "files", open })}
+                              onOpenDocument={(key) => setView({ kind: "doc", key, edit: false })}
+                            />
+                          )}
                         </For>
                       </div>
                     </FileGroup>
@@ -649,9 +662,43 @@ function AttachmentTile(props: { file: IssueAttachment; people: TaskPeople; canD
   );
 }
 
-function OutputCard(props: { output: IssueWorkProduct; onOpenFile: (open: FileOpen) => void }) {
+function OutputCard(props: {
+  output: IssueWorkProduct;
+  taskId: string;
+  /** The output's review document already exists. */
+  reviewReady: boolean;
+  onOpenFile: (open: FileOpen) => void;
+  onOpenDocument: (key: string) => void;
+}) {
+  const client = useQueryClient();
   const icon = () => (OUTPUT_ICONS[props.output.type] ?? OUTPUT_ICONS.artifact!)();
   const ref = () => workspaceFileRef(props.output);
+  // A Markdown file the output points at reads as a document (`documents-artifacts/documents`).
+  const markdown = () => markdownOutput(props.output);
+  const [status, setStatus] = createSignal<number | undefined>();
+  const [preparing, setPreparing] = createSignal(false);
+  const problem = () => {
+    const meta = markdown();
+    return meta ? reviewProblem(meta, status()) : null;
+  };
+  const review = async () => {
+    const key = reviewDocumentKey(props.output.id);
+    if (props.reviewReady) return props.onOpenDocument(key);
+    setPreparing(true);
+    try {
+      await issuesApi.ensureReviewDocument(props.taskId, props.output.id);
+      await client.invalidateQueries({ queryKey: queryKeys.issues.section(props.taskId, "documents") });
+      props.onOpenDocument(key);
+    } catch (error) {
+      const code = error instanceof ApiError ? error.status : undefined;
+      setStatus(code);
+      if (!code || ![413, 415, 422].includes(code)) {
+        pushToast({ tone: "error", title: "Couldn't open it for review", body: error instanceof Error ? error.message : String(error) });
+      }
+    } finally {
+      setPreparing(false);
+    }
+  };
   return (
     <div class="card tf-output" data-primary={props.output.isPrimary || undefined}>
       <span class="tf-output-icon">{icon()}</span>
@@ -675,6 +722,21 @@ function OutputCard(props: { output: IssueWorkProduct; onOpenFile: (open: FileOp
               <Button size="compact" icon={<FileText size={14} aria-hidden="true" />} onClick={() => props.onOpenFile(fileOpenFor(file()))}>
                 Open <span class="mono tf-output-path">{file().displayPath}</span>
               </Button>
+            </div>
+          )}
+        </Show>
+        <Show when={markdown()}>
+          {(meta) => (
+            <div class="tf-output-actions">
+              <Show when={!problem()} fallback={<span class="tsec-muted">{problem()}</span>}>
+                <Button size="compact" icon={<FileText size={14} aria-hidden="true" />} disabled={preparing()} onClick={() => void review()}>
+                  {preparing() ? "Opening…" : "Review"}
+                </Button>
+              </Show>
+              <a class="btn btn--ghost btn--compact" href={meta().contentPath} target="_blank" rel="noopener noreferrer">
+                <ExternalLink size={14} aria-hidden="true" />
+                Raw
+              </a>
             </div>
           )}
         </Show>
