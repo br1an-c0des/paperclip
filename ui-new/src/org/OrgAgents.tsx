@@ -17,6 +17,7 @@ import { Menu } from "@/ui/Menu";
 import { Capsule } from "@/ui/Status";
 import { gradientVar } from "@/ui/status-meta";
 import { AgentStarButton } from "@/agents/AgentStar";
+import { AvailableBuiltIns } from "@/agents/BuiltInSetup";
 import { actionTargets, useAgentActions } from "./actions";
 import { BulkEditDialog } from "./BulkEditDialog";
 import { bulkDisabledReason, harnessGroups } from "./bulk-model";
@@ -276,7 +277,7 @@ export function OrgAgents() {
           </Match>
         </Switch>
         <For each={team()}>{(row) => <AgentRow row={row} data={data} checked={selected().has(row.agent.id)} onToggle={() => toggle(row.agent.id)} actions={actions} />}</For>
-        <Show when={builtIns().length > 0}>
+        <Show when={builtIns().length > 0 || (data.builtInsAvailable().length > 0 && (filter() === "all" || filter() === "builtin") && !query().trim())}>
           <div class="org-group-head">
             <h3 class="disp">Built-in agents</h3>
             <span class="org-muted">
@@ -285,6 +286,9 @@ export function OrgAgents() {
             </span>
           </div>
           <For each={builtIns()}>{(row) => <AgentRow row={row} data={data} checked={selected().has(row.agent.id)} onToggle={() => toggle(row.agent.id)} actions={actions} />}</For>
+          <Show when={(filter() === "all" || filter() === "builtin") && !query().trim()}>
+            <AvailableBuiltIns />
+          </Show>
         </Show>
       </section>
 

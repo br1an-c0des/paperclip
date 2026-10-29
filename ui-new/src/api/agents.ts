@@ -12,7 +12,9 @@ import type {
   AgentKeyCreated,
   AgentPermissions,
   AgentProjectAccess,
+  AgentPublicIdentity,
   AgentRunner,
+  AgentRunnerChoice,
   AgentRuntimeState,
   AgentSkillSnapshot,
   AgentTaskSession,
@@ -26,6 +28,7 @@ import type {
   ToolProfileEffectiveSummary,
   UpdateResourceMembership,
 } from "@paperclipai/shared";
+import type { AdapterConfigSchema } from "@paperclipai/adapter-utils";
 import { api } from "./client";
 
 /*
@@ -108,6 +111,17 @@ export type AdapterInfo = {
   };
 };
 
+/** `GET /companies/:id/adapters/:type/detect-model`: the model the harness's own settings on the server's machine name (ui/src/api/agents.ts). */
+export type DetectedAdapterModel = { model: string; provider: string; source: string; candidates?: string[] };
+
+/** `PATCH /agents/:id/instructions-bundle` (ui/src/api/agents.ts `updateInstructionsBundle`). */
+export type InstructionsBundleUpdate = {
+  mode?: "managed" | "external";
+  rootPath?: string | null;
+  entryFile?: string;
+  clearLegacyPromptTemplate?: boolean;
+};
+
 /** `POST /adapters/install`: what the server registered. */
 export type AdapterInstallResult = { type: string; packageName: string; version?: string; installedAt: string };
 
@@ -128,6 +142,12 @@ export const adaptersApi = {
     api.patch<{ type: string; paused: boolean; changed: boolean }>(`/adapters/${encodeURIComponent(type)}/override`, { paused }),
   /** Loads the package again from disk, such as a local folder's new build. */
   reload: (type: string) => api.post<{ type: string; version?: string; reloaded: boolean }>(`/adapters/${encodeURIComponent(type)}/reload`, {}),
+  /**
+   * The harness's declared settings (`GET /adapters/:type/config-schema`), for the agent's harness
+   * settings card. Harnesses without one answer 404.
+   */
+  configSchema: (type: string, signal?: AbortSignal) =>
+    api.get<AdapterConfigSchema>(`/adapters/${encodeURIComponent(type)}/config-schema`, { signal }),
   /** Pulls the latest version from npm and swaps it in; agents use it from their next run. */
   reinstall: (type: string) =>
     api.post<{ type: string; version?: string; reinstalled: boolean }>(`/adapters/${encodeURIComponent(type)}/reinstall`, {}),
@@ -185,6 +205,12 @@ export const agentsApi = {
       `/companies/${encodeURIComponent(companyId)}/adapters/${encodeURIComponent(adapterType)}/models${params.size ? `?${params}` : ""}`,
     );
   },
+  /** The model the harness's own configuration on the server's machine names, if any. */
+  detectModel: (companyId: string, adapterType: string, signal?: AbortSignal) =>
+    api.get<DetectedAdapterModel | null>(
+      `/companies/${encodeURIComponent(companyId)}/adapters/${encodeURIComponent(adapterType)}/detect-model`,
+      { signal },
+    ),
   /** Registered harnesses with the runners each supports for the company or one environment. */
   adapters: (companyId: string, environmentId?: string | null, signal?: AbortSignal) => {
     const params = new URLSearchParams({ companyId });
@@ -201,6 +227,9 @@ export const agentsApi = {
 
   // The agent itself
   get: (id: string, companyId?: string, signal?: AbortSignal) => api.get<AgentDetail>(agentPath(id, companyId), { signal }),
+  /** Its public signing key, or null until its first managed run creates one. */
+  identity: (id: string, companyId?: string, signal?: AbortSignal) =>
+    api.get<AgentPublicIdentity | null>(agentPath(id, companyId, "/identity"), { signal }),
   update: (id: string, patch: Record<string, unknown>, companyId?: string) => api.patch<Agent>(agentPath(id, companyId), patch),
   /** The narrow model and AI-connection change the roster's bulk edit uses; stale `expected` values are refused. */
   updateRuntimeSettings: (id: string, runtimeSettings: AgentRuntimeSettingsPatch, companyId?: string) =>
@@ -246,6 +275,9 @@ export const agentsApi = {
   // Instructions
   instructionsBundle: (id: string, companyId?: string, signal?: AbortSignal) =>
     api.get<AgentInstructionsBundle>(agentPath(id, companyId, "/instructions-bundle"), { signal }),
+  /** Where the files live (Paperclip's folder or one on disk) and which one is read first. */
+  updateInstructionsBundle: (id: string, data: InstructionsBundleUpdate, companyId?: string) =>
+    api.patch<AgentInstructionsBundle>(agentPath(id, companyId, "/instructions-bundle"), data),
   instructionsFile: (id: string, path: string, companyId?: string, signal?: AbortSignal) =>
     api.get<AgentInstructionsFileDetail>(agentPath(id, companyId, `/instructions-bundle/file?path=${encodeURIComponent(path)}`), { signal }),
   saveInstructionsFile: (
@@ -321,6 +353,85 @@ export const agentsApi = {
       `/companies/${encodeURIComponent(companyId)}/resource-memberships/me/agents/${encodeURIComponent(agentId)}`,
       data,
     ),
+};
+
+/*
+ * Built-in agents (`enableBuiltInAgents`; the routes answer 404 without it), as
+ * ui/src/api/builtInAgents.ts calls them: agents Paperclip defines for its own features (briefs,
+ * summaries, learning), set up per company. Some ship a bundle of instructions, a skill and a
+ * routine, each tracked against Paperclip's stock version. These types live in the old UI only.
+ */
+
+/** `not_provisioned → pending_approval → needs_setup → ready ⇄ paused`. */
+export type BuiltInAgentStatus = "not_provisioned" | "pending_approval" | "needs_setup" | "ready" | "paused";
+
+export type BuiltInManagedResourceKind = "instructions" | "skill" | "routine";
+
+/** One managed resource against the stock default it came from. */
+export type BuiltInManagedResourceState = {
+  resourceKind: BuiltInManagedResourceKind;
+  resourceKey: string;
+  resourceId: string | null;
+  stockVersion: string;
+  stockStatus: "missing" | "stock_current" | "stock_update_available" | "operator_modified";
+  updateAvailable: boolean;
+  resetAvailable: boolean;
+  changedFiles?: string[];
+  /** Routines: whether the managed schedule is on. */
+  scheduleEnabled?: boolean;
+};
+
+export type BuiltInAgentDefinition = {
+  key: string;
+  displayName: string;
+  featureKeys: string[];
+  shortPurpose: string;
+  defaultRole: string;
+  allowedAdapterTypes?: string[];
+  defaultAdapterType?: string;
+  defaultBudgetMonthlyCents?: number;
+  bundle?: {
+    stockVersion: string;
+    instructions: { entryFile: string; files: string[] };
+    skill: { skillKey: string; displayName: string; files: string[] };
+    routine: { routineKey: string; title: string; status: "active" | "paused"; triggerCount: number; scheduleLabel?: string };
+  };
+};
+
+export type BuiltInAgentState = {
+  definition: BuiltInAgentDefinition;
+  status: BuiltInAgentStatus;
+  agentId: string | null;
+  agent: Agent | null;
+  pauseReason: string | null;
+  resources?: BuiltInManagedResourceState[];
+  /** When provisioning queued a hire approval. */
+  approval?: Approval | null;
+};
+
+export type BuiltInAgentProvisionInput = {
+  runner?: AgentRunnerChoice;
+  adapterType?: string;
+  adapterConfig?: Record<string, unknown>;
+  budgetMonthlyCents?: number;
+};
+
+const builtIns = (companyId: string, key?: string) =>
+  `/companies/${encodeURIComponent(companyId)}/built-in-agents${key ? `/${encodeURIComponent(key)}` : ""}`;
+
+export const builtInAgentsApi = {
+  list: (companyId: string, signal?: AbortSignal) => api.get<BuiltInAgentState[]>(builtIns(companyId), { signal }),
+  /** Creates (or reconfigures) the agent; a company that approves hires queues it in the Inbox. */
+  provision: (companyId: string, key: string, input: BuiltInAgentProvisionInput = {}) =>
+    api.post<BuiltInAgentState>(`${builtIns(companyId, key)}/provision`, input),
+  /** Back to Paperclip's defaults: everything, or only the named parts (`agent` is its settings). */
+  reset: (companyId: string, key: string, resources?: ("agent" | BuiltInManagedResourceKind)[]) =>
+    api.post<BuiltInAgentState>(`${builtIns(companyId, key)}/reset`, resources ? { resources } : {}),
+  /** Starts the bundle's routine now, as a run of the agent. */
+  runRoutine: (companyId: string, key: string, routineKey: string) =>
+    api.post<unknown>(`${builtIns(companyId, key)}/routines/${encodeURIComponent(routineKey)}/run`, {}),
+  setRoutineSchedule: (companyId: string, key: string, routineKey: string, on: boolean) =>
+    api.post<BuiltInAgentState>(`${builtIns(companyId, key)}/routines/${encodeURIComponent(routineKey)}/${on ? "enable" : "disable"}`, {}),
 };
 
 /** Agents the board works with: everything except terminated ones. */

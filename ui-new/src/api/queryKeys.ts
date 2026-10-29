@@ -52,6 +52,10 @@ export const queryKeys = {
         ? (["agents", companyId, "adapter-models", adapterType, options] as const)
         : (["agents", companyId, "adapter-models", adapterType] as const),
     primary: (companyId: string) => ["primary-agent", companyId, "me"] as const,
+    /** The model a harness's own settings name on the server's machine. */
+    detectModel: (companyId: string, adapterType: string) => ["agents", companyId, "detect-model", adapterType] as const,
+    /** A harness's declared settings, which don't change per company. */
+    configSchema: (adapterType: string) => ["adapters", "config-schema", adapterType] as const,
   },
   issues: {
     /** Prefix for every task list in a company. */

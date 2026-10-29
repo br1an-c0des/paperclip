@@ -1,0 +1,40 @@
+/* Built-in agents not set up yet, under Manage agents' Built-in group. */
+.ag-builtins-available {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ag-builtins-available > li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.ag-builtins-available .ps-list-name {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ag-builtins-available .ps-list-meta {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+}
+
+.ag-builtins-mark {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+}

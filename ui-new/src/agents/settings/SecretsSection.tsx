@@ -1,10 +1,11 @@
 import type { AgentDetail, AgentEnvConfig } from "@paperclipai/shared";
-import { createQuery } from "@tanstack/solid-query";
+import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Check, KeyRound, Plus, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
 import { queryKeys } from "@/api/queryKeys";
 import { secretsApi } from "@/api/secrets";
+import { NewSecret } from "@/projects/settings/EnvironmentSection";
 import { envDirty, envFromRows, envProblem, envRows, newEnvRow, type EnvRow, type EnvRowKind } from "@/projects/settings/settings-model";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
@@ -20,14 +21,15 @@ import { CardNote, FootError, SectionTitle, useAgentSaver } from "../shared";
  * and the server keeps any value it sent back redacted. Saving is explicit and replaces the
  * variables as a set.
  *
- * Creating a company secret lives in the project settings and company settings; here a variable
- * picks an existing one.
+ * New secret creates a company secret (the project settings' popover) and adds a variable that
+ * points to it, to save with the others.
  */
 
 const KIND_LABEL: Record<EnvRowKind, string> = { text: "Text", secret: "Secret", user_secret: "Personal secret" };
 
 export function SecretsSection(props: { agent: AgentDetail }) {
   const company = useCompany();
+  const client = useQueryClient();
   const saver = useAgentSaver(() => props.agent);
   const env = () => ((props.agent.adapterConfig as Record<string, unknown>).env ?? null) as AgentEnvConfig | null;
   const [rows, setRows] = createStore<EnvRow[]>(envRows(env()));
@@ -77,6 +79,13 @@ export function SecretsSection(props: { agent: AgentDetail }) {
             <Button size="compact" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setRows(rows.length, newEnvRow())}>
               Add variable
             </Button>
+            <NewSecret
+              onCreated={(secret) => {
+                void client.invalidateQueries({ queryKey: queryKeys.projectSettings.secrets(company().id) });
+                const name = secret.name.toUpperCase().replace(/[^A-Z0-9_]/g, "_").replace(/^(\d)/, "_$1");
+                setRows(rows.length, { ...newEnvRow("secret"), name, secretId: secret.id });
+              }}
+            />
             <Show when={dirty()}>
               <span class="ps-foot-end">
                 <FootError message={problem()} />
@@ -144,7 +153,7 @@ export function SecretsSection(props: { agent: AgentDetail }) {
                         {secretName(row.secretId)}
                       </Menu.Trigger>
                       <Menu.Content label="Company secrets" width={300}>
-                        <For each={activeSecrets()} fallback={<p class="nt-menu-note">The company has no secrets yet. Add one in company settings.</p>}>
+                        <For each={activeSecrets()} fallback={<p class="nt-menu-note">The company has no secrets yet. Create one with New secret.</p>}>
                           {(secret) => (
                             <Menu.Item onSelect={() => update(row.id, (draft) => void (draft.secretId = secret.id))} hint={row.secretId === secret.id ? <Check size={14} /> : undefined}>
                               {secret.name}
