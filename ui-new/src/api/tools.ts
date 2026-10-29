@@ -22,6 +22,12 @@ import type {
   ToolOAuthStartResult,
   ToolPolicy,
   ToolProfileWithDetails,
+  ToolConnectionTestAgentAccessResponse,
+  ToolConnectionTestAgentsResponse,
+  ToolConnectionTestCallResult,
+  ToolConnectionTestCallStatus,
+  ConfigureRailwaySsh,
+  RailwaySshSetup,
 } from "@paperclipai/shared";
 import { api } from "./client";
 
@@ -103,6 +109,24 @@ export const toolsApi = {
     api.put<ToolConnectionInstallSnapshot>(connection(connectionId, "/installs"), { installs }),
   grants: (connectionId: string, signal?: AbortSignal) =>
     api.get<ConnectionGrantsResponse>(connection(connectionId, "/grants"), { signal }),
+
+  /*
+   * Testing an action as an agent (the old UI's ActionTestDialog): the agents you may act as, how
+   * each action behaves for one of them, and a real call with their permissions and credentials.
+   * An Ask-first call waits in Review; its status is polled until it's done.
+   */
+  testAgents: (connectionId: string, signal?: AbortSignal) =>
+    api.get<ToolConnectionTestAgentsResponse>(connection(connectionId, "/test-agents"), { signal }),
+  testAgentAccess: (connectionId: string, agentId: string, signal?: AbortSignal) =>
+    api.get<ToolConnectionTestAgentAccessResponse>(connection(connectionId, `/test-agents/${enc(agentId)}/access`), { signal }),
+  runTestCall: (connectionId: string, input: { agentId: string; toolName: string; parameters?: Record<string, unknown> }) =>
+    api.post<ToolConnectionTestCallResult>(connection(connectionId, "/test-calls"), input),
+  testCallStatus: (connectionId: string, actionRequestId: string, signal?: AbortSignal) =>
+    api.get<ToolConnectionTestCallStatus>(connection(connectionId, `/test-calls/${enc(actionRequestId)}`), { signal }),
+
+  /** Railway: an SSH key pair for direct container access, and the verified host key. */
+  configureRailwaySsh: (connectionId: string, input: ConfigureRailwaySsh) =>
+    api.post<RailwaySshSetup>(connection(connectionId, "/railway/ssh"), input),
 
   actionRequests: (companyId: string, status: ToolActionRequestStatus = "pending", signal?: AbortSignal) =>
     api.get<ToolActionRequestsResponse>(company(companyId, `tools/action-requests?status=${enc(status)}`), { signal }),

@@ -42,6 +42,8 @@ import {
 import { ReviewQueue } from "./Review";
 import { ConnectionExtras } from "./identities/Identities";
 import { PoolPage } from "./pools/Pools";
+import { BrowserUsePanel, RailwayPanel, TestCallDialog } from "./TestCall";
+import { appPanel } from "./test-call-model";
 import { poolPluginKey } from "./pools/pool-model";
 import { AgentAccessPicker, AppLogo, failureText, StateTag, useApplications, useGallery, usePendingRequests, useRefreshTools } from "./shared";
 
@@ -63,9 +65,11 @@ import { AgentAccessPicker, AppLogo, failureText, StateTag, useApplications, use
  * Who it acts as (personal, per-agent and organization identities, audiences, delegations) and an
  * aggregator's accounts sit above Permissions (src/apps/identities/, src/apps/setups/).
  *
- * Not here yet: agent-specific tool profiles, the test-an-action dialog, connection
- * activity (in the company's activity), and app-specific panels (Browser Use, Railway, Honcho,
- * email inboxes, aggregators).
+ * Each action can be tested as an agent (src/apps/TestCall.tsx). Settings carries the app's own
+ * panel where it has one: Railway's container access, Browser Use Cloud's profiles and cost cap.
+ *
+ * Not here yet: agent-specific tool profiles, connection activity (in the company's activity), and
+ * Honcho's panel.
  */
 
 export function AppDetail(props: { connectionId: string; tab: DetailTab; success: boolean; oauth: string | null }) {
@@ -206,6 +210,14 @@ export function AppDetail(props: { connectionId: string; tab: DetailTab; success
                   </Show>
                 </Match>
                 <Match when={props.tab === "settings"}>
+                  <Switch>
+                    <Match when={appPanel(connectionSlug(connection(), current().application)) === "railway"}>
+                      <RailwayPanel connection={connection()} grants={grants.data} />
+                    </Match>
+                    <Match when={appPanel(connectionSlug(connection(), current().application)) === "browser-use-cloud"}>
+                      <BrowserUsePanel connection={connection()} grants={grants.data} />
+                    </Match>
+                  </Switch>
                   <ConnectionSettings connection={connection()} name={current().name} canConfigure={canConfigure()} />
                 </Match>
               </Switch>
@@ -391,6 +403,7 @@ function ActionsCard(props: { connection: ToolConnection; state: AccessState; ca
   const set = (ids: string[], next: ActionPermission) =>
     props.state.save.mutate(withPermission(ids, next, props.state.enabled(), props.state.askFirst()));
   const quarantined = () => props.state.split().quarantined.length;
+  const [testing, setTesting] = createSignal<ToolCatalogEntry | null>(null);
 
   return (
     <section class="card ap-card" aria-labelledby="ap-actions">
@@ -418,9 +431,10 @@ function ActionsCard(props: { connection: ToolConnection; state: AccessState; ca
         </div>
       </Show>
       <Show when={props.state.split().active.length > 0} fallback={<p class="ap-empty">No actions found yet. Check for new actions once the connection works.</p>}>
-        <ActionGroup title="Reads" entries={props.state.split().readOnly.filter(matches)} state={props.state} canConfigure={props.canConfigure} onSet={set} />
-        <ActionGroup title="Makes changes" entries={props.state.split().changes.filter(matches)} state={props.state} canConfigure={props.canConfigure} onSet={set} />
+        <ActionGroup title="Reads" entries={props.state.split().readOnly.filter(matches)} state={props.state} canConfigure={props.canConfigure} onSet={set} onTest={setTesting} />
+        <ActionGroup title="Makes changes" entries={props.state.split().changes.filter(matches)} state={props.state} canConfigure={props.canConfigure} onSet={set} onTest={setTesting} />
       </Show>
+      <TestCallDialog connection={props.connection} entry={testing()} onClose={() => setTesting(null)} />
     </section>
   );
 }
@@ -431,6 +445,7 @@ function ActionGroup(props: {
   state: AccessState;
   canConfigure: boolean;
   onSet: (ids: string[], next: ActionPermission) => void;
+  onTest: (entry: ToolCatalogEntry) => void;
 }) {
   const busy = () => !props.canConfigure || props.state.save.isPending;
   return (
@@ -474,6 +489,9 @@ function ActionGroup(props: {
                       <span class="ap-action-desc">{entry.description}</span>
                     </Show>
                   </div>
+                  <Button size="compact" variant="quiet" class="ap-test-button" aria-label={`Test ${displayName(entry.toolName, entry.title)}`} onClick={() => props.onTest(entry)}>
+                    Test
+                  </Button>
                   <Show when={props.canConfigure} fallback={<span class="ap-row-meta">{PERMISSION_OPTIONS.find((option) => option.value === value())?.label}</span>}>
                     <Segmented
                       label={`${displayName(entry.toolName, entry.title)} permission`}
