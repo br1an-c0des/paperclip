@@ -1,15 +1,17 @@
 import { Tabs } from "@kobalte/core/tabs";
 import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { ChevronDown, ChevronLeft, ChevronRight, Download, Link2, RotateCcw, Square } from "lucide-solid";
+import { ChevronDown, ChevronLeft, ChevronRight, Download, Link2, Monitor, RotateCcw, Square } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { accessApi } from "@/api/access";
 import { heartbeatsApi } from "@/api/heartbeats";
+import { WorkspaceOperations } from "@/workspaces/WorkspaceOperations";
 import { instanceSettingsApi } from "@/api/instance-settings";
 import { issuePath, issuesApi } from "@/api/issues";
 import { chatPath } from "@/chat/chat-model";
 import { queryKeys } from "@/api/queryKeys";
 import { runPath, runsApi } from "@/api/runs";
+import { isCompact } from "@/layout/breakpoints";
 import { useNow } from "@/lib/clock";
 import { useCommands } from "@/lib/commands";
 import { Menu } from "@/ui/Menu";
@@ -58,7 +60,11 @@ import {
 import { RunRawOutput } from "./RunRawOutput";
 import { RunTrace } from "./RunTrace";
 import { RunTranscript } from "./RunTranscript";
+import { RunWatchdog } from "./RunWatchdog";
+import { resolveInput, type RequestAnswer } from "./runtime-requests";
+import { decisionLookup } from "./tool-decisions";
 import { traceMetaLine, traceReadable } from "./trace-model";
+import type { RuntimeRequest } from "./transcript-model";
 import { buildItems, stepCount } from "./transcript-model";
 import "./RunModal.css";
 
@@ -69,10 +75,13 @@ import "./RunModal.css";
  *   while it's going, Rerun once it's over (Retry or Resume, as the old UI offers them, and Rerun
  *   with a provider trace), the task's other runs either side, and a copy of the run's link (the
  *   old UI's `/:companyPrefix/agents/:agentId/runs/:runId`, which RunRoute opens here).
- * - Six stats: model, start, duration, tokens, cost, and the session or exit.
+ * - Six stats: model, start, duration, tokens, cost, and the session or exit, then the watchdog's
+ *   warning when a going run has gone quiet, with its three answers (RunWatchdog.tsx).
  * - Four views: the transcript (live while the run is going), what the agent was sent, the raw
  *   output, and the provider trace (instance admins only, decision 4). Find in run searches the
- *   view that's open, opening folded steps that hide a match.
+ *   view that's open, opening folded steps that hide a match. The transcript starts with what
+ *   Paperclip did to the run's workspace, marks the tool gateway's decision on each tool call, and
+ *   answers the harness's permission and input requests in place.
  * - While the run is going, a footer says the transcript is following new output, and holds the
  *   task's queued messages and the composer, to queue, steer or interrupt.
  *
@@ -172,8 +181,44 @@ function RunView(props: { runId: string }) {
   const harness = () => harnessName(adapterType());
 
   const log = createRunLog(() => props.runId, () => run.data);
-  const entries = createMemo(() => buildTranscript(log.chunks(), adapterType(), { censorUsername: censorUsername() }));
+  const entries = createMemo(() =>
+    buildTranscript(log.chunks(), adapterType(), { censorUsername: censorUsername(), runtimeMode: run.data?.runtimeMode }),
+  );
   const items = createMemo(() => buildItems(entries(), active()));
+
+  // What Paperclip did to the run's workspace, and the tool gateway's decisions on its tool calls.
+  const operations = createQuery(() => ({
+    queryKey: queryKeys.runs.workspaceOperations(props.runId),
+    queryFn: ({ signal }) => heartbeatsApi.runWorkspaceOperations(props.runId, signal),
+    refetchInterval: active() ? 5_000 : false,
+    retry: false,
+  }));
+  const decisions = createQuery(() => ({
+    queryKey: queryKeys.runs.toolDecisions(props.runId),
+    queryFn: ({ signal }) => runsApi.toolDecisions(company().id, props.runId, signal),
+    refetchInterval: active() ? 3_000 : false,
+    retry: false,
+  }));
+  const decisionFor = createMemo(() => decisionLookup(decisions.data?.decisions));
+
+  // A harness's permission or input request, answered from the transcript.
+  const answer = async (request: RuntimeRequest, reply: RequestAnswer) => {
+    const input = resolveInput(props.runId, request, reply);
+    if ("error" in input) {
+      pushToast({ tone: "error", title: "Couldn't answer the request", body: input.error });
+      return;
+    }
+    try {
+      await heartbeatsApi.resolveRuntimeRequest(input);
+      pushToast({ tone: "success", title: "Answer sent", body: "The run picks up from here." });
+    } catch (error) {
+      pushToast({ tone: "error", title: "Couldn't answer the request", body: error instanceof Error ? error.message : String(error) });
+    }
+  };
+  const settingsHref = () => {
+    const found = agent();
+    return found ? `/${company().issuePrefix}/agents/${found.urlKey ?? found.id}/settings/runtime` : null;
+  };
 
   const position = createMemo(() => runPosition(props.runId, taskRuns.data));
   const usage = createMemo(() => (run.data ? runUsage(run.data) : null));
@@ -194,6 +239,11 @@ function RunView(props: { runId: string }) {
       { defer: true },
     ),
   );
+
+  // On a phone the run is its transcript; input, raw output and the trace open on desktop (M11).
+  createEffect(() => {
+    if (isCompact() && view() !== "transcript") setView("transcript");
+  });
 
   const stop = createMutation(() => ({
     mutationFn: () => heartbeatsApi.cancel(props.runId),
@@ -402,9 +452,12 @@ function RunView(props: { runId: string }) {
   const tabs = createMemo(() => {
     const list: { value: View; label: string; note: string }[] = [
       { value: "transcript", label: "Transcript", note: plural(stepCount(items()), "step") },
+    ];
+    if (isCompact()) return list;
+    list.push(
       { value: "input", label: "Input", note: promptSize(invocation()?.prompt ?? null)?.replace(" characters", " chars") ?? "" },
       { value: "raw", label: "Raw output", note: run.data?.logBytes ? formatBytes(run.data.logBytes) : `${log.chunks().length} lines` },
-    ];
+    );
     if (isAdmin()) {
       const meta = trace();
       list.push({ value: "trace", label: "Provider trace", note: traceReadable(meta) ? `${meta!.frameCount} frames` : "Off" });
@@ -528,16 +581,18 @@ function RunView(props: { runId: string }) {
                   >
                     <Link2 size={15} aria-hidden="true" />
                   </button>
-                  <button
-                    type="button"
-                    class="btn btn--icon btn--ghost btn--compact"
-                    aria-label="Download the loaded log"
-                    title="Download the loaded log"
-                    disabled={log.chunks().length === 0}
-                    onClick={download}
-                  >
-                    <Download size={15} aria-hidden="true" />
-                  </button>
+                  <Show when={!isCompact()}>
+                    <button
+                      type="button"
+                      class="btn btn--icon btn--ghost btn--compact"
+                      aria-label="Download the loaded log"
+                      title="Download the loaded log"
+                      disabled={log.chunks().length === 0}
+                      onClick={download}
+                    >
+                      <Download size={15} aria-hidden="true" />
+                    </button>
+                  </Show>
                 </div>
               </header>
 
@@ -561,6 +616,11 @@ function RunView(props: { runId: string }) {
                     <Show when={current().errorCode}>{(code) => <span class="mono"> · {code()}</span>}</Show>
                   </p>
                 )}
+              </Show>
+              <Show when={active()}>
+                <div class="rm-watch">
+                  <RunWatchdog run={current()} taskId={issueId()} onNavigate={() => commands.closeRunModal()} />
+                </div>
               </Show>
 
               <Tabs class="rm-tabs-root" value={view()} onChange={(value) => setView(value as View)}>
@@ -617,9 +677,27 @@ function RunView(props: { runId: string }) {
                       skippedBytes={log.skippedBytes()}
                       plainLines={showsPlainLines(adapterType(), current().runtimeMode)}
                       onRetry={log.retry}
-                      onShowInput={() => setView("input")}
+                      onShowInput={isCompact() ? undefined : () => setView("input")}
                       reveal={reveal()}
+                      decisionFor={decisionFor()}
+                      onAnswer={answer}
+                      before={
+                        <Show when={(operations.data ?? []).length > 0}>
+                          <section class="rm-ops" aria-label="Workspace operations">
+                            <span class="rm-ops-head">
+                              Workspace <span class="cap">· what Paperclip did before and after the run</span>
+                            </span>
+                            <WorkspaceOperations operations={operations.data!} censorUsername={censorUsername()} />
+                          </section>
+                        </Show>
+                      }
                     />
+                    <Show when={isCompact()}>
+                      <p class="rm-desk">
+                        <Monitor size={15} aria-hidden="true" />
+                        Input, raw output and provider trace open on desktop
+                      </p>
+                    </Show>
                   </Tabs.Content>
                   <Tabs.Content value="input">
                     <RunInput
@@ -647,6 +725,8 @@ function RunView(props: { runId: string }) {
                         rerunning={rerun.isPending}
                         onRerun={() => rerun.mutate()}
                         metaLine={trace() ? traceMetaLine(trace()!) : ""}
+                        settingsHref={settingsHref()}
+                        onNavigate={() => commands.closeRunModal()}
                       />
                     </Tabs.Content>
                   </Show>

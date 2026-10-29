@@ -1,8 +1,9 @@
 import type { ExecutionWorkspaceStatus, WorkspaceOverviewItem, WorkspaceOverviewResponse } from "@paperclipai/shared";
-import { A } from "@solidjs/router";
-import { createInfiniteQuery, useQueryClient } from "@tanstack/solid-query";
+import { A, useSearchParams } from "@solidjs/router";
+import { createInfiniteQuery, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Copy, ExternalLink, FolderOpen, GitBranch, LoaderCircle, Play, Square } from "lucide-solid";
-import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
+import { ApiError } from "@/api/client";
 import { executionWorkspacesApi } from "@/api/execution-workspaces";
 import { queryKeys } from "@/api/queryKeys";
 import { workspacesApi } from "@/api/workspaces";
@@ -64,6 +65,43 @@ export function WorkspacesPage() {
   const total = () => overview.data?.pages[0]?.total ?? items().length;
   const groups = createMemo(() => groupWorkspaces(items()));
 
+  // `?workspace=<id>`, where old `/execution-workspaces/:id` links land (routes/legacy-model.ts):
+  // the page has no detail view, so it shows that workspace's card, switching to Closed when it's
+  // closed and loading more pages until the card is there.
+  const [params, setParams] = useSearchParams<{ workspace?: string }>();
+  const focusId = () => params.workspace || null;
+  const focused = createQuery(() => ({
+    queryKey: ["execution-workspace", focusId() ?? "", "detail"] as const,
+    queryFn: ({ signal }) => executionWorkspacesApi.get(focusId()!, signal),
+    enabled: focusId() !== null,
+    retry: false,
+  }));
+  createEffect(
+    on(
+      () => focused.data,
+      (workspace) => {
+        if (workspace && workspace.id === focusId()) setView(CLOSED.includes(workspace.status) ? "closed" : "open");
+      },
+    ),
+  );
+  const listed = () => {
+    const id = focusId();
+    return id !== null && items().some((item) => item.executionWorkspaceId === id);
+  };
+  createEffect(() => {
+    if (focusId() === null || !focused.data || listed() || !overview.hasNextPage || overview.isFetchingNextPage) return;
+    void overview.fetchNextPage();
+  });
+  const focusNote = (): string | null => {
+    if (focusId() === null || listed()) return null;
+    if (focused.isError) {
+      const missing = focused.error instanceof ApiError && focused.error.status === 404;
+      return missing ? "The workspace from that link wasn't found. It may have been removed." : `The workspace from that link couldn't be loaded: ${(focused.error as Error).message}`;
+    }
+    if (!focused.data || overview.isPending || overview.hasNextPage) return null;
+    return `${focused.data.name} isn't in this list.`;
+  };
+
   const openTask = (task: { id: string; identifier: string | null; title: string }, projectId: string | null) =>
     commands.openTaskModal({ id: task.id, identifier: task.identifier, title: task.title, projectId });
 
@@ -96,6 +134,16 @@ export function WorkspacesPage() {
           <span class="ws-muted ws-toolbar-note">A closed workspace reopens from its task: a new message or resuming the task reopens it.</span>
         </Show>
       </div>
+      <Show when={focusNote()}>
+        {(note) => (
+          <p class="ws-focus-note" role="status">
+            <span>{note()}</span>
+            <Button size="compact" variant="quiet" onClick={() => setParams({ workspace: undefined })}>
+              Dismiss
+            </Button>
+          </p>
+        )}
+      </Show>
       <Switch>
         <Match when={overview.isPending}>
           <p class="ws-muted">Loading workspaces…</p>
@@ -115,6 +163,7 @@ export function WorkspacesPage() {
                 group={group}
                 hidePaths={hidePaths()}
                 busy={busy()}
+                focusId={focusId()}
                 onServices={(item, action) => void services(item, action)}
                 onClose={(item) => setClosing({ id: item.executionWorkspaceId, name: item.workspaceName, status: item.executionWorkspaceStatus })}
                 onOpenTask={(task) => openTask(task, group.projectId)}
@@ -142,6 +191,7 @@ function ProjectGroup(props: {
   group: WorkspaceGroup;
   hidePaths: boolean;
   busy: string | null;
+  focusId: string | null;
   onServices: (item: WorkspaceOverviewItem, action: "start" | "stop") => void;
   onClose: (item: WorkspaceOverviewItem) => void;
   onOpenTask: (task: { id: string; identifier: string | null; title: string }) => void;
@@ -149,7 +199,15 @@ function ProjectGroup(props: {
   const company = useCompany();
   const count = () => props.group.items.length + props.group.failed.length;
   const card = (item: WorkspaceOverviewItem) => (
-    <WorkspaceCard item={item} hidePaths={props.hidePaths} busy={props.busy} onServices={props.onServices} onClose={props.onClose} onOpenTask={props.onOpenTask} />
+    <WorkspaceCard
+      item={item}
+      hidePaths={props.hidePaths}
+      busy={props.busy}
+      focused={props.focusId === item.executionWorkspaceId}
+      onServices={props.onServices}
+      onClose={props.onClose}
+      onOpenTask={props.onOpenTask}
+    />
   );
   return (
     <section class="ws-group" aria-label={props.group.projectName}>
@@ -186,10 +244,23 @@ function WorkspaceCard(props: {
   item: WorkspaceOverviewItem;
   hidePaths: boolean;
   busy: string | null;
+  /** The workspace a link pointed at: marked, and scrolled to once. */
+  focused: boolean;
   onServices: (item: WorkspaceOverviewItem, action: "start" | "stop") => void;
   onClose: (item: WorkspaceOverviewItem) => void;
   onOpenTask: (task: { id: string; identifier: string | null; title: string }) => void;
 }) {
+  let element: HTMLElement | undefined;
+  createEffect(
+    on(
+      () => props.focused,
+      (focused) => {
+        if (!focused || !element) return;
+        element.scrollIntoView?.({ block: "center" });
+        element.focus({ preventScroll: true });
+      },
+    ),
+  );
   const item = () => props.item;
   const actions = () => cardActions(item());
   const status = () => STATUS[item().executionWorkspaceStatus];
@@ -197,7 +268,14 @@ function WorkspaceCard(props: {
   const more = () => Math.max(item().linkedIssueCount - shown().length, 0);
   const pending = (action: "start" | "stop") => props.busy === `${item().key}:${action}`;
   return (
-    <article class="card ws-card" aria-label={item().workspaceName}>
+    <article
+      ref={element}
+      class="card ws-card"
+      aria-label={item().workspaceName}
+      aria-current={props.focused ? "true" : undefined}
+      tabIndex={props.focused ? -1 : undefined}
+      data-focused={props.focused ? "" : undefined}
+    >
       <div class="ws-card-head">
         <span class="ws-name">{item().workspaceName}</span>
         <span class="ws-tag" data-tone={status().tone}>

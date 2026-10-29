@@ -128,3 +128,9 @@
   color: var(--text);
   font-weight: 600;
 }
+
+/* The watchdog's warning on a running run that has gone quiet */
+.tr-run-main .rw,
+.tr-run-main .rw-snoozed {
+  margin-top: 6px;
+}

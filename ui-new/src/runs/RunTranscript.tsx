@@ -20,6 +20,8 @@ import type { RunDetail } from "@/api/runs";
 import { Markdown } from "@/ui/Markdown";
 import type { RunInvocation } from "./invocation";
 import { capitalize, costLabel, elapsedLabel, formatBytes, formatDuration, tokenCount, triggerLabel } from "./run-model";
+import { RunRequest, type AnswerRequest } from "./RunRequest";
+import { summarizeDecision, type DecisionLookup } from "./tool-decisions";
 import { transcriptSteps, visibleItems, type DiffLine, type ShownItem, type StepKind, type TranscriptItem } from "./transcript-model";
 import "./RunTranscript.css";
 
@@ -28,6 +30,10 @@ import "./RunTranscript.css";
  * stamped with the time since the run started. Messages read as text; thinking, tool calls and
  * diffs open on demand; long stretches of steps fold. A finished run leads with its outcome when
  * the agent reported one.
+ *
+ * Tool calls carry the tool gateway's decision on them (allowed, denied, needs approval) when
+ * there is one, and a harness's runtime requests (permission or input it asked for mid-turn) can
+ * be answered in place while the run goes.
  */
 
 const STEP_ICONS: Record<StepKind, (props: { size: number }) => JSX.Element> = {
@@ -58,9 +64,16 @@ export function RunTranscript(props: {
   /** The harness's output can't be read as a structured transcript, so it shows as plain lines. */
   plainLines: boolean;
   onRetry: () => void;
-  onShowInput: () => void;
+  /** Opens the Input view; left out on a phone, where it opens on desktop. */
+  onShowInput?: () => void;
   /** Folds opened for Find in run, because they hide a match (find-model.ts `foldsToReveal`). */
   reveal?: ReadonlySet<string>;
+  /** The tool gateway's decision on a tool call, if it made one. */
+  decisionFor?: DecisionLookup;
+  /** Answers a runtime request; without it, requests show read-only. */
+  onAnswer?: AnswerRequest;
+  /** Shown before the steps, such as the run's workspace operations. */
+  before?: JSX.Element;
 }) {
   const [expanded, setExpanded] = createSignal<ReadonlySet<string>>(new Set());
   createEffect(on(() => props.run.id, () => setExpanded(new Set<string>()), { defer: true }));
@@ -113,9 +126,13 @@ export function RunTranscript(props: {
                 <span class="rt-tag">Input</span>
                 <span>Prompt from Paperclip</span>
                 <span class="cap">· {prompt().length.toLocaleString()} characters</span>
-                <button type="button" class="rm-b" onClick={() => props.onShowInput()}>
-                  Show full input
-                </button>
+                <Show when={props.onShowInput}>
+                  {(show) => (
+                    <button type="button" class="rm-b" onClick={() => show()()}>
+                      Show full input
+                    </button>
+                  )}
+                </Show>
               </div>
               <div class="rt-fade">
                 <pre class="rm-pre">{prompt().slice(0, 600)}</pre>
@@ -124,6 +141,8 @@ export function RunTranscript(props: {
           </div>
         )}
       </Show>
+
+      {props.before}
 
       <Show when={props.skippedBytes > 0}>
         <p class="rm-note">
@@ -142,6 +161,9 @@ export function RunTranscript(props: {
                 agentName={props.agentName}
                 onExpand={(key) => setExpanded(new Set([...expanded(), key]))}
                 at={at}
+                decisionFor={props.decisionFor}
+                live={props.live}
+                onAnswer={props.onAnswer}
               />
             </div>
           </div>
@@ -177,7 +199,15 @@ export function RunTranscript(props: {
   );
 }
 
-function Item(props: { item: ShownItem; agentName: string; at: (ts: string) => string; onExpand: (key: string) => void }) {
+function Item(props: {
+  item: ShownItem;
+  agentName: string;
+  at: (ts: string) => string;
+  onExpand: (key: string) => void;
+  decisionFor?: DecisionLookup;
+  live: boolean;
+  onAnswer?: AnswerRequest;
+}) {
   return (
     <Switch>
       <Match when={props.item.kind === "fold" && props.item}>
@@ -247,7 +277,12 @@ function Item(props: { item: ShownItem; agentName: string; at: (ts: string) => s
           </details>
         )}
       </Match>
-      <Match when={props.item.kind === "tool" && props.item}>{(tool) => <Tool item={tool()} />}</Match>
+      <Match when={props.item.kind === "tool" && props.item}>
+        {(tool) => <Tool item={tool()} decisionFor={props.decisionFor} />}
+      </Match>
+      <Match when={props.item.kind === "request" && props.item}>
+        {(asked) => <RunRequest request={asked().request} live={props.live} onAnswer={props.onAnswer} />}
+      </Match>
       <Match when={props.item.kind === "diff" && props.item}>
         {(diff) => (
           <details class="rt-tool" open>
@@ -301,17 +336,31 @@ function Item(props: { item: ShownItem; agentName: string; at: (ts: string) => s
   );
 }
 
-function Tool(props: { item: Extract<TranscriptItem, { kind: "tool" }> }) {
+function Tool(props: { item: Extract<TranscriptItem, { kind: "tool" }>; decisionFor?: DecisionLookup }) {
   const took = () =>
     props.item.endTs ? formatDuration(new Date(props.item.endTs).getTime() - new Date(props.item.ts).getTime()) : null;
+  const decision = createMemo(() => props.decisionFor?.(props.item.refs) ?? null);
+  const summary = createMemo(() => {
+    const found = decision();
+    return found ? summarizeDecision(found) : null;
+  });
+  // A call the gateway held or refused opens, so the reader sees why.
+  const held = () => summary()?.tone === "red" || summary()?.tone === "amber";
   return (
-    <details class="rt-tool" data-status={props.item.status}>
+    <details class="rt-tool" data-status={props.item.status} open={held() || undefined}>
       <summary>
         <ChevronRight size={13} class="rt-chev" aria-hidden="true" />
         {STEP_ICONS[props.item.step]({ size: 14 })}
         <span class="rt-tn">{props.item.name}</span>
         <span class="rt-tt">{props.item.title}</span>
         <span class="rt-tm">
+          <Show when={summary()}>
+            {(found) => (
+              <span class="rt-dec" data-tone={found().tone} title="The tool gateway's decision">
+                {found().label}
+              </span>
+            )}
+          </Show>
           <Show when={props.item.diff}>
             <span class="rt-add">+{props.item.added}</span>
             <Show when={props.item.removed}>
@@ -330,6 +379,23 @@ function Tool(props: { item: Extract<TranscriptItem, { kind: "tool" }> }) {
         </span>
       </summary>
       <div class="rt-tbody">
+        <Show when={decision()}>
+          {(found) => (
+            <div class="rt-decision">
+              <span class="rt-lbl">Gateway decision</span>
+              <p>
+                <b>{summary()!.label}</b>
+                <Show when={found().reasonCode}>{(code) => <span class="mono"> · {code()}</span>}</Show>
+                <Show when={summary()!.detail && summary()!.detail !== found().reasonCode}> · {summary()!.detail}</Show>
+              </p>
+              <Show when={found().pendingAction?.previewMarkdown}>{(preview) => <Markdown source={preview()} class="rt-md" />}</Show>
+              <span class="cap mono">
+                invocation {found().invocation.id.slice(0, 8)} · {found().auditEvents.length} audit {found().auditEvents.length === 1 ? "event" : "events"}
+                <Show when={found().actionRequest}>{(request) => <> · action {request().status.replace(/_/g, " ")}</>}</Show>
+              </span>
+            </div>
+          )}
+        </Show>
         <Show
           when={props.item.diff}
           fallback={

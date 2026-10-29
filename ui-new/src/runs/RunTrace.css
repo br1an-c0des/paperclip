@@ -103,3 +103,10 @@
     padding: 16px 16px 24px;
   }
 }
+
+/* The link to the agent's runtime settings, where tracing every run is turned on */
+.rx-link {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

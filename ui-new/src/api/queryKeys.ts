@@ -83,6 +83,9 @@ export const queryKeys = {
   executionWorkspaces: {
     /** The company's execution workspaces in brief, for the task list's workspace filter and groups. */
     summaryList: (companyId: string) => ["execution-workspaces", companyId, "summary", {}] as const,
+    /** One workspace's operations; `operationLog` is one operation's stored log. */
+    operations: (workspaceId: string) => ["execution-workspace", workspaceId, "operations"] as const,
+    operationLog: (operationId: string) => ["workspace-operation-log", operationId] as const,
   },
   /**
    * Company activity. Called as a function it's the prefix the live events refresh on every
@@ -123,6 +126,8 @@ export const queryKeys = {
     events: (runId: string) => ["heartbeat-run", runId, "events"] as const,
     providerTrace: (runId: string) => ["heartbeat-run", runId, "provider-trace"] as const,
     providerTraceMetadata: (companyId: string, runId: string) => ["provider-traces", companyId, runId] as const,
+    workspaceOperations: (runId: string) => ["heartbeat-run", runId, "workspace-operations"] as const,
+    toolDecisions: (runId: string) => ["heartbeat-run", runId, "tool-decisions"] as const,
   },
   heartbeats: (companyId: string) => ["heartbeats", companyId] as const,
   /** The old UI's live events invalidate `["ai-connections", companyId]`, which reaches both. */

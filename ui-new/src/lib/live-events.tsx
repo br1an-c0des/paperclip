@@ -54,6 +54,10 @@ function changesAttention(action: string | null) {
 
 /** Query keys an `activity.logged` event affects, by the entity it's about and what was done. */
 function activityKeys(companyId: string, entityType: string | null, entityId: string | null, action: string | null): QueryKey[] {
+  // Listing or reading a task's workspace files is logged (`issue.file_resource_list`,
+  // `…_content_read`) but changes nothing. Refreshing the task would refetch the open file viewer,
+  // whose reads log again: a loop that ends on the server's rate limit.
+  if (action?.startsWith("issue.file_resource_")) return [queryKeys.activity(companyId)];
   const keys: QueryKey[] = [queryKeys.activity(companyId), queryKeys.dashboard(companyId), queryKeys.sidebarBadges(companyId)];
   // Apps and tools (src/apps/): connections, their tools, profiles, policies and Ask-first requests
   // are logged on `tool_*` entities; one prefix covers every Apps query for the company.

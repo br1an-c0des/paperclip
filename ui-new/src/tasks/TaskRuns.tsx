@@ -1,12 +1,15 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Square } from "lucide-solid";
-import { createMemo, For, Match, Show, Switch } from "solid-js";
+import { RotateCcw, Square } from "lucide-solid";
+import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { heartbeatsApi } from "@/api/heartbeats";
 import { issuesApi, type RunForIssue } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
+import { runsApi } from "@/api/runs";
 import { useNow } from "@/lib/clock";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
+import { canResumeRun, canRetryRun, resumePayload, retryOutcome } from "@/runs/run-model";
+import { RunWatchdog } from "@/runs/RunWatchdog";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { pushToast } from "@/ui/Toast";
@@ -18,6 +21,10 @@ import "./TaskRuns.css";
  * The task panel's Runs section: what the task's runs cost in all, then each run, newest first, with
  * its agent, how it started, how long it took, how it ended, and Stop while it's going. "View run"
  * opens its transcript in the run modal.
+ *
+ * A failed or timed-out run offers Retry (the same request again as a new run), and a run whose
+ * process was lost offers Resume, by the run modal's rules (run-model.ts). A going run that has
+ * gone quiet shows the watchdog's warning with its answers (RunWatchdog.tsx).
  */
 
 const ACTIVE = new Set(["queued", "running", "scheduled_retry"]);
@@ -61,6 +68,16 @@ export function runNextAction(run: Pick<RunForIssue, "execution" | "nextAction">
   return (run.execution ? run.execution.nextAction : run.nextAction) ?? null;
 }
 
+/** A running run's watchdog warning: the run's own detail carries the output-silence state. */
+function QuietRun(props: { runId: string; taskId: string }) {
+  const run = createQuery(() => ({
+    queryKey: queryKeys.runs.detail(props.runId),
+    queryFn: ({ signal }) => runsApi.get(props.runId, signal),
+    refetchInterval: 30_000,
+  }));
+  return <Show when={run.data}>{(found) => <RunWatchdog run={found()} taskId={props.taskId} />}</Show>;
+}
+
 export function TaskRuns(props: { taskId: string }) {
   const company = useCompany();
   const commands = useCommands();
@@ -87,6 +104,38 @@ export function TaskRuns(props: { taskId: string }) {
       void client.invalidateQueries({ queryKey: queryKeys.issues.section(props.taskId, "runs") });
     } catch (error) {
       pushToast({ tone: "error", title: "Couldn't stop the run", body: error instanceof Error ? error.message : String(error) });
+    }
+  };
+
+  // Retry and Resume, as the run modal offers them; one at a time.
+  const [rerunning, setRerunning] = createSignal<string | null>(null);
+  const afterRerun = () => {
+    void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
+    void client.invalidateQueries({ queryKey: queryKeys.issues.section(props.taskId, "runs") });
+    void client.invalidateQueries({ queryKey: queryKeys.issues.detail(props.taskId) });
+  };
+  const rerun = async (run: RunForIssue, how: "retry" | "resume") => {
+    setRerunning(run.runId);
+    const target = { id: run.runId, agentId: run.agentId, companyId: company().id };
+    try {
+      if (how === "resume") {
+        const result = await runsApi.resume(target, resumePayload({ id: run.runId, contextSnapshot: { issueId: props.taskId } }));
+        if (!("id" in result)) throw new Error(result.message ?? "The resume request was skipped.");
+        pushToast({ tone: "success", title: "Resuming the run" });
+      } else {
+        const outcome = retryOutcome(await runsApi.retry(target));
+        if ("error" in outcome) throw new Error(outcome.error);
+        pushToast(
+          outcome.runId
+            ? { tone: "success", title: "Retrying the run" }
+            : { tone: "success", title: "Retry queued", body: "The same request will retry when the task is ready." },
+        );
+      }
+      afterRerun();
+    } catch (error) {
+      pushToast({ tone: "error", title: how === "resume" ? "Couldn't resume the run" : "Couldn't retry the run", body: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setRerunning(null);
     }
   };
 
@@ -139,6 +188,9 @@ export function TaskRuns(props: { taskId: string }) {
                 {(run) => {
                   const agent = () => people.agent(run.agentId);
                   const active = () => ACTIVE.has(run.status);
+                  const rerunnable = () => ({ status: run.status, errorCode: run.errorCode ?? null, execution: run.execution });
+                  const resumable = () => canResumeRun(rerunnable());
+                  const retryable = () => canRetryRun(rerunnable());
                   return (
                     <li class="tr-run">
                       <Show when={agent()} fallback={<span class="tr-avatar-gap" aria-hidden="true" />}>
@@ -174,6 +226,9 @@ export function TaskRuns(props: { taskId: string }) {
                             </p>
                           )}
                         </Show>
+                        <Show when={run.status === "running"}>
+                          <QuietRun runId={run.runId} taskId={props.taskId} />
+                        </Show>
                       </div>
                       <div class="tr-actions">
                         <Button size="compact" onClick={() => commands.openRunModal(run.runId)}>
@@ -183,6 +238,17 @@ export function TaskRuns(props: { taskId: string }) {
                           <Button size="compact" onClick={() => void stop(run)}>
                             <Square size={12} aria-hidden="true" />
                             Stop
+                          </Button>
+                        </Show>
+                        <Show when={resumable() || retryable()}>
+                          <Button
+                            size="compact"
+                            disabled={rerunning() !== null}
+                            title={resumable() ? "The process was lost. Pick up from where this run stopped." : "Send the same request again as a new run."}
+                            onClick={() => void rerun(run, resumable() ? "resume" : "retry")}
+                          >
+                            <RotateCcw size={12} aria-hidden="true" />
+                            {rerunning() === run.runId ? "Starting…" : resumable() ? "Resume" : "Retry"}
                           </Button>
                         </Show>
                       </div>

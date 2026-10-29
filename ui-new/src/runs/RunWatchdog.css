@@ -1,0 +1,70 @@
+/* The output-silence warning (RunWatchdog.tsx): amber while suspicious, red once critical */
+.rw {
+  --tone-bg: var(--amber-bg);
+  --tone-fg: var(--amber-fg);
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--tone-fg) 40%, transparent);
+  border-radius: var(--r-inner);
+  background: var(--tone-bg);
+  font-size: 13px;
+}
+
+.rw[data-level="critical"] {
+  --tone-bg: var(--red-bg);
+  --tone-fg: var(--red-fg);
+}
+
+.rw-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--tone-fg);
+}
+
+.rw-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rw-title {
+  margin: 0;
+  color: var(--tone-fg);
+  font-weight: 700;
+}
+
+.rw-body {
+  margin: 0;
+  color: var(--body);
+  line-height: 1.5;
+}
+
+.rw-link {
+  color: var(--text);
+}
+
+.rw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.rw-error {
+  margin: 2px 0 0;
+  color: var(--red-fg);
+  font-size: 12px;
+}
+
+.rw-snoozed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}

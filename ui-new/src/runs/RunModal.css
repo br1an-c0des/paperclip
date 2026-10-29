@@ -218,6 +218,29 @@
   overflow-wrap: anywhere;
 }
 
+/* The watchdog's warning on a quiet run, under the stats */
+.rm-watch {
+  padding: 10px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rm-watch:empty {
+  display: none;
+}
+
+/* The run's workspace operations, at the top of the transcript */
+.rm-ops {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rm-ops-head {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--body);
+}
+
 /* The tab bar, with the transcript's chips on the right */
 .rm-tabs-root {
   flex: 1;
@@ -410,6 +433,18 @@
   line-height: 1.55;
 }
 
+/* On a phone, under the transcript: where the other views are (M11) */
+.rm-desk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--row-line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .rm-note > svg {
   flex-shrink: 0;
   margin-top: 2px;
@@ -509,19 +544,87 @@
     display: none;
   }
 
+  /* M11: the task by its ID alone, so the line stays one line; a chat keeps its title */
+  .rm-task:has(.mono) .rm-task-title {
+    display: none;
+  }
+
+  .rm-task .mono {
+    white-space: nowrap;
+  }
+
+  /* Three across, as on M11, so the transcript keeps most of the screen */
   .rm-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .rm-stats > div,
   .rm-stats > div:first-child,
   .rm-stats > div:nth-child(3n + 1) {
+    padding: 8px 10px 9px;
+  }
+
+  .rm-stats > div:nth-child(3n + 1) {
     padding-left: 16px;
+  }
+
+  .rm-stats dd {
+    font-size: 14px;
   }
 
   .rm-bar,
   .rm-foot,
-  .rm-alert {
+  .rm-alert,
+  .rm-watch {
     padding-inline: 16px;
+  }
+
+  /* Tabs and the Show chips share a row; Find takes the next */
+  .rm-lbl {
+    display: none;
+  }
+
+  /*
+   * A live run keeps room for its transcript: the status line stays one line (the composer's
+   * placeholder already says where messages go), and the silence warning tightens up.
+   */
+  .rm-foot {
+    padding-block: 8px 10px;
+  }
+
+  .rm-foot-status {
+    flex-wrap: nowrap;
+  }
+
+  .rm-foot-status > span:nth-child(2) {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .rm-foot-hint {
+    display: none;
+  }
+
+  .rm-watch .rw {
+    padding: 8px 12px;
+  }
+
+  .rm-watch .rw-icon {
+    display: none;
+  }
+
+  .rm-watch .rw-body {
+    font-size: 12px;
+  }
+
+  .rm-watch .rw-actions {
+    flex-wrap: nowrap;
+  }
+
+  .rm-watch .rw-actions .btn {
+    padding-inline: 10px;
   }
 }

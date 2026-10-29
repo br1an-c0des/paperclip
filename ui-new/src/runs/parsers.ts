@@ -11,6 +11,7 @@ import { parseOpenCodeStdoutLine } from "@paperclipai/adapter-opencode-local/ui"
 import { parsePiStdoutLine } from "@paperclipai/adapter-pi-local/ui";
 import { parseStdoutLine as parseHermesGatewayStdoutLine } from "@paperclipai/hermes-paperclip-adapter/gateway/ui";
 import { parseHermesStdoutLine } from "@paperclipai/hermes-paperclip-adapter/ui";
+import { createPaperclipRunnerParser } from "./paperclip-runner-parser";
 import type { RunLogChunk } from "./run-log";
 
 /*
@@ -19,8 +20,13 @@ import type { RunLogChunk } from "./run-log";
  * imports the same parsers rather than keeping copies. `buildTranscript` follows
  * ui/src/adapters/transcript.ts.
  *
+ * The Paperclip runner (`paperclip_runner`) has no package parser, so ui-new keeps a copy of the
+ * old UI's (paperclip-runner-parser.ts). Native-runtime runs go through the runner too: their log
+ * is the runner's event envelopes, whatever the agent's harness, so they use that parser.
+ *
  * Not covered yet, so their output shows as plain lines:
- * - `paperclip_runner` and `cursor_cloud`, whose parsers live in the old UI's own source;
+ * - `cursor_cloud`, whose parser is in `@paperclipai/adapter-cursor-cloud/ui`, a package ui-new
+ *   doesn't depend on yet;
  * - external adapters, whose parsers the old UI loads from the server at run time
  *   (ui/src/adapters/dynamic-loader.ts).
  */
@@ -49,9 +55,21 @@ const PARSERS: Record<string, () => LineParser> = {
   http: plainLines,
 };
 
-/** Whether ui-new can read this harness's output as a structured transcript. */
+const RUNNER = "paperclip_runner";
+
+/**
+ * Whether a local harness's own package can read its output as a structured transcript. The
+ * runner's events are read separately where they're needed (the chat reads them from the run's
+ * events), so it doesn't count here.
+ */
 export function hasStructuredParser(adapterType: string | null | undefined) {
   return !!adapterType && adapterType in PARSERS && adapterType !== "process" && adapterType !== "http";
+}
+
+/** The parser for a run: the runner's for runner and native runs, else the harness's own. */
+function parserFor(adapterType: string | null | undefined, runtimeMode?: string): LineParser {
+  if (runtimeMode === "native" || adapterType === RUNNER) return createPaperclipRunnerParser();
+  return adapterType && PARSERS[adapterType] ? PARSERS[adapterType]!() : plainLines();
 }
 
 /**
@@ -59,7 +77,7 @@ export function hasStructuredParser(adapterType: string | null | undefined) {
  * yet. The process and HTTP adapters write plain output anyway, so they don't need the note.
  */
 export function showsPlainLines(adapterType: string | null | undefined, runtimeMode?: string) {
-  if (runtimeMode === "native") return true;
+  if (runtimeMode === "native" || adapterType === RUNNER) return false;
   return !!adapterType && !(adapterType in PARSERS);
 }
 
@@ -84,15 +102,16 @@ function truncate(line: string, max = 160) {
  * Builds the transcript from a run's chunks. stderr and system chunks pass through; stdout is split
  * into lines, carrying a partial line over to the next chunk, and each line goes to the harness's
  * parser. A line the parser throws on becomes an error entry instead of breaking the transcript.
- * `censorUsername` hides the user's name in home-directory paths, per the instance setting.
+ * `censorUsername` hides the user's name in home-directory paths, per the instance setting;
+ * `runtimeMode` is the run's, as a native run's output is the runner's.
  */
 export function buildTranscript(
   chunks: readonly RunLogChunk[],
   adapterType: string | null | undefined,
-  options: { censorUsername?: boolean } = {},
+  options: { censorUsername?: boolean; runtimeMode?: string } = {},
 ): TranscriptEntry[] {
   const redaction = { enabled: options.censorUsername ?? false };
-  const parser = (adapterType && PARSERS[adapterType]) ? PARSERS[adapterType]!() : plainLines();
+  const parser = parserFor(adapterType, options.runtimeMode);
   const entries: TranscriptEntry[] = [];
   let buffer = "";
 

@@ -152,6 +152,7 @@ describe("visibleItems", () => {
     diff: null,
     added: 0,
     removed: 0,
+    refs: {},
   });
   const thinking = (second: number): TranscriptItem => ({ kind: "thinking", key: `k${second}`, ts: ts(second), endTs: ts(second), text: "hmm", streaming: false });
 

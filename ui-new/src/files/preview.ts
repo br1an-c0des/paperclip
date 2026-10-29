@@ -4,11 +4,14 @@ import { basename } from "./file-tree";
 /*
  * How the file viewer shows a workspace file. The server classifies each file (`previewKind`: text,
  * image, video, pdf or unsupported) and sends text as UTF-8 and media as base64; the viewer refines
- * text into Markdown (rendered, with its source a toggle away), code (highlighted) and plain text.
+ * text into Markdown and HTML (rendered, with the source a toggle away), CSV (a table, likewise),
+ * code (highlighted) and plain text.
  */
 
 export type Preview =
   | { kind: "markdown" }
+  | { kind: "html" }
+  | { kind: "csv" }
   | { kind: "code"; language: string }
   | { kind: "text" }
   | { kind: "image"; src: string }
@@ -114,6 +117,18 @@ export function languageFor(path: string): string | null {
   return NAMED[name] ?? LANGUAGES[extension(path)] ?? null;
 }
 
+const mediaType = (contentType: string | null | undefined) => (contentType ?? "").split(";")[0]!.trim().toLowerCase();
+
+/** HTML pages, shown rendered in a sandboxed frame (html-preview.ts). */
+export function isHtmlFile(path: string, contentType?: string | null) {
+  const type = mediaType(contentType);
+  return type === "text/html" || type === "application/xhtml+xml" || /\.(html?|xhtml)$/i.test(path);
+}
+
+export function isCsvFile(path: string, contentType?: string | null) {
+  return /\.csv$/i.test(path) || mediaType(contentType) === "text/csv";
+}
+
 /** The path the viewer goes by: the display path, else the title. */
 export const resourcePath = (resource: Pick<ResourceLike, "displayPath" | "title">) => resource.displayPath || resource.title;
 
@@ -138,6 +153,8 @@ export function detectPreview(resource: ResourceLike, content?: WorkspaceFileCon
     case "text": {
       if (content && content.encoding !== "utf8") return { kind: "unsupported", reason: "This file isn't text." };
       if (isMarkdownPath(path) || resource.contentType === "text/markdown") return { kind: "markdown" };
+      if (isHtmlFile(path, resource.contentType)) return { kind: "html" };
+      if (isCsvFile(path, resource.contentType)) return { kind: "csv" };
       const language = languageFor(path);
       return language ? { kind: "code", language } : { kind: "text" };
     }

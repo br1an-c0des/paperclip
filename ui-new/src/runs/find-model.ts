@@ -25,6 +25,8 @@ export function itemText(item: TranscriptItem): string {
       return item.text;
     case "outcome":
       return [item.summary, ...item.checks.map((check) => check.label), ...item.remaining, ...item.artifacts].join("\n");
+    case "request":
+      return item.request.prompt;
   }
 }
 
