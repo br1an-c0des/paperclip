@@ -1,13 +1,15 @@
 import type { Issue } from "@paperclipai/shared";
-import { useSearchParams } from "@solidjs/router";
+import { useLocation, useSearchParams } from "@solidjs/router";
 import { Activity, FileText, FolderGit2, Layers, Play, Puzzle } from "lucide-solid";
-import { For, Match, Show, Switch, type JSX } from "solid-js";
+import { createEffect, createMemo, For, Match, on, Show, Switch, type JSX } from "solid-js";
+import { viewport } from "@/layout/breakpoints";
 import { TaskActivity } from "./TaskActivity";
 import { TaskDetails } from "./TaskDetails";
 import { TaskFiles } from "./TaskFiles";
 import { TaskNotices } from "./TaskNotices";
 import { TaskRuns } from "./TaskRuns";
 import { TaskWorkspace } from "./TaskWorkspace";
+import { anchorSection, parseTaskAnchor } from "./task-anchor";
 import { isPluginTab } from "@/plugins/model";
 import { TaskPluginExtras, TaskPluginSectionView, useTaskPluginSections } from "@/plugins/TaskPlugins";
 import "./TaskSections.css";
@@ -24,14 +26,22 @@ import "./TaskSections.css";
  * The task's health notices (TaskNotices) sit above whichever section is open, then what plugins
  * add to tasks (toolbar buttons, launchers, detail blocks). Plugins' task tabs and agent side panels
  * join the rail as sections of their own (`?section=plugin:<pluginKey>:<slotId>`; src/plugins/).
+ *
+ * A link into the task (`#comment-<id>`, `#document-<key>`; task-anchor.ts) opens the section it
+ * points into: Activity scrolls to the comment, Docs and files opens the document.
+ *
+ * On a phone (M2 to M4) the sections are tabs above the open one, with Details, Activity and Files
+ * named, and the modal's split becomes the same single column.
+ *
+ * Sections are a list (SECTIONS), so another one (cases, say) is one entry and one Match below.
  */
 
 export type TaskSection = "details" | "activity" | "files" | "runs" | "workspace";
 
-const SECTIONS: { id: TaskSection; label: string; icon: () => JSX.Element }[] = [
-  { id: "details", label: "Details", icon: () => <Layers size={16} aria-hidden="true" /> },
-  { id: "activity", label: "Activity", icon: () => <Activity size={16} aria-hidden="true" /> },
-  { id: "files", label: "Docs and files", icon: () => <FileText size={16} aria-hidden="true" /> },
+const SECTIONS: { id: TaskSection; label: string; short?: string; icon: () => JSX.Element }[] = [
+  { id: "details", label: "Details", short: "Details", icon: () => <Layers size={16} aria-hidden="true" /> },
+  { id: "activity", label: "Activity", short: "Activity", icon: () => <Activity size={16} aria-hidden="true" /> },
+  { id: "files", label: "Docs and files", short: "Files", icon: () => <FileText size={16} aria-hidden="true" /> },
   { id: "runs", label: "Runs", icon: () => <Play size={16} aria-hidden="true" /> },
   { id: "workspace", label: "Workspace", icon: () => <FolderGit2 size={16} aria-hidden="true" /> },
 ];
@@ -50,7 +60,9 @@ export function TaskSections(props: {
   onOpenTask: (task: { id: string; identifier: string | null }) => void;
 }) {
   const [params, setParams] = useSearchParams<{ section?: string }>();
-  const split = () => props.layout === "split";
+  const location = useLocation();
+  const phone = () => viewport() === "phone";
+  const split = () => props.layout === "split" && !phone();
   const pluginSections = useTaskPluginSections(() => props.taskId);
   const pluginSection = () => (isPluginTab(params.section) ? params.section : null);
   const requested = (): TaskSection => (params.section && IDS.has(params.section) ? (params.section as TaskSection) : "details");
@@ -59,14 +71,33 @@ export function TaskSections(props: {
   const choose = (next: string) => setParams({ section: next === "details" ? undefined : next }, { replace: true });
   const rail = () => (split() ? SECTIONS.filter((entry) => entry.id !== "details") : SECTIONS);
 
+  // A link into the task opens the section it points into, when it arrives or another task opens.
+  const anchor = createMemo(() => parseTaskAnchor(location.hash));
+  createEffect(
+    on([() => location.hash, () => props.taskId], () => {
+      const target = anchor();
+      if (!target) return;
+      const wanted = anchorSection(target);
+      if (section() !== wanted) choose(wanted);
+    }),
+  );
+  const focusComment = () => {
+    const target = anchor();
+    return target?.kind === "comment" ? target.id : undefined;
+  };
+  const openDocument = () => {
+    const target = anchor();
+    return target?.kind === "document" ? target.key : undefined;
+  };
+
   const details = () => <TaskDetails taskId={props.taskId} initial={props.initial} hideTitle={props.hideTitle} onOpenTask={props.onOpenTask} />;
   const other = () => (
     <Switch>
       <Match when={section() === "activity"}>
-        <TaskActivity taskId={props.taskId} title={props.hideTitle || split() ? undefined : props.title} />
+        <TaskActivity taskId={props.taskId} title={props.hideTitle || split() ? undefined : props.title} focusCommentId={focusComment()} />
       </Match>
       <Match when={section() === "files"}>
-        <TaskFiles taskId={props.taskId} />
+        <TaskFiles taskId={props.taskId} openDocKey={openDocument()} />
       </Match>
       <Match when={section() === "runs"}>
         <TaskRuns taskId={props.taskId} />
@@ -79,7 +110,7 @@ export function TaskSections(props: {
   );
 
   return (
-    <div class="tsec" classList={{ "tsec--split": split() }} data-section={section()}>
+    <div class="tsec" classList={{ "tsec--split": split(), "tsec--tabs": phone() }} data-section={section()}>
       <Show
         when={split()}
         fallback={
@@ -108,9 +139,13 @@ export function TaskSections(props: {
               aria-current={section() === entry.id ? "page" : undefined}
               aria-label={entry.label}
               title={entry.label}
+              data-named={entry.short ? "" : undefined}
               onClick={() => choose(entry.id)}
             >
               {entry.icon()}
+              <Show when={phone() && entry.short}>
+                <span class="tsec-rail-label">{entry.short}</span>
+              </Show>
             </button>
           )}
         </For>

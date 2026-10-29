@@ -24,7 +24,7 @@ import {
   Upload,
   X,
 } from "lucide-solid";
-import { createMemo, createSignal, For, lazy, Match, Show, Suspense, Switch, type JSX } from "solid-js";
+import { createEffect, createMemo, createSignal, For, lazy, Match, on, Show, Suspense, Switch, type JSX } from "solid-js";
 import { documentsApi } from "@/api/documents";
 import { fileResourcesApi, WORKSPACE_FILE_PAGE_SIZE } from "@/api/file-resources";
 import { issuesApi } from "@/api/issues";
@@ -98,7 +98,7 @@ const DocumentView = lazy(() => import("@/documents/DocumentView").then((module)
 const NewDocument = lazy(() => import("@/documents/NewDocument").then((module) => ({ default: module.NewDocument })));
 const WorkspaceFiles = lazy(() => import("@/files/WorkspaceFiles").then((module) => ({ default: module.WorkspaceFiles })));
 
-export function TaskFiles(props: { taskId: string }) {
+export function TaskFiles(props: { taskId: string; /** A document to open, from a `#document-<key>` link. */ openDocKey?: string }) {
   const company = useCompany();
   const client = useQueryClient();
   const people = useTaskPeople();
@@ -111,6 +111,13 @@ export function TaskFiles(props: { taskId: string }) {
   const [dragging, setDragging] = createSignal(false);
   let picker: HTMLInputElement | undefined;
   let importer: HTMLInputElement | undefined;
+
+  // A `#document-<key>` link opens that document, when it arrives or another task opens.
+  createEffect(
+    on([() => props.openDocKey, () => props.taskId], ([key]) => {
+      if (key) setView({ kind: "doc", key, edit: false });
+    }),
+  );
 
   const host = createMemo<DocumentHost>(() => ({
     owner: { kind: "issue", id: props.taskId },

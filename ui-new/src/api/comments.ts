@@ -23,6 +23,9 @@ export type CommentPost = {
 };
 
 export const commentsApi = {
+  /** One comment on the task, or 404 when it isn't one of the task's (a `#comment-<id>` link checks first). */
+  get: (issueId: string, commentId: string, signal?: AbortSignal) =>
+    api.get<IssueComment>(`/issues/${issueId}/comments/${encodeURIComponent(commentId)}`, { signal }),
   post: (issueId: string, data: CommentPost) => api.post<IssueComment>(`/issues/${issueId}/comments`, data),
   /** `PATCH /issues/:id` with a comment; the response is the task with the comment it made. */
   updateWithComment: (issueId: string, data: Record<string, unknown>) =>

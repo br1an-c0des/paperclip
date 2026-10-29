@@ -1,7 +1,7 @@
 import type { IssueComment, IssueStatus } from "@paperclipai/shared";
 import { createInfiniteQuery, createMutation, createQuery, keepPreviousData, useQueryClient } from "@tanstack/solid-query";
-import { Ellipsis, Search, Square, X } from "lucide-solid";
-import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
+import { ArrowDown, Ellipsis, Search, Square, X } from "lucide-solid";
+import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch } from "solid-js";
 import { approvalsApi } from "@/api/approvals";
 import { commentsApi } from "@/api/comments";
 import { heartbeatsApi } from "@/api/heartbeats";
@@ -43,6 +43,7 @@ import { MessageBody } from "./MessageBody";
 import { useTaskPeople } from "./people";
 import { StatusChip } from "./TaskDetails";
 import { duration, stampLabel, type ThreadFilter } from "./thread-model";
+import { commentElementId, nearBottom } from "./task-anchor";
 import { CommentPluginActions, CommentPluginAnnotations } from "@/plugins/CommentPlugins";
 import "./TaskActivity.css";
 
@@ -58,6 +59,11 @@ import "./TaskActivity.css";
  *
  * Under the thread: the messages queued for the agent's next turn, with steer and interrupt, then
  * the composer (mentions, files, work mode, reassigning, run settings, reopening).
+ *
+ * A `#comment-<id>` link (`focusCommentId`, from TaskSections) checks the comment is this task's,
+ * loads earlier pages until it's in the thread, scrolls to it and highlights it. New entries keep
+ * the newest in view only while the reader is at the foot; scrolled up, "Jump to latest" takes them
+ * back down.
  */
 
 const COMMENT_PAGE_SIZE = 50;
@@ -68,7 +74,10 @@ const FILTERS: { value: ThreadFilter; label: string }[] = [
   { value: "changes", label: "Changes" },
 ];
 
-export function TaskActivity(props: { taskId: string; title?: string }) {
+/** How many pages of older comments a `#comment-<id>` link loads before giving up. */
+const FOCUS_PAGE_LIMIT = 40;
+
+export function TaskActivity(props: { taskId: string; title?: string; focusCommentId?: string }) {
   const company = useCompany();
   const commands = useCommands();
   const client = useQueryClient();
@@ -231,14 +240,74 @@ export function TaskActivity(props: { taskId: string; title?: string }) {
   // A search or a filter needs the whole history.
   createEffect(on([filter, search], ([chosen, text]) => (chosen !== "all" || text.trim()) && expandHistory(props.taskId), { defer: true }));
 
-  // Opening the section, and new entries arriving at the foot, keep the newest in view. Older
-  // entries loading above don't move the reader.
-  const toBottom = () => queueMicrotask(() => log?.scrollTo({ top: log.scrollHeight }));
-  createEffect(on(() => [props.taskId, loading()], () => !loading() && toBottom()));
+  // A `#comment-<id>` link: once the server confirms the comment is this task's, show the whole
+  // history unfiltered and load earlier pages until it's in the thread, then scroll to it.
+  const [focusing, setFocusing] = createSignal<string | null>(null);
+  const [highlighted, setHighlighted] = createSignal<string | null>(null);
+  let focusPages = 0;
+  createEffect(
+    on([() => props.focusCommentId, () => props.taskId], ([id]) => {
+      focusPages = 0;
+      setFocusing(id ?? null);
+    }),
+  );
+  const linked = createQuery(() => ({
+    queryKey: queryKeys.issues.section(props.taskId, "comment", focusing() ?? ""),
+    queryFn: ({ signal }) => commentsApi.get(props.taskId, focusing()!, signal),
+    enabled: focusing() !== null,
+    retry: false,
+    staleTime: Infinity,
+  }));
+  createEffect(() => {
+    const id = focusing();
+    if (!id) return;
+    if (linked.isError) {
+      setFocusing(null);
+      pushToast({ tone: "error", title: "That comment isn't on this task", body: "It may have been deleted, or the link is for another task." });
+      return;
+    }
+    if (!linked.data || loading()) return;
+    if (shownComments().some((comment) => comment.id === id)) {
+      setFocusing(null);
+      setFilter("all");
+      setSearch("");
+      setSearching(false);
+      queueMicrotask(() => {
+        const element = log?.querySelector<HTMLElement>(`#${CSS.escape(commentElementId(id))}`);
+        element?.scrollIntoView({ block: "center" });
+        setHighlighted(id);
+        setFollowing(log ? nearBottom(log) : true);
+      });
+      return;
+    }
+    if (!expanded()) return expandHistory(props.taskId);
+    if (comments.isPending || comments.isFetchingNextPage) return;
+    if (comments.hasNextPage && focusPages < FOCUS_PAGE_LIMIT) {
+      focusPages += 1;
+      void comments.fetchNextPage();
+    } else setFocusing(null);
+  });
+  createEffect(
+    on(highlighted, (id) => {
+      if (!id) return;
+      const timer = window.setTimeout(() => setHighlighted(null), 4_000);
+      onCleanup(() => window.clearTimeout(timer));
+    }),
+  );
+
+  // Opening the section keeps the newest in view, and so do new entries arriving at the foot while
+  // the reader is there. Older entries loading above don't move the reader.
+  const [following, setFollowing] = createSignal(true);
+  const toBottom = () =>
+    queueMicrotask(() => {
+      log?.scrollTo({ top: log.scrollHeight });
+      setFollowing(true);
+    });
+  createEffect(on(() => [props.taskId, loading()], () => !loading() && !focusing() && !props.focusCommentId && toBottom()));
   createEffect(
     on(
       () => `${thread()[thread().length - 1]?.key ?? ""}:${live().length}`,
-      (now, before) => before !== undefined && now !== before && toBottom(),
+      (now, before) => before !== undefined && now !== before && following() && !focusing() && toBottom(),
     ),
   );
 
@@ -287,7 +356,7 @@ export function TaskActivity(props: { taskId: string; title?: string }) {
         </div>
       </Show>
 
-      <div class="ta-log" role="log" aria-label="Task thread" ref={log}>
+      <div class="ta-log" role="log" aria-label="Task thread" ref={log} onScroll={() => log && setFollowing(nearBottom(log))}>
         <Switch>
           <Match when={loading()}>
             <p class="ta-muted">Loading activity…</p>
@@ -359,7 +428,15 @@ export function TaskActivity(props: { taskId: string; title?: string }) {
                     )}
                   </Match>
                   <Match when={item.kind === "comment" && item}>
-                    {(entry) => <Comment taskId={props.taskId} comment={entry().comment} input={inputs().get(entry().comment.id)} people={people} />}
+                    {(entry) => (
+                      <Comment
+                        taskId={props.taskId}
+                        comment={entry().comment}
+                        input={inputs().get(entry().comment.id)}
+                        people={people}
+                        highlighted={highlighted() === entry().comment.id}
+                      />
+                    )}
                   </Match>
                   <Match when={item.kind === "request" && item}>{(entry) => <RequestCard request={entry().request} taskId={props.taskId} people={people} inThread />}</Match>
                 </Switch>
@@ -390,6 +467,13 @@ export function TaskActivity(props: { taskId: string; title?: string }) {
           </Match>
         </Switch>
       </div>
+      <Show when={!following() && !loading()}>
+        <div class="ta-jump">
+          <Button size="compact" icon={<ArrowDown size={14} aria-hidden="true" />} onClick={toBottom}>
+            Jump to latest
+          </Button>
+        </div>
+      </Show>
       <Show when={task()}>
         {(found) => (
           <div class="ta-compose">
@@ -401,7 +485,14 @@ export function TaskActivity(props: { taskId: string; title?: string }) {
   );
 }
 
-function Comment(props: { taskId: string; comment: IssueComment; input?: CommentInput; people: ReturnType<typeof useTaskPeople> }) {
+function Comment(props: {
+  taskId: string;
+  comment: IssueComment;
+  input?: CommentInput;
+  people: ReturnType<typeof useTaskPeople>;
+  /** Reached through a `#comment-<id>` link. */
+  highlighted?: boolean;
+}) {
   const client = useQueryClient();
   const commands = useCommands();
   const remove = createMutation(() => ({
@@ -421,7 +512,12 @@ function Comment(props: { taskId: string; comment: IssueComment; input?: Comment
   };
   const notice = () => props.comment.presentation?.kind === "system_notice";
   return (
-    <article class="ta-comment" classList={{ "ta-comment--notice": notice() }} data-tone={props.comment.presentation?.tone}>
+    <article
+      id={commentElementId(props.comment.id)}
+      class="ta-comment"
+      classList={{ "ta-comment--notice": notice(), "ta-comment--linked": props.highlighted }}
+      data-tone={props.comment.presentation?.tone}
+    >
       <div class="ta-comment-head">
         <Switch fallback={<InitialsDisc name={name()} seed={userId() ?? name()} size={22} you={you()} />}>
           <Match when={agent()}>{(found) => <AgentAvatar agent={found()} size={24} />}</Match>

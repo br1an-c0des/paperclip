@@ -1,6 +1,6 @@
 import type { Agent, CompanySearchResponse, CompanySearchResult, CompanySearchScope } from "@paperclipai/shared";
 import { useLocation, useNavigate } from "@solidjs/router";
-import { createInfiniteQuery, keepPreviousData } from "@tanstack/solid-query";
+import { createInfiniteQuery, keepPreviousData, useQueryClient } from "@tanstack/solid-query";
 import { Clock, Plus, Search, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, onMount, Show, Switch, untrack } from "solid-js";
 import { openProjects } from "@/api/projects";
@@ -9,6 +9,7 @@ import { SEARCH_MAX_LIMIT, SEARCH_MAX_OFFSET, searchApi, searchQueryString, type
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useLabelsQuery, useProjectsQuery } from "@/lib/company-data";
+import { useLiveEvent } from "@/lib/live-events";
 import { hasOpenDialog, isTextInputTarget } from "@/lib/shortcuts";
 import { useChatIndex } from "@/chat/chat-index";
 import { useTaskPeople, type TaskPeople } from "@/tasks/people";
@@ -30,7 +31,18 @@ import {
 } from "./filters";
 import { parseQuery, stripFilters, type ParserContext } from "./query-parser";
 import { loadRecent, pushRecent } from "./recent";
-import { chatResultHref, enterTarget, groupResults, kindOfScope, resultIssueId, resultTask, scopeTabs, shownResults, type ResultSection } from "./results-model";
+import {
+  chatResultHref,
+  enterTarget,
+  groupResults,
+  kindOfScope,
+  resultFragment,
+  resultIssueId,
+  resultTask,
+  scopeTabs,
+  shownResults,
+  type ResultSection,
+} from "./results-model";
 import { FacetColumn, FilterChips, FilterMenu, SortMenu, TypedFiltersTip } from "./SearchControls";
 import { SearchRow } from "./SearchRow";
 import { readSearchState, searchPath, type SearchState } from "./search-url";
@@ -47,15 +59,20 @@ import "./Search.css";
  *   them with the controls folds the typed ones into the URL.
  * - With nothing found, the response's `zeroResults` offers filters to drop (S3).
  * - A task, a comment or document on a task, or a file opens its task in the task modal, as on
- *   other pages without a task list; agents and projects go to their pages. Results from your
+ *   other pages without a task list, at the comment or with the document open (the result's
+ *   `#comment-<id>` or `#document-<key>` goes on the page's address, which the task's sections
+ *   read); agents and projects go to their pages. Results from your
  *   chats with agents show as chats and open the chat (decision 8), with the document open when the
  *   result was found in one.
  * - Keys: `/` focuses the box, ↓ moves into the results and ↑/↓ through them, Enter opens (from the
  *   box: the task whose ID was typed, or the first result), Escape clears the box.
  *
  * One request per search, debounced; the server allows 60 a minute. A kind's view reads All's counts
- * for the other tabs from the cache, when All was searched first, rather than asking again.
+ * for the other tabs from the cache, when All was searched first, rather than asking again. Changes
+ * to tasks, comments and documents (live events) search again, at most every 15 seconds.
  */
+
+const LIVE_REFRESH_MS = 15_000;
 
 const DEBOUNCE_MS = 300;
 const PAGE_SIZE = 25;
@@ -208,9 +225,31 @@ export function SearchPage() {
     const agent = chatAgent(result);
     if (agent) return navigate(chatResultHref(company().issuePrefix, agent.urlKey, result));
     const task = resultTask(result);
-    if (task) commands.openTaskModal(task);
-    else navigate(result.href);
+    if (!task) return navigate(result.href);
+    // The modal opens at the comment, or with the document, the result was found in.
+    const fragment = resultFragment(result);
+    if (fragment !== location.hash) navigate(`${location.pathname}${location.search}${fragment}`, { replace: true, scroll: false });
+    commands.openTaskModal(task);
   };
+
+  // Live refresh: what changed may change the results. Throttled, as the server limits searches.
+  const client = useQueryClient();
+  let refreshTimer: number | undefined;
+  let lastRefresh = 0;
+  const refreshResults = () => {
+    if (refreshTimer !== undefined) return;
+    const wait = Math.max(0, lastRefresh + LIVE_REFRESH_MS - Date.now());
+    refreshTimer = window.setTimeout(() => {
+      refreshTimer = undefined;
+      lastRefresh = Date.now();
+      void client.invalidateQueries({ queryKey: queryKeys.search.all(company().id) });
+    }, wait);
+  };
+  onCleanup(() => window.clearTimeout(refreshTimer));
+  useLiveEvent(["activity.logged"], (event) => {
+    const entity = event.payload?.entityType;
+    if (searching() && (entity === "issue" || entity === "agent" || entity === "project")) refreshResults();
+  });
 
   let input!: HTMLInputElement;
   let list: HTMLDivElement | undefined;

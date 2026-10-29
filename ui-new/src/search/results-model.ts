@@ -198,6 +198,17 @@ export function resultTask(result: CompanySearchResult) {
   return null;
 }
 
+/**
+ * The part of a result's link that points into its task: `#comment-<id>` or `#document-<key>`, or
+ * "" for the task itself. The task's sections read it to scroll to the comment or open the document.
+ */
+export function resultFragment(result: Pick<CompanySearchResult, "href">) {
+  const at = result.href.indexOf("#");
+  if (at === -1) return "";
+  const fragment = result.href.slice(at);
+  return fragment.startsWith("#comment-") || fragment.startsWith("#document-") ? fragment : "";
+}
+
 const IDENTIFIER = /^[A-Za-z]+-\d+$/;
 
 /**
