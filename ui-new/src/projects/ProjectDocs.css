@@ -351,3 +351,116 @@
   align-items: center;
   gap: 8px;
 }
+
+/* Open task under a task's items: phones only (M13). */
+.pdocs-link--foot {
+  display: none;
+}
+
+/*
+ * Phone (M13): a full-width search, the type filters in one row that scrolls sideways, each task's
+ * head with only its ID, title and count, its items as rows (a small preview square, the name and
+ * who made it), and Open task beneath them.
+ */
+:root[data-viewport="phone"] .pdocs {
+  gap: 20px;
+}
+
+:root[data-viewport="phone"] .pdocs-search {
+  width: 100%;
+}
+
+:root[data-viewport="phone"] .pdocs-filters {
+  flex-wrap: nowrap;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+:root[data-viewport="phone"] .pdocs-filter {
+  flex-shrink: 0;
+}
+
+:root[data-viewport="phone"] .pdocs-group-head .pdocs-status,
+:root[data-viewport="phone"] .pdocs-group-head .pdocs-assignee,
+:root[data-viewport="phone"] .pdocs-group-head .pdocs-link {
+  display: none;
+}
+
+:root[data-viewport="phone"] .pdocs-group-head {
+  gap: 8px;
+  padding-right: 14px;
+}
+
+:root[data-viewport="phone"] .pdocs-task {
+  flex: 1;
+}
+
+:root[data-viewport="phone"] .pdocs-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  padding: 0 14px;
+}
+
+:root[data-viewport="phone"] .pdocs-tile {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--row-line);
+  border-radius: 0;
+  background: none;
+}
+
+:root[data-viewport="phone"] .pdocs-tile:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+:root[data-viewport="phone"] .pdocs-preview {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+}
+
+:root[data-viewport="phone"] .pdocs-tag {
+  padding: 0;
+  background: none !important;
+  font-size: 11px;
+}
+
+/* A document's preview text doesn't fit the square: it shows as "DOC". */
+:root[data-viewport="phone"] .pdocs-doc {
+  display: none;
+}
+
+:root[data-viewport="phone"] .pdocs-tile[data-kind="doc"] .pdocs-preview::before {
+  content: "DOC";
+  color: var(--run-fg);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+:root[data-viewport="phone"] .pdocs-meta {
+  flex: 1;
+  padding: 0;
+}
+
+:root[data-viewport="phone"] .pdocs-badge {
+  position: static;
+  flex-shrink: 0;
+}
+
+:root[data-viewport="phone"] .pdocs-link--foot {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 12px 0 14px;
+  border-top: 1px solid var(--row-line);
+  font-weight: 600;
+  text-align: center;
+}
