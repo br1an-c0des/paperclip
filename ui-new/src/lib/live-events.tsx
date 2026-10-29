@@ -116,6 +116,11 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
     case "approval":
       keys.push(["approvals", companyId], queryKeys.inbox.attention(companyId));
       break;
+    // Cases (src/cases/): hand-offs and document changes are logged on the case. A hand-off also
+    // reassigns its main task, which is logged on the task.
+    case "case":
+      keys.push(queryKeys.cases.all(companyId));
+      break;
     case "routine":
     case "routine_trigger":
     case "routine_run":
@@ -142,6 +147,11 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
     // reaches a company's socket.
     case "plugin":
       keys.push(["plugins"]);
+      break;
+    // Status cards (src/status-cards/): created, changed, archived, deleted, an update or rebuild
+    // asked for, and the agent writing the query or a summary are all logged on `status_card`.
+    case "status_card":
+      keys.push(queryKeys.statusCards.all);
       break;
     case "company":
       keys.push(queryKeys.companies.all);

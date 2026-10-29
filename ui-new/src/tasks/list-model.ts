@@ -8,7 +8,11 @@ import type { WorkspaceLookup } from "./workspaces";
  * viewer picks another grouping, with each row's subtask count, live state and note. Subtasks whose
  * parent is in the same list hang under the parent's row (`children`, which the list can unfold)
  * instead of getting their own; a subtask whose parent isn't loaded (another project, or filtered
- * out) stands on its own. Grouped by parent task, every task gets its own row instead.
+ * out) stands on its own. Grouped by parent task or by case, every task gets its own row instead.
+ *
+ * Grouped by case (board C2), a task is in each of its cases' groups, as with labels; open cases
+ * come first, each parent case followed by its children, then closed ones (collapsed), then Not in
+ * a case.
  *
  * Rows keep the order of the tasks passed in (task-sort.ts sorts them first), within each group and
  * under each parent.
@@ -40,6 +44,8 @@ export type GroupMark =
   | { kind: "task"; status: IssueStatus | null }
   | { kind: "project"; color: string | null }
   | { kind: "workspace" }
+  /** A case (board C2): its group card draws the case's own heading; `depth` nests child cases. */
+  | { kind: "case"; caseId: string; depth: number; closed: boolean }
   | { kind: "none" };
 
 /**
@@ -54,6 +60,7 @@ export type GroupValue =
   | { field: "project"; projectId: string | null }
   | { field: "workspace"; workspaceId: string | null; defaults: Record<string, unknown> }
   | { field: "parent"; parentId: string | null }
+  | { field: "case"; caseId: string | null }
   | null;
 
 export type TaskGroup = { key: string; label: string; mark: GroupMark; value: GroupValue; rows: TaskRow[] };
@@ -69,14 +76,27 @@ export type GroupNames = {
   project?: (id: string) => { name: string; color: string | null } | undefined;
   /** Each task's workspace and the workspaces' names (workspaces.ts). */
   workspace?: Pick<WorkspaceLookup, "of" | "name" | "defaults">;
+  /** Cases, for Group: Case (src/cases/). */
+  cases?: CaseGroups;
+};
+
+/**
+ * What Group: Case needs: the cases each task is in, and the cases in group order (open ones first,
+ * children under their parent; cases/case-model.ts `orderCases`). Open cases with no work yet get
+ * a group of their own even without tasks.
+ */
+export type CaseGroups = {
+  of: (taskId: string) => readonly string[];
+  order: readonly { id: string; title: string; depth: number; closed: boolean; empty: boolean }[];
 };
 
 /**
  * Whether tasks dragged into a group change to fit it. Moving a task to another workspace is more
- * than a field change (its files stay where they are), so workspace groups don't take drops.
+ * than a field change (its files stay where they are), so workspace groups don't take drops; nor do
+ * case groups, since a task's place in a case is the agents' to set.
  */
 export function takesDrops(value: GroupValue) {
-  return value !== null && value.field !== "workspace";
+  return value !== null && value.field !== "workspace" && value.field !== "case";
 }
 
 /** Status groups that start collapsed, as on board 1. */
@@ -87,7 +107,9 @@ export const PRIORITY_ORDER: IssuePriority[] = ["critical", "high", "medium", "l
 /** The order of statuses in pickers: the order work moves through them. */
 export const STATUS_PICK_ORDER: IssueStatus[] = ["backlog", "todo", "in_progress", "in_review", "blocked", "done", "cancelled"];
 
+/** Done and cancelled statuses start collapsed, and so do done and cancelled cases. */
 export function startsCollapsed(group: Pick<TaskGroup, "mark">) {
+  if (group.mark.kind === "case") return group.mark.closed;
   return group.mark.kind === "status" && COLLAPSED_BY_DEFAULT.has(group.mark.status);
 }
 
@@ -173,9 +195,27 @@ function slotsFor(task: CompactIssue, groupBy: GroupBy, names: GroupNames | unde
       const mark: GroupMark = { kind: "task", status: (parent?.status as IssueStatus | undefined) ?? null };
       return [slot(id, label, mark, { field: "parent", parentId: id }, 0, order.get(id) ?? 0)];
     }
+    // The task's cases in the cases' order, then Not in a case.
+    case "case": {
+      const ids = names?.cases?.of(task.id) ?? [];
+      if (ids.length === 0) return [caseNoneSlot()];
+      return ids.flatMap((id) => {
+        const at = names!.cases!.order.findIndex((entry) => entry.id === id);
+        return at === -1 ? [] : [caseSlot(names!.cases!.order[at]!, at)];
+      });
+    }
     case "none":
       return [slot("all", "All tasks", { kind: "none" }, null, 0)];
   }
+}
+
+function caseSlot(entry: CaseGroups["order"][number], at: number): Slot {
+  const mark: GroupMark = { kind: "case", caseId: entry.id, depth: entry.depth, closed: entry.closed };
+  return slot(`case:${entry.id}`, entry.title, mark, { field: "case", caseId: entry.id }, 0, at);
+}
+
+function caseNoneSlot(): Slot {
+  return slot("none", "Not in a case", { kind: "none" }, { field: "case", caseId: null }, 1);
 }
 
 function compareRank(a: Slot, b: Slot) {
@@ -192,7 +232,8 @@ export function buildTaskGroups(
   options: { groupBy?: GroupBy; names?: GroupNames } = {},
 ): TaskGroup[] {
   const groupBy = options.groupBy ?? "status";
-  const nest = groupBy !== "parent";
+  // Grouped by case, a subtask can be in a case its parent isn't, so every task gets its own row.
+  const nest = groupBy !== "parent" && groupBy !== "case";
   const ids = new Set(tasks.map((task) => task.id));
   // Parent groups come in the order their first subtask appears in the list.
   const order = new Map<string, number>();
@@ -235,6 +276,15 @@ export function buildTaskGroups(
       rows.set(slot.key, list);
     }
   }
+  // An open case with no work yet has a group without tasks, with the button that starts it.
+  if (groupBy === "case") {
+    options.names?.cases?.order.forEach((entry, at) => {
+      if (!entry.empty || entry.closed || slots.has(`case:${entry.id}`)) return;
+      const empty = caseSlot(entry, at);
+      slots.set(empty.key, empty);
+      rows.set(empty.key, []);
+    });
+  }
   return [...slots.values()].sort(compareRank).map(({ rank: _rank, ...group }) => ({ ...group, rows: rows.get(group.key)! }));
 }
 
@@ -262,6 +312,7 @@ export function moveUpdate(task: CompactIssue, from: GroupValue | undefined, to:
     case "project":
       return (task.projectId ?? null) === to.projectId ? null : { projectId: to.projectId };
     case "workspace":
+    case "case":
       return null;
     case "parent":
       if ((task.parentId ?? null) === to.parentId || to.parentId === task.id) return null;
@@ -285,6 +336,9 @@ export function groupDefaults(value: GroupValue): Record<string, unknown> {
       return value.projectId ? { projectId: value.projectId } : {};
     case "workspace":
       return value.defaults;
+    // Linking a task added from a case's group is a second request (TaskList's QuickAdd).
+    case "case":
+      return {};
     case "parent":
       return value.parentId ? { parentId: value.parentId } : {};
   }

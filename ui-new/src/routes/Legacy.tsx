@@ -2,16 +2,18 @@ import type { Company } from "@paperclipai/shared";
 import { A, Navigate, useLocation, useParams } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
 import { Match, Show, Switch } from "solid-js";
-import { api } from "@/api/client";
+import { casesApi } from "@/api/cases";
+import { api, ApiError } from "@/api/client";
 import { executionWorkspacesApi } from "@/api/execution-workspaces";
 import { issuesApi } from "@/api/issues";
+import { queryKeys } from "@/api/queryKeys";
 import { findCompanyByPrefix, lastCompanyPrefix, useCompaniesQuery, useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
 import { projectGoalIds } from "@/projects/settings/settings-model";
 import { PageHeader } from "@/ui/PageHeader";
 import { PlannedNote } from "./Planned";
 import { Splash } from "./Splash";
-import { companyLegacyTarget, identifierPrefix, isUuid, withSearchAndHash } from "./legacy-model";
+import { caseLinkTarget, companyLegacyTarget, identifierPrefix, isUuid, withSearchAndHash } from "./legacy-model";
 
 /*
  * The old UI's addresses that have no page of their own here (legacy-model.ts has the mapping):
@@ -22,7 +24,8 @@ import { companyLegacyTarget, identifierPrefix, isUuid, withSearchAndHash } from
  * - Without a company, a task (`/issues/PAP-12`) or case (`/cases/PAP-C3`) opens in the company its
  *   identifier names; a workspace, approval or case given by id asks the API which company it's in.
  *   Everything else goes to the company you were last in (activity/redirects.tsx).
- * - `/cases/:id` opens the case's main task until cases get their own pages (D1).
+ * - `/cases/:id` opens the case's main task on its Case section, and `/cases` the task list grouped
+ *   by case: there's no cases page (decision F).
  * - `/status*` holds the status cards' place until they're built (D3).
  */
 
@@ -64,40 +67,33 @@ export function ExecutionWorkspaceRedirect() {
   return <Navigate href={`/${company().issuePrefix}/workspaces?workspace=${encodeURIComponent(params.workspaceId)}`} />;
 }
 
-/** What `GET /cases/:id` returns that the redirect reads; the case pages aren't built yet (D1). */
-type CaseLinks = {
-  companyId: string;
-  workIssueId?: string | null;
-  issueLinks?: { issue: { id: string; identifier: string | null } }[];
-};
-
-const casesApi = {
-  get: (ref: string, signal?: AbortSignal) => api.get<CaseLinks>(`/cases/${encodeURIComponent(ref)}?includeDocumentBodies=false`, { signal }),
-};
-
-/** `/:prefix/cases/:caseId`: the case's main task, else its first linked task. */
+/**
+ * `/:prefix/cases/:caseId` (and its old tabs): there's no case page (decision F), so the case's
+ * main task opens on its Case section; a case with no work yet opens the task list grouped by case
+ * (legacy-model.ts `caseLinkTarget`). With cases turned off the server refuses, and the page says so.
+ */
 export function CaseRedirect() {
   const params = useParams<{ caseId: string }>();
   const company = useCompany();
   const location = useLocation();
   const found = createQuery(() => ({
-    queryKey: ["cases", "detail", params.caseId, "links"] as const,
+    queryKey: queryKeys.cases.detail(company().id, params.caseId),
     queryFn: ({ signal }) => casesApi.get(params.caseId, signal),
     retry: false,
   }));
-  const task = () => found.data?.workIssueId ?? found.data?.issueLinks?.[0]?.issue.identifier ?? found.data?.issueLinks?.[0]?.issue.id ?? null;
+  const off = () => found.error instanceof ApiError && found.error.status === 403;
   return (
     <Switch>
-      <Match when={task()}>
-        {(ref) => <Navigate href={withSearchAndHash(`/${company().issuePrefix}/issues/${encodeURIComponent(ref())}`, "", location.hash)} />}
+      <Match when={found.data}>
+        {(kase) => <Navigate href={withSearchAndHash(`/${company().issuePrefix}/${caseLinkTarget(kase())}`, "", location.hash)} />}
       </Match>
-      <Match when={found.isError || found.isSuccess}>
+      <Match when={found.isError}>
         <PageHeader crumbs={<span>Cases</span>} title={<span class="mono">{params.caseId}</span>} />
         <section class="card planned">
           <p>
-            {found.isError
-              ? `This case couldn't be opened: ${(found.error as Error).message}`
-              : "This case has no task yet. Cases get pages of their own in a later round."}
+            {off()
+              ? "Cases are turned off on this instance. An instance admin can turn them on in App settings → General → Features; then this link opens the case's main task."
+              : `This case couldn't be opened: ${(found.error as Error).message}`}
           </p>
           <p>
             <A href={`/${company().issuePrefix}/issues`}>All tasks</A>

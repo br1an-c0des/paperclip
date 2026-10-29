@@ -512,3 +512,55 @@
 .tl--phone .tl-row:has(.tl-name--sub) {
   padding-left: 30px;
 }
+
+/*
+ * Group: Case (board C2): a case's heading has its chip, status and phase beside the count, and its
+ * stats and hand-off strip under the bar. Child cases step in under their parent.
+ */
+.tl-mark-case {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  background: var(--well);
+  color: var(--body);
+}
+
+/* A group with no tasks (a case with no work yet) has no column headings */
+.tl-cols--empty {
+  display: none;
+}
+
+.tl-head-below {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 14px 12px 62px;
+  margin-top: -4px;
+}
+
+.tl-card--nested {
+  --tl-step: 28px;
+  margin-left: calc(var(--tl-nest) * var(--tl-step));
+}
+
+.tl-card--nested > .tl-frame {
+  width: calc(100cqw - var(--tl-nest) * var(--tl-step));
+}
+
+.tl-card--nested .tl-bar {
+  width: calc(100cqw - 2px - var(--tl-nest) * var(--tl-step));
+}
+
+.tl-name .case-chip {
+  margin-left: 2px;
+}
+
+.tl--phone .tl-head-below {
+  padding-left: 16px;
+}
+
+.tl--phone .tl-card--nested {
+  --tl-step: 12px;
+}

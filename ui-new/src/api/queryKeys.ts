@@ -72,6 +72,19 @@ export const queryKeys = {
     /** Your thumbs up and down on the task's agent output. */
     feedbackVotes: (issueId: string) => ["issues", "detail", issueId, "feedback-votes"] as const,
   },
+  /** Cases and their workflows (api/cases.ts), all under one prefix so a case event refreshes them. */
+  cases: {
+    all: (companyId: string) => ["cases", companyId] as const,
+    list: (companyId: string) => ["cases", companyId, "list"] as const,
+    /** One case, by the id or identifier it was asked for. */
+    detail: (companyId: string, ref: string) => ["cases", companyId, "detail", ref] as const,
+    /** The cases a task is linked to. */
+    forTask: (companyId: string, taskId: string) => ["cases", companyId, "task", taskId] as const,
+    handoffs: (companyId: string, caseId: string) => ["cases", companyId, "handoffs", caseId] as const,
+    children: (companyId: string, caseId: string) => ["cases", companyId, "children", caseId] as const,
+    workflows: (companyId: string) => ["cases", companyId, "workflows"] as const,
+    workflow: (companyId: string, workflowId: string) => ["cases", companyId, "workflow", workflowId] as const,
+  },
   projects: {
     /** Prefix for every project query in a company. */
     all: (companyId: string) => ["projects", companyId] as const,
@@ -413,6 +426,18 @@ export const queryKeys = {
     list: (companyId: string) => ["approvals", companyId, "list"] as const,
   },
   userProfile: (companyId: string, slug: string) => ["user-profile", companyId, slug] as const,
+  /*
+   * Status cards (src/status-cards/), in the old UI's shapes. Everything sits under
+   * `["status-cards"]`, which the live events refresh on any `status_card` activity.
+   */
+  statusCards: {
+    all: ["status-cards"] as const,
+    list: (companyId: string, archived: boolean) => ["status-cards", companyId, archived ? "archived" : "active"] as const,
+    detail: (id: string) => ["status-cards", "detail", id] as const,
+    updates: (id: string) => ["status-cards", "detail", id, "updates"] as const,
+    summaryRevisions: (id: string) => ["status-cards", "detail", id, "summary-revisions"] as const,
+    dryRun: (id: string) => ["status-cards", "detail", id, "dry-run"] as const,
+  },
   recentTasks: (companyId: string, ids: readonly string[]) => ["issues", companyId, "summaries", ...ids] as const,
   sidebarPreferences: {
     companyOrder: (userId: string) => ["sidebar-preferences", "company-order", userId] as const,
