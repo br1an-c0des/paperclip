@@ -424,12 +424,18 @@ Progress:
   service worker, deploy fixes; decision 41), B (requests and Inbox, the aging shelf; decision 40),
   C1 (task panel, thread, documents, task list) and C2 (runs and workspaces) (decision 42). Phone
   layouts built for N1 on detail pages, M1–M4, M6, M7, M10 and M11.
-- **Round 2, next:** D (projects, agents, org, goals, recurring, with the outside-agent invite and
-  phone M12 and M13), E (Tier 2 depth, with the plugin compatibility stylesheet), cases (C1, C2, C5
-  in full) and status cards.
+- **Round 2 (Oct 29), complete:** D (agents, projects, goals, recurring, the outside-agent invite,
+  phone M12 and M13; decision 45), E (tier 2 depth and the plugin compatibility stylesheet; decision
+  46), cases (C1, C2, C5; decision 43) and status cards (decision 44; no real update yet).
+- **Left after round 2:** the rows still `partial` in [capabilities.md](inventory/capabilities.md):
+  shell leftovers, `tasks/feedback`, four project rows, `workspaces/files-git`, `runs-adapters/runs`,
+  `approvals/tool-review`, `documents-artifacts/library`, company settings, skills, apps, status
+  cards, onboarding (Copilot and gateway paths) and sign-in flows. Also: status cards' open question
+  (decision 44), and small leftovers in decisions 43 and 45 (the Workspaces summary card, the phone
+  toolbar width, the project header on phones).
 
-- Plugin hosting (decision G): built in M6 rounds 2 and 3. Left: the `organizationSwitcher` slot
-  and choosing a plugin's local folders.
+- Plugin hosting (decision G): built in M6 rounds 2 and 3; the `organizationSwitcher` slot and local
+  folders in M7 round 2.
 - Parity audit: every row in [capabilities.md](inventory/capabilities.md) is `done` or `dropped` with
   a reason.
 - The responsive pass: mobile layouts for every screen not folded in earlier (decision H). And an
