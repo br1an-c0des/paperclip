@@ -8,7 +8,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { Dock } from "@/layout/Panel";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
-import { useLabelsQuery, useProjectsQuery } from "@/lib/company-data";
+import { useExperimentalSettingsQuery, useLabelsQuery, useProjectsQuery } from "@/lib/company-data";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
@@ -18,6 +18,7 @@ import { Segmented } from "@/ui/Segmented";
 import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
 import { boardCollapseKey, boardColumns, boardStartsCollapsed, CLOSED_STATUSES } from "./board-model";
 import { BoardView } from "./BoardView";
+import { EXTERNAL_STATUS_FILTERS, matchesExternalStatus } from "./external-objects";
 import { buildTaskGroups, PRIORITY_ORDER, shownRows, startsCollapsed, STATUS_PICK_ORDER, type GroupNames, type TaskGroup } from "./list-model";
 import { useTaskPeople } from "./people";
 import { AssigneeItems, LabelDot, LabelItems, PriorityItems, StatusItems } from "./pickers";
@@ -246,6 +247,20 @@ export function TasksView(props: {
   );
   const workspaces = createMemo(() => workspaceLookup(projects.data ?? [], summaries.data ?? []));
 
+  // External objects (tasks/external-objects), behind the enableExternalObjects experiment: their
+  // states are fetched for the list's tasks only while the filter is on or its menu is open.
+  const experiments = useExperimentalSettingsQuery();
+  const externalOn = () => experiments.data?.enableExternalObjects === true;
+  const filters = createMemo(() => (externalOn() ? view().filters : { ...view().filters, externalObjects: [] }));
+  const taskIds = createMemo(() => tasks().map((task) => task.id).sort());
+  const external = createQuery(() => ({
+    queryKey: ["issues", company().id, "external-object-summaries", idsFingerprint(taskIds())],
+    queryFn: ({ signal }) => issuesApi.externalObjectSummaries(company().id, taskIds(), signal),
+    enabled: externalOn() && taskIds().length > 0 && (filters().externalObjects.length > 0 || filterMenuOpen()),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  }));
+
   const tasksById = createMemo(() => new Map(tasks().map((task) => [task.id, task] as const)));
   const labelsById = createMemo(() => new Map((labels.data ?? []).map((label) => [label.id, label] as const)));
   const projectsById = createMemo(() => new Map((projects.data ?? []).map((project) => [project.id, project] as const)));
@@ -263,7 +278,13 @@ export function TasksView(props: {
   const layout = () => props.layout ?? view().layout;
   const hideClosed = () => layout() === "board" && !view().board.closed;
   const visible = createMemo(() => {
-    const shown = applyFilters(tasks(), view().filters, search(), { liveIssueIds: people.liveIssueIds(), workspaceOf: workspaces().of });
+    const known = external.data;
+    const shown = applyFilters(tasks(), filters(), search(), {
+      liveIssueIds: people.liveIssueIds(),
+      workspaceOf: workspaces().of,
+      // Until the states arrive the filter waits rather than hiding everything.
+      externalMatches: known ? (task, value) => matchesExternalStatus(known[task.id], value) : undefined,
+    });
     return hideClosed() ? shown.filter((task) => !CLOSED_STATUSES.has(task.status)) : shown;
   });
   const groups = createMemo(() =>
@@ -335,7 +356,7 @@ export function TasksView(props: {
 
   const open = (task: { id: string; identifier: string | null }) => setParams({ task: task.identifier ?? task.id });
   const close = () => setParams({ task: undefined, section: undefined });
-  const activeFilters = () => filterCount(view().filters);
+  const activeFilters = () => filterCount(filters());
   const groupOptions = () => GROUP_BY_OPTIONS.filter((option) => !(props.projectId && option.value === "project"));
   const groupLabel = () => GROUP_BY_OPTIONS.find((option) => option.value === view().groupBy)?.label ?? "Status";
   const participantName = () => {
@@ -403,7 +424,8 @@ export function TasksView(props: {
         </Show>
         <span class="tv-toolbar-end">
           <FilterMenu
-            filters={view().filters}
+            filters={filters()}
+            external={externalOn()}
             people={people}
             creators={creatorKeys()}
             projects={props.projectId ? [] : projectOptions()}
@@ -611,6 +633,8 @@ function FilterMenu(props: {
   creators: readonly string[];
   projects: readonly { id: string; name: string; color: string | null }[];
   workspaces: readonly { id: string; name: string }[];
+  /** Offer the external-object filter (the enableExternalObjects experiment). */
+  external: boolean;
   onOpenChange: (open: boolean) => void;
   onChange: (next: Partial<TaskFilters>) => void;
 }) {
@@ -789,6 +813,21 @@ function FilterMenu(props: {
             </For>
           </Menu.Group>
         </Show>
+        <Show when={props.external}>
+          <Menu.Separator />
+          <Menu.Group label="External objects">
+            <For each={EXTERNAL_STATUS_FILTERS}>
+              {(option) => (
+                <Menu.CheckboxItem
+                  checked={props.filters.externalObjects.includes(option.value)}
+                  onChange={() => props.onChange({ externalObjects: toggled(props.filters.externalObjects, option.value) })}
+                >
+                  {option.label}
+                </Menu.CheckboxItem>
+              )}
+            </For>
+          </Menu.Group>
+        </Show>
       </Menu.Content>
     </Menu>
   );
@@ -878,4 +917,11 @@ function SelectionBar(props: {
       </Button>
     </div>
   );
+}
+
+/** A short, stable key for a set of task ids, so the external-object states are cached per list. */
+function idsFingerprint(ids: readonly string[]) {
+  let hash = 5381;
+  for (const id of ids) for (let i = 0; i < id.length; i++) hash = ((hash << 5) + hash + id.charCodeAt(i)) | 0;
+  return `${ids.length}:${(hash >>> 0).toString(36)}`;
 }

@@ -41,6 +41,11 @@ export type TaskFilters = {
   creators: string[];
   projects: string[];
   workspaces: string[];
+  /**
+   * External objects' states (external-objects.ts EXTERNAL_STATUS_FILTERS), offered only while the
+   * enableExternalObjects experiment is on.
+   */
+  externalObjects: string[];
   /** Only tasks with a run going right now. */
   liveOnly: boolean;
   /** Leave out tasks agents created (isAgentCreated), which the old list hides by default. */
@@ -83,6 +88,7 @@ export const EMPTY_FILTERS: TaskFilters = {
   creators: [],
   projects: [],
   workspaces: [],
+  externalObjects: [],
   liveOnly: false,
   hideAgentCreated: false,
 };
@@ -132,6 +138,7 @@ export function parseFilters(value: unknown): TaskFilters {
     creators: strings(filters.creators),
     projects: strings(filters.projects),
     workspaces: strings(filters.workspaces),
+    externalObjects: strings(filters.externalObjects),
     liveOnly: filters.liveOnly === true,
     hideAgentCreated: filters.hideAgentCreated === true,
   };
@@ -214,6 +221,7 @@ export function filterCount(filters: TaskFilters) {
     filters.creators.length +
     filters.projects.length +
     filters.workspaces.length +
+    filters.externalObjects.length +
     (filters.liveOnly ? 1 : 0) +
     (filters.hideAgentCreated ? 1 : 0)
   );
@@ -233,6 +241,8 @@ function matchesSearch(task: CompactIssue, words: string[]) {
 export type FilterContext = {
   liveIssueIds?: ReadonlySet<string>;
   workspaceOf?: (task: CompactIssue) => string | null;
+  /** Whether a task's external objects match one external-object filter value; unset, that filter is off. */
+  externalMatches?: (task: CompactIssue, value: string) => boolean;
 };
 
 /**
@@ -267,6 +277,10 @@ export function applyFilters(
     if (creators.size > 0 && !creators.has(creatorKey(task))) return false;
     if (projects.size > 0 && !projects.has(task.projectId ?? "none")) return false;
     if (workspaces.size > 0 && !workspaces.has(context.workspaceOf?.(task) ?? "none")) return false;
+    if (filters.externalObjects.length > 0 && context.externalMatches) {
+      const matches = context.externalMatches;
+      if (!filters.externalObjects.some((value) => matches(task, value))) return false;
+    }
     return words.length === 0 || matchesSearch(task, words);
   });
 }
