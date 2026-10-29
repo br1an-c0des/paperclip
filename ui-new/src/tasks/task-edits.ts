@@ -1,5 +1,5 @@
 import type { Agent, ExecutionWorkspace, Issue, IssueStatus, Project } from "@paperclipai/shared";
-import { agentRunDefaults, effortKeyFor, effortOptions, supportsOverrides } from "./new-task";
+import { agentRunDefaults, effortKeyFor, effortOptions, modeForExisting, supportsOverrides } from "./new-task";
 
 /*
  * The changes the Details section sends (board 2), each as the `PATCH /issues/:id` body the old UI
@@ -139,13 +139,6 @@ export function workspaceChoice(task: WorkspaceSource): WorkspaceChoice {
   if (task.executionWorkspacePreference == null && task.executionWorkspaceSettings == null) return "default";
   const selection = task.executionWorkspacePreference ?? task.executionWorkspaceSettings?.mode;
   return selection === "isolated_workspace" ? "isolated" : selection === "reuse_existing" ? "reuse" : "default";
-}
-
-/** The mode a reused workspace is recorded with, after `issueExecutionWorkspaceModeForExistingWorkspace`. */
-function modeForExisting(mode: string | null | undefined) {
-  if (mode === "isolated_workspace" || mode === "operator_branch" || mode === "shared_workspace") return mode;
-  if (mode === "adapter_managed" || mode === "cloud_sandbox") return "agent_default";
-  return "shared_workspace";
 }
 
 /** The fields that move a task to the project's default, a new isolated workspace, or one it reuses. */

@@ -29,6 +29,7 @@ import {
   type SendMode,
 } from "./composer-model";
 import { activeMention, insertMention, matchesQuery, type ActiveMention, type MentionTarget } from "./mentions";
+import { MentionOption } from "./MentionTextArea";
 import { createRunnerGoal, RunnerGoalCard } from "./RunnerGoal";
 import { goalFromComposer, type GoalCommand } from "./runner-goal-model";
 import "./Composer.css";
@@ -605,35 +606,6 @@ export function Composer(props: {
         </div>
       </div>
     </form>
-    </>
-  );
-}
-
-function MentionOption(props: { candidate: MentionTarget; people: TaskPeople }) {
-  const candidate = props.candidate;
-  if (candidate.kind === "agent") {
-    const agent = props.people.agent(candidate.id);
-    return (
-      <>
-        <Show when={agent} fallback={<InitialsDisc name={candidate.name} seed={candidate.id} size={20} />}>
-          {(found) => <AgentAvatar agent={found()} size={24} />}
-        </Show>
-        <span class="cmp-option-label">{candidate.name}</span>
-      </>
-    );
-  }
-  if (candidate.kind === "user") {
-    return (
-      <>
-        <InitialsDisc name={candidate.name} seed={candidate.id} size={20} />
-        <span class="cmp-option-label">{candidate.name}</span>
-      </>
-    );
-  }
-  return (
-    <>
-      <span class="mono cmp-option-id">{candidate.identifier}</span>
-      <span class="cmp-option-label">{candidate.title}</span>
     </>
   );
 }

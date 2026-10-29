@@ -13,7 +13,8 @@ import { buildAdapterOverrides } from "./run-overrides";
  * - Model and effort overrides use the table in run-overrides.ts, shared with the composer, with
  *   each adapter's effort key; nothing is sent at "Agent default" (decisions 7 and 13).
  * - The workspace choice is sent only when the project has execution workspaces on and the instance
- *   has `enableIsolatedWorkspaces` (decision 12: follows the setting).
+ *   has `enableIsolatedWorkspaces` (decision 12: follows the setting). Reusing another task's
+ *   worktree sends that workspace's id, its mode and its project workspace.
  * - Review policy "Anyone approves" is the server's default, sent as nothing.
  * - Tasks have no due date (decision 6).
  *
@@ -26,7 +27,17 @@ import { buildAdapterOverrides } from "./run-overrides";
 
 export type Principal = { kind: "agent" | "user"; id: string };
 
-export type WorkspaceMode = "shared_workspace" | "isolated_workspace";
+export type WorkspaceMode = "shared_workspace" | "isolated_workspace" | "reuse_existing";
+
+/** The mode a reused workspace is recorded with, after `issueExecutionWorkspaceModeForExistingWorkspace`. */
+export function modeForExisting(mode: string | null | undefined) {
+  if (mode === "isolated_workspace" || mode === "operator_branch" || mode === "shared_workspace") return mode;
+  if (mode === "adapter_managed" || mode === "cloud_sandbox") return "agent_default";
+  return "shared_workspace";
+}
+
+/** Another task's workspace, picked to reuse (`reuse_existing`). */
+export type ReusedWorkspace = { id: string; name: string; mode: string; projectWorkspaceId: string | null };
 
 export type NewTaskDraft = {
   projectId: string | null;
@@ -49,6 +60,8 @@ export type NewTaskDraft = {
   watchdogAgentId: string | null;
   workMode: Extract<IssueWorkMode, "standard" | "ask" | "planning">;
   workspace: WorkspaceMode;
+  /** The workspace to reuse, when `workspace` is "reuse_existing". */
+  reuseWorkspace: ReusedWorkspace | null;
   reviewPolicy: IssueReviewPolicy;
   /** "More fields" and assignment roles the user added, in the order they were added. */
   extras: ExtraField[];
@@ -81,6 +94,7 @@ export function emptyDraft(overrides: Partial<NewTaskDraft> = {}): NewTaskDraft 
     watchdogAgentId: null,
     workMode: "standard",
     workspace: "shared_workspace",
+    reuseWorkspace: null,
     reviewPolicy: "anyone",
     extras: [],
     names: {},
@@ -188,10 +202,21 @@ export function buildCreatePayload(draft: NewTaskDraft, context: PayloadContext)
   if (draft.reviewPolicy !== "anyone") payload.reviewPolicy = draft.reviewPolicy;
 
   if (context.project && workspaceChoiceAvailable(context.project, context.isolatedWorkspacesEnabled)) {
-    payload.executionWorkspacePreference = draft.workspace;
-    payload.executionWorkspaceSettings = { mode: draft.workspace };
-    const workspaceId = defaultProjectWorkspaceId(context.project);
-    if (workspaceId) payload.projectWorkspaceId = workspaceId;
+    const reused = draft.workspace === "reuse_existing" ? draft.reuseWorkspace : null;
+    if (reused) {
+      // Another task's worktree, as the old dialog's "Reuse existing workspace" sends it.
+      payload.executionWorkspacePreference = "reuse_existing";
+      payload.executionWorkspaceId = reused.id;
+      payload.executionWorkspaceSettings = { mode: modeForExisting(reused.mode) };
+      const workspaceId = reused.projectWorkspaceId ?? defaultProjectWorkspaceId(context.project);
+      if (workspaceId) payload.projectWorkspaceId = workspaceId;
+    } else {
+      const mode = draft.workspace === "reuse_existing" ? "shared_workspace" : draft.workspace;
+      payload.executionWorkspacePreference = mode;
+      payload.executionWorkspaceSettings = { mode };
+      const workspaceId = defaultProjectWorkspaceId(context.project);
+      if (workspaceId) payload.projectWorkspaceId = workspaceId;
+    }
   }
   return payload;
 }
@@ -200,6 +225,7 @@ export function buildCreatePayload(draft: NewTaskDraft, context: PayloadContext)
 export function draftProblem(draft: NewTaskDraft): string | null {
   if (!draftHasContent(draft)) return "Give the task a title or a description.";
   if (draft.extras.includes("watchdog") && !draft.watchdogAgentId) return "Pick a watchdog agent, or remove the role.";
+  if (draft.workspace === "reuse_existing" && !draft.reuseWorkspace) return "Pick the workspace to reuse.";
   return null;
 }
 

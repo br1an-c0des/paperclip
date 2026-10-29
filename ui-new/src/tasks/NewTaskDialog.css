@@ -633,3 +633,15 @@ button.nt-pill:hover,
   font-size: 13px;
   font-weight: 600;
 }
+
+/* The workspace pill names a reused worktree, which can be long */
+.nt-choice-text {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nt-choice[data-problem] {
+  border-color: var(--amber-fg);
+  color: var(--amber-fg);
+}
