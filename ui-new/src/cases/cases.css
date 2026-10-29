@@ -1,0 +1,983 @@
+/* Cases in the task views (boards C1, C2 and C5) */
+
+/* The case chip: solid with phase ticks on a main task, dashed on a task linked to the case */
+.case-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px 0 6px;
+  box-sizing: border-box;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--edge);
+  background: var(--well);
+  color: var(--body);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.case-chip .mono {
+  font-size: 11.5px;
+  color: var(--text);
+}
+
+.case-chip--link {
+  background: transparent;
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.case-chip--link .mono {
+  color: var(--muted);
+}
+
+.case-chip--head {
+  height: 26px;
+  padding: 0 10px 0 8px;
+  font-size: 13px;
+}
+
+/* Phase ticks: done, current, queued (a ring) or to come */
+.case-ticks {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.case-ticks i {
+  display: block;
+  width: 10px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--pri-off);
+}
+
+.case-ticks i[data-tick="done"] {
+  background: linear-gradient(90deg, var(--lagoon-a), var(--lagoon-b));
+}
+
+.case-ticks i[data-tick="current"] {
+  background: linear-gradient(90deg, var(--ion-a), var(--ion-b));
+}
+
+.case-ticks i[data-tick="queued"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--run-fg) 70%, transparent);
+}
+
+/* The case's status: a tinted pill */
+.case-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px;
+  box-sizing: border-box;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--edge);
+  background: var(--well);
+  color: var(--body);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.case-status--run,
+.case-status--violet,
+.case-status--green {
+  border-color: color-mix(in srgb, var(--tone-fg) 50%, transparent);
+  background: var(--tone-bg);
+  color: var(--tone-fg);
+}
+
+.case-status--run {
+  --tone-bg: var(--run-bg);
+  --tone-fg: var(--run-fg);
+}
+
+.case-status--violet {
+  --tone-bg: var(--violet-bg);
+  --tone-fg: var(--violet-fg);
+}
+
+.case-status--green {
+  --tone-bg: var(--green-bg);
+  --tone-fg: var(--green-fg);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   The Case section (board C1) */
+
+.tcase {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tcase-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tcase-muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.tcase-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tcase-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tcase-role {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.tcase-role a {
+  color: var(--body);
+  font-weight: 600;
+}
+
+.tcase-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.15;
+  font-weight: 800;
+}
+
+.tcase-summary {
+  margin: 0;
+  color: var(--body);
+  line-height: 1.55;
+}
+
+.tcase-labels {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tcase-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--edge);
+  color: var(--body);
+  font-size: 12px;
+}
+
+.tcase-h {
+  margin: 0;
+  font-family: var(--display);
+  letter-spacing: -0.01em;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+/* The workflow's phase track, on a well */
+.tcase-well {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 14px 12px;
+  border-radius: 16px;
+  background: var(--well);
+}
+
+.tcase-well-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tcase-well-head .tcase-h {
+  font-size: 14px;
+}
+
+.tcase-well-link {
+  margin-left: auto;
+  color: var(--body);
+  font-size: 13px;
+}
+
+.tcase-track {
+  margin: 0;
+  padding: 0 0 2px;
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tcase-conn {
+  flex: 1 1 10px;
+  min-width: 8px;
+  height: 2px;
+  margin-top: 16px;
+  border-radius: var(--r-pill);
+  background: var(--line);
+}
+
+.tcase-conn--done {
+  background: linear-gradient(90deg, var(--lagoon-a), var(--lagoon-b));
+}
+
+.tcase-step {
+  flex: 0 0 auto;
+  width: 78px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.tcase-step-disc {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  border: 1.5px dashed var(--dashed);
+}
+
+.tcase-step-disc > :first-child:not(svg) {
+  width: 24px;
+  height: 24px;
+}
+
+.tcase-step[data-state="done"] .tcase-step-disc,
+.tcase-step[data-state="current"] .tcase-step-disc {
+  border: 0;
+}
+
+.tcase-step[data-state="done"] .tcase-step-disc::after {
+  content: "";
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--lagoon-a), var(--lagoon-b));
+  box-shadow: 0 0 0 2px var(--well);
+}
+
+.tcase-step[data-state="current"] .tcase-step-disc {
+  box-shadow: 0 0 0 2px var(--well), 0 0 0 4px var(--run-fg);
+}
+
+.tcase-step[data-state="queued"] .tcase-step-disc {
+  border-color: var(--run-fg);
+  color: var(--run-fg);
+}
+
+.tcase-step-name {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--muted);
+}
+
+.tcase-step[data-state="done"] .tcase-step-name {
+  color: var(--body);
+}
+
+.tcase-step[data-state="current"] .tcase-step-name,
+.tcase-step[data-state="queued"] .tcase-step-name {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.tcase-step-who {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tcase-step-note {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--muted);
+}
+
+.tcase-step[data-state="current"] .tcase-step-note,
+.tcase-step[data-state="queued"] .tcase-step-note {
+  color: var(--run-fg);
+}
+
+.tcase-disc-none {
+  display: block;
+  box-sizing: border-box;
+  border-radius: 50%;
+}
+
+.tcase-phase-text {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+.tcase-note {
+  color: var(--run-fg);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tcase-phase-why {
+  flex-basis: 100%;
+  font-size: 12px;
+}
+
+/* A hand-off on its way */
+.tcase-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 12px 14px;
+  border-radius: 16px;
+  background: var(--run-bg);
+  border: 1px solid color-mix(in srgb, var(--run-fg) 40%, transparent);
+}
+
+.tcase-strip-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--body);
+}
+
+.tcase-strip-text strong {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.tcase-part {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tcase-part-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tcase-part-end {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+/* Fields: key and value rows */
+.tcase-kv {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(120px, 190px) minmax(0, 1fr);
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  overflow: hidden;
+}
+
+.tcase-kv dt,
+.tcase-kv dd {
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--row-line);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tcase-kv dt {
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--well);
+  display: flex;
+  align-items: center;
+}
+
+.tcase-kv dd {
+  font-size: 13px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tcase-kv dt:first-of-type,
+.tcase-kv dd:first-of-type {
+  border-top: 0;
+}
+
+.tcase-tiles {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tcase-tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  max-width: 100%;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--body);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.tcase-tile:hover {
+  background: var(--hover);
+}
+
+.tcase-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tcase-toggle:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.tcase-toggle svg {
+  transition: transform 0.14s ease;
+}
+
+.tcase-toggle-open {
+  transform: rotate(180deg);
+}
+
+/* Hand-offs, newest first */
+.tcase-hops {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.tcase-hop {
+  display: grid;
+  grid-template-columns: 72px 64px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--row-line);
+  font-size: 13px;
+}
+
+.tcase-hop:first-child {
+  border-top: 0;
+}
+
+.tcase-hop time {
+  font-size: 12px;
+  padding-top: 3px;
+}
+
+.tcase-hop-who {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+}
+
+.tcase-hop-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tcase-hop-text strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tcase-hop-note {
+  padding: 0;
+  text-align: left;
+  color: var(--body);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+
+.tcase-hop-note--open {
+  display: block;
+}
+
+.tcase-hop-state {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.tcase-hop:not([data-state="delivered"]):not([data-state="completed"]):not([data-state="cancelled"]) .tcase-hop-state {
+  background: var(--run-bg);
+  color: var(--run-fg);
+}
+
+/* The case's other tasks and cases */
+.tcase-rows {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.tcase-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 14px;
+  border-top: 1px solid var(--row-line);
+  font-size: 13px;
+}
+
+.tcase-row:first-child {
+  border-top: 0;
+}
+
+.tcase-row--note {
+  color: var(--muted);
+}
+
+.tcase-row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tcase-role-pill {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--edge);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+@container panel (width < 480px) {
+  .tcase-kv {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tcase-kv dd {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .tcase-hop {
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+  }
+
+  .tcase-hop time {
+    display: none;
+  }
+
+  .tcase-strip {
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tcase-toggle svg {
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   A case's group heading under Group: Case (board C2) */
+
+.case-head-phase {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The head's own buttons follow the phase */
+.tl-head:has(.case-head-phase) .tl-head-add {
+  margin-left: 0;
+}
+
+/* On a phone the type, ID and phase drop below the name (CaseHeadBelow) */
+.case-head-phone {
+  display: none;
+}
+
+.tl--phone .tl-head:has(.case-head-phase) .case-chip,
+.tl--phone .tl-head .case-head-phase {
+  display: none;
+}
+
+.tl--phone .tl-head:has(.case-head-phase) h2 {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tl--phone .tl-head:has(.case-head-phase) .tl-head-add {
+  margin-left: auto;
+}
+
+.tl--phone .case-head-phone {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.tl--phone .case-head-phone .case-head-phase {
+  margin-left: 0;
+}
+
+.case-head-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.case-stat {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  max-width: 260px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.case-stat b {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 0;
+}
+
+.case-stat span {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.case-head-meta {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.case-head-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 14px;
+  border-radius: var(--r-inner);
+  background: var(--run-bg);
+  border: 1px solid color-mix(in srgb, var(--run-fg) 40%, transparent);
+}
+
+.case-head-strip--draft {
+  background: transparent;
+  border: 1px dashed var(--edge);
+}
+
+.case-head-strip-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--body);
+}
+
+.case-head-strip-text strong {
+  color: var(--text);
+}
+
+/* Start workflow */
+.case-start {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.case-start select.input {
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   New task's case box (board C5) */
+
+.ntc {
+  margin: 12px 24px 0;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ntc--on {
+  background: var(--well);
+}
+
+.ntc-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ntc-icon {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--edge);
+  display: grid;
+  place-items: center;
+  color: var(--text);
+}
+
+.ntc-head .switch-row {
+  flex: 0 1 auto;
+}
+
+.ntc-link {
+  margin-left: auto;
+  border-style: dashed;
+}
+
+.ntc-link--on {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--run-fg) 50%, transparent);
+  background: var(--run-bg);
+  color: var(--run-fg);
+}
+
+.ntc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-left: 40px;
+}
+
+.ntc-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ntc-label {
+  font-family: var(--display);
+  letter-spacing: -0.01em;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.ntc-template {
+  margin-left: 6px;
+  background: var(--card);
+}
+
+.ntc-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-inner);
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+
+.ntc-preview-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.ntc-preview-desc {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--body);
+  line-height: 1.45;
+}
+
+.ntc-muted {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ntc-phases {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ntc-phase {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 11px;
+  box-sizing: border-box;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.ntc-arrow {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ntc-facts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ntc-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--body);
+}
+
+.ntc-linked {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+}
+
+.ntc-linked-title {
+  font-family: var(--display);
+  letter-spacing: -0.01em;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.ntc-role {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* A task's role in the group's case */
+.case-role {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--edge);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.case-role--main {
+  border-color: color-mix(in srgb, var(--run-fg) 45%, transparent);
+  background: var(--run-bg);
+  color: var(--run-fg);
+}

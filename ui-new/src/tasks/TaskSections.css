@@ -11,12 +11,42 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  /* Tall notices or plugin blocks above a section scroll with it rather than squeezing it shut. */
+  /* Above Details, notices and plugin blocks scroll with it. */
   overflow-y: auto;
 }
 
-.tsec-body > :last-child {
+/* The task's notices and plugins' blocks, above the open section */
+.tsec-lead {
+  display: flex;
+  flex-direction: column;
+}
+
+.tsec-lead:empty {
+  display: none;
+}
+
+/*
+ * The other sections fill the panel and scroll inside it: the notices and plugin blocks above them
+ * get at most a third of its height, scrolling on their own, and the section keeps the rest (and
+ * never less than a usable height, where the page itself scrolls, as on a phone).
+ */
+.tsec-body--fill > .tsec-lead {
+  flex: 0 1 auto;
+  max-height: 34%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-bottom: 1px solid var(--line);
+}
+
+.tsec-main {
+  flex: 1 1 0;
   min-height: min(420px, 70dvh);
+  display: flex;
+  flex-direction: column;
+}
+
+.tsec-pad {
+  padding: 18px 24px;
 }
 
 /* In the dock the panel keeps its full height, so switching sections or tasks doesn't resize it */

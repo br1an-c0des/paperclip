@@ -112,6 +112,11 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
     case "approval":
       keys.push(["approvals", companyId], queryKeys.inbox.attention(companyId));
       break;
+    // Cases (src/cases/): hand-offs and document changes are logged on the case. A hand-off also
+    // reassigns its main task, which is logged on the task.
+    case "case":
+      keys.push(queryKeys.cases.all(companyId));
+      break;
     case "routine":
     case "routine_trigger":
     case "routine_run":
