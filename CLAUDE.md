@@ -63,6 +63,7 @@ or package code.
 | [ui-new/docs/inventory/generated/](ui-new/docs/inventory/generated/) | Generated routes, per-page requests, API methods and experimental flags. |
 | [ui-new/docs/proposals/](ui-new/docs/proposals/) | Design proposals for the redesign, such as unifying questions, decisions and approvals into requests. |
 | [ui-new/docs/decisions.md](ui-new/docs/decisions.md) | Discoveries and decisions: API gaps and constraints the redesign runs into, their options, and what was decided. |
+| [ui-new/docs/guides/](ui-new/docs/guides/README.md) | Notes toward a user-facing guide to Paperclip: what each feature is for, when it helps, example flows. Raw material for a written guide and an in-app one (build plan 3.15). |
 | [ui-new/docs/design/](ui-new/docs/design/README.md) | The approved redesign to build from: board index, phone layouts (`mobile.md`), Capsule Stack design system, `tokens.css`, a style guide page, and the board sources. |
 
 ## Common commands

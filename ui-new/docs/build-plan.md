@@ -112,6 +112,7 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | A "fast mode" for meetings | 2b | Codex agents already have a `fastMode` setting (`codex_local`). `claude_local` has none ([2b-11](#2b-small-features-ask-upstream-first)). A fast model or low effort per message works today. |
 | A core skill add-on for new behaviour | 3 | [3.10](#310-core-skill-add-on). Fork-owned, with no conflict. |
 | A `COMPANY.md`: company-wide instructions every run in the company receives, like an agent's `AGENTS.md` | Idea, then 2b or 3 | Raised Oct 27, 2026 ([3.14](#314-company-instructions-companymd)). Not designed yet. |
+| Help people understand what Paperclip is and how to use each feature: a user guide with worked examples, and an interactive guide in the app | Idea, then 1 or 3 | Raised Oct 28, 2026 ([3.15](#315-an-in-app-guide-to-paperclip)). Notes collect in [guides/](guides/README.md). Not designed yet. |
 
 ## Stage 1: the new UI
 
@@ -729,6 +730,30 @@ An idea raised Oct 27, 2026; not designed or scheduled yet.
      context, and Runner agents treat skills differently.
 - **Questions:** how it interacts with an agent's own instructions (which wins on conflict), size
   limits (it would be in every run's prompt), whether chats get it too, and who may edit it.
+
+### 3.15 An in-app guide to Paperclip
+
+An idea raised Oct 28, 2026, while going through the M7 audit's decisions; not designed or scheduled
+yet.
+
+- **The idea:** help people understand what Paperclip is, everything it can do, and when and how to
+  use each part. Upstream's docs mostly explain how a feature works and how to configure it; they
+  rarely say why you'd choose it or walk through using it. Explaining outside agents for D2 (why
+  invite one instead of using a built-in harness, when it helps and when it doesn't, an example flow)
+  showed the kind of material that's missing.
+- **Two forms:**
+  1. **A written user guide**: per feature, what it's for, when it helps and when it doesn't, worked
+     examples and an end-to-end flow. Notes start in [guides/](guides/README.md), beginning with
+     [outside agents](guides/outside-agents.md); add one whenever a feature needs explaining in a
+     decision or review.
+  2. **An interactive guide in `ui-new`**: for example a guided tour on first use, "what's this?"
+     explanations beside features, or a help page that links each guide to the page where the
+     feature lives and offers to try it on sample data.
+- **Have today:** `ui-new`'s onboarding (create a company, the first agent, Get started), empty states,
+  and upstream's docs in `doc/` and `docs/`.
+- **Questions:** how much of it is UI-only (likely all of it: guide text and tours ship with `ui-new`);
+  whether the guide text lives in the app or is fetched from docs; how it avoids going stale as
+  upstream changes features; and whether it's for first-time users only or a reference too.
 
 ## Questions for you
 

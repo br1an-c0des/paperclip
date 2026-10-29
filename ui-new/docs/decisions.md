@@ -42,7 +42,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 13 | [The task composer overrides runs for more adapters than New task does](#13-the-task-composer-overrides-runs-for-more-adapters-than-new-task-does) | `tasks/create`, `agents/runtime` | Decided | Oct 25, 2026 |
 | 14 | [Lists need their own storage, so they're on hold](#14-lists-need-their-own-storage-so-theyre-on-hold) | `goals/*`, `tasks/organize`, `projects/task-context` | Decided | Oct 26, 2026 |
 | 15 | [Run transcripts use the adapter packages' parsers at runtime](#15-run-transcripts-use-the-adapter-packages-parsers-at-runtime) | `runs-adapters/runs`, `tasks/run-control` | Decided | Oct 26, 2026 |
-| 16 | [Cases don't store the structure the case boards draw](#16-cases-dont-store-the-structure-the-case-boards-draw) | `cases/*`, `tasks/views` | Open | Oct 26, 2026 |
+| 16 | [Cases don't store the structure the case boards draw](#16-cases-dont-store-the-structure-the-case-boards-draw) | `cases/*`, `tasks/views` | Decided | Oct 28, 2026 |
 | 17 | [Search results are shaped differently from board S1](#17-search-results-are-shaped-differently-from-board-s1) | `inbox-search/search` | Open | Oct 26, 2026 |
 | 18 | [The phone layouts assume push notifications](#18-the-phone-layouts-assume-push-notifications) | phone navigation, `inbox-search/triage` | Open | Oct 26, 2026 |
 | 19 | [The document editor is CodeMirror 6, loaded on demand](#19-the-document-editor-is-codemirror-6-loaded-on-demand) | `documents-artifacts/documents`, `tasks/workspace` | Decided | Oct 26, 2026 |
@@ -65,6 +65,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 36 | [Gaps found building onboarding and the pages outside a company](#36-gaps-found-building-onboarding-and-the-pages-outside-a-company) | Companies and onboarding, sign-in and connect flows | Open | Oct 28, 2026 |
 | 37 | [Gaps found building plugin hosting](#37-gaps-found-building-plugin-hosting) | `shell/plugins` | Open | Oct 28, 2026 |
 | 38 | [Gaps found building task and workspace leftovers](#38-gaps-found-building-task-and-workspace-leftovers) | `tasks/runner-goal`, `tasks/feedback`, `workspaces/*` | Open | Oct 28, 2026 |
+| 39 | [Decisions from the M7 audit](#39-decisions-from-the-m7-audit) | M7, see [audit/m7-parity.md](audit/m7-parity.md#5-decisions-needed) | In progress | Oct 28, 2026 |
 
 ## Entries
 
@@ -712,7 +713,7 @@ past Vite's 500 KB warning (627 KB); loading the run modal as its own chunk is t
 
 ### 16. Cases don't store the structure the case boards draw
 
-- **Status:** Open
+- **Status:** Decided 2026-10-28
 - **Area:** `cases/*`, `tasks/views`
 - **Found in:** boards C1, C2 and C5, checked against the cases API.
 
@@ -735,7 +736,20 @@ these, the case views either parse prose or make a request per task.
 membership per visible task, or propose structured phases and a membership field upstream. Upstream
 is still changing cases, so check its direction first.
 
-**Decision.** Open.
+**Decision (2026-10-28).** Build C1, C2 and C5 in full in M7 (audit decision D1, option a), drawing
+what the API stores:
+
+- **Phase track:** since #16959 (Oct 20) a workflow is Markdown, and upstream recommends a Mermaid
+  `stateDiagram-v2` whose state IDs match the phase names (advisory, not enforced). Read the phases
+  from that diagram when there is one; otherwise show the current phase as text with its rounds from
+  `GET /api/cases/:caseId/handoffs`.
+- **Membership:** one `GET /api/cases/:id` per case in view, not one request per task.
+- **"Used by N cases":** count from the case list if it carries each case's workflow; otherwise
+  leave the line out.
+- **No upstream proposal for now**; upstream is still changing cases.
+
+Cases follow `enableCases`. The user agreed to turn it on, and leave it on, on the test instance so
+the boards can be built and checked.
 
 ### 17. Search results are shaped differently from board S1
 
@@ -1218,3 +1232,24 @@ Both are handled in `ui-new` for now.
 - **A branch's ahead and behind state comes only from `GET /execution-workspaces/:id/close-readiness`**,
   which runs git on each call; the Workspace section caches it for 30 seconds. Folders that aren't
   git repositories report a blocking reason there.
+
+### 39. Decisions from the M7 audit
+
+- **Status:** In progress (D1 and D2 decided; D3 to D11 to go)
+- **Area:** M7; the questions are in [audit/m7-parity.md](audit/m7-parity.md#5-decisions-needed),
+  section 5.
+- **Found in:** the M7 parity audit (Oct 28, 2026), gone through with the user one decision at a time.
+
+- **D1. Cases: build C1, C2 and C5 in full** (option a, not the audit's minimal option). How to draw
+  what the API doesn't store is [decision 16](#16-cases-dont-store-the-structure-the-case-boards-draw).
+  The cases agent may turn `enableCases` on, and leave it on, on the test instance.
+- **D2. Outside agents: build the plain invite, drop Dot, Grok and Muse** (a new option c). The old
+  picker's Hermes and Other choices aren't behind any setting: they create an agent-only company
+  invite (`POST /companies/:id/invites` with `allowedJoinTypes: "agent"`) and show a copyable
+  onboarding prompt (`ui/src/lib/agent-onboarding-prompt.ts`, using
+  `GET /invites/:token/onboarding`). `ui-new` could accept an agent invite but not create one, so it
+  had no way to add a Hermes, OpenClaw or HTTP agent. Build "Invite an outside agent" in New agent
+  with the prompt and a waiting state that points to the Inbox, where slice B approves join requests.
+  Dot (`enableOpenAiDot`), Grok (`enableGrokBot`) and Muse (`enableMuse`), with Muse's connection
+  panel, are dropped while their settings are off; a sync that turns one on raises it again. What
+  the feature is for, with an example flow: [guides/outside-agents.md](guides/outside-agents.md).
