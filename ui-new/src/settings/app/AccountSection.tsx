@@ -12,10 +12,12 @@ import { Button } from "@/ui/Button";
 import { SettingsCard, SettingsRow, TextInput } from "@/ui/Field";
 import { pushToast } from "@/ui/Toast";
 import { APP_SETTINGS_PATH, avatarNamespace, displayNameProblem } from "./app-settings-model";
+import { InboxTidyCard } from "./InboxTidyCard";
 import { failure, LaterNote, SaveNote, SectionTitle, useSaver } from "./shared";
 
 /*
- * Account (board 30's outline): your profile, the organizations you belong to, and signing out.
+ * Account (board 30's outline): your profile, whether agents may tidy your inbox (InboxTidyCard.tsx,
+ * from the old Profile page), the organizations you belong to, and signing out.
  * The profile is `GET|PATCH /api/auth/profile`, which a local_trusted instance answers for the local
  * board user too. The name saves when the field loses focus; a new avatar is uploaded into this
  * organization's file storage and saved at once, as in the old UI.
@@ -132,6 +134,8 @@ export function AccountSection(props: { isAdmin: boolean }) {
           <div class="as-muted as-min-34">{profile.data?.email ?? "None"}</div>
         </SettingsRow>
       </SettingsCard>
+
+      <InboxTidyCard />
 
       <SettingsCard title="Your organizations" description="The organizations you belong to.">
         <For each={companies.data ?? []} fallback={<p class="as-empty-line">You don't belong to any organization yet.</p>}>

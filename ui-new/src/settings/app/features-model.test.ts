@@ -46,10 +46,15 @@ describe("the Features card's flags", () => {
     expect(unsorted, "new upstream flags: sort them under decision 12").toEqual([]);
   });
 
-  it("keeps out the flags decision 12 drops or builds in, agent chat and maintainer tools", () => {
-    for (const key of ["enableStreamlinedUi", "enableDecisions", "enableEnvironments", "enableAgentChat", "enableSmokeLab", "enableConferenceRoomChat", "enablePaperclipDeveloperMode"]) {
+  it("keeps out the flags decision 12 drops or builds in, and maintainer tools", () => {
+    for (const key of ["enableStreamlinedUi", "enableDecisions", "enableEnvironments", "enableSmokeLab", "enableConferenceRoomChat", "enablePaperclipDeveloperMode"]) {
       expect(listed).not.toContain(key);
     }
+  });
+
+  it("gives admins the agent chat switch a fresh instance needs (decision A, M7 audit part B)", () => {
+    expect(listed).toContain("enableAgentChat");
+    expect(featureFlag("enableAgentChat")?.label).toBe("Agent chat");
   });
 });
 

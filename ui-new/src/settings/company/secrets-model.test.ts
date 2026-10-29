@@ -1,6 +1,31 @@
-import type { CompanySecret, SecretProposalView } from "@paperclipai/shared";
+import type { CompanySecret, CompanySecretProviderConfig, SecretProposalView } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { coverageLabel, keyFromName, keyProblem, listedProviders, organizationSecrets, proposalMeta, proposalTitle, secretCounts, storedIn, usesLabel } from "./secrets-model";
+import {
+  applyCandidate,
+  consumerLabel,
+  coverageLabel,
+  discoveryQuery,
+  emptyVaultForm,
+  importableVaults,
+  importDraft,
+  importDraftProblem,
+  importKey,
+  importResultLine,
+  keyFromName,
+  keyProblem,
+  listedProviders,
+  organizationSecrets,
+  proposalMeta,
+  proposalTitle,
+  secretCounts,
+  storedIn,
+  usesLabel,
+  vaultBlockReason,
+  vaultConfig,
+  vaultForm,
+  vaultProblem,
+  vaultStatus,
+} from "./secrets-model";
 
 function secret(overrides: Partial<CompanySecret>): CompanySecret {
   return {
@@ -102,5 +127,78 @@ describe("per-person secrets", () => {
     expect(keyProblem("has space")).toMatch(/letters/);
     expect(keyProblem("GITHUB_TOKEN")).toBeNull();
     expect(keyFromName("Personal GitHub token!")).toBe("PERSONAL_GITHUB_TOKEN");
+  });
+});
+
+describe("vaults", () => {
+  const awsConfig = {
+    id: "v1",
+    provider: "aws_secrets_manager",
+    displayName: "Prod AWS",
+    status: "ready",
+    isDefault: false,
+    config: { region: "us-east-1", namespace: "prod", secretNamePrefix: null },
+    healthStatus: null,
+    healthMessage: null,
+  } as unknown as CompanySecretProviderConfig;
+
+  it("round-trips an AWS vault, sending blank optional fields as null", () => {
+    const form = vaultForm(awsConfig);
+    expect(form.fields).toEqual({ region: "us-east-1", namespace: "prod" });
+    expect(vaultConfig({ ...form, fields: { ...form.fields, kmsKeyId: "  " } })).toEqual({
+      region: "us-east-1",
+      namespace: "prod",
+      secretNamePrefix: null,
+      kmsKeyId: null,
+      ownerTag: null,
+      environmentTag: null,
+    });
+  });
+
+  it("needs a name, AWS's region and the Paperclip vault's backup note", () => {
+    expect(vaultProblem(emptyVaultForm("aws_secrets_manager"))).toBe("Give the vault a name.");
+    expect(vaultProblem({ ...emptyVaultForm("aws_secrets_manager"), displayName: "A" })).toBe("Enter the AWS region.");
+    expect(vaultProblem({ ...emptyVaultForm("local_encrypted"), displayName: "Local" })).toMatch(/back it up/);
+    expect(vaultConfig({ ...emptyVaultForm("local_encrypted"), backupReminderAcknowledged: true })).toEqual({ backupReminderAcknowledged: true });
+    expect(vaultStatus("vault")).toBe("coming_soon");
+    expect(vaultStatus("aws_secrets_manager")).toBe("ready");
+  });
+
+  it("says why a vault can't take secrets, and which can be imported from", () => {
+    expect(vaultBlockReason({ status: "disabled", healthStatus: null, healthMessage: null })).toMatch(/off/);
+    expect(vaultBlockReason({ status: "ready", healthStatus: "error", healthMessage: "No access" })).toBe("No access");
+    expect(vaultBlockReason({ status: "warning", healthStatus: "warning", healthMessage: null })).toBeNull();
+    expect(importableVaults([awsConfig, { ...awsConfig, id: "v2", status: "disabled" }, { ...awsConfig, id: "v3", provider: "vault" }]).map((config) => config.id)).toEqual(["v1"]);
+  });
+
+  it("takes a discovered candidate's routing, keeping a typed name", () => {
+    const candidate = { provider: "aws_secrets_manager", displayName: "paperclip/prod", config: { region: "eu-west-1", secretNamePrefix: "pc" } } as never;
+    expect(applyCandidate({ ...emptyVaultForm("aws_secrets_manager"), displayName: "Mine" }, candidate)).toMatchObject({
+      displayName: "Mine",
+      fields: { region: "eu-west-1", secretNamePrefix: "pc", namespace: "" },
+    });
+    expect(applyCandidate(emptyVaultForm("aws_secrets_manager"), candidate).displayName).toBe("paperclip/prod");
+    expect(discoveryQuery({ ...emptyVaultForm("aws_secrets_manager"), fields: { namespace: "prod", ownerTag: "me" } })).toBe("prod");
+  });
+});
+
+describe("importing a vault's secrets", () => {
+  const candidate = (externalRef: string, name: string, key: string) =>
+    ({ externalRef, remoteName: name, name, key, providerVersionRef: null, providerMetadata: null, status: "ready", importable: true, conflicts: [] }) as never;
+
+  it("checks names and keys against existing secrets and the other rows", () => {
+    const one = importDraft(candidate("arn:1", "Stripe key", "stripe-key"));
+    const two = { ...importDraft(candidate("arn:2", "Other", "other")), key: "stripe-key" };
+    expect(importDraftProblem(one, [secret({ name: "Stripe key" })], [one])).toMatch(/already has this name/);
+    expect(importDraftProblem(two, [], [one, two])).toMatch(/Another selected/);
+    expect(importDraftProblem({ ...one, key: "Bad Key" }, [], [one])).toMatch(/lowercase/);
+    expect(importDraftProblem(one, [], [one])).toBeNull();
+    expect(importKey("Prod/Stripe Key")).toBe("prod-stripe-key");
+    expect(importResultLine({ importedCount: 2, skippedCount: 1, errorCount: 0 })).toBe("2 imported · 1 skipped · 0 failed");
+  });
+
+  it("names who read a secret", () => {
+    expect(consumerLabel("agent_api")).toBe("Agent API");
+    expect(consumerLabel("agent")).toBe("Agent");
   });
 });

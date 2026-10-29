@@ -17,6 +17,8 @@ import {
   groupHarnesses,
   harnessSummary,
   harnessUsage,
+  inboxPolicyBody,
+  inboxPolicyDirty,
   isExperimentalPlugin,
   legacySettingsSuffix,
   parseInstallTarget,
@@ -25,6 +27,7 @@ import {
   renameEdit,
   signInChecks,
   sortOrganizations,
+  tidyingAgents,
   updateOffer,
   visibleSections,
 } from "./app-settings-model";
@@ -262,5 +265,29 @@ describe("organizations, admins and account", () => {
     expect(displayNameProblem("  ")).toBe("Enter a name.");
     expect(displayNameProblem("x".repeat(121))).toMatch(/120/);
     expect(displayNameProblem("Brian")).toBeNull();
+  });
+});
+
+describe("let agents tidy my inbox", () => {
+  it("names agents only for an allowlist, as the server requires", () => {
+    expect(inboxPolicyBody({ mode: "open", allowedAgentIds: ["a"] })).toEqual({ mode: "open", allowedAgentIds: [] });
+    expect(inboxPolicyBody({ mode: "allowlist", allowedAgentIds: ["b", "a", "b"] })).toEqual({ mode: "allowlist", allowedAgentIds: ["a", "b"] });
+  });
+
+  it("is unsaved only when the effective policy differs", () => {
+    const saved = { mode: "allowlist" as const, allowedAgentIds: ["a", "b"] };
+    expect(inboxPolicyDirty({ mode: "allowlist", allowedAgentIds: ["b", "a"] }, saved)).toBe(false);
+    expect(inboxPolicyDirty({ mode: "allowlist", allowedAgentIds: ["a"] }, saved)).toBe(true);
+    expect(inboxPolicyDirty({ mode: "disabled", allowedAgentIds: ["a"] }, { mode: "disabled", allowedAgentIds: [] })).toBe(false);
+    expect(inboxPolicyDirty({ mode: "open", allowedAgentIds: [] }, undefined)).toBe(false);
+  });
+
+  it("offers agents that can take work", () => {
+    const agent = (id: string, name: string, status: string, chain?: string) => ({ id, name, status, orgChainHealth: chain ? { status: chain } : undefined }) as never;
+    expect(
+      tidyingAgents([agent("1", "Zed", "idle"), agent("2", "Gone", "terminated"), agent("3", "New", "pending_approval"), agent("4", "Loop", "idle", "invalid_org_chain"), agent("5", "Ada", "running")]).map(
+        (entry) => entry.name,
+      ),
+    ).toEqual(["Ada", "Zed"]);
   });
 });
