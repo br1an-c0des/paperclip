@@ -65,7 +65,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 36 | [Gaps found building onboarding and the pages outside a company](#36-gaps-found-building-onboarding-and-the-pages-outside-a-company) | Companies and onboarding, sign-in and connect flows | Open | Oct 28, 2026 |
 | 37 | [Gaps found building plugin hosting](#37-gaps-found-building-plugin-hosting) | `shell/plugins` | Open | Oct 28, 2026 |
 | 38 | [Gaps found building task and workspace leftovers](#38-gaps-found-building-task-and-workspace-leftovers) | `tasks/runner-goal`, `tasks/feedback`, `workspaces/*` | Open | Oct 28, 2026 |
-| 39 | [Decisions from the M7 audit](#39-decisions-from-the-m7-audit) | M7, see [audit/m7-parity.md](audit/m7-parity.md#5-decisions-needed) | In progress | Oct 28, 2026 |
+| 39 | [Decisions from the M7 audit](#39-decisions-from-the-m7-audit) | M7, see [audit/m7-parity.md](audit/m7-parity.md#5-decisions-needed) | Decided | Oct 28, 2026 |
 
 ## Entries
 
@@ -1235,7 +1235,7 @@ Both are handled in `ui-new` for now.
 
 ### 39. Decisions from the M7 audit
 
-- **Status:** In progress (D1 and D2 decided; D3 to D11 to go)
+- **Status:** Decided 2026-10-28
 - **Area:** M7; the questions are in [audit/m7-parity.md](audit/m7-parity.md#5-decisions-needed),
   section 5.
 - **Found in:** the M7 parity audit (Oct 28, 2026), gone through with the user one decision at a time.
@@ -1253,3 +1253,63 @@ Both are handled in `ui-new` for now.
   Dot (`enableOpenAiDot`), Grok (`enableGrokBot`) and Muse (`enableMuse`), with Muse's connection
   panel, are dropped while their settings are off; a sync that turns one on raises it again. What
   the feature is for, with an example flow: [guides/outside-agents.md](guides/outside-agents.md).
+- **D3. Status cards: port them, kept separate from briefings** (neither of the audit's options). No
+  board draws them, so port the old UI's structure (board, tile, new card, detail drawer with
+  history, earlier summaries and dry run, settings, archive) in Capsule Stack components, behind
+  `enableStatusCards`, as far as the API allows; design them afterwards once the user has tried them.
+  They may later turn out to do the job of briefings ([3.13](build-plan.md#313-briefings-and-reports)),
+  but that's for later. The agent may turn `enableStatusCards` (and with it `enableSummaries`) on on
+  the test instance and run a few real updates with a cheap model and a low daily token cap.
+- **D4. The user profile page: port it as a small read-only page** (option a, not the audit's
+  redirect). It's stable, not behind a setting, and one request
+  (`GET /companies/:id/users/:slug/profile`); it's the only personal summary of a person's work and
+  of what agents spent on their tasks. Reached from the account menu's View profile; old `/u/…` links
+  land on it. No board draws it, so it's ported in Capsule Stack pieces.
+- **D5. Port the aging shelf, drop decide-by** (a new option c). The attention feed already sends
+  each item's `shelf` flag (idle past its retention days, 30 by default), `keep`, `decideBy` and
+  `decideByAttribution`; `ui-new`'s Needs you ignored them. Build a collapsed "Older than 30 days"
+  group at the bottom of Needs you, with Keep (`PATCH /companies/:id/decision-retention/:kind/:id`).
+  Drop decide-by (its chip, the setting menu and the Decide now group): nothing tells agents to set
+  it, and for one person snooze covers it. It's easy to add later, since the feed carries it.
+- **D6. Skill Studio test runs: dropped for M7** (option b). Saved test inputs, run templates and
+  hidden test runs with output and history per skill version (`/skills/:id/test-inputs`,
+  `/skills/:id/test-runs*`, `/skill-test-run-templates`; 11 requests; stable since #9241, Jul 9,
+  2026). The user doesn't expect to write and tune skills here much yet. Revisit if they start to:
+  it's the tool for testing a skill change against saved examples without leaving test tasks in the
+  lists and costs.
+- **D7. Custom sandbox images and the environment terminal: on hold** (option b). Setup sessions, a
+  browser terminal into the sandbox (xterm over a WebSocket), capturing the machine as an image and
+  booting later runs from it (`/environments/:id/custom-image-setup-sessions`,
+  `/environment-custom-image-setup-sessions/*`; #8794, #8911). It needs `enableEnvironments` (off
+  here), a sandbox provider plugin, and Daytona specifically, the only provider that captures images.
+  Revisit when the user starts running agents in sandbox environments. Creating and editing
+  environments stays on the M7 list.
+- **D8. The old agent sign-in flows: all three dropped** (option b). Superseded by AI connections
+  (#13247, Sep 12, 2026; Apps → AI connections in `ui-new`, API key or subscription sign-in): the
+  sandbox sign-in panel (`/adapters/:type/login-sessions*`, shown only for sandbox environments
+  without an AI connection), Claude's setup-token login (`/setup-token-login-sessions*`,
+  `/claude-oauth-token-status`), and "Login to Claude Code" on a run that failed with
+  `claude_auth_required` (`POST /agents/:id/claude-login`). Local agents here use the CLI's own login.
+  A real subscription sign-in through AI connections wasn't tried (it opens a provider OAuth page);
+  it uses the same routes as the old UI's Connections page.
+- **D9. Comment threads on a recurring task's description: dropped** (option b). Passage comments on
+  the routine description (`/routines/:id/description/annotations*`, 5 requests; #8229, Jun 23,
+  2026). Descriptions are short templates and discussion belongs on the occurrences. Cheap to add
+  later: `ui-new`'s document comments (`src/documents/Annotations.tsx`) work per document owner.
+- **D10. Build a Tailwind compatibility stylesheet for plugin areas** (option a, not the audit's
+  "accept the gap"). Plugins that style with the old UI's Tailwind classes render unstyled in
+  `ui-new`: upstream's SDK README dialog example (`fixed inset-0 z-50 …`), the first-party Workspace
+  diff plugin (about 60 classes), and LLM Wiki's sidebar entries. Generate a sheet at build time from
+  the old UI's sources and the first-party plugins (the same classes the old UI offers; it doesn't
+  scan plugins either), scope it to plugin areas, leave out Tailwind's preflight, and load it lazily
+  with the plugin runtime. Tailwind becomes a build-time dependency of `ui-new` for this sheet only.
+  Updates [decision 37](#37-gaps-found-building-plugin-hosting)'s first bullet.
+- **D11. The installable app: port the manifest, icons and the service worker** (option b). The old
+  UI's `site.webmanifest` (now `display: "standalone"`, #13461, Oct 27, 2026), favicons and
+  home-screen icons, and the standalone Refresh, Share and Open in browser controls on phones. Port
+  `ui/public/sw.js` too: the offline page in Capsule Stack style, the network-first cache of hashed
+  build assets (never `/api` or private responses), and the build ID stamped at build time, so a
+  deploy reloads parked tabs and the home-screen app (`skipWaiting` and `controllerchange`). `ui-new`
+  must serve a `sw.js` in any case: the old worker stays registered in every browser that opened the
+  old UI, and a 404 doesn't remove it. The new worker is the base for push later
+  ([decision 18](#18-the-phone-layouts-assume-push-notifications)).

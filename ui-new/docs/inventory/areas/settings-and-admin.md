@@ -99,6 +99,31 @@ Upstream recipes: `maps/feature-map/activity.md`, `budgets-costs.md`.
 
 Note: an agent's runs, costs and budget link here filtered to the agent ([agents](agents.md)).
 
+## Status cards
+
+Behind `enableStatusCards` (turning it on also turns on `enableSummaries`); the server gates the API
+too. Added upstream on 2026-07-24 (#10101, #10202, #10205).
+
+| Page | Route (under `/:co`) | What it does |
+| --- | --- | --- |
+| Status cards (`StatusCards`) | `/status` | A board of cards, each a standing question in plain language ("Keep an eye on the ID and Cloud projects…") with an agent-written summary kept current as matching tasks change. Tiles show the summary, freshness and state (setting up, updating, stale, paused by the daily token cap or outside active hours, error, keeping the last good summary); archived cards below with Restore. New card: one prompt and a summarizer agent. Detail drawer: the summary, update history (trigger, the tasks that fed it, cost), earlier summaries, and a dry run of the compiled query's current matches. Settings: prompt, agent, refresh (manual, interval, reactive), daily token cap, active hours, recompile the query. Actions: update now, archive, restore, delete. |
+
+Resources: `GET|POST /api/companies/:companyId/status-cards` (`?archived=`), `GET|PATCH|DELETE
+/api/status-cards/:id`, `GET /api/status-cards/:id/updates`, `/summary-revisions`, `/dry-run`,
+`POST /api/status-cards/:id/refresh`, `/recompile`.
+Old UI: `ui/src/pages/StatusCards/`, `ui/src/api/statusCards.ts`, `ui/src/lib/status-card-state.ts`.
+
+## User profile
+
+Not behind a setting. Added upstream on 2026-04-20 (#4088). The old UI links it only from the
+account menu's View profile (`/u/me`, `ui/src/lib/userProfileLinks.ts`).
+
+| Page | Route (under `/:co`) | What it does |
+| --- | --- | --- |
+| User profile (`UserProfile`) | `/u/:userSlug` (`me` for yourself) | A person's identity (name, avatar, email, role, joined), headline numbers (all-time tokens, completed, open assigned, 7-day actions) with 7-day, 30-day and all-time windows (touched, created, completed, open assigned, comments, actions, cost, tokens), a 14-day chart of activity, completions and spend, recent tasks, recent activity, agent attribution (tokens agents spent on tasks linked to the person) and provider mix. |
+
+Resources: `GET /api/companies/:companyId/users/:userSlug/profile` (`UserProfileResponse`).
+
 ## Companies and onboarding
 
 | Page | Route | What it does |

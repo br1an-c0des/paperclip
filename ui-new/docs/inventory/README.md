@@ -76,8 +76,8 @@ These may be merged or regrouped in `ui-new`.
 
 ### Undecided
 
-Not yet placed in a tier: Dashboard (`Dashboard`, `DashboardLive`), Status cards (`StatusCards`),
-User profile (`UserProfile`). Board chat (`BoardChat`) is dropped, with its flag
+Not yet placed in a tier: Dashboard (`Dashboard`, `DashboardLive`). Status cards and User profile
+moved to tier 2 on Oct 28, 2026. Board chat (`BoardChat`) is dropped, with its flag
 ([decision 12](../decisions.md#12-what-happens-to-each-experimental-flag)). Pipelines were also here until upstream removed the
 experiment on 2026-10-22 (its data is kept, but the UI, API and CLI are gone).
 
@@ -90,6 +90,8 @@ experiment on 2026-10-22 (its data is kept, but the UI, API and CLI are gone).
 | [Skills](areas/settings-and-admin.md#skills) | `CompanySkills`, `SkillSources`, `SkillStudio` |
 | [Apps and tools](areas/settings-and-admin.md#apps-and-tools-connectors) | `Browse`, `AppsConnect`, `AppsReview`, `AppDetail`, `AppNotConnected`, `AssistantConnection`, `GatewaysList`, `GatewayDetail`, `AdvancedToolsRoute`, `ProfileWizardRoute`, `ProfileDetailRoute`, `ChatEndpointSetup`, `ChatEndpointDetail` |
 | [Activity and costs](areas/settings-and-admin.md#activity-and-costs) | `AuditHub`, `CompanyActivity` |
+| [Status cards](areas/settings-and-admin.md#status-cards) | `StatusCards` |
+| [User profile](areas/settings-and-admin.md#user-profile) | `UserProfile` |
 | [Companies and onboarding](areas/settings-and-admin.md#companies-and-onboarding) | `Companies`, `OnboardingRoutePage` |
 | [Sign-in and connect flows](areas/settings-and-admin.md#sign-in-and-connect-flows-outside-a-company) | `Auth`, `BoardClaim`, `CliAuth`, `InviteLanding`, `McpConnect`, `ChatIdentityConfirm`, `PaperclipCloudOAuthHandoff` |
 
