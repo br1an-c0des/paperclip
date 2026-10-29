@@ -64,6 +64,12 @@ services:
       # LLM provider keys for agents (at least one is needed).
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+
+      # Claude Code's own auto-memory off for claude_local runs, so every run
+      # of an agent sees the same per-agent memory (ui-new/docs/decisions.md,
+      # decision 5). Paperclip Runner agents don't inherit the server's
+      # environment: set it in their adapter env instead.
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1"
     volumes:
       # PAPERCLIP_HOME: config, uploads, logs, secrets key, repo clones and
       # agent worktrees (instances/default/projects/...).
