@@ -113,6 +113,7 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | A core skill add-on for new behaviour | 3 | [3.10](#310-core-skill-add-on). Fork-owned, with no conflict. |
 | A `COMPANY.md`: company-wide instructions every run in the company receives, like an agent's `AGENTS.md` | Idea, then 2b or 3 | Raised Oct 27, 2026 ([3.14](#314-company-instructions-companymd)). Not designed yet. |
 | Help people understand what Paperclip is and how to use each feature: a user guide with worked examples, and an interactive guide in the app | Idea, then 1 or 3 | Raised Oct 28, 2026 ([3.15](#315-an-in-app-guide-to-paperclip)). Notes collect in [guides/](guides/README.md). Not designed yet. |
+| Investigate and design upstream's Coordinator workspace (one conversation per agent, task proposals from chat, decision cards, a Needs You queue) against `ui-new`'s Inbox, requests and chat | 1 | Raised Oct 29, 2026, from the upstream sync ([3.16](#316-upstreams-coordinator-workspace)). Not investigated yet. |
 
 ## Stage 1: the new UI
 
@@ -783,6 +784,26 @@ yet.
 - **Questions:** how much of it is UI-only (likely all of it: guide text and tours ship with `ui-new`);
   whether the guide text lives in the app or is fetched from docs; how it avoids going stale as
   upstream changes features; and whether it's for first-time users only or a reference too.
+
+### 3.16 Upstream's Coordinator workspace
+
+Raised Oct 29, 2026, when the upstream sync outlined #17983 (`71f0c0c99`, Oct 26–29); the user wants it
+investigated and designed for `ui-new`. Not started.
+
+- **What upstream built:** a per-person workspace, off by default and turned on in the old UI's
+  Settings > Experimental (stored as a workspace preference, `GET|PUT …/workspace-preferences/me`, not
+  an instance flag). One conversation per agent; task proposals from chat (a new task with no assignee
+  defaults to the chat's agent); compact task and decision cards; document panels beside the chat; a
+  Needs You queue with search, filters, grouping and history.
+- **New requests:** `GET /issues/:id/pending-questions`, `/issues/:id/decision-receipts`,
+  `/issues/:id/chat-handoffs`, `/issues/:id/documents/:key/revisions/:revisionId`, and
+  `GET /companies/:companyId/attention/history` (decision history, cursor-paged).
+- **Why it matters here:** it's upstream's own take on what `ui-new` redesigns: the Inbox's Needs you,
+  requests (proposal 1) and agent chat (M5). It may change what the redesign should be, or give
+  `ui-new` endpoints it lacked (decision history, pending questions).
+- **To do:** use it in the old UI on TES; compare it board by board with `ui-new`'s Inbox, request
+  cards and chat; decide what to adopt, merge or leave (and, under decision 12, what to do with its
+  per-person switch); then design boards for the parts `ui-new` takes.
 
 ## Questions for you
 
