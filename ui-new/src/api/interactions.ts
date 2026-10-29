@@ -5,7 +5,8 @@ import { api } from "./client";
  * Requests an agent posts on a task (questions, confirmations, suggested tasks, verdicts), as
  * ui/src/api/issues.ts calls them. Answering goes through the action that fits the card: accept,
  * reject, respond (question forms) or verdicts. Dismiss sets a request aside without answering it;
- * it stays in the thread and can still be answered there.
+ * it stays in the thread and can still be answered there. Cancel withdraws a question you asked
+ * (the server cancels only question forms, and only for people).
  */
 
 export type AcceptInteraction = {
@@ -35,4 +36,6 @@ export const interactionsApi = {
   skip: (issueId: string, interactionId: string, reason?: string) =>
     api.post<IssueThreadInteraction>(path(issueId, interactionId, "skip"), reasonBody(reason)),
   dismiss: (issueId: string, interactionId: string) => api.post<IssueThreadInteraction>(path(issueId, interactionId, "dismiss"), {}),
+  cancel: (issueId: string, interactionId: string, reason?: string) =>
+    api.post<IssueThreadInteraction>(path(issueId, interactionId, "cancel"), reasonBody(reason)),
 };

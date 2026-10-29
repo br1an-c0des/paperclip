@@ -1,14 +1,22 @@
 import type { AttentionItem, AttentionSourceKind } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import {
+  activityGroups,
+  agingLabel,
   archivedTasks,
+  arrivalGroups,
   feedKind,
   filterByKind,
   groupFeed,
   inboxKeyAction,
+  isFresh,
   itemKind,
+  itemWords,
+  lastLookedLabel,
+  matchesTerms,
   kindCounts,
   placement,
+  searchTerms,
   selectionAfterRemoval,
   snoozeLabel,
   stepSelection,
@@ -140,6 +148,10 @@ describe("the nav's count", () => {
     expect(needsYouCount(items)).toBe(3);
   });
 
+  it("leaves out requests on the aging shelf, but counts one you kept", () => {
+    expect(needsYouCount([item("old", "approval", { shelf: true }), item("kept", "approval", { shelf: true, keep: true }), item("new", "review")])).toBe(2);
+  });
+
   it("moves with a triage step patched into the cached feed", () => {
     const now = new Date("2026-10-27T12:00:00.000Z");
     const question = item("question", "issue_thread_interaction");
@@ -156,6 +168,7 @@ describe("kinds and the kind filter", () => {
     expect(feedKind(item("a", "approval"))).toBe("approval");
     expect(feedKind(item("r", "review"))).toBe("signoff");
     expect(feedKind(item("d", "decision"))).toBe("proposal");
+    expect(feedKind(item("j", "join_request"))).toBe("approval");
     const question = item("q", "issue_thread_interaction", {
       subject: { kind: "interaction", id: "i1", companyId: "c1", title: null, identifier: null, status: "pending", href: null, metadata: { kind: "ask_user_questions" } },
     });
@@ -224,5 +237,79 @@ describe("Updates", () => {
     expect(unreadCount([{ isUnreadForMe: true }, { isUnreadForMe: false }, {}])).toBe(1);
     expect(unreadCount(undefined)).toBe(0);
     expect(archivedTasks([{ id: "a" }, { id: "b" }, { id: "c" }], [{ id: "b" }]).map((task) => task.id)).toEqual(["a", "c"]);
+  });
+});
+
+describe("the aging shelf", () => {
+  it("takes requests idle past their retention days out of Needs you, newest activity first, until kept", () => {
+    const groups = groupFeed([
+      item("fresh", "approval"),
+      item("old", "approval", { shelf: true, activityAt: "2026-09-01T00:00:00.000Z" }),
+      item("older", "review", { shelf: true, activityAt: "2026-08-01T00:00:00.000Z" }),
+      item("kept", "approval", { shelf: true, keep: true }),
+      item("broken", "failed_run", { shelf: true }),
+    ]);
+    expect(groups.needs.map((entry) => entry.id)).toEqual(["fresh", "kept"]);
+    expect(groups.aging.map((entry) => entry.id)).toEqual(["old", "older"]);
+    // Alerts don't age.
+    expect(groups.alerts.map((entry) => entry.id)).toEqual(["broken"]);
+  });
+
+  it("names the group after the shortest retention", () => {
+    expect(agingLabel([{ retentionDays: 30 }])).toBe("Older than 30 days");
+    expect(agingLabel([{ retentionDays: 30 }, { retentionDays: 1 }])).toBe("Older than 1 day");
+  });
+});
+
+describe("time", () => {
+  const now = new Date(2026, 9, 28, 15, 0);
+  it("splits Needs you into New today and Earlier, keeping the order", () => {
+    const groups = arrivalGroups(
+      [item("b", "approval", { createdAt: new Date(2026, 9, 27, 23, 0).toISOString() }), item("a", "approval", { createdAt: new Date(2026, 9, 28, 1, 0).toISOString() })],
+      now,
+    );
+    expect(groups.map((group) => [group.label, group.items.map((entry) => entry.id)])).toEqual([
+      ["New today", ["a"]],
+      ["Earlier", ["b"]],
+    ]);
+  });
+
+  it("groups Updates by latest activity", () => {
+    const at = (h: number, d = 28) => new Date(2026, 9, d, h, 0).toISOString();
+    const tasks = [
+      { id: "1", at: at(14, 28) },
+      { id: "2", at: at(9) },
+      { id: "3", at: at(9, 27) },
+      { id: "4", at: at(9, 24) },
+      { id: "5", at: at(9, 1) },
+    ];
+    expect(activityGroups(tasks, (task) => task.at, now).map((group) => [group.label, group.items.map((task) => task.id)])).toEqual([
+      ["Last hour", ["1"]],
+      ["Earlier today", ["2"]],
+      ["Yesterday", ["3"]],
+      ["Earlier this week", ["4"]],
+      ["Older", ["5"]],
+    ]);
+  });
+
+  it("marks what arrived after you last looked, and says when that was", () => {
+    expect(isFresh({ createdAt: "2026-10-28T10:00:00.000Z" }, Date.parse("2026-10-28T09:00:00.000Z"))).toBe(true);
+    expect(isFresh({ createdAt: "2026-10-28T08:00:00.000Z" }, Date.parse("2026-10-28T09:00:00.000Z"))).toBe(false);
+    expect(lastLookedLabel(new Date(2026, 9, 28, 9, 40).getTime(), now)).toBe("at 9:40 am");
+    expect(lastLookedLabel(new Date(2026, 9, 27, 18, 5).getTime(), now)).toBe("yesterday at 6:05 pm");
+    expect(lastLookedLabel(new Date(2026, 9, 20, 18, 5).getTime(), now)).toBe("on Oct 20");
+  });
+});
+
+describe("search", () => {
+  it("matches every word against the item's subject, task, reason and who raised it", () => {
+    const found = item("q", "issue_thread_interaction", {
+      subject: { kind: "interaction", id: "i1", companyId: "c1", title: "Which strategies first?", identifier: null, status: null, href: null },
+      relatedIssue: { kind: "issue", id: "t1", companyId: "c1", title: "Port strategies", identifier: "TRA-38", status: "todo", href: null },
+      originAgentName: "Quant Researcher",
+    });
+    expect(matchesTerms(searchTerms("  tra-38 QUANT "), itemWords(found))).toBe(true);
+    expect(matchesTerms(searchTerms("tra-38 budget"), itemWords(found))).toBe(false);
+    expect(matchesTerms(searchTerms(""), [])).toBe(true);
   });
 });

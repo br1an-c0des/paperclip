@@ -49,7 +49,7 @@ function readString(value: unknown): string | null {
 
 /** Actions on a task that can add, answer or end an item in the Inbox's attention feed. */
 function changesAttention(action: string | null) {
-  return action !== null && (action.startsWith("issue.thread_interaction_") || action === "issue.updated");
+  return action !== null && (action.startsWith("issue.thread_interaction_") || action.startsWith("issue.connection_intent_") || action === "issue.updated");
 }
 
 /** Query keys an `activity.logged` event affects, by the entity it's about and what was done. */
@@ -74,7 +74,11 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
       if (changesAttention(action)) keys.push(queryKeys.inbox.attention(companyId));
       break;
     case "decision":
-      keys.push(queryKeys.inbox.attention(companyId));
+      keys.push(queryKeys.inbox.attention(companyId), queryKeys.decisions.all);
+      break;
+    // A join request approved or rejected elsewhere (Settings → Members, another board).
+    case "join_request":
+      keys.push(queryKeys.inbox.attention(companyId), queryKeys.companySettings.joinRequests(companyId));
       break;
     case "agent":
       keys.push(queryKeys.agents.list(companyId), queryKeys.org(companyId), queryKeys.companies.stats);

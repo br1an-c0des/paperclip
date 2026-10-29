@@ -194,6 +194,16 @@ export const queryKeys = {
     tasks: (companyId: string) => ["issues", companyId, "inbox", "mine"] as const,
     tasksWithArchived: (companyId: string) => ["issues", companyId, "inbox", "with-archived"] as const,
   },
+  /** Proposals (Decisions): one by id, and the company's open list, which says which targets changed. */
+  decisions: {
+    all: ["decisions"] as const,
+    detail: (decisionId: string) => ["decisions", "detail", decisionId] as const,
+    open: (companyId: string) => ["decisions", companyId, "open"] as const,
+  },
+  /** A connection request's setup options, which only the person it's addressed to can read. */
+  connectionIntents: {
+    setup: (interactionId: string) => ["connection-intent", interactionId, "setup-options"] as const,
+  },
   /**
    * The Search page (src/search/). The old UI keys company search `["company-search", companyId, …]`;
    * the rest of the key is the request, filters and sort included, without the page offset.
