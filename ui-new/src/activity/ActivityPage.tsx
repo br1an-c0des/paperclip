@@ -15,7 +15,8 @@ import "./Activity.css";
  * - Log (`/activity`): the company's activity log, filtered and paged (ActivityLog.tsx).
  * - Runs (`/activity/runs`): the company's latest runs, by agent; each opens the run modal.
  * - Commentary (`/activity/commentary`): suggestions and complaints agents send in.
- * - Costs (`/activity/costs`): spend by agent, model and project over a range, and budgets.
+ * - Costs (`/activity/costs`): spend by agent, model, project and person over a range, and budgets;
+ *   `?tab=` opens providers, billers, finance, or decision and fast-response call history.
  *
  * The old hub's Budgets section is the Costs tab's Budgets card (`/activity/budgets` lands there),
  * and its Timeline isn't ported: Workload (board 33) draws runs over time. Old `/audit`, `/costs`,

@@ -99,6 +99,12 @@ export const queryKeys = {
     commentary: (companyId: string, filters: string) => ["agent-commentary", companyId, "list", filters] as const,
     commentaryEntry: (companyId: string, id: string) => ["agent-commentary", companyId, "detail", id] as const,
     costSummary: (companyId: string, from?: string, to?: string) => ["costs", companyId, "summary", from ?? "all", to ?? "now"] as const,
+    /**
+     * One of the Costs tab's other reports ("by-user", "by-provider", "by-biller", "finance-summary",
+     * "subscriptions", "data-quality", "decision-history"…) over a range. Under `["costs", companyId]`,
+     * so cost events refresh them all; the decision and fast-response calls log cost events too.
+     */
+    costReport: (companyId: string, report: string, from?: string, to?: string) => ["costs", companyId, report, from ?? "all", to ?? "now"] as const,
     /** Apart from `heartbeats`, which every run's progress refreshes; refetched when a live run changes. */
     runs: (companyId: string, agentId: string | null) => ["activity-runs", companyId, agentId ?? "__all__"] as const,
   }),
