@@ -52,6 +52,8 @@ until one becomes a concrete fix.
 | 13 | [Include `executionBlocker` on compact issues](#13-include-executionblocker-on-compact-issues) | candidate | | | 2026-10-28 | | |
 | 14 | [Let Keep take an item off the attention feed's aging shelf](#14-let-keep-take-an-item-off-the-attention-feeds-aging-shelf) | candidate | | | 2026-10-28 | | |
 | 15 | [Don't return agent credentials in plain text from the join request list](#15-dont-return-agent-credentials-in-plain-text-from-the-join-request-list) | candidate | | | 2026-10-28 | | |
+| 16 | [Don't merge keyless cases of the same type](#16-dont-merge-keyless-cases-of-the-same-type) | candidate | | | 2026-10-29 | | |
+| 17 | [Log activity when a case is created, edited or linked](#17-log-activity-when-a-case-is-created-edited-or-linked) | candidate | | | 2026-10-29 | | |
 
 ## Details
 
@@ -269,3 +271,31 @@ Found building `ui-new`'s join request cards (M7 slice B, 2026-10-28).
   response, matching how the Hermes key is handled; with a route test. Check upstream's
   `docs/specs` and OpenClaw onboarding docs first for whether the list is meant to carry them.
 - **Fork workaround:** none needed; `ui-new` only says that credentials were sent.
+
+### 16. Don't merge keyless cases of the same type
+
+Found building cases into `ui-new`'s task views (M7, 2026-10-29).
+
+- **Problem:** `POST /api/companies/:companyId/cases` upserts on (company, case type, key), and with
+  no `key` it matches `key IS NULL` (`server/src/routes/cases.ts`, around line 668). So creating a
+  second keyless case of a type overwrites the first one's title, summary and fields instead of
+  creating a new case. On that update path `parentCaseId` isn't checked against the case itself, so a
+  case can become its own parent; `PATCH /cases/:id` does check.
+- **Likely fix:** only upsert when a `key` is given (keyless creates always insert), and pass the
+  existing case's id to `assertParentCaseBelongsToCompany` on the upsert path; with route tests. Check
+  first whether a keyless case is meant to be a singleton per type (docs, `cases-schemas.ts`, tests).
+- **Fork workaround:** none; `ui-new` doesn't create cases directly (Start a case goes through the
+  task description, decision F).
+
+### 17. Log activity when a case is created, edited or linked
+
+Found building cases into `ui-new`'s task views (M7, 2026-10-29).
+
+- **Problem:** creating a case, `PATCH /api/cases/:id` and `POST /api/cases/:id/links` write case
+  events but no activity entries, so no live event goes out and other open boards don't refresh.
+  Hand-offs and case document changes do log activity (entity type `case`).
+- **Likely fix:** a `logActivity` call (entity type `case`) in those three routes, matching the
+  document routes; with route tests. Check upstream's activity conventions for cases first, since the
+  case event history was removed on Oct 22.
+- **Fork workaround:** `ui-new` refreshes after its own changes and on case activity
+  ([decision 43](../ui-new/docs/decisions.md#43-gaps-found-building-cases-into-the-task-views)).

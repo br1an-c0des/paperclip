@@ -69,6 +69,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 40 | [Gaps found building requests and the Inbox](#40-gaps-found-building-requests-and-the-inbox) | `tasks/interactions`, `inbox-search/triage`, `decisions/feed` | Open | Oct 28, 2026 |
 | 41 | [Gaps found building old links, the shell and the installable app](#41-gaps-found-building-old-links-the-shell-and-the-installable-app) | `shell/*`, `approvals/governance`, User profile | Open | Oct 28, 2026 |
 | 42 | [Gaps found building the task panel, runs and workspaces](#42-gaps-found-building-the-task-panel-runs-and-workspaces) | `tasks/*`, `runs-adapters/runs`, `workspaces/*` | Open | Oct 28, 2026 |
+| 43 | [Gaps found building cases into the task views](#43-gaps-found-building-cases-into-the-task-views) | `cases/*` | Open | Oct 29, 2026 |
 
 ## Entries
 
@@ -1399,3 +1400,37 @@ Both are handled in `ui-new` for now.
   run or workspace action with side effects (mocks only).
 - **M11's result card** (result text, changed files, pull request, outputs) isn't built: the run
   modal doesn't load that data yet.
+
+### 43. Gaps found building cases into the task views
+
+- **Status:** Open
+- **Area:** `cases/*`, the task list and panel
+- **Found in:** M7 cases (boards C1, C2, C5), with `enableCases` turned on on the test instance and left
+  on.
+
+- **Membership costs a request per case.** The case list doesn't carry linked tasks, so the task list
+  makes one `GET /cases/:id` per open case (cached for 60 seconds, refreshed by live events); closed
+  cases are fetched only under Group: Case. Fine at TES's size; revisit if a company has hundreds of
+  open cases.
+- **Phase ticks in the list come only from company workflows** (one `GET /workflows/:id` per distinct
+  workflow). Cases whose workflow is prose or a task document get ticks only in the panel's Case tab,
+  from the main task's `workflow` document. Mermaid phases worked as decision 16 planned, including
+  pseudo-states and `state "X" as Id` aliases; "Used by N" comes from the list's `workflowId`.
+- **No case page:** old `/cases/:id` links open the main task's Case tab, else the first linked
+  task's, else the list grouped by case; a 403 says cases are off.
+- **Left out because the API doesn't carry them:** a "waiting on you" strip, phase owners and a
+  default assignee in Start a case's preview, Retry hand-off. Also not built: case chips on board
+  cards, and carrying the case into More options from a case group's quick add (it needs a change in
+  `lib/commands`).
+- **Cancel hand-off in the list doesn't check `canControl`;** only the hand-offs list returns it (the
+  panel does check). The server still refuses what the user can't do.
+- **Case status stays `draft` after hand-offs start work.** Probably by design (the caller sets
+  status); noted, not a candidate.
+- **Upstream candidates 16 and 17:** a case created without a `key` overwrites another keyless case
+  of the same type, and on that path can be made its own parent; creating, editing and linking a case
+  write case events but no activity, so no live event fires (only hand-offs refresh other tabs).
+- **Test data:** "M7 test case agent (paused)", "M7 test case reviewer (paused)" (two hand-offs stay
+  queued to them; they'd be delivered if either is resumed), workflow "M7 test Strategy pipeline",
+  cases TES-C1 to TES-C4, tasks TES-19 to TES-22, TES-25, TES-26.
+- **Seen, not fixed:** the task list's phone toolbar (`.tv-toolbar--phone`) is about 4px wider than a
+  390px screen.
