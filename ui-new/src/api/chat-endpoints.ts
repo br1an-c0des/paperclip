@@ -7,9 +7,25 @@ import type {
   ChatPublicationState,
   ChatPublicationSummary,
   ExternalChannelBindingSummary,
+  ExecutionWorkspaceSummary,
+  GitHubAppRegistrationInput,
+  GitHubAppWizardState,
+  GitHubChatConfiguration,
+  GitHubRepositoryPage,
   GitHubTaskReview,
+  PhotonProjectInspection,
   SlackAppConfiguration,
+  SlackInstallAuthorization,
+  SlackManagedProvisionInput,
+  SlackManagedResult,
+  SlackManagerAuthorization,
+  SlackRegistrationInput,
+  SlackSearchStatus,
   SlackSetupOptions,
+  SlackTestMessageInput,
+  SlackTestMessageResult,
+  SlackToolCapabilities,
+  VoiceCallbackPreference,
   UpdateChatEndpointInput,
   VoiceCallHistoryEntry,
   VoiceInboundCall,
@@ -53,6 +69,9 @@ export interface ChatIdentityLink {
   paperclipUserImage?: string | null;
   lastConnectAt?: string | null;
   status: "linked" | "pending" | "revoked";
+  /** GitHub identities carry the account's stable ID and login. */
+  githubUserId?: string | null;
+  githubLogin?: string | null;
 }
 
 export interface ChatConversation {
@@ -105,7 +124,15 @@ export interface ChatEndpoint {
     command?: string | null;
     slackApp?: SlackAppConfiguration;
     slackSetupMethod?: "managed" | "automatic" | "manual" | "existing";
-    slackRegistration?: { status: string; appId?: string | null; managementUrl?: string | null } | null;
+    slackRegistration?: {
+      status: "creating" | "uncertain" | "failed" | "install" | "credentials_saved" | "configured" | "removed";
+      appId?: string | null;
+      managementUrl?: string | null;
+      managerGrantId?: string | null;
+      errorCode?: string | null;
+    } | null;
+    /** Why managed Slack setup stopped, as a code (`slackSetupMessage`). */
+    slackManagerError?: string | null;
     slackOAuthCallbackUri?: string | null;
     webhookVerifiedAt?: string | null;
     webhookSecretConfigured?: boolean;
@@ -182,19 +209,97 @@ export const chatEndpointsApi = {
     api.post<ChatPublicationSummary>(endpoint(id, `/conversations/${enc(conversationId)}/publications`), { body, idempotencyKey }),
   publicationStatus: (id: string, conversationId: string, publicationId: string, signal?: AbortSignal) =>
     api.get<ChatPublicationBatchStatus>(endpoint(id, `/conversations/${enc(conversationId)}/publications/${enc(publicationId)}/status`), { signal }),
+
+  /*
+   * Slack's provisioned setups. Managed: Paperclip's own Slack manager app creates the agent's app
+   * in a workspace you authorized (`managed/authorize`, then `managed/provision`). Automatic: an App
+   * configuration access token you paste creates it (`registration`). Either then installs it with
+   * your Slack account (`install`), and `resume` retries a saved installation.
+   */
+  authorizeSlackManager: (id: string) => api.post<SlackManagerAuthorization>(endpoint(id, "/slack/managed/authorize"), {}),
+  provisionManagedSlack: (id: string, input: SlackManagedProvisionInput) => api.post<SlackManagedResult>(endpoint(id, "/slack/managed/provision"), input),
+  createSlackApp: (id: string, input: SlackRegistrationInput) => api.post<ChatEndpoint>(endpoint(id, "/slack/registration"), input),
+  installSlackApp: (id: string) => api.post<SlackInstallAuthorization>(endpoint(id, "/slack/install"), {}),
+  resumeSlackInstallation: (id: string) => api.post<ChatEndpoint>(endpoint(id, "/slack/resume"), {}),
+  /** A direct message from the bot to you (or a Slack account you pick) to check it works. */
+  sendSlackTestMessage: (id: string, input: SlackTestMessageInput) => api.post<SlackTestMessageResult>(endpoint(id, "/slack/test-message"), input),
+  /** The lines a Photon project offers; the secret is used for this check only. */
+  inspectPhoton: (id: string, input: { projectId: string; projectSecret: string }) =>
+    api.post<PhotonProjectInspection>(endpoint(id, "/photon/inspect"), input),
+
+  /** Workspaces a new chat task may use, for task defaults. */
+  taskWorkspaces: (companyId: string, signal?: AbortSignal) =>
+    api.get<ExecutionWorkspaceSummary[]>(`/companies/${enc(companyId)}/execution-workspaces?summary=true&selectableForTask=true`, { signal }),
 };
 
-/** GitHub review bots (`/chat-endpoints/:id/github/*`), the parts ui-new uses. */
+/*
+ * Slack tools on a Slack endpoint (`/companies/:companyId/slack/endpoints/:id/*`, ui/src/api/slackTools.ts):
+ * what the bot's tools can do, and personal search, which needs its own Slack OAuth client.
+ */
+const slackTools = (companyId: string, endpointId: string) => `/companies/${enc(companyId)}/slack/endpoints/${enc(endpointId)}`;
+
+export const slackToolsApi = {
+  capabilities: (companyId: string, endpointId: string, signal?: AbortSignal) =>
+    api.get<SlackToolCapabilities>(`${slackTools(companyId, endpointId)}/capabilities`, { signal }),
+  search: (companyId: string, endpointId: string, signal?: AbortSignal) =>
+    api.get<SlackSearchStatus>(`${slackTools(companyId, endpointId)}/search`, { signal }),
+  configureSearch: (companyId: string, endpointId: string, input: { clientId: string; clientSecret: string }) =>
+    api.put<SlackSearchStatus>(`${slackTools(companyId, endpointId)}/search`, input),
+  /** The Slack sign-in address that grants your own search. */
+  connectSearch: (companyId: string, endpointId: string) => api.post<{ url: string }>(`${slackTools(companyId, endpointId)}/search/connect`, {}),
+  disconnectSearch: (companyId: string, endpointId: string) => api.delete<SlackSearchStatus>(`${slackTools(companyId, endpointId)}/search`),
+};
+
+export type GitHubConfigurationRecord = { revision: number; configuration: GitHubChatConfiguration };
+export type GitHubIdentity = { githubUserId: string; login: string; connectionId: string; avatarUrl: string | null };
+export type GitHubPersonalConnection = { connectionId: string; name: string; login: string | null; status: string; enabled: boolean };
+
+/*
+ * GitHub review bots (`/chat-endpoints/:id/github/*`, ui/src/api/githubChat.ts). Guided setup:
+ * `setup` reports (and advances) where the App registration stands; `registration` returns the
+ * manifest to post to github.com; `identity*` links your GitHub account. Then the bot's
+ * repositories and its review configuration (saved with the revision it was read at).
+ */
 export const githubChatApi = {
   connectApp: (id: string, credentials: { appId: string; privateKey: string; webhookSecret: string }) =>
     api.post<ChatEndpoint>(endpoint(id, "/github/app"), credentials),
   reviews: (id: string, signal?: AbortSignal) => api.get<GitHubTaskReview[]>(endpoint(id, "/github/reviews"), { signal }),
+
+  advance: (id: string) => api.post<GitHubAppWizardState>(endpoint(id, "/github/setup"), {}),
+  registration: (id: string, input: GitHubAppRegistrationInput) => api.post<GitHubAppWizardState>(endpoint(id, "/github/registration"), input),
+  /** Starts again after a registration expired; you confirm no App was made on GitHub. */
+  restartRegistration: (id: string, registrationId: string) =>
+    api.post<GitHubAppWizardState>(endpoint(id, "/github/registration/restart"), { registrationId, appNotCreated: true }),
+  saveDraft: (id: string, input: GitHubAppRegistrationInput) => api.put<{ saved: true }>(endpoint(id, "/github/draft"), input),
+  startIdentity: (id: string) => api.post<{ authorizationUrl: string }>(endpoint(id, "/github/identity/start"), {}),
+  confirmIdentity: (id: string, githubUserId: string) => api.post<GitHubAppWizardState>(endpoint(id, "/github/identity/confirm"), { githubUserId }),
+  personalConnections: (id: string, signal?: AbortSignal) => api.get<GitHubPersonalConnection[]>(endpoint(id, "/github/personal-connections"), { signal }),
+  /** Reads (and, with the confirmed user ID, links) the GitHub account behind one of your connections. */
+  identity: (id: string, connectionId: string, confirmedGithubUserId?: string) =>
+    api.post<GitHubIdentity>(endpoint(id, "/github/identity"), { connectionId, confirmedGithubUserId }),
+
+  repositories: (id: string, options: { offset?: number; search?: string; limit?: number } = {}, signal?: AbortSignal) => {
+    const query = new URLSearchParams({ limit: String(options.limit ?? 20), offset: String(options.offset ?? 0), search: options.search ?? "" });
+    return api.get<GitHubRepositoryPage>(endpoint(id, `/github/repositories?${query}`), { signal });
+  },
+  toggleAllRepositories: (id: string, enabled: boolean) => api.put<{ success: true }>(endpoint(id, "/github/repositories/access"), { enabled }),
+  refreshRepositories: (id: string) => api.post<ChatEndpointResource[]>(endpoint(id, "/github/repositories/refresh"), {}),
+  configuration: (id: string, signal?: AbortSignal) => api.get<GitHubConfigurationRecord>(endpoint(id, "/github/configuration"), { signal }),
+  saveConfiguration: (id: string, expectedRevision: number, configuration: GitHubChatConfiguration) =>
+    api.put<GitHubConfigurationRecord>(endpoint(id, "/github/configuration"), { expectedRevision, configuration }),
+  /** A GitHub login's stable user ID, for allowing an outside contributor. */
+  lookup: (id: string, login: string) => api.post<{ githubUserId: string; login: string }>(endpoint(id, "/github/people/lookup"), { login }),
 };
 
 const voice = (companyId: string, kind: string, endpointId: string) => `/companies/${enc(companyId)}/${kind}/${enc(endpointId)}`;
 
 /** Speko voice personas: call history, the phone line and incoming calls that wait for a code. */
 export const voiceApi = {
+  /** Your own "call my phone" number for this persona, or null. */
+  callback: (companyId: string, endpointId: string, signal?: AbortSignal) =>
+    api.get<VoiceCallbackPreference | null>(voice(companyId, "voice-callbacks", endpointId), { signal }),
+  saveCallback: (companyId: string, endpointId: string, preference: VoiceCallbackPreference) =>
+    api.put<VoiceCallbackPreference>(voice(companyId, "voice-callbacks", endpointId), preference),
   history: (companyId: string, endpointId: string, signal?: AbortSignal) =>
     api.get<VoiceCallHistoryEntry[]>(voice(companyId, "voice-history", endpointId), { signal }),
   phone: (companyId: string, endpointId: string, signal?: AbortSignal) =>
