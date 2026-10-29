@@ -22,6 +22,7 @@ import {
 } from "./apps-model";
 import { AppLogo, StateTag, useApplications, useConnections, useGallery, usePendingRequests } from "./shared";
 import { ChatEndpointGroup } from "./chat/ChatRoutes";
+import { poolPluginKey } from "./pools/pool-model";
 import { chatConnectHref, galleryChatProvider, withChatApps } from "./chat/chat-model";
 
 /*
@@ -97,7 +98,7 @@ export function Browse() {
           </Match>
           <Match when={true}>
             <ConnectionGroup title="Tools and MCP servers" rows={tools()} base={base()} />
-            <ConnectionGroup title="AI accounts" rows={ai()} base={base()} hrefFor={() => `${base()}/ai`} note="Managed in AI connections." />
+            <ConnectionGroup title="AI accounts" rows={ai()} base={base()} hrefFor={(row) => (poolPluginKey(row.connection) ? `${base()}/${row.connection.id}/permissions` : `${base()}/ai`)} note="Managed in AI connections." />
             <ChatEndpointGroup />
             <Show when={(inboxes.data?.length ?? 0) > 0}>
               <div class="ap-group">

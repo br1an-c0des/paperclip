@@ -41,6 +41,8 @@ import {
 } from "./apps-model";
 import { ReviewQueue } from "./Review";
 import { ConnectionExtras } from "./identities/Identities";
+import { PoolPage } from "./pools/Pools";
+import { poolPluginKey } from "./pools/pool-model";
 import { AgentAccessPicker, AppLogo, failureText, StateTag, useApplications, useGallery, usePendingRequests, useRefreshTools } from "./shared";
 
 /*
@@ -114,6 +116,9 @@ export function AppDetail(props: { connectionId: string; tab: DetailTab; success
         <p class="ap-empty card" role="status">
           Loading the connection…
         </p>
+      </Match>
+      <Match when={poolPluginKey(connectionQuery.data) ? connectionQuery.data : null}>
+        {(connection) => <PoolPage connection={connection()} />}
       </Match>
       <Match when={connectionQuery.isError || !row()}>
         <section class="card ap-later">

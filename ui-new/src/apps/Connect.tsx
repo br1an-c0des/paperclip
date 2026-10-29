@@ -42,6 +42,7 @@ import { channelMethod, chatConnectHref } from "./chat/chat-model";
 import { AggregatorConnect } from "./setups/AggregatorConnect";
 import { setupExtras, type GalleryExtras } from "./setups/SetupExtras";
 import { isAggregator } from "./setups/setups-model";
+import { NewPool } from "./pools/Pools";
 
 /*
  * Connecting an app (the old UI's AppsConnect and ConnectionSetupFlow, on a page):
@@ -138,6 +139,9 @@ export function GalleryConnect(props: { source: string | null; resume: string | 
             Retry
           </Button>
         </div>
+      </Match>
+      <Match when={app()?.aiConnectionRouter && app()} keyed>
+        {(entry) => <NewPool app={entry} />}
       </Match>
       <Match when={isAi()}>
         <Navigate href={`/${company().issuePrefix}/apps/ai`} />
