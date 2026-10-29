@@ -170,6 +170,8 @@ export const queryKeys = {
     /** Saved AgentMail accounts, and what one can reach (src/apps/chat/EmailSetup.tsx). */
     emailCredentials: (companyId: string) => ["tools", companyId, "email-credentials"] as const,
     emailInspection: (companyId: string, connectionId: string) => ["tools", companyId, "email-inspection", connectionId] as const,
+    /** AI connection pools (src/apps/pools/), and one pool's usage inspection under it. */
+    pools: (companyId: string) => ["tools", companyId, "pools"] as const,
   },
   /**
    * Chat endpoints (src/apps/chat/, the agent's channels): an agent in Slack, GitHub, Teams, a voice

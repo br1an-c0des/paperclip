@@ -5,6 +5,7 @@ import type {
   ChatPublicationState,
   ConnectionMethodDef,
   InstanceExperimentalSettings,
+  PhotonProjectInspection,
   SlackAppConfiguration,
 } from "@paperclipai/shared";
 import type { ChatEndpoint, ChatEndpointStatus, ChatResolution } from "@/api/chat-endpoints";
@@ -237,8 +238,23 @@ export function isRepairing(endpoint: Pick<ChatEndpoint, "status" | "provider" |
   return recovering || (reconnect && (endpoint.status === "active" || endpoint.status === "paused"));
 }
 
-/** Providers whose setup this board can walk through (Photon's line picker and managed Slack aren't here). */
-export const SETUP_PROVIDERS = new Set<ChatProvider>(["slack", "github", "discord", "microsoft-teams", "telegram", "speko", "agentmail"]);
+/**
+ * What Photon's setup sends: the shared DM line when the project offers it, else the picked
+ * dedicated number; null until the inspection allows one.
+ */
+export function photonCredentials(
+  inspection: Pick<PhotonProjectInspection, "allocation" | "eligible"> | null,
+  projectId: string,
+  projectSecret: string,
+  lineId: string,
+): Record<string, string> | null {
+  if (!inspection?.eligible) return null;
+  if (inspection.allocation === "shared") return { projectId: projectId.trim(), projectSecret, allocation: "shared" };
+  return lineId ? { projectId: projectId.trim(), projectSecret, lineId, allocation: "dedicated" } : null;
+}
+
+/** Providers whose setup this board can walk through (all of them since M7: Photon picks its line, Slack can be set up for you). */
+export const SETUP_PROVIDERS = new Set<ChatProvider>(["slack", "github", "discord", "microsoft-teams", "telegram", "speko", "agentmail", "imessage-photon"]);
 
 /** Slack's app name, bot name and slash command from the agent's name (the shared package's default). */
 export function defaultSlackApp(agentName: string): SlackAppConfiguration {

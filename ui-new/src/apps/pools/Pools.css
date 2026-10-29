@@ -1,0 +1,150 @@
+/* AI connection pools (Pools.tsx): the ordered member list, the picker and the model rows. */
+
+.pl-adds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.pl-new {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pl-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--edge);
+}
+
+.pl-order-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px 0;
+}
+
+.pl-order {
+  list-style: none;
+  margin: 0;
+  padding: 8px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pl-new .pl-order {
+  padding: 0;
+}
+
+.pl-member {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+  background: var(--card);
+}
+
+.pl-index {
+  width: 18px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pl-member-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.pl-member-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.pl-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pl-options {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.pl-options .cx-option-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pl-picker-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.pl-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 20px;
+}
+
+.pl-profile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.pl-profile-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  padding-bottom: 8px;
+}
+
+.pl-agents {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.pl-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .pl-profile {
+    grid-template-columns: 1fr;
+  }
+
+  .pl-profile-name {
+    padding-bottom: 0;
+  }
+
+  .pl-member {
+    flex-wrap: wrap;
+  }
+}

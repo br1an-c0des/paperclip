@@ -23,6 +23,7 @@ import {
   type Connection,
 } from "@/connectors/connection-model";
 import { ConnectionSetup } from "@/connectors/ConnectionSetup";
+import { PoolsCard } from "./pools/Pools";
 
 /*
  * Apps → AI connections (`/:prefix/apps/ai`): the company's AI accounts, which agents run on. This
@@ -120,6 +121,8 @@ export function AiConnections() {
           </Match>
         </Switch>
       </section>
+
+      <PoolsCard />
 
       <Show when={list.data}>
         {(data) => (

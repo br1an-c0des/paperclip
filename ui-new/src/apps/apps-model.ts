@@ -41,6 +41,8 @@ export type AppsView =
   | { section: "ai" }
   | { section: "review" }
   | { section: "connect" }
+  /** Connecting a gallery app with a connector set up in Vercel (`/apps/vercel-connect?source=…`). */
+  | { section: "vercel" }
   | { section: "byo" }
   | { section: "application"; applicationId: string }
   | { section: "detail"; connectionId: string; tab: DetailTab }
@@ -54,7 +56,6 @@ const LATER: Record<string, string> = {
   gateways: "Gateways",
   advanced: "Advanced",
   chat: "Chat endpoints",
-  "vercel-connect": "Vercel Connect",
 };
 
 /** Where `/:prefix/apps/<rest>` goes. Keeps the old UI's addresses (ui/src/App.tsx). */
@@ -66,6 +67,7 @@ export function appsView(rest: string): AppsView {
   if (first === "ai") return { section: "ai" };
   if (first === "review") return { section: "review" };
   if (first === "byo") return { section: "byo" };
+  if (first === "vercel-connect") return { section: "vercel" };
   if (first === "connect") {
     // The old `/apps/connect/:appKey(/:stage)` addresses: open that app's setup.
     if (second) return { section: "redirect", to: `connect?source=${encodeURIComponent(second)}` };
@@ -499,15 +501,20 @@ function fieldProblem(field: FieldDef, value: unknown) {
   return null;
 }
 
-/** The first thing stopping Connect, or null. */
-export function connectProblem(method: ConnectionMethodDef | null, draft: ConnectDraft): string | null {
+/**
+ * The first thing stopping Connect, or null. Through Vercel Connect (`vercelConnector` given) the
+ * connector carries the address and credentials, so only the name, settings and connector count.
+ */
+export function connectProblem(method: ConnectionMethodDef | null, draft: ConnectDraft, vercelConnector?: string): string | null {
   if (!method) return "Choose how to connect.";
   if (!draft.name.trim()) return "Give the connection a name.";
-  if (needsLink(method)) {
+  const vercel = vercelConnector !== undefined;
+  if (vercel && !vercelConnector.trim()) return "Paste the connector's UID or ID from Vercel.";
+  if (!vercel && needsLink(method)) {
     if (!draft.link.trim()) return "Paste the server address.";
     if (!/^https?:\/\//i.test(draft.link.trim())) return "The address should start with https://.";
   }
-  for (const field of method.credentialFields ?? []) {
+  for (const field of vercel ? [] : (method.credentialFields ?? [])) {
     const problem = fieldProblem(field, draft.credentials[field.key]);
     if (problem) return problem;
   }
@@ -517,36 +524,52 @@ export function connectProblem(method: ConnectionMethodDef | null, draft: Connec
   }
   const oneOf = method.configRequirements?.atLeastOneOf ?? [];
   if (oneOf.length > 0 && !oneOf.some((key) => filled(draft.config[key]))) return "Fill in at least one of the options.";
-  if (needsOwnOAuthClient(method)) {
+  if (!vercel && needsOwnOAuthClient(method)) {
     if (!draft.oauthClientId.trim()) return "Add your OAuth client ID.";
     if (method.oauthClientSecretRequired && !draft.oauthClientSecret.trim()) return "Add your OAuth client secret.";
   }
   return null;
 }
 
-/** `POST tools/apps/connect` for a gallery app. */
+/**
+ * `POST tools/apps/connect` for a gallery app. With `vercelConnector` the credentials come from that
+ * Vercel connector (`credentialSource: "vercel_connect"`), and no address, key or OAuth app is sent.
+ */
 export function connectPayload(
   app: AppDefinition,
   method: ConnectionMethodDef,
   draft: ConnectDraft,
-  options: { applicationId?: string; resumeConnectionId?: string } = {},
+  options: { applicationId?: string; resumeConnectionId?: string; vercelConnector?: string } = {},
 ): ConnectToolApp {
-  const credentials = Object.fromEntries(Object.entries(draft.credentials).filter(([, value]) => value.trim()));
   const config = Object.fromEntries(Object.entries(draft.config).filter(([, value]) => filled(value)));
-  const clientId = draft.oauthClientId.trim();
+  const vercel = options.vercelConnector !== undefined;
+  const credentials = vercel ? {} : Object.fromEntries(Object.entries(draft.credentials).filter(([, value]) => value.trim()));
+  const clientId = vercel ? "" : draft.oauthClientId.trim();
   const secret = draft.oauthClientSecret.trim();
   return {
     galleryKey: app.slug,
     connectionMethodKey: method.key,
     name: draft.name.trim(),
-    credentialSource: "paperclip_vault",
-    ...(needsLink(method) ? { link: draft.link.trim() } : {}),
+    credentialSource: vercel ? "vercel_connect" : "paperclip_vault",
+    ...(vercel ? { vercelConnect: { connector: options.vercelConnector!.trim() } } : {}),
+    ...(!vercel && needsLink(method) ? { link: draft.link.trim() } : {}),
     ...(Object.keys(credentials).length > 0 ? { credentialValues: credentials } : {}),
     ...(Object.keys(config).length > 0 ? { configValues: config } : {}),
     ...(acceptsOwnOAuthClient(method) && clientId ? { oauthClient: { clientId, ...(secret ? { clientSecret: secret } : {}) } } : {}),
     ...(options.applicationId ? { applicationId: options.applicationId } : {}),
     ...(options.resumeConnectionId ? { resumeConnectionId: options.resumeConnectionId } : {}),
   } as ConnectToolApp;
+}
+
+/** The ways to connect an app that Vercel Connect has reviewed (`credentialSources.vercelConnect`). */
+export function vercelMethods(app: AppDefinition): ConnectionMethodDef[] {
+  return toolMethods(app).filter((method) => Boolean(method.credentialSources?.vercelConnect));
+}
+
+/** Where a connection is set up again: through Vercel when that's where its credentials come from. */
+export function connectHref(base: string, slug: string, params: Record<string, string>, credentialSource?: string | null) {
+  const path = credentialSource === "vercel_connect" ? "vercel-connect" : "connect";
+  return `${base}/${path}?${new URLSearchParams({ source: slug, ...params }).toString()}`;
 }
 
 /** Every discovered action on; the risky ones the server suggests ask first. */

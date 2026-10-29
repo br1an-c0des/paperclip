@@ -26,7 +26,11 @@ import {
   slackManifest,
   type SetupStep,
 } from "./chat-model";
+import { GitHubGuidedSetup } from "./GitHubSetup";
 import { CopyValue, SetupSteps, useChatEndpoint } from "./parts";
+import { PhotonConnect } from "./PhotonConnect";
+import { defaultSlackMethod, isProvisioned, type SlackMethod } from "./slack-model";
+import { AutomaticSlackSetup, ManagedSlackSetup } from "./SlackSetup";
 
 /*
  * Setting up a chat endpoint (`/apps/chat/connect?provider=…`, the old UI's ChatEndpointSetup):
@@ -41,9 +45,12 @@ import { CopyValue, SetupSteps, useChatEndpoint } from "./parts";
  * 4. Try it: send the agent a message there; once it arrives, Finish turns the endpoint on.
  *
  * `?resume=<id>` continues a draft; `&reconnect=1` replaces a working endpoint's credentials.
- * Slack's managed and automatic setups, Photon's line picker, GitHub's guided App registration and
- * Speko's in-browser test call aren't here: Slack and GitHub use your own app, and a Speko persona
- * is finished from its page.
+ *
+ * Slack can also be set up for you (managed, or automatic with an App configuration access token)
+ * and GitHub registers its App from a manifest (src/apps/chat/SlackSetup.tsx, GitHubSetup.tsx); the
+ * manual forms below stay for your own app. Photon picks its line after inspecting the project
+ * (PhotonConnect.tsx). Speko's in-browser test call isn't here: it needs Speko's browser client,
+ * which ui-new doesn't bundle, so a persona is finished from its page.
  */
 
 export function ChatConnect(props: { provider: ChatProvider; app: AppDefinition | null }) {
@@ -130,6 +137,9 @@ function SetupFlow(props: {
     return seen && order.indexOf(seen) <= order.indexOf(reached()) && seen !== "agent" ? seen : reached();
   };
   const name = () => providerName(props.provider);
+  const [ownGitHubApp, setOwnGitHubApp] = createSignal(props.reconnect);
+  const guidedGitHub = () =>
+    props.provider === "github" && !repairing() && !ownGitHubApp() && Boolean(endpoint()) && !endpoint()!.botExternalId && step() !== "try";
   const save = (next: ChatEndpoint) => {
     client.setQueryData(queryKeys.chatEndpoints.detail(company().id, next.id), next);
     void client.invalidateQueries({ queryKey: queryKeys.chatEndpoints.list(company().id) });
@@ -181,6 +191,47 @@ function SetupFlow(props: {
             onCancel={exit}
           />
         </Match>
+        <Match when={guidedGitHub() && endpoint()}>
+          {(current) => <GitHubGuidedSetup endpoint={current()} base={props.base} onOwnApp={() => setOwnGitHubApp(true)} onExit={exit} />}
+        </Match>
+        <Match when={step() === "connect" && props.provider === "slack" && isProvisioned(endpoint()?.setup?.slackSetupMethod) && endpoint()}>
+          {(current) => (
+            <Show
+              when={current().setup?.slackSetupMethod === "managed"}
+              fallback={
+                <AutomaticSlackSetup
+                  endpoint={current()}
+                  onSaved={save}
+                  onExit={exit}
+                  onManual={(existing) =>
+                    void chatEndpointsApi.update(current().id, { slackSetupMethod: existing ? "existing" : "manual" }).then(save)
+                  }
+                />
+              }
+            >
+              <ManagedSlackSetup
+                endpoint={current()}
+                reconnect={repairing()}
+                onSaved={save}
+                onExit={exit}
+                onManual={() => void chatEndpointsApi.update(current().id, { slackSetupMethod: "automatic" }).then(save)}
+              />
+            </Show>
+          )}
+        </Match>
+        <Match when={step() === "connect" && props.provider === "imessage-photon" && endpoint()}>
+          {(current) => (
+            <PhotonConnect
+              endpoint={current()}
+              repairing={repairing()}
+              onSaved={(next) => {
+                save(next);
+                setViewed(null);
+              }}
+              onExit={exit}
+            />
+          )}
+        </Match>
         <Match when={step() === "connect" && endpoint()}>
           {(current) => (
             <ConnectStep
@@ -230,6 +281,14 @@ function AgentStep(props: {
   const agent = () => props.agents.find((candidate) => candidate.id === agentId()) ?? null;
   const [slack, setSlack] = createSignal<SlackAppConfiguration | null>(null);
   const slackApp = () => slack() ?? defaultSlackApp(agent()?.name ?? "");
+  const slackOptions = createQuery(() => ({
+    queryKey: [...queryKeys.chatEndpoints.all(company().id), "slack-setup-options"],
+    queryFn: ({ signal }) => chatEndpointsApi.slackSetupOptions(company().id, signal),
+    enabled: props.provider === "slack",
+    retry: false,
+  }));
+  const [slackMethod, setSlackMethod] = createSignal<SlackMethod | null>(null);
+  const method = () => slackMethod() ?? defaultSlackMethod(slackOptions.data);
   // A new agent means new defaults for the Slack app's names, unless they were edited.
   createEffect(on(agentId, () => setSlack(null), { defer: true }));
   const slackProblem = () => {
@@ -245,7 +304,7 @@ function AgentStep(props: {
       chatEndpointsApi.create(company().id, {
         provider: props.provider,
         assignedAgentId: agentId(),
-        ...(props.provider === "slack" ? { slackSetupMethod: "manual" as const, slackApp: slackApp() } : {}),
+        ...(props.provider === "slack" ? { slackSetupMethod: method(), slackApp: slackApp() } : {}),
       }),
     onSuccess: (next) => props.onCreated(next),
   }));
@@ -288,6 +347,38 @@ function AgentStep(props: {
             <TextInput id="ch-slack-command" value={slackApp().command} maxLength={32} onInput={(event) => setField("command", event.currentTarget.value)} />
           </Field>
         </div>
+      </Show>
+      <Show when={props.provider === "slack" && agent()}>
+        <Field label="How to set up the Slack app">
+          <ul class="cx-options" role="radiogroup" aria-label="Slack setup">
+            <Show when={slackOptions.data?.managedAvailable}>
+              <li>
+                <label class="cx-option" classList={{ "cx-option--on": method() === "managed" }}>
+                  <input type="radio" name="ch-slack-method" checked={method() === "managed"} onChange={() => setSlackMethod("managed")} />
+                  <span class="cx-option-name">
+                    For me <span class="cx-row-meta">Paperclip's Slack app creates and installs it in a workspace you authorize.</span>
+                  </span>
+                </label>
+              </li>
+            </Show>
+            <li>
+              <label class="cx-option" classList={{ "cx-option--on": method() === "automatic" }}>
+                <input type="radio" name="ch-slack-method" checked={method() === "automatic"} onChange={() => setSlackMethod("automatic")} />
+                <span class="cx-option-name">
+                  With a configuration token <span class="cx-row-meta">Paste a Slack App configuration access token; Paperclip creates the app.</span>
+                </span>
+              </label>
+            </li>
+            <li>
+              <label class="cx-option" classList={{ "cx-option--on": method() === "manual" }}>
+                <input type="radio" name="ch-slack-method" checked={method() === "manual"} onChange={() => setSlackMethod("manual")} />
+                <span class="cx-option-name">
+                  Myself <span class="cx-row-meta">Paste the app manifest in Slack and copy its credentials back.</span>
+                </span>
+              </label>
+            </li>
+          </ul>
+        </Field>
       </Show>
       <Show when={slackProblem() && agent()}>
         <p class="cx-note cx-note--error" role="alert">

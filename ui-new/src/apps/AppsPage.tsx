@@ -9,7 +9,7 @@ import { MoreApps } from "./advanced/MoreApps";
 import { moreAppsTab, moreAppsView } from "./advanced/routes-model";
 import { appsView, type AppsView } from "./apps-model";
 import { Browse } from "./Browse";
-import { ApplicationPage, ByoConnect, GalleryConnect } from "./Connect";
+import { ApplicationPage, ByoConnect, GalleryConnect, VercelConnect } from "./Connect";
 import { ReviewPage } from "./Review";
 import { ChatRoutes } from "./chat/ChatRoutes";
 import { chatRoute } from "./chat/chat-model";
@@ -25,8 +25,9 @@ import "./Apps.css";
  * - AI connections (`/apps/ai`): the accounts agents run on. This was the temporary Connectors page
  *   (decision 23); `/connectors` sends you here.
  * - Review (`/apps/review`): Ask-first app calls waiting for your OK.
- * - Connect (`/apps/connect?source=…`, `/apps/byo`, `/apps/app/:applicationId`): a gallery app, your
- *   own MCP server, or one more account for an app you have.
+ * - Connect (`/apps/connect?source=…`, `/apps/vercel-connect`, `/apps/byo`, `/apps/app/:applicationId`):
+ *   a gallery app, one through a Vercel connector, your own MCP server, or one more account for an
+ *   app you have.
  * - A connection (`/apps/:connectionId/:tab`): its tools and who may use them, its review queue, and
  *   its settings.
  *
@@ -113,6 +114,9 @@ export function AppsPage() {
           </Match>
           <Match when={view().section === "connect"}>
             <GalleryConnect source={search().get("source")} resume={search().get("resume")} applicationId={search().get("applicationId")} />
+          </Match>
+          <Match when={view().section === "vercel"}>
+            <VercelConnect source={search().get("source")} resume={search().get("resume")} applicationId={search().get("applicationId")} />
           </Match>
           <Match when={view().section === "byo"}>
             <ByoConnect />

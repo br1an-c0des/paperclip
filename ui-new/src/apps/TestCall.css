@@ -1,0 +1,66 @@
+/* Testing an action as an agent, and the app panels on a connection's Settings (TestCall.tsx). */
+
+.ap-test {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.ap-test-agent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  padding: 12px 14px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+}
+
+.ap-test-agent .field-stack {
+  flex: 1;
+  min-width: 200px;
+}
+
+.ap-test-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--edge);
+}
+
+.ap-test-output {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ap-test-button {
+  flex-shrink: 0;
+}
+
+.ap-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ap-panel p {
+  margin: 0;
+}
+
+.ap-panel-set {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
