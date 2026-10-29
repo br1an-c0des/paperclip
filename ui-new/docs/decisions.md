@@ -71,6 +71,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 42 | [Gaps found building the task panel, runs and workspaces](#42-gaps-found-building-the-task-panel-runs-and-workspaces) | `tasks/*`, `runs-adapters/runs`, `workspaces/*` | Open | Oct 28, 2026 |
 | 43 | [Gaps found building cases into the task views](#43-gaps-found-building-cases-into-the-task-views) | `cases/*` | Open | Oct 29, 2026 |
 | 44 | [Status cards need an agent that can write them](#44-status-cards-need-an-agent-that-can-write-them) | Status cards | Open | Oct 29, 2026 |
+| 45 | [Gaps found building agents, projects, goals and recurring tasks](#45-gaps-found-building-agents-projects-goals-and-recurring-tasks) | `agents/*`, `projects/*`, `goals/*`, `routines/*` | Open | Oct 29, 2026 |
 
 ## Entries
 
@@ -1480,3 +1481,44 @@ Both are handled in `ui-new` for now.
 - **Test data:** cards 1d784e5f (archived, stalled setup) and 8f1d8233 "M7 test card 2" (setting up,
   its task TES-24 left in progress), hidden setup tasks TES-23 and TES-24, the summarizer agent, the
   `status-card-query` skill.
+
+### 45. Gaps found building agents, projects, goals and recurring tasks
+
+- **Status:** Open
+- **Area:** `agents/*`, `agent-chat/*`, `projects/defaults`, `projects/summary`, `goals/*`, `routines/*`
+- **Found in:** M7 slice D.
+
+- **Outside agents** are invited only through an agent-only invite and the copied prompt (D2). The
+  prompt is ported word for word from `ui/src/lib/agent-onboarding-prompt.ts`, and
+  `agents/new/outside-agent-model.ts` mirrors `EXTERNAL_AGENT_TOOL_GUIDANCE`; a test compares them with
+  the old builder. Check both at each upstream sync.
+- **Harness fields** come from `GET /adapters/:type/config-schema` plus a mirrored copy of the old
+  UI's hand-written fields for Claude Code, Codex, OpenCode, HTTP and OpenClaw;
+  `agents/harness-model.ts` mirrors `ADAPTER_AGNOSTIC_KEYS`. Check both at each sync.
+- **Not built in runtime settings:** the Runner's managed-provider select (`claude_managed`,
+  `aws_agentcore`; Change harness covers the provider, so managed providers are API-only for now), and
+  OpenClaw headers and gateway token (they arrive with the join request, and editing them risks
+  upstream #14313's redaction bug).
+- **Built-in agent setup** is one generic dialog (harness, model, budget); the old Summarizer-specific
+  dialog and its streamed draft preview aren't ported. All built-in controls were checked with mocks
+  only (`enableBuiltInAgents` is off).
+- **The Workspaces summary card is built but not mounted:** `src/workspaces/` belonged to another
+  slice. The mount is one line in the Workspaces overview:
+  `<SummaryCard scopeKind="workspaces_overview" …>` from `@/projects/summary/AiSummary`. Also left:
+  the project header wrapping on phones (`src/routes/Project.tsx`).
+- **Recurring tasks, API gaps:** `PATCH /routines/:id` doesn't accept `responsibleUserId`, so Runs for
+  is read-only; routines don't store an execution workspace or environment (only
+  `POST /routines/:id/run` takes them); the activity section needs the routine, each trigger and the
+  latest 20 runs (no routine activity endpoint); repairing or resetting a plugin-managed routine is
+  plugin-worker only.
+- **Goals:** no dates beyond created and updated; `POST /companies/:id/goals` and `PATCH /goals/:id`
+  don't validate `parentId` (a goal can be its own parent, form a loop, or point to another
+  company's goal).
+- **Suspected upstream bugs, unconfirmed:** `PATCH /agents/:id/instructions-bundle` answers 500, not
+  a 4xx, when an external `rootPath` can't be written; an agent created paused showed `idle` a little
+  later with no request in between (paused again; no run happened).
+- **Test data:** agent "M7 test D settings" (paused; now Codex on the Paperclip Runner), project
+  "M7 test goals and recurring", goals "M7 test goal: company/team/task", the paused routine
+  "M7 test recurring {{region}}", a commands JSON on workspace "M7 test files". One invite was created
+  and revoked. Two older agent invites from 02:40 and 02:41 on Oct 29 (`5cc3e3db`, `3e2df05c`) are
+  still open; they're not from this slice.
