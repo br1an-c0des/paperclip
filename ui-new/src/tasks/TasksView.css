@@ -118,3 +118,38 @@
     width: 100%;
   }
 }
+
+/* Phones (M1): one row of quick filters that scrolls sideways, with search behind its icon */
+.tv-toolbar--phone {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin-inline: -16px;
+  padding-inline: 16px;
+  scrollbar-width: none;
+}
+
+.tv-toolbar--phone::-webkit-scrollbar {
+  display: none;
+}
+
+.tv-toolbar--phone > .btn,
+.tv-toolbar--phone .tv-toolbar-end > .btn {
+  flex-shrink: 0;
+  height: 36px;
+  padding-inline: 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.tv-toolbar--phone > .btn--icon {
+  width: 36px;
+  padding: 0;
+}
+
+.tv-toolbar--phone .tv-toolbar-end:empty {
+  display: none;
+}
+
+.tv-toolbar--phone + .tv-search {
+  width: 100%;
+}

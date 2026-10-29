@@ -26,6 +26,9 @@ const browsers = vi.hoisted(() => ({
 const flags = vi.hoisted(() => ({ value: { enableChatConnectors: true } as Record<string, boolean> }));
 
 vi.mock("@/api/chat-endpoints", () => ({ chatEndpointsApi: chat }));
+vi.mock("./board-send", async (original) => ({ ...(await original<typeof import("./board-send")>()), publishBoardMessage: chat.publishBoardMessage }));
+const issues = vi.hoisted(() => ({ listAttachments: vi.fn(), uploadAttachment: vi.fn() }));
+vi.mock("@/api/issues", () => ({ issuesApi: issues }));
 vi.mock("@/api/email", () => ({ emailApi: email }));
 vi.mock("@/api/browser-use", () => ({ browserUseApi: browsers }));
 vi.mock("@/lib/company", () => ({ useCompany: () => () => ({ id: "co1", issuePrefix: "TES" }) }));
@@ -114,6 +117,8 @@ describe("TaskIntegrations", () => {
   });
 
   it("sends a board message to the bound conversation and keeps one key for the send", async () => {
+    sessionStorage.clear();
+    issues.listAttachments.mockResolvedValue([]);
     chat.issueBinding.mockResolvedValue(binding);
     chat.publishBoardMessage.mockResolvedValue({ id: "pub-1", state: "pending", attempts: 0 });
     chat.publicationStatus.mockResolvedValue({ publication: { id: "pub-1", state: "pending", attempts: 1 }, total: 1, published: 0 });
@@ -128,14 +133,49 @@ describe("TaskIntegrations", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() => expect(chat.publishBoardMessage).toHaveBeenCalledTimes(1));
-    const [endpointId, conversationId, body, key] = chat.publishBoardMessage.mock.calls[0]!;
-    expect([endpointId, conversationId, body]).toEqual(["e1", "conv-1", "Shipping today"]);
-    expect(key).toMatch(/^[0-9a-f-]{36}$/);
+    const [endpointId, conversationId, input] = chat.publishBoardMessage.mock.calls[0]!;
+    expect([endpointId, conversationId, input.body, input.attachmentIds]).toEqual(["e1", "conv-1", "Shipping today", []]);
+    expect(input.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
+    // Kept before it went, so a reload finishes this send instead of making another.
+    const keptKey = Object.keys(sessionStorage).find((key) => key.startsWith("ui-new:board-send:"))!;
+    expect(JSON.parse(sessionStorage.getItem(keptKey)!).idempotencyKey).toBe(input.idempotencyKey);
     expect(await screen.findByText("Queued")).toBeTruthy();
     expect((screen.getByLabelText("Message to Slack") as HTMLTextAreaElement).disabled).toBe(true);
 
     chat.publicationStatus.mockResolvedValue({ publication: { id: "pub-1", state: "published", attempts: 1 }, total: 1, published: 1 });
     await waitFor(() => expect(screen.queryByLabelText("Message to Slack")).toBeNull(), { timeout: 4000 });
+    expect(sessionStorage.getItem(keptKey)).toBeNull();
+  });
+
+  it("brings back an unconfirmed send after a reload and repeats it with the same key, files and all", async () => {
+    sessionStorage.clear();
+    sessionStorage.setItem(
+      'ui-new:board-send:v1:["co1","task-1","e1","conv-1"]',
+      JSON.stringify({
+        body: "Kept from before",
+        attachmentIds: ["a1"],
+        attachmentNames: [{ id: "a1", name: "plan.pdf" }],
+        idempotencyKey: "11111111-2222-4333-8444-555555555555",
+        publication: null,
+      }),
+    );
+    issues.listAttachments.mockResolvedValue([]);
+    chat.issueBinding.mockResolvedValue(binding);
+    chat.publishBoardMessage.mockReset();
+    chat.publishBoardMessage.mockResolvedValue({ id: "pub-2", state: "published", attempts: 1 });
+    renderTask();
+
+    expect(await screen.findByText(/wasn't confirmed before the page closed/)).toBeTruthy();
+    expect((screen.getByLabelText("Message to Slack") as HTMLTextAreaElement).value).toBe("Kept from before");
+    expect(screen.getByText("plan.pdf")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Send again" }));
+    await waitFor(() => expect(chat.publishBoardMessage).toHaveBeenCalledTimes(1));
+    expect(chat.publishBoardMessage.mock.calls[0]![2]).toEqual({
+      body: "Kept from before",
+      idempotencyKey: "11111111-2222-4333-8444-555555555555",
+      attachmentIds: ["a1"],
+    });
+    await waitFor(() => expect(sessionStorage.length).toBe(0));
   });
 
   it("opens an email thread and records an uncertain delivery without resending", async () => {

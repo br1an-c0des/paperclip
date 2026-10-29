@@ -1,5 +1,5 @@
 import type { Agent, ExecutionWorkspace, Issue, IssueStatus, Project } from "@paperclipai/shared";
-import { agentRunDefaults, effortKeyFor, effortOptions, supportsOverrides } from "./new-task";
+import { agentRunDefaults, effortKeyFor, effortOptions, modeForExisting, supportsOverrides } from "./new-task";
 
 /*
  * The changes the Details section sends (board 2), each as the `PATCH /issues/:id` body the old UI
@@ -78,7 +78,7 @@ export function runOverrides(task: Pick<Issue, "assigneeAdapterOverrides">) {
   const config = record(task.assigneeAdapterOverrides?.adapterConfig);
   const model = typeof config.model === "string" && config.model ? config.model : null;
   const effortValue = EFFORT_KEYS.map((key) => config[key]).find((value) => typeof value === "string" && value);
-  return { model, effort: (effortValue as string | undefined) ?? null };
+  return { model, effort: (effortValue as string | undefined) ?? null, chrome: config.chrome === true };
 }
 
 /**
@@ -89,7 +89,7 @@ export function runOverrides(task: Pick<Issue, "assigneeAdapterOverrides">) {
 export function runOverridesEdit(
   task: Pick<Issue, "assigneeAdapterOverrides">,
   agent: Pick<Agent, "adapterType" | "adapterConfig">,
-  change: { model?: string | null; effort?: string | null },
+  change: { model?: string | null; effort?: string | null; chrome?: boolean },
 ): Patch | null {
   if (!supportsOverrides(agent.adapterType)) return null;
   const existing = task.assigneeAdapterOverrides ?? null;
@@ -107,6 +107,8 @@ export function runOverridesEdit(
     const effortKey = effortKeyFor(agent.adapterType);
     if (change.effort && effortKey) config[effortKey] = change.effort;
   }
+  // Claude's browser access (`--chrome`), the old properties panel's "Enable Chrome".
+  if ("chrome" in change && agent.adapterType === "claude_local") config.chrome = change.chrome ? true : undefined;
   const adapterConfig = compact(config);
   const next = compact({
     useProjectWorkspace: existing?.useProjectWorkspace,
@@ -119,8 +121,8 @@ export function runOverridesEdit(
 
 /** "Opus 5.5, high effort", from the overrides and the model list's labels. Null with no overrides. */
 export function runSummary(task: Pick<Issue, "assigneeAdapterOverrides">, modelLabel: (id: string) => string = (id) => id) {
-  const { model, effort } = runOverrides(task);
-  const parts = [model ? modelLabel(model) : null, effort ? `${effort} effort` : null].filter(Boolean);
+  const { model, effort, chrome } = runOverrides(task);
+  const parts = [model ? modelLabel(model) : null, effort ? `${effort} effort` : null, chrome ? "Chrome" : null].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
@@ -137,13 +139,6 @@ export function workspaceChoice(task: WorkspaceSource): WorkspaceChoice {
   if (task.executionWorkspacePreference == null && task.executionWorkspaceSettings == null) return "default";
   const selection = task.executionWorkspacePreference ?? task.executionWorkspaceSettings?.mode;
   return selection === "isolated_workspace" ? "isolated" : selection === "reuse_existing" ? "reuse" : "default";
-}
-
-/** The mode a reused workspace is recorded with, after `issueExecutionWorkspaceModeForExistingWorkspace`. */
-function modeForExisting(mode: string | null | undefined) {
-  if (mode === "isolated_workspace" || mode === "operator_branch" || mode === "shared_workspace") return mode;
-  if (mode === "adapter_managed" || mode === "cloud_sandbox") return "agent_default";
-  return "shared_workspace";
 }
 
 /** The fields that move a task to the project's default, a new isolated workspace, or one it reuses. */

@@ -1,7 +1,7 @@
 import type { BrowserUseControl, BrowserUseViewportPreset, BrowserUseViewportRequest, BrowserUseViewportState, TaskBrowser } from "@paperclipai/shared";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Globe } from "lucide-solid";
-import { createEffect, createSignal, on, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { browserUseApi } from "@/api/browser-use";
 import { queryKeys } from "@/api/queryKeys";
 import { ConfirmDialog } from "@/documents/ConfirmDialog";
@@ -10,21 +10,31 @@ import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
-import { browserHeadline, costText, currentBrowser, idleCountdown, isViewable, paneSize, SIZE_OPTIONS } from "./integrations-model";
+import { browserHeadline, costText, currentBrowser, idleCountdown, isViewable, paneSize, resizedEnough, SIZE_OPTIONS } from "./integrations-model";
 
 /*
  * Browsers an agent opened for the task (Browser Use): a row while one is open, with Watch, which
  * opens a live view of it. The view's address is short-lived and carries a token, so it's fetched
  * when the view opens, renewed every 15 seconds, and never stored. In the view:
  *
- * - Size: Fit (the remote window follows this pane) or a preset (phone, tablet, laptop, desktop).
- *   When someone else's view sets the size, Take control claims it for this one.
+ * - Size: Fit (the remote window follows this pane, as it's resized too) or a preset (phone,
+ *   tablet, laptop, desktop). When someone else's view sets the size, Take control claims it for
+ *   this one; following the pane never takes it over by itself.
+ * - A view that hasn't loaded after 15 seconds reconnects once by itself, then offers Reconnect.
  * - Keep open (an idle browser closes after ten minutes; watching an idle one keeps it open too),
  *   Stop the agent's browsing, and End the browser.
- *
- * Not here: following the pane while it's being resized (Fit measures when the view loads and
- * when you pick it) and the old panel's automatic reconnect after a stalled load.
  */
+
+/** How long a live view may take to load before it counts as stalled. */
+const LOAD_WINDOW_MS = 15_000;
+/** How long the pane must hold still before Fit sends its new size. */
+const RESIZE_SETTLE_MS = 300;
+
+/** Where ResizeObserver is missing (tests), Fit measures only on load and when picked. */
+class NoResizeObserver {
+  observe() {}
+  disconnect() {}
+}
 
 const BROWSERS_KEY = (taskId: string) => queryKeys.issues.section(taskId, "browsers");
 
@@ -92,6 +102,10 @@ export function BrowserView(props: { taskId: string; browser: TaskBrowser; now: 
   const [sizeError, setSizeError] = createSignal<string | null>(null);
   const [ending, setEnding] = createSignal(false);
   const [presenceFailed, setPresenceFailed] = createSignal(false);
+  // Reconnecting remounts the frame (`attempt`) with a fresh address; one happens by itself.
+  const [attempt, setAttempt] = createSignal(0);
+  const [stalled, setStalled] = createSignal(false);
+  let autoReconnects = 0;
   let pane: HTMLDivElement | undefined;
 
   const viewer = createQuery(() => ({
@@ -127,6 +141,42 @@ export function BrowserView(props: { taskId: string; browser: TaskBrowser; now: 
   };
   const pick = (preset: BrowserUseViewportPreset) => (preset === "fit" ? fit(true) : resize.mutate({ preset, viewerId }));
 
+  // Fit follows the pane as the dialog or window is resized, once it settles.
+  let lastMeasured: { width: number; height: number } | null = null;
+  let settle: ReturnType<typeof setTimeout> | undefined;
+  const observer = new (globalThis.ResizeObserver ?? NoResizeObserver)(() => {
+    const rect = pane?.getBoundingClientRect();
+    const measured = rect ? paneSize(rect.width, rect.height) : null;
+    if (!measured || !resizedEnough(lastMeasured, measured)) return;
+    const first = lastMeasured === null;
+    lastMeasured = measured;
+    if (first) return; // The load measures it.
+    clearTimeout(settle);
+    settle = setTimeout(() => {
+      if (loaded() && size().preset === "fit" && !size().controlledElsewhere && !resize.isPending) fit();
+    }, RESIZE_SETTLE_MS);
+  });
+  const reconnect = (automatic = false) => {
+    if (!automatic) autoReconnects = 0;
+    setStalled(false);
+    setLoaded(false);
+    setAttempt((count) => count + 1);
+    void viewer.refetch();
+  };
+  createEffect(
+    on([() => viewer.data?.url, attempt, loaded], ([url, , done]) => {
+      if (!url || done) return;
+      const timer = setTimeout(() => {
+        if (loaded()) return;
+        if (autoReconnects === 0) {
+          autoReconnects += 1;
+          reconnect(true);
+        } else setStalled(true);
+      }, LOAD_WINDOW_MS);
+      onCleanup(() => clearTimeout(timer));
+    }),
+  );
+
   // An idle browser stays open while someone watches it.
   const renewPresence = () => {
     if (props.browser.status !== "idle" || document.visibilityState === "hidden") return;
@@ -139,32 +189,58 @@ export function BrowserView(props: { taskId: string; browser: TaskBrowser; now: 
   renewPresence();
   onCleanup(() => {
     clearInterval(timer);
+    clearTimeout(settle);
+    observer.disconnect();
     void browserUseApi.releaseViewport(props.taskId, props.browser.id, viewerId).catch(() => undefined);
   });
 
   return (
     <div class="ti-viewer">
-      <div class="ti-viewer-pane" ref={pane}>
+      <div
+        class="ti-viewer-pane"
+        ref={(element) => {
+          pane = element;
+          observer.observe(element);
+        }}
+      >
         <Show
           when={isViewable(props.browser) && viewer.data?.url}
           fallback={
-            <p class="ti-viewer-state" role={viewer.isError ? "alert" : "status"}>
-              {viewer.isError ? "The live view disconnected." : isViewable(props.browser) ? "Connecting to the browser…" : browserHeadline(props.browser)}
-            </p>
+            <div class="ti-viewer-state" role={viewer.isError ? "alert" : "status"}>
+              <p>{viewer.isError ? "The live view disconnected." : isViewable(props.browser) ? "Connecting to the browser…" : browserHeadline(props.browser)}</p>
+              <Show when={viewer.isError && isViewable(props.browser)}>
+                <Button size="compact" disabled={viewer.isFetching} onClick={() => reconnect()}>
+                  Reconnect
+                </Button>
+              </Show>
+            </div>
           }
         >
           {(url) => (
-            <iframe
-              title="Live browser"
-              src={url()}
-              referrerPolicy="no-referrer"
-              allow="autoplay; clipboard-write"
-              onLoad={() => {
-                if (!loaded() && size().preset === "fit" && !size().controlledElsewhere) fit();
-                setLoaded(true);
-              }}
-            />
+            <For each={[attempt()]}>
+              {() => (
+                <iframe
+                  title="Live browser"
+                  src={url()}
+                  referrerPolicy="no-referrer"
+                  allow="autoplay; clipboard-write"
+                  onLoad={() => {
+                    if (!loaded() && size().preset === "fit" && !size().controlledElsewhere) fit();
+                    setLoaded(true);
+                    setStalled(false);
+                  }}
+                />
+              )}
+            </For>
           )}
+        </Show>
+        <Show when={stalled()}>
+          <div class="ti-viewer-state ti-viewer-state--over" role="alert">
+            <p>The live view isn't loading.</p>
+            <Button size="compact" disabled={viewer.isFetching} onClick={() => reconnect()}>
+              Reconnect
+            </Button>
+          </div>
         </Show>
       </div>
       <Show when={size().controlledElsewhere}>

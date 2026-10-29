@@ -355,6 +355,25 @@ a.td-chip:hover {
   min-height: 36px;
 }
 
+/* Phones (M2): a narrower label column, and long values wrap */
+@media (max-width: 640px) {
+  .td-props {
+    grid-template-columns: 112px minmax(0, 1fr);
+    column-gap: 10px;
+  }
+
+  .td-dates {
+    white-space: normal;
+  }
+
+  .td-more {
+    height: auto;
+    min-height: 28px;
+    padding-block: 4px;
+    text-align: left;
+  }
+}
+
 /* A narrow panel stacks the property labels over their values */
 @container panel (width < 480px) {
   .td-main {
@@ -379,4 +398,86 @@ a.td-chip:hover {
   .td-table-row > .assignee {
     display: none;
   }
+}
+
+/* The About rows: origin, requester and the review-policy badge (TaskAbout.tsx). */
+.td-chip--small {
+  height: 24px;
+  gap: 5px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+
+.td-chip--link {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.td-chip[data-tone="green"] {
+  border-color: transparent;
+  background: var(--green-bg);
+  color: var(--green-fg);
+}
+
+.td-chip[data-tone="amber"] {
+  border-color: transparent;
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+}
+
+/* Accepted plan splits (PlanDecompositions.tsx). */
+.td-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
+.td-plan-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.td-plan-kids {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.td-plan-kid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  min-height: 32px;
+}
+
+/* External objects (ExternalObjects.tsx). */
+.td-external {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px 16px;
+  border-top: 1px solid var(--row-line);
+}
+
+.td-external:first-child {
+  border-top: 0;
+}
+
+.td-external-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.td-external-text .td-muted {
+  font-size: 12px;
 }

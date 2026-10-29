@@ -50,6 +50,8 @@ import {
 import { documentKeys, type DocumentHost } from "./host";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { useThreads } from "./queries";
+import { SourceTrustBadge } from "./SourceTrustBadge";
+import { FeedbackVotes } from "@/tasks/FeedbackVotes";
 import "./DocumentView.css";
 
 /*
@@ -297,6 +299,9 @@ export function DocumentView(props: {
   };
 
   const title = () => (doc.data ? documentName(viewing() ?? doc.data) : props.docKey);
+  // An agent wrote the current revision, so it takes a thumbs up or down (the old UI's rule).
+  const agentRevision = (current: IssueDocument) =>
+    current.latestRevisionId && current.updatedByAgentId && !current.updatedByUserId ? current.latestRevisionId : null;
 
   return (
     <section
@@ -324,7 +329,7 @@ export function DocumentView(props: {
               <span class="tsec-muted dv-meta">
                 <span class="mono">{current().key}</span> · rev {viewing()?.revisionNumber ?? current().latestRevisionNumber}
                 <Show when={author(viewing() ?? revState()!.current)}>{(name) => <> · {name()}</>}</Show> ·{" "}
-                {stampLabel(viewing()?.createdAt ?? current().updatedAt)}
+                {stampLabel(viewing()?.createdAt ?? current().updatedAt)} <SourceTrustBadge sourceTrust={current().sourceTrust} />
               </span>
             )}
           </Show>
@@ -533,6 +538,8 @@ export function DocumentView(props: {
                               }
                             >
                               <MarkdownEditor
+                                mentions={{ excludeTaskId: props.host.owner.id }}
+                                onUploadImage={props.host.uploadImage}
                                 value={editingDraft().body}
                                 label={`${title()} (Markdown)`}
                                 placeholder="Write in Markdown…"
@@ -556,6 +563,20 @@ export function DocumentView(props: {
                         <div class="dv-text" ref={setTextEl}>
                           <Show when={shownBody().trim()} fallback={<p class="tsec-muted">This document is empty.</p>}>
                             <Markdown source={shownBody()} />
+                          </Show>
+                          <Show when={props.host.feedback && !viewing() && agentRevision(current())}>
+                            {(revisionId) => (
+                              <div class="dv-feedback">
+                                <span class="tsec-muted">Was this revision useful?</span>
+                                <FeedbackVotes
+                                  taskId={props.host.owner.id}
+                                  commentId={revisionId()}
+                                  youId={props.host.youId()}
+                                  targetType="issue_document_revision"
+                                  label="Feedback on this revision"
+                                />
+                              </div>
+                            )}
                           </Show>
                           <Show when={selection()}>
                             {(picked) => (

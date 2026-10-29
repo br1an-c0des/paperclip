@@ -13,6 +13,10 @@ export type DocumentHost = {
   /** An agent's or person's name; "You" for the signed-in user. */
   nameOf: (agentId: string | null | undefined, userId: string | null | undefined) => string | null;
   youId: () => string | null;
+  /** Uploads an image put into the editor and answers its URL; the task stores it as an attachment. */
+  uploadImage?: (file: File) => Promise<string>;
+  /** Thumbs up and down on a revision an agent wrote; tasks have them, other owners may not. */
+  feedback?: boolean;
 };
 
 export const documentKeys = {

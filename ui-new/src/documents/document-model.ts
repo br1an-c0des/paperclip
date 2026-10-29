@@ -1,4 +1,4 @@
-import type { DocumentRevision, IssueDocument, IssueDocumentSummary, UpsertIssueDocument } from "@paperclipai/shared";
+import type { DocumentRevision, IssueDocument, IssueDocumentSummary, SourceTrustMetadata, UpsertIssueDocument } from "@paperclipai/shared";
 import { ApiError } from "@/api/client";
 
 /*
@@ -315,4 +315,36 @@ export function listContinuation(line: string): ListContinuation | null {
   const [, indent, bullet, number, delimiter, gap, task] = match;
   const marker = bullet ?? `${Number(number) + 1}${delimiter}`;
   return { kind: "continue", insert: `\n${indent}${marker}${gap}${task ? "[ ] " : ""}` };
+}
+
+// Images and source trust -------------------------------------------------------------------------
+
+/** The text an image stands as while it uploads, unique enough to find and replace afterwards. */
+export function uploadingPlaceholder(filename: string) {
+  return `![Uploading ${filename.replace(/[[\]]/g, "")}…](#uploading-${Math.random().toString(36).slice(2, 10)})`;
+}
+
+/** An uploaded image as Markdown, named after its file. */
+export function imageMarkdown(filename: string, url: string) {
+  const alt = filename.replace(/\.[a-z0-9]+$/i, "").replace(/[[\]\\]/g, "");
+  return `![${alt}](${url})`;
+}
+
+/**
+ * The source-trust badge for a document or comment a low-trust review agent wrote, as the old UI's
+ * `sourceTrustLabel` decides (ui/src/lib/trust-policy-ui.ts); null for everything else.
+ */
+export function sourceTrustBadge(
+  sourceTrust: SourceTrustMetadata | null | undefined,
+): { label: string; description: string; promoted: boolean } | null {
+  if (!sourceTrust || sourceTrust.preset !== "low_trust_review") return null;
+  if (sourceTrust.disposition === "promoted") {
+    const when = sourceTrust.promotedAt ? ` on ${new Date(sourceTrust.promotedAt).toLocaleDateString()}` : "";
+    return { label: "Promoted from low trust", description: `Written by a low-trust review agent and promoted${when}.`, promoted: true };
+  }
+  return {
+    label: "Low-trust source",
+    description: "Written by a low-trust review agent. It isn't shared with higher-trust agents as it is.",
+    promoted: false,
+  };
 }

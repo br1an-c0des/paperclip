@@ -434,3 +434,81 @@
     opacity: 1;
   }
 }
+
+/*
+ * Phones (M1): no columns. A row is two lines, the status, ID and title, then the assignee,
+ * priority, subtasks, running and notes, with the time at the end. The row's ::after breaks the line.
+ */
+.tl--phone .tl-sheet {
+  min-width: 0;
+  gap: 12px;
+}
+
+.tl--phone .tl-cols,
+.tl--phone .tl-check,
+.tl--phone .tl-labels {
+  display: none;
+}
+
+.tl--phone .tl-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 7px;
+  min-height: 0;
+  padding: 12px 16px 12px 12px;
+}
+
+.tl--phone .tl-row::after {
+  content: "";
+  order: 1;
+  flex-basis: 100%;
+}
+
+.tl--phone .tl-name {
+  display: contents;
+}
+
+.tl--phone .tl-status {
+  margin: 0;
+}
+
+.tl--phone .tl-title {
+  flex: 1 1 0;
+}
+
+.tl--phone .tl-cell {
+  order: 2;
+  min-height: 26px;
+  margin-left: 0;
+  padding: 0 4px;
+}
+
+/* The second line starts under the ID */
+.tl--phone .tl-cell:first-of-type {
+  margin-left: 14px;
+}
+
+.tl--phone .tl-name > :not(.tl-branch, .tl-status, .tl-id, .tl-title) {
+  order: 3;
+}
+
+.tl--phone .tl-cell .assignee-name {
+  display: none;
+}
+
+.tl--phone .tl-cell .priority {
+  font-size: 0;
+}
+
+.tl--phone .tl-updated {
+  order: 4;
+  margin-left: auto;
+  font-size: 12px;
+}
+
+/* Unfolded subtasks keep a step in */
+.tl--phone .tl-row:has(.tl-name--sub) {
+  padding-left: 30px;
+}

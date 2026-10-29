@@ -9,6 +9,7 @@ import {
   FileText,
   GitBranch,
   Lock,
+  Camera,
   Paperclip,
   Plus,
   Receipt,
@@ -43,12 +44,14 @@ import {
 import { useSession } from "@/lib/session";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Dialog } from "@/ui/Dialog";
-import { TextArea, TextInput } from "@/ui/Field";
+import { TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { Popover } from "@/ui/Popover";
 import { Capsule, LabelPill, PriorityBars, StatusCapsule } from "@/ui/Status";
 import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
+import { taskActionsApi } from "@/api/task-actions";
+import { MentionTextArea } from "./composer/MentionTextArea";
 import { ConnectWebhook, type ConnectTarget } from "@/recurring/ConnectWebhook";
 import { recurringPath, refreshRecurring } from "@/recurring/queries";
 import { templatePlaceholders } from "@/recurring/recurring-model";
@@ -74,6 +77,7 @@ import {
   type ExtraField,
   type NewTaskDraft,
   type Principal,
+  type ReusedWorkspace,
   type WorkspaceMode,
 } from "./new-task";
 import { TaskPicker, taskName } from "./TaskPicker";
@@ -85,11 +89,13 @@ import "./NewTaskDialog.css";
  *
  * - Project, then status, priority, labels and "More fields" (parent, goal and blocked by under
  *   Plan; billing code and private under Admin).
- * - A bordered title and description, then attachments, uploaded once the task exists.
+ * - A bordered title and description (with @-mentions of agents, people and tasks), then
+ *   attachments, uploaded once the task exists.
  * - One assignment row: the assignee capsule (agent or person, with the run's model and effort
  *   where the adapter allows it, decision 7), a reviewer, and a + menu for approver and watchdog.
- * - Work mode, workspace (when the project and instance allow it) and review policy as small pills
- *   beside Cancel and Create task (Cmd/Ctrl+Enter).
+ * - Work mode, workspace (when the project and instance allow it: shared, a new worktree, or
+ *   another task's worktree to reuse) and review policy as small pills beside Cancel and Create
+ *   task (Cmd/Ctrl+Enter).
  *
  * The draft is kept per company in local storage, so closing the dialog by accident loses nothing;
  * Cancel discards it. The payload rules live in new-task.ts.
@@ -101,8 +107,7 @@ import "./NewTaskDialog.css";
  * your app" (board N7), with the URL and secret the API returns once. Repeat isn't offered on a
  * phone, where setting up recurring tasks stays on desktop (mobile.md).
  *
- * Not yet: "Open as full page" (there's no full-page editor until M2's task page), @-mentions in
- * the description (the M2 composer), reusing another task's worktree (needs the workspace list).
+ * Left out: "Open as full page" (Create and open covers it).
  */
 
 const STATUSES: IssueStatus[] = ["backlog", "todo", "in_progress", "in_review", "blocked", "done"];
@@ -114,7 +119,7 @@ const WORK_MODES = [
   { value: "planning", label: "Plan first", description: "Propose a plan for you to approve" },
 ] as const;
 
-const WORKSPACES: { value: WorkspaceMode; label: string; description: string }[] = [
+const WORKSPACES: { value: Exclude<WorkspaceMode, "reuse_existing">; label: string; description: string }[] = [
   { value: "shared_workspace", label: "Shared workspace", description: "The project's main checkout" },
   { value: "isolated_workspace", label: "New worktree", description: "A fresh branch just for this task" },
 ];
@@ -158,6 +163,7 @@ export function NewTaskDialog() {
       titleHidden
       hideClose
       width={connect() ? 640 : 760}
+      class="nt-dialog"
       initialFocus={() => document.getElementById("nt-title")}
     >
       <Show when={open()}>
@@ -248,7 +254,10 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
     const id = current?.id ?? null;
     if (id === workspaceFor) return;
     workspaceFor = id;
-    setDraft("workspace", defaultWorkspaceMode(current));
+    batch(() => {
+      setDraft("workspace", defaultWorkspaceMode(current));
+      setDraft("reuseWorkspace", null);
+    });
   });
 
   const toggleExtra = (field: ExtraField) => {
@@ -437,6 +446,7 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
   };
 
   let fileInput: HTMLInputElement | undefined;
+  let cameraInput: HTMLInputElement | undefined;
   const addFiles = (list: FileList | null) => {
     if (!list?.length) return;
     setFiles((current) => [...current, ...Array.from(list)]);
@@ -742,13 +752,14 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
         <label class="sr-only" for="nt-desc">
           Description
         </label>
-        <TextArea
+        <MentionTextArea
           id="nt-desc"
-          class="nt-input nt-input--desc"
+          class="input input--area nt-input nt-input--desc"
           rows={6}
-          placeholder="Add a description, acceptance criteria or context."
+          below
+          placeholder="Add a description, acceptance criteria or context. Type @ to mention an agent, person or task."
           value={draft.description}
-          onInput={(event) => setDraft("description", event.currentTarget.value)}
+          onInput={(value) => setDraft("description", value)}
         />
       </div>
 
@@ -794,6 +805,24 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
           <Paperclip size={13} aria-hidden="true" />
           Attach files
         </button>
+        {/* On a phone (M6), a photo straight from the camera. */}
+        <Show when={isCompact()}>
+          <button type="button" class="nt-attach" onClick={() => cameraInput?.click()}>
+            <Camera size={13} aria-hidden="true" />
+            Take a photo
+          </button>
+          <input
+            ref={cameraInput}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            onChange={(event) => {
+              addFiles(event.currentTarget.files);
+              event.currentTarget.value = "";
+            }}
+          />
+        </Show>
         <input
           ref={fileInput}
           type="file"
@@ -926,7 +955,8 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
       </div>
 
       <footer class="nt-foot">
-        <Show when={!repeating()}>
+        {/* Work mode, workspace and review policy stay on desktop (M6). */}
+        <Show when={!repeating() && !isCompact()}>
         <ChoicePill
           label="Work mode"
           icon={<SlidersHorizontal size={13} />}
@@ -935,12 +965,16 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
           onPick={(value) => setDraft("workMode", value)}
         />
         <Show when={showWorkspace()}>
-          <ChoicePill
-            label="Workspace"
-            icon={<GitBranch size={13} />}
+          <WorkspacePill
+            projectId={draft.projectId}
             value={draft.workspace}
-            options={WORKSPACES}
-            onPick={(value) => setDraft("workspace", value)}
+            reused={draft.reuseWorkspace}
+            onPick={(value, reused) =>
+              batch(() => {
+                setDraft("workspace", value);
+                setDraft("reuseWorkspace", reused ?? null);
+              })
+            }
           />
         </Show>
         <ChoicePill
@@ -969,7 +1003,9 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
           <div class="nt-create">
             <button type="button" class="nt-create-main" disabled={pending()} onClick={() => void submit(false)}>
               {pending() ? "Creating…" : repeating() ? "Create recurring task" : "Create task"}
-              <kbd aria-hidden="true">{/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘↵" : "Ctrl ↵"}</kbd>
+              <Show when={!isCompact()}>
+                <kbd aria-hidden="true">{/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘↵" : "Ctrl ↵"}</kbd>
+              </Show>
             </button>
             <Menu placement="top-end">
               <Menu.Trigger
@@ -1120,6 +1156,75 @@ function RolePill(props: {
         </button>
       </Show>
     </span>
+  );
+}
+
+/**
+ * The workspace pill: the project's shared checkout, a new worktree, or another task's worktree to
+ * reuse (`reuse_existing`, the workspaces the server says can be reused in this project).
+ */
+function WorkspacePill(props: {
+  projectId: string | null;
+  value: WorkspaceMode;
+  reused: ReusedWorkspace | null;
+  onPick: (value: WorkspaceMode, reused?: ReusedWorkspace) => void;
+}) {
+  const company = useCompany();
+  const [open, setOpen] = createSignal(false);
+  const reusable = createQuery(() => ({
+    queryKey: ["execution-workspaces", company().id, "reusable", props.projectId ?? ""],
+    queryFn: ({ signal }) => taskActionsApi.reusableWorkspaces(company().id, { projectId: props.projectId! }, signal),
+    enabled: open() && !!props.projectId,
+    retry: false,
+  }));
+  const label = () =>
+    props.value === "reuse_existing" ? (props.reused ? `Reuse ${props.reused.name}` : "Reuse a worktree") : (WORKSPACES.find((option) => option.value === props.value)?.label ?? "Workspace");
+  return (
+    <Menu placement="top-start" open={open()} onOpenChange={setOpen}>
+      <Menu.Trigger class="nt-choice" aria-label={`Workspace: ${label()}`} data-problem={props.value === "reuse_existing" && !props.reused ? "" : undefined}>
+        <GitBranch size={13} />
+        <span class="nt-choice-text">{label()}</span>
+        <ChevronDown size={12} aria-hidden="true" />
+      </Menu.Trigger>
+      <Menu.Content label="Workspace" width={300}>
+        <Menu.Group label="Workspace">
+          <For each={WORKSPACES}>
+            {(option) => (
+              <Menu.Item
+                onSelect={() => props.onPick(option.value)}
+                description={option.description}
+                hint={option.value === props.value ? <Check size={14} /> : undefined}
+              >
+                {option.label}
+              </Menu.Item>
+            )}
+          </For>
+        </Menu.Group>
+        <Menu.Group label="Reuse another task's worktree">
+          <For
+            each={reusable.data ?? []}
+            fallback={<Menu.Item disabled>{reusable.isLoading ? "Loading worktrees…" : reusable.isError ? "Couldn't load the worktrees" : "None to reuse"}</Menu.Item>}
+          >
+            {(workspace) => (
+              <Menu.Item
+                description={workspace.branchName && workspace.branchName !== workspace.name ? workspace.name : undefined}
+                hint={props.value === "reuse_existing" && props.reused?.id === workspace.id ? <Check size={14} /> : undefined}
+                onSelect={() =>
+                  props.onPick("reuse_existing", {
+                    id: workspace.id,
+                    name: workspace.branchName ?? workspace.name,
+                    mode: workspace.mode,
+                    projectWorkspaceId: workspace.projectWorkspaceId ?? null,
+                  })
+                }
+              >
+                {workspace.branchName ?? workspace.name}
+              </Menu.Item>
+            )}
+          </For>
+        </Menu.Group>
+      </Menu.Content>
+    </Menu>
   );
 }
 

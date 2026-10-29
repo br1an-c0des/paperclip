@@ -11,6 +11,12 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* Tall notices or plugin blocks above a section scroll with it rather than squeezing it shut. */
+  overflow-y: auto;
+}
+
+.tsec-body > :last-child {
+  min-height: min(420px, 70dvh);
 }
 
 /* In the dock the panel keeps its full height, so switching sections or tasks doesn't resize it */
@@ -118,4 +124,53 @@
   .tsec-scroll {
     padding: 4px 16px 24px;
   }
+}
+
+/* On a phone (M2 to M4) the rail is a row of tabs above the open section */
+.tsec--tabs {
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tsec--tabs .tsec-rail {
+  order: -1;
+  flex: none;
+  min-width: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  margin: 10px 12px 4px;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tsec--tabs .tsec-rail-btn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+}
+
+.tsec--tabs .tsec-rail-btn[data-named] {
+  flex: 1 0 auto;
+  width: auto;
+  display: inline-flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+}
+
+.tsec--tabs .tsec-rail-btn[aria-current="page"] {
+  background: var(--sel, var(--card));
+  color: var(--text);
+  box-shadow: var(--sel-shadow, none);
+}
+
+.tsec-rail-label {
+  font-size: 13px;
+  font-weight: 600;
 }

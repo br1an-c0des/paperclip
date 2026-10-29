@@ -247,3 +247,29 @@
     padding-right: 10px;
   }
 }
+
+/* A comment reached through a #comment-<id> link */
+.ta-comment {
+  scroll-margin: 24px;
+  transition: box-shadow 0.4s ease;
+}
+
+.ta-comment--linked {
+  box-shadow: 0 0 0 2px var(--run-fg);
+}
+
+/* Jump to latest, over the foot of the thread while the reader is scrolled up */
+.ta-jump {
+  position: relative;
+  height: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 1;
+}
+
+.ta-jump .btn {
+  position: absolute;
+  bottom: 10px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}

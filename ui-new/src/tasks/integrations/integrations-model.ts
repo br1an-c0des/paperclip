@@ -136,3 +136,8 @@ export function paneSize(width: number, height: number) {
   const scale = Math.min(1, 6144 / width, 3456 / height);
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
+
+/** Whether the pane changed by at least two pixels either way since it was last measured. */
+export function resizedEnough(last: { width: number; height: number } | null, next: { width: number; height: number }) {
+  return !last || Math.abs(next.width - last.width) >= 2 || Math.abs(next.height - last.height) >= 2;
+}

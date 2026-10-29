@@ -543,6 +543,18 @@ button.nt-pill:hover,
   outline-offset: -2px;
 }
 
+/* Phones (M6): a sheet up from the bottom, as tall as the form, over the page */
+.layer-dialog-frame:has(> .nt-dialog[data-mode="sheet"]) {
+  align-items: flex-end;
+}
+
+[data-layer="dialog"][data-mode="sheet"].nt-dialog {
+  min-height: 0;
+  margin-top: auto;
+  border-radius: 24px 24px 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 @media (max-width: 720px) {
   .nt-who-grid {
     grid-template-columns: 1fr;
@@ -632,4 +644,16 @@ button.nt-pill:hover,
   color: var(--muted);
   font-size: 13px;
   font-weight: 600;
+}
+
+/* The workspace pill names a reused worktree, which can be long */
+.nt-choice-text {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nt-choice[data-problem] {
+  border-color: var(--amber-fg);
+  color: var(--amber-fg);
 }

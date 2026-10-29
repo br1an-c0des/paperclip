@@ -54,3 +54,13 @@
 .tn-action .btn {
   background: var(--card);
 }
+
+/* The recovery card (TaskRecovery.tsx) */
+.tn-recovery-next {
+  color: var(--text);
+}
+
+.tn-recovery-meta {
+  color: var(--muted);
+  font-size: 12px;
+}

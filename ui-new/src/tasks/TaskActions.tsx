@@ -1,6 +1,6 @@
 import type { Issue, IssueTreeControlMode } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Copy, EyeOff, Globe, Link2, Lock, MoreHorizontal, PauseCircle, PlayCircle, Plus, RotateCcw, XCircle } from "lucide-solid";
+import { Copy, EyeOff, Globe, Link2, Lock, MoreHorizontal, PauseCircle, PlayCircle, Plus, RotateCcw, Users, XCircle } from "lucide-solid";
 import { createSignal, Show } from "solid-js";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
@@ -12,6 +12,7 @@ import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Menu } from "@/ui/Menu";
 import { pushToast } from "@/ui/Toast";
+import { ShareSheet } from "./ShareSheet";
 import { canManagePrivacy, taskLink, taskMarkdown, type BoardAccess } from "./task-edits";
 import "./TaskActions.css";
 
@@ -22,11 +23,11 @@ import "./TaskActions.css";
  * - The privacy pill: "Open" or "Private". Making a task private is immediate; making it public
  *   asks first, since what others have seen can't be taken back, and is refused while a private
  *   parent or project keeps it private.
- * - More: add a subtask, copy the link or the task as Markdown, pause or resume the task (or its
- *   subtree), cancel or restore its subtree with a preview of what's affected, and hide the task.
+ * - More: who can see a private task (the share sheet, ShareSheet.tsx), add a subtask, copy the
+ *   link or the task as Markdown, pause or resume the task (or its subtree), cancel or restore its
+ *   subtree with a preview of what's affected, and hide the task.
  *
- * Archive from inbox comes with the Inbox (M3); sharing a private task with named people (the old
- * share sheet) isn't built yet.
+ * Archive from inbox comes with the Inbox (M3).
  */
 
 /** Copies text, falling back to a hidden field where the Clipboard API isn't available (plain HTTP). */
@@ -102,6 +103,7 @@ export function TaskActions(props: {
   const access = useBoardAccess();
   const tree = useTreeControlState(() => props.task.id);
   const [publicOpen, setPublicOpen] = createSignal(false);
+  const [shareOpen, setShareOpen] = createSignal(false);
   const [treeMode, setTreeMode] = createSignal<Exclude<IssueTreeControlMode, "pause"> | null>(null);
   const [busy, setBusy] = createSignal(false);
 
@@ -216,6 +218,16 @@ export function TaskActions(props: {
           <MoreHorizontal size={16} aria-hidden="true" />
         </Menu.Trigger>
         <Menu.Content label="Task actions" width={250}>
+          <Show when={isPrivate()}>
+            <Menu.Item
+              icon={<Users size={15} />}
+              description={canManage() ? "Share it, or take access back" : undefined}
+              onSelect={() => setShareOpen(true)}
+            >
+              Who can see it…
+            </Menu.Item>
+            <Menu.Separator />
+          </Show>
           <Menu.Item icon={<Plus size={15} />} onSelect={() => commands.openNewTask({ parentId: props.task.id, projectId: props.task.projectId })}>
             Add subtask
           </Menu.Item>
@@ -264,6 +276,7 @@ export function TaskActions(props: {
         </Menu.Content>
       </Menu>
 
+      <ShareSheet task={props.task} open={shareOpen()} canManage={canManage()} onOpenChange={setShareOpen} />
       <MakePublicDialog open={publicOpen()} task={props.task} busy={busy()} onCancel={() => setPublicOpen(false)} onConfirm={() => void setVisibility("open")} />
       <TreeControlDialog
         task={props.task}

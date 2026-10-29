@@ -11,10 +11,13 @@ import {
   FileText,
   Flag,
   FolderGit2,
+  GitFork,
   GitPullRequest,
   Hash,
   ListTree,
   Plus,
+  Layers3,
+  Send,
   RotateCcw,
   ShieldCheck,
   Tag,
@@ -51,6 +54,10 @@ import {
   WorkspaceControl,
 } from "./TaskEditors";
 import { MonitorControl, ScheduledRetryControl, WatchdogControl } from "./TaskExecution";
+import { hasOrigin, OriginValue, RequesterValue, ReviewPolicyBadge } from "./TaskAbout";
+import { requester } from "./task-origin";
+import { PlanDecompositions } from "./PlanDecompositions";
+import { ExternalObjects } from "./ExternalObjects";
 import "./TaskDetails.css";
 
 /*
@@ -153,7 +160,18 @@ export function TaskDetails(props: {
   const properties: Property[] = [
     { key: "status", icon: <CircleDot size={15} />, label: "Status", empty: () => false, value: () => <StatusControl status={t().status} onChange={change} /> },
     { key: "assignee", icon: <UserRound size={15} />, label: "Assignee", empty: () => false, value: () => <AssigneeControl task={t()} people={people} onChange={change} /> },
-    { key: "review", icon: <Eye size={15} />, label: "Review", empty: (current) => !hasStages(current), value: () => <ReviewControl task={t()} people={people} onChange={change} /> },
+    {
+      key: "review",
+      icon: <Eye size={15} />,
+      label: "Review",
+      empty: (current) => !hasStages(current) && !current.reviewPolicy,
+      value: () => (
+        <span class="td-inline td-wrap">
+          <ReviewControl task={t()} people={people} onChange={change} />
+          <ReviewPolicyBadge task={t()} />
+        </span>
+      ),
+    },
     { key: "priority", icon: <Flag size={15} />, label: "Priority", empty: () => false, value: () => <PriorityControl priority={t().priority} onChange={change} /> },
     { key: "project", icon: <Box size={15} />, label: "Project", empty: (current) => !current.projectId, value: () => <ProjectControl task={t()} onChange={change} /> },
     {
@@ -162,6 +180,13 @@ export function TaskDetails(props: {
       label: "Parent",
       empty: (current) => !current.parentId,
       value: () => <ParentControl task={t()} onOpenTask={props.onOpenTask} onChange={change} />,
+    },
+    {
+      key: "origin",
+      icon: <GitFork size={15} />,
+      label: "From",
+      empty: (current) => !hasOrigin(current),
+      value: () => <OriginValue task={t()} onOpenTask={props.onOpenTask} />,
     },
     { key: "goal", icon: <Target size={15} />, label: "Goal", empty: (current) => !current.goalId, value: () => <GoalControl task={t()} onChange={change} /> },
     { key: "labels", icon: <Tag size={15} />, label: "Labels", empty: (current) => !(current.labels?.length ?? 0), value: () => <LabelsControl task={t()} onChange={change} /> },
@@ -195,6 +220,21 @@ export function TaskDetails(props: {
       value: () => <ScheduledRetryControl task={t()} />,
     },
     { key: "billing", icon: <Hash size={15} />, label: "Billing code", empty: (current) => !current.billingCode, value: () => <BillingControl task={t()} onChange={change} /> },
+    { key: "requester", icon: <Send size={15} />, label: "Requested by", empty: (current) => !requester(current), value: () => <RequesterValue task={t()} people={people} /> },
+    {
+      key: "depth",
+      icon: <Layers3 size={15} />,
+      label: "Depth",
+      empty: (current) => !(current.requestDepth > 0),
+      value: () => (
+        <Show when={t().requestDepth > 0} fallback={<span class="td-muted">The first request</span>}>
+          <span class="td-inline" title="How many delegations deep this task is: a request made by another agent's request, and so on.">
+            <span class="mono">{t().requestDepth}</span>
+            <span class="td-muted">delegation{t().requestDepth === 1 ? "" : "s"} from the first request</span>
+          </span>
+        </Show>
+      ),
+    },
   ];
   // A row that has had a value stays put until another task opens, so clearing it (the last label,
   // say) doesn't whisk the row and its open menu away.
@@ -359,6 +399,9 @@ export function TaskDetails(props: {
                   </button>
                 </div>
               </section>
+
+              <PlanDecompositions taskId={props.taskId} people={people} onOpenTask={props.onOpenTask} />
+              <ExternalObjects taskId={props.taskId} />
 
               <section class="td-section" aria-labelledby={`td-deps-${props.taskId}`}>
                 <h2 class="disp td-section-title" id={`td-deps-${props.taskId}`}>

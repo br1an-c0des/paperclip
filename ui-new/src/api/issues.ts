@@ -1,13 +1,19 @@
 import type {
+  AcceptedPlanDecompositionSummary,
   ActivityEvent,
   CompactIssue,
+  ExternalObjectMentionGroup,
+  ExternalObjectSummary,
   Issue,
   IssueAttachment,
   IssueComment,
   IssueCostSummary,
   IssueDocument,
   IssueDocumentSummary,
+  IssueAccessGrant,
+  IssueAccessGrantSubjectType,
   IssueLabel,
+  IssueRecoveryAction,
   IssueRecentComments,
   IssueWorkProduct,
   ExecutionProjection,
@@ -153,6 +159,53 @@ export const issuesApi = {
   listAttachments: (id: string, signal?: AbortSignal) => api.get<IssueAttachment[]>(`/issues/${id}/attachments`, { signal }),
   deleteAttachment: (attachmentId: string) => api.delete<{ ok: true }>(`/attachments/${encodeURIComponent(attachmentId)}`),
   listWorkProducts: (id: string, signal?: AbortSignal) => api.get<IssueWorkProduct[]>(`/issues/${id}/work-products`, { signal }),
+  /**
+   * Makes (or finds) the reviewable document for a Markdown file a run produced: the server copies
+   * the attachment into an `artifact-review-<workProductId>` document, which then takes comments on
+   * its text like any other. It answers 413, 415 or 422 when the file can't be read as Markdown.
+   */
+  ensureReviewDocument: (id: string, workProductId: string) =>
+    api.post<IssueDocument>(`/issues/${id}/work-products/${encodeURIComponent(workProductId)}/review-document`, {}),
+  /** The plan revisions that were accepted and turned into subtasks, with the subtasks they made. */
+  acceptedPlanDecompositions: (id: string, signal?: AbortSignal) =>
+    api.get<AcceptedPlanDecompositionSummary[]>(`/issues/${id}/accepted-plan-decompositions`, { signal }),
+  /**
+   * Settles the task's active recovery action (`activeRecoveryAction`): `restored` puts the task in
+   * the status given, `false_positive` (board only) dismisses the action as raised in error.
+   */
+  resolveRecoveryAction: (
+    id: string,
+    data: { actionId: string; outcome: "restored" | "false_positive"; sourceIssueStatus: "todo" | "done" | "in_review"; resolutionNote?: string | null },
+  ) => api.post<{ issue: Issue; recoveryAction: IssueRecoveryAction }>(`/issues/${id}/recovery-actions/resolve`, data),
+
+  // Who can see a private task (the share sheet).
+  /**
+   * Everyone with access and why: explicit grants, access through assignment or the project, and
+   * access inherited from a private parent, each with the subject's name and avatar.
+   */
+  accessGrants: (id: string, signal?: AbortSignal) => api.get<IssueAccessGrant[]>(`/issues/${id}/access-grants`, { signal }),
+  /** Shares the task, and its subtasks, with a person or an agent. */
+  grantAccess: (id: string, subject: { subjectType: IssueAccessGrantSubjectType; subjectId: string }) =>
+    api.post<IssueAccessGrant>(`/issues/${id}/access-grants`, subject),
+  revokeAccess: (id: string, grantId: string) => api.post<IssueAccessGrant>(`/issues/${id}/access-grants/${encodeURIComponent(grantId)}/revoke`, {}),
+
+  // External objects (`enableExternalObjects`): things outside Paperclip a task mentions, such as
+  // pull requests and tickets, with their live status from the plugin that tracks them.
+  externalObjects: (id: string, signal?: AbortSignal) => api.get<ExternalObjectMentionGroup[]>(`/issues/${id}/external-objects`, { signal }),
+  /** Each task's external objects summed up, for the list's filter. The server takes 1,000 ids a request. */
+  externalObjectSummaries: async (companyId: string, issueIds: readonly string[], signal?: AbortSignal) => {
+    const batches: Promise<{ summaries: Record<string, ExternalObjectSummary> }>[] = [];
+    for (let start = 0; start < issueIds.length; start += 1000) {
+      batches.push(
+        api.post<{ summaries: Record<string, ExternalObjectSummary> }>(
+          `/companies/${companyId}/issues/external-object-summaries`,
+          { issueIds: issueIds.slice(start, start + 1000) },
+          { signal },
+        ),
+      );
+    }
+    return Object.assign({}, ...(await Promise.all(batches)).map((batch) => batch.summaries)) as Record<string, ExternalObjectSummary>;
+  },
 };
 
 /** What `POST /issues/:id/retry` answers, as ui/src/api/issues.ts types it. */

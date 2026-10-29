@@ -361,3 +361,9 @@ html[data-viewport="phone"] .cmp-who-run {
 html[data-viewport="phone"] .cmp-text {
   font-size: 16px;
 }
+
+/* The mention list under a field (MentionTextArea's `below`), for fields at the top of a dialog */
+.cmp-picker--below {
+  top: calc(100% + 6px);
+  bottom: auto;
+}

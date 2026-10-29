@@ -24,7 +24,7 @@ import {
   Upload,
   X,
 } from "lucide-solid";
-import { createMemo, createSignal, For, lazy, Match, Show, Suspense, Switch, type JSX } from "solid-js";
+import { createEffect, createMemo, createSignal, For, lazy, Match, on, Show, Suspense, Switch, type JSX } from "solid-js";
 import { documentsApi } from "@/api/documents";
 import { fileResourcesApi, WORKSPACE_FILE_PAGE_SIZE } from "@/api/file-resources";
 import { issuesApi } from "@/api/issues";
@@ -43,6 +43,7 @@ import {
 } from "@/documents/document-model";
 import { documentKeys, type DocumentHost } from "@/documents/host";
 import { useThreads } from "@/documents/queries";
+import { SourceTrustBadge } from "@/documents/SourceTrustBadge";
 import { fileOpenFor, workspaceFileRef, type FileOpen } from "@/files/file-ref";
 import { fileSize } from "@/files/preview";
 import { viewport } from "@/layout/breakpoints";
@@ -52,7 +53,9 @@ import { TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
+import { ApiError } from "@/api/client";
 import { readDivergence } from "./branch-reconcile";
+import { isReviewDocumentKey, markdownOutput, reviewDocumentKey, reviewProblem } from "./review-documents";
 import { useTaskPeople, type TaskPeople } from "./people";
 import { stampLabel } from "./thread-model";
 import "./TaskFiles.css";
@@ -93,12 +96,17 @@ function byWhom(people: TaskPeople, agentId: string | null | undefined, userId: 
 
 const words = (value: string) => value.replace(/_/g, " ");
 
+/** A pasted file read into memory first: the browser can drop a clipboard file's data once the paste is over. */
+async function copyFile(file: File) {
+  return new globalThis.File([await file.arrayBuffer()], file.name || "image.png", { type: file.type });
+}
+
 // The editor and the file viewer load when first opened, not with the task panel.
 const DocumentView = lazy(() => import("@/documents/DocumentView").then((module) => ({ default: module.DocumentView })));
 const NewDocument = lazy(() => import("@/documents/NewDocument").then((module) => ({ default: module.NewDocument })));
 const WorkspaceFiles = lazy(() => import("@/files/WorkspaceFiles").then((module) => ({ default: module.WorkspaceFiles })));
 
-export function TaskFiles(props: { taskId: string }) {
+export function TaskFiles(props: { taskId: string; /** A document to open, from a `#document-<key>` link. */ openDocKey?: string }) {
   const company = useCompany();
   const client = useQueryClient();
   const people = useTaskPeople();
@@ -112,11 +120,25 @@ export function TaskFiles(props: { taskId: string }) {
   let picker: HTMLInputElement | undefined;
   let importer: HTMLInputElement | undefined;
 
+  // A `#document-<key>` link opens that document, when it arrives or another task opens.
+  createEffect(
+    on([() => props.openDocKey, () => props.taskId], ([key]) => {
+      if (key) setView({ kind: "doc", key, edit: false });
+    }),
+  );
+
   const host = createMemo<DocumentHost>(() => ({
     owner: { kind: "issue", id: props.taskId },
     root: queryKeys.issues.section(props.taskId, "documents"),
     nameOf: (agentId, userId) => byWhom(people, agentId, userId),
     youId: () => people.youId(),
+    // Images in a document are stored as the task's attachments, as the old editor does.
+    uploadImage: async (file: File) => {
+      const attachment = await issuesApi.uploadAttachment(company().id, props.taskId, await copyFile(file));
+      void client.invalidateQueries({ queryKey: queryKeys.issues.section(props.taskId, "attachments") });
+      return attachment.contentPath;
+    },
+    feedback: true,
   }));
 
   const task = createQuery(() => ({
@@ -151,7 +173,10 @@ export function TaskFiles(props: { taskId: string }) {
     const haystack = texts.filter(Boolean).join(" ").toLowerCase();
     return terms.every((term) => haystack.includes(term));
   };
-  const docs = createMemo(() => sortDocuments((documents.data ?? []).filter((doc) => matches(doc.title, doc.key))));
+  // Review copies of Markdown outputs open from their output, not the Documents list.
+  const docs = createMemo(() =>
+    sortDocuments((documents.data ?? []).filter((doc) => !isReviewDocumentKey(doc.key) && matches(doc.title, doc.key))),
+  );
   const files = createMemo(() => (attachments.data ?? []).filter((file) => matches(file.originalFilename, file.contentType)));
   const made = createMemo(() => (outputs.data ?? []).filter((output) => matches(output.title, output.summary, output.provider)));
   const total = () => docs().length + files().length + made().length;
@@ -375,7 +400,15 @@ export function TaskFiles(props: { taskId: string }) {
                     <FileGroup title="Outputs" count={made().length} empty="Nothing produced yet: pull requests, branches and previews from runs show here.">
                       <div class="tf-outputs">
                         <For each={made()}>
-                          {(output) => <OutputCard output={output} onOpenFile={(open) => setView({ kind: "files", open })} />}
+                          {(output) => (
+                            <OutputCard
+                              output={output}
+                              taskId={props.taskId}
+                              reviewReady={(documents.data ?? []).some((doc) => doc.key === reviewDocumentKey(output.id))}
+                              onOpenFile={(open) => setView({ kind: "files", open })}
+                              onOpenDocument={(key) => setView({ kind: "doc", key, edit: false })}
+                            />
+                          )}
                         </For>
                       </div>
                     </FileGroup>
@@ -499,6 +532,7 @@ function DocumentRow(props: {
           <Show when={isPlanKey(props.doc.key)}>
             <span class="tf-pill tf-pill--run">Task plan</span>
           </Show>
+          <SourceTrustBadge sourceTrust={props.doc.sourceTrust} />
           <Show when={lock().locked}>
             <span class="tf-pill tf-pill--amber">
               <Lock size={10} aria-hidden="true" />
@@ -628,9 +662,43 @@ function AttachmentTile(props: { file: IssueAttachment; people: TaskPeople; canD
   );
 }
 
-function OutputCard(props: { output: IssueWorkProduct; onOpenFile: (open: FileOpen) => void }) {
+function OutputCard(props: {
+  output: IssueWorkProduct;
+  taskId: string;
+  /** The output's review document already exists. */
+  reviewReady: boolean;
+  onOpenFile: (open: FileOpen) => void;
+  onOpenDocument: (key: string) => void;
+}) {
+  const client = useQueryClient();
   const icon = () => (OUTPUT_ICONS[props.output.type] ?? OUTPUT_ICONS.artifact!)();
   const ref = () => workspaceFileRef(props.output);
+  // A Markdown file the output points at reads as a document (`documents-artifacts/documents`).
+  const markdown = () => markdownOutput(props.output);
+  const [status, setStatus] = createSignal<number | undefined>();
+  const [preparing, setPreparing] = createSignal(false);
+  const problem = () => {
+    const meta = markdown();
+    return meta ? reviewProblem(meta, status()) : null;
+  };
+  const review = async () => {
+    const key = reviewDocumentKey(props.output.id);
+    if (props.reviewReady) return props.onOpenDocument(key);
+    setPreparing(true);
+    try {
+      await issuesApi.ensureReviewDocument(props.taskId, props.output.id);
+      await client.invalidateQueries({ queryKey: queryKeys.issues.section(props.taskId, "documents") });
+      props.onOpenDocument(key);
+    } catch (error) {
+      const code = error instanceof ApiError ? error.status : undefined;
+      setStatus(code);
+      if (!code || ![413, 415, 422].includes(code)) {
+        pushToast({ tone: "error", title: "Couldn't open it for review", body: error instanceof Error ? error.message : String(error) });
+      }
+    } finally {
+      setPreparing(false);
+    }
+  };
   return (
     <div class="card tf-output" data-primary={props.output.isPrimary || undefined}>
       <span class="tf-output-icon">{icon()}</span>
@@ -654,6 +722,21 @@ function OutputCard(props: { output: IssueWorkProduct; onOpenFile: (open: FileOp
               <Button size="compact" icon={<FileText size={14} aria-hidden="true" />} onClick={() => props.onOpenFile(fileOpenFor(file()))}>
                 Open <span class="mono tf-output-path">{file().displayPath}</span>
               </Button>
+            </div>
+          )}
+        </Show>
+        <Show when={markdown()}>
+          {(meta) => (
+            <div class="tf-output-actions">
+              <Show when={!problem()} fallback={<span class="tsec-muted">{problem()}</span>}>
+                <Button size="compact" icon={<FileText size={14} aria-hidden="true" />} disabled={preparing()} onClick={() => void review()}>
+                  {preparing() ? "Opening…" : "Review"}
+                </Button>
+              </Show>
+              <a class="btn btn--ghost btn--compact" href={meta().contentPath} target="_blank" rel="noopener noreferrer">
+                <ExternalLink size={14} aria-hidden="true" />
+                Raw
+              </a>
             </div>
           )}
         </Show>

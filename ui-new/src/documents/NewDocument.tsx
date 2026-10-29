@@ -109,6 +109,8 @@ export function NewDocument(props: {
                 : "Agents find documents by key. Lowercase letters, numbers, - and _.")}
           </p>
           <MarkdownEditor
+            mentions={{ excludeTaskId: props.host.owner.id }}
+            onUploadImage={props.host.uploadImage}
             value={draft().body}
             label="New document (Markdown)"
             placeholder="Write in Markdown…"

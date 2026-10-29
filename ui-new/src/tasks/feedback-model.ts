@@ -1,4 +1,4 @@
-import type { FeedbackDataSharingPreference, FeedbackVote, FeedbackVoteValue } from "@paperclipai/shared";
+import type { FeedbackDataSharingPreference, FeedbackTargetType, FeedbackVote, FeedbackVoteValue } from "@paperclipai/shared";
 
 /*
  * Feedback votes on agent output (`tasks/feedback`), after ui/src/components/AgentBubbleActionRow.tsx
@@ -15,10 +15,10 @@ import type { FeedbackDataSharingPreference, FeedbackVote, FeedbackVoteValue } f
 /** The terms the sharing question links to, as the old UI's VITE_FEEDBACK_TERMS_URL or its default. */
 export const FEEDBACK_TERMS_URL: string = (import.meta.env.VITE_FEEDBACK_TERMS_URL as string | undefined)?.trim() || "https://paperclip.ing/tos";
 
-/** Your vote on each comment, by comment id. */
-export function votesByComment(votes: readonly FeedbackVote[] | undefined) {
+/** Your vote on each comment (or each document revision), by its id. */
+export function votesByComment(votes: readonly FeedbackVote[] | undefined, targetType: FeedbackTargetType = "issue_comment") {
   const map = new Map<string, FeedbackVote>();
-  for (const vote of votes ?? []) if (vote.targetType === "issue_comment") map.set(vote.targetId, vote);
+  for (const vote of votes ?? []) if (vote.targetType === targetType) map.set(vote.targetId, vote);
   return map;
 }
 
@@ -38,11 +38,12 @@ export function savedVoteTitle(preferenceAtSubmit: FeedbackDataSharingPreference
 /** The list with your vote on one comment put in place (or added), to show it before the server answers. */
 export function withVote(
   previous: readonly FeedbackVote[] | undefined,
-  next: { taskId: string; commentId: string; vote: FeedbackVoteValue; reason?: string },
+  next: { taskId: string; commentId: string; vote: FeedbackVoteValue; reason?: string; targetType?: FeedbackTargetType },
   youId: string | null,
 ): FeedbackVote[] {
   const votes = [...(previous ?? [])];
-  const index = votes.findIndex((entry) => entry.targetType === "issue_comment" && entry.targetId === next.commentId && (!youId || entry.authorUserId === youId));
+  const targetType = next.targetType ?? "issue_comment";
+  const index = votes.findIndex((entry) => entry.targetType === targetType && entry.targetId === next.commentId && (!youId || entry.authorUserId === youId));
   const now = new Date();
   if (index >= 0) {
     const existing = votes[index]!;
@@ -53,7 +54,7 @@ export function withVote(
     id: `optimistic:${next.commentId}`,
     companyId: "",
     issueId: next.taskId,
-    targetType: "issue_comment",
+    targetType,
     targetId: next.commentId,
     authorUserId: youId ?? "local-board",
     vote: next.vote,

@@ -8,6 +8,7 @@ import {
   draftFrom,
   draftProblem,
   editBlock,
+  imageMarkdown,
   isDirty,
   isMarkdownFile,
   keyProblem,
@@ -19,7 +20,9 @@ import {
   revisionState,
   slugifyKey,
   sortDocuments,
+  sourceTrustBadge,
   titleFromFilename,
+  uploadingPlaceholder,
   upsertPayload,
   viewedRevision,
 } from "./document-model";
@@ -222,5 +225,24 @@ describe("list continuation", () => {
     expect(listContinuation("- [ ] ")).toEqual({ kind: "end" });
     expect(listContinuation("Plain text")).toBeNull();
     expect(listContinuation("-not a list")).toBeNull();
+  });
+});
+
+describe("images and source trust", () => {
+  it("links an uploaded image by its file name, and stands in for it while it uploads", () => {
+    expect(imageMarkdown("Screen [1].PNG", "/api/attachments/a1/content")).toBe("![Screen 1](/api/attachments/a1/content)");
+    const first = uploadingPlaceholder("shot.png");
+    expect(first).toMatch(/^!\[Uploading shot\.png…\]\(#uploading-[a-z0-9]+\)$/);
+    expect(uploadingPlaceholder("shot.png")).not.toBe(first);
+  });
+
+  it("badges low-trust writing, and says when it was promoted", () => {
+    expect(sourceTrustBadge(null)).toBeNull();
+    expect(sourceTrustBadge({ preset: "other" } as never)).toBeNull();
+    expect(sourceTrustBadge({ preset: "low_trust_review", disposition: "quarantined" } as never)?.label).toBe("Low-trust source");
+    expect(sourceTrustBadge({ preset: "low_trust_review", disposition: "promoted", promotedAt: null } as never)).toMatchObject({
+      label: "Promoted from low trust",
+      promoted: true,
+    });
   });
 });

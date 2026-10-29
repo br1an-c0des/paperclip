@@ -15,6 +15,7 @@ import { useTaskPeople } from "./people";
 import { pauseDetail, retryCountdown, taskNotices, WAITING_TEXT, type TaskNotice } from "./recovery";
 import { useTaskRetry } from "./retry";
 import { TreeControlDialog, useTreeControlState } from "./TaskActions";
+import { TaskRecovery } from "./TaskRecovery";
 import "./TaskNotices.css";
 import { TaskIntegrations } from "./integrations/TaskIntegrations";
 
@@ -109,6 +110,13 @@ export function TaskNotices(props: { taskId: string }) {
             wakeByDefault={(!!current().assigneeAgentId && current().status !== "done" && current().status !== "cancelled") || hasSubtasks()}
             onClose={() => setResumeOpen(false)}
           />
+        </div>
+      )}
+    </Show>
+    <Show when={task()?.activeRecoveryAction && task()}>
+      {(current) => (
+        <div class="tn">
+          <TaskRecovery task={current()} />
         </div>
       )}
     </Show>

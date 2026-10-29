@@ -1,14 +1,15 @@
 import type { CompactIssue, IssuePriority, IssueStatus } from "@paperclipai/shared";
 import { useLocation, useSearchParams } from "@solidjs/router";
 import { createQuery, keepPreviousData, useQueryClient } from "@tanstack/solid-query";
-import { ArrowUpDown, ChevronDown, CircleCheck, CornerDownRight, ListFilter, Plus, Search, X } from "lucide-solid";
+import { ArrowUpDown, ChevronDown, CircleCheck, CornerDownRight, ListFilter, Plus, Search, UserRound, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
+import { viewport } from "@/layout/breakpoints";
 import { Dock } from "@/layout/Panel";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
-import { useLabelsQuery, useProjectsQuery } from "@/lib/company-data";
+import { useExperimentalSettingsQuery, useLabelsQuery, useProjectsQuery } from "@/lib/company-data";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
@@ -18,6 +19,7 @@ import { Segmented } from "@/ui/Segmented";
 import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
 import { boardCollapseKey, boardColumns, boardStartsCollapsed, CLOSED_STATUSES } from "./board-model";
 import { BoardView } from "./BoardView";
+import { EXTERNAL_STATUS_FILTERS, matchesExternalStatus } from "./external-objects";
 import { buildTaskGroups, PRIORITY_ORDER, shownRows, startsCollapsed, STATUS_PICK_ORDER, type GroupNames, type TaskGroup } from "./list-model";
 import { useTaskPeople } from "./people";
 import { AssigneeItems, LabelDot, LabelItems, PriorityItems, StatusItems } from "./pickers";
@@ -246,6 +248,20 @@ export function TasksView(props: {
   );
   const workspaces = createMemo(() => workspaceLookup(projects.data ?? [], summaries.data ?? []));
 
+  // External objects (tasks/external-objects), behind the enableExternalObjects experiment: their
+  // states are fetched for the list's tasks only while the filter is on or its menu is open.
+  const experiments = useExperimentalSettingsQuery();
+  const externalOn = () => experiments.data?.enableExternalObjects === true;
+  const filters = createMemo(() => (externalOn() ? view().filters : { ...view().filters, externalObjects: [] }));
+  const taskIds = createMemo(() => tasks().map((task) => task.id).sort());
+  const external = createQuery(() => ({
+    queryKey: ["issues", company().id, "external-object-summaries", idsFingerprint(taskIds())],
+    queryFn: ({ signal }) => issuesApi.externalObjectSummaries(company().id, taskIds(), signal),
+    enabled: externalOn() && taskIds().length > 0 && (filters().externalObjects.length > 0 || filterMenuOpen()),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  }));
+
   const tasksById = createMemo(() => new Map(tasks().map((task) => [task.id, task] as const)));
   const labelsById = createMemo(() => new Map((labels.data ?? []).map((label) => [label.id, label] as const)));
   const projectsById = createMemo(() => new Map((projects.data ?? []).map((project) => [project.id, project] as const)));
@@ -260,10 +276,21 @@ export function TasksView(props: {
       return workspaces();
     },
   };
-  const layout = () => props.layout ?? view().layout;
+  // Phones (M1) show the list only, under a row of quick filters; the board stays on desktop.
+  const phone = () => viewport() === "phone";
+  const [searchOpen, setSearchOpen] = createSignal(false);
+  const layout = () => (phone() ? "list" : (props.layout ?? view().layout));
+  const youKey = () => (people.youId() ? `user:${people.youId()}` : null);
+  const mine = () => !!youKey() && view().filters.assignees.length === 1 && view().filters.assignees[0] === youKey();
   const hideClosed = () => layout() === "board" && !view().board.closed;
   const visible = createMemo(() => {
-    const shown = applyFilters(tasks(), view().filters, search(), { liveIssueIds: people.liveIssueIds(), workspaceOf: workspaces().of });
+    const known = external.data;
+    const shown = applyFilters(tasks(), filters(), search(), {
+      liveIssueIds: people.liveIssueIds(),
+      workspaceOf: workspaces().of,
+      // Until the states arrive the filter waits rather than hiding everything.
+      externalMatches: known ? (task, value) => matchesExternalStatus(known[task.id], value) : undefined,
+    });
     return hideClosed() ? shown.filter((task) => !CLOSED_STATUSES.has(task.status)) : shown;
   });
   const groups = createMemo(() =>
@@ -335,7 +362,7 @@ export function TasksView(props: {
 
   const open = (task: { id: string; identifier: string | null }) => setParams({ task: task.identifier ?? task.id });
   const close = () => setParams({ task: undefined, section: undefined });
-  const activeFilters = () => filterCount(view().filters);
+  const activeFilters = () => filterCount(filters());
   const groupOptions = () => GROUP_BY_OPTIONS.filter((option) => !(props.projectId && option.value === "project"));
   const groupLabel = () => GROUP_BY_OPTIONS.find((option) => option.value === view().groupBy)?.label ?? "Status";
   const participantName = () => {
@@ -343,11 +370,44 @@ export function TasksView(props: {
     return id ? (people.agent(id)?.name ?? "an agent") : null;
   };
 
+  const searchField = () => (
+    <label class="tv-search">
+      <Search size={14} aria-hidden="true" />
+      <TextInput
+        type="search"
+        value={search()}
+        onInput={(event) => setSearch(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && search()) {
+            event.preventDefault();
+            setSearch("");
+          }
+        }}
+        placeholder="Search tasks"
+        aria-label="Search tasks"
+        autofocus={phone()}
+      />
+    </label>
+  );
+
   return (
     <Show when={!recurring()} fallback={<RecurringView projectId={props.projectId} tasks={props.tasks} />}>
-      <div class="tv-toolbar" role="toolbar" aria-label="Task list">
-        <ShowSwitch projectId={props.projectId} />
-        <Show when={!props.layout}>
+      <div class="tv-toolbar" classList={{ "tv-toolbar--phone": phone() }} role="toolbar" aria-label="Task list">
+        <Show when={phone()}>
+          <Button
+            variant="icon"
+            class="tv-toggle"
+            aria-pressed={searchOpen() || !!search()}
+            aria-label="Search tasks"
+            onClick={() => setSearchOpen(!searchOpen())}
+          >
+            <Search size={15} aria-hidden="true" />
+          </Button>
+        </Show>
+        <Show when={!phone()}>
+          <ShowSwitch projectId={props.projectId} />
+        </Show>
+        <Show when={!props.layout && !phone()}>
           <Segmented
             label="Layout"
             options={LAYOUT_OPTIONS}
@@ -355,6 +415,7 @@ export function TasksView(props: {
             onChange={(next) => changeView({ layout: next })}
           />
         </Show>
+        <Show when={!phone()}>
         <SavedViewsMenu
           views={savedViews()}
           current={currentView()}
@@ -369,6 +430,7 @@ export function TasksView(props: {
           onRename={(saved, name) => storeViews(renameView(savedViews(), saved.id, name))}
           onDelete={(saved) => storeViews(deleteView(savedViews(), saved.id))}
         />
+        </Show>
         <Menu>
           <Menu.Trigger as={Button}>
             {view().groupBy === "none" ? "No grouping" : `${layout() === "board" ? "Columns" : "Group"}: ${groupLabel()}`}
@@ -387,6 +449,30 @@ export function TasksView(props: {
             </For>
           </Menu.Content>
         </Menu>
+        <Show when={phone()}>
+          <FilterMenu
+            filters={filters()}
+            external={externalOn()}
+            people={people}
+            creators={creatorKeys()}
+            projects={props.projectId ? [] : projectOptions()}
+            workspaces={workspaceOptions()}
+            onOpenChange={setFilterMenuOpen}
+            onChange={changeFilters}
+          />
+          <Show when={youKey()}>
+            {(key) => (
+              <Button
+                class="tv-toggle"
+                aria-pressed={mine()}
+                onClick={() => changeFilters({ assignees: mine() ? [] : [key()] })}
+              >
+                <UserRound size={14} aria-hidden="true" />
+                Assigned to me
+              </Button>
+            )}
+          </Show>
+        </Show>
         <SortMenu sort={view().sort} onChange={(sort) => changeView({ sort })} />
         <Show when={layout() === "board"}>
           <Button
@@ -402,8 +488,10 @@ export function TasksView(props: {
           </Button>
         </Show>
         <span class="tv-toolbar-end">
+          <Show when={!phone()}>
           <FilterMenu
-            filters={view().filters}
+            filters={filters()}
+            external={externalOn()}
             people={people}
             creators={creatorKeys()}
             projects={props.projectId ? [] : projectOptions()}
@@ -411,6 +499,7 @@ export function TasksView(props: {
             onOpenChange={setFilterMenuOpen}
             onChange={changeFilters}
           />
+          </Show>
           <Show when={activeFilters() > 0}>
             <Button ghost size="compact" onClick={clearFilters}>
               Clear filters
@@ -430,31 +519,20 @@ export function TasksView(props: {
             </Button>
           </Show>
         </span>
-        <label class="tv-search">
-          <Search size={14} aria-hidden="true" />
-          <TextInput
-            type="search"
-            value={search()}
-            onInput={(event) => setSearch(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape" && search()) {
-                event.preventDefault();
-                setSearch("");
-              }
-            }}
-            placeholder="Search tasks"
-            aria-label="Search tasks"
-          />
-        </label>
-        <Button
-          variant="primary"
-          class="tv-new"
-          onClick={() => commands.openNewTask(props.projectId ? { projectId: props.projectId } : {})}
-        >
-          <Plus size={15} stroke-width={2.4} aria-hidden="true" />
-          Task
-        </Button>
+        <Show when={!phone()}>{searchField()}</Show>
+        {/* On phones the dock's round button adds a task. */}
+        <Show when={!phone()}>
+          <Button
+            variant="primary"
+            class="tv-new"
+            onClick={() => commands.openNewTask(props.projectId ? { projectId: props.projectId } : {})}
+          >
+            <Plus size={15} stroke-width={2.4} aria-hidden="true" />
+            Task
+          </Button>
+        </Show>
       </div>
+      <Show when={phone() && (searchOpen() || search())}>{searchField()}</Show>
       <Show when={participantName()}>
         {(name) => (
           <div class="tv-scope">
@@ -611,6 +689,8 @@ function FilterMenu(props: {
   creators: readonly string[];
   projects: readonly { id: string; name: string; color: string | null }[];
   workspaces: readonly { id: string; name: string }[];
+  /** Offer the external-object filter (the enableExternalObjects experiment). */
+  external: boolean;
   onOpenChange: (open: boolean) => void;
   onChange: (next: Partial<TaskFilters>) => void;
 }) {
@@ -789,6 +869,21 @@ function FilterMenu(props: {
             </For>
           </Menu.Group>
         </Show>
+        <Show when={props.external}>
+          <Menu.Separator />
+          <Menu.Group label="External objects">
+            <For each={EXTERNAL_STATUS_FILTERS}>
+              {(option) => (
+                <Menu.CheckboxItem
+                  checked={props.filters.externalObjects.includes(option.value)}
+                  onChange={() => props.onChange({ externalObjects: toggled(props.filters.externalObjects, option.value) })}
+                >
+                  {option.label}
+                </Menu.CheckboxItem>
+              )}
+            </For>
+          </Menu.Group>
+        </Show>
       </Menu.Content>
     </Menu>
   );
@@ -878,4 +973,11 @@ function SelectionBar(props: {
       </Button>
     </div>
   );
+}
+
+/** A short, stable key for a set of task ids, so the external-object states are cached per list. */
+function idsFingerprint(ids: readonly string[]) {
+  let hash = 5381;
+  for (const id of ids) for (let i = 0; i < id.length; i++) hash = ((hash << 5) + hash + id.charCodeAt(i)) | 0;
+  return `${ids.length}:${(hash >>> 0).toString(36)}`;
 }

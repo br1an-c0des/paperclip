@@ -7,7 +7,8 @@ import { openProjects } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
 import { taskActionsApi } from "@/api/task-actions";
 import { useCompany } from "@/lib/company";
-import { useExperimentalSettingsQuery, useGoalsQuery, useProjectsQuery } from "@/lib/company-data";
+import { useExperimentalSettingsQuery, useGoalsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
+import { ConfirmDialog } from "@/documents/ConfirmDialog";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
@@ -17,6 +18,7 @@ import { Menu } from "@/ui/Menu";
 import { Popover } from "@/ui/Popover";
 import { LabelPill, PriorityBars } from "@/ui/Status";
 import { STATUS_META } from "@/ui/status-meta";
+import { Switch } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
 import { agentRunDefaults, effortOptions, supportsOverrides } from "./new-task";
 import type { TaskPeople } from "./people";
@@ -369,9 +371,26 @@ function assigneeKey(task: Pick<Issue, "assigneeAgentId" | "assigneeUserId">) {
   return "none";
 }
 
-/** The assignee menu, and for agents whose runner takes them, the task's model and effort (decisions 7 and 13). */
+/**
+ * The assignee menu, and for agents whose runner takes them, the task's model and effort (decisions 7
+ * and 13). While an agent's run is going, the menu says so, and handing the task to someone else
+ * asks first: the server stops the run when the assignee changes (ui/src/lib/interrupt-handoff.ts).
+ */
 export function AssigneeControl(props: { task: Issue; people: TaskPeople; onChange: ChangeTask }) {
+  const liveRuns = useLiveRunsQuery();
   const agent = () => props.people.agent(props.task.assigneeAgentId);
+  const running = createMemo(() => (liveRuns.data ?? []).find((run) => run.issueId === props.task.id && run.status === "running"));
+  const [pending, setPending] = createSignal<{ agentId: string | null; userId: string | null } | null>(null);
+  const pick = (next: { agentId: string | null; userId: string | null }) => {
+    if (next.agentId === props.task.assigneeAgentId && next.userId === props.task.assigneeUserId) return;
+    if (running()) setPending(next);
+    else props.onChange({ assigneeAgentId: next.agentId, assigneeUserId: next.userId });
+  };
+  const pendingName = () => {
+    const next = pending();
+    if (!next) return "";
+    return assigneeName({ assigneeAgentId: next.agentId, assigneeUserId: next.userId }, props.people);
+  };
   return (
     <span class="te-assignee">
       <Menu>
@@ -380,17 +399,29 @@ export function AssigneeControl(props: { task: Issue; people: TaskPeople; onChan
           {caret()}
         </Menu.Trigger>
         <Menu.Content label="Assignee" width={260}>
-          <AssigneeItems
-            people={props.people}
-            current={assigneeKey(props.task)}
-            onPick={(pick) => {
-              if (pick.agentId === props.task.assigneeAgentId && pick.userId === props.task.assigneeUserId) return;
-              props.onChange({ assigneeAgentId: pick.agentId, assigneeUserId: pick.userId });
-            }}
-          />
+          <Show when={running()}>
+            {(run) => <p class="te-running-note">{run().agentName ?? "An agent"} is running. Changing the assignee stops this run.</p>}
+          </Show>
+          <AssigneeItems people={props.people} current={assigneeKey(props.task)} onPick={(next) => pick({ agentId: next.agentId, userId: next.userId })} />
         </Menu.Content>
       </Menu>
       <Show when={agent()}>{(found) => <RunSettings task={props.task} agent={found()} onChange={props.onChange} />}</Show>
+      <ConfirmDialog
+        open={pending() !== null}
+        onOpenChange={(open) => !open && setPending(null)}
+        title="Stop the current run?"
+        body={
+          <>
+            {running()?.agentName ?? "The agent"} is working on this task. Assigning it to {pendingName()} stops that run.
+          </>
+        }
+        confirmLabel="Stop and reassign"
+        danger
+        onConfirm={() => {
+          const next = pending();
+          if (next) props.onChange({ assigneeAgentId: next.agentId, assigneeUserId: next.userId });
+        }}
+      />
     </span>
   );
 }
@@ -411,7 +442,8 @@ function RunSettings(props: { task: Issue; agent: Agent; onChange: ChangeTask })
   const defaults = () => agentRunDefaults(props.agent.adapterType, props.agent.adapterConfig ?? {});
   const efforts = () => effortOptions(props.agent.adapterType, current().model ?? defaults().model);
   const summary = () => runSummary(props.task, label);
-  const set = (change: { model?: string | null; effort?: string | null }) => props.onChange(runOverridesEdit(props.task, props.agent, change));
+  const set = (change: { model?: string | null; effort?: string | null; chrome?: boolean }) => props.onChange(runOverridesEdit(props.task, props.agent, change));
+  const overridden = () => props.task.assigneeAdapterOverrides != null;
 
   return (
     <Show when={overridable()} fallback={<Show when={summary()}>{(text) => <span class="te-muted">· {text()}</span>}</Show>}>
@@ -454,8 +486,23 @@ function RunSettings(props: { task: Issue; agent: Agent; onChange: ChangeTask })
               </For>
             </div>
           </div>
+          <Show when={props.agent.adapterType === "claude_local"}>
+            <div class="te-run-switch">
+              <Switch
+                checked={current().chrome}
+                label="Browser access"
+                description="Claude can use Chrome on this task (--chrome)."
+                onChange={(on) => set({ chrome: on })}
+              />
+            </div>
+          </Show>
           <div class="te-pop-foot">
             <span class="te-hint">For this task only. The agent keeps its own settings.</span>
+            <Show when={overridden()}>
+              <Button variant="quiet" size="compact" onClick={() => props.onChange({ assigneeAdapterOverrides: null })}>
+                Use the agent's settings
+              </Button>
+            </Show>
             <Button variant="primary" size="compact" onClick={() => setOpen(false)}>
               Done
             </Button>

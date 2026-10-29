@@ -126,6 +126,7 @@ describe("applyFilters", () => {
   it("counts and toggles filter values", () => {
     expect(filterCount({ ...EMPTY_FILTERS, statuses: ["todo"], labels: ["bug", "none"] })).toBe(3);
     expect(filterCount({ ...EMPTY_FILTERS, creators: ["user:me"], projects: ["p"], workspaces: ["w"], liveOnly: true, hideAgentCreated: true })).toBe(5);
+    expect(filterCount({ ...EMPTY_FILTERS, externalObjects: ["failed", "stale"] })).toBe(2);
     expect(toggled(["a", "b"], "a")).toEqual(["b"]);
     expect(toggled(["a"], "b")).toEqual(["a", "b"]);
   });
@@ -173,5 +174,26 @@ describe("applyUpdate", () => {
     const labels = [{ id: "bug", name: "bug", color: "#f00" }] as NonNullable<CompactIssue["labels"]>;
     const next = applyUpdate(task("a", { labels: [] }), { labelIds: ["bug", "missing"], status: "done" }, labels);
     expect(next).toMatchObject({ status: "done", labelIds: ["bug", "missing"], labels: [{ id: "bug", name: "bug" }] });
+  });
+});
+
+describe("applyFilters, external objects", () => {
+  const tasks = [task("a"), task("b"), task("c")];
+  const ids = (list: CompactIssue[]) => list.map((each) => each.id);
+  const failing = new Set(["a"]);
+  const externalMatches = (each: CompactIssue, value: string) => (value === "failed" ? failing.has(each.id) : value === "none" && each.id === "c");
+
+  it("keeps tasks whose external objects match any value picked", () => {
+    const filters = { ...EMPTY_FILTERS, externalObjects: ["failed", "none"] };
+    expect(ids(applyFilters(tasks, filters, "", { externalMatches }))).toEqual(["a", "c"]);
+  });
+
+  it("waits, rather than hiding everything, until the states arrive", () => {
+    expect(ids(applyFilters(tasks, { ...EMPTY_FILTERS, externalObjects: ["failed"] }))).toEqual(["a", "b", "c"]);
+  });
+
+  it("reads the filter back from saved state", () => {
+    expect(parseViewState(JSON.stringify({ filters: { externalObjects: ["stale", 3] } })).filters.externalObjects).toEqual(["stale"]);
+    expect(parseViewState(JSON.stringify({ filters: {} })).filters.externalObjects).toEqual([]);
   });
 });

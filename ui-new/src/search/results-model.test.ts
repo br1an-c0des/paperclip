@@ -9,6 +9,7 @@ import {
   chatWhere,
   resultIssueId,
   resultKind,
+  resultFragment,
   resultTask,
   rowSnippet,
   scopeTabs,
@@ -199,5 +200,14 @@ describe("chat results", () => {
     const comment = issue("TES-13", { href: "/TES/issues/TES-13#comment-c1" });
     expect(chatResultHref("TES", "bob", comment)).toBe("/TES/agents/bob");
     expect(chatResultHref("TES", "bob", issue("TES-13"))).toBe("/TES/agents/bob");
+  });
+});
+
+describe("resultFragment", () => {
+  it("keeps a comment or document fragment for the task page to jump to", () => {
+    expect(resultFragment(issue("TES-13", { href: "/TES/issues/TES-13#comment-c1" }))).toBe("#comment-c1");
+    expect(resultFragment(issue("TES-13", { href: "/TES/issues/TES-13#document-plan" }))).toBe("#document-plan");
+    expect(resultFragment(issue("TES-13", { href: "/TES/issues/TES-13#other" }))).toBe("");
+    expect(resultFragment(issue("TES-13"))).toBe("");
   });
 });

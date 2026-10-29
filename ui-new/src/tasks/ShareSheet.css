@@ -1,0 +1,117 @@
+/* The share sheet (ShareSheet.tsx) */
+.share-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.share-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.share-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px 0;
+  border-top: 1px solid var(--row-line);
+}
+
+.share-row:first-child {
+  border-top: 0;
+}
+
+.share-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.share-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.share-text .share-muted {
+  font-size: 12px;
+}
+
+.share-badge {
+  flex-shrink: 0;
+  height: 22px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--body);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.share-badge[data-source="explicit"] {
+  background: var(--run-bg);
+  color: var(--run-fg);
+}
+
+
+.share-add {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.share-pick {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.share-option {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border-top: 0;
+  text-align: left;
+}
+
+.share-option .share-name {
+  flex: 1;
+}
+
+.share-option:hover {
+  background: var(--row-hover);
+}
+
+.share-option[aria-checked="true"] {
+  background: var(--well);
+}
+
+.share-caution {
+  margin: 0;
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.share-caution svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
