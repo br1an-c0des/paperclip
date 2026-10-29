@@ -167,9 +167,10 @@ export function GalleryConnect(props: { source: string | null; resume: string | 
           </p>
         </section>
       </Match>
-      <Match when={app()} keyed>
-        {(entry) => (
-          <GalleryForm app={entry} methods={methods()} resume={props.resume} applicationId={props.applicationId} extras={(method) => setupExtras(entry, method)} />
+      {/* Keyed by slug: a gallery refetch (after a failed connect) must not reset the form. */}
+      <Match when={app()?.slug} keyed>
+        {(_slug) => (
+          <GalleryForm app={app()!} methods={methods()} resume={props.resume} applicationId={props.applicationId} extras={(method) => setupExtras(app()!, method)} />
         )}
       </Match>
     </Switch>
@@ -204,9 +205,9 @@ export function VercelConnect(props: { source: string | null; resume: string | n
           </Button>
         </div>
       </Match>
-      <Match when={usable() ? app() : null} keyed>
-        {(entry) => (
-          <GalleryForm app={entry} methods={vercelMethods(entry)} resume={props.resume} applicationId={props.applicationId} vercel={availability()} />
+      <Match when={usable() ? app()?.slug : null} keyed>
+        {(_slug) => (
+          <GalleryForm app={app()!} methods={vercelMethods(app()!)} resume={props.resume} applicationId={props.applicationId} vercel={availability()} />
         )}
       </Match>
       <Match when={props.source && !app()}>
@@ -277,7 +278,10 @@ function GalleryForm(props: {
   const company = useCompany();
   const gallery = useGallery();
   const [methodKey, setMethodKey] = createSignal(recommendedMethod(props.methods)?.key ?? null);
-  const method = createMemo(() => props.methods.find((candidate) => candidate.key === methodKey()) ?? null);
+  // Compared by key, so a refetched gallery doesn't count as a different method and clear the form.
+  const method = createMemo(() => props.methods.find((candidate) => candidate.key === methodKey()) ?? null, null, {
+    equals: (a, b) => a?.key === b?.key,
+  });
   const extras = props.extras?.(method);
   const [draft, setDraft] = createStore<ConnectDraft>(newConnectDraft(props.app, method()));
   const [failure, setFailure] = createSignal<string | null>(null);
