@@ -99,6 +99,12 @@ export const queryKeys = {
     commentary: (companyId: string, filters: string) => ["agent-commentary", companyId, "list", filters] as const,
     commentaryEntry: (companyId: string, id: string) => ["agent-commentary", companyId, "detail", id] as const,
     costSummary: (companyId: string, from?: string, to?: string) => ["costs", companyId, "summary", from ?? "all", to ?? "now"] as const,
+    /**
+     * One of the Costs tab's other reports ("by-user", "by-provider", "by-biller", "finance-summary",
+     * "subscriptions", "data-quality", "decision-history"…) over a range. Under `["costs", companyId]`,
+     * so cost events refresh them all; the decision and fast-response calls log cost events too.
+     */
+    costReport: (companyId: string, report: string, from?: string, to?: string) => ["costs", companyId, report, from ?? "all", to ?? "now"] as const,
     /** Apart from `heartbeats`, which every run's progress refreshes; refetched when a live run changes. */
     runs: (companyId: string, agentId: string | null) => ["activity-runs", companyId, agentId ?? "__all__"] as const,
   }),
@@ -299,7 +305,16 @@ export const queryKeys = {
     detail: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId] as const,
     versions: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId, "versions"] as const,
     file: (companyId: string, skillId: string, path: string) => ["company-skills", companyId, "skill", skillId, "file", path] as const,
+    updateStatus: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId, "update-status"] as const,
+    forkPrecheck: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId, "fork-precheck"] as const,
+    folders: (companyId: string) => ["company-skills", companyId, "folders"] as const,
     sources: (companyId: string) => ["skill-sources", companyId] as const,
+    sourceBranches: (companyId: string, sourceId: string) => ["skill-sources", companyId, sourceId, "branches"] as const,
+    repositories: (companyId: string) => ["skill-sources", companyId, "repositories"] as const,
+    projectRepositories: (companyId: string) => ["skill-sources", companyId, "project-repositories"] as const,
+    /** Paperclip's catalog is the same for every company. */
+    catalog: ["skills-catalog"] as const,
+    catalogFile: (catalogId: string, path: string) => ["skills-catalog", catalogId, "file", path] as const,
   },
 
   chat: {

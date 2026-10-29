@@ -13,6 +13,8 @@ import { AgentAvatar } from "@/ui/Avatar";
 import { TextInput } from "@/ui/Field";
 import { Segmented } from "@/ui/Segmented";
 import { TonePill } from "@/ui/Status";
+import { QualityNotice, SubscriptionsKpi, useSubscriptions } from "./CostExtras";
+import { BillersView, ByPersonCard, CallHistory, FinanceView, ProvidersView, type CostScope } from "./CostReports";
 import {
   agentCostRows,
   barPercent,
@@ -26,19 +28,22 @@ import {
   type AgentCostRow,
   type RangePreset,
 } from "./costs-model";
+import { COSTS_TABS, costsTab, type CostsTab } from "./usage-model";
 
 /*
  * Costs (`/:prefix/activity/costs`): what the organization spent over a range, as the old Costs
- * page's Overview and Budgets show it: the range's spend and tokens against the company budget
- * (`/costs/summary`), spend by agent with each agent's models (`/costs/by-agent`,
- * `/costs/by-agent-model`), by project (`/costs/by-project`), and the budgets in force with any
- * open incidents (`/budgets/overview`). Ranges: this month, 7 or 30 days, this year, all time, or
- * custom days, kept in the address (`?range=`, `?from=`, `?to=`).
+ * page shows it. Ranges: this month, 7 or 30 days, this year, all time, or custom days, kept in the
+ * address (`?range=`, `?from=`, `?to=`), with the view (`?tab=`, the old page's names):
+ *
+ * - Overview: the range's spend and tokens, subscription fees and recorded charges against the
+ *   company budget (`/costs/summary`, CostExtras.tsx, `/costs/finance-summary`), a line for runs
+ *   with missing costs, spend by agent with each agent's models (`/costs/by-agent`,
+ *   `/costs/by-agent-model`), by project (`/costs/by-project`) and by person (`/costs/by-user`),
+ *   and the budgets in force with any open incidents (`/budgets/overview`).
+ * - Providers, Billers, Finance, Decisions and Fast responses (CostReports.tsx).
  *
  * Budgets are viewed here and edited, with their incidents resolved, in company settings → Budgets
- * (the old `/budgets` page's job, so its links land there). Not ported from the old page: providers and billers,
- * the finance ledger, subscriptions and quota windows, spend by person, data quality, and the
- * decision and fast-response histories.
+ * (the old `/budgets` page's job, so its links land there, as does the old `?tab=budgets`).
  */
 
 export function Costs() {
@@ -46,8 +51,9 @@ export function Costs() {
   const base = () => `/${company().issuePrefix}`;
   const people = useTaskPeople();
   const minute = useMinute();
-  const [search, setSearch] = useSearchParams<{ range?: string; from?: string; to?: string }>();
+  const [search, setSearch] = useSearchParams<{ range?: string; from?: string; to?: string; tab?: string }>();
   const preset = (): RangePreset => (isRangePreset(search.range) ? search.range : "mtd");
+  const tab = (): CostsTab => costsTab(search.tab);
   const range = createMemo(() => costRange(preset(), new Date(minute()), { from: search.from, to: search.to }));
   // The range's lower bound moves with the clock for rolling windows; key the cache by the preset so polling doesn't pile up entries.
   const keyFrom = () => (preset() === "custom" ? range()?.from : preset());
@@ -91,6 +97,14 @@ export function Costs() {
   };
   const companyBudget = () => summary.data?.budgetCents ?? 0;
   const budgetsHref = () => `${base()}/company/settings/budgets`;
+  const scope = createMemo((): CostScope => ({ from: range()?.from, to: range()?.to, keyFrom: keyFrom(), keyTo: keyTo(), preset: preset(), budgetCents: companyBudget() }));
+  const subscriptions = useSubscriptions(scope);
+  const finance = createQuery(() => ({
+    queryKey: queryKeys.activity.costReport(company().id, "finance-summary", keyFrom(), keyTo()),
+    queryFn: ({ signal }) => costsApi.financeSummary(company().id, range()?.from, range()?.to, signal),
+    enabled: ready() && tab() === "overview",
+  }));
+  const incidents = () => budgets.data?.activeIncidents.length ?? 0;
 
   return (
     <section class="act-section" aria-label="Costs">
@@ -112,8 +126,34 @@ export function Costs() {
           </label>
         </Show>
       </div>
+      <div class="org-filters act-cost-tabs" role="group" aria-label="Costs view">
+        <For each={COSTS_TABS}>
+          {(entry) => (
+            <button type="button" class="org-ftab" aria-pressed={tab() === entry.value} onClick={() => setSearch({ tab: entry.value === "overview" ? undefined : entry.value }, { replace: true })}>
+              {entry.label}
+            </button>
+          )}
+        </For>
+      </div>
 
       <Show when={ready()} fallback={<section class="card act-card"><p class="org-empty">Pick the first and last day to see that range.</p></section>}>
+        <Switch>
+          <Match when={tab() === "providers"}>
+            <ProvidersView scope={scope()} />
+          </Match>
+          <Match when={tab() === "billers"}>
+            <BillersView scope={scope()} />
+          </Match>
+          <Match when={tab() === "finance"}>
+            <FinanceView scope={scope()} />
+          </Match>
+          <Match when={tab() === "decisions" || tab() === "fast-responses"}>
+            <CallHistory kind={tab() as "decisions" | "fast-responses"} scope={scope()} />
+          </Match>
+        </Switch>
+      </Show>
+
+      <Show when={ready() && tab() === "overview"}>
         <div class="org-kpis act-kpis">
           <div class="card org-kpi">
             <span class="org-kpi-label">Spend</span>
@@ -125,27 +165,36 @@ export function Costs() {
             <span class="org-kpi-value disp">{byAgent.data ? formatTokens(totalTokens()) : "—"}</span>
             <span class="org-kpi-note">{runsLine()}</span>
           </div>
+          <SubscriptionsKpi
+            report={subscriptions.report.data}
+            failed={subscriptions.report.isError}
+            checkFailed={subscriptions.checkFailed()}
+            onRetryCheck={subscriptions.retryCheck}
+          />
           <div class="card org-kpi">
-            <span class="org-kpi-label">Company budget</span>
-            <span class="org-kpi-value disp">{companyBudget() > 0 ? (preset() === "mtd" ? `${summary.data?.utilizationPercent ?? 0}%` : formatCents(companyBudget(), true)) : "None"}</span>
+            <span class="org-kpi-label">Recorded charges</span>
+            <span class="org-kpi-value disp">{finance.data ? formatCents(finance.data.netCents) : "—"}</span>
             <span class="org-kpi-note">
-              {companyBudget() > 0
-                ? preset() === "mtd"
-                  ? `${formatCents(summary.data?.spendCents ?? 0)} of ${formatCents(companyBudget(), true)} this month`
-                  : "A month's limit"
-                : "No monthly limit set"}
+              {finance.data ? `${finance.data.eventCount} ledger ${finance.data.eventCount === 1 ? "entry" : "entries"}` : finance.isError ? "Couldn't load" : ""}
             </span>
           </div>
           <div class="card org-kpi">
-            <span class="org-kpi-label">Budget incidents</span>
-            <span class="org-kpi-value disp" classList={{ "org-amber": (budgets.data?.activeIncidents.length ?? 0) > 0 }}>
-              {budgets.data?.activeIncidents.length ?? "—"}
+            <span class="org-kpi-label">Company budget</span>
+            <span class="org-kpi-value disp" classList={{ "org-amber": incidents() > 0 }}>
+              {incidents() > 0 ? `${incidents()} open` : companyBudget() > 0 ? (preset() === "mtd" ? `${summary.data?.utilizationPercent ?? 0}%` : formatCents(companyBudget(), true)) : "None"}
             </span>
             <span class="org-kpi-note">
-              {budgets.data ? `${budgets.data.pausedAgentCount} agents and ${budgets.data.pausedProjectCount} projects paused` : ""}
+              {incidents() > 0 && budgets.data
+                ? `${budgets.data.pausedAgentCount} agents and ${budgets.data.pausedProjectCount} projects paused`
+                : companyBudget() > 0
+                  ? preset() === "mtd"
+                    ? `${formatCents(summary.data?.spendCents ?? 0)} of ${formatCents(companyBudget(), true)} this month`
+                    : "A month's limit"
+                  : "No monthly limit set"}
             </span>
           </div>
         </div>
+        <QualityNotice scope={scope()} summary={summary.data} />
 
         <div class="act-cost-grid">
           <section class="card org-card act-cost-card" aria-labelledby="act-by-agent">
@@ -168,6 +217,7 @@ export function Costs() {
             </ul>
           </section>
 
+          <div class="act-cost-col">
           <section class="card org-card act-cost-card" aria-labelledby="act-by-project">
             <div class="org-card-row">
               <h2 class="disp" id="act-by-project">
@@ -210,9 +260,12 @@ export function Costs() {
               </For>
             </ul>
           </section>
+          <ByPersonCard scope={scope()} />
+          </div>
         </div>
       </Show>
 
+      <Show when={tab() === "overview"}>
       <section class="card org-card" id="budgets" aria-labelledby="act-budgets">
         <div class="org-card-row">
           <h2 class="disp" id="act-budgets">
@@ -271,6 +324,7 @@ export function Costs() {
           </For>
         </ul>
       </section>
+      </Show>
     </section>
   );
 }

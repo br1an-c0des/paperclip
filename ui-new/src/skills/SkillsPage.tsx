@@ -1,9 +1,10 @@
-import { A, Navigate, useParams } from "@solidjs/router";
+import { A, Navigate, useParams, useSearchParams } from "@solidjs/router";
 import { createMemo, Match, Show, Switch } from "solid-js";
 import { isCompact } from "@/layout/breakpoints";
 import { useCompany } from "@/lib/company";
 import { OrgHeader } from "@/org/OrgHeader";
-import { skillsView, type SkillsView } from "./skills-model";
+import { legacyCatalogPath, skillsView, type SkillsView } from "./skills-model";
+import { SkillCatalog } from "./SkillCatalog";
 import { SkillLibrary } from "./SkillLibrary";
 import { SkillSources } from "./SkillSources";
 import { NewSkill, SkillStudio, StudioHome } from "./SkillStudio";
@@ -15,6 +16,7 @@ import "./Skills.css";
  *
  * - Library (`/skills`, `/skills/:skillId`): the company's skills, where each comes from, which
  *   agents use it and its versions; the core Paperclip skills are marked for lead agents.
+ * - Catalog (`/skills/catalog`, `/:catalogId`): Paperclip's own skills to install.
  * - Sources (`/skills/sources`, `/:sourceId`): the repositories the library imports from.
  * - Studio (`/skills/studio`, `/new`, `/:skillId`): skills written here, their files and versions.
  *
@@ -24,15 +26,20 @@ import "./Skills.css";
 
 export function SkillsPage() {
   const params = useParams<{ rest?: string }>();
+  const [search] = useSearchParams<{ view?: string; catalog?: string }>();
   const company = useCompany();
   const base = () => `/${company().issuePrefix}/skills`;
-  const view = createMemo(() => skillsView(params.rest ?? ""));
+  const view = createMemo((): SkillsView => {
+    const legacy = !params.rest ? legacyCatalogPath(search) : null;
+    return legacy ? { section: "redirect", to: legacy } : skillsView(params.rest ?? "");
+  });
   const section = () => view().section;
   const pick = <S extends SkillsView["section"]>(name: S) => {
     const current = view();
     return current.section === name ? (current as Extract<SkillsView, { section: S }>) : null;
   };
   const library = createMemo(() => pick("library"));
+  const catalog = createMemo(() => pick("catalog"));
   const sources = createMemo(() => pick("sources"));
   const studio = createMemo(() => pick("studio"));
   const redirect = createMemo(() => pick("redirect"));
@@ -47,6 +54,9 @@ export function SkillsPage() {
           <A href={base()} activeClass="" inactiveClass="" classList={{ active: section() === "library" }} aria-current={section() === "library" ? "page" : undefined}>
             Library
           </A>
+          <A href={`${base()}/catalog`} activeClass="" inactiveClass="" classList={{ active: section() === "catalog" }} aria-current={section() === "catalog" ? "page" : undefined}>
+            Catalog
+          </A>
           <A href={`${base()}/sources`} activeClass="" inactiveClass="" classList={{ active: section() === "sources" }} aria-current={section() === "sources" ? "page" : undefined}>
             Sources
           </A>
@@ -56,6 +66,7 @@ export function SkillsPage() {
         </nav>
         <Switch>
           <Match when={library()}>{(current) => <SkillLibrary skillId={current().skillId} />}</Match>
+          <Match when={catalog()}>{(current) => <SkillCatalog catalogId={current().catalogId} />}</Match>
           <Match when={sources()}>{(current) => <SkillSources sourceId={current().sourceId} />}</Match>
           <Match when={studio()?.creating}>
             <NewSkill />

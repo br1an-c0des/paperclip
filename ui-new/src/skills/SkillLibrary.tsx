@@ -1,46 +1,60 @@
-import type { CompanySkillDetail, CompanySkillListItem } from "@paperclipai/shared";
+import type { CompanySkillDetail, CompanySkillListItem, FolderListItem } from "@paperclipai/shared";
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
-import { FileText, Pencil, Plus, Search, Star, X } from "lucide-solid";
+import { BookOpen, ChevronDown, FileText, FolderSearch, GitBranch, GitFork, Link, Pencil, Plus, Search, Star, X } from "lucide-solid";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
+import { PickMenu } from "@/activity/PickMenu";
 import { PAPERCLIP_CORE_SKILL_KEY } from "@/agents/agent-model";
 import { CodeView } from "@/files/CodeView";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
 import { agoLabel, dayLabel } from "@/runs/run-model";
 import { AgentAvatar } from "@/ui/Avatar";
-import { buttonClass } from "@/ui/Button";
+import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Markdown } from "@/ui/Markdown";
+import { Menu } from "@/ui/Menu";
 import { TonePill, type Tone } from "@/ui/Status";
-import { useSkillDetail, useSkillFile, useSkillList, useSkillVersions } from "./queries";
+import { useSkillDetail, useSkillFile, useSkillFolders, useSkillList, useSkillVersions } from "./queries";
+import { CompareVersionsDialog, ForkDialog, StarButton, UpdateBlock } from "./SkillActions";
+import { FolderMenu, MoveToFolder } from "./SkillFolders";
+import { ImportDialog, ScanProjectsDialog } from "./SkillImport";
 import {
+  folderSubtree,
   isCoreSkill,
   isLibraryFilter,
+  isLibrarySort,
   leadsWithout,
   LIBRARY_FILTERS,
+  LIBRARY_SORTS,
   libraryCounts,
+  matchesFolder,
   matchesLibrary,
   matchesQuery,
   ORIGIN_LABEL,
   skillOrigin,
   sortedFiles,
-  sortLibrary,
+  sortSkills,
   sourceLine,
   versionName,
+  type FolderPick,
   type LibraryFilter,
+  type LibrarySort,
   type SkillOrigin,
 } from "./skills-model";
 
 /*
  * The skill library (`/:prefix/skills`): every skill the company has, with where it comes from
  * (bundled with Paperclip, imported, or authored here), how many agents use it, and its version.
- * Filters by origin and "not in use", and a search. The core Paperclip skills come first, marked
- * as recommended for lead agents.
+ * Filters by origin and "not in use", a folder (SkillFolders.tsx), a sort and a search, all but
+ * the search kept in the address. The core Paperclip skills come first when sorted by name.
+ * "Add skills" opens the catalog, an import from a path or URL, a project scan (SkillImport.tsx),
+ * Sources, or a new skill in the Studio.
  *
  * Opening a skill (`/skills/:skillId`) shows its detail beside the list: what it's for, the agents
  * using it (`GET /skills/:id`, `usedByAgents`), the lead agents without a core skill, its source,
- * versions and files. Skills are turned on per agent in the agent's Skills settings, which the
- * agent links lead there; authored skills open in the Studio for editing.
+ * update status, forks, versions (compared in a dialog) and files. Star, Fork and its folder sit
+ * under the title (SkillActions.tsx). Skills are turned on per agent in the agent's Skills
+ * settings, which the agent links lead there; authored skills open in the Studio for editing.
  */
 
 const ORIGIN_TONE: Record<SkillOrigin, Tone> = { bundled: "violet", imported: "cyan", authored: "green" };
@@ -56,14 +70,29 @@ export function OriginPill(props: { origin: SkillOrigin }) {
 export function SkillLibrary(props: { skillId: string | null }) {
   const company = useCompany();
   const base = () => `/${company().issuePrefix}/skills`;
+  const navigate = useNavigate();
   const skills = useSkillList();
-  const [search, setSearch] = useSearchParams<{ filter?: string }>();
+  const folders = useSkillFolders();
+  const [search, setSearch] = useSearchParams<{ filter?: string; folder?: string; sort?: string }>();
   const filter = (): LibraryFilter => (isLibraryFilter(search.filter) ? search.filter : "all");
+  const folder = (): FolderPick => search.folder || "all";
+  const sort = (): LibrarySort => (isLibrarySort(search.sort) ? search.sort : "name");
   const [query, setQuery] = createSignal("");
+  const [adding, setAdding] = createSignal<"import" | "scan" | null>(null);
 
-  const counts = createMemo(() => libraryCounts(skills.data ?? []));
-  const shown = createMemo(() => sortLibrary((skills.data ?? []).filter((skill) => matchesLibrary(skill, filter()) && matchesQuery(skill, query()))));
-  const keep = () => (search.filter ? `?filter=${search.filter}` : "");
+  const folderList = () => folders.data?.folders ?? [];
+  const subtree = createMemo(() => (folder() === "all" || folder() === "unfiled" ? null : folderSubtree(folderList(), folder())));
+  const inFolder = createMemo(() => (skills.data ?? []).filter((skill) => matchesFolder(skill, folder(), subtree())));
+  const counts = createMemo(() => libraryCounts(inFolder()));
+  const shown = createMemo(() => sortSkills(inFolder().filter((skill) => matchesLibrary(skill, filter()) && matchesQuery(skill, query())), sort()));
+  const keep = () => {
+    const params = new URLSearchParams();
+    if (search.filter) params.set("filter", search.filter);
+    if (search.folder) params.set("folder", search.folder);
+    if (search.sort) params.set("sort", search.sort);
+    const text = params.toString();
+    return text ? `?${text}` : "";
+  };
 
   return (
     <section class="act-section" aria-label="Skill library">
@@ -78,17 +107,53 @@ export function SkillLibrary(props: { skillId: string | null }) {
             )}
           </For>
         </div>
+        <FolderMenu
+          folders={folderList()}
+          allCount={folders.data?.allCount ?? skills.data?.length ?? 0}
+          unfiledCount={folders.data?.unfiledCount ?? 0}
+          value={folder()}
+          onPick={(pick) => setSearch({ folder: pick === "all" ? undefined : pick }, { replace: true })}
+        />
+        <PickMenu
+          label="Sort"
+          value={sort() === "name" ? undefined : sort()}
+          allLabel="Name"
+          options={LIBRARY_SORTS.filter((entry) => entry.value !== "name")}
+          onPick={(value) => setSearch({ sort: value }, { replace: true })}
+        />
         <div class="act-toolbar-end">
           <label class="org-search">
             <Search size={14} aria-hidden="true" />
             <input type="search" placeholder="Search skills" aria-label="Search skills" value={query()} onInput={(event) => setQuery(event.currentTarget.value)} />
           </label>
-          <A class={buttonClass({ variant: "primary", size: "compact" })} href={`${base()}/studio/new`}>
-            <Plus size={14} stroke-width={2.2} aria-hidden="true" />
-            New skill
-          </A>
+          <Menu>
+            <Menu.Trigger as={Button} variant="primary" size="compact" icon={<Plus size={14} stroke-width={2.2} aria-hidden="true" />}>
+              Add skills
+              <ChevronDown size={13} aria-hidden="true" />
+            </Menu.Trigger>
+            <Menu.Content label="Add skills" width={300} class="sk-add-menu">
+              <Menu.Item icon={<BookOpen size={14} />} description="Paperclip's recommended and optional skills" onSelect={() => navigate(`${base()}/catalog`)}>
+                Browse the catalog
+              </Menu.Item>
+              <Menu.Item icon={<Link size={14} />} description="A folder, a GitHub address or a skills.sh link" onSelect={() => setAdding("import")}>
+                Import from a path or URL
+              </Menu.Item>
+              <Menu.Item icon={<FolderSearch size={14} />} description="Skill folders in a project's workspaces" onSelect={() => setAdding("scan")}>
+                Scan a project
+              </Menu.Item>
+              <Menu.Item icon={<GitBranch size={14} />} description="A repository whose skills stay up to date" onSelect={() => navigate(`${base()}/sources`)}>
+                Add a source
+              </Menu.Item>
+              <Menu.Separator />
+              <Menu.Item icon={<Pencil size={14} />} description="Write one in the Studio" onSelect={() => navigate(`${base()}/studio/new`)}>
+                New skill
+              </Menu.Item>
+            </Menu.Content>
+          </Menu>
         </div>
       </div>
+      <ImportDialog open={adding() === "import"} onOpenChange={(open) => setAdding(open ? "import" : null)} />
+      <ScanProjectsDialog open={adding() === "scan"} onOpenChange={(open) => setAdding(open ? "scan" : null)} />
 
       <div class="sk-library" classList={{ "sk-library--open": props.skillId !== null }}>
         <section class="card act-card sk-list" aria-label="Skills">
@@ -108,7 +173,7 @@ export function SkillLibrary(props: { skillId: string | null }) {
           </ul>
         </section>
         <Show when={props.skillId} keyed>
-          {(skillId) => <SkillDetail skillId={skillId} closeHref={`${base()}${keep()}`} />}
+          {(skillId) => <SkillDetail skillId={skillId} closeHref={`${base()}${keep()}`} folders={folderList()} />}
         </Show>
       </div>
       <p class="org-foot">Bundled skills update with Paperclip and imported ones with their source. Turn a skill on for an agent in the agent's Skills settings.</p>
@@ -144,7 +209,7 @@ function SkillRow(props: { skill: CompanySkillListItem; href: string; selected: 
   );
 }
 
-function SkillDetail(props: { skillId: string; closeHref: string }) {
+function SkillDetail(props: { skillId: string; closeHref: string; folders: readonly FolderListItem[] }) {
   const company = useCompany();
   const prefix = () => `/${company().issuePrefix}`;
   const navigate = useNavigate();
@@ -152,6 +217,8 @@ function SkillDetail(props: { skillId: string; closeHref: string }) {
   const versions = useSkillVersions(() => props.skillId);
   const agents = useAgentsQuery();
   const [file, setFile] = createSignal<string | null>(null);
+  const [forking, setForking] = createSignal(false);
+  const [comparing, setComparing] = createSignal<{ targetId: string | null } | null>(null);
 
   const agentKey = (id: string) => agents.data?.find((agent) => agent.id === id)?.urlKey ?? id;
   const missing = createMemo(() => (detail.data ? leadsWithout(detail.data.key, detail.data.usedByAgents, agents.data ?? []) : []));
@@ -180,16 +247,23 @@ function SkillDetail(props: { skillId: string; closeHref: string }) {
                       <span class="mono org-muted sk-key">{skill().key}</span>
                     </div>
                   </div>
+                  <button type="button" class={buttonClass({ variant: "icon", size: "compact", ghost: true })} aria-label="Close" onClick={() => navigate(props.closeHref)}>
+                    <X size={15} aria-hidden="true" />
+                  </button>
+                </header>
+                <div class="org-row sk-detail-actions">
+                  <StarButton skill={skill()} />
                   <Show when={origin() === "authored" && skill().editable}>
                     <A class={buttonClass({ size: "compact" })} href={`${prefix()}/skills/studio/${skill().id}`}>
                       <Pencil size={14} aria-hidden="true" />
                       Edit in Studio
                     </A>
                   </Show>
-                  <button type="button" class={buttonClass({ variant: "icon", size: "compact", ghost: true })} aria-label="Close" onClick={() => navigate(props.closeHref)}>
-                    <X size={15} aria-hidden="true" />
-                  </button>
-                </header>
+                  <Button size="compact" icon={<GitFork size={14} aria-hidden="true" />} onClick={() => setForking(true)}>
+                    Fork
+                  </Button>
+                  <MoveToFolder skillId={skill().id} folderId={skill().folderId} folderPath={skill().folderPath} folders={props.folders} />
+                </div>
                 <Show when={skill().description}>
                   <p class="sk-desc">{skill().description}</p>
                 </Show>
@@ -270,8 +344,45 @@ function SkillDetail(props: { skillId: string; closeHref: string }) {
                       <dt>Editing</dt>
                       <dd>{skill().editableReason}</dd>
                     </Show>
+                    <Show when={skill().starCount > 0 || skill().forkCount > 0 || skill().installCount > 0}>
+                      <dt>Activity</dt>
+                      <dd>
+                        {[
+                          skill().starCount ? `${skill().starCount} ${skill().starCount === 1 ? "star" : "stars"}` : null,
+                          skill().forkCount ? `${skill().forkCount} ${skill().forkCount === 1 ? "fork" : "forks"}` : null,
+                          skill().installCount ? `${skill().installCount} ${skill().installCount === 1 ? "install" : "installs"}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </dd>
+                    </Show>
                   </dl>
                 </section>
+
+                <Show when={origin() !== "authored"}>
+                  <UpdateBlock skill={skill()} />
+                </Show>
+
+                <Show when={skill().existingForks.length > 0}>
+                  <section class="sk-block" aria-labelledby="sk-forks-h">
+                    <h3 class="sk-block-head" id="sk-forks-h">
+                      Forks
+                    </h3>
+                    <ul class="sk-agents">
+                      <For each={skill().existingForks}>
+                        {(fork) => (
+                          <li>
+                            <A class="sk-agent" href={`${prefix()}/skills/${fork.id}`}>
+                              <GitFork size={14} aria-hidden="true" />
+                              <span>{fork.name}</span>
+                              <span class="org-muted">{fork.diverged ? "· changed since" : "· unchanged"}</span>
+                            </A>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </section>
+                </Show>
 
                 <section class="sk-block" aria-labelledby="sk-files-h">
                   <h3 class="sk-block-head" id="sk-files-h">
@@ -293,9 +404,16 @@ function SkillDetail(props: { skillId: string; closeHref: string }) {
                 </section>
 
                 <section class="sk-block" aria-labelledby="sk-versions-h">
-                  <h3 class="sk-block-head" id="sk-versions-h">
-                    Versions
-                  </h3>
+                  <div class="sk-versions-head">
+                    <h3 class="sk-block-head" id="sk-versions-h">
+                      Versions
+                    </h3>
+                    <Show when={(versions.data ?? []).length > 1}>
+                      <button type="button" class="act-linkish" onClick={() => setComparing({ targetId: null })}>
+                        Compare
+                      </button>
+                    </Show>
+                  </div>
                   <Show when={(versions.data ?? []).length > 0} fallback={<p class="org-muted">{versions.isPending ? "Loading…" : "No saved versions."}</p>}>
                     <ul class="sk-versions">
                       <For each={(versions.data ?? []).slice(0, 8)}>
@@ -308,6 +426,11 @@ function SkillDetail(props: { skillId: string; closeHref: string }) {
                               </TonePill>
                             </Show>
                             <span class="org-muted org-push">{whenLabel(version.createdAt)}</span>
+                            <Show when={version.revisionNumber > 1}>
+                              <button type="button" class="act-linkish" aria-label={`What changed in ${versionName(version)}`} onClick={() => setComparing({ targetId: version.id })}>
+                                Changes
+                              </button>
+                            </Show>
                           </li>
                         )}
                       </For>
@@ -315,6 +438,14 @@ function SkillDetail(props: { skillId: string; closeHref: string }) {
                   </Show>
                 </section>
                 <SkillFileDialog skill={skill()} path={file()} onClose={() => setFile(null)} />
+                <ForkDialog open={forking()} onOpenChange={setForking} skill={skill()} />
+                <CompareVersionsDialog
+                  open={comparing() !== null}
+                  onOpenChange={(open) => !open && setComparing(null)}
+                  skillName={skill().name}
+                  versions={versions.data ?? []}
+                  targetId={comparing()?.targetId}
+                />
               </>
             );
           }}

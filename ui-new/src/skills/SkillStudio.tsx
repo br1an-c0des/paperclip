@@ -14,6 +14,7 @@ import { Field, TextArea, TextInput } from "@/ui/Field";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { failureText, useRefreshSkills, useSkillDetail, useSkillList, useSkillVersions } from "./queries";
+import { CompareVersionsDialog } from "./SkillActions";
 import { OriginPill, whenLabel } from "./SkillLibrary";
 import { createPayload, draftProblem, newFileProblem, skillOrigin, slugFor, sortedFiles, versionName, type SkillDraft } from "./skills-model";
 
@@ -29,8 +30,9 @@ import { createPayload, draftProblem, newFileProblem, skillOrigin, slugFor, sort
  *   (`POST …/versions`); Restore writes an earlier version's files back and saves that as a new
  *   version, as the old Studio does. Deleting the skill removes it from every agent.
  *
- * Bundled and imported skills are read-only here. Not ported: test runs and their inputs and
- * templates (they run a real agent), forking, folders, sharing, and the version diff.
+ * Compare opens two versions side by side (SkillActions.tsx). Bundled and imported skills are
+ * read-only here; fork one from the library to edit a copy. Not ported: test runs and their inputs
+ * and templates (decision 39, D6), and sharing.
  */
 
 export function StudioHome() {
@@ -217,6 +219,7 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
   const [deleteFileOpen, setDeleteFileOpen] = createSignal(false);
   const [deleteSkillOpen, setDeleteSkillOpen] = createSignal(false);
   const [restoring, setRestoring] = createSignal<CompanySkillVersion | null>(null);
+  const [comparing, setComparing] = createSignal(false);
 
   // A new file starts empty: there's nothing on the server until it's saved.
   const isNew = () => !props.skill.fileInventory.some((entry) => entry.path === path());
@@ -357,7 +360,13 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
 
           <div class="org-card-row sk-versions-head">
             <h3 class="sk-block-head">Versions</h3>
+            <Show when={(versions.data ?? []).length > 1}>
+              <button type="button" class="act-linkish org-push" onClick={() => setComparing(true)}>
+                Compare
+              </button>
+            </Show>
           </div>
+          <CompareVersionsDialog open={comparing()} onOpenChange={setComparing} skillName={props.skill.name} versions={versions.data ?? []} />
           <Show when={(versions.data ?? []).length > 0} fallback={<p class="org-muted">{versions.isPending ? "Loading…" : "None yet."}</p>}>
             <ul class="sk-versions">
               <For each={(versions.data ?? []).slice(0, 12)}>
