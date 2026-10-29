@@ -4,6 +4,7 @@ import { createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "s
 import { issuePath } from "@/api/issues";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
+import { viewport } from "@/layout/breakpoints";
 import { hasOpenDialog, isTextInputTarget } from "@/lib/shortcuts";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { TextInput } from "@/ui/Field";
@@ -103,6 +104,7 @@ export function TaskList(props: {
 }) {
   const company = useCompany();
   const commands = useCommands();
+  const phone = () => viewport() === "phone";
   let root: HTMLDivElement | undefined;
   const [pinned, setPinned] = createSignal(readPin());
   const [adding, setAdding] = createSignal<string | null>(null);
@@ -276,7 +278,7 @@ export function TaskList(props: {
     <div
       ref={root}
       class="tl"
-      classList={{ "tl--pinned": pinned(), "tl--checking": props.checked.size > 0, "tl--dragging": drag() !== null }}
+      classList={{ "tl--pinned": pinned() && !phone(), "tl--checking": props.checked.size > 0, "tl--dragging": drag() !== null, "tl--phone": phone() }}
     >
       <div class="tl-scroll">
         <div class="tl-sheet">

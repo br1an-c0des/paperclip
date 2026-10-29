@@ -116,9 +116,15 @@ export function TaskSections(props: {
         fallback={
           <div class="tsec-body">
             <TaskNotices taskId={props.taskId} />
-            <TaskPluginExtras taskId={props.taskId} />
+            {/* On phones, plugins' blocks follow the task's own details instead of leading them. */}
+            <Show when={!phone()}>
+              <TaskPluginExtras taskId={props.taskId} />
+            </Show>
             <Show when={section() === "details"} fallback={other()}>
               {details()}
+              <Show when={phone()}>
+                <TaskPluginExtras taskId={props.taskId} />
+              </Show>
             </Show>
           </div>
         }

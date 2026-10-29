@@ -355,6 +355,25 @@ a.td-chip:hover {
   min-height: 36px;
 }
 
+/* Phones (M2): a narrower label column, and long values wrap */
+@media (max-width: 640px) {
+  .td-props {
+    grid-template-columns: 112px minmax(0, 1fr);
+    column-gap: 10px;
+  }
+
+  .td-dates {
+    white-space: normal;
+  }
+
+  .td-more {
+    height: auto;
+    min-height: 28px;
+    padding-block: 4px;
+    text-align: left;
+  }
+}
+
 /* A narrow panel stacks the property labels over their values */
 @container panel (width < 480px) {
   .td-main {

@@ -9,6 +9,7 @@ import {
   FileText,
   GitBranch,
   Lock,
+  Camera,
   Paperclip,
   Plus,
   Receipt,
@@ -162,6 +163,7 @@ export function NewTaskDialog() {
       titleHidden
       hideClose
       width={connect() ? 640 : 760}
+      class="nt-dialog"
       initialFocus={() => document.getElementById("nt-title")}
     >
       <Show when={open()}>
@@ -444,6 +446,7 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
   };
 
   let fileInput: HTMLInputElement | undefined;
+  let cameraInput: HTMLInputElement | undefined;
   const addFiles = (list: FileList | null) => {
     if (!list?.length) return;
     setFiles((current) => [...current, ...Array.from(list)]);
@@ -802,6 +805,24 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
           <Paperclip size={13} aria-hidden="true" />
           Attach files
         </button>
+        {/* On a phone (M6), a photo straight from the camera. */}
+        <Show when={isCompact()}>
+          <button type="button" class="nt-attach" onClick={() => cameraInput?.click()}>
+            <Camera size={13} aria-hidden="true" />
+            Take a photo
+          </button>
+          <input
+            ref={cameraInput}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            onChange={(event) => {
+              addFiles(event.currentTarget.files);
+              event.currentTarget.value = "";
+            }}
+          />
+        </Show>
         <input
           ref={fileInput}
           type="file"
@@ -934,7 +955,8 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
       </div>
 
       <footer class="nt-foot">
-        <Show when={!repeating()}>
+        {/* Work mode, workspace and review policy stay on desktop (M6). */}
+        <Show when={!repeating() && !isCompact()}>
         <ChoicePill
           label="Work mode"
           icon={<SlidersHorizontal size={13} />}
@@ -981,7 +1003,9 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
           <div class="nt-create">
             <button type="button" class="nt-create-main" disabled={pending()} onClick={() => void submit(false)}>
               {pending() ? "Creating…" : repeating() ? "Create recurring task" : "Create task"}
-              <kbd aria-hidden="true">{/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘↵" : "Ctrl ↵"}</kbd>
+              <Show when={!isCompact()}>
+                <kbd aria-hidden="true">{/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘↵" : "Ctrl ↵"}</kbd>
+              </Show>
             </button>
             <Menu placement="top-end">
               <Menu.Trigger

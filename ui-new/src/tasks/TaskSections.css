@@ -129,11 +129,13 @@
 /* On a phone (M2 to M4) the rail is a row of tabs above the open section */
 .tsec--tabs {
   flex-direction: column;
+  min-width: 0;
 }
 
 .tsec--tabs .tsec-rail {
   order: -1;
   flex: none;
+  min-width: 0;
   flex-direction: row;
   align-items: center;
   gap: 4px;

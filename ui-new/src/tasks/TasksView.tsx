@@ -1,10 +1,11 @@
 import type { CompactIssue, IssuePriority, IssueStatus } from "@paperclipai/shared";
 import { useLocation, useSearchParams } from "@solidjs/router";
 import { createQuery, keepPreviousData, useQueryClient } from "@tanstack/solid-query";
-import { ArrowUpDown, ChevronDown, CircleCheck, CornerDownRight, ListFilter, Plus, Search, X } from "lucide-solid";
+import { ArrowUpDown, ChevronDown, CircleCheck, CornerDownRight, ListFilter, Plus, Search, UserRound, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
+import { viewport } from "@/layout/breakpoints";
 import { Dock } from "@/layout/Panel";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
@@ -275,7 +276,12 @@ export function TasksView(props: {
       return workspaces();
     },
   };
-  const layout = () => props.layout ?? view().layout;
+  // Phones (M1) show the list only, under a row of quick filters; the board stays on desktop.
+  const phone = () => viewport() === "phone";
+  const [searchOpen, setSearchOpen] = createSignal(false);
+  const layout = () => (phone() ? "list" : (props.layout ?? view().layout));
+  const youKey = () => (people.youId() ? `user:${people.youId()}` : null);
+  const mine = () => !!youKey() && view().filters.assignees.length === 1 && view().filters.assignees[0] === youKey();
   const hideClosed = () => layout() === "board" && !view().board.closed;
   const visible = createMemo(() => {
     const known = external.data;
@@ -364,11 +370,44 @@ export function TasksView(props: {
     return id ? (people.agent(id)?.name ?? "an agent") : null;
   };
 
+  const searchField = () => (
+    <label class="tv-search">
+      <Search size={14} aria-hidden="true" />
+      <TextInput
+        type="search"
+        value={search()}
+        onInput={(event) => setSearch(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && search()) {
+            event.preventDefault();
+            setSearch("");
+          }
+        }}
+        placeholder="Search tasks"
+        aria-label="Search tasks"
+        autofocus={phone()}
+      />
+    </label>
+  );
+
   return (
     <Show when={!recurring()} fallback={<RecurringView projectId={props.projectId} tasks={props.tasks} />}>
-      <div class="tv-toolbar" role="toolbar" aria-label="Task list">
-        <ShowSwitch projectId={props.projectId} />
-        <Show when={!props.layout}>
+      <div class="tv-toolbar" classList={{ "tv-toolbar--phone": phone() }} role="toolbar" aria-label="Task list">
+        <Show when={phone()}>
+          <Button
+            variant="icon"
+            class="tv-toggle"
+            aria-pressed={searchOpen() || !!search()}
+            aria-label="Search tasks"
+            onClick={() => setSearchOpen(!searchOpen())}
+          >
+            <Search size={15} aria-hidden="true" />
+          </Button>
+        </Show>
+        <Show when={!phone()}>
+          <ShowSwitch projectId={props.projectId} />
+        </Show>
+        <Show when={!props.layout && !phone()}>
           <Segmented
             label="Layout"
             options={LAYOUT_OPTIONS}
@@ -376,6 +415,7 @@ export function TasksView(props: {
             onChange={(next) => changeView({ layout: next })}
           />
         </Show>
+        <Show when={!phone()}>
         <SavedViewsMenu
           views={savedViews()}
           current={currentView()}
@@ -390,6 +430,7 @@ export function TasksView(props: {
           onRename={(saved, name) => storeViews(renameView(savedViews(), saved.id, name))}
           onDelete={(saved) => storeViews(deleteView(savedViews(), saved.id))}
         />
+        </Show>
         <Menu>
           <Menu.Trigger as={Button}>
             {view().groupBy === "none" ? "No grouping" : `${layout() === "board" ? "Columns" : "Group"}: ${groupLabel()}`}
@@ -408,6 +449,30 @@ export function TasksView(props: {
             </For>
           </Menu.Content>
         </Menu>
+        <Show when={phone()}>
+          <FilterMenu
+            filters={filters()}
+            external={externalOn()}
+            people={people}
+            creators={creatorKeys()}
+            projects={props.projectId ? [] : projectOptions()}
+            workspaces={workspaceOptions()}
+            onOpenChange={setFilterMenuOpen}
+            onChange={changeFilters}
+          />
+          <Show when={youKey()}>
+            {(key) => (
+              <Button
+                class="tv-toggle"
+                aria-pressed={mine()}
+                onClick={() => changeFilters({ assignees: mine() ? [] : [key()] })}
+              >
+                <UserRound size={14} aria-hidden="true" />
+                Assigned to me
+              </Button>
+            )}
+          </Show>
+        </Show>
         <SortMenu sort={view().sort} onChange={(sort) => changeView({ sort })} />
         <Show when={layout() === "board"}>
           <Button
@@ -423,6 +488,7 @@ export function TasksView(props: {
           </Button>
         </Show>
         <span class="tv-toolbar-end">
+          <Show when={!phone()}>
           <FilterMenu
             filters={filters()}
             external={externalOn()}
@@ -433,6 +499,7 @@ export function TasksView(props: {
             onOpenChange={setFilterMenuOpen}
             onChange={changeFilters}
           />
+          </Show>
           <Show when={activeFilters() > 0}>
             <Button ghost size="compact" onClick={clearFilters}>
               Clear filters
@@ -452,31 +519,20 @@ export function TasksView(props: {
             </Button>
           </Show>
         </span>
-        <label class="tv-search">
-          <Search size={14} aria-hidden="true" />
-          <TextInput
-            type="search"
-            value={search()}
-            onInput={(event) => setSearch(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape" && search()) {
-                event.preventDefault();
-                setSearch("");
-              }
-            }}
-            placeholder="Search tasks"
-            aria-label="Search tasks"
-          />
-        </label>
-        <Button
-          variant="primary"
-          class="tv-new"
-          onClick={() => commands.openNewTask(props.projectId ? { projectId: props.projectId } : {})}
-        >
-          <Plus size={15} stroke-width={2.4} aria-hidden="true" />
-          Task
-        </Button>
+        <Show when={!phone()}>{searchField()}</Show>
+        {/* On phones the dock's round button adds a task. */}
+        <Show when={!phone()}>
+          <Button
+            variant="primary"
+            class="tv-new"
+            onClick={() => commands.openNewTask(props.projectId ? { projectId: props.projectId } : {})}
+          >
+            <Plus size={15} stroke-width={2.4} aria-hidden="true" />
+            Task
+          </Button>
+        </Show>
       </div>
+      <Show when={phone() && (searchOpen() || search())}>{searchField()}</Show>
       <Show when={participantName()}>
         {(name) => (
           <div class="tv-scope">
