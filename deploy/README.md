@@ -16,10 +16,21 @@ why things are set up this way, see [FORK.md](../FORK.md).
 
 The server serves whatever is in `ui/dist`. `Dockerfile` therefore:
 
-1. Builds `ui-new` in a small Node stage.
+1. Builds `ui-new` in a small Node stage. The build copies the app logos (`ui/public/brands`) and
+   the favicons and home-screen icons from `ui/public`, adds `ui-new/public` (the web app manifest
+   and the service worker), and stamps the worker with a build id; the stage fails if any of these
+   is missing.
 2. Starts `FROM ghcr.io/paperclipai/paperclip:sha-<UPSTREAM_SHA>`, the image upstream publishes
    for each `master` commit.
 3. Replaces `/app/ui/dist` with the `ui-new` build.
+
+The service worker (`/sw.js`) replaces the old UI's in every browser that had it, since it's served
+at the same address with new contents. Each deploy changes its build id, so open tabs and the
+home-screen app reload onto the new build the next time they're in the background.
+
+`docker-compose.yml` also sets `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` for the server, which reaches
+`claude_local` agent runs, so every run of an agent sees the same memory. Paperclip Runner agents
+don't inherit the server's environment; set it in their adapter's `env`.
 
 `deploy.sh` sets `UPSTREAM_SHA` to the newest upstream commit already merged into your branch
 that has a published image. The server in the image then matches the API your UI was

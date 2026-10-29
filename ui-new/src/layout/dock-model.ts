@@ -1,3 +1,5 @@
+import { agentView } from "@/agents/agent-model";
+
 /*
  * The phone dock's rules (design/mobile.md, N1), kept apart from the components so they can be
  * tested: which of the three places owns the current page, what tapping Tasks does, which tasks
@@ -53,6 +55,51 @@ export function isOrgPage(pathname: string, prefix: string): boolean {
   // `/agents/:key` is that agent's page; only the roster itself (and its old tab addresses) is org.
   const agentPage = /^\/agents\/([^/]+)/.exec(path);
   return !agentPage || ["all", "active", "paused", "error", "builtin"].includes(agentPage[1]!.toLowerCase());
+}
+
+const OLD_TASK_VIEWS = new Set(["active", "all", "backlog", "done", "recent"]);
+
+/**
+ * A detail page, where the phone hides the dock (design/mobile.md: M2 a task, M9 an agent's chat,
+ * M11 a run) and shows a way back instead: one task, an agent's own page and its runs, and one
+ * approval.
+ */
+export function isDetailPage(pathname: string, prefix: string): boolean {
+  const path = companyPath(pathname, prefix);
+  if (!path) return false;
+  const task = /^\/issues\/([^/]+)/.exec(path);
+  if (task) return !OLD_TASK_VIEWS.has(task[1]!.toLowerCase());
+  if (/^\/agents\/[^/]+/.test(path)) return !isOrgPage(pathname, prefix) && !/^\/agents\/new(?:\/|$)/.test(path);
+  const approval = /^\/approvals\/([^/]+)$/.exec(path);
+  return !!approval && !["all", "pending"].includes(approval[1]!);
+}
+
+/** Where the phone's Back goes from a detail page when there's no page to go back to. */
+export function detailParent(pathname: string, prefix: string): string {
+  const path = companyPath(pathname, prefix) ?? "/";
+  const base = `/${prefix}`;
+  if (path.startsWith("/agents/")) return `${base}/agents`;
+  if (path.startsWith("/approvals/")) return `${base}/inbox`;
+  return `${base}/issues`;
+}
+
+/**
+ * Screens outside the phone's scope (design/mobile.md, "Scope": settings of every kind, and the
+ * org's Apps, Skills and Activity tabs): they still open, under an "On desktop" note. Returns what
+ * to call the area, or null.
+ */
+export function desktopArea(pathname: string, prefix: string): string | null {
+  const path = companyPath(pathname, prefix);
+  if (!path) return null;
+  if (/^\/company\/settings\/instance(?:\/|$)/.test(path)) return "App settings";
+  if (/^\/(?:company\/settings|settings|instance)(?:\/|$)/.test(path)) return "Settings";
+  if (/^\/projects\/[^/]+\/settings(?:\/|$)/.test(path)) return "Project settings";
+  const agent = /^\/agents\/[^/]+\/(.+)$/.exec(path);
+  if (agent && !isOrgPage(pathname, prefix) && agentView(agent[1]!)?.view === "settings") return "Agent settings";
+  if (/^\/apps(?:\/|$)/.test(path)) return "Apps";
+  if (/^\/skills(?:\/|$)/.test(path)) return "Skills";
+  if (/^\/activity(?:\/|$)/.test(path)) return "Activity";
+  return null;
 }
 
 /** The tasks scope of a task list page, or null for anything else (a single task, other pages). */

@@ -21,10 +21,20 @@ RUN corepack enable
 WORKDIR /app
 COPY . .
 # Install only ui-new and the workspace packages it depends on, then build it.
+# The build copies the app logos (brands/) and the favicons from ui/public and
+# stamps the service worker with a build id (ui-new/vite.config.ts); check that
+# each made it in, since a missing one only shows as broken images, missing
+# icons, or tabs that never pick up a deploy.
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --filter "@paperclipai/ui-new..." --ignore-scripts \
   && pnpm --filter @paperclipai/ui-new build \
-  && test -f ui-new/dist/index.html
+  && test -f ui-new/dist/index.html \
+  && test -n "$(ls -A ui-new/dist/brands 2>/dev/null)" \
+  && test -f ui-new/dist/favicon.ico \
+  && test -f ui-new/dist/apple-touch-icon.png \
+  && test -f ui-new/dist/site.webmanifest \
+  && test -f ui-new/dist/sw.js \
+  && ! grep -q "__PAPERCLIP_BUILD_ID__" ui-new/dist/sw.js
 
 FROM ghcr.io/paperclipai/paperclip:sha-${UPSTREAM_SHA}
 # The server serves the first of server/ui-dist and ui/dist that has an

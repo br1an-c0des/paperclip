@@ -1,10 +1,11 @@
 import type { Company } from "@paperclipai/shared";
 import { A, Navigate } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
-import { Plus } from "lucide-solid";
+import { ArrowDown, ArrowUp, Plus } from "lucide-solid";
 import { For, Match, Show, Switch } from "solid-js";
 import { companiesApi, statsFor } from "@/api/companies";
 import { queryKeys } from "@/api/queryKeys";
+import { useCompanyOrder } from "@/layout/nav-prefs";
 import { useCanCreateCompany } from "@/onboarding/can-create";
 import { findCompanyByPrefix, lastCompanyPrefix, useCompaniesQuery } from "@/lib/company";
 import { InitialsDisc } from "@/ui/Avatar";
@@ -54,6 +55,8 @@ export function Companies() {
   const companies = useCompaniesQuery();
   const stats = createQuery(() => ({ queryKey: queryKeys.companies.stats, queryFn: companiesApi.stats }));
   const canCreate = useCanCreateCompany();
+  // Your order, which the nav's company switcher follows too (`/sidebar-preferences/me`).
+  const order = useCompanyOrder();
 
   return (
     <div class="companies-page">
@@ -90,9 +93,9 @@ export function Companies() {
         <Match when={companies.data}>
           {(list) => (
             <ul class="companies-list">
-              <For each={list()}>
-                {(company) => (
-                  <li>
+              <For each={order.ordered(list())}>
+                {(company, index) => (
+                  <li class="companies-item">
                     <A class="card company-card" href={`/${company.issuePrefix}`}>
                       <CompanyMark company={company} />
                       <span class="company-card-text">
@@ -113,6 +116,28 @@ export function Companies() {
                         </span>
                       </span>
                     </A>
+                    <Show when={list().length > 1}>
+                      <span class="companies-order">
+                        <button
+                          type="button"
+                          class={buttonClass({ variant: "icon", size: "compact", ghost: true })}
+                          aria-label={`Move ${company.name} up`}
+                          disabled={index() === 0}
+                          onClick={() => order.move(list(), company.id, -1)}
+                        >
+                          <ArrowUp size={15} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          class={buttonClass({ variant: "icon", size: "compact", ghost: true })}
+                          aria-label={`Move ${company.name} down`}
+                          disabled={index() === list().length - 1}
+                          onClick={() => order.move(list(), company.id, 1)}
+                        >
+                          <ArrowDown size={15} aria-hidden="true" />
+                        </button>
+                      </span>
+                    </Show>
                   </li>
                 )}
               </For>

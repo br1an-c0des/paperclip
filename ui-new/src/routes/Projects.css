@@ -1,0 +1,82 @@
+/* `/:prefix/projects`: the company's projects as nav-style rows in one card. */
+.projects-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.projects-list-head {
+  display: flex;
+  padding: 2px 4px 4px;
+}
+
+.projects-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.projects-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.projects-row + .projects-row {
+  border-top: 1px solid var(--row-line);
+}
+
+.projects-link {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 10px;
+  border-radius: var(--r-inner);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.projects-link:hover {
+  background: var(--row-hover);
+}
+
+.projects-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.projects-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--body);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.projects-count {
+  min-width: 64px;
+  text-align: right;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.projects-empty {
+  padding: 10px;
+}
+
+@container main (max-width: 560px) {
+  .projects-count {
+    display: none;
+  }
+}

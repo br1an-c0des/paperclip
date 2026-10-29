@@ -14,6 +14,14 @@ import type { Request, RequestKind } from "@/requests/request-model";
  *   then, so the filter counts don't wait on every card.
  * - Keys, after the old Decisions page and Inbox: j/k move, Enter opens the task, y (or x) clears,
  *   s snoozes, a answers, r and Shift+U mark read and unread, u restores.
+ * - The aging shelf (decision 39, D5): a request idle past its retention days (30 unless a queue
+ *   says otherwise) leaves Needs you for a collapsed "Older than 30 days" group at its bottom, until
+ *   you Keep it. The server flags `shelf` whether or not the item is kept, so a kept item counts as
+ *   active here. Alerts don't age.
+ * - Time: Needs you splits into New today and Earlier, by when each request arrived, most urgent
+ *   first within each; Updates groups your tasks by their latest activity (M10). "New" marks what
+ *   arrived since you last opened the Inbox (`seen.ts`).
+ * - Search narrows the open tab to items whose words match every term typed.
  */
 
 export type InboxTab = "needs" | "updates" | "alerts" | "snoozed" | "cleared";
@@ -33,6 +41,11 @@ const OLD_PATHS: Record<string, InboxTab> = { mine: "updates", recent: "updates"
 export function tabFromPath(rest: string | undefined): InboxTab {
   const segment = (rest ?? "").split("/")[0] ?? "";
   return INBOX_TABS.find((entry) => entry.path === segment && segment !== "")?.tab ?? OLD_PATHS[segment] ?? "needs";
+}
+
+/** On the aging shelf: idle past its retention days, and not kept. */
+export function onShelf(item: Pick<AttentionItem, "shelf" | "keep">) {
+  return item.shelf && !item.keep;
 }
 
 const ALERT_SOURCES: ReadonlySet<AttentionSourceKind> = new Set(["failed_run", "budget_alert", "agent_error_alert", "blocker_attention"]);
@@ -79,22 +92,25 @@ export function snoozedUntil(item: Pick<AttentionItem, "dismissal">, pending?: P
   return item.dismissal?.kind === "snooze" ? item.dismissal.snoozedUntil : null;
 }
 
-export type FeedGroups = { needs: AttentionItem[]; alerts: AttentionItem[]; snoozed: AttentionItem[]; cleared: AttentionItem[] };
+export type FeedGroups = { needs: AttentionItem[]; aging: AttentionItem[]; alerts: AttentionItem[]; snoozed: AttentionItem[]; cleared: AttentionItem[] };
 
 /**
- * The feed sorted into tabs. Needs you and Alerts are most urgent first; Snoozed is by when each
- * comes back; Cleared is most recently cleared first.
+ * The feed sorted into tabs. Needs you and Alerts are most urgent first, with Needs you's aging
+ * requests apart, most recently active first; Snoozed is by when each comes back; Cleared is most
+ * recently cleared first.
  */
 export function groupFeed(items: readonly AttentionItem[], pending: ReadonlyMap<string, Pending> = new Map()): FeedGroups {
-  const groups: FeedGroups = { needs: [], alerts: [], snoozed: [], cleared: [] };
+  const groups: FeedGroups = { needs: [], aging: [], alerts: [], snoozed: [], cleared: [] };
   for (const item of items) {
     const where = placement(item, pending.get(item.id));
     if (where === "snoozed") groups.snoozed.push(item);
     else if (where === "cleared") groups.cleared.push(item);
     else if (isAlert(item)) groups.alerts.push(item);
+    else if (onShelf(item)) groups.aging.push(item);
     else groups.needs.push(item);
   }
   groups.needs.sort(byUrgency);
+  groups.aging.sort((a, b) => Date.parse(b.activityAt) - Date.parse(a.activityAt));
   groups.alerts.sort(byUrgency);
   const until = (item: AttentionItem) => Date.parse(snoozedUntil(item, pending.get(item.id)) ?? "") || Infinity;
   groups.snoozed.sort((a, b) => until(a) - until(b));
@@ -114,7 +130,10 @@ export function feedKind(item: Pick<AttentionItem, "sourceKind" | "subject">): R
       const kind = item.subject.metadata?.kind;
       return kind === "suggest_tasks" || kind === "connection_intent" ? "proposal" : "question";
     }
-    // Decisions, join requests and recovery actions all apply something when answered.
+    // Join requests are approved or rejected, as an approval is.
+    case "join_request":
+      return "approval";
+    // Decisions and recovery actions apply something when answered.
     default:
       return "proposal";
   }
@@ -231,4 +250,100 @@ export function unreadCount(tasks: readonly Pick<CompactIssue, "isUnreadForMe">[
 export function archivedTasks<T extends Pick<CompactIssue, "id">>(withArchived: readonly T[], unarchived: readonly T[]): T[] {
   const kept = new Set(unarchived.map((task) => task.id));
   return withArchived.filter((task) => !kept.has(task.id));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Time, search and the aging shelf's label
+
+function startOfDay(at: Date) {
+  const day = new Date(at);
+  day.setHours(0, 0, 0, 0);
+  return day.getTime();
+}
+
+export type TimeGroup<T> = { key: string; label: string; items: T[] };
+
+/** Needs you by when each request arrived: New today, then Earlier. Order within each is kept. */
+export function arrivalGroups(items: readonly AttentionItem[], now: Date = new Date()): TimeGroup<AttentionItem>[] {
+  const today = startOfDay(now);
+  const fresh = items.filter((item) => Date.parse(item.createdAt) >= today);
+  const earlier = items.filter((item) => !(Date.parse(item.createdAt) >= today));
+  return [
+    { key: "today", label: "New today", items: fresh },
+    { key: "earlier", label: "Earlier", items: earlier },
+  ].filter((group) => group.items.length > 0);
+}
+
+/** Updates by latest activity, as M10 groups them: last hour, earlier today, yesterday, this week, older. */
+export function activityGroups<T>(items: readonly T[], at: (item: T) => Date | string | null | undefined, now: Date = new Date()): TimeGroup<T>[] {
+  const today = startOfDay(now);
+  const hourAgo = now.getTime() - 60 * 60 * 1000;
+  const yesterday = today - 24 * 60 * 60 * 1000;
+  const weekAgo = today - 6 * 24 * 60 * 60 * 1000;
+  const groups: TimeGroup<T>[] = [
+    { key: "hour", label: "Last hour", items: [] },
+    { key: "today", label: "Earlier today", items: [] },
+    { key: "yesterday", label: "Yesterday", items: [] },
+    { key: "week", label: "Earlier this week", items: [] },
+    { key: "older", label: "Older", items: [] },
+  ];
+  for (const item of items) {
+    const raw = at(item);
+    const time = raw ? new Date(raw).getTime() : NaN;
+    const index = !Number.isFinite(time) ? 4 : time >= hourAgo ? 0 : time >= today ? 1 : time >= yesterday ? 2 : time >= weekAgo ? 3 : 4;
+    groups[index]!.items.push(item);
+  }
+  return groups.filter((group) => group.items.length > 0);
+}
+
+/** The search's terms: lower-case words. */
+export function searchTerms(query: string) {
+  return query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+}
+
+/** Whether every term is in the text. No terms match everything. */
+export function matchesTerms(terms: readonly string[], parts: readonly (string | null | undefined)[]) {
+  if (terms.length === 0) return true;
+  const text = parts.filter(Boolean).join(" ").toLocaleLowerCase();
+  return terms.every((term) => text.includes(term));
+}
+
+/** The words an item can be found by: its subject, task, why it's here, who raised it, its project. */
+export function itemWords(item: AttentionItem): (string | null | undefined)[] {
+  const detail = item.detail as { summaryExcerpt?: string | null; promptExcerpt?: string | null; firstQuestionText?: string | null; failureReasonExcerpt?: string | null } | null;
+  return [
+    item.subject.title,
+    item.subject.identifier,
+    item.relatedIssue?.title,
+    item.relatedIssue?.identifier,
+    item.whyNow,
+    item.originAgentName,
+    item.project?.name,
+    detail?.summaryExcerpt,
+    detail?.promptExcerpt,
+    detail?.firstQuestionText,
+    detail?.failureReasonExcerpt,
+  ];
+}
+
+/** The aging group's heading: "Older than 30 days", or the shortest retention when queues set others. */
+export function agingLabel(items: readonly Pick<AttentionItem, "retentionDays">[]) {
+  const days = items.length ? Math.min(...items.map((item) => item.retentionDays || 30)) : 30;
+  return `Older than ${days} day${days === 1 ? "" : "s"}`;
+}
+
+/** Arrived after you last looked, so the card carries "New". */
+export function isFresh(item: Pick<AttentionItem, "createdAt">, seenAt: number | null) {
+  return seenAt !== null && Date.parse(item.createdAt) > seenAt;
+}
+
+/** "at 9:40 am", "yesterday at 6:05 pm", "on Oct 26": when you last looked, for Updates (M10). */
+export function lastLookedLabel(at: number, now: Date = new Date()) {
+  const date = new Date(at);
+  const hours = date.getHours();
+  const time = `${hours % 12 || 12}:${String(date.getMinutes()).padStart(2, "0")} ${hours < 12 ? "am" : "pm"}`;
+  const today = startOfDay(now);
+  if (at >= today) return `at ${time}`;
+  if (at >= today - 24 * 60 * 60 * 1000) return `yesterday at ${time}`;
+  return `on ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
 }

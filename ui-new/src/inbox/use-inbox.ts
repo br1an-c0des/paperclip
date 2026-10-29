@@ -1,10 +1,14 @@
 import type { AttentionFeed, AttentionItem, AttentionSubject, CompactIssue } from "@paperclipai/shared";
 import { createMutation, createQueries, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createMemo, createSignal } from "solid-js";
+import { accessApi } from "@/api/access";
+import { decisionsApi } from "@/api/decisions";
 import { inboxApi } from "@/api/inbox";
 import { interactionsApi } from "@/api/interactions";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
+import { requestFromDecision } from "@/requests/decision-model";
+import { requestFromJoin } from "@/requests/join-model";
 import { requestFromApproval, requestFromInteraction, requestFromReview, type Request } from "@/requests/request-model";
 import { useReviewTasks } from "@/requests/review-tasks";
 import type { TaskPeople } from "@/tasks/people";
@@ -17,7 +21,10 @@ import { useAttentionFeed } from "./needs-you";
  *
  * - The attention feed, whole and with your cleared and snoozed items, sorted into tabs.
  * - Each request's card source: a task's interactions (the same query as the task's thread, so an
- *   answer here shows there), each approval by id, and the task behind each review for its sign-off.
+ *   answer here shows there), each approval by id, the task behind each review for its sign-off,
+ *   each proposal by id with the open list's changed targets, and the pending join requests (the
+ *   list Settings → Members reads).
+ * - Keep brings a request back from the aging shelf, at once in the cached feed.
  * - Clear, snooze and restore, shown at once and undone from the toast. A step stays shown until a
  *   feed fetched after it lands. It also patches the feed's cache, which the nav's Inbox count reads
  *   (`needs-you.ts`), so the count moves with it; a failed step puts the item back.
@@ -130,6 +137,21 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
   };
   const restore = (item: AttentionItem) => triage.mutate({ item, step: { action: "restore" } });
 
+  // Keep: off the aging shelf, back in Needs you.
+  const keepStep = createMutation(() => ({
+    mutationFn: (item: AttentionItem) => inboxApi.keep(companyId(), item.sourceKind, item.subject.id, true),
+    onMutate: async (item: AttentionItem) => {
+      await client.cancelQueries({ queryKey: queryKeys.inbox.feed(companyId()) });
+      return { before: patchItem(item.id, (current) => ({ ...current, keep: true })) };
+    },
+    onSuccess: () => refreshFeed(),
+    onError: (error: Error, item, context) => {
+      if (context?.before) patchItem(item.id, () => context.before!);
+      pushToast({ tone: "error", title: "Couldn't keep it", body: error.message });
+    },
+  }));
+  const keep = (item: AttentionItem) => keepStep.mutate(item);
+
   // The cards' sources. Interactions are read per task, as the task's thread reads them.
   const interactionTaskIds = createMemo(() => [
     ...new Set(
@@ -141,6 +163,25 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
     ...new Set((feed.data?.items ?? []).flatMap((item) => (item.sourceKind === "review" && itemTask(item) ? [itemTask(item)!.id] : []))),
   ]);
   const reviews = useReviewTasks(reviewTaskIds);
+  const decisionIds = createMemo(() => [...new Set((feed.data?.items ?? []).flatMap((item) => (item.sourceKind === "decision" ? [item.subject.id] : [])))]);
+  const hasJoins = createMemo(() => (feed.data?.items ?? []).some((item) => item.sourceKind === "join_request"));
+  const decisions = createQueries(() => ({
+    queries: decisionIds().map((decisionId) => ({
+      queryKey: queryKeys.decisions.detail(decisionId),
+      queryFn: ({ signal }: { signal: AbortSignal }) => decisionsApi.get(decisionId, signal),
+    })),
+  }));
+  // One list for every open proposal's changed targets.
+  const openDecisions = createQuery(() => ({
+    queryKey: queryKeys.decisions.open(companyId()),
+    queryFn: ({ signal }) => decisionsApi.open(companyId(), signal),
+    enabled: decisionIds().length > 0,
+  }));
+  const joins = createQuery(() => ({
+    queryKey: queryKeys.companySettings.joinRequests(companyId()),
+    queryFn: ({ signal }) => accessApi.joinRequests(companyId(), signal),
+    enabled: hasJoins(),
+  }));
   const interactions = createQueries(() => ({
     queries: interactionTaskIds().map((taskId) => ({
       queryKey: queryKeys.issues.section(taskId, "interactions"),
@@ -188,6 +229,9 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
     const people = options.people;
     const interactionById = new Map(interactions.flatMap((query) => query.data ?? []).map((interaction) => [interaction.id, interaction] as const));
     const approvalById = new Map(approvals.flatMap((query) => (query.data ? [query.data] : [])).map((approval) => [approval.id, approval] as const));
+    const decisionById = new Map(decisions.flatMap((query) => (query.data ? [query.data] : [])).map((decision) => [decision.id, decision] as const));
+    const changedById = new Map((openDecisions.data ?? []).map((decision) => [decision.id, decision.targetChanged] as const));
+    const joinById = new Map((joins.data ?? []).map((join) => [join.id, join] as const));
     const result = new Map<string, Request>();
     for (const item of feed.data?.items ?? []) {
       const task = taskOf(item);
@@ -203,6 +247,12 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
       } else if (item.sourceKind === "approval") {
         const approval = approvalById.get(item.subject.id);
         if (approval) result.set(item.id, requestFromApproval(approval, ctx));
+      } else if (item.sourceKind === "decision") {
+        const decision = decisionById.get(item.subject.id);
+        if (decision) result.set(item.id, requestFromDecision(decision, ctx, changedById.get(decision.id) ?? null));
+      } else if (item.sourceKind === "join_request") {
+        const join = joinById.get(item.subject.id);
+        if (join) result.set(item.id, requestFromJoin(join, ctx));
       } else if (item.sourceKind === "review" && task) {
         const reviewed = reviews.task(task.id);
         const stalled = item.subject.metadata?.reviewAttentionState === "stalled";
@@ -214,6 +264,9 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
   /** Whether an item's card source failed to load, so it falls back to a plain row. */
   const sourceFailed = (item: AttentionItem) => {
     if (item.sourceKind === "approval") return approvals[approvalIds().indexOf(item.subject.id)]?.isError ?? false;
+    if (item.sourceKind === "decision") return decisions[decisionIds().indexOf(item.subject.id)]?.isError ?? false;
+    // Without the right to approve joins, the list fails; so does a request no longer pending.
+    if (item.sourceKind === "join_request") return joins.isError || (!!joins.data && !joins.data.some((join) => join.id === item.subject.id));
     const task = itemTask(item);
     if (item.sourceKind === "review") return task ? reviews.failed(task.id) : false;
     return task ? (interactions[interactionTaskIds().indexOf(task.id)]?.isError ?? false) : false;
@@ -288,6 +341,7 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
     clear,
     snooze,
     restore,
+    keep,
     refreshFeed,
     tasks,
     unread: () => unreadCount(tasks.data),

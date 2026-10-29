@@ -1,0 +1,30 @@
+/* Phone-only pieces of the company shell (CompanyLayout.tsx). */
+
+/* Back, where the dock steps aside on a detail page (in shell/pwa.tsx's top row). */
+.phone-back.btn {
+  gap: 2px;
+  padding-left: 6px;
+}
+
+/* A screen outside the phone's scope (design/mobile.md, "Scope"). */
+.on-desktop {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--well);
+  box-shadow: none;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.on-desktop svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+.on-desktop b {
+  color: var(--text);
+}

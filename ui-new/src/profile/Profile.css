@@ -1,0 +1,317 @@
+/* A person's profile (no board; Capsule Stack cards, wells, capsule bars and meters). */
+
+.prof-note {
+  padding: 18px 22px;
+  color: var(--body);
+}
+
+.prof-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* The headline numbers: four wells in one card, two by two on a narrow main. */
+.prof-hero {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+}
+
+@container main (max-width: 720px) {
+  .prof-hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.prof-hero-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 16px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+  min-width: 0;
+}
+
+.prof-hero-cell b {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: var(--dtrack);
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.prof-hero-cell small {
+  font-size: 12px;
+}
+
+.prof-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+@container main (max-width: 900px) {
+  .prof-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.prof-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  min-width: 0;
+}
+
+.prof-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.prof-h {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.prof-strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.prof-empty {
+  font-size: 13px;
+}
+
+.prof-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@container main (max-width: 520px) {
+  .prof-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.prof-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.prof-metric b {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.prof-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.prof-facts div {
+  display: inline-flex;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  font-size: 13px;
+}
+
+.prof-facts dt {
+  color: var(--muted);
+}
+
+.prof-facts dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Fourteen capsule bars, each a day's tokens, with a dot for a day that completed tasks. */
+.prof-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.prof-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.prof-bar-track {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  max-width: 14px;
+  height: 120px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  overflow: hidden;
+}
+
+.prof-bar {
+  display: block;
+  width: 100%;
+  border-radius: var(--r-pill);
+  background: var(--g-ion);
+}
+
+.prof-day:hover .prof-bar {
+  filter: brightness(1.15);
+}
+
+.prof-done {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.prof-done[data-on] {
+  background: var(--g-lagoon);
+}
+
+.prof-tick {
+  height: 14px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.prof-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.prof-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prof-key {
+  display: inline-block;
+  border-radius: var(--r-pill);
+}
+
+.prof-key--bar {
+  width: 6px;
+  height: 14px;
+  background: var(--g-ion);
+}
+
+.prof-key--done {
+  width: 6px;
+  height: 6px;
+  background: var(--g-lagoon);
+}
+
+.prof-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.prof-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 7px 8px;
+  border-radius: var(--r-inner);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.prof-rows > li + li {
+  border-top: 1px solid var(--row-line);
+}
+
+a.prof-row:hover {
+  background: var(--row-hover);
+}
+
+.prof-id {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.prof-row-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.prof-row-title small {
+  font-size: 12px;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prof-when {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.prof-usage {
+  flex-wrap: wrap;
+}
+
+.prof-usage-nums {
+  display: inline-flex;
+  gap: 12px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.prof-meter {
+  flex-basis: 100%;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  overflow: hidden;
+}
+
+.prof-meter span {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--g-ion);
+}

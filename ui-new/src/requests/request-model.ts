@@ -1,11 +1,13 @@
 import type { Approval, IssueExecutionStagePrincipal, IssueExecutionState, IssueStatus, IssueThreadInteraction } from "@paperclipai/shared";
+import type { CompanyJoinRequest } from "@/api/access";
+import type { DecisionOutcome } from "@/api/decisions";
 
 /*
  * The request view model (proposals/unifying-requests.md, "Proposed model: requests"): anything
  * waiting on someone's response, described by the same properties whatever table it lives in.
  * Board 15 draws it. This module builds requests from a task's interactions and approvals, and
- * from a task waiting on a review stage's sign-off; the Inbox draws the attention feed's other kinds
- * as plain cards.
+ * from a task waiting on a review stage's sign-off; decision-model.ts builds proposals (Decisions)
+ * and join-model.ts join requests. The Inbox draws the attention feed's other kinds as plain cards.
  *
  * - kind: question (the answer goes back to the agent), proposal (approving applies a change),
  *   approval (a formal request with its own discussion), sign-off (a review stage's turn).
@@ -28,7 +30,9 @@ export type RequestShape =
   | "tool_call"
   | "connection"
   | "approval"
-  | "signoff";
+  | "signoff"
+  | "decision"
+  | "join";
 
 export type RequestOutcome = "return" | "apply" | "apply_and_remember";
 
@@ -47,7 +51,9 @@ export type Tone = "ok" | "bad" | "mid" | "muted";
 export type RequestSource =
   | { type: "interaction"; interaction: IssueThreadInteraction }
   | { type: "approval"; approval: Approval }
-  | { type: "review"; issueId: string; identifier: string; signoff: Signoff; stalled: boolean };
+  | { type: "review"; issueId: string; identifier: string; signoff: Signoff; stalled: boolean }
+  | { type: "decision"; decision: DecisionOutcome; targetChanged: Record<string, boolean> | null }
+  | { type: "join"; join: CompanyJoinRequest };
 
 export type Request = {
   key: string;
@@ -131,16 +137,13 @@ function audienceOf(interaction: IssueThreadInteraction, ctx: RequestContext): R
 function respondOf(interaction: IssueThreadInteraction, ctx: RequestContext): Request["respond"] {
   if (interaction.addresseeUserId && interaction.addresseeUserId !== ctx.youId) {
     const name = ctx.personName(interaction.addresseeUserId);
-    return { allowed: false, reason: `Waiting on ${name}. Only ${name} can answer this.` };
+    return { allowed: false, reason: `Waiting on ${name.replace(/\.$/, "")}. Only ${name} can answer this.` };
   }
   if (interaction.addresseeAgentId) {
     return { allowed: false, reason: `Waiting on ${ctx.agentName(interaction.addresseeAgentId) ?? "an agent"}.` };
   }
   if (interaction.effectiveResolverPolicy === "not_creator" && interaction.createdByUserId && interaction.createdByUserId === ctx.youId) {
     return { allowed: false, reason: "You asked this, so someone else answers it." };
-  }
-  if (interaction.kind === "connection_intent") {
-    return { allowed: false, reason: "Connecting an app isn't in this board yet. Use the classic board to finish it." };
   }
   if (interaction.acceptanceBlocker === "workspace_sync_pending") {
     return { allowed: false, reason: "Getting the workspace ready. You can answer in a moment." };
@@ -233,16 +236,21 @@ function classify(interaction: IssueThreadInteraction): Classified {
         body: interaction.summary ?? null,
       };
     }
-    case "connection_intent":
+    case "connection_intent": {
+      const payload = interaction.payload;
+      const access = payload.accessRequest;
       return {
         kind: "proposal",
         shape: "connection",
         outcome: "apply",
         acts: false,
-        askVerb: "asks to connect an app",
-        title: titled(`Connect ${interaction.payload.serviceName}`),
+        askVerb: access ? "asks for access to an app" : payload.purpose === "ai" ? "needs an AI connection" : "asks to connect an app",
+        title: access
+          ? `Give ${payload.requestingAgentName} access to ${access.connectionName}?`
+          : titled(payload.purpose === "ai" ? `Connect ${payload.serviceName} so ${payload.requestingAgentName} can run` : `Connect ${payload.serviceName}`),
         body: interaction.summary ?? null,
       };
+    }
   }
 }
 
@@ -255,8 +263,12 @@ function nextLine(c: Classified, interaction: IssueThreadInteraction, asker: str
     }
     case "suggested_tasks":
       return `Creating them adds the tasks you pick, then tells ${asker} which ones.`;
-    case "connection":
-      return `Connecting lets ${asker} use the app, then it continues.`;
+    case "connection": {
+      const payload = interaction.kind === "connection_intent" ? interaction.payload : null;
+      if (payload?.accessRequest) return `Granting lets ${asker} use these tools on ${payload.accessRequest.connectionName}, then it continues.`;
+      if (payload?.purpose === "ai") return `Once ${asker} has a working AI connection, the task resumes on its own.`;
+      return `Connecting lets ${asker} use the app, then it continues. Access is added for this agent only.`;
+    }
     default:
       if (c.acts) return `Approving applies it now, then tells ${asker}.`;
       return `Your answer goes to ${asker}${continues}.`;
@@ -281,6 +293,7 @@ const ENDED: Record<string, string> = {
   issue_closed: "Ended when the task closed",
   addressee_deleted: "Ended: the person it was for left",
   cancelled: "Cancelled",
+  superseded: "Replaced by a newer request",
 };
 
 /** What was decided, and what came of it, for a settled interaction. */
@@ -334,6 +347,13 @@ export function settledLines(interaction: IssueThreadInteraction, ctx: RequestCo
       .map(([verdict, word]) => (count(verdict!) ? `${count(verdict!)} ${word}` : ""))
       .filter(Boolean);
     return { verdict: { text: `${by} gave verdicts${parts.length ? `: ${parts.join(", ")}` : ""}`, tone: "ok", at }, result: { text: `Sent to ${asker}`, tone: "muted" } };
+  }
+
+  if (interaction.kind === "connection_intent" && (interaction.status === "accepted" || interaction.status === "rejected")) {
+    const access = !!interaction.payload.accessRequest;
+    return interaction.status === "accepted"
+      ? { verdict: { text: `${by} ${access ? "granted access" : "connected it"}`, tone: "ok", at }, result: { text: `${asker} can use it now`, tone: "muted" } }
+      : { verdict: { text: `${by} declined`, tone: "muted", at }, result: { text: `Sent to ${asker}, which continues without it`, tone: "muted" } };
   }
 
   if (interaction.status === "rejected") {
@@ -511,8 +531,10 @@ export type ReviewContext = { stalled?: boolean; whyNow?: string | null; since?:
 /**
  * A task waiting on a review stage, as a sign-off request. On your turn you approve or send it back
  * with the comment the server asks for (`issue-execution-policy.ts`): approving moves the task to
- * done, sending back to in progress, both through `PATCH /issues/:id`. Once the task leaves review,
- * the request is settled with the stage's last decision.
+ * done, sending back to in progress, both through `PATCH /issues/:id`. A stalled review (nobody can
+ * review it) is any person's to decide, through `POST /issues/:id/stalled-review-decision`: approve,
+ * request changes (with a note) or send back. Once the task leaves review, the request is settled
+ * with the stage's last decision.
  */
 export function requestFromReview(task: ReviewTask, ctx: RequestContext, review: ReviewContext = {}): Request {
   const nameOf = (key: string) => {
@@ -538,8 +560,8 @@ export function requestFromReview(task: ReviewTask, ctx: RequestContext, review:
       : signoff.waitingOn
         ? `Review pending with ${signoff.waitingOn}`
         : `Review ${task.title || identifier}`;
-  const next = stalled
-    ? (review.whyNow ?? "Nobody is set to review it. Choose a review path from the task.")
+  const next = stalled && open
+    ? `Nobody can review ${identifier}, so you decide: approving marks it done; requesting changes or sending it back returns it to its assignee with your note.`
     : canSign
       ? after && steps.some((step) => step.now)
         ? `Approving moves ${identifier} to its next stage: ${after.label.toLowerCase()}.`
@@ -575,9 +597,9 @@ export function requestFromReview(task: ReviewTask, ctx: RequestContext, review:
     state: open ? "open" : "settled",
     respond: !open
       ? { allowed: false, reason: null }
-      : canSign
+      : canSign || stalled
         ? { allowed: true, reason: null }
-        : { allowed: false, reason: stalled ? null : signoff.waitingOn ? `Waiting on ${signoff.waitingOn.replace(/\.$/, "")}.` : null },
+        : { allowed: false, reason: signoff.waitingOn ? `Waiting on ${signoff.waitingOn.replace(/\.$/, "")}.` : null },
     verdict,
     result: null,
     createdAt: new Date(review.since ?? task.updatedAt),
