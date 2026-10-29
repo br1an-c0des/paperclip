@@ -416,6 +416,136 @@
   list-style: none;
 }
 
+/* The environment dialog (EnvironmentDialog.tsx): SSH fields two by two, stacking on a phone. */
+.cs-env-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.cs-env-pem {
+  font-size: 12px;
+}
+
+.cs-env-probe {
+  margin: 0;
+  color: var(--body);
+  font-size: 13px;
+}
+
+.cs-env {
+  gap: 8px;
+}
+
+.cs-env .ps-env-head,
+.cs-env .ps-env-row {
+  padding-inline: 0;
+}
+
+@media (max-width: 640px) {
+  .cs-env-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cs-env .ps-env-head {
+    display: none;
+  }
+
+  .cs-env .ps-env-row {
+    grid-template-columns: minmax(0, 1fr) 30px;
+  }
+
+  .cs-env .ps-env-value {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* Secrets: AWS discovery in the vault dialog, the import list, and the access log. */
+.cs-discovery {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.cs-discovery p {
+  margin: 0;
+}
+
+.cs-warn {
+  color: var(--amber-fg);
+}
+
+.cs-lrow--flush {
+  min-height: 40px;
+  padding-inline: 0;
+}
+
+.cs-import-list {
+  display: flex;
+  flex-direction: column;
+  max-height: min(420px, 55vh);
+  overflow: auto;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-field);
+}
+
+.cs-import-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.cs-import-row:first-child {
+  border-top: 0;
+}
+
+.cs-import-list > p {
+  margin: 0;
+  padding: 12px;
+}
+
+.cs-import-pick {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.cs-import-pick input {
+  margin-top: 3px;
+}
+
+.cs-import-names {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  padding-left: 24px;
+}
+
+.cs-import-names .field-error {
+  grid-column: 1 / -1;
+}
+
+.cs-access-log {
+  gap: 12px;
+}
+
+.cs-access-when {
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .cs-import-names {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Narrow cards: tables stack their cells. */
 @container (max-width: 640px) {
   .cs-thead {

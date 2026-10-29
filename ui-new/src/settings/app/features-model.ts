@@ -8,6 +8,9 @@ import type { InstanceExperimentalSettingsWithManaged, InstanceFeatureKey, Patch
  * with its reason in LEFT_OUT, so a flag upstream adds or renames fails features-model.test.ts until
  * it's sorted here.
  *
+ * Agent chat (`enableAgentChat`) has a switch too: decision A wants it always on, but a fresh
+ * instance starts with it off, and an admin needs a way to turn it on (M7 audit, part B).
+ *
  * Switches save with `PATCH /api/instance/settings/experimental`, the flag's key and its new value.
  * Two kinds of requirement:
  *
@@ -63,6 +66,11 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
   {
     title: "Agents",
     flags: [
+      {
+        key: "enableAgentChat",
+        label: "Agent chat",
+        help: "Chat with an agent from its page and the Chat tab. This UI is built around it, so keep it on; a fresh instance starts with it off. Turning it off hides chat everywhere; saved chats are kept.",
+      },
       {
         key: "enableNativeRunner",
         label: "Paperclip Runner",
@@ -194,8 +202,6 @@ export const LEFT_OUT: Partial<Record<InstanceFeatureKey, string>> = {
   enableEnvironments: "Built in: Environments is a company settings section.",
   enableIssuePlanDecompositions: "Built in: shown in a task's history.",
   enableExperimentalFileViewer: "Built in: the task panel's file browser.",
-  // Always on for ui-new.
-  enableAgentChat: "Always on: ui-new's agent chat needs it (decision A).",
   // Maintainer and developer tools.
   enableSmokeLab: "Maintainer tooling.",
   enablePaperclipDeveloperMode: "Maintainer tooling.",

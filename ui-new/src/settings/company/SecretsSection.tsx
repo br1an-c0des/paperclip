@@ -14,20 +14,9 @@ import { Menu } from "@/ui/Menu";
 import { Popover } from "@/ui/Popover";
 import { TonePill, type Tone } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
-import {
-  coverageLabel,
-  keyFromName,
-  keyProblem,
-  listedProviders,
-  organizationSecrets,
-  proposalMeta,
-  proposalTitle,
-  providerName,
-  secretCounts,
-  secretsLabel,
-  storedIn,
-  usesLabel,
-} from "./secrets-model";
+import { coverageLabel, keyFromName, keyProblem, organizationSecrets, proposalMeta, proposalTitle, storedIn, usesLabel } from "./secrets-model";
+import { AccessLogDialog } from "./SecretAccessLog";
+import { ImportFromVaultButton, ProvidersCard } from "./SecretVaults";
 import { CardHead, CardNoteLine, failure, SectionTitle, shortDate } from "./shared";
 
 /*
@@ -36,12 +25,11 @@ import { CardHead, CardNoteLine, failure, SectionTitle, shortDate } from "./shar
  *
  * - Requests from agents: secrets and bindings an agent proposed while working. The agent supplied
  *   the value with its request, so approving stores it; declining needs a reason the agent reads.
- * - Organization secrets, with where each is used (`/secrets/:id/usage`).
- * - Providers: where values are stored, their health, and the default.
+ * - Organization secrets, with where each is used (`/secrets/:id/usage`) and who read it (its
+ *   access log, SecretAccessLog.tsx), and an import of an AWS vault's existing secrets.
+ * - Providers: where values are stored, this organization's vaults, their health and the default
+ *   (SecretVaults.tsx).
  * - Per-person secrets: definitions each person fills in with their own value, and yours.
- *
- * Setting up a new external provider and importing secrets from one aren't here yet; those flows
- * stay in the classic UI for now.
  */
 
 export function SecretsSection() {
@@ -181,6 +169,7 @@ function OrganizationSecretsCard(props: {
   const list = createMemo(() => organizationSecrets(props.secrets));
   const [edit, setEdit] = createSignal<SecretEdit | null>(null);
   const [deleting, setDeleting] = createSignal<CompanySecret | null>(null);
+  const [logOf, setLogOf] = createSignal<CompanySecret | null>(null);
 
   const setStatus = async (secret: CompanySecret, status: "active" | "disabled") => {
     try {
@@ -211,9 +200,12 @@ function OrganizationSecretsCard(props: {
         title="Organization secrets"
         note={props.secrets ? (list().length === 1 ? "1 secret" : `${list().length} secrets`) : props.loading ? "Loading…" : ""}
         actions={
-          <Button size="compact" variant="primary" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setEdit({ mode: "new" })}>
-            New secret
-          </Button>
+          <>
+            <ImportFromVaultButton secrets={list()} />
+            <Button size="compact" variant="primary" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setEdit({ mode: "new" })}>
+              New secret
+            </Button>
+          </>
         }
       />
       <Show when={props.error}>
@@ -260,6 +252,9 @@ function OrganizationSecretsCard(props: {
                         Rotate
                       </Menu.Item>
                       <Menu.Item onSelect={() => setEdit({ mode: "edit", secret })}>Rename or describe</Menu.Item>
+                      <Menu.Item onSelect={() => setLogOf(secret)} description="Each time a run or plugin read it">
+                        Access log
+                      </Menu.Item>
                       <Show when={secret.status === "active"} fallback={<Menu.Item onSelect={() => void setStatus(secret, "active")}>Turn on</Menu.Item>}>
                         <Menu.Item onSelect={() => void setStatus(secret, "disabled")} description="Runs that need it fail until it's on again">
                           Turn off
@@ -278,6 +273,7 @@ function OrganizationSecretsCard(props: {
         </div>
       </Show>
       <SecretDialog edit={edit()} onClose={() => setEdit(null)} onSaved={props.onChanged} />
+      <AccessLogDialog secret={logOf()} onClose={() => setLogOf(null)} />
       <ConfirmDialog
         open={!!deleting()}
         onOpenChange={(open) => !open && setDeleting(null)}
@@ -426,120 +422,6 @@ function SecretDialog(props: { edit: SecretEdit | null; onClose: () => void; onS
         </Show>
       </div>
     </Dialog>
-  );
-}
-
-function ProvidersCard(props: { secrets: CompanySecret[] }) {
-  const company = useCompany();
-  const client = useQueryClient();
-  const descriptors = createQuery(() => ({
-    queryKey: queryKeys.companySettings.secretProviders(company().id),
-    queryFn: ({ signal }) => secretsApi.providers(company().id, signal),
-  }));
-  const configs = createQuery(() => ({
-    queryKey: queryKeys.companySettings.secretProviderConfigs(company().id),
-    queryFn: ({ signal }) => secretsApi.providerConfigs(company().id, signal),
-    retry: false,
-  }));
-  const counts = createMemo(() => secretCounts(props.secrets));
-  const listed = createMemo(() => listedProviders(descriptors.data, counts()));
-  const others = createMemo(() => (descriptors.data ?? []).filter((descriptor) => !listed().includes(descriptor)));
-  const [checking, setChecking] = createSignal<string | null>(null);
-  const refresh = () => client.invalidateQueries({ queryKey: queryKeys.companySettings.secretProviderConfigs(company().id) });
-
-  const check = async (configId: string) => {
-    setChecking(configId);
-    try {
-      const result = await secretsApi.checkProviderConfig(configId);
-      await refresh();
-      pushToast({ tone: result.status === "ready" ? "success" : "warn", title: result.message });
-    } catch (caught) {
-      pushToast({ tone: "error", title: "Couldn't check the provider", body: failure(caught, "") || undefined });
-    } finally {
-      setChecking(null);
-    }
-  };
-  const makeDefault = async (configId: string) => {
-    try {
-      await secretsApi.setDefaultProviderConfig(configId);
-      await refresh();
-      pushToast({ tone: "success", title: "New secrets go there now" });
-    } catch (caught) {
-      pushToast({ tone: "error", title: "Couldn't change the default", body: failure(caught, "") || undefined });
-    }
-  };
-
-  const healthTone = (status: string | null): Tone | null => (status === "ready" ? "green" : status === "warning" ? "amber" : status === "error" ? "red" : null);
-
-  return (
-    <section class="card settings-card" aria-labelledby="cs-providers">
-      <CardHead id="cs-providers" title="Providers" note="Where secret values are stored." />
-      <Show when={descriptors.isError}>
-        <CardNoteLine alert>Couldn't load the providers. {failure(descriptors.error, "")}</CardNoteLine>
-      </Show>
-      <For each={listed()}>
-        {(descriptor) => (
-          <div class="cs-lrow">
-            <div class="cs-person cs-grow">
-              <span class="cs-conn-mark" aria-hidden="true">
-                <ShieldCheck size={15} />
-              </span>
-              <span class="cs-person-text">
-                <span class="cs-strong">{providerName(descriptor.id)}</span>
-                <span class="cs-muted">
-                  {[descriptor.id === "local_encrypted" ? "Built in · encrypted on this server" : null, secretsLabel(counts().get(descriptor.id))].filter(Boolean).join(" · ")}
-                </span>
-              </span>
-            </div>
-            <Show when={descriptor.configured} fallback={<span class="cs-pill">Not set up</span>}>
-              <TonePill tone="green" compact>
-                Ready
-              </TonePill>
-            </Show>
-          </div>
-        )}
-      </For>
-      <For each={configs.data ?? []}>
-        {(config) => (
-          <div class="cs-lrow" classList={{ "cs-lrow--quiet": config.status === "disabled" }}>
-            <div class="cs-person cs-grow">
-              <span class="cs-conn-mark" aria-hidden="true">
-                {config.provider === "aws_secrets_manager" ? "AW" : config.provider === "gcp_secret_manager" ? "GC" : config.provider === "vault" ? "HV" : "PV"}
-              </span>
-              <span class="cs-person-text">
-                <span class="cs-strong">
-                  {config.displayName}
-                  {config.isDefault ? " · default" : ""}
-                </span>
-                <span class="cs-muted">
-                  {[providerName(config.provider), config.healthMessage, config.healthCheckedAt ? `checked ${shortDate(config.healthCheckedAt)}` : null].filter(Boolean).join(" · ")}
-                </span>
-              </span>
-            </div>
-            <Show when={healthTone(config.healthStatus)} fallback={<span class="cs-pill">{config.status === "disabled" ? "Off" : "Not checked"}</span>}>
-              {(tone) => (
-                <TonePill tone={tone()} compact>
-                  {config.healthStatus === "ready" ? "Healthy" : config.healthStatus === "warning" ? "Warning" : "Error"}
-                </TonePill>
-              )}
-            </Show>
-            <Button size="compact" disabled={checking() === config.id} onClick={() => void check(config.id)}>
-              {checking() === config.id ? "Checking…" : "Check"}
-            </Button>
-            <Show when={!config.isDefault && config.status !== "disabled"}>
-              <Button size="compact" variant="quiet" onClick={() => void makeDefault(config.id)}>
-                Make default
-              </Button>
-            </Show>
-          </div>
-        )}
-      </For>
-      <Show when={others().length > 0}>
-        <footer class="cfoot cs-muted">
-          Also available: {others().map((descriptor) => providerName(descriptor.id)).join(", ")}. Setting one up isn't in this version yet; use the classic UI's Secrets page.
-        </footer>
-      </Show>
-    </section>
   );
 }
 

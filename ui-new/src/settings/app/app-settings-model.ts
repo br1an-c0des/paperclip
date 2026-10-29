@@ -1,4 +1,13 @@
-import type { Agent, BackupRetentionPolicy, Company, FeedbackDataSharingPreference, PluginRecord, PluginStatus } from "@paperclipai/shared";
+import type {
+  Agent,
+  BackupRetentionPolicy,
+  Company,
+  FeedbackDataSharingPreference,
+  InboxAgentPolicy,
+  InboxAgentPolicyMode,
+  PluginRecord,
+  PluginStatus,
+} from "@paperclipai/shared";
 import type { AdapterInfo } from "@/api/agents";
 import type { BundledPlugin } from "@/api/plugins";
 import type { HealthStatus } from "@/api/health";
@@ -434,4 +443,32 @@ export function displayNameProblem(name: string) {
   if (!value) return "Enter a name.";
   if (value.length > 120) return "Keep it under 120 characters.";
   return null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// "Let agents tidy my inbox" (the old Profile page's InboxAgentPolicyControl)
+
+export const INBOX_POLICY_OPTIONS: readonly { value: InboxAgentPolicyMode; label: string; help: string }[] = [
+  { value: "open", label: "Any of my agents", help: "Any agent you manage may archive tasks out of your inbox." },
+  { value: "allowlist", label: "Only chosen agents", help: "Only the agents you pick below may." },
+  { value: "disabled", label: "Off", help: "Agents never archive tasks from your inbox." },
+];
+
+export type InboxPolicyDraft = { mode: InboxAgentPolicyMode; allowedAgentIds: string[] };
+
+/** What `PUT …/users/me/inbox-agent-policy` takes: agents are named only for an allowlist, as the server requires. */
+export function inboxPolicyBody(draft: InboxPolicyDraft): InboxPolicyDraft {
+  return { mode: draft.mode, allowedAgentIds: draft.mode === "allowlist" ? [...new Set(draft.allowedAgentIds)].sort() : [] };
+}
+
+export function inboxPolicyDirty(draft: InboxPolicyDraft, saved: Pick<InboxAgentPolicy, "mode" | "allowedAgentIds"> | undefined) {
+  if (!saved) return false;
+  return JSON.stringify(inboxPolicyBody(draft)) !== JSON.stringify(inboxPolicyBody(saved));
+}
+
+/** The agents that can be picked: not terminated, not waiting for approval, in a sound org chain (`isAgentTaskTarget`). */
+export function tidyingAgents(agents: readonly Agent[] | undefined) {
+  return (agents ?? [])
+    .filter((agent) => agent.status !== "terminated" && agent.status !== "pending_approval" && agent.orgChainHealth?.status !== "invalid_org_chain")
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

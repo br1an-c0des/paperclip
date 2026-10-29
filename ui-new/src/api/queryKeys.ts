@@ -336,6 +336,9 @@ export const queryKeys = {
     mySecrets: (companyId: string) => ["my-user-secrets", companyId] as const,
     secretProposals: (companyId: string) => ["secret-proposals", companyId, "pending"] as const,
     exportFidelity: (companyId: string) => ["companies", companyId, "export-fidelity"] as const,
+    secretAccessEvents: (secretId: string) => ["secrets", "access-events", secretId] as const,
+    environmentCapabilities: (companyId: string) => ["environment-capabilities", companyId] as const,
+    environmentSecretRefs: (environmentId: string) => ["environment-secret-refs", environmentId] as const,
     pluginPages: ["plugins", "ui-contributions"] as const,
     /** The whole instance settings (`GET /instance/settings`), for the instance-wide default environment. */
     instanceSettings: ["instance", "settings"] as const,
@@ -359,6 +362,8 @@ export const queryKeys = {
     companyDirectory: ["companies", "directory"] as const,
     /** The latest version of an npm package, for an installed harness's Update button. */
     npmLatest: (packageName: string) => ["npm-latest-version", packageName] as const,
+    /** "Let agents tidy my inbox": your policy in one organization. */
+    inboxAgentPolicy: (companyId: string) => ["inbox-agent-policy", companyId, "me"] as const,
   },
 
   /*
