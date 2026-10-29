@@ -1,4 +1,13 @@
-import type { Approval, AttentionFeed, CompactIssue, InboxDismissal, Issue } from "@paperclipai/shared";
+import type {
+  Approval,
+  AttentionFeed,
+  AttentionSourceKind,
+  CompactIssue,
+  InboxDismissal,
+  Issue,
+  StalledReviewDecisionAction,
+  StalledReviewDecisionResponse,
+} from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
@@ -10,7 +19,11 @@ import { api } from "./client";
  *   (`includeDismissed`), and sorts it into tabs itself.
  * - Clearing and snoozing are per person (`/companies/:id/inbox-dismissals`), keyed by the item's
  *   `dismissalKey`. Restoring deletes the entry.
+ * - Keep (`/companies/:id/decision-retention/:sourceKind/:sourceId`): brings an item that went
+ *   quiet past its retention days back from the aging shelf, and keeps it from being archived.
  * - One approval by id, for its request card, and the tasks it's linked to.
+ * - A stalled review, one nobody can review: approve, request changes or send it back, as a person
+ *   (`POST /issues/:id/stalled-review-decision`).
  * - Updates: the tasks you took part in, as the old Inbox's Mine tab lists them, with read state and
  *   the per-person inbox archive.
  */
@@ -46,9 +59,18 @@ export const inboxApi = {
   restore: (companyId: string, itemKey: string) =>
     api.delete<void>(`/companies/${companyId}/inbox-dismissals/${encodeURIComponent(itemKey)}`),
 
+  keep: (companyId: string, sourceKind: AttentionSourceKind, sourceId: string, keep: boolean) =>
+    api.patch<{ keep: boolean }>(
+      `/companies/${companyId}/decision-retention/${encodeURIComponent(sourceKind)}/${encodeURIComponent(sourceId)}`,
+      { keep },
+    ),
+
   approval: (approvalId: string, signal?: AbortSignal) => api.get<Approval>(`/approvals/${approvalId}`, { signal }),
   /** The tasks an approval is linked to; the feed doesn't carry them. */
   approvalIssues: (approvalId: string, signal?: AbortSignal) => api.get<Issue[]>(`/approvals/${approvalId}/issues`, { signal }),
+
+  decideStalledReview: (issueId: string, action: StalledReviewDecisionAction, note?: string) =>
+    api.post<StalledReviewDecisionResponse>(`/issues/${issueId}/stalled-review-decision`, note ? { action, note } : { action }),
 
   /** Your tasks, minus the ones you archived from the inbox. */
   tasks: (companyId: string, signal?: AbortSignal) => api.get<CompactIssue[]>(`/companies/${companyId}/issues?${taskParams(false)}`, { signal }),
