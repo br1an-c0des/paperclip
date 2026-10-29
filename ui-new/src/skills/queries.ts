@@ -36,6 +36,16 @@ export function useSkillVersions(skillId: () => string | null) {
   }));
 }
 
+/** One version with its files' contents (the versions list carries names only). */
+export function useSkillVersion(skillId: () => string | null, versionId: () => string | null) {
+  const company = useCompany();
+  return createQuery(() => ({
+    queryKey: [...queryKeys.skills.versions(company().id, skillId() ?? ""), versionId() ?? ""],
+    queryFn: ({ signal }) => skillsApi.version(company().id, skillId()!, versionId()!, signal),
+    enabled: skillId() !== null && versionId() !== null,
+  }));
+}
+
 export function useSkillFile(skillId: () => string | null, path: () => string | null) {
   const company = useCompany();
   return createQuery(() => ({

@@ -1,4 +1,4 @@
-import type { CompanySkillDetail, CompanySkillVersion } from "@paperclipai/shared";
+import type { CompanySkillDetail, CompanySkillVersionSummary } from "@paperclipai/shared";
 import { A, useNavigate } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ArrowLeft, FilePlus, FileText, History, Plus, Save, Trash2 } from "lucide-solid";
@@ -218,7 +218,7 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
   const [versionOpen, setVersionOpen] = createSignal(false);
   const [deleteFileOpen, setDeleteFileOpen] = createSignal(false);
   const [deleteSkillOpen, setDeleteSkillOpen] = createSignal(false);
-  const [restoring, setRestoring] = createSignal<CompanySkillVersion | null>(null);
+  const [restoring, setRestoring] = createSignal<CompanySkillVersionSummary | null>(null);
   const [comparing, setComparing] = createSignal(false);
 
   // A new file starts empty: there's nothing on the server until it's saved.
@@ -284,9 +284,11 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
     }
   };
 
-  const restore = async (version: CompanySkillVersion) => {
+  const restore = async (version: CompanySkillVersionSummary) => {
     try {
-      for (const entry of version.fileInventory) {
+      // The versions list names the files only; read the version for their contents.
+      const full = await skillsApi.version(company().id, props.skill.id, version.id);
+      for (const entry of full.fileInventory) {
         await skillsApi.saveFile(company().id, props.skill.id, entry.path, entry.content, { encoding: entry.encoding, executable: entry.executable ?? false });
       }
       await skillsApi.createVersion(company().id, props.skill.id, `Restore of v${version.revisionNumber}`);

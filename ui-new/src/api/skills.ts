@@ -20,6 +20,7 @@ import type {
   CompanySkillStarResult,
   CompanySkillUpdateStatus,
   CompanySkillVersion,
+  CompanySkillVersionSummary,
   Folder,
   FolderListResult,
   ProjectRepositoryOptions,
@@ -67,8 +68,11 @@ const folders = (companyId: string) => `/companies/${encodeURIComponent(companyI
 export const skillsApi = {
   list: (companyId: string, signal?: AbortSignal) => api.get<CompanySkillListItem[]>(`${skills(companyId)}?sort=alphabetical`, { signal }),
   detail: (companyId: string, skillId: string, signal?: AbortSignal) => api.get<CompanySkillDetail>(skill(companyId, skillId), { signal }),
+  /** The versions with file names and kinds only; read one with `version` for its files' contents. */
   versions: (companyId: string, skillId: string, signal?: AbortSignal) =>
-    api.get<CompanySkillVersion[]>(`${skill(companyId, skillId)}/versions`, { signal }),
+    api.get<CompanySkillVersionSummary[]>(`${skill(companyId, skillId)}/versions`, { signal }),
+  version: (companyId: string, skillId: string, versionId: string, signal?: AbortSignal) =>
+    api.get<CompanySkillVersion>(`${skill(companyId, skillId)}/versions/${encodeURIComponent(versionId)}`, { signal }),
   /** Names the skill's current files as a version. */
   createVersion: (companyId: string, skillId: string, label: string | null) =>
     api.post<CompanySkillVersion>(`${skill(companyId, skillId)}/versions`, { label }),

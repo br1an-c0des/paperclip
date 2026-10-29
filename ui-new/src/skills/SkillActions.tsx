@@ -1,4 +1,4 @@
-import type { CompanySkillDetail, CompanySkillVersion } from "@paperclipai/shared";
+import type { CompanySkillDetail, CompanySkillVersion, CompanySkillVersionSummary } from "@paperclipai/shared";
 import { useNavigate } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Check, Download, FileText, GitFork, Star } from "lucide-solid";
@@ -12,7 +12,7 @@ import { Dialog } from "@/ui/Dialog";
 import { Field, TextInput } from "@/ui/Field";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
-import { failureText, useRefreshSkills, useSkillUpdateStatus } from "./queries";
+import { failureText, useRefreshSkills, useSkillUpdateStatus, useSkillVersion } from "./queries";
 import { comparedPaths, compareSelection, fileChange, slugFor, updateLine, versionName } from "./skills-model";
 import "@/documents/DocumentView.css";
 
@@ -259,7 +259,7 @@ export function CompareVersionsDialog(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   skillName: string;
-  versions: readonly CompanySkillVersion[];
+  versions: readonly CompanySkillVersionSummary[];
   targetId?: string | null;
 }) {
   const sorted = createMemo(() => [...props.versions].sort((a, b) => b.revisionNumber - a.revisionNumber));
@@ -280,8 +280,12 @@ export function CompareVersionsDialog(props: {
     ),
   );
 
-  const before = () => sorted().find((version) => version.id === beforeId()) ?? null;
-  const after = () => sorted().find((version) => version.id === afterId()) ?? null;
+  // The list names the files only; each side's contents come from its own version read.
+  const skillId = () => props.versions[0]?.companySkillId ?? null;
+  const beforeQuery = useSkillVersion(skillId, () => (props.open ? beforeId() : null));
+  const afterQuery = useSkillVersion(skillId, () => (props.open ? afterId() : null));
+  const before = () => (beforeId() ? (beforeQuery.data ?? null) : null);
+  const after = () => (afterId() ? (afterQuery.data ?? null) : null);
   const paths = createMemo(() => comparedPaths(before(), after()));
   const current = () => (paths().includes(path()) ? path() : (paths()[0] ?? "SKILL.md"));
   const content = (version: CompanySkillVersion | null) => version?.fileInventory.find((file) => file.path === current())?.content ?? "";
@@ -304,7 +308,11 @@ export function CompareVersionsDialog(props: {
             </select>
           </label>
         </div>
-        <Show when={after()} fallback={<p class="org-muted">This skill has no saved versions to compare.</p>}>
+        <Show when={afterId()} fallback={<p class="org-muted">This skill has no saved versions to compare.</p>}>
+          <Show when={beforeQuery.error ?? afterQuery.error}>
+            {(error) => <p class="org-muted" role="alert">{failureText(error(), "Couldn't load the versions.")}</p>}
+          </Show>
+          <Show when={after() && (!beforeId() || before())} fallback={<Show when={!(beforeQuery.error ?? afterQuery.error)}><p class="org-muted">Loading the versions…</p></Show>}>
           <div class="sk-compare-body">
             <ul class="sk-files sk-compare-files" aria-label="Files">
               <For each={paths()}>
@@ -326,10 +334,11 @@ export function CompareVersionsDialog(props: {
                 }}
               </For>
             </ul>
-            <Show when={before()?.id !== after()?.id} fallback={<p class="org-muted">Both sides are the same version.</p>}>
+            <Show when={beforeId() !== afterId()} fallback={<p class="org-muted">Both sides are the same version.</p>}>
               <VersionDiff before={content(before())} after={content(after())} beforeLabel={before() ? versionName(before()!) : "Nothing"} afterLabel={versionName(after()!)} />
             </Show>
           </div>
+          </Show>
         </Show>
       </div>
     </Dialog>

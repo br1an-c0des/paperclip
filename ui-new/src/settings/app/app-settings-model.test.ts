@@ -140,7 +140,7 @@ describe("harnesses", () => {
       usage,
     );
     expect(harnessSummary(groups.inUse[0]!)).toBe("Built in · 3 agents, 1 on the Paperclip Runner");
-    expect(harnessSummary(groups.inUse[1]!)).toBe("Built in · 2 agents · carries Claude Code, Codex, OpenCode and Pi");
+    expect(harnessSummary(groups.inUse[1]!)).toBe("Built in · 2 agents · carries Claude Code, Codex, Grok Build, OpenCode and Pi");
     expect(harnessSummary(groups.installed[0]!)).toBe("Version 0.4.1 · no agents yet");
   });
 

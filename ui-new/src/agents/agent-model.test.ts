@@ -18,6 +18,7 @@ import {
   probeQualified,
   recommendedForLeads,
   revisionConfigChanges,
+  runnerCapable,
   runnerOffer,
   runtimeDraft,
   runtimeIdentity,
@@ -75,6 +76,11 @@ describe("harness and runner", () => {
     expect(harnessType("paperclip_runner", { provider: "opencode" })).toBe("opencode_local");
     expect(harnessType("paperclip_runner", { provider: "acpx", acpxAgent: "copilot" })).toBe("acpx:copilot");
     expect(harnessType("claude_local", { provider: "ignored" })).toBe("claude_local");
+  });
+
+  it("knows which harnesses the Paperclip Runner carries", () => {
+    for (const harness of ["codex_local", "claude_local", "pi_local", "grok_local", "opencode_local"]) expect(runnerCapable(harness)).toBe(true);
+    expect(runnerCapable("gemini_local")).toBe(false);
   });
 
   it("labels the harness with its runner where there's a choice", () => {

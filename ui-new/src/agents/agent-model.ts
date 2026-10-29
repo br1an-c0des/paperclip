@@ -36,8 +36,8 @@ export function agentRunner(adapterType: string): AgentRunner {
   return adapterType === "paperclip_runner" ? "paperclip" : "legacy";
 }
 
-/** Harnesses the Paperclip Runner can carry. */
-export const RUNNER_HARNESSES = new Set(["codex_local", "claude_local", "pi_local", "opencode_local"]);
+/** Harnesses the Paperclip Runner can carry (`paperclipRunnerProfileForHarness` in @paperclipai/shared). */
+export const RUNNER_HARNESSES = new Set(["codex_local", "claude_local", "pi_local", "grok_local", "opencode_local"]);
 
 export function runnerCapable(harness: string) {
   return RUNNER_HARNESSES.has(harness);

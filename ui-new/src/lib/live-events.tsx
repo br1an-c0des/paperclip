@@ -201,8 +201,11 @@ export function keysForEvent(companyId: string, event: LiveEvent): QueryKey[] {
     case "plugin.worker.restarted":
       return [["plugins"]];
     // Run logs and events stream to subscribers only (the run modal and chat read them).
+    // `heartbeat.run.activity` is the server's throttled "a run produced output" hint, sent instead
+    // of transcripts to clients that negotiate run interests; ui-new doesn't negotiate.
     case "heartbeat.run.log":
     case "heartbeat.run.event":
+    case "heartbeat.run.activity":
     case "external_object.updated":
       return [];
   }
