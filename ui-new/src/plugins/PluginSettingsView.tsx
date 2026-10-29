@@ -6,9 +6,11 @@ import { createMemo, For, Match, Show, Switch } from "solid-js";
 import { pluginsApi } from "@/api/plugins";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
+import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { buttonClass } from "@/ui/Button";
 import { usePluginSlots } from "./contributions";
 import { PluginConfigForm } from "./PluginConfigForm";
+import { PluginLocalFolders } from "./PluginLocalFolders";
 import { PluginSlotMount } from "./PluginSlot";
 import { PluginStatus } from "./PluginStatus";
 import type { JsonSchemaNode } from "./schema-form";
@@ -22,9 +24,10 @@ import "./plugin-settings.css";
  * - Settings: the `settingsPage` slots the plugin draws itself; or, for a plugin that only declares
  *   `instanceConfigSchema`, a form generated from it (PluginConfigForm.tsx); or a pointer to
  *   Environments for a plugin that adds environment drivers.
+ * - Folders: the server folders a plugin asks for (`localFolders`), per organization
+ *   (PluginLocalFolders.tsx). Hidden under `enableManagedSandboxOnly`, where the managed environment
+ *   owns the filesystem, as the old page does.
  * - Status: health, the worker, recent jobs and webhooks, logs and permissions (PluginStatus.tsx).
- *
- * The old page's local folders (host folders a plugin asks for) aren't ported.
  */
 
 export function PluginSettingsView(props: { plugin: PluginRecord; name: string; backHref: string }) {
@@ -42,7 +45,10 @@ export function PluginSettingsView(props: { plugin: PluginRecord; name: string; 
     return value?.properties && Object.keys(value.properties).length > 0 ? value : null;
   });
   const drivers = () => props.plugin.manifestJson?.environmentDrivers ?? [];
-  const folders = () => props.plugin.manifestJson?.localFolders ?? [];
+  const experimental = useExperimentalSettingsQuery();
+  // Unknown counts as managed, so a failed read never shows host paths the policy hides.
+  const hideHostPaths = () => experimental.data === undefined || experimental.data.enableManagedSandboxOnly === true;
+  const folders = () => (hideHostPaths() ? [] : (props.plugin.manifestJson?.localFolders ?? []));
 
   return (
     <div class="plugin-settings">
@@ -52,11 +58,16 @@ export function PluginSettingsView(props: { plugin: PluginRecord; name: string; 
       </A>
       <Show when={props.plugin.manifestJson?.description}>{(text) => <p class="plugin-settings-about">{text()}</p>}</Show>
 
+      <Show when={folders().length > 0}>
+        <PluginLocalFolders pluginId={props.plugin.id} companyId={company().id} declarations={folders()} />
+      </Show>
       <Switch
         fallback={
-          <section class="card plugin-note">
-            <p>{props.name} doesn't need any settings.</p>
-          </section>
+          <Show when={folders().length === 0}>
+            <section class="card plugin-note">
+              <p>{props.name} doesn't need any settings.</p>
+            </section>
+          </Show>
         }
       >
         <Match when={slots().length > 0}>
@@ -93,11 +104,6 @@ export function PluginSettingsView(props: { plugin: PluginRecord; name: string; 
           </section>
         </Match>
       </Switch>
-      <Show when={folders().length > 0}>
-        <p class="plugin-note plugin-note--quiet">
-          {props.name} also asks for {folders().length === 1 ? "a folder" : `${folders().length} folders`} on the server; choosing them is still in the classic UI.
-        </p>
-      </Show>
 
       <PluginStatus plugin={props.plugin} />
     </div>

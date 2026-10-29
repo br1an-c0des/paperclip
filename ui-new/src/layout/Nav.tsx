@@ -32,7 +32,7 @@ import { useCompaniesQuery, useCompany } from "@/lib/company";
 import { useNeedsYouCount } from "@/inbox/needs-you";
 import { isOrgPage } from "./dock-model";
 import { NavPlugins, NavProjectPlugins } from "@/plugins/NavPlugins";
-import { GlobalToolbarPlugins } from "@/plugins/ShellPlugins";
+import { GlobalToolbarPlugins, PluginOrganizationSwitcher } from "@/plugins/ShellPlugins";
 import { useAgentStars } from "@/agents/AgentStar";
 import { starredAgents } from "@/agents/star-model";
 import { useCanCreateCompany } from "@/onboarding/can-create";
@@ -277,7 +277,9 @@ export function Nav() {
   return (
     <>
       <div class="nav-top">
-        <CompanySwitcher />
+        <PluginOrganizationSwitcher>
+          <CompanySwitcher />
+        </PluginOrganizationSwitcher>
         <button
           type="button"
           class={buttonClass({ variant: "icon", ghost: true })}

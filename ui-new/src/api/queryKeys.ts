@@ -377,6 +377,7 @@ export const queryKeys = {
     dashboard: (pluginId: string) => ["plugins", "detail", pluginId, "dashboard"] as const,
     logs: (pluginId: string) => ["plugins", "detail", pluginId, "logs"] as const,
     config: (pluginId: string, companyId: string) => ["plugins", "detail", pluginId, "config", companyId] as const,
+    localFolders: (pluginId: string, companyId: string) => ["plugins", "detail", pluginId, "local-folders", companyId] as const,
   },
 
   /** The current Paperclip announcement for a signed-in person (src/shell/Announcements.tsx). */

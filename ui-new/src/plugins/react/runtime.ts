@@ -5,6 +5,7 @@ import * as ReactDom from "react-dom";
 import * as ReactDomClient from "react-dom/client";
 import * as ReactJsxRuntime from "react/jsx-runtime";
 import { PluginBridgeContext, copyTextToClipboard, useHostContext, useHostLocation, useHostNavigation, usePluginAction, usePluginData, usePluginStream, usePluginToast } from "./bridge";
+import { discGradient, initials } from "@/ui/Avatar";
 import * as components from "./components";
 import "./sdk.css";
 // The old UI's Tailwind classes, scoped to plugin areas (scripts/plugin-tailwind.ts, decision 39 D10).
@@ -47,11 +48,13 @@ export type MountSpec = {
   component: unknown;
   props: Record<string, unknown>;
   hostContext: PluginHostContext;
+  /** Called when the component throws; a replacement surface uses it to fall back to the host's own. */
+  onError?: () => void;
 };
 
 export type MountHandle = { update: (spec: MountSpec) => void; unmount: () => void };
 
-type BoundaryProps = { label: string; pluginId: string; children?: ReactNode };
+type BoundaryProps = { label: string; pluginId: string; onError?: () => void; children?: ReactNode };
 
 /** One plugin area failing leaves the page and every other plugin area standing. */
 export class PluginErrorBoundary extends Component<BoundaryProps, { failed: boolean }> {
@@ -63,6 +66,7 @@ export class PluginErrorBoundary extends Component<BoundaryProps, { failed: bool
 
   override componentDidCatch(error: unknown, info: ErrorInfo) {
     console.error("Plugin UI failed to render", { pluginId: this.props.pluginId, label: this.props.label, error, componentStack: info.componentStack });
+    this.props.onError?.();
   }
 
   override render() {
@@ -74,7 +78,7 @@ export class PluginErrorBoundary extends Component<BoundaryProps, { failed: bool
 function tree(spec: MountSpec) {
   return h(
     PluginErrorBoundary,
-    { label: spec.label, pluginId: spec.pluginId },
+    { label: spec.label, pluginId: spec.pluginId, onError: spec.onError },
     h(PluginBridgeContext.Provider, { value: { pluginId: spec.pluginId, hostContext: spec.hostContext } }, h(spec.component as React.ComponentType<Record<string, unknown>>, spec.props)),
   );
 }
@@ -87,4 +91,24 @@ export function mountPluginComponent(container: HTMLElement, spec: MountSpec): M
     // Unmounting inside a Solid cleanup can land mid-render; defer it a tick as React asks.
     unmount: () => queueMicrotask(() => root.unmount()),
   };
+}
+
+/**
+ * A company's mark as a React element, for the `organizationSwitcher` slot's `renderIcon`: the logo,
+ * or the initials disc ui-new's switcher draws (ui/Avatar.tsx's colours, keyed by `seed`).
+ */
+export function renderCompanyIcon(name: string, logoUrl: string | null, inMenu: boolean, seed: string) {
+  const size = inMenu ? 22 : 28;
+  if (logoUrl) {
+    return h("img", { src: logoUrl, alt: "", width: size, height: size, className: "plugin-company-logo", style: { width: size, height: size } });
+  }
+  return h(
+    "span",
+    {
+      className: "disc-avatar",
+      "aria-hidden": "true",
+      style: { width: size, height: size, fontSize: Math.max(8, Math.round(size * 0.36)), background: discGradient(seed) },
+    },
+    initials(name),
+  );
 }

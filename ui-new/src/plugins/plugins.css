@@ -459,3 +459,15 @@ button.plugin-launcher-navi {
 .plugin-workspace-view {
   padding: 14px 16px;
 }
+
+/* An `organizationSwitcher` plugin takes the company switcher's place at the top of the nav. */
+.plugin-org-switcher {
+  flex: 1;
+  min-width: 0;
+}
+
+.plugin-company-logo {
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+}
