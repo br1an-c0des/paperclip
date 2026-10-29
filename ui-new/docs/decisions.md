@@ -68,6 +68,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 39 | [Decisions from the M7 audit](#39-decisions-from-the-m7-audit) | M7, see [audit/m7-parity.md](audit/m7-parity.md#5-decisions-needed) | Decided | Oct 28, 2026 |
 | 40 | [Gaps found building requests and the Inbox](#40-gaps-found-building-requests-and-the-inbox) | `tasks/interactions`, `inbox-search/triage`, `decisions/feed` | Open | Oct 28, 2026 |
 | 41 | [Gaps found building old links, the shell and the installable app](#41-gaps-found-building-old-links-the-shell-and-the-installable-app) | `shell/*`, `approvals/governance`, User profile | Open | Oct 28, 2026 |
+| 42 | [Gaps found building the task panel, runs and workspaces](#42-gaps-found-building-the-task-panel-runs-and-workspaces) | `tasks/*`, `runs-adapters/runs`, `workspaces/*` | Open | Oct 28, 2026 |
 
 ## Entries
 
@@ -1363,3 +1364,37 @@ Both are handled in `ui-new` for now.
   links land on a placeholder until D3.
 - **`]` and `y`, `g c`:** `]` remembers the closed panel per path; `y` and `g c` are handled in the
   shell through the open task's DOM.
+
+### 42. Gaps found building the task panel, runs and workspaces
+
+- **Status:** Open
+- **Area:** `tasks/*`, `documents-artifacts/*`, `runs-adapters/runs`, `workspaces/*`
+- **Found in:** M7 slices C1 and C2.
+
+- **Decision 15 is wrong about `cursor_cloud`:** its transcript parser ships in
+  `@paperclipai/adapter-cursor-cloud/ui`. Using it means adding that workspace package to
+  `ui-new/package.json`. Open: add it, or keep `cursor_cloud` as plain lines.
+- **Copies of upstream code to check at each sync:** the Paperclip Runner transcript parser (copied
+  from `ui/src/adapters/paperclip-runner`, upstream 57e977be7; no package exports it) and the
+  runtime-command matching (`listWorkspaceCommandDefinitions`, `matchWorkspaceRuntimeServiceToCommand`
+  from `@paperclipai/shared`, ported to `workspaces/runtime-commands.ts` because `ui-new` imports
+  types only).
+- **Reading workspace files is logged as activity** (`issue.file_resource_*`) and broadcast on the
+  socket. Refreshing the task on it looped with the open file viewer until the server's rate limit
+  answered "Too many workspace file list requests". `ui-new` treats those actions as activity only.
+- **`GET /issues/:id/comments/:commentId` 404s when `:id` is an identifier** (it compares
+  `comment.issueId` with the raw parameter); `ui-new` always passes the task's UUID.
+- **Watchdog buttons show to every board user:** `ui-new`'s board access has no membership roles, so
+  a 403 is explained after the click.
+- **Plugin task extras squeeze full-height sections:** `TaskPluginExtras` sits above the section
+  content in `.tsec-body`, so a tall plugin block (Kitchen Sink's JSON) can push the Files viewer to
+  zero height. To fix with the plugin work (slice E) or the task panel.
+- **On phones:** the task list only (the board, saved views and the Recurring switch stay on
+  desktop); in a run, the transcript only (input, raw output and trace on desktop, per M11).
+- **Board sends are kept in sessionStorage** before they're posted, as in the old UI: it's a record of
+  a send, not a draft, so a send that can't be kept isn't posted.
+- **Not checked live:** reusing another task's worktree (`enableIsolatedWorkspaces` is off), board
+  sends (chat connectors off), revision votes and source-trust badges (no such data in TES), and every
+  run or workspace action with side effects (mocks only).
+- **M11's result card** (result text, changed files, pull request, outputs) isn't built: the run
+  modal doesn't load that data yet.
