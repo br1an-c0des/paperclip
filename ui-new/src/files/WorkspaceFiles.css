@@ -1,4 +1,10 @@
 /* A task's workspace files: the list or tree, and the preview beside it (or instead of it when narrow) */
+
+/* Its own container, so the two panes follow its width in the dock panel and on the task page alike */
+.wf {
+  container: wf / inline-size;
+}
+
 .wf-heading h2 {
   overflow: hidden;
   white-space: nowrap;
@@ -24,7 +30,7 @@
   display: none;
 }
 
-@container panel (width >= 760px) {
+@container wf (width >= 760px) {
   .wf-body {
     grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
   }
@@ -395,9 +401,19 @@ button.wf-row:focus-visible {
   overflow-wrap: anywhere;
 }
 
-@container panel (width < 480px) {
+@container wf (width < 480px) {
   .wf-preview-head {
     padding: 10px 12px;
     flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  /* The name keeps the first row; the view switch and tools drop to the next */
+  .wf-preview-title {
+    flex-basis: calc(100% - 48px);
+  }
+
+  .wf-preview-tools {
+    margin-left: auto;
   }
 }

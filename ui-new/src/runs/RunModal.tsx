@@ -1,7 +1,7 @@
 import { Tabs } from "@kobalte/core/tabs";
 import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { ChevronDown, ChevronLeft, ChevronRight, Download, Link2, RotateCcw, Square } from "lucide-solid";
+import { ChevronDown, ChevronLeft, ChevronRight, Download, Link2, Monitor, RotateCcw, Square } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { accessApi } from "@/api/access";
 import { heartbeatsApi } from "@/api/heartbeats";
@@ -11,6 +11,7 @@ import { issuePath, issuesApi } from "@/api/issues";
 import { chatPath } from "@/chat/chat-model";
 import { queryKeys } from "@/api/queryKeys";
 import { runPath, runsApi } from "@/api/runs";
+import { isCompact } from "@/layout/breakpoints";
 import { useNow } from "@/lib/clock";
 import { useCommands } from "@/lib/commands";
 import { Menu } from "@/ui/Menu";
@@ -239,6 +240,11 @@ function RunView(props: { runId: string }) {
     ),
   );
 
+  // On a phone the run is its transcript; input, raw output and the trace open on desktop (M11).
+  createEffect(() => {
+    if (isCompact() && view() !== "transcript") setView("transcript");
+  });
+
   const stop = createMutation(() => ({
     mutationFn: () => heartbeatsApi.cancel(props.runId),
     onSuccess: () => {
@@ -446,9 +452,12 @@ function RunView(props: { runId: string }) {
   const tabs = createMemo(() => {
     const list: { value: View; label: string; note: string }[] = [
       { value: "transcript", label: "Transcript", note: plural(stepCount(items()), "step") },
+    ];
+    if (isCompact()) return list;
+    list.push(
       { value: "input", label: "Input", note: promptSize(invocation()?.prompt ?? null)?.replace(" characters", " chars") ?? "" },
       { value: "raw", label: "Raw output", note: run.data?.logBytes ? formatBytes(run.data.logBytes) : `${log.chunks().length} lines` },
-    ];
+    );
     if (isAdmin()) {
       const meta = trace();
       list.push({ value: "trace", label: "Provider trace", note: traceReadable(meta) ? `${meta!.frameCount} frames` : "Off" });
@@ -572,16 +581,18 @@ function RunView(props: { runId: string }) {
                   >
                     <Link2 size={15} aria-hidden="true" />
                   </button>
-                  <button
-                    type="button"
-                    class="btn btn--icon btn--ghost btn--compact"
-                    aria-label="Download the loaded log"
-                    title="Download the loaded log"
-                    disabled={log.chunks().length === 0}
-                    onClick={download}
-                  >
-                    <Download size={15} aria-hidden="true" />
-                  </button>
+                  <Show when={!isCompact()}>
+                    <button
+                      type="button"
+                      class="btn btn--icon btn--ghost btn--compact"
+                      aria-label="Download the loaded log"
+                      title="Download the loaded log"
+                      disabled={log.chunks().length === 0}
+                      onClick={download}
+                    >
+                      <Download size={15} aria-hidden="true" />
+                    </button>
+                  </Show>
                 </div>
               </header>
 
@@ -666,7 +677,7 @@ function RunView(props: { runId: string }) {
                       skippedBytes={log.skippedBytes()}
                       plainLines={showsPlainLines(adapterType(), current().runtimeMode)}
                       onRetry={log.retry}
-                      onShowInput={() => setView("input")}
+                      onShowInput={isCompact() ? undefined : () => setView("input")}
                       reveal={reveal()}
                       decisionFor={decisionFor()}
                       onAnswer={answer}
@@ -681,6 +692,12 @@ function RunView(props: { runId: string }) {
                         </Show>
                       }
                     />
+                    <Show when={isCompact()}>
+                      <p class="rm-desk">
+                        <Monitor size={15} aria-hidden="true" />
+                        Input, raw output and provider trace open on desktop
+                      </p>
+                    </Show>
                   </Tabs.Content>
                   <Tabs.Content value="input">
                     <RunInput

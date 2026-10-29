@@ -64,7 +64,8 @@ export function RunTranscript(props: {
   /** The harness's output can't be read as a structured transcript, so it shows as plain lines. */
   plainLines: boolean;
   onRetry: () => void;
-  onShowInput: () => void;
+  /** Opens the Input view; left out on a phone, where it opens on desktop. */
+  onShowInput?: () => void;
   /** Folds opened for Find in run, because they hide a match (find-model.ts `foldsToReveal`). */
   reveal?: ReadonlySet<string>;
   /** The tool gateway's decision on a tool call, if it made one. */
@@ -125,9 +126,13 @@ export function RunTranscript(props: {
                 <span class="rt-tag">Input</span>
                 <span>Prompt from Paperclip</span>
                 <span class="cap">· {prompt().length.toLocaleString()} characters</span>
-                <button type="button" class="rm-b" onClick={() => props.onShowInput()}>
-                  Show full input
-                </button>
+                <Show when={props.onShowInput}>
+                  {(show) => (
+                    <button type="button" class="rm-b" onClick={() => show()()}>
+                      Show full input
+                    </button>
+                  )}
+                </Show>
               </div>
               <div class="rt-fade">
                 <pre class="rm-pre">{prompt().slice(0, 600)}</pre>

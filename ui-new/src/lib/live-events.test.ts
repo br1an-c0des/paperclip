@@ -40,6 +40,12 @@ describe("keysForEvent", () => {
     );
   });
 
+  it("leaves the task alone when its workspace files are only listed or read", () => {
+    for (const action of ["issue.file_resource_list", "issue.file_resource_content_read", "issue.file_resource_resolve"]) {
+      expect(keysForEvent("c1", event("activity.logged", { entityType: "issue", entityId: "i1", action }))).toEqual([queryKeys.activity("c1")]);
+    }
+  });
+
   it("leaves the Inbox's feed alone for other task activity", () => {
     const keys = keysForEvent("c1", event("activity.logged", { entityType: "issue", entityId: "i1", action: "issue.comment_added" }));
     expect(keys).not.toContainEqual(queryKeys.inbox.attention("c1"));
