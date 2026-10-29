@@ -1373,7 +1373,8 @@ Both are handled in `ui-new` for now.
 
 - **Decision 15 is wrong about `cursor_cloud`:** its transcript parser ships in
   `@paperclipai/adapter-cursor-cloud/ui`. Using it means adding that workspace package to
-  `ui-new/package.json`. Open: add it, or keep `cursor_cloud` as plain lines.
+  `ui-new/package.json`. Decided 2026-10-29: keep `cursor_cloud` as plain lines; the user doesn't use
+  Cursor, so the dependency isn't worth it.
 - **Copies of upstream code to check at each sync:** the Paperclip Runner transcript parser (copied
   from `ui/src/adapters/paperclip-runner`, upstream 57e977be7; no package exports it) and the
   runtime-command matching (`listWorkspaceCommandDefinitions`, `matchWorkspaceRuntimeServiceToCommand`
