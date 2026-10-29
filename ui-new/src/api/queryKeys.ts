@@ -72,6 +72,19 @@ export const queryKeys = {
     /** Your thumbs up and down on the task's agent output. */
     feedbackVotes: (issueId: string) => ["issues", "detail", issueId, "feedback-votes"] as const,
   },
+  /** Cases and their workflows (api/cases.ts), all under one prefix so a case event refreshes them. */
+  cases: {
+    all: (companyId: string) => ["cases", companyId] as const,
+    list: (companyId: string) => ["cases", companyId, "list"] as const,
+    /** One case, by the id or identifier it was asked for. */
+    detail: (companyId: string, ref: string) => ["cases", companyId, "detail", ref] as const,
+    /** The cases a task is linked to. */
+    forTask: (companyId: string, taskId: string) => ["cases", companyId, "task", taskId] as const,
+    handoffs: (companyId: string, caseId: string) => ["cases", companyId, "handoffs", caseId] as const,
+    children: (companyId: string, caseId: string) => ["cases", companyId, "children", caseId] as const,
+    workflows: (companyId: string) => ["cases", companyId, "workflows"] as const,
+    workflow: (companyId: string, workflowId: string) => ["cases", companyId, "workflow", workflowId] as const,
+  },
   projects: {
     /** Prefix for every project query in a company. */
     all: (companyId: string) => ["projects", companyId] as const,

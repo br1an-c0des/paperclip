@@ -80,14 +80,31 @@ export function companyLegacyTarget(rest: string): string | null {
     // Artifacts V1 was dropped (decision 12); Search's Artifacts scope lists the company's outputs.
     case "artifacts":
       return parts.length === 1 ? "search?scope=artifacts" : null;
-    // Cases get pages of their own with D1; until then the list is the task list.
+    // There's no cases page (decision F): the case list is the task list grouped by case (board C2).
     case "cases":
-      return parts.length === 1 ? "issues" : null;
+      return parts.length === 1 ? "issues?group=case" : null;
     case "status-cards":
       return second ? `status/${encodeURIComponent(second)}` : "status";
     default:
       return null;
   }
+}
+
+type CaseLinks = {
+  workIssueId?: string | null;
+  workIssue?: { identifier: string | null } | null;
+  issueLinks?: { issue: { id: string; identifier: string | null } }[];
+};
+
+/**
+ * Where an old case link (`/:prefix/cases/:id`) lands, relative to `/:prefix/`: its main task's
+ * Case section, else the first task linked to it, else (a case with no work yet) the task list
+ * grouped by case, where it has a group of its own.
+ */
+export function caseLinkTarget(kase: CaseLinks): string {
+  const first = kase.issueLinks?.[0]?.issue;
+  const ref = kase.workIssueId ? (kase.workIssue?.identifier ?? kase.workIssueId) : (first?.identifier ?? first?.id ?? null);
+  return ref ? `issues/${encodeURIComponent(ref)}?section=case` : "issues?group=case";
 }
 
 /** A project's old tabs (`/projects/:key/<tab>`), which became sections of its settings. */

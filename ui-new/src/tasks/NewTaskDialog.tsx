@@ -61,6 +61,7 @@ import {
   agentRunDefaults,
   buildCreatePayload,
   buildRoutinePayload,
+  caseLinkFor,
   buildTriggerPayloads,
   clearDraft,
   defaultWorkspaceMode,
@@ -81,6 +82,8 @@ import {
   type WorkspaceMode,
 } from "./new-task";
 import { TaskPicker, taskName } from "./TaskPicker";
+import { casesApi } from "@/api/cases";
+import { NewTaskCase } from "@/cases/NewTaskCase";
 import "./NewTaskDialog.css";
 
 /*
@@ -106,6 +109,10 @@ import "./NewTaskDialog.css";
  * Create makes the routine and its triggers. With a webhook, the dialog then turns into "Connect
  * your app" (board N7), with the URL and secret the API returns once. Repeat isn't offered on a
  * phone, where setting up recurring tasks stays on desktop (mobile.md).
+ *
+ * With cases on (board C5, src/cases/NewTaskCase.tsx), a box under the description starts a case
+ * with this task as its main task, or adds the task to an open case. Not on phones (M6) and not
+ * for recurring tasks.
  *
  * Left out: "Open as full page" (Create and open covers it).
  */
@@ -243,6 +250,10 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
   const agentById = (id: string | null | undefined) => agentList().find((agent) => agent.id === id);
   const assigneeAgent = () => (draft.assignee?.kind === "agent" ? agentById(draft.assignee.id) : undefined);
   const isolatedWorkspaces = () => experimental.data?.enableIsolatedWorkspaces === true;
+  // Cases (board C5): Start a case and Add to case, on desktop while the instance has cases on.
+  const casesOn = () => experimental.data?.enableCases === true;
+  const offersCases = () => casesOn() && !repeating() && !isCompact();
+  const startingCase = () => offersCases() && draft.startCase;
   const showWorkspace = () => workspaceChoiceAvailable(project(), isolatedWorkspaces());
   const has = (field: ExtraField) => draft.extras.includes(field);
 
@@ -292,7 +303,7 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
   };
 
   const create = createMutation(() => ({
-    mutationFn: async (payload: Record<string, unknown>) => {
+    mutationFn: async ({ payload, caseLink }: { payload: Record<string, unknown>; caseLink: NewTaskDraft["addToCase"] }) => {
       const issue = await issuesApi.create(company().id, payload);
       const failed: string[] = [];
       for (const file of files()) {
@@ -300,6 +311,14 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
           await issuesApi.uploadAttachment(company().id, issue.id, file);
         } catch {
           failed.push(file.name);
+        }
+      }
+      // Add to case (board C5): a second request once the task exists.
+      if (caseLink) {
+        try {
+          await casesApi.link(caseLink.caseId, issue.id, caseLink.role);
+        } catch {
+          failed.push("the link to its case");
         }
       }
       return { issue, failed };
@@ -394,11 +413,14 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
       project: project(),
       isolatedWorkspacesEnabled: isolatedWorkspaces(),
       idempotencyKey: submission.key,
+      startCase: startingCase(),
     });
+    const caseLink = caseLinkFor(base, casesOn() && !isCompact());
     try {
-      const { issue, failed } = await create.mutateAsync(payload);
+      const { issue, failed } = await create.mutateAsync({ payload, caseLink });
       clearDraft(company().id);
       void client.invalidateQueries({ queryKey: queryKeys.issues.list(company().id) });
+      if (caseLink) void client.invalidateQueries({ queryKey: queryKeys.cases.all(company().id) });
       void client.invalidateQueries({ queryKey: queryKeys.projects.all(company().id) });
       void client.invalidateQueries({ queryKey: queryKeys.sidebarBadges(company().id) });
       const ref = issue.identifier ?? "the task";
@@ -836,6 +858,13 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
       </div>
       </Show>
 
+      <Show when={offersCases()}>
+        <NewTaskCase
+          value={{ startCase: draft.startCase, caseTemplate: draft.caseTemplate, addToCase: draft.addToCase }}
+          onChange={(patch) => setDraft(patch)}
+        />
+      </Show>
+
       <div class="nt-assign">
         <Popover open={whoOpen()} onOpenChange={setWhoOpen}>
           <Popover.Trigger
@@ -1002,7 +1031,7 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
           </button>
           <div class="nt-create">
             <button type="button" class="nt-create-main" disabled={pending()} onClick={() => void submit(false)}>
-              {pending() ? "Creating…" : repeating() ? "Create recurring task" : "Create task"}
+              {pending() ? "Creating…" : repeating() ? "Create recurring task" : startingCase() ? "Create and start case" : "Create task"}
               <Show when={!isCompact()}>
                 <kbd aria-hidden="true">{/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘↵" : "Ctrl ↵"}</kbd>
               </Show>

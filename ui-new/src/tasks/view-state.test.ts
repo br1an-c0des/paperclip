@@ -117,6 +117,14 @@ describe("applyFilters", () => {
     expect(ids(applyFilters(tasks, { ...EMPTY_FILTERS, priorities: ["high"] }))).toEqual(["b"]);
   });
 
+  it("keeps only tasks in a case once their cases are known", () => {
+    const filters = { ...EMPTY_FILTERS, inCase: true };
+    expect(ids(applyFilters(tasks, filters, "", { inCase: (task) => task.id === "b" }))).toEqual(["b"]);
+    // Until the cases arrive (or with cases off) the filter waits.
+    expect(ids(applyFilters(tasks, filters))).toEqual(["a", "b", "c"]);
+    expect(filterCount(filters)).toBe(1);
+  });
+
   it("searches identifiers, titles and descriptions, word by word", () => {
     expect(ids(applyFilters(tasks, EMPTY_FILTERS, "login"))).toEqual(["a", "b"]);
     expect(ids(applyFilters(tasks, EMPTY_FILTERS, "login fix"))).toEqual(["a"]);

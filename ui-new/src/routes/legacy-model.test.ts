@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { companyLegacyTarget, identifierPrefix, isUuid, legacyToolsTarget, projectLegacyTab, withSearchAndHash } from "./legacy-model";
+import { caseLinkTarget, companyLegacyTarget, identifierPrefix, isUuid, legacyToolsTarget, projectLegacyTab, withSearchAndHash } from "./legacy-model";
 
 describe("identifierPrefix", () => {
   it("reads the company prefix of a task or case identifier", () => {
@@ -60,7 +60,7 @@ describe("companyLegacyTarget", () => {
     ["companies", "/companies"],
     ["board-chat", "chats"],
     ["artifacts", "search?scope=artifacts"],
-    ["cases", "issues"],
+    ["cases", "issues?group=case"],
     ["status-cards/abc", "status/abc"],
   ])("%s goes to %s", (from, to) => {
     expect(companyLegacyTarget(from)).toBe(to);
@@ -74,6 +74,15 @@ describe("companyLegacyTarget", () => {
     expect(companyLegacyTarget("goals/g1")).toBeNull();
     expect(companyLegacyTarget("dashboard")).toBeNull();
     expect(companyLegacyTarget("company/settings")).toBeNull();
+  });
+});
+
+describe("caseLinkTarget", () => {
+  it("opens the main task's Case section, else the first linked task's, else the list by case", () => {
+    expect(caseLinkTarget({ workIssueId: "uuid-1", workIssue: { identifier: "TES-19" } })).toBe("issues/TES-19?section=case");
+    expect(caseLinkTarget({ workIssueId: "uuid-1", workIssue: null })).toBe("issues/uuid-1?section=case");
+    expect(caseLinkTarget({ workIssueId: null, issueLinks: [{ issue: { id: "uuid-2", identifier: "TES-20" } }] })).toBe("issues/TES-20?section=case");
+    expect(caseLinkTarget({ workIssueId: null, issueLinks: [] })).toBe("issues?group=case");
   });
 });
 

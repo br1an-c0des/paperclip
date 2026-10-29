@@ -51,6 +51,11 @@ import {
   type TaskViewState,
 } from "./view-state";
 import { useWorkspaceSummaries, workspaceLookup } from "./workspaces";
+import { casesApi } from "@/api/cases";
+import { CaseIcon } from "@/cases/CaseChip";
+import { caseGroupDecor, caseGroups, caseRowExtra } from "@/cases/CaseListParts";
+import { useCaseIndex, useCasesOn } from "@/cases/queries";
+import { pushToast } from "@/ui/Toast";
 import { RecurringView } from "@/recurring/RecurringView";
 import { ShowSwitch, showsRecurring } from "@/recurring/ShowSwitch";
 import "./TasksView.css";
@@ -72,6 +77,10 @@ import "./TasksView.css";
  *
  * Show: Tasks or Recurring starts the toolbar (board R1). `?show=recurring` swaps the list for the
  * Recurring view (src/recurring/), which replaces the old Routines page.
+ *
+ * While the instance has cases on (src/cases/), rows carry their case chips, "In a case" filters to
+ * tasks in one (board C1), and Group: Case gives each case a group card (board C2). `?group=case`
+ * (view-url.ts) opens the list grouped that way, as old case links do.
  */
 
 type ListScope = { projectId?: string };
@@ -140,6 +149,7 @@ export function TasksView(props: {
   layout?: TaskLayout;
 }) {
   const company = useCompany();
+  const client = useQueryClient();
   const commands = useCommands();
   const people = useTaskPeople();
   const labels = useLabelsQuery();
@@ -147,13 +157,13 @@ export function TasksView(props: {
   const updates = useTaskUpdates();
   const retry = useTaskRetry();
   const location = useLocation();
-  const [params, setParams] = useSearchParams<{ task?: string; section?: string; show?: string }>();
+  const [params, setParams] = useSearchParams<{ task?: string; section?: string; show?: string; group?: string }>();
   const tasks = () => props.tasks.data ?? [];
   const recurring = () => showsRecurring(params.show);
 
   // What the URL says: the search, and pre-filters that replace the saved view's.
   const url = createMemo(() => parseListUrl(location.search, people.youId()));
-  const urlFilters = createMemo(() => JSON.stringify(url().filters));
+  const urlFilters = createMemo(() => JSON.stringify([url().filters, url().groupBy]));
   // The search box keeps its own text and writes it to `?q=`; a change to the URL from elsewhere
   // (the back button, a link) comes back into the box, but the box's own writes don't, so a slow
   // navigation can't undo typing.
@@ -179,14 +189,14 @@ export function TasksView(props: {
   // The view: saved per list, and read again when the list changes (another project) or the URL's
   // pre-filters do.
   const storageKey = () => viewStateKey(company().id, props.projectId);
-  const [view, setView] = createSignal<TaskViewState>(withUrlFilters(readViewState(storageKey()), url().filters));
+  const [view, setView] = createSignal<TaskViewState>(withUrlFilters(readViewState(storageKey()), url().filters, url().groupBy));
   const [checked, setChecked] = createSignal<ReadonlySet<string>>(new Set());
   const [expanded, setExpanded] = createSignal<ReadonlySet<string>>(new Set());
   createEffect(
     on(
       [storageKey, urlFilters],
       ([key], previous) => {
-        setView(withUrlFilters(readViewState(key), url().filters));
+        setView(withUrlFilters(readViewState(key), url().filters, url().groupBy));
         if (previous?.[0] !== key) {
           setChecked(new Set<string>());
           setExpanded(new Set<string>());
@@ -252,7 +262,14 @@ export function TasksView(props: {
   // states are fetched for the list's tasks only while the filter is on or its menu is open.
   const experiments = useExperimentalSettingsQuery();
   const externalOn = () => experiments.data?.enableExternalObjects === true;
-  const filters = createMemo(() => (externalOn() ? view().filters : { ...view().filters, externalObjects: [] }));
+  // Cases (src/cases/), behind enableCases: chips, the In a case filter and Group: Case.
+  const casesOn = useCasesOn();
+  const groupBy = () => (view().groupBy === "case" && !casesOn() ? "status" : view().groupBy);
+  const caseIndex = useCaseIndex({ enabled: casesOn, withClosed: () => groupBy() === "case" });
+  const filters = createMemo(() => {
+    const own = view().filters;
+    return { ...own, externalObjects: externalOn() ? own.externalObjects : [], inCase: casesOn() && own.inCase };
+  });
   const taskIds = createMemo(() => tasks().map((task) => task.id).sort());
   const external = createQuery(() => ({
     queryKey: ["issues", company().id, "external-object-summaries", idsFingerprint(taskIds())],
@@ -275,6 +292,9 @@ export function TasksView(props: {
     get workspace() {
       return workspaces();
     },
+    get cases() {
+      return groupBy() === "case" ? caseGroups(caseIndex) : undefined;
+    },
   };
   // Phones (M1) show the list only, under a row of quick filters; the board stays on desktop.
   const phone = () => viewport() === "phone";
@@ -290,16 +310,18 @@ export function TasksView(props: {
       workspaceOf: workspaces().of,
       // Until the states arrive the filter waits rather than hiding everything.
       externalMatches: known ? (task, value) => matchesExternalStatus(known[task.id], value) : undefined,
+      // So does In a case, until the cases' links are in.
+      inCase: caseIndex.settled() ? (task) => caseIndex.of(task.id).length > 0 : undefined,
     });
     return hideClosed() ? shown.filter((task) => !CLOSED_STATUSES.has(task.status)) : shown;
   });
   const groups = createMemo(() =>
-    buildTaskGroups(sortTasks(visible(), view().sort), people.liveIssueIds(), { groupBy: view().groupBy, names }),
+    buildTaskGroups(sortTasks(visible(), view().sort), people.liveIssueIds(), { groupBy: groupBy(), names }),
   );
-  const columns = createMemo(() => boardColumns(groups(), view().groupBy, view().filters, !hideClosed()));
+  const columns = createMemo(() => boardColumns(groups(), groupBy(), view().filters, !hideClosed()));
   // The board folds its columns apart from the list's groups, with its own defaults.
   const collapseKey = (group: TaskGroup) =>
-    layout() === "board" ? boardCollapseKey(view().groupBy, group) : `${view().groupBy}:${group.key}`;
+    layout() === "board" ? boardCollapseKey(groupBy(), group) : `${groupBy()}:${group.key}`;
   const isOpen = (group: TaskGroup) =>
     !(view().collapsed[collapseKey(group)] ?? (layout() === "board" ? boardStartsCollapsed(group) : startsCollapsed(group)));
   const toggleGroup = (group: TaskGroup, open: boolean) =>
@@ -363,8 +385,20 @@ export function TasksView(props: {
   const open = (task: { id: string; identifier: string | null }) => setParams({ task: task.identifier ?? task.id });
   const close = () => setParams({ task: undefined, section: undefined });
   const activeFilters = () => filterCount(filters());
-  const groupOptions = () => GROUP_BY_OPTIONS.filter((option) => !(props.projectId && option.value === "project"));
-  const groupLabel = () => GROUP_BY_OPTIONS.find((option) => option.value === view().groupBy)?.label ?? "Status";
+  const groupOptions = () =>
+    GROUP_BY_OPTIONS.filter((option) => !(props.projectId && option.value === "project") && (option.value !== "case" || casesOn()));
+  // A task added from a case's group goes into that case, as work.
+  const linkAdded = (task: { id: string }, group: TaskGroup) => {
+    if (group.value?.field !== "case" || !group.value.caseId) return;
+    const caseId = group.value.caseId;
+    casesApi
+      .link(caseId, task.id, "work")
+      .then(() => client.invalidateQueries({ queryKey: queryKeys.cases.all(company().id) }))
+      .catch((error: unknown) =>
+        pushToast({ tone: "error", title: "Added the task, but couldn't put it in the case", body: error instanceof Error ? error.message : String(error) }),
+      );
+  };
+  const groupLabel = () => GROUP_BY_OPTIONS.find((option) => option.value === groupBy())?.label ?? "Status";
   const participantName = () => {
     const id = url().participantAgentId;
     return id ? (people.agent(id)?.name ?? "an agent") : null;
@@ -433,15 +467,19 @@ export function TasksView(props: {
         </Show>
         <Menu>
           <Menu.Trigger as={Button}>
-            {view().groupBy === "none" ? "No grouping" : `${layout() === "board" ? "Columns" : "Group"}: ${groupLabel()}`}
+            {groupBy() === "none" ? "No grouping" : `${layout() === "board" ? "Columns" : "Group"}: ${groupLabel()}`}
             <ChevronDown size={12} stroke-width={2} aria-hidden="true" class="tv-caret" />
           </Menu.Trigger>
           <Menu.Content label={layout() === "board" ? "Columns by" : "Group by"} width={220}>
             <For each={groupOptions()}>
               {(option) => (
                 <Menu.Item
-                  hint={view().groupBy === option.value ? "✓" : undefined}
-                  onSelect={() => changeView({ groupBy: option.value })}
+                  hint={groupBy() === option.value ? "✓" : undefined}
+                  onSelect={() => {
+                    changeView({ groupBy: option.value });
+                    // Picking a grouping takes over from the URL's.
+                    if (url().groupBy) setParams({ group: undefined }, { replace: true, scroll: false });
+                  }}
                 >
                   {option.label}
                 </Menu.Item>
@@ -449,10 +487,22 @@ export function TasksView(props: {
             </For>
           </Menu.Content>
         </Menu>
+        <Show when={casesOn() && !phone()}>
+          <Button
+            class="tv-toggle"
+            aria-pressed={filters().inCase}
+            title={filters().inCase ? "Show every task" : "Show only tasks in a case"}
+            onClick={() => changeFilters({ inCase: !filters().inCase })}
+          >
+            <CaseIcon size={14} />
+            In a case
+          </Button>
+        </Show>
         <Show when={phone()}>
           <FilterMenu
             filters={filters()}
             external={externalOn()}
+            cases={casesOn()}
             people={people}
             creators={creatorKeys()}
             projects={props.projectId ? [] : projectOptions()}
@@ -492,6 +542,7 @@ export function TasksView(props: {
           <FilterMenu
             filters={filters()}
             external={externalOn()}
+            cases={casesOn()}
             people={people}
             creators={creatorKeys()}
             projects={props.projectId ? [] : projectOptions()}
@@ -599,6 +650,9 @@ export function TasksView(props: {
                     onCheckedChange={setChecked}
                     expanded={expanded()}
                     onToggleExpanded={toggleExpanded}
+                    rowExtra={caseRowExtra(caseIndex)}
+                    groupDecor={caseGroupDecor(caseIndex)}
+                    onAdded={linkAdded}
                   />
                 }
               >
@@ -691,6 +745,8 @@ function FilterMenu(props: {
   workspaces: readonly { id: string; name: string }[];
   /** Offer the external-object filter (the enableExternalObjects experiment). */
   external: boolean;
+  /** Offer In a case (the instance has cases on). */
+  cases: boolean;
   onOpenChange: (open: boolean) => void;
   onChange: (next: Partial<TaskFilters>) => void;
 }) {
@@ -737,6 +793,11 @@ function FilterMenu(props: {
           >
             Hide tasks agents created
           </Menu.CheckboxItem>
+          <Show when={props.cases}>
+            <Menu.CheckboxItem icon={<CaseIcon size={14} />} checked={props.filters.inCase} onChange={() => props.onChange({ inCase: !props.filters.inCase })}>
+              In a case
+            </Menu.CheckboxItem>
+          </Show>
         </Menu.Group>
         <Menu.Separator />
         <Menu.Group label="Status">
