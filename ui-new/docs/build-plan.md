@@ -638,6 +638,17 @@ as an idea to develop or propose upstream later; stage 1 keeps building on hidde
 ([decision 8](decisions.md#8-agent-chats-are-tasks-underneath)). The notes below are the earlier
 research.
 
+Part of the same idea, noted Oct 28, 2026: chat should offer **prompt suggestions**, a predicted next
+message you can accept, as in Claude Code. The Claude Agent SDK already makes them (the
+`promptSuggestions` option sends a `prompt_suggestion` after each turn; never on the first turn, and
+nearly free because it reuses the prompt cache). Paperclip loses them on the way: `acpx` doesn't pass
+the option to the SDK, and `claude-agent-acp` discards the message. Both the adapter's default ACP
+engine and the Runner's Claude ACPX profile go through those two packages; the Runner's Claude
+Managed driver doesn't use the SDK. Supporting them means forwarding the option and the message,
+a run event for it (the Runner's generic `Notification` event could carry it), and an API that keeps
+the latest one per chat. Turn it on for chat runs only: ordinary task runs have no person replying,
+so there's nothing to predict.
+
 Dropped Oct 24, 2026. What it was for, a fluid conversation that isn't a task underneath, is covered
 by Paperclip's MCP connection instead ([doc/public-mcp.md](../../doc/public-mcp.md)):
 
