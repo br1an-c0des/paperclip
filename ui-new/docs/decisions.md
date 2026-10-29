@@ -70,6 +70,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 41 | [Gaps found building old links, the shell and the installable app](#41-gaps-found-building-old-links-the-shell-and-the-installable-app) | `shell/*`, `approvals/governance`, User profile | Open | Oct 28, 2026 |
 | 42 | [Gaps found building the task panel, runs and workspaces](#42-gaps-found-building-the-task-panel-runs-and-workspaces) | `tasks/*`, `runs-adapters/runs`, `workspaces/*` | Open | Oct 28, 2026 |
 | 43 | [Gaps found building cases into the task views](#43-gaps-found-building-cases-into-the-task-views) | `cases/*` | Open | Oct 29, 2026 |
+| 44 | [Status cards need an agent that can write them](#44-status-cards-need-an-agent-that-can-write-them) | Status cards | Open | Oct 29, 2026 |
 
 ## Entries
 
@@ -1434,3 +1435,48 @@ Both are handled in `ui-new` for now.
   cases TES-C1 to TES-C4, tasks TES-19 to TES-22, TES-25, TES-26.
 - **Seen, not fixed:** the task list's phone toolbar (`.tv-toolbar--phone`) is about 4px wider than a
   390px screen.
+
+### 44. Status cards need an agent that can write them
+
+- **Status:** Open
+- **Area:** Status cards ([decision 39](#39-decisions-from-the-m7-audit), D3)
+- **Found in:** M7 status cards, with `enableStatusCards` and `enableSummaries` turned on on the test
+  instance and left on.
+
+- **No card finished a real update on TES.** A card's setup task asks its agent to write the card's
+  query (`PUT /status-cards/:id/query`), and none of the agents the port was allowed to use could:
+  - the default, the built-in Summarizer, needs `enableBuiltInAgents` (off), so New card answers 422
+    `summarizer_not_configured`;
+  - an ordinary `claude_local` hire runs on the Paperclip Runner (`enableNativeRunner` is on), whose
+    semantic tools have no status-card operations ("semantic operation failed");
+  - the same agent on `runner: "legacy"` got no `PAPERCLIP_API_KEY`, because this dev server has no
+    local agent JWT secret.
+
+  Options: (a) turn on built-in agents on the test instance and try again; (b) warn in New card when
+  the chosen agent can't write cards; (c) an upstream fix so the runner can write cards. Not decided.
+- **Real runs spent:** five runs by "M7 test summarizer" (Claude Haiku 4.5), three of which used
+  tokens, about $0.45 in all; one was an automatic follow-up that stopped when the agent was paused. To
+  try to make it work the agent was bound to the company's Claude subscription connection (the one Bob
+  uses; Bob unchanged) and given the catalog skill `status-card-query`, installed into TES. It's
+  paused, `runner: legacy`, with a $1.50 monthly budget.
+- **A retried setup can stall:** Run setup again reopens the same task; if no run starts (the agent in
+  `error`), the card stays compiling with `generatingIssueId` set, and another rebuild is a no-op
+  unless the prompt changes. The page can't tell a stalled setup from a slow one. Upstream candidate
+  18.
+- **Old UI mismatches the port corrects:** an empty daily cap means 100k tokens on the server, not
+  "no cap"; Restore forces an update when the card has a query; `/refresh` and `/recompile` answer
+  `{card, generatingIssue, alreadyGenerating, enqueued}`, not a bare card. Runs that fail setup write
+  nothing to the card's ledger, so History stays empty and their cost shows only on the agent's runs.
+- **Polling:** the update engine changes card state without logging activity, so the page polls every
+  5 seconds while any card is setting up or updating. A stalled card keeps that polling going while
+  the page is open.
+- **Not built:** the summary streaming as it's written (the old tile reads `acpx.text_delta`, ACP
+  harnesses only), a Status entry in the phone dock, a Features switch for `enableStatusCards`.
+  `StatusPlaceholder` in `routes/Legacy.tsx` is now unused.
+- **First impressions** (the agent's): every card shows a next step and the panel's tabs are easy to
+  follow; setup is opaque while it runs and its failure reason shows only in the panel; the agent
+  picker offers agents that can't run a card; tiles are tall for short summaries; the cost preview is
+  rough, and manual updates aren't held by the daily cap.
+- **Test data:** cards 1d784e5f (archived, stalled setup) and 8f1d8233 "M7 test card 2" (setting up,
+  its task TES-24 left in progress), hidden setup tasks TES-23 and TES-24, the summarizer agent, the
+  `status-card-query` skill.

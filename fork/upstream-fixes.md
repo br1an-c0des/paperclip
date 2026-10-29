@@ -54,6 +54,7 @@ until one becomes a concrete fix.
 | 15 | [Don't return agent credentials in plain text from the join request list](#15-dont-return-agent-credentials-in-plain-text-from-the-join-request-list) | candidate | | | 2026-10-28 | | |
 | 16 | [Don't merge keyless cases of the same type](#16-dont-merge-keyless-cases-of-the-same-type) | candidate | | | 2026-10-29 | | |
 | 17 | [Log activity when a case is created, edited or linked](#17-log-activity-when-a-case-is-created-edited-or-linked) | candidate | | | 2026-10-29 | | |
+| 18 | [Let a stalled status card setup be retried](#18-let-a-stalled-status-card-setup-be-retried) | candidate | | | 2026-10-29 | | |
 
 ## Details
 
@@ -299,3 +300,17 @@ Found building cases into `ui-new`'s task views (M7, 2026-10-29).
   case event history was removed on Oct 22.
 - **Fork workaround:** `ui-new` refreshes after its own changes and on case activity
   ([decision 43](../ui-new/docs/decisions.md#43-gaps-found-building-cases-into-the-task-views)).
+
+### 18. Let a stalled status card setup be retried
+
+Found porting status cards to `ui-new` (M7, 2026-10-29). Not yet confirmed in the server code.
+
+- **Problem:** retrying a failed setup (`POST /status-cards/:id/recompile`) reopens the same setup task
+  (same idempotency key). If no run starts, for example because the agent is in `error`, the card stays
+  `compiling` with `generatingIssueId` set, and every later recompile answers `alreadyGenerating`
+  unless the prompt changes. Nothing in the card says the setup stalled.
+- **Likely fix:** treat a setup task that's closed, or has no active run after a timeout, as not
+  generating; or expose that state so a client can offer a real retry. With a service test. Read the
+  status card service first to confirm.
+- **Fork workaround:** none; the page shows "setting up" with a link to the task
+  ([decision 44](../ui-new/docs/decisions.md#44-status-cards-need-an-agent-that-can-write-them)).
