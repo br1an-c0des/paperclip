@@ -87,6 +87,16 @@ cheatsheet, the command palette, global dialogs, and plugin overlays.
   backoff; polling is used as a fallback for some lists (`hooks/useSharedPolling.ts`, one tab leads).
 - **Notes:** toast eligibility rules are in `doc/TOASTS.md` (only your own participation or explicit
   mentions).
+- **Since the 2026-10-29 sync:**
+  - Run transcripts share this socket instead of opening their own. The client sends
+    `live.hello` and `live.interests` (the run IDs on screen), and the server sends transcript events
+    only for those runs. Other runs produce a throttled `heartbeat.run.activity` (last output time).
+    Clients that don't negotiate still get every event, but the server closes their socket (1013)
+    when the backlog passes 1,000 items or 1 MiB.
+  - A connection banner covers the whole app during an outage. Recovery is confirmed by
+    `GET /api/health` or the socket. Reads keep cached data, and writes (autosave, comments, new
+    tasks, decisions) are kept and retried with their original account and request key
+    (`lib/connectivity.ts`, `hooks/useDurableAutosave.ts`, `hooks/useDurableSubmit.ts`).
 
 ### `shell/company`: Company context
 

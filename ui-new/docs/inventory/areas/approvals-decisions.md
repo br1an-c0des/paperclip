@@ -50,6 +50,9 @@ Reference:
   `GET /api/decisions/:id`, `POST /api/decisions/:id/decide|dismiss`,
   `POST /api/issues/:id/interactions/:interactionId/*`, `POST /api/issues/:id/stalled-review-decision`,
   `POST /api/issues/:id/comments`, approval, join-request and connection-intent requests as above.
+  Since the 2026-10-29 sync, a history of resolved decisions:
+  `GET /api/companies/:companyId/attention/history` (cursor pages; search, outcome, agent, project,
+  sort, since). It reads the tasks' own decisions; it doesn't keep a separate store.
 - **Notes:** dismiss and snooze go through `inboxDismissalsApi` (shared with Inbox). Unanswered
   questions stay in the feed after dismissal and can be reopened (upstream `dismiss-and-reopen`).
 

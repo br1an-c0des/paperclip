@@ -63,6 +63,8 @@ terminal WebSocket (`pages/CompanyEnvironments.tsx`).
 Resources: `/api/companies/:companyId/skills*` (`/catalog`, `/import`, `/install-catalog`,
 `/scan-projects`, `/browse-project`), `/skill-sources*`, `/skill-test-run-templates`, `/folders*`.
 Upstream recipe: `maps/feature-map/skills.md`. Flag `enableBetaSkills`.
+Since the 2026-10-29 sync, `GET .../skills/:skillId/versions` returns versions with file names and
+kinds only. Comparing and restoring read each version with `GET .../versions/:versionId`.
 
 ## Apps and tools ("Connectors")
 
@@ -80,6 +82,9 @@ Upstream recipe: `maps/feature-map/skills.md`. Flag `enableBetaSkills`.
 Resources: `/api/companies/:companyId/tools/*`, `/api/tool-connections*`, `/api/tool-profiles*`,
 `/api/tool-gateway/*`, `/ai-connections*`, `/ai-connection-pools*`, `/mcp/*`, `/chat-endpoints*`,
 `/slack/endpoints*`, `/email/*`, `/browser-use-cloud/grants`, `/connection-intents*`, `/smoke-lab/*`.
+Since the 2026-10-29 sync, a saved AI sign-in setup can be resumed from its handoff:
+`GET /api/companies/:companyId/ai-connections/login/:sessionId/setup`. Authorized agents can also
+configure connections within the authority a person delegated to them.
 Upstream recipes: `maps/feature-map/connection-setup.md`, `gateways-profiles.md`, `chat-channels.md`,
 `app-permissions.md`.
 

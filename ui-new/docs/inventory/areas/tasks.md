@@ -170,7 +170,9 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   composer reminders and stops gating completion, stays in the conversation history and can be
   reopened from there. Dismissing never counts as an answer or approval (`dismissedAt`,
   `dismissedByUserId` on the interaction).
-- **Requests:** `POST /api/issues/:id/interactions/:interactionId/accept|reject|respond|verdicts|skip|cancel|dismiss`;
+- **Requests:** `POST /api/issues/:id/interactions/:interactionId/accept|reject|respond|verdicts|skip|cancel|dismiss`
+  (since the 2026-10-29 sync, accept, reject and respond read `GET /api/issues/:id/interactions` again
+  to check an uncertain result after a dropped response);
   `/api/connection-intents/:interactionId/complete|decline|phase|setup-options`;
   `POST /api/agents/:agentId/connection-intents/:interactionId/adopt`;
   `PUT /api/companies/:companyId/ai-connections/default`.
@@ -254,7 +256,8 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   revision; lock/unlock against concurrent edits; import a markdown file as a document; delete;
   annotation threads on document text (comment, resolve).
 - **Requests:** `GET /api/issues/:id/documents`, `GET|PUT|DELETE .../documents/:key`,
-  `GET .../revisions`, `POST .../revisions/:revisionId/restore`, `POST .../lock|unlock`,
+  `GET .../revisions`, `GET .../revisions/:revisionId` (one revision, for a decision's exact review
+  target; since the 2026-10-29 sync), `POST .../revisions/:revisionId/restore`, `POST .../lock|unlock`,
   `GET|POST /api/issues/:issueId/documents/:documentKey/annotations` (+ thread PATCH and comments).
 
 ### `documents-artifacts/attachments`, `/work-products`: Files and outputs
