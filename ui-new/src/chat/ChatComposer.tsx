@@ -1,7 +1,7 @@
 import type { AgentDetail, Issue, IssueWorkMode } from "@paperclipai/shared";
 import { useQueryClient } from "@tanstack/solid-query";
 import { ArrowUp, Check, ChevronDown, LoaderCircle, Paperclip, TriangleAlert, X } from "lucide-solid";
-import { batch, createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
+import { batch, createEffect, createMemo, createSignal, createUniqueId, For, on, onCleanup, Show } from "solid-js";
 import { commentsApi } from "@/api/comments";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
@@ -11,6 +11,8 @@ import { Button } from "@/ui/Button";
 import { Menu } from "@/ui/Menu";
 import { pushToast } from "@/ui/Toast";
 import { attachmentIds, clearComposerDraft, loadComposerDraft, messageBody, saveComposerDraft, type ComposerAttachment } from "@/tasks/composer/composer-model";
+import { MentionList, useMentionCandidates } from "@/tasks/composer/MentionTextArea";
+import { activeMention, insertMention, type ActiveMention, type MentionTarget } from "@/tasks/composer/mentions";
 import { newId } from "@/tasks/new-task";
 import "@/tasks/composer/Composer.css";
 
@@ -19,6 +21,8 @@ import "@/tasks/composer/Composer.css";
  *
  * - Enter sends and Shift+Enter starts a new line, as in a chat. `/` lists the commands; `/new`
  *   starts a fresh session (the history stays visible), as does New session in the header.
+ * - `@` and a name lists agents, people and tasks to mention, as in a task's composer; while the
+ *   list is open, Enter or Tab picks and the arrows move.
  * - The first message or upload creates the chat (`ensure`).
  * - While the agent is replying, Send queues the message for its next turn ("Queue"); the menu
  *   steers it into the reply going now, or stops the reply and starts over with it.
@@ -89,6 +93,32 @@ export function ChatComposer(props: {
   const mode = () => modeChoice() ?? props.chat?.workMode ?? "standard";
   const modeMeta = () => MODES.find((entry) => entry.value === mode()) ?? MODES[0]!;
   const live = () => !!props.replyRunId;
+  // @-mentions: the list opens at an "@query" before the caret, until it's picked or dismissed.
+  const mentionListId = createUniqueId();
+  const [caret, setCaret] = createSignal(0);
+  const [closedAt, setClosedAt] = createSignal<number | null>(null);
+  const [mentionIndex, setMentionIndex] = createSignal(0);
+  const mention = createMemo<ActiveMention | null>(() => {
+    const found = activeMention(body(), caret());
+    return found && found.start !== closedAt() ? found : null;
+  });
+  const { candidates, people } = useMentionCandidates(mention, () => props.chat?.id);
+  createEffect(on(() => mention()?.start, () => setMentionIndex(0)));
+  const mentionOpen = () => !!mention() && candidates().length > 0;
+  const syncCaret = () => textarea && setCaret(textarea.selectionStart ?? 0);
+  const pickMention = (target: MentionTarget) => {
+    const at = mention();
+    if (!at) return;
+    const result = insertMention(body(), at, target);
+    setBody(result.text);
+    queueMicrotask(() => {
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(result.caret, result.caret);
+      setCaret(result.caret);
+      resize();
+    });
+  };
   const commandsOpen = () => /^\/\S*$/.test(body()) && COMMANDS.some((command) => command.name.startsWith(body()) && command.name !== body());
 
   const resize = () => {
@@ -205,6 +235,9 @@ export function ChatComposer(props: {
       }}
     >
       <div class="cmp-field">
+        <Show when={mentionOpen()}>
+          <MentionList id={mentionListId} candidates={candidates()} index={mentionIndex()} people={people} onPick={pickMention} />
+        </Show>
         <Show when={commandsOpen()}>
           <div class="cmp-picker" role="listbox" aria-label="Commands">
             <For each={COMMANDS.filter((command) => command.name.startsWith(body()))}>
@@ -238,11 +271,41 @@ export function ChatComposer(props: {
           placeholder={props.disabledReason ?? `Message ${props.agent.name}, or type / for commands`}
           readOnly={sending()}
           disabled={!!props.disabledReason}
+          role="combobox"
+          aria-expanded={mentionOpen()}
+          aria-controls={mentionOpen() ? mentionListId : undefined}
+          aria-activedescendant={mentionOpen() ? `${mentionListId}-opt-${mentionIndex()}` : undefined}
+          aria-autocomplete="list"
           onInput={(event) => {
             setBody(event.currentTarget.value);
+            syncCaret();
+            setClosedAt(null);
             resize();
           }}
+          onKeyUp={syncCaret}
+          onClick={syncCaret}
+          onBlur={() => setClosedAt(mention()?.start ?? null)}
+          onFocus={() => setClosedAt(null)}
           onKeyDown={(event) => {
+            if (mentionOpen()) {
+              const count = candidates().length;
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                setMentionIndex((current) => (current + (event.key === "ArrowDown" ? 1 : count - 1)) % count);
+                return;
+              }
+              if ((event.key === "Enter" && !event.shiftKey && !event.isComposing) || event.key === "Tab") {
+                event.preventDefault();
+                pickMention(candidates()[mentionIndex()]!);
+                return;
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                setClosedAt(mention()!.start);
+                return;
+              }
+            }
             if (event.key === "Tab" && commandsOpen()) {
               event.preventDefault();
               setBody(COMMANDS.find((command) => command.name.startsWith(body()))!.name);
