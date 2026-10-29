@@ -1,5 +1,5 @@
 import type { IssueStatus } from "@paperclipai/shared";
-import type { TaskFilters, TaskViewState } from "./view-state";
+import { GROUP_BY_OPTIONS, type GroupBy, type TaskFilters, type TaskViewState } from "./view-state";
 
 /*
  * What a task list's URL says about the view, so a link reproduces it. The old list's parameters
@@ -12,8 +12,9 @@ import type { TaskFilters, TaskViewState } from "./view-state";
  * - `participantAgentId`: tasks an agent took part in. The server filters those
  *   (`GET /api/companies/:companyId/issues?participantAgentId=`), so TasksView asks for them.
  * - `view`: the old Organization views, as status presets: `all`, `active`, `backlog`, `done`.
+ * - `group`: a grouping, such as `case`, where the old case list's links land (routes/Legacy.tsx).
  *
- * The pre-filters replace those filters in the view when the page opens with them. The open task
+ * The pre-filters (and the grouping) replace the view's own when the page opens with them. The open task
  * (`task`, `section`) also lives in the URL, but that's TasksView's.
  */
 
@@ -30,6 +31,8 @@ export type ListUrl = {
   /** Filters the URL sets, replacing the view's own for those fields. */
   filters: Partial<Pick<TaskFilters, "assignees" | "workspaces" | "statuses">>;
   participantAgentId: string | null;
+  /** A grouping the URL asks for, replacing the view's. */
+  groupBy: GroupBy | null;
 };
 
 function assigneeFrom(value: string, youId: string | null): string | null {
@@ -55,13 +58,14 @@ export function parseListUrl(search: string | URLSearchParams, youId: string | n
     search: params.get("q") ?? "",
     filters,
     participantAgentId: params.get("participantAgentId") || null,
+    groupBy: GROUP_BY_OPTIONS.some((option) => option.value === params.get("group")) ? (params.get("group") as GroupBy) : null,
   };
 }
 
-/** The view with the URL's pre-filters in place of its own, or the view itself when there are none. */
-export function withUrlFilters(state: TaskViewState, filters: ListUrl["filters"]): TaskViewState {
-  if (Object.keys(filters).length === 0) return state;
-  return { ...state, filters: { ...state.filters, ...filters } };
+/** The view with the URL's pre-filters and grouping in place of its own, or the view itself when there are none. */
+export function withUrlFilters(state: TaskViewState, filters: ListUrl["filters"], groupBy: GroupBy | null = null): TaskViewState {
+  if (Object.keys(filters).length === 0 && (!groupBy || groupBy === state.groupBy)) return state;
+  return { ...state, ...(groupBy ? { groupBy } : {}), filters: { ...state.filters, ...filters } };
 }
 
 /** The pre-filter parameters, cleared, for "Clear filters" to leave the URL saying what the view shows. */

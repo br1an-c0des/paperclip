@@ -1,6 +1,7 @@
 import type { IssuePriority, IssueReviewPolicy, IssueStatus, IssueWorkMode, Project } from "@paperclipai/shared";
 import { templatePlaceholders } from "@/recurring/recurring-model";
 import { isRepeating, repeatProblem, scheduleCron, type RepeatDraft } from "@/recurring/schedule";
+import { withStartCaseRequest } from "@/cases/case-model";
 import { buildAdapterOverrides } from "./run-overrides";
 
 /*
@@ -17,6 +18,9 @@ import { buildAdapterOverrides } from "./run-overrides";
  *   worktree sends that workspace's id, its mode and its project workspace.
  * - Review policy "Anyone approves" is the server's default, sent as nothing.
  * - Tasks have no due date (decision 6).
+ * - Start a case (board C5) adds a line to the description asking the assignee to set up a case
+ *   with this task as its main task; the API has no field for it (decision F). Add to case links
+ *   the task once it's made (`POST /cases/:id/links`), a second request.
  *
  * With Repeat on (boards N4–N7) the draft becomes a recurring task: `POST /companies/:id/routines`
  * with the fields a routine copies to each occurrence (title, description, agent, project,
@@ -69,6 +73,14 @@ export type NewTaskDraft = {
   names: Record<string, string>;
   /** Repeat (board N4): null, or how the recurring task repeats. */
   repeat: RepeatDraft | null;
+  /**
+   * Cases (board C5), while the instance has them on. Start a case asks the assignee, in the
+   * description, to set up a case with this task as its main task, following the template if one
+   * is picked; Add to case links the new task to an existing case once it's made.
+   */
+  startCase: boolean;
+  caseTemplate: { id: string; name: string } | null;
+  addToCase: { caseId: string; role: "work" | "reference" } | null;
 };
 
 export type ExtraField = "parent" | "goal" | "blocked" | "billing" | "private" | "approver" | "watchdog";
@@ -99,6 +111,9 @@ export function emptyDraft(overrides: Partial<NewTaskDraft> = {}): NewTaskDraft 
     extras: [],
     names: {},
     repeat: null,
+    startCase: false,
+    caseTemplate: null,
+    addToCase: null,
     ...overrides,
   };
 }
@@ -165,7 +180,14 @@ export type PayloadContext = {
   isolatedWorkspacesEnabled: boolean;
   /** Retries of the same submission reuse this, so the server makes one task. */
   idempotencyKey: string;
+  /** Cases are on and Start a case is: the description gets the request (cases/case-model.ts). */
+  startCase?: boolean;
 };
+
+/** The case to link the new task to once it's made, if Add to case is set and Start a case isn't. */
+export function caseLinkFor(draft: Pick<NewTaskDraft, "startCase" | "addToCase">, casesOn: boolean) {
+  return casesOn && !draft.startCase ? draft.addToCase : null;
+}
 
 export function buildCreatePayload(draft: NewTaskDraft, context: PayloadContext): Record<string, unknown> {
   const has = (field: ExtraField) => draft.extras.includes(field);
@@ -177,7 +199,7 @@ export function buildCreatePayload(draft: NewTaskDraft, context: PayloadContext)
     idempotencyKey: context.idempotencyKey,
   };
   const title = draft.title.trim();
-  const description = draft.description.trim();
+  const description = (context.startCase ? withStartCaseRequest(draft.description, draft.caseTemplate) : draft.description).trim();
   if (title) payload.title = title;
   if (description) payload.description = description;
   if (draft.projectId) payload.projectId = draft.projectId;

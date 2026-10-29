@@ -12,6 +12,9 @@ import { TaskWorkspace } from "./TaskWorkspace";
 import { anchorSection, parseTaskAnchor } from "./task-anchor";
 import { isPluginTab } from "@/plugins/model";
 import { TaskPluginExtras, TaskPluginSectionView, useTaskPluginSections } from "@/plugins/TaskPlugins";
+import { CaseIcon } from "@/cases/CaseChip";
+import { TaskCaseSection, useTaskCases } from "@/cases/CaseSection";
+import { useCasesOn } from "@/cases/queries";
 import "./TaskSections.css";
 
 /*
@@ -24,8 +27,14 @@ import "./TaskSections.css";
  * the left, and the rail picks what's beside it, Activity by default.
  *
  * The task's health notices (TaskNotices) sit above whichever section is open, then what plugins
- * add to tasks (toolbar buttons, launchers, detail blocks). Plugins' task tabs and agent side panels
- * join the rail as sections of their own (`?section=plugin:<pluginKey>:<slotId>`; src/plugins/).
+ * add to tasks (toolbar buttons, launchers, detail blocks). Above Details they scroll with it. The
+ * other sections fill the panel and scroll inside (a file viewer, the thread), so above those they
+ * get at most a third of its height and scroll on their own: a tall plugin block can't squeeze the
+ * section shut. Plugins' task tabs and agent side panels join the rail as sections of their own
+ * (`?section=plugin:<pluginKey>:<slotId>`; src/plugins/).
+ *
+ * With cases on (`enableCases`), a task that's in a case gets a Case section after Details
+ * (board C1, src/cases/CaseSection.tsx).
  *
  * A link into the task (`#comment-<id>`, `#document-<key>`; task-anchor.ts) opens the section it
  * points into: Activity scrolls to the comment, Docs and files opens the document.
@@ -33,13 +42,14 @@ import "./TaskSections.css";
  * On a phone (M2 to M4) the sections are tabs above the open one, with Details, Activity and Files
  * named, and the modal's split becomes the same single column.
  *
- * Sections are a list (SECTIONS), so another one (cases, say) is one entry and one Match below.
+ * Sections are a list (SECTIONS), so another one is one entry and one Match below.
  */
 
-export type TaskSection = "details" | "activity" | "files" | "runs" | "workspace";
+export type TaskSection = "details" | "case" | "activity" | "files" | "runs" | "workspace";
 
 const SECTIONS: { id: TaskSection; label: string; short?: string; icon: () => JSX.Element }[] = [
   { id: "details", label: "Details", short: "Details", icon: () => <Layers size={16} aria-hidden="true" /> },
+  { id: "case", label: "Case", short: "Case", icon: () => <CaseIcon size={16} /> },
   { id: "activity", label: "Activity", short: "Activity", icon: () => <Activity size={16} aria-hidden="true" /> },
   { id: "files", label: "Docs and files", short: "Files", icon: () => <FileText size={16} aria-hidden="true" /> },
   { id: "runs", label: "Runs", icon: () => <Play size={16} aria-hidden="true" /> },
@@ -65,11 +75,21 @@ export function TaskSections(props: {
   const split = () => props.layout === "split" && !phone();
   const pluginSections = useTaskPluginSections(() => props.taskId);
   const pluginSection = () => (isPluginTab(params.section) ? params.section : null);
-  const requested = (): TaskSection => (params.section && IDS.has(params.section) ? (params.section as TaskSection) : "details");
+  // The Case section is there while cases are on and the task is in one.
+  const casesOn = useCasesOn();
+  const taskCases = useTaskCases(() => props.taskId, casesOn);
+  const caseLinks = () => (casesOn() ? (taskCases.data ?? []) : []);
+  const offered = (id: TaskSection) => id !== "case" || caseLinks().length > 0;
+  const requested = (): TaskSection => {
+    const wanted = params.section && IDS.has(params.section) ? (params.section as TaskSection) : "details";
+    // A link to the Case section waits for the task's cases before falling back to Details.
+    if (wanted === "case" && !offered("case")) return casesOn() && taskCases.isPending ? "case" : "details";
+    return wanted;
+  };
   // Split, Details is always shown, so the other pane shows Activity unless something else is asked for.
   const section = (): TaskSection | "plugin" => (pluginSection() ? "plugin" : split() && requested() === "details" ? "activity" : requested());
   const choose = (next: string) => setParams({ section: next === "details" ? undefined : next }, { replace: true });
-  const rail = () => (split() ? SECTIONS.filter((entry) => entry.id !== "details") : SECTIONS);
+  const rail = () => SECTIONS.filter((entry) => offered(entry.id) && !(split() && entry.id === "details"));
 
   // A link into the task opens the section it points into, when it arrives or another task opens.
   const anchor = createMemo(() => parseTaskAnchor(location.hash));
@@ -93,6 +113,11 @@ export function TaskSections(props: {
   const details = () => <TaskDetails taskId={props.taskId} initial={props.initial} hideTitle={props.hideTitle} onOpenTask={props.onOpenTask} />;
   const other = () => (
     <Switch>
+      <Match when={section() === "case"}>
+        <Show when={caseLinks().length > 0} fallback={<p class="tsec-muted tsec-pad">Loading the task's cases…</p>}>
+          <TaskCaseSection taskId={props.taskId} links={caseLinks()} onOpenTask={props.onOpenTask} />
+        </Show>
+      </Match>
       <Match when={section() === "activity"}>
         <TaskActivity taskId={props.taskId} title={props.hideTitle || split() ? undefined : props.title} focusCommentId={focusComment()} />
       </Match>
@@ -114,13 +139,15 @@ export function TaskSections(props: {
       <Show
         when={split()}
         fallback={
-          <div class="tsec-body">
-            <TaskNotices taskId={props.taskId} />
-            {/* On phones, plugins' blocks follow the task's own details instead of leading them. */}
-            <Show when={!phone()}>
-              <TaskPluginExtras taskId={props.taskId} />
-            </Show>
-            <Show when={section() === "details"} fallback={other()}>
+          <div class="tsec-body" classList={{ "tsec-body--fill": section() !== "details" }}>
+            <div class="tsec-lead">
+              <TaskNotices taskId={props.taskId} />
+              {/* On phones, plugins' blocks follow the task's own details instead of leading them. */}
+              <Show when={!phone()}>
+                <TaskPluginExtras taskId={props.taskId} />
+              </Show>
+            </div>
+            <Show when={section() === "details"} fallback={<div class="tsec-main">{other()}</div>}>
               {details()}
               <Show when={phone()}>
                 <TaskPluginExtras taskId={props.taskId} />

@@ -31,6 +31,15 @@ describe("parseListUrl", () => {
   });
 });
 
+describe("the group parameter", () => {
+  it("reads a known grouping and replaces the view's", () => {
+    expect(parseListUrl("?group=case").groupBy).toBe("case");
+    expect(parseListUrl("?group=nonsense").groupBy).toBeNull();
+    expect(withUrlFilters(DEFAULT_VIEW_STATE, {}, "case").groupBy).toBe("case");
+    expect(withUrlFilters(DEFAULT_VIEW_STATE, {}, null)).toBe(DEFAULT_VIEW_STATE);
+  });
+});
+
 describe("withUrlFilters", () => {
   it("replaces only the fields the URL sets", () => {
     const state = { ...DEFAULT_VIEW_STATE, filters: { ...DEFAULT_VIEW_STATE.filters, assignees: ["none"], labels: ["bug"] } };
