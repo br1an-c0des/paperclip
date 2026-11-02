@@ -70,7 +70,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 41 | [Gaps found building old links, the shell and the installable app](#41-gaps-found-building-old-links-the-shell-and-the-installable-app) | `shell/*`, `approvals/governance`, User profile | Open | Oct 28, 2026 |
 | 42 | [Gaps found building the task panel, runs and workspaces](#42-gaps-found-building-the-task-panel-runs-and-workspaces) | `tasks/*`, `runs-adapters/runs`, `workspaces/*` | Open | Oct 28, 2026 |
 | 43 | [Gaps found building cases into the task views](#43-gaps-found-building-cases-into-the-task-views) | `cases/*` | Open | Oct 29, 2026 |
-| 44 | [Status cards need an agent that can write them](#44-status-cards-need-an-agent-that-can-write-them) | Status cards | Open | Oct 29, 2026 |
+| 44 | [Status cards need an agent that can write them](#44-status-cards-need-an-agent-that-can-write-them) | Status cards | Decided | Oct 29, 2026 |
 | 45 | [Gaps found building agents, projects, goals and recurring tasks](#45-gaps-found-building-agents-projects-goals-and-recurring-tasks) | `agents/*`, `projects/*`, `goals/*`, `routines/*` | Open | Oct 29, 2026 |
 | 46 | [Gaps found building tier 2 and the plugin stylesheet](#46-gaps-found-building-tier-2-and-the-plugin-stylesheet) | Tier 2, `shell/plugins` | Open | Oct 29, 2026 |
 | 47 | [Upstream sync 2026-10-29](#47-upstream-sync-2026-10-29) | Skills, `shell/coordinator-workspace`, `agents/configuration-yaml` | Decided | Nov 1, 2026 |
