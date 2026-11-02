@@ -1565,6 +1565,24 @@ Both are handled in `ui-new` for now.
   `entries`; Vercel Connect connects with `credentialSource: vercel_connect` and no key; a plan with
   an unknown price comes back named "Plan unknown", and the price editor saves that name back, as the
   old UI does.
+- **Apps leftovers (M7 round 3, 2026-11-02):**
+  - **Composio and Arcade catalog:** ui-new imports the shared package's `aggregator-app-catalog` at
+    runtime (pure data, about 1,600 apps, lazy-loaded as its own 79 kB chunk when the gallery opens),
+    like its other runtime imports from `@paperclipai/shared`. Its own copies of the connection
+    instruction and Sheets helpers live in `apps/setups/extras-model.ts`.
+  - **No automatic provider sync:** the old UI asks each gateway to re-check its provider every 60
+    seconds (`POST …/aggregator/apps/sync`); ui-new's Browse reads what gateways last saw, and Refresh
+    re-checks.
+  - **Left out:** Executor rows (no Executor gateway setup in ui-new); the old "setup task" path
+    (`aggregatorAppSetupTask`, which makes a task and wakes an agent); the agent page's "From
+    connections" instructions (`AgentConnectionInstructions`, agents area, not yet ported).
+  - **The Sheets robot setup is unreachable on any instance:** `GET /companies/:id/tools/gallery`
+    never sets `availability.robotEmail`; only `googleSheetsRobotEmailFromEnv()` knows it, at connect
+    time (`server/src/routes/tool-access.ts` near line 879). The old UI says "not available" too.
+    Upstream candidate 20. ui-new ports the setup and the connection's "Sheets agents can open" card
+    anyway (the old card in `SetupPanel.tsx` is no longer rendered).
+  - **Memory apps leave the gallery when `enableMemoryConnectors` is off,** so an existing Honcho
+    connection's instructions card can't offer "Reset to default".
 - **Voice on hold:** Speko's in-browser voice and calls from a task need `@spekoai/client`, not
   added. Decided 2026-11-02: voice is on hold, to be explored separately later. The old UI pins
   `@spekoai/client` 0.0.13 and loads it only when a call starts (`ui/src/lib/speko-voice-media.ts`,

@@ -56,6 +56,7 @@ until one becomes a concrete fix.
 | 17 | [Log activity when a case is created, edited or linked](#17-log-activity-when-a-case-is-created-edited-or-linked) | candidate | | | 2026-10-29 | | |
 | 18 | [Let a stalled status card setup be retried](#18-let-a-stalled-status-card-setup-be-retried) | candidate | | | 2026-10-29 | | |
 | 19 | [Return `lastExternalCommentAt` on chats as an ISO date](#19-return-lastexternalcommentat-on-chats-as-an-iso-date) | candidate | | | 2026-11-02 | | |
+| 20 | [Offer the Google Sheets robot account in the tools gallery](#20-offer-the-google-sheets-robot-account-in-the-tools-gallery) | candidate | | | 2026-11-02 | | |
 
 ## Details
 
@@ -327,3 +328,17 @@ response.
 - **Likely fix:** map the column (`.mapWith(...)` or convert in the service) so it serializes as ISO,
   with a service or route test.
 - **Fork workaround:** none needed; `ui-new` doesn't read the field.
+
+### 20. Offer the Google Sheets robot account in the tools gallery
+
+Found porting Apps leftovers to `ui-new` (M7 round 3, 2026-11-02). Not yet confirmed beyond reading
+the route.
+
+- **Problem:** the Google Sheets robot method needs the robot's email to show in setup, but
+  `GET /api/companies/:id/tools/gallery` never sets `availability.robotEmail`. Only
+  `googleSheetsRobotEmailFromEnv()` knows it, and it's called only at connect time
+  (`server/src/routes/tool-access.ts`, around line 879). Both UIs therefore say the robot isn't
+  available, even when it's configured.
+- **Likely fix:** set `availability.robotEmail` from `googleSheetsRobotEmailFromEnv()` when building
+  the Sheets gallery entry, with a route test.
+- **Fork workaround:** none; `ui-new`'s setup shows the robot once the field is there.
