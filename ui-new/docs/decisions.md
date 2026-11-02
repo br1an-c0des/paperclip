@@ -73,6 +73,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 44 | [Status cards need an agent that can write them](#44-status-cards-need-an-agent-that-can-write-them) | Status cards | Open | Oct 29, 2026 |
 | 45 | [Gaps found building agents, projects, goals and recurring tasks](#45-gaps-found-building-agents-projects-goals-and-recurring-tasks) | `agents/*`, `projects/*`, `goals/*`, `routines/*` | Open | Oct 29, 2026 |
 | 46 | [Gaps found building tier 2 and the plugin stylesheet](#46-gaps-found-building-tier-2-and-the-plugin-stylesheet) | Tier 2, `shell/plugins` | Open | Oct 29, 2026 |
+| 47 | [Upstream sync 2026-10-29](#47-upstream-sync-2026-10-29) | Skills, `shell/coordinator-workspace`, `agents/configuration-yaml` | Decided | Nov 1, 2026 |
 
 ## Entries
 
@@ -1571,3 +1572,24 @@ Both are handled in `ui-new` for now.
   environment.
 - **Test data:** skill folder "M7 test folder"; environment "M7 test SSH" (host `m7-test.invalid`),
   archived, which shows as archived in every organization.
+
+### 47. Upstream sync 2026-10-29
+
+- **Status:** Decided 2026-11-01
+- **Area:** Skills, `shell/coordinator-workspace`, `agents/configuration-yaml`
+- **Found in:** the upstream sync of Oct 29 (`3edba1157..f1911a4c5`, 197 commits;
+  [report](../../fork/sync-reports/2026-10-29.md)).
+
+- **Skill version lists carry no file contents.** `GET …/skills/:skillId/versions` now returns
+  `CompanySkillVersionSummary` (file names and kinds). `ui-new`'s Compare reads each side, and Restore
+  reads the version first, with `GET …/versions/:versionId`, as the old UI does.
+- **The Coordinator workspace** (#17983) is a per-person preference (`…/workspace-preferences/me`),
+  not an instance flag, so decision 12 has no flag to settle. Not ported for now; the user wants it
+  investigated and designed ([build plan 3.16](build-plan.md#316-upstreams-coordinator-workspace)).
+- **The agent YAML editor** (the old UI's Advanced tab, #18036, #18168): a new checklist row, not
+  placed yet.
+- **Follow-ups left open:** negotiating run interests (`live.interests`) in `live-events.tsx`; the
+  plugin bridge's new retry policy (`ui/src/plugins/bridge.ts`); checking chat task creation against
+  the new default (an unassigned task made in chat goes to the chat's agent); checking onboarding
+  against the new approval and first-task rules; using decision history
+  (`GET /companies/:id/attention/history`) in the Inbox.
