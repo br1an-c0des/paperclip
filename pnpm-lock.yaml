@@ -1487,6 +1487,9 @@ importers:
       solid-js:
         specifier: ^1.9.17
         version: 1.9.17
+      yaml:
+        specifier: ^2.8.1
+        version: 2.9.1
     devDependencies:
       '@babel/parser':
         specifier: ^7.29.0
@@ -8316,6 +8319,7 @@ packages:
 
   opencode-ai@1.18.34:
     resolution: {integrity: sha512-9WUS2T0t4HHDVzXvuwTHF0nvhXvZ9mQ0r+ozCvKdJu0LVoQpOzqAW4qWTC3ygNc5Oedcc7j+Oct24JYlQYnySA==}
+    cpu: [arm64, x64]
     os: [darwin, linux, win32]
     hasBin: true
 

@@ -13,6 +13,7 @@ import { isPluginTab, pluginTabValue } from "@/plugins/model";
 import { PluginDetailTab } from "@/plugins/PluginSlot";
 import { AgentHeader } from "./AgentHeader";
 import { AGENT_SECTIONS, agentView, type AgentSectionKey } from "./agent-model";
+import { AdvancedSection } from "./settings/AdvancedSection";
 import { BudgetSection } from "./settings/BudgetSection";
 import { HistorySection } from "./settings/HistorySection";
 import { InstructionsSection } from "./settings/InstructionsSection";
@@ -162,6 +163,9 @@ function AgentSettings(props: { agent: AgentDetail; base: string; section: Agent
         </Match>
         <Match when={props.section === "history"}>
           <HistorySection agent={props.agent} base={props.base} />
+        </Match>
+        <Match when={props.section === "advanced"}>
+          <AdvancedSection agent={props.agent} />
         </Match>
       </Switch>
     </RailLayout>
