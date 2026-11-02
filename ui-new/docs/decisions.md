@@ -74,6 +74,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 45 | [Gaps found building agents, projects, goals and recurring tasks](#45-gaps-found-building-agents-projects-goals-and-recurring-tasks) | `agents/*`, `projects/*`, `goals/*`, `routines/*` | Open | Oct 29, 2026 |
 | 46 | [Gaps found building tier 2 and the plugin stylesheet](#46-gaps-found-building-tier-2-and-the-plugin-stylesheet) | Tier 2, `shell/plugins` | Open | Oct 29, 2026 |
 | 47 | [Upstream sync 2026-10-29](#47-upstream-sync-2026-10-29) | Skills, `shell/coordinator-workspace`, `agents/configuration-yaml` | Decided | Nov 1, 2026 |
+| 48 | [Upstream sync 2026-11-01](#48-upstream-sync-2026-11-01) | Skills, chat, plugins, settings | Decided | Nov 1, 2026 |
 
 ## Entries
 
@@ -567,6 +568,10 @@ doesn't branch on them: `enableAiConnectionRouters`, `enableIsolatedWorkspacesBy
 `enableWorkspaceDirtyQuarantineRepair`, `enableOwnerInstanceAdmin`, `enableSandboxDuplexBridge`,
 `enableWorktreeRunExecution`, and the compatibility keys `enableMcpAggregators` and
 `enableRunnerPreviewIngress`.
+
+Left out of the settings page (an operator setting the old page doesn't show either):
+`remoteWorkspaceStorageEnabled` ("Remote workspace storage", added upstream Nov 1, 2026, managed
+tier, on by default; [decision 48](#48-upstream-sync-2026-11-01)).
 
 **Decision.** Option 1, as recommended above (Oct 25, 2026). The file viewer is built into the task
 panel in M2, and Conference Room chat is dropped. A flag that upstream adds later gets a row here,
@@ -1593,3 +1598,31 @@ Both are handled in `ui-new` for now.
   the new default (an unassigned task made in chat goes to the chat's agent); checking onboarding
   against the new approval and first-task rules; using decision history
   (`GET /companies/:id/attention/history`) in the Inbox.
+
+### 48. Upstream sync 2026-11-01
+
+- **Status:** Decided 2026-11-01
+- **Area:** Skills, `agent-chat/*`, `shell/plugins`, App settings
+- **Found in:** the upstream sync of Nov 1 (`f1911a4c5..1a6017d64`, 167 commits;
+  [report](../../fork/sync-reports/2026-11-01.md)).
+
+- **`remoteWorkspaceStorageEnabled`** is left out of the Features card
+  ([decision 12](#12-what-happens-to-each-experimental-flag)): an operator setting for remote
+  workspace storage that the old page doesn't show.
+- **Managed skills** (#18334: skill content stored as immutable versions; source type `managed`,
+  badge `paperclip`) are filed as authored here, as the old UI files them under Organization, not
+  Bundled, and their source reads "Paperclip". That makes them editable in the Studio, which the
+  server allows. Restore is one call for them (`POST …/versions` with `sourceVersionId` and
+  `expectedVersionId`, refused with 409 if the skill changed meanwhile) and removes files added
+  since; linked local skills still write each file back (the server answers 422 to a restore).
+- **Agents can message a person's chat from any run** (#18374: `send_chat_message`,
+  `POST /api/agents/me/chat/messages`). The server picks the company, agent and responsible person
+  from the run and checks the source task's access; the message carries `chatMessage`
+  (source task and run), and chats carry `isUnreadForMe` and `lastExternalCommentAt`. This is the
+  delivery briefings needed ([build plan 3.13](build-plan.md#313-briefings-and-reports)); `ui-new`
+  doesn't show the source label or unread dots yet.
+- **Follow-ups left open:** `expectedVersionId` on ordinary Studio saves with a conflict notice;
+  plugin task side panels opening by hand and on runtime activity, with availability called with
+  `runId` and `issueId` instead of polled; chat read state and the source label; `attention/summary`
+  for nav counts; harness labels for Antigravity and Kimi; and, from the Oct 29 sync, the plugin
+  bridge's retry policy and `live.hello`.

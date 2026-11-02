@@ -108,7 +108,7 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | Voting | Tabled | Set aside, and may be dropped ([3.6](#36-voting)). |
 | Group announcement channels | 3 | [3.7](#37-announcement-channels). The old UI's Board chat is a concierge for running the company, not this. |
 | Meetings: scheduled work sessions with an agent | 3, partly 1 | [3.9](#39-meetings). Each meeting is a scheduled task: the agent writes the agenda to it, you talk in its thread, and notes and the agreed actions follow. A routine's schedule trigger already creates a task for an agent at a set time. |
-| Agents message you first: a morning briefing, scheduled reports, reports after milestones | 1, then 3 and 2b | Raised in discussion on Oct 24, 2026. A recurring task does the work, and the result reaches your chat through a fork plugin tool, later through "report to chat" upstream ([3.13](#313-briefings-and-reports), [2b-14](#2b-small-features-ask-upstream-first)). |
+| Agents message you first: a morning briefing, scheduled reports, reports after milestones | 1, then 3 | Raised in discussion on Oct 24, 2026. A recurring task does the work, and the agent sends the result to your chat with upstream's `send_chat_message` (added Nov 1, 2026), so the fork plugin tool and the upstream ask aren't needed ([3.13](#313-briefings-and-reports)). |
 | A "fast mode" for meetings | 2b | Codex agents already have a `fastMode` setting (`codex_local`). `claude_local` has none ([2b-11](#2b-small-features-ask-upstream-first)). A fast model or low effort per message works today. |
 | A core skill add-on for new behaviour | 3 | [3.10](#310-core-skill-add-on). Fork-owned, with no conflict. |
 | A `COMPANY.md`: company-wide instructions every run in the company receives, like an agent's `AGENTS.md` | Idea, then 2b or 3 | Raised Oct 27, 2026 ([3.14](#314-company-instructions-companymd)). Not designed yet. |
@@ -331,7 +331,8 @@ recurring tasks, New project, and Agent workload (boards 31, 32, plus the compan
     enough;
   - search shows a chat as a chat, not as a task;
   - the agent's briefings and reports show as cards between messages
-    ([3.13](#313-briefings-and-reports)), until the plugin can post them as messages.
+    ([3.13](#313-briefings-and-reports)); since Nov 1, 2026 agents can post them as messages
+    themselves (`send_chat_message`).
 - Org dashboard (board 19), Manage agents (board 20) including upstream's new bulk edit of connections
   and models, and company workload (board 33).
 - Agent settings (boards 26, 27, and the board 30 outline): profile, instructions, skills, model and
@@ -480,7 +481,7 @@ dropped.
 | 11 | A fast-mode option for `claude_local`, matching Codex's `fastMode` | Meetings |
 | 12 | Due dates on tasks | Only if you want them back ([decision 6](decisions.md#6-tasks-have-no-due-date)) |
 | 13 | More relation types ("relates to", "duplicates") | Only if mentions and blockers prove too little |
-| 14 | "Report to chat": let any task or routine deliver its result into a person's chat with the agent | Briefings and reports ([3.13](#313-briefings-and-reports)). The delivery already exists for tasks handed off from a chat (`chatTaskHandoffs`, decision 8); this adds a way to link other tasks. |
+| 14 | ~~"Report to chat": let any task or routine deliver its result into a person's chat with the agent~~ | Done upstream on Oct 30, 2026 (#18374, `send_chat_message` and `POST /api/agents/me/chat/messages`; [decision 48](decisions.md#48-upstream-sync-2026-11-01)). |
 | 15 | Return the project's and goal's descriptions in `heartbeat-context` | Agents read it first, but it gives only names, so the "why" behind a task reaches them only if they load the full task ([decision 14](decisions.md#14-lists-need-their-own-storage-so-theyre-on-hold)). |
 | 16 | Each adapter's effort choices per model, beside `GET /api/companies/:companyId/adapters/:type/models` | [Decision 13](decisions.md#13-the-task-composer-overrides-runs-for-more-adapters-than-new-task-does). New task and the composer read one list instead of a mirrored copy that drifts. |
 
@@ -493,8 +494,8 @@ dropped.
   `ui-new` calls like any other API), agent tools, scheduled jobs, event subscriptions, and read access
   to allowed core tables. Plugins never conflict with upstream.
 - **A fork skill to steer agents.** Plugins can't add to the core prompt. The skill in [3.10](#310-core-skill-add-on)
-  tells agents when to use the plugin's tools: read project docs, save memory, read announcements,
-  message the user.
+  tells agents when to use the plugin's tools: read project docs, save memory, read announcements
+  (and when to message the user with upstream's `send_chat_message`).
   Plugin plus skill covers most of stage 3 without touching upstream code.
 - **Patches only when unavoidable.** Ask first, then follow
   [FORK.md](../../FORK.md#changing-server-database-and-packages): a hook in new files over edits to
@@ -697,8 +698,9 @@ messenger would have used. Agent-initiated messages are a separate feature
 ### 3.13 Briefings and reports
 
 Raised in discussion on Oct 24, 2026. The agent writes to you first: a morning briefing, other
-scheduled reports, and a report when a milestone is reached. "Report to chat" is the end goal, with
-plugins added as needed. This is its own feature, added to the built-in chat as it is.
+scheduled reports, and a report when a milestone is reached. Delivery into the chat now exists
+upstream (below); plugins are added only where needed. This is its own feature, added to the
+built-in chat as it is.
 
 - **Have:**
   - Recurring tasks: routines with schedule, webhook and API triggers create a task for the agent
@@ -706,29 +708,29 @@ plugins added as needed. This is its own feature, added to the built-in chat as 
   - Tasks handed off from a chat already report back to it when they're done (decision 8). That
     covers milestone reports for work that started in the chat.
   - Read markers on tasks (`POST /api/issues/:id/read`), so the chat can show what's new.
+- **Have since Nov 1, 2026** (upstream #18374, [decision 48](decisions.md#48-upstream-sync-2026-11-01)):
+  any run can post into its agent's chat with the responsible person (`send_chat_message`, or
+  `POST /api/agents/me/chat/messages` for HTTP agents). The server picks the chat from the run and
+  checks the source task's access; the message names its source task, and the chat is marked
+  unread. Upstream's own example is a morning review routine leaving a digest in the chat. This
+  replaces the fork plugin tool and the upstream ask planned here.
 - **Missing:**
-  - A way for any other run to post into your chat. The server only accepts a chat message from a
-    run the chat started, so a briefing run's message would be refused.
   - Routines triggered by events. They only have schedule, webhook and API triggers.
+  - In `ui-new`: the message's source label ("from task X") and unread dots in the chat; making a
+    recurring task's responsible person editable, since it decides whose chat a briefing reaches
+    (`PATCH /routines/:id` doesn't take `responsibleUserId` yet,
+    [decision 45](decisions.md#45-gaps-found-building-agents-projects-goals-and-recurring-tasks)).
 - **Approach:**
-  1. **In M5, UI only:** the chat shows the agent's report tasks as cards between messages. This
-     needs a way to tell report tasks apart, so check what a routine can carry (a label, for
-     example).
-  2. **A fork plugin tool, "message the user":** any run can call it, including a briefing's. The
-     plugin posts the message into the person's built-in chat as a comment from the agent. From
-     reading the code, plugins can add comments attributed to an agent (`createComment` in
-     `server/src/services/plugin-host-services.ts`), and the chat's check that a reply comes from one
-     of its own runs doesn't apply to them. That's untested, and upstream could close it. Finding the
-     chat's task ID is a detail to work out (`ui-new` knows it). The fork skill tells agents when to
-     use the tool.
-  3. **Upstream, "report to chat"** ([2b-14](#2b-small-features-ask-upstream-first)): the proper
-     version, reusing the hand-off delivery. The plugin tool switches to it if it lands.
-  4. **Milestone reports for work that didn't start in the chat:** the plugin watches for events (a
-     list's last task done, a project reaching a state) and fires the briefing routine through its
-     API trigger.
+  1. **UI only:** show briefing messages well in the chat: the source label, unread dots, perhaps a
+     briefing card style.
+  2. **A briefing recurring task:** its instructions (or a fork skill) tell the agent to send the
+     result with `send_chat_message`. Try a real morning briefing on TES with a cheap model.
+  3. **Milestone reports for work that didn't start in the chat:** something still has to start the
+     run when the milestone happens: a plugin watching for events (a list's last task done, a project
+     reaching a state) fires the briefing routine through its API trigger.
 
   Meetings (3.9) use the same delivery for their reminder and agenda.
-- **Risk:** low for the plugin, with the caveat in step 2.
+- **Risk:** low: the delivery is upstream's; only step 3 needs a plugin.
 
 ### 3.14 Company instructions (COMPANY.md)
 
