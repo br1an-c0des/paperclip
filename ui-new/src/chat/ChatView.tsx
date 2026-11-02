@@ -1,7 +1,7 @@
 import type { AgentDetail, IssueStatus } from "@paperclipai/shared";
 import { A, useLocation, useNavigate } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
-import { Activity, MessageCircleOff, NotebookPen, RotateCcw, Search, SlidersHorizontal, X } from "lucide-solid";
+import { Activity, MessageCircleOff, NotebookPen, Repeat, RotateCcw, Search, Send, SlidersHorizontal, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch } from "solid-js";
 import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
@@ -12,6 +12,9 @@ import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
 import { useYouName } from "@/lib/session";
 import { isSetupDraft } from "@/agents/new/new-agent-model";
+import { recurringPath } from "@/recurring/queries";
+import { FeedbackVotes } from "@/tasks/FeedbackVotes";
+import { originRoutineId } from "@/tasks/task-origin";
 import { documentName, isPlanKey } from "@/documents/document-model";
 import { RequestCard } from "@/requests/RequestCard";
 import { QueuedMessages } from "@/tasks/composer/QueuedMessages";
@@ -26,6 +29,7 @@ import { ChatComposer } from "./ChatComposer";
 import { ChatDocumentCard, ChatDocumentDialog, ChatDocumentList, chatDocumentHost } from "./ChatDocuments";
 import {
   chatDocumentLink,
+  commentRunId,
   documentHash,
   documentKeyFromHash,
   messageTime,
@@ -33,8 +37,10 @@ import {
   shortDate,
   statusTag,
   type ChatEntry,
+  type ChatMessageSource,
   type ChatTask,
 } from "./chat-model";
+import { useChatReadMarker } from "./chat-read";
 import { LiveReply } from "./LiveReply";
 import { atFoot, shouldFollow, type FollowCause } from "./scroll-model";
 import { useChat } from "./use-chat";
@@ -45,7 +51,10 @@ import "./Chat.css";
  * the task page, though it's a hidden task underneath (decision 8). The thread is messages, hand-off
  * and report cards, requests, session lines and the live reply; under it the queue and the
  * composer, with a strip while the agent works on something else; beside it the Activity column
- * (a sheet on a phone). Runs open in the run modal over the chat (board 18).
+ * (a sheet on a phone). Runs open in the run modal over the chat (board 18), from the live reply,
+ * a reply that posted nothing, or an agent message's Transcript. Agent messages have thumbs up and
+ * down; a message the agent sent from another task (a briefing or report, build plan 3.13) names
+ * that task and its recurring task. Reading the chat marks it read (chat-read.tsx).
  *
  * While the instance's `enableAgentChat` is off, the chat routes answer 404, so the view says so and
  * points to the agent's settings (decision 2, option 2).
@@ -178,6 +187,16 @@ function ChatThread(props: ChatViewProps) {
   window.addEventListener("scroll", onScroll, { passive: true });
   onCleanup(() => window.removeEventListener("scroll", onScroll));
   const shown = createMemo(() => !state.off() && !state.loading() && !state.error());
+  // Reading the chat marks it read up to the newest agent message you've seen (chat-read.tsx).
+  // Its scroll check is added after `onScroll`, so it sees where the reader is now.
+  useChatReadMarker({
+    chatId: state.chatId,
+    agentId: () => props.agent.id,
+    unread: state.unread,
+    comments: state.allComments,
+    ready: () => shown() && !!state.chatId() && state.comments.isSuccess,
+    atFoot: () => following,
+  });
   createEffect(on(shown, (open) => open && follow("opened")));
   const watchGrowth = (element: HTMLElement) => {
     const observer = new ResizeObserver(() => follow("grew"));
@@ -426,7 +445,9 @@ function Entry(props: {
           </div>
         )}
       </Match>
-      <Match when={props.entry.kind === "message" && props.entry}>{(message) => <Message entry={message()} agent={props.agent} youName={props.youName} projectName={props.projectName} people={props.people} />}</Match>
+      <Match when={props.entry.kind === "message" && props.entry}>
+        {(message) => <Message entry={message()} agent={props.agent} chatId={props.chatId} youName={props.youName} projectName={props.projectName} people={props.people} />}
+      </Match>
       <Match when={props.entry.kind === "handoff" && props.entry}>
         {(handoff) => (
           <div class="ch-msg ch-msg--card">
@@ -503,6 +524,7 @@ function Entry(props: {
 function Message(props: {
   entry: Extract<ChatEntry, { kind: "message" }>;
   agent: AgentDetail;
+  chatId: string;
   youName: string;
   projectName: (id: string | null) => string | undefined;
   people: ReturnType<typeof useChat>["people"];
@@ -517,6 +539,12 @@ function Message(props: {
     return "Paperclip";
   };
   const notice = () => props.entry.comment.presentation?.kind === "system_notice";
+  const commands = useCommands();
+  // An agent's message has thumbs up and down, as in the task thread (tasks/FeedbackVotes.tsx), and
+  // its run a click away (board 18: the run modal over the chat). A message sent from another
+  // task's run opens that run, which is the one that wrote it.
+  const voted = () => author().kind === "agent" && !notice() && !props.entry.comment.deletedAt && !!props.chatId;
+  const runId = () => (author().kind === "agent" ? (props.entry.source?.runId ?? commentRunId(props.entry.comment)) : null);
   return (
     <article class="ch-msg" classList={{ "ch-msg--cont": !props.entry.head, "ch-msg--you": author().kind === "you", "ch-msg--notice": notice() }} data-tone={props.entry.comment.presentation?.tone}>
       <span class="ch-av">
@@ -536,14 +564,80 @@ function Message(props: {
             </time>
           </div>
         </Show>
+        <Show when={props.entry.source}>{(source) => <MessageSource source={source()} />}</Show>
         <Show when={!props.entry.comment.deletedAt} fallback={<p class="ch-muted">This message was deleted.</p>}>
           <MessageBody source={props.entry.comment.body} />
         </Show>
         <For each={props.entry.tasks}>
           {(task) => <TaskCard task={task} meta="Created from this chat" projectName={props.projectName} people={props.people} />}
         </For>
+        <Show when={voted() || runId()}>
+          <div class="ch-msg-foot">
+            <Show when={voted()}>
+              <FeedbackVotes taskId={props.chatId} commentId={props.entry.comment.id} youId={props.people.youId()} label="Feedback on this message" />
+            </Show>
+            <Show when={runId()}>
+              {(id) => (
+                <button type="button" class="ch-link ch-msg-run" onClick={() => commands.openRunModal(id())}>
+                  Transcript
+                </button>
+              )}
+            </Show>
+          </div>
+        </Show>
       </div>
     </article>
+  );
+}
+
+/**
+ * Where a message the agent sent from another task came from (build plan 3.13): the task, opening
+ * in the task modal, and the recurring task that made it, for a briefing or a scheduled report.
+ * The task is read for its title and origin. The title is the occurrence's, with its date filled
+ * in, where the recurring task's own has `{{date}}`. Without access to it, the identifier shows.
+ */
+function MessageSource(props: { source: ChatMessageSource }) {
+  const company = useCompany();
+  const commands = useCommands();
+  const task = createQuery(() => ({
+    queryKey: queryKeys.issues.section(props.source.taskId, "core"),
+    queryFn: ({ signal }) => issuesApi.getCore(props.source.taskId, signal),
+    retry: false,
+    staleTime: 60_000,
+  }));
+  const routineId = () => (task.data ? originRoutineId(task.data) : null);
+  const target = () => ({ id: props.source.taskId, identifier: props.source.identifier });
+  return (
+    <p class="ch-source">
+      <Show when={routineId()} fallback={<Send size={13} aria-hidden="true" />}>
+        <Repeat size={13} aria-hidden="true" />
+      </Show>
+      <span>
+        <Show when={routineId()} fallback={<>Sent from </>}>
+          {(id) => (
+            <>
+              From the recurring task{" "}
+              <A class="ch-source-link" href={recurringPath(company().issuePrefix, id())}>
+                {task.data?.title ?? "recurring task"}
+              </A>
+              {" · "}
+            </>
+          )}
+        </Show>
+        <a
+          class="ch-source-link mono"
+          href={issuePath(company().issuePrefix, target())}
+          onClick={(event) => {
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            commands.openTaskModal({ ...target(), title: task.data?.title ?? props.source.identifier, projectId: task.data?.projectId ?? null });
+          }}
+        >
+          {props.source.identifier}
+        </a>
+        <Show when={!routineId() && task.data?.title}>{(title) => <span class="ch-source-title"> · {title()}</span>}</Show>
+      </span>
+    </p>
   );
 }
 

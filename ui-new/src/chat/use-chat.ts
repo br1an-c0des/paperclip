@@ -235,9 +235,12 @@ export function useChat(agent: () => AgentDetail) {
     },
     chat,
     chatId,
+    /** Whether the chat had agent messages you hadn't read when it loaded (decision 48). */
+    unread: () => chatQuery.data?.isUnreadForMe === true,
     ensure,
     entries,
     comments,
+    allComments,
     handoffs,
     documents,
     replies,

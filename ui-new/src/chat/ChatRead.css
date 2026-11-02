@@ -1,0 +1,9 @@
+/* A chat with messages you haven't read: a small dot beside the agent */
+.ch-unread {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--run-fg);
+  box-shadow: 0 0 0 2px var(--ground);
+}
