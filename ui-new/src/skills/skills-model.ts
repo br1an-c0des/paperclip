@@ -87,12 +87,14 @@ type OriginInput = Pick<CompanySkillListItem, "key" | "sourceBadge" | "sourceTyp
 
 /**
  * Bundled skills ship with Paperclip (`paperclipai/paperclip/…`); authored ones were written in this
- * company (their key is `company/<id>/<slug>`, forks included); everything else came in from a
+ * company (their key is `company/<id>/<slug>`, forks included) or are managed by Paperclip here
+ * (source type `managed`, such as an imported skill made editable); everything else came in from a
  * source, the catalog, a URL or a folder.
  */
 export function skillOrigin(skill: OriginInput): SkillOrigin {
-  // Authored skills carry the "paperclip" badge too ("Paperclip workspace"), so they're told apart first.
-  if (skill.key.startsWith("company/") || skill.forkedFromSkillId) return "authored";
+  // Authored and managed skills carry the "paperclip" badge too ("Paperclip workspace", "Paperclip"),
+  // so they're told apart first. The old UI files managed skills under Organization, not Bundled.
+  if (skill.key.startsWith("company/") || skill.forkedFromSkillId || skill.sourceType === "managed") return "authored";
   if (skill.sourceBadge === "paperclip" || skill.key.startsWith("paperclipai/paperclip/")) return "bundled";
   return "imported";
 }
@@ -109,6 +111,8 @@ export function sourceLine(skill: Pick<CompanySkillListItem, "sourceType" | "sou
       return "Paperclip catalog";
     case "skills_sh":
       return "skills.sh";
+    case "managed":
+      return "Paperclip";
     default:
       return "A local folder";
   }

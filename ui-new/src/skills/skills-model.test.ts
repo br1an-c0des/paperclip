@@ -69,12 +69,16 @@ describe("where a skill comes from", () => {
     expect(skillOrigin(skill({ key: "company/c1/notes", sourceBadge: "paperclip", sourceLabel: "Paperclip workspace" }))).toBe("authored");
     expect(skillOrigin(skill({ key: "acme/skills/review", sourceType: "github", sourceBadge: "github", forkedFromSkillId: null }))).toBe("imported");
     expect(skillOrigin(skill({ key: "local/abc/x", forkedFromSkillId: "orig" }))).toBe("authored");
+    // Managed content (upstream sync 2026-11-01): an imported skill made editable keeps its key and
+    // gets the "paperclip" badge, but it isn't bundled with Paperclip.
+    expect(skillOrigin(skill({ key: "acme/skills/review", sourceType: "managed", sourceBadge: "paperclip", sourceLabel: "Paperclip" }))).toBe("authored");
   });
 
   it("says where an imported skill came from", () => {
     expect(sourceLine(skill({ sourceLabel: "Paperclip bundled" }))).toBe("Paperclip bundled");
     expect(sourceLine(skill({ sourceType: "github", key: "acme/skills/review" }))).toBe("acme/skills");
     expect(sourceLine(skill({ sourceType: "local_path" }))).toBe("A local folder");
+    expect(sourceLine(skill({ sourceType: "managed", sourceLabel: null }))).toBe("Paperclip");
   });
 });
 
