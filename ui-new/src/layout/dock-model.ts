@@ -2,12 +2,16 @@ import { agentView } from "@/agents/agent-model";
 
 /*
  * The phone dock's rules (design/mobile.md, N1), kept apart from the components so they can be
- * tested: which of the three places owns the current page, what tapping Tasks does, which tasks
+ * tested: which of the places owns the current page, what tapping Tasks does, which tasks
  * scope the switcher marks as current, and when the dock slides away while scrolling.
  */
 
-/** The dock's three places. Pages outside them (the dashboard, settings) leave none current. */
-export type DockPlace = "inbox" | "tasks" | "agents";
+/**
+ * The dock's places: Inbox, Tasks and Agents, and Status (status cards) while the instance has
+ * `enableStatusCards`, as the desktop nav has it under Inbox. Pages outside them (the dashboard,
+ * settings) leave none current.
+ */
+export type DockPlace = "inbox" | "status" | "tasks" | "agents";
 
 /** What the Tasks switcher sheet shows: closed, the projects, the company list, or You. */
 export type SheetView = "closed" | "projects" | "companies" | "you";
@@ -36,6 +40,7 @@ export function dockPlace(pathname: string, prefix: string): DockPlace | null {
   const path = companyPath(pathname, prefix);
   if (!path) return null;
   if (path === "/inbox" || path.startsWith("/inbox/")) return "inbox";
+  if (path === "/status" || path.startsWith("/status/")) return "status";
   if (path === "/issues" || path.startsWith("/issues/")) return "tasks";
   if (PROJECT_TASKS.test(path)) return "tasks";
   if (path === "/agents" || path.startsWith("/agents/")) return "agents";

@@ -12,9 +12,10 @@ import { HeaderNumber, PageHeader } from "@/ui/PageHeader";
 import { pushToast } from "@/ui/Toast";
 import { CARD_TABS, CardPanel, type CardTab } from "./CardPanel";
 import { CardTile } from "./CardTile";
+import { useCardAgentChecks } from "./agent-checks";
 import { NewCardDialog } from "./NewCardDialog";
 import { useCardQuery, useCardsQuery, useRefreshCards, useStatusCardsEnabled, useUpdatesQuery } from "./queries";
-import { formatCents, formatTokens, midSentence, rollupAll } from "./status-model";
+import { cardLifecycle, formatCents, formatTokens, midSentence, rollupAll } from "./status-model";
 import "./StatusCards.css";
 
 /*
@@ -39,6 +40,15 @@ export function StatusPage() {
   const params = useParams<{ cardId?: string }>();
   const [search, setSearch] = useSearchParams<{ tab?: string }>();
   const refresh = useRefreshCards();
+  const agentChecks = useCardAgentChecks();
+  /** "Summarizer: paused.", for a card setting up whose agent won't run it as things stand. */
+  const agentProblem = (card: StatusCard) => {
+    if (cardLifecycle(card) !== "compiling") return null;
+    const check = agentChecks.check(card.agentId);
+    if (check.level !== "warn" && check.level !== "blocked") return null;
+    const name = card.agentId ? (agentChecks.agents.data?.find((agent) => agent.id === card.agentId)?.name ?? "Its agent") : "Summarizer";
+    return `${name}: ${check.title.charAt(0).toLowerCase()}${check.title.slice(1)}.`;
+  };
   const enabled = useStatusCardsEnabled();
   const on = () => enabled() === true;
 
@@ -154,6 +164,7 @@ export function StatusPage() {
                         onSetup={() => setup(card)}
                         onArchive={() => archive(card, true)}
                         onOpenTask={(id) => openTask({ id, identifier: null })}
+                        agentProblem={agentProblem(card)}
                       />
                     )}
                   </For>

@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 afterEach(cleanup);
 
-const settings = { enableStatusCards: true };
+const settings = { enableStatusCards: true, enableBuiltInAgents: false };
+const builtIns = { summarizer: "not_provisioned" as string };
 const policy = { mode: "manual" as const, triggers: { statusTransitions: true, membershipChanges: true, humanComments: true, assigneeChanges: true, anyUpdate: false } };
 const card = (patch: Partial<StatusCard>): StatusCard =>
   ({
@@ -101,11 +102,31 @@ const api = {
 const openTaskModal = vi.fn();
 
 vi.mock("@/api/status-cards", () => ({ statusCardsApi: api }));
+vi.mock("@/api/agents", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/agents")>()),
+  builtInAgentsApi: {
+    list: async () => [
+      { definition: { key: "summarizer", displayName: "Summarizer", shortPurpose: "Summaries", featureKeys: ["summarizer"] }, status: builtIns.summarizer, agentId: builtIns.summarizer === "not_provisioned" ? null : "s1", agent: null },
+    ],
+  },
+  adaptersApi: {
+    list: async () => [
+      { type: "claude_local", capabilities: { supportsLocalAgentJwt: true } },
+      { type: "process", capabilities: { supportsLocalAgentJwt: true } },
+    ],
+  },
+}));
 vi.mock("@/lib/company", () => ({ useCompany: () => () => ({ id: "co1", issuePrefix: "TES", name: "Test" }) }));
 vi.mock("@/lib/commands", () => ({ useCommands: () => ({ openTaskModal }) }));
 vi.mock("@/lib/company-data", () => ({
   useExperimentalSettingsQuery: () => ({ data: settings }),
-  useAgentsQuery: () => ({ data: [{ id: "a1", name: "M7 test summarizer", status: "idle", appearance: null }] }),
+  useAgentsQuery: () => ({
+    data: [
+      { id: "a1", name: "M7 test summarizer", status: "idle", adapterType: "claude_local", budgetMonthlyCents: 0, spentMonthlyCents: 0, appearance: null },
+      { id: "a2", name: "M7 test pipe", status: "idle", adapterType: "process", budgetMonthlyCents: 0, spentMonthlyCents: 0, appearance: null },
+      { id: "s1", name: "Summarizer", status: "paused", adapterType: "claude_local", budgetMonthlyCents: 0, spentMonthlyCents: 0, appearance: null },
+    ],
+  }),
 }));
 
 const { StatusPage } = await import("./StatusPage");
@@ -124,6 +145,8 @@ function mount(path = "/TES/status") {
 
 beforeEach(() => {
   settings.enableStatusCards = true;
+  settings.enableBuiltInAgents = false;
+  builtIns.summarizer = "not_provisioned";
   vi.clearAllMocks();
 });
 afterEach(() => window.history.replaceState(null, "", "/"));
@@ -193,15 +216,74 @@ describe("StatusPage", () => {
     expect((api.patch.mock.calls[0] as unknown[])[1]).not.toHaveProperty("interestPrompt");
   });
 
-  it("asks for an agent when the company has no Summarizer", async () => {
+  it("holds Create back while built-in agents are off, until an agent is chosen", async () => {
     mount();
     await screen.findByRole("article", { name: "Test Project at a glance" });
     fireEvent.click(screen.getAllByRole("button", { name: "New card" })[0]!);
     const dialog = await screen.findByRole("dialog");
     fireEvent.input(within(dialog).getByLabelText("What do you want to keep an eye on?"), { target: { value: "Everything blocked" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Create card" }));
+    expect((await within(dialog).findByRole("alert")).textContent).toContain("Built-in agents are off");
+    const create = within(dialog).getByRole("button", { name: "Create card" }) as HTMLButtonElement;
+    expect(create.disabled).toBe(true);
+
+    const picker = within(dialog).getByRole("button", { name: "Agent" });
+    fireEvent.pointerDown(picker, { button: 0, pointerType: "mouse" });
+    fireEvent.click(picker);
+    const pipe = await screen.findByRole("menuitem", { name: /M7 test pipe/ });
+    expect(pipe.getAttribute("aria-disabled")).toBe("true");
+    expect(pipe.textContent).toContain("Can't write cards");
+    const quill = screen.getByRole("menuitem", { name: /M7 test summarizer/ });
+    fireEvent.pointerDown(quill, { button: 0, pointerType: "mouse" });
+    fireEvent.pointerUp(quill, { button: 0, pointerType: "mouse" });
+    fireEvent.click(quill);
+    await waitFor(() => expect(create.disabled).toBe(false));
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+  });
+
+  it("says the Summarizer isn't set up and offers to set it up; a paused one is held back too", async () => {
+    settings.enableBuiltInAgents = true;
+    mount();
+    await screen.findByRole("article", { name: "Test Project at a glance" });
+    fireEvent.click(screen.getAllByRole("button", { name: "New card" })[0]!);
+    const dialog = await screen.findByRole("dialog");
+    expect((await within(dialog).findByRole("alert")).textContent).toContain("Summarizer: not set up");
+    expect(within(dialog).getByRole("button", { name: "Set up the Summarizer" })).toBeTruthy();
+    cleanup();
+
+    builtIns.summarizer = "paused";
+    mount();
+    await screen.findByRole("article", { name: "Test Project at a glance" });
+    fireEvent.click(screen.getAllByRole("button", { name: "New card" })[0]!);
+    const again = await screen.findByRole("dialog");
+    expect((await within(again).findByRole("alert")).textContent).toContain("Summarizer: paused");
+    expect(within(again).getByRole("link", { name: "Open the Summarizer" }).getAttribute("href")).toBe("/TES/agents/s1");
+  });
+
+  it("explains the server's refusal when the Summarizer turns out not to be ready", async () => {
+    settings.enableBuiltInAgents = true;
+    builtIns.summarizer = "ready";
+    mount();
+    await screen.findByRole("article", { name: "Test Project at a glance" });
+    fireEvent.click(screen.getAllByRole("button", { name: "New card" })[0]!);
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.input(within(dialog).getByLabelText("What do you want to keep an eye on?"), { target: { value: "Everything blocked" } });
+    const create = within(dialog).getByRole("button", { name: "Create card" }) as HTMLButtonElement;
+    await waitFor(() => expect(create.disabled).toBe(false));
+    fireEvent.click(create);
     expect(await within(dialog).findByText(/no Summarizer set up/)).toBeTruthy();
     expect(api.create).toHaveBeenCalledWith("co1", expect.objectContaining({ interestPrompt: "Everything blocked", agentId: null }));
+  });
+
+  it("says a setup is waiting when its agent can't get to it", async () => {
+    settings.enableBuiltInAgents = true;
+    builtIns.summarizer = "paused";
+    api.list.mockImplementation(async (_companyId: string, isArchived: boolean) =>
+      isArchived ? [] : [card({ id: "c5", title: "Waiting card", agentId: null, state: "compiling", queries: [], summaryBody: null, generatingIssueId: "g5" })],
+    );
+    mount();
+    const tile = await screen.findByRole("article", { name: "Waiting card" });
+    await waitFor(() => expect(tile.textContent).toContain("Waiting. Summarizer: paused."));
+    api.list.mockImplementation(async (_companyId: string, isArchived: boolean) => (isArchived ? archived : active));
   });
 
   it("says so when status cards are off, without asking for cards", async () => {

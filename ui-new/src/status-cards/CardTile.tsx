@@ -15,7 +15,7 @@ import type { CardTab } from "./CardPanel";
  * with Retry, paused), the summary, and a footer with freshness, refresh policy and today's tokens
  * and cost. The title opens the card's panel, and so does a click anywhere on the tile; the "…" menu
  * holds Update now, Run setup again (when setup stalled or failed), Settings, Watched tasks,
- * History and Archive.
+ * History and Archive. A setup whose agent can't get to it (paused, not set up) says so in its line.
  *
  * The old tile also streams the summary as the agent writes it, from the run's `acpx.text_delta`
  * output. That only works for ACP harnesses and isn't ported; an update shows its task instead.
@@ -30,6 +30,8 @@ export function CardTile(props: {
   onSetup: () => void;
   onArchive: () => void;
   onOpenTask: (issueId: string) => void;
+  /** Why the card's agent may not get to it ("Summarizer: paused."), from card-agent-model.ts. */
+  agentProblem?: string | null;
 }) {
   const state = () => cardLifecycle(props.card);
   const meta = () => LIFECYCLE[state()];
@@ -115,7 +117,11 @@ export function CardTile(props: {
                 </>
               }
             >
-              <span class="sc-banner-text">The agent is building the query and the first summary.</span>
+              <span class="sc-banner-text" title={props.agentProblem ?? undefined}>
+                <Show when={props.agentProblem} fallback="The agent is building the query and the first summary.">
+                  <TriangleAlert size={14} aria-hidden="true" /> Waiting. {props.agentProblem}
+                </Show>
+              </span>
               <Button size="compact" variant="quiet" onClick={() => props.onOpenTask(props.card.generatingIssueId!)}>
                 Setup task
               </Button>

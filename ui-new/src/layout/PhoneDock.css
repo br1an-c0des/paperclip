@@ -85,6 +85,16 @@
   text-overflow: ellipsis;
 }
 
+/* With Status in the dock (status cards on) four places share the pill; tighten them to fit 390px */
+.pdock-pill[data-places="4"] .pdock-item {
+  min-width: 44px;
+  padding: 0 12px;
+}
+
+.pdock-pill[data-places="4"] .pdock-label--scope {
+  max-width: 30vw;
+}
+
 .pdock-caret {
   flex-shrink: 0;
   color: var(--muted);
