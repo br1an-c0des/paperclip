@@ -14,7 +14,8 @@ import { pushToast } from "@/ui/Toast";
 import { failureText, useRefreshSkills } from "./queries";
 import { whenLabel } from "./SkillLibrary";
 import { repositoryProblem, repositoryUrl, syncLabel } from "./skills-model";
-import { CandidateList, ChooseSkillsDialog, ProjectRepositories, SourceSettingsDialog } from "./SourceExtras";
+import { connectionChoices, needsConnection } from "./skill-settings-model";
+import { CandidateList, ChooseSkillsDialog, ConnectionField, ProjectRepositories, ScanProgress, SourceSettingsDialog, useStreamedScan } from "./SourceExtras";
 
 /*
  * Skill sources (`/:prefix/skills/sources`): the Git repositories the library imports skills from
@@ -24,11 +25,13 @@ import { CandidateList, ChooseSkillsDialog, ProjectRepositories, SourceSettingsD
  * branch, and Remove disconnects it, keeping its skills as copies or deleting them (`DELETE …/:id`).
  * Project workspaces' repositories that aren't sources yet are offered below (SourceExtras.tsx).
  *
- * Add a source reads a repository first (`POST …/discover`) and lists the skills in it, each with
- * a preview; the chosen ones are imported from that exact commit (`POST …/skill-sources`). The
- * repositories the company's GitHub connections can read are offered as picks. Private repositories
- * need a GitHub connection, which is set up under Apps; picking a connection other than the one
- * the server chooses isn't offered.
+ * Add a source reads a repository first (`POST …/discover`, streamed so the download and checks
+ * show as they go) and lists the skills in it, each with a preview; the chosen ones are imported
+ * from that exact commit (`POST …/skill-sources`). The repositories the company's GitHub
+ * connections can read are offered as picks; when more than one connection can read the chosen
+ * repository, the person picks whose access is used. Private repositories need a GitHub
+ * connection, which is set up under Apps. A source failing for its connection offers Choose a
+ * connection (its settings).
  */
 
 export function SkillSources(props: { sourceId: string | null }) {
@@ -160,9 +163,13 @@ function SourceRow(props: { source: SkillSource; selected: boolean; onRemove: ()
         <Show when={props.source.lastError}>
           <p class="sk-error" role="alert">
             {props.source.lastError}
-            <Show when={props.source.repairAction === "connection"}> Check the GitHub connection under Apps.</Show>
             <Show when={props.source.repairAction === "branch"}> Pick another branch in Settings.</Show>
           </p>
+          <Show when={needsConnection(props.source) && props.source.enabled}>
+            <Button size="compact" class="sk-self-start" onClick={props.onSettings}>
+              Choose a connection
+            </Button>
+          </Show>
         </Show>
         <Show when={imported().length > 0}>
           <ul class="sk-chips">
@@ -206,7 +213,9 @@ function AddSourceDialog(props: { open: boolean; onOpenChange: (open: boolean) =
   const refreshSkills = useRefreshSkills();
   const [url, setUrl] = createSignal("");
   const [branch, setBranch] = createSignal("");
-  const [scanning, setScanning] = createSignal(false);
+  const [connection, setConnection] = createSignal<string | null>(null);
+  const live = useStreamedScan();
+  const scanning = live.scanning;
   const [importing, setImporting] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [found, setFound] = createSignal<SkillSourceDiscovery | null>(null);
@@ -225,10 +234,14 @@ function AddSourceDialog(props: { open: boolean; onOpenChange: (open: boolean) =
     const words = url().trim().toLowerCase();
     return (repositories.data?.repositories ?? []).filter((repo) => !words || repo.fullName.toLowerCase().includes(words) || repo.url.toLowerCase() === words).slice(0, 8);
   });
+  // More than one connection can read it: the person picks whose access the source uses.
+  const connections = createMemo(() => (problem() || !url().trim() ? [] : connectionChoices(repositories.data, repositoryUrl(url()))));
 
   const reset = () => {
+    live.cancel();
     setUrl("");
     setBranch("");
+    setConnection(null);
     setError(null);
     setFound(null);
     setPicked(new Set<string>());
@@ -239,17 +252,16 @@ function AddSourceDialog(props: { open: boolean; onOpenChange: (open: boolean) =
   };
 
   const scan = async () => {
-    if (repositoryProblem(url())) return;
-    setScanning(true);
+    if (repositoryProblem(url()) || scanning()) return;
     setError(null);
     try {
-      const discovery = await skillsApi.discover(company().id, { repositoryUrl: repositoryUrl(url()), trackingRef: branch().trim() || undefined });
+      const chosen = connection() && connections().some((entry) => entry.id === connection()) ? connection() : null;
+      const discovery = await live.scan({ repositoryUrl: repositoryUrl(url()), trackingRef: branch().trim() || undefined, connectionId: chosen ?? undefined, packageMode: "repository" });
+      if (!discovery) return;
       setFound(discovery);
       setPicked(new Set(discovery.candidates.filter((candidate) => !candidate.error).map((candidate) => candidate.path)));
     } catch (caught) {
       setError(failureText(caught, "Couldn't read that repository."));
-    } finally {
-      setScanning(false);
     }
   };
 
@@ -332,6 +344,12 @@ function AddSourceDialog(props: { open: boolean; onOpenChange: (open: boolean) =
               <Field label="Branch" for="sk-source-branch" help="Leave empty for the repository's default branch.">
                 <TextInput id="sk-source-branch" value={branch()} placeholder="main" onInput={(event) => setBranch(event.currentTarget.value)} />
               </Field>
+              <Show when={connections().length > 1}>
+                <ConnectionField id="sk-source-connection-new" choices={connections()} value={connection()} onChange={setConnection} automatic disabled={scanning()} />
+              </Show>
+              <Show when={scanning()}>
+                <ScanProgress progress={live.progress()} found={live.found()} />
+              </Show>
               <Show when={suggestions().length > 0}>
                 <div class="sk-suggest">
                   <span class="org-muted">Your GitHub connections can read:</span>

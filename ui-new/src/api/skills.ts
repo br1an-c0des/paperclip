@@ -1,4 +1,11 @@
 import type {
+  CompanySkillAuditResult,
+  CompanySkillRenameRequest,
+  CompanySkillRenameResult,
+  CompanySkillResetRequest,
+  CompanySkillUpdateRequest,
+  SkillSourceDiscoveryEvent,
+  SkillSourceScanUpdate,
   CatalogSkill,
   CatalogSkillFileDetail,
   CompanySkill,
@@ -40,7 +47,7 @@ import type {
   SkillSourceSelectionRequest,
   SkillSourceSettingsRequest,
 } from "@paperclipai/shared";
-import { api } from "./client";
+import { api, ApiError, errorMessage, readApiJson } from "./client";
 
 /*
  * The company's skill library (src/skills/), as ui/src/api/companySkills.ts, skillSources.ts and
@@ -57,8 +64,14 @@ import { api } from "./client";
  * library's folders (kind "skill"), and a source's settings, branches, selection and file previews,
  * plus the project repositories a source can adopt.
  *
- * Left out: comments (unused in the old UI), editing a skill's metadata, and the Studio's test
- * runs, inputs and templates (decision 39, D6).
+ * Also a skill's settings (`PATCH …/:id`: description, tagline, categories, author, homepage,
+ * icon, colour, sharing), renaming one written here (`POST …/:id/rename`), the audit
+ * (`POST …/:id/audit`) and resetting a catalog skill (`POST …/:id/reset`), a source's GitHub
+ * connection (`PATCH …/:id/settings { connectionId }`, branches read through it), and a repository
+ * scan's live progress (`POST …/discover` with `Accept: application/x-ndjson`).
+ *
+ * Left out: comments (unused in the old UI) and the Studio's test runs, inputs and templates
+ * (decision 39, D6).
  */
 
 const skills = (companyId: string) => `/companies/${encodeURIComponent(companyId)}/skills`;
@@ -88,6 +101,14 @@ export const skillsApi = {
   deleteFile: (companyId: string, skillId: string, path: string) =>
     api.delete<CompanySkillFileDeleteResult>(`${skill(companyId, skillId)}/files`, { path, target: "file" }),
   create: (companyId: string, payload: CompanySkillCreateRequest) => api.post<CompanySkill>(skills(companyId), payload),
+  /** Description, tagline, categories, author, homepage, icon, colour and sharing. */
+  update: (companyId: string, skillId: string, payload: CompanySkillUpdateRequest) => api.patch<CompanySkill>(skill(companyId, skillId), payload),
+  /** Renames a skill written here; agents using it move to the new key (`reassignments`). */
+  rename: (companyId: string, skillId: string, payload: CompanySkillRenameRequest) => api.post<CompanySkillRenameResult>(`${skill(companyId, skillId)}/rename`, payload),
+  /** Scans the installed files and records the verdict on the skill. */
+  audit: (companyId: string, skillId: string) => api.post<CompanySkillAuditResult>(`${skill(companyId, skillId)}/audit`, {}),
+  /** A catalog skill back to the catalog's files; `force` discards saved edits. */
+  reset: (companyId: string, skillId: string, payload: CompanySkillResetRequest = {}) => api.post<CompanySkill>(`${skill(companyId, skillId)}/reset`, payload),
   remove: (companyId: string, skillId: string) => api.delete<CompanySkill>(skill(companyId, skillId)),
 
   star: (companyId: string, skillId: string) => api.post<CompanySkillStarResult>(`${skill(companyId, skillId)}/star`, {}),
@@ -101,7 +122,9 @@ export const skillsApi = {
   /** Whether the skill's origin has a newer version (imported and catalog skills). */
   updateStatus: (companyId: string, skillId: string, signal?: AbortSignal) =>
     api.get<CompanySkillUpdateStatus>(`${skill(companyId, skillId)}/update-status`, { signal }),
-  installUpdate: (companyId: string, skillId: string) => api.post<CompanySkill>(`${skill(companyId, skillId)}/install-update`, {}),
+  /** `force` installs an update held for local edits, discarding them. */
+  installUpdate: (companyId: string, skillId: string, options: { force?: boolean } = {}) =>
+    api.post<CompanySkill>(`${skill(companyId, skillId)}/install-update`, options.force ? { force: true } : {}),
   /** Imports from a local path, a GitHub address, a skills.sh link or a URL to a SKILL.md. */
   importFrom: (companyId: string, from: string) => api.post<CompanySkillImportResult>(`${skills(companyId)}/import`, { source: from }),
   /** Scans project workspaces for skill folders: `mode: "preview"` lists them, `"import"` imports the selection. */
@@ -133,6 +156,31 @@ export const skillsApi = {
   sources: (companyId: string, signal?: AbortSignal) => api.get<SkillSource[]>(sources(companyId), { signal }),
   /** Reads a repository and lists the skills in it, without importing anything. */
   discover: (companyId: string, input: SkillSourceDiscoveryRequest) => api.post<SkillSourceDiscovery>(`${sources(companyId)}/discover`, input),
+  /**
+   * The same scan, streamed: progress and each skill found as they come (NDJSON), then the result.
+   * Rejects when the server doesn't stream (an older server, or a proxy that buffers it).
+   */
+  discoverStream: async (companyId: string, input: SkillSourceDiscoveryRequest, onUpdate: (update: SkillSourceScanUpdate) => void, signal?: AbortSignal) => {
+    const res = await fetch(`/api${sources(companyId)}/discover`, {
+      method: "POST",
+      credentials: "include",
+      body: JSON.stringify(input),
+      headers: { Accept: "application/x-ndjson", "Content-Type": "application/json" },
+      signal,
+    });
+    if (!res.ok) {
+      const body = await readApiJson<unknown>(res);
+      throw new ApiError(errorMessage(body, res.status), res.status, body);
+    }
+    if (!res.body || !res.headers.get("Content-Type")?.includes("application/x-ndjson")) throw new StreamUnavailableError();
+    const reader = res.body.getReader();
+    try {
+      return await readDiscoveryStream(reader, onUpdate, signal);
+    } finally {
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+  },
   /** Adds the repository as a source and imports the chosen skills from the scanned commit. */
   addSource: (companyId: string, input: SkillSourceCreateRequest) => api.post<SkillSourceRefreshResult>(sources(companyId), input),
   syncSource: (companyId: string, sourceId: string) => api.post<SkillSourceRefreshResult>(`${source(companyId, sourceId)}/refresh`, {}),
@@ -145,7 +193,9 @@ export const skillsApi = {
   /** Which of the repository's skills are imported. */
   selectSource: (companyId: string, sourceId: string, input: SkillSourceSelectionRequest) =>
     api.patch<SkillSourceRefreshResult>(source(companyId, sourceId), input),
-  branches: (companyId: string, sourceId: string, signal?: AbortSignal) => api.get<SkillSourceBranches>(`${source(companyId, sourceId)}/branches`, { signal }),
+  /** Branches as the given connection sees them (the source's own otherwise). */
+  branches: (companyId: string, sourceId: string, signal?: AbortSignal, connectionId?: string | null) =>
+    api.get<SkillSourceBranches>(`${source(companyId, sourceId)}/branches${connectionId ? `?connectionId=${encodeURIComponent(connectionId)}` : ""}`, { signal }),
   /** One file of a scanned skill, before importing it. */
   preview: (companyId: string, input: SkillSourcePreviewRequest) => api.post<SkillSourceFilePreview>(`${sources(companyId)}/preview`, input),
   /** Repositories the company's GitHub connections can read, to pick from. */
@@ -156,3 +206,43 @@ export const skillsApi = {
   /** Makes a project workspace's repository a source, limited to that project. */
   adoptProject: (companyId: string, workspaceId: string) => api.post<{ bindingId: string }>(`${sources(companyId)}/adopt-project`, { workspaceId }),
 };
+
+/** The server answered a streamed scan without streaming it. */
+export class StreamUnavailableError extends Error {
+  constructor() {
+    super("The live scan isn't available.");
+    this.name = "StreamUnavailableError";
+  }
+}
+
+/**
+ * Reads a scan's NDJSON lines (ui/src/api/skillSources.ts `discoverStream`): progress and found
+ * skills go to `onUpdate`; `complete` resolves the discovery; `error` rejects with its status. A
+ * stream that ends before `complete` was cut off.
+ */
+export async function readDiscoveryStream(
+  reader: { read: () => Promise<{ value?: Uint8Array; done: boolean }> },
+  onUpdate: (update: SkillSourceScanUpdate) => void,
+  signal?: AbortSignal,
+): Promise<SkillSourceDiscovery> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    signal?.throwIfAborted();
+    const { value, done } = await reader.read();
+    signal?.throwIfAborted();
+    buffer += decoder.decode(value, { stream: !done });
+    let newline: number;
+    while ((newline = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, newline);
+      buffer = buffer.slice(newline + 1);
+      if (!line.trim()) continue;
+      const event = JSON.parse(line) as SkillSourceDiscoveryEvent;
+      if (event.type === "error") throw new ApiError(event.error, event.status, event);
+      if (event.type === "complete") return event.discovery;
+      if (event.type === "progress" || event.type === "candidate") onUpdate(event);
+      else throw new Error("The scan sent something unexpected. Try again.");
+    }
+    if (done) throw new Error("The repository scan was cut off. Try again.");
+  }
+}
