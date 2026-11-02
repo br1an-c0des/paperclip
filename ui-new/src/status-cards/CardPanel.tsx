@@ -1,7 +1,13 @@
 import type { CompanySearchIssueSummary, IssueStatus, StatusCard, StatusCardUpdate } from "@paperclipai/shared";
 import { Archive, ArchiveRestore, Ellipsis, History, RefreshCw, Wand2 } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
+import { A } from "@solidjs/router";
+import { createQuery } from "@tanstack/solid-query";
+import { queryKeys } from "@/api/queryKeys";
+import { runPath, runsApi } from "@/api/runs";
 import { Panel } from "@/layout/Panel";
+import { useCompany } from "@/lib/company";
+import { useAgentsQuery } from "@/lib/company-data";
 import { stampLabel } from "@/tasks/thread-model";
 import { updatedLabel } from "@/tasks/list-model";
 import { Button } from "@/ui/Button";
@@ -27,6 +33,8 @@ import {
   midSentence,
   policyLabel,
   rollupToday,
+  rowsShowingRunUsage,
+  runUsageLine,
   setupRunning,
   summaryUpdates,
   triggerLabel,
@@ -41,7 +49,9 @@ import {
  *
  * - Summary: the latest summary, or an earlier one picked from the revisions (each update that
  *   wrote a summary pairs with a document revision), and the task changes that update folded in.
- * - History: every run in the ledger with its trigger, tokens, cost and model; today's totals.
+ * - History: every run in the ledger with its trigger, tokens, cost and model; today's totals. A row
+ *   the server wrote before its run reported usage (0 tokens, $0.00) shows the run's own usage and
+ *   links to the run (rowsShowingRunUsage).
  * - Watched: a dry run of the compiled query, the tasks it matches now, plus tasks the summary
  *   mentions. No agent runs.
  * - Settings: CardSettings.
@@ -315,6 +325,7 @@ function StatusWord(props: { status: string }) {
 function HistoryTab(props: { card: StatusCard; onOpenTask: (task: { id: string; identifier: string | null }) => void }) {
   const updates = useUpdatesQuery(() => props.card.id, { poll: () => cardIsBusy(props.card) });
   const today = () => rollupToday(updates.data ?? []);
+  const runUsage = createMemo(() => rowsShowingRunUsage(updates.data ?? []));
   return (
     <div class="sc-tab">
       <Switch>
@@ -365,6 +376,7 @@ function HistoryTab(props: { card: StatusCard; onOpenTask: (task: { id: string; 
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
+                  <Show when={runUsage().get(update.id)}>{(runId) => <RunUsage runId={runId()} />}</Show>
                   <Show when={update.changeSummary}>
                     <p class="sc-history-note">{update.changeSummary}</p>
                   </Show>
@@ -383,6 +395,40 @@ function HistoryTab(props: { card: StatusCard; onOpenTask: (task: { id: string; 
         </Match>
       </Switch>
     </div>
+  );
+}
+
+/** A ledger row's run, for its usage when the ledger has none, and a link to it. */
+function RunUsage(props: { runId: string }) {
+  const company = useCompany();
+  const agents = useAgentsQuery();
+  const run = createQuery(() => ({
+    queryKey: queryKeys.runs.detail(props.runId),
+    queryFn: ({ signal }) => runsApi.get(props.runId, signal),
+    staleTime: 30_000,
+    retry: false,
+  }));
+  const line = () => runUsageLine(run.data?.usageJson);
+  const href = () => {
+    const data = run.data;
+    if (!data) return null;
+    const agent = agents.data?.find((entry) => entry.id === data.agentId);
+    return runPath(company().issuePrefix, agent?.urlKey ?? data.agentId, props.runId);
+  };
+  return (
+    <Show when={run.data}>
+      <p class="cap sc-history-run">
+        {line() ?? "Its run reported no usage."}
+        <Show when={href()}>
+          {(to) => (
+            <>
+              {" · "}
+              <A href={to()}>Open its run</A>
+            </>
+          )}
+        </Show>
+      </p>
+    </Show>
   );
 }
 
