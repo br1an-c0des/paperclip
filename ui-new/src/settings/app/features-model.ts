@@ -214,6 +214,7 @@ export const LEFT_OUT: Partial<Record<InstanceFeatureKey, string>> = {
   enableWorkspaceDirtyQuarantineRepair: "An operator kill switch for workspace recovery.",
   enableOwnerInstanceAdmin: "Paperclip Cloud only; inert on self-hosted instances.",
   enablePaperclipNotebook: "A managed rollout; nothing reads it yet.",
+  remoteWorkspaceStorageEnabled: "An operator setting for remote workspace storage; the old page doesn't show it.",
 };
 
 const FLAGS = new Map(FEATURE_GROUPS.flatMap((group) => group.flags.map((flag) => [flag.key, flag] as const)));
