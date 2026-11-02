@@ -334,6 +334,26 @@ export function chatPath(prefix: string, agentKey: string) {
   return `/${prefix}/agents/${agentKey}`;
 }
 
+/** The agent page's addresses that show its chat, as agents/agent-model.ts `agentView` reads them. */
+const CHAT_VIEWS = new Set(["", "overview", "dashboard", "chat"]);
+
+/**
+ * The agent whose chat the address shows (`/TES/agents/bob`, or its old `/overview`, `/dashboard`
+ * and `/chat` spellings), by the key in the address (a url key or an id); null on any other page,
+ * the agent's settings among them.
+ */
+export function openChatAgentKey(pathname: string, prefix: string): string | null {
+  const parts = pathname.split("/").filter(Boolean);
+  if (parts.length < 3 || parts[0]!.toLowerCase() !== prefix.toLowerCase() || parts[1] !== "agents") return null;
+  const key = parts[2]!;
+  if (key === "new" || !CHAT_VIEWS.has(parts[3] ?? "")) return null;
+  try {
+    return decodeURIComponent(key);
+  } catch {
+    return key;
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Documents in the address
 

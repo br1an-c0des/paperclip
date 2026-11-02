@@ -8,6 +8,7 @@ import {
   documentHash,
   documentKeyFromHash,
   newestUnreadable,
+  openChatAgentKey,
   quietRunText,
   readThrough,
   shownReplies,
@@ -314,5 +315,19 @@ describe("read state", () => {
     expect([...unreadChatAgents(chats)]).toEqual(["a1", "a3"]);
     expect([...unreadChatAgents(chats, "a3")]).toEqual(["a1"]);
     expect(unreadChatAgents(undefined).size).toBe(0);
+  });
+
+  it("knows which agent's chat the address shows", () => {
+    expect(openChatAgentKey("/TES/agents/bob", "TES")).toBe("bob");
+    expect(openChatAgentKey("/tes/agents/bob/", "TES")).toBe("bob");
+    expect(openChatAgentKey("/TES/agents/bob/chat", "TES")).toBe("bob");
+    expect(openChatAgentKey("/TES/agents/bob/overview", "TES")).toBe("bob");
+    expect(openChatAgentKey("/TES/agents/bob%20two", "TES")).toBe("bob two");
+    expect(openChatAgentKey("/TES/agents/bob/profile", "TES")).toBeNull();
+    expect(openChatAgentKey("/TES/agents/bob/settings/runtime", "TES")).toBeNull();
+    expect(openChatAgentKey("/TES/agents/new", "TES")).toBeNull();
+    expect(openChatAgentKey("/TES/agents", "TES")).toBeNull();
+    expect(openChatAgentKey("/TES/issues/TES-1", "TES")).toBeNull();
+    expect(openChatAgentKey("/OTH/agents/bob", "TES")).toBeNull();
   });
 });
