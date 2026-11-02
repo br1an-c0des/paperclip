@@ -1446,7 +1446,8 @@ Both are handled in `ui-new` for now.
 
 ### 44. Status cards need an agent that can write them
 
-- **Status:** Open
+- **Status:** Decided 2026-11-02: options (a) and (b). Built-in agents are on on the test instance,
+  and New card says which agents can write cards.
 - **Area:** Status cards ([decision 39](#39-decisions-from-the-m7-audit), D3)
 - **Found in:** M7 status cards, with `enableStatusCards` and `enableSummaries` turned on on the test
   instance and left on.
@@ -1461,7 +1462,37 @@ Both are handled in `ui-new` for now.
     local agent JWT secret.
 
   Options: (a) turn on built-in agents on the test instance and try again; (b) warn in New card when
-  the chosen agent can't write cards; (c) an upstream fix so the runner can write cards. Not decided.
+  the chosen agent can't write cards; (c) an upstream fix so the runner can write cards.
+- **The real cause (M7 round 3, 2026-11-02):** the dev server had no agent JWT secret
+  (`PAPERCLIP_AGENT_JWT_SECRET` or `BETTER_AUTH_SECRET`; the startup banner said "Agent JWT
+  missing"). Without it legacy runs get no `PAPERCLIP_API_KEY`
+  (`server/src/services/heartbeat/runtime-execution.ts` around 256–281), and every Runner tool that
+  calls the API fails (`createLocalAgentJwt` returns null, `paperclip-runner-tool-authority.ts`);
+  "semantic operation failed" came from `list_projects`. The Runner's `call_api` does cover
+  `PUT /status-cards/:id/query` and `/summary`, so (c) isn't needed. The PM restarted the test server
+  with a random secret set only in the process environment (not saved; `npx paperclipai onboard`
+  would save one). Nothing in the API says whether the server can mint run keys, so the UI can't
+  warn about it.
+- **Built (M7 round 3):** `status-cards/card-agent-model.ts`: the Summarizer must be `ready`;
+  `process` agents are blocked; harnesses without `capabilities.supportsLocalAgentJwt`
+  (`GET /adapters`) warn that they need their own API key; paused, over-budget and errored agents
+  warn that the setup waits. The picker sorts capable agents first, a notice under it offers the
+  fix (set up the Summarizer, open the agent, open the Inbox), Create stays disabled while blocked,
+  and a waiting tile says why. Status is in the phone dock; the Features switch already existed
+  (decision 32). History shows a run's own usage where the ledger recorded none.
+  `GET /companies/:id/built-in-agents` drops `adapterConfig`, so the Summarizer's harness is read
+  from the agents list.
+- **Live test, about $0.62 in all (Claude Haiku 4.5):** the built-in Summarizer (8adc8dfd, Runner,
+  bound to the company's Claude subscription connection, $1 a month, now paused) set up
+  "M7 test card 3" (265530b3) and wrote its first summary (run f9581d7d, est. $0.22); an Update now
+  wrote revision 2, then hung in `paperclip_finish` and ended failed
+  (`native_session_cleanup_quarantined`, run 43ef710c, est. $0.12), leaving the agent in `error` and
+  update task TES-28 blocked. Card 2 (8f1d8233) completed with "M7 test summarizer" (legacy, run
+  7e493c3a, $0.23) after its prompt was edited, since Run setup again and changing the agent are both
+  no-ops while the old setup task TES-24 stays in progress; an automatic
+  `issue_disposition_repair` wake on its new task TES-29 (run 7c7ddc97, $0.06) was cancelled by
+  pausing the agent. The archived card 1d784e5f was left alone. Upstream candidates 18 (refined),
+  21, 22, 23.
 - **Real runs spent:** five runs by "M7 test summarizer" (Claude Haiku 4.5), three of which used
   tokens, about $0.45 in all; one was an automatic follow-up that stopped when the agent was paused. To
   try to make it work the agent was bound to the company's Claude subscription connection (the one Bob

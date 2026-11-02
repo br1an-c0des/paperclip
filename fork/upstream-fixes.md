@@ -57,6 +57,9 @@ until one becomes a concrete fix.
 | 18 | [Let a stalled status card setup be retried](#18-let-a-stalled-status-card-setup-be-retried) | candidate | | | 2026-10-29 | | |
 | 19 | [Return `lastExternalCommentAt` on chats as an ISO date](#19-return-lastexternalcommentat-on-chats-as-an-iso-date) | candidate | | | 2026-11-02 | | |
 | 20 | [Offer the Google Sheets robot account in the tools gallery](#20-offer-the-google-sheets-robot-account-in-the-tools-gallery) | candidate | | | 2026-11-02 | | |
+| 21 | [Let a Paperclip Runner run finish after it writes a status card](#21-let-a-paperclip-runner-run-finish-after-it-writes-a-status-card) | candidate | | | 2026-11-02 | | |
+| 22 | [Record a run's usage in the status card ledger](#22-record-a-runs-usage-in-the-status-card-ledger) | candidate | | | 2026-11-02 | | |
+| 23 | [Close a status card's setup task when a legacy run finishes the card](#23-close-a-status-cards-setup-task-when-a-legacy-run-finishes-the-card) | candidate | | | 2026-11-02 | | |
 
 ## Details
 
@@ -314,6 +317,9 @@ Found porting status cards to `ui-new` (M7, 2026-10-29). Not yet confirmed in th
 - **Likely fix:** treat a setup task that's closed, or has no active run after a timeout, as not
   generating; or expose that state so a client can offer a real retry. With a service test. Read the
   status card service first to confirm.
+- **Confirmed live (M7 round 3, 2026-11-02):** with the old setup task still in progress and
+  assigned to a paused agent, Run setup again answers `alreadyGenerating: true`, and changing the
+  card's agent doesn't move the task; only editing the prompt made a new setup task.
 - **Fork workaround:** none; the page shows "setting up" with a link to the task
   ([decision 44](../ui-new/docs/decisions.md#44-status-cards-need-an-agent-that-can-write-them)).
 
@@ -342,3 +348,37 @@ the route.
 - **Likely fix:** set `availability.robotEmail` from `googleSheetsRobotEmailFromEnv()` when building
   the Sheets gallery entry, with a route test.
 - **Fork workaround:** none; `ui-new`'s setup shows the robot once the field is there.
+
+### 21. Let a Paperclip Runner run finish after it writes a status card
+
+Found in the status cards live test (M7 round 3, 2026-11-02). Seen once.
+
+- **Problem:** a Summarizer update run on the Paperclip Runner wrote the card's summary, then hung
+  about 6 minutes in `paperclip_finish` and ended failed (`native_finalization_missing`, then
+  `native_session_cleanup_quarantined`, "requires operator recovery"). The agent was left in
+  `error` and the hidden update task blocked (run 43ef710c on TES).
+- **Likely fix:** unknown; read the native finalization path for hidden status-card tasks first and
+  try to reproduce.
+- **Fork workaround:** none; the tile says the agent's last run failed.
+
+### 22. Record a run's usage in the status card ledger
+
+Found in the status cards live test (M7 round 3, 2026-11-02).
+
+- **Problem:** the card's ledger copies tokens and cost when the agent writes the card, before the
+  run reports usage, so Runner runs show 0 tokens and $0.00. The daily token cap counts these rows,
+  so it never trips for those runs, and the guide says each generation's cost is copied into update
+  history.
+- **Likely fix:** fill the ledger row's usage when the run finishes (or read it from the run), with a
+  service test.
+- **Fork workaround:** `ui-new`'s History shows the run's own usage when the ledger row has none.
+
+### 23. Close a status card's setup task when a legacy run finishes the card
+
+Found in the status cards live test (M7 round 3, 2026-11-02).
+
+- **Problem:** a legacy run that wrote the card's query and summary left its hidden setup task in
+  progress, which set off an automatic `issue_disposition_repair` wake that spends again.
+- **Likely fix:** close the hidden task when the card's write completes the setup, as the Runner
+  path does; with a service test.
+- **Fork workaround:** none; pause the agent after setup.
