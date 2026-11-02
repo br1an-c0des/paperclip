@@ -851,6 +851,13 @@ button.sk-chip {
   font-size: 12px;
 }
 
+/* One line each while scanning; the full problems show in the list that follows. */
+.sk-scan-found li {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sk-meter span {
     transition: none;

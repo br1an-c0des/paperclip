@@ -579,7 +579,9 @@ export function AuditBlock(props: { skill: Pick<CompanySkillDetail, "id" | "name
   const [result, setResult] = createSignal<CompanySkillAuditResult | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
-  createEffect(on(() => props.skill.id, () => (setResult(null), setError(null))));
+  // The detail refetches after each change; only a different skill clears the result.
+  const skillId = createMemo(() => props.skill.id);
+  createEffect(on(skillId, () => (setResult(null), setError(null)), { defer: true }));
   const verdict = () => result()?.verdict ?? status.data?.auditVerdict ?? null;
 
   const run = async () => {

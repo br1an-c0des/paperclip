@@ -503,7 +503,10 @@ export function updateLine(status: CompanySkillUpdateStatus | undefined): Update
 /** A commit's first 7 characters; anything else as it is. */
 export function shortRef(ref: string | null | undefined) {
   if (!ref) return "?";
-  return /^[0-9a-f]{12,}$/i.test(ref) ? ref.slice(0, 7) : ref;
+  if (/^[0-9a-f]{12,}$/i.test(ref)) return ref.slice(0, 7);
+  // Content hashes ("sha256:2b6e…") read by their first characters too.
+  const hash = /^(sha\d+):([0-9a-f]{12,})$/i.exec(ref);
+  return hash ? `${hash[1]}:${hash[2]!.slice(0, 7)}` : ref;
 }
 
 // ---------------------------------------------------------------------------------------------
