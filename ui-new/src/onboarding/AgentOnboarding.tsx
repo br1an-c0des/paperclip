@@ -62,8 +62,20 @@ import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
+import { GatewaySetup } from "./GatewaySetup";
 import { OnboardingFrame } from "./OnboardingFrame";
-import { DEFAULT_TASK_TITLE, launchFirstTask, onboardingEntry, onboardingProfile, onboardingTaskHref, type OnboardingStep } from "./onboarding-model";
+import {
+  DEFAULT_TASK_TITLE,
+  launchFirstTask,
+  onboardingEntry,
+  onboardingHarnessChoices,
+  onboardingProfile,
+  onboardingSetup,
+  onboardingTaskHref,
+  personalGatewayChoices,
+  routedModels,
+  type OnboardingStep,
+} from "./onboarding-model";
 // Settings rows, menus and palettes are the agent settings' (and the project settings' they share).
 import "@/projects/NewProjectDialog.css";
 import "@/projects/settings/ProjectSettings.css";
@@ -77,6 +89,10 @@ import "@/agents/Agent.css";
  * the hire so the server seeds its instructions. A hire that needs approval is approved here, as the
  * old wizard does: the person onboarding is the board. The page keeps its place in the address
  * (`?setupAgentId=`, then `?agentId=`), so a reload resumes it.
+ *
+ * As in the old wizard since upstream #18309, only Claude Code and Codex are offered (its GitHub
+ * Copilot path is gone; New agent has every harness), and either can sign in through a custom
+ * gateway (#17253, GatewaySetup.tsx), whose listed models are then the ones to pick from.
  */
 
 type AgentStep = Exclude<OnboardingStep, "organization">;
@@ -135,7 +151,8 @@ export function AgentOnboarding() {
         setSearch({ agentId: agent.id, setupAgentId: undefined }, { replace: true });
         return;
       }
-      const saved = setupFromAgent(agent);
+      // A draft on a harness onboarding no longer offers (an old Copilot one, say) picks again.
+      const saved = onboardingSetup(setupFromAgent(agent));
       batch(() => {
         setProfile(reconcile(profileFromAgent(agent)));
         setSetup(reconcile(saved));
@@ -158,7 +175,7 @@ export function AgentOnboarding() {
     queryFn: ({ signal }) => agentsApi.adapters(company().id, setup.environmentId || null, signal),
     staleTime: 60_000,
   }));
-  const harnesses = createMemo(() => harnessChoices(adapters.data, agents.data));
+  const harnesses = createMemo(() => onboardingHarnessChoices(harnessChoices(adapters.data, agents.data)));
   const runner = createMemo(() => resolveRunner(setup.harness, setup.runner, adapters.data));
   const connections = createQuery(() => ({
     queryKey: [...queryKeys.aiConnections.list(company().id), "agent", draftId() ?? "new"] as const,
@@ -167,7 +184,15 @@ export function AgentOnboarding() {
     retry: false,
   }));
   const health = createQuery(() => ({ queryKey: queryKeys.health, queryFn: healthApi.get, enabled: onModel() }));
-  const signIns = createMemo(() => (setup.harness ? signInChoices(setup.harness, connections.data) : []));
+  const signIns = createMemo(() =>
+    setup.harness ? [...signInChoices(setup.harness, connections.data), ...personalGatewayChoices(connections.data, setup.harness)] : [],
+  );
+  /** A gateway connection's own model list, which is then the only choice. */
+  const gatewayModels = createMemo(() => routedModels(setup.binding, connections.data));
+  createEffect(() => {
+    const listed = gatewayModels();
+    if (listed.length > 0 && !listed.some((model) => model.id === setup.model)) setSetup("model", listed[0]!.id);
+  });
   const modelOptions = createMemo<AdapterModelOptions>(() => ({
     provider: setup.binding && setup.binding.mode !== "router" ? setup.binding.provider : undefined,
     environmentId: setup.environmentId || null,
@@ -325,7 +350,10 @@ export function AgentOnboarding() {
 
   /** Hire: test first unless it has been, then finish the draft; an approval is approved here. */
   const hire = async () => {
-    const found = profileProblem(profile) ?? setupProblem(setup);
+    const found =
+      profileProblem(profile) ??
+      setupProblem(setup) ??
+      (gatewayModels().length > 0 && !gatewayModels().some((model) => model.id === setup.model) ? "Choose one of the gateway's models." : null);
     if (found) return setProblem(found);
     setBusy("hire");
     setProblem(null);
@@ -393,8 +421,9 @@ export function AgentOnboarding() {
     }
   };
 
-  // ---- Connect Claude -----------------------------------------------------------------------
+  // ---- Connect Claude, or a custom gateway ---------------------------------------------------
   const [connectOpen, setConnectOpen] = createSignal(false);
+  const [gatewayOpen, setGatewayOpen] = createSignal(false);
   const provider = () => (setup.harness ? providerForHarness(setup.harness) : undefined);
 
   // ---- View ---------------------------------------------------------------------------------
@@ -518,8 +547,24 @@ export function AgentOnboarding() {
                 </Match>
 
                 <Match when={step() === "model"}>
-                  <SettingsRow label="Harness" help="The program the agent works in.">
-                    <Show when={harnesses().length > 0} fallback={<span class="ag-static-text">{adapters.isError ? "Couldn't load the harnesses." : "Loading harnesses…"}</span>}>
+                  <SettingsRow label="Harness" help="The program the agent works in. Other harnesses are in New agent once you're set up.">
+                    <Show
+                      when={harnesses().length > 0}
+                      fallback={
+                        <span class="ag-static-text" role={adapters.isSuccess ? "alert" : "status"}>
+                          <Switch fallback="Loading harnesses…">
+                            <Match when={adapters.isError}>Couldn't load the harnesses.</Match>
+                            <Match when={adapters.isSuccess}>
+                              Claude Code and Codex aren't available on this instance. Finish later, or{" "}
+                              <A class="ps-link" href={`${base()}/agents/new`}>
+                                add an agent from New agent
+                              </A>{" "}
+                              with another harness.
+                            </Match>
+                          </Switch>
+                        </span>
+                      }
+                    >
                       <div class="na-harnesses" role="radiogroup" aria-label="Harness">
                         <For each={harnesses()}>
                           {(choice) => (
@@ -589,11 +634,21 @@ export function AgentOnboarding() {
                             Connect Claude
                           </Button>
                         </Show>
+                        <Show when={connections.data}>
+                          <Button size="compact" variant="quiet" disabled={working()} onClick={() => setGatewayOpen(true)}>
+                            Use a custom gateway
+                          </Button>
+                        </Show>
                       </div>
                       <span class="fhelp">{selectedSignIn(signIns(), setup.binding)?.description}</span>
                     </SettingsRow>
 
-                    <SettingsRow label="Model" for={models.data?.length ? undefined : "ob-model"}>
+                    <SettingsRow
+                      label="Model"
+                      for={models.data?.length || gatewayModels().length ? undefined : "ob-model"}
+                      help={gatewayModels().length ? "The models your gateway lists." : undefined}
+                    >
+                      <Show when={gatewayModels().length === 0} fallback={<ModelMenu models={gatewayModels()} loading={false} value={setup.model} onChange={(model) => setSetup("model", model)} />}>
                       <Show
                         when={models.data?.length}
                         fallback={
@@ -609,6 +664,7 @@ export function AgentOnboarding() {
                         }
                       >
                         <ModelMenu models={models.data} loading={models.isLoading} value={setup.model} allowDefault={!requiresProviderModel(setup.harness)} onChange={(model) => setSetup("model", model)} />
+                      </Show>
                       </Show>
                     </SettingsRow>
 
@@ -741,6 +797,26 @@ export function AgentOnboarding() {
                 );
                 setSetup("binding", choice?.binding ?? defaultBinding(setup.harness, fresh.data));
                 pushToast({ tone: "success", title: `Connected ${name}` });
+              }}
+            />
+          )}
+        </Show>
+        <Show when={connections.data && setup.harness ? connections.data : null}>
+          {(list) => (
+            <GatewaySetup
+              open={gatewayOpen()}
+              onOpenChange={setGatewayOpen}
+              harness={setup.harness}
+              agentId={draftId()}
+              list={list()}
+              onSaved={async (name, binding) => {
+                setGatewayOpen(false);
+                await connections.refetch();
+                batch(() => {
+                  setSetup("binding", binding);
+                  setSetup("model", "");
+                });
+                pushToast({ tone: "success", title: `Saved ${name}`, body: "Choose a model, then test it." });
               }}
             />
           )}

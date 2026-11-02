@@ -351,7 +351,9 @@ export function setupAdapterConfig(setup: SetupDraft, runner: AgentRunner, saved
       if (runner === "legacy") config.maxTurnsPerRun = 1000;
       break;
     case "codex_local":
-      Object.assign(config, { timeoutSec: 0, graceSec: 15, search: false, fastMode: false, dangerouslyBypassApprovalsAndSandbox: setup.runner === "legacy" });
+      // The builder's default (DEFAULT_CODEX_LOCAL_BYPASS_APPROVALS_AND_SANDBOX). False is refused for the
+      // Paperclip Runner ("cannot honor these settings"), which drops the key when it converts the harness.
+      Object.assign(config, { timeoutSec: 0, graceSec: 15, search: false, fastMode: false, dangerouslyBypassApprovalsAndSandbox: true });
       break;
     case "opencode_local":
       Object.assign(config, { timeoutSec: 0, graceSec: 20, dangerouslySkipPermissions: true });
