@@ -150,6 +150,10 @@
   white-space: nowrap;
 }
 
+.sc-banner-text svg {
+  flex-shrink: 0;
+}
+
 .sc-tile-body {
   position: relative;
   flex: 1;

@@ -15,6 +15,12 @@ const companies = [
 vi.mock("@/inbox/needs-you", () => ({ useNeedsYouCount: () => () => 3 }));
 
 const experimental = { enableStatusCards: false };
+const unread = { count: 0 };
+
+vi.mock("@/chat/chat-read", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/chat/chat-read")>()),
+  useUnreadChats: () => ({ agentIds: () => new Set<string>(), has: () => false, count: () => unread.count }),
+}));
 
 vi.mock("@/lib/company-data", () => ({
   useExperimentalSettingsQuery: () => ({ data: experimental }),
@@ -73,6 +79,17 @@ describe("PhoneDock", () => {
   afterEach(() => {
     cleanup();
     experimental.enableStatusCards = false;
+    unread.count = 0;
+  });
+
+  it("marks Agents while a chat has messages you haven't read", () => {
+    renderDock("/TST/inbox");
+    expect(screen.getByRole("link", { name: "Agents" }).querySelector(".ch-unread")).toBeNull();
+    cleanup();
+    unread.count = 2;
+    renderDock("/TST/inbox");
+    const agents = screen.getByRole("link", { name: "Agents, 2 unread chats" });
+    expect(agents.querySelector(".ch-unread")).not.toBeNull();
   });
 
   it("adds Status after Inbox while status cards are on", () => {
