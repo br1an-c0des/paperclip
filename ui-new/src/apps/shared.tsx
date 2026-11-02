@@ -64,12 +64,15 @@ export function failureText(error: unknown, fallback: string) {
 
 /**
  * The app's logo from the gallery (`/brands/apps/…`, served beside the board), its dark version in
- * the dark theme, or a gradient tile with its initial when there's none or it doesn't load.
+ * the dark theme, a provider-hosted `logoUrl`, or a gradient tile with its initial when there's none
+ * or it doesn't load.
  */
-export function AppLogo(props: { app?: AppDefinition | null; name: string; size?: number }) {
+export function AppLogo(props: { app?: AppDefinition | null; name: string; size?: number; logoUrl?: string | null }) {
   const [failed, setFailed] = createSignal<string | null>(null);
   const size = () => props.size ?? 36;
   const src = () => {
+    // A logo the provider hosts, for Composio and Arcade catalog apps.
+    if (props.logoUrl) return props.logoUrl;
     const branding = props.app?.branding;
     if (!branding) return null;
     return (theme() === "dark" ? branding.darkLogoUrl : undefined) ?? branding.logoUrl ?? null;
@@ -88,7 +91,7 @@ export function AppLogo(props: { app?: AppDefinition | null; name: string; size?
       }
     >
       {(url) => (
-        <span class="ap-logo" style={{ width: `${size()}px`, height: `${size()}px` }} aria-hidden="true">
+        <span class="ap-logo" classList={{ "ap-logo--hosted": Boolean(props.logoUrl) }} style={{ width: `${size()}px`, height: `${size()}px` }} aria-hidden="true">
           <img src={url()} alt="" width={size() - 10} height={size() - 10} onError={() => setFailed(url())} />
         </span>
       )}

@@ -141,6 +141,11 @@
   object-fit: contain;
 }
 
+/* Provider-hosted logos (Composio, Arcade) are drawn for a light ground, so they keep one in dark. */
+.ap-logo--hosted {
+  background: #fff;
+}
+
 .ap-logo--initial {
   border: 0;
   color: #fff;
@@ -687,4 +692,68 @@ a.ap-row-name:hover {
   .ap-header-row > :nth-child(2) {
     grid-column: 1;
   }
+}
+
+/* Composio and Arcade's catalog in the gallery (setups/CatalogRows.tsx) */
+.ap-catalog {
+  border-top: 1px solid var(--row-line);
+}
+
+.ap-catalog .ap-tile .ap-inline {
+  width: 100%;
+}
+
+.ap-more-rows {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 20px 18px;
+}
+
+.ap-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ap-dialog-body + .ap-dialog-body {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--row-line);
+}
+
+.ap-providers {
+  max-height: none;
+}
+
+button.ap-provider {
+  width: 100%;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.ap-provider .ap-method-text {
+  flex: 1;
+}
+
+/* Agent instructions (setups/AppExtras.tsx) */
+.ap-instructions-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ap-instructions {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--body);
+  white-space: pre-wrap;
 }

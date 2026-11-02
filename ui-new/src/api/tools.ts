@@ -74,6 +74,8 @@ export type UpdateConnectionInput = {
   name?: string;
   enabled?: boolean;
   agentInstructions?: ConnectionAgentInstructions | null;
+  /** The whole config, replaced: Honcho's workspace, Google Sheets' list of sheets. */
+  config?: Record<string, unknown>;
 };
 
 const enc = encodeURIComponent;
