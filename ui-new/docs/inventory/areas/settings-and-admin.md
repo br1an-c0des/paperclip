@@ -52,6 +52,17 @@ Resources: `/api/users/me`, `/api/auth/*`, `/api/companies/:companyId/environmen
 Notes: the instance "General" settings render inside company General for admins. Environments use a
 terminal WebSocket (`pages/CompanyEnvironments.tsx`).
 
+Further requests behind import, environments and secrets (ported in M7 round 3):
+`POST /companies/import/preview` and `POST /companies/import?async=1` take JSON with
+`source: { type: "github", url }` as well as a zip, plus `selectedFiles`, `adapterOverrides` (harness,
+model and `runner: "auto"` per agent) and `secretValues` (keyed `agent:<slug>:<KEY>`,
+`project:<slug>:<KEY>` or `<KEY>`); `GET /companies/import/jobs/:id` polls a running import, and a 409
+on start means one is already running, which the page picks up. Deleting an environment moves its
+agents first (`PATCH /agents/:id { defaultEnvironmentId }`) and destroys reusable sandboxes only with
+`DELETE /environments/:id?destroyReusableSandboxLeases=true`. A secret can be an
+`external_reference` to a provider, and `POST /secrets/:id/rotate` takes a new value or a new
+`externalRef` and `providerVersionRef`.
+
 ## Skills
 
 | Page | Route (under `/:co`) | What it does |
@@ -73,6 +84,13 @@ version, install update, reset) take an optional `expectedVersionId` and answer 
 changed meanwhile; the Studio keeps the draft and offers "Load latest saved file". A managed skill
 restores a version in one call, `POST .../versions` with `{ sourceVersionId, expectedVersionId }`;
 linked local skills still write the version's files back one by one.
+
+Further requests (ported in M7 round 3): `PATCH /companies/:id/skills/:skillId` for metadata and
+sharing (`sharingScope` "public_link" is refused, "not available in this version");
+`POST …/skills/:id/rename` (authored skills only, makes a new version), `/audit` (the safety check),
+`/reset` (catalog skills only, with `force` and `expectedVersionId`) and `/install-update { force }`;
+`PATCH …/skill-sources/:id/settings` with `connectionId` and `GET …/branches?connectionId=` for a
+source's connection; `POST …/discover` with `Accept: application/x-ndjson` streams scan progress.
 
 ## Apps and tools ("Connectors")
 

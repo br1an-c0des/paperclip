@@ -1596,6 +1596,17 @@ Both are handled in `ui-new` for now.
   `entries`; Vercel Connect connects with `credentialSource: vercel_connect` and no key; a plan with
   an unknown price comes back named "Plan unknown", and the price editor saves that name back, as the
   old UI does.
+- **Company settings and Skills leftovers (M7 round 3, 2026-11-02):**
+  - **Left out at import:** renaming or skipping single items, and picking files at export (the old
+    UI rewrites `.paperclip.yaml` in the browser; keep it only if asked), and the full harness
+    settings forms (Dot, Muse, Runner provider): import offers a harness change plus a model.
+  - **Environment delete moves only this company's agents:** environments are instance-wide but the
+    agents list is per company, so agents in other organizations (and terminated ones) are counted,
+    not listed, and fall back to the instance default.
+  - **Skill sharing:** only "Organization" and "Only me"; the server refuses "public_link".
+  - **Import resumes per tab:** the running job's id is kept in sessionStorage
+    (`paperclip:company-import-job:<companyId>`), so a reload picks it up but another tab doesn't.
+  - **Test data:** skill "M7 test skill renamed" (ccc0d473), secret "M7 test/demo-token" (9da4853c).
 - **Apps leftovers (M7 round 3, 2026-11-02):**
   - **Composio and Arcade catalog:** ui-new imports the shared package's `aggregator-app-catalog` at
     runtime (pure data, about 1,600 apps, lazy-loaded as its own 79 kB chunk when the gallery opens),
