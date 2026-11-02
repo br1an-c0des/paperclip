@@ -30,6 +30,13 @@ export const chatApi = {
     api.get<Issue | null>(`/companies/${companyId}/chats/${encodeURIComponent(agentRef)}`, { signal }),
   /** Creates the chat if it doesn't exist yet, and answers it either way. */
   open: (companyId: string, agentRef: string) => api.post<Issue>(`/companies/${companyId}/chats/${encodeURIComponent(agentRef)}`, {}),
+  /**
+   * Marks your chat read up to one message (`POST /issues/:id/read` with `throughCommentId`), as
+   * ui/src/hooks/useAgentChatRead.tsx does, so a message that arrives meanwhile stays unread. Only
+   * the chat's owner may; the list's `isUnreadForMe` follows.
+   */
+  markRead: (chatId: string, throughCommentId: string) =>
+    api.post<{ id: string; lastReadAt: string }>(`/issues/${encodeURIComponent(chatId)}/read`, { throughCommentId }),
   /** Tasks the chat's runs created: the hand-offs. */
   handoffs: (companyId: string, chatId: string, signal?: AbortSignal) =>
     api.get<CompactIssue[]>(`/companies/${companyId}/issues?${compactList({ createdFromIssueId: chatId, limit: "100" })}`, { signal }),

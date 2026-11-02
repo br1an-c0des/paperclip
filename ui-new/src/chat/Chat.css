@@ -833,3 +833,60 @@ a.ch-tl-target {
 :root[data-viewport="phone"] .ch-cmp-hint {
   display: none;
 }
+
+/* Under an agent's message: thumbs up and down, and its run */
+.ch-msg-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 26px;
+  margin-top: -2px;
+}
+
+.ch-msg-foot .fbv {
+  margin-top: 0;
+}
+
+.ch-msg-run {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ch-msg-run:hover {
+  color: var(--run-fg);
+}
+
+/* A message the agent sent from another task: where it came from (a briefing, a report) */
+.ch-source {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ch-source > svg {
+  flex: 0 0 auto;
+  align-self: center;
+  color: var(--violet-fg);
+}
+
+.ch-source > span {
+  min-width: 0;
+}
+
+.ch-source-link {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ch-source-link:hover {
+  text-decoration: underline;
+}
+
+.ch-source-title {
+  overflow-wrap: anywhere;
+}

@@ -20,6 +20,10 @@ import { dayLabel } from "@/runs/run-model";
  * - A reply run that ended without posting a message (it failed, was stopped, or had nothing to
  *   say) leaves a short line where the reply would have been, with its transcript a click away.
  * - Comments still waiting in the queue are left out: the queue shows them under the thread.
+ * - A message the agent sent from a task it was working on (`send_chat_message`, decision 48: a
+ *   briefing or report) names its source task (`metadata.chatMessage`) and always starts its own
+ *   group. Its run belongs to that task, not to the chat, so hand-offs don't attach to it. A report
+ *   card for a task that has sent a loaded message is left out: the message is the report.
  * - The chat's documents (its `plan`, and anything the agent saves there) are cards at the time
  *   they were first saved, inside the loaded history. The Activity column lists them all.
  */
@@ -53,6 +57,8 @@ export type ChatEntry =
       at: Date;
       comment: IssueComment;
       author: ChatAuthor;
+      /** The task the agent sent this from, when it posted from another task's run. */
+      source: ChatMessageSource | null;
       /** First of a group: draws the avatar, name and time. */
       head: boolean;
       /** Tasks this message's run handed off. */
@@ -75,6 +81,56 @@ export function isSessionReset(comment: Pick<IssueComment, "body" | "authorUserI
 /** The run a comment came from, stored or worked out by the server. */
 export function commentRunId(comment: Pick<IssueComment, "createdByRunId" | "derivedCreatedByRunId">) {
   return comment.createdByRunId ?? comment.derivedCreatedByRunId ?? null;
+}
+
+/** Where a message the agent sent from another task came from (`metadata.chatMessage`). */
+export type ChatMessageSource = { taskId: string; identifier: string; runId: string };
+
+export function chatMessageSource(comment: Pick<IssueComment, "metadata">): ChatMessageSource | null {
+  const source = comment.metadata?.chatMessage;
+  if (!source?.sourceTaskId) return null;
+  return { taskId: source.sourceTaskId, identifier: source.sourceTaskIdentifier || source.sourceTaskId, runId: source.sourceRunId };
+}
+
+/**
+ * Whether a message counts toward a chat's unread state, as the server counts it
+ * (server/src/services/agent-chat-read-state.ts): an agent's own comment, not a system notice.
+ */
+export function countsAsUnread(comment: Pick<IssueComment, "authorAgentId" | "authorType" | "presentation" | "origin" | "deletedAt">) {
+  return (
+    !!comment.authorAgentId &&
+    comment.authorType !== "system" &&
+    comment.presentation?.kind !== "system_notice" &&
+    (comment.origin ?? "comment") === "comment" &&
+    !comment.deletedAt
+  );
+}
+
+/** The newest message that counts toward unread, for marking the chat read up to it. */
+export function newestUnreadable<T extends Pick<IssueComment, "id" | "createdAt" | "authorAgentId" | "authorType" | "presentation" | "origin" | "deletedAt">>(
+  comments: readonly T[],
+): T | null {
+  let newest: T | null = null;
+  for (const comment of comments) {
+    if (!countsAsUnread(comment)) continue;
+    if (!newest || time(comment.createdAt) > time(newest.createdAt)) newest = comment;
+  }
+  return newest;
+}
+
+/**
+ * The message to mark the chat read through, or null when there's nothing new: the newest agent
+ * message, when the chat is unread or it's newer than the last one marked.
+ */
+export function readThrough(
+  newest: Pick<IssueComment, "id" | "createdAt"> | null,
+  state: { unread: boolean; marked: { id: string; at: number } | null },
+): string | null {
+  if (!newest) return null;
+  const at = time(newest.createdAt);
+  if (state.marked && (state.marked.id === newest.id || state.marked.at >= at)) return null;
+  if (!state.unread && !state.marked) return null;
+  return newest.id;
 }
 
 export function commentAuthor(comment: IssueComment, youId: string | null): ChatAuthor {
@@ -123,7 +179,7 @@ export function buildChat(input: {
   const messageRuns = new Map<string, string>();
   for (const comment of comments) {
     const runId = commentRunId(comment);
-    if (runId && commentAuthor(comment, input.youId).kind === "agent" && !messageRuns.has(runId)) messageRuns.set(runId, comment.id);
+    if (runId && !chatMessageSource(comment) && commentAuthor(comment, input.youId).kind === "agent" && !messageRuns.has(runId)) messageRuns.set(runId, comment.id);
   }
   const attached = new Map<string, ChatTask[]>();
   const loose: ChatTask[] = [];
@@ -150,7 +206,9 @@ export function buildChat(input: {
       const at = new Date(task.createdAt);
       if (at.getTime() >= oldest) raw.push({ at, order: 1, handoff: task });
     }
+    const sent = new Set(comments.flatMap((comment) => chatMessageSource(comment)?.taskId ?? []));
     for (const task of input.reports ?? []) {
+      if (sent.has(task.id)) continue;
       const at = reportAt(task);
       if (at.getTime() >= oldest) raw.push({ at, order: 1, report: task });
     }
@@ -173,7 +231,7 @@ export function buildChat(input: {
 
   const entries: ChatEntry[] = [];
   let day: string | null = null;
-  let previous: { author: ChatAuthor; at: number } | null = null;
+  let previous: { author: ChatAuthor; at: number; source: string | null } | null = null;
   for (const item of raw) {
     const label = dayLabel(item.at, now);
     if (label !== day && words.length === 0) {
@@ -189,9 +247,11 @@ export function buildChat(input: {
         continue;
       }
       const author = commentAuthor(comment, input.youId);
-      const head = !previous || !sameAuthor(previous.author, author) || item.at.getTime() - previous.at > GROUP_GAP_MS;
-      entries.push({ kind: "message", key: `comment:${comment.id}`, at: item.at, comment, author, head, tasks: attached.get(comment.id) ?? [] });
-      previous = { author, at: item.at.getTime() };
+      const source = chatMessageSource(comment);
+      const head =
+        !previous || !sameAuthor(previous.author, author) || item.at.getTime() - previous.at > GROUP_GAP_MS || !!source || previous.source !== null;
+      entries.push({ kind: "message", key: `comment:${comment.id}`, at: item.at, comment, author, source, head, tasks: attached.get(comment.id) ?? [] });
+      previous = { author, at: item.at.getTime(), source: source?.taskId ?? null };
       continue;
     }
     previous = null;
@@ -274,6 +334,26 @@ export function chatPath(prefix: string, agentKey: string) {
   return `/${prefix}/agents/${agentKey}`;
 }
 
+/** The agent page's addresses that show its chat, as agents/agent-model.ts `agentView` reads them. */
+const CHAT_VIEWS = new Set(["", "overview", "dashboard", "chat"]);
+
+/**
+ * The agent whose chat the address shows (`/TES/agents/bob`, or its old `/overview`, `/dashboard`
+ * and `/chat` spellings), by the key in the address (a url key or an id); null on any other page,
+ * the agent's settings among them.
+ */
+export function openChatAgentKey(pathname: string, prefix: string): string | null {
+  const parts = pathname.split("/").filter(Boolean);
+  if (parts.length < 3 || parts[0]!.toLowerCase() !== prefix.toLowerCase() || parts[1] !== "agents") return null;
+  const key = parts[2]!;
+  if (key === "new" || !CHAT_VIEWS.has(parts[3] ?? "")) return null;
+  try {
+    return decodeURIComponent(key);
+  } catch {
+    return key;
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Documents in the address
 
@@ -327,4 +407,21 @@ export function yourChatAgent(task: ChatLike, listed: ReadonlyMap<string, string
   const known = listed.get(task.id);
   if (known) return known;
   return task.conversationAgentId && youId && task.createdByUserId === youId ? task.conversationAgentId : undefined;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Unread chats
+
+/**
+ * The agents whose chat with you has agent messages you haven't read (`isUnreadForMe` on
+ * `GET /companies/:id/chats`, decision 48), skipping the chat open now: reading it marks it read,
+ * and its dot would only blink until the list refetches.
+ */
+export function unreadChatAgents(
+  chats: readonly { conversationAgentId?: string | null; isUnreadForMe?: boolean }[] | undefined,
+  openAgentId?: string | null,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const chat of chats ?? []) if (chat.isUnreadForMe && chat.conversationAgentId && chat.conversationAgentId !== openAgentId) ids.add(chat.conversationAgentId);
+  return ids;
 }

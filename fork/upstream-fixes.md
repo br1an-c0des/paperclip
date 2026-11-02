@@ -55,6 +55,7 @@ until one becomes a concrete fix.
 | 16 | [Don't merge keyless cases of the same type](#16-dont-merge-keyless-cases-of-the-same-type) | candidate | | | 2026-10-29 | | |
 | 17 | [Log activity when a case is created, edited or linked](#17-log-activity-when-a-case-is-created-edited-or-linked) | candidate | | | 2026-10-29 | | |
 | 18 | [Let a stalled status card setup be retried](#18-let-a-stalled-status-card-setup-be-retried) | candidate | | | 2026-10-29 | | |
+| 19 | [Return `lastExternalCommentAt` on chats as an ISO date](#19-return-lastexternalcommentat-on-chats-as-an-iso-date) | candidate | | | 2026-11-02 | | |
 
 ## Details
 
@@ -314,3 +315,15 @@ Found porting status cards to `ui-new` (M7, 2026-10-29). Not yet confirmed in th
   status card service first to confirm.
 - **Fork workaround:** none; the page shows "setting up" with a link to the task
   ([decision 44](../ui-new/docs/decisions.md#44-status-cards-need-an-agent-that-can-write-them)).
+
+### 19. Return `lastExternalCommentAt` on chats as an ISO date
+
+Found building chat read state into `ui-new` (M7 round 3, 2026-11-02). Not yet confirmed beyond one
+response.
+
+- **Problem:** `GET /api/companies/:id/chats` returns `lastExternalCommentAt` as Postgres text
+  (`"2026-10-27 22:09:08.561415-06"`) instead of an ISO timestamp like the other date fields.
+  `withConversationReadState` selects a raw `sql<Date>` max that isn't mapped to a `Date`.
+- **Likely fix:** map the column (`.mapWith(...)` or convert in the service) so it serializes as ISO,
+  with a service or route test.
+- **Fork workaround:** none needed; `ui-new` doesn't read the field.

@@ -1621,10 +1621,13 @@ Both are handled in `ui-new` for now.
   `POST /api/agents/me/chat/messages`). The server picks the company, agent and responsible person
   from the run and checks the source task's access; the message carries `chatMessage`
   (source task and run), and chats carry `isUnreadForMe` and `lastExternalCommentAt`. This is the
-  delivery briefings needed ([build plan 3.13](build-plan.md#313-briefings-and-reports)); `ui-new`
-  doesn't show the source label or unread dots yet.
+  delivery briefings needed ([build plan 3.13](build-plan.md#313-briefings-and-reports)); M7 round 3
+  (2026-11-02) added the source label ("From the recurring task … · TES-10"), read marking
+  (`POST /issues/:id/read` with `throughCommentId`) and unread dots beside agents in the desktop nav;
+  the phone has no dot yet. `lastExternalCommentAt` comes back as Postgres text, not ISO (upstream
+  candidate 19); `ui-new` doesn't use it.
 - **Follow-ups left open:** `expectedVersionId` on ordinary Studio saves with a conflict notice;
   plugin task side panels opening by hand and on runtime activity, with availability called with
-  `runId` and `issueId` instead of polled; chat read state and the source label; `attention/summary`
+  `runId` and `issueId` instead of polled; ~~chat read state and the source label~~ (done in M7 round 3); `attention/summary`
   for nav counts; harness labels for Antigravity and Kimi; and, from the Oct 29 sync, the plugin
   bridge's retry policy and `live.hello`.

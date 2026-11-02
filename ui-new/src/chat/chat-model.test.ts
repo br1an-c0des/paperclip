@@ -1,7 +1,23 @@
 import type { IssueComment } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import type { Request } from "@/requests/request-model";
-import { buildChat, chatDocumentLink, documentHash, documentKeyFromHash, quietRunText, shownReplies, statusTag, yourChatAgent, type ChatEntry, type ChatTask } from "./chat-model";
+import {
+  buildChat,
+  chatDocumentLink,
+  chatMessageSource,
+  documentHash,
+  documentKeyFromHash,
+  newestUnreadable,
+  openChatAgentKey,
+  quietRunText,
+  readThrough,
+  shownReplies,
+  statusTag,
+  unreadChatAgents,
+  yourChatAgent,
+  type ChatEntry,
+  type ChatTask,
+} from "./chat-model";
 
 const NOW = new Date("2026-10-27T15:00:00");
 
@@ -214,5 +230,104 @@ describe("yourChatAgent", () => {
     expect(yourChatAgent({ id: "t1", conversationAgentId: null, createdByUserId: "me" }, listed, "me")).toBeUndefined();
     expect(yourChatAgent({ id: "chat3", conversationAgentId: "ada", createdByUserId: "maya" }, listed, "me")).toBeUndefined();
     expect(yourChatAgent({ id: "chat3", conversationAgentId: "ada", createdByUserId: null }, listed, null)).toBeUndefined();
+  });
+});
+
+/** A message the agent sent from another task's run (send_chat_message, decision 48). */
+function sent(id: string, at: string, agent: string, source: { taskId: string; identifier: string; runId: string }) {
+  return {
+    ...message(id, at, { agent }, id, source.runId),
+    metadata: { version: 1, chatMessage: { sourceTaskId: source.taskId, sourceTaskIdentifier: source.identifier, sourceRunId: source.runId, contentHash: "h" } },
+  } as unknown as IssueComment;
+}
+
+describe("messages sent from another task", () => {
+  const briefing = { taskId: "t9", identifier: "TES-9", runId: "r9" };
+
+  it("names the source task", () => {
+    expect(chatMessageSource(sent("c1", "2026-10-27T08:00:00", "a1", briefing))).toEqual({ taskId: "t9", identifier: "TES-9", runId: "r9" });
+    expect(chatMessageSource(message("c2", "2026-10-27T08:00:00", { agent: "a1" }))).toBeNull();
+  });
+
+  it("starts its own group, and the next message starts another", () => {
+    const entries = buildChat({
+      comments: [
+        message("c1", "2026-10-27T10:00:00", { agent: "a1" }),
+        sent("c2", "2026-10-27T10:01:00", "a1", briefing),
+        message("c3", "2026-10-27T10:02:00", { agent: "a1" }),
+        message("c4", "2026-10-27T10:03:00", { agent: "a1" }),
+      ],
+      youId: "u1",
+      now: NOW,
+    });
+    expect(kinds(entries)).toEqual(["day:Today", "M:c1", "M:c2", "M:c3", "m:c4"]);
+    expect((entries[2] as Extract<ChatEntry, { kind: "message" }>).source?.identifier).toBe("TES-9");
+  });
+
+  it("leaves out the report card for a task that sent a message, and attaches no hand-offs to it", () => {
+    const entries = buildChat({
+      comments: [sent("c1", "2026-10-27T08:00:00", "a1", briefing)],
+      reports: [task("t9", "2026-10-27T07:59:00", { status: "done", completedAt: "2026-10-27T08:01:00" }), task("t8", "2026-10-27T07:00:00")],
+      handoffs: [task("h1", "2026-10-27T08:00:30", { originRunId: "r9" })],
+      youId: "u1",
+      now: NOW,
+    });
+    expect(kinds(entries)).toEqual(["day:Today", "report", "M:c1", "handoff"]);
+    expect((entries[1] as Extract<ChatEntry, { kind: "report" }>).task.id).toBe("t8");
+  });
+});
+
+describe("read state", () => {
+  const agentMessage = (id: string, at: string, extra: Record<string, unknown> = {}) =>
+    ({ ...message(id, at, { agent: "a1" }), origin: "comment", presentation: null, ...extra }) as unknown as IssueComment;
+
+  it("finds the newest agent message, skipping people, notices, fast responses and deleted ones", () => {
+    const comments = [
+      agentMessage("c1", "2026-10-27T10:00:00"),
+      agentMessage("c2", "2026-10-27T10:05:00"),
+      message("c3", "2026-10-27T10:06:00", { user: "u1" }),
+      agentMessage("c4", "2026-10-27T10:07:00", { presentation: { kind: "system_notice" } }),
+      agentMessage("c5", "2026-10-27T10:08:00", { origin: "fast_response" }),
+      agentMessage("c6", "2026-10-27T10:09:00", { deletedAt: "2026-10-27T10:10:00" }),
+    ];
+    expect(newestUnreadable(comments)?.id).toBe("c2");
+    expect(newestUnreadable([])).toBeNull();
+  });
+
+  it("marks read through the newest message only when there's something new", () => {
+    const newest = { id: "c2", createdAt: "2026-10-27T10:05:00" } as unknown as IssueComment;
+    const at = new Date("2026-10-27T10:05:00").getTime();
+    expect(readThrough(newest, { unread: true, marked: null })).toBe("c2");
+    expect(readThrough(newest, { unread: false, marked: null })).toBeNull();
+    expect(readThrough(newest, { unread: false, marked: { id: "c2", at } })).toBeNull();
+    expect(readThrough(newest, { unread: false, marked: { id: "c1", at: at - 1000 } })).toBe("c2");
+    expect(readThrough(newest, { unread: false, marked: { id: "", at: -Infinity } })).toBe("c2");
+    expect(readThrough(null, { unread: true, marked: null })).toBeNull();
+  });
+
+  it("lists the agents with unread chats, except the one open", () => {
+    const chats = [
+      { conversationAgentId: "a1", isUnreadForMe: true },
+      { conversationAgentId: "a2", isUnreadForMe: false },
+      { conversationAgentId: "a3", isUnreadForMe: true },
+      { conversationAgentId: null, isUnreadForMe: true },
+    ];
+    expect([...unreadChatAgents(chats)]).toEqual(["a1", "a3"]);
+    expect([...unreadChatAgents(chats, "a3")]).toEqual(["a1"]);
+    expect(unreadChatAgents(undefined).size).toBe(0);
+  });
+
+  it("knows which agent's chat the address shows", () => {
+    expect(openChatAgentKey("/TES/agents/bob", "TES")).toBe("bob");
+    expect(openChatAgentKey("/tes/agents/bob/", "TES")).toBe("bob");
+    expect(openChatAgentKey("/TES/agents/bob/chat", "TES")).toBe("bob");
+    expect(openChatAgentKey("/TES/agents/bob/overview", "TES")).toBe("bob");
+    expect(openChatAgentKey("/TES/agents/bob%20two", "TES")).toBe("bob two");
+    expect(openChatAgentKey("/TES/agents/bob/profile", "TES")).toBeNull();
+    expect(openChatAgentKey("/TES/agents/bob/settings/runtime", "TES")).toBeNull();
+    expect(openChatAgentKey("/TES/agents/new", "TES")).toBeNull();
+    expect(openChatAgentKey("/TES/agents", "TES")).toBeNull();
+    expect(openChatAgentKey("/TES/issues/TES-1", "TES")).toBeNull();
+    expect(openChatAgentKey("/OTH/agents/bob", "TES")).toBeNull();
   });
 });
