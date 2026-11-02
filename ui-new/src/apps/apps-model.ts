@@ -15,6 +15,7 @@ import type {
 } from "@paperclipai/shared";
 import type { AccessSelection, InstallTarget } from "@/api/tools";
 import type { Tone } from "@/ui/Status";
+import { isSheetsRobotMethod } from "./setups/extras-model";
 
 /*
  * View model for Apps and tools (src/apps/): the routes under `/:prefix/apps`, the gallery and your
@@ -99,13 +100,16 @@ export const SPECIAL_SETUP_APPS = new Set<string>();
 
 const TOOL_TRANSPORTS = new Set(["mcp_remote", "rest_api"]);
 
-/** The methods that connect the app as tools (not AI accounts, chat channels or local commands). */
+/**
+ * The methods that connect the app as tools (not AI accounts, chat channels or local commands, apart
+ * from Google Sheets' robot account, a local server Paperclip runs with the sheets you share).
+ */
 export function toolMethods(app: AppDefinition): ConnectionMethodDef[] {
   const availability = { ...DEFAULT_OWNERSHIP, ...app.ownershipAvailability };
   return app.methods.filter(
     (method) =>
       (method.purpose ?? "tool") === "tool" &&
-      TOOL_TRANSPORTS.has(method.transport) &&
+      (TOOL_TRANSPORTS.has(method.transport) || isSheetsRobotMethod(app, method)) &&
       method.ownershipModes.some((ownership) => availability[ownership] !== false),
   );
 }

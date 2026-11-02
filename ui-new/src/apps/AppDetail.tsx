@@ -2,7 +2,7 @@ import type { ConnectionMethodDef, ToolCatalogEntry, ToolConnection } from "@pap
 import { A, useNavigate } from "@solidjs/router";
 import { createMutation, createQuery } from "@tanstack/solid-query";
 import { RefreshCw } from "lucide-solid";
-import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch, type JSX } from "solid-js";
 import { createStore } from "solid-js/store";
 import { queryKeys } from "@/api/queryKeys";
 import { toolsApi } from "@/api/tools";
@@ -42,6 +42,8 @@ import {
 } from "./apps-model";
 import { ReviewQueue } from "./Review";
 import { ConnectionExtras } from "./identities/Identities";
+import { HonchoCard, InstructionsCard, SheetsCard } from "./setups/AppExtras";
+import { isHoncho, isSheetsRobotConnection } from "./setups/extras-model";
 import { PoolPage } from "./pools/Pools";
 import { BrowserUsePanel, RailwayPanel, TestCallDialog } from "./TestCall";
 import { appPanel } from "./test-call-model";
@@ -69,8 +71,11 @@ import { AgentAccessPicker, AppLogo, failureText, StateTag, useApplications, use
  * Each action can be tested as an agent (src/apps/TestCall.tsx). Settings carries the app's own
  * panel where it has one: Railway's container access, Browser Use Cloud's profiles and cost cap.
  *
- * Not here yet: agent-specific tool profiles, connection activity (in the company's activity), and
- * Honcho's panel.
+ * Permissions also carries the agent instructions an app comes with (between who may use it and its
+ * actions), Honcho's workspace, and the sheets a Google Sheets robot-account connection may open
+ * (src/apps/setups/AppExtras.tsx).
+ *
+ * Not here yet: agent-specific tool profiles, and connection activity (in the company's activity).
  */
 
 export function AppDetail(props: { connectionId: string; tab: DetailTab; success: boolean; oauth: string | null }) {
@@ -194,7 +199,18 @@ export function AppDetail(props: { connectionId: string; tab: DetailTab; success
                     </p>
                   </Show>
                   <ConnectionExtras connection={connection()} canConfigure={canConfigure()} />
-                  <Permissions connection={connection()} canConfigure={canConfigure()} editable={grants.data?.capabilities.editableAgentIds} />
+                  <Show when={isHoncho(connection())}>
+                    <HonchoCard connection={connection()} canConfigure={canConfigure()} />
+                  </Show>
+                  <Show when={isSheetsRobotConnection(connection())}>
+                    <SheetsCard connection={connection()} canConfigure={canConfigure()} />
+                  </Show>
+                  <Permissions
+                    connection={connection()}
+                    canConfigure={canConfigure()}
+                    editable={grants.data?.capabilities.editableAgentIds}
+                    instructions={<InstructionsCard connection={connection()} app={current().app} canConfigure={canConfigure()} />}
+                  />
                 </Match>
                 <Match when={props.tab === "review"}>
                   <section class="card ap-card" aria-labelledby="ap-detail-review">
@@ -293,7 +309,7 @@ function useConnectionAccess(connection: () => ToolConnection) {
   return { catalog, split, enabled, askFirst, install, access, loading, failed, save, retry, isAi };
 }
 
-function Permissions(props: { connection: ToolConnection; canConfigure: boolean; editable?: string[] }) {
+function Permissions(props: { connection: ToolConnection; canConfigure: boolean; editable?: string[]; instructions?: JSX.Element }) {
   const state = useConnectionAccess(() => props.connection);
   return (
     <Switch>
@@ -312,6 +328,7 @@ function Permissions(props: { connection: ToolConnection; canConfigure: boolean;
       </Match>
       <Match when={true}>
         <AccessCard state={state} canConfigure={props.canConfigure} editable={props.editable} />
+        <Show when={!state.isAi()}>{props.instructions}</Show>
         <Show when={!state.isAi()}>
           <ActionsCard connection={props.connection} state={state} canConfigure={props.canConfigure} />
         </Show>

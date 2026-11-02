@@ -24,12 +24,26 @@ import { AppLogo, StateTag, useApplications, useConnections, useGallery, usePend
 import { ChatEndpointGroup } from "./chat/ChatRoutes";
 import { poolPluginKey } from "./pools/pool-model";
 import { chatConnectHref, galleryChatProvider, withChatApps } from "./chat/chat-model";
+import { Segmented } from "@/ui/Segmented";
+import {
+  CATALOG_SOURCES,
+  catalogRows,
+  nativeOverlaps,
+  PROVIDER_NAMES,
+  showsNative,
+  visibleCatalogRows,
+  type CatalogRow,
+  type CatalogSource,
+} from "./setups/catalog-model";
+import { CatalogManageDialog, CatalogSection, useAggregatorCatalog, useGatewayAccounts } from "./setups/CatalogRows";
 
 /*
  * Browse (`/apps`): the company's connections, then the gallery. Connections are grouped as the old
  * UI's landing page groups them: tools and MCP servers, AI accounts (managed in AI connections),
  * chat endpoints when the instance has `enableChatConnectors` on, and email inboxes. Each opens its
- * own page. The gallery lists the apps ui-new can connect, searchable and by category.
+ * own page. The gallery lists the apps ui-new can connect, searchable and by category, and the
+ * apps Composio and Arcade connect through a gateway (src/apps/setups/CatalogRows.tsx): under their
+ * own source, or under Paperclip's when a search finds them.
  */
 
 export function Browse() {
@@ -188,9 +202,27 @@ function Gallery(props: { counts: Map<string, number> }) {
   const flags = useExperimentalSettingsQuery();
   const [query, setQuery] = createSignal("");
   const [category, setCategory] = createSignal<AppCategory | null>(null);
+  const [source, setSource] = createSignal<CatalogSource>("paperclip");
   const apps = createMemo(() => withChatApps(galleryApps(gallery.data?.apps ?? [], flags.data), gallery.data?.apps ?? [], flags.data));
   const categories = createMemo(() => categoriesIn(apps()));
-  const shown = createMemo(() => apps().filter((app) => matchesApp(app, query(), category())));
+  const shown = createMemo(() => (showsNative(source()) ? apps().filter((app) => matchesApp(app, query(), category())) : []));
+
+  // Composio and Arcade's catalog, beside Paperclip's own apps (which win where both have one).
+  const catalog = useAggregatorCatalog();
+  const accounts = useGatewayAccounts();
+  const allCatalog = createMemo(() => {
+    const module = catalog();
+    return module ? catalogRows(module.AGGREGATOR_APP_CATALOG, gallery.data?.apps ?? [], accounts.observed(), module.aggregatorAppIdentity) : [];
+  });
+  // A category narrows Paperclip's apps; the providers' catalogs have none.
+  const catalogShown = createMemo(() => (category() && showsNative(source()) ? [] : visibleCatalogRows(allCatalog(), source(), query())));
+  // Accounts a gateway saw for apps the gallery has itself, shown on the gallery's tile.
+  const overlaps = createMemo(() => nativeOverlaps(allCatalog()));
+  const [managing, setManaging] = createSignal<CatalogRow | null>(null);
+  const catalogLoading = () => catalog.loading && (source() !== "paperclip" || query().trim().length > 0);
+  const catalogSection = () => (
+    <CatalogSection rows={catalogShown()} source={source()} gateways={accounts.gateways()} loading={catalogLoading()} searching={query().trim().length > 0} />
+  );
 
   return (
     <section class="card ap-card" aria-labelledby="ap-gallery">
@@ -213,18 +245,21 @@ function Gallery(props: { counts: Map<string, number> }) {
             onInput={(event) => setQuery(event.currentTarget.value)}
           />
         </label>
-        <div class="ap-chips" role="group" aria-label="Category">
-          <button type="button" class="ap-chip" aria-pressed={category() === null} onClick={() => setCategory(null)}>
-            All
-          </button>
-          <For each={categories()}>
-            {(value) => (
-              <button type="button" class="ap-chip" aria-pressed={category() === value} onClick={() => setCategory(category() === value ? null : value)}>
-                {CATEGORY_LABELS[value]}
-              </button>
-            )}
-          </For>
-        </div>
+        <Segmented label="Apps from" options={CATALOG_SOURCES} value={source()} onChange={setSource} />
+        <Show when={showsNative(source())}>
+          <div class="ap-chips" role="group" aria-label="Category">
+            <button type="button" class="ap-chip" aria-pressed={category() === null} onClick={() => setCategory(null)}>
+              All
+            </button>
+            <For each={categories()}>
+              {(value) => (
+                <button type="button" class="ap-chip" aria-pressed={category() === value} onClick={() => setCategory(category() === value ? null : value)}>
+                  {CATEGORY_LABELS[value]}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
       </div>
       <Switch>
         <Match when={gallery.isPending}>
@@ -240,9 +275,10 @@ function Gallery(props: { counts: Map<string, number> }) {
             </Button>
           </div>
         </Match>
-        <Match when={shown().length === 0}>
+        <Match when={shown().length === 0 && catalogShown().length === 0 && !catalogLoading()}>
           <p class="ap-empty">No apps match. Try another word, or connect your own MCP server.</p>
         </Match>
+        <Match when={shown().length === 0}>{catalogSection()}</Match>
         <Match when={true}>
           <ul class="ap-grid">
             <For each={shown()}>
@@ -261,6 +297,14 @@ function Gallery(props: { counts: Map<string, number> }) {
                       </div>
                     </div>
                     <p class="ap-tile-desc">{app.description}</p>
+                    <Show when={overlaps().get(app.slug)}>
+                      {(row) => (
+                        <button type="button" class="cx-link" onClick={() => setManaging(row())}>
+                          {row().accounts.length === 1 ? "1 account" : `${row().accounts.length} accounts`} through{" "}
+                          {[...new Set(row().accounts.map((item) => PROVIDER_NAMES[item.snapshot.provider as "composio" | "arcade"]))].join(" and ")}
+                        </button>
+                      )}
+                    </Show>
                     <Show
                       when={!unavailable()}
                       fallback={
@@ -278,8 +322,10 @@ function Gallery(props: { counts: Map<string, number> }) {
               }}
             </For>
           </ul>
+          {catalogSection()}
         </Match>
       </Switch>
+      <Show when={managing()}>{(row) => <CatalogManageDialog row={row()} gateways={accounts.gateways()} onClose={() => setManaging(null)} />}</Show>
     </section>
   );
 }

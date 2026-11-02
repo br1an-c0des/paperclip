@@ -43,6 +43,7 @@ import { channelMethod, chatConnectHref } from "./chat/chat-model";
 import { AggregatorConnect } from "./setups/AggregatorConnect";
 import { setupExtras, type GalleryExtras } from "./setups/SetupExtras";
 import { isAggregator } from "./setups/setups-model";
+import { isSheetsRobotMethod } from "./setups/extras-model";
 import { NewPool } from "./pools/Pools";
 
 /*
@@ -64,7 +65,9 @@ import { NewPool } from "./pools/Pools";
  * (AgentMail, Telegram…) go to their chat setup (src/apps/chat/); Google Workspace's services and
  * whose account a connection is come from src/apps/setups/SetupExtras.tsx.
  *
- * Not here yet: the agent instructions some apps offer. Paperclip Cloud sign-in hand-offs are refused with a message.
+ * The agent instructions some apps come with, and Google Sheets' robot account, come from
+ * src/apps/setups/AppExtras.tsx through SetupExtras. Paperclip Cloud sign-in hand-offs are refused
+ * with a message.
  */
 
 type ConnectOutcome = { kind: "done"; connectionId: string } | { kind: "redirect" };
@@ -98,6 +101,7 @@ function useConnectFlow(onFailure: (message: string) => void) {
       await toolsApi.finishApp(company().id, result.connectionId, {
         enabledCatalogEntryIds: defaults.enabled,
         askFirstCatalogEntryIds: defaults.askFirst,
+        ...(input.payload.agentInstructions ? { agentInstructions: input.payload.agentInstructions } : {}),
         access: input.access.mode === "all" ? "all_agents" : { agentIds: [...input.access.agentIds] },
       });
       await toolsApi.putInstalls(result.connectionId, installs);
@@ -170,7 +174,7 @@ export function GalleryConnect(props: { source: string | null; resume: string | 
       {/* Keyed by slug: a gallery refetch (after a failed connect) must not reset the form. */}
       <Match when={app()?.slug} keyed>
         {(_slug) => (
-          <GalleryForm app={app()!} methods={methods()} resume={props.resume} applicationId={props.applicationId} extras={(method) => setupExtras(app()!, method)} />
+          <GalleryForm app={app()!} methods={methods()} resume={props.resume} applicationId={props.applicationId} extras={(method) => setupExtras(app()!, method, { resume: props.resume })} />
         )}
       </Match>
     </Switch>
@@ -207,7 +211,14 @@ export function VercelConnect(props: { source: string | null; resume: string | n
       </Match>
       <Match when={usable() ? app()?.slug : null} keyed>
         {(_slug) => (
-          <GalleryForm app={app()!} methods={vercelMethods(app()!)} resume={props.resume} applicationId={props.applicationId} vercel={availability()} />
+          <GalleryForm
+            app={app()!}
+            methods={vercelMethods(app()!)}
+            resume={props.resume}
+            applicationId={props.applicationId}
+            vercel={availability()}
+            extras={(method) => setupExtras(app()!, method, { resume: props.resume, vercel: true })}
+          />
         )}
       </Match>
       <Match when={props.source && !app()}>
@@ -353,7 +364,8 @@ function GalleryForm(props: {
         </Show>
       </header>
 
-      <Show when={props.app.setupPrerequisite}>
+      {/* Google's Developer Preview applies to its MCP servers, not the robot account. */}
+      <Show when={isSheetsRobotMethod(props.app, method()) ? undefined : props.app.setupPrerequisite}>
         {(pre) => (
           <div class="cx-note cx-note--warn">
             <b>{pre().title}.</b> {pre().description}{" "}
