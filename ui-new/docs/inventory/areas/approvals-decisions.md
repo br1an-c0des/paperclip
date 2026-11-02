@@ -55,6 +55,8 @@ Reference:
   sort, since). It reads the tasks' own decisions; it doesn't keep a separate store.
 - **Notes:** dismiss and snooze go through `inboxDismissalsApi` (shared with Inbox). Unanswered
   questions stay in the feed after dismissal and can be reopened (upstream `dismiss-and-reopen`).
+- **Since the 2026-11-01 sync:** `GET /api/companies/:companyId/attention/summary`
+  (`attentionApi.summary`) returns the feed's counts without the cards, for navigation badges.
 
 ### `decisions/queues`: Decision queues and triage
 

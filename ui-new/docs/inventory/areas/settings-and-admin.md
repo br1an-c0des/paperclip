@@ -66,6 +66,14 @@ Upstream recipe: `maps/feature-map/skills.md`. Flag `enableBetaSkills`.
 Since the 2026-10-29 sync, `GET .../skills/:skillId/versions` returns versions with file names and
 kinds only. Comparing and restoring read each version with `GET .../versions/:versionId`.
 
+Since the 2026-11-01 sync, skills written in Paperclip have source type `managed`: their content
+lives in versions (database and object storage), they carry the `paperclip` badge and the label
+"Paperclip", and the old UI files them under Organization. Writes (file save and delete, rename,
+version, install update, reset) take an optional `expectedVersionId` and answer 409 when the skill
+changed meanwhile; the Studio keeps the draft and offers "Load latest saved file". A managed skill
+restores a version in one call, `POST .../versions` with `{ sourceVersionId, expectedVersionId }`;
+linked local skills still write the version's files back one by one.
+
 ## Apps and tools ("Connectors")
 
 | Page | Route (under `/:co`) | What it does |

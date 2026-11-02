@@ -97,6 +97,9 @@ cheatsheet, the command palette, global dialogs, and plugin overlays.
     `GET /api/health` or the socket. Reads keep cached data, and writes (autosave, comments, new
     tasks, decisions) are kept and retried with their original account and request key
     (`lib/connectivity.ts`, `hooks/useDurableAutosave.ts`, `hooks/useDurableSubmit.ts`).
+- **Since the 2026-11-01 sync:** when one web server hands over to another, the server can send
+  `live.resync` with reason `controller_change` to clients that negotiated `live.hello`. The
+  replaced server's sockets close, so clients reconnect and refresh.
 
 ### `shell/company`: Company context
 
@@ -116,6 +119,12 @@ cheatsheet, the command palette, global dialogs, and plugin overlays.
 - **Source:** `PluginSlotMount`, `PluginSlotOutlet`, `PluginLauncherOutlet`, `PluginAppShellOverlays`,
   `plugins/`.
 - **Notes:** a new UI must keep these mount points (or a subset) for installed plugins to keep working.
+- **Since the 2026-11-01 sync:** a task side panel can declare
+  `taskSidePanel.activation: { namespace, activityKey }`. Runtime activity that matches opens it,
+  read from `GET /api/heartbeat-runs/:runId/events?view=plugin-panels` (`heartbeatsApi.taskPanelActivations`,
+  at most 128 panels) and live run updates. Panels can also be opened by hand while the assigned
+  agent is idle. Availability (`GET /api/plugins/:pluginId/api<availabilityPath>?runId=&issueId=`)
+  is checked up to three times after activity instead of on a timer (`hooks/useTaskPluginPanels.ts`).
 
 ### `shell/misc`: Other shell features
 

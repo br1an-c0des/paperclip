@@ -65,6 +65,10 @@ Agent Chat (`/:co/chats/:agentRef`) reuses `TaskDetailSurface` in a conversation
 - **Notes:** view state is saved per surface in local storage (`viewStateKey`). Creating a task from a group
   header pre-fills that group's value. Keyboard: `j`/`k` or arrows move, left/right collapse/expand
   parents and groups, Enter opens.
+- **Since the 2026-11-01 sync:** a Routine tasks filter under Visibility shows the tasks routines
+  created, kept in the URL; a routine links to it. Needs attention reads the task IDs from
+  `GET /api/companies/:companyId/attention/tasks` (`attentionApi.taskIndex`) and loads the rows in
+  batches of up to 100; the list renders 100 rows, then 150 more at a time.
 
 ### `inbox-search/triage`: Inbox triage
 
@@ -138,6 +142,10 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   (in batches of 100), `/runs?view=recent`, and `GET /api/heartbeat-runs/:runId/events?view=conversation`.
 - **Notes:** opening a task marks it read (`POST /api/issues/:id/read`). Since the 2026-10-26 sync the
   old UI shows the recent conversation first and loads the full history behind it.
+- **Since the 2026-11-01 sync:** subtasks an agent creates show inline in the feed as task cards
+  (link, title, number, status), once each. The feed reads the runs it shows in batches with
+  `GET /api/issues/:issueId/runs?runIds=` (`activityApi.runsByIdsForIssue`, up to 100 IDs per
+  request).
 
 ### `tasks/discussion`: Comment and reassign
 
@@ -259,6 +267,8 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   `GET .../revisions`, `GET .../revisions/:revisionId` (one revision, for a decision's exact review
   target; since the 2026-10-29 sync), `POST .../revisions/:revisionId/restore`, `POST .../lock|unlock`,
   `GET|POST /api/issues/:issueId/documents/:documentKey/annotations` (+ thread PATCH and comments).
+- **Since the 2026-11-01 sync:** a document's images open in a gallery, in reading order
+  (`components/DocumentMarkdownBody.tsx`, `ImageGalleryModal.tsx`).
 
 ### `documents-artifacts/attachments`, `/work-products`: Files and outputs
 

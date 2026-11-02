@@ -91,6 +91,12 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   then `PATCH /api/agents/:id`), can probe the chosen environment
   (`POST /api/environments/:environmentId/probe`), and new Claude (qualified macOS and Linux targets),
   OpenCode and Pi agents also default to Paperclip Runner.
+- **Since the 2026-11-01 sync:**
+  - Kimi Code and Google Antigravity run on Paperclip Runner (ACPX `kimi` and `antigravity`). Both
+    need an operator's candidate authorization; `GET /api/companies/:companyId/adapters` lists
+    Antigravity under `candidateHarnesses` on `paperclip_runner` when it's authorized. Antigravity
+    signs in with a Google subscription or a Gemini API key.
+  - First onboarding offers only Claude and Codex.
 
 ## Agent detail
 
@@ -225,6 +231,16 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   plus the task-detail requests.
 - **Notes:** flag `enableAgentChat` (default off) shows chat links and pages. Board chat (`/board-chat`,
   "conference room") is a separate, separately gated feature (`enableConferenceRoomChat`).
+- **Since the 2026-11-01 sync:**
+  - An agent can post into a person's chat from a task it is working on
+    (`POST /api/agents/me/chat/messages`); the comment's `metadata.chatMessage` names the source
+    task and run.
+  - Chats carry `isUnreadForMe` and `lastExternalCommentAt`; reading a chat marks it read up to the
+    last message shown (`POST /api/issues/:id/read` with `{ throughCommentId }`,
+    `hooks/useAgentChatRead.tsx`).
+  - `GET /api/issues/:id/recent-comments` returns a chat's 20 newest comments with
+    `oldestCommentId`; older ones page in on scroll (`GET /api/issues/:id/comments`,
+    `hooks/useConversationHistoryPages.ts`).
 
 ## Switches that change this area
 
