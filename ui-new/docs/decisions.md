@@ -1565,8 +1565,10 @@ Both are handled in `ui-new` for now.
   `entries`; Vercel Connect connects with `credentialSource: vercel_connect` and no key; a plan with
   an unknown price comes back named "Plan unknown", and the price editor saves that name back, as the
   old UI does.
-- **Waiting on a dependency:** Speko's in-browser voice and calls from a task need `@spekoai/client`,
-  not added.
+- **Voice on hold:** Speko's in-browser voice and calls from a task need `@spekoai/client`, not
+  added. Decided 2026-11-02: voice is on hold, to be explored separately later. The old UI pins
+  `@spekoai/client` 0.0.13 and loads it only when a call starts (`ui/src/lib/speko-voice-media.ts`,
+  `voice-session-controller.ts`, `components/voice/`).
 - **Suspected upstream bugs, unconfirmed:**
   `GET /chat-endpoints/:id/github/{configuration,principals,resources}` answers 500 for an id that
   isn't a UUID; `GET /costs/quota-windows` answers `permission_denied` for TES's managed Claude
