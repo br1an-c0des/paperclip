@@ -716,13 +716,13 @@ built-in chat as it is.
   replaces the fork plugin tool and the upstream ask planned here.
 - **Missing:**
   - Routines triggered by events. They only have schedule, webhook and API triggers.
-  - In `ui-new`: the message's source label ("from task X") and unread dots in the chat; making a
-    recurring task's responsible person editable, since it decides whose chat a briefing reaches
+  - In `ui-new`: ~~the message's source label and unread dots~~ (done in M7 round 3, 2026-11-02;
+    the phone dock has no unread count yet); making a recurring task's responsible person editable, since it decides whose chat a briefing reaches
     (`PATCH /routines/:id` doesn't take `responsibleUserId` yet,
     [decision 45](decisions.md#45-gaps-found-building-agents-projects-goals-and-recurring-tasks)).
 - **Approach:**
   1. **UI only:** show briefing messages well in the chat: the source label, unread dots, perhaps a
-     briefing card style.
+     briefing card style. Done in M7 round 3 except a briefing card style.
   2. **A briefing recurring task:** its instructions (or a fork skill) tell the agent to send the
      result with `send_chat_message`. Try a real morning briefing on TES with a cheap model.
   3. **Milestone reports for work that didn't start in the chat:** something still has to start the
