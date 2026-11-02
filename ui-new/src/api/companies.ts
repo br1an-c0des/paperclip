@@ -116,6 +116,10 @@ export const companiesApi = {
   /** Starts an import of a zip package as a background job (`?async=1`, as the old UI does). */
   importPackageAsync: (file: File, meta: CompanyImportMeta) =>
     api.postForm<CompanyImportJobAccepted>("/companies/import?async=1", packageForm(file, meta)),
+  /** Previews a package the server reads itself: a GitHub address (`source: { type: "github", url }`). */
+  importPreview: (data: CompanyPortabilityPreviewRequest) => api.post<CompanyPortabilityPreviewResult>("/companies/import/preview", data),
+  /** Starts an import from a GitHub address as a background job; a 409 carries the person's import still running. */
+  importAsync: (data: CompanyPortabilityImportRequest) => api.post<CompanyImportJobAccepted>("/companies/import?async=1", data),
   importJob: (jobId: string) => api.get<CompanyImportJobStatus>(`/companies/import/jobs/${encodeURIComponent(jobId)}`),
 
   /*

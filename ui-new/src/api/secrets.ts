@@ -13,6 +13,7 @@ import type {
   SecretProviderConfigHealthResponse,
   SecretProviderConfigStatus,
   SecretProviderDescriptor,
+  SecretManagedMode,
   SecretStatus,
   UserSecretCoverageSummary,
   UserSecretDefinition,
@@ -25,7 +26,8 @@ import { api } from "./client";
  * the server.
  *
  * Projects and agents use the list, the create and the per-person definitions. Company settings →
- * Secrets (board 24) adds the rest: editing, rotating, disabling and deleting a secret, where it's
+ * Secrets (board 24) adds the rest: external references (a secret that stays in AWS, GCP or Vault
+ * and is read at run time), editing, rotating (a value or a reference), disabling and deleting a secret, where it's
  * used and who read it, the providers and their vaults (set up, edited, checked, turned off,
  * removed, discovered from AWS), importing a vault's existing secrets as references, per-person
  * definitions and your own values, and the secrets agents propose.
@@ -34,7 +36,30 @@ import { api } from "./client";
 /** One "My secrets" row: a company definition paired with your own value, if you set one. */
 export type MyUserSecretEntry = { definition: UserSecretDefinition; secret: CompanySecret | null };
 
-export type UpdateSecretInput = { name?: string; key?: string; status?: SecretStatus; description?: string | null };
+export type UpdateSecretInput = { name?: string; key?: string; status?: SecretStatus; description?: string | null; externalRef?: string | null };
+
+/**
+ * A new secret: a value Paperclip stores (`paperclip_managed`), or a reference to one that already
+ * lives in a provider (`external_reference`, read at run time). Without a provider config it goes to
+ * the company's default store.
+ */
+export type CreateSecretInput = {
+  name: string;
+  key?: string;
+  description?: string | null;
+  provider?: SecretProvider;
+  managedMode?: SecretManagedMode;
+  value?: string;
+  externalRef?: string;
+  providerVersionRef?: string | null;
+  providerConfigId?: string | null;
+};
+
+/**
+ * A new version: a value (for a reference, written through to the provider when it can take
+ * writes), or the reference pointed somewhere else without writing.
+ */
+export type RotateSecretInput = { value?: string; externalRef?: string; providerVersionRef?: string | null; providerConfigId?: string | null };
 
 /** A vault (provider config): where a provider stores this company's values, and how they're named. */
 export type ProviderConfigInput = {
@@ -74,12 +99,11 @@ const secret = (secretId: string) => `/secrets/${encodeURIComponent(secretId)}`;
 
 export const secretsApi = {
   list: (companyId: string, signal?: AbortSignal) => api.get<CompanySecret[]>(`${company(companyId)}/secrets`, { signal }),
-  /** Stores a new secret. Without a provider config it goes to the company's default store. */
-  create: (companyId: string, data: { name: string; value: string; description?: string | null; providerConfigId?: string | null }) =>
-    api.post<CompanySecret>(`${company(companyId)}/secrets`, data),
+  /** Stores a new secret, or links one a provider already holds. Without a provider config it goes to the company's default store. */
+  create: (companyId: string, data: CreateSecretInput) => api.post<CompanySecret>(`${company(companyId)}/secrets`, data),
   update: (secretId: string, data: UpdateSecretInput) => api.patch<CompanySecret>(secret(secretId), data),
-  /** Stores a new value as the secret's next version. */
-  rotate: (secretId: string, value: string) => api.post<CompanySecret>(`${secret(secretId)}/rotate`, { value }),
+  /** Stores a new value, or a new reference, as the secret's next version. */
+  rotate: (secretId: string, data: RotateSecretInput) => api.post<CompanySecret>(`${secret(secretId)}/rotate`, data),
   remove: (secretId: string) => api.delete<{ ok: true }>(secret(secretId)),
   usage: (secretId: string, signal?: AbortSignal) =>
     api.get<{ secretId: string; bindings: CompanySecretUsageBinding[] }>(`${secret(secretId)}/usage`, { signal }),

@@ -2,7 +2,10 @@ import type { Environment, EnvironmentDeleteBlastRadius } from "@paperclipai/sha
 import { describe, expect, it } from "vitest";
 import {
   defaultPatchId,
+  agentsOnEnvironment,
   deleteSummary,
+  reassignTargets,
+  unlistedAgentCount,
   driverLabel,
   effectiveDefaultId,
   emptyEnvironmentForm,
@@ -80,8 +83,46 @@ describe("environments", () => {
   it("explains a blocked delete", () => {
     expect(deleteSummary(radius({ canDelete: false, deleteBlockedReasons: ["instance_default"] }))).toEqual({
       allowed: false,
+      leaseConsent: false,
       lines: ["It's the instance's default environment."],
     });
+  });
+
+  it("lets a delete destroy sandboxes kept for reuse, with consent", () => {
+    const leased = radius({
+      canDelete: false,
+      deleteBlockedReasons: ["reusable_sandbox_lease"],
+      reusableSandboxLeaseCount: 2,
+      reusableSandboxLeaseHolders: [
+        { leaseId: "l1", executionWorkspaceId: "w", executionWorkspaceName: "Fix login", issueId: null, issueIdentifier: null, issueTitle: null },
+        { leaseId: "l2", executionWorkspaceId: null, executionWorkspaceName: null, issueId: "i", issueIdentifier: "TES-4", issueTitle: "x" },
+      ],
+    });
+    expect(deleteSummary(leased)).toEqual({
+      allowed: false,
+      leaseConsent: true,
+      lines: ["2 sandboxes are kept for reuse (Fix login, TES-4). Close their workspaces first, or destroy them with the delete."],
+    });
+    expect(deleteSummary(leased, true)).toEqual({ allowed: true, leaseConsent: true, lines: ["2 sandboxes are kept for reuse (Fix login, TES-4). They're destroyed with it."] });
+    // Another block stays a block.
+    expect(deleteSummary(radius({ canDelete: false, deleteBlockedReasons: ["reusable_sandbox_lease", "instance_default"] }), true).allowed).toBe(false);
+  });
+
+  it("finds the agents to move and where they can go", () => {
+    const agents = [
+      { id: "a", status: "idle", defaultEnvironmentId: "box" },
+      { id: "b", status: "terminated", defaultEnvironmentId: "box" },
+      { id: "c", status: "paused", defaultEnvironmentId: null },
+    ];
+    expect(agentsOnEnvironment(agents, "box").map((agent) => agent.id)).toEqual(["a"]);
+    const environments = [
+      env({ id: "box", name: "Box", driver: "ssh" }),
+      env({ id: "other", name: "Other", driver: "ssh" }),
+      env({ id: "old", name: "Old", driver: "ssh", status: "archived" }),
+      env({ id: "local", name: "Local", driver: "local" }),
+    ];
+    expect(reassignTargets(environments, "box").map((environment) => environment.id)).toEqual(["other"]);
+    expect(unlistedAgentCount(radius({ staticReferences: { ...radius({}).staticReferences, agentDefaultCount: 3 } }), 1)).toBe(2);
   });
 
   it("lists what a delete affects", () => {
@@ -91,7 +132,7 @@ describe("environments", () => {
         activeRuntimeUse: { activeLeaseCount: 1, activeCustomImageSetupSessionCount: 0, hasActiveRuntimeUse: true },
       }),
     );
-    expect(summary).toEqual({ allowed: true, lines: ["2 agents run there by default", "1 project uses it", "It's in use right now."] });
+    expect(summary).toEqual({ allowed: true, leaseConsent: false, lines: ["2 agents run there by default", "1 project uses it", "It's in use right now."] });
   });
 });
 

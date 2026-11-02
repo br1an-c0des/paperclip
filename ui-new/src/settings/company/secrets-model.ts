@@ -282,3 +282,126 @@ const CONSUMER_LABELS: Record<string, string> = { agent_api: "Agent API", plugin
 export function consumerLabel(consumerType: SecretAccessEvent["consumerType"]) {
   return CONSUMER_LABELS[consumerType] ?? consumerType.charAt(0).toUpperCase() + consumerType.slice(1).replace(/_/g, " ");
 }
+
+// ---------------------------------------------------------------------------------------------
+// Folders (the old page's folder view, ui/src/pages/secrets/secret-path.ts)
+
+/*
+ * Folders come from slashes in secret names (`github/deploy-token`); the server keeps no folder
+ * records. A folder exists while a secret is named under it, so a new folder is just the start of
+ * the next secret's name.
+ */
+
+export type SecretFolder = { name: string; path: string; secretCount: number };
+
+function segments(path: string) {
+  return path.split("/").filter(Boolean);
+}
+
+export function normalizeFolderPath(path: string) {
+  return segments(path).join("/");
+}
+
+/** Whether any name has a slash, so the folder view is worth offering. */
+export function hasFolders(secrets: readonly Pick<CompanySecret, "name">[]) {
+  return secrets.some((secret) => segments(secret.name).length > 1);
+}
+
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+/** One folder's contents: the folders directly in it, with how many secrets each holds, and its own secrets. */
+export function folderListing<T extends Pick<CompanySecret, "name">>(secrets: readonly T[], path: string): { folders: SecretFolder[]; secrets: T[] } {
+  const base = segments(path);
+  const folders = new Map<string, number>();
+  const own: T[] = [];
+  for (const secret of secrets) {
+    const parts = segments(secret.name);
+    if (!base.every((part, index) => parts[index] === part)) continue;
+    const depth = parts.length - base.length;
+    if (depth < 1) continue;
+    if (depth === 1) own.push(secret);
+    else folders.set(parts[base.length]!, (folders.get(parts[base.length]!) ?? 0) + 1);
+  }
+  return {
+    folders: [...folders.entries()].map(([name, secretCount]) => ({ name, path: [...base, name].join("/"), secretCount })).sort((a, b) => collator.compare(a.name, b.name)),
+    secrets: own.sort((a, b) => collator.compare(a.name, b.name)),
+  };
+}
+
+/** The trail from the top to `path`: each folder with its full path. */
+export function folderCrumbs(path: string) {
+  const parts = segments(path);
+  return parts.map((name, index) => ({ name, path: parts.slice(0, index + 1).join("/") }));
+}
+
+/** A secret's name inside the folder shown: `github/deploy-token` in `github` reads `deploy-token`. */
+export function nameInFolder(name: string, path: string) {
+  const base = normalizeFolderPath(path);
+  return base && name.startsWith(`${base}/`) ? name.slice(base.length + 1) : name;
+}
+
+export function folderNameProblem(value: string): string | null {
+  if (!value.trim()) return "Name the folder.";
+  if (value.includes("/")) return "A folder name can't have a slash.";
+  return null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Where a new secret goes, and external references
+
+export type SecretKind = "managed" | "external";
+
+/** One place a new secret can go: the organization's default, a vault, or a provider's deployment settings. */
+export type SecretStore = { value: string; label: string; provider?: SecretProvider; providerConfigId: string | null };
+
+/** Whether any provider can hold references here: a usable vault, or deployment settings that work. */
+export function supportsReferences(descriptors: readonly SecretProviderDescriptor[] | undefined, configs: readonly CompanySecretProviderConfig[] | undefined) {
+  return storeChoices("external", descriptors, configs).length > 0;
+}
+
+/**
+ * The places a new secret of this kind can go. A stored value can go to the default (the server
+ * picks) or a vault whose provider keeps values; a reference needs a provider that can resolve one:
+ * one of its vaults, or the provider's deployment settings when they're configured.
+ */
+export function storeChoices(kind: SecretKind, descriptors: readonly SecretProviderDescriptor[] | undefined, configs: readonly CompanySecretProviderConfig[] | undefined): SecretStore[] {
+  const byId = new Map((descriptors ?? []).map((descriptor) => [descriptor.id, descriptor]));
+  const fits = (provider: SecretProvider) => {
+    const descriptor = byId.get(provider);
+    if (!descriptor) return false;
+    return kind === "managed" ? descriptor.supportsManagedValues !== false : descriptor.supportsExternalReferences === true;
+  };
+  const vaults = (configs ?? [])
+    .filter((config) => !vaultBlockReason(config) && fits(config.provider))
+    .sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.displayName.localeCompare(b.displayName))
+    .map((config): SecretStore => ({ value: config.id, label: `${config.displayName} · ${providerName(config.provider)}`, provider: config.provider, providerConfigId: config.id }));
+  if (kind === "managed") return [{ value: "", label: "The organization's default", providerConfigId: null }, ...vaults];
+  const withVault = new Set(vaults.map((vault) => vault.provider));
+  const deployment = (descriptors ?? [])
+    .filter((descriptor) => descriptor.supportsExternalReferences === true && descriptor.configured !== false && !withVault.has(descriptor.id))
+    .map((descriptor): SecretStore => ({ value: `provider:${descriptor.id}`, label: `${descriptor.label} (this deployment's settings)`, provider: descriptor.id, providerConfigId: null }));
+  return [...vaults, ...deployment];
+}
+
+/** What a reference looks like for a provider, as a placeholder. */
+export function referencePlaceholder(provider: SecretProvider | undefined) {
+  if (provider === "aws_secrets_manager") return "arn:aws:secretsmanager:region:account:secret:name";
+  if (provider === "gcp_secret_manager") return "projects/my-project/secrets/name";
+  if (provider === "vault") return "secret/data/team/name";
+  return "The secret's name or path in the provider";
+}
+
+/**
+ * How a secret takes a new version: a stored one takes a value; a reference can be pointed
+ * elsewhere, and also take a value when its provider accepts writes (AWS).
+ */
+export function rotateKinds(secret: Pick<CompanySecret, "managedMode" | "provider" | "externalRef">, descriptors: readonly SecretProviderDescriptor[] | undefined): ("value" | "reference")[] {
+  if (secret.managedMode !== "external_reference") return ["value"];
+  const writes = descriptors?.find((descriptor) => descriptor.id === secret.provider)?.supportsExternalValueWrites === true;
+  return writes && secret.externalRef ? ["reference", "value"] : ["reference"];
+}
+
+/** The rotate menu item's words. */
+export function rotateLabel(secret: Pick<CompanySecret, "managedMode">) {
+  return secret.managedMode === "external_reference" ? { title: "Update", help: "A new reference or version, or a new value" } : { title: "Rotate", help: "Store a new value" };
+}

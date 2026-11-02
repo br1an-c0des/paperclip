@@ -63,5 +63,9 @@ export const environmentsApi = {
   /** What a delete would touch, and whether it's allowed. */
   deleteBlastRadius: (environmentId: string, signal?: AbortSignal) =>
     api.get<EnvironmentDeleteBlastRadius>(`/environments/${encodeURIComponent(environmentId)}/delete-blast-radius`, { signal }),
-  remove: (environmentId: string) => api.delete<Environment>(`/environments/${encodeURIComponent(environmentId)}`),
+  /** `destroyReusableSandboxLeases` consents to destroying sandboxes kept for reuse; without it they block the delete (409). */
+  remove: (environmentId: string, options: { destroyReusableSandboxLeases?: boolean } = {}) =>
+    api.delete<Environment & { destroyedReusableSandboxLeaseCount?: number }>(
+      `/environments/${encodeURIComponent(environmentId)}${options.destroyReusableSandboxLeases ? "?destroyReusableSandboxLeases=true" : ""}`,
+    ),
 };

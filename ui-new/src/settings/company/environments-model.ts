@@ -53,13 +53,24 @@ export function sortEnvironments(environments: readonly Environment[] | undefine
 const BLOCKED: Record<string, string> = {
   managed_local: "It's the built-in local environment.",
   instance_default: "It's the instance's default environment.",
-  reusable_sandbox_lease: "Sandboxes kept for reuse still depend on it. Close their workspaces first.",
+  reusable_sandbox_lease: "Sandboxes kept for reuse still depend on it.",
   pending_sandbox_cleanup: "A sandbox is still being cleaned up. Try again shortly.",
 };
 
-/** Why a delete isn't allowed, or what it would affect when it is. */
-export function deleteSummary(radius: EnvironmentDeleteBlastRadius): { allowed: boolean; lines: string[] } {
-  if (!radius.canDelete) return { allowed: false, lines: radius.deleteBlockedReasons.map((reason) => BLOCKED[reason] ?? reason) };
+/**
+ * Why a delete isn't allowed, or what it would affect when it is. Sandboxes kept for reuse are the
+ * one block a person can lift: with `destroyLeases` the delete destroys them first, as the old
+ * page's consent box does; `leaseConsent` says that's the only thing in the way.
+ */
+export function deleteSummary(radius: EnvironmentDeleteBlastRadius, destroyLeases = false): { allowed: boolean; lines: string[]; leaseConsent: boolean } {
+  const leaseOnly = radius.deleteBlockedReasons.length > 0 && radius.deleteBlockedReasons.every((reason) => reason === "reusable_sandbox_lease");
+  if (!radius.canDelete && !(leaseOnly && destroyLeases)) {
+    return {
+      allowed: false,
+      leaseConsent: leaseOnly,
+      lines: leaseOnly ? [`${reusableLeaseLine(radius)} Close their workspaces first, or destroy them with the delete.`] : radius.deleteBlockedReasons.map((reason) => BLOCKED[reason] ?? reason),
+    };
+  }
   const refs = radius.staticReferences;
   const lines: string[] = [];
   const count = (value: number, one: string, many: string) => value > 0 && lines.push(`${value} ${value === 1 ? one : many}`);
@@ -68,8 +79,35 @@ export function deleteSummary(radius: EnvironmentDeleteBlastRadius): { allowed: 
   count(refs.issueSelectionCount, "task uses it", "tasks use it");
   count(refs.executionWorkspaceSelectionCount, "workspace uses it", "workspaces use it");
   count(refs.secretBindingCount, "secret is bound to it", "secrets are bound to it");
+  if (leaseOnly) lines.push(`${reusableLeaseLine(radius)} They're destroyed with it.`);
   if (radius.activeRuntimeUse.hasActiveRuntimeUse) lines.push("It's in use right now.");
-  return { allowed: true, lines };
+  return { allowed: true, lines, leaseConsent: leaseOnly };
+}
+
+/** "2 sandboxes are kept for reuse (Workspace A, PAP-12)." */
+function reusableLeaseLine(radius: EnvironmentDeleteBlastRadius) {
+  const count = radius.reusableSandboxLeaseCount || radius.reusableSandboxLeaseHolders?.length || 0;
+  const holders = [...new Set((radius.reusableSandboxLeaseHolders ?? []).map((holder) => holder.executionWorkspaceName ?? holder.issueIdentifier).filter(Boolean))];
+  return `${count === 1 ? "A sandbox is" : `${count} sandboxes are`} kept for reuse${holders.length ? ` (${holders.slice(0, 3).join(", ")}${holders.length > 3 ? "…" : ""})` : ""}.`;
+}
+
+/**
+ * The organization's agents whose default environment this is, other than terminated ones. Agents
+ * in other organizations (environments are instance-wide) can't be listed here; they fall back to
+ * the instance default.
+ */
+export function agentsOnEnvironment<T extends { status: string; defaultEnvironmentId?: string | null }>(agents: readonly T[] | undefined, environmentId: string) {
+  return (agents ?? []).filter((agent) => agent.status !== "terminated" && agent.defaultEnvironmentId === environmentId);
+}
+
+/** Where those agents can move: another active, non-local environment; or the default (`null`). */
+export function reassignTargets(environments: readonly Environment[] | undefined, environmentId: string) {
+  return (environments ?? []).filter((environment) => environment.id !== environmentId && environment.status === "active" && environment.driver !== "local");
+}
+
+/** Agents it can't name (other organizations, terminated ones) when the server counts more. */
+export function unlistedAgentCount(radius: EnvironmentDeleteBlastRadius, listed: number) {
+  return Math.max(0, radius.staticReferences.agentDefaultCount - listed);
 }
 
 // ---------------------------------------------------------------------------------------------

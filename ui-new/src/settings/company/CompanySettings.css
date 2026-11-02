@@ -532,6 +532,100 @@
   grid-column: 1 / -1;
 }
 
+/* Secrets: the folder bar above the table. */
+.cs-folder-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.cs-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cs-crumbs .cs-link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.cs-crumbs [aria-current="page"] {
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.cs-folder-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.cs-folder-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cs-folder-link:hover .cs-strong {
+  text-decoration: underline;
+}
+
+/* Import: files by folder, harnesses, values. */
+.cs-import-files {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 24px;
+  font-size: 12px;
+}
+
+.cs-disclose svg {
+  transition: transform 0.15s ease;
+}
+
+.cs-disclose--open svg {
+  transform: rotate(90deg);
+}
+
+.cs-harness-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.cs-harness-row > .cs-person-text {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cs-disclose svg {
+    transition: none;
+  }
+}
+
 .cs-access-log {
   gap: 12px;
 }
@@ -543,6 +637,14 @@
 @media (max-width: 640px) {
   .cs-import-names {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cs-harness-row {
+    flex-wrap: wrap;
+  }
+
+  .cs-harness-row > select {
+    width: 100%;
   }
 }
 
