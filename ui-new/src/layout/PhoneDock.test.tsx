@@ -14,7 +14,16 @@ const companies = [
 
 vi.mock("@/inbox/needs-you", () => ({ useNeedsYouCount: () => () => 3 }));
 
+const experimental = { enableStatusCards: false };
+const unread = { count: 0 };
+
+vi.mock("@/chat/chat-read", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/chat/chat-read")>()),
+  useUnreadChats: () => ({ agentIds: () => new Set<string>(), has: () => false, count: () => unread.count }),
+}));
+
 vi.mock("@/lib/company-data", () => ({
+  useExperimentalSettingsQuery: () => ({ data: experimental }),
   useAgentsQuery: () => ({ data: [{ id: "a1", name: "Quill", status: "idle", urlKey: "quill" }] }),
   useLiveRunsQuery: () => ({ data: [] }),
   useProjectsQuery: () => ({
@@ -67,7 +76,35 @@ function renderDock(path: string) {
 }
 
 describe("PhoneDock", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    experimental.enableStatusCards = false;
+    unread.count = 0;
+  });
+
+  it("marks Agents while a chat has messages you haven't read", () => {
+    renderDock("/TST/inbox");
+    expect(screen.getByRole("link", { name: "Agents" }).querySelector(".ch-unread")).toBeNull();
+    cleanup();
+    unread.count = 2;
+    renderDock("/TST/inbox");
+    const agents = screen.getByRole("link", { name: "Agents, 2 unread chats" });
+    expect(agents.querySelector(".ch-unread")).not.toBeNull();
+  });
+
+  it("adds Status after Inbox while status cards are on", () => {
+    renderDock("/TST/inbox");
+    expect(screen.queryByRole("link", { name: "Status" })).toBeNull();
+    cleanup();
+    experimental.enableStatusCards = true;
+    renderDock("/TST/status/c1");
+    const links = screen.getAllByRole("link").map((link) => link.getAttribute("aria-label"));
+    expect(links.slice(0, 3)).toEqual(["Inbox, 3 need you", "Status", "Tasks"]);
+    const status = screen.getByRole("link", { name: "Status" });
+    expect(status.getAttribute("href")).toBe("/TST/status");
+    expect(status.getAttribute("aria-current")).toBe("page");
+    expect(status.textContent).toContain("Status");
+  });
 
   it("is a labelled nav that marks the current place and names the others", () => {
     renderDock("/TST/inbox");

@@ -33,6 +33,8 @@ describe("dockPlace", () => {
     expect(dockPlace("/TST/projects/trading/issues/TST-41", "TST")).toBe("tasks");
     expect(dockPlace("/TST/agents", "TST")).toBe("agents");
     expect(dockPlace("/TST/agents/ceo/chat", "TST")).toBe("agents");
+    expect(dockPlace("/TST/status", "TST")).toBe("status");
+    expect(dockPlace("/TST/status/8f1d8233", "TST")).toBe("status");
   });
 
   it("leaves pages outside the three places with none", () => {

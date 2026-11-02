@@ -156,6 +156,43 @@ export function summaryUpdates(updates: readonly StatusCardUpdate[]): StatusCard
   return updates.filter((update) => update.status === "ok" && update.finishedAt && (update.kind === "full" || update.kind === "incremental"));
 }
 
+/**
+ * Ledger rows that should show their run's usage instead. The server copies a run's tokens and cost
+ * into the ledger when the agent writes the card, which is before the run reports them, so a
+ * finished row can read 0 tokens and $0.00 although the run spent (seen with the Paperclip Runner).
+ * One run often writes two rows (the query build and the first summary): its usage goes on the
+ * newest of them, once.
+ */
+export function rowsShowingRunUsage(updates: readonly StatusCardUpdate[]): Map<string, string> {
+  const byRow = new Map<string, string>();
+  const seen = new Set<string>();
+  for (const update of updates) {
+    if (!update.runId || seen.has(update.runId)) continue;
+    seen.add(update.runId);
+    if (update.status !== "running" && update.inputTokens + update.outputTokens === 0 && update.costCents === 0) byRow.set(update.id, update.runId);
+  }
+  return byRow;
+}
+
+/** A run's usage (`usageJson`), as History shows it: "Its run: 25.2k in / 3.2k out · 315k cached · cost not reported". */
+export function runUsageLine(usage: Record<string, unknown> | null | undefined): string | null {
+  if (!usage) return null;
+  const num = (key: string) => (typeof usage[key] === "number" ? (usage[key] as number) : 0);
+  const input = num("inputTokens");
+  const output = num("outputTokens");
+  if (input + output === 0) return null;
+  const cached = num("cachedInputTokens");
+  const cost = typeof usage.costUsd === "number" ? (usage.costUsd as number) : null;
+  const subscription = usage.billingType === "subscription_included";
+  return [
+    `Its run: ${formatTokenSplit(input, output)}`,
+    cached > 0 ? `${formatTokens(cached)?.replace(" tok", "")} cached` : null,
+    cost !== null ? formatCents(cost * 100) : subscription ? "on a subscription, no cost reported" : "cost not reported",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 // ---------------------------------------------------------------------------------------------
 // The dry run
 

@@ -5,7 +5,9 @@ import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Field, TextArea } from "@/ui/Field";
-import { AgentPicker } from "./AgentPicker";
+import { useCardAgentChecks } from "./agent-checks";
+import { AgentNotice, AgentPicker } from "./AgentPicker";
+import { blocksCreate } from "./card-agent-model";
 import { useRefreshCards } from "./queries";
 import { defaultPolicy, isSummarizerMissing } from "./status-model";
 
@@ -15,9 +17,11 @@ import { defaultPolicy, isSummarizerMissing } from "./status-model";
  * starts the setup at once (the agent builds the query, then the first summary). New cards update
  * manually until their settings say otherwise.
  *
- * Without a chosen agent the company's built-in Summarizer runs the card. When it isn't set up
- * (built-in agents are a separate experimental setting) the server refuses the card; the dialog
- * then asks for an agent.
+ * Without a chosen agent the company's built-in Summarizer runs the card. The server refuses the
+ * card unless the Summarizer is set up and ready (built-in agents are a separate experimental
+ * setting), so the dialog says so before Create, offers to set it up, and holds Create back; the
+ * same goes for an agent that can never write a card. Other problems (a paused agent, a harness
+ * without a run key) are warnings: the card can be created, and waits (card-agent-model.ts).
  */
 
 const EXAMPLES = ["Tasks about evals", "Everything blocked this week", "Is the new sign-in flow live? If not, the next three steps to ship it"];
@@ -29,6 +33,9 @@ export function NewCardDialog(props: { open: boolean; onOpenChange: (open: boole
   const [agentId, setAgentId] = createSignal("");
   const [error, setError] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
+  const checks = useCardAgentChecks();
+  const agentCheck = () => checks.check(agentId());
+  const blocked = () => blocksCreate(agentCheck());
   let promptField: HTMLTextAreaElement | undefined;
 
   const close = () => {
@@ -40,7 +47,7 @@ export function NewCardDialog(props: { open: boolean; onOpenChange: (open: boole
 
   const create = async (event?: Event) => {
     event?.preventDefault();
-    if (!prompt().trim() || busy()) return;
+    if (!prompt().trim() || busy() || blocked()) return;
     setBusy(true);
     setError(null);
     try {
@@ -79,7 +86,7 @@ export function NewCardDialog(props: { open: boolean; onOpenChange: (open: boole
           <Button variant="quiet" onClick={close} disabled={busy()}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={!prompt().trim() || busy()} onClick={() => void create()}>
+          <Button variant="primary" disabled={!prompt().trim() || busy() || blocked()} onClick={() => void create()}>
             {busy() ? "Creating…" : "Create card"}
           </Button>
         </>
@@ -112,6 +119,7 @@ export function NewCardDialog(props: { open: boolean; onOpenChange: (open: boole
         <Field label="Agent" for="sc-new-agent" help="Runs the card's setup and updates. Each run is a real agent run and costs tokens.">
           <AgentPicker id="sc-new-agent" value={agentId()} onChange={setAgentId} />
         </Field>
+        <AgentNotice agentId={agentId()} check={agentCheck()} />
         <Show when={error()}>
           <p class="field-error" role="alert">
             {error()}

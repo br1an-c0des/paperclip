@@ -150,6 +150,10 @@
   white-space: nowrap;
 }
 
+.sc-banner-text svg {
+  flex-shrink: 0;
+}
+
 .sc-tile-body {
   position: relative;
   flex: 1;
@@ -667,4 +671,49 @@
 .sc-menu-note {
   padding: 8px 12px;
   font-size: 13px;
+}
+
+/* What stands in the way of the chosen agent writing the card (AgentPicker.tsx, AgentNotice) */
+.sc-agent-notice {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.sc-agent-notice--blocked {
+  background: var(--red-bg);
+  color: var(--red-fg);
+}
+
+.sc-agent-notice-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.sc-agent-notice-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sc-agent-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.sc-agent-notice-link {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

@@ -18,6 +18,8 @@ import {
   policyLabel,
   rollupAll,
   rollupToday,
+  rowsShowingRunUsage,
+  runUsageLine,
   setupRunning,
   summaryUpdates,
   withMode,
@@ -160,5 +162,32 @@ describe("live events", () => {
     expect(keysForEvent("c1", event)).toContainEqual(queryKeys.statusCards.all);
     expect(queryKeys.statusCards.detail("s1").slice(0, 1)).toEqual([...queryKeys.statusCards.all]);
     expect(queryKeys.statusCards.list("c1", true).slice(0, 1)).toEqual([...queryKeys.statusCards.all]);
+  });
+});
+
+describe("run usage for ledger rows without it", () => {
+  it("puts a run's usage on its newest row that has none, once per run", () => {
+    const rows = [
+      update({ id: "u3", runId: "r2", inputTokens: 0, outputTokens: 0, costCents: 0 }),
+      update({ id: "u2", runId: "r1", kind: "full", inputTokens: 0, outputTokens: 0, costCents: 0 }),
+      update({ id: "u1", runId: "r1", kind: "compile", inputTokens: 0, outputTokens: 0, costCents: 0 }),
+      update({ id: "u0", runId: "r0" }),
+      update({ id: "u-1", runId: null, inputTokens: 0, outputTokens: 0, costCents: 0 }),
+      update({ id: "u-2", runId: "r3", status: "running", inputTokens: 0, outputTokens: 0, costCents: 0 }),
+    ];
+    expect([...rowsShowingRunUsage(rows)]).toEqual([
+      ["u3", "r2"],
+      ["u2", "r1"],
+    ]);
+  });
+
+  it("says what the run reported, and why there's no cost", () => {
+    expect(runUsageLine({ inputTokens: 25248, outputTokens: 3221, cachedInputTokens: 314692, costUsd: null, billingType: "subscription_included" })).toBe(
+      "Its run: 25.2k in / 3.2k out · 314.7k cached · on a subscription, no cost reported",
+    );
+    expect(runUsageLine({ inputTokens: 900, outputTokens: 300, costUsd: 0.0123 })).toBe("Its run: 900 in / 300 out · $0.012");
+    expect(runUsageLine({ inputTokens: 900, outputTokens: 300 })).toBe("Its run: 900 in / 300 out · cost not reported");
+    expect(runUsageLine({ inputTokens: 0, outputTokens: 0 })).toBeNull();
+    expect(runUsageLine(null)).toBeNull();
   });
 });

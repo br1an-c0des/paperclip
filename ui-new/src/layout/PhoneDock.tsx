@@ -2,20 +2,24 @@ import { useLocation, useNavigate } from "@solidjs/router";
 import { ChevronUp, Plus } from "lucide-solid";
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from "solid-js";
 import { activeAgents } from "@/api/agents";
+import { ChatUnreadDot, useUnreadChats } from "@/chat/chat-read";
 import { agentState, runningAgentIds } from "@/lib/agent-state";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useNeedsYouCount } from "@/inbox/needs-you";
-import { useAgentsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
+import { useAgentsQuery, useExperimentalSettingsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
 import { InitialsDisc } from "@/ui/Avatar";
 import { dockHiddenAfterScroll, dockPlace, tapTasks, tasksScope, type SheetView } from "./dock-model";
-import { AgentsIcon, InboxIcon, TasksIcon } from "./dock-icons";
+import { AgentsIcon, InboxIcon, StatusIcon, TasksIcon } from "./dock-icons";
+import { showStatusLink } from "./nav-model";
 import { TasksSheet } from "./TasksSheet";
 import "./PhoneDock.css";
 
 /*
  * The phone's navigation (design/mobile.md, N1, "Floating dock"): one pill at the foot of the
- * screen with Inbox (and its count), Tasks and Agents, and a 56px New task button beside it. Only
+ * screen with Inbox (and its count), Tasks and Agents, and a 56px New task button beside it; Status
+ * (status cards) joins them after Inbox while the instance has them on, as in the desktop nav. Agents
+ * carries a dot while a chat with an agent has messages you haven't read (chat-read.tsx). Only
  * the current place shows its label; the others are icons with their name for screen readers. The
  * dock slides away while you scroll down and comes back when you scroll up, or when it has focus.
  *
@@ -32,6 +36,8 @@ export function PhoneDock() {
   const agents = useAgentsQuery();
   const liveRuns = useLiveRunsQuery();
   const projects = useProjectsQuery();
+  const experimental = useExperimentalSettingsQuery();
+  const showStatus = () => showStatusLink(experimental.data);
 
   const base = () => `/${company().issuePrefix}`;
   const place = () => dockPlace(location.pathname, company().issuePrefix);
@@ -43,6 +49,15 @@ export function PhoneDock() {
   });
 
   const inboxCount = () => needsYou() ?? 0;
+  const unreadChats = useUnreadChats();
+  const agentsLabel = () =>
+    [
+      "Agents",
+      running() > 0 ? `${running()} running` : null,
+      unreadChats.count() > 0 ? `${unreadChats.count()} unread ${unreadChats.count() === 1 ? "chat" : "chats"}` : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
   const running = createMemo(() => {
     const ids = runningAgentIds(liveRuns.data);
     return activeAgents(agents.data).filter((agent) => agentState(agent, ids).key === "running").length;
@@ -152,7 +167,7 @@ export function PhoneDock() {
         />
       </Show>
       <div class="pdock-bar">
-        <nav class="pdock-pill" aria-label="Main">
+        <nav class="pdock-pill" aria-label="Main" data-places={showStatus() ? 4 : 3}>
           <a
             class="pdock-item"
             href={`${base()}/inbox`}
@@ -169,6 +184,14 @@ export function PhoneDock() {
               </span>
             </Show>
           </a>
+          <Show when={showStatus()}>
+            <a class="pdock-item" href={`${base()}/status`} aria-current={place() === "status" ? "page" : undefined} aria-label="Status">
+              <StatusIcon />
+              <Show when={place() === "status"}>
+                <span class="pdock-label">Status</span>
+              </Show>
+            </a>
+          </Show>
           <Show
             when={place() === "tasks"}
             fallback={
@@ -208,9 +231,16 @@ export function PhoneDock() {
             class="pdock-item"
             href={`${base()}/agents`}
             aria-current={place() === "agents" ? "page" : undefined}
-            aria-label={running() > 0 ? `Agents, ${running()} running` : "Agents"}
+            aria-label={agentsLabel()}
           >
-            <AgentsIcon />
+            <span class="pdock-icon">
+              <AgentsIcon />
+              <Show when={unreadChats.count() > 0}>
+                <span class="pdock-unread" aria-hidden="true">
+                  <ChatUnreadDot />
+                </span>
+              </Show>
+            </span>
             <Show when={place() === "agents"}>
               <span class="pdock-label">Agents</span>
             </Show>

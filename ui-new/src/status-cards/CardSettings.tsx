@@ -10,7 +10,7 @@ import { Segmented } from "@/ui/Segmented";
 import { Switch } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
 import { Tooltip } from "@/ui/Tooltip";
-import { AgentPicker } from "./AgentPicker";
+import { AgentNotice, AgentPicker } from "./AgentPicker";
 import { useRefreshCards } from "./queries";
 import {
   DEBOUNCE_OPTIONS,
@@ -113,6 +113,7 @@ export function CardSettings(props: { card: StatusCard; onDeleted: () => void })
       <Field label="Agent" for="sc-agent" help="Runs the card's setup and updates.">
         <AgentPicker id="sc-agent" value={agentId()} onChange={setAgentId} />
       </Field>
+      <AgentNotice agentId={agentId()} />
 
       <fieldset class="sc-fieldset">
         <legend class="field-label">Updates</legend>
