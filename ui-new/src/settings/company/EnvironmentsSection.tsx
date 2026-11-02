@@ -342,7 +342,7 @@ function DeleteEnvironmentDialog(props: { environment: Environment | null; envir
               </Show>
               <Show when={found().allowed && unlisted() > 0}>
                 <p class="cs-muted">
-                  {unlisted() === 1 ? "One other agent" : `${unlisted()} other agents`} (in other organizations, or terminated) fall back to the instance default.
+                  {unlisted() === 1 ? "One other agent (in another organization, or terminated) falls" : `${unlisted()} other agents (in other organizations, or terminated) fall`} back to the instance default.
                 </p>
               </Show>
             </>

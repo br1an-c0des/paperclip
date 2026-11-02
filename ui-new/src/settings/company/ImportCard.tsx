@@ -548,7 +548,9 @@ function ImportFiles(props: { paths: readonly string[]; checked: ReadonlySet<str
                           onChange={(event) => set(group.paths, event.currentTarget.checked)}
                         />
                         <span class="cs-person-text">
-                          <span class="cs-strong mono">{group.label}</span>
+                          <span class="cs-strong" classList={{ mono: group.key !== "" }}>
+                            {group.label}
+                          </span>
                           <span class="cs-muted">
                             {picked()} of {group.paths.length}
                           </span>

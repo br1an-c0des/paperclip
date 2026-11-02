@@ -79,7 +79,7 @@ export function deleteSummary(radius: EnvironmentDeleteBlastRadius, destroyLease
   count(refs.issueSelectionCount, "task uses it", "tasks use it");
   count(refs.executionWorkspaceSelectionCount, "workspace uses it", "workspaces use it");
   count(refs.secretBindingCount, "secret is bound to it", "secrets are bound to it");
-  if (leaseOnly) lines.push(`${reusableLeaseLine(radius)} They're destroyed with it.`);
+  if (leaseOnly) lines.push(`${reusableLeaseLine(radius)} ${(radius.reusableSandboxLeaseCount || radius.reusableSandboxLeaseHolders?.length || 0) === 1 ? "It's" : "They're"} destroyed with it.`);
   if (radius.activeRuntimeUse.hasActiveRuntimeUse) lines.push("It's in use right now.");
   return { allowed: true, lines, leaseConsent: leaseOnly };
 }
