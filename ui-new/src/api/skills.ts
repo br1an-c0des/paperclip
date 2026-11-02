@@ -6,6 +6,7 @@ import type {
   CompanySkillDetail,
   CompanySkillFileDeleteResult,
   CompanySkillFileDetail,
+  CompanySkillFileUpdateRequest,
   CompanySkillForkPrecheckResult,
   CompanySkillForkRequest,
   CompanySkillForkResult,
@@ -20,6 +21,7 @@ import type {
   CompanySkillStarResult,
   CompanySkillUpdateStatus,
   CompanySkillVersion,
+  CompanySkillVersionCreateRequest,
   CompanySkillVersionSummary,
   Folder,
   FolderListResult,
@@ -73,12 +75,15 @@ export const skillsApi = {
     api.get<CompanySkillVersionSummary[]>(`${skill(companyId, skillId)}/versions`, { signal }),
   version: (companyId: string, skillId: string, versionId: string, signal?: AbortSignal) =>
     api.get<CompanySkillVersion>(`${skill(companyId, skillId)}/versions/${encodeURIComponent(versionId)}`, { signal }),
-  /** Names the skill's current files as a version. */
-  createVersion: (companyId: string, skillId: string, label: string | null) =>
-    api.post<CompanySkillVersion>(`${skill(companyId, skillId)}/versions`, { label }),
+  /**
+   * Names the skill's current files as a version. For a managed skill, `sourceVersionId` restores
+   * that version instead; `expectedVersionId` refuses the write (409) if the skill changed meanwhile.
+   */
+  createVersion: (companyId: string, skillId: string, label: string | null, options: Omit<CompanySkillVersionCreateRequest, "label"> = {}) =>
+    api.post<CompanySkillVersion>(`${skill(companyId, skillId)}/versions`, { label, ...options }),
   file: (companyId: string, skillId: string, path: string, signal?: AbortSignal) =>
     api.get<CompanySkillFileDetail>(`${skill(companyId, skillId)}/files?path=${encodeURIComponent(path)}`, { signal }),
-  saveFile: (companyId: string, skillId: string, path: string, content: string, format: Pick<CompanySkillFileDetail, "encoding" | "executable"> = {}) =>
+  saveFile: (companyId: string, skillId: string, path: string, content: string, format: Pick<CompanySkillFileUpdateRequest, "encoding" | "executable" | "expectedVersionId"> = {}) =>
     api.patch<CompanySkillFileDetail>(`${skill(companyId, skillId)}/files`, { path, content, ...format }),
   deleteFile: (companyId: string, skillId: string, path: string) =>
     api.delete<CompanySkillFileDeleteResult>(`${skill(companyId, skillId)}/files`, { path, target: "file" }),

@@ -14,6 +14,7 @@ import { Field, TextArea, TextInput } from "@/ui/Field";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { failureText, useRefreshSkills, useSkillDetail, useSkillList, useSkillVersions } from "./queries";
+import { restoreReplacesFiles, restoreSkillVersion } from "./restore";
 import { CompareVersionsDialog } from "./SkillActions";
 import { OriginPill, whenLabel } from "./SkillLibrary";
 import { createPayload, draftProblem, newFileProblem, skillOrigin, slugFor, sortedFiles, versionName, type SkillDraft } from "./skills-model";
@@ -27,8 +28,9 @@ import { createPayload, draftProblem, newFileProblem, skillOrigin, slugFor, sort
  * - A skill (`/studio/:skillId`) edits its files: SKILL.md and any others, in the document editor,
  *   saved with Save or Ctrl/Cmd+S (`PATCH …/files`; the server keeps a version of each change). New
  *   files and deleting them (`DELETE …/files`). "Save version" names the current files as a version
- *   (`POST …/versions`); Restore writes an earlier version's files back and saves that as a new
- *   version, as the old Studio does. Deleting the skill removes it from every agent.
+ *   (`POST …/versions`); Restore saves an earlier version as a new one, as the old Studio does: one
+ *   `POST …/versions` with `sourceVersionId` for a managed skill, or its files written back for a
+ *   linked local one (restore.ts). Deleting the skill removes it from every agent.
  *
  * Compare opens two versions side by side (SkillActions.tsx). Bundled and imported skills are
  * read-only here; fork one from the library to edit a copy. Not ported: test runs and their inputs
@@ -286,12 +288,7 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
 
   const restore = async (version: CompanySkillVersionSummary) => {
     try {
-      // The versions list names the files only; read the version for their contents.
-      const full = await skillsApi.version(company().id, props.skill.id, version.id);
-      for (const entry of full.fileInventory) {
-        await skillsApi.saveFile(company().id, props.skill.id, entry.path, entry.content, { encoding: entry.encoding, executable: entry.executable ?? false });
-      }
-      await skillsApi.createVersion(company().id, props.skill.id, `Restore of v${version.revisionNumber}`);
+      await restoreSkillVersion(skillsApi, company().id, props.skill, version);
       setDraft(null);
       void client.invalidateQueries({ queryKey: queryKeys.skills.detail(company().id, props.skill.id) });
       refreshSkills();
@@ -484,7 +481,11 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
         open={restoring() !== null}
         onOpenChange={(value) => !value && setRestoring(null)}
         title={`Restore v${restoring()?.revisionNumber ?? ""}?`}
-        body="Its files are written back over the current ones and saved as a new version. Files added since stay."
+        body={
+          restoreReplacesFiles(props.skill)
+            ? "The skill's files are set back to this version's and saved as a new version. Files added since are removed."
+            : "Its files are written back over the current ones and saved as a new version. Files added since stay."
+        }
         confirmLabel="Restore"
         onConfirm={async () => {
           const version = restoring();
