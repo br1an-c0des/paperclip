@@ -83,20 +83,6 @@ export function importTarget(
     : { target: { mode: "existing_company", companyId }, collisionStrategy: collision };
 }
 
-/**
- * The files to import into this organization. As in the old page, the package's company file
- * (its name, description and settings) is left out unless asked for, so a merge doesn't rename or
- * redescribe this organization. Undefined means every file.
- */
-export function importedFiles(preview: CompanyPortabilityPreviewResult, updateDetails: boolean): string[] | undefined {
-  const companyPath = preview.manifest.company?.path;
-  if (updateDetails || preview.plan.companyAction !== "update" || !companyPath) return undefined;
-  const skip = companyPath.endsWith(".md") ? companyPath : `${companyPath}.md`;
-  return Object.keys(preview.files)
-    .filter((path) => path !== skip)
-    .sort();
-}
-
 // ---------------------------------------------------------------------------------------------
 // Resumable transfers for large packages (ui/src/lib/import-transfer.ts)
 

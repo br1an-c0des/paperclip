@@ -1,26 +1,40 @@
 import type { Environment, EnvironmentDeleteBlastRadius, EnvironmentProbeResult } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Ellipsis, Plus, Server } from "lucide-solid";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
 import { createStore } from "solid-js/store";
+import { agentsApi } from "@/api/agents";
 import { environmentsApi } from "@/api/environments";
 import { instanceSettingsApi } from "@/api/instance-settings";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
+import { Field } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { EnvironmentDialog, type EnvironmentEdit } from "./EnvironmentDialog";
-import { defaultPatchId, deleteSummary, driverLabel, effectiveDefaultId, environmentSummary, isManaged, sortEnvironments } from "./environments-model";
+import {
+  agentsOnEnvironment,
+  defaultPatchId,
+  deleteSummary,
+  driverLabel,
+  effectiveDefaultId,
+  environmentSummary,
+  isManaged,
+  reassignTargets,
+  sortEnvironments,
+  unlistedAgentCount,
+} from "./environments-model";
 import { CardHead, CardNoteLine, failure, OutlineCard, SectionTitle } from "./shared";
 
 /*
  * Environments (board 30's outline): where this organization's agents run. The API is per company,
  * so this moved here from instance settings. Each environment can be probed (what it can do, and on
- * a sandbox the qualification the Paperclip Runner needs), archived or restored, and deleted once
- * nothing depends on it. The default is the instance's (`PATCH /instance/settings`), so making one
+ * a sandbox the qualification the Paperclip Runner needs), archived or restored, and deleted: this
+ * organization's agents that run there move to another environment first, and sandboxes kept for
+ * reuse are destroyed with it when the person agrees. The default is the instance's (`PATCH /instance/settings`), so making one
  * the default reaches every organization; the section says so where it's shown and set.
  *
  * New environment and Edit open a dialog (EnvironmentDialog.tsx): an SSH host or a sandbox
@@ -200,33 +214,79 @@ export function EnvironmentsSection() {
         was="Instance settings → Environments"
       />
       <EnvironmentDialog edit={editing()} onClose={() => setEditing(null)} onSaved={refresh} />
-      <DeleteEnvironmentDialog environment={deleting()} onClose={() => setDeleting(null)} onDeleted={refresh} />
+      <DeleteEnvironmentDialog environment={deleting()} environments={environments.data ?? []} onClose={() => setDeleting(null)} onDeleted={refresh} />
     </>
   );
 }
 
-function DeleteEnvironmentDialog(props: { environment: Environment | null; onClose: () => void; onDeleted: () => Promise<unknown> }) {
+/**
+ * Delete, after checking what depends on it (`GET /environments/:id/delete-blast-radius`). This
+ * organization's agents that run there by default can move to another environment first (one
+ * `PATCH /agents/:id` each, so their config history records it), as the old page does; without a
+ * pick they fall back to the instance default. Sandboxes kept for reuse block a delete unless the
+ * person agrees to destroy them with it.
+ */
+function DeleteEnvironmentDialog(props: { environment: Environment | null; environments: readonly Environment[]; onClose: () => void; onDeleted: () => Promise<unknown> }) {
+  const company = useCompany();
+  const client = useQueryClient();
   const radius = createQuery(() => ({
     queryKey: ["environments", "delete-blast-radius", props.environment?.id ?? ""],
     queryFn: ({ signal }) => environmentsApi.deleteBlastRadius(props.environment!.id, signal),
     enabled: !!props.environment,
     staleTime: 0,
   }));
+  const agents = createQuery(() => ({
+    queryKey: queryKeys.agents.list(company().id),
+    queryFn: () => agentsApi.list(company().id),
+    enabled: !!props.environment,
+  }));
   const [busy, setBusy] = createSignal(false);
-  const summary = () => (radius.data ? deleteSummary(radius.data as EnvironmentDeleteBlastRadius) : null);
+  const [destroyLeases, setDestroyLeases] = createSignal(false);
+  const [target, setTarget] = createSignal("");
+  createEffect(
+    on(
+      () => props.environment?.id,
+      () => {
+        setDestroyLeases(false);
+        setTarget("");
+      },
+    ),
+  );
+  const summary = () => (radius.data ? deleteSummary(radius.data as EnvironmentDeleteBlastRadius, destroyLeases()) : null);
+  const moving = createMemo(() => (props.environment ? agentsOnEnvironment(agents.data, props.environment.id) : []));
+  const targets = createMemo(() => (props.environment ? reassignTargets(props.environments, props.environment.id) : []));
+  const unlisted = () => (radius.data ? unlistedAgentCount(radius.data as EnvironmentDeleteBlastRadius, moving().length) : 0);
 
   const remove = async () => {
     const environment = props.environment;
     if (!environment) return;
     setBusy(true);
+    let moved = 0;
     try {
-      await environmentsApi.remove(environment.id);
+      // Move first: a failure part-way leaves the moved agents on their new environment.
+      for (const agent of moving()) {
+        await agentsApi.update(agent.id, { defaultEnvironmentId: target() || null }, company().id);
+        moved += 1;
+      }
+      const result = await environmentsApi.remove(environment.id, { destroyReusableSandboxLeases: destroyLeases() });
       await props.onDeleted();
-      pushToast({ tone: "success", title: `Deleted ${environment.name}` });
+      const destroyed = result?.destroyedReusableSandboxLeaseCount ?? 0;
+      pushToast({
+        tone: "success",
+        title: `Deleted ${environment.name}`,
+        body: [
+          moved ? `${moved === 1 ? "1 agent" : `${moved} agents`} moved to ${targets().find((entry) => entry.id === target())?.name ?? "the default"}.` : null,
+          destroyed ? `Destroyed ${destroyed === 1 ? "1 sandbox" : `${destroyed} sandboxes`} kept for reuse.` : null,
+        ]
+          .filter(Boolean)
+          .join(" ") || undefined,
+      });
       props.onClose();
     } catch (caught) {
-      pushToast({ tone: "error", title: "Couldn't delete the environment", body: failure(caught, "") || undefined });
+      pushToast({ tone: "error", title: "Couldn't delete the environment", body: [failure(caught, ""), moved ? `${moved} agents were moved before it stopped.` : null].filter(Boolean).join(" ") || undefined });
+      void radius.refetch();
     } finally {
+      if (moved) void client.invalidateQueries({ queryKey: queryKeys.agents.list(company().id) });
       setBusy(false);
     }
   };
@@ -234,17 +294,17 @@ function DeleteEnvironmentDialog(props: { environment: Environment | null; onClo
   return (
     <Dialog
       open={!!props.environment}
-      onOpenChange={(open) => !open && props.onClose()}
+      onOpenChange={(open) => !open && !busy() && props.onClose()}
       title={`Delete ${props.environment?.name ?? ""}?`}
-      width={460}
+      width={500}
       hideClose
       footer={
         <>
           <Button variant="quiet" disabled={busy()} onClick={props.onClose}>
             Cancel
           </Button>
-          <Button variant="danger" disabled={busy() || !summary()?.allowed} onClick={() => void remove()}>
-            {busy() ? "Deleting…" : "Delete"}
+          <Button variant="danger" disabled={busy() || !summary()?.allowed || agents.isPending} onClick={() => void remove()}>
+            {busy() ? "Deleting…" : moving().length ? `Move ${moving().length === 1 ? "1 agent" : `${moving().length} agents`} and delete` : "Delete"}
           </Button>
         </>
       }
@@ -258,6 +318,32 @@ function DeleteEnvironmentDialog(props: { environment: Environment | null; onClo
                 <ul class="cs-bullets">
                   <For each={found().lines}>{(line) => <li>{line}</li>}</For>
                 </ul>
+              </Show>
+              <Show when={found().leaseConsent}>
+                <label class="cs-import-pick">
+                  <input type="checkbox" checked={destroyLeases()} disabled={busy()} onChange={(event) => setDestroyLeases(event.currentTarget.checked)} />
+                  <span>Destroy the sandboxes kept for reuse. Work left in them is lost.</span>
+                </label>
+              </Show>
+              <Show when={found().allowed && moving().length > 0}>
+                <Field
+                  label={`Move ${moving().length === 1 ? "its agent" : `its ${moving().length} agents`} to`}
+                  for="cs-env-reassign"
+                  help={`${moving()
+                    .map((agent) => agent.name)
+                    .slice(0, 4)
+                    .join(", ")}${moving().length > 4 ? "…" : ""} run here by default.`}
+                >
+                  <select id="cs-env-reassign" class="input" value={target()} disabled={busy()} onChange={(event) => setTarget(event.currentTarget.value)}>
+                    <option value="">The instance default</option>
+                    <For each={targets()}>{(environment) => <option value={environment.id}>{environment.name}</option>}</For>
+                  </select>
+                </Field>
+              </Show>
+              <Show when={found().allowed && unlisted() > 0}>
+                <p class="cs-muted">
+                  {unlisted() === 1 ? "One other agent (in another organization, or terminated) falls" : `${unlisted()} other agents (in other organizations, or terminated) fall`} back to the instance default.
+                </p>
               </Show>
             </>
           )}

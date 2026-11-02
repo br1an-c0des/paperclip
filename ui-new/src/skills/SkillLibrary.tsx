@@ -1,6 +1,6 @@
 import type { CompanySkillDetail, CompanySkillListItem, FolderListItem } from "@paperclipai/shared";
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
-import { BookOpen, ChevronDown, FileText, FolderSearch, GitBranch, GitFork, Link, Pencil, Plus, Search, Star, X } from "lucide-solid";
+import { BookOpen, ChevronDown, FileText, FolderSearch, GitBranch, GitFork, Link, Pencil, Plus, Search, Settings2, Star, X } from "lucide-solid";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { PickMenu } from "@/activity/PickMenu";
 import { PAPERCLIP_CORE_SKILL_KEY } from "@/agents/agent-model";
@@ -15,7 +15,7 @@ import { Markdown } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
 import { TonePill, type Tone } from "@/ui/Status";
 import { useSkillDetail, useSkillFile, useSkillFolders, useSkillList, useSkillVersions } from "./queries";
-import { CompareVersionsDialog, ForkDialog, StarButton, UpdateBlock } from "./SkillActions";
+import { AuditBlock, CompareVersionsDialog, ForkDialog, SkillSettingsDialog, StarButton, UpdateBlock } from "./SkillActions";
 import { FolderMenu, MoveToFolder } from "./SkillFolders";
 import { ImportDialog, ScanProjectsDialog } from "./SkillImport";
 import {
@@ -52,8 +52,9 @@ import {
  *
  * Opening a skill (`/skills/:skillId`) shows its detail beside the list: what it's for, the agents
  * using it (`GET /skills/:id`, `usedByAgents`), the lead agents without a core skill, its source,
- * update status, forks, versions (compared in a dialog) and files. Star, Fork and its folder sit
- * under the title (SkillActions.tsx). Skills are turned on per agent in the agent's Skills
+ * update status, the safety check, forks, versions (compared in a dialog) and files. Star, Fork,
+ * Settings (name, description, tagline, categories, author, who sees it) and its folder sit under
+ * the title (SkillActions.tsx). Skills are turned on per agent in the agent's Skills
  * settings, which the agent links lead there; authored skills open in the Studio for editing.
  */
 
@@ -218,6 +219,7 @@ function SkillDetail(props: { skillId: string; closeHref: string; folders: reado
   const agents = useAgentsQuery();
   const [file, setFile] = createSignal<string | null>(null);
   const [forking, setForking] = createSignal(false);
+  const [setting, setSetting] = createSignal(false);
   const [comparing, setComparing] = createSignal<{ targetId: string | null } | null>(null);
 
   const agentKey = (id: string) => agents.data?.find((agent) => agent.id === id)?.urlKey ?? id;
@@ -262,8 +264,14 @@ function SkillDetail(props: { skillId: string; closeHref: string; folders: reado
                   <Button size="compact" icon={<GitFork size={14} aria-hidden="true" />} onClick={() => setForking(true)}>
                     Fork
                   </Button>
+                  <Button size="compact" icon={<Settings2 size={14} aria-hidden="true" />} onClick={() => setSetting(true)}>
+                    Settings
+                  </Button>
                   <MoveToFolder skillId={skill().id} folderId={skill().folderId} folderPath={skill().folderPath} folders={props.folders} />
                 </div>
+                <Show when={skill().tagline}>
+                  <p class="sk-tagline">{skill().tagline}</p>
+                </Show>
                 <Show when={skill().description}>
                   <p class="sk-desc">{skill().description}</p>
                 </Show>
@@ -340,6 +348,24 @@ function SkillDetail(props: { skillId: string; closeHref: string; folders: reado
                       <dt>Categories</dt>
                       <dd>{skill().categories.join(", ")}</dd>
                     </Show>
+                    <dt>Seen by</dt>
+                    <dd>{skill().accessSourceId ? "Its project's agents" : skill().sharingScope === "private" ? "Only you" : "The organization"}</dd>
+                    <Show when={skill().authorName || skill().homepageUrl}>
+                      <dt>Author</dt>
+                      <dd>
+                        {skill().authorName}
+                        <Show when={skill().homepageUrl}>
+                          {(url) => (
+                            <>
+                              {skill().authorName ? " · " : ""}
+                              <a class="org-link" href={url()} target="_blank" rel="noreferrer">
+                                {url().replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                              </a>
+                            </>
+                          )}
+                        </Show>
+                      </dd>
+                    </Show>
                     <Show when={!skill().editable && skill().editableReason}>
                       <dt>Editing</dt>
                       <dd>{skill().editableReason}</dd>
@@ -362,6 +388,7 @@ function SkillDetail(props: { skillId: string; closeHref: string; folders: reado
                 <Show when={origin() !== "authored"}>
                   <UpdateBlock skill={skill()} />
                 </Show>
+                <AuditBlock skill={skill()} />
 
                 <Show when={skill().existingForks.length > 0}>
                   <section class="sk-block" aria-labelledby="sk-forks-h">
@@ -439,6 +466,7 @@ function SkillDetail(props: { skillId: string; closeHref: string; folders: reado
                 </section>
                 <SkillFileDialog skill={skill()} path={file()} onClose={() => setFile(null)} />
                 <ForkDialog open={forking()} onOpenChange={setForking} skill={skill()} />
+                <SkillSettingsDialog open={setting()} onOpenChange={setSetting} skill={skill()} />
                 <CompareVersionsDialog
                   open={comparing() !== null}
                   onOpenChange={(open) => !open && setComparing(null)}

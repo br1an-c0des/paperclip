@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   exportCounts,
   exportFileName,
-  importedFiles,
   importPlanLines,
   importTarget,
   packageProblem,
@@ -45,16 +44,6 @@ describe("import", () => {
   it("targets a new organization or this one, with a rule for same names", () => {
     expect(importTarget("new", "c1", " Acme ", "replace")).toEqual({ target: { mode: "new_company", newCompanyName: "Acme" }, collisionStrategy: "rename" });
     expect(importTarget("existing", "c1", "ignored", "skip")).toEqual({ target: { mode: "existing_company", companyId: "c1" }, collisionStrategy: "skip" });
-  });
-
-  it("leaves the package's company file out of a merge unless asked", () => {
-    const preview = {
-      plan: { companyAction: "update" },
-      manifest: { company: { path: "COMPANY" } },
-      files: { "COMPANY.md": "", "agents/ceo/AGENTS.md": "", "projects/web/PROJECT.md": "" },
-    } as never;
-    expect(importedFiles(preview, false)).toEqual(["agents/ceo/AGENTS.md", "projects/web/PROJECT.md"]);
-    expect(importedFiles(preview, true)).toBeUndefined();
   });
 });
 

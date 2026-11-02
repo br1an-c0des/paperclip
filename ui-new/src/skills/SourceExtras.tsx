@@ -1,9 +1,10 @@
-import type { ProjectSkillRepository, SkillSource, SkillSourceCandidate, SkillSourceDiscovery } from "@paperclipai/shared";
+import type { ProjectSkillRepository, SkillSource, SkillSourceCandidate, SkillSourceDiscovery, SkillSourceDiscoveryRequest, SkillSourceScanProgress } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Check, Eye, FolderGit2 } from "lucide-solid";
-import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch } from "solid-js";
+import { ApiError } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import { skillsApi } from "@/api/skills";
+import { skillsApi, StreamUnavailableError } from "@/api/skills";
 import { CodeView } from "@/files/CodeView";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
@@ -14,6 +15,7 @@ import { TonePill } from "@/ui/Status";
 import { Switch as Toggle } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
 import { failureText, useRefreshSkills } from "./queries";
+import { allConnections, connectionChoices, scanFraction, scanProgressLine, type ConnectionChoice } from "./skill-settings-model";
 import { branchLabel } from "./skills-model";
 
 /*
@@ -22,9 +24,12 @@ import { branchLabel } from "./skills-model";
  * - A candidate list with checkboxes and a file preview (`POST …/skill-sources/preview`), shared by
  *   Add a source and Choose skills.
  * - Source settings (`PATCH …/:id/settings`): automatic updates, importing new skills as they
- *   appear, and the branch it follows (`GET …/:id/branches`; any name can be typed).
- * - Choose skills (`POST …/discover` again, then `PATCH …/:id`): which of the repository's skills
- *   are imported.
+ *   appear, the GitHub connection whose access reads it (from `GET …/repositories`), and the branch
+ *   it follows (`GET …/:id/branches`, read through the chosen connection; any name can be typed).
+ *   A source failing for its connection opens here.
+ * - Choose skills (`POST …/discover` again, streamed, then `PATCH …/:id`): which of the
+ *   repository's skills are imported.
+ * - Streamed scans (`useStreamedScan`): progress and the skills found while a repository is read.
  * - Project repositories (`GET …/project-repositories`, `POST …/adopt-project`): repositories of
  *   project workspaces that aren't sources yet, imported for that project only.
  */
@@ -138,12 +143,28 @@ export function SourceSettingsDialog(props: { source: SkillSource | null; onClos
   const company = useCompany();
   const client = useQueryClient();
   const refresh = useRefreshSkills();
+  const [connection, setConnection] = createSignal<string | null>(null);
   const branches = createQuery(() => ({
-    queryKey: queryKeys.skills.sourceBranches(company().id, props.source?.id ?? ""),
-    queryFn: ({ signal }) => skillsApi.branches(company().id, props.source!.id, signal),
+    queryKey: [...queryKeys.skills.sourceBranches(company().id, props.source?.id ?? ""), connection() ?? ""],
+    queryFn: ({ signal }) => skillsApi.branches(company().id, props.source!.id, signal, connection()),
     enabled: props.source !== null,
     retry: false,
   }));
+  const repositories = createQuery(() => ({
+    queryKey: queryKeys.skills.repositories(company().id),
+    queryFn: ({ signal }) => skillsApi.repositories(company().id, signal),
+    enabled: props.source !== null,
+    retry: false,
+    staleTime: 60_000,
+  }));
+  // The connections that list this repository; when none do (a private one the list misses), any of the person's.
+  const connections = createMemo((): ConnectionChoice[] => {
+    const source = props.source;
+    if (!source) return [];
+    const matching = connectionChoices(repositories.data, source.repositoryUrl);
+    const list = matching.length ? matching : allConnections(repositories.data);
+    return source.connectionId && !list.some((entry) => entry.id === source.connectionId) ? [{ id: source.connectionId, name: "The current connection" }, ...list] : list;
+  });
   const [automatic, setAutomatic] = createSignal(true);
   const [importNew, setImportNew] = createSignal(false);
   const [branch, setBranch] = createSignal("HEAD");
@@ -159,6 +180,7 @@ export function SourceSettingsDialog(props: { source: SkillSource | null; onClos
         setAutomatic(source.automaticUpdates ?? true);
         setImportNew(source.importNewSkills ?? false);
         setBranch(source.trackingRef);
+        setConnection(source.connectionId);
         setError(null);
       },
     ),
@@ -176,13 +198,22 @@ export function SourceSettingsDialog(props: { source: SkillSource | null; onClos
         automaticUpdates: automatic(),
         importNewSkills: importNew(),
         ...(ref !== source.trackingRef ? { trackingRef: ref } : {}),
+        ...(connection() !== source.connectionId ? { connectionId: connection() } : {}),
       });
       void client.invalidateQueries({ queryKey: queryKeys.skills.sources(company().id) });
       refresh();
       pushToast({ tone: "success", title: `Saved ${source.fullName}` });
       props.onClose();
     } catch (caught) {
-      setError(failureText(caught, "Couldn't save the settings."));
+      const code = caught instanceof ApiError ? (caught.body as { code?: string } | null)?.code : undefined;
+      if (code === "skill_source_settings_changed") {
+        void client.invalidateQueries({ queryKey: queryKeys.skills.sources(company().id) });
+        setError("This source changed meanwhile. Close and open its settings again, then save.");
+      } else if (code === "skill_source_ref_unavailable") {
+        setError(`${failureText(caught, "")} Pick a branch this connection can read.`);
+      } else {
+        setError(failureText(caught, "Couldn't save the settings."));
+      }
     } finally {
       setBusy(false);
     }
@@ -208,6 +239,15 @@ export function SourceSettingsDialog(props: { source: SkillSource | null; onClos
       <div class="sk-form">
         <Toggle checked={automatic()} onChange={setAutomatic} label="Update automatically" description="Install new commits on the branch as they land. Off, use Sync now." />
         <Toggle checked={importNew()} onChange={setImportNew} label="Import new skills" description="Skills added to the repository later are imported too, not just offered." />
+        <Show when={connections().length > 0} fallback={<Show when={repositories.isSuccess}><p class="org-muted">No GitHub connection can read it. Connect GitHub under Apps; public repositories work without one.</p></Show>}>
+          <ConnectionField
+            id="sk-source-connection"
+            choices={connections()}
+            value={connection()}
+            onChange={setConnection}
+            help={props.source?.lastError && props.source.repairAction === "connection" ? "Its last sync failed reading the repository. Pick a connection that can read it." : undefined}
+          />
+        </Show>
         <Field label="Branch" for="sk-source-branch-set" help={branches.data ? `Default: ${branches.data.defaultBranch}. Pinned agent versions stay as they are.` : "HEAD follows the repository's default branch."}>
           <TextInput id="sk-source-branch-set" list="sk-source-branches" value={branch()} onInput={(event) => setBranch(event.currentTarget.value)} />
           <datalist id="sk-source-branches">
@@ -232,6 +272,7 @@ export function ChooseSkillsDialog(props: { source: SkillSource | null; onClose:
   const company = useCompany();
   const client = useQueryClient();
   const refresh = useRefreshSkills();
+  const live = useStreamedScan();
   const [found, setFound] = createSignal<SkillSourceDiscovery | null>(null);
   const [picked, setPicked] = createSignal<ReadonlySet<string>>(new Set());
   const [loading, setLoading] = createSignal(false);
@@ -245,15 +286,16 @@ export function ChooseSkillsDialog(props: { source: SkillSource | null; onClose:
         const source = props.source;
         setFound(null);
         setError(null);
-        if (!source) return;
+        if (!source) return live.cancel();
         setLoading(true);
         try {
-          const discovery = await skillsApi.discover(company().id, {
+          const discovery = await live.scan({
             repositoryUrl: source.repositoryUrl,
             trackingRef: source.trackingRef,
             connectionId: source.connectionId,
             packageMode: source.packageMode,
           });
+          if (!discovery) return;
           setFound(discovery);
           setPicked(new Set(source.entries.filter((entry) => entry.selection === "selected").map((entry) => entry.path)));
         } catch (caught) {
@@ -318,7 +360,7 @@ export function ChooseSkillsDialog(props: { source: SkillSource | null; onClose:
     >
       <div class="sk-form">
         <Show when={loading()}>
-          <p class="org-muted">Reading the repository…</p>
+          <ScanProgress progress={live.progress()} found={live.found()} />
         </Show>
         <Show when={found()}>
           {(discovery) => (
@@ -428,4 +470,129 @@ export function groupRepositories(repos: readonly ProjectSkillRepository[]): Rep
     groups.set(key, group);
   }
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Streamed scans
+
+type FoundSkill = Pick<SkillSourceCandidate, "path" | "name" | "description" | "fileCount" | "error">;
+
+/**
+ * A repository scan with live progress (`POST …/discover` as NDJSON), as the old Sources page runs
+ * it: how far the download and the checks are, and the last few skills found. A server that
+ * doesn't stream gets the plain scan. A package whose skills reach outside their folders is read
+ * again in repository mode, so shared files come along. Closing the dialog cancels the scan.
+ */
+export function useStreamedScan() {
+  const company = useCompany();
+  const [progress, setProgress] = createSignal<SkillSourceScanProgress | null>(null);
+  const [found, setFound] = createSignal<FoundSkill[]>([]);
+  const [scanning, setScanning] = createSignal(false);
+  let controller: AbortController | null = null;
+  onCleanup(() => controller?.abort());
+
+  const once = async (input: SkillSourceDiscoveryRequest, signal: AbortSignal) => {
+    try {
+      return await skillsApi.discoverStream(
+        company().id,
+        input,
+        (update) => {
+          if (signal.aborted) return;
+          if (update.type === "progress") setProgress(update);
+          else setFound((current) => [...current.filter((skill) => skill.path !== update.candidate.path), update.candidate].slice(-5));
+        },
+        signal,
+      );
+    } catch (error) {
+      if (error instanceof StreamUnavailableError) return skillsApi.discover(company().id, input);
+      throw error;
+    }
+  };
+
+  const scan = async (input: SkillSourceDiscoveryRequest): Promise<SkillSourceDiscovery | null> => {
+    controller?.abort();
+    const current = new AbortController();
+    controller = current;
+    setProgress(null);
+    setFound([]);
+    setScanning(true);
+    try {
+      let result = await once(input, current.signal);
+      if ((input.packageMode ?? "skills") === "skills" && needsRepositoryMode(result)) {
+        setFound([]);
+        result = await once({ ...input, packageMode: "repository" }, current.signal);
+      }
+      return controller === current ? result : null;
+    } catch (error) {
+      if (current.signal.aborted) return null;
+      throw error;
+    } finally {
+      if (controller === current) setScanning(false);
+    }
+  };
+
+  const cancel = () => {
+    controller?.abort();
+    controller = null;
+    setScanning(false);
+  };
+
+  return { scan, cancel, progress, found, scanning };
+}
+
+/** Whether a scanned skill links files outside its own folder, which repository mode brings along. */
+export function needsRepositoryMode(discovery: Pick<SkillSourceDiscovery, "candidates">) {
+  return discovery.candidates.some((candidate) => candidate.inspection?.references.some((reference) => reference.kind === "outside_package"));
+}
+
+/** The scan's progress line, a meter while it has a fraction, and the skills found so far. */
+export function ScanProgress(props: { progress: SkillSourceScanProgress | null; found: readonly FoundSkill[] }) {
+  const fraction = () => scanFraction(props.progress);
+  return (
+    <div class="sk-scan" role="status" aria-live="polite">
+      <p class="org-muted">{scanProgressLine(props.progress)}</p>
+      <Show when={fraction() !== null}>
+        <div class="sk-meter" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((fraction() ?? 0) * 100)} aria-label="Scan progress">
+          <span style={{ width: `${Math.round((fraction() ?? 0) * 100)}%` }} />
+        </div>
+      </Show>
+      <Show when={props.found.length > 0}>
+        <ul class="sk-scan-found">
+          <For each={props.found}>
+            {(skill) => (
+              <li>
+                <span class="org-strong">{skill.name}</span> <span class="mono org-muted">{skill.path || "/"}</span>
+                <Show when={skill.error}>
+                  <span class="sk-error"> {skill.error}</span>
+                </Show>
+              </li>
+            )}
+          </For>
+        </ul>
+      </Show>
+    </div>
+  );
+}
+
+/** A choice of GitHub connection, when more than one can read the repository (or none is known). */
+export function ConnectionField(props: {
+  id: string;
+  choices: readonly ConnectionChoice[];
+  value: string | null;
+  onChange: (id: string | null) => void;
+  /** Offer "Let Paperclip choose" (a new source); a saved one keeps a connection. */
+  automatic?: boolean;
+  help?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <Field label="GitHub connection" for={props.id} help={props.help ?? "Whose access reads the repository. Manage connections under Apps."}>
+      <select id={props.id} class="input" value={props.value ?? ""} disabled={props.disabled} onChange={(event) => props.onChange(event.currentTarget.value || null)}>
+        <Show when={props.automatic || !props.value}>
+          <option value="">{props.automatic ? "Let Paperclip choose" : "None chosen"}</option>
+        </Show>
+        <For each={props.choices}>{(choice) => <option value={choice.id}>{choice.name}</option>}</For>
+      </select>
+    </Field>
+  );
 }

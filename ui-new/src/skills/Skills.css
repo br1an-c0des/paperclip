@@ -763,3 +763,109 @@ button.sk-chip {
     padding-left: 12px;
   }
 }
+
+/* Settings, the safety check and live scans (SkillActions.tsx, SourceExtras.tsx). */
+.sk-tagline {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sk-self-start {
+  align-self: flex-start;
+}
+
+.sk-form-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.sk-swatch {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+}
+
+.sk-foot-error {
+  margin-right: auto;
+}
+
+.sk-findings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.sk-findings li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 10px;
+  border-left: 2px solid var(--amber-fg);
+}
+
+.sk-findings li[data-severity="error"] {
+  border-left-color: var(--red-fg);
+}
+
+.sk-scan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sk-scan p {
+  margin: 0;
+}
+
+.sk-meter {
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.sk-meter span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--g-ion);
+  transition: width 0.2s ease;
+}
+
+.sk-scan-found {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+/* One line each while scanning; the full problems show in the list that follows. */
+.sk-scan-found li {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-meter span {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .sk-form-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

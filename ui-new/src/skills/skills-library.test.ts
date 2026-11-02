@@ -146,6 +146,7 @@ describe("updates", () => {
     expect(updateLine(status({}))?.text).toBe("Up to date at aaaaaaa.");
     expect(updateLine(undefined)).toBeNull();
     expect(shortRef("v1.2")).toBe("v1.2");
+    expect(shortRef("sha256:2b6e53bf8491f027afdbd6961ad84f677cfd385a0a6a73616ea84111ca8886ed")).toBe("sha256:2b6e53b");
   });
 });
 

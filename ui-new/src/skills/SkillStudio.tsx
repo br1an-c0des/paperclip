@@ -1,7 +1,7 @@
 import type { CompanySkillDetail, CompanySkillVersionSummary } from "@paperclipai/shared";
 import { A, useNavigate } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { ArrowLeft, FilePlus, FileText, History, Plus, Save, Trash2 } from "lucide-solid";
+import { ArrowLeft, FilePlus, FileText, History, Plus, Save, Settings2, Trash2 } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
 import { queryKeys } from "@/api/queryKeys";
 import { skillsApi } from "@/api/skills";
@@ -15,7 +15,7 @@ import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { failureText, useRefreshSkills, useSkillDetail, useSkillList, useSkillVersions } from "./queries";
 import { restoreReplacesFiles, restoreSkillVersion } from "./restore";
-import { CompareVersionsDialog } from "./SkillActions";
+import { CompareVersionsDialog, SkillSettingsDialog } from "./SkillActions";
 import { OriginPill, whenLabel } from "./SkillLibrary";
 import { createPayload, draftProblem, newFileProblem, skillOrigin, slugFor, sortedFiles, versionName, type SkillDraft } from "./skills-model";
 
@@ -33,8 +33,9 @@ import { createPayload, draftProblem, newFileProblem, skillOrigin, slugFor, sort
  *   linked local one (restore.ts). Deleting the skill removes it from every agent.
  *
  * Compare opens two versions side by side (SkillActions.tsx). Bundled and imported skills are
- * read-only here; fork one from the library to edit a copy. Not ported: test runs and their inputs
- * and templates (decision 39, D6), and sharing.
+ * read-only here; fork one from the library to edit a copy. Settings renames the skill and edits
+ * what the library shows and who sees it (SkillActions.tsx). Not ported: test runs and their
+ * inputs and templates (decision 39, D6).
  */
 
 export function StudioHome() {
@@ -220,6 +221,7 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
   const [versionOpen, setVersionOpen] = createSignal(false);
   const [deleteFileOpen, setDeleteFileOpen] = createSignal(false);
   const [deleteSkillOpen, setDeleteSkillOpen] = createSignal(false);
+  const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [restoring, setRestoring] = createSignal<CompanySkillVersionSummary | null>(null);
   const [comparing, setComparing] = createSignal(false);
 
@@ -300,6 +302,7 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
 
   return (
     <div class="sk-studio">
+      <SkillSettingsDialog open={settingsOpen()} onOpenChange={setSettingsOpen} skill={props.skill} />
       <header class="card sk-studio-head">
         <A class={buttonClass({ variant: "icon", size: "compact", ghost: true })} href={`${base()}/studio`} aria-label="Back to the Studio">
           <ArrowLeft size={15} aria-hidden="true" />
@@ -318,6 +321,9 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
           <A class={buttonClass({ size: "compact", variant: "quiet" })} href={`${base()}/${props.skill.id}`}>
             In the library
           </A>
+          <Button size="compact" icon={<Settings2 size={14} aria-hidden="true" />} onClick={() => setSettingsOpen(true)}>
+            Settings
+          </Button>
           <Button size="compact" icon={<History size={14} aria-hidden="true" />} onClick={() => setVersionOpen(true)}>
             Save version
           </Button>
