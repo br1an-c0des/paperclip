@@ -126,6 +126,9 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
 - **Requests:** `GET|PATCH /api/agents/:id/instructions-bundle`,
   `GET|PUT|DELETE .../instructions-bundle/file`, `GET .../history`, `POST .../restore`, `GET .../diff`,
   `GET .../candidates`, `POST .../candidates/:runId/resolve`, `POST /api/companies/:companyId/assets/images`.
+  Since the 2026-11-03 sync, bundle settings have their own panel
+  (`pages/agent-detail/InstructionsBundleSettings.tsx`), and `PATCH .../instructions-bundle` accepts
+  `requireExistingEntry` so a changed entry file must already exist.
 
 ### `agents/skills`: Skills
 
@@ -223,6 +226,11 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
 
 - **What:** log of the agent's actions, exportable as CSV.
 - **Requests:** `GET /api/companies/:companyId/audit/agent-actions` (+ `.csv`).
+- Since the 2026-11-03 sync (Refine-v2 agent page, #18378), Activity, Runs, Costs and Budgets show
+  inside the agent page instead of linking out: `GET /api/companies/:companyId/activity`,
+  `/heartbeat-runs`, `GET /api/routines/:id/runs`, `/costs/by-agent`, `/costs/by-agent-model`,
+  `/budgets/overview`, `POST /api/companies/:companyId/budgets/policies`,
+  `POST /api/companies/:companyId/budget-incidents/:incidentId/resolve`.
 
 ### `agents/built-in`: Built-in agents
 

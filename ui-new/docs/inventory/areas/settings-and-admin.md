@@ -111,6 +111,13 @@ Resources: `/api/companies/:companyId/tools/*`, `/api/tool-connections*`, `/api/
 Since the 2026-10-29 sync, a saved AI sign-in setup can be resumed from its handoff:
 `GET /api/companies/:companyId/ai-connections/login/:sessionId/setup`. Authorized agents can also
 configure connections within the authority a person delegated to them.
+Since the 2026-11-03 sync: `GET /api/companies/:companyId/ai-connections/:connectionId/identity?grantId=`
+shows the provider account and organization behind a saved AI credential
+(`AiConnectionAccountIdentity`); `GET /api/tool-connections/:connectionId/review-counts` gives one
+connection's pending action requests and quarantined catalog entries (the connection sidebar uses it
+instead of `tools/apps/attention`); `GET /api/tool-connections/:connectionId/profile-configuration`
+gives a connection's saved profiles without access summaries (App detail uses it instead of
+`tools/profiles`).
 Upstream recipes: `maps/feature-map/connection-setup.md`, `gateways-profiles.md`, `chat-channels.md`,
 `app-permissions.md`.
 

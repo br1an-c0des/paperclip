@@ -86,7 +86,9 @@ Agent Chat (`/:co/chats/:agentRef`) reuses `TaskDetailSurface` in a conversation
   `POST /api/companies/:companyId/join-requests/:requestId/approve|reject`, `POST /api/agents/:id/wakeup`
   (retry failed run), `POST /api/issues/:issueId/retry` (Retry an interrupted task), `GET /api/companies/:companyId/approvals`, `/heartbeat-runs`, `/join-requests`,
   `/dashboard`; dismissing and snoozing items goes through `inboxDismissalsApi` (server, shared with the
-  Decisions page).
+  Decisions page). Since the 2026-11-03 sync, the Mine tab opens from one snapshot,
+  `GET /api/companies/:companyId/inbox/mine` (`InboxMineSnapshot`: the Mine rows, their context tasks
+  and the latest failed runs, with per-source errors), instead of separate startup reads.
 - **Notes:** archiving is "out of my inbox", not completing the task. Read state for non-task items
   (approvals, failed runs, join requests) is browser-only local storage. Keyboard: `j`/`k`, `a` or `y`
   archive, `r` mark read, `U` mark unread, Enter open, left/right collapse. Blocked view groups by blocker
