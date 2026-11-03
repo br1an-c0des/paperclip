@@ -435,6 +435,16 @@ Progress:
   cards, onboarding (Copilot and gateway paths) and sign-in flows. Also: status cards' open question
   (decision 44), and small leftovers in decisions 43 and 45 (the Workspaces summary card, the phone
   toolbar width, the project header on phones).
+- **Round 3 (Nov 2–3), complete:** run detail and agent chat (votes, briefing sources, read state
+  and unread dots, board 18's entry point), Apps leftovers without voice (decision 46), company
+  settings and skills (decision 46), status cards with real updates (decision 44, decided), and the
+  agent YAML editor with onboarding's gateway path (decisions 36, 47). Projects lifecycle and
+  membership closed on review. Speko voice is on hold.
+- **Left after round 3:** `documents-artifacts/library` (waits for upstream project documents,
+  decision D), the sign-in flows (need an instance that requires sign-in to check live), and
+  `shell/coordinator-workspace` (to investigate and design, 3.16). Still open from earlier: the
+  Workspaces summary card, the phone toolbar width (`.tv-toolbar--phone` is 394px at 390), the
+  project header on phones, and the agent page's "From connections" instructions.
 
 - Plugin hosting (decision G): built in M6 rounds 2 and 3; the `organizationSwitcher` slot and local
   folders in M7 round 2.
