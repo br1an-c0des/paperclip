@@ -167,10 +167,14 @@ export default defineConfig({
     // 5173 is the existing React UI, so both can run side by side.
     port: 5174,
     strictPort: true,
+    // Reaching the dev server from other devices through `tailscale serve`, which keeps the
+    // tailnet hostname as Host. The server needs that hostname too: PAPERCLIP_ALLOWED_HOSTNAMES.
+    allowedHosts: [".ts.net"],
     proxy: apiProxy,
   },
   preview: {
     port: 3102,
+    allowedHosts: [".ts.net"],
     proxy: apiProxy,
   },
   // Tests for view models and key components (build plan, "How it's built"). They run in jsdom so
