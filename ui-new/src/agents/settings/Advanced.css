@@ -1,0 +1,287 @@
+/* Configuration as YAML (AdvancedSection.tsx). Cards stack 16px apart like the other sections. */
+
+.adv-card,
+.adv-alert,
+.adv-reference {
+  min-width: 0;
+}
+
+.adv-card + *,
+.adv-alert + *,
+.adv-reference {
+  margin-top: 16px;
+}
+
+.adv-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-height: 44px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.adv-kind {
+  color: var(--text);
+}
+
+.adv-rev .mono {
+  color: var(--body);
+}
+
+.adv-editor {
+  min-width: 0;
+  background: var(--code);
+}
+
+.adv-editor-host {
+  height: min(62vh, 640px);
+  min-height: 280px;
+}
+
+.adv-editor-host[hidden] {
+  display: none;
+}
+
+.adv-editor-host .cm-editor {
+  height: 100%;
+}
+
+.adv-editor-plain {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: min(62vh, 640px);
+  min-height: 280px;
+  padding: 12px 14px;
+  border: 0;
+  outline: 0;
+  resize: vertical;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+.adv-foot {
+  border-top: 1px solid var(--line);
+}
+
+.adv-status {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Problems and a save that stopped part-way */
+.adv-alert {
+  padding: 16px 20px;
+  border-color: color-mix(in srgb, var(--red-fg) 40%, transparent);
+  background: color-mix(in srgb, var(--red-bg) 55%, var(--card));
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--body);
+}
+
+.adv-alert h3 {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--red-fg);
+}
+
+.adv-alert > * + * {
+  margin-top: 6px;
+}
+
+.adv-alert ul {
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.adv-alert > div {
+  margin-top: 12px;
+}
+
+.adv-pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* The steps a save runs */
+.adv-steps {
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+}
+
+.adv-steps li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  padding: 7px 20px;
+  border-top: 1px solid var(--row-line);
+  font-size: 13px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.adv-steps li:first-child {
+  border-top: 0;
+}
+
+.adv-step-n {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: right;
+}
+
+.adv-diff-toggle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 20px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.adv-diff-summary {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.adv-diff {
+  max-height: 420px;
+  overflow: auto;
+}
+
+/* Created keys and secrets */
+.adv-receipts .adv-receipt {
+  display: grid;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--row-line);
+  font-size: 13px;
+}
+
+.adv-receipts .adv-receipt:first-child {
+  border-top: 0;
+}
+
+.adv-receipts + * {
+  margin-top: 16px;
+}
+
+.adv-id {
+  font-size: 12px;
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+
+/* What the document can hold */
+.adv-reference summary {
+  padding: 14px 20px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.adv-reference[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.adv-reference-body {
+  padding: 8px 20px 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--body);
+}
+
+.adv-terms {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 0 20px;
+}
+
+.adv-terms dt,
+.adv-terms dd {
+  padding: 8px 0;
+  border-top: 1px solid var(--row-line);
+  overflow-wrap: anywhere;
+}
+
+.adv-terms dt {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.adv-terms dt:first-of-type,
+.adv-terms dt:first-of-type + dd {
+  border-top: 0;
+}
+
+.adv-terms .mono {
+  font-size: 12px;
+}
+
+.adv-ids {
+  margin-top: 14px;
+}
+
+.adv-ids h4 {
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: none;
+}
+
+.adv-ids ul {
+  margin-top: 4px;
+}
+
+.adv-ids li {
+  padding: 3px 0;
+}
+
+.adv-loading {
+  padding: 4px 0;
+}
+
+@container (max-width: 560px) {
+  .adv-terms {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .adv-terms dd {
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
+/* Phones */
+:root[data-viewport="phone"] :is(.adv-head, .adv-steps li, .adv-diff-toggle, .adv-receipts .adv-receipt, .adv-reference summary, .adv-reference-body, .adv-alert) {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+:root[data-viewport="phone"] .adv-terms {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:root[data-viewport="phone"] .adv-terms dd {
+  padding-top: 0;
+  border-top: 0;
+}
+
+:root[data-viewport="phone"] :is(.adv-editor-host, .adv-editor-plain) {
+  height: 56vh;
+}

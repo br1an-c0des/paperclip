@@ -458,4 +458,10 @@ export const queryKeys = {
     companyOrder: (userId: string) => ["sidebar-preferences", "company-order", userId] as const,
     projectOrder: (companyId: string, userId: string) => ["sidebar-preferences", "project-order", companyId, userId] as const,
   },
+  /*
+   * The agent YAML editor's snapshot (agents/settings/AdvancedSection.tsx): every resource the
+   * document covers, read in one go. Kept outside `agents.detail` so the agent's live updates
+   * don't reload a dozen requests; the editor reloads it itself.
+   */
+  agentConfiguration: (companyId: string, agentId: string) => ["agent-configuration-yaml", companyId, agentId] as const,
 };

@@ -141,6 +141,7 @@ describe("agentView", () => {
     expect(agentView("api-keys")).toEqual({ view: "settings", section: "keys" });
     expect(agentView("budgets")).toEqual({ view: "settings", section: "budget" });
     expect(agentView("permissions")).toEqual({ view: "settings", section: "permissions" });
+    expect(agentView("advanced")).toEqual({ view: "settings", section: "advanced" });
     expect(agentView("settings")).toEqual({ view: "settings", section: "profile" });
     expect(agentView("settings/trust")).toEqual({ view: "settings", section: "permissions" });
   });

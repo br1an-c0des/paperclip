@@ -159,7 +159,8 @@ export type AgentSectionKey =
   | "budget"
   | "permissions"
   | "keys"
-  | "history";
+  | "history"
+  | "advanced";
 
 /** Board 26's rail, with Memory (decision 5, option 4) under Agent. */
 export const AGENT_SECTIONS: ({ heading: string } | { key: AgentSectionKey; label: string })[] = [
@@ -177,6 +178,8 @@ export const AGENT_SECTIONS: ({ heading: string } | { key: AgentSectionKey; labe
   { key: "permissions", label: "Permissions and trust" },
   { key: "keys", label: "API keys" },
   { key: "history", label: "History" },
+  { heading: "Advanced" },
+  { key: "advanced", label: "Configuration as YAML" },
 ];
 
 /** The old UI's tab names, so its links (`/agents/:id/configuration`, `…/api-keys`) keep working. */
@@ -201,6 +204,8 @@ const SECTION_ALIASES: Record<string, AgentSectionKey> = {
   "api-keys": "keys",
   history: "history",
   revisions: "history",
+  advanced: "advanced",
+  yaml: "advanced",
 };
 
 /**

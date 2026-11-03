@@ -212,6 +212,8 @@ describe("draft to request", () => {
       modelReasoningEffort: "xhigh",
       dangerouslyBypassApprovalsAndSandbox: true,
     });
+    // The Paperclip Runner refuses `false` (agent_runner_config_incompatible) and drops the key itself.
+    expect(setupAdapterConfig(setup({ harness: "codex_local" }), "paperclip")).toMatchObject({ dangerouslyBypassApprovalsAndSandbox: true });
     expect(setupAdapterConfig(setup({ harness: "pi_local", effort: "high" }), "paperclip")).toMatchObject({ piThinkingLevel: "high" });
     expect(setupAdapterConfig(setup({ harness: "pi_local", effort: "high" }), "legacy")).toMatchObject({ thinking: "high" });
     expect(setupAdapterConfig(setup({ harness: "opencode_local", effort: "low" }), "paperclip")).toMatchObject({ variant: "low" });
