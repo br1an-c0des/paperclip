@@ -1,5 +1,5 @@
 {
-  "upstreamCommit": "1a6017d6460267ad89d7e1784e2b521c28d8e9ac",
+  "upstreamCommit": "adb49a44346849e751548b2fb640693dbfad4b6f",
   "routes": [
     {
       "path": "/oauth-handoff",
@@ -5135,8 +5135,7 @@
         ],
         "via": [
           "components/AgentConfigForm.tsx",
-          "components/NewGoalDialog.tsx",
-          "components/NewIssueDialog.tsx"
+          "components/NewGoalDialog.tsx"
         ]
       },
       {
@@ -5306,6 +5305,18 @@
         ]
       },
       {
+        "key": "api/tools.ts::toolsApi.getConnectionReviewCounts",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/tool-connections/:connectionId/review-counts"
+          }
+        ],
+        "via": [
+          "components/AppConnectionSidebar.tsx"
+        ]
+      },
+      {
         "key": "api/tools.ts::toolsApi.listApplications",
         "requests": [
           {
@@ -5316,18 +5327,6 @@
         "via": [
           "components/AppConnectionSidebar.tsx",
           "features/connections/ConnectionSetupFlow.tsx"
-        ]
-      },
-      {
-        "key": "api/tools.ts::toolsApi.listAppsAttention",
-        "requests": [
-          {
-            "method": "GET",
-            "path": "/api/companies/:companyId/tools/apps/attention"
-          }
-        ],
-        "via": [
-          "components/AppConnectionSidebar.tsx"
         ]
       },
       {
@@ -9470,7 +9469,8 @@
           ],
           "via": [
             "lib/agent-configuration/load.ts",
-            "pages/AgentDetail.tsx"
+            "pages/AgentDetail.tsx",
+            "pages/agent-detail/AgentHistoryDialog.tsx"
           ]
         },
         {
@@ -9570,7 +9570,8 @@
           ],
           "via": [
             "lib/agent-configuration/load.ts",
-            "pages/AgentToolsTab.tsx"
+            "pages/AgentToolsTab.tsx",
+            "pages/agent-detail/AgentAllowedConnectors.tsx"
           ]
         },
         {
@@ -9647,7 +9648,8 @@
           ],
           "via": [
             "lib/agent-configuration/save.ts",
-            "pages/AgentDetail.tsx"
+            "pages/AgentDetail.tsx",
+            "pages/agent-detail/AgentHistoryDialog.tsx"
           ]
         },
         {
@@ -9699,7 +9701,8 @@
           ],
           "via": [
             "lib/agent-configuration/save.ts",
-            "pages/AgentDetail.tsx"
+            "pages/AgentDetail.tsx",
+            "pages/agent-detail/InstructionsBundleSettings.tsx"
           ]
         },
         {
@@ -9885,6 +9888,66 @@
           ]
         },
         {
+          "key": "api/budgets.ts::budgetsApi.overview",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/budgets/overview"
+            }
+          ],
+          "via": [
+            "pages/AgentBudgetsPanel.tsx"
+          ]
+        },
+        {
+          "key": "api/budgets.ts::budgetsApi.resolveIncident",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/budget-incidents/:incidentId/resolve"
+            }
+          ],
+          "via": [
+            "pages/AgentBudgetsPanel.tsx"
+          ]
+        },
+        {
+          "key": "api/budgets.ts::budgetsApi.upsertPolicy",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/budgets/policies"
+            }
+          ],
+          "via": [
+            "pages/AgentBudgetsPanel.tsx"
+          ]
+        },
+        {
+          "key": "api/costs.ts::costsApi.byAgent",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/costs/by-agent"
+            }
+          ],
+          "via": [
+            "pages/AgentCostsPanel.tsx"
+          ]
+        },
+        {
+          "key": "api/costs.ts::costsApi.byAgentModel",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/costs/by-agent-model"
+            }
+          ],
+          "via": [
+            "pages/AgentCostsPanel.tsx"
+          ]
+        },
+        {
           "key": "api/access.ts::accessApi.listUserDirectory",
           "requests": [
             {
@@ -9894,6 +9957,7 @@
           ],
           "via": [
             "pages/AgentDetail.tsx",
+            "pages/agent-detail/AgentHistoryDialog.tsx",
             "pages/audit/AuditFeed.tsx"
           ]
         },
@@ -9910,11 +9974,11 @@
           ]
         },
         {
-          "key": "api/agents.ts::agentsApi.downloadInstructionsFile",
+          "key": "api/activity.ts::activityApi.list",
           "requests": [
             {
-              "method": "LINK",
-              "path": "/api/agents/:id/instructions-bundle/file"
+              "method": "GET",
+              "path": "/api/companies/:companyId/activity"
             }
           ],
           "via": [
@@ -9922,11 +9986,11 @@
           ]
         },
         {
-          "key": "api/agents.ts::agentsApi.getIdentity",
+          "key": "api/agents.ts::agentsApi.downloadInstructionsFile",
           "requests": [
             {
-              "method": "GET",
-              "path": "/api/agents/:id/identity"
+              "method": "LINK",
+              "path": "/api/agents/:id/instructions-bundle/file"
             }
           ],
           "via": [
@@ -9955,7 +10019,9 @@
           ],
           "via": [
             "pages/AgentDetail.tsx",
-            "pages/audit/AuditFeed.tsx"
+            "pages/agent-detail/AgentHistoryDialog.tsx",
+            "pages/audit/AuditFeed.tsx",
+            "pages/audit/AuditRuns.tsx"
           ]
         },
         {
@@ -10148,7 +10214,8 @@
             }
           ],
           "via": [
-            "pages/AgentDetail.tsx"
+            "pages/AgentDetail.tsx",
+            "pages/audit/AuditRuns.tsx"
           ]
         },
         {
@@ -10184,7 +10251,8 @@
             }
           ],
           "via": [
-            "pages/AgentToolsTab.tsx"
+            "pages/AgentToolsTab.tsx",
+            "pages/agent-detail/AgentAllowedConnectors.tsx"
           ]
         },
         {
@@ -10209,6 +10277,18 @@
           ],
           "via": [
             "pages/AgentToolsTab.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.listApplications",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/tools/applications"
+            }
+          ],
+          "via": [
+            "pages/agent-detail/AgentAllowedConnectors.tsx"
           ]
         },
         {
@@ -10245,6 +10325,18 @@
           ],
           "via": [
             "pages/audit/AuditFeed.tsx"
+          ]
+        },
+        {
+          "key": "api/routines.ts::routinesApi.listRuns",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/routines/:id/runs"
+            }
+          ],
+          "via": [
+            "pages/audit/AuditRuns.tsx"
           ]
         }
       ]
@@ -10924,6 +11016,18 @@
           ]
         },
         {
+          "key": "api/ai-connections.ts::aiConnectionsApi.accountIdentity",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/ai-connections/:connectionId/identity"
+            }
+          ],
+          "via": [
+            "components/ai-connections/AiConnectionAccountDetails.tsx"
+          ]
+        },
+        {
           "key": "api/agents.ts::agentsApi.list",
           "requests": [
             {
@@ -11363,11 +11467,11 @@
           ]
         },
         {
-          "key": "api/tools.ts::toolsApi.listPolicies",
+          "key": "api/tools.ts::toolsApi.listConnectionProfileConfiguration",
           "requests": [
             {
               "method": "GET",
-              "path": "/api/companies/:companyId/tools/policies"
+              "path": "/api/tool-connections/:connectionId/profile-configuration"
             }
           ],
           "via": [
@@ -11375,11 +11479,11 @@
           ]
         },
         {
-          "key": "api/tools.ts::toolsApi.listProfiles",
+          "key": "api/tools.ts::toolsApi.listPolicies",
           "requests": [
             {
               "method": "GET",
-              "path": "/api/companies/:companyId/tools/profiles"
+              "path": "/api/companies/:companyId/tools/policies"
             }
           ],
           "via": [
@@ -11723,6 +11827,18 @@
           ]
         },
         {
+          "key": "api/ai-connections.ts::aiConnectionsApi.accountIdentity",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/ai-connections/:connectionId/identity"
+            }
+          ],
+          "via": [
+            "components/ai-connections/AiConnectionAccountDetails.tsx"
+          ]
+        },
+        {
           "key": "api/agents.ts::agentsApi.list",
           "requests": [
             {
@@ -12160,11 +12276,11 @@
           ]
         },
         {
-          "key": "api/tools.ts::toolsApi.listPolicies",
+          "key": "api/tools.ts::toolsApi.listConnectionProfileConfiguration",
           "requests": [
             {
               "method": "GET",
-              "path": "/api/companies/:companyId/tools/policies"
+              "path": "/api/tool-connections/:connectionId/profile-configuration"
             }
           ],
           "via": [
@@ -12172,11 +12288,11 @@
           ]
         },
         {
-          "key": "api/tools.ts::toolsApi.listProfiles",
+          "key": "api/tools.ts::toolsApi.listPolicies",
           "requests": [
             {
               "method": "GET",
-              "path": "/api/companies/:companyId/tools/profiles"
+              "path": "/api/companies/:companyId/tools/policies"
             }
           ],
           "via": [
@@ -12516,6 +12632,18 @@
           ]
         },
         {
+          "key": "api/ai-connections.ts::aiConnectionsApi.accountIdentity",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/ai-connections/:connectionId/identity"
+            }
+          ],
+          "via": [
+            "components/ai-connections/AiConnectionAccountDetails.tsx"
+          ]
+        },
+        {
           "key": "api/agents.ts::agentsApi.list",
           "requests": [
             {
@@ -12955,11 +13083,11 @@
           ]
         },
         {
-          "key": "api/tools.ts::toolsApi.listPolicies",
+          "key": "api/tools.ts::toolsApi.listConnectionProfileConfiguration",
           "requests": [
             {
               "method": "GET",
-              "path": "/api/companies/:companyId/tools/policies"
+              "path": "/api/tool-connections/:connectionId/profile-configuration"
             }
           ],
           "via": [
@@ -12967,11 +13095,11 @@
           ]
         },
         {
-          "key": "api/tools.ts::toolsApi.listProfiles",
+          "key": "api/tools.ts::toolsApi.listPolicies",
           "requests": [
             {
               "method": "GET",
-              "path": "/api/companies/:companyId/tools/profiles"
+              "path": "/api/companies/:companyId/tools/policies"
             }
           ],
           "via": [
@@ -13303,6 +13431,18 @@
           ]
         },
         {
+          "key": "api/ai-connections.ts::aiConnectionsApi.accountIdentity",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/ai-connections/:connectionId/identity"
+            }
+          ],
+          "via": [
+            "components/ai-connections/AiConnectionAccountDetails.tsx"
+          ]
+        },
+        {
           "key": "api/agents.ts::agentsApi.list",
           "requests": [
             {
@@ -13742,11 +13882,11 @@
           ]
         },
         {
-          "key": "api/tools.ts::toolsApi.listPolicies",
+          "key": "api/tools.ts::toolsApi.listConnectionProfileConfiguration",
           "requests": [
             {
               "method": "GET",
-              "path": "/api/companies/:companyId/tools/policies"
+              "path": "/api/tool-connections/:connectionId/profile-configuration"
             }
           ],
           "via": [
@@ -13754,11 +13894,11 @@
           ]
         },
         {
-          "key": "api/tools.ts::toolsApi.listProfiles",
+          "key": "api/tools.ts::toolsApi.listPolicies",
           "requests": [
             {
               "method": "GET",
-              "path": "/api/companies/:companyId/tools/profiles"
+              "path": "/api/companies/:companyId/tools/policies"
             }
           ],
           "via": [
@@ -14353,6 +14493,18 @@
         }
       ],
       "calls": [
+        {
+          "key": "api/ai-connections.ts::aiConnectionsApi.accountIdentity",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/ai-connections/:connectionId/identity"
+            }
+          ],
+          "via": [
+            "components/ai-connections/AiConnectionAccountDetails.tsx"
+          ]
+        },
         {
           "key": "api/ai-connections.ts::aiConnectionsApi.probeUsage",
           "requests": [
@@ -23584,6 +23736,18 @@
       ],
       "calls": [
         {
+          "key": "api/access.ts::accessApi.getCurrentBoardAccess",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/cli-auth/me"
+            }
+          ],
+          "via": [
+            "api/board-access-query.ts"
+          ]
+        },
+        {
           "key": "api/heartbeats.ts::heartbeatsApi.liveRunsForCompany",
           "requests": [
             {
@@ -23620,11 +23784,11 @@
           ]
         },
         {
-          "key": "api/access.ts::accessApi.getCurrentBoardAccess",
+          "key": "api/auth.ts::authApi.getSession",
           "requests": [
             {
               "method": "GET",
-              "path": "/api/cli-auth/me"
+              "path": "/api/auth/get-session"
             }
           ],
           "via": [
@@ -23632,11 +23796,11 @@
           ]
         },
         {
-          "key": "api/auth.ts::authApi.getSession",
+          "key": "api/board-access-query.ts::boardAccessQueryOptions",
           "requests": [
             {
               "method": "GET",
-              "path": "/api/auth/get-session"
+              "path": "/api/cli-auth/me"
             }
           ],
           "via": [
@@ -25285,6 +25449,18 @@
           "via": [
             "pages/Inbox.tsx",
             "pages/LegacyInbox.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.inboxMine",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/inbox/mine"
+            }
+          ],
+          "via": [
+            "pages/Inbox.tsx"
           ]
         },
         {
@@ -27737,6 +27913,18 @@
           "via": [
             "pages/Inbox.tsx",
             "pages/LegacyInbox.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.inboxMine",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/inbox/mine"
+            }
+          ],
+          "via": [
+            "pages/Inbox.tsx"
           ]
         },
         {
@@ -31658,6 +31846,7 @@
       ],
       "usedBy": [
         "App shell",
+        "pages/AgentDetailPage.tsx",
         "pages/BoardChat.tsx",
         "pages/Dashboard.tsx"
       ],
@@ -32263,10 +32452,8 @@
           "path": "/api/agents/:id/identity"
         }
       ],
-      "usedBy": [
-        "pages/AgentDetailPage.tsx"
-      ],
-      "referenced": true
+      "usedBy": [],
+      "referenced": false
     },
     "api/agents.ts::agentsApi.hire": {
       "requests": [
@@ -32927,6 +33114,22 @@
       ],
       "referenced": true
     },
+    "api/ai-connections.ts::aiConnectionsApi.accountIdentity": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/companies/:companyId/ai-connections/:connectionId/identity"
+        }
+      ],
+      "usedBy": [
+        "App.tsx#AppsConnectEntryRoute",
+        "pages/apps/AppDetail.tsx",
+        "pages/apps/AppNotConnected.tsx",
+        "pages/apps/AppsConnect.tsx",
+        "pages/apps/Browse.tsx"
+      ],
+      "referenced": true
+    },
     "api/ai-connections.ts::aiConnectionsApi.activeRuns": {
       "requests": [
         {
@@ -33475,6 +33678,18 @@
       ],
       "referenced": true
     },
+    "api/board-access-query.ts::boardAccessQueryOptions": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/cli-auth/me"
+        }
+      ],
+      "usedBy": [
+        "pages/DesignGuide.tsx"
+      ],
+      "referenced": true
+    },
     "api/browser-use.ts::browserUseApi.control": {
       "requests": [
         {
@@ -33606,6 +33821,7 @@
         }
       ],
       "usedBy": [
+        "pages/AgentDetailPage.tsx",
         "pages/ProjectDetail.tsx",
         "pages/audit/AuditHub.tsx",
         "pages/audit/CompanyActivity.tsx"
@@ -33620,6 +33836,7 @@
         }
       ],
       "usedBy": [
+        "pages/AgentDetailPage.tsx",
         "pages/audit/AuditHub.tsx",
         "pages/audit/CompanyActivity.tsx"
       ],
@@ -33633,6 +33850,7 @@
         }
       ],
       "usedBy": [
+        "pages/AgentDetailPage.tsx",
         "pages/ProjectDetail.tsx",
         "pages/audit/AuditHub.tsx",
         "pages/audit/CompanyActivity.tsx"
@@ -35354,6 +35572,7 @@
         }
       ],
       "usedBy": [
+        "pages/AgentDetailPage.tsx",
         "pages/audit/AuditHub.tsx",
         "pages/audit/CompanyActivity.tsx"
       ],
@@ -35367,6 +35586,7 @@
         }
       ],
       "usedBy": [
+        "pages/AgentDetailPage.tsx",
         "pages/audit/AuditHub.tsx",
         "pages/audit/CompanyActivity.tsx"
       ],
@@ -38402,6 +38622,19 @@
       "usedBy": [],
       "referenced": false
     },
+    "api/issues.ts::issuesApi.inboxMine": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/companies/:companyId/inbox/mine"
+        }
+      ],
+      "usedBy": [
+        "pages/Inbox.tsx",
+        "pages/Issues.tsx"
+      ],
+      "referenced": true
+    },
     "api/issues.ts::issuesApi.interruptLatestQueuedComments": {
       "requests": [
         {
@@ -40046,6 +40279,7 @@
         }
       ],
       "usedBy": [
+        "pages/AgentDetailPage.tsx",
         "pages/RoutineDetail.tsx",
         "pages/audit/AuditHub.tsx",
         "pages/audit/CompanyActivity.tsx"
@@ -41637,6 +41871,18 @@
       ],
       "referenced": true
     },
+    "api/tools.ts::toolsApi.getConnectionReviewCounts": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/tool-connections/:connectionId/review-counts"
+        }
+      ],
+      "usedBy": [
+        "App shell"
+      ],
+      "referenced": true
+    },
     "api/tools.ts::toolsApi.getEffectiveProfilesForAgent": {
       "requests": [
         {
@@ -41776,6 +42022,7 @@
       "usedBy": [
         "App shell",
         "App.tsx#AppsConnectEntryRoute",
+        "pages/AgentDetailPage.tsx",
         "pages/apps/AppDetail.tsx",
         "pages/apps/AppNotConnected.tsx",
         "pages/apps/AppsConnect.tsx",
@@ -41795,10 +42042,8 @@
           "path": "/api/companies/:companyId/tools/apps/attention"
         }
       ],
-      "usedBy": [
-        "App shell"
-      ],
-      "referenced": true
+      "usedBy": [],
+      "referenced": false
     },
     "api/tools.ts::toolsApi.listAudit": {
       "requests": [
@@ -41869,6 +42114,21 @@
         "pages/apps/AppsConnect.tsx",
         "pages/apps/Browse.tsx",
         "pages/apps/chat/ChatEndpointDetail.tsx"
+      ],
+      "referenced": true
+    },
+    "api/tools.ts::toolsApi.listConnectionProfileConfiguration": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/tool-connections/:connectionId/profile-configuration"
+        }
+      ],
+      "usedBy": [
+        "App.tsx#AppsConnectEntryRoute",
+        "pages/apps/AppDetail.tsx",
+        "pages/apps/AppNotConnected.tsx",
+        "pages/apps/AppsConnect.tsx"
       ],
       "referenced": true
     },
@@ -41962,11 +42222,7 @@
         }
       ],
       "usedBy": [
-        "App.tsx#AppsConnectEntryRoute",
         "pages/AgentDetailPage.tsx",
-        "pages/apps/AppDetail.tsx",
-        "pages/apps/AppNotConnected.tsx",
-        "pages/apps/AppsConnect.tsx",
         "pages/apps/gateways/GatewayDetail.tsx",
         "pages/apps/gateways/GatewaysList.tsx",
         "pages/tools/AdvancedToolsRoute.tsx",
