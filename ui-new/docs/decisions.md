@@ -1205,6 +1205,21 @@ Both are handled in `ui-new` for now.
 - **Response types for invites, chat-identity links, board claims and CLI auth challenges** aren't in
   `@paperclipai/shared`; they're declared in the new API modules
   ([decision 10](#10-some-response-types-arent-exported-from-the-shared-package)).
+- **Onboarding offers only Claude Code and Codex (M7 round 3, 2026-11-02),** as upstream does since
+  Oct 30 (#18309, "Limit first onboarding to Claude and Codex"); the old wizard's GitHub Copilot path
+  is gone upstream, so there was nothing to port. A resumed draft on another harness picks again;
+  with neither available the page says so and links to New agent. Dropping the
+  `onboardingHarnessChoices` filter would restore every harness.
+- **Custom gateway sign-in (upstream #17253, M7 round 3):** "Use a custom gateway" creates an AI
+  connection (`POST /ai-connections`, checked with the shared schemas first) that becomes the draft's
+  sign-in; its model ids become the model list. Left out on purpose: the old wizard's credential
+  fields and animation, and "Invite people" in the company switcher. Test data: draft
+  "M7 test onboarding gateway" (de267aaa), gateways "M7 test gateway" (1da2467c) and
+  "My m7-test-gateway.example.com" (4c260274, named before a name-field fix).
+- **New agent with Codex on the Paperclip Runner was broken in ui-new** (422
+  `agent_runner_config_incompatible`): `setupAdapterConfig` sent
+  `dangerouslyBypassApprovalsAndSandbox: false`, which the runner refuses. Fixed in M7 round 3 to
+  send the adapter's default, `true`.
 
 ### 37. Gaps found building plugin hosting
 
@@ -1654,7 +1669,10 @@ Both are handled in `ui-new` for now.
   not an instance flag, so decision 12 has no flag to settle. Not ported for now; the user wants it
   investigated and designed ([build plan 3.16](build-plan.md#316-upstreams-coordinator-workspace)).
 - **The agent YAML editor** (the old UI's Advanced tab, #18036, #18168): a new checklist row, not
-  placed yet.
+  placed yet. Built in M7 round 3 (2026-11-02) at Advanced → Configuration as YAML, with the
+  `yaml` package (2.9.1, as `ui/` and the root use) added to `ui-new`, approved by the user. It reads
+  the shared zod schemas (`agentConfigurationInputSchema`) at runtime, as the old UI does. Test
+  data: agent "M7 test yaml agent" (41bfe639, paused), secret "M7 test yaml secret" (181a6c62).
 - **Follow-ups left open:** negotiating run interests (`live.interests`) in `live-events.tsx`; the
   plugin bridge's new retry policy (`ui/src/plugins/bridge.ts`); checking chat task creation against
   the new default (an unassigned task made in chat goes to the chat's agent); checking onboarding

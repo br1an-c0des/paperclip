@@ -192,6 +192,33 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
 - **Requests:** `GET /api/agents/:id/config-revisions`,
   `POST /api/agents/:id/config-revisions/:revisionId/rollback`.
 
+### `agents/configuration-yaml`: Agent configuration as YAML
+
+- **Where:** the agent's Advanced tab (`/agents/:agentId/advanced`); in ui-new, Advanced →
+  Configuration as YAML (`/agents/:key/advanced`, alias `/yaml`).
+- **What:** the agent's whole setup as one `paperclip/v1` YAML document (profile, harness and its
+  settings, runtime, instructions location and files, skill pins, tool installs, profiles and
+  policies, channels and channel operations, permissions, secrets and proposals, API keys, revision
+  restore), saved through each resource's own API. Omitted sections stay as saved; the editor shows
+  a compact document (no defaults, empty fields, instruction file contents or legacy prompt text).
+  Before saving it lists the steps in order; it refuses stale writes (`configurationRevision` or an
+  edited section changed), checks the whole plan before writing, and explains a save that stopped
+  part-way. Created API key tokens and secret ids are shown once.
+- **Requests:** `GET /api/agents/:id/configuration`, `GET /api/agents/:id`, `…/instructions-bundle`
+  (+ `/file`), `…/skills`, `…/keys`, `…/config-revisions`;
+  `GET /api/companies/:companyId/tools/connections|profiles|policies`, `…/chat-endpoints`
+  (+ `/chat-endpoints/:id`, `/resources`, `/principals`), `…/secrets`, `…/secret-proposals`.
+  Writes: `PATCH /api/agents/:id` (with `expectedConfigurationRevision`, `replaceAdapterConfig`),
+  `PATCH|PUT|DELETE …/instructions-bundle(/file)`, `POST …/skills/sync`, `PATCH …/permissions`,
+  `POST|DELETE …/keys`, `POST …/config-revisions/:revisionId/rollback`,
+  `GET|PUT /api/tool-connections/:id/installs`, `POST …/tools/profiles`
+  (+ `PATCH /api/tool-profiles/:id`, `…/bind|unbind`), `POST|PATCH|DELETE …/tools/policies`,
+  `PATCH /api/chat-endpoints/:id` (+ `/resources`, `/setup`, `DELETE /principals/:id/link`),
+  `POST …/chat-endpoints`, `POST …/secrets`, `POST /api/secrets/:id/rotate`, `PATCH /api/secrets/:id`,
+  `POST …/secret-proposals/:id/approve|reject`.
+- **Notes:** upstream #18036, #18168. The schema is `agentConfigurationInputSchema` in
+  `@paperclipai/shared`; a revision restore must be saved on its own.
+
 ### `agents/audit`: Agent actions audit
 
 - **What:** log of the agent's actions, exportable as CSV.
