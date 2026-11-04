@@ -126,6 +126,27 @@ cheatsheet, the command palette, global dialogs, and plugin overlays.
   agent is idle. Availability (`GET /api/plugins/:pluginId/api<availabilityPath>?runId=&issueId=`)
   is checked up to three times after activity instead of on a timer (`hooks/useTaskPluginPanels.ts`).
 
+### `shell/coordinator-workspace`: Coordinator workspace
+
+- **What:** a per-person workspace, added upstream on 2026-10-29 (#17983). It's off by default and
+  turned on in Settings > Experimental, stored as a workspace preference rather than an instance
+  flag. It needs `enableAgentChat`. It has:
+  - one conversation per agent;
+  - task proposals from chat (a new task with no assignee goes to the chat's agent);
+  - compact task and decision cards;
+  - document panels beside the chat;
+  - pinned destinations;
+  - a Needs You queue with search, filters, grouping and history.
+- **Requests:** `GET /api/workspace-preferences/me`,
+  `PUT /api/companies/:companyId/workspace-preferences/me`, `GET /api/issues/:id/pending-questions`,
+  `/decision-receipts`, `/chat-handoffs`, `/documents/:key/revisions/:revisionId`,
+  `GET /api/companies/:companyId/attention/history` (cursor-paged decision history). Since the
+  2026-11-01 sync, its counts and Needs attention use `GET /api/companies/:companyId/attention/summary`
+  and `/attention/tasks`.
+- **Notes:** upstream's own take on what `ui-new` redesigns: the Inbox's Needs you, requests and agent
+  chat. Not ported. It's to be compared with `ui-new` and designed
+  ([build plan 3.16](../../build-plan.md#316-upstreams-coordinator-workspace), U36).
+
 ### `shell/misc`: Other shell features
 
 - Announcements (`AnnouncementWell`; `GET /api/announcements/*`, dismiss).

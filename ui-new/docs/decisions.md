@@ -85,10 +85,10 @@ decision changes, mark the old one superseded and link the new entry rather than
 - **Found in:** the project Docs tab in the tasks and projects design canvas (screen 9,
   [private link](https://claude.ai/artifact/Rfim4J3VCm6qkSvcpeLsi7)).
 
-**What we found.** Documents (keyed markdown with revisions, locks and annotations) exist on tasks,
-cases and pipelines (`/api/issues/:id/documents/:key`, `/api/cases/:id/documents/:key`,
-`/api/pipelines/:pipelineId/documents/:key`). Attachments exist on tasks and cases. Projects have
-neither. The only project-level text is the project's markdown `description`, which can embed images
+**What we found.** Documents (keyed markdown with revisions, locks and annotations) exist on tasks
+and cases (`/api/issues/:id/documents/:key`, `/api/cases/:id/documents/:key`). Pipelines had them
+too until upstream removed the Pipelines experiment on Oct 22, 2026 (#16834). Attachments exist on
+tasks and cases. Projects have neither. The only project-level text is the project's markdown `description`, which can embed images
 uploaded with `POST /api/companies/:companyId/assets/images`.
 
 Part of the design already works on the existing API: `GET /api/companies/:companyId/artifacts`
@@ -110,7 +110,7 @@ well as people.
 2. **The project description only.** Treat the description as the single project doc. Nothing new is
    needed, but it's one document, with no revisions and no files other than embedded images.
 3. **Propose project documents upstream.** Ask Paperclip to support documents and attachments on
-   projects, as it already does for cases and pipelines. This is the cleanest result, but it depends on
+   projects, as it already does for cases. This is the cleanest result, but it depends on
    upstream accepting it and on when it lands.
 4. **Drop the section.** The Docs tab shows task docs only.
 
@@ -192,8 +192,9 @@ default. There are two ways to turn it on:
 
 - **For an agent:** the "Capture raw provider traces" setting under Debugging in the agent's
   configuration. It records every future run until someone turns it off.
-- **For one run:** "Run with provider trace", which wakes the agent with
-  `debug: { providerTrace: "raw" }`.
+- **For one run:** a wake with `debug: { providerTrace: "raw" }`. The old UI's "Run with provider
+  trace" header button was removed upstream on Oct 22, 2026 (#17211), but the wake request still
+  accepts it, and `ui-new`'s "Rerun with trace" uses it.
 
 Traces have tight limits. Only instance admins can view them (`GET /api/heartbeat-runs/:runId/provider-trace`).
 Message bodies stay redacted until an admin reveals a frame, and both viewing and revealing are logged
@@ -1673,11 +1674,10 @@ Both are handled in `ui-new` for now.
   `yaml` package (2.9.1, as `ui/` and the root use) added to `ui-new`, approved by the user. It reads
   the shared zod schemas (`agentConfigurationInputSchema`) at runtime, as the old UI does. Test
   data: agent "M7 test yaml agent" (41bfe639, paused), secret "M7 test yaml secret" (181a6c62).
-- **Follow-ups left open:** negotiating run interests (`live.interests`) in `live-events.tsx`; the
-  plugin bridge's new retry policy (`ui/src/plugins/bridge.ts`); checking chat task creation against
-  the new default (an unassigned task made in chat goes to the chat's agent); checking onboarding
-  against the new approval and first-task rules; using decision history
-  (`GET /companies/:id/attention/history`) in the Inbox.
+- **Follow-ups:** moved on Nov 3, 2026 to the build plan's
+  [Upstream changes to integrate](build-plan.md#upstream-changes-to-integrate): run interests (U28),
+  the plugin bridge's retry policy (U29), the chat task default (U34), onboarding's approval and
+  first-task rules (U35) and decision history in the Inbox (U33).
 
 ### 48. Upstream sync 2026-11-01
 
@@ -1702,10 +1702,10 @@ Both are handled in `ui-new` for now.
   delivery briefings needed ([build plan 3.13](build-plan.md#313-briefings-and-reports)); M7 round 3
   (2026-11-02) added the source label ("From the recurring task … · TES-10"), read marking
   (`POST /issues/:id/read` with `throughCommentId`) and unread dots beside agents in the desktop nav;
-  the phone has no dot yet. `lastExternalCommentAt` comes back as Postgres text, not ISO (upstream
+  the status cards work added the dock's dot on phones. `lastExternalCommentAt` comes back as Postgres text, not ISO (upstream
   candidate 19); `ui-new` doesn't use it.
-- **Follow-ups left open:** `expectedVersionId` on ordinary Studio saves with a conflict notice;
-  plugin task side panels opening by hand and on runtime activity, with availability called with
-  `runId` and `issueId` instead of polled; ~~chat read state and the source label~~ (done in M7 round 3); `attention/summary`
-  for nav counts; harness labels for Antigravity and Kimi; and, from the Oct 29 sync, the plugin
-  bridge's retry policy and `live.hello`.
+- **Follow-ups:** chat read state and the source label were done in M7 round 3. The rest moved on
+  Nov 3, 2026 to the build plan's
+  [Upstream changes to integrate](build-plan.md#upstream-changes-to-integrate): `expectedVersionId`
+  on Studio saves (U31), plugin task side panels (U30), `attention/summary` (U32), the Antigravity
+  and Kimi labels (U22), and `live.hello` (U28).

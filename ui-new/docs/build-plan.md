@@ -445,6 +445,65 @@ Progress:
   `shell/coordinator-workspace` (to investigate and design, 3.16). Still open from earlier: the
   Workspaces summary card, the phone toolbar width (`.tv-toolbar--phone` is 394px at 390), the
   project header on phones, and the agent page's "From connections" instructions.
+- **Upstream changes to integrate:** the [table below](#upstream-changes-to-integrate), from the
+  Nov 3 audit of every sync report since Oct 15 and the Nov 3 sync.
+
+##### Upstream changes to integrate
+
+`ui-new` keeps adopting upstream's changes, not just staying compatible. Every sync change that
+affects the board gets a line here, with an outcome, before `new-ui` moves (the
+[upstream-sync skill](../../.claude/skills/upstream-sync/SKILL.md), step 9). Each capability row's
+"Upstream sync" note links its line here.
+
+Outcomes: **build** (an agent builds it), **decide** (a question for the user first), **check**
+(verify, then build or close), **design** (needs boards first), **left out** (with the reason),
+**done**. When a line is built or settled, mark it done or left out here and in its row.
+
+The audit (Nov 3) found the Oct 15–26 syncs mostly built. The gaps start with the Oct 22 sync. Many
+were noted on `done` rows as "Upstream sync …" without being built or recorded as a to-do. The
+follow-ups that decisions 47 and 48 listed are moved here.
+
+| # | Change | Sync | Upstream | Row | Outcome |
+| --- | --- | --- | --- | --- | --- |
+| U1 | **Monitoring status.** Tasks and search results carry `displayStatus`, which adds `monitoring` (an agent's task waiting on a saved monitor, with no run, reviewer or recovery). Lists and search filter by `displayStatus=`, and search returns its facet counts. The stored `status` is unchanged and is still what people set. | 11-03 | #18624 | `tasks/views`, `tasks/organize`, `tasks/properties`, `inbox-search/search` | **decide**: recommended adopt (a Monitoring capsule, column and filter; the status picker still sets `status`) |
+| U2 | **Provider and workspace failures** on interrupted tasks (`interruption.providerFailure`, `workspaceFailure`) and in run results. `readProviderFailure` is a runtime export. | 11-03 | #18622, #18770 | `tasks/recovery`, `runs-adapters/runs` | build |
+| U3 | **`GET …/inbox/mine`**: the Updates tab in one read, with each source's errors. Read marks now refresh only the reader's own lists. | 11-03 | #18790 | `inbox-search/triage` | build |
+| U4 | **`boardBootstrap` on the session**: companies and board access with the session, read through `readBoardBootstrap`, to seed those reads on first load. | 11-03 | #18790 | `shell/company` | build |
+| U5 | **AI connection account identity** (`…/ai-connections/:id/identity?grantId=`): the signed-in account and organization. | 11-03 | #18653 | Apps and tools | build |
+| U6 | **`sortField=created`**: server sort by created, kept in the URL, stable paging. `ui-new` always sends `updated` and sorts on the client. | 11-03 | `946735d03` | `tasks/organize`, `routines/run-now + /history` | build |
+| U7 | **Instructions bundle settings** (external folder, entry file; "Not yet" in decision 29), sending `requireExistingEntry`. | 11-03 | #18378 | `agents/instructions` | build |
+| U8 | **"Started by run"** on routine runs (`RoutineRun.createdByRunId`), linked to the run. | 11-03 | #18772 | `routines/run-now + /history` | build |
+| U9 | **Per-connection reads** on App detail: `…/review-counts` and `…/profile-configuration` instead of the company-wide attention and profiles reads. | 11-03 | `58308a3e6`, `554a770c6` | Apps and tools | build |
+| U10 | **`agents:read` permission** (migration 0423): redacted configuration reads for agents. Check how Permissions, trust and the YAML editor handle a 403, and whether the grant should be listed. | 11-03 | #18766 | `agents/permissions`, `agents/configuration-yaml` | check |
+| U11 | **The old UI's refined agent page:** Activity, Runs, Costs and Budgets inside the agent; an agent history dialog; direct reports and allowed connectors panels; the identity card dropped. Its new URLs `/agents/:id/identity` and `/activity` aren't mapped in `SECTION_ALIASES`. | 11-03 | #18378 | `agents/overview`, `agents/audit`, `agents/revisions` | build the old links; **decide** the rest (recommended: drop the identity card too, compare the rest board by board) |
+| U12 | **Cursor Cloud** as a Paperclip Runner provider (experimental; repository or cloud environment, per-turn, only `CURSOR_API_KEY`). | 11-03 | #18068, #18069 | `agents/hire`, `agents/runtime` | **decide**, with the Runner's managed-provider select (decision 45) |
+| U13 | **Writes that survive outages:** autosave, comments, new tasks and decisions queued and replayed with their idempotency keys; receipt recovery (`X-Paperclip-Receipt-Only`); request answers re-read interactions after an uncertain result. `ui-new` only shows a reconnecting notice. | 10-29 | #15754, #17960 | `shell/live-updates`, `tasks/interactions` | **decide**: the largest item |
+| U14 | **Retry on interrupted tasks in the Inbox**: interruption state and Retry on Inbox task rows, as the task list has. | 10-22 | `d33b40a5c` | `inbox-search/triage` | build |
+| U15 | **Subtasks an agent creates, shown inline** in the task feed. | 11-01 | #18320 | `tasks/thread` | build |
+| U16 | **Batched run reads** (`GET /issues/:id/runs?runIds=`, up to 100). | 11-01 | — | `tasks/thread` | build |
+| U17 | **Image gallery** in task documents. | 11-01 | `cd5f93055` | `documents-artifacts/documents` | build |
+| U18 | **Routine tasks filter and Needs attention:** `?originKind=routine_execution`, and Needs attention from `GET …/attention/tasks`. Old `/issues?originKind=` links aren't mapped. | 11-01 | #18317, #18323 | `tasks/organize`, `shell/misc` (old links) | build the link mapping and Needs attention; check whether the Recurring view covers the filter |
+| U19 | **Run events `?view=conversation`** and `alignStartToRecord` on the log, instead of reading everything from offset 0. | 10-26 | #17593, #17756 | `runs-adapters/runs` | build |
+| U20 | **Chat history newest first:** the 20 newest comments (`oldestCommentId`), older ones on scroll. `ui-new` pages forward from the oldest. | 11-01 | #18358 | `agent-chat/history + /handoff` | build |
+| U21 | **Resume a saved AI sign-in setup** (`GET …/ai-connections/login/:sessionId/setup`). | 10-29 | #17737 | Apps and tools | build |
+| U22 | **Kimi Code and Antigravity in New agent** (Runner candidates through `candidateHarnesses`, operator-gated), with labels for `kimi_runtime` and `antigravity_runtime`. | 11-01 | `b866fa4bd`, `09c05c550` | `agents/hire` | build |
+| U23 | **Workspace file source label** ("Live workspace" or "Saved copy from …", from `data.workspace.source`). | 11-01 | #18403 | `workspaces/files-git` | build |
+| U24 | **GitHub "Retry access"** banner with a link to the installation settings (`github_installation_required`). | 10-26 | `3edba1157` | Apps and tools | build |
+| U25 | **Runner Test re-qualifies** the saved computer (`qualify-runner`), not only the environment test. | 10-26 | `f0877a9c7` | `agents/runtime` | build |
+| U26 | **Case types** (`GET …/cases/types`). There's no case list (decision F); check whether Group: Case needs it. | 10-22 | `505e1a558` | `cases/browse` | check |
+| U27 | **Kimi progress channel** (`payload.update.channel`) in native transcripts. | 11-01 | `59da15066` | `runs-adapters/runs` | check `runs/paperclip-runner-parser.ts` |
+| U28 | **Live update interests:** `live.hello` and `live.interests` for run events, and `live.resync` with `controller_change`. | 10-29, 11-01 | #17456, #18518 | `shell/live-updates` | build |
+| U29 | **Plugin bridge retry policy**: upstream's backoff, keeping the last good data. `ui-new` retries twice. | 10-29 | — | `shell/plugins` | build |
+| U30 | **Plugin task side panels** opened by hand while the agent is idle and on runtime activity (`?view=plugin-panels`), availability checked with `runId` and `issueId` instead of polled. | 11-01 | #18131, #18363 | `shell/plugins` | build |
+| U31 | **`expectedVersionId` on ordinary Studio saves** and deletes, with a notice on 409. | 11-01 | #18334 | Skills | build |
+| U32 | **Nav counts from `GET …/attention/summary`.** | 11-01 | #18323 | `shell/navigation` | build |
+| U33 | **Decision history in the Inbox** (`GET …/attention/history`, cursor-paged). | 10-29 | #17983 | `inbox-search/triage` | build, or with U36 |
+| U34 | **Chat task default**: an unassigned task made in chat goes to the chat's agent. Check `ui-new`'s chat task creation. | 10-29 | #17983 | `agent-chat/history + /handoff` | check |
+| U35 | **Onboarding** against the new approval-before-tasks and first-task rules (server-only changes). | 10-29 | #17914, #17940 | Companies and onboarding | check |
+| U36 | **The Coordinator workspace**, and the requests it uses (`pending-questions`, `decision-receipts`, `chat-handoffs`, document revisions, `attention/history`, `workspace-preferences/me`). | 10-29, 11-01 | #17983 | `shell/coordinator-workspace` | design ([3.16](#316-upstreams-coordinator-workspace)) |
+| U37 | **Recheck the mirrored effort tables** after the model catalog refresh (decision 13's rule). Probably handled on Oct 26, not confirmed. | 10-26 | #17809 | `tasks/run-control` | check |
+| U38 | **Unread chat dot on phones.** | 11-01 | #18374 | `agent-chat/history + /handoff` | done (M7 round 3, status cards: the dock's Agents entry) |
+| U39 | **Stale decision text:** decision 1 named pipelines (removed upstream), decision 4 the removed "Run with provider trace" button. | 10-22 | `907774889`, #17211 | — | done (Nov 3) |
 
 - Plugin hosting (decision G): built in M6 rounds 2 and 3; the `organizationSwitcher` slot and local
   folders in M7 round 2.
@@ -815,7 +874,9 @@ investigated and designed for `ui-new`. Not started.
   `ui-new` endpoints it lacked (decision history, pending questions).
 - **To do:** use it in the old UI on TES; compare it board by board with `ui-new`'s Inbox, request
   cards and chat; decide what to adopt, merge or leave (and, under decision 12, what to do with its
-  per-person switch); then design boards for the parts `ui-new` takes.
+  per-person switch); then design boards for the parts `ui-new` takes. Tracked as
+  [U36](#upstream-changes-to-integrate); the area guide entry is
+  [`shell/coordinator-workspace`](inventory/areas/app-shell.md#shellcoordinator-workspace-coordinator-workspace).
 
 ## Questions for you
 
@@ -845,6 +906,9 @@ All answered Oct 24, 2026.
 
 - After each milestone, update its row statuses in [capabilities.md](inventory/capabilities.md) and
   mark the milestone done here.
+- After each upstream sync, give every change that affects the board a line in
+  [Upstream changes to integrate](#upstream-changes-to-integrate), with an outcome, and link it from
+  its capability row.
 - Upstream syncs can move items between stages. When upstream ships something the plan expected to
   build (as Artifacts V1 and bulk agent edits did on 2026-10-24), update the matching milestone or
   stage 3 entry.

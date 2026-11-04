@@ -187,7 +187,9 @@ git diff --stat ui-new/docs/inventory/generated
   - **An existing capability** (the new request serves a page or feature already in the
     checklist): add the request, and a few words on what it does, to that capability's entry in
     `ui-new/docs/inventory/areas/`, and note the change in the **Notes** of its row in
-    `ui-new/docs/inventory/capabilities.md` (`Upstream sync <date>: <what changed>`).
+    `ui-new/docs/inventory/capabilities.md` (`Upstream sync <date>: <what changed>`). If `ui-new`
+    doesn't do it yet, the note also names its line in the integration table (below), so a `done`
+    row never describes work that wasn't built.
   - **A new capability:** add a row to `capabilities.md` in the right area table. Leave
     **New home** and **Status** blank and put `Added by upstream sync <date>` in **Notes**. Don't
     write its area guide entry; say in the report that one is needed.
@@ -196,6 +198,20 @@ git diff --stat ui-new/docs/inventory/generated
     list it in the report for the user to confirm. Add it to that entry only once confirmed.
 
   List them all in the report.
+- **Integration table.** `ui-new` keeps adopting upstream's changes, not just compiling against them.
+  Go through the whole range, not only the inventory diff: new fields, statuses, routes, query
+  parameters, live events, behaviour changes, and old-UI changes that show a feature `ui-new` lacks.
+  For each one that affects the board and that `ui-new` doesn't handle yet, add a line to
+  [Upstream changes to integrate](../../../ui-new/docs/build-plan.md#upstream-changes-to-integrate)
+  in `ui-new/docs/build-plan.md`. Number it after the last `U` line and give it the change, the
+  sync date, the upstream PR or commit, the capability row, and a proposed outcome:
+  - **build** for anything that fits the redesign;
+  - **check** when it may already be covered;
+  - **decide** for large items, removals, or anything that changes the redesign;
+  - **left out**, with the reason, for operator-only or flag-gated features that decision 12
+    already leaves out.
+
+  Link the line from its capability row. Commit these with the checklist annotations.
 - If a resolution moved or rewrote a patch, update its FORK-PATCHES.md entry in the same commit.
 
 ## 9. Report
@@ -222,11 +238,17 @@ Range: <BASE short>..<TIP short> (<n> commits). Branch: sync/<date>.
 ## Checks
 <each check: passed / failed, with the relevant output>
 
+## To integrate into ui-new
+<every change from the integration table step: what changed, the ui-new files it touches, the
+capability rows, its U number and proposed outcome. "Nothing." if the range has none.>
+
 ## Inventory and capabilities
 <new or changed routes, requests and flags; rows added to the checklist>
 ```
 
-Then give the user a short summary in chat and the path to the report.
+Then give the user a short summary in chat and the path to the report. List the new U lines with
+their proposed outcomes, and ask about the **decide** ones. Don't move `new-ui` until each line has
+an outcome the user has seen.
 
 ## 10. Finish (only after the user approves the result)
 
