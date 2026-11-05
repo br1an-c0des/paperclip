@@ -7,7 +7,7 @@ import { activeAgents } from "@/api/agents";
 import { ApiError } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
-import { useAgentsQuery } from "@/lib/company-data";
+import { useAgentsQuery, usePeopleQuery } from "@/lib/company-data";
 import { useSession } from "@/lib/session";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
@@ -17,6 +17,7 @@ import { Menu } from "@/ui/Menu";
 import { pushToast } from "@/ui/Toast";
 import {
   approveRole,
+  directoryMembers,
   inviteMeta,
   inviteTitle,
   memberMeta,
@@ -38,6 +39,9 @@ import { CardHead, CardNoteLine, copyText, failure, SectionTitle } from "./share
  * archives the membership and hands their open tasks to whoever you pick (or leaves them
  * unassigned). An invite's link is only returned when it's made, so it's shown and copied then;
  * older invites can be revoked but not copied again.
+ *
+ * Without the permission to manage members, `/members` is refused, so People lists the company's
+ * active people and their roles from the user directory instead (#15183), read-only.
  */
 
 const INVITE_PAGE = 20;
@@ -52,6 +56,14 @@ export function MembersSection(props: { anchor?: string }) {
   }));
   const access = () => members.data?.access;
   const list = createMemo(() => visibleMembers(members.data?.members ?? []));
+  const forbidden = () => members.error instanceof ApiError && members.error.status === 403;
+  const people = usePeopleQuery();
+  const readOnly = createMemo(() => (forbidden() ? directoryMembers(people.data?.users ?? []) : []));
+  const peopleNote = () => {
+    const count = members.data ? list().length : forbidden() && people.data ? readOnly().length : null;
+    if (count === null) return forbidden() && people.isError ? "Couldn't load them" : "Loading…";
+    return count === 1 ? "1 member" : `${count} members`;
+  };
 
   const refresh = () =>
     Promise.all([
@@ -87,8 +99,8 @@ export function MembersSection(props: { anchor?: string }) {
 
       <Show when={members.isError}>
         <CardNoteLine alert>
-          {members.error instanceof ApiError && members.error.status === 403
-            ? "You don't have permission to manage this organization's members."
+          {forbidden()
+            ? "You don't have permission to manage this organization's members, so you can see who's here but not change anything."
             : `Couldn't load the members. ${failure(members.error, "")}`}
         </CardNoteLine>
       </Show>
@@ -102,7 +114,7 @@ export function MembersSection(props: { anchor?: string }) {
         <CardHead
           id="cs-people"
           title="People"
-          note={members.data ? (list().length === 1 ? "1 member" : `${list().length} members`) : "Loading…"}
+          note={peopleNote()}
           actions={
             <Show when={access()?.canInviteUsers}>
               <a class={`btn btn--primary btn--compact`} href="#invites">
@@ -213,6 +225,28 @@ export function MembersSection(props: { anchor?: string }) {
                     </Menu>
                   </Show>
                 </span>
+              </div>
+            )}
+          </For>
+          <For each={readOnly()}>
+            {(person) => (
+              <div class="cs-trow" role="row">
+                <span role="cell" class="cs-person">
+                  <InitialsDisc name={memberName(person)} seed={person.principalId} size={30} you={person.principalId === session.youId()} />
+                  <span class="cs-person-text">
+                    <span class="cs-strong">
+                      {memberName(person)}
+                      {person.principalId === session.youId() ? " (you)" : ""}
+                    </span>
+                    <Show when={person.user?.email && person.user.name?.trim()}>
+                      <span class="cs-muted">{person.user!.email}</span>
+                    </Show>
+                  </span>
+                </span>
+                <span role="cell" class="cs-muted">
+                  {roleLabel(person.membershipRole)}
+                </span>
+                <span role="cell" />
               </div>
             )}
           </For>

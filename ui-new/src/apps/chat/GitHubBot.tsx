@@ -3,10 +3,10 @@ import { A } from "@solidjs/router";
 import { createInfiniteQuery, createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ExternalLink, Plus, RefreshCw } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch, type JSX } from "solid-js";
-import { accessApi } from "@/api/access";
 import { chatEndpointsApi, githubChatApi, type ChatEndpoint, type GitHubConfigurationRecord } from "@/api/chat-endpoints";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
+import { usePeopleQuery } from "@/lib/company-data";
 import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Field, TextArea, TextInput } from "@/ui/Field";
@@ -474,17 +474,14 @@ export function GitHubAccess(props: { endpoint: ChatEndpoint; base: string }) {
   const company = useCompany();
   const client = useQueryClient();
   const state = useConfiguration(() => props.endpoint);
-  const members = createQuery(() => ({
-    queryKey: queryKeys.chatEndpoints.part(company().id, props.endpoint.id, "github-members"),
-    queryFn: ({ signal }) => accessApi.members(company().id, signal),
-    retry: false,
-  }));
+  // The company's active people with their roles (#15183), which any member can read.
+  const members = usePeopleQuery();
   const linksKey = () => queryKeys.chatEndpoints.part(company().id, props.endpoint.id, "principals");
   const links = createQuery(() => ({
     queryKey: linksKey(),
     queryFn: ({ signal }) => chatEndpointsApi.principals(props.endpoint.id, signal),
   }));
-  const active = createMemo(() => (members.data?.members ?? []).filter((member) => member.status === "active" && member.membershipRole !== "viewer"));
+  const active = createMemo(() => (members.data?.users ?? []).filter((member) => member.membershipRole !== "viewer"));
   const memberName = (userId: string) => {
     const member = active().find((entry) => entry.principalId === userId);
     return member?.user?.name ?? member?.user?.email ?? userId;
