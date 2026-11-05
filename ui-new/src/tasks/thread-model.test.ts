@@ -1,9 +1,10 @@
-import type { ActivityEvent, IssueComment } from "@paperclipai/shared";
+import type { ActivityEvent, CompactIssue, IssueComment, IssueThreadInteraction } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import type { RunForIssue } from "@/api/issues";
 import { activityLine } from "./activity-format";
 import type { Request } from "@/requests/request-model";
-import { buildThread, duration, stampLabel } from "./thread-model";
+import { buildThread, createdTasks, duration, stampLabel, suggestedTaskIds } from "./thread-model";
+import { windowThread } from "./history-window";
 
 const names = {
   agent: (id: string) => ({ a1: "Ada", a2: "Ben" })[id],
@@ -157,5 +158,48 @@ describe("requests and queued comments in the thread", () => {
     });
     expect(items.map((item) => item.key)).toEqual(["old-open", "comment:c1"]);
     expect(buildThread({ comments: [], events: [], runs: [], requests: [request("r", "2026-10-25T10:00:00Z", "open")], names, filter: "changes" })).toEqual([]);
+  });
+});
+
+describe("tasks made from this one", () => {
+  const made = (id: string, at: string, extra: Partial<CompactIssue> = {}) =>
+    ({ id, companyId: "c1", identifier: id.toUpperCase(), title: `Task ${id}`, status: "todo", projectId: null, parentId: "t1", createdByAgentId: "a1", createdAt: at, ...extra }) as CompactIssue;
+  const context = { taskId: "t1", companyId: "c1" };
+
+  it("keeps agents' tasks in this company, each once, and tells subtasks from follow-ups", () => {
+    const found = createdTasks(
+      [
+        made("s1", "2026-10-01T10:00:00Z"),
+        made("s1", "2026-10-01T10:00:00Z"),
+        made("f1", "2026-10-01T11:00:00Z", { parentId: null }),
+        made("human", "2026-10-01T11:00:00Z", { createdByAgentId: null }),
+        made("other", "2026-10-01T11:00:00Z", { companyId: "c2" }),
+        made("t1", "2026-10-01T11:00:00Z"),
+        made("suggested", "2026-10-01T11:00:00Z"),
+      ],
+      { ...context, shown: new Set(["suggested"]) },
+    );
+    expect(found.map((entry) => [entry.task.id, entry.task.subtask])).toEqual([
+      ["s1", true],
+      ["f1", false],
+    ]);
+  });
+
+  it("knows the tasks an accepted suggestion made", () => {
+    const interactions = [
+      { kind: "suggest_tasks", status: "accepted", result: { createdTasks: [{ clientKey: "k", issueId: "x1" }] } },
+      { kind: "suggest_tasks", status: "pending", result: { createdTasks: [{ clientKey: "k", issueId: "x2" }] } },
+    ] as unknown as IssueThreadInteraction[];
+    expect([...suggestedTaskIds(interactions)]).toEqual(["x1"]);
+  });
+
+  it("puts each in time order among the changes, held back behind the gap like them", () => {
+    const tasks = createdTasks([made("s1", "2026-10-01T10:30:00Z")], context);
+    const thread = buildThread({ comments: [comment("c1", "2026-10-01T10:00:00Z"), comment("c2", "2026-10-01T11:00:00Z")], events: [], runs: [], tasks, names });
+    expect(thread.map((item) => item.key)).toEqual(["comment:c1", "task:s1", "comment:c2"]);
+    expect(buildThread({ comments: [], events: [], runs: [], tasks, names, filter: "comments" })).toEqual([]);
+    expect(buildThread({ comments: [], events: [], runs: [], tasks, names, search: "S1" })).toHaveLength(1);
+    const windowed = windowThread({ comments: [], events: [], runs: [], tasks, names, from: new Date("2026-10-01T11:00:00Z").getTime() });
+    expect(windowed.map((item) => item.key)).toEqual(["gap"]);
   });
 });

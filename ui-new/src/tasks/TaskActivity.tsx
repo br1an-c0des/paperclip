@@ -1,12 +1,12 @@
 import type { IssueComment, IssueStatus } from "@paperclipai/shared";
 import { createInfiniteQuery, createMutation, createQuery, keepPreviousData, useQueryClient } from "@tanstack/solid-query";
-import { ArrowDown, Ellipsis, Search, Square, X } from "lucide-solid";
+import { ArrowDown, ArrowUpRight, Ellipsis, ListTree, Search, Square, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch } from "solid-js";
 import { approvalsApi } from "@/api/approvals";
 import { commentsApi } from "@/api/comments";
 import { heartbeatsApi } from "@/api/heartbeats";
 import { interactionsApi } from "@/api/interactions";
-import { issuesApi } from "@/api/issues";
+import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useNow } from "@/lib/clock";
 import { useCommands } from "@/lib/commands";
@@ -43,7 +43,9 @@ import { MessageBody } from "./MessageBody";
 import { SourceTrustBadge } from "@/documents/SourceTrustBadge";
 import { useTaskPeople } from "./people";
 import { StatusChip } from "./TaskDetails";
-import { duration, stampLabel, type ThreadFilter } from "./thread-model";
+import { plainClick } from "./TaskList";
+import { shownStatus } from "@/ui/status-meta";
+import { createdTasks, duration, stampLabel, suggestedTaskIds, type CreatedTask, type ThreadFilter } from "./thread-model";
 import { commentElementId, nearBottom } from "./task-anchor";
 import { CommentPluginActions, CommentPluginAnnotations } from "@/plugins/CommentPlugins";
 import "./TaskActivity.css";
@@ -51,8 +53,9 @@ import "./TaskActivity.css";
 /*
  * The task panel's Activity section (board 3): the thread, oldest first, with comments as cards,
  * changes and finished runs as compact lines between them, agents' requests and the task's
- * approvals as request cards (board 15), and the live run as a card at the foot with Stop. Runs
- * open in the run modal ("View run"). An agent's comment has thumbs up and down (FeedbackVotes.tsx).
+ * approvals as request cards (board 15), tasks an agent made from this one as linked cards, and the
+ * live run as a card at the foot with Stop. Runs open in the run modal ("View run"). An agent's
+ * comment has thumbs up and down (FeedbackVotes.tsx).
  *
  * It opens on the latest of the task's history and the task row alone (history-window.ts), and
  * reads the rest when the reader asks: "Show earlier activity", a search, or a filter. From then on
@@ -78,7 +81,13 @@ const FILTERS: { value: ThreadFilter; label: string }[] = [
 /** How many pages of older comments a `#comment-<id>` link loads before giving up. */
 const FOCUS_PAGE_LIMIT = 40;
 
-export function TaskActivity(props: { taskId: string; title?: string; focusCommentId?: string }) {
+export function TaskActivity(props: {
+  taskId: string;
+  title?: string;
+  focusCommentId?: string;
+  /** Opens a task the thread links to in the same place; without it, in the task modal. */
+  onOpenTask?: (task: { id: string; identifier: string | null }) => void;
+}) {
   const company = useCompany();
   const commands = useCommands();
   const client = useQueryClient();
@@ -125,7 +134,12 @@ export function TaskActivity(props: { taskId: string; title?: string; focusComme
     return {
       queryKey: key,
       queryFn: async ({ signal }: { signal: AbortSignal }) =>
-        mergeRuns(client.getQueryData<RunWindow>(key), await issuesApi.recentRuns(taskId, signal), () => issuesApi.runs(taskId, signal)),
+        mergeRuns(
+          client.getQueryData<RunWindow>(key),
+          await issuesApi.recentRuns(taskId, signal),
+          () => issuesApi.runs(taskId, signal),
+          (ids) => issuesApi.runsByIds(taskId, ids, signal),
+        ),
       enabled: !expanded(),
     };
   });
@@ -195,6 +209,22 @@ export function TaskActivity(props: { taskId: string; title?: string; focusComme
     queryKey: queryKeys.issues.section(props.taskId, "approvals"),
     queryFn: ({ signal }) => approvalsApi.forIssue(props.taskId, signal),
   }));
+  // Tasks agents made from this one: its subtasks (the same read as Details) and its follow-ups.
+  const subtasks = createQuery(() => ({
+    queryKey: queryKeys.issues.view(company().id, { parentId: props.taskId }),
+    queryFn: ({ signal }) => issuesApi.list(company().id, { parentId: props.taskId }, signal),
+  }));
+  const followUps = createQuery(() => ({
+    queryKey: [...queryKeys.issues.list(company().id), "created-from", props.taskId],
+    queryFn: ({ signal }) => issuesApi.listAll(company().id, { createdFromIssueId: props.taskId, includeRoutineExecutions: true }, signal),
+  }));
+  const madeTasks = createMemo(() =>
+    createdTasks([...(subtasks.data ?? []), ...(followUps.data ?? [])], {
+      taskId: props.taskId,
+      companyId: company().id,
+      shown: suggestedTaskIds(interactions.data ?? []),
+    }),
+  );
   const live = createMemo(() => (liveRuns.data ?? []).filter((run) => run.issueId === props.taskId));
   // Ticks the live runs' running times.
   const now = useNow(() => live().length > 0);
@@ -223,6 +253,7 @@ export function TaskActivity(props: { taskId: string; title?: string; focusComme
       events: shownEvents(),
       runs: shownRuns(),
       requests: requests(),
+      tasks: madeTasks(),
       hiddenCommentIds: queuedIds(queue.data),
       names,
       from: from(),
@@ -440,6 +471,15 @@ export function TaskActivity(props: { taskId: string; title?: string; focusComme
                     )}
                   </Match>
                   <Match when={item.kind === "request" && item}>{(entry) => <RequestCard request={entry().request} taskId={props.taskId} people={people} inThread />}</Match>
+                  <Match when={item.kind === "task" && item}>
+                    {(entry) => (
+                      <CreatedTaskCard
+                        task={entry().task}
+                        at={entry().at}
+                        onOpen={(task) => (props.onOpenTask ? props.onOpenTask(task) : commands.openTaskModal({ id: task.id, identifier: task.identifier, title: task.title, projectId: task.projectId }))}
+                      />
+                    )}
+                  </Match>
                 </Switch>
               )}
             </For>
@@ -571,5 +611,35 @@ function Comment(props: {
         <FeedbackVotes taskId={props.taskId} commentId={props.comment.id} youId={props.people.youId()} />
       </Show>
     </article>
+  );
+}
+
+/** A task an agent made from this one, as a card at the time it was made, with its status as it is now. */
+function CreatedTaskCard(props: { task: CreatedTask; at: Date; onOpen: (task: CreatedTask) => void }) {
+  const company = useCompany();
+  return (
+    <a
+      class="ta-made"
+      href={issuePath(company().issuePrefix, props.task)}
+      onClick={(event) => {
+        if (!plainClick(event)) return;
+        event.preventDefault();
+        props.onOpen(props.task);
+      }}
+    >
+      <ListTree size={16} aria-hidden="true" class="ta-made-icon" />
+      <span class="ta-made-text">
+        <span class="ta-made-kicker">
+          {props.task.subtask ? "Subtask created" : "Task created"}
+          <time datetime={props.at.toISOString()}> · {stampLabel(props.at)}</time>
+        </span>
+        <span class="ta-made-title">{props.task.title}</span>
+        <span class="ta-made-meta">
+          <Show when={props.task.identifier}>{(id) => <span class="mono">{id()}</span>}</Show>
+          <StatusChip status={shownStatus(props.task)} small />
+        </span>
+      </span>
+      <ArrowUpRight size={15} aria-hidden="true" class="ta-made-icon" />
+    </a>
   );
 }

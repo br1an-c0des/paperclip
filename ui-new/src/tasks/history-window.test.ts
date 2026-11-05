@@ -126,6 +126,34 @@ describe("mergeRuns", () => {
     expect(fetchAll).toHaveBeenCalledOnce();
     expect(next).toEqual({ runs: all, from: null });
   });
+
+  it("reads only the dropped runs by id when the latest two meet the runs seen before", async () => {
+    const fetchAll = vi.fn();
+    const fetchByIds = vi.fn(async () => [run("r3", "succeeded", 30)]);
+    const previous = { runs: [run("r4", "running", 40), run("r3", "running", 30), run("r2", "succeeded", 20)], from: at(19) };
+    const next = await mergeRuns(previous, [run("r5", "running", 50), run("r4", "succeeded", 40)], fetchAll, fetchByIds);
+    expect(fetchAll).not.toHaveBeenCalled();
+    expect(fetchByIds).toHaveBeenCalledWith(["r3"]);
+    expect(next.from).toBe(at(19));
+    expect(Object.fromEntries(next.runs.map((item) => [item.runId, item.status]))).toEqual({
+      r2: "succeeded",
+      r3: "succeeded",
+      r4: "succeeded",
+      r5: "running",
+    });
+  });
+
+  it("still reads every run when unseen runs may lie between, and lets go of a run the task no longer lists", async () => {
+    const fetchAll = vi.fn(async () => [run("r6", "succeeded", 60)]);
+    const fetchByIds = vi.fn(async () => []);
+    const previous = { runs: [run("r3", "running", 30)], from: null };
+    await mergeRuns(previous, [run("r6", "succeeded", 60), run("r5", "succeeded", 50)], fetchAll, fetchByIds);
+    expect(fetchAll).toHaveBeenCalledOnce();
+    expect(fetchByIds).not.toHaveBeenCalled();
+    const known = { runs: [run("r4", "succeeded", 40), run("r3", "running", 30)], from: null };
+    const next = await mergeRuns(known, [run("r5", "succeeded", 50), run("r4", "succeeded", 40)], fetchAll, fetchByIds);
+    expect(next.runs.map((item) => item.runId)).toEqual(["r4", "r5"]);
+  });
 });
 
 describe("historyFrom", () => {

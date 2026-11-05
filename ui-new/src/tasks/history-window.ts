@@ -127,17 +127,29 @@ const ACTIVE_RUN = new Set(["queued", "running", "scheduled_retry"]);
 
 /**
  * The run window after a `?view=recent` answer (newest first): every run seen. A run that was going
- * and has dropped out of the latest two means several turns ended meanwhile (after a reconnect, say),
- * so the whole list is read once with `fetchAll`, as the old UI does.
+ * and has dropped out of the latest two means turns ended meanwhile (after a reconnect, say). When
+ * the answer's older run was seen before, nothing else can be missing, so only the dropped runs are
+ * read again, by id (`fetchByIds`, `?runIds=`, since the 2026-11-01 sync), as the old feed does;
+ * otherwise runs may have come and gone unseen, and the whole list is read once with `fetchAll`.
  */
 export async function mergeRuns(
   previous: RunWindow | undefined,
   recent: readonly RunForIssue[],
   fetchAll: () => Promise<RunForIssue[]>,
+  fetchByIds?: (runIds: string[]) => Promise<RunForIssue[]>,
 ): Promise<RunWindow> {
   const seen = new Set(recent.map((run) => run.runId));
-  if (previous?.runs.some((run) => ACTIVE_RUN.has(run.status) && !seen.has(run.runId))) {
-    return { runs: await fetchAll(), from: null };
+  const dropped = previous?.runs.filter((run) => ACTIVE_RUN.has(run.status) && !seen.has(run.runId)) ?? [];
+  if (previous && dropped.length > 0) {
+    const known = new Set(previous.runs.map((run) => run.runId));
+    const older = recent[recent.length - 1];
+    if (!fetchByIds || !older || !known.has(older.runId)) return { runs: await fetchAll(), from: null };
+    const settled = await fetchByIds(dropped.map((run) => run.runId));
+    // A dropped run the server no longer lists for the task is let go.
+    const gone = new Set(dropped.map((run) => run.runId).filter((id) => !settled.some((run) => run.runId === id)));
+    const kept = previous.runs.filter((run) => !gone.has(run.runId));
+    const runs = [...new Map([...kept, ...settled, ...recent].map((run) => [run.runId, run] as const)).values()];
+    return { runs, from: previous.from };
   }
   const oldest = recent[recent.length - 1];
   const from = previous ? previous.from : recent.length >= RECENT_RUNS_LIMIT && oldest ? new Date(runAt(oldest)).toISOString() : null;
@@ -160,8 +172,8 @@ const itemTime = (item: ThreadItem) => (item.kind === "lines" ? item.lines[0]!.a
 
 /**
  * The thread over windows of history (thread-model.ts's `buildThread`), with a gap where they stop:
- * changes, runs and settled requests from before `from` are held back, and comments from before it
- * show above the gap. With `from` null the history is whole and there's no gap.
+ * changes, runs, tasks made and settled requests from before `from` are held back, and comments
+ * from before it show above the gap. With `from` null the history is whole and there's no gap.
  */
 export function windowThread(input: Omit<Parameters<typeof buildThread>[0], "moreComments"> & { from: number | null }): WindowItem[] {
   const { from, ...rest } = input;
@@ -171,6 +183,7 @@ export function windowThread(input: Omit<Parameters<typeof buildThread>[0], "mor
     events: rest.events.filter((event) => time(event.createdAt) >= from),
     runs: rest.runs.filter((run) => time(runAt(run)) >= from),
     requests: rest.requests?.filter((request) => request.state !== "settled" || request.createdAt.getTime() >= from),
+    tasks: rest.tasks?.filter((made) => made.at.getTime() >= from),
   });
   const at = items.findIndex((item) => itemTime(item as ThreadItem) >= from);
   items.splice(at === -1 ? items.length : at, 0, { kind: "gap", key: "gap" });
