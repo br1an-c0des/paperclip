@@ -11,7 +11,7 @@ import { Segmented } from "@/ui/Segmented";
 import type { FileOpen } from "./file-ref";
 import { FilePreview } from "./FilePreview";
 import { appendPage, basename, groupByFolder, normalizePath, revealPath, treeRows, type FolderListing } from "./file-tree";
-import { describeUnavailable, fileSize, isMarkdownPath, languageFor } from "./preview";
+import { describeUnavailable, fileSize, isMarkdownPath, languageFor, savedAtLabel, workspaceSourceText } from "./preview";
 import "./WorkspaceFiles.css";
 
 /*
@@ -24,6 +24,9 @@ import "./WorkspaceFiles.css";
  * The workspace picker in the header can browse any project workspace in the company instead, as
  * the old file browser's "other workspace" source does (`workspace=project` with its project and
  * workspace ids).
+ *
+ * The heading says whether the files are the live workspace or a saved copy, and from when, when
+ * the server says (`workspace.source`).
  */
 
 type Mode = "changed" | "recent" | "all";
@@ -168,6 +171,22 @@ export function WorkspaceFiles(props: {
               <span class="tsec-muted wf-label">
                 <span class="mono">{workspace().workspaceLabel}</span>
                 <Show when={workspace().projectName}>{(name) => <> · {name()}</>}</Show>
+                <Show when={info()?.state === "available" && workspaceSourceText(workspace().source)}>
+                  {(from) => (
+                    <span aria-label="Workspace file source">
+                      {" · "}
+                      {from().text}
+                      <Show when={from().savedAt}>
+                        {(at) => (
+                          <>
+                            {" from "}
+                            <time datetime={at()}>{savedAtLabel(at())}</time>
+                          </>
+                        )}
+                      </Show>
+                    </span>
+                  )}
+                </Show>
               </span>
             )}
           </Show>
