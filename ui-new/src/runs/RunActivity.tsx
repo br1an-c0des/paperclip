@@ -310,7 +310,7 @@ export function ProposalCard(props: { markdown: string; streaming: boolean }) {
         </summary>
         <div class="rt-tbody">
           <Markdown source={props.markdown} class="rt-md ra-proposal-md" />
-          <p class="cap">The task's Plan document holds this plan, with a request to approve it.</p>
+          <p class="cap">On a standard or planning task, the task's Plan document takes this plan, with a request to approve it.</p>
         </div>
       </details>
     </Show>
