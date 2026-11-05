@@ -259,4 +259,10 @@ git push origin new-ui
 git branch -d sync/<date>
 ```
 
+Then run `corepack pnpm install` in the main checkout and rebuild the plugin SDK
+(`corepack pnpm --filter @paperclipai/plugin-sdk build`). The dev server loads it from its built
+`dist/`, so after a sync that adds SDK exports the server crashes on startup with "does not provide
+an export named …" until it's rebuilt. Restart the dev servers if they're running, and check that
+`/api/health` answers.
+
 If the user rejects the sync, leave the branch for them and don't delete anything.
