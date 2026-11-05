@@ -1,6 +1,6 @@
 import type { AgentDetail } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Square } from "lucide-solid";
+import { Square, TriangleAlert } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show, untrack } from "solid-js";
 import { heartbeatsApi } from "@/api/heartbeats";
 import { queryKeys } from "@/api/queryKeys";
@@ -13,6 +13,7 @@ import { buildTranscript, hasStructuredParser } from "@/runs/parsers";
 import { createRunLog } from "@/runs/run-log-source";
 import { costLabel, elapsedLabel, isActiveRun, runUsage } from "@/runs/run-model";
 import { buildItems } from "@/runs/transcript-model";
+import type { Plan } from "@/runs/activity-model";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
@@ -27,6 +28,12 @@ import { EMPTY_REPLY, mergeEvents, pickReply, prpEventsFromOutput, recentSteps, 
  * socket) and its stored events (read again on each event signal); reply-model.ts says which wins.
  * Once the run ends the card stays, without the caret, until the agent's message takes its place
  * (chat-model.ts, `shownReplies`).
+ *
+ * Each step says how it went (U42): "$ npm test · exit 1 · 2.3s", a blocked call, a subagent's
+ * progress, a web search. While the agent thinks, its latest reasoning headline stands in for
+ * "Thinking…"; a status notice that's still going (a retry, a compaction) shows under the steps;
+ * an MCP server that failed to start is a warning at the top. The agent's native plan goes to the
+ * chat (`onPlan`), which docks it above the composer (ChatPlanDock.tsx).
  */
 
 /** A burst of event signals costs one read. */
@@ -86,7 +93,13 @@ function useStoredEvents(runId: () => string) {
   return events;
 }
 
-export function LiveReply(props: { turn: ReplyTurn; agent: AgentDetail; censorUsername?: boolean }) {
+export function LiveReply(props: {
+  turn: ReplyTurn;
+  agent: AgentDetail;
+  censorUsername?: boolean;
+  /** The agent's plan while the reply runs, and whether a runtime request is waiting; null once it ends. */
+  onPlan?: (runId: string, plan: { plan: Plan; asking: boolean } | null) => void;
+}) {
   const company = useCompany();
   const commands = useCommands();
   const client = useQueryClient();
@@ -113,6 +126,15 @@ export function LiveReply(props: { turn: ReplyTurn; agent: AgentDetail; censorUs
   const reply = createMemo(() => pickReply(fromOutputEvents(), fromStoredEvents(), fromTranscript()));
   const steps = createMemo(() => recentSteps(reply().steps));
   const html = createMemo(() => (reply().text ? renderMarkdown(reply().text) : ""));
+  const health = () => reply().health ?? [];
+
+  // The plan is docked only while the reply runs (upstream #19252 hides it once the run ends).
+  const docked = createMemo(() => {
+    const plan = reply().plan;
+    return active() && plan && plan.steps.length > 0 ? { plan, asking: !!reply().asking } : null;
+  });
+  createEffect(on(docked, (plan) => props.onPlan?.(props.turn.runId, plan)));
+  onCleanup(() => props.onPlan?.(untrack(() => props.turn.runId), null));
 
   const elapsed = () => {
     const started = run.data?.startedAt;
@@ -159,6 +181,16 @@ export function LiveReply(props: { turn: ReplyTurn; agent: AgentDetail; censorUs
             </Show>
           </div>
         </div>
+        <Show when={health().length > 0}>
+          <p class="ch-live-health" role="status">
+            <TriangleAlert size={13} aria-hidden="true" />
+            <span>
+              <b>{health().map((failure) => failure.server).join(", ")}</b> {health().length === 1 ? "MCP server" : "MCP servers"} failed to start
+              <Show when={health().length === 1 && health()[0]!.reason}>: {health()[0]!.reason}</Show>. The agent is working without{" "}
+              {health().length === 1 ? "its tools" : "their tools"}.
+            </span>
+          </p>
+        </Show>
         <Show when={steps().shown.length > 0}>
           <ul class="ch-steps mono" aria-label="Steps">
             <Show when={steps().hidden > 0}>
@@ -175,17 +207,35 @@ export function LiveReply(props: { turn: ReplyTurn; agent: AgentDetail; censorUs
                   </span>
                   <span class="ch-step-label">{step.label}</span>
                   <span class="ch-step-detail">{step.detail}</span>
+                  <Show when={step.meta}>
+                    <span class="ch-step-meta">{step.meta}</span>
+                  </Show>
                   <span class="sr-only">{step.state === "running" ? "(going)" : step.state === "error" ? "(failed)" : "(done)"}</span>
                 </li>
               )}
             </For>
           </ul>
         </Show>
+        <Show when={active() && reply().notice}>
+          {(notice) => (
+            <p class="ch-live-notice" role="status">
+              <span class="ch-live-dot" aria-hidden="true" />
+              {notice()}
+            </p>
+          )}
+        </Show>
         <Show
           when={html()}
           fallback={
-            <Show when={steps().shown.length === 0}>
-              <p class="ch-muted">{queued() ? "Waiting to start…" : active() ? "Thinking…" : "Finishing up…"}</p>
+            <Show
+              when={active() && reply().headline}
+              fallback={
+                <Show when={steps().shown.length === 0}>
+                  <p class="ch-muted">{queued() ? "Waiting to start…" : active() ? "Thinking…" : "Finishing up…"}</p>
+                </Show>
+              }
+            >
+              {(headline) => <p class="ch-muted ch-live-headline">{headline()}…</p>}
             </Show>
           }
         >

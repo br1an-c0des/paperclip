@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TranscriptItem } from "@/runs/transcript-model";
+import { upgradeRunEvents } from "@/runs/fixtures/upgrade-run";
 import { mergeEvents, pickReply, prpEventsFromOutput, recentSteps, replyFromEvents, replyFromTranscript, stepLabel, type ReplyEvent } from "./reply-model";
 
 function delta(seq: number, text: string): ReplyEvent {
@@ -7,7 +8,8 @@ function delta(seq: number, text: string): ReplyEvent {
 }
 
 function tool(seq: number, eventType: string, name: string, extra: Record<string, unknown> = {}): ReplyEvent {
-  return { seq, eventType, payload: { prpEvent: { payload: { name, status: eventType.endsWith("started") ? "running" : "completed", ...extra } } } };
+  const payload = { schema: "paperclip.tool.execution.v1", executionId: `x-${name}`, name, status: eventType.endsWith("started") ? "running" : "completed", ...extra };
+  return { seq, eventType, payload: { prpEvent: { payload } } };
 }
 
 describe("replyFromEvents", () => {
@@ -49,7 +51,50 @@ describe("replyFromEvents", () => {
   });
 
   it("ignores other events", () => {
-    expect(replyFromEvents([{ seq: 1, eventType: "lifecycle", payload: null }, { seq: 2, eventType: "item.completed", payload: { prpEvent: { payload: { kind: "usage" } } } }])).toEqual({ text: "", steps: [] });
+    expect(replyFromEvents([{ seq: 1, eventType: "lifecycle", payload: null }, { seq: 2, eventType: "item.completed", payload: { prpEvent: { payload: { kind: "usage" } } } }])).toMatchObject({
+      text: "",
+      steps: [],
+      plan: null,
+      headline: null,
+      notice: null,
+      health: [],
+    });
+  });
+});
+
+describe("the runner's upgraded steps (U42)", () => {
+  const events = (upTo?: number): ReplyEvent[] =>
+    upgradeRunEvents(upTo).map((event, index) => ({
+      seq: index + 1,
+      eventType: event.eventType,
+      payload: { prpEvent: { eventType: event.eventType, ...(event.itemId ? { itemId: event.itemId } : {}), payload: event.payload } },
+    }));
+
+  it("says what each step ran and how it went", () => {
+    const steps = replyFromEvents(events()).steps;
+    const find = (label: string, detail?: string) => steps.find((step) => step.label === label && (detail === undefined || step.detail.startsWith(detail)));
+    expect(find("Bash", "$ node --test")).toMatchObject({ state: "error", meta: "exit 1 · 2.3s" });
+    expect(find("Bash", "$ git push")).toMatchObject({ state: "error", meta: "blocked" });
+    expect(find("Edit")).toMatchObject({ detail: "server/src/export/worker.ts", meta: "+3 −1 · 300ms" });
+    expect(find("Searched the web")).toMatchObject({ detail: "“Temporal.PlainDate.from ISO week date”", state: "done" });
+    expect(find("Explore subagent")).toMatchObject({ detail: "Find the date parsing tests", meta: "2 steps", state: "done" });
+    expect(find("PreToolUse hook blocked Bash")).toMatchObject({ state: "error" });
+    expect(find("Check failed")).toMatchObject({ state: "error", meta: "2 errors in src/export/worker.ts" });
+    expect(find("Proposed a plan")).toBeDefined();
+  });
+
+  it("carries the plan, the reasoning headline and the MCP failures", () => {
+    const reply = replyFromEvents(events());
+    expect(reply.plan?.steps).toHaveLength(5);
+    expect(reply.headline).toBe("Looking up Temporal's week dates");
+    expect(reply.health).toEqual([{ server: "github", reason: "needs re-authentication" }]);
+    expect(reply.text).toMatch(/^Week-date strings/);
+  });
+
+  it("names a status notice only while it's still going", () => {
+    const cut = upgradeRunEvents().findIndex((event) => event.payload.noticeId === "retry-1") + 1;
+    expect(replyFromEvents(events(cut)).notice).toBe("Reconnecting (attempt 1 of 5)");
+    expect(replyFromEvents(events()).notice).toBeNull();
   });
 });
 
@@ -91,7 +136,7 @@ describe("replyFromTranscript", () => {
       { kind: "tool", key: "t1", ts: "", endTs: null, name: "Read", step: "read", title: "README.md", input: "", output: null, status: "done", diff: null, added: 0, removed: 0 },
       { kind: "message", key: "m2", ts: "", role: "assistant", text: "It says hi", streaming: true },
     ] as TranscriptItem[];
-    expect(replyFromTranscript(items)).toEqual({ text: "It says hi", steps: [{ key: "t1", label: "Read", detail: "README.md", state: "done" }] });
+    expect(replyFromTranscript(items)).toMatchObject({ text: "It says hi", steps: [{ key: "t1", label: "Read", detail: "README.md", state: "done" }] });
   });
 });
 

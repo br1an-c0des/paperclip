@@ -42,6 +42,8 @@ import {
 } from "./chat-model";
 import { useChatReadMarker } from "./chat-read";
 import { LiveReply } from "./LiveReply";
+import { ChatPlanDock } from "./ChatPlanDock";
+import type { Plan } from "@/runs/activity-model";
 import { oldestLoadedAt } from "./history-model";
 import { atFoot, NEAR_TOP_PX, shouldFollow, type FollowCause } from "./scroll-model";
 import { useChat } from "./use-chat";
@@ -157,6 +159,21 @@ function ChatThread(props: ChatViewProps) {
 
   const projectName = (id: string | null) => (id ? projects.data?.find((project) => project.id === id)?.name : undefined);
   const replyRunId = () => state.replyRuns()[0]?.id ?? null;
+  // The agent's plan while a reply runs (LiveReply hands it up), docked above the composer.
+  const [plans, setPlans] = createSignal<ReadonlyMap<string, { plan: Plan; asking: boolean }>>(new Map());
+  const reportPlan = (runId: string, plan: { plan: Plan; asking: boolean } | null) =>
+    setPlans((previous) => {
+      if (!plan && !previous.has(runId)) return previous;
+      const next = new Map(previous);
+      if (plan) next.set(runId, plan);
+      else next.delete(runId);
+      return next;
+    });
+  const dockedPlan = createMemo(() => {
+    const shown = state.replies().map((turn) => turn.runId).filter((runId) => plans().has(runId));
+    const runId = shown[shown.length - 1];
+    return runId ? { runId, ...plans().get(runId)! } : null;
+  });
   const work = () => state.otherRuns().find((run) => run.status === "running") ?? state.otherRuns()[0];
   const workTask = createQuery(() => ({
     queryKey: queryKeys.issues.section(work()?.issueId ?? "", "core"),
@@ -398,7 +415,9 @@ function ChatThread(props: ChatViewProps) {
                 )}
               </For>
               <Show when={!state.search()}>
-                <For each={state.replies()}>{(turn) => <LiveReply turn={turn} agent={props.agent} censorUsername={general.data?.censorUsernameInLogs === true} />}</For>
+                <For each={state.replies()}>
+                  {(turn) => <LiveReply turn={turn} agent={props.agent} censorUsername={general.data?.censorUsernameInLogs === true} onPlan={reportPlan} />}
+                </For>
               </Show>
               <Show when={state.queue.data && state.chatId()}>
                 <QueuedMessages taskId={state.chatId()!} queue={state.queue.data!} />
@@ -419,6 +438,10 @@ function ChatThread(props: ChatViewProps) {
                     </button>
                   </div>
                 )}
+              </Show>
+              <Show when={dockedPlan()?.runId} keyed>
+                {/* A new run's plan starts from its own folding rules, not the last run's. */}
+                {(_runId: string) => <Show when={dockedPlan()}>{(docked) => <ChatPlanDock plan={docked().plan} asking={docked().asking} />}</Show>}
               </Show>
               <ChatComposer
                 agent={props.agent}
