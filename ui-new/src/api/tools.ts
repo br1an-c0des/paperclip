@@ -10,7 +10,6 @@ import type {
   ToolActionRequestStatus,
   ToolActionRequestsResponse,
   ToolApplication,
-  ToolAppsAttentionResponse,
   ToolCatalogEntry,
   ToolCatalogRefreshResult,
   ToolConnection,
@@ -22,6 +21,8 @@ import type {
   ToolOAuthStartResult,
   ToolPolicy,
   ToolProfileWithDetails,
+  ToolProfileConfiguration,
+  ToolConnectionReviewCounts,
   ToolConnectionTestAgentAccessResponse,
   ToolConnectionTestAgentsResponse,
   ToolConnectionTestCallResult,
@@ -88,10 +89,14 @@ export const toolsApi = {
     api.get<{ applications: ToolApplication[] }>(company(companyId, "tools/applications"), { signal }),
   connections: (companyId: string, signal?: AbortSignal) =>
     api.get<{ connections: ToolConnection[] }>(company(companyId, "tools/connections"), { signal }),
-  attention: (companyId: string, signal?: AbortSignal) =>
-    api.get<ToolAppsAttentionResponse>(company(companyId, "tools/apps/attention"), { signal }),
   profiles: (companyId: string, signal?: AbortSignal) =>
     api.get<{ profiles: ToolProfileWithDetails[] }>(company(companyId, "tools/profiles"), { signal }),
+  /** One connection's saved profiles, entries and bindings, without the effective-access summary. */
+  profileConfiguration: (connectionId: string, signal?: AbortSignal) =>
+    api.get<{ profiles: ToolProfileConfiguration[] }>(connection(connectionId, "/profile-configuration"), { signal }),
+  /** One connection's Review badge: Ask-first calls waiting, and new actions held for review. */
+  reviewCounts: (connectionId: string, signal?: AbortSignal) =>
+    api.get<ToolConnectionReviewCounts>(connection(connectionId, "/review-counts"), { signal }),
   policies: (companyId: string, signal?: AbortSignal) =>
     api.get<{ policies: ToolPolicy[] }>(company(companyId, "tools/policies"), { signal }),
 

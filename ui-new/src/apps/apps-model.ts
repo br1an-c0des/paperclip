@@ -11,8 +11,10 @@ import type {
   ToolConnection,
   ToolConnectionInstall,
   ToolPolicy,
-  ToolProfileWithDetails,
+  ToolConnectionReviewCounts,
+  ToolProfileConfiguration,
 } from "@paperclipai/shared";
+import { ApiError } from "@/api/client";
 import type { AccessSelection, InstallTarget } from "@/api/tools";
 import type { Tone } from "@/ui/Status";
 import { isSheetsRobotMethod } from "./setups/extras-model";
@@ -367,11 +369,14 @@ export function installTargets(companyId: string, state: InstallState): InstallT
 }
 
 /** The app's own profile (`app:<connectionId>`), which holds its actions and who may use it. */
-export function appProfile(profiles: readonly ToolProfileWithDetails[], connectionId: string) {
+/** What a connection's app profile needs here: its key and entries (`…/profile-configuration`). */
+type AppProfile = Pick<ToolProfileConfiguration, "profileKey" | "entries">;
+
+export function appProfile<P extends AppProfile>(profiles: readonly P[], connectionId: string) {
   return profiles.find((profile) => profile.profileKey === `app:${connectionId}`);
 }
 
-export function enabledIds(profile: ToolProfileWithDetails | undefined) {
+export function enabledIds(profile: AppProfile | undefined) {
   const ids = new Set<string>();
   for (const entry of profile?.entries ?? []) if (entry.effect === "include" && entry.catalogEntryId) ids.add(entry.catalogEntryId);
   return ids;
@@ -395,7 +400,7 @@ export function askFirstIds(policies: readonly ToolPolicy[], connectionId: strin
  * installs: the old UI found that reading an unbound profile as "all agents" turned any save into a
  * silent company-wide grant.
  */
-export function accessFrom(profile: ToolProfileWithDetails | undefined, install: InstallState): AccessDraft {
+export function accessFrom(profile: (AppProfile & Pick<ToolProfileConfiguration, "bindings">) | undefined, install: InstallState): AccessDraft {
   const bindings = profile?.bindings ?? [];
   if (bindings.some((binding) => binding.targetType === "company")) return { mode: "all", agentIds: new Set() };
   const agentIds = new Set(bindings.filter((binding) => binding.targetType === "agent").map((binding) => binding.targetId));
@@ -721,4 +726,33 @@ export function requestTitle(item: ToolActionRequestListItem) {
 /** Always allow makes a trust rule for an agent's action on a connection; approvals can't. */
 export function canAlwaysAllow(item: ToolActionRequestListItem) {
   return Boolean(item.requestedByAgentId && item.connectionId && !item.request.approvalId);
+}
+
+// ---------------------------------------------------------------------------------------------
+// A connection's Review badge and access recovery
+
+/**
+ * The Review tab's count, as the old sidebar adds it up (`GET tool-connections/:id/review-counts`):
+ * each Ask-first call waiting, plus one when new actions are held back for review.
+ */
+export function reviewBadgeCount(counts: ToolConnectionReviewCounts | undefined) {
+  if (!counts) return 0;
+  return counts.pendingActionRequestCount + (counts.quarantinedCatalogEntryCount > 0 ? 1 : 0);
+}
+
+/**
+ * The GitHub page that fixes a failed access check (upstream 3edba1157): when every installation of
+ * the GitHub App is suspended the check fails with `github_installation_required` and the
+ * installation's settings, where an owner can Unsuspend. Only an https github.com address is used.
+ */
+export function githubRecoveryUrl(error: unknown): string | null {
+  if (!(error instanceof ApiError) || !error.body || typeof error.body !== "object") return null;
+  const details = (error.body as { details?: { code?: unknown; managementUrl?: unknown } }).details;
+  if (details?.code !== "github_installation_required" || typeof details.managementUrl !== "string") return null;
+  try {
+    const url = new URL(details.managementUrl);
+    return url.protocol === "https:" && url.hostname.toLowerCase() === "github.com" ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
