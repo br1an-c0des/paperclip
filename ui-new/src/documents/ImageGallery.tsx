@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-solid";
-import { Show } from "solid-js";
+import { createEffect, createMemo, onCleanup, Show } from "solid-js";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { imageLabel, stepImage, type GalleryImage } from "./gallery-model";
@@ -15,13 +15,27 @@ import "./ImageGallery.css";
 export function ImageGallery(props: { images: readonly GalleryImage[]; position: number | null; onPosition: (position: number | null) => void }) {
   const count = () => props.images.length;
   const current = () => (props.position ? props.images[props.position - 1] : undefined);
+  // Open only changes when the gallery opens or closes, not as it steps, so focus goes back to the
+  // image it was opened from.
+  const open = createMemo(() => !!current());
   const go = (by: 1 | -1) => {
     const next = props.position ? stepImage(props.position, by, count()) : null;
     if (next) props.onPosition(next);
   };
+  // ← and → step wherever focus is in the dialog, the close button included.
+  createEffect(() => {
+    if (!current()) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      go(event.key === "ArrowRight" ? 1 : -1);
+    };
+    window.addEventListener("keydown", onKey);
+    onCleanup(() => window.removeEventListener("keydown", onKey));
+  });
   return (
     <Dialog
-      open={!!current()}
+      open={open()}
       onOpenChange={(open) => !open && props.onPosition(null)}
       title={props.position ? `Image ${props.position} of ${count()}` : "Image"}
       width={1100}
@@ -29,14 +43,7 @@ export function ImageGallery(props: { images: readonly GalleryImage[]; position:
     >
       <Show when={current()}>
         {(image) => (
-          <div
-            class="ig-body"
-            onKeyDown={(event) => {
-              if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-              event.preventDefault();
-              go(event.key === "ArrowRight" ? 1 : -1);
-            }}
-          >
+          <div class="ig-body">
             <figure class="ig-figure">
               <img src={image().src} alt={image().alt || imageLabel(props.position!, count())} />
               <Show when={image().alt}>
