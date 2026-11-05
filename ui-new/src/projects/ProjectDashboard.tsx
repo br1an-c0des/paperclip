@@ -26,6 +26,7 @@ import { Markdown } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { Capsule, RunningPill, StatusCapsule, TonePill } from "@/ui/Status";
+import { shownStatus } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
 import {
   budgetView,
@@ -574,7 +575,7 @@ function StuckRow(props: { item: StuckItem; onOpen: () => void }) {
   };
   return (
     <li class="pd-stuck-row">
-      <StatusCapsule status={props.item.task.status} size="row" />
+      <StatusCapsule status={shownStatus(props.item.task)} size="row" />
       <div class="pd-stuck-text">
         <div class="pd-stuck-title">
           <span class="mono">{props.item.task.identifier}</span>

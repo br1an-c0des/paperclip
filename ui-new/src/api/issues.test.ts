@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "./client";
-import { issuesApi } from "./issues";
+import { issuesApi, markMonitoring } from "./issues";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -69,5 +69,18 @@ describe("Monitoring on compact lists", () => {
     get.mockResolvedValue([{ id: "p", status: "in_progress", displayStatus: "in_progress" }] as never);
     await issuesApi.list("c1", {});
     expect(get).toHaveBeenCalledTimes(2);
+  });
+
+  it("marks rows read another way against the company's monitored tasks", async () => {
+    const get = vi.spyOn(api, "get").mockResolvedValue([{ id: "m", status: "in_progress" }] as never);
+    const rows = await markMonitoring("c1", [
+      { id: "m", status: "in_progress" as const },
+      { id: "p", status: "in_progress" as const },
+    ]);
+    expect(rows.map((row) => ("displayStatus" in row ? row.displayStatus : null))).toEqual(["monitoring", null]);
+    expect(get).toHaveBeenCalledTimes(1);
+    const url = new URL(String(get.mock.calls[0]![0]), "http://x");
+    expect(url.pathname).toBe("/companies/c1/issues");
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({ displayStatus: "monitoring", includeRoutineExecutions: "true" });
   });
 });

@@ -23,7 +23,7 @@ import { TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { Capsule, StatusCapsule } from "@/ui/Status";
 import { Switch } from "@/ui/Switch";
-import { STATUS_META } from "@/ui/status-meta";
+import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
 import { refreshRecurring, useRoutineFoldersQuery, useRoutinesQuery } from "./queries";
 import {
@@ -520,7 +520,7 @@ function RoutineRow(props: {
             {(task) => (
               <li class="tl-row rv-kid" onClick={(event) => !(event.target as Element).closest("a") && props.onOpenTask(task)}>
                 <div class="tl-pin-col tl-name rv-kid-name">
-                  <StatusCapsule status={task.status} size="row" live={task.status === "in_progress"} />
+                  <StatusCapsule status={shownStatus(task)} size="row" live={shownStatus(task) === "in_progress"} />
                   <span class="tl-id mono">{task.identifier}</span>
                   <a
                     class="tl-title"
@@ -536,7 +536,7 @@ function RoutineRow(props: {
                 </div>
                 <span />
                 <span class="rv-sub">{updatedLabel(task.createdAt)}</span>
-                <span class="rv-sub">{STATUS_META[task.status]?.label ?? task.status}</span>
+                <span class="rv-sub">{STATUS_META[shownStatus(task)].label}</span>
                 <span />
               </li>
             )}

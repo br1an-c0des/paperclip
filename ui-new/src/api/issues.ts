@@ -107,12 +107,25 @@ async function allPages(companyId: string, filters: Omit<IssueListFilters, "limi
  * `displayStatus=monitoring`, which the server answers, and marked. Lists with no task in progress,
  * or rows that carry the field, need no second request.
  */
-async function withMonitoring(companyId: string, filters: IssueListFilters, tasks: CompactIssue[], signal?: AbortSignal) {
+async function withMonitoring<T extends Pick<CompactIssue, "id" | "status">>(
+  companyId: string,
+  filters: IssueListFilters,
+  tasks: T[],
+  signal?: AbortSignal,
+): Promise<T[]> {
   if (filters.displayStatus || !tasks.some((task) => task.status === "in_progress") || tasks.some((task) => "displayStatus" in task)) return tasks;
   const { limit: _limit, offset: _offset, ...scope } = filters;
   const monitored = new Set((await allPages(companyId, { ...scope, displayStatus: "monitoring" }, signal)).map((task) => task.id));
   if (monitored.size === 0) return tasks;
   return tasks.map((task) => (task.status === "in_progress" && monitored.has(task.id) ? { ...task, displayStatus: "monitoring" as const } : task));
+}
+
+/**
+ * The same marking for compact rows read some other way, such as the inbox's `/inbox/mine`, which
+ * compacts its rows the same way: checked against the company's monitored tasks.
+ */
+export function markMonitoring<T extends Pick<CompactIssue, "id" | "status">>(companyId: string, tasks: T[], signal?: AbortSignal) {
+  return withMonitoring(companyId, { includeRoutineExecutions: true }, tasks, signal);
 }
 
 /** `GET /issues/:id/runs?runIds=` takes at most this many ids. */

@@ -1,4 +1,4 @@
-import type { AgentDetail, IssueStatus } from "@paperclipai/shared";
+import type { AgentDetail } from "@paperclipai/shared";
 import { A, useLocation, useNavigate } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
 import { Activity, MessageCircleOff, NotebookPen, Repeat, RotateCcw, Search, Send, SlidersHorizontal, X } from "lucide-solid";
@@ -22,8 +22,8 @@ import { MessageBody } from "@/tasks/MessageBody";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
-import { Capsule } from "@/ui/Status";
-import { STATUS_META } from "@/ui/status-meta";
+import { Capsule, StatusCapsule } from "@/ui/Status";
+import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { ChatActivity } from "./ChatActivity";
 import { ChatComposer } from "./ChatComposer";
 import { ChatDocumentCard, ChatDocumentDialog, ChatDocumentList, chatDocumentHost } from "./ChatDocuments";
@@ -665,14 +665,6 @@ function MessageSource(props: { source: ChatMessageSource }) {
   );
 }
 
-const STATUS_TONE: Partial<Record<IssueStatus, string>> = {
-  in_progress: "run",
-  in_review: "violet",
-  todo: "amber",
-  blocked: "red",
-  done: "green",
-};
-
 /** A task handed off from the chat, or a report (board 12's linked card). Opens in the task modal. */
 function TaskCard(props: {
   task: ChatTask;
@@ -685,7 +677,12 @@ function TaskCard(props: {
   const commands = useCommands();
   const assignee = () => props.people.agent(props.task.assigneeAgentId)?.name;
   const meta = () => [props.meta, props.projectName(props.task.projectId), assignee() ? `assigned to ${assignee()}` : null].filter(Boolean).join(" · ");
-  const tone = () => STATUS_TONE[props.task.status];
+  // Monitoring (an in-progress task waiting for its monitor) shows as itself, in the run tone.
+  const shown = () => shownStatus(props.task);
+  const tone = () => {
+    const found = STATUS_META[shown()].tone;
+    return found === "neutral" ? null : found;
+  };
   return (
     <a
       class="ch-task"
@@ -696,7 +693,7 @@ function TaskCard(props: {
         commands.openTaskModal({ id: props.task.id, identifier: props.task.identifier, title: props.task.title, projectId: props.task.projectId });
       }}
     >
-      <Capsule gradient={STATUS_META[props.task.status].gradient} size="row" live={props.task.status === "in_progress"} />
+      <StatusCapsule status={shown()} size="row" live={shown() === "in_progress"} />
       <span class="ch-task-text">
         <Show when={props.kicker}>
           <span class="ch-task-kicker">{props.kicker}</span>
@@ -707,8 +704,12 @@ function TaskCard(props: {
         </span>
         <span class="ch-task-meta">{meta()}</span>
       </span>
-      <span class="ch-task-status" style={tone() ? { background: `var(--${tone()}-bg)`, color: `var(--${tone()}-fg)` } : undefined}>
-        {statusTag(props.task.status)}
+      <span
+        class="ch-task-status"
+        data-hollow={STATUS_META[shown()].hollow ? "" : undefined}
+        style={tone() ? { background: STATUS_META[shown()].hollow ? "transparent" : `var(--${tone()}-bg)`, color: `var(--${tone()}-fg)` } : undefined}
+      >
+        {statusTag(shown())}
       </span>
     </a>
   );

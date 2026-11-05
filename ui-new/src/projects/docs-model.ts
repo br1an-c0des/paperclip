@@ -1,4 +1,4 @@
-import type { CompanyArtifact, CompanyArtifactGroup, IssueStatus } from "@paperclipai/shared";
+import type { CompanyArtifact, CompanyArtifactGroup, IssueDisplayStatus } from "@paperclipai/shared";
 
 /*
  * The project Docs tab's "From tasks" section (board 9): every task's documents, attachments and
@@ -70,14 +70,14 @@ export function fileType(artifact: Pick<CompanyArtifact, "source" | "title" | "c
   return TYPE_BY_TAG[tag] ?? (artifact.mediaKind === "image" ? "Image" : artifact.mediaKind === "video" ? "Video" : "File");
 }
 
-export type TaskFacts = { status: IssueStatus; assigneeAgentId: string | null; assigneeUserId: string | null };
+export type TaskFacts = { status: IssueDisplayStatus; assigneeAgentId: string | null; assigneeUserId: string | null };
 
 export type DocGroup = {
   issueId: string;
   identifier: string;
   title: string;
-  /** The task's status, from the project's task list; null when the list doesn't have it. */
-  status: IssueStatus | null;
+  /** The status the task shows (Monitoring included), from the project's task list; null when the list doesn't have it. */
+  status: IssueDisplayStatus | null;
   assigneeAgentId: string | null;
   closed: boolean;
   /** The group's artifacts that pass the filter: all of them once loaded, else the previews. */

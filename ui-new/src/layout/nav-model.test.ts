@@ -42,7 +42,14 @@ describe("recent tasks", () => {
     const list = [task("1"), task("2")];
     expect(refreshRecent(list, undefined)).toEqual(list);
     const next = refreshRecent(list, [{ id: "2", identifier: "T-2", title: "Renamed", status: "done" }]);
-    expect(next).toEqual([{ ...task("2"), title: "Renamed", status: "done" }]);
+    expect(next).toEqual([{ ...task("2"), title: "Renamed", status: "done", displayStatus: null }]);
+  });
+
+  it("keeps what the server says a task shows, such as Monitoring, and lets go of it when it stops", () => {
+    const list = [task("1")];
+    const monitored = refreshRecent(list, [{ id: "1", identifier: "T-1", title: "One", status: "in_progress", displayStatus: "monitoring" }]);
+    expect(monitored[0]).toMatchObject({ status: "in_progress", displayStatus: "monitoring" });
+    expect(refreshRecent(monitored, [{ id: "1", identifier: "T-1", title: "One", status: "in_progress" }])[0]!.displayStatus).toBeNull();
   });
 
   it("parses what was stored, ignoring junk", () => {

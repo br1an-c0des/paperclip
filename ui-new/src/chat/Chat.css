@@ -287,6 +287,13 @@
   align-items: center;
 }
 
+/* Monitoring: its tone as a dashed outline, as its capsule is hollow (as in the task panel) */
+.ch-task-status[data-hollow] {
+  background: transparent;
+  outline: 1px dashed currentColor;
+  outline-offset: -1px;
+}
+
 /* The live reply (board 13) */
 .ch-live {
   flex: 1;
