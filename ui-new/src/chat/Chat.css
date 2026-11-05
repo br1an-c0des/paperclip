@@ -377,6 +377,7 @@
   display: flex;
   gap: 10px;
   min-width: 0;
+  max-width: 100%;
 }
 
 .ch-step-mark {
@@ -396,8 +397,12 @@
 }
 
 .ch-step-label {
-  flex-shrink: 0;
+  flex: 0 1 auto;
   min-width: 52px;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--muted);
 }
 
@@ -410,6 +415,160 @@
 
 .ch-step--more {
   opacity: 0.8;
+}
+
+/* How a step went: "exit 1 · 2.3s", "blocked" */
+.ch-step-meta {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ch-step[data-state="error"] .ch-step-meta {
+  color: var(--red-fg);
+}
+
+/* A status notice still going (a retry, a compaction), the reasoning headline, an MCP failure */
+.ch-live-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--amber-fg);
+  font-size: 12px;
+}
+
+.ch-live-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ch-live-headline {
+  font-style: italic;
+}
+
+.ch-live-health {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--amber-fg) 40%, transparent);
+  border-radius: var(--r-inner);
+  background: var(--amber-bg);
+  color: var(--body);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ch-live-health > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--amber-fg);
+}
+
+.ch-live-health b {
+  color: var(--text);
+}
+
+/* The agent's plan, docked above the composer while it replies */
+.ch-plan {
+  margin-bottom: 8px;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.ch-plan-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: var(--r-card);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+.ch-plan-head:not(:disabled):hover {
+  background: var(--row-hover);
+}
+
+.ch-plan-head:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: -2px;
+}
+
+.ch-plan-icon {
+  flex-shrink: 0;
+  color: var(--run-fg);
+}
+
+.ch-plan[data-state="complete"] .ch-plan-icon {
+  color: var(--green-fg);
+}
+
+.ch-plan[data-state="blocked"] .ch-plan-icon {
+  color: var(--red-fg);
+}
+
+.ch-plan-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.ch-plan[data-state="complete"] .ch-plan-title {
+  font-weight: 500;
+  color: var(--body);
+}
+
+.ch-plan-count {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.ch-plan-chev {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 0.12s;
+}
+
+.ch-plan-head[aria-expanded="true"] .ch-plan-chev {
+  transform: rotate(180deg);
+}
+
+.ch-plan-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 14px 12px;
+}
+
+/* The list scrolls within a bounded height, so it never covers the conversation */
+.ch-plan-list {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ch-plan-chev {
+    transition: none;
+  }
 }
 
 .ch-live-text {

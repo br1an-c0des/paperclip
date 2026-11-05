@@ -1,4 +1,8 @@
-import type { TranscriptItem } from "@/runs/transcript-model";
+import type { Plan } from "@/runs/activity-model";
+import { toolDuration } from "@/runs/activity-model";
+import { latestReasoningHeadline } from "@/runs/reasoning-summary";
+import { createRunnerTranscriptParser } from "@/runs/runner-entries";
+import { buildItems, latestPlan, runHealth, type TranscriptItem } from "@/runs/transcript-model";
 
 /*
  * The live reply (board 13): while the agent's run is going, the chat shows the steps it has taken
@@ -18,14 +22,40 @@ import type { TranscriptItem } from "@/runs/transcript-model";
  * The first source with something wins. The text shown is what the agent wrote after its latest
  * step (kept while the next step runs), since that's the part that becomes the reply; earlier text
  * is thinking out loud, which the transcript keeps.
+ *
+ * The steps are read as the run modal reads them (U42): runner events go through the same parser
+ * and transcript model, so a step says what ran and how it went ("$ npm test", "exit 1 · 2.3s"),
+ * and web searches, model switches, waits, checks, hook and auto-review decisions, subagents and a
+ * proposed plan are steps too. The reply also carries the agent's native plan (docked above the
+ * composer), its latest reasoning headline (the status while it thinks), a status notice that's
+ * still going (a retry, a compaction), and MCP servers that failed to start.
  */
 
-export type ReplyStep = { key: string; label: string; detail: string; state: "running" | "done" | "error" };
+export type ReplyStep = {
+  key: string;
+  label: string;
+  detail: string;
+  state: "running" | "done" | "error";
+  /** How it went, after the detail: "exit 1 · 2.3s", "blocked", "2 steps". */
+  meta?: string;
+};
 
-export type LiveReply = { text: string; steps: ReplyStep[] };
+export type LiveReply = {
+  text: string;
+  steps: ReplyStep[];
+  /** The agent's latest native plan in the run. */
+  plan?: Plan | null;
+  /** The latest headline of a reasoning summary, while the agent thinks. */
+  headline?: string | null;
+  /** A harness status notice that's still going, such as "Reconnecting (attempt 2 of 5)". */
+  notice?: string | null;
+  /** MCP servers that failed to start. */
+  health?: { server: string; reason: string | null }[];
+  /** A runtime request (permission or input) is waiting, so the plan card shrinks to its header. */
+  asking?: boolean;
+};
 
 export const EMPTY_REPLY: LiveReply = { text: "", steps: [] };
-
 /** The fields of a run event the reply reads, from the API or the socket. */
 export type ReplyEvent = { seq: number; eventType: string; payload: Record<string, unknown> | null | undefined };
 
@@ -62,11 +92,11 @@ export function mergeEvents(previous: readonly ReplyEvent[], incoming: readonly 
 }
 
 export function replyFromEvents(events: readonly ReplyEvent[]): LiveReply {
-  const steps: ReplyStep[] = [];
   let text = "";
   /** Text written since the last step; a step starts a new paragraph. */
   let fresh = true;
-  for (const event of [...events].sort((a, b) => a.seq - b.seq)) {
+  const sorted = [...events].sort((a, b) => a.seq - b.seq);
+  for (const event of sorted) {
     const prp = record(record(event.payload)?.prpEvent);
     const body = record(prp?.payload);
     if (!body) continue;
@@ -87,43 +117,114 @@ export function replyFromEvents(events: readonly ReplyEvent[]): LiveReply {
       }
       continue;
     }
-    if (event.eventType === "tool.execution.started") {
-      const name = str(body.name) ?? "Tool";
-      const detail = str(body.target) ?? str(body.title) ?? "";
-      steps.push({ key: `step:${event.seq}`, label: stepLabel(name), detail: short(detail), state: "running" });
-      fresh = true;
-      continue;
-    }
-    if (event.eventType === "tool.execution.completed" || event.eventType === "tool.execution.failed") {
-      const name = stepLabel(str(body.name) ?? "Tool");
-      const open = steps.find((step) => step.state === "running" && step.label === name) ?? steps.find((step) => step.state === "running");
-      const failed = event.eventType === "tool.execution.failed" || /fail|error/.test(str(body.status) ?? "") || body.isError === true;
-      if (open) open.state = failed ? "error" : "done";
-    }
+    if (STEP_START.test(event.eventType)) fresh = true;
   }
-  return { text, steps };
+  return { text, ...replyDetails(itemsFromEvents(sorted)) };
+}
+
+/** Events that start a step, after which the agent's text starts over. */
+const STEP_START = /^(tool\.execution|research|delegation|wait|hook|safety\.review)\.started$/;
+
+/** The runner's events read as the run modal reads its log: through the runner's parser. */
+export function itemsFromEvents(events: readonly ReplyEvent[]): TranscriptItem[] {
+  const parser = createRunnerTranscriptParser();
+  const entries = events.flatMap((event) => {
+    const prp = record(record(event.payload)?.prpEvent);
+    if (!prp) return [];
+    const ts = str(prp.emittedAt) ?? "";
+    return parser.parseLine(JSON.stringify({ type: "paperclip.prp.event", event: { eventType: event.eventType, ...prp } }), ts);
+  });
+  return buildItems(entries, true);
 }
 
 /** The same, from transcript items (local harnesses' output). */
 export function replyFromTranscript(items: readonly TranscriptItem[]): LiveReply {
-  const steps: ReplyStep[] = [];
   let text = "";
   let fresh = true;
   for (const item of items) {
-    if (item.kind === "tool") {
-      steps.push({ key: item.key, label: stepLabel(item.name), detail: short(item.title), state: item.status });
+    if (item.kind === "tool" || item.kind === "activity" || item.kind === "subagents") {
       fresh = true;
     } else if (item.kind === "message" && item.role === "assistant") {
       text = fresh ? item.text : `${text}\n\n${item.text}`;
       fresh = false;
     }
   }
-  return { text, steps };
+  return { text, ...replyDetails(items) };
+}
+
+/** "exit 1 · 2.3s", "blocked", "Auto-approved": how a tool call went, in a few words. */
+function toolMeta(tool: Extract<TranscriptItem, { kind: "tool" }>) {
+  if (tool.blocked) return "blocked";
+  const exit = tool.status !== "running" && typeof tool.exitCode === "number" && (tool.exitCode !== 0 || tool.step === "command") ? `exit ${tool.exitCode}` : null;
+  const took = tool.status !== "running" && tool.durationMs ? toolDuration(tool.durationMs) : null;
+  const diff = tool.diff && (tool.added || tool.removed) ? [tool.added ? `+${tool.added}` : "", tool.removed ? `−${tool.removed}` : ""].filter(Boolean).join(" ") : null;
+  return [exit, diff, took].filter(Boolean).join(" · ") || undefined;
+}
+
+function toolStep(tool: Extract<TranscriptItem, { kind: "tool" }>): ReplyStep {
+  const meta = toolMeta(tool);
+  return {
+    key: tool.key,
+    label: stepLabel(tool.name),
+    detail: short(tool.step === "command" && tool.title ? `$ ${tool.title}` : tool.title),
+    state: tool.blocked ? "error" : tool.status,
+    ...(meta ? { meta } : {}),
+  };
+}
+
+/** The steps, plan, headline, notice and MCP failures of a run's items. */
+function replyDetails(items: readonly TranscriptItem[]): Omit<LiveReply, "text"> {
+  const steps: ReplyStep[] = [];
+  let headline: string | null = null;
+  let notice: string | null = null;
+  let asking = false;
+  for (const item of items) {
+    switch (item.kind) {
+      case "tool":
+        steps.push(toolStep(item));
+        break;
+      case "activity":
+        steps.push({
+          key: item.key,
+          label: item.row.label,
+          detail: short(item.row.detail),
+          state: item.row.tone === "blocked" || item.row.tone === "failed" ? "error" : item.row.status,
+          ...(item.row.note && item.row.icon === "check" ? { meta: item.row.note } : {}),
+        });
+        break;
+      case "subagents":
+        for (const agent of item.agents) {
+          steps.push({
+            key: `${item.key}:${agent.id}`,
+            label: `${agent.role} subagent`,
+            detail: short(agent.status === "running" && agent.progress ? agent.progress : agent.description),
+            state: agent.status === "error" ? "error" : agent.status === "running" ? "running" : "done",
+            ...(agent.tools.length ? { meta: `${agent.tools.length} ${agent.tools.length === 1 ? "step" : "steps"}` } : {}),
+          });
+        }
+        break;
+      case "proposal":
+        steps.push({ key: item.key, label: item.streaming ? "Writing a plan" : "Proposed a plan", detail: "", state: item.streaming ? "running" : "done" });
+        break;
+      case "thinking":
+        if (item.summary) headline = latestReasoningHeadline(item.text) ?? headline;
+        break;
+      case "chip":
+        // Only a notice that's still going says something about now; the transcript keeps the rest.
+        notice = item.chip.active || item.chip.fatal ? `${item.chip.label}${item.chip.fatal && item.chip.detail ? `: ${item.chip.detail}` : ""}` : null;
+        break;
+      case "request":
+        asking = item.request.status === "pending";
+        break;
+    }
+  }
+  const health = runHealth(items);
+  return { steps, plan: latestPlan(items), headline, notice, health, asking };
 }
 
 /** The first source that has anything. */
 export function pickReply(...sources: LiveReply[]): LiveReply {
-  return sources.find((reply) => reply.text || reply.steps.length > 0) ?? EMPTY_REPLY;
+  return sources.find((reply) => reply.text || reply.steps.length > 0 || reply.plan || reply.headline || reply.health?.length) ?? EMPTY_REPLY;
 }
 
 /**

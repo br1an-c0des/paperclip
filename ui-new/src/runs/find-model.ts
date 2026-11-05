@@ -27,6 +27,20 @@ export function itemText(item: TranscriptItem): string {
       return [item.summary, ...item.checks.map((check) => check.label), ...item.remaining, ...item.artifacts].join("\n");
     case "request":
       return item.request.prompt;
+    case "activity":
+      return [item.row.label, item.row.detail, item.row.note ?? "", ...(item.row.links ?? []).map((link) => link.title)].join("\n");
+    case "chip":
+      return [item.chip.label, item.chip.detail ?? ""].join("\n");
+    case "subagents":
+      return item.agents
+        .flatMap((agent) => [agent.role, agent.description, agent.prompt ?? "", agent.progress ?? "", agent.result ?? "", ...agent.tools.map((tool) => itemText(tool))])
+        .join("\n");
+    case "plan":
+      return [item.plan.explanation, ...item.plan.steps.map((step) => step.label)].join("\n");
+    case "proposal":
+      return item.markdown;
+    case "health":
+      return item.failures.map((failure) => `${failure.server} ${failure.reason ?? ""}`).join("\n");
   }
 }
 

@@ -11,7 +11,7 @@ import { parseOpenCodeStdoutLine } from "@paperclipai/adapter-opencode-local/ui"
 import { parsePiStdoutLine } from "@paperclipai/adapter-pi-local/ui";
 import { parseStdoutLine as parseHermesGatewayStdoutLine } from "@paperclipai/hermes-paperclip-adapter/gateway/ui";
 import { parseHermesStdoutLine } from "@paperclipai/hermes-paperclip-adapter/ui";
-import { createPaperclipRunnerParser } from "./paperclip-runner-parser";
+import { createRunnerTranscriptParser } from "./runner-entries";
 import type { RunLogChunk } from "./run-log";
 
 /*
@@ -21,7 +21,8 @@ import type { RunLogChunk } from "./run-log";
  * ui/src/adapters/transcript.ts.
  *
  * The Paperclip runner (`paperclip_runner`) has no package parser, so ui-new keeps a copy of the
- * old UI's (paperclip-runner-parser.ts). Native-runtime runs go through the runner too: their log
+ * old UI's (paperclip-runner-parser.ts), read through runner-entries.ts, which adds the event shapes
+ * the old UI reads only from stored events. Native-runtime runs go through the runner too: their log
  * is the runner's event envelopes, whatever the agent's harness, so they use that parser.
  *
  * Not covered yet, so their output shows as plain lines:
@@ -68,7 +69,7 @@ export function hasStructuredParser(adapterType: string | null | undefined) {
 
 /** The parser for a run: the runner's for runner and native runs, else the harness's own. */
 function parserFor(adapterType: string | null | undefined, runtimeMode?: string): LineParser {
-  if (runtimeMode === "native" || adapterType === RUNNER) return createPaperclipRunnerParser();
+  if (runtimeMode === "native" || adapterType === RUNNER) return createRunnerTranscriptParser();
   return adapterType && PARSERS[adapterType] ? PARSERS[adapterType]!() : plainLines();
 }
 
