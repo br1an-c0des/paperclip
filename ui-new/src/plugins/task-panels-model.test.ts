@@ -73,6 +73,6 @@ describe("plugin task panels", () => {
     const fetch = vi.fn(async () => new Response(JSON.stringify({ available: false }), { status: 200 }));
     vi.stubGlobal("fetch", fetch);
     await expect(taskPanelsApi.availability(slot("browser"), "a 1", "r1", "i1")).rejects.toBeInstanceOf(PanelNotReadyError);
-    expect(fetch.mock.calls[0]![0]).toBe("/api/plugins/p1/api/panels/a%201?runId=r1&issueId=i1");
+    expect((fetch.mock.calls[0] as unknown[])[0]).toBe("/api/plugins/p1/api/panels/a%201?runId=r1&issueId=i1");
   });
 });

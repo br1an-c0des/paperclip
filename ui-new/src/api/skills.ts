@@ -11,6 +11,7 @@ import type {
   CompanySkill,
   CompanySkillCreateRequest,
   CompanySkillDetail,
+  CompanySkillFileDeleteRequest,
   CompanySkillFileDeleteResult,
   CompanySkillFileDetail,
   CompanySkillFileUpdateRequest,
@@ -96,10 +97,12 @@ export const skillsApi = {
     api.post<CompanySkillVersion>(`${skill(companyId, skillId)}/versions`, { label, ...options }),
   file: (companyId: string, skillId: string, path: string, signal?: AbortSignal) =>
     api.get<CompanySkillFileDetail>(`${skill(companyId, skillId)}/files?path=${encodeURIComponent(path)}`, { signal }),
+  /** `expectedVersionId` refuses the save (409) if the skill changed since that version. */
   saveFile: (companyId: string, skillId: string, path: string, content: string, format: Pick<CompanySkillFileUpdateRequest, "encoding" | "executable" | "expectedVersionId"> = {}) =>
     api.patch<CompanySkillFileDetail>(`${skill(companyId, skillId)}/files`, { path, content, ...format }),
-  deleteFile: (companyId: string, skillId: string, path: string) =>
-    api.delete<CompanySkillFileDeleteResult>(`${skill(companyId, skillId)}/files`, { path, target: "file" }),
+  /** `expectedVersionId` refuses the delete (409) if the skill changed since that version. */
+  deleteFile: (companyId: string, skillId: string, path: string, options: Pick<CompanySkillFileDeleteRequest, "expectedVersionId"> = {}) =>
+    api.delete<CompanySkillFileDeleteResult>(`${skill(companyId, skillId)}/files`, { path, target: "file", ...options } satisfies CompanySkillFileDeleteRequest),
   create: (companyId: string, payload: CompanySkillCreateRequest) => api.post<CompanySkill>(skills(companyId), payload),
   /** Description, tagline, categories, author, homepage, icon, colour and sharing. */
   update: (companyId: string, skillId: string, payload: CompanySkillUpdateRequest) => api.patch<CompanySkill>(skill(companyId, skillId), payload),

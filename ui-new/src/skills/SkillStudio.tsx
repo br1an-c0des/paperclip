@@ -14,6 +14,7 @@ import { Field, TextArea, TextInput } from "@/ui/Field";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { failureText, useRefreshSkills, useSkillDetail, useSkillList, useSkillVersions } from "./queries";
+import { CONFLICT_NOTICE, isVersionConflict } from "./studio-model";
 import { restoreReplacesFiles, restoreSkillVersion } from "./restore";
 import { CompareVersionsDialog, SkillSettingsDialog } from "./SkillActions";
 import { OriginPill, whenLabel } from "./SkillLibrary";
@@ -27,7 +28,10 @@ import { createPayload, draftProblem, newFileProblem, skillOrigin, slugFor, sort
  *   with a starting SKILL.md (`POST /companies/:id/skills`).
  * - A skill (`/studio/:skillId`) edits its files: SKILL.md and any others, in the document editor,
  *   saved with Save or Ctrl/Cmd+S (`PATCH …/files`; the server keeps a version of each change). New
- *   files and deleting them (`DELETE …/files`). "Save version" names the current files as a version
+ *   files and deleting them (`DELETE …/files`). Saves and deletes send the version the edit started
+ *   from (`expectedVersionId`, upstream #18334); if someone changed the skill meanwhile the server
+ *   answers 409 and a notice keeps the edits on screen, with "Load latest saved file" to start over
+ *   from the server's copy (studio-model.ts). "Save version" names the current files as a version
  *   (`POST …/versions`); Restore saves an earlier version as a new one, as the old Studio does: one
  *   `POST …/versions` with `sourceVersionId` for a managed skill, or its files written back for a
  *   linked local one (restore.ts). Deleting the skill removes it from every agent.
@@ -224,6 +228,8 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [restoring, setRestoring] = createSignal<CompanySkillVersionSummary | null>(null);
   const [comparing, setComparing] = createSignal(false);
+  const [conflict, setConflict] = createSignal(false);
+  const [reloadOpen, setReloadOpen] = createSignal(false);
 
   // A new file starts empty: there's nothing on the server until it's saved.
   const isNew = () => !props.skill.fileInventory.some((entry) => entry.path === path());
@@ -237,6 +243,14 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
   const text = () => draft() ?? saved();
   const dirty = () => draft() !== null && draft() !== saved();
   const binary = () => file.data?.encoding === "base64";
+  // The version the edit started from, sent with each save and delete. It follows the file as read
+  // until you start editing, then holds, so a change someone else saves meanwhile is a conflict.
+  const [baseVersion, setBaseVersion] = createSignal<string | null>(null);
+  createEffect(() => {
+    if (draft() !== null) return;
+    setBaseVersion((isNew() ? null : file.data?.versionId) ?? props.skill.currentVersionId ?? null);
+  });
+  createEffect(on(path, () => setConflict(false)));
 
   const refresh = () => {
     refreshSkills(props.skill.id);
@@ -247,14 +261,22 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
     if (!dirty() && !isNew()) return;
     setSaving(true);
     try {
-      const result = await skillsApi.saveFile(company().id, props.skill.id, path(), text(), file.data ? { executable: file.data.executable } : {});
+      const result = await skillsApi.saveFile(company().id, props.skill.id, path(), text(), {
+        ...(file.data ? { executable: file.data.executable } : {}),
+        expectedVersionId: baseVersion(),
+      });
       // The draft stays: once the cache has the saved text it matches, and clearing it now would show
       // the cached text from before the save for a moment (and the editor would take it up).
       client.setQueryData(queryKeys.skills.file(company().id, props.skill.id, path()), result);
+      setBaseVersion(result.versionId ?? baseVersion());
+      setConflict(false);
       refresh();
       pushToast({ tone: "success", title: `Saved ${path()}` });
     } catch (error) {
-      pushToast({ tone: "error", title: `Couldn't save ${path()}`, body: failureText(error, "") });
+      if (isVersionConflict(error)) {
+        setConflict(true);
+        refresh();
+      } else pushToast({ tone: "error", title: `Couldn't save ${path()}`, body: failureText(error, "") });
     } finally {
       setSaving(false);
     }
@@ -268,13 +290,29 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
 
   const deleteFile = async () => {
     try {
-      await skillsApi.deleteFile(company().id, props.skill.id, path());
+      await skillsApi.deleteFile(company().id, props.skill.id, path(), { expectedVersionId: baseVersion() });
       pushToast({ tone: "success", title: `Deleted ${path()}` });
       setPath("SKILL.md");
       refresh();
     } catch (error) {
-      pushToast({ tone: "error", title: `Couldn't delete ${path()}`, body: failureText(error, "") });
+      if (isVersionConflict(error)) {
+        setConflict(true);
+        refresh();
+      } else pushToast({ tone: "error", title: `Couldn't delete ${path()}`, body: failureText(error, "") });
     }
+  };
+
+  // Starts over from the server's copy of the file, dropping the draft.
+  const loadLatest = async () => {
+    const reading = path();
+    const result = await file.refetch();
+    if (reading !== path()) return;
+    if (result.error) {
+      pushToast({ tone: "error", title: `Couldn't load ${reading}`, body: failureText(result.error, "") });
+      return;
+    }
+    setDraft(null);
+    setConflict(false);
   };
 
   const deleteSkill = async () => {
@@ -424,6 +462,14 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
               </Button>
             </div>
           </div>
+          <Show when={conflict()}>
+            <div class="sk-conflict" role="alert">
+              <span>{CONFLICT_NOTICE}</span>
+              <Button size="compact" disabled={file.isFetching} onClick={() => (dirty() ? setReloadOpen(true) : void loadLatest())}>
+                Load latest saved file
+              </Button>
+            </div>
+          </Show>
           <Switch>
             <Match when={!isNew() && file.isPending}>
               <p class="org-muted sk-editor-note">Loading…</p>
@@ -468,6 +514,15 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
           setPendingPath(null);
           if (next) setPath(next);
         }}
+      />
+      <ConfirmDialog
+        open={reloadOpen()}
+        onOpenChange={setReloadOpen}
+        title="Load the latest saved file?"
+        body={`Your unsaved changes to ${path()} will be lost. Copy anything you want to keep first.`}
+        confirmLabel="Discard and load"
+        danger
+        onConfirm={() => void loadLatest()}
       />
       <ConfirmDialog open={deleteFileOpen()} onOpenChange={setDeleteFileOpen} title={`Delete ${path()}?`} body="Earlier versions keep it; agents get the skill without it from the next run." confirmLabel="Delete file" danger onConfirm={deleteFile} />
       <ConfirmDialog

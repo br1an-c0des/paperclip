@@ -510,6 +510,23 @@
   padding: 20px;
 }
 
+/* Saving or deleting against a newer version of the skill (409): the edits stay. */
+.sk-conflict {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--amber-fg) 35%, transparent);
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-size: 13px;
+}
+
+.sk-conflict > span {
+  flex: 1 1 240px;
+}
+
 .sk-editor .mde {
   flex: 1;
   min-height: 420px;
