@@ -81,10 +81,10 @@ export function ManagerMenu(props: {
       <Menu.Trigger
         as={FieldButton}
         class={props.class ?? "ps-field-360"}
-        aria-label={`Reports to ${props.manager?.name ?? "nobody"}`}
+        aria-label={`Reports to ${props.manager?.name ?? (props.value ? "an unavailable manager" : "nobody")}`}
         icon={<Show when={props.manager}>{(found) => <AgentAvatar agent={found()} size={20} ring={false} />}</Show>}
       >
-        {props.manager?.name ?? "Nobody: top of the org"}
+        {props.manager?.name ?? (props.value ? "Manager unavailable" : "Nobody: top of the org")}
       </Menu.Trigger>
       <Menu.Content label="Reports to" width={280}>
         <For each={props.candidates} fallback={<p class="nt-menu-note">No other agents to report to.</p>}>

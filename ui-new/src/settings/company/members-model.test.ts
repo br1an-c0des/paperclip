@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CompanyInviteRecord, CompanyJoinRequest, CompanyMember } from "@/api/access";
-import { approveRole, inviteMeta, inviteTitle, memberMeta, requesterName, roleLabel, sortInvites, visibleMembers } from "./members-model";
+import { approveRole, directoryMembers, inviteMeta, inviteTitle, memberMeta, requesterName, roleLabel, sortInvites, visibleMembers } from "./members-model";
 
 const NOW = new Date("2026-10-27T12:00:00Z");
 
@@ -51,6 +51,17 @@ describe("members", () => {
   it("says when someone joined and whether they're suspended", () => {
     expect(memberMeta(member({}), NOW)).toBe("Joined Sep 12");
     expect(memberMeta(member({ status: "suspended" }), NOW)).toBe("Joined Sep 12 · suspended");
+  });
+
+  it("lists the user directory's people by role, then name, when you can't manage members", () => {
+    const person = (principalId: string, membershipRole: "owner" | "viewer" | null, name: string) => ({
+      principalId,
+      status: "active" as const,
+      membershipRole,
+      user: { id: principalId, email: null, name, image: null },
+    });
+    const list = directoryMembers([person("a", null, "Ann"), person("b", "viewer", "Bo"), person("c", "owner", "Cy"), person("d", "viewer", "Al")]);
+    expect(list.map((entry) => entry.principalId)).toEqual(["c", "d", "b", "a"]);
   });
 
   it("labels roles", () => {

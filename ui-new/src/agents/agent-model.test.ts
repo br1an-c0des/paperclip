@@ -8,6 +8,7 @@ import {
   buildRuntimePatch,
   canQualifyRunnerEnvironment,
   changedKeyLabel,
+  directReportsOf,
   harnessLabel,
   harnessType,
   headerSummary,
@@ -217,6 +218,17 @@ describe("profile", () => {
       { id: "gone", reportsTo: null, status: "terminated" },
     ] as never[] as { id: string; reportsTo: string | null; status: string }[];
     expect(managerCandidates(agents as never, "bob").map((entry: { id: string }) => entry.id)).toEqual(["ceo", "peer"]);
+  });
+
+  it("lists an agent's direct reports, leaving retired ones out", () => {
+    const agents = [
+      { id: "ceo", reportsTo: null, status: "idle" },
+      { id: "bob", reportsTo: "ceo", status: "paused" },
+      { id: "deep", reportsTo: "bob", status: "idle" },
+      { id: "gone", reportsTo: "ceo", status: "terminated" },
+    ] as never[] as { id: string; reportsTo: string | null; status: string }[];
+    expect(directReportsOf(agents as never, "ceo").map((entry: { id: string }) => entry.id)).toEqual(["bob"]);
+    expect(directReportsOf(agents as never, "deep")).toEqual([]);
   });
 
   it("summarizes the header line", () => {

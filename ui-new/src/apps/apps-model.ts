@@ -170,17 +170,55 @@ export function appFlagOn(app: AppDefinition, flags: Flags) {
   return Boolean((flags as Record<string, unknown> | undefined)?.[app.experimentalFeatureKey]);
 }
 
-/** The gallery: tool apps ui-new can connect, featured first, then by name. */
-export function galleryApps(apps: readonly AppDefinition[], flags: Flags): AppDefinition[] {
+/**
+ * Google's per-service connectors, which the one Google Workspace connector replaces for new
+ * accounts: the app slugs of the shared package's `GOOGLE_WORKSPACE_CONNECTOR_PROFILES` other than
+ * `google-workspace` (the old UI's `LEGACY_GOOGLE_CONNECTOR_SLUGS`). A company's existing
+ * connections to them keep working, so they show while it has one.
+ */
+export const LEGACY_GOOGLE_SLUGS: ReadonlySet<string> = new Set([
+  "gmail",
+  "google-drive",
+  "google-docs",
+  "google-sheets",
+  "google-slides",
+  "google-calendar",
+  "google-chat",
+  "google-people",
+  "google-workspace-search",
+]);
+
+export const GOOGLE_WORKSPACE_SLUG = "google-workspace";
+
+/**
+ * The gallery: tool apps ui-new can connect, featured first, then by name. Google's per-service
+ * connectors only show while you have a connection to one (`counts`, by slug).
+ */
+export function galleryApps(apps: readonly AppDefinition[], flags: Flags, counts?: ReadonlyMap<string, number>): AppDefinition[] {
   return apps
     .filter(
       (app) =>
         !app.aiConnectionRouter &&
         !SPECIAL_SETUP_APPS.has(app.slug) &&
         appFlagOn(app, flags) &&
+        (!LEGACY_GOOGLE_SLUGS.has(app.slug) || (counts?.get(app.slug) ?? 0) > 0) &&
         toolMethods(app).some(canSetUp),
     )
     .sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)) || a.name.localeCompare(b.name));
+}
+
+/**
+ * The gallery apps that claim a Composio or Arcade app of the same name, which then shows on the
+ * gallery's tile instead of in the catalog. While the Google Workspace connector is off
+ * (`enableGoogleWorkspaceConnector`, #19247: the server leaves it out of the gallery and refuses
+ * it), Paperclip's own Google connectors step aside for the gateways' Google apps, except one you
+ * have a connection to.
+ */
+export function claimingApps<A extends Pick<AppDefinition, "slug">>(apps: readonly A[], workspaceOn: boolean, counts?: ReadonlyMap<string, number>): A[] {
+  if (workspaceOn) return [...apps];
+  return apps.filter(
+    (app) => !(app.slug === GOOGLE_WORKSPACE_SLUG || LEGACY_GOOGLE_SLUGS.has(app.slug)) || (counts?.get(app.slug) ?? 0) > 0,
+  );
 }
 
 export const CATEGORY_LABELS: Record<AppCategory, string> = {

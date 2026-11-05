@@ -33,10 +33,15 @@ export function boardAccessFromBootstrap(bootstrap: Pick<BoardBootstrap, "boardA
   };
 }
 
-/** The company's people (`GET /companies/:id/user-directory`), for assignee and reviewer menus. */
+/**
+ * The company's active people (`GET /companies/:id/user-directory`), for assignee and reviewer
+ * menus. Any member can read it, and since #15183 it has each one's role, which otherwise needs
+ * `/members` and the permission to manage members.
+ */
 export type CompanyUserDirectoryEntry = {
   principalId: string;
   status: "active";
+  membershipRole: HumanCompanyRole | null;
   user: PersonRef | null;
 };
 

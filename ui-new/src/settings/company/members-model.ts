@@ -1,4 +1,4 @@
-import type { CompanyInviteRecord, CompanyJoinRequest, CompanyMember, HumanCompanyRole } from "@/api/access";
+import type { CompanyInviteRecord, CompanyJoinRequest, CompanyMember, CompanyUserDirectoryEntry, HumanCompanyRole } from "@/api/access";
 
 /*
  * Members (board 22): people and roles, invite links, and requests to join, as the old
@@ -27,6 +27,18 @@ export function visibleMembers(members: readonly CompanyMember[]) {
         (ROLE_ORDER[a.membershipRole ?? ""] ?? 9) - (ROLE_ORDER[b.membershipRole ?? ""] ?? 9) ||
         memberName(a).localeCompare(memberName(b)),
     );
+}
+
+/**
+ * Who to list when you can't manage members (`/members` needs that permission): the company's
+ * active people from the user directory, which has their roles since #15183, in the same order.
+ */
+export function directoryMembers(users: readonly CompanyUserDirectoryEntry[]) {
+  return [...users].sort(
+    (a, b) =>
+      (ROLE_ORDER[a.membershipRole ?? ""] ?? 9) - (ROLE_ORDER[b.membershipRole ?? ""] ?? 9) ||
+      memberName(a).localeCompare(memberName(b)),
+  );
 }
 
 export function memberName(member: Pick<CompanyMember, "principalId" | "user">) {

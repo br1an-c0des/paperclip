@@ -35,7 +35,7 @@ import { projectsApi } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
-import { useAgentsQuery, usePeopleQuery } from "@/lib/company-data";
+import { useAgentsQuery, usePeopleQuery, useProjectsQuery } from "@/lib/company-data";
 import { useSession } from "@/lib/session";
 import { newId } from "@/tasks/new-task";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
@@ -49,9 +49,11 @@ import { pushToast } from "@/ui/Toast";
 import {
   buildProjectPayload,
   emptyProjectDraft,
+  initialStorage,
   membersToAdd,
   NEW_PROJECT_STATUSES,
   projectProblem,
+  storageCatalog,
   TILE_COLORS,
   TILE_ICONS,
   tileGradient,
@@ -69,7 +71,8 @@ import "./NewProjectDialog.css";
  *
  * - the tile (a color, and the name's first letter or an icon), then the name and description;
  * - pills for status, lead and visibility (a private project lists its members), and a target date;
- * - Code: GitHub repositories from the company's connections, a folder on the server, or none.
+ * - Code: GitHub repositories from the company's connections, a folder on the server, or none; and,
+ *   when the company has workspace storage plugins, the storage the project keeps (#19036).
  *
  * Creating goes to the new project's dashboard. The form rules and the request live in
  * new-project.ts.
@@ -141,8 +144,19 @@ function NewProjectForm() {
   const client = useQueryClient();
   const agents = useAgentsQuery();
   const people = usePeopleQuery();
+  const projects = useProjectsQuery();
+  const catalog = createMemo(() => storageCatalog(projects.data));
 
   const [draft, setDraft] = createStore<NewProjectDraft>(emptyProjectDraft());
+  // Starts on the installed default once the catalog has loaded, until someone picks.
+  let storagePicked = false;
+  createEffect(on(catalog, (list) => !storagePicked && setDraft("storage", list.length > 0 ? initialStorage(list) : null)));
+  const pickStorage = (value: string) => {
+    storagePicked = true;
+    setDraft("storage", value);
+  };
+  const storageName = () =>
+    draft.storage === "core" ? "Core, on this server" : (catalog().find((provider) => provider.id === draft.storage)?.displayName ?? "Choose storage");
   const [error, setError] = createSignal<string | null>(null);
   const [tileOpen, setTileOpen] = createSignal(false);
   // A retry of the same submission reuses its key, so the server makes one project.
@@ -182,14 +196,14 @@ function NewProjectForm() {
   }));
 
   const submit = async () => {
-    const problem = projectProblem(draft);
+    const problem = projectProblem(draft, catalog());
     if (problem) return setError(problem);
     setError(null);
     const base = unwrap(draft);
     const fingerprint = JSON.stringify(base);
     if (submission?.fingerprint !== fingerprint) submission = { fingerprint, key: newId() };
     try {
-      const { project, failed } = await create.mutateAsync(buildProjectPayload(base, submission.key));
+      const { project, failed } = await create.mutateAsync(buildProjectPayload(base, submission.key, catalog()));
       void client.invalidateQueries({ queryKey: queryKeys.projects.all(company().id) });
       if (failed.length > 0) pushToast({ tone: "warn", title: `Created ${project.name}, but some members weren't added`, body: failed.join(", ") });
       else pushToast({ tone: "success", title: `Created ${project.name}` });
@@ -468,6 +482,34 @@ function NewProjectForm() {
             <p class="np-code-note">No code. Agents work in a folder Paperclip manages for the project, and you can add a repository later in Settings.</p>
           </Match>
         </Switch>
+        <Show when={catalog().length > 0}>
+          <div class="np-storage">
+            <span class="cap">Workspace storage</span>
+            <Menu>
+              <Menu.Trigger class="nt-pill" aria-label={`Workspace storage: ${storageName()}`}>
+                <b class="np-pill-value">{storageName()}</b>
+                <ChevronDown size={13} aria-hidden="true" />
+              </Menu.Trigger>
+              <Menu.Content label="Workspace storage" width={280}>
+                <Menu.Item onSelect={() => pickStorage("core")} hint={draft.storage === "core" ? <Check size={14} /> : undefined}>
+                  Core, on this server
+                </Menu.Item>
+                <For each={catalog()}>
+                  {(provider) => (
+                    <Menu.Item
+                      onSelect={() => pickStorage(provider.id)}
+                      description={provider.isDefault ? "The installed default" : undefined}
+                      hint={draft.storage === provider.id ? <Check size={14} /> : undefined}
+                    >
+                      {provider.displayName}
+                    </Menu.Item>
+                  )}
+                </For>
+              </Menu.Content>
+            </Menu>
+            <p class="np-storage-note">A project on a storage plugin stays on it; a project on Core can move to a plugin later.</p>
+          </div>
+        </Show>
       </section>
 
       <footer class="nt-foot np-foot">

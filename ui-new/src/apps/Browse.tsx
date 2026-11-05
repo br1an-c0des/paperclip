@@ -11,10 +11,12 @@ import { TextInput } from "@/ui/Field";
 import {
   CATEGORY_LABELS,
   categoriesIn,
+  claimingApps,
   connectionCounts,
   connectionGroup,
   connectionRows,
   galleryApps,
+  GOOGLE_WORKSPACE_SLUG,
   hostedAt,
   matchesApp,
   type AppCategory,
@@ -203,7 +205,9 @@ function Gallery(props: { counts: Map<string, number> }) {
   const [query, setQuery] = createSignal("");
   const [category, setCategory] = createSignal<AppCategory | null>(null);
   const [source, setSource] = createSignal<CatalogSource>("paperclip");
-  const apps = createMemo(() => withChatApps(galleryApps(gallery.data?.apps ?? [], flags.data), gallery.data?.apps ?? [], flags.data));
+  const apps = createMemo(() => withChatApps(galleryApps(gallery.data?.apps ?? [], flags.data, props.counts), gallery.data?.apps ?? [], flags.data));
+  // The built-in Google Workspace connector is on when the server offers it and the instance has it on.
+  const workspaceOn = () => apps().some((app) => app.slug === GOOGLE_WORKSPACE_SLUG);
   const categories = createMemo(() => categoriesIn(apps()));
   const shown = createMemo(() => (showsNative(source()) ? apps().filter((app) => matchesApp(app, query(), category())) : []));
 
@@ -212,7 +216,8 @@ function Gallery(props: { counts: Map<string, number> }) {
   const accounts = useGatewayAccounts();
   const allCatalog = createMemo(() => {
     const module = catalog();
-    return module ? catalogRows(module.AGGREGATOR_APP_CATALOG, gallery.data?.apps ?? [], accounts.observed(), module.aggregatorAppIdentity) : [];
+    const native = claimingApps(gallery.data?.apps ?? [], workspaceOn(), props.counts);
+    return module ? catalogRows(module.AGGREGATOR_APP_CATALOG, native, accounts.observed(), module.aggregatorAppIdentity) : [];
   });
   // A category narrows Paperclip's apps; the providers' catalogs have none.
   const catalogShown = createMemo(() => (category() && showsNative(source()) ? [] : visibleCatalogRows(allCatalog(), source(), query())));

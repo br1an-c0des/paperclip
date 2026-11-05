@@ -397,6 +397,11 @@ export function managerCandidates<T extends Pick<Agent, "id" | "reportsTo" | "st
   return agents.filter((agent) => !below.has(agent.id) && agent.status !== "terminated");
 }
 
+/** The agents that report to this one, leaving out retired ones, as the old profile lists them. */
+export function directReportsOf<T extends Pick<Agent, "id" | "reportsTo" | "status">>(agents: readonly T[], agentId: string): T[] {
+  return agents.filter((agent) => agent.reportsTo === agentId && agent.status !== "terminated");
+}
+
 // ---------------------------------------------------------------------------------------------
 // Model and runtime
 
