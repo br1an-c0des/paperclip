@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildProjectPayload, emptyProjectDraft, membersToAdd, projectProblem, TILE_COLORS, TILE_ICONS, tileGradient } from "./new-project";
+import { buildProjectPayload, emptyProjectDraft, initialStorage, membersToAdd, projectProblem, storageCatalog, TILE_COLORS, TILE_ICONS, tileGradient } from "./new-project";
 
 describe("emptyProjectDraft", () => {
   it("starts Planned and open, with no code, on one of the tile colors", () => {
@@ -57,6 +57,31 @@ describe("buildProjectPayload", () => {
     const none = buildProjectPayload(emptyProjectDraft({ name: "Ops", source: "none", repositoryIds: ["9"], folder: "/x" }));
     expect(none).not.toHaveProperty("repositoryIds");
     expect(none).not.toHaveProperty("workspace");
+  });
+});
+
+describe("workspace storage", () => {
+  const managed = { id: "11111111-1111-4111-8111-111111111111", displayName: "Managed", isDefault: true };
+  const other = { id: "22222222-2222-4222-8222-222222222222", displayName: "Other", isDefault: false };
+
+  it("reads the company's storage plugins from any project", () => {
+    expect(storageCatalog(undefined)).toEqual([]);
+    expect(storageCatalog([{ workspaceProvider: undefined }, { workspaceProvider: { source: "core", pluginId: null, displayName: "Core / local", providers: [managed], effectivePolicy: null, error: null } }])).toEqual([managed]);
+  });
+
+  it("starts on the one default, else Core, and makes you pick when several claim it", () => {
+    expect(initialStorage([])).toBe("core");
+    expect(initialStorage([other])).toBe("core");
+    expect(initialStorage([managed, other])).toBe(managed.id);
+    expect(initialStorage([managed, { ...other, isDefault: true }])).toBeNull();
+    expect(projectProblem(emptyProjectDraft({ name: "Ops", storage: null }), [managed])).toMatch(/stored/);
+    expect(projectProblem(emptyProjectDraft({ name: "Ops", storage: null }), [])).toBeNull();
+  });
+
+  it("sends the choice only while there are storage plugins", () => {
+    expect(buildProjectPayload(emptyProjectDraft({ name: "Ops", storage: "core" }))).not.toHaveProperty("executionWorkspacePolicy");
+    expect(buildProjectPayload(emptyProjectDraft({ name: "Ops", storage: "core" }), undefined, [managed]).executionWorkspacePolicy).toEqual({ enabled: false, storageProviderPluginId: null });
+    expect(buildProjectPayload(emptyProjectDraft({ name: "Ops", storage: other.id }), undefined, [managed, other]).executionWorkspacePolicy).toEqual({ enabled: true, storageProviderPluginId: other.id });
   });
 });
 

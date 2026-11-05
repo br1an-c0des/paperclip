@@ -368,7 +368,11 @@ export type CheckoutDraft = {
   provisionCommand: string;
   runtimeProvisionCommand: string;
   teardownCommand: string;
-  /** "inherit" keeps the installed default, "core" is core local storage, else a provider plugin id. */
+  /**
+   * "core" is core local storage, else a storage plugin's id. Since #19036 a project keeps the
+   * storage it was created with: a project on Core can move to a plugin, and one on a plugin is
+   * locked to it (`storageLocked`).
+   */
   storage: string;
 };
 
@@ -392,7 +396,7 @@ export function checkoutDraft(project: Pick<Project, "executionWorkspacePolicy" 
     provisionCommand: strategy?.provisionCommand ?? "",
     runtimeProvisionCommand: strategy?.runtimeProvisionCommand ?? "",
     teardownCommand: strategy?.teardownCommand ?? "",
-    storage: stored?.storageProviderPluginId === null ? "core" : (stored?.storageProviderPluginId ?? "inherit"),
+    storage: stored?.storageProviderPluginId ?? "core",
   };
 }
 
@@ -422,9 +426,14 @@ export function checkoutPolicy(project: Pick<Project, "executionWorkspacePolicy"
     for (const key of strategyKeys) strategy[key] = draft[key].trim() || null;
     policy.workspaceStrategy = strategy;
   }
-  if (draft.storage === "inherit") delete policy.storageProviderPluginId;
-  else policy.storageProviderPluginId = draft.storage === "core" ? null : draft.storage;
+  // Core is only written when it was already saved; a plugin-backed project keeps its plugin.
+  if (draft.storage !== "core" && !storageLocked(project)) policy.storageProviderPluginId = draft.storage;
   return policy;
+}
+
+/** A plugin-backed project stays on its plugin: the server refuses a change (#19036). */
+export function storageLocked(project: Pick<Project, "executionWorkspacePolicy">) {
+  return Boolean(project.executionWorkspacePolicy?.storageProviderPluginId);
 }
 
 // ---------------------------------------------------------------------------------------------

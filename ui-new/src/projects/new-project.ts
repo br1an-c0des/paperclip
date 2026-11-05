@@ -1,4 +1,4 @@
-import type { ProjectIconName, ProjectStatus } from "@paperclipai/shared";
+import type { Project, ProjectIconName, ProjectStatus } from "@paperclipai/shared";
 
 /*
  * New project's form (board N1): what the dialog holds, what's missing before it can be created, and
@@ -11,6 +11,11 @@ import type { ProjectIconName, ProjectStatus } from "@paperclipai/shared";
  * - status (Backlog, Planned, In progress), lead agent, visibility and target date;
  * - code: GitHub repositories from the company's connections (`repositoryIds`, the first becomes
  *   primary), a folder on the server (a primary `local_path` workspace), or none.
+ *
+ * - storage, when the company has workspace storage plugins: Core or one of them, saved as
+ *   `executionWorkspacePolicy.storageProviderPluginId`. Since #19036 a project keeps the storage it
+ *   was created with: left out, the server applies the one installed default (and refuses the
+ *   create when several claim it), and a plugin-backed project can't move off its plugin later.
  *
  * A private project's members are added once it exists (`POST /projects/:id/access-members`); the
  * person creating it is its owner and always has access.
@@ -36,7 +41,33 @@ export type NewProjectDraft = {
   /** GitHub repository ids in order; the first is the primary. */
   repositoryIds: string[];
   folder: string;
+  /**
+   * `"core"` or a storage plugin's id; null leaves it to the server. Only sent while the company has
+   * storage plugins (see `storageCatalog`).
+   */
+  storage: string | null;
 };
+
+export type StorageProvider = { id: string; displayName: string; isDefault: boolean };
+
+/**
+ * The company's workspace storage plugins. There's no endpoint for the list on its own, but every
+ * project carries the company's catalog in `workspaceProvider.providers`, so the first project's is
+ * used. With no projects yet it's empty, and the server's default applies.
+ */
+export function storageCatalog(projects: Pick<Project, "workspaceProvider">[] | undefined): StorageProvider[] {
+  return projects?.find((project) => project.workspaceProvider)?.workspaceProvider?.providers ?? [];
+}
+
+/**
+ * The storage a new project starts on: the one plugin that claims the project default, else Core.
+ * Null when several claim it, which the server refuses, so someone has to pick.
+ */
+export function initialStorage(catalog: StorageProvider[]): string | null {
+  const defaults = catalog.filter((provider) => provider.isDefault);
+  if (defaults.length > 1) return null;
+  return defaults[0]?.id ?? "core";
+}
 
 /** The board's eight tile colors, as 160deg disc gradients. The first stop is what's saved. */
 export const TILE_COLORS: { name: string; stops: [string, string] }[] = [
@@ -98,13 +129,15 @@ export function emptyProjectDraft(seed: Partial<NewProjectDraft> = {}, random: (
     source: "none",
     repositoryIds: [],
     folder: "",
+    storage: null,
     ...seed,
   };
 }
 
 /** Why the draft can't be created yet, or null. */
-export function projectProblem(draft: NewProjectDraft): string | null {
+export function projectProblem(draft: NewProjectDraft, catalog: StorageProvider[] = []): string | null {
   if (!draft.name.trim()) return "Give the project a name.";
+  if (catalog.length > 0 && draft.storage === null) return "Choose where the project's workspaces are stored.";
   if (draft.source === "local" && !draft.folder.trim()) return "Enter the folder on the server, or choose None.";
   if (draft.source === "github" && draft.repositoryIds.length === 0) return "Add a repository, or choose None.";
   if (draft.targetDate && !/^\d{4}-\d{2}-\d{2}$/.test(draft.targetDate)) return "The target date isn't a date.";
@@ -112,7 +145,7 @@ export function projectProblem(draft: NewProjectDraft): string | null {
 }
 
 /** The create request. Fields left at their defaults are left out. */
-export function buildProjectPayload(draft: NewProjectDraft, idempotencyKey?: string): Record<string, unknown> {
+export function buildProjectPayload(draft: NewProjectDraft, idempotencyKey?: string, catalog: StorageProvider[] = []): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     name: draft.name.trim(),
     status: draft.status,
@@ -128,6 +161,10 @@ export function buildProjectPayload(draft: NewProjectDraft, idempotencyKey?: str
   if (draft.source === "local" && draft.folder.trim()) {
     payload.workspace = { sourceType: "local_path", cwd: draft.folder.trim(), isPrimary: true };
   }
+  // The schema needs `enabled`: Core leaves task checkouts off, as no policy does, and a plugin turns
+  // them on, as the server does when it applies the default.
+  if (catalog.length > 0 && draft.storage === "core") payload.executionWorkspacePolicy = { enabled: false, storageProviderPluginId: null };
+  else if (catalog.length > 0 && draft.storage) payload.executionWorkspacePolicy = { enabled: true, storageProviderPluginId: draft.storage };
   if (idempotencyKey) payload.idempotencyKey = idempotencyKey;
   return payload;
 }

@@ -28,6 +28,7 @@ import {
   newWorkspacePayload,
   sameIds,
   savedRepositories,
+  storageLocked,
   workspaceDraft,
   workspacePatch,
   workspaceProblem,
@@ -685,6 +686,14 @@ function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
     }),
   );
   const providers = () => props.project.workspaceProvider?.providers ?? [];
+  const locked = () => storageLocked(props.project);
+  const storageName = (id: string) =>
+    id === "core" ? "Core, on this server" : (providers().find((provider) => provider.id === id)?.displayName ?? "An unavailable provider");
+  const storageHelp = () => {
+    if (locked()) return `This project stays on ${storageName(draft.storage)}; a plugin-backed project can't move.`;
+    if (draft.storage !== "core") return `Once saved, this project stays on ${storageName(draft.storage)} and can't move back to Core.`;
+    return "A project moved to a storage plugin stays on that plugin.";
+  };
   const environmentName = () => runnable().find((environment) => environment.id === draft.environmentId)?.name ?? "No environment";
   const text = (key: "baseRef" | "branchTemplate" | "worktreeParentDir" | "provisionCommand" | "runtimeProvisionCommand" | "teardownCommand", label: string, placeholder: string, help?: string) => (
     <SettingsRow label={label} help={help} for={`ps-co-${key}`}>
@@ -761,29 +770,34 @@ function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
           {text("teardownCommand", "Teardown command", "bash ./scripts/teardown-worktree.sh", "Runs when a checkout is closed.")}
         </Show>
       </Show>
-      <Show when={providers().length > 0}>
-        <SettingsRow label="Workspace storage">
-          <Menu>
-            <Menu.Trigger as={FieldButton} class="ps-field-360" aria-label="Workspace storage">
-              {draft.storage === "inherit" ? "The installed default" : draft.storage === "core" ? "Core, on this server" : (providers().find((provider) => provider.id === draft.storage)?.displayName ?? "An unavailable provider")}
-            </Menu.Trigger>
-            <Menu.Content label="Workspace storage" width={300}>
-              <Menu.Item onSelect={() => setDraft("storage", "inherit")} hint={draft.storage === "inherit" ? <Check size={14} /> : undefined}>
-                The installed default
-              </Menu.Item>
-              <Menu.Item onSelect={() => setDraft("storage", "core")} hint={draft.storage === "core" ? <Check size={14} /> : undefined}>
-                Core, on this server
-              </Menu.Item>
-              <For each={providers()}>
-                {(provider) => (
-                  <Menu.Item onSelect={() => setDraft("storage", provider.id)} hint={draft.storage === provider.id ? <Check size={14} /> : undefined}>
-                    {provider.displayName}
-                    {provider.isDefault ? " (default)" : ""}
-                  </Menu.Item>
-                )}
-              </For>
-            </Menu.Content>
-          </Menu>
+      <Show when={providers().length > 0 || locked()}>
+        <SettingsRow label="Workspace storage" help={storageHelp()}>
+          <Show
+            when={!locked()}
+            fallback={
+              <FieldButton class="ps-field-360" aria-label={`Workspace storage: ${storageName(draft.storage)}`} disabled>
+                {storageName(draft.storage)}
+              </FieldButton>
+            }
+          >
+            <Menu>
+              <Menu.Trigger as={FieldButton} class="ps-field-360" aria-label={`Workspace storage: ${storageName(draft.storage)}`}>
+                {storageName(draft.storage)}
+              </Menu.Trigger>
+              <Menu.Content label="Workspace storage" width={300}>
+                <Menu.Item onSelect={() => setDraft("storage", "core")} hint={draft.storage === "core" ? <Check size={14} /> : undefined}>
+                  Core, on this server
+                </Menu.Item>
+                <For each={providers()}>
+                  {(provider) => (
+                    <Menu.Item onSelect={() => setDraft("storage", provider.id)} hint={draft.storage === provider.id ? <Check size={14} /> : undefined}>
+                      {provider.displayName}
+                    </Menu.Item>
+                  )}
+                </For>
+              </Menu.Content>
+            </Menu>
+          </Show>
           <Show when={props.project.workspaceProvider?.error}>
             <span class="field-error" role="alert">
               {props.project.workspaceProvider!.error}

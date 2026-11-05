@@ -9,6 +9,7 @@ import {
   checkoutDirty,
   checkoutDraft,
   checkoutPolicy,
+  storageLocked,
   currentPolicy,
   emptyGoalDraft,
   envDirty,
@@ -311,7 +312,7 @@ describe("code", () => {
 
 describe("task checkouts", () => {
   it("reads the effective policy, defaulting to shared checkouts", () => {
-    expect(checkoutDraft(project())).toMatchObject({ enabled: false, isolatedByDefault: false, concurrency: "auto", storage: "inherit" });
+    expect(checkoutDraft(project())).toMatchObject({ enabled: false, isolatedByDefault: false, concurrency: "auto", storage: "core" });
   });
 
   it("keeps fields the page doesn't show, and only writes what was picked", () => {
@@ -329,11 +330,19 @@ describe("task checkouts", () => {
     expect(policy.workspaceStrategy).toMatchObject({ type: "git_worktree", baseRef: "origin/main", branchTemplate: null, teardownCommand: "git worktree prune" });
   });
 
-  it("sets workspace storage: inherited, core, or a provider", () => {
-    const p = project({ executionWorkspacePolicy: { enabled: true, storageProviderPluginId: "plug" } });
-    expect(checkoutDraft(p).storage).toBe("plug");
-    expect(checkoutPolicy(p, { ...checkoutDraft(p), storage: "core" }).storageProviderPluginId).toBeNull();
-    expect("storageProviderPluginId" in checkoutPolicy(p, { ...checkoutDraft(p), storage: "inherit" })).toBe(false);
+  it("moves a Core project to a plugin, and keeps a plugin-backed project on its plugin", () => {
+    const core = project({ executionWorkspacePolicy: { enabled: true } });
+    expect(storageLocked(core)).toBe(false);
+    expect("storageProviderPluginId" in checkoutPolicy(core, checkoutDraft(core))).toBe(false);
+    expect(checkoutPolicy(core, { ...checkoutDraft(core), storage: "plug" }).storageProviderPluginId).toBe("plug");
+    const savedCore = project({ executionWorkspacePolicy: { enabled: true, storageProviderPluginId: null } });
+    expect(checkoutDraft(savedCore).storage).toBe("core");
+    expect(checkoutPolicy(savedCore, checkoutDraft(savedCore)).storageProviderPluginId).toBeNull();
+
+    const plugged = project({ executionWorkspacePolicy: { enabled: true, storageProviderPluginId: "plug" } });
+    expect(checkoutDraft(plugged).storage).toBe("plug");
+    expect(storageLocked(plugged)).toBe(true);
+    expect(checkoutPolicy(plugged, { ...checkoutDraft(plugged), storage: "core" }).storageProviderPluginId).toBe("plug");
   });
 });
 
