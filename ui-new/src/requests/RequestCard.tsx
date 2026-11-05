@@ -44,7 +44,7 @@ import { DeclineButton, Footer } from "./card-parts";
 import { ConnectionControls } from "./ConnectionControls";
 import { DecisionControls, DecisionResults } from "./DecisionControls";
 import { JoinControls } from "./JoinControls";
-import { KIND_LABEL, type Request, type RequestKind } from "./request-model";
+import { KIND_LABEL, suggestedOwner, type Request, type RequestKind } from "./request-model";
 import "./RequestCard.css";
 
 /*
@@ -795,14 +795,17 @@ function SuggestedTasks(props: {
   const tasks = () => props.interaction.payload.tasks.filter((task) => !task.hiddenInPreview);
   const [picked, setPicked] = createSignal<string[]>(tasks().map((task) => task.clientKey));
   const toggle = (key: string) => setPicked((current) => (current.includes(key) ? current.filter((value) => value !== key) : [...current, key]));
+  // In an agent chat, a suggested task nobody is named for goes to the chat's agent (upstream
+  // #17983), so the preview names it. The chat's task row is the one the chat itself reads.
+  const sourceId = () => props.interaction.issueId;
+  const source = createQuery(() => ({
+    queryKey: queryKeys.issues.section(sourceId(), "core"),
+    queryFn: ({ signal }) => issuesApi.getCore(sourceId(), signal),
+    enabled: !!sourceId() && tasks().some((task) => !task.assigneeAgentId && !task.assigneeUserId),
+    staleTime: 60_000,
+  }));
   const owner = (task: { assigneeAgentId?: string | null; assigneeUserId?: string | null }) =>
-    task.assigneeAgentId
-      ? (props.people.agent(task.assigneeAgentId)?.name ?? "An agent")
-      : task.assigneeUserId
-        ? task.assigneeUserId === props.people.youId()
-          ? "You"
-          : props.people.personName(task.assigneeUserId)
-        : "Unassigned";
+    suggestedOwner(task, { chatAgentId: source.data?.conversationAgentId ?? null, youId: props.people.youId(), agentName: (id) => props.people.agent(id)?.name, personName: props.people.personName });
   return (
     <>
       <div class="rq-opts" role="group" aria-label="Suggested tasks">

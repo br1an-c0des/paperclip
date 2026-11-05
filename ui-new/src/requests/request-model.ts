@@ -620,3 +620,18 @@ export const KIND_LABEL: Record<RequestKind, string> = {
   approval: "Approval",
   signoff: "Sign-off",
 };
+
+/**
+ * Who a suggested task will go to, for its preview: the agent or person it names, else, in an
+ * agent chat, the chat's agent (the server's default for tasks proposed there, upstream #17983),
+ * else nobody.
+ */
+export function suggestedOwner(
+  task: { assigneeAgentId?: string | null; assigneeUserId?: string | null },
+  context: { chatAgentId: string | null; youId: string | null; agentName: (id: string) => string | undefined; personName: (id: string) => string },
+) {
+  const agentId = task.assigneeAgentId ?? (task.assigneeUserId ? null : context.chatAgentId);
+  if (agentId) return context.agentName(agentId) ?? "An agent";
+  if (task.assigneeUserId) return task.assigneeUserId === context.youId ? "You" : context.personName(task.assigneeUserId);
+  return "Unassigned";
+}
