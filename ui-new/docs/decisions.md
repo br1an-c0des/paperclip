@@ -546,6 +546,7 @@ UI-only flags:
 | `enableEnvironments` | Built in | Environments are a company settings section (boards 21–25). |
 | `enableIssuePlanDecompositions` | Built in | Shown in a task's history when there is one (M2). |
 | `enableExperimentalFileViewer` | Built in | A task's workspace file browser, for reviewing an agent's work (M2). |
+| `enableLegacyComposerSubmit` | Follows the setting | Added upstream Nov 5, 2026 (#19272). A preference the server doesn't enforce: Enter sends task replies and new tasks, and with this on Command/Ctrl+Enter does, as in the old UI. A switch in Features; the composers read it once U48 is built (decided Nov 5, 2026). |
 
 Server-enforced flags, all following the setting:
 
@@ -559,6 +560,7 @@ Server-enforced flags, all following the setting:
 | `enableServerInfoDebugView` | The server-info section in the account menu, when the setting is on. |
 | `enableManagedSandboxOnly`, `enableIsolatedWorkspaces`, `enableNativeRunner` | Agent, project and environment settings show the controls these allow. |
 | `enableChatConnectors`, `enableGitHubReviewBots`, `enableMemoryConnectors`, `enableFastResponses` | Apps and tools sections (M6). |
+| `enableGoogleWorkspaceConnector` | Added upstream Nov 5, 2026 (#19247), off by default. The server hides and blocks Paperclip's own Google Workspace connector while it's off, and the Composio and Arcade Google apps show instead; Apps already gates catalog entries by `experimentalFeatureKey`. A switch in Features (confirmed Nov 5, 2026; U53). |
 | `enableOpenAiDot`, `enableGrokBot`, `enableMuse`, `enableBuiltInAgents`, `enableBetaSkills` | New-agent choices and agent settings (M5). |
 | `enableExternalObjects`, `enableSummaries`, `enableStatusCards` | Their panels on tasks, projects and workspaces, when the setting is on. |
 

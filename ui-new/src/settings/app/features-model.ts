@@ -61,6 +61,11 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
         label: "External objects",
         help: "Finds links in tasks to pull requests, tickets and other outside work, and shows their status.",
       },
+      {
+        key: "enableLegacyComposerSubmit",
+        label: "Command/Ctrl+Enter to send",
+        help: "Task replies and new tasks send with Command/Ctrl+Enter, and Enter adds a new line. When off, Enter sends and Shift+Enter adds a new line.",
+      },
     ],
   },
   {
@@ -153,6 +158,11 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
         key: "enableFastResponses",
         label: "Fast responses",
         help: "Lets agents send a short acknowledgement while they start work.",
+      },
+      {
+        key: "enableGoogleWorkspaceConnector",
+        label: "Google Workspace connector",
+        help: "Offers Paperclip's own Google Workspace connector while Google's app verification is pending. When off, Google apps come through Composio and Arcade instead.",
       },
       {
         key: "enableAiConnectionRouters",
