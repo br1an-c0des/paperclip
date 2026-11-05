@@ -136,6 +136,13 @@
 .td-status[data-tone="green"] { --tone-bg: var(--green-bg); --tone-fg: var(--green-fg); }
 .td-status[data-tone="neutral"] { --tone-bg: var(--pri-off); --tone-fg: var(--text); }
 
+/* Monitoring: its tone as a dashed outline, like the scheduled outlines, as its capsule is hollow. */
+.td-status[data-hollow] {
+  background: transparent;
+  outline: 1px dashed var(--tone-fg);
+  outline-offset: -1px;
+}
+
 .td-more {
   align-self: flex-start;
   display: flex;

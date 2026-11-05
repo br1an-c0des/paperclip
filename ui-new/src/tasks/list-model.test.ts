@@ -7,6 +7,7 @@ import {
   rowsById,
   shownRows,
   startsCollapsed,
+  takesAdds,
   takesDrops,
   updatedLabel,
   type GroupNames,
@@ -255,5 +256,32 @@ describe("Group: Case", () => {
     expect(takesDrops({ field: "case", caseId: "c1" })).toBe(false);
     expect(groupDefaults({ field: "case", caseId: "c1" })).toEqual({});
     expect(moveUpdate(task("a", "todo"), undefined, { field: "case", caseId: "c2" })).toBeNull();
+  });
+});
+
+describe("Monitoring", () => {
+  const monitored = (id: string) => task(id, "in_progress", { displayStatus: "monitoring" });
+
+  it("groups a task by what it shows, under In progress, in a group that takes no drops or new tasks", () => {
+    const groups = buildTaskGroups([task("a", "todo"), monitored("m"), task("b", "in_progress")], new Set());
+    expect(groups.map((group) => group.key)).toEqual(["in_progress", "monitoring", "todo"]);
+    const group = groups[1]!;
+    expect(group).toMatchObject({ label: "Monitoring", mark: { kind: "status", status: "monitoring" }, value: { field: "monitoring" } });
+    expect(takesDrops(group.value)).toBe(false);
+    expect(takesAdds(group.value)).toBe(false);
+    expect(takesAdds(groups[0]!.value)).toBe(true);
+    expect(groupDefaults(group.value)).toEqual({});
+    expect(startsCollapsed(group)).toBe(false);
+  });
+
+  it("moves a monitored task by its stored status", () => {
+    expect(moveUpdate(monitored("m"), { field: "monitoring" }, { field: "status", status: "in_progress" })).toBeNull();
+    expect(moveUpdate(monitored("m"), { field: "monitoring" }, { field: "status", status: "done" })).toEqual({ status: "done" });
+  });
+
+  it("marks a parent group with the status its task shows", () => {
+    const names = { task: () => ({ identifier: "P", title: "Parent", status: "in_progress", displayStatus: "monitoring" }) } as unknown as GroupNames;
+    const groups = buildTaskGroups([task("a", "todo", { parentId: "p" })], new Set(), { groupBy: "parent", names });
+    expect(groups[0]!.mark).toEqual({ kind: "task", status: "monitoring" });
   });
 });

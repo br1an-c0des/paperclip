@@ -35,6 +35,8 @@ export function applyUpdate<T extends Pick<CompactIssue, "labels">>(
   labels: readonly IssueLabel[] = [],
 ): T {
   const next = { ...task, ...data } as T;
+  // A new status replaces the server's display status (Monitoring) until the server says again.
+  if (typeof data.status === "string" && "displayStatus" in task) (next as { displayStatus?: unknown }).displayStatus = data.status;
   if (Array.isArray(data.labelIds)) {
     const byId = new Map([...labels, ...(task.labels ?? [])].map((label) => [label.id, label] as const));
     next.labels = (data.labelIds as string[]).flatMap((id) => {

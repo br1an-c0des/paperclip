@@ -1,4 +1,4 @@
-import type { CompanySearchScope, CompanySearchSort, IssuePriority, IssueStatus } from "@paperclipai/shared";
+import type { CompanySearchScope, CompanySearchSort, IssuePriority, IssueDisplayStatus } from "@paperclipai/shared";
 import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
 import { EMPTY_FILTERS, type SearchFilters } from "./filters";
 
@@ -55,7 +55,7 @@ export function readSearchState(search: string | URLSearchParams): SearchState {
     scope: isSearchScope(scope) ? scope : "all",
     sort: sort && (SEARCH_SORTS as readonly string[]).includes(sort) ? (sort as CompanySearchSort) : "relevance",
     filters: {
-      status: listOf<IssueStatus>(params, "status", Object.keys(STATUS_META)),
+      status: listOf<IssueDisplayStatus>(params, "status", Object.keys(STATUS_META)),
       priority: listOf<IssuePriority>(params, "priority", Object.keys(PRIORITY_META)),
       assignee: agent === "null" ? "none" : agent ? `agent:${agent}` : user ? `user:${user}` : null,
       projectId: projectId && UUID.test(projectId) ? projectId : null,

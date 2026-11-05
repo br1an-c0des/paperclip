@@ -1,15 +1,16 @@
 import type { CompactIssue } from "@paperclipai/shared";
+import { shownStatus } from "@/ui/status-meta";
 import type { SortField, TaskSort } from "./view-state";
 
 /*
  * Sorting a task list, with the fields the old list offers (ui/src/components/IssuesList.tsx,
  * `sortIssues`). Tasks are sorted before they're grouped, so rows keep this order inside each group
  * and column, and subtasks inside their parent. Ties keep the server's order (most recently updated
- * first), as the sort is stable.
+ * first, or by created when the view sorts by created: view-state.ts `serverSort`), as the sort is stable.
  *
- * Status sorts in the order work moves (Backlog to Cancelled) and priority from Critical down,
- * ascending. "Updated" uses the time the Updated column shows: the last activity, else the last
- * change.
+ * Status sorts by what tasks show, in the order work moves (Backlog to Cancelled, with Monitoring
+ * after In progress), and priority from Critical down, ascending. "Updated" uses the time the
+ * Updated column shows: the last activity, else the last change.
  */
 
 export const SORT_OPTIONS: { value: SortField; label: string }[] = [
@@ -42,7 +43,7 @@ export function dirLabels(field: SortField): { asc: string; desc: string } {
   }
 }
 
-const STATUS_RANK = ["backlog", "todo", "in_progress", "in_review", "blocked", "done", "cancelled"];
+const STATUS_RANK = ["backlog", "todo", "in_progress", "monitoring", "in_review", "blocked", "done", "cancelled"];
 const PRIORITY_RANK = ["critical", "high", "medium", "low"];
 
 function time(value: Date | string | null | undefined) {
@@ -65,7 +66,7 @@ function compare(field: Exclude<SortField, "workflow">, a: CompactIssue, b: Comp
     case "priority":
       return rank(PRIORITY_RANK, a.priority) - rank(PRIORITY_RANK, b.priority);
     case "status":
-      return rank(STATUS_RANK, a.status) - rank(STATUS_RANK, b.status);
+      return rank(STATUS_RANK, shownStatus(a)) - rank(STATUS_RANK, shownStatus(b));
     case "title":
       return a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true });
   }

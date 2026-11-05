@@ -1,4 +1,4 @@
-import type { IssuePriority, IssueStatus } from "@paperclipai/shared";
+import type { IssueDisplayStatus, IssuePriority, IssueStatus } from "@paperclipai/shared";
 import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
 import { PRIORITY_ORDER, takesDrops, type TaskGroup } from "./list-model";
 import type { GroupBy, TaskFilters } from "./view-state";
@@ -12,19 +12,16 @@ import type { GroupBy, TaskFilters } from "./view-state";
  * Columns run in the order work moves (Backlog to Done, Critical to Low). Done and Cancelled start
  * collapsed, as on board 4; the board keeps its own folds, apart from the list's. Board 4's "Closed"
  * switch takes them, and closed tasks, off the board altogether.
+ *
+ * Monitoring (status-meta.ts) gets a column after In progress while tasks show it, as the old board
+ * has since the 2026-11-03 sync. Nothing can be dropped into it, so it doesn't stand empty.
  */
 
-/** Status columns in the order work moves through them. Cancelled shows only when it has tasks. */
-export const BOARD_STATUSES: IssueStatus[] = ["backlog", "todo", "in_progress", "in_review", "blocked", "done"];
+/** Status columns in the order work moves through them. Monitoring and Cancelled show only when they have tasks. */
+export const BOARD_STATUSES: IssueDisplayStatus[] = ["backlog", "todo", "in_progress", "monitoring", "in_review", "blocked", "done", "cancelled"];
 
-/** Board 4's tones: each status column is tinted with its status's background. */
-const STATUS_TONE: Partial<Record<IssueStatus, "amber" | "run" | "violet" | "red" | "green">> = {
-  todo: "amber",
-  in_progress: "run",
-  in_review: "violet",
-  blocked: "red",
-  done: "green",
-};
+/** Columns that show only while tasks are in them. */
+const SHOWN_WITH_TASKS: ReadonlySet<string> = new Set<IssueDisplayStatus>(["monitoring", "cancelled"]);
 
 export function emptyStatusGroup(status: IssueStatus): TaskGroup {
   return { key: status, label: STATUS_META[status].label, mark: { kind: "status", status }, value: { field: "status", status }, rows: [] };
@@ -40,17 +37,21 @@ export function emptyPriorityGroup(priority: IssuePriority): TaskGroup {
   };
 }
 
-/** Every value in `order` the filter lets through, as a column, with the tasks' groups filled in. */
+/**
+ * Every value in `order` the filter lets through, as a column, with the tasks' groups filled in.
+ * Values in `withTasks` are columns only while they have tasks.
+ */
 function fixedColumns<T extends string>(
   groups: readonly TaskGroup[],
   order: readonly T[],
   filter: readonly T[],
   empty: (value: T) => TaskGroup,
+  withTasks: ReadonlySet<string> = new Set(),
 ): TaskGroup[] {
   const byKey = new Map(groups.map((group) => [group.key, group] as const));
-  const shown = order.filter((value) => filter.length === 0 || filter.includes(value) || byKey.has(value));
+  const shown = order.filter((value) => byKey.has(value) || (!withTasks.has(value) && (filter.length === 0 || filter.includes(value))));
   const columns = shown.map((value) => byKey.get(value) ?? empty(value));
-  // Anything the order doesn't know (cancelled, or a status added upstream) goes at the end.
+  // Anything the order doesn't know (a status added upstream) goes at the end.
   const known = new Set<string>(order);
   return [...columns, ...groups.filter((group) => !known.has(group.key))];
 }
@@ -64,15 +65,19 @@ export const CLOSED_STATUSES: ReadonlySet<string> = new Set<IssueStatus>(["done"
  */
 export function boardColumns(groups: readonly TaskGroup[], groupBy: GroupBy, filters?: TaskFilters, closed = true): TaskGroup[] {
   switch (groupBy) {
-    case "status":
+    case "status": {
+      // Monitoring and Cancelled are never empty columns, so `empty` only meets settable statuses.
+      const empty = (status: IssueDisplayStatus) => emptyStatusGroup(status as IssueStatus);
       return closed
-        ? fixedColumns(groups, BOARD_STATUSES, filters?.statuses ?? [], emptyStatusGroup)
+        ? fixedColumns(groups, BOARD_STATUSES, filters?.statuses ?? [], empty, SHOWN_WITH_TASKS)
         : fixedColumns(
             groups.filter((group) => !CLOSED_STATUSES.has(group.key)),
             BOARD_STATUSES.filter((status) => !CLOSED_STATUSES.has(status)),
             filters?.statuses ?? [],
-            emptyStatusGroup,
+            empty,
+            SHOWN_WITH_TASKS,
           );
+    }
     case "priority":
       return fixedColumns(groups, PRIORITY_ORDER, filters?.priorities ?? [], emptyPriorityGroup);
     default:
@@ -89,10 +94,10 @@ export function boardStartsCollapsed(group: Pick<TaskGroup, "mark">) {
   return group.mark.kind === "status" && (group.mark.status === "done" || group.mark.status === "cancelled");
 }
 
-/** A column's colors: its tint, and the color of its name when collapsed. */
+/** A column's colors (board 4: its status's tone): its tint, and the color of its name when collapsed. */
 export function columnTone(group: Pick<TaskGroup, "mark">): { tint: string; ink: string } {
-  const tone = group.mark.kind === "status" ? STATUS_TONE[group.mark.status] : undefined;
-  return tone ? { tint: `var(--${tone}-bg)`, ink: `var(--${tone}-fg)` } : { tint: "var(--well)", ink: "var(--text)" };
+  const tone = group.mark.kind === "status" ? STATUS_META[group.mark.status]?.tone : undefined;
+  return tone && tone !== "neutral" ? { tint: `var(--${tone}-bg)`, ink: `var(--${tone}-fg)` } : { tint: "var(--well)", ink: "var(--text)" };
 }
 
 /** Cards shown per column before "Show more", as the old board pages its columns. */

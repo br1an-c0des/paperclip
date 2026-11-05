@@ -7,6 +7,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { TextInput } from "@/ui/Field";
 import { StatusCapsule } from "@/ui/Status";
+import { shownStatus } from "@/ui/status-meta";
 
 /*
  * Finds tasks by title or identifier, for the new-task dialog's Parent task and Blocked by fields.
@@ -61,7 +62,7 @@ export function TaskPicker(props: {
             const on = () => props.selected.includes(issue.id);
             return (
               <button type="button" class="nt-option" role="option" aria-selected={on()} onClick={() => props.onPick(issue)}>
-                <StatusCapsule status={issue.status} size="row" />
+                <StatusCapsule status={shownStatus(issue)} size="row" />
                 <span class="nt-option-id mono">{issue.identifier}</span>
                 <span class="nt-option-label">{issue.title}</span>
                 <Show when={on()}>

@@ -1,4 +1,4 @@
-import type { IssuePriority, IssueStatus } from "@paperclipai/shared";
+import type { IssueDisplayStatus, IssuePriority } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { Lightbulb, Plus, Search } from "lucide-solid";
 import { createSignal, For, onMount, Show } from "solid-js";
@@ -43,7 +43,7 @@ const GRADIENTS: { name: string; role: string; gradient: Gradient }[] = [
   { name: "Tide", role: "Questions", gradient: "tide" },
 ];
 
-const STATUSES: IssueStatus[] = ["in_progress", "in_review", "todo", "blocked", "backlog", "done", "cancelled"];
+const STATUSES: IssueDisplayStatus[] = ["in_progress", "monitoring", "in_review", "todo", "blocked", "backlog", "done", "cancelled"];
 const PRIORITIES = Object.keys(PRIORITY_META) as IssuePriority[];
 
 const SAMPLE_AGENTS = [
@@ -147,6 +147,9 @@ function ThemeColumn(props: { theme: Theme }) {
           <div class="sg-row">
             <For each={STATUSES}>{(status, index) => <StatusPill status={status} count={index() + 1} />}</For>
           </div>
+          <span class="cap">
+            Monitoring is shown, never set: an agent's in-progress task waiting for its monitor's next check. Ion as an outline.
+          </span>
           <div class="sg-row sg-row--wide">
             <For each={PRIORITIES}>{(item) => <PriorityBars priority={item} withLabel />}</For>
           </div>
@@ -418,6 +421,17 @@ function ThemeColumn(props: { theme: Theme }) {
               <span class="sg-task-title">Known bugs and limitations</span>
               <PriorityBars priority="low" />
               <InitialsDisc name="Brian A." you label="You" />
+            </div>
+            <div class="sg-group-head">
+              <StatusCapsule status="monitoring" size="group" />
+              <h3>{STATUS_META.monitoring.label}</h3>
+              <span class="muted">1</span>
+            </div>
+            <div class="sg-task">
+              <StatusCapsule status="monitoring" size="row" />
+              <span class="mono cap">TRA-44</span>
+              <span class="sg-task-title">Wait for the nightly CI run to pass</span>
+              <InitialsDisc name="Quant Researcher" seed="quant-researcher" label="Quant Researcher" />
             </div>
           </section>
           <Show when={panelOpen()}>

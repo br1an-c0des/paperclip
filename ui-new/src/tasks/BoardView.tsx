@@ -1,4 +1,4 @@
-import type { CompactIssue, IssuePriority, IssueStatus } from "@paperclipai/shared";
+import type { CompactIssue, IssuePriority } from "@paperclipai/shared";
 import { ChevronLeft, ChevronRight, CornerDownRight, Plus } from "lucide-solid";
 import { createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { issuePath } from "@/api/issues";
@@ -8,9 +8,9 @@ import { hasOpenDialog, isTextInputTarget } from "@/lib/shortcuts";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Menu } from "@/ui/Menu";
 import { Capsule, LabelPill, PriorityBars, RunningPill, StatusCapsule, TonePill } from "@/ui/Status";
-import { PRIORITY_META } from "@/ui/status-meta";
+import { PRIORITY_META, shownStatus } from "@/ui/status-meta";
 import { CARD_SUBTASKS, columnTone, COLUMN_PAGE, moveCursor, neighbourColumn, type CursorMove } from "./board-model";
-import { moveUpdate, takesDrops, type GroupValue, type TaskGroup, type TaskRow } from "./list-model";
+import { moveUpdate, takesAdds, takesDrops, type GroupValue, type TaskGroup, type TaskRow } from "./list-model";
 import { assigneeName, type TaskPeople } from "./people";
 import { AssigneeItems, LabelItems, PriorityItems } from "./pickers";
 import { RetryMark, type TaskRetry } from "./retry";
@@ -99,6 +99,7 @@ export function BoardView(props: {
   };
 
   const startAdding = (group: TaskGroup) => {
+    if (!takesAdds(group.value)) return;
     if (!props.isOpen(group)) props.onToggleGroup(group, true);
     setAdding(group.key);
   };
@@ -320,14 +321,16 @@ export function BoardView(props: {
                       >
                         <ChevronLeft size={14} stroke-width={2.2} aria-hidden="true" />
                       </button>
-                      <button
-                        type="button"
-                        class="btn btn--icon btn--ghost btn--compact"
-                        aria-label={`Add task to ${group().label}`}
-                        onClick={() => startAdding(group())}
-                      >
-                        <Plus size={14} aria-hidden="true" />
-                      </button>
+                      <Show when={takesAdds(group().value)}>
+                        <button
+                          type="button"
+                          class="btn btn--icon btn--ghost btn--compact"
+                          aria-label={`Add task to ${group().label}`}
+                          onClick={() => startAdding(group())}
+                        >
+                          <Plus size={14} aria-hidden="true" />
+                        </button>
+                      </Show>
                     </div>
                     <For each={shownRows(group()).map((row) => row.task.id)}>
                       {(id) => {
@@ -361,27 +364,29 @@ export function BoardView(props: {
                         Show {Math.min(COLUMN_PAGE, group().rows.length - limitOf(group()))} more
                       </button>
                     </Show>
-                    <Show
-                      when={adding() === group().key}
-                      fallback={
-                        <button type="button" class="bv-add" onClick={() => startAdding(group())}>
-                          <Plus size={14} aria-hidden="true" />
-                          Add task
-                        </button>
-                      }
-                    >
-                      <QuickAdd
-                        class="card bv-quick"
-                        hideHint
-                        group={group()}
-                        updates={props.updates}
-                        projectId={props.projectId}
-                        onClose={() => setAdding(null)}
-                        onMore={(title) => {
-                          setAdding(null);
-                          openMoreOptions(commands, props.projectId, group().value, title);
-                        }}
-                      />
+                    <Show when={takesAdds(group().value)}>
+                      <Show
+                        when={adding() === group().key}
+                        fallback={
+                          <button type="button" class="bv-add" onClick={() => startAdding(group())}>
+                            <Plus size={14} aria-hidden="true" />
+                            Add task
+                          </button>
+                        }
+                      >
+                        <QuickAdd
+                          class="card bv-quick"
+                          hideHint
+                          group={group()}
+                          updates={props.updates}
+                          projectId={props.projectId}
+                          onClose={() => setAdding(null)}
+                          onMore={(title) => {
+                            setAdding(null);
+                            openMoreOptions(commands, props.projectId, group().value, title);
+                          }}
+                        />
+                      </Show>
                     </Show>
                   </section>
                 </Show>
@@ -549,7 +554,7 @@ function Card(props: {
             <For each={props.row.children.slice(0, CARD_SUBTASKS)}>
               {(child) => (
                 <li class="bv-subtask">
-                  <StatusCapsule status={child.task.status as IssueStatus} size="row" />
+                  <StatusCapsule status={shownStatus(child.task)} size="row" />
                   <span class="mono bv-subtask-id">{child.task.identifier}</span>
                   <a
                     class="bv-subtask-title"

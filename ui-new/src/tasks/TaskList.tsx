@@ -11,13 +11,14 @@ import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { Capsule, LabelPill, PriorityBars, RunningPill, StatusCapsule, TonePill } from "@/ui/Status";
-import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
+import { PRIORITY_META, shownStatus, STATUS_META } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
 import {
   groupDefaults,
   moveUpdate,
   rowsById,
   shownRows,
+  takesAdds,
   takesDrops,
   updatedLabel,
   type GroupMark,
@@ -171,6 +172,7 @@ export function TaskList(props: {
   };
 
   const startAdding = (group: TaskGroup) => {
+    if (!takesAdds(group.value)) return;
     if (!props.isOpen(group)) props.onToggleGroup(group, true);
     setAdding(group.key);
   };
@@ -316,14 +318,16 @@ export function TaskList(props: {
                       <h2 class="disp">{group().label}</h2>
                       <span class="tl-count">{group().rows.length}</span>
                       {decor()?.after}
-                      <button
-                        type="button"
-                        class="btn btn--icon btn--ghost btn--compact tl-head-add"
-                        aria-label={`Add task to ${group().label}`}
-                        onClick={() => startAdding(group())}
-                      >
-                        <Plus size={15} aria-hidden="true" />
-                      </button>
+                      <Show when={takesAdds(group().value)}>
+                        <button
+                          type="button"
+                          class="btn btn--icon btn--ghost btn--compact tl-head-add"
+                          aria-label={`Add task to ${group().label}`}
+                          onClick={() => startAdding(group())}
+                        >
+                          <Plus size={15} aria-hidden="true" />
+                        </button>
+                      </Show>
                       <button
                         type="button"
                         class="btn btn--icon btn--ghost btn--compact"
@@ -385,26 +389,28 @@ export function TaskList(props: {
                           );
                         }}
                       </For>
-                      <Show
-                        when={adding() === group().key}
-                        fallback={
-                          <button type="button" class="tl-bar tl-add" onClick={() => startAdding(group())}>
-                            <Plus size={14} aria-hidden="true" />
-                            Add task
-                          </button>
-                        }
-                      >
-                        <QuickAdd
-                          group={group()}
-                          updates={props.updates}
-                          projectId={props.projectId}
-                          onAdded={(task) => props.onAdded?.(task, group())}
-                          onClose={() => setAdding(null)}
-                          onMore={(title) => {
-                            setAdding(null);
-                            openMoreOptions(commands, props.projectId, group().value, title);
-                          }}
-                        />
+                      <Show when={takesAdds(group().value)}>
+                        <Show
+                          when={adding() === group().key}
+                          fallback={
+                            <button type="button" class="tl-bar tl-add" onClick={() => startAdding(group())}>
+                              <Plus size={14} aria-hidden="true" />
+                              Add task
+                            </button>
+                          }
+                        >
+                          <QuickAdd
+                            group={group()}
+                            updates={props.updates}
+                            projectId={props.projectId}
+                            onAdded={(task) => props.onAdded?.(task, group())}
+                            onClose={() => setAdding(null)}
+                            onMore={(title) => {
+                              setAdding(null);
+                              openMoreOptions(commands, props.projectId, group().value, title);
+                            }}
+                          />
+                        </Show>
                       </Show>
                     </Show>
                   </div>
@@ -436,7 +442,7 @@ export function GroupMarkView(props: { mark: GroupMark; people: TaskPeople }) {
     <span class="tl-mark">
       <Switch fallback={<Capsule gradient="ash" size="group" grain />}>
         <Match when={props.mark.kind === "status" && props.mark}>
-          {(mark) => <Capsule gradient={STATUS_META[mark().status].gradient} size="group" grain />}
+          {(mark) => <StatusCapsule status={mark().status} size="group" grain />}
         </Match>
         <Match when={props.mark.kind === "priority" && props.mark}>{(mark) => <PriorityBars priority={mark().priority} />}</Match>
         <Match when={props.mark.kind === "agent" && props.mark}>
@@ -491,7 +497,9 @@ function Row(props: {
   extra?: JSX.Element;
 }) {
   const task = () => props.row.task;
+  // The stored status is what the menu sets; the capsule shows what the task shows (Monitoring).
   const status = () => task().status as IssueStatus;
+  const shown = () => shownStatus(task());
   const priority = () => task().priority as IssuePriority;
   const labelIds = () => task().labelIds ?? task().labels?.map((label) => label.id) ?? [];
   const labelNames = () => (task().labels ?? []).map((label) => label.name).join(", ");
@@ -541,8 +549,8 @@ function Row(props: {
           </Show>
         </button>
         <Menu>
-          <Menu.Trigger class="tl-status" aria-label={`Status: ${STATUS_META[status()].label}. Change status`}>
-            <StatusCapsule status={status()} size="row" />
+          <Menu.Trigger class="tl-status" aria-label={`Status: ${STATUS_META[shown()].label}. Change status`}>
+            <StatusCapsule status={shown()} size="row" />
           </Menu.Trigger>
           <Menu.Content label="Status" width={220}>
             <StatusItems current={status()} onPick={(next) => next !== status() && change({ status: next })} />

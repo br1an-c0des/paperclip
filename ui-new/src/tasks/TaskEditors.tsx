@@ -1,4 +1,4 @@
-import type { Agent, CompactIssue, ExecutionWorkspace, Issue, IssueLabel, IssuePriority, IssueStatus } from "@paperclipai/shared";
+import type { Agent, CompactIssue, ExecutionWorkspace, Issue, IssueDisplayStatus, IssueLabel, IssuePriority, IssueStatus } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Check, ChevronDown, Pencil, Play, Plus, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, Show, type JSX } from "solid-js";
@@ -199,25 +199,25 @@ export function DescriptionEditor(props: { task: Issue; onChange: ChangeTask }) 
 
 // --- Status, priority, labels -----------------------------------------------------------------------
 
-const STATUS_TONE: Record<IssueStatus, string> = {
-  in_progress: "run",
-  in_review: "violet",
-  todo: "amber",
-  blocked: "red",
-  backlog: "neutral",
-  done: "green",
-  cancelled: "neutral",
-};
-
-/** Board 2's status control: the status pill opens the menu, ▸ moves it one step on, ✓ marks it done. */
-export function StatusControl(props: { status: IssueStatus; onChange: ChangeTask }) {
+/**
+ * Board 2's status control: the status pill opens the menu, ▸ moves it one step on, ✓ marks it done.
+ * The pill shows `shown`, what the task shows (Monitoring while it waits on its monitor); the menu,
+ * ▸ and ✓ read and set the stored `status`.
+ */
+export function StatusControl(props: { status: IssueStatus; shown?: IssueDisplayStatus; onChange: ChangeTask }) {
   const next = () => nextStatus(props.status);
+  const shown = () => STATUS_META[props.shown ?? props.status];
+  const derived = () => (props.shown ?? props.status) !== props.status;
   return (
     <span class="te-status-row">
-      <span class="te-status" data-tone={STATUS_TONE[props.status]}>
+      <span class="te-status" data-tone={shown().tone} data-hollow={shown().hollow ? "" : undefined}>
         <Menu>
-          <Menu.Trigger class="te-status-main" aria-label={`Status: ${STATUS_META[props.status].label}. Change status`}>
-            {STATUS_META[props.status].label}
+          <Menu.Trigger
+            class="te-status-main"
+            aria-label={`Status: ${shown().label}${derived() ? `, set to ${STATUS_META[props.status].label}` : ""}. Change status`}
+            title={derived() ? `Waiting for its monitor's next check. Its status is ${STATUS_META[props.status].label}.` : undefined}
+          >
+            {shown().label}
           </Menu.Trigger>
           <Menu.Content label="Status" width={220}>
             <StatusItems current={props.status} onPick={(status) => status !== props.status && props.onChange({ status })} />
