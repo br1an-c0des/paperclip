@@ -7,6 +7,7 @@ import type {
   ToolPolicy,
   ToolProfileWithDetails,
 } from "@paperclipai/shared";
+import { GOOGLE_WORKSPACE_CONNECTOR_PROFILES } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import {
   accessFrom,
@@ -19,6 +20,7 @@ import {
   byoProblem,
   canAlwaysAllow,
   categoriesIn,
+  claimingApps,
   connectFailure,
   connectHref,
   connectionRows,
@@ -31,7 +33,9 @@ import {
   errorCode,
   finishDefaults,
   galleryApps,
+  GOOGLE_WORKSPACE_SLUG,
   installState,
+  LEGACY_GOOGLE_SLUGS,
   matchesApp,
   needsLink,
   needsOwnOAuthClient,
@@ -121,6 +125,32 @@ describe("gallery", () => {
     // Composio, Arcade, Google Workspace and AgentMail have their setups since M6 round 3.
     expect(galleryApps(apps, {}).map((entry) => entry.slug)).toEqual(["star", "alpha", "composio", "zeta"]);
     expect(galleryApps(apps, { enableMemoryConnectors: true }).map((entry) => entry.slug)).toContain("memory");
+  });
+
+  it("shows Google's per-service connectors only while you have a connection to one", () => {
+    const apps = [
+      app({ slug: "gmail", name: "Gmail" }),
+      app({ slug: "google-drive", name: "Google Drive" }),
+      app({ slug: "google-workspace", name: "Google Workspace", experimentalFeatureKey: "enableGoogleWorkspaceConnector" as AppDefinition["experimentalFeatureKey"] }),
+    ];
+    expect(galleryApps(apps, {}).map((entry) => entry.slug)).toEqual([]);
+    expect(galleryApps(apps, { enableGoogleWorkspaceConnector: true }).map((entry) => entry.slug)).toEqual(["google-workspace"]);
+    expect(galleryApps(apps, {}, new Map([["gmail", 1]])).map((entry) => entry.slug)).toEqual(["gmail"]);
+  });
+
+  it("follows the shared package's list of Google's per-service connectors", () => {
+    const slugs = Object.values(GOOGLE_WORKSPACE_CONNECTOR_PROFILES)
+      .map((profile) => profile.appSlug)
+      .filter((slug) => slug !== GOOGLE_WORKSPACE_SLUG);
+    expect([...LEGACY_GOOGLE_SLUGS].sort()).toEqual([...new Set(slugs)].sort());
+  });
+
+  it("lets the gateways' Google apps show while the Google Workspace connector is off", () => {
+    const apps = [{ slug: "gmail" }, { slug: "google-workspace" }, { slug: "linear" }];
+    expect(claimingApps(apps, true).map((entry) => entry.slug)).toEqual(["gmail", "google-workspace", "linear"]);
+    expect(claimingApps(apps, false).map((entry) => entry.slug)).toEqual(["linear"]);
+    // A connection you already have keeps claiming its app, so its accounts stay on its tile.
+    expect(claimingApps(apps, false, new Map([["gmail", 2]])).map((entry) => entry.slug)).toEqual(["gmail", "linear"]);
   });
 
   it("filters by words and category", () => {
