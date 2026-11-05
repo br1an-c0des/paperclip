@@ -96,6 +96,11 @@ export type AdapterInfo = {
   overriddenBuiltin?: boolean;
   /** For an override: paused, so the built-in harness runs instead. */
   overridePaused?: boolean;
+  /**
+   * The Paperclip Runner only: harnesses an operator has authorized for this company and a local
+   * computer before their release, each with the one model it admits (upstream `candidateHarnesses`).
+   */
+  candidateHarnesses?: Array<{ agent: "antigravity"; model: string }>;
   /** External harnesses: the npm package (or local folder) and its installed version. */
   packageName?: string;
   version?: string;
@@ -120,6 +125,11 @@ export type InstructionsBundleUpdate = {
   rootPath?: string | null;
   entryFile?: string;
   clearLegacyPromptTemplate?: boolean;
+  /**
+   * For an external folder: refuse the change unless the folder and its entry file already exist,
+   * instead of creating them (upstream #18378). The server ignores it for a managed bundle.
+   */
+  requireExistingEntry?: boolean;
 };
 
 /** `POST /adapters/install`: what the server registered. */

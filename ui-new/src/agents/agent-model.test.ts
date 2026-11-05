@@ -8,6 +8,7 @@ import {
   buildRuntimePatch,
   canQualifyRunnerEnvironment,
   changedKeyLabel,
+  harnessLabel,
   harnessType,
   headerSummary,
   intervalLabel,
@@ -17,6 +18,8 @@ import {
   memoryFor,
   probeQualified,
   recommendedForLeads,
+  requalifyEnvironment,
+  requalifyProblem,
   revisionConfigChanges,
   runnerCapable,
   runnerOffer,
@@ -75,6 +78,10 @@ describe("harness and runner", () => {
     expect(harnessType("paperclip_runner", {})).toBe("codex_local");
     expect(harnessType("paperclip_runner", { provider: "opencode" })).toBe("opencode_local");
     expect(harnessType("paperclip_runner", { provider: "acpx", acpxAgent: "copilot" })).toBe("acpx:copilot");
+    expect(harnessType("paperclip_runner", { provider: "acpx", acpxAgent: "kimi" })).toBe("kimi_local");
+    expect(harnessType("paperclip_runner", { provider: "acpx", acpxAgent: "antigravity" })).toBe("antigravity_runtime");
+    expect(harnessLabel("antigravity_runtime")).toBe("Google Antigravity");
+    expect(harnessLabel("kimi_runtime")).toBe("Kimi Code (Runner)");
     expect(harnessType("claude_local", { provider: "ignored" })).toBe("claude_local");
   });
 
@@ -127,6 +134,36 @@ describe("harness and runner", () => {
   });
 });
 
+describe("requalifyEnvironment", () => {
+  const computer = { id: "env-1", driver: "sandbox", config: { provider: "daytona", snapshot: "managed-snapshot" } } as never;
+  const agent = { adapterType: "paperclip_runner", adapterConfig: { provider: "opencode" }, runtimeConfig: {}, defaultEnvironmentId: "env-1" } as never;
+  const input = { dirty: false, environment: computer, adapters: [] as AdapterInfo[] };
+
+  it("qualifies a Runner agent's saved computer again before Test", () => {
+    expect(requalifyEnvironment(agent, input)).toBe("env-1");
+    expect(requalifyEnvironment(agent, { ...input, adapters: undefined })).toBe("env-1");
+  });
+
+  it("leaves everything else to the ordinary Test", () => {
+    expect(requalifyEnvironment(agent, { ...input, dirty: true })).toBeNull();
+    expect(requalifyEnvironment({ ...(agent as object), adapterType: "claude_local" } as never, input)).toBeNull();
+    expect(requalifyEnvironment({ ...(agent as object), defaultEnvironmentId: null } as never, input)).toBeNull();
+    expect(requalifyEnvironment(agent, { ...input, environment: { id: "env-2", driver: "sandbox", config: { provider: "daytona", snapshot: "s" } } as never })).toBeNull();
+    expect(requalifyEnvironment(agent, { ...input, environment: { id: "env-1", driver: "local", config: {} } as never })).toBeNull();
+    for (const provider of ["openai_dot", "muse", "grok_bot"]) {
+      expect(requalifyEnvironment({ ...(agent as object), adapterConfig: { provider } } as never, input)).toBeNull();
+    }
+    expect(requalifyEnvironment({ ...(agent as object), runtimeConfig: { aiConnection: { mode: "router", connectionId: "c1" } } } as never, input)).toBeNull();
+    expect(requalifyEnvironment(agent, { ...input, adapters: [{ type: "opencode_local", defaultRunner: "paperclip" } as AdapterInfo] })).toBeNull();
+  });
+
+  it("reads the qualification", () => {
+    expect(requalifyProblem({ ok: true, details: { platformQualificationRecorded: true } })).toBeNull();
+    expect(requalifyProblem({ ok: true, summary: "Computer test failed.", details: { platformQualificationRecorded: false } })).toBe("Computer test failed.");
+    expect(requalifyProblem({ ok: false, details: null })).toMatch(/Couldn't verify the saved computer/);
+  });
+});
+
 describe("agentView", () => {
   it("sends the agent's own address to the chat", () => {
     expect(agentView("")).toEqual({ view: "chat" });
@@ -144,6 +181,15 @@ describe("agentView", () => {
     expect(agentView("advanced")).toEqual({ view: "settings", section: "advanced" });
     expect(agentView("settings")).toEqual({ view: "settings", section: "profile" });
     expect(agentView("settings/trust")).toEqual({ view: "settings", section: "permissions" });
+  });
+
+  it("maps the refined agent page's sections (upstream #18378) to the nearest one", () => {
+    expect(agentView("identity")).toEqual({ view: "settings", section: "instructions" });
+    expect(agentView("activity")).toEqual({ view: "settings", section: "history" });
+    expect(agentView("audit")).toEqual({ view: "settings", section: "history" });
+    expect(agentView("runs")).toEqual({ view: "settings", section: "budget" });
+    expect(agentView("cost")).toEqual({ view: "settings", section: "budget" });
+    expect(agentView("costs")).toEqual({ view: "settings", section: "budget" });
   });
 
   it("returns null for unknown names", () => {

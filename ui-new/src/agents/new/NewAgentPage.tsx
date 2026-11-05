@@ -12,7 +12,8 @@ import { queryKeys } from "@/api/queryKeys";
 import { ConnectionSetup } from "@/connectors/ConnectionSetup";
 import { localLoginSupported } from "@/connectors/connection-model";
 import { useCompaniesQuery, findCompanyByPrefix, lastCompanyPrefix, useCompany } from "@/lib/company";
-import { useAgentsQuery } from "@/lib/company-data";
+import { useAgentsQuery, useExperimentalSettingsQuery } from "@/lib/company-data";
+import { secretsApi } from "@/api/secrets";
 import { providerForHarness } from "@/org/bulk-model";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
@@ -37,6 +38,7 @@ import {
 import { failure } from "../shared";
 import { OutsideAgentInvite } from "./OutsideAgentInvite";
 import {
+  antigravityCandidate,
   defaultBinding,
   defaultProfile,
   draftCreateRequest,
@@ -44,7 +46,10 @@ import {
   harnessChoices,
   hireOutcome,
   hireRequest,
+  isRunnerOnly,
   isSetupDraft,
+  KIMI_KEY,
+  kimiKeySecrets,
   legacyHireParams,
   needsRunnerQualification,
   preparing,
@@ -54,6 +59,7 @@ import {
   profileProblem,
   provisionalAdapter,
   qualificationProblem,
+  requestAdapterType,
   requiresProviderModel,
   resolveRunner,
   runnerSwitch,
@@ -164,8 +170,23 @@ export function NewAgentPage() {
     queryFn: ({ signal }) => agentsApi.adapters(company().id, setup.environmentId || null, signal),
     staleTime: 60_000,
   }));
-  const harnesses = createMemo(() => harnessChoices(adapters.data, agents.data));
+  const experimental = useExperimentalSettingsQuery();
+  const harnesses = createMemo(() => harnessChoices(adapters.data, agents.data, { nativeRunner: experimental.data?.enableNativeRunner === true }));
   const runner = createMemo(() => resolveRunner(setup.harness, setup.runner, adapters.data));
+  // Google Antigravity before its release runs only the model the operator authorized.
+  const candidate = createMemo(() => (setup.harness === "antigravity_runtime" ? antigravityCandidate(adapters.data) : null));
+  const secrets = createQuery(() => ({
+    queryKey: queryKeys.projectSettings.secrets(company().id),
+    queryFn: ({ signal }) => secretsApi.list(company().id, signal),
+    enabled: setup.harness === "kimi_runtime",
+  }));
+  const kimiSecrets = createMemo(() => kimiKeySecrets(secrets.data));
+  // Kimi Code on the Runner starts on the organization's KIMI_API_KEY secret when there is one.
+  createEffect(() => {
+    if (setup.harness !== "kimi_runtime" || setup.secretId) return;
+    const named = kimiSecrets().find((secret) => secret.key === KIMI_KEY);
+    if (named) setSetup("secretId", named.id);
+  });
   const connections = createQuery(() => ({
     queryKey: [...queryKeys.aiConnections.list(company().id), "agent", draftId() ?? "new"] as const,
     queryFn: () => aiConnectionsApi.list(company().id, draftId() ?? undefined),
@@ -174,14 +195,24 @@ export function NewAgentPage() {
   }));
   const health = createQuery(() => ({ queryKey: queryKeys.health, queryFn: healthApi.get, enabled: step() === "model" }));
   const signIns = createMemo(() => (setup.harness ? signInChoices(setup.harness, connections.data) : []));
-  const modelOptions = createMemo<AdapterModelOptions>(() => ({
-    provider: setup.binding && setup.binding.mode !== "router" ? setup.binding.provider : undefined,
-    environmentId: setup.environmentId || null,
-  }));
+  // A Runner-only harness's models come from the Runner's catalog for its ACPX profile, Antigravity's for the Google account.
+  const modelOptions = createMemo<AdapterModelOptions>(() =>
+    isRunnerOnly(setup.harness)
+      ? {
+          provider: "acpx",
+          acpxAgent: setup.harness === "kimi_runtime" ? "kimi" : "antigravity",
+          aiConnection: setup.harness === "antigravity_runtime" ? (setup.binding ?? undefined) : undefined,
+          environmentId: setup.environmentId || null,
+        }
+      : {
+          provider: setup.binding && setup.binding.mode !== "router" ? setup.binding.provider : undefined,
+          environmentId: setup.environmentId || null,
+        },
+  );
   const models = createQuery(() => ({
-    queryKey: queryKeys.agents.adapterModels(company().id, setup.harness, adapterModelKeyOptions(modelOptions())),
-    queryFn: () => agentsApi.adapterModels(company().id, setup.harness, modelOptions()),
-    enabled: step() === "model" && !!setup.harness,
+    queryKey: queryKeys.agents.adapterModels(company().id, requestAdapterType(setup.harness), adapterModelKeyOptions(modelOptions())),
+    queryFn: () => agentsApi.adapterModels(company().id, requestAdapterType(setup.harness), modelOptions()),
+    enabled: step() === "model" && !!setup.harness && !candidate(),
     staleTime: 5 * 60_000,
     retry: false,
   }));
@@ -295,7 +326,8 @@ export function NewAgentPage() {
 
   function pickHarness(type: string) {
     if (setup.harness === type) return;
-    setSetup(reconcile({ ...emptySetup(type), environmentId: setup.environmentId, binding: defaultBinding(type, connections.data) }));
+    const admitted = type === "antigravity_runtime" ? antigravityCandidate(adapters.data)?.model : undefined;
+    setSetup(reconcile({ ...emptySetup(type), environmentId: setup.environmentId, binding: defaultBinding(type, connections.data), model: admitted ?? "" }));
     setTestError(null);
     setProblem(null);
   }
@@ -411,7 +443,7 @@ export function NewAgentPage() {
     if (step() === "model" && setup.harness) {
       rows.push(
         ["Harness", runner().label],
-        ["Model", `${modelLabel(setup.model, models.data) ?? "Harness default"}${efforts().length ? ` · ${effortLabel()}` : ""}`],
+        ["Model", `${modelLabel(setup.model, models.data) ?? (isRunnerOnly(setup.harness) ? "Not chosen yet" : "Harness default")}${efforts().length ? ` · ${effortLabel()}` : ""}`],
         ["Runs on", environment()?.name ?? "Organization default"],
       );
     }
@@ -571,68 +603,118 @@ export function NewAgentPage() {
                         </div>
                       </Show>
 
-                      <SettingsRow label="Sign-in" help="How the harness reaches its model.">
-                        <div class="ps-inline">
-                          <Menu>
-                            <Menu.Trigger as={FieldButton} class="ps-field-320" aria-label={`Sign-in: ${selectedSignIn(signIns(), setup.binding)?.name ?? "an AI connection"}`}>
-                              {selectedSignIn(signIns(), setup.binding)?.name ?? "An AI connection"}
-                            </Menu.Trigger>
-                            <Menu.Content label="Sign-in" width={360}>
-                              <Show when={connections.isLoading}>
-                                <p class="nt-menu-note">Loading connections…</p>
-                              </Show>
-                              <For each={signIns()}>
-                                {(choice) => (
-                                  <Menu.Item
-                                    disabled={choice.disabled}
-                                    description={choice.description}
-                                    onSelect={() => setSetup("binding", choice.binding)}
-                                    hint={selectedSignIn(signIns(), setup.binding)?.id === choice.id ? <Check size={14} /> : undefined}
-                                  >
-                                    {choice.name}
-                                  </Menu.Item>
-                                )}
-                              </For>
-                            </Menu.Content>
-                          </Menu>
-                          <Show
-                            when={provider() === "anthropic" && connections.data}
-                            fallback={
-                              <A class="ps-link" href={`${base()}/apps/ai`}>
-                                Manage connections
-                              </A>
-                            }
-                          >
-                            <Button size="compact" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setConnectOpen(true)}>
-                              Connect Claude
-                            </Button>
-                          </Show>
-                        </div>
-                        <span class="fhelp">{selectedSignIn(signIns(), setup.binding)?.description}</span>
-                      </SettingsRow>
+                      <Show when={setup.harness === "kimi_runtime"}>
+                        <SettingsRow label="Kimi key" help={`The organization secret Kimi Code reads as ${KIMI_KEY}.`}>
+                          <div class="ps-inline">
+                            <Menu>
+                              <Menu.Trigger
+                                as={FieldButton}
+                                class="ps-field-320"
+                                aria-label={`Kimi key: ${kimiSecrets().find((secret) => secret.id === setup.secretId)?.name ?? "none picked"}`}
+                              >
+                                {kimiSecrets().find((secret) => secret.id === setup.secretId)?.name ?? (secrets.isLoading ? "Loading secrets…" : "Pick a secret")}
+                              </Menu.Trigger>
+                              <Menu.Content label="Kimi key" width={320}>
+                                <Show when={kimiSecrets().length === 0}>
+                                  <p class="nt-menu-note">{secrets.isError ? "Couldn't load the secrets." : "This organization has no secrets yet."}</p>
+                                </Show>
+                                <For each={kimiSecrets()}>
+                                  {(secret) => (
+                                    <Menu.Item
+                                      description={secret.key}
+                                      onSelect={() => setSetup("secretId", secret.id)}
+                                      hint={setup.secretId === secret.id ? <Check size={14} /> : undefined}
+                                    >
+                                      {secret.name}
+                                    </Menu.Item>
+                                  )}
+                                </For>
+                              </Menu.Content>
+                            </Menu>
+                            <A class="ps-link" href={`${base()}/company/settings/secrets`}>
+                              Add a secret
+                            </A>
+                          </div>
+                        </SettingsRow>
+                      </Show>
 
-                      <SettingsRow label="Model" for={models.data?.length ? undefined : "na-model"}>
+                      <Show when={setup.harness !== "kimi_runtime"}>
+                        <SettingsRow label="Sign-in" help="How the harness reaches its model.">
+                          <div class="ps-inline">
+                            <Menu>
+                              <Menu.Trigger as={FieldButton} class="ps-field-320" aria-label={`Sign-in: ${selectedSignIn(signIns(), setup.binding)?.name ?? "an AI connection"}`}>
+                                {selectedSignIn(signIns(), setup.binding)?.name ?? "An AI connection"}
+                              </Menu.Trigger>
+                              <Menu.Content label="Sign-in" width={360}>
+                                <Show when={connections.isLoading}>
+                                  <p class="nt-menu-note">Loading connections…</p>
+                                </Show>
+                                <For each={signIns()}>
+                                  {(choice) => (
+                                    <Menu.Item
+                                      disabled={choice.disabled}
+                                      description={choice.description}
+                                      onSelect={() => setSetup("binding", choice.binding)}
+                                      hint={selectedSignIn(signIns(), setup.binding)?.id === choice.id ? <Check size={14} /> : undefined}
+                                    >
+                                      {choice.name}
+                                    </Menu.Item>
+                                  )}
+                                </For>
+                              </Menu.Content>
+                            </Menu>
+                            <Show
+                              when={provider() === "anthropic" && connections.data}
+                              fallback={
+                                <A class="ps-link" href={`${base()}/apps/ai`}>
+                                  Manage connections
+                                </A>
+                              }
+                            >
+                              <Button size="compact" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setConnectOpen(true)}>
+                                Connect Claude
+                              </Button>
+                            </Show>
+                          </div>
+                          <span class="fhelp">{selectedSignIn(signIns(), setup.binding)?.description}</span>
+                        </SettingsRow>
+                      </Show>
+
+                      <SettingsRow label="Model" for={models.data?.length || candidate() ? undefined : "na-model"}>
                         <Show
-                          when={models.data?.length}
+                          when={!candidate()}
                           fallback={
-                            <TextInput
-                              id="na-model"
-                              class="ps-field-320 mono"
-                              value={setup.model}
-                              autocomplete="off"
-                              spellcheck={false}
-                              placeholder={requiresProviderModel(setup.harness) ? "provider/model" : models.isLoading ? "Loading models…" : "Harness default"}
-                              onChange={(event) => setSetup("model", event.currentTarget.value.trim())}
-                            />
+                            <div class="ps-stack">
+                              <span class="mono ag-static-text">{candidate()!.model}</span>
+                              <span class="fhelp">Google Antigravity is in preview here: it runs only the model an operator authorized.</span>
+                            </div>
                           }
                         >
-                          <ModelMenu
-                            models={models.data}
-                            loading={models.isLoading}
-                            value={setup.model}
-                            allowDefault={!requiresProviderModel(setup.harness)}
-                            onChange={(model) => setSetup("model", model)}
-                          />
+                          <Show
+                            when={models.data?.length}
+                            fallback={
+                              <TextInput
+                                id="na-model"
+                                class="ps-field-320 mono"
+                                value={setup.model}
+                                autocomplete="off"
+                                spellcheck={false}
+                                placeholder={
+                                  requiresProviderModel(setup.harness) ? "provider/model" : models.isLoading ? "Loading models…" : isRunnerOnly(setup.harness) ? "The exact model ID" : "Harness default"
+                                }
+                                onChange={(event) => setSetup("model", event.currentTarget.value.trim())}
+                              />
+                            }
+                          >
+                            <ModelMenu
+                              models={models.data}
+                              loading={models.isLoading}
+                              value={setup.model}
+                              allowDefault={!requiresProviderModel(setup.harness) && !isRunnerOnly(setup.harness)}
+                              emptyLabel={isRunnerOnly(setup.harness) ? "Choose a model" : undefined}
+                              onChange={(model) => setSetup("model", model)}
+                            />
+                          </Show>
                         </Show>
                       </SettingsRow>
 

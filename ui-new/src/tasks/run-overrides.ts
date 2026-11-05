@@ -89,8 +89,31 @@ const CODEX_BY_MODEL: Record<string, string[]> = {
   "gpt-5.6-luna": CODEX_MAX,
 };
 
+/** `CODEX_LOCAL_MODEL_ALIASES`: the bare `gpt-5.6` is `gpt-5.6-sol`. Model ids are case-sensitive, as `normalizeCodexModel` keeps them. */
+const CODEX_ALIASES: Record<string, string> = { "gpt-5.6": "gpt-5.6-sol" };
+
 function codexEfforts(model: string) {
-  return CODEX_BY_MODEL[model.trim().toLowerCase()] ?? CODEX_DEFAULT;
+  const id = model.trim();
+  return CODEX_BY_MODEL[CODEX_ALIASES[id] ?? id] ?? CODEX_DEFAULT;
+}
+
+function grokEfforts(model: string) {
+  return model === "grok-4.7" || model === "grok-4.6" ? ["low", "medium", "high", "xhigh"] : ["low", "medium", "high"];
+}
+
+/**
+ * The runner's efforts follow the harness it carries, as `composerEfforts` reads them through
+ * `agentHarnessType`: Codex by default, Claude Code and Grok Build through ACPX. Its other providers
+ * (OpenCode, Pi, Kimi, Antigravity…) take no effort override.
+ */
+function runnerEfforts(adapterConfig: Record<string, unknown>, model: string) {
+  const provider = String(adapterConfig.provider ?? "codex");
+  if (provider === "codex") return codexEfforts(model);
+  if (provider !== "acpx" || !model) return [];
+  const agent = String(adapterConfig.acpxAgent ?? "claude");
+  if (agent === "claude") return claudeEfforts(model);
+  if (agent === "grok") return grokEfforts(model);
+  return [];
 }
 
 function claudeEfforts(model: string) {
@@ -108,8 +131,8 @@ const KIMI_EFFORT_MODELS = new Set([KIMI_DEFAULT_MODEL, "kimi-code/k3", "kimi-co
 
 /**
  * The effort choices for an adapter and model, after `composerEfforts`. `model` is the chosen
- * model, or else the agent's own. Kimi needs its CLI engine, and the runner its Codex provider, so
- * those read the agent's config.
+ * model, or else the agent's own. Kimi needs its CLI engine, and the runner follows the harness it
+ * carries, so those read the agent's config.
  */
 export function effortOptions(adapterType: string, model: string | null, adapterConfig: Record<string, unknown> = {}): EffortOption[] {
   const chosen = (model ?? "").trim();
@@ -122,13 +145,11 @@ export function effortOptions(adapterType: string, model: string | null, adapter
       values = codexEfforts(chosen);
       break;
     case "paperclip_runner":
-      values = String(adapterConfig.provider ?? "codex") === "codex" ? codexEfforts(chosen) : [];
+      values = runnerEfforts(adapterConfig, chosen);
       break;
-    case "grok_local": {
-      const id = chosen || GROK_DEFAULT_MODEL;
-      values = id === "grok-4.7" || id === "grok-4.6" ? ["low", "medium", "high", "xhigh"] : ["low", "medium", "high"];
+    case "grok_local":
+      values = grokEfforts(chosen || GROK_DEFAULT_MODEL);
       break;
-    }
     case "pi_local":
       values = ["off", "minimal", "low", "medium", "high", "xhigh"];
       break;

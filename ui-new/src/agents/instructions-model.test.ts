@@ -1,6 +1,6 @@
 import type { AgentInstructionCandidate, AgentInstructionsFileSummary } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { actionableCandidates, bundleSize, diffHunks, diffSummary, fileRows, lineDiff, newFileProblem } from "./instructions-model";
+import { actionableCandidates, bundleDraft, bundleSize, bundleUpdate, diffHunks, diffSummary, fileRows, lineDiff, newFileProblem } from "./instructions-model";
 
 const file = (path: string, size = 10, isEntryFile = false) => ({ path, size, isEntryFile }) as AgentInstructionsFileSummary;
 
@@ -79,5 +79,28 @@ describe("actionableCandidates", () => {
     ] as unknown as AgentInstructionCandidate[];
     expect(actionableCandidates(candidates).map((candidate) => candidate.runId)).toEqual(["a"]);
     expect(actionableCandidates(undefined)).toEqual([]);
+  });
+});
+
+// The rest of the bundle settings' tests are in settings-models.test.ts.
+describe("bundle settings: requireExistingEntry", () => {
+  const managed = bundleDraft({ mode: "managed", rootPath: null, managedRootPath: "/data/agents/a1/instructions", entryFile: "AGENTS.md" });
+
+  it("asks the server to find an external folder's entry file rather than create it", () => {
+    expect(bundleUpdate(managed, managed)).toBeNull();
+    expect(bundleUpdate(managed, { mode: "external", rootPath: " /srv/prompts ", entryFile: "AGENTS.md" })).toEqual({
+      mode: "external",
+      rootPath: "/srv/prompts",
+      entryFile: "AGENTS.md",
+      requireExistingEntry: true,
+    });
+    const external = { mode: "external" as const, rootPath: "/srv/prompts", entryFile: "AGENTS.md" };
+    expect(bundleUpdate(external, { ...external, entryFile: "CLAUDE.md" })).toEqual({ mode: "external", rootPath: "/srv/prompts", entryFile: "CLAUDE.md", requireExistingEntry: true });
+  });
+
+  it("lets a managed bundle start a new entry file, and moves back to managed without the check", () => {
+    expect(bundleUpdate(managed, { ...managed, entryFile: "CLAUDE.md" })).toEqual({ mode: "managed", rootPath: null, entryFile: "CLAUDE.md" });
+    const external = { mode: "external" as const, rootPath: "/srv/prompts", entryFile: "AGENTS.md" };
+    expect(bundleUpdate(external, { ...external, mode: "managed" })).toEqual({ mode: "managed", rootPath: null, entryFile: "AGENTS.md" });
   });
 });

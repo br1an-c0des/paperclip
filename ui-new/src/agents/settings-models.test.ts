@@ -212,7 +212,7 @@ describe("bundle settings", () => {
     const saved = bundleDraft(managed);
     expect(bundleUpdate(saved, saved)).toBeNull();
     expect(bundleUpdate(saved, { ...saved, entryFile: "README.md" })).toEqual({ mode: "managed", rootPath: null, entryFile: "README.md" });
-    expect(bundleUpdate(saved, { mode: "external", rootPath: "/srv/prompts", entryFile: "AGENTS.md" })).toEqual({ mode: "external", rootPath: "/srv/prompts", entryFile: "AGENTS.md" });
+    expect(bundleUpdate(saved, { mode: "external", rootPath: "/srv/prompts", entryFile: "AGENTS.md" })).toEqual({ mode: "external", rootPath: "/srv/prompts", entryFile: "AGENTS.md", requireExistingEntry: true });
   });
 
   it("checks the folder and the entry file", () => {

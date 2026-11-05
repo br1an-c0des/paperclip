@@ -38,6 +38,21 @@ describe("effortOptions", () => {
     expect(values("paperclip_runner", "gpt-6-luna", { provider: "codex" })).toContain("max");
     expect(values("gemini_local", "gemini-3")).toEqual([]);
   });
+
+  it("reads Codex ids as the adapter does: the gpt-5.6 alias, and case kept", () => {
+    expect(values("codex_local", "gpt-5.6")).toContain("ultra");
+    expect(values("codex_local", " gpt-5.6-luna ")).toContain("max");
+    expect(values("codex_local", "GPT-6-SOL")).toEqual(["minimal", "low", "medium", "high", "xhigh"]);
+  });
+
+  it("follows the harness the runner carries", () => {
+    expect(values("paperclip_runner", "claude-opus-5-5", { provider: "acpx", acpxAgent: "claude" })).toEqual(["low", "medium", "high", "xhigh", "max"]);
+    expect(values("paperclip_runner", "claude-haiku-4-5", { provider: "acpx" })).toEqual([]);
+    expect(values("paperclip_runner", "grok-4.7", { provider: "acpx", acpxAgent: "grok" })).toContain("xhigh");
+    expect(values("paperclip_runner", null, { provider: "acpx", acpxAgent: "claude" })).toEqual([]);
+    expect(values("paperclip_runner", "kimi-code/k3", { provider: "acpx", acpxAgent: "kimi" })).toEqual([]);
+    expect(values("paperclip_runner", "openrouter/x", { provider: "opencode" })).toEqual([]);
+  });
 });
 
 describe("mergeRunOverrides", () => {

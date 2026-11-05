@@ -28,6 +28,7 @@ import { Dialog } from "@/ui/Dialog";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { findInvokeEvent, promptSize, readInvocation } from "./invocation";
+import { providerFailureNotice } from "./provider-failure";
 import { buildTranscript, showsPlainLines } from "./parsers";
 import { RunInput } from "./RunInput";
 import { logAsText } from "./run-log";
@@ -477,6 +478,7 @@ function RunView(props: { runId: string }) {
       >
         {(current) => {
           const status = () => runStatusMeta(current().status);
+          const providerFailure = createMemo(() => providerFailureNotice(current().resultJson));
           return (
             <>
               <header class="rm-head">
@@ -609,12 +611,32 @@ function RunView(props: { runId: string }) {
                   )}
                 </For>
               </dl>
-              <Show when={current().error}>
-                {(error) => (
-                  <p class="rm-alert" data-tone={status().tone === "red" ? "red" : "amber"}>
-                    {error()}
-                    <Show when={current().errorCode}>{(code) => <span class="mono"> · {code()}</span>}</Show>
-                  </p>
+              {/* The provider's own failure, when it reported one, says more than the run's error. */}
+              <Show
+                when={providerFailure()}
+                fallback={
+                  <Show when={current().error}>
+                    {(error) => (
+                      <p class="rm-alert" data-tone={status().tone === "red" ? "red" : "amber"}>
+                        {error()}
+                        <Show when={current().errorCode}>{(code) => <span class="mono"> · {code()}</span>}</Show>
+                      </p>
+                    )}
+                  </Show>
+                }
+              >
+                {(notice) => (
+                  <div class="rm-alert rm-provider" data-tone={status().tone === "red" ? "red" : "amber"} role="note" aria-label={notice().title}>
+                    <b>{notice().title}</b>
+                    <p class="rm-provider-msg">{notice().message}</p>
+                    <span class="rm-provider-meta">
+                      {notice().detail}
+                      <Show when={notice().retryAt}>
+                        {(at) => ` · ${notice().transient ? "Clears" : "Can retry"} after ${dayLabel(at(), now())} ${clockTime(at())}`}
+                      </Show>
+                      <Show when={notice().requestId}>{(id) => <span class="mono"> · Request {id()}</span>}</Show>
+                    </span>
+                  </div>
                 )}
               </Show>
               <Show when={active()}>

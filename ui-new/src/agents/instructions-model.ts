@@ -130,12 +130,19 @@ export function bundleProblem(draft: BundleDraft): string | null {
   return null;
 }
 
-/** The `PATCH /agents/:id/instructions-bundle` body, or null when nothing changed. */
+/**
+ * The `PATCH /agents/:id/instructions-bundle` body, or null when nothing changed. Pointing at an
+ * external folder, or at another entry file in one, asks the server to check that the file is
+ * already there (`requireExistingEntry`), as the old UI's bundle settings do; otherwise it would
+ * create the folder and write the current instructions into it. A managed bundle creates a new
+ * entry file from the current one.
+ */
 export function bundleUpdate(saved: BundleDraft, draft: BundleDraft): InstructionsBundleUpdate | null {
   const entryFile = draft.entryFile.trim();
   const rootPath = draft.rootPath.trim();
   if (draft.mode === saved.mode && entryFile === saved.entryFile && (draft.mode === "managed" || rootPath === saved.rootPath)) return null;
-  return { mode: draft.mode, rootPath: draft.mode === "external" ? rootPath : null, entryFile };
+  if (draft.mode === "external") return { mode: "external", rootPath, entryFile, requireExistingEntry: true };
+  return { mode: "managed", rootPath: null, entryFile };
 }
 
 /** Suggested changes a person can act on: the per-run preserved edits, not whole-folder failures. */

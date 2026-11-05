@@ -27,7 +27,10 @@ export function harnessType(adapterType: string, config: Record<string, unknown>
   if (config.provider === "opencode") return "opencode_local";
   if (config.provider === "acpx") {
     const agent = String(config.acpxAgent ?? "claude");
-    return ({ codex: "codex_local", claude: "claude_local", grok: "grok_local", cursor: "cursor", pi: "pi_local" } as Record<string, string>)[agent] ?? `acpx:${agent}`;
+    return (
+      ({ codex: "codex_local", claude: "claude_local", grok: "grok_local", cursor: "cursor", pi: "pi_local", kimi: "kimi_local", antigravity: "antigravity_runtime" } as Record<string, string>)[agent] ??
+      `acpx:${agent}`
+    );
   }
   return String(config.provider);
 }
@@ -49,6 +52,9 @@ const HARNESS_LABELS: Record<string, string> = {
   gemini_local: "Gemini CLI",
   grok_local: "Grok Build",
   kimi_local: "Kimi Code",
+  // The Runner-only choices New agent offers (the old UI's adapter display registry).
+  kimi_runtime: "Kimi Code (Runner)",
+  antigravity_runtime: "Google Antigravity",
   hermes_local: "Hermes",
   hermes_gateway: "Hermes Gateway",
   opencode_local: "OpenCode",
@@ -145,6 +151,42 @@ export function probeQualified(probe: { ok: boolean; summary?: string; details: 
     : probe.summary || "The environment's platform qualification couldn't be confirmed. Retry the probe.";
 }
 
+/** Runner providers that run elsewhere, with no computer of the agent's to qualify (the old UI's `isExternalRunner`). */
+const EXTERNAL_RUNNER_PROVIDERS = new Set(["openai_dot", "grok_bot", "muse"]);
+
+/**
+ * The saved computer Test qualifies again before testing a Runner agent, or null (upstream
+ * f0877a9c7, AgentConfigForm's Test): a managed computer's update can invalidate its earlier
+ * qualification. Only the saved settings are qualified, so not while there are unsaved changes, not
+ * on the organization default, not for a pool connection or a runner that runs elsewhere, and not
+ * where the Runner is already the default for the harness.
+ */
+export function requalifyEnvironment(
+  agent: Pick<Agent, "adapterType" | "adapterConfig" | "runtimeConfig" | "defaultEnvironmentId">,
+  input: {
+    dirty: boolean;
+    environment: Pick<Environment, "id" | "driver" | "config"> | null | undefined;
+    adapters: readonly AdapterInfo[] | undefined;
+  },
+): string | null {
+  if (agent.adapterType !== "paperclip_runner" || input.dirty) return null;
+  const config = (agent.adapterConfig ?? {}) as Record<string, unknown>;
+  if (EXTERNAL_RUNNER_PROVIDERS.has(String(config.provider ?? ""))) return null;
+  const connection = (agent.runtimeConfig as Record<string, unknown> | null | undefined)?.aiConnection as { mode?: unknown } | undefined;
+  if (connection?.mode === "router") return null;
+  const environment = input.environment;
+  if (!agent.defaultEnvironmentId || environment?.id !== agent.defaultEnvironmentId || !canQualifyRunnerEnvironment(environment)) return null;
+  const harness = harnessType(agent.adapterType, config);
+  if (input.adapters?.find((adapter) => adapter.type === harness)?.defaultRunner === "paperclip") return null;
+  return environment.id;
+}
+
+/** Why a Test's qualification of the saved computer didn't confirm it, or null. */
+export function requalifyProblem(probe: { ok: boolean; summary?: string; details: Record<string, unknown> | null }): string | null {
+  if (probe.ok === true && probe.details?.platformQualificationRecorded === true) return null;
+  return probe.summary || "Couldn't verify the saved computer. Test again.";
+}
+
 // ---------------------------------------------------------------------------------------------
 // Sections
 
@@ -182,11 +224,17 @@ export const AGENT_SECTIONS: ({ heading: string } | { key: AgentSectionKey; labe
   { key: "advanced", label: "Configuration as YAML" },
 ];
 
-/** The old UI's tab names, so its links (`/agents/:id/configuration`, `…/api-keys`) keep working. */
+/**
+ * The old UI's tab names, so its links (`/agents/:id/configuration`, `…/api-keys`) keep working.
+ * Its refined agent page (upstream #18378) calls the instructions view Identity and keeps Activity,
+ * Runs, Costs and Budgets inside the agent; here they open the nearest section: History lists the
+ * agent's own actions, Budget its spend and recent runs.
+ */
 const SECTION_ALIASES: Record<string, AgentSectionKey> = {
   profile: "profile",
   instructions: "instructions",
   prompts: "instructions",
+  identity: "instructions",
   memory: "memory",
   skills: "skills",
   runtime: "runtime",
@@ -197,13 +245,17 @@ const SECTION_ALIASES: Record<string, AgentSectionKey> = {
   secrets: "secrets",
   budget: "budget",
   budgets: "budget",
+  cost: "budget",
   costs: "budget",
+  runs: "budget",
   permissions: "permissions",
   trust: "permissions",
   keys: "keys",
   "api-keys": "keys",
   history: "history",
   revisions: "history",
+  activity: "history",
+  audit: "history",
   advanced: "advanced",
   yaml: "advanced",
 };

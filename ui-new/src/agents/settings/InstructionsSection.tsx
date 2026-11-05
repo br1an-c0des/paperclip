@@ -555,7 +555,7 @@ function BundleSettings(props: { agent: AgentDetail; bundle: AgentInstructionsBu
             onChange={(value) => setMode(value as "managed" | "external")}
           />
         </SettingsRow>
-        <SettingsRow label="Folder" help={mode() === "external" ? "An absolute path on the machine Paperclip runs on." : "Paperclip's own folder for this agent."} for="ag-bundle-root">
+        <SettingsRow label="Folder" help={mode() === "external" ? "An absolute path on the machine Paperclip runs on. The folder and its entry file must already exist." : "Paperclip's own folder for this agent."} for="ag-bundle-root">
           <Show
             when={mode() === "external"}
             fallback={
@@ -572,7 +572,11 @@ function BundleSettings(props: { agent: AgentDetail; bundle: AgentInstructionsBu
             <TextInput id="ag-bundle-root" class="mono" spellcheck={false} autocomplete="off" placeholder="/absolute/path/to/agent/prompts" value={rootPath()} onInput={(event) => setRootPath(event.currentTarget.value)} />
           </Show>
         </SettingsRow>
-        <SettingsRow label="Entry file" help="The file the agent reads first. Usually AGENTS.md." for="ag-bundle-entry">
+        <SettingsRow
+          label="Entry file"
+          help={mode() === "external" ? "The file the agent reads first, inside the folder. Paperclip checks it's there before switching." : "The file the agent reads first. Usually AGENTS.md; a new name starts from the current one."}
+          for="ag-bundle-entry"
+        >
           <TextInput id="ag-bundle-entry" class="mono ps-field-240" spellcheck={false} autocomplete="off" value={entryFile()} onInput={(event) => setEntryFile(event.currentTarget.value)} />
         </SettingsRow>
         <Show when={legacy()}>

@@ -27,6 +27,8 @@ import {
   latestRevision,
   modelLabel,
   probeQualified,
+  requalifyEnvironment,
+  requalifyProblem,
   runnerLabel,
   runnerOffer,
   runtimeChanges,
@@ -196,7 +198,14 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
 
       <SettingsCard
         title="Harness and model"
-        footer={<TestEnvironment agent={props.agent} environmentId={draft.environmentId || null} />}
+        footer={
+          <TestEnvironment
+            agent={props.agent}
+            environmentId={draft.environmentId || null}
+            qualifyEnvironmentId={requalifyEnvironment(props.agent, { dirty: changes().length > 0, environment: environment(), adapters: adapters.data })}
+            dirty={changes().length > 0}
+          />
+        }
       >
         <SettingsRow label="Harness" help="The program the agent runs in.">
           <div class="ps-inline">
@@ -594,16 +603,34 @@ function ExtraFieldRow(props: { field: HarnessField; value: ExtraValue | undefin
   );
 }
 
-/** Test environment: checks the saved setup can start (harness found, signed in, model available). */
-function TestEnvironment(props: { agent: AgentDetail; environmentId: string | null }) {
+/**
+ * Test environment: checks the saved setup can start (harness found, signed in, model available).
+ * For a Runner agent on a sandbox it first qualifies the saved computer again
+ * (`requalifyEnvironment`), and stops there when that fails or the settings change meanwhile.
+ */
+function TestEnvironment(props: { agent: AgentDetail; environmentId: string | null; qualifyEnvironmentId: string | null; dirty: boolean }) {
   const company = useCompany();
+  const client = useQueryClient();
   const [busy, setBusy] = createSignal(false);
   const [result, setResult] = createSignal<AdapterEnvironmentTestResult | null>(null);
   const [error, setError] = createSignal<string | null>(null);
+  const [phase, setPhase] = createSignal<"qualifying" | "testing">("testing");
   const test = async () => {
     setBusy(true);
     setError(null);
+    setResult(null);
     try {
+      const qualify = props.qualifyEnvironmentId;
+      if (qualify) {
+        setPhase("qualifying");
+        const updatedAt = props.agent.updatedAt;
+        const probe = await agentsApi.qualifyRunner(props.agent.id, qualify, company().id);
+        if (props.dirty || props.agent.updatedAt !== updatedAt) throw new Error("The settings changed during the test. Test again.");
+        const why = requalifyProblem(probe);
+        void client.invalidateQueries({ queryKey: queryKeys.agents.adapters(company().id, qualify) });
+        if (why) throw new Error(why);
+      }
+      setPhase("testing");
       setResult(
         await agentsApi.testEnvironment(company().id, props.agent.adapterType, {
           adapterConfig: props.agent.adapterConfig as Record<string, unknown>,
@@ -623,9 +650,19 @@ function TestEnvironment(props: { agent: AgentDetail; environmentId: string | nu
     <div class="ps-stack ag-test">
       <div class="ps-inline">
         <Button size="compact" disabled={busy()} icon={<Check size={14} aria-hidden="true" />} onClick={() => void test()}>
-          {busy() ? "Testing…" : "Test environment"}
+          {busy() ? (phase() === "qualifying" ? "Checking the computer…" : "Testing…") : "Test environment"}
         </Button>
-        <Show when={result()} fallback={<span class="ps-muted-line">{error() ?? "Tests the saved settings: harness found, signed in, model available."}</span>}>
+        <Show
+          when={result()}
+          fallback={
+            <span class="ps-muted-line" role={error() ? "alert" : undefined}>
+              {error() ??
+                (props.qualifyEnvironmentId
+                  ? "Checks the saved computer still qualifies for the Runner, then tests the saved settings."
+                  : "Tests the saved settings: harness found, signed in, model available.")}
+            </span>
+          }
+        >
           {(found) => (
             <TonePill tone={tone()} compact>
               {found().status === "pass" ? "Passed" : found().status === "warn" ? "Passed with warnings" : "Failed"} · {shortDate(found().testedAt)}

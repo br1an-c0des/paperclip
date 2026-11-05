@@ -218,6 +218,23 @@
   overflow-wrap: anywhere;
 }
 
+/* A provider's own failure (rate limit, sign-in, model): what it said, then how and when */
+.rm-provider {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rm-provider-msg {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.rm-provider-meta {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 /* The watchdog's warning on a quiet run, under the stats */
 .rm-watch {
   padding: 10px 22px;
