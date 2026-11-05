@@ -42,7 +42,8 @@ import {
 } from "./chat-model";
 import { useChatReadMarker } from "./chat-read";
 import { LiveReply } from "./LiveReply";
-import { atFoot, shouldFollow, type FollowCause } from "./scroll-model";
+import { oldestLoadedAt } from "./history-model";
+import { atFoot, NEAR_TOP_PX, shouldFollow, type FollowCause } from "./scroll-model";
 import { useChat } from "./use-chat";
 import "./Chat.css";
 
@@ -181,9 +182,44 @@ function ChatThread(props: ChatViewProps) {
     if (!shouldFollow(cause, following)) return;
     following = true;
     // After layout; by then the reader may have scrolled away.
-    requestAnimationFrame(() => following && window.scrollTo({ top: document.documentElement.scrollHeight }));
+    requestAnimationFrame(() => {
+      if (following) window.scrollTo({ top: document.documentElement.scrollHeight });
+      if (cause === "opened") armed = true;
+    });
   };
-  const onScroll = () => (following = atFoot(metrics()));
+
+  // Earlier messages load as the reader scrolls up near the top of the thread (history-model.ts),
+  // or from the button there when the thread is too short to scroll. Scrolling only counts once the
+  // chat has opened at its foot, so opening doesn't page back. The page keeps its distance from the
+  // foot as the older messages go in above, so the message being read stays where it was.
+  let armed = false;
+  let more: HTMLButtonElement | undefined;
+  let fromFoot: number | null = null;
+  const loadEarlier = () => {
+    if (!state.comments.hasNextPage || state.comments.isFetchingNextPage) return;
+    following = false;
+    fromFoot = document.documentElement.scrollHeight - window.scrollY;
+    void state.comments.fetchNextPage().then((result) => {
+      // Nothing new drawn (a failure): drop the saved place, so a later refetch doesn't jump to it.
+      if (result.isError) fromFoot = null;
+    });
+  };
+  const nearTop = () => !!more && more.getBoundingClientRect().bottom > -NEAR_TOP_PX;
+  createEffect(
+    on(
+      () => state.comments.data?.pages.length,
+      () => {
+        if (fromFoot === null) return;
+        window.scrollTo({ top: document.documentElement.scrollHeight - fromFoot });
+        fromFoot = null;
+      },
+      { defer: true },
+    ),
+  );
+  const onScroll = () => {
+    following = atFoot(metrics());
+    if (armed && !state.comments.isFetchNextPageError && nearTop()) loadEarlier();
+  };
   window.addEventListener("scroll", onScroll, { passive: true });
   onCleanup(() => window.removeEventListener("scroll", onScroll));
   const shown = createMemo(() => !state.off() && !state.loading() && !state.error());
@@ -257,11 +293,7 @@ function ChatThread(props: ChatViewProps) {
     onCleanup(() => element.removeEventListener("click", onClick, true));
   };
 
-  const oldestLoaded = () => {
-    const pages = state.comments.data?.pages;
-    const last = pages?.[pages.length - 1];
-    return last?.[last.length - 1]?.createdAt ?? null;
-  };
+  const oldestLoaded = () => oldestLoadedAt(state.comments.data?.pages);
 
   const activity = (sheet: boolean) => (
     <ChatActivity
@@ -326,15 +358,7 @@ function ChatThread(props: ChatViewProps) {
 
             <div class="ch-log" ref={catchDocumentLinks} role="log" aria-label={`Conversation with ${props.agent.name}`}>
               <Show when={state.comments.hasNextPage}>
-                <button
-                  type="button"
-                  class="ch-more"
-                  disabled={state.comments.isFetchingNextPage}
-                  onClick={() => {
-                    following = false;
-                    void state.comments.fetchNextPage();
-                  }}
-                >
+                <button type="button" class="ch-more" ref={more} disabled={state.comments.isFetchingNextPage} onClick={loadEarlier}>
                   {state.comments.isFetchingNextPage
                     ? "Loading earlier messages…"
                     : state.comments.isFetchNextPageError
