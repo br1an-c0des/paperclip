@@ -463,6 +463,10 @@ U34).
 The Nov 5 sync (`adb49a443..d3713d827`, [report](../../fork/sync-reports/2026-11-05.md)) added U40–U56
 and folded its read-side change into U13.
 
+Integration round 2 (Nov 5): four agents, `integrate/transcripts` (U41 check, U42, U43),
+`integrate/task-state` (U40, U44–U47), `integrate/composer-requests` (U48, U50, U49 check) and
+`integrate/settings-checks` (U56; U52–U55 checks). U13 with U51 follows as its own agent.
+
 Outcomes: **build** (an agent builds it), **decide** (a question for the user first), **check**
 (verify, then build or close), **design** (needs boards first), **left out** (with the reason),
 **done**. When a line is built or settled, mark it done or left out here and in its row.
