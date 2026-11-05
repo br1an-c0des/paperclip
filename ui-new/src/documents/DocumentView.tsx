@@ -29,6 +29,8 @@ import { CommentsPanel, useAnnotationLayer, type PendingComment } from "./Annota
 import type { SelectionAnchor } from "./anchor";
 import { newCommentBlock, openThreadCount } from "./annotation-model";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { clampImage, documentImages, imageLabel, type GalleryImage } from "./gallery-model";
+import { ImageGallery } from "./ImageGallery";
 import {
   classifySaveError,
   diffCounts,
@@ -63,6 +65,10 @@ import "./DocumentView.css";
  * and the editor shows both versions: keep editing, take theirs, or overwrite with yours. A locked
  * document can't be saved, restored or deleted until someone unlocks it; the header says who holds
  * the lock.
+ *
+ * Its images open in a gallery (ImageGallery.tsx), in reading order. A page that keeps the open
+ * image in its address (a task's `#document-<key>&image=2`) passes `image` and `onImage`; without
+ * them the gallery keeps its own place.
  */
 
 export function DocumentView(props: {
@@ -70,6 +76,10 @@ export function DocumentView(props: {
   docKey: string;
   /** Open straight into the editor, as after New document or a row's Edit. */
   editOnOpen?: boolean;
+  /** The gallery's image (1-based) from the page's address, or null for none. */
+  image?: number | null;
+  /** Called with the image the gallery moves to, or null when it closes; the page puts it in the address. */
+  onImage?: (position: number | null) => void;
   backLabel: string;
   onBack: () => void;
   onDeleted: () => void;
@@ -134,6 +144,31 @@ export function DocumentView(props: {
   const store = (result: IssueDocument) => {
     client.setQueryData(documentKeys.doc(props.host, props.docKey), result);
     void refresh();
+  };
+
+  // The rendered document's images, each a button that opens the gallery on it.
+  const [images, setImages] = createSignal<GalleryImage[]>([]);
+  const [ownImage, setOwnImage] = createSignal<number | null>(null);
+  const imagePosition = () => clampImage(props.onImage ? props.image : ownImage(), images().length);
+  const showImage = (position: number | null) => (props.onImage ? props.onImage(position) : setOwnImage(position));
+  createEffect(() => {
+    const root = textEl();
+    shownBody();
+    const found = root ? documentImages(root) : [];
+    found.forEach(({ element, image }, index) => {
+      element.dataset.gallery = String(index + 1);
+      element.tabIndex = 0;
+      element.setAttribute("role", "button");
+      element.setAttribute("aria-label", `Open ${imageLabel(index + 1, found.length, image.alt).replace(/^I/, "i")}`);
+    });
+    setImages(found.map((entry) => entry.image));
+  });
+  const openImage = (event: MouseEvent | KeyboardEvent) => {
+    if (event instanceof KeyboardEvent && event.key !== "Enter" && event.key !== " ") return;
+    const image = (event.target as Element).closest?.("img[data-gallery]") as HTMLImageElement | null;
+    if (!image) return;
+    event.preventDefault();
+    showImage(Number(image.dataset.gallery));
   };
 
   // Open in the editor once, if asked and allowed.
@@ -560,7 +595,7 @@ export function DocumentView(props: {
                         />
                       </Match>
                       <Match when={true}>
-                        <div class="dv-text" ref={setTextEl}>
+                        <div class="dv-text" ref={setTextEl} onClick={openImage} onKeyDown={openImage}>
                           <Show when={shownBody().trim()} fallback={<p class="tsec-muted">This document is empty.</p>}>
                             <Markdown source={shownBody()} />
                           </Show>
@@ -661,6 +696,7 @@ export function DocumentView(props: {
           action?.();
         }}
       />
+      <ImageGallery images={images()} position={editing() ? null : imagePosition()} onPosition={showImage} />
     </section>
   );
 }

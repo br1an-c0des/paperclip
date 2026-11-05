@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_VIEW_STATE } from "./view-state";
-import { parseListUrl, withUrlFilters } from "./view-url";
+import { parseListUrl, sortParams, withUrlFilters } from "./view-url";
 
 describe("parseListUrl", () => {
   it("reads the search term", () => {
@@ -18,7 +18,7 @@ describe("parseListUrl", () => {
 
   it("reads repeated workspaces, the participant and the old status views", () => {
     const url = parseListUrl("?workspace=w1&workspace=w2&participantAgentId=ada&view=active");
-    expect(url.filters).toEqual({ workspaces: ["w1", "w2"], statuses: ["todo", "in_progress", "in_review", "blocked"] });
+    expect(url.filters).toEqual({ workspaces: ["w1", "w2"], statuses: ["todo", "in_progress", "monitoring", "in_review", "blocked"] });
     expect(url.participantAgentId).toBe("ada");
     expect(parseListUrl("?view=done").filters.statuses).toEqual(["done", "cancelled"]);
     expect(parseListUrl("?view=all").filters.statuses).toEqual([]);
@@ -46,5 +46,31 @@ describe("withUrlFilters", () => {
     const next = withUrlFilters(state, { assignees: ["agent:a"] });
     expect(next.filters).toMatchObject({ assignees: ["agent:a"], labels: ["bug"] });
     expect(withUrlFilters(state, {})).toBe(state);
+  });
+});
+
+describe("the sort parameters", () => {
+  it("reads the old list's sortField and sortDir, ignoring fields ui-new doesn't sort by", () => {
+    expect(parseListUrl("?sortField=created&sortDir=asc").sort).toEqual({ field: "created", dir: "asc" });
+    expect(parseListUrl("?sortField=title").sort).toEqual({ field: "title", dir: "desc" });
+    expect(parseListUrl("?sortField=taskId&sortDir=asc").sort).toBeNull();
+    expect(parseListUrl("").sort).toBeNull();
+  });
+
+  it("replaces the view's sort, and writes none for the default", () => {
+    const sort = { field: "created", dir: "desc" } as const;
+    expect(withUrlFilters(DEFAULT_VIEW_STATE, {}, null, sort).sort).toEqual(sort);
+    expect(withUrlFilters(DEFAULT_VIEW_STATE, {}, null, DEFAULT_VIEW_STATE.sort)).toBe(DEFAULT_VIEW_STATE);
+    expect(sortParams(sort)).toEqual({ sortField: "created", sortDir: "desc" });
+    expect(sortParams({ field: "updated", dir: "desc" })).toEqual({ sortField: undefined, sortDir: undefined });
+  });
+});
+
+describe("originKind=routine_execution", () => {
+  it("turns on the recurring task runs filter, as the old Routines page links to it", () => {
+    const url = parseListUrl("?view=all&originKind=routine_execution&sortField=created&sortDir=desc");
+    expect(url.filters).toEqual({ statuses: [], routineOnly: true });
+    expect(url.sort).toEqual({ field: "created", dir: "desc" });
+    expect(parseListUrl("?originKind=manual").filters).toEqual({});
   });
 });

@@ -8,6 +8,7 @@ import {
   isFilterOn,
   loosenOptions,
   mergeFilters,
+  statusCounts,
   toggleFilter,
   updatedLabel,
   type FilterNames,
@@ -136,5 +137,14 @@ describe("loosenOptions", () => {
 
   it("offers nothing when the query finds nothing even unfiltered", () => {
     expect(loosenOptions({ unfilteredTotal: 0, loosenSuggestions: [] }, set, names)).toEqual([]);
+  });
+});
+
+describe("statusCounts", () => {
+  it("reads the display-status counts, which count Monitoring, else the stored ones", () => {
+    const counts = { status: { in_progress: 3 }, displayStatus: { in_progress: 2, monitoring: 1 } } as never;
+    expect(statusCounts(counts)).toEqual({ in_progress: 2, monitoring: 1 });
+    expect(statusCounts({ status: { in_progress: 3 } } as never)).toEqual({ in_progress: 3 });
+    expect(statusCounts(undefined)).toEqual({});
   });
 });

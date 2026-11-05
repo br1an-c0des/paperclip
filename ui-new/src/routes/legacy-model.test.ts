@@ -66,6 +66,16 @@ describe("companyLegacyTarget", () => {
     expect(companyLegacyTarget(from)).toBe(to);
   });
 
+  it("keeps the old list's routine tasks link, which the task list reads itself", () => {
+    // /issues?view=all&originKind=routine_execution&sortField=created&sortDir=desc (the old Routines page's link)
+    // is current: tasks/view-url.ts reads originKind and the sort. The old view path keeps them too.
+    expect(companyLegacyTarget("issues")).toBeNull();
+    const to = companyLegacyTarget("issues/all")!;
+    expect(withSearchAndHash(to, "?originKind=routine_execution&sortField=created&sortDir=desc", "")).toBe(
+      "issues?view=all&originKind=routine_execution&sortField=created&sortDir=desc",
+    );
+  });
+
   it("leaves current addresses alone", () => {
     expect(companyLegacyTarget("issues")).toBeNull();
     expect(companyLegacyTarget("issues/PAP-1")).toBeNull();

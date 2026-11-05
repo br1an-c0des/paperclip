@@ -1,4 +1,4 @@
-import type { CompanySearchResponse, CompanySearchScope, CompanySearchSort, IssuePriority, IssueStatus } from "@paperclipai/shared";
+import type { CompanySearchResponse, CompanySearchScope, CompanySearchSort, IssuePriority, IssueDisplayStatus } from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
@@ -7,7 +7,9 @@ import { api } from "./client";
  * when filters empty the page, the ways to loosen them (`zeroResults`).
  *
  * The task filters narrow every task-shaped kind (tasks, comments, documents, files). Status and
- * priority take several values; assignee, project, label and the updated window take one. The
+ * priority take several values; assignee, project, label and the updated window take one. Status
+ * is what tasks show, sent as `displayStatus` (since the 2026-11-03 sync), so Monitoring can be
+ * picked apart from In progress; its counts come back as `filterOptionCounts.displayStatus`. The
  * server allows 60 searches a minute per person, a limit of at most 50 and an offset of at most 200.
  */
 
@@ -19,7 +21,7 @@ export type SearchRequest = {
   scope?: CompanySearchScope;
   limit?: number;
   offset?: number;
-  status?: readonly IssueStatus[];
+  status?: readonly IssueDisplayStatus[];
   priority?: readonly IssuePriority[];
   /** An agent's id, or null for unassigned tasks. */
   assigneeAgentId?: string | null;
@@ -37,7 +39,8 @@ export function searchQueryString(request: SearchRequest) {
   if (request.scope && request.scope !== "all") params.set("scope", request.scope);
   if (request.limit !== undefined) params.set("limit", String(request.limit));
   if (request.offset) params.set("offset", String(request.offset));
-  for (const status of request.status ?? []) params.append("status", status);
+  // What tasks show, so Monitoring is told apart from In progress (the server still takes `status`).
+  for (const status of request.status ?? []) params.append("displayStatus", status);
   for (const priority of request.priority ?? []) params.append("priority", priority);
   if (request.assigneeAgentId !== undefined) params.set("assigneeAgentId", request.assigneeAgentId ?? "null");
   if (request.assigneeUserId) params.set("assigneeUserId", request.assigneeUserId);

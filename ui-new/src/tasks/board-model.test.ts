@@ -149,3 +149,23 @@ describe("the Closed switch", () => {
     ]);
   });
 });
+
+describe("Monitoring on the board", () => {
+  const monitored = () => task("m", "in_progress", { displayStatus: "monitoring" });
+
+  it("gets a column after In progress only while tasks show it", () => {
+    const columns = boardColumns(buildTaskGroups([monitored(), task("b", "in_progress")], new Set()), "status", EMPTY_FILTERS);
+    expect(columns.map((column) => column.key)).toEqual(["backlog", "todo", "in_progress", "monitoring", "in_review", "blocked", "done"]);
+    expect(columns[3]).toMatchObject({ label: "Monitoring", value: { field: "monitoring" } });
+    const filtered = boardColumns(buildTaskGroups([], new Set()), "status", { ...EMPTY_FILTERS, statuses: ["monitoring"] });
+    expect(filtered.map((column) => column.key)).not.toContain("monitoring");
+  });
+
+  it("takes no drops, so a drag can't make a task Monitoring, and is tinted as In progress", () => {
+    const columns = boardColumns(buildTaskGroups([monitored()], new Set()), "status", EMPTY_FILTERS);
+    const at = columns.findIndex((column) => column.key === "monitoring");
+    expect(neighbourColumn(columns, at - 1, 1)).toBe(at + 1);
+    expect(moveUpdate(monitored(), undefined, columns[at]!.value)).toBeNull();
+    expect(columnTone(columns[at]!)).toEqual(columnTone(columns[at - 1]!));
+  });
+});

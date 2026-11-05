@@ -105,3 +105,10 @@ describe("workflowSort", () => {
     expect(ids(workflowSort(cycle))).toEqual(["y", "x"]);
   });
 });
+
+describe("status sort and Monitoring", () => {
+  it("puts monitored tasks after In progress, by what they show", () => {
+    const tasks = [task("r", { status: "in_review" }), task("m", { status: "in_progress", displayStatus: "monitoring" }), task("p", { status: "in_progress" })];
+    expect(sortTasks(tasks, { field: "status", dir: "asc" }).map((each) => each.id)).toEqual(["p", "m", "r"]);
+  });
+});

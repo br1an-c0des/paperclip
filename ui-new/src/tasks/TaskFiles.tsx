@@ -1,4 +1,5 @@
 import type { IssueAttachment, IssueDocumentSummary, IssueWorkProduct } from "@paperclipai/shared";
+import { useLocation, useNavigate } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import {
   ChevronRight,
@@ -57,6 +58,7 @@ import { ApiError } from "@/api/client";
 import { readDivergence } from "./branch-reconcile";
 import { isReviewDocumentKey, markdownOutput, reviewDocumentKey, reviewProblem } from "./review-documents";
 import { useTaskPeople, type TaskPeople } from "./people";
+import { documentAnchor } from "./task-anchor";
 import { stampLabel } from "./thread-model";
 import "./TaskFiles.css";
 
@@ -106,8 +108,16 @@ const DocumentView = lazy(() => import("@/documents/DocumentView").then((module)
 const NewDocument = lazy(() => import("@/documents/NewDocument").then((module) => ({ default: module.NewDocument })));
 const WorkspaceFiles = lazy(() => import("@/files/WorkspaceFiles").then((module) => ({ default: module.WorkspaceFiles })));
 
-export function TaskFiles(props: { taskId: string; /** A document to open, from a `#document-<key>` link. */ openDocKey?: string }) {
+export function TaskFiles(props: {
+  taskId: string;
+  /** A document to open, from a `#document-<key>` link. */
+  openDocKey?: string;
+  /** The image its gallery opens on, from a `#document-<key>&image=<n>` link. */
+  openImage?: number | null;
+}) {
   const company = useCompany();
+  const location = useLocation();
+  const navigate = useNavigate();
   const client = useQueryClient();
   const people = useTaskPeople();
   const phone = () => viewport() === "phone";
@@ -224,6 +234,9 @@ export function TaskFiles(props: { taskId: string; /** A document to open, from 
   };
 
   const backToList = () => setView({ kind: "list" });
+  // The gallery's image goes in the address (`#document-<key>&image=2`), so a link opens it again.
+  const showImage = (key: string, image: number | null) =>
+    navigate(`${location.pathname}${location.search}${documentAnchor(key, image)}`, { replace: true, scroll: false });
 
   return (
     <Suspense fallback={<p class="tsec-muted tf-loading">Loading…</p>}>
@@ -234,6 +247,8 @@ export function TaskFiles(props: { taskId: string; /** A document to open, from 
               host={host()}
               docKey={open().key}
               editOnOpen={open().edit}
+              image={open().key === props.openDocKey ? (props.openImage ?? null) : null}
+              onImage={(image) => showImage(open().key, image)}
               backLabel="Back to docs and files"
               onBack={backToList}
               onDeleted={backToList}

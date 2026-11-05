@@ -1,4 +1,4 @@
-import type { CompactIssue, Issue, IssueRelationIssueSummary, IssueStatus } from "@paperclipai/shared";
+import type { CompactIssue, Issue, IssueDisplayStatus, IssueRelationIssueSummary } from "@paperclipai/shared";
 import { createQuery } from "@tanstack/solid-query";
 import {
   Box,
@@ -33,7 +33,7 @@ import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery, useLiveRunsQuery } from "@/lib/company-data";
 import { Capsule, RunningPill } from "@/ui/Status";
-import { STATUS_META } from "@/ui/status-meta";
+import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { Assignee, useTaskPeople } from "./people";
 import { stageKeys } from "./review-stages";
 import { blockerIds, blockersEdit, workspacePickerAvailable } from "./task-edits";
@@ -70,16 +70,6 @@ import "./TaskDetails.css";
  * fold under "Show N empty fields", as on the board.
  */
 
-const STATUS_TONE: Record<IssueStatus, string> = {
-  in_progress: "run",
-  in_review: "violet",
-  todo: "amber",
-  blocked: "red",
-  backlog: "neutral",
-  done: "green",
-  cancelled: "neutral",
-};
-
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function shortDate(value: Date | string | null | undefined) {
@@ -98,10 +88,12 @@ function elapsed(since: string | Date | null, now: number) {
   return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
-export function StatusChip(props: { status: IssueStatus; small?: boolean }) {
+/** A status in its tone. Pass what the task shows (`shownStatus`), so Monitoring reads as Monitoring. */
+export function StatusChip(props: { status: IssueDisplayStatus; small?: boolean }) {
+  const meta = () => STATUS_META[props.status] ?? STATUS_META.backlog;
   return (
-    <span class="td-status" classList={{ "td-status--small": props.small }} data-tone={STATUS_TONE[props.status]}>
-      {STATUS_META[props.status].label}
+    <span class="td-status" classList={{ "td-status--small": props.small }} data-tone={meta().tone} data-hollow={meta().hollow ? "" : undefined}>
+      {meta().label}
     </span>
   );
 }
@@ -158,7 +150,7 @@ export function TaskDetails(props: {
     !!current.executionState?.currentStageType;
   const workspaceEditable = (current: Issue) => workspacePickerAvailable(current.project, settings.data?.enableIsolatedWorkspaces === true);
   const properties: Property[] = [
-    { key: "status", icon: <CircleDot size={15} />, label: "Status", empty: () => false, value: () => <StatusControl status={t().status} onChange={change} /> },
+    { key: "status", icon: <CircleDot size={15} />, label: "Status", empty: () => false, value: () => <StatusControl status={t().status} shown={shownStatus(t())} onChange={change} /> },
     { key: "assignee", icon: <UserRound size={15} />, label: "Assignee", empty: () => false, value: () => <AssigneeControl task={t()} people={people} onChange={change} /> },
     {
       key: "review",
@@ -385,7 +377,7 @@ export function TaskDetails(props: {
                           {kid.title}
                         </button>
                         <Assignee task={kid} people={people} size={20} />
-                        <StatusChip status={kid.status as IssueStatus} small />
+                        <StatusChip status={shownStatus(kid)} small />
                       </div>
                     )}
                   </For>
@@ -456,7 +448,7 @@ function Relation(props: {
         {props.relation.title}
       </button>
       <span class="td-relation-note">
-        <Show when={props.kind === "blocking"} fallback={<StatusChip status={props.relation.status} small />}>
+        <Show when={props.kind === "blocking"} fallback={<StatusChip status={shownStatus(props.relation)} small />}>
           <Show when={waiter()}>{(name) => <>{name()} {name() === "You" ? "wait" : "waits"} on this</>}</Show>
         </Show>
       </span>

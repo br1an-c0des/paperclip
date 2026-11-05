@@ -1,4 +1,4 @@
-import type { CompanySearchFilterOptionCounts, CompanySearchSort, IssueLabel, IssueStatus, Project } from "@paperclipai/shared";
+import type { CompanySearchFilterOptionCounts, CompanySearchSort, IssueLabel, Project } from "@paperclipai/shared";
 import { Check, ChevronDown, Info, ListFilter, X } from "lucide-solid";
 import { createMemo, For, Match, Show, Switch, type JSX } from "solid-js";
 import { LabelDot } from "@/tasks/pickers";
@@ -13,6 +13,7 @@ import { Tooltip } from "@/ui/Tooltip";
 import {
   assigneeName,
   isFilterOn,
+  statusCounts,
   UPDATED_WINDOWS,
   type FilterChip,
   type FilterDimension,
@@ -82,7 +83,7 @@ export function FilterMenu(props: {
         <Menu.Group label="Status">
           <For each={STATUS_ORDER}>
             {(status) => (
-              <Menu.CheckboxItem icon={<StatusCapsule status={status} size="row" />} hint={count(props.counts?.status[status])} {...item("status", status)}>
+              <Menu.CheckboxItem icon={<StatusCapsule status={status} size="row" />} hint={count(statusCounts(props.counts)[status])} {...item("status", status)}>
                 {STATUS_META[status].label}
               </Menu.CheckboxItem>
             )}
@@ -252,10 +253,10 @@ export function FacetColumn(props: {
   onClear: () => void;
 }) {
   const status = createMemo<FacetOption[]>(() =>
-    STATUS_ORDER.filter((value) => (props.counts?.status[value] ?? 0) > 0 || props.filters.status.includes(value)).map((value) => ({
+    STATUS_ORDER.filter((value) => (statusCounts(props.counts)[value] ?? 0) > 0 || props.filters.status.includes(value)).map((value) => ({
       value,
-      label: STATUS_META[value as IssueStatus].label,
-      count: props.counts?.status[value] ?? 0,
+      label: STATUS_META[value].label,
+      count: statusCounts(props.counts)[value] ?? 0,
       mark: <StatusCapsule status={value} size="tiny" />,
     })),
   );

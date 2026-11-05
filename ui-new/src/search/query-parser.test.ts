@@ -56,3 +56,10 @@ describe("stripFilters", () => {
     expect(stripFilters(query, context, "status")).toBe("login assignee:me fix");
   });
 });
+
+describe("Monitoring", () => {
+  it("is a status to search by, and open includes it", () => {
+    expect(parseQuery("status:monitoring", context).filters).toEqual({ status: ["monitoring"] });
+    expect(parseQuery("is:open", context).filters.status).toContain("monitoring");
+  });
+});

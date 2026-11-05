@@ -334,6 +334,11 @@
   white-space: nowrap;
 }
 
+.sx-chip--hollow {
+  outline: 1px dashed currentColor;
+  outline-offset: -1px;
+}
+
 .sx-snip {
   display: -webkit-box;
   overflow: hidden;

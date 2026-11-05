@@ -1,4 +1,5 @@
-import type { CompactIssue, IssuePriority, IssueStatus } from "@paperclipai/shared";
+import type { CompactIssue, IssueDisplayStatus, IssuePriority } from "@paperclipai/shared";
+import { shownStatus } from "@/ui/status-meta";
 
 /*
  * How a task list is arranged: as a list or a board, what it's grouped by, filtered to and sorted
@@ -36,7 +37,8 @@ export const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
 ];
 
 export type TaskFilters = {
-  statuses: IssueStatus[];
+  /** What tasks show (`shownStatus`): Monitoring is a status of its own here, apart from In progress. */
+  statuses: IssueDisplayStatus[];
   priorities: IssuePriority[];
   assignees: string[];
   labels: string[];
@@ -54,6 +56,11 @@ export type TaskFilters = {
   hideAgentCreated: boolean;
   /** Only tasks in a case (board C1's "In a case"), offered while cases are on. */
   inCase: boolean;
+  /**
+   * Only the tasks recurring tasks (routines) made, as the old list's Routine tasks filter
+   * (`?originKind=routine_execution`, since the 2026-11-01 sync). Agent-created tasks show with it on.
+   */
+  routineOnly: boolean;
 };
 
 /** The fields the old list sorts by (ui/src/components/IssuesList.tsx); task-sort.ts sorts. */
@@ -96,6 +103,7 @@ export const EMPTY_FILTERS: TaskFilters = {
   liveOnly: false,
   hideAgentCreated: false,
   inCase: false,
+  routineOnly: false,
 };
 
 /** The server's order: most recently updated first. */
@@ -136,7 +144,7 @@ export function parseGroupBy(value: unknown): GroupBy {
 export function parseFilters(value: unknown): TaskFilters {
   const filters = record(value);
   return {
-    statuses: strings(filters.statuses) as IssueStatus[],
+    statuses: strings(filters.statuses) as IssueDisplayStatus[],
     priorities: strings(filters.priorities) as IssuePriority[],
     assignees: strings(filters.assignees),
     labels: strings(filters.labels),
@@ -147,6 +155,7 @@ export function parseFilters(value: unknown): TaskFilters {
     liveOnly: filters.liveOnly === true,
     hideAgentCreated: filters.hideAgentCreated === true,
     inCase: filters.inCase === true,
+    routineOnly: filters.routineOnly === true,
   };
 }
 
@@ -154,6 +163,18 @@ export function parseSort(value: unknown): TaskSort {
   const sort = record(value);
   if (!SORT_FIELDS.has(sort.field as SortField)) return DEFAULT_SORT;
   return { field: sort.field as SortField, dir: sort.dir === "asc" ? "asc" : "desc" };
+}
+
+/**
+ * The order to ask the server for the list in (`sortField`, `sortDir`; since the 2026-11-03 sync it
+ * takes `created`), as the old list does: by created when the view sorts by created, else most
+ * recently updated first. The list reads every page and sorts on the client either way; the
+ * server's order keeps the pages from shifting under it, and breaks ties.
+ */
+export function serverSort(sort: TaskSort): { field: "updated" | "created"; dir: "asc" | "desc" } {
+  if (sort.field === "created") return { field: "created", dir: sort.dir };
+  if (sort.field === "updated") return { field: "updated", dir: sort.dir };
+  return { field: "updated", dir: "desc" };
 }
 
 /** A saved state, with anything missing or malformed replaced by the default. */
@@ -230,7 +251,8 @@ export function filterCount(filters: TaskFilters) {
     filters.externalObjects.length +
     (filters.liveOnly ? 1 : 0) +
     (filters.hideAgentCreated ? 1 : 0) +
-    (filters.inCase ? 1 : 0)
+    (filters.inCase ? 1 : 0) +
+    (filters.routineOnly ? 1 : 0)
   );
 }
 
@@ -275,9 +297,11 @@ export function applyFilters(
   const words = search.toLowerCase().split(/\s+/).filter(Boolean);
   return tasks.filter((task) => {
     if (filters.liveOnly && !context.liveIssueIds?.has(task.id)) return false;
-    if (filters.hideAgentCreated && isAgentCreated(task)) return false;
+    if (filters.routineOnly && task.originKind !== "routine_execution") return false;
+    // Routine tasks are agent-created; asking for them shows them, as in the old list.
+    if (filters.hideAgentCreated && !filters.routineOnly && isAgentCreated(task)) return false;
     if (filters.inCase && context.inCase && !context.inCase(task)) return false;
-    if (statuses.size > 0 && !statuses.has(task.status)) return false;
+    if (statuses.size > 0 && !statuses.has(shownStatus(task))) return false;
     if (priorities.size > 0 && !priorities.has(task.priority)) return false;
     if (assignees.size > 0 && !assignees.has(assigneeKey(task))) return false;
     if (labels.size > 0) {

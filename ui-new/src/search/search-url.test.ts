@@ -54,10 +54,16 @@ describe("searchQuery and searchPath", () => {
 describe("searchQueryString", () => {
   it("writes the request the API takes", () => {
     expect(searchQueryString({ q: "login", scope: "all", limit: 50, assigneeAgentId: null, status: ["todo", "blocked"] })).toBe(
-      "q=login&limit=50&status=todo&status=blocked&assigneeAgentId=null",
+      "q=login&limit=50&displayStatus=todo&displayStatus=blocked&assigneeAgentId=null",
     );
     expect(searchQueryString({ q: "", scope: "issues", offset: 25, sort: "updated", updatedWithin: "7d" })).toBe(
       "q=&scope=issues&offset=25&updatedWithin=7d&sort=updated",
     );
+  });
+});
+
+describe("Monitoring in the address", () => {
+  it("reads status=monitoring as a status filter", () => {
+    expect(readSearchState("?q=ci&status=monitoring&status=nonsense").filters.status).toEqual(["monitoring"]);
   });
 });

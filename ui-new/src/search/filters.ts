@@ -1,8 +1,9 @@
 import type {
+  CompanySearchFilterOptionCounts,
   CompanySearchIssueFilterKey,
   CompanySearchZeroResults,
+  IssueDisplayStatus,
   IssuePriority,
-  IssueStatus,
 } from "@paperclipai/shared";
 import type { SearchRequest } from "@/api/search";
 import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
@@ -21,7 +22,7 @@ import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
  */
 
 export type SearchFilters = {
-  status: IssueStatus[];
+  status: IssueDisplayStatus[];
   priority: IssuePriority[];
   assignee: string | null;
   projectId: string | null;
@@ -113,7 +114,7 @@ export function toggleFilter(filters: SearchFilters, dimension: FilterDimension,
   const pick = (current: string | null) => (current === value ? null : value);
   switch (dimension) {
     case "status":
-      return { ...filters, status: toggledIn(filters.status, value as IssueStatus) };
+      return { ...filters, status: toggledIn(filters.status, value as IssueDisplayStatus) };
     case "priority":
       return { ...filters, priority: toggledIn(filters.priority, value as IssuePriority) };
     case "assignee":
@@ -130,7 +131,7 @@ export function toggleFilter(filters: SearchFilters, dimension: FilterDimension,
 export function isFilterOn(filters: SearchFilters, dimension: FilterDimension, value: string) {
   switch (dimension) {
     case "status":
-      return filters.status.includes(value as IssueStatus);
+      return filters.status.includes(value as IssueDisplayStatus);
     case "priority":
       return filters.priority.includes(value as IssuePriority);
     case "assignee":
@@ -261,4 +262,12 @@ export function loosenOptions(zero: CompanySearchZeroResults, filters: SearchFil
     options.push({ dimension: null, label: "Clear every filter", count: zero.unfilteredTotal });
   }
   return options;
+}
+
+/**
+ * Tasks per status, by what they show: the display-status counts, which tell Monitoring apart from
+ * In progress (since the 2026-11-03 sync), else the stored-status counts an older server sends.
+ */
+export function statusCounts(counts: CompanySearchFilterOptionCounts | undefined): Partial<Record<IssueDisplayStatus, number>> {
+  return counts?.displayStatus ?? counts?.status ?? {};
 }

@@ -1,5 +1,5 @@
-import type { CompactIssue, IssuePriority, IssueStatus } from "@paperclipai/shared";
-import { PRIORITY_META, STATUS_META, STATUS_ORDER } from "@/ui/status-meta";
+import type { CompactIssue, IssueDisplayStatus, IssuePriority, IssueStatus } from "@paperclipai/shared";
+import { PRIORITY_META, shownStatus, STATUS_META, STATUS_ORDER } from "@/ui/status-meta";
 import type { GroupBy } from "./view-state";
 import type { WorkspaceLookup } from "./workspaces";
 
@@ -35,13 +35,13 @@ export type TaskRow = {
 
 /** The group heading's mark. */
 export type GroupMark =
-  | { kind: "status"; status: IssueStatus }
+  | { kind: "status"; status: IssueDisplayStatus }
   | { kind: "priority"; priority: IssuePriority }
   | { kind: "agent"; agentId: string }
   | { kind: "user"; userId: string; you: boolean }
   | { kind: "unassigned" }
   | { kind: "label"; color: string | null }
-  | { kind: "task"; status: IssueStatus | null }
+  | { kind: "task"; status: IssueDisplayStatus | null }
   | { kind: "project"; color: string | null }
   | { kind: "workspace" }
   /** A case (board C2): its group card draws the case's own heading; `depth` nests child cases. */
@@ -50,10 +50,13 @@ export type GroupMark =
 
 /**
  * What the group's tasks have in common. Null for an ungrouped list. A workspace group gives tasks
- * added from it its workspace (`defaults`), but tasks can't be dragged into it (takesDrops).
+ * added from it its workspace (`defaults`), but tasks can't be dragged into it (takesDrops). The
+ * Monitoring group's tasks share a status the server works out, which nothing can give a task, so
+ * it takes neither drops nor new tasks (as the old board's Monitoring lane).
  */
 export type GroupValue =
   | { field: "status"; status: IssueStatus }
+  | { field: "monitoring" }
   | { field: "priority"; priority: IssuePriority }
   | { field: "assignee"; agentId: string | null; userId: string | null }
   | { field: "label"; labelId: string | null }
@@ -72,7 +75,7 @@ export type GroupNames = {
   youId: () => string | null;
   label: (id: string) => { name: string; color: string | null } | undefined;
   /** A task by id, for parent groups; looked up in the whole list, not just the filtered rows. */
-  task: (id: string) => Pick<CompactIssue, "identifier" | "title" | "status"> | undefined;
+  task: (id: string) => Pick<CompactIssue, "identifier" | "title" | "status" | "displayStatus"> | undefined;
   project?: (id: string) => { name: string; color: string | null } | undefined;
   /** Each task's workspace and the workspaces' names (workspaces.ts). */
   workspace?: Pick<WorkspaceLookup, "of" | "name" | "defaults">;
@@ -96,16 +99,24 @@ export type CaseGroups = {
  * case groups, since a task's place in a case is the agents' to set.
  */
 export function takesDrops(value: GroupValue) {
-  return value !== null && value.field !== "workspace" && value.field !== "case";
+  return value !== null && value.field !== "workspace" && value.field !== "case" && value.field !== "monitoring";
+}
+
+/** Whether a group offers "Add task": every one but Monitoring, which no new task can be in. */
+export function takesAdds(value: GroupValue) {
+  return value?.field !== "monitoring";
 }
 
 /** Status groups that start collapsed, as on board 1. */
-export const COLLAPSED_BY_DEFAULT: ReadonlySet<IssueStatus> = new Set(["backlog", "done", "cancelled"]);
+export const COLLAPSED_BY_DEFAULT: ReadonlySet<IssueDisplayStatus> = new Set(["backlog", "done", "cancelled"]);
 
 export const PRIORITY_ORDER: IssuePriority[] = ["critical", "high", "medium", "low"];
 
-/** The order of statuses in pickers: the order work moves through them. */
+/** The order of statuses in pickers: the order work moves through them. Monitoring isn't one to set. */
 export const STATUS_PICK_ORDER: IssueStatus[] = ["backlog", "todo", "in_progress", "in_review", "blocked", "done", "cancelled"];
+
+/** The statuses the filter offers: what tasks show, so Monitoring is told apart from In progress. */
+export const STATUS_FILTER_ORDER: IssueDisplayStatus[] = ["backlog", "todo", "in_progress", "monitoring", "in_review", "blocked", "done", "cancelled"];
 
 /** Done and cancelled statuses start collapsed, and so do done and cancelled cases. */
 export function startsCollapsed(group: Pick<TaskGroup, "mark">) {
@@ -137,9 +148,10 @@ function slot(key: string, label: string, mark: GroupMark, value: GroupValue, ..
 function slotsFor(task: CompactIssue, groupBy: GroupBy, names: GroupNames | undefined, order: Map<string, number>): Slot[] {
   switch (groupBy) {
     case "status": {
-      const status = task.status as IssueStatus;
+      const status = shownStatus(task);
       const label = STATUS_META[status]?.label ?? status;
-      return [slot(status, label, { kind: "status", status }, { field: "status", status }, STATUS_ORDER.indexOf(status))];
+      const value: GroupValue = status === "monitoring" ? { field: "monitoring" } : { field: "status", status };
+      return [slot(status, label, { kind: "status", status }, value, STATUS_ORDER.indexOf(status))];
     }
     case "priority": {
       const priority = task.priority as IssuePriority;
@@ -192,7 +204,7 @@ function slotsFor(task: CompactIssue, groupBy: GroupBy, names: GroupNames | unde
       if (!id) return [slot("none", "No parent task", { kind: "none" }, { field: "parent", parentId: null }, 1, 0)];
       const parent = names?.task(id);
       const label = parent ? `${parent.identifier ? `${parent.identifier} · ` : ""}${parent.title}` : "A task outside this list";
-      const mark: GroupMark = { kind: "task", status: (parent?.status as IssueStatus | undefined) ?? null };
+      const mark: GroupMark = { kind: "task", status: parent ? shownStatus(parent) : null };
       return [slot(id, label, mark, { field: "parent", parentId: id }, 0, order.get(id) ?? 0)];
     }
     // The task's cases in the cases' order, then Not in a case.
@@ -311,6 +323,7 @@ export function moveUpdate(task: CompactIssue, from: GroupValue | undefined, to:
     }
     case "project":
       return (task.projectId ?? null) === to.projectId ? null : { projectId: to.projectId };
+    case "monitoring":
     case "workspace":
     case "case":
       return null;
@@ -336,6 +349,7 @@ export function groupDefaults(value: GroupValue): Record<string, unknown> {
       return value.projectId ? { projectId: value.projectId } : {};
     case "workspace":
       return value.defaults;
+    case "monitoring":
     // Linking a task added from a case's group is a second request (TaskList's QuickAdd).
     case "case":
       return {};

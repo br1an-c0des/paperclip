@@ -147,6 +147,13 @@
 .te-status[data-tone="green"] { --tone-bg: var(--green-bg); --tone-fg: var(--green-fg); }
 .te-status[data-tone="neutral"] { --tone-bg: var(--pri-off); --tone-fg: var(--text); }
 
+/* Monitoring: its tone as a dashed outline, as its capsule is hollow (TaskDetails.css .td-status). */
+.te-status[data-hollow] {
+  background: transparent;
+  outline: 1px dashed var(--tone-fg);
+  outline-offset: -1px;
+}
+
 .te-status-main {
   padding: 0 10px;
   color: inherit;

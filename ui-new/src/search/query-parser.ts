@@ -1,4 +1,4 @@
-import type { IssuePriority, IssueStatus } from "@paperclipai/shared";
+import type { IssuePriority, IssueDisplayStatus } from "@paperclipai/shared";
 import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
 import type { FilterDimension, SearchFilters } from "./filters";
 
@@ -30,8 +30,8 @@ export type ParsedQuery = {
   dimensions: FilterDimension[];
 };
 
-const OPEN: IssueStatus[] = ["backlog", "todo", "in_progress", "in_review", "blocked"];
-const CLOSED: IssueStatus[] = ["done", "cancelled"];
+const OPEN: IssueDisplayStatus[] = ["backlog", "todo", "in_progress", "monitoring", "in_review", "blocked"];
+const CLOSED: IssueDisplayStatus[] = ["done", "cancelled"];
 
 /** Splits on whitespace, keeping `"quoted phrases"` and `key:"quoted values"` whole. */
 export function tokenize(input: string): string[] {
@@ -86,7 +86,7 @@ function resolveToken(token: string, context: ParserContext): Resolved | null {
   if (!value) return null;
   switch (key) {
     case "status":
-      return Object.hasOwn(STATUS_META, lower) ? { dimension: "status", filters: { status: [lower as IssueStatus] } } : null;
+      return Object.hasOwn(STATUS_META, lower) ? { dimension: "status", filters: { status: [lower as IssueDisplayStatus] } } : null;
     case "is":
       if (lower === "open") return { dimension: "status", filters: { status: OPEN } };
       if (lower === "closed") return { dimension: "status", filters: { status: CLOSED } };

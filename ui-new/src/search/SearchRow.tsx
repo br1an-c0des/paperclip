@@ -1,11 +1,11 @@
-import type { Agent, CompanySearchResult, IssueStatus } from "@paperclipai/shared";
+import type { Agent, CompanySearchResult, IssueDisplayStatus } from "@paperclipai/shared";
 import { FileText, FolderKanban, MessageSquare, Paperclip } from "lucide-solid";
 import { For, Match, Show, Switch } from "solid-js";
 import { updatedLabel } from "@/tasks/list-model";
 import type { TaskPeople } from "@/tasks/people";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { StatusCapsule } from "@/ui/Status";
-import { STATUS_META } from "@/ui/status-meta";
+import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { chatWhere, documentTitle, rowSnippet, snippetLabel, titleSegments, highlightSegments, type ResultKind, type Segment } from "./results-model";
 
 /*
@@ -20,28 +20,23 @@ import { chatWhere, documentTitle, rowSnippet, snippetLabel, titleSegments, high
  * chat with Bob" where the task's project would be, no task ID or status, and a link to the chat.
  */
 
-const STATUS_TONE: Partial<Record<IssueStatus, string>> = {
-  in_progress: "run",
-  in_review: "violet",
-  todo: "amber",
-  blocked: "red",
-  done: "green",
-};
-
 export function Marked(props: { segments: Segment[] }) {
   return (
     <For each={props.segments}>{(segment) => (segment.hit ? <mark class="sx-mark">{segment.text}</mark> : segment.text)}</For>
   );
 }
 
-function StatusChip(props: { status: IssueStatus }) {
-  const tone = () => STATUS_TONE[props.status];
+/** The status a result shows, in its tone; Monitoring as a dashed outline, as its capsule is hollow. */
+function StatusChip(props: { status: IssueDisplayStatus }) {
+  const meta = () => STATUS_META[props.status] ?? STATUS_META.backlog;
+  const tone = () => (meta().tone === "neutral" ? null : meta().tone);
   return (
     <span
       class="sx-chip"
-      style={tone() ? { background: `var(--${tone()}-bg)`, color: `var(--${tone()}-fg)` } : undefined}
+      classList={{ "sx-chip--hollow": meta().hollow }}
+      style={tone() ? { background: meta().hollow ? "transparent" : `var(--${tone()}-bg)`, color: `var(--${tone()}-fg)` } : undefined}
     >
-      {STATUS_META[props.status].label}
+      {meta().label}
     </span>
   );
 }
@@ -130,7 +125,7 @@ export function SearchRow(props: {
         <Switch fallback={<IconTile kind={props.kind} />}>
           <Match when={props.kind === "task" && props.chatAgent}>{(found) => <AgentAvatar agent={found()} size={32} />}</Match>
           <Match when={props.kind === "task" && issue()}>
-            {(found) => <StatusCapsule status={found().status} size="pill" live={live()} />}
+            {(found) => <StatusCapsule status={shownStatus(found())} size="pill" live={live()} />}
           </Match>
           <Match when={props.kind === "file" && props.result.previewImageUrl}>
             {(src) => <img class="sx-thumb" src={src()} alt="" loading="lazy" decoding="async" />}
@@ -149,7 +144,7 @@ export function SearchRow(props: {
           <span class="sx-title">
             <Marked segments={title()} />
           </span>
-          <Show when={!props.chatAgent && props.kind === "task" && issue()}>{(found) => <StatusChip status={found().status} />}</Show>
+          <Show when={!props.chatAgent && props.kind === "task" && issue()}>{(found) => <StatusChip status={shownStatus(found())} />}</Show>
         </span>
         <Show when={snippet()}>
           {(found) => (

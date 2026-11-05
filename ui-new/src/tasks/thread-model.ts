@@ -1,4 +1,4 @@
-import type { ActivityEvent, IssueComment } from "@paperclipai/shared";
+import type { ActivityEvent, CompactIssue, IssueComment, IssueThreadInteraction } from "@paperclipai/shared";
 import type { RunForIssue } from "@/api/issues";
 import type { Request } from "@/requests/request-model";
 import { activityLine, type ActivityLine, type ActivityNames } from "./activity-format";
@@ -12,6 +12,11 @@ import { activityLine, type ActivityLine, type ActivityNames } from "./activity-
  * questions, suggested tasks, approvals) sit in time order like comments; settled ones from before
  * the oldest loaded comment wait with it, open ones always show. Comments still waiting in the
  * queue are left out, since the queue shows them.
+ *
+ * Tasks an agent made while working on this one (its subtasks, and follow-ups made from it) show as
+ * a card at the time they were made, as the old feed has since the 2026-11-01 sync (upstream
+ * #18320), with their title and status as they are now. Tasks a request card already shows (an
+ * accepted suggestion's) aren't shown twice.
  */
 
 export type ThreadFilter = "all" | "comments" | "changes";
@@ -22,8 +27,12 @@ export type ThreadFilter = "all" | "comments" | "changes";
  */
 export type ThreadLine = ActivityLine & { key: string; at: Date; tone?: "red" | "green"; count?: number; runId?: string };
 
+/** A task an agent made from this one; `subtask` when it's this task's child. */
+export type CreatedTask = Pick<CompactIssue, "id" | "identifier" | "title" | "status" | "displayStatus" | "projectId"> & { subtask: boolean };
+
 export type ThreadItem =
   | { kind: "lines"; key: string; lines: ThreadLine[] }
+  | { kind: "task"; key: string; at: Date; task: CreatedTask }
   | { kind: "comment"; key: string; at: Date; comment: IssueComment }
   | { kind: "request"; key: string; at: Date; request: Request };
 
@@ -60,11 +69,47 @@ export function duration(start: string | Date | null | undefined, end: string | 
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
+type MadeTask = Pick<
+  CompactIssue,
+  "id" | "companyId" | "identifier" | "title" | "status" | "displayStatus" | "projectId" | "parentId" | "createdByAgentId" | "createdAt"
+>;
+
+/** The tasks an accepted suggestion made, which its request card lists. */
+export function suggestedTaskIds(interactions: readonly IssueThreadInteraction[]): Set<string> {
+  const ids = new Set<string>();
+  for (const interaction of interactions) {
+    if (interaction.kind !== "suggest_tasks" || interaction.status !== "accepted") continue;
+    for (const task of interaction.result?.createdTasks ?? []) ids.add(task.issueId);
+  }
+  return ids;
+}
+
+/**
+ * The tasks to show as made in this task's thread, from its subtasks and the tasks made from it
+ * (the server checks the reader may see each): only those an agent made, in this company, each once,
+ * leaving out the task itself and any in `shown`.
+ */
+export function createdTasks(
+  tasks: readonly MadeTask[],
+  context: { taskId: string; companyId: string; shown?: ReadonlySet<string> },
+): { at: Date; task: CreatedTask }[] {
+  const seen = new Set(context.shown ?? []);
+  return tasks.flatMap((task) => {
+    if (!task.createdByAgentId || task.id === context.taskId || task.companyId !== context.companyId || seen.has(task.id)) return [];
+    seen.add(task.id);
+    const { id, identifier, title, status, displayStatus, projectId } = task;
+    const subtask = task.parentId === context.taskId;
+    return [{ at: new Date(task.createdAt), task: { id, identifier, title, status, displayStatus, projectId, subtask } }];
+  });
+}
+
 export function buildThread(input: {
   comments: readonly IssueComment[];
   events: readonly ActivityEvent[];
   runs: readonly RunForIssue[];
   requests?: readonly Request[];
+  /** Tasks agents made from this one (`createdTasks`). */
+  tasks?: readonly { at: Date; task: CreatedTask }[];
   /** Comments to leave out, such as those still queued for the agent's next turn. */
   hiddenCommentIds?: ReadonlySet<string>;
   names: ActivityNames & { agent: (id: string) => string | undefined };
@@ -80,7 +125,7 @@ export function buildThread(input: {
     ? Math.min(...input.comments.map((comment) => new Date(comment.createdAt).getTime()))
     : -Infinity;
 
-  type Entry = { at: Date; line?: ThreadLine; comment?: IssueComment; request?: Request };
+  type Entry = { at: Date; line?: ThreadLine; comment?: IssueComment; request?: Request; task?: CreatedTask };
   const entries: Entry[] = [];
   if (filter !== "changes") {
     for (const comment of input.comments) {
@@ -103,6 +148,11 @@ export function buildThread(input: {
       if (!line || (words.length > 0 && !matches(`${line.actor} ${line.text}`))) continue;
       entries.push({ at, line: { ...line, key: `event:${event.id}`, at } });
     }
+    for (const made of input.tasks ?? []) {
+      if (made.at.getTime() < oldest) continue;
+      if (words.length > 0 && !matches(`${made.task.identifier ?? ""} ${made.task.title}`)) continue;
+      entries.push({ at: made.at, task: made.task });
+    }
     for (const run of input.runs) {
       if (ACTIVE_RUN.has(run.status)) continue;
       const at = new Date(run.finishedAt ?? run.startedAt ?? run.createdAt);
@@ -118,6 +168,10 @@ export function buildThread(input: {
   for (const entry of entries) {
     if (entry.request) {
       items.push({ kind: "request", key: entry.request.key, at: entry.at, request: entry.request });
+      continue;
+    }
+    if (entry.task) {
+      items.push({ kind: "task", key: `task:${entry.task.id}`, at: entry.at, task: entry.task });
       continue;
     }
     if (entry.comment) {

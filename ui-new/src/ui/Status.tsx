@@ -1,4 +1,4 @@
-import type { IssuePriority, IssueStatus } from "@paperclipai/shared";
+import type { IssueDisplayStatus, IssuePriority } from "@paperclipai/shared";
 import { Show, type JSX, type ParentProps } from "solid-js";
 import { Grain } from "./Grain";
 import { gradientVar, PRIORITY_META, STATUS_META, type Gradient } from "./status-meta";
@@ -14,11 +14,12 @@ import "./Status.css";
  * headers, `tiny` 5×12 inside tone pills. */
 export type CapsuleSize = "tiny" | "row" | "pill" | "group";
 
-export function Capsule(props: { gradient: Gradient; size?: CapsuleSize; live?: boolean; grain?: boolean }) {
+/** A gradient capsule. `hollow` draws only its outline, for a status that waits on a schedule (Monitoring). */
+export function Capsule(props: { gradient: Gradient; size?: CapsuleSize; live?: boolean; grain?: boolean; hollow?: boolean }) {
   return (
     <span
       class={`capsule capsule--${props.size ?? "pill"}`}
-      classList={{ live: props.live, grained: props.grain }}
+      classList={{ live: props.live, grained: props.grain, hollow: props.hollow }}
       style={{ background: gradientVar(props.gradient) }}
       aria-hidden="true"
     >
@@ -29,12 +30,14 @@ export function Capsule(props: { gradient: Gradient; size?: CapsuleSize; live?: 
   );
 }
 
-export function StatusCapsule(props: { status: IssueStatus; size?: CapsuleSize; live?: boolean }) {
-  return <Capsule gradient={STATUS_META[props.status].gradient} size={props.size} live={props.live} />;
+/** A status's capsule. Pass what the task shows (`shownStatus`), so Monitoring draws as Monitoring. */
+export function StatusCapsule(props: { status: IssueDisplayStatus; size?: CapsuleSize; live?: boolean; grain?: boolean }) {
+  const meta = () => STATUS_META[props.status] ?? STATUS_META.backlog;
+  return <Capsule gradient={meta().gradient} hollow={meta().hollow} size={props.size} live={props.live} grain={props.grain} />;
 }
 
 /** Capsule, label and muted count on --ground (board 1's status filters, board 8's counts). */
-export function StatusPill(props: { status: IssueStatus; count?: number; label?: string }) {
+export function StatusPill(props: { status: IssueDisplayStatus; count?: number; label?: string }) {
   return (
     <span class="status-pill">
       <StatusCapsule status={props.status} />

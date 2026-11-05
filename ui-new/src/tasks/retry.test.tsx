@@ -19,11 +19,27 @@ function interruption(extra: Partial<TaskInterruptionPresentation>): TaskInterru
 
 describe("retryOffer", () => {
   it("offers Retry on an attempt the system couldn't finish", () => {
-    expect(retryOffer({ interruption: interruption({}) })).toEqual({ state: "failed", canRetry: true });
+    expect(retryOffer({ interruption: interruption({}) })).toEqual({ state: "failed", canRetry: true, reason: null });
     expect(retryOffer({ interruption: interruption({ state: "retry_scheduled", canRetry: false }) })).toEqual({
       state: "retry_scheduled",
       canRetry: false,
+      reason: null,
     });
+  });
+
+  it("says what stopped it: a provider's refusal or folders that couldn't be prepared", () => {
+    const providerFailure = {
+      schema: "paperclip.provider-failure.v1",
+      provider: "anthropic",
+      phase: "turn",
+      category: "rate_limit",
+      message: "Too many requests",
+      retryability: "transient",
+    } as const;
+    expect(retryOffer({ interruption: interruption({ providerFailure }) })?.reason).toBe("Claude: Rate limit reached");
+    expect(retryOffer({ interruption: interruption({ workspaceFailure: { message: "Disk full" } }) })?.reason).toBe(
+      "Couldn't prepare the task folders: Disk full",
+    );
   });
 
   it("leaves out tasks with no interruption, one waiting on you, or one already moving", () => {

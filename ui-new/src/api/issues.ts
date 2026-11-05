@@ -32,13 +32,18 @@ import { api } from "./client";
  * (`?view=comment-inputs`). The full history is read when the reader asks for it.
  */
 
-export type IssueSearch = { q?: string; limit?: number; status?: string };
+/**
+ * `status` filters by the stored status; `displayStatus` by what tasks show, which tells Monitoring
+ * (an in-progress task waiting on its monitor) apart from In progress. Both take a comma list.
+ */
+export type IssueSearch = { q?: string; limit?: number; status?: string; displayStatus?: string };
 
 function searchParams(filters: IssueSearch) {
   const params = new URLSearchParams();
   if (filters.q) params.set("q", filters.q);
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.status) params.set("status", filters.status);
+  if (filters.displayStatus) params.set("displayStatus", filters.displayStatus);
   return params.toString();
 }
 
@@ -51,14 +56,26 @@ export type IssueListFilters = {
   includeRoutineExecutions?: boolean;
   /** Only the tasks this agent took part in, as agent pages link to them (`?participantAgentId=`). */
   participantAgentId?: string;
+  /** Tasks made from this one that aren't its subtasks, such as an agent's follow-ups (`?createdFromIssueId=`). */
+  createdFromIssueId?: string;
+  /** What tasks show, comma separated: tells Monitoring apart from In progress (`?displayStatus=`). */
+  displayStatus?: string;
+  /**
+   * The server's order, most recently updated first unless asked: `created` since the 2026-11-03
+   * sync. Paging in an order that doesn't move (created) keeps pages from shifting while they load.
+   */
+  sortField?: "updated" | "created";
+  sortDir?: "asc" | "desc";
   limit?: number;
   offset?: number;
 };
 
 function listParams(filters: IssueListFilters) {
-  const params = new URLSearchParams({ view: "compact", sortField: "updated", sortDir: "desc" });
+  const params = new URLSearchParams({ view: "compact", sortField: filters.sortField ?? "updated", sortDir: filters.sortDir ?? "desc" });
   if (filters.projectId) params.set("projectId", filters.projectId);
   if (filters.parentId) params.set("parentId", filters.parentId);
+  if (filters.createdFromIssueId) params.set("createdFromIssueId", filters.createdFromIssueId);
+  if (filters.displayStatus) params.set("displayStatus", filters.displayStatus);
   if (filters.participantAgentId) params.set("participantAgentId", filters.participantAgentId);
   if (filters.includeBlockedBy) params.set("includeBlockedBy", "true");
   if (filters.includeRoutineExecutions) params.set("includeRoutineExecutions", "true");
@@ -70,18 +87,43 @@ function listParams(filters: IssueListFilters) {
 /** A page of the compact list. Pages past this size are fetched on demand. */
 export const ISSUE_LIST_PAGE_SIZE = 500;
 
+function listPage(companyId: string, filters: IssueListFilters, signal?: AbortSignal) {
+  return api.get<CompactIssue[]>(`/companies/${companyId}/issues?${listParams(filters)}`, { signal });
+}
+
+async function allPages(companyId: string, filters: Omit<IssueListFilters, "limit" | "offset">, signal?: AbortSignal) {
+  const tasks: CompactIssue[] = [];
+  for (let offset = 0; ; offset += ISSUE_LIST_PAGE_SIZE) {
+    const page = await listPage(companyId, { ...filters, limit: ISSUE_LIST_PAGE_SIZE, offset }, signal);
+    tasks.push(...page);
+    if (page.length < ISSUE_LIST_PAGE_SIZE) return tasks;
+  }
+}
+
+/**
+ * The compact list leaves out `displayStatus` (the server's `toCompactIssue` doesn't copy it, though
+ * `CompactIssue` has it), so Monitoring would never show in task lists. Until it does, the
+ * in-progress tasks of a list that lacks it are checked against the same list filtered to
+ * `displayStatus=monitoring`, which the server answers, and marked. Lists with no task in progress,
+ * or rows that carry the field, need no second request.
+ */
+async function withMonitoring(companyId: string, filters: IssueListFilters, tasks: CompactIssue[], signal?: AbortSignal) {
+  if (filters.displayStatus || !tasks.some((task) => task.status === "in_progress") || tasks.some((task) => "displayStatus" in task)) return tasks;
+  const { limit: _limit, offset: _offset, ...scope } = filters;
+  const monitored = new Set((await allPages(companyId, { ...scope, displayStatus: "monitoring" }, signal)).map((task) => task.id));
+  if (monitored.size === 0) return tasks;
+  return tasks.map((task) => (task.status === "in_progress" && monitored.has(task.id) ? { ...task, displayStatus: "monitoring" as const } : task));
+}
+
+/** `GET /issues/:id/runs?runIds=` takes at most this many ids. */
+export const RUN_IDS_PER_REQUEST = 100;
+
 export const issuesApi = {
-  list: (companyId: string, filters: IssueListFilters, signal?: AbortSignal) =>
-    api.get<CompactIssue[]>(`/companies/${companyId}/issues?${listParams(filters)}`, { signal }),
+  list: async (companyId: string, filters: IssueListFilters, signal?: AbortSignal) =>
+    withMonitoring(companyId, filters, await listPage(companyId, filters, signal), signal),
   /** Every page of a list, for views that group the whole set. */
-  listAll: async (companyId: string, filters: Omit<IssueListFilters, "limit" | "offset">, signal?: AbortSignal) => {
-    const tasks: CompactIssue[] = [];
-    for (let offset = 0; ; offset += ISSUE_LIST_PAGE_SIZE) {
-      const page = await issuesApi.list(companyId, { ...filters, limit: ISSUE_LIST_PAGE_SIZE, offset }, signal);
-      tasks.push(...page);
-      if (page.length < ISSUE_LIST_PAGE_SIZE) return tasks;
-    }
-  },
+  listAll: async (companyId: string, filters: Omit<IssueListFilters, "limit" | "offset">, signal?: AbortSignal) =>
+    withMonitoring(companyId, filters, await allPages(companyId, filters, signal), signal),
   /** One task by id or identifier (`TRA-41`), with its project, goal, relations and documents. */
   get: (ref: string, signal?: AbortSignal) => api.get<Issue>(`/issues/${encodeURIComponent(ref)}`, { signal }),
   /**
@@ -150,6 +192,19 @@ export const issuesApi = {
     return (await Promise.all(batches)).flat();
   },
   runs: (id: string, signal?: AbortSignal) => api.get<RunForIssue[]>(`/issues/${id}/runs`, { signal }),
+  /**
+   * Some of a task's runs by id (`?runIds=`, since the 2026-11-01 sync), in one request per 100,
+   * instead of the whole list. Runs that aren't the task's are left out.
+   */
+  runsByIds: async (id: string, runIds: readonly string[], signal?: AbortSignal) => {
+    const ids = [...new Set(runIds)];
+    const batches: Promise<RunForIssue[]>[] = [];
+    for (let start = 0; start < ids.length; start += RUN_IDS_PER_REQUEST) {
+      const params = new URLSearchParams({ runIds: ids.slice(start, start + RUN_IDS_PER_REQUEST).join(",") });
+      batches.push(api.get<RunForIssue[]>(`/issues/${id}/runs?${params}`, { signal }));
+    }
+    return (await Promise.all(batches)).flat();
+  },
   /** The latest 2 runs, newest first. */
   recentRuns: (id: string, signal?: AbortSignal) => api.get<RunForIssue[]>(`/issues/${id}/runs?view=recent`, { signal }),
   costSummary: (id: string, signal?: AbortSignal) => api.get<IssueCostSummary>(`/issues/${id}/cost-summary`, { signal }),

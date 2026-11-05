@@ -24,6 +24,19 @@
   height: 20px;
 }
 
+/* Only the gradient's outline: the content box is masked out, so it shows on any background. */
+.capsule.hollow {
+  box-sizing: border-box;
+  padding: 1.5px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+.capsule--group.hollow {
+  padding: 2px;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
