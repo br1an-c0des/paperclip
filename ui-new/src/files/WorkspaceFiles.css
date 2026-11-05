@@ -60,6 +60,13 @@
   padding: 10px 12px;
 }
 
+/* "Live workspace" or "Saved copy from …" (`workspace.source`). */
+.wf-source-note {
+  margin: 8px 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .wf-list {
   flex: 1;
   min-height: 0;
