@@ -333,6 +333,8 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
   const retry = useTaskRetry();
   /** A task's interruption, from its Updates row or the failure context; for Retry. */
   const interruptionFor = (taskId: string) => interruptionOf(taskId, tasks.data, mineContext.data);
+  /** A task's display status (Monitoring), from its Updates row: the attention feed's subjects don't carry one. */
+  const displayStatusFor = (taskId: string) => tasks.data?.find((task) => task.id === taskId)?.displayStatus ?? null;
 
   // Cleared: the archived tasks, as the task list with them less the one without them.
   const tasksUnarchived = createQuery(() => ({
@@ -430,6 +432,7 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
     retrySources,
     retry,
     interruptionFor,
+    displayStatusFor,
     unread: () => unreadCount(rows()),
     tasksWithArchived,
     archived,

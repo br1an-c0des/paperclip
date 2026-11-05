@@ -16,7 +16,7 @@ import { Markdown } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { Capsule, StatusCapsule, TonePill } from "@/ui/Status";
-import { STATUS_META } from "@/ui/status-meta";
+import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { CardSettings } from "./CardSettings";
 import { useDryRunQuery, useRevisionsQuery, useUpdatesQuery } from "./queries";
 import {
@@ -491,7 +491,7 @@ function TaskRows(props: { tasks: CompanySearchIssueSummary[]; onOpenTask: (task
         {(task) => (
           <li>
             <button type="button" class="sc-task" onClick={() => props.onOpenTask({ id: task.id, identifier: task.identifier, title: task.title })}>
-              <StatusCapsule status={task.status} size="row" />
+              <StatusCapsule status={shownStatus(task)} size="row" />
               <span class="mono cap">{task.identifier ?? task.id.slice(0, 8)}</span>
               <span class="sc-task-title">{task.title}</span>
               <span class="cap">{updatedLabel(task.updatedAt)}</span>

@@ -8,7 +8,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { Capsule, TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
-import { interruptionReason } from "./provider-failure";
+import { providerFailureOf, providerFailureTitle } from "@/ui/provider-failure";
 import "./retry.css";
 
 /*
@@ -28,6 +28,17 @@ import "./retry.css";
  */
 
 export type RetryOffer = { state: "failed" | "retry_scheduled"; canRetry: boolean; reason: string | null };
+
+/**
+ * What stopped an interrupted task, in a line for a row's tooltip: the provider's refusal, or the
+ * task's folders that couldn't be prepared (`workspaceFailure`, upstream #18770). Null for neither.
+ */
+export function interruptionReason(interruption: { providerFailure?: unknown; workspaceFailure?: { message: string } | null } | null | undefined) {
+  const failure = providerFailureOf(interruption?.providerFailure);
+  if (failure) return providerFailureTitle(failure);
+  const workspace = interruption?.workspaceFailure?.message;
+  return workspace ? `Couldn't prepare the task folders: ${workspace}` : null;
+}
 
 /** What a row shows for the task's interruption, or null for none worth showing. */
 export function retryOffer(task: Pick<CompactIssue, "interruption">): RetryOffer | null {

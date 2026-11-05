@@ -1,4 +1,4 @@
-import type { AttentionItem, AttentionSubject, IssueStatus } from "@paperclipai/shared";
+import type { AttentionItem, AttentionSubject, IssueDisplayStatus } from "@paperclipai/shared";
 import { AlarmClock, Archive, CircleAlert, Clock, CornerDownRight, Ellipsis, RotateCcw, Sparkles, X } from "lucide-solid";
 import { For, Match, Show, Switch, type JSX } from "solid-js";
 import { useCompany } from "@/lib/company";
@@ -9,7 +9,7 @@ import { RetryMark } from "@/tasks/retry";
 import { Button, buttonClass } from "@/ui/Button";
 import { Menu } from "@/ui/Menu";
 import { StatusCapsule } from "@/ui/Status";
-import { STATUS_META } from "@/ui/status-meta";
+import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { DEFAULT_SNOOZE, SNOOZE_PRESETS, snoozedUntil, snoozeLabel, type Pending } from "./inbox-model";
 import { itemTask, type Inbox } from "./use-inbox";
 
@@ -49,11 +49,15 @@ export function itemTitle(item: AttentionItem) {
   return item.subject.title ?? itemTask(item)?.title ?? sourceLabel(item);
 }
 
-function isStatus(value: string | null): value is IssueStatus {
-  return value !== null && value in STATUS_META;
+/** The status a feed subject shows: Monitoring when its Updates row says so, else its own, or null for none known. */
+function subjectStatus(status: string | null, displayStatus: IssueDisplayStatus | null): IssueDisplayStatus | null {
+  if (status === null || !Object.hasOwn(STATUS_META, status)) return null;
+  return shownStatus({ status, displayStatus });
 }
 
-export function TaskLink(props: { task: AttentionSubject; people: TaskPeople; onOpen: () => void }) {
+/** `displayStatus` is the task's display status from the inbox's own rows, which the feed's subject lacks. */
+export function TaskLink(props: { task: AttentionSubject; displayStatus?: IssueDisplayStatus | null; people: TaskPeople; onOpen: () => void }) {
+  const status = () => subjectStatus(props.task.status, props.displayStatus ?? null);
   const meta = () => props.task.metadata ?? {};
   const assignee = () => {
     const agentId = typeof meta().assigneeAgentId === "string" ? (meta().assigneeAgentId as string) : null;
@@ -64,7 +68,7 @@ export function TaskLink(props: { task: AttentionSubject; people: TaskPeople; on
   };
   return (
     <button type="button" class="ibx-rel" onClick={() => props.onOpen()}>
-      <Show when={isStatus(props.task.status) && (props.task.status as IssueStatus)} fallback={<span class="ibx-rel-glyph" aria-hidden="true" />}>
+      <Show when={status()} fallback={<span class="ibx-rel-glyph" aria-hidden="true" />}>
         {(status) => <StatusCapsule status={status()} size="row" />}
       </Show>
       <span class="ibx-rel-main">
@@ -75,7 +79,7 @@ export function TaskLink(props: { task: AttentionSubject; people: TaskPeople; on
           <span class="ibx-rel-title">{props.task.title}</span>
         </span>
         <span class="ibx-rel-meta">
-          <Show when={isStatus(props.task.status) && (props.task.status as IssueStatus)}>{(status) => <span>{STATUS_META[status()].label}</span>}</Show>
+          <Show when={status()}>{(found) => <span>{STATUS_META[found()].label}</span>}</Show>
           <Show when={assignee()}>{(name) => <span>{name()}</span>}</Show>
         </span>
       </span>
@@ -124,7 +128,9 @@ function Context(props: { item: AttentionItem; inbox: Inbox; people: TaskPeople;
   return (
     <>
       <h4 class="ibx-ctx-h">{task()?.identifier ? `About ${task()!.identifier}` : "Why it's here"}</h4>
-      <Show when={task()}>{(found) => <TaskLink task={found()} people={props.people} onOpen={props.onOpen} />}</Show>
+      <Show when={task()}>
+        {(found) => <TaskLink task={found()} displayStatus={props.inbox.displayStatusFor(found().id)} people={props.people} onOpen={props.onOpen} />}
+      </Show>
       <Show when={props.showWhy || !task()}>
         <p class="ibx-why">{props.item.whyNow}</p>
       </Show>

@@ -1,4 +1,4 @@
-import type { Approval } from "@paperclipai/shared";
+import type { Approval, IssueDisplayStatus } from "@paperclipai/shared";
 import { A, Navigate, useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ChevronRight, CircleCheck, Trash2, Undo2, Wallet } from "lucide-solid";
@@ -14,7 +14,7 @@ import { stampLabel } from "@/tasks/thread-model";
 import { Button, buttonClass } from "@/ui/Button";
 import { PageHeader } from "@/ui/PageHeader";
 import { Capsule, StatusCapsule } from "@/ui/Status";
-import { STATUS_META } from "@/ui/status-meta";
+import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
 import { afterApproval, approvalFollowUps, approvalStatus, hiredAgentId } from "./approval-model";
 import "./Approvals.css";
@@ -251,7 +251,7 @@ function RawRequest(props: { approval: Approval }) {
   );
 }
 
-function LinkedTasks(props: { approval: Approval; tasks: { id: string; identifier: string | null; title: string; status: string }[] | undefined; loading: boolean }) {
+function LinkedTasks(props: { approval: Approval; tasks: { id: string; identifier: string | null; title: string; status: string; displayStatus?: IssueDisplayStatus | null }[] | undefined; loading: boolean }) {
   const company = useCompany();
   return (
     <section class="card apv-tasks" aria-labelledby="apv-tasks-h">
@@ -266,7 +266,7 @@ function LinkedTasks(props: { approval: Approval; tasks: { id: string; identifie
                 <li>
                   <A class="apv-task" href={`/${company().issuePrefix}/issues/${encodeURIComponent(task.identifier ?? task.id)}`}>
                     <Show when={task.status in STATUS_META} fallback={<Capsule gradient="ash" size="row" />}>
-                      <StatusCapsule status={task.status as keyof typeof STATUS_META} size="row" />
+                      <StatusCapsule status={shownStatus(task)} size="row" />
                     </Show>
                     <span class="mono muted">{task.identifier ?? task.id.slice(0, 8)}</span>
                     <span class="apv-task-title">{task.title}</span>

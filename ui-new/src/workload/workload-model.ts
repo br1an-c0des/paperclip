@@ -3,7 +3,7 @@ import type { LiveRun } from "@/api/heartbeats";
 import type { WorkloadRun } from "@/api/workload";
 import { isAgentBlocked } from "@/lib/agent-state";
 import { discGradient } from "@/ui/Avatar";
-import { STATUS_META, gradientVar } from "@/ui/status-meta";
+import { gradientVar, shownStatus, STATUS_META } from "@/ui/status-meta";
 
 /*
  * Agent workload (boards 31–33), worked out from runs, live runs and assignments; there's no
@@ -28,7 +28,7 @@ const DAY = 24 * HOUR;
 
 export type WorkloadTask = Pick<
   CompactIssue,
-  "id" | "identifier" | "title" | "status" | "priority" | "projectId" | "assigneeAgentId" | "assigneeUserId" | "updatedAt" | "createdAt" | "blockedBy"
+  "id" | "identifier" | "title" | "status" | "displayStatus" | "priority" | "projectId" | "assigneeAgentId" | "assigneeUserId" | "updatedAt" | "createdAt" | "blockedBy"
 >;
 
 export type WorkloadAgent = Pick<Agent, "id" | "name" | "role" | "status"> &
@@ -302,7 +302,7 @@ export type ChainNode = {
 
 export type Chain = { key: string; nodes: ChainNode[]; summary: string; involvesYou: boolean };
 
-type Holder = Pick<WorkloadTask, "id" | "identifier" | "title" | "status" | "assigneeAgentId" | "assigneeUserId">;
+type Holder = Pick<WorkloadTask, "id" | "identifier" | "title" | "status" | "displayStatus" | "assigneeAgentId" | "assigneeUserId">;
 
 function holderNode(task: Holder, note: string, youId: string | null, held = false): ChainNode {
   const base = { label: task.identifier ?? task.title, mono: !!task.identifier, note, taskId: task.id, held };
@@ -311,9 +311,9 @@ function holderNode(task: Holder, note: string, youId: string | null, held = fal
   return { ...base, kind: "nobody", agentId: null, userId: null };
 }
 
-function statusNote(task: Pick<Holder, "id" | "status">, running: ReadonlySet<string>) {
+function statusNote(task: Pick<Holder, "id" | "status" | "displayStatus">, running: ReadonlySet<string>) {
   if (running.has(task.id)) return "running";
-  return STATUS_META[task.status]?.label.toLowerCase() ?? task.status;
+  return STATUS_META[shownStatus(task)].label.toLowerCase();
 }
 
 /**
@@ -394,7 +394,8 @@ export function openWork(input: WorkloadInput, agentIds: readonly string[]): { r
   const projects = new Map((input.projects ?? []).map((project) => [project.id, project] as const));
   const segmentOf = (task: WorkloadTask): Omit<OpenWorkSegment, "count"> => {
     if (input.scope.kind === "project") {
-      return { key: task.status, label: STATUS_META[task.status].label, gradient: gradientVar(STATUS_META[task.status].gradient) };
+      const status = shownStatus(task);
+      return { key: status, label: STATUS_META[status].label, gradient: gradientVar(STATUS_META[status].gradient) };
     }
     const project = task.projectId ? projects.get(task.projectId) : undefined;
     return { key: task.projectId ?? "none", label: project?.name ?? "No project", gradient: projectGradient(project) };

@@ -1,4 +1,4 @@
-import type { CompactIssue, IssueComment, IssueDocumentSummary, IssueStatus } from "@paperclipai/shared";
+import type { CompactIssue, IssueComment, IssueDisplayStatus, IssueDocumentSummary, IssueStatus } from "@paperclipai/shared";
 import type { Request } from "@/requests/request-model";
 import { dayLabel } from "@/runs/run-model";
 
@@ -31,7 +31,7 @@ import { dayLabel } from "@/runs/run-model";
 /** Messages from one author this close together share a header. */
 export const GROUP_GAP_MS = 5 * 60_000;
 
-export type ChatTask = Pick<CompactIssue, "id" | "identifier" | "title" | "status" | "projectId" | "assigneeAgentId" | "originRunId"> & {
+export type ChatTask = Pick<CompactIssue, "id" | "identifier" | "title" | "status" | "displayStatus" | "projectId" | "assigneeAgentId" | "originRunId"> & {
   createdAt: string | Date;
   completedAt?: string | Date | null;
   updatedAt?: string | Date;
@@ -295,7 +295,7 @@ export function shownReplies(turns: readonly ReplyTurn[], comments: readonly Pic
 export const OPEN_TASK_STATUSES: ReadonlySet<IssueStatus> = new Set(["backlog", "todo", "in_progress", "in_review", "blocked"]);
 
 /** "IN PROGRESS", as board 12's task card writes the status. */
-export function statusTag(status: IssueStatus) {
+export function statusTag(status: IssueDisplayStatus) {
   return status.replace(/_/g, " ").toUpperCase();
 }
 
@@ -364,10 +364,14 @@ export function documentHash(key: string) {
   return `${DOCUMENT_HASH}${encodeURIComponent(key)}`;
 }
 
-/** The document a fragment opens (`#document-plan` gives `plan`), or null. */
+/**
+ * The document a fragment opens (`#document-plan` gives `plan`), or null. Anything from `&` on is
+ * left out, as `parseTaskAnchor` (tasks/task-anchor.ts) does: task links can add the image to open,
+ * as `#document-plan&image=2`.
+ */
 export function documentKeyFromHash(hash: string | null | undefined): string | null {
   if (!hash?.startsWith(DOCUMENT_HASH)) return null;
-  const raw = hash.slice(DOCUMENT_HASH.length);
+  const raw = hash.slice(DOCUMENT_HASH.length).split("&")[0]!;
   if (!raw) return null;
   try {
     return decodeURIComponent(raw);

@@ -1,4 +1,4 @@
-import type { Agent, IssueStatus, Project } from "@paperclipai/shared";
+import type { Agent, Project } from "@paperclipai/shared";
 import { A, useLocation, useNavigate } from "@solidjs/router";
 import {
   ArrowDown,
@@ -48,6 +48,7 @@ import { buttonClass } from "@/ui/Button";
 import { Grain } from "@/ui/Grain";
 import { Menu } from "@/ui/Menu";
 import { StatusCapsule } from "@/ui/Status";
+import { shownStatus } from "@/ui/status-meta";
 import { navSection, setNavHidden, useCompanyOrder, useProjectOrder, useProjectStars, useRecentTasks } from "./nav-prefs";
 import { showStatusLink, visibleProjects } from "./nav-model";
 import { openChatAgentKey } from "@/chat/chat-model";
@@ -388,7 +389,7 @@ export function Nav() {
           <For each={recent()}>
             {(task) => (
               <A class="navi navi--task" href={`${base()}/issues/${encodeURIComponent(task.identifier ?? task.id)}`} title={task.title}>
-                <StatusCapsule status={task.status as IssueStatus} size="row" />
+                <StatusCapsule status={shownStatus(task)} size="row" />
                 <span class="navi-label">{task.title}</span>
                 <span class="navi-note mono">{task.identifier}</span>
               </A>

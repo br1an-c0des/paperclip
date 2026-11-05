@@ -1,5 +1,6 @@
 import type { ActivityEvent, CompactIssue, Issue } from "@paperclipai/shared";
 import { api } from "./client";
+import { markMonitoring } from "./issues";
 
 /*
  * Agent chat (boards 12, 13), as ui/src/api/agentChats.ts and ui/src/pages/AgentChat.tsx use it.
@@ -37,19 +38,30 @@ export const chatApi = {
    */
   markRead: (chatId: string, throughCommentId: string) =>
     api.post<{ id: string; lastReadAt: string }>(`/issues/${encodeURIComponent(chatId)}/read`, { throughCommentId }),
-  /** Tasks the chat's runs created: the hand-offs. */
-  handoffs: (companyId: string, chatId: string, signal?: AbortSignal) =>
-    api.get<CompactIssue[]>(`/companies/${companyId}/issues?${compactList({ createdFromIssueId: chatId, limit: "100" })}`, { signal }),
+  /**
+   * Tasks the chat's runs created: the hand-offs. Like reports, marked Monitoring where the server
+   * says so (`markMonitoring` in issues.ts), as compact rows leave `displayStatus` out.
+   */
+  handoffs: async (companyId: string, chatId: string, signal?: AbortSignal) =>
+    markMonitoring(
+      companyId,
+      await api.get<CompactIssue[]>(`/companies/${companyId}/issues?${compactList({ createdFromIssueId: chatId, limit: "100" })}`, { signal }),
+      signal,
+    ),
   /** Tasks recurring tasks made for the agent, newest first: its briefings and reports. */
-  reports: (companyId: string, agentId: string, signal?: AbortSignal) =>
-    api.get<CompactIssue[]>(
-      `/companies/${companyId}/issues?${compactList({
-        assigneeAgentId: agentId,
-        originKind: "routine_execution",
-        includeRoutineExecutions: "true",
-        limit: "20",
-      })}`,
-      { signal },
+  reports: async (companyId: string, agentId: string, signal?: AbortSignal) =>
+    markMonitoring(
+      companyId,
+      await api.get<CompactIssue[]>(
+        `/companies/${companyId}/issues?${compactList({
+          assigneeAgentId: agentId,
+          originKind: "routine_execution",
+          includeRoutineExecutions: "true",
+          limit: "20",
+        })}`,
+        { signal },
+      ),
+      signal,
     ),
   /** The agent's open work that isn't started yet, for "Up next". */
   upNext: (companyId: string, agentId: string, signal?: AbortSignal) =>

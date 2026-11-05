@@ -1,6 +1,6 @@
 import type { Agent, Issue, PauseReason, Project, TaskInterruptionPresentation } from "@paperclipai/shared";
 import type { TreeControlState } from "@/api/task-actions";
-import { providerFailureOf, type ProviderFailure } from "./provider-failure";
+import { providerFailureOf, type ProviderFailure } from "@/ui/provider-failure";
 
 /*
  * The health notices at the top of an open task (`tasks/recovery`), and which fix each offers. The

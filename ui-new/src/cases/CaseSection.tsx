@@ -1,4 +1,4 @@
-import type { IssueStatus } from "@paperclipai/shared";
+import type { IssueDisplayStatus } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createInfiniteQuery, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ArrowRight, ChevronDown, CornerDownRight, FileText, Flag, Paperclip } from "lucide-solid";
@@ -11,7 +11,7 @@ import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Segmented } from "@/ui/Segmented";
 import { StatusCapsule } from "@/ui/Status";
-import { STATUS_META } from "@/ui/status-meta";
+import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
 import { useTaskPeople } from "@/tasks/people";
 import { updatedLabel } from "@/tasks/list-model";
@@ -554,13 +554,13 @@ function HandoffRow(props: { handoff: CaseHandoffView; agentDisc: AgentDisc }) {
 }
 
 function TaskRow(props: {
-  task: { id: string; identifier: string | null; title: string; status: string };
+  task: { id: string; identifier: string | null; title: string; status: string; displayStatus?: IssueDisplayStatus | null };
   role: CaseRole;
   href: string;
   onOpen: (event: MouseEvent) => void;
   agentDisc?: JSX.Element;
 }) {
-  const status = () => (STATUS_META[props.task.status as IssueStatus] ? (props.task.status as IssueStatus) : null);
+  const status = () => (Object.hasOwn(STATUS_META, props.task.status) ? shownStatus(props.task) : null);
   return (
     <div class="tcase-row">
       <Show when={status()} fallback={<span class="capsule capsule--row" style={{ background: "var(--g-ash)" }} aria-hidden="true" />}>

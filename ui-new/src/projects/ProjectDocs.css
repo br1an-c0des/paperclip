@@ -184,6 +184,14 @@
   color: var(--run-fg);
 }
 
+/* Monitoring: its tone as a dashed outline, as its capsule is hollow (as in the task panel) */
+.pdocs-status--monitoring {
+  background: transparent;
+  color: var(--run-fg);
+  outline: 1px dashed var(--run-fg);
+  outline-offset: -1px;
+}
+
 .pdocs-status--in_review {
   background: var(--violet-bg);
   color: var(--violet-fg);

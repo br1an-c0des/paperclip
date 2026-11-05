@@ -15,7 +15,7 @@ import { useTaskPeople } from "./people";
 import { pauseDetail, retryCountdown, taskNotices, WAITING_TEXT, type TaskNotice } from "./recovery";
 import { useTaskRetry } from "./retry";
 import { TreeControlDialog, useTreeControlState } from "./TaskActions";
-import { ProviderFailureNotice } from "./ProviderFailureNotice";
+import { ProviderFailureNotice } from "@/ui/ProviderFailureNotice";
 import { TaskRecovery } from "./TaskRecovery";
 import "./TaskNotices.css";
 import { TaskIntegrations } from "./integrations/TaskIntegrations";
@@ -27,7 +27,7 @@ import { TaskIntegrations } from "./integrations/TaskIntegrations";
  * (releasing its pause, with the agents woken), Resume agent for a paused assignee (and a fresh
  * wake, since the pause dropped the assignment's), and the project access notice from the
  * 2026-10-24 upstream sync, which links to the agent's project access and retries once it's added.
- * A provider's refusal shows as its own notice (ProviderFailureNotice.tsx), with Retry.
+ * A provider's refusal shows as its own notice (ui/ProviderFailureNotice.tsx), with Retry.
  */
 
 export function TaskNotices(props: { taskId: string }) {

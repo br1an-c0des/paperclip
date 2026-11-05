@@ -33,7 +33,7 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 
 export type ProjectTask = Pick<
   CompactIssue,
-  "id" | "identifier" | "title" | "status" | "priority" | "assigneeAgentId" | "assigneeUserId" | "updatedAt" | "blockedBy" | "interruption" | "reviewAttention"
+  "id" | "identifier" | "title" | "status" | "displayStatus" | "priority" | "assigneeAgentId" | "assigneeUserId" | "updatedAt" | "blockedBy" | "interruption" | "reviewAttention"
 > & { lastActivityAt?: Date | string | null };
 
 const OPEN: ReadonlySet<IssueStatus> = new Set(["backlog", "todo", "in_progress", "in_review", "blocked"]);

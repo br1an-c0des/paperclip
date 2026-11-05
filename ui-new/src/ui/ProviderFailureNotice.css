@@ -1,0 +1,58 @@
+/* A provider's refusal (ProviderFailureNotice.tsx), in the task panel's notices and the run modal */
+.pf {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--r-inner);
+  background: var(--tone-bg);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pf[data-tone="red"] { --tone-bg: var(--red-bg); --tone-fg: var(--red-fg); }
+.pf[data-tone="amber"] { --tone-bg: var(--amber-bg); --tone-fg: var(--amber-fg); }
+
+.pf-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 1px;
+  color: var(--tone-fg);
+}
+
+.pf-text {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--body);
+}
+
+.pf-text b {
+  color: var(--tone-fg);
+  font-weight: 700;
+}
+
+.pf-message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.pf-facts {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.pf-action {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.pf-action .btn {
+  background: var(--card);
+}

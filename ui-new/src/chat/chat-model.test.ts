@@ -175,6 +175,9 @@ describe("document links", () => {
     expect(documentKeyFromHash("#comment-1")).toBeNull();
     expect(documentKeyFromHash("#document-")).toBeNull();
     expect(documentKeyFromHash("")).toBeNull();
+    expect(documentKeyFromHash("#document-plan&image=2")).toBe("plan");
+    expect(documentKeyFromHash("#document-&image=2")).toBeNull();
+    expect(chatDocumentLink("/TES/issues/TES-13#document-plan&image=2", chat)).toBe("plan");
   });
 
   it("knows links to the chat's own documents", () => {

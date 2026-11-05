@@ -11,7 +11,7 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useProjectsQuery } from "@/lib/company-data";
 import { theme, toggleTheme } from "@/lib/theme";
 import { Dialog } from "@/ui/Dialog";
-import { STATUS_META } from "@/ui/status-meta";
+import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { profilePath } from "@/profile/profile-model";
 import { searchPath } from "@/search/search-url";
 import { useSession } from "@/lib/session";
@@ -155,7 +155,7 @@ export function CommandPalette() {
       commands: tasks.data.map((issue) => ({
         id: `task:${issue.id}`,
         label: issue.title,
-        hint: [issue.identifier, STATUS_META[issue.status].label].filter(Boolean).join(" · "),
+        hint: [issue.identifier, STATUS_META[shownStatus(issue)].label].filter(Boolean).join(" · "),
         run: go(issuePath(company().issuePrefix, issue)),
       })),
     };

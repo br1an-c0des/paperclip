@@ -1,4 +1,4 @@
-import type { CompactIssue, IssueStatus } from "@paperclipai/shared";
+import type { CompactIssue } from "@paperclipai/shared";
 import { Archive, ArchiveRestore, Eye, EyeOff } from "lucide-solid";
 import { For, Show } from "solid-js";
 import { updatedLabel } from "@/tasks/list-model";
@@ -6,7 +6,7 @@ import { assigneeName, type TaskPeople } from "@/tasks/people";
 import { RetryMark } from "@/tasks/retry";
 import { Button } from "@/ui/Button";
 import { StatusCapsule } from "@/ui/Status";
-import { STATUS_META } from "@/ui/status-meta";
+import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { parentOf } from "./inbox-model";
 import type { Inbox } from "./use-inbox";
 
@@ -44,7 +44,7 @@ export function TaskRows(props: {
             onPointerDown={() => props.onSelect(task.id)}
           >
             <span class="ibx-dot" aria-label={task.isUnreadForMe && !props.archived ? "Unread" : undefined} />
-            <StatusCapsule status={task.status as IssueStatus} size="row" />
+            <StatusCapsule status={shownStatus(task)} size="row" />
             <button type="button" class="ibx-task-open" onClick={() => props.onOpen(task)}>
               <span class="mono">{task.identifier}</span>
               <span class="ibx-row-title">{task.title}</span>
@@ -60,7 +60,7 @@ export function TaskRows(props: {
               <RetryMark task={task} retry={props.inbox.retry} />
             </Show>
             <span class="ibx-task-meta">
-              {STATUS_META[task.status as IssueStatus]?.label} · {assigneeName(task, props.people)}
+              {STATUS_META[shownStatus(task)].label} · {assigneeName(task, props.people)}
             </span>
             <span class="ibx-row-when">{updatedLabel(task.lastActivityAt ?? task.updatedAt)}</span>
             <span class="ibx-row-acts">

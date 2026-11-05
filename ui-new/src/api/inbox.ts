@@ -10,6 +10,7 @@ import type {
   StalledReviewDecisionResponse,
 } from "@paperclipai/shared";
 import { api } from "./client";
+import { markMonitoring } from "./issues";
 
 /*
  * The Inbox (board 14), as ui/src/api/attention.ts, inboxDismissals.ts, approvals.ts and issues.ts
@@ -79,13 +80,21 @@ export const inboxApi = {
   decideStalledReview: (issueId: string, action: StalledReviewDecisionAction, note?: string) =>
     api.post<StalledReviewDecisionResponse>(`/issues/${issueId}/stalled-review-decision`, note ? { action, note } : { action }),
 
-  /** Updates in one read: your tasks, their context, failed runs, and each source's error. */
-  mine: (companyId: string, signal?: AbortSignal) => api.get<InboxMineSnapshot>(`/companies/${companyId}/inbox/mine`, { signal }),
+  /**
+   * Updates in one read: your tasks, their context, failed runs, and each source's error. Its rows
+   * are compacted without `displayStatus`, like the task lists, so Monitoring is marked on them
+   * (`markMonitoring` in issues.ts) with one more read while any of them is in progress.
+   */
+  mine: async (companyId: string, signal?: AbortSignal) => {
+    const snapshot = await api.get<InboxMineSnapshot>(`/companies/${companyId}/inbox/mine`, { signal });
+    return { ...snapshot, issues: await markMonitoring(companyId, snapshot.issues, signal) };
+  },
   /** Your tasks, minus the ones you archived from the inbox (for Cleared's archived list). */
-  tasks: (companyId: string, signal?: AbortSignal) => api.get<CompactIssue[]>(`/companies/${companyId}/issues?${taskParams(false)}`, { signal }),
+  tasks: async (companyId: string, signal?: AbortSignal) =>
+    markMonitoring(companyId, await api.get<CompactIssue[]>(`/companies/${companyId}/issues?${taskParams(false)}`, { signal }), signal),
   /** Your tasks, archived ones included. */
-  tasksWithArchived: (companyId: string, signal?: AbortSignal) =>
-    api.get<CompactIssue[]>(`/companies/${companyId}/issues?${taskParams(true)}`, { signal }),
+  tasksWithArchived: async (companyId: string, signal?: AbortSignal) =>
+    markMonitoring(companyId, await api.get<CompactIssue[]>(`/companies/${companyId}/issues?${taskParams(true)}`, { signal }), signal),
   markRead: (issueId: string) => api.post<{ id: string; lastReadAt: string }>(`/issues/${issueId}/read`, {}),
   markUnread: (issueId: string) => api.delete<{ id: string; removed: boolean }>(`/issues/${issueId}/read`),
   archive: (issueId: string) => api.post<{ id: string; archivedAt: string }>(`/issues/${issueId}/inbox-archive`, {}),

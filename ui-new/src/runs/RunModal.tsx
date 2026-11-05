@@ -28,7 +28,8 @@ import { Dialog } from "@/ui/Dialog";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { findInvokeEvent, promptSize, readInvocation } from "./invocation";
-import { providerFailureNotice } from "./provider-failure";
+import { runProviderFailure } from "@/ui/provider-failure";
+import { ProviderFailureNotice } from "@/ui/ProviderFailureNotice";
 import { buildTranscript, showsPlainLines } from "./parsers";
 import { RunInput } from "./RunInput";
 import { logAsText } from "./run-log";
@@ -478,7 +479,7 @@ function RunView(props: { runId: string }) {
       >
         {(current) => {
           const status = () => runStatusMeta(current().status);
-          const providerFailure = createMemo(() => providerFailureNotice(current().resultJson));
+          const providerFailure = createMemo(() => runProviderFailure(current().resultJson));
           return (
             <>
               <header class="rm-head">
@@ -625,17 +626,9 @@ function RunView(props: { runId: string }) {
                   </Show>
                 }
               >
-                {(notice) => (
-                  <div class="rm-alert rm-provider" data-tone={status().tone === "red" ? "red" : "amber"} role="note" aria-label={notice().title}>
-                    <b>{notice().title}</b>
-                    <p class="rm-provider-msg">{notice().message}</p>
-                    <span class="rm-provider-meta">
-                      {notice().detail}
-                      <Show when={notice().retryAt}>
-                        {(at) => ` · ${notice().transient ? "Clears" : "Can retry"} after ${dayLabel(at(), now())} ${clockTime(at())}`}
-                      </Show>
-                      <Show when={notice().requestId}>{(id) => <span class="mono"> · Request {id()}</span>}</Show>
-                    </span>
+                {(failure) => (
+                  <div class="rm-provider">
+                    <ProviderFailureNotice failure={failure()} tone={status().tone === "red" ? "red" : "amber"} />
                   </div>
                 )}
               </Show>

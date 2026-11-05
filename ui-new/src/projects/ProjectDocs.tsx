@@ -13,7 +13,7 @@ import type { useTaskList } from "@/tasks/TasksView";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Dialog } from "@/ui/Dialog";
 import { StatusCapsule } from "@/ui/Status";
-import { STATUS_META } from "@/ui/status-meta";
+import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { Switch as Toggle } from "@/ui/Switch";
 import {
   DOC_FILTERS,
@@ -98,7 +98,7 @@ export function ProjectDocs(props: { project: Project; tasks: Tasks }) {
       new Map<string, TaskFacts>(
         (props.tasks.data ?? []).map((task) => [
           task.id,
-          { status: task.status, assigneeAgentId: task.assigneeAgentId, assigneeUserId: task.assigneeUserId },
+          { status: shownStatus(task), assigneeAgentId: task.assigneeAgentId, assigneeUserId: task.assigneeUserId },
         ]),
       ),
   );
