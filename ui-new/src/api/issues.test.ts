@@ -51,3 +51,23 @@ describe("issuesApi.runsByIds", () => {
     expect(new URL(String(get.mock.calls[1]![0]), "http://x").searchParams.get("runIds")!.split(",")).toHaveLength(50);
   });
 });
+
+describe("Monitoring on compact lists", () => {
+  it("marks in-progress tasks the server lists as monitoring, since compact rows leave the field out", async () => {
+    const get = vi.spyOn(api, "get").mockImplementation(async (url: string) =>
+      (url.includes("displayStatus=monitoring") ? [{ id: "m", status: "in_progress" }] : [{ id: "m", status: "in_progress" }, { id: "p", status: "in_progress" }, { id: "t", status: "todo" }]) as never,
+    );
+    const tasks = await issuesApi.listAll("c1", { projectId: "p1" });
+    expect(tasks.map((task) => task.displayStatus ?? null)).toEqual(["monitoring", null, null]);
+    const second = new URL(String(get.mock.calls[1]![0]), "http://x");
+    expect(Object.fromEntries(second.searchParams)).toMatchObject({ projectId: "p1", displayStatus: "monitoring" });
+  });
+
+  it("asks nothing more when no task is in progress or the rows carry the field", async () => {
+    const get = vi.spyOn(api, "get").mockResolvedValue([{ id: "t", status: "todo" }] as never);
+    await issuesApi.list("c1", {});
+    get.mockResolvedValue([{ id: "p", status: "in_progress", displayStatus: "in_progress" }] as never);
+    await issuesApi.list("c1", {});
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+});
