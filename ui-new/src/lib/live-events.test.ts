@@ -2,7 +2,7 @@ import type { LiveEvent } from "@paperclipai/shared";
 import { QueryClient } from "@tanstack/solid-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryKeys } from "@/api/queryKeys";
-import { createTrailingRefetch, keysForEvent, LIST_CACHE_HOLD_MS, LIVE_RUNS_HOLD_MS, RunInterests } from "./live-events";
+import { createTrailingRefetch, FRESH_ON_OPEN_MS, keysForEvent, LIST_CACHE_HOLD_MS, LIVE_RUNS_HOLD_MS, RunInterests, skipOnFirstOpen } from "./live-events";
 
 const event = (type: LiveEvent["type"], payload: Record<string, unknown>): LiveEvent => ({
   id: 1,
@@ -123,6 +123,12 @@ describe("keysForEvent", () => {
     expect(keys).not.toContainEqual(queryKeys.issues.detail("i1"));
     expect(keys).not.toContainEqual(queryKeys.issues.list("c1"));
     expect(keys).not.toContainEqual(queryKeys.dashboard("c1"));
+  });
+
+  it("refreshes the Inbox's Updates when a run starts or ends", () => {
+    for (const type of ["heartbeat.run.queued", "heartbeat.run.status"] as const) {
+      expect(keysForEvent("c1", event(type, { agentId: "a1", runId: "r1" }))).toContainEqual(queryKeys.inbox.tasks("c1"));
+    }
   });
 
   it("ignores ids that aren't strings", () => {
@@ -286,5 +292,22 @@ describe("RunInterests", () => {
 
   it("passes ordinary events through", () => {
     expect(new RunInterests().receive({ type: "activity.logged", companyId: "c1", payload: {} })).toBe(false);
+  });
+});
+
+describe("skipOnFirstOpen", () => {
+  const now = 1_000_000;
+  it("leaves the just-loaded session, health, companies and board access alone", () => {
+    for (const key of [queryKeys.health, queryKeys.auth.session, queryKeys.companies.list("u1"), queryKeys.access.currentBoardAccess]) {
+      expect(skipOnFirstOpen(key, now - 1_000, now)).toBe(true);
+      expect(skipOnFirstOpen(key, now - FRESH_ON_OPEN_MS - 1, now)).toBe(false);
+      expect(skipOnFirstOpen(key, 0, now)).toBe(false);
+    }
+  });
+
+  it("refreshes everything else", () => {
+    expect(skipOnFirstOpen(queryKeys.issues.list("c1"), now - 1_000, now)).toBe(false);
+    expect(skipOnFirstOpen(queryKeys.companies.detail("c1"), now - 1_000, now)).toBe(false);
+    expect(skipOnFirstOpen(queryKeys.companySettings.members("c1"), now - 1_000, now)).toBe(false);
   });
 });

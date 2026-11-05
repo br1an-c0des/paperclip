@@ -11,7 +11,9 @@ import { useSession } from "@/lib/session";
  *
  * - Reconnects with backoff (1s, 2s, 4s, 8s, then every 15s), and polls active queries every 15s
  *   while the socket is down.
- * - Events aren't replayed, so every (re)open refreshes the active queries to close the gap.
+ * - Events aren't replayed, so every (re)open refreshes the active queries to close the gap. The
+ *   page's first open leaves the shell's just-loaded session, health, companies and board access
+ *   alone (`skipOnFirstOpen`).
  * - While the tab is hidden the socket is closed; coming back refreshes active queries.
  * - Each event invalidates the query keys it affects (`invalidateForEvent`), then goes to
  *   subscribers (`useLiveEvent`), so a subscriber sees fresh data.
@@ -214,6 +216,8 @@ export function keysForEvent(companyId: string, event: LiveEvent, viewer?: LiveV
         queryKeys.agents.list(companyId),
         queryKeys.dashboard(companyId),
         queryKeys.sidebarBadges(companyId),
+        // The Inbox's Updates (`inbox/mine`) carries the latest failed run per agent.
+        queryKeys.inbox.tasks(companyId),
       ];
       if (agentId) keys.push(queryKeys.agents.detail(agentId));
       if (issueId) keys.push(queryKeys.issues.detail(issueId));
@@ -287,8 +291,9 @@ export const LIVE_RUNS_HOLD_MS = 1_500;
 export function createTrailingRefetch(client: QueryClient, delayMs = LIST_CACHE_HOLD_MS, liveRunsDelayMs = LIVE_RUNS_HOLD_MS): TrailingRefetch {
   const groups = [
     // A list keeps the prefix (it covers every filtered view); a task is refetched on its own,
-    // since its comments, runs and other sections aren't behind the list cache.
-    trailingGroup(client, delayMs, (key) => key[0] === "issues", (key) => key[1] === "detail"),
+    // since its comments, runs and other sections aren't behind the list cache. The Inbox's
+    // Updates snapshot (`inbox/mine`, which run events refresh) isn't either.
+    trailingGroup(client, delayMs, (key) => key[0] === "issues" && key[2] !== "inbox", (key) => key[1] === "detail"),
     trailingGroup(client, liveRunsDelayMs, (key) => key[0] === "live-runs", () => true),
   ];
   return {
@@ -325,6 +330,24 @@ function trailingGroup(
       keys.clear();
     },
   };
+}
+
+/** How recently a shell query must have loaded for the socket's first open to leave it alone. */
+export const FRESH_ON_OPEN_MS = 5_000;
+
+/**
+ * Whether the socket's first open should leave a query alone: the health check, the session, and
+ * the companies and board access the session's `boardBootstrap` seeds (lib/session.tsx), while
+ * they're only just loaded. Nothing in them changes from the live events, and rereading them on
+ * every page load is wasted (upstream skips the session and health the same way).
+ */
+export function skipOnFirstOpen(queryKey: QueryKey, dataUpdatedAt: number, now = Date.now()) {
+  if (!dataUpdatedAt || now - dataUpdatedAt > FRESH_ON_OPEN_MS) return false;
+  const [first, second] = queryKey;
+  if (first === "health") return queryKey.length === 1;
+  if (first === "auth") return second === "session";
+  if (first === "companies") return second === "list";
+  return first === "access" && second === "current-board-access";
 }
 
 /** The most runs one socket can ask transcripts for (the server's LIVE_DELIVERY_MAX_ITEMS). */
@@ -496,6 +519,17 @@ export function LiveEventsProvider(props: ParentProps<{ companyId: string | null
 
   /** `restart` drops fetches in flight, so what comes back was read after now. */
   const refreshActive = (restart = false) => void client.invalidateQueries({ type: "active" }, { cancelRefetch: restart });
+  // The first open of the page's socket leaves the just-loaded shell queries alone.
+  let opened = false;
+  const refreshOnOpen = () => {
+    if (opened) return refreshActive();
+    opened = true;
+    const now = Date.now();
+    void client.invalidateQueries(
+      { type: "active", predicate: (query) => !skipOnFirstOpen(query.queryKey, query.state.dataUpdatedAt, now) },
+      { cancelRefetch: false },
+    );
+  };
 
   let wasHidden = false;
   // A memo, so a refetched company object with the same id doesn't reopen the socket.
@@ -559,7 +593,7 @@ export function LiveEventsProvider(props: ParentProps<{ companyId: string | null
         setConnection("open");
         interests.open(next);
         // Events aren't replayed: refresh whatever loaded before the socket opened.
-        refreshActive();
+        refreshOnOpen();
       };
       next.onmessage = (message) => {
         if (closed || socket !== next || typeof message.data !== "string") return;
