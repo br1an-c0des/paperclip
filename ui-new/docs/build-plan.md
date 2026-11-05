@@ -455,6 +455,11 @@ affects the board gets a line here, with an outcome, before `new-ui` moves (the
 [upstream-sync skill](../../.claude/skills/upstream-sync/SKILL.md), step 9). Each capability row's
 "Upstream sync" note links its line here.
 
+Integration round 1 (Nov 5): four agents, `integrate/tasks` (U1, U2, U6, U15–U18),
+`integrate/inbox-shell` (U3, U4, U14, U32, U33), `integrate/agents-runs` (U7, U10, U11 links, U19,
+U22, U25, U27, U35, U37) and `integrate/chat-apps` (U5, U8, U9, U20, U21, U23, U24, U26, U28–U31,
+U34).
+
 Outcomes: **build** (an agent builds it), **decide** (a question for the user first), **check**
 (verify, then build or close), **design** (needs boards first), **left out** (with the reason),
 **done**. When a line is built or settled, mark it done or left out here and in its row.
@@ -465,7 +470,7 @@ follow-ups that decisions 47 and 48 listed are moved here.
 
 | # | Change | Sync | Upstream | Row | Outcome |
 | --- | --- | --- | --- | --- | --- |
-| U1 | **Monitoring status.** Tasks and search results carry `displayStatus`, which adds `monitoring` (an agent's task waiting on a saved monitor, with no run, reviewer or recovery). Lists and search filter by `displayStatus=`, and search returns its facet counts. The stored `status` is unchanged and is still what people set. | 11-03 | #18624 | `tasks/views`, `tasks/organize`, `tasks/properties`, `inbox-search/search` | **decide**: recommended adopt (a Monitoring capsule, column and filter; the status picker still sets `status`) |
+| U1 | **Monitoring status.** Tasks and search results carry `displayStatus`, which adds `monitoring` (an agent's task waiting on a saved monitor, with no run, reviewer or recovery). Lists and search filter by `displayStatus=`, and search returns its facet counts. The stored `status` is unchanged and is still what people set. | 11-03 | #18624 | `tasks/views`, `tasks/organize`, `tasks/properties`, `inbox-search/search` | build (decided Nov 5: adopt; a Monitoring capsule, column and filter; the status picker still sets `status`) |
 | U2 | **Provider and workspace failures** on interrupted tasks (`interruption.providerFailure`, `workspaceFailure`) and in run results. `readProviderFailure` is a runtime export. | 11-03 | #18622, #18770 | `tasks/recovery`, `runs-adapters/runs` | build |
 | U3 | **`GET …/inbox/mine`**: the Updates tab in one read, with each source's errors. Read marks now refresh only the reader's own lists. | 11-03 | #18790 | `inbox-search/triage` | build |
 | U4 | **`boardBootstrap` on the session**: companies and board access with the session, read through `readBoardBootstrap`, to seed those reads on first load. | 11-03 | #18790 | `shell/company` | build |
@@ -475,9 +480,9 @@ follow-ups that decisions 47 and 48 listed are moved here.
 | U8 | **"Started by run"** on routine runs (`RoutineRun.createdByRunId`), linked to the run. | 11-03 | #18772 | `routines/run-now + /history` | build |
 | U9 | **Per-connection reads** on App detail: `…/review-counts` and `…/profile-configuration` instead of the company-wide attention and profiles reads. | 11-03 | `58308a3e6`, `554a770c6` | Apps and tools | build |
 | U10 | **`agents:read` permission** (migration 0423): redacted configuration reads for agents. Check how Permissions, trust and the YAML editor handle a 403, and whether the grant should be listed. | 11-03 | #18766 | `agents/permissions`, `agents/configuration-yaml` | check |
-| U11 | **The old UI's refined agent page:** Activity, Runs, Costs and Budgets inside the agent; an agent history dialog; direct reports and allowed connectors panels; the identity card dropped. Its new URLs `/agents/:id/identity` and `/activity` aren't mapped in `SECTION_ALIASES`. | 11-03 | #18378 | `agents/overview`, `agents/audit`, `agents/revisions` | build the old links; **decide** the rest (recommended: drop the identity card too, compare the rest board by board) |
-| U12 | **Cursor Cloud** as a Paperclip Runner provider (experimental; repository or cloud environment, per-turn, only `CURSOR_API_KEY`). | 11-03 | #18068, #18069 | `agents/hire`, `agents/runtime` | **decide**, with the Runner's managed-provider select (decision 45) |
-| U13 | **Writes that survive outages:** autosave, comments, new tasks and decisions queued and replayed with their idempotency keys; receipt recovery (`X-Paperclip-Receipt-Only`); request answers re-read interactions after an uncertain result. `ui-new` only shows a reconnecting notice. | 10-29 | #15754, #17960 | `shell/live-updates`, `tasks/interactions` | **decide**: the largest item |
+| U11 | **The old UI's refined agent page:** Activity, Runs, Costs and Budgets inside the agent; an agent history dialog; direct reports and allowed connectors panels; the identity card dropped. Its new URLs `/agents/:id/identity` and `/activity` aren't mapped in `SECTION_ALIASES`. | 11-03 | #18378 | `agents/overview`, `agents/audit`, `agents/revisions` | build the old links; identity card left out, as upstream dropped it (decided Nov 5); the rest to compare board by board |
+| U12 | **Cursor Cloud** as a Paperclip Runner provider (experimental; repository or cloud environment, per-turn, only `CURSOR_API_KEY`). | 11-03 | #18068, #18069 | `agents/hire`, `agents/runtime` | left out for now (decided Nov 5): revisit with the Runner's managed-provider select (decision 45) |
+| U13 | **Writes that survive outages:** autosave, comments, new tasks and decisions queued and replayed with their idempotency keys; receipt recovery (`X-Paperclip-Receipt-Only`); request answers re-read interactions after an uncertain result. `ui-new` only shows a reconnecting notice. | 10-29 | #15754, #17960 | `shell/live-updates`, `tasks/interactions` | build, as its own agent after the Nov 5 integration round (decided Nov 5) |
 | U14 | **Retry on interrupted tasks in the Inbox**: interruption state and Retry on Inbox task rows, as the task list has. | 10-22 | `d33b40a5c` | `inbox-search/triage` | build |
 | U15 | **Subtasks an agent creates, shown inline** in the task feed. | 11-01 | #18320 | `tasks/thread` | build |
 | U16 | **Batched run reads** (`GET /issues/:id/runs?runIds=`, up to 100). | 11-01 | — | `tasks/thread` | build |
