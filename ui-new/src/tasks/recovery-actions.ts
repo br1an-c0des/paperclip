@@ -12,6 +12,12 @@ import type { BoardAccess } from "./task-edits";
  * Left out on purpose: the retry-lineage meter and the workspace re-issue, reconcile and
  * break-glass actions. The branch fixes live in the Workspace section (TaskBranch.tsx), and the
  * card points there for workspace actions.
+ *
+ * Since the 2026-11-05 sync some causes read on their own: a saved workspace that couldn't be
+ * restored into a new sandbox (#19207) names the failed step from its run (`restoreFailure`), and a
+ * native export hold (#18848, #19208) says the files need recovering, with Recover saved files
+ * under the card (recover-files.ts). When automatic recovery spends its attempts the server hands
+ * the action to the board, and its next step says so.
  */
 
 export type RecoveryState = "needed" | "in_progress" | "observing";
@@ -77,10 +83,28 @@ const RECONCILIATION_CAUSES = new Set([
   "legacy_execution_requires_reconciliation",
 ]);
 
+/** Causes with words of their own, over the kind's. */
+const CAUSES: Record<string, { label: string; headline: string }> = {
+  remote_workspace_restore_failed: {
+    label: "Saved workspace couldn't be restored",
+    headline: "The saved workspace couldn't be restored into a new sandbox. The saved version was kept.",
+  },
+  native_workspace_sync_out_retry_exhausted: {
+    label: "Saved files need recovering",
+    headline: "The last run's files weren't saved back from its sandbox. Work stays paused until they're recovered.",
+  },
+  native_workspace_sync_out_unrecoverable: {
+    label: "Saved files need recovering",
+    headline: "The last run's files couldn't be saved back from its sandbox. Work stays paused until they're recovered.",
+  },
+};
+
 export type RecoveryCard = {
   state: RecoveryState;
   kindLabel: string;
   headline: string;
+  /** The server's own account of what failed (a restore's step and reason), when it gives one. */
+  detail: string | null;
   /** The server's own next step, when it gives one. */
   nextAction: string | null;
   attempts: string | null;
@@ -99,10 +123,13 @@ export function recoveryCard(action: IssueRecoveryAction | null | undefined, opt
       : action.status === "escalated" || action.ownerType === "board"
         ? "needed"
         : "in_progress";
+  const cause = action.cause ? CAUSES[action.cause] : undefined;
   const headline =
-    state === "needed" && action.ownerType === "board" && (action.kind === "active_run_watchdog" || action.kind === "deliberate_wait_without_target")
+    cause?.headline ??
+    (state === "needed" && action.ownerType === "board" && (action.kind === "active_run_watchdog" || action.kind === "deliberate_wait_without_target")
       ? "Paperclip's own repairs didn't move this task on, so it needs a person. Look at what happened and choose the next step."
-      : (KIND_HEADLINES[action.kind] ?? KIND_HEADLINES.missing_disposition);
+      : (KIND_HEADLINES[action.kind] ?? KIND_HEADLINES.missing_disposition));
+  const restoreFailure = action.evidence?.restoreFailure;
   const outcomes =
     state !== "needed"
       ? []
@@ -114,8 +141,9 @@ export function recoveryCard(action: IssueRecoveryAction | null | undefined, opt
         });
   return {
     state,
-    kindLabel: KIND_LABELS[action.kind] ?? action.kind.replace(/_/g, " "),
+    kindLabel: cause?.label ?? KIND_LABELS[action.kind] ?? action.kind.replace(/_/g, " "),
     headline,
+    detail: typeof restoreFailure === "string" && restoreFailure.trim() ? restoreFailure.trim() : null,
     nextAction: action.nextAction?.trim() || null,
     attempts: action.attemptCount > 1 ? `Attempt ${action.attemptCount}${action.maxAttempts ? ` of ${action.maxAttempts}` : ""}` : null,
     outcomes,

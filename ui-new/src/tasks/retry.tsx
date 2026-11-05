@@ -1,7 +1,7 @@
 import type { CompactIssue, TaskInterruptionPresentation } from "@paperclipai/shared";
 import { useQueryClient } from "@tanstack/solid-query";
 import { RotateCcw } from "lucide-solid";
-import { createSignal, Show } from "solid-js";
+import { createSignal, onCleanup, Show } from "solid-js";
 import { ApiError } from "@/api/client";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
@@ -33,7 +33,11 @@ export type RetryOffer = { state: "failed" | "retry_scheduled"; canRetry: boolea
  * What stopped an interrupted task, in a line for a row's tooltip: the provider's refusal, or the
  * task's folders that couldn't be prepared (`workspaceFailure`, upstream #18770). Null for neither.
  */
-export function interruptionReason(interruption: { providerFailure?: unknown; workspaceFailure?: { message: string } | null } | null | undefined) {
+export function interruptionReason(
+  interruption: { providerFailure?: unknown; workspaceFailure?: { message: string } | null; retryWait?: { message: string } | null } | null | undefined,
+) {
+  // An accepted Retry that still waits says why, over what stopped the attempt (#18845).
+  if (interruption?.retryWait?.message) return interruption.retryWait.message;
   const failure = providerFailureOf(interruption?.providerFailure);
   if (failure) return providerFailureTitle(failure);
   const workspace = interruption?.workspaceFailure?.message;
@@ -49,6 +53,9 @@ export function retryOffer(task: Pick<CompactIssue, "interruption">): RetryOffer
 }
 
 type Retryable = Pick<CompactIssue, "id" | "identifier" | "title" | "interruption">;
+
+/** When the task is read again after an accepted Retry: once the admission has run, and after its grace. */
+export const RETRY_FOLLOW_UPS_MS = [1_000, 10_000];
 
 export function useTaskRetry() {
   const client = useQueryClient();
@@ -67,6 +74,17 @@ export function useTaskRetry() {
   const refresh = (id: string) => {
     void client.invalidateQueries({ queryKey: queryKeys.issues.list(company().id) });
     void client.invalidateQueries({ queryKey: queryKeys.issues.detail(id) });
+  };
+  const timers = new Set<number>();
+  onCleanup(() => timers.forEach((timer) => window.clearTimeout(timer)));
+  const followUp = (id: string) => {
+    for (const delay of RETRY_FOLLOW_UPS_MS) {
+      const timer = window.setTimeout(() => {
+        timers.delete(timer);
+        void client.invalidateQueries({ queryKey: queryKeys.issues.detail(id) });
+      }, delay);
+      timers.add(timer);
+    }
   };
   const mark = (id: string, on: boolean) =>
     setBusy((current) => {
@@ -90,6 +108,9 @@ export function useTaskRetry() {
       setInterruption(task.id, receipt.presentation);
       if (receipt.stale) pushToast({ tone: "info", title: `${ref} has moved on`, body: "Its latest run changed since this was shown." });
       else pushToast({ tone: "success", title: `Trying ${ref} again` });
+      // The run is admitted after the receipt, so its wait (`retryWait`) shows up a moment later:
+      // read the task again twice, as the old UI's useTaskRetry does, rather than poll.
+      if (receipt.accepted && !receipt.stale) followUp(task.id);
     } catch (error) {
       // A refusal won't change on a resend; anything else might still land, so keep the key.
       if (error instanceof ApiError && error.status >= 400 && error.status < 500) keys.delete(slot);

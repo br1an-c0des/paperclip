@@ -18,6 +18,7 @@ import type {
   IssueWorkProduct,
   ExecutionProjection,
   TaskInterruptionPresentation,
+  WorkspaceSourceInspection,
 } from "@paperclipai/shared";
 import { api } from "./client";
 
@@ -245,6 +246,23 @@ export const issuesApi = {
     id: string,
     data: { actionId: string; outcome: "restored" | "false_positive"; sourceIssueStatus: "todo" | "done" | "in_review"; resolutionNote?: string | null },
   ) => api.post<{ issue: Issue; recoveryAction: IssueRecoveryAction }>(`/issues/${id}/recovery-actions/resolve`, data),
+  /**
+   * The task's recovery actions, with the retained files of one failed run inspected
+   * (`inspectSourceRunId`, `inspectSourceActionId`): whether its recorded source is still the one
+   * the action names. Recover saved files reads it before and after asking (since the 2026-11-05
+   * sync, upstream #18848).
+   */
+  recoveryActions: (id: string, source: { runId: string; actionId: string }, signal?: AbortSignal) => {
+    const query = new URLSearchParams({ inspectSourceRunId: source.runId, inspectSourceActionId: source.actionId });
+    return api.get<RecoveryActionsInspection>(`/issues/${id}/recovery-actions?${query}`, { signal });
+  },
+  /**
+   * Asks the server to preserve a failed run's retained files (202). The worker stops the run,
+   * copies the files back and verifies them; this only queues it. `idempotencyKey` is saved before
+   * the request and kept, so a lost answer resends the same one.
+   */
+  recoverWorkspace: (id: string, data: { actionId: string; runId: string; idempotencyKey: string }) =>
+    api.post<{ actionId: string; status: string }>(`/issues/${id}/recovery-actions/recover-workspace`, data),
 
   // Who can see a private task (the share sheet).
   /**
@@ -277,6 +295,13 @@ export const issuesApi = {
 };
 
 /** What `POST /issues/:id/retry` answers, as ui/src/api/issues.ts types it. */
+/** `GET /issues/:id/recovery-actions` with a run's source inspected. */
+export type RecoveryActionsInspection = {
+  active: IssueRecoveryAction | null;
+  actions: IssueRecoveryAction[];
+  sourceInspection?: WorkspaceSourceInspection;
+};
+
 export type TaskRetryReceipt = {
   requestId: string | null;
   accepted: boolean;
