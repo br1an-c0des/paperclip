@@ -115,9 +115,11 @@ export function ModelMenu(props: {
   onChange: (model: string) => void;
   /** Offers "Harness default" as the first item. */
   allowDefault?: boolean;
+  /** What an empty value reads as; "Harness default" unless the harness has none. */
+  emptyLabel?: string;
   class?: string;
 }) {
-  const label = () => modelLabel(props.value, props.models) ?? "Harness default";
+  const label = () => modelLabel(props.value, props.models) ?? props.emptyLabel ?? "Harness default";
   return (
     <Menu>
       <Menu.Trigger as={FieldButton} class={props.class ?? "ps-field-320"} aria-label={`Model: ${label()}`}>

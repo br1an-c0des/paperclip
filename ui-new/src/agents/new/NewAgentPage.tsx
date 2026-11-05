@@ -443,7 +443,7 @@ export function NewAgentPage() {
     if (step() === "model" && setup.harness) {
       rows.push(
         ["Harness", runner().label],
-        ["Model", `${modelLabel(setup.model, models.data) ?? "Harness default"}${efforts().length ? ` · ${effortLabel()}` : ""}`],
+        ["Model", `${modelLabel(setup.model, models.data) ?? (isRunnerOnly(setup.harness) ? "Not chosen yet" : "Harness default")}${efforts().length ? ` · ${effortLabel()}` : ""}`],
         ["Runs on", environment()?.name ?? "Organization default"],
       );
     }
@@ -711,6 +711,7 @@ export function NewAgentPage() {
                               loading={models.isLoading}
                               value={setup.model}
                               allowDefault={!requiresProviderModel(setup.harness) && !isRunnerOnly(setup.harness)}
+                              emptyLabel={isRunnerOnly(setup.harness) ? "Choose a model" : undefined}
                               onChange={(model) => setSetup("model", model)}
                             />
                           </Show>
