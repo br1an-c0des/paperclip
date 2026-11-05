@@ -1,5 +1,5 @@
 {
-  "upstreamCommit": "adb49a44346849e751548b2fb640693dbfad4b6f",
+  "upstreamCommit": "d3713d827f70ddba63a323e57c562384dbd648ba",
   "routes": [
     {
       "path": "/oauth-handoff",
@@ -5201,6 +5201,7 @@
           "hooks/useChatConnectorsEnabled.ts",
           "hooks/useClassicTaskInterfaceEnabled.ts",
           "hooks/useCombinedInboxTasksEnabled.ts",
+          "hooks/useComposerSubmitKey.ts",
           "hooks/useConnectorAvailability.ts",
           "hooks/useIssueExternalObjects.ts",
           "hooks/useMemoryConnectorsEnabled.ts",
@@ -5301,7 +5302,8 @@
         ],
         "via": [
           "components/AppConnectionSidebar.tsx",
-          "features/connections/ConnectionSetupFlow.tsx"
+          "features/connections/ConnectionSetupFlow.tsx",
+          "features/connections/remote-mcp/RemoteMcpProductionSetup.tsx"
         ]
       },
       {
@@ -6292,6 +6294,19 @@
         ]
       },
       {
+        "key": "api/connection-intents.ts::connectionIntentsApi.setupOptions",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/connection-intents/:interactionId/setup-options"
+          }
+        ],
+        "via": [
+          "features/connections/ConnectionSetupFlow.tsx",
+          "features/connections/remote-mcp/RemoteMcpProductionSetup.tsx"
+        ]
+      },
+      {
         "key": "api/tools.ts::toolsApi.connectApp",
         "requests": [
           {
@@ -6894,6 +6909,18 @@
         ],
         "via": [
           "lib/provider-credential.ts"
+        ]
+      },
+      {
+        "key": "api/heartbeats.ts::heartbeatsApi.get",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/heartbeat-runs/:runId"
+          }
+        ],
+        "via": [
+          "lib/wait-for-stopped-runs.ts"
         ]
       },
       {
@@ -9160,6 +9187,8 @@
           "via": [
             "components/RunWorkspaceRecoverySurface.tsx",
             "components/RunnerInspector.tsx",
+            "components/WorkspaceExportRecovery.tsx",
+            "lib/native-run-stop.ts",
             "pages/AgentDetail.tsx"
           ]
         },
@@ -9221,7 +9250,8 @@
             }
           ],
           "via": [
-            "components/RunWorkspaceSourceInspection.tsx"
+            "components/RunWorkspaceSourceInspection.tsx",
+            "components/WorkspaceExportRecovery.tsx"
           ]
         },
         {
@@ -9283,6 +9313,18 @@
           ],
           "via": [
             "components/RunnerInspector.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.recoverWorkspace",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/recovery-actions/recover-workspace"
+            }
+          ],
+          "via": [
+            "components/WorkspaceExportRecovery.tsx"
           ]
         },
         {
@@ -9383,6 +9425,7 @@
           ],
           "via": [
             "hooks/useSelectedHeartbeatRun.ts",
+            "lib/native-run-stop.ts",
             "pages/AgentDetail.tsx"
           ]
         },
@@ -9688,7 +9731,8 @@
           ],
           "via": [
             "lib/agent-configuration/save.ts",
-            "pages/AgentDetail.tsx"
+            "pages/AgentDetail.tsx",
+            "pages/agent-detail/AgentReportingManager.tsx"
           ]
         },
         {
@@ -9888,6 +9932,19 @@
           ]
         },
         {
+          "key": "api/heartbeats.ts::heartbeatsApi.cancel",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/heartbeat-runs/:runId/cancel"
+            }
+          ],
+          "via": [
+            "lib/native-run-stop.ts",
+            "pages/AgentDetail.tsx"
+          ]
+        },
+        {
           "key": "api/budgets.ts::budgetsApi.overview",
           "requests": [
             {
@@ -10020,6 +10077,7 @@
           "via": [
             "pages/AgentDetail.tsx",
             "pages/agent-detail/AgentHistoryDialog.tsx",
+            "pages/agent-detail/AgentReportingManager.tsx",
             "pages/audit/AuditFeed.tsx",
             "pages/audit/AuditRuns.tsx"
           ]
@@ -10187,18 +10245,6 @@
             {
               "method": "POST",
               "path": "/api/companies/:companyId/agents/:agentId/grok-binding/stop"
-            }
-          ],
-          "via": [
-            "pages/AgentDetail.tsx"
-          ]
-        },
-        {
-          "key": "api/heartbeats.ts::heartbeatsApi.cancel",
-          "requests": [
-            {
-              "method": "POST",
-              "path": "/api/heartbeat-runs/:runId/cancel"
             }
           ],
           "via": [
@@ -10397,19 +10443,6 @@
           ]
         },
         {
-          "key": "api/ai-connections.ts::aiConnectionsApi.list",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/companies/:companyId/ai-connections"
-            }
-          ],
-          "via": [
-            "components/agents/AgentBulkRoster.tsx",
-            "components/agents/AgentBulkSettingsSheet.tsx"
-          ]
-        },
-        {
           "key": "api/agents.ts::agentsApi.get",
           "requests": [
             {
@@ -10422,6 +10455,20 @@
             }
           ],
           "via": [
+            "components/agents/AgentBulkRoster.tsx",
+            "components/agents/AgentBulkSettingsSheet.tsx"
+          ]
+        },
+        {
+          "key": "api/ai-connections.ts::aiConnectionsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/ai-connections"
+            }
+          ],
+          "via": [
+            "components/agents/AgentBulkRoster.tsx",
             "components/agents/AgentBulkSettingsSheet.tsx"
           ]
         },
@@ -16638,6 +16685,18 @@
           ]
         },
         {
+          "key": "api/tools.ts::toolsApi.getConnection",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/tool-connections/:connectionId"
+            }
+          ],
+          "via": [
+            "pages/tools/PasteConfigTab.tsx"
+          ]
+        },
+        {
           "key": "api/tools.ts::toolsApi.importMcpJson",
           "requests": [
             {
@@ -18080,6 +18139,7 @@
           "via": [
             "components/IssueRunLedger.tsx",
             "components/RunnerInspector.tsx",
+            "components/WorkspaceExportRecovery.tsx",
             "pages/IssueDetail.tsx"
           ]
         },
@@ -18361,8 +18421,7 @@
             }
           ],
           "via": [
-            "components/WorkspaceBaseRefRecovery.tsx",
-            "lib/wait-for-stopped-runs.ts"
+            "components/WorkspaceBaseRefRecovery.tsx"
           ]
         },
         {
@@ -18376,6 +18435,30 @@
           "via": [
             "components/WorkspaceBaseRefRecovery.tsx",
             "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.recoverWorkspace",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/recovery-actions/recover-workspace"
+            }
+          ],
+          "via": [
+            "components/WorkspaceExportRecovery.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.recoveryActions",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:id/recovery-actions"
+            }
+          ],
+          "via": [
+            "components/WorkspaceExportRecovery.tsx"
           ]
         },
         {
@@ -18500,6 +18583,18 @@
             {
               "method": "GET",
               "path": "/api/companies/:companyId/adapters/:type/models"
+            }
+          ],
+          "via": [
+            "components/issue-properties/IssueProperties.tsx"
+          ]
+        },
+        {
+          "key": "api/agents.ts::agentsApi.runtimeState",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/agents/:id/runtime-state"
             }
           ],
           "via": [
@@ -26063,6 +26158,7 @@
           "via": [
             "components/IssueRunLedger.tsx",
             "components/RunnerInspector.tsx",
+            "components/WorkspaceExportRecovery.tsx",
             "pages/IssueDetail.tsx"
           ]
         },
@@ -26343,8 +26439,7 @@
             }
           ],
           "via": [
-            "components/WorkspaceBaseRefRecovery.tsx",
-            "lib/wait-for-stopped-runs.ts"
+            "components/WorkspaceBaseRefRecovery.tsx"
           ]
         },
         {
@@ -26358,6 +26453,30 @@
           "via": [
             "components/WorkspaceBaseRefRecovery.tsx",
             "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.recoverWorkspace",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/recovery-actions/recover-workspace"
+            }
+          ],
+          "via": [
+            "components/WorkspaceExportRecovery.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.recoveryActions",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:id/recovery-actions"
+            }
+          ],
+          "via": [
+            "components/WorkspaceExportRecovery.tsx"
           ]
         },
         {
@@ -26482,6 +26601,18 @@
             {
               "method": "GET",
               "path": "/api/companies/:companyId/adapters/:type/models"
+            }
+          ],
+          "via": [
+            "components/issue-properties/IssueProperties.tsx"
+          ]
+        },
+        {
+          "key": "api/agents.ts::agentsApi.runtimeState",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/agents/:id/runtime-state"
             }
           ],
           "via": [
@@ -32839,7 +32970,9 @@
         }
       ],
       "usedBy": [
-        "pages/AgentDetailPage.tsx"
+        "pages/AgentChat.tsx",
+        "pages/AgentDetailPage.tsx",
+        "pages/IssueDetail.tsx"
       ],
       "referenced": true
     },
@@ -35546,6 +35679,7 @@
         }
       ],
       "usedBy": [
+        "App shell",
         "App.tsx#AppsConnectEntryRoute",
         "pages/AgentChat.tsx",
         "pages/Dashboard.tsx",
@@ -37761,6 +37895,7 @@
         }
       ],
       "usedBy": [
+        "App shell",
         "pages/AgentChat.tsx",
         "pages/AgentDetailPage.tsx",
         "pages/Dashboard.tsx",
@@ -39021,8 +39156,12 @@
           "path": "/api/issues/:id/recovery-actions/recover-workspace"
         }
       ],
-      "usedBy": [],
-      "referenced": false
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/AgentDetailPage.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
     },
     "api/issues.ts::issuesApi.recoveryActions": {
       "requests": [
@@ -39032,7 +39171,9 @@
         }
       ],
       "usedBy": [
-        "pages/AgentDetailPage.tsx"
+        "pages/AgentChat.tsx",
+        "pages/AgentDetailPage.tsx",
+        "pages/IssueDetail.tsx"
       ],
       "referenced": true
     },
@@ -41849,7 +41990,8 @@
         "pages/apps/AppNotConnected.tsx",
         "pages/apps/AppsConnect.tsx",
         "pages/apps/chat/ChatEndpointDetail.tsx",
-        "pages/apps/chat/ChatEndpointSetup.tsx"
+        "pages/apps/chat/ChatEndpointSetup.tsx",
+        "pages/tools/AdvancedToolsRoute.tsx"
       ],
       "referenced": true
     },
