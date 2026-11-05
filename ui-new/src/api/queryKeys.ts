@@ -167,6 +167,8 @@ export const queryKeys = {
     list: (companyId: string) => ["ai-connections", companyId] as const,
     activeRuns: (companyId: string, connectionId: string) =>
       ["ai-connections", companyId, connectionId, "active-runs"] as const,
+    identity: (companyId: string, connectionId: string, grantId: string) => ["ai-connections", companyId, connectionId, "identity", grantId] as const,
+    loginSetup: (companyId: string, sessionId: string) => ["ai-connections", companyId, "login-setup", sessionId] as const,
   },
   /**
    * Apps and tools (src/apps/). Everything sits under `["tools", companyId]`, one connection's

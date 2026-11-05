@@ -1,4 +1,5 @@
 import type {
+  AiConnectionAccountIdentity,
   AiConnectionList,
   AiConnectionLoginIntent,
   AiConnectionUsage,
@@ -24,9 +25,34 @@ import { api } from "./client";
  * AI connections (`/api/companies/:companyId/ai-connections`), as ui/src/api/ai-connections.ts uses
  * them: the list, the personal default, usage and active runs, the API-key save, and the local
  * subscription sign-in (start an attempt, check it, submit the browser code, cancel, save).
+ *
+ * Also the signed-in account behind a saved credential (`GET :id/identity?grantId=`, upstream
+ * #18653), which asks the provider and so is given 20 seconds, and a saved sign-in setup to resume
+ * (`GET login/:sessionId/setup`, #17737): an agent that starts a sign-in hands its person a link to
+ * `/apps/connect?aiLogin=<sessionId>`.
  */
 
 export type AiConnectionResult = { connectionId: string; grantId: string };
+
+/** A sign-in someone (often an agent) started for you, to finish on the board. */
+export type AiLoginSetup = {
+  sessionId: string;
+  intent: AiConnectionLoginIntent;
+  environmentId: string;
+  status: string;
+  /** Set once the sign-in has been saved as a connection. */
+  connectionId: string | null;
+  grantId: string | null;
+};
+
+/** How long the account check waits for the provider, as the old UI does. */
+export const IDENTITY_TIMEOUT_MS = 20_000;
+
+/** The caller's signal, ended also after `ms`. */
+function withTimeout(signal: AbortSignal | undefined, ms: number) {
+  const timeout = AbortSignal.timeout(ms);
+  return signal && typeof AbortSignal.any === "function" ? AbortSignal.any([signal, timeout]) : timeout;
+}
 export type AiConnectionActiveRun = { id: string; agentId: string; agentName: string; status: string };
 
 const base = (companyId: string) => `/companies/${encodeURIComponent(companyId)}/ai-connections`;
@@ -39,6 +65,14 @@ export const aiConnectionsApi = {
     api.get<AiConnectionUsage>(
       `${base(companyId)}/${encodeURIComponent(connectionId)}/usage${grantId ? `?grantId=${encodeURIComponent(grantId)}` : ""}`,
     ),
+  /** The provider account (and organization) a saved credential signs in as. */
+  accountIdentity: (companyId: string, connectionId: string, grantId: string, signal?: AbortSignal) =>
+    api.get<AiConnectionAccountIdentity>(`${base(companyId)}/${encodeURIComponent(connectionId)}/identity?grantId=${encodeURIComponent(grantId)}`, {
+      signal: withTimeout(signal, IDENTITY_TIMEOUT_MS),
+    }),
+  /** A saved sign-in setup, to resume; 404 once it's cancelled, failed, timed out or expired. */
+  loginSetup: (companyId: string, sessionId: string, signal?: AbortSignal) =>
+    api.get<AiLoginSetup>(`${base(companyId)}/login/${encodeURIComponent(sessionId)}/setup`, { signal }),
   activeRuns: (companyId: string, connectionId: string) =>
     api.get<AiConnectionActiveRun[]>(`${base(companyId)}/${encodeURIComponent(connectionId)}/active-runs`),
   /** Saves an API-key connection. The server checks the key with the provider first. */
