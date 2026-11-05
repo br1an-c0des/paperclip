@@ -198,6 +198,8 @@ export function harnessMark(harness: string) {
     cursor: "CR",
     pi_local: "PI",
     kimi_local: "KM",
+    kimi_runtime: "KM",
+    antigravity_runtime: "AG",
     hermes_local: "HM",
     grok_local: "GK",
   };

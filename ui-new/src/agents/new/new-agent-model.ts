@@ -5,9 +5,11 @@ import type {
   AgentRunner,
   AiConnectionList,
   AiRuntimeConnectionBinding,
+  CompanySecret,
   Environment,
   EnvironmentProbeResult,
 } from "@paperclipai/shared";
+import { PAPERCLIP_RUNNER_ACPX_PROFILES } from "@paperclipai/adapter-utils/paperclip-runner-permissions";
 import type { AdapterInfo } from "@/api/agents";
 import { agentConnection, connectionChoices, providerForHarness, sameBinding, type ConnectionChoice } from "@/org/bulk-model";
 import { effortKeyFor, effortOptions, type EffortOption } from "@/tasks/run-overrides";
@@ -52,6 +54,54 @@ export const NEW_AGENT_HARNESSES = [
 
 export type HarnessChoice = { type: string; label: string; meta: string };
 
+/**
+ * Harnesses only the Paperclip Runner carries, offered as their own choices as the old UI's
+ * AgentBasicsDialog does (`kimi_runtime`, `antigravity_runtime`): the agent is saved as
+ * `paperclip_runner` with `provider: "acpx"` and this `acpxAgent`.
+ */
+const RUNNER_ONLY_HARNESSES: Record<string, string> = { kimi_runtime: "kimi", antigravity_runtime: "antigravity" };
+
+export function isRunnerOnly(harness: string) {
+  return harness in RUNNER_ONLY_HARNESSES;
+}
+
+/** The adapter type a harness choice is saved and tested as. */
+export function requestAdapterType(harness: string) {
+  return isRunnerOnly(harness) ? "paperclip_runner" : harness;
+}
+
+/** The ACPX profile's release state (`PAPERCLIP_RUNNER_ACPX_PROFILES`): a profile not qualified yet runs only with an operator's candidate authorization. */
+function profileQualified(acpxAgent: string) {
+  return PAPERCLIP_RUNNER_ACPX_PROFILES.some((profile) => profile.value === acpxAgent && profile.qualified);
+}
+
+function usableRunner(adapters: readonly AdapterInfo[] | undefined) {
+  const runner = adapters?.find((entry) => entry.type === "paperclip_runner");
+  return runner && runner.loaded !== false && !runner.disabled && !runner.overriddenBuiltin ? runner : undefined;
+}
+
+/**
+ * The operator's authorization to try Google Antigravity before its release (`candidateHarnesses`
+ * on the Paperclip Runner's adapter, for this company and a local computer), with the one model it
+ * admits. Null once Antigravity is qualified, or when there's none.
+ */
+export function antigravityCandidate(adapters: readonly AdapterInfo[] | undefined) {
+  if (profileQualified("antigravity")) return null;
+  return usableRunner(adapters)?.candidateHarnesses?.find((candidate) => candidate.agent === "antigravity" && candidate.model) ?? null;
+}
+
+/**
+ * The harness New agent shows for an agent: its harness, except that a Runner agent on a
+ * Runner-only harness is that choice (Kimi Code on the Runner isn't the legacy Kimi Code CLI).
+ */
+export function newAgentHarness(adapterType: string, config: Record<string, unknown> = {}) {
+  if (adapterType === "paperclip_runner" && config.provider === "acpx") {
+    const found = Object.entries(RUNNER_ONLY_HARNESSES).find(([, agent]) => agent === config.acpxAgent);
+    if (found) return found[0];
+  }
+  return harnessType(adapterType, config);
+}
+
 function liveAgent(agent: Pick<Agent, "status" | "pauseReason">) {
   return agent.status !== "terminated" && agent.pauseReason !== "setup";
 }
@@ -59,24 +109,34 @@ function liveAgent(agent: Pick<Agent, "status" | "pauseReason">) {
 /**
  * The harnesses to pick from: those the server has loaded and enabled, each with how many agents
  * already use it ("8 agents", "Not used yet"). Until the adapters load, none.
+ *
+ * After them, the Runner-only ones, while the Paperclip Runner is enabled: Kimi Code with the
+ * instance's Paperclip Runner setting on (`nativeRunner`), Google Antigravity once it's released or
+ * an operator has authorized it here (`antigravityCandidate`).
  */
 export function harnessChoices(
   adapters: readonly AdapterInfo[] | undefined,
   agents: readonly Pick<Agent, "adapterType" | "adapterConfig" | "status" | "pauseReason">[] | undefined,
+  options: { nativeRunner?: boolean } = {},
 ): HarnessChoice[] {
   if (!adapters) return [];
   const counts = new Map<string, number>();
   for (const agent of agents ?? []) {
     if (!liveAgent(agent)) continue;
-    const harness = harnessType(agent.adapterType, (agent.adapterConfig ?? {}) as Record<string, unknown>);
+    const harness = newAgentHarness(agent.adapterType, (agent.adapterConfig ?? {}) as Record<string, unknown>);
     counts.set(harness, (counts.get(harness) ?? 0) + 1);
   }
-  return NEW_AGENT_HARNESSES.filter((type) => {
+  const runner = usableRunner(adapters);
+  const offered: string[] = NEW_AGENT_HARNESSES.filter((type) => {
     const adapter = adapters.find((entry) => entry.type === type);
     return adapter && adapter.loaded !== false && !adapter.disabled && !adapter.overriddenBuiltin;
-  }).map((type) => {
+  });
+  if (runner && options.nativeRunner && profileQualified("kimi")) offered.push("kimi_runtime");
+  if (runner && (profileQualified("antigravity") || antigravityCandidate(adapters))) offered.push("antigravity_runtime");
+  return offered.map((type) => {
     const count = counts.get(type) ?? 0;
-    return { type, label: harnessLabel(type), meta: count === 0 ? "Not used yet" : count === 1 ? "1 agent" : `${count} agents` };
+    const used = count === 0 ? "Not used yet" : count === 1 ? "1 agent" : `${count} agents`;
+    return { type, label: harnessLabel(type), meta: type === "antigravity_runtime" && !profileQualified("antigravity") ? `Preview · ${used}` : used };
   });
 }
 
@@ -110,6 +170,10 @@ export type RunnerResolution = {
  * Paperclip Runner counts only while its own adapter is enabled.
  */
 export function resolveRunner(harness: string, choice: RunnerChoice, adapters: readonly AdapterInfo[] | undefined): RunnerResolution {
+  // A Runner-only harness has no runner to choose: "Kimi Code · Paperclip Runner".
+  if (isRunnerOnly(harness)) {
+    return { applies: false, runner: "paperclip", recommended: "paperclip", alternative: null, label: `${harnessLabel(harness).replace(/ \(Runner\)$/, "")} · ${runnerLabel("paperclip")}` };
+  }
   const name = harnessLabel(harness);
   if (!runnerCapable(harness)) return { applies: false, runner: "legacy", recommended: "legacy", alternative: null, label: name };
   const adapter = adapters?.find((entry) => entry.type === harness);
@@ -288,29 +352,50 @@ export type SetupDraft = {
   environmentId: string;
   /** The AI connection, or null for the harness's own sign-in on the machine it runs on. */
   binding: AiRuntimeConnectionBinding | null;
+  /** Kimi Code on the Runner: the organization secret that holds its `KIMI_API_KEY`, or empty. */
+  secretId: string;
 };
 
 export function emptySetup(harness = ""): SetupDraft {
-  return { harness, model: "", effort: "", runner: "auto", environmentId: "", binding: null };
+  return { harness, model: "", effort: "", runner: "auto", environmentId: "", binding: null, secretId: "" };
+}
+
+/** Whether a harness is one New agent offers (the Runner-only ones included). */
+function offered(harness: string) {
+  return (NEW_AGENT_HARNESSES as readonly string[]).includes(harness) || isRunnerOnly(harness);
+}
+
+/** The environment variable Kimi Code on the Runner reads its key from (the old UI's `envKey` for it). */
+export const KIMI_KEY = "KIMI_API_KEY";
+
+function secretRef(value: unknown): string {
+  const ref = value as { type?: unknown; secretId?: unknown } | undefined;
+  return ref?.type === "secret_ref" && typeof ref.secretId === "string" ? ref.secretId : "";
 }
 
 /** A draft whose harness is picked, after a reload or from Agents: its saved choices. */
 export function setupFromAgent(agent: Pick<Agent, "adapterType" | "adapterConfig" | "runtimeConfig" | "defaultEnvironmentId" | "metadata">): SetupDraft {
   if (agent.metadata?.setupAdapterPending === true) return { ...emptySetup(), environmentId: agent.defaultEnvironmentId ?? "" };
   const config = (agent.adapterConfig ?? {}) as Record<string, unknown>;
-  const harness = harnessType(agent.adapterType, config);
+  const harness = newAgentHarness(agent.adapterType, config);
   const effort = [config.modelReasoningEffort, config.reasoningEffort, config.effort, config.piThinkingLevel, config.thinking, config.variant].find(
     (value): value is string => typeof value === "string" && value.length > 0,
   );
   return {
-    harness: (NEW_AGENT_HARNESSES as readonly string[]).includes(harness) ? harness : "",
+    harness: offered(harness) ? harness : "",
     model: typeof config.model === "string" ? config.model : "",
     effort: effort ?? "",
     // A draft keeps its runner: the server converted it already.
     runner: runnerCapable(harness) ? (agent.adapterType === "paperclip_runner" ? "paperclip" : "legacy") : "auto",
     environmentId: agent.defaultEnvironmentId ?? "",
     binding: agentConnection(agent) ?? null,
+    secretId: harness === "kimi_runtime" ? secretRef((config.env as Record<string, unknown> | undefined)?.[KIMI_KEY]) : "",
   };
+}
+
+/** The organization's secrets a Kimi key can come from, those named `KIMI_API_KEY` first. */
+export function kimiKeySecrets<T extends Pick<CompanySecret, "id" | "key" | "name" | "status">>(secrets: readonly T[] | undefined): T[] {
+  return (secrets ?? []).filter((secret) => secret.status === "active").sort((a, b) => Number(b.key === KIMI_KEY) - Number(a.key === KIMI_KEY) || a.name.localeCompare(b.name));
 }
 
 /** The thinking-effort choices for a harness, model and runner. Pi on the Paperclip Runner has its own scale. */
@@ -345,6 +430,7 @@ export function setupAdapterConfig(setup: SetupDraft, runner: AgentRunner, saved
   for (const key of KEPT_KEYS) if (saved[key] !== undefined) config[key] = saved[key];
   const model = setup.model.trim();
   if (model) config.model = model;
+  if (isRunnerOnly(setup.harness)) return { ...config, ...runnerOnlyConfig(setup, config.env) };
   switch (setup.harness) {
     case "claude_local":
       Object.assign(config, { timeoutSec: 0, graceSec: 15, dangerouslySkipPermissions: true });
@@ -376,6 +462,29 @@ export function setupAdapterConfig(setup: SetupDraft, runner: AgentRunner, saved
   return config;
 }
 
+/**
+ * A Runner-only harness's settings, as the old UI's `buildPaperclipRunnerConfig` writes them for an
+ * ACPX provider (packages/adapters/codex-local/src/ui/build-config.ts): the time limits, each
+ * provider's default permission mode, one process per turn, and the exact model. Kimi Code gets
+ * its key from the chosen organization secret.
+ */
+function runnerOnlyConfig(setup: SetupDraft, env: unknown): Record<string, unknown> {
+  const config: Record<string, unknown> = {
+    timeoutSec: 0,
+    graceSec: 15,
+    provider: "acpx",
+    acpxAgent: RUNNER_ONLY_HARNESSES[setup.harness],
+    codexPermissionMode: "never",
+    opencodePermissionMode: "allow",
+    acpxPermissionMode: "approve-all",
+    lifecycleMode: "per_turn",
+  };
+  if (setup.harness === "kimi_runtime" && setup.secretId) {
+    config.env = { ...((env ?? {}) as Record<string, unknown>), [KIMI_KEY]: { type: "secret_ref", secretId: setup.secretId, version: "latest" } };
+  }
+  return config;
+}
+
 function withoutConnection(runtime: Record<string, unknown> | null | undefined) {
   const { aiConnection: _drop, ...rest } = (runtime ?? {}) as Record<string, unknown>;
   return rest;
@@ -392,7 +501,7 @@ export function setupPatch(
   runner: AgentRunner,
 ): Record<string, unknown> {
   return {
-    adapterType: setup.harness,
+    adapterType: requestAdapterType(setup.harness),
     ...(runnerCapable(setup.harness) ? { runner: setup.runner } : {}),
     adapterConfig: setupAdapterConfig(setup, runner, (agent.adapterConfig ?? {}) as Record<string, unknown>),
     replaceAdapterConfig: true,
@@ -404,7 +513,7 @@ export function setupPatch(
 
 /** What a save would change, to tell whether the draft on the server is current. */
 export function setupSignature(setup: SetupDraft) {
-  return JSON.stringify([setup.harness, setup.model.trim(), setup.effort, setup.runner, setup.environmentId, setup.binding ?? null]);
+  return JSON.stringify([setup.harness, setup.model.trim(), setup.effort, setup.runner, setup.environmentId, setup.binding ?? null, setup.secretId]);
 }
 
 /** Why the setup can't be tested or hired yet, or null. */
@@ -413,6 +522,12 @@ export function setupProblem(setup: SetupDraft): string | null {
   if (requiresProviderModel(setup.harness) && !/^[^/\s]+\/\S+$/.test(setup.model.trim())) {
     return `${harnessLabel(setup.harness)} needs a model in provider/model form, such as openrouter/deepseek/deepseek-v4-flash.`;
   }
+  // The Runner-only harnesses need an exact model id (the old UI's NewAgentSetup checks).
+  const model = setup.model.trim();
+  if (isRunnerOnly(setup.harness) && (!model || /\s/.test(model) || ["auto", "default"].includes(model.toLowerCase()))) {
+    return setup.harness === "kimi_runtime" ? "Enter the exact Kimi model ID." : "Choose or enter an exact Google Antigravity model ID.";
+  }
+  if (setup.harness === "kimi_runtime" && !setup.secretId) return `Pick the organization secret that holds ${KIMI_KEY}.`;
   return null;
 }
 
@@ -430,7 +545,7 @@ export function hireRequest(
   return {
     setupAgentId: agent.id,
     ...profileFields(profile),
-    adapterType: setup.harness,
+    adapterType: requestAdapterType(setup.harness),
     ...(runnerCapable(setup.harness) && setup.runner !== "auto" ? { runner: setup.runner } : {}),
     adapterConfig: setupAdapterConfig(setup, runner, (agent.adapterConfig ?? {}) as Record<string, unknown>),
     defaultEnvironmentId: setup.environmentId || null,
@@ -445,6 +560,16 @@ export function hireRequest(
 export type SignInChoice = { id: string; name: string; description: string; disabled: boolean; binding: AiRuntimeConnectionBinding | null };
 
 /**
+ * The AI connection provider a harness signs in with. Google Antigravity uses a Google connection
+ * (a Google subscription or a Gemini key); Kimi Code on the Runner takes its key from a secret instead.
+ */
+function signInProvider(harness: string) {
+  if (harness === "antigravity_runtime") return "google";
+  if (harness === "kimi_runtime") return undefined;
+  return providerForHarness(harness);
+}
+
+/**
  * The sign-ins a harness can use: its own sign-in on the machine it runs on, then the AI connections
  * for its provider (yours, then the company's shared ones), as the old UI's connection field.
  */
@@ -456,7 +581,7 @@ export function signInChoices(harness: string, list: AiConnectionList | undefine
     disabled: false,
     binding: null,
   };
-  const provider = providerForHarness(harness);
+  const provider = signInProvider(harness);
   if (!provider) return [local];
   return [local, ...connectionChoices(list, provider).map((choice: ConnectionChoice) => ({ ...choice, binding: choice.binding as AiRuntimeConnectionBinding }))];
 }
@@ -469,7 +594,7 @@ export function selectedSignIn(choices: readonly SignInChoice[], binding: AiRunt
 
 /** The sign-in a harness starts with: your own connection for its provider when you have one, else its own sign-in. */
 export function defaultBinding(harness: string, list: AiConnectionList | undefined): AiRuntimeConnectionBinding | null {
-  const provider = providerForHarness(harness);
+  const provider = signInProvider(harness);
   if (!provider || !list) return null;
   const mine = list.connections.find(
     (connection) => connection.provider === provider && connection.ownership === "personal" && connection.ownerUserId === list.currentUserId && connection.isDefault && connection.status === "connected",
@@ -524,7 +649,7 @@ export async function testSetup(
     adapterConfig: input.adapterConfig,
     environmentId: input.environmentId,
   };
-  const runtime = await test(input.setup.harness, body);
+  const runtime = await test(requestAdapterType(input.setup.harness), body);
   const proved = runtime.checks.some((check) => check.code.includes("hello_probe") || check.code === "ai_connection_api_key_reverified");
   if (
     input.setup.binding?.mode === "router" ||
@@ -595,12 +720,14 @@ export function legacyHireParams(search: Record<string, string | string[] | unde
   let harness = one("adapterType");
   if (harness === "paperclip_runner") {
     const provider = one("runnerProvider") ?? "codex";
-    harness = ({ codex: "codex_local", claude: "claude_local", opencode: "opencode_local", pi: "pi_local" } as Record<string, string>)[provider];
+    harness = (
+      { codex: "codex_local", claude: "claude_local", opencode: "opencode_local", pi: "pi_local", kimi: "kimi_runtime", antigravity: "antigravity_runtime" } as Record<string, string>
+    )[provider];
   }
   return {
     setupAgentId: one("setupAgentId"),
     createdAgentId: one("createdAgentId"),
     name: one("name"),
-    harness: harness && (NEW_AGENT_HARNESSES as readonly string[]).includes(harness) ? harness : undefined,
+    harness: harness && offered(harness) ? harness : undefined,
   };
 }

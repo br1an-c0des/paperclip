@@ -2,6 +2,7 @@ import type { AdapterEnvironmentTestResult, AiConnectionList } from "@paperclipa
 import { describe, expect, it, vi } from "vitest";
 import type { AdapterInfo } from "@/api/agents";
 import {
+  antigravityCandidate,
   defaultBinding,
   defaultProfile,
   draftCreateRequest,
@@ -9,6 +10,7 @@ import {
   harnessChoices,
   hireOutcome,
   hireRequest,
+  kimiKeySecrets,
   legacyHireParams,
   needsRunnerQualification,
   preparing,
@@ -282,6 +284,7 @@ describe("draft to request", () => {
       runner: "paperclip",
       environmentId: "env-1",
       binding: { provider: "anthropic", method: "subscription", mode: "responsible_user" },
+      secretId: "",
     });
     expect(setupFromAgent({ adapterType: "process", adapterConfig: {}, runtimeConfig: {}, defaultEnvironmentId: null, metadata: { setupAdapterPending: true } } as never)).toEqual(emptySetup());
   });
@@ -403,5 +406,95 @@ describe("drafts and outcome", () => {
     });
     expect(legacyHireParams({ adapterType: "http" }).harness).toBeUndefined();
     expect(legacyHireParams({ createdAgentId: "a2" }).createdAgentId).toBe("a2");
+    expect(legacyHireParams({ adapterType: "paperclip_runner", runnerProvider: "kimi" }).harness).toBe("kimi_runtime");
+    expect(legacyHireParams({ adapterType: "paperclip_runner", runnerProvider: "antigravity" }).harness).toBe("antigravity_runtime");
+  });
+});
+
+describe("Runner-only harnesses (Kimi Code, Google Antigravity)", () => {
+  const candidate = adapter("paperclip_runner", { candidateHarnesses: [{ agent: "antigravity", model: "gemini-3.5-pro" }] });
+  const types = (adapters: AdapterInfo[], nativeRunner = true) => harnessChoices(adapters, [], { nativeRunner }).map((choice) => choice.type);
+
+  it("offers Kimi Code on the Runner while the Paperclip Runner setting is on", () => {
+    expect(types(ADAPTERS)).toContain("kimi_runtime");
+    expect(types(ADAPTERS, false)).not.toContain("kimi_runtime");
+    expect(types(ADAPTERS.map((entry) => (entry.type === "paperclip_runner" ? { ...entry, disabled: true } : entry)))).not.toContain("kimi_runtime");
+  });
+
+  it("offers Google Antigravity only with an operator's authorization, as a preview", () => {
+    expect(types(ADAPTERS)).not.toContain("antigravity_runtime");
+    const adapters = [...ADAPTERS.filter((entry) => entry.type !== "paperclip_runner"), candidate];
+    expect(types(adapters, false)).toEqual(["claude_local", "codex_local", "gemini_local", "antigravity_runtime"]);
+    expect(harnessChoices(adapters, [], {}).find((choice) => choice.type === "antigravity_runtime")).toEqual({ type: "antigravity_runtime", label: "Google Antigravity", meta: "Preview · Not used yet" });
+    expect(antigravityCandidate(adapters)).toEqual({ agent: "antigravity", model: "gemini-3.5-pro" });
+    expect(antigravityCandidate(ADAPTERS)).toBeNull();
+  });
+
+  it("counts Runner Kimi agents apart from the Kimi Code CLI", () => {
+    const agents = [
+      { adapterType: "paperclip_runner", adapterConfig: { provider: "acpx", acpxAgent: "kimi" }, status: "idle", pauseReason: null },
+      { adapterType: "kimi_local", adapterConfig: {}, status: "idle", pauseReason: null },
+    ] as never;
+    const choices = harnessChoices([...ADAPTERS, adapter("kimi_local")], agents, { nativeRunner: true });
+    expect(choices.find((choice) => choice.type === "kimi_runtime")?.meta).toBe("1 agent");
+    expect(choices.find((choice) => choice.type === "kimi_local")?.meta).toBe("1 agent");
+  });
+
+  it("saves them as the Paperclip Runner with their ACPX profile", () => {
+    expect(resolveRunner("kimi_runtime", "auto", ADAPTERS)).toMatchObject({ applies: false, runner: "paperclip", label: "Kimi Code · Paperclip Runner" });
+    const kimi = { ...emptySetup("kimi_runtime"), model: "kimi-code/k3", secretId: "sec-1" };
+    const patch = setupPatch({ adapterConfig: { env: { OTHER: "x" } }, runtimeConfig: {}, metadata: { setupAdapterPending: true } } as never, kimi, "paperclip");
+    expect(patch.adapterType).toBe("paperclip_runner");
+    expect(patch).not.toHaveProperty("runner");
+    expect(patch.adapterConfig).toEqual({
+      env: { OTHER: "x", KIMI_API_KEY: { type: "secret_ref", secretId: "sec-1", version: "latest" } },
+      model: "kimi-code/k3",
+      timeoutSec: 0,
+      graceSec: 15,
+      provider: "acpx",
+      acpxAgent: "kimi",
+      codexPermissionMode: "never",
+      opencodePermissionMode: "allow",
+      acpxPermissionMode: "approve-all",
+      lifecycleMode: "per_turn",
+    });
+    const hire = hireRequest({ id: "a1", adapterConfig: {} } as never, profile, { ...emptySetup("antigravity_runtime"), model: "gemini-3.5-pro" }, "paperclip");
+    expect(hire).toMatchObject({ adapterType: "paperclip_runner", adapterConfig: { provider: "acpx", acpxAgent: "antigravity", model: "gemini-3.5-pro" } });
+  });
+
+  it("needs an exact model, and Kimi its key", () => {
+    expect(setupProblem({ ...emptySetup("kimi_runtime"), secretId: "s" })).toBe("Enter the exact Kimi model ID.");
+    expect(setupProblem({ ...emptySetup("kimi_runtime"), model: "kimi-code/k3" })).toMatch(/KIMI_API_KEY/);
+    expect(setupProblem({ ...emptySetup("kimi_runtime"), model: "kimi-code/k3", secretId: "s" })).toBeNull();
+    expect(setupProblem({ ...emptySetup("antigravity_runtime"), model: "auto" })).toMatch(/exact Google Antigravity model/);
+    expect(setupProblem({ ...emptySetup("antigravity_runtime"), model: "gemini-3.5-pro" })).toBeNull();
+  });
+
+  it("reopens a saved Runner draft as its choice, with its key", () => {
+    const saved = setupFromAgent({
+      adapterType: "paperclip_runner",
+      adapterConfig: { provider: "acpx", acpxAgent: "kimi", model: "kimi-code/k3", env: { KIMI_API_KEY: { type: "secret_ref", secretId: "sec-9", version: "latest" } } },
+      runtimeConfig: {},
+      defaultEnvironmentId: null,
+      metadata: {},
+    } as never);
+    expect(saved).toMatchObject({ harness: "kimi_runtime", model: "kimi-code/k3", runner: "auto", secretId: "sec-9" });
+  });
+
+  it("signs Antigravity in with a Google connection, and lists Kimi key secrets", () => {
+    expect(signInChoices("antigravity_runtime", { connections: [], currentUserId: "u1" } as never).map((choice) => (choice.binding && "provider" in choice.binding ? choice.binding.provider : "local"))).toEqual(["local", "google"]);
+    expect(signInChoices("kimi_runtime", undefined)).toHaveLength(1);
+    const secrets = [
+      { id: "a", key: "OTHER", name: "Another", status: "active" },
+      { id: "b", key: "KIMI_API_KEY", name: "Kimi", status: "active" },
+      { id: "c", key: "KIMI_API_KEY", name: "Old Kimi", status: "disabled" },
+    ] as never[];
+    expect(kimiKeySecrets(secrets).map((secret: { id: string }) => secret.id)).toEqual(["b", "a"]);
+  });
+
+  it("tests them as the Paperclip Runner", async () => {
+    const test = vi.fn().mockResolvedValue(result("pass"));
+    await testSetup(test, { agentId: "a1", setup: { ...emptySetup("kimi_runtime"), model: "kimi-code/k3" }, runner: "paperclip", runnerChoice: "auto", environmentId: null, adapterConfig: {} });
+    expect(test).toHaveBeenCalledWith("paperclip_runner", expect.not.objectContaining({ runner: expect.anything() }));
   });
 });

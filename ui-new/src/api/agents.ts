@@ -96,6 +96,11 @@ export type AdapterInfo = {
   overriddenBuiltin?: boolean;
   /** For an override: paused, so the built-in harness runs instead. */
   overridePaused?: boolean;
+  /**
+   * The Paperclip Runner only: harnesses an operator has authorized for this company and a local
+   * computer before their release, each with the one model it admits (upstream `candidateHarnesses`).
+   */
+  candidateHarnesses?: Array<{ agent: "antigravity"; model: string }>;
   /** External harnesses: the npm package (or local folder) and its installed version. */
   packageName?: string;
   version?: string;
