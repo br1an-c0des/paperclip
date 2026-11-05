@@ -4,6 +4,7 @@ import type {
   AttentionSourceKind,
   CompactIssue,
   InboxDismissal,
+  InboxMineSnapshot,
   Issue,
   StalledReviewDecisionAction,
   StalledReviewDecisionResponse,
@@ -24,14 +25,20 @@ import { api } from "./client";
  * - One approval by id, for its request card, and the tasks it's linked to.
  * - A stalled review, one nobody can review: approve, request changes or send it back, as a person
  *   (`POST /issues/:id/stalled-review-decision`).
- * - Updates: the tasks you took part in, as the old Inbox's Mine tab lists them, with read state and
- *   the per-person inbox archive.
+ * - Updates: the tasks you took part in, in one read (`GET /companies/:id/inbox/mine`, the old
+ *   Inbox's Mine tab): the 100 most recently active, not archived, with their parents, the latest
+ *   failed run per agent and the interruption state of the tasks behind them. A source that failed
+ *   (failed runs, or the parents and failure state) comes back as an error beside the rows. It takes
+ *   no query parameters.
+ * - Read state and the per-person inbox archive. Cleared lists the archived tasks as the task list
+ *   with them less the task list without them, both read the old way (the snapshot has no archived
+ *   form).
  */
 
 /** Statuses the old Inbox's Mine tab lists (`INBOX_MINE_ISSUE_STATUSES` in the shared package). */
 export const INBOX_TASK_STATUSES = "backlog,todo,in_progress,in_review,blocked,done";
 
-/** How many of your tasks Updates reads, as the old Inbox's `INBOX_ISSUE_LIST_LIMIT`. */
+/** How many of your tasks Cleared compares, as the old Inbox's `INBOX_ISSUE_LIST_LIMIT`. */
 export const INBOX_TASK_LIMIT = 200;
 
 function taskParams(archived: boolean) {
@@ -72,7 +79,9 @@ export const inboxApi = {
   decideStalledReview: (issueId: string, action: StalledReviewDecisionAction, note?: string) =>
     api.post<StalledReviewDecisionResponse>(`/issues/${issueId}/stalled-review-decision`, note ? { action, note } : { action }),
 
-  /** Your tasks, minus the ones you archived from the inbox. */
+  /** Updates in one read: your tasks, their context, failed runs, and each source's error. */
+  mine: (companyId: string, signal?: AbortSignal) => api.get<InboxMineSnapshot>(`/companies/${companyId}/inbox/mine`, { signal }),
+  /** Your tasks, minus the ones you archived from the inbox (for Cleared's archived list). */
   tasks: (companyId: string, signal?: AbortSignal) => api.get<CompactIssue[]>(`/companies/${companyId}/issues?${taskParams(false)}`, { signal }),
   /** Your tasks, archived ones included. */
   tasksWithArchived: (companyId: string, signal?: AbortSignal) =>

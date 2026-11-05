@@ -12,7 +12,9 @@ import { groupFeed } from "./inbox-model";
  * that cache at once (`use-inbox.ts`), and the live events and answered cards refresh it.
  *
  * The feed's `deskBadgeCount` isn't this count: it counts items that arrived today or are due to be
- * decided today, alerts and snoozed items included.
+ * decided today, alerts and snoozed items included. Nor is `GET …/attention/summary`'s (what the old
+ * UI's nav reads now): its counts by kind leave cleared and snoozed items out, but keep requests on
+ * the aging shelf, which Needs you folds away (decision 39), and it doesn't say how many those are.
  */
 
 export function needsYouCount(items: readonly AttentionItem[]) {

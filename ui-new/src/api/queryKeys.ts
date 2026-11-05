@@ -226,13 +226,23 @@ export const queryKeys = {
    * The Inbox (board 14). The feed keeps the old UI's `["attention", companyId]` prefix; an approval
    * sits under `["approvals", companyId]`, which answering a card and the live events refresh; your
    * tasks sit under the company's task lists, so task changes refresh Updates.
+   *
+   * Updates' one read (`inbox/mine`) is kept as arrays, as the old UI keeps it: its rows under
+   * `tasks`, and its context rows (parents, and tasks behind failed runs with their interruption)
+   * under `mineContext`, both under the task lists so a retry patches them in place; what else it
+   * says (which tasks had failed runs, each source's error) under `mineSources`. Decision history
+   * sits under the feed's prefix, so whatever refreshes the feed refreshes it.
    */
   inbox: {
     attention: (companyId: string) => ["attention", companyId] as const,
     feed: (companyId: string) => ["attention", companyId, "with-dismissed"] as const,
+    history: (companyId: string, filters: Record<string, string>) => ["attention", companyId, "history", filters] as const,
     approval: (companyId: string, approvalId: string) => ["approvals", companyId, "detail", approvalId] as const,
     approvalIssues: (companyId: string, approvalId: string) => ["approvals", companyId, "detail", approvalId, "issues"] as const,
     tasks: (companyId: string) => ["issues", companyId, "inbox", "mine"] as const,
+    mineContext: (companyId: string) => ["issues", companyId, "inbox", "mine-context"] as const,
+    mineSources: (companyId: string) => ["inbox-mine", companyId, "sources"] as const,
+    tasksUnarchived: (companyId: string) => ["issues", companyId, "inbox", "unarchived"] as const,
     tasksWithArchived: (companyId: string) => ["issues", companyId, "inbox", "with-archived"] as const,
   },
   /** Proposals (Decisions): one by id, and the company's open list, which says which targets changed. */

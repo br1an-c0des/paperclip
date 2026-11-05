@@ -530,3 +530,73 @@
 :root[data-viewport="phone"] .ibx-row-title {
   flex: 1 1 60%;
 }
+
+/* Updates: a source the read couldn't load, above the rows; a subtask's parent beside its title. */
+.ibx-source {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 16px;
+  color: var(--amber-fg);
+  font-size: 13px;
+}
+
+.ibx-source p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--body);
+  line-height: 1.45;
+}
+
+.ibx-source-detail {
+  color: var(--muted);
+}
+
+.ibx-task-parent {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* History: filter buttons that show their pick, outcome labels, Load more. */
+.ibx-pick {
+  gap: 6px;
+}
+
+.ibx-pick-label {
+  color: var(--muted);
+}
+
+.ibx-pick b {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.ibx-hist-outcome {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ibx-hist-task {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ibx-more {
+  display: flex;
+  justify-content: center;
+}
+
+@container ibx (max-width: 640px) {
+  .ibx-hist-task {
+    display: none;
+  }
+}

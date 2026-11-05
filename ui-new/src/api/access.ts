@@ -1,4 +1,4 @@
-import type { HumanCompanyMembershipRole, JoinRequest, PermissionKey } from "@paperclipai/shared";
+import type { AuthSession, BoardBootstrap, HumanCompanyMembershipRole, JoinRequest, PermissionKey } from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
@@ -15,6 +15,23 @@ export type CurrentBoardAccess = {
 };
 
 type PersonRef = { id: string; email: string | null; name: string | null; image: string | null };
+
+/**
+ * Board access from the session's `boardBootstrap`, as `GET /cli-auth/me` would answer it. The
+ * bootstrap carries the access itself; the person comes from the session, and the source from the
+ * session's id (`paperclip:<source>:<userId>`), which is how the server names it. The server sends a
+ * bootstrap only for a signed-in session (`session` or `cloud_tenant`).
+ */
+export function boardAccessFromBootstrap(bootstrap: Pick<BoardBootstrap, "boardAccess">, session: Pick<AuthSession, "session" | "user">): CurrentBoardAccess {
+  const source = /^paperclip:([^:]+):/.exec(session.session.id)?.[1] ?? "session";
+  return {
+    user: { id: session.user.id, email: session.user.email, name: session.user.name, image: session.user.image },
+    userId: bootstrap.boardAccess.userId,
+    isInstanceAdmin: bootstrap.boardAccess.isInstanceAdmin,
+    companyIds: [...bootstrap.boardAccess.companyIds],
+    source,
+  };
+}
 
 /** The company's people (`GET /companies/:id/user-directory`), for assignee and reviewer menus. */
 export type CompanyUserDirectoryEntry = {

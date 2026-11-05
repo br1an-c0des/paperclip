@@ -5,6 +5,7 @@ import { useCompany } from "@/lib/company";
 import { budgetIncidentHref, RequestCard } from "@/requests/RequestCard";
 import { expiryLabel, type Request } from "@/requests/request-model";
 import type { TaskPeople } from "@/tasks/people";
+import { RetryMark } from "@/tasks/retry";
 import { Button, buttonClass } from "@/ui/Button";
 import { Menu } from "@/ui/Menu";
 import { StatusCapsule } from "@/ui/Status";
@@ -18,7 +19,9 @@ import { itemTask, type Inbox } from "./use-inbox";
  * with a card source — questions, proposals (connection requests and Decisions among them),
  * approvals, join requests and sign-offs — draw the shared RequestCard; everything else (stuck work,
  * alerts) draws a plain card in the same frame that links to its task, or for a budget alert to the
- * budget controls. Cards that arrived since you last looked carry "New".
+ * budget controls. Cards that arrived since you last looked carry "New". A plain card whose task is
+ * interrupted (a failed run's, say) shows the state and Retry beside Open the task, as task rows do;
+ * the state comes from Updates' read (`interruptionFor`).
  *
  * Snoozed and Cleared draw items as one-line rows with Restore; the aging shelf draws them as rows
  * with Keep.
@@ -145,6 +148,11 @@ export function NeedsItem(props: {
   onOpen: () => void;
 }) {
   const task = () => props.inbox.taskOf(props.item);
+  const retryTask = () => {
+    const found = task();
+    const interruption = found ? props.inbox.interruptionFor(found.id) : null;
+    return found && interruption ? { id: found.id, identifier: found.identifier, title: found.title ?? found.identifier ?? "", interruption } : null;
+  };
   const waitsOnCard = () => !props.failed && ((CARD_SOURCES.has(props.item.sourceKind) && !!task()) || TASKLESS_SOURCES.has(props.item.sourceKind));
   return (
     <div
@@ -164,6 +172,9 @@ export function NeedsItem(props: {
               fresh={props.fresh}
               onOpen={props.onOpen}
               menu={<TriageMenu item={props.item} inbox={props.inbox} />}
+              retry={
+                <Show when={retryTask()}>{(found) => <RetryMark task={found()} retry={props.inbox.retry} />}</Show>
+              }
               aside={<Context item={props.item} inbox={props.inbox} people={props.people} showWhy={false} onOpen={props.onOpen} />}
             />
           }
@@ -202,7 +213,7 @@ function noActionNote(item: AttentionItem) {
 }
 
 /** Items without a request card (stuck work, alerts, and any card whose source didn't load): what and why, and the task. */
-function PlainCard(props: { item: AttentionItem; hasTask: boolean; fresh?: boolean; onOpen: () => void; menu: JSX.Element; aside: JSX.Element }) {
+function PlainCard(props: { item: AttentionItem; hasTask: boolean; fresh?: boolean; onOpen: () => void; menu: JSX.Element; aside: JSX.Element; retry?: JSX.Element }) {
   const company = useCompany();
   const budget = () => props.item.sourceKind === "budget_alert" || props.item.subject.kind === "budget_incident";
   const alert = () => ["failed_run", "budget_alert", "agent_error_alert", "blocker_attention"].includes(props.item.sourceKind);
@@ -261,6 +272,7 @@ function PlainCard(props: { item: AttentionItem; hasTask: boolean; fresh?: boole
               <Button size="compact" variant={alert() ? "secondary" : "primary"} onClick={() => props.onOpen()}>
                 Open the task
               </Button>
+              {props.retry}
             </Show>
           </div>
         </div>
