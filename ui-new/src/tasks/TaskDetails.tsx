@@ -11,6 +11,7 @@ import {
   FileText,
   Flag,
   FolderGit2,
+  Gauge,
   GitFork,
   GitPullRequest,
   Hash,
@@ -58,6 +59,7 @@ import { hasOrigin, OriginValue, RequesterValue, ReviewPolicyBadge } from "./Tas
 import { requester } from "./task-origin";
 import { PlanDecompositions } from "./PlanDecompositions";
 import { ExternalObjects } from "./ExternalObjects";
+import { UsageLimitValue, useUsageLimit } from "./UsageLimit";
 import "./TaskDetails.css";
 
 /*
@@ -113,8 +115,11 @@ export function TaskStatusChip(props: { task: StatusSource; small?: boolean }) {
   return <StatusChip status={look().status} queued={look().queued} title={look().title} small={props.small} />;
 }
 
-/** One property row. `empty` folds it under "Show N empty fields" until it has a value. */
-type Property = { key: string; icon: JSX.Element; label: string; empty: (task: Issue) => boolean; value: () => JSX.Element };
+/**
+ * One property row. `empty` folds it under "Show N empty fields" until it has a value; `absent`
+ * leaves it out altogether, for a row that only exists while there's something to say (Usage limit).
+ */
+type Property = { key: string; icon: JSX.Element; label: string; empty: (task: Issue) => boolean; absent?: () => boolean; value: () => JSX.Element };
 
 export function TaskDetails(props: {
   taskId: string;
@@ -147,6 +152,12 @@ export function TaskDetails(props: {
   const now = useNow(() => !!run());
   const kids = () => subtasks.data ?? [];
   const kidsDone = () => kids().filter((kid) => kid.status === "done").length;
+  // The assignee's provider usage limit (U40), while it has a current window to show.
+  const usage = useUsageLimit(() => task()?.assigneeAgentId);
+  const usageHref = () => {
+    const agent = people.agent(task()?.assigneeAgentId);
+    return agent ? `/${company().issuePrefix}/agents/${agent.urlKey ?? agent.id}/runtime` : undefined;
+  };
 
   // The rows are made once and read the task reactively, so an open menu (labels, the stage editor)
   // stays open while the change it made comes back.
@@ -167,6 +178,14 @@ export function TaskDetails(props: {
   const properties: Property[] = [
     { key: "status", icon: <CircleDot size={15} />, label: "Status", empty: () => false, value: () => <StatusControl status={t().status} look={statusLook(t())} onChange={change} /> },
     { key: "assignee", icon: <UserRound size={15} />, label: "Assignee", empty: () => false, value: () => <AssigneeControl task={t()} people={people} onChange={change} /> },
+    {
+      key: "usage",
+      icon: <Gauge size={15} />,
+      label: "Usage limit",
+      empty: () => false,
+      absent: () => !usage(),
+      value: () => <Show when={usage()}>{(limit) => <UsageLimitValue limit={limit()} href={usageHref()} />}</Show>,
+    },
     {
       key: "review",
       icon: <Eye size={15} />,
@@ -257,8 +276,9 @@ export function TaskDetails(props: {
     const current = task();
     return !!current && property.empty(current) && !pinned().has(property.key);
   };
-  const shown = createMemo(() => (task() ? properties.filter((property) => showEmpty() || !isEmpty(property)) : []));
-  const empty = createMemo(() => (task() ? properties.filter(isEmpty) : []));
+  const present = () => properties.filter((property) => !property.absent?.());
+  const shown = createMemo(() => (task() ? present().filter((property) => showEmpty() || !isEmpty(property)) : []));
+  const empty = createMemo(() => (task() ? present().filter(isEmpty) : []));
 
   return (
     <div class="td-main">

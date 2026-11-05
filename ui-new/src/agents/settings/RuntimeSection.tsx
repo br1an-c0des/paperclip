@@ -44,6 +44,7 @@ import { extrasChanges, extrasConfig, extrasDraft, fieldVisible, harnessFields, 
 import { EnvironmentMenu, HarnessDisc, instanceDefaultEnvironment, ModelMenu, TestChecks } from "./fields";
 import { HarnessChangeDialog } from "./HarnessChange";
 import { RunnerStateCard } from "./RunnerStateCard";
+import { UsageLimitDetail, useUsageLimit } from "@/tasks/UsageLimit";
 
 /*
  * Model and runtime (board 26): harness and model, where it runs, when it wakes, run limits,
@@ -68,6 +69,8 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
   const company = useCompany();
   const client = useQueryClient();
   const identity = createMemo(() => runtimeIdentity(props.agent));
+  // The provider usage limit the harness last reported (U40), the same read as RunnerStateCard's.
+  const usage = useUsageLimit(() => props.agent.id);
   const fields = createMemo(() => runtimeFields(props.agent));
   const base = createMemo(() => runtimeDraft(props.agent));
   const [draft, setDraft] = createStore<RuntimeDraft>(runtimeDraft(props.agent));
@@ -257,6 +260,13 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
           </Show>
         </SettingsRow>
         <SignInRow agent={props.agent} value={draft.connection} saved={base().connection} onChange={(value) => setDraft("connection", value)} />
+        <Show when={usage()}>
+          {(limit) => (
+            <SettingsRow label="Usage limit" help={`What ${limit().provider} last reported for this sign-in's limits. Queued work waits while it's used up.`}>
+              <UsageLimitDetail limit={limit()} />
+            </SettingsRow>
+          )}
+        </Show>
         <Show when={fields().model}>
           <SettingsRow label="Model">
             <ModelMenu models={models.data} loading={models.isLoading} value={draft.model} onChange={(model) => setDraft("model", model)} />

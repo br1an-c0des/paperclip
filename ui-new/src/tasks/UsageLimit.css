@@ -1,0 +1,129 @@
+/* The "Usage limit" property (UsageLimit.tsx): a small bar and the line, amber near the limit, red at it. */
+.ul-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 32px;
+  margin-left: -8px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  color: var(--text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.ul-trigger:hover {
+  background: var(--hover);
+}
+
+.ul-trigger[data-tone="warn"] {
+  color: var(--amber-fg);
+}
+
+.ul-trigger[data-tone="reached"] {
+  color: var(--red-fg);
+}
+
+.ul-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ul-bar {
+  position: relative;
+  flex-shrink: 0;
+  width: 24px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--pri-off);
+}
+
+.ul-bar--wide {
+  width: 100%;
+}
+
+.ul-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--r-pill);
+  background: var(--muted);
+}
+
+.ul-bar[data-tone="warn"] > span {
+  background: var(--amber-fg);
+}
+
+.ul-bar[data-tone="reached"] > span {
+  background: var(--red-fg);
+}
+
+.ul-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.ul-window {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ul-window-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ul-window-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--body);
+}
+
+.ul-window-value {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.ul-window-value[data-tone="warn"],
+.ul-note[data-tone="warn"] {
+  color: var(--amber-fg);
+}
+
+.ul-window-value[data-tone="reached"] {
+  color: var(--red-fg);
+}
+
+.ul-muted {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.ul-detail p {
+  margin: 0;
+}
+
+.ul-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ul-foot a {
+  color: var(--run-fg);
+}
