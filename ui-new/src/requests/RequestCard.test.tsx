@@ -111,6 +111,21 @@ describe("RequestCard", () => {
     expect(screen.queryByRole("button", { name: /Send/ })).toBeNull();
   });
 
+  it("links a plan review to the Plan revision it asks about, open or settled (U41)", () => {
+    const review = {
+      ...question,
+      kind: "request_confirmation",
+      payload: { version: 1, prompt: "Approve the plan?", acceptLabel: "Approve plan", rejectLabel: "Request changes", target: { type: "issue_document", key: "plan", revisionId: "rev-2", revisionNumber: 2 } },
+    } as unknown as IssueThreadInteraction;
+    const open = mount(review);
+    expect(screen.getByRole("link", { name: "Plan v2" }).getAttribute("href")).toBe("#document-plan&revision=rev-2");
+    expect(screen.getByRole("button", { name: "Approve plan" })).toBeTruthy();
+    open.unmount();
+    mount({ ...review, status: "rejected", resolvedByUserId: "me", result: { version: 1, outcome: "rejected", reason: "Split step 3" } } as unknown as IssueThreadInteraction);
+    expect(screen.getByText("You requested changes to Plan v2: Split step 3")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Plan v2" })).toBeTruthy();
+  });
+
   it("adds the page's triage to its menu, draws the context column and opens the subject in place", async () => {
     const client = new QueryClient();
     const onOpen = vi.fn();

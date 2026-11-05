@@ -22,7 +22,8 @@ import { MessageBody } from "@/tasks/MessageBody";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
-import { Capsule, StatusCapsule } from "@/ui/Status";
+import { documentAnchor, parseTaskAnchor } from "@/tasks/task-anchor";
+import { Capsule, TaskStatusCapsule } from "@/ui/Status";
 import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { ChatActivity } from "./ChatActivity";
 import { ChatComposer } from "./ChatComposer";
@@ -262,12 +263,18 @@ function ChatThread(props: ChatViewProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const openKey = createMemo(() => documentKeyFromHash(location.hash));
-  const documentHref = (key: string) => `${location.pathname}${location.search}${documentHash(key)}`;
+  // A plan review's "Plan v2" link adds the revision (`#document-plan&revision=<id>`; task-anchor.ts).
+  const openRevision = createMemo(() => {
+    const anchor = parseTaskAnchor(location.hash);
+    return anchor?.kind === "document" ? anchor.revision : null;
+  });
+  const documentHref = (key: string, revision: string | null = null) =>
+    `${location.pathname}${location.search}${revision ? documentAnchor(key, null, revision) : documentHash(key)}`;
   let pushedDocument = false;
-  const openDocument = (key: string) => {
-    if (openKey() === key) return;
+  const openDocument = (key: string, revision: string | null = null) => {
+    if (openKey() === key && openRevision() === revision) return;
     pushedDocument = openKey() === null;
-    navigate(documentHref(key), { scroll: false, replace: openKey() !== null });
+    navigate(documentHref(key, revision), { scroll: false, replace: openKey() !== null });
   };
   const closeDocument = () => {
     if (openKey() === null) return;
@@ -300,11 +307,13 @@ function ChatThread(props: ChatViewProps) {
       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const link = (event.target as Element | null)?.closest?.("a[href]");
       const current = state.chat();
-      const key = link ? chatDocumentLink(link.getAttribute("href"), current ? { id: current.id, identifier: current.identifier } : null) : null;
+      const href = link?.getAttribute("href") ?? null;
+      const key = chatDocumentLink(href, current ? { id: current.id, identifier: current.identifier } : null);
       if (!key) return;
       event.preventDefault();
       event.stopPropagation();
-      openDocument(key);
+      const anchor = parseTaskAnchor(href!.slice(href!.indexOf("#")));
+      openDocument(key, anchor?.kind === "document" ? anchor.revision : null);
     };
     element.addEventListener("click", onClick, true);
     onCleanup(() => element.removeEventListener("click", onClick, true));
@@ -458,7 +467,7 @@ function ChatThread(props: ChatViewProps) {
           <Show when={viewport() === "desktop"} fallback={<Show when={props.controls.activityOpen()}>{<div class="ch-scrim" onClick={() => props.controls.setActivityOpen(false)} />}{activity(true)}</Show>}>
             {activity(false)}
           </Show>
-          <ChatDocumentDialog host={documentHost()} docKey={openKey()} title={openTitle()} onClose={closeDocument} />
+          <ChatDocumentDialog host={documentHost()} docKey={openKey()} revision={openRevision()} title={openTitle()} onClose={closeDocument} />
         </div>
       </Match>
     </Switch>
@@ -716,7 +725,7 @@ function TaskCard(props: {
         commands.openTaskModal({ id: props.task.id, identifier: props.task.identifier, title: props.task.title, projectId: props.task.projectId });
       }}
     >
-      <StatusCapsule status={shown()} size="row" live={shown() === "in_progress"} />
+      <TaskStatusCapsule task={props.task} size="row" live={shown() === "in_progress"} />
       <span class="ch-task-text">
         <Show when={props.kicker}>
           <span class="ch-task-kicker">{props.kicker}</span>

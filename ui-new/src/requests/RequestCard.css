@@ -477,6 +477,33 @@
   font-weight: 500;
 }
 
+/* A plan review's "Plan v2" link (U41). */
+.rq-plan {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 2px 9px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.rq-plan svg {
+  color: var(--violet-fg);
+}
+
+.rq-plan:hover,
+.rq-plan:focus-visible {
+  border-color: var(--muted);
+  color: var(--text);
+}
+
 .rq-res {
   display: flex;
   align-items: center;

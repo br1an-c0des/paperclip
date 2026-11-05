@@ -114,6 +114,8 @@ export function TaskFiles(props: {
   openDocKey?: string;
   /** The image its gallery opens on, from a `#document-<key>&image=<n>` link. */
   openImage?: number | null;
+  /** The revision it opens on, from a `#document-<key>&revision=<id>` link (a plan review's "Plan v2"). */
+  openRevision?: string | null;
 }) {
   const company = useCompany();
   const location = useLocation();
@@ -236,7 +238,10 @@ export function TaskFiles(props: {
   const backToList = () => setView({ kind: "list" });
   // The gallery's image goes in the address (`#document-<key>&image=2`), so a link opens it again.
   const showImage = (key: string, image: number | null) =>
-    navigate(`${location.pathname}${location.search}${documentAnchor(key, image)}`, { replace: true, scroll: false });
+    navigate(`${location.pathname}${location.search}${documentAnchor(key, image, key === props.openDocKey ? (props.openRevision ?? null) : null)}`, {
+      replace: true,
+      scroll: false,
+    });
 
   return (
     <Suspense fallback={<p class="tsec-muted tf-loading">Loading…</p>}>
@@ -248,6 +253,7 @@ export function TaskFiles(props: {
               docKey={open().key}
               editOnOpen={open().edit}
               image={open().key === props.openDocKey ? (props.openImage ?? null) : null}
+              revision={open().key === props.openDocKey ? (props.openRevision ?? null) : null}
               onImage={(image) => showImage(open().key, image)}
               backLabel="Back to docs and files"
               onBack={backToList}

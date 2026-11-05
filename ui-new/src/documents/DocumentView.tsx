@@ -80,6 +80,8 @@ export function DocumentView(props: {
   image?: number | null;
   /** Called with the image the gallery moves to, or null when it closes; the page puts it in the address. */
   onImage?: (position: number | null) => void;
+  /** A revision to open on, from the page's address (a plan review's "Plan v2" link), or null for the current one. */
+  revision?: string | null;
   backLabel: string;
   onBack: () => void;
   onDeleted: () => void;
@@ -116,6 +118,18 @@ export function DocumentView(props: {
   const [selection, setSelection] = createSignal<PendingComment | null>(null);
   const [composing, setComposing] = createSignal<SelectionAnchor | null>(null);
   const [textEl, setTextEl] = createSignal<HTMLElement>();
+
+  // A link to one revision opens it as history does: read-only, with Restore and Compare.
+  createEffect(
+    on(
+      () => props.revision ?? null,
+      (revision) => {
+        if (!revision) return;
+        setHistoryWanted(true);
+        setSelectedRevision(revision);
+      },
+    ),
+  );
 
   const revState = createMemo(() => (doc.data ? revisionState(doc.data, revisions.data ?? []) : null));
   const viewing = createMemo(() => {
