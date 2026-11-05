@@ -95,6 +95,9 @@ export type RequestCardProps = {
   fresh?: boolean;
 };
 
+/** The prompt's element id, so a control group can be labelled by the rendered Markdown. */
+const promptId = (request: Request) => `rq-prompt-${request.key.replace(/[^\w-]/g, "-")}`;
+
 export function RequestCard(props: RequestCardProps) {
   const [opened, setOpened] = createSignal(false);
   return (
@@ -366,7 +369,16 @@ function OpenCard(props: RequestCardProps) {
             <span>· {stampLabel(props.request.createdAt)}</span>
           </div>
         </Show>
-        <h3 class="disp">{props.request.title}</h3>
+        <Show when={!props.request.prompt || props.request.prompt.ownTitle}>
+          <h3 class="disp">{props.request.title}</h3>
+        </Show>
+        <Show when={props.request.prompt}>
+          {(prompt) => (
+            <div id={promptId(props.request)} class="rq-prompt" classList={{ "rq-prompt--lead": !prompt().ownTitle }}>
+              <Markdown source={prompt().markdown} />
+            </div>
+          )}
+        </Show>
         <Show when={props.request.body && props.request.shape !== "tool_call"}>
           <div class="rq-body">
             <Markdown source={props.request.body!} />
@@ -655,7 +667,7 @@ function CheckboxConfirmation(props: {
   const toggle = (id: string) => setPicked((current) => (current.includes(id) ? current.filter((value) => value !== id) : current.length < max() ? [...current, id] : current));
   return (
     <>
-      <div class="rq-opts" role="group" aria-label={payload().prompt}>
+      <div class="rq-opts" role="group" aria-labelledby={props.request.prompt ? promptId(props.request) : undefined} aria-label={props.request.prompt ? undefined : props.request.title}>
         <For each={payload().options}>
           {(option) => (
             <button type="button" class="rq-opt" role="checkbox" aria-checked={picked().includes(option.id)} disabled={props.busy} onClick={() => toggle(option.id)}>

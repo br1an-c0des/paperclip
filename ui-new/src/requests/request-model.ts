@@ -71,7 +71,14 @@ export type Request = {
   asker: { agentId: string | null; userId: string | null; name: string };
   /** "asks you", "suggests 3 tasks", "requests approval"… */
   askVerb: string;
+  /** One plain line: the card's heading, and where a short name is needed (set-aside rows, receipts, labels). */
   title: string;
+  /**
+   * A confirmation's prompt as Markdown (#18851), which the open card draws in place of the plain
+   * title, or under the agent's own title when it gave one (`ownTitle`). Images in it are shown as
+   * references, not loaded.
+   */
+  prompt?: { markdown: string; ownTitle: boolean } | null;
   body: string | null;
   next: string;
   lifetime: string;
@@ -151,10 +158,47 @@ function respondOf(interaction: IssueThreadInteraction, ctx: RequestContext): Re
   return { allowed: true, reason: null };
 }
 
-type Classified = Pick<Request, "kind" | "shape" | "outcome" | "acts" | "askVerb" | "title" | "body">;
+/**
+ * A Markdown prompt as one plain line, for a title: the first line with text, without its
+ * formatting, cut to `max` characters.
+ */
+export function plainLine(markdown: string, max = 140) {
+  const line =
+    markdown
+      .replace(/```[\s\S]*?(?:```|$)/g, "\n")
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/<[^>]+>/g, "")
+      .split("\n")
+      .map((part) => part.replace(/^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)/, "").trim())
+      .find(Boolean) ?? "";
+  const plain = line
+    .replace(/(\*\*|__|~~)(.+?)\1/g, "$2")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/(^|[^\w*])\*(\S(?:.*?\S)?)\*(?!\w)/g, "$1$2")
+    .replace(/(^|[^\w])_(\S(?:.*?\S)?)_(?!\w)/g, "$1$2")
+    .replace(/\\([\\`*_{}[\]()#+\-.!>~|])/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+  return plain.length > max ? `${plain.slice(0, max - 1).trimEnd()}…` : plain;
+}
+
+/** Images in an agent's prompt as references ("Image: alt (url)"), so the card loads nothing, as the old UI's `mediaMode="reference"`. */
+export function referenceImages(markdown: string) {
+  return markdown.replace(/!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g, (_match, alt: string, url: string) => `Image: ${alt.trim() || "untitled"} (${url})`);
+}
+
+type Classified = Pick<Request, "kind" | "shape" | "outcome" | "acts" | "askVerb" | "title" | "prompt" | "body">;
 
 function classify(interaction: IssueThreadInteraction): Classified {
   const titled = (fallback: string) => interaction.title?.trim() || fallback;
+  // A confirmation's prompt is Markdown: the plain title is its first line, unless the agent gave
+  // the request a title of its own.
+  const prompted = (prompt: string) => {
+    const own = interaction.title?.trim();
+    const ownTitle = !!own && own !== prompt.trim();
+    return { title: ownTitle ? own! : plainLine(prompt) || "Confirm", prompt: prompt.trim() ? { markdown: referenceImages(prompt), ownTitle } : null };
+  };
   switch (interaction.kind) {
     case "ask_user_questions": {
       const questions = interaction.payload.questions ?? [];
@@ -178,7 +222,7 @@ function classify(interaction: IssueThreadInteraction): Classified {
           outcome: payload.toolAction.rememberActionScope ? "apply_and_remember" : "apply",
           acts: true,
           askVerb: "wants to run a tool",
-          title: titled(payload.prompt),
+          ...prompted(payload.prompt),
           body: payload.toolAction.previewMarkdown || null,
         };
       }
@@ -189,7 +233,7 @@ function classify(interaction: IssueThreadInteraction): Classified {
           outcome: "apply",
           acts: true,
           askVerb: "asks for a secret",
-          title: titled(payload.prompt),
+          ...prompted(payload.prompt),
           body: payload.secretProposal.justification || payload.detailsMarkdown || null,
         };
       }
@@ -200,8 +244,8 @@ function classify(interaction: IssueThreadInteraction): Classified {
         outcome: "return",
         acts: false,
         askVerb: plan ? "asks you to approve the plan" : "asks you",
-        title: titled(payload.prompt),
-        body: interaction.title?.trim() && interaction.title.trim() !== payload.prompt ? payload.prompt : (payload.detailsMarkdown ?? null),
+        ...prompted(payload.prompt),
+        body: payload.detailsMarkdown ?? null,
       };
     }
     case "request_checkbox_confirmation":
@@ -211,7 +255,7 @@ function classify(interaction: IssueThreadInteraction): Classified {
         outcome: "return",
         acts: false,
         askVerb: "asks you to pick",
-        title: titled(interaction.payload.prompt),
+        ...prompted(interaction.payload.prompt),
         body: interaction.payload.detailsMarkdown ?? null,
       };
     case "request_item_verdicts":

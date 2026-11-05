@@ -177,6 +177,22 @@
   color: var(--body);
 }
 
+/* A confirmation's Markdown prompt (#18851): under the agent's own title, or as the heading */
+.rq-prompt .md {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.rq-prompt--lead .md {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.rq-prompt--lead .md strong {
+  font-weight: 800;
+}
+
 .rq-next {
   display: flex;
   align-items: flex-start;

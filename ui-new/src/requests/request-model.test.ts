@@ -1,6 +1,6 @@
 import type { Approval, IssueThreadInteraction } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { expiryLabel, requestFromApproval, requestFromInteraction, requestFromReview, signoffOf, suggestedOwner, taskRequests, type RequestContext } from "./request-model";
+import { expiryLabel, plainLine, referenceImages, requestFromApproval, requestFromInteraction, requestFromReview, signoffOf, suggestedOwner, taskRequests, type RequestContext } from "./request-model";
 
 const ctx: RequestContext = {
   youId: "me",
@@ -99,6 +99,24 @@ describe("interactions as requests", () => {
     expect(requestFromInteraction(failed, ctx)).toMatchObject({ verdict: { text: "You approved and ran it", tone: "ok" }, result: { text: "The call failed: checks failed", tone: "bad" } });
   });
 
+  it("keeps a confirmation's prompt as Markdown, with a plain title from its first line (#18851)", () => {
+    const prompt = "Review the [two screenshots](/TRA/issues/TRA-42#document-preview).\n\nSelect **Accept** to keep this design.\n\n![Review image](https://provider.invalid/review.png)";
+    const confirm = interaction({ kind: "request_confirmation", payload: { version: 1, prompt, detailsMarkdown: "More context" } });
+    const request = requestFromInteraction(confirm, ctx);
+    expect(request.title).toBe("Review the two screenshots.");
+    expect(request.prompt?.ownTitle).toBe(false);
+    expect(request.prompt?.markdown).toContain("Select **Accept**");
+    expect(request.prompt?.markdown).toContain("Image: Review image (https://provider.invalid/review.png)");
+    expect(request.prompt?.markdown).not.toContain("![");
+    expect(request.body).toBe("More context");
+
+    const titled = requestFromInteraction({ ...confirm, title: "Pick a design" } as IssueThreadInteraction, ctx);
+    expect(titled).toMatchObject({ title: "Pick a design", prompt: { ownTitle: true }, body: "More context" });
+
+    const checkbox = interaction({ kind: "request_checkbox_confirmation", payload: { version: 1, prompt: "Keep **which** files?", options: [] } });
+    expect(requestFromInteraction(checkbox, ctx)).toMatchObject({ title: "Keep which files?", prompt: { markdown: "Keep **which** files?", ownTitle: false } });
+  });
+
   it("knows who may answer", () => {
     expect(requestFromInteraction({ ...question, addresseeUserId: "u2" } as IssueThreadInteraction, ctx).respond).toEqual({
       allowed: false,
@@ -106,6 +124,20 @@ describe("interactions as requests", () => {
     });
     expect(requestFromInteraction({ ...question, effectiveResolverPolicy: "not_creator", createdByAgentId: null, createdByUserId: "me" } as IssueThreadInteraction, ctx).respond.allowed).toBe(false);
     expect(requestFromInteraction({ ...question, addresseeUserId: "me" } as IssueThreadInteraction, ctx).audience.label).toBe("You");
+  });
+});
+
+describe("plainLine and referenceImages", () => {
+  it("takes the first line with text, without its formatting", () => {
+    expect(plainLine("\n# Ship **v2**?\n\nMore")).toBe("Ship v2?");
+    expect(plainLine("- Check `preview.png` and [the doc](/x)")).toBe("Check preview.png and the doc");
+    expect(plainLine("```mermaid\nflowchart LR\n```\nApprove *this* plan")).toBe("Approve this plan");
+    expect(plainLine("Keep snake_case_names and 2 * 3")).toBe("Keep snake_case_names and 2 * 3");
+    expect(plainLine("x".repeat(200), 20)).toHaveLength(20);
+  });
+
+  it("turns images into references", () => {
+    expect(referenceImages('See ![shot](https://a.invalid/s.png "Title") and ![](/api/x.png)')).toBe("See Image: shot (https://a.invalid/s.png) and Image: untitled (/api/x.png)");
   });
 });
 
