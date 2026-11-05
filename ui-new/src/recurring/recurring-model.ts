@@ -189,6 +189,15 @@ function humanize(reason: string) {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/**
+ * The agent run that started this one, when an agent's run fired the routine's webhook
+ * (`createdByRunId`, upstream #18772): the automation's ancestry, shown as "started by run …".
+ */
+export function startedByRun(run: Pick<RoutineRunSummary, "createdByRunId">): { runId: string; label: string } | null {
+  const runId = run.createdByRunId;
+  return runId ? { runId, label: `run ${runId.slice(0, 8)}` } : null;
+}
+
 /** How a run turned out (board R3): the task it made and that task's status, or why there's none. */
 export function runOutcome(run: Pick<RoutineRunSummary, "status" | "failureReason" | "linkedIssue">): RunOutcome {
   const issue = run.linkedIssue;

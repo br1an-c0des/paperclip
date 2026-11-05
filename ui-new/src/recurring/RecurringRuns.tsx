@@ -8,6 +8,7 @@ import { issuePath } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { routinesApi } from "@/api/routines";
 import { taskActionsApi } from "@/api/task-actions";
+import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useExperimentalSettingsQuery, useProjectsQuery } from "@/lib/company-data";
 import { workspaceChoiceAvailable, type ReusedWorkspace, type WorkspaceMode } from "@/tasks/new-task";
@@ -20,14 +21,15 @@ import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { environmentChoiceAvailable, projectEnvironment, runWorkspacePayload } from "./details-model";
 import { refreshRecurring } from "./queries";
-import { filterRuns, RUN_SOURCE_LABEL, runOutcome, type RunFilter, type RunSource } from "./recurring-model";
+import { filterRuns, RUN_SOURCE_LABEL, runOutcome, startedByRun, type RunFilter, type RunSource } from "./recurring-model";
 import { formatFire } from "./schedule";
 
 /*
  * The recurring task's runs (board R3): each run's time, what started it (schedule, webhook, API,
  * Run now) and how it turned out: the task it made and that task's status, or skipped, added to the
- * open one, or failed with the reason. A filter for all runs, the ones that made a task, and the
- * ones that didn't. Run now takes the inputs and who to assign (`POST /routines/:id/run`), and, as
+ * open one, or failed with the reason. A run an agent's run started through the webhook says
+ * which, and opens that run in the run modal. A filter for all runs, the ones that made a task,
+ * and the ones that didn't. Run now takes the inputs and who to assign (`POST /routines/:id/run`), and, as
  * the old Run now dialog does, where the run works: the project's checkout, a new worktree or another
  * task's (when the instance and the project have execution workspaces on), and the environment
  * (when the instance has environments on). Routines don't store these, so each run picks them.
@@ -49,6 +51,7 @@ const PAGE = 50;
 
 export function RecurringRuns(props: { routine: RoutineDetail; onOpenTask: (task: { id: string; identifier: string | null }) => void }) {
   const company = useCompany();
+  const commands = useCommands();
   const [limit, setLimit] = createSignal(PAGE);
   const [filter, setFilter] = createSignal<RunFilter>("all");
   const runs = createQuery(() => ({
@@ -107,6 +110,18 @@ export function RecurringRuns(props: { routine: RoutineDetail; onOpenTask: (task
                           </a>
                         </Show>
                         <span>{outcome().label}</span>
+                        <Show when={startedByRun(run)}>
+                          {(by) => (
+                            <button
+                              type="button"
+                              class="rpn-run-by"
+                              title={`Started by agent run ${by().runId}`}
+                              onClick={() => commands.openRunModal(by().runId)}
+                            >
+                              started by <span class="mono">{by().label}</span>
+                            </button>
+                          )}
+                        </Show>
                       </span>
                     </li>
                   );
