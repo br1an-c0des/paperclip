@@ -8,7 +8,8 @@ import { ApiError } from "@/api/client";
  * - While a run is going, a message can be steered into it, if the runner supports steering.
  *   Legacy runners, and answers that need a fresh session, interrupt the run instead.
  * - Messages the agent hasn't seen can be edited, moved and cancelled. Answers to a request card
- *   are fixed: they can't be edited or moved.
+ *   are fixed receipts: they can't be edited or moved, and while one waits the queue isn't
+ *   reordered, as in the old UI. A receipt never hides the messages queued after it.
  * - Steering or interrupting takes messages out of the queue at once, before the server confirms,
  *   so a poll that still has them doesn't make them flicker back.
  */
@@ -57,6 +58,16 @@ export function moveEntry(entries: readonly IssueQueuedCommentEntry[], commentId
 /** "1 message queued", "3 messages queued". */
 export function queuedSummary(count: number) {
   return `${count} message${count === 1 ? "" : "s"} queued`;
+}
+
+/**
+ * The one line a row shows. A fixed answer shows its receipt's summary ("Declined: Slack
+ * connection", #19331) or the first line of its body: the rest of the body is a JSON receipt for the
+ * agent and never reaches a label or a hover.
+ */
+export function entryLabel(entry: IssueQueuedCommentEntry) {
+  if (!isFixed(entry)) return preview(entry.comment.body);
+  return entry.source?.summary?.trim() || preview(entry.comment.body) || "Saved response";
 }
 
 /** The first line of a message, for the queue row. */

@@ -8,7 +8,9 @@ import { queuedCommentsApi } from "@/api/queued-comments";
 import { Button } from "@/ui/Button";
 import { TextArea } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
-import { isFixed, moveEntry, preview, queueErrorMessage, queuedSummary, rowDelivery, visibleEntries, type QueueAction } from "./queue-model";
+import { useExperimentalSettingsQuery } from "@/lib/company-data";
+import { entryLabel, isFixed, moveEntry, queueErrorMessage, queuedSummary, rowDelivery, visibleEntries, type QueueAction } from "./queue-model";
+import { enterKeyHint, isSubmitKey, submitKeyFor } from "./submit-key";
 import "./QueuedMessages.css";
 
 /*
@@ -16,6 +18,8 @@ import "./QueuedMessages.css";
  * steered into the run that's going now (or, on runners that can't steer, the run interrupted so
  * the queue starts the next one), edited, moved, or cancelled. The queue polls while a run is
  * going, and every change echoes the queue's revision so a stale tab can't overwrite a newer one.
+ * A saved answer to a request card sits in the queue as a fixed receipt, shown by its summary. A
+ * long queue scrolls inside the strip instead of covering the conversation (#19321).
  */
 
 export function useQueuedComments(taskId: () => string, active: () => boolean) {
@@ -34,6 +38,9 @@ export function queuedIds(queue: IssueQueuedCommentQueue | undefined) {
 
 export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommentQueue }) {
   const client = useQueryClient();
+  const settings = useExperimentalSettingsQuery();
+  // An edit saves with the composer's send key (submit-key.ts).
+  const submitKey = () => submitKeyFor(settings.data);
   const [delivering, setDelivering] = createSignal<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
@@ -104,7 +111,18 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
                     fallback={
                       <>
                         <CornerDownRight size={14} class="qm-glyph" aria-hidden="true" />
-                        <span class="qm-text">“{preview(entry.comment.body)}”</span>
+                        <Show
+                          when={fixed}
+                          fallback={
+                            <span class="qm-text" title={entry.comment.body}>
+                              “{entryLabel(entry)}”
+                            </span>
+                          }
+                        >
+                          <span class="qm-text qm-text--receipt" title={entryLabel(entry)}>
+                            {entryLabel(entry)}
+                          </span>
+                        </Show>
                         <div class="qm-acts">
                           <Show when={delivery()}>
                             {(found) => (
@@ -165,8 +183,9 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
                         value={editing()!.body}
                         ref={(element) => queueMicrotask(() => element.focus())}
                         onInput={(event) => setEditing({ id: entry.comment.id, body: event.currentTarget.value })}
+                        enterkeyhint={enterKeyHint(submitKey())}
                         onKeyDown={(event) => {
-                          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                          if (isSubmitKey(event, submitKey())) {
                             event.preventDefault();
                             void saveEdit();
                           } else if (event.key === "Escape") {

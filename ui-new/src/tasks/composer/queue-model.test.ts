@@ -1,7 +1,7 @@
 import type { IssueQueuedCommentEntry, IssueQueuedCommentQueue } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@/api/client";
-import { moveEntry, preview, queueErrorMessage, queuedSummary, rowDelivery, visibleEntries } from "./queue-model";
+import { entryLabel, moveEntry, preview, queueErrorMessage, queuedSummary, rowDelivery, visibleEntries } from "./queue-model";
 
 const entry = (id: string, position: number, extra: Partial<IssueQueuedCommentEntry> = {}): IssueQueuedCommentEntry =>
   ({ comment: { id, body: `Message ${id}` }, position, canEdit: true, canDiscard: true, ...extra }) as IssueQueuedCommentEntry;
@@ -46,6 +46,33 @@ describe("visibleEntries and moveEntry", () => {
     expect(moveEntry(entries, "c", 1)).toBeNull();
     const fixed = [entry("a", 0), entry("b", 1, { source: { kind: "interaction", interactionId: "x", interactionKind: "k" } })];
     expect(moveEntry(fixed, "a", 1)).toBeNull();
+  });
+});
+
+describe("entryLabel", () => {
+  const receipt = (summary?: string) =>
+    entry("r1", 0, {
+      canEdit: false,
+      comment: { id: "r1", body: `Rejected: Connect Slack\n\n${JSON.stringify({ interactionId: "slack-1", kind: "connection_intent" }, null, 2)}` } as IssueQueuedCommentEntry["comment"],
+      source: { kind: "interaction", interactionId: "slack-1", interactionKind: "connection_intent", ...(summary === undefined ? {} : { summary }) },
+    });
+
+  it("shows a fixed answer by its receipt's summary, never its JSON", () => {
+    expect(entryLabel(receipt("Declined: Slack connection"))).toBe("Declined: Slack connection");
+    expect(entryLabel(receipt())).toBe("Rejected: Connect Slack");
+    expect(entryLabel(receipt("  "))).toBe("Rejected: Connect Slack");
+    expect(entryLabel(receipt())).not.toContain("{");
+  });
+
+  it("shows a message by its first line", () => {
+    expect(entryLabel(entry("c1", 0, { comment: { id: "c1", body: "\nFirst\nsecond" } as IssueQueuedCommentEntry["comment"] }))).toBe("First");
+  });
+
+  it("keeps the user's own messages next to a receipt, and movable once it's gone", () => {
+    const own = [entry("a", 0), entry("b", 1)];
+    expect(visibleEntries(queue({ entries: [receipt("Declined: Slack connection"), ...own] }), new Set()).map((item) => item.comment.id)).toEqual(["r1", "a", "b"]);
+    expect(moveEntry([receipt(), ...own], "a", 1)).toBeNull();
+    expect(moveEntry(own, "a", 1)).toEqual(["b", "a"]);
   });
 });
 
