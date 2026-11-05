@@ -757,3 +757,25 @@ button.ap-provider {
   color: var(--body);
   white-space: pre-wrap;
 }
+
+/* An AI connection's account, as the provider reports it (AiConnections.tsx). */
+.ap-account {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.ap-account dt {
+  color: var(--muted);
+}
+
+.ap-account dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ap-later > button {
+  align-self: flex-start;
+}

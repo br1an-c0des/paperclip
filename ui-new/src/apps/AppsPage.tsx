@@ -10,6 +10,7 @@ import { moreAppsTab, moreAppsView } from "./advanced/routes-model";
 import { appsView, type AppsView } from "./apps-model";
 import { Browse } from "./Browse";
 import { ApplicationPage, ByoConnect, GalleryConnect, VercelConnect } from "./Connect";
+import { ResumeAiLogin } from "./ResumeAiLogin";
 import { ReviewPage } from "./Review";
 import { ChatRoutes } from "./chat/ChatRoutes";
 import { chatRoute } from "./chat/chat-model";
@@ -27,7 +28,8 @@ import "./Apps.css";
  * - Review (`/apps/review`): Ask-first app calls waiting for your OK.
  * - Connect (`/apps/connect?source=…`, `/apps/vercel-connect`, `/apps/byo`, `/apps/app/:applicationId`):
  *   a gallery app, one through a Vercel connector, your own MCP server, or one more account for an
- *   app you have.
+ *   app you have. `/apps/connect?aiLogin=<sessionId>` finishes an AI sign-in started for you
+ *   (ResumeAiLogin.tsx).
  * - A connection (`/apps/:connectionId/:tab`): its tools and who may use them, its review queue, and
  *   its settings.
  *
@@ -111,6 +113,9 @@ export function AppsPage() {
           </Match>
           <Match when={view().section === "review"}>
             <ReviewPage />
+          </Match>
+          <Match when={view().section === "connect" && search().get("aiLogin")}>
+            {(sessionId) => <ResumeAiLogin sessionId={sessionId()} />}
           </Match>
           <Match when={view().section === "connect"}>
             <GalleryConnect source={search().get("source")} resume={search().get("resume")} applicationId={search().get("applicationId")} />

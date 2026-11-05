@@ -135,6 +135,19 @@ export function draftProblem(draft: SetupDraft, canManage: boolean): string | nu
   return null;
 }
 
+/** The details of a sign-in saved earlier, to pick it up with the same target. */
+export function resumeDraft(intent: AiConnectionLoginIntent): SetupDraft {
+  return {
+    method: "subscription",
+    name: intent.name,
+    ownership: intent.ownership,
+    allAgents: intent.allAgents ?? false,
+    agentIds: intent.agentIds ?? [],
+    apiKey: "",
+    ...(intent.connectionId ? { connectionId: intent.connectionId } : {}),
+  };
+}
+
 export function loginIntent(draft: SetupDraft): AiConnectionLoginIntent {
   return {
     provider: "anthropic",
