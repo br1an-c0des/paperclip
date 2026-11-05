@@ -1,6 +1,6 @@
 import type { AgentInstructionCandidate, AgentInstructionsFileSummary } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { actionableCandidates, bundleDraft, bundleProblem, bundleSize, bundleUpdate, diffHunks, diffSummary, fileRows, lineDiff, newFileProblem } from "./instructions-model";
+import { actionableCandidates, bundleDraft, bundleSize, bundleUpdate, diffHunks, diffSummary, fileRows, lineDiff, newFileProblem } from "./instructions-model";
 
 const file = (path: string, size = 10, isEntryFile = false) => ({ path, size, isEntryFile }) as AgentInstructionsFileSummary;
 
@@ -82,20 +82,9 @@ describe("actionableCandidates", () => {
   });
 });
 
-describe("bundle settings", () => {
+// The rest of the bundle settings' tests are in settings-models.test.ts.
+describe("bundle settings: requireExistingEntry", () => {
   const managed = bundleDraft({ mode: "managed", rootPath: null, managedRootPath: "/data/agents/a1/instructions", entryFile: "AGENTS.md" });
-
-  it("reads the saved settings", () => {
-    expect(managed).toEqual({ mode: "managed", rootPath: "/data/agents/a1/instructions", entryFile: "AGENTS.md" });
-    expect(bundleDraft({ mode: "external", rootPath: "/srv/prompts", managedRootPath: "/x", entryFile: "" })).toEqual({ mode: "external", rootPath: "/srv/prompts", entryFile: "AGENTS.md" });
-  });
-
-  it("checks the folder and entry file", () => {
-    expect(bundleProblem({ mode: "external", rootPath: "prompts", entryFile: "AGENTS.md" })).toMatch(/absolute path/);
-    expect(bundleProblem({ mode: "external", rootPath: "/srv/prompts", entryFile: "../AGENTS.md" })).toMatch(/inside the folder/);
-    expect(bundleProblem({ mode: "managed", rootPath: "/x", entryFile: " " })).toMatch(/Name the entry file/);
-    expect(bundleProblem({ mode: "external", rootPath: "~/prompts", entryFile: "docs/AGENTS.md" })).toBeNull();
-  });
 
   it("asks the server to find an external folder's entry file rather than create it", () => {
     expect(bundleUpdate(managed, managed)).toBeNull();
