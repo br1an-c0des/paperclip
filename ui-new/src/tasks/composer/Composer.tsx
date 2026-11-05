@@ -8,6 +8,7 @@ import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { queuedCommentsApi } from "@/api/queued-comments";
 import { useCompany } from "@/lib/company";
+import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Menu } from "@/ui/Menu";
@@ -30,8 +31,10 @@ import {
 } from "./composer-model";
 import { activeMention, insertMention, matchesQuery, type ActiveMention, type MentionTarget } from "./mentions";
 import { MentionOption } from "./MentionTextArea";
+import { createFileDropTarget, FileDropOverlay } from "./file-drop";
 import { createRunnerGoal, RunnerGoalCard } from "./RunnerGoal";
 import { goalFromComposer, type GoalCommand } from "./runner-goal-model";
+import { enterKeyHint, isComposing, isPickKey, isSubmitKey, submitHint, submitKeyFor } from "./submit-key";
 import "./Composer.css";
 
 /*
@@ -39,11 +42,13 @@ import "./Composer.css";
  * modal's live footer.
  *
  * - Markdown text with @-mentions of agents, people and tasks, picked from a list as you type.
- * - Files by the clip button, paste or drop. Images go inline; other files ride along as links.
+ * - Files by the clip button, paste, or a drop anywhere on the screen (file-drop.tsx). Images go
+ *   inline; other files ride along as links.
  * - The work mode, who the message is for (reassigning the task) with the run's model and effort
  *   (decision 13), and reopening a closed task.
- * - Cmd/Ctrl+Enter sends. While a run is going the message queues for the next turn; the send menu
- *   steers it into the current turn or interrupts the run instead.
+ * - Enter sends and Shift+Enter adds a line, or only Cmd/Ctrl+Enter sends with the instance's legacy
+ *   preference (submit-key.ts). While a run is going the message queues for the next turn; the send
+ *   menu steers it into the current turn or interrupts the run instead.
  * - For runners that support it, the Goal pill ("Goal: keep pursuing", or `/goal …` typed) sets a
  *   goal the agent keeps working toward instead of sending a message; its card sits above the
  *   composer (RunnerGoal.tsx).
@@ -66,6 +71,9 @@ export function Composer(props: {
   const people = useTaskPeople();
   let textarea: HTMLTextAreaElement | undefined;
   let fileInput: HTMLInputElement | undefined;
+  let form: HTMLFormElement | undefined;
+  const settings = useExperimentalSettingsQuery();
+  const submitKey = () => submitKeyFor(settings.data);
 
   const [body, setBody] = createSignal("");
   const [attachments, setAttachments] = createSignal<ComposerAttachment[]>([]);
@@ -78,7 +86,6 @@ export function Composer(props: {
   const [caret, setCaret] = createSignal(0);
   const [pickerIndex, setPickerIndex] = createSignal(0);
   const [pickerClosedAt, setPickerClosedAt] = createSignal<number | null>(null);
-  const [dragging, setDragging] = createSignal(false);
   const [goalMode, setGoalMode] = createSignal(false);
   let requestId = newId();
 
@@ -340,6 +347,7 @@ export function Composer(props: {
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
+    if (isComposing(event)) return;
     if (pickerOpen()) {
       const count = candidates().length;
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -347,7 +355,7 @@ export function Composer(props: {
         setPickerIndex((index) => (index + (event.key === "ArrowDown" ? 1 : count - 1)) % count);
         return;
       }
-      if ((event.key === "Enter" && !event.metaKey && !event.ctrlKey) || event.key === "Tab") {
+      if (isPickKey(event)) {
         event.preventDefault();
         pick(candidates()[pickerIndex()]!);
         return;
@@ -359,11 +367,14 @@ export function Composer(props: {
         return;
       }
     }
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+    if (isSubmitKey(event, submitKey())) {
       event.preventDefault();
       void send("send");
     }
   };
+
+  const dragging = createFileDropTarget({ element: () => form, enabled: () => !sending(), onFiles: addFiles });
+  const sendLabel = () => (goalMode() ? "Set goal" : live() ? "Queue" : "Send");
 
   const placeholder = () =>
     goalMode() ? `What should ${targetAgent()?.name ?? "the agent"} keep working toward? It keeps going across turns until it's done` : basePlaceholder();
@@ -376,7 +387,9 @@ export function Composer(props: {
     <Show when={!props.compact}>
       <RunnerGoalCard control={goal} agentName={targetAgent()?.name ?? null} />
     </Show>
+    <FileDropOverlay show={dragging()} />
     <form
+      ref={form}
       class="cmp"
       classList={{ "cmp--compact": props.compact, "cmp--drop": dragging(), "cmp--goal": goalMode() }}
       data-mode={workMode()}
@@ -384,20 +397,6 @@ export function Composer(props: {
       onSubmit={(event) => {
         event.preventDefault();
         void send("send");
-      }}
-      onDragOver={(event) => {
-        if (!event.dataTransfer?.types.includes("Files")) return;
-        event.preventDefault();
-        setDragging(true);
-      }}
-      onDragLeave={(event) => {
-        if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node)) setDragging(false);
-      }}
-      onDrop={(event) => {
-        if (!event.dataTransfer?.files.length) return;
-        event.preventDefault();
-        setDragging(false);
-        addFiles(event.dataTransfer.files);
       }}
     >
       <div class="cmp-field">
@@ -445,6 +444,7 @@ export function Composer(props: {
           aria-controls={pickerOpen() ? `${fieldId()}-list` : undefined}
           aria-activedescendant={pickerOpen() ? optionId(pickerIndex()) : undefined}
           aria-autocomplete="list"
+          enterkeyhint={enterKeyHint(submitKey())}
           onInput={(event) => {
             setBody(event.currentTarget.value);
             syncCaret();
@@ -575,11 +575,11 @@ export function Composer(props: {
         </Show>
 
         <div class="cmp-send">
-          <Button type="submit" variant="primary" size="compact" class="cmp-send-main" disabled={sending()} title="Send (Ctrl+Enter or ⌘+Enter)">
+          <Button type="submit" variant="primary" size="compact" class="cmp-send-main" disabled={sending()} title={`${sendLabel()} (${submitHint(submitKey())})`}>
             <Show when={sending()} fallback={<ArrowUp size={14} aria-hidden="true" />}>
               <LoaderCircle size={14} class="cmp-spin" aria-hidden="true" />
             </Show>
-            {goalMode() ? "Set goal" : live() ? "Queue" : "Send"}
+            {sendLabel()}
           </Button>
           <Show when={live() && !goalMode()}>
             <Menu placement="top-end">

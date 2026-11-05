@@ -61,6 +61,42 @@ describe("RequestCard", () => {
     await waitFor(() => expect(respond).toHaveBeenCalledWith("t1", "i1", { answers: [{ questionId: "q1", optionIds: ["o2"], otherText: null }] }));
   });
 
+  it("draws a confirmation's prompt as Markdown, with images as references (#18851)", () => {
+    const confirm = {
+      ...question,
+      kind: "request_confirmation",
+      payload: {
+        version: 1,
+        prompt: "Review the [two screenshots](/TRA/issues/TRA-42#document-preview).\n\nSelect **Accept** to keep this design.\n\n- Check `preview.png`\n- Keep the layout\n\n![Review image](https://provider.invalid/review.png)",
+      },
+    } as unknown as IssueThreadInteraction;
+    const { container } = mount(confirm);
+    const link = screen.getByRole("link", { name: "two screenshots" });
+    expect(link.getAttribute("href")).toBe("/TRA/issues/TRA-42#document-preview");
+    const prompt = link.closest(".rq-prompt")!;
+    expect(prompt.querySelector("strong")?.textContent).toBe("Accept");
+    expect(prompt.querySelector("code")?.textContent).toBe("preview.png");
+    expect(prompt.querySelectorAll("li")).toHaveLength(2);
+    expect(prompt.querySelector("img")).toBeNull();
+    expect(prompt.textContent).toContain("Image: Review image (https://provider.invalid/review.png)");
+    expect(prompt.textContent).not.toContain("**");
+    // The prompt is the heading, so the plain title isn't drawn twice.
+    expect(container.querySelector(".rq h3")).toBeNull();
+  });
+
+  it("labels a checkbox group by its rendered prompt, under the agent's own title", () => {
+    const pick = {
+      ...question,
+      kind: "request_checkbox_confirmation",
+      title: "Pick the files",
+      payload: { version: 1, prompt: "Keep **which** files?", options: [{ id: "o1", label: "a.png" }] },
+    } as unknown as IssueThreadInteraction;
+    mount(pick);
+    expect(screen.getByRole("heading", { name: "Pick the files" })).toBeTruthy();
+    const group = screen.getByRole("group", { name: "Keep which files?" });
+    expect(group.getAttribute("aria-label")).toBeNull();
+  });
+
   it("shrinks a set-aside request to one line that opens again", () => {
     mount({ ...question, dismissedAt: "2026-10-26T11:30:00Z" } as IssueThreadInteraction);
     expect(screen.queryByRole("heading")).toBeNull();

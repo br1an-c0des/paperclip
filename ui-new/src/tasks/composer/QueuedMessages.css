@@ -28,12 +28,16 @@
   color: var(--red-fg);
 }
 
+/* About four rows, and less on short windows, so the conversation stays in view (#19321) */
 .qm-list {
   margin: 0;
   padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
+  max-height: min(160px, 28dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .qm-row {
@@ -56,6 +60,11 @@
   color: var(--body);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A saved answer to a request card: its receipt's summary, not a quote */
+.qm-text--receipt {
+  color: var(--muted);
 }
 
 .qm-acts {
