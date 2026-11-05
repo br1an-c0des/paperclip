@@ -8,7 +8,7 @@ import { runsApi } from "@/api/runs";
 import { useNow } from "@/lib/clock";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
-import { useLiveEvent } from "@/lib/live-events";
+import { useLiveEvent, useRunInterest } from "@/lib/live-events";
 import { buildTranscript, hasStructuredParser } from "@/runs/parsers";
 import { createRunLog } from "@/runs/run-log-source";
 import { costLabel, elapsedLabel, isActiveRun, runUsage } from "@/runs/run-model";
@@ -98,6 +98,8 @@ export function LiveReply(props: { turn: ReplyTurn; agent: AgentDetail; censorUs
   const queued = () => (run.data?.status ?? props.turn.status) === "queued";
   const now = useNow(active);
 
+  // The reply streams the run's output and event signals, so the socket asks for its transcript.
+  useRunInterest(() => [props.turn.runId]);
   const log = createRunLog(() => props.turn.runId, () => run.data);
   const stored = useStoredEvents(() => props.turn.runId);
   const fromOutputEvents = createMemo(() => replyFromEvents(prpEventsFromOutput(log.chunks())));

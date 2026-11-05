@@ -1,5 +1,6 @@
 import type { IssueStatus } from "@paperclipai/shared";
 import { createContext, createSignal, lazy, Show, useContext, type ParentProps } from "solid-js";
+import { useRunInterest } from "@/lib/live-events";
 
 /*
  * The shell's global actions, after ui/src/context/DialogContext.tsx: any page, the nav, the command
@@ -62,6 +63,11 @@ export function CommandsProvider(props: ParentProps) {
   const [paletteOpen, setPaletteOpen] = createSignal(false);
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
   const [runModal, setRunModal] = createSignal<string | null>(null);
+  // The run modal streams its run's output, so the socket asks for that run's transcript.
+  useRunInterest(() => {
+    const runId = runModal();
+    return runId ? [runId] : [];
+  });
   const [taskModal, setTaskModal] = createSignal<TaskModalTarget | null>(null);
   const value: CommandsValue = {
     newTask,

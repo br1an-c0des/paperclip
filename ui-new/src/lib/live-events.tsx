@@ -1,8 +1,9 @@
-import type { LiveEvent, LiveEventType } from "@paperclipai/shared";
+import type { LiveDeliveryClientMessage, LiveEvent, LiveEventType } from "@paperclipai/shared";
 import type { QueryClient, QueryKey } from "@tanstack/solid-query";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createContext, createEffect, createMemo, createSignal, onCleanup, useContext, type ParentProps } from "solid-js";
 import { queryKeys } from "@/api/queryKeys";
+import { useSession } from "@/lib/session";
 
 /*
  * The live-events socket: one WebSocket per company (`/api/companies/:id/events/ws`), as in
@@ -16,6 +17,16 @@ import { queryKeys } from "@/api/queryKeys";
  *   subscribers (`useLiveEvent`), so a subscriber sees fresh data.
  * - Task lists, tasks and the live runs are fetched once more after a burst of events settles
  *   (`createTrailingRefetch`): the refetch an event starts can come back with them as they were.
+ * - Run transcripts (`heartbeat.run.log`, `heartbeat.run.event`) come only for the runs on screen
+ *   (upstream #17456). On open the socket says `live.hello`; a server that answers
+ *   `live.capabilities` with `run-interests` is sent the runs views asked for with `useRunInterest`
+ *   (`live.interests`, a new revision each time the set changes). Other runs' output arrives as a
+ *   throttled `heartbeat.run.activity`. A server that doesn't answer sends every transcript, as
+ *   before. `RunInterests` keeps that state, after ui/src/lib/live-transcript-interests.ts.
+ * - `live.resync` (`delivery_overflow`, or `controller_change` when another web server takes over
+ *   the socket, #18518) means events were dropped: the interests are sent again, active queries
+ *   refresh, and refresh once more when the server acknowledges, so nothing read during the gap
+ *   is kept.
  *
  * The old UI also patches caches in place and raises toasts from events. Those come with the screens
  * that need them (toasts in M1, run state in M2); this module is where they plug in.
@@ -39,7 +50,11 @@ type Subscriber = { types: ReadonlySet<LiveEventType> | null; handler: (event: L
 type LiveEventsContextValue = {
   connection: () => LiveConnection;
   subscribe: (subscriber: Subscriber) => () => void;
+  interests: RunInterests;
 };
+
+/** Who is looking, for events whose effect depends on it (read marks). */
+export type LiveViewer = { userId: string | null };
 
 const LiveEventsContext = createContext<LiveEventsContextValue>();
 
@@ -47,17 +62,37 @@ function readString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+/** Your Inbox's task lists (Updates, with or without archived), under the company's task lists. */
+const inboxLists = (companyId: string): QueryKey => ["issues", companyId, "inbox"];
+
 /** Actions on a task that can add, answer or end an item in the Inbox's attention feed. */
 function changesAttention(action: string | null) {
   return action !== null && (action.startsWith("issue.thread_interaction_") || action.startsWith("issue.connection_intent_") || action === "issue.updated");
 }
 
 /** Query keys an `activity.logged` event affects, by the entity it's about and what was done. */
-function activityKeys(companyId: string, entityType: string | null, entityId: string | null, action: string | null): QueryKey[] {
+function activityKeys(
+  companyId: string,
+  entityType: string | null,
+  entityId: string | null,
+  action: string | null,
+  reader: string | null,
+  viewer: LiveViewer | undefined,
+): QueryKey[] {
   // Listing or reading a task's workspace files is logged (`issue.file_resource_list`,
   // `…_content_read`) but changes nothing. Refreshing the task would refetch the open file viewer,
   // whose reads log again: a loop that ends on the server's rate limit.
   if (action?.startsWith("issue.file_resource_")) return [queryKeys.activity(companyId)];
+  // Marking a task read or unread changes only the reader's unread state, and the task's activity,
+  // which lists read receipts (upstream b40e6edae). Refreshing the whole task would reread the open
+  // chat's history each time it marks itself read. Your own marks refresh your Inbox lists, nav
+  // counts and chats' dots; someone else's only the activity.
+  if (entityType === "issue" && (action === "issue.read_marked" || action === "issue.read_unmarked")) {
+    const keys: QueryKey[] = [queryKeys.activity(companyId)];
+    if (entityId) keys.push(queryKeys.issues.section(entityId, "activity"));
+    if (reader && reader === viewer?.userId) keys.push(inboxLists(companyId), queryKeys.sidebarBadges(companyId), queryKeys.chat.list(companyId));
+    return keys;
+  }
   const keys: QueryKey[] = [queryKeys.activity(companyId), queryKeys.dashboard(companyId), queryKeys.sidebarBadges(companyId)];
   // Apps and tools (src/apps/): connections, their tools, profiles, policies and Ask-first requests
   // are logged on `tool_*` entities; one prefix covers every Apps query for the company.
@@ -162,8 +197,11 @@ function activityKeys(companyId: string, entityType: string | null, entityId: st
   return keys;
 }
 
-/** Query keys an event affects. Exported for tests and for screens that add their own rules. */
-export function keysForEvent(companyId: string, event: LiveEvent): QueryKey[] {
+/**
+ * Query keys an event affects. Exported for tests and for screens that add their own rules.
+ * `viewer` is who is looking, for read marks.
+ */
+export function keysForEvent(companyId: string, event: LiveEvent, viewer?: LiveViewer): QueryKey[] {
   const payload = event.payload ?? {};
   const issueId = readString(payload.issueId);
   const agentId = readString(payload.agentId);
@@ -194,15 +232,18 @@ export function keysForEvent(companyId: string, event: LiveEvent): QueryKey[] {
       ];
     case "agent.session.goal.changed":
       return agentId ? [queryKeys.agents.detail(agentId)] : [];
-    case "activity.logged":
-      return activityKeys(companyId, readString(payload.entityType), readString(payload.entityId), readString(payload.action));
+    case "activity.logged": {
+      const details = (payload.details ?? null) as Record<string, unknown> | null;
+      const reader = readString(details?.userId) ?? (payload.actorType === "user" ? readString(payload.actorId) : null);
+      return activityKeys(companyId, readString(payload.entityType), readString(payload.entityId), readString(payload.action), reader, viewer);
+    }
     case "plugin.ui.updated":
     case "plugin.worker.crashed":
     case "plugin.worker.restarted":
       return [["plugins"]];
     // Run logs and events stream to subscribers only (the run modal and chat read them).
     // `heartbeat.run.activity` is the server's throttled "a run produced output" hint, sent instead
-    // of transcripts to clients that negotiate run interests; ui-new doesn't negotiate.
+    // of transcripts for runs no view asked for (`useRunInterest`).
     case "heartbeat.run.log":
     case "heartbeat.run.event":
     case "heartbeat.run.activity":
@@ -211,8 +252,8 @@ export function keysForEvent(companyId: string, event: LiveEvent): QueryKey[] {
   }
 }
 
-function invalidateForEvent(client: QueryClient, companyId: string, event: LiveEvent, trailing: TrailingRefetch) {
-  const keys = keysForEvent(companyId, event);
+function invalidateForEvent(client: QueryClient, companyId: string, event: LiveEvent, trailing: TrailingRefetch, viewer: LiveViewer) {
+  const keys = keysForEvent(companyId, event, viewer);
   for (const queryKey of keys) {
     void client.invalidateQueries({ queryKey }, { cancelRefetch: false });
   }
@@ -286,6 +327,124 @@ function trailingGroup(
   };
 }
 
+/** The most runs one socket can ask transcripts for (the server's LIVE_DELIVERY_MAX_ITEMS). */
+export const MAX_RUN_INTERESTS = 1_000;
+
+type Sender = { send: (data: string) => void };
+
+/**
+ * The runs whose transcripts views want, and the socket's side of the negotiation, as
+ * ui/src/lib/live-transcript-interests.ts keeps them:
+ *
+ * - Views hold runs with `acquire`; the set changes when a run's first holder comes or its last goes.
+ * - `open` greets a new socket with `live.hello`. Interests go only once the server has answered
+ *   `live.capabilities` with `run-interests`; until then (or from a server without it) every
+ *   transcript arrives.
+ * - Each change is sent as the whole set with the next revision; `live.subscribed` acknowledges one.
+ * - `live.resync` for a revision already sent means the server dropped events: the set is sent
+ *   again, and `onRecovered` runs when that is acknowledged.
+ *
+ * `receive` answers whether a frame was one of these control frames.
+ */
+export class RunInterests {
+  private counts = new Map<string, number>();
+  private socket: Sender | null = null;
+  private capable = false;
+  private revision = 0;
+  private acknowledged = 0;
+  private lastResync = 0;
+  private recovering = false;
+
+  acquire(runIds: readonly string[]): () => void {
+    const unique = [...new Set(runIds.filter(Boolean))];
+    let changed = false;
+    for (const id of unique) {
+      const count = this.counts.get(id) ?? 0;
+      this.counts.set(id, count + 1);
+      changed ||= count === 0;
+    }
+    if (changed) this.replace();
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      let gone = false;
+      for (const id of unique) {
+        const count = this.counts.get(id) ?? 0;
+        if (count <= 1) {
+          this.counts.delete(id);
+          gone = true;
+        } else this.counts.set(id, count - 1);
+      }
+      if (gone) this.replace();
+    };
+  }
+
+  /** The runs held now, as they're sent. */
+  runIds() {
+    return [...this.counts.keys()].sort().slice(0, MAX_RUN_INTERESTS);
+  }
+
+  open(socket: Sender) {
+    this.socket = socket;
+    this.capable = false;
+    this.revision = 0;
+    this.acknowledged = 0;
+    this.lastResync = 0;
+    this.recovering = false;
+    this.send({ type: "live.hello", version: 1, capabilities: ["run-interests"] });
+  }
+
+  close() {
+    this.socket = null;
+    this.capable = false;
+    this.recovering = false;
+  }
+
+  receive(frame: unknown, onRecovered?: () => void): boolean {
+    if (!frame || typeof frame !== "object") return false;
+    const value = frame as { type?: unknown; version?: unknown; capabilities?: unknown; revision?: unknown };
+    if (typeof value.type !== "string" || !value.type.startsWith("live.")) return false;
+    if (value.version !== 1 || !this.socket) return true;
+    const revision = Number(value.revision);
+    if (value.type === "live.capabilities") {
+      if (Array.isArray(value.capabilities) && value.capabilities.includes("run-interests") && !this.capable) {
+        this.capable = true;
+        this.replace();
+      }
+    } else if (value.type === "live.subscribed") {
+      if (revision === this.revision && revision !== this.acknowledged) {
+        this.acknowledged = revision;
+        if (this.recovering) {
+          this.recovering = false;
+          onRecovered?.();
+        }
+      }
+    } else if (value.type === "live.resync") {
+      if (Number.isSafeInteger(revision) && revision > this.lastResync && revision <= this.revision) {
+        this.lastResync = revision;
+        this.recovering = true;
+        this.replace();
+      }
+    }
+    return true;
+  }
+
+  private replace() {
+    if (!this.socket || !this.capable) return;
+    this.revision += 1;
+    this.send({ type: "live.interests", version: 1, revision: this.revision, runIds: this.runIds() });
+  }
+
+  private send(message: LiveDeliveryClientMessage) {
+    try {
+      this.socket?.send(JSON.stringify(message));
+    } catch {
+      this.close();
+    }
+  }
+}
+
 function socketUrl(companyId: string) {
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
   return `${protocol}://${window.location.host}/api/companies/${encodeURIComponent(companyId)}/events/ws`;
@@ -293,6 +452,13 @@ function socketUrl(companyId: string) {
 
 export function LiveEventsProvider(props: ParentProps<{ companyId: string | null }>) {
   const client = useQueryClient();
+  const session = useSession();
+  const viewer: LiveViewer = {
+    get userId() {
+      return session.youId();
+    },
+  };
+  const interests = new RunInterests();
   const [connection, setConnection] = createSignal<LiveConnection>("connecting");
   const [visible, setVisible] = createSignal(document.visibilityState !== "hidden");
   const subscribers = new Set<Subscriber>();
@@ -301,7 +467,8 @@ export function LiveEventsProvider(props: ParentProps<{ companyId: string | null
   document.addEventListener("visibilitychange", onVisibility);
   onCleanup(() => document.removeEventListener("visibilitychange", onVisibility));
 
-  const refreshActive = () => void client.invalidateQueries({ type: "active" }, { cancelRefetch: false });
+  /** `restart` drops fetches in flight, so what comes back was read after now. */
+  const refreshActive = (restart = false) => void client.invalidateQueries({ type: "active" }, { cancelRefetch: restart });
 
   let wasHidden = false;
   // A memo, so a refetched company object with the same id doesn't reopen the socket.
@@ -329,7 +496,7 @@ export function LiveEventsProvider(props: ParentProps<{ companyId: string | null
     const trailing = createTrailingRefetch(client);
 
     const startPolling = () => {
-      if (pollTimer === undefined) pollTimer = window.setInterval(refreshActive, DISCONNECTED_POLL_INTERVAL_MS);
+      if (pollTimer === undefined) pollTimer = window.setInterval(() => refreshActive(), DISCONNECTED_POLL_INTERVAL_MS);
     };
     const stopPolling = () => {
       window.clearInterval(pollTimer);
@@ -363,6 +530,7 @@ export function LiveEventsProvider(props: ParentProps<{ companyId: string | null
         stopPolling();
         attempt = 0;
         setConnection("open");
+        interests.open(next);
         // Events aren't replayed: refresh whatever loaded before the socket opened.
         refreshActive();
       };
@@ -374,8 +542,15 @@ export function LiveEventsProvider(props: ParentProps<{ companyId: string | null
         } catch {
           return;
         }
+        // The negotiation's own frames. A resync means events were dropped: refresh now, and again
+        // once the server has the interests back, as what loads in between can predate the gap.
+        const resync = (event as { type?: unknown }).type === "live.resync";
+        if (interests.receive(event, () => !closed && socket === next && refreshActive(true))) {
+          if (resync && !closed && socket === next) refreshActive();
+          return;
+        }
         if (event.companyId !== companyId) return;
-        invalidateForEvent(client, companyId, event, trailing);
+        invalidateForEvent(client, companyId, event, trailing, viewer);
         for (const subscriber of subscribers) {
           if (!subscriber.types || subscriber.types.has(event.type)) subscriber.handler(event);
         }
@@ -384,6 +559,7 @@ export function LiveEventsProvider(props: ParentProps<{ companyId: string | null
       next.onclose = () => {
         if (socket !== next) return;
         socket = null;
+        interests.close();
         if (closed) return;
         startPolling();
         scheduleReconnect();
@@ -398,6 +574,7 @@ export function LiveEventsProvider(props: ParentProps<{ companyId: string | null
       window.clearTimeout(reconnectTimer);
       stopPolling();
       trailing.cancel();
+      interests.close();
       const active = socket;
       socket = null;
       if (active && active.readyState <= WebSocket.OPEN) active.close(1000, "provider_unmount");
@@ -406,6 +583,7 @@ export function LiveEventsProvider(props: ParentProps<{ companyId: string | null
 
   const value: LiveEventsContextValue = {
     connection,
+    interests,
     subscribe: (subscriber) => {
       subscribers.add(subscriber);
       return () => subscribers.delete(subscriber);
@@ -430,4 +608,20 @@ export function useLiveEvent(types: LiveEventType[] | null, handler: (event: Liv
   if (!context) return;
   const unsubscribe = context.subscribe({ types: types ? new Set(types) : null, handler });
   onCleanup(unsubscribe);
+}
+
+/**
+ * Asks for the transcripts (`heartbeat.run.log`, `heartbeat.run.event`) of these runs while the
+ * calling view is mounted. Every view that reads a run's live output must hold its run; for the
+ * others the socket sends only `heartbeat.run.activity`.
+ */
+export function useRunInterest(runIds: () => readonly string[]) {
+  const context = useContext(LiveEventsContext);
+  if (!context) return;
+  const key = createMemo(() => [...new Set(runIds().filter(Boolean))].sort().join(","));
+  createEffect(() => {
+    const ids = key();
+    if (!ids) return;
+    onCleanup(context.interests.acquire(ids.split(",")));
+  });
 }
