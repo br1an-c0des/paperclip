@@ -120,6 +120,11 @@ export type InstructionsBundleUpdate = {
   rootPath?: string | null;
   entryFile?: string;
   clearLegacyPromptTemplate?: boolean;
+  /**
+   * For an external folder: refuse the change unless the folder and its entry file already exist,
+   * instead of creating them (upstream #18378). The server ignores it for a managed bundle.
+   */
+  requireExistingEntry?: boolean;
 };
 
 /** `POST /adapters/install`: what the server registered. */
