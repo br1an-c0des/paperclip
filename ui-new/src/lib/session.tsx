@@ -1,10 +1,11 @@
-import type { AuthSession } from "@paperclipai/shared";
+import type { AuthSession, BoardBootstrapSession } from "@paperclipai/shared";
 import { Navigate, useLocation, useNavigate } from "@solidjs/router";
-import { createQuery, useQueryClient } from "@tanstack/solid-query";
+import { createQuery, useQueryClient, type QueryClient } from "@tanstack/solid-query";
 import { createContext, createEffect, createSignal, Match, Show, Switch, useContext, type ParentProps } from "solid-js";
-import { accessApi } from "@/api/access";
+import { accessApi, boardAccessFromBootstrap } from "@/api/access";
 import { authApi } from "@/api/auth";
 import { isTemporaryApiError } from "@/api/client";
+import { companiesFromBootstrap } from "@/api/companies";
 import { healthApi, type HealthStatus } from "@/api/health";
 import { queryKeys } from "@/api/queryKeys";
 import { BootstrapPending } from "@/auth/BootstrapPending";
@@ -18,6 +19,13 @@ import { Splash } from "@/routes/Splash";
  * 2. On `authenticated` instances, `GET /api/auth/get-session` must return a session, or the user
  *    is sent to `/auth?next=…`.
  * 3. `GET /api/cli-auth/me` must show access to at least one company (or instance admin).
+ *
+ * A signed-in session may carry `boardBootstrap` (your companies and board access, read with it).
+ * Each session read that has one puts both into their caches before the gate asks for them, so the
+ * board opens without the two reads; the companies list is keyed by account, and board access is
+ * replaced outright, so access cached for another account (or since revoked) doesn't stay. Without
+ * one (an older server, a failed bootstrap, or a local_trusted instance, which has no session read)
+ * the ordinary reads run. Later reads and live events refresh both as before.
  *
  * While the server is restarting the gate keeps what it has and shows a reconnecting notice, so an
  * outage doesn't unmount the page and lose drafts.
@@ -36,6 +44,21 @@ type SessionValue = {
 };
 
 const SessionContext = createContext<SessionValue>();
+
+/**
+ * Seeds the companies list and board access from a session's bootstrap, as fresh as the session.
+ * A read of either already on its way is cancelled first, so an older answer can't land over it.
+ */
+export async function seedBoardBootstrap(client: QueryClient, session: BoardBootstrapSession | null) {
+  const bootstrap = session?.boardBootstrap;
+  if (!session || !bootstrap) return;
+  const companies = queryKeys.companies.list(session.user.id);
+  const access = queryKeys.access.currentBoardAccess;
+  await Promise.all([client.cancelQueries({ queryKey: companies, exact: true }), client.cancelQueries({ queryKey: access, exact: true })]);
+  const updatedAt = Date.now();
+  client.setQueryData(companies, companiesFromBootstrap(bootstrap), { updatedAt });
+  client.setQueryData(access, boardAccessFromBootstrap(bootstrap, session), { updatedAt });
+}
 
 export function useSession() {
   const context = useContext(SessionContext);
@@ -69,6 +92,7 @@ export function safeNextPath(next: string | null | undefined) {
 
 export function SessionGate(props: ParentProps) {
   const location = useLocation();
+  const client = useQueryClient();
 
   const health = createQuery(() => ({
     queryKey: queryKeys.health,
@@ -87,7 +111,11 @@ export function SessionGate(props: ParentProps) {
 
   const session = createQuery(() => ({
     queryKey: queryKeys.auth.session,
-    queryFn: authApi.getSession,
+    queryFn: async () => {
+      const value = await authApi.getSession();
+      await seedBoardBootstrap(client, value);
+      return value;
+    },
     enabled: isAuthenticatedMode(),
     retry: false,
     refetchInterval: (query) => (isTemporaryApiError(query.state.error) ? RECONNECT_INTERVAL_MS : false),

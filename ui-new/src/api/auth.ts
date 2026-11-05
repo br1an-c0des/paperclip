@@ -1,16 +1,26 @@
-import type { AuthSession } from "@paperclipai/shared";
+import { readBoardBootstrap, type AuthSession, type BoardBootstrapSession } from "@paperclipai/shared";
 import { ApiError, errorMessage, readApiJson } from "./client";
 
 /*
  * Better Auth endpoints under `/api/auth`, as ui/src/api/auth.ts uses them. A signed-out session is
  * `null` (401), not an error. Better Auth answers a failed sign-in or sign-up with `{ code, message }`;
  * `authErrorCode` reads the code back off the thrown `ApiError`.
+ *
+ * The session may carry `boardBootstrap`: your companies and board access, read with it, so the board
+ * can open without asking for them again (`src/lib/session.tsx`). It's kept only as
+ * `readBoardBootstrap` passes it, for this account; a malformed one, or one for another account, is
+ * dropped and the ordinary reads run.
  */
 
-function asSession(value: unknown): AuthSession | null {
+export function asSession(value: unknown): BoardBootstrapSession | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
-  if (record.session && record.user) return value as AuthSession;
+  if (record.session && record.user) {
+    const { boardBootstrap: raw, ...session } = record as AuthSession & { boardBootstrap?: unknown };
+    const userId = (session.user as { id?: unknown }).id;
+    const boardBootstrap = typeof userId === "string" && raw !== undefined ? readBoardBootstrap(raw, userId) : undefined;
+    return boardBootstrap ? { ...session, boardBootstrap } : session;
+  }
   // Some responses wrap the session in `data`.
   return record.data ? asSession(record.data) : null;
 }
@@ -28,7 +38,7 @@ async function authPost(path: string, body: Record<string, unknown>): Promise<un
 }
 
 export const authApi = {
-  getSession: async (): Promise<AuthSession | null> => {
+  getSession: async (): Promise<BoardBootstrapSession | null> => {
     const res = await fetch("/api/auth/get-session", {
       credentials: "include",
       headers: { Accept: "application/json" },

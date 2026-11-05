@@ -1,6 +1,7 @@
 import type {
   AgentObservabilitySettingsResponse,
   AgentObservabilityTestReceipt,
+  BoardBootstrap,
   Company,
   CompanyPortabilityExportPreviewResult,
   CompanyPortabilityExportRequest,
@@ -154,6 +155,15 @@ async function putBytes<T>(path: string, bytes: Blob): Promise<T> {
   const body = await readApiJson<unknown>(res);
   if (!res.ok) throw new ApiError(errorMessage(body, res.status), res.status, body);
   return body as T;
+}
+
+/**
+ * The session's company list (`boardBootstrap.companies`, the same companies as `scope=accessible`)
+ * in the shape the list read returns. `readBoardBootstrap` turns dates into `Date`s; the list read
+ * leaves them as the JSON strings the rest of the board reads, so they go back to strings.
+ */
+export function companiesFromBootstrap(bootstrap: Pick<BoardBootstrap, "companies">): Company[] {
+  return JSON.parse(JSON.stringify(bootstrap.companies)) as Company[];
 }
 
 /** One company's counts; stats leaves out companies with no agents or tasks yet. */
