@@ -111,7 +111,7 @@ function Inbox(props: { tab: InboxTab; base: string }) {
   /** Whether an item matches the search: the feed's words, and its card's once loaded. */
   const found = (item: AttentionItem) => {
     const request = inbox.requests().get(item.id);
-    return matchesTerms(terms(), [...itemWords(item), request?.title, request?.body, request?.asker.name]);
+    return matchesTerms(terms(), [...itemWords(item), request?.title, request?.prompt?.markdown, request?.body, request?.asker.name]);
   };
   const searched = (items: readonly AttentionItem[]) => (terms().length ? items.filter(found) : [...items]);
 
