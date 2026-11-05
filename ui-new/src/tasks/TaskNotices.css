@@ -64,3 +64,30 @@
   color: var(--muted);
   font-size: 12px;
 }
+
+/* A restore's named failure, as the server built it: "snapshot_download: code=EIO". */
+.tn-recovery-detail {
+  font-size: 12px;
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+
+/* Recover saved files, under a native export hold's card. */
+.tn-files {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--text);
+}
+
+.tn-files-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tn-files-alert {
+  color: var(--red-fg);
+}

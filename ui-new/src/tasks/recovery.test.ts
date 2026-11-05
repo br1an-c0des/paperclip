@@ -1,6 +1,6 @@
 import type { TaskInterruptionPresentation } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { retryCountdown, taskNotices, type NoticeInput } from "./recovery";
+import { pauseDetail, retryCountdown, taskNotices, type NoticeInput } from "./recovery";
 
 function interruption(extra: Partial<TaskInterruptionPresentation>): TaskInterruptionPresentation {
   return {
@@ -34,7 +34,7 @@ describe("taskNotices", () => {
 
   it("offers Retry on a failed attempt when the server allows it", () => {
     expect(taskNotices(input({ task: { interruption: interruption({}) } }))).toEqual([
-      { kind: "interrupted", state: "failed", canRetry: true, nextRetryAt: null, workspaceFailure: null },
+      { kind: "interrupted", state: "failed", canRetry: true, nextRetryAt: null, workspaceFailure: null, retryWait: null, recoveryStep: null },
     ]);
     const scheduled = interruption({ state: "retry_scheduled", nextRetryAt: "2026-10-26T10:00:40.000Z" });
     expect(taskNotices(input({ task: { interruption: scheduled } }))[0]).toMatchObject({ kind: "interrupted", state: "retry_scheduled" });
@@ -83,6 +83,24 @@ describe("taskNotices", () => {
     expect(kinds(input({ task: { interruption: resume }, assignee: agent }))).toEqual(["agent-paused"]);
   });
 
+  it("doesn't call a setup draft paused, and links to Finish setup once its computer is ready (#19322)", () => {
+    const draft = { id: "a1", name: "Sam", status: "paused" as const, pauseReason: "setup" as const, lifecycleState: "preparing" as const };
+    expect(taskNotices(input({ assignee: draft }))).toEqual([{ kind: "agent-setup", agentId: "a1", agentName: "Sam", preparing: true }]);
+    expect(taskNotices(input({ assignee: { ...draft, lifecycleState: "paused" } }))[0]).toMatchObject({ kind: "agent-setup", preparing: false });
+    expect(taskNotices(input({ assignee: { ...draft, lifecycleState: "verifying" } }))[0]).toMatchObject({ kind: "agent-setup", preparing: false });
+    // It stands in for the generic paused notice too.
+    const resume = interruption({ responsibility: "user", state: "waiting_for_user", userAction: "resume", canRetry: false });
+    expect(kinds(input({ task: { interruption: resume }, assignee: draft }))).toEqual(["agent-setup"]);
+  });
+
+  it("offers no Resume for a company archive pause, and only says 'by hand' for a manual one", () => {
+    const agent = { id: "a1", name: "Sam", status: "paused" as const, pauseReason: "company_archived" as const };
+    expect(taskNotices(input({ assignee: agent }))[0]).toMatchObject({ kind: "agent-paused", canResume: false });
+    expect(pauseDetail("company_archived")).toBe("It was paused because its company is archived.");
+    expect(pauseDetail("manual")).toBe("It was paused by hand.");
+    expect(pauseDetail(null)).toBe("");
+  });
+
   it("marks a hidden task", () => {
     expect(kinds(input({ task: { hiddenAt: new Date() } }))).toEqual(["hidden"]);
   });
@@ -110,7 +128,7 @@ describe("provider and workspace failures", () => {
 
   it("shows a provider's refusal in place of the plain interruption, or of the wait it caused", () => {
     expect(taskNotices(input({ task: { interruption: interruption({ providerFailure }) } }))).toEqual([
-      { kind: "provider-failure", failure: providerFailure, state: "failed", canRetry: true, nextRetryAt: null },
+      { kind: "provider-failure", failure: providerFailure, state: "failed", canRetry: true, nextRetryAt: null, recoveryStep: null },
     ]);
     const waiting = interruption({ providerFailure, responsibility: "user", state: "waiting_for_user", userAction: "reconnect", canRetry: false });
     expect(kinds(input({ task: { interruption: waiting } }))).toEqual(["provider-failure"]);
@@ -130,5 +148,51 @@ describe("provider and workspace failures", () => {
   it("keeps the project access notice first", () => {
     const access = interruption({ providerFailure, projectAccess: { agentId: "a1", projectId: "p1", ready: false } });
     expect(kinds(input({ task: { interruption: access } }))).toEqual(["project-access"]);
+  });
+
+  it("shows a persisted Retry wait over the provider's refusal (#18845)", () => {
+    const waited = interruption({ providerFailure, retryWait: { reason: "budget", message: "Retry is waiting for the budget to allow it." }, canRetry: false });
+    expect(taskNotices(input({ task: { interruption: waited } }))).toEqual([
+      {
+        kind: "interrupted",
+        state: "failed",
+        canRetry: false,
+        nextRetryAt: null,
+        workspaceFailure: null,
+        retryWait: "Retry is waiting for the budget to allow it.",
+        recoveryStep: null,
+      },
+    ]);
+  });
+});
+
+describe("saved-work recovery", () => {
+  it("names the step while it works, and before a scheduled retry (#19260)", () => {
+    const working = interruption({ state: "working", recoveryStep: "saving_previous_files" });
+    expect(taskNotices(input({ task: { interruption: working } }))).toEqual([{ kind: "recovering", step: "Saving files from the previous attempt" }]);
+    const scheduled = interruption({ state: "retry_scheduled", nextRetryAt: "2026-10-26T10:00:40.000Z", recoveryStep: "checking_previous_run", canRetry: false });
+    expect(taskNotices(input({ task: { interruption: scheduled } }))[0]).toMatchObject({
+      kind: "interrupted",
+      state: "retry_scheduled",
+      canRetry: false,
+      recoveryStep: "Checking that the previous attempt stopped",
+    });
+    // A step on a failed attempt isn't shown: the failure is what to read.
+    expect(taskNotices(input({ task: { interruption: interruption({ recoveryStep: "finishing_recovery" }) } }))[0]).toMatchObject({ recoveryStep: null });
+  });
+
+  it("drops Retry under a native export hold, where Recover saved files takes its place (#18848)", () => {
+    const executionBlocker = {
+      recoveryActionId: "ra1",
+      runId: "run-1",
+      agentId: "a1",
+      cause: "native_workspace_sync_out_retry_exhausted",
+      nextAction: "Recover the files",
+      workspaceRepairRequired: true,
+    };
+    expect(taskNotices(input({ task: { interruption: interruption({}), executionBlocker } }))[0]).toMatchObject({ kind: "interrupted", canRetry: false });
+    expect(taskNotices(input({ task: { interruption: interruption({}), executionBlocker: { ...executionBlocker, cause: "other" } } }))[0]).toMatchObject({
+      canRetry: true,
+    });
   });
 });

@@ -2,6 +2,7 @@ import type { ActivityEvent, CompactIssue, IssueComment, IssueThreadInteraction 
 import type { RunForIssue } from "@/api/issues";
 import type { Request } from "@/requests/request-model";
 import { activityLine, type ActivityLine, type ActivityNames } from "./activity-format";
+import { runWait } from "./run-waits";
 
 /*
  * The Activity section's timeline (board 3): comments, activity events and finished runs merged in
@@ -53,6 +54,11 @@ function runText(run: RunForIssue): { text: string; tone?: "red" | "green" } {
     case "timed_out":
       return { text: `run timed out${suffix}`, tone: "red" };
     case "cancelled":
+      // Held for the provider's usage limit, not stopped: it starts again at the reset (#19246).
+      if (run.errorCode === "provider_limit_wait") {
+        const until = runWait(run)?.until;
+        return { text: `run is waiting for its usage limit to reset${until ? `, until ${stampLabel(until)}` : ""}` };
+      }
       return { text: `run was stopped${suffix}` };
     default:
       return { text: `run ${run.status.replace(/_/g, " ")}${suffix}` };

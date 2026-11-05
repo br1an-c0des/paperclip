@@ -1,7 +1,6 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { RotateCcw, Square } from "lucide-solid";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
-import { heartbeatsApi } from "@/api/heartbeats";
 import { issuesApi, type RunForIssue } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { runsApi } from "@/api/runs";
@@ -14,6 +13,8 @@ import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { pushToast } from "@/ui/Toast";
 import { useTaskPeople } from "./people";
+import { canStopRun, stopLabel, stopRun } from "./run-stop";
+import { runWait } from "./run-waits";
 import { duration, stampLabel } from "./thread-model";
 import "./TaskRuns.css";
 
@@ -25,6 +26,11 @@ import "./TaskRuns.css";
  * A failed or timed-out run offers Retry (the same request again as a new run), and a run whose
  * process was lost offers Resume, by the run modal's rules (run-model.ts). A going run that has
  * gone quiet shows the watchdog's warning with its answers (RunWatchdog.tsx).
+ *
+ * Since the 2026-11-05 sync a failed native run that still owns its retry offers Stop too
+ * (`execution.canStop`, run-stop.ts), a Stop the server records but settles later reads as
+ * stopping, and a run waiting on something the server names (the usage limit's reset) says so
+ * (run-waits.ts).
  */
 
 const ACTIVE = new Set(["queued", "running", "scheduled_retry"]);
@@ -97,13 +103,33 @@ export function TaskRuns(props: { taskId: string }) {
   // Ticks the running times while a run is going.
   const now = useNow(() => ordered().some((run) => ACTIVE.has(run.status)));
 
+  // Runs whose Stop is out, or recorded and settling (a native session still starting).
+  const [stopping, setStopping] = createSignal<ReadonlySet<string>>(new Set());
+  const markStopping = (runId: string, on: boolean) =>
+    setStopping((current) => {
+      const next = new Set(current);
+      if (on) next.add(runId);
+      else next.delete(runId);
+      return next;
+    });
   const stop = async (run: RunForIssue) => {
+    if (stopping().has(run.runId)) return;
+    markStopping(run.runId, true);
+    let settling = false;
     try {
-      await heartbeatsApi.cancel(run.runId);
-      void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
-      void client.invalidateQueries({ queryKey: queryKeys.issues.section(props.taskId, "runs") });
+      const result = await stopRun(run, company().id);
+      if (result === "pending") {
+        settling = true;
+        pushToast({ tone: "info", title: "Stopping the run", body: "The Stop is recorded. The run ends as cancelled once its session opens." });
+      }
     } catch (error) {
       pushToast({ tone: "error", title: "Couldn't stop the run", body: error instanceof Error ? error.message : String(error) });
+    } finally {
+      // A settling Stop stays marked until the run's next status arrives (the list refetches).
+      if (!settling) markStopping(run.runId, false);
+      void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
+      void client.invalidateQueries({ queryKey: queryKeys.issues.section(props.taskId, "runs") });
+      void client.invalidateQueries({ queryKey: queryKeys.runs.detail(run.runId) });
     }
   };
 
@@ -191,6 +217,10 @@ export function TaskRuns(props: { taskId: string }) {
                   const rerunnable = () => ({ status: run.status, errorCode: run.errorCode ?? null, execution: run.execution });
                   const resumable = () => canResumeRun(rerunnable());
                   const retryable = () => canRetryRun(rerunnable());
+                  const stoppable = () => canStopRun(run);
+                  const wait = () => runWait(run);
+                  // A settling Stop clears once the run has moved on.
+                  const isStopping = () => stopping().has(run.runId) && stoppable();
                   return (
                     <li class="tr-run">
                       <Show when={agent()} fallback={<span class="tr-avatar-gap" aria-hidden="true" />}>
@@ -199,9 +229,20 @@ export function TaskRuns(props: { taskId: string }) {
                       <div class="tr-run-main">
                         <div class="tr-run-top">
                           <span class="tr-agent">{agent()?.name ?? "An agent"}</span>
-                          <span class="tr-status" data-tone={STATUS_TONE[run.status] ?? "neutral"}>
-                            {words(run.status)}
-                          </span>
+                          <Show
+                            when={wait()}
+                            fallback={
+                              <span class="tr-status" data-tone={STATUS_TONE[run.status] ?? "neutral"}>
+                                {words(run.status)}
+                              </span>
+                            }
+                          >
+                            {(found) => (
+                              <span class="tr-status" data-tone="amber" title={run.error ?? undefined}>
+                                {found().label}
+                              </span>
+                            )}
+                          </Show>
                           <Show when={run.retryOfRunId}>
                             <span class="tsec-muted">retry</span>
                           </Show>
@@ -215,9 +256,9 @@ export function TaskRuns(props: { taskId: string }) {
                             {" "}· <span title={run.livenessReason ?? undefined}>{words(run.livenessState!)}</span>
                           </Show>
                         </span>
-                        <Show when={run.error}>{(error) => <p class="tr-error">{error()}</p>}</Show>
-                        <Show when={run.scheduledRetryAt}>
-                          {(at) => <p class="tsec-muted">Retries {stampLabel(at())}</p>}
+                        <Show when={!wait() && run.error}>{(error) => <p class="tr-error">{error()}</p>}</Show>
+                        <Show when={wait()?.until ?? run.scheduledRetryAt}>
+                          {(at) => <p class="tsec-muted">{wait()?.held ? "Its retry starts" : wait() ? "Starts" : "Retries"} {stampLabel(at())}</p>}
                         </Show>
                         <Show when={runNextAction(run)}>
                           {(next) => (
@@ -234,10 +275,15 @@ export function TaskRuns(props: { taskId: string }) {
                         <Button size="compact" onClick={() => commands.openRunModal(run.runId)}>
                           View run
                         </Button>
-                        <Show when={active()}>
-                          <Button size="compact" onClick={() => void stop(run)}>
+                        <Show when={stoppable()}>
+                          <Button
+                            size="compact"
+                            disabled={isStopping()}
+                            title={run.status === "failed" ? "Stop the retry this run would start by itself." : undefined}
+                            onClick={() => void stop(run)}
+                          >
                             <Square size={12} aria-hidden="true" />
-                            Stop
+                            {stopLabel(run.status, isStopping())}
                           </Button>
                         </Show>
                         <Show when={resumable() || retryable()}>

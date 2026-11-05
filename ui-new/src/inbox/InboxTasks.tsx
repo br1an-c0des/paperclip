@@ -5,7 +5,7 @@ import { updatedLabel } from "@/tasks/list-model";
 import { assigneeName, type TaskPeople } from "@/tasks/people";
 import { RetryMark } from "@/tasks/retry";
 import { Button } from "@/ui/Button";
-import { StatusCapsule } from "@/ui/Status";
+import { TaskStatusCapsule } from "@/ui/Status";
 import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { parentOf } from "./inbox-model";
 import type { Inbox } from "./use-inbox";
@@ -44,7 +44,7 @@ export function TaskRows(props: {
             onPointerDown={() => props.onSelect(task.id)}
           >
             <span class="ibx-dot" aria-label={task.isUnreadForMe && !props.archived ? "Unread" : undefined} />
-            <StatusCapsule status={shownStatus(task)} size="row" />
+            <TaskStatusCapsule task={task} size="row" />
             <button type="button" class="ibx-task-open" onClick={() => props.onOpen(task)}>
               <span class="mono">{task.identifier}</span>
               <span class="ibx-row-title">{task.title}</span>

@@ -168,6 +168,7 @@
 }
 
 .bv-card > .tone-pill,
+.bv-card > .tl-note,
 .bv-card > .retry-mark {
   align-self: flex-start;
 }

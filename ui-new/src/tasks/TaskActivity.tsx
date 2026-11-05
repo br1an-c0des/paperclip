@@ -4,7 +4,6 @@ import { ArrowDown, ArrowUpRight, Ellipsis, ListTree, Search, Square, X } from "
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch } from "solid-js";
 import { approvalsApi } from "@/api/approvals";
 import { commentsApi } from "@/api/comments";
-import { heartbeatsApi } from "@/api/heartbeats";
 import { interactionsApi } from "@/api/interactions";
 import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
@@ -42,9 +41,9 @@ import {
 import { MessageBody } from "./MessageBody";
 import { SourceTrustBadge } from "@/documents/SourceTrustBadge";
 import { useTaskPeople } from "./people";
-import { StatusChip } from "./TaskDetails";
+import { StatusChip, TaskStatusChip } from "./TaskDetails";
+import { stopLabel, stopRun } from "./run-stop";
 import { plainClick } from "./TaskList";
-import { shownStatus } from "@/ui/status-meta";
 import { createdTasks, duration, stampLabel, suggestedTaskIds, type CreatedTask, type ThreadFilter } from "./thread-model";
 import { commentElementId, nearBottom } from "./task-anchor";
 import { CommentPluginActions, CommentPluginAnnotations } from "@/plugins/CommentPlugins";
@@ -343,12 +342,21 @@ export function TaskActivity(props: {
     ),
   );
 
-  const stop = async (runId: string) => {
+  // Live runs whose Stop is out, or recorded and settling (a native session still starting).
+  const [stopping, setStopping] = createSignal<ReadonlySet<string>>(new Set());
+  const stop = async (run: { id: string; status: string }) => {
+    if (stopping().has(run.id)) return;
+    setStopping((current) => new Set([...current, run.id]));
+    let settling = false;
     try {
-      await heartbeatsApi.cancel(runId);
-      void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
+      settling = (await stopRun({ runId: run.id, status: run.status }, company().id)) === "pending";
+      if (settling) pushToast({ tone: "info", title: "Stopping the run", body: "The Stop is recorded. The run ends as cancelled once its session opens." });
     } catch (error) {
       pushToast({ tone: "error", title: "Couldn't stop the run", body: error instanceof Error ? error.message : String(error) });
+    } finally {
+      // A settling Stop stays marked; the run leaves the live list when it ends.
+      if (!settling) setStopping((current) => new Set([...current].filter((id) => id !== run.id)));
+      void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
     }
   };
 
@@ -497,9 +505,9 @@ export function TaskActivity(props: {
                   <Button size="compact" class="ta-live-view" onClick={() => commands.openRunModal(run.id)}>
                     View run
                   </Button>
-                  <Button size="compact" onClick={() => void stop(run.id)}>
+                  <Button size="compact" disabled={stopping().has(run.id)} onClick={() => void stop(run)}>
                     <Square size={12} aria-hidden="true" />
-                    Stop
+                    {stopLabel(run.status, stopping().has(run.id))}
                   </Button>
                 </article>
               )}
@@ -636,7 +644,7 @@ function CreatedTaskCard(props: { task: CreatedTask; at: Date; onOpen: (task: Cr
         <span class="ta-made-title">{props.task.title}</span>
         <span class="ta-made-meta">
           <Show when={props.task.identifier}>{(id) => <span class="mono">{id()}</span>}</Show>
-          <StatusChip status={shownStatus(props.task)} small />
+          <TaskStatusChip task={props.task} small />
         </span>
       </span>
       <ArrowUpRight size={15} aria-hidden="true" class="ta-made-icon" />

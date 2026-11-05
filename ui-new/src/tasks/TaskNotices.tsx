@@ -1,7 +1,7 @@
 import type { Issue } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { ArrowRight, EyeOff, PauseCircle, RotateCcw, ShieldCheck, ShieldX, TriangleAlert } from "lucide-solid";
+import { ArrowRight, EyeOff, LifeBuoy, PauseCircle, RotateCcw, ShieldCheck, ShieldX, TriangleAlert, Wrench } from "lucide-solid";
 import { createMemo, createSignal, For, Match, Show, Switch, type JSX } from "solid-js";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
@@ -156,32 +156,53 @@ function Notice(props: {
       <Match when={props.notice.kind === "interrupted" && props.notice}>
         {(notice) => {
           const found = notice() as Extract<TaskNotice, { kind: "interrupted" }>;
+          const scheduled = found.state === "retry_scheduled";
+          const title = () => {
+            if (scheduled) return found.recoveryStep ? "Recovering saved work" : `${retryCountdown(found.nextRetryAt, now())}…`;
+            return found.retryWait ? "Retry is waiting" : "Interrupted";
+          };
           return (
             <Row
-              tone={found.state === "failed" ? "red" : "amber"}
-              icon={<TriangleAlert size={16} />}
-              title={found.state === "failed" ? "Interrupted" : `${retryCountdown(found.nextRetryAt, now())}…`}
-              action={found.canRetry ? retryButton(found.state === "failed" ? "Retry" : "Retry now") : undefined}
+              tone={scheduled || found.retryWait ? "amber" : "red"}
+              icon={found.recoveryStep ? <LifeBuoy size={16} /> : <TriangleAlert size={16} />}
+              title={title()}
+              action={found.canRetry ? retryButton(scheduled ? "Retry now" : "Retry") : undefined}
             >
-              {found.state === "retry_scheduled"
-                ? "The last attempt didn't finish, so the agent will try again by itself."
-                : found.workspaceFailure
-                  ? `Couldn't prepare the task folders. ${found.workspaceFailure}`
-                  : "The agent couldn't finish its last attempt. Anything you sent is saved."}
+              {scheduled
+                ? found.recoveryStep
+                  ? `${found.recoveryStep}. ${retryCountdown(found.nextRetryAt, now())}…`
+                  : "The last attempt didn't finish, so the agent will try again by itself."
+                : found.retryWait
+                  ? found.retryWait
+                  : found.workspaceFailure
+                    ? `Couldn't prepare the task folders. ${found.workspaceFailure}`
+                    : "The agent couldn't finish its last attempt. Anything you sent is saved."}
             </Row>
           );
         }}
       </Match>
+      <Match when={props.notice.kind === "recovering" && props.notice}>
+        {(notice) => (
+          <Row tone="neutral" icon={<LifeBuoy size={16} />} title="Recovering saved work">
+            {(notice() as Extract<TaskNotice, { kind: "recovering" }>).step}…
+          </Row>
+        )}
+      </Match>
       <Match when={props.notice.kind === "provider-failure" && props.notice}>
         {(notice) => {
           const found = notice() as Extract<TaskNotice, { kind: "provider-failure" }>;
+          const countdown = () => retryCountdown(found.nextRetryAt, now());
           return (
             <ProviderFailureNotice
               failure={found.failure}
               tone={found.state === "retry_scheduled" ? "amber" : "red"}
               action={found.canRetry ? retryButton(found.state === "retry_scheduled" ? "Retry now" : "Retry") : undefined}
             >
-              {found.state === "retry_scheduled" ? `${retryCountdown(found.nextRetryAt, now())} by itself.` : undefined}
+              {found.state === "retry_scheduled"
+                ? found.recoveryStep
+                  ? `${found.recoveryStep}. ${countdown()}…`
+                  : `${countdown()} by itself.`
+                : undefined}
             </ProviderFailureNotice>
           );
         }}
@@ -241,7 +262,31 @@ function Notice(props: {
                 ) : undefined
               }
             >
-              New runs won't start until the agent is resumed. {pauseDetail(found.reason)}
+              New runs won't start until the agent is resumed.{pauseDetail(found.reason) ? ` ${pauseDetail(found.reason)}` : ""}
+            </Row>
+          );
+        }}
+      </Match>
+      <Match when={props.notice.kind === "agent-setup" && props.notice}>
+        {(notice) => {
+          const found = notice() as Extract<TaskNotice, { kind: "agent-setup" }>;
+          return (
+            <Row
+              tone="neutral"
+              icon={<Wrench size={16} />}
+              title={`${found.agentName} is still being set up`}
+              action={
+                found.preparing ? undefined : (
+                  <A class="btn btn--secondary btn--compact" href={`/${company().issuePrefix}/agents/new?setupAgentId=${encodeURIComponent(found.agentId)}`}>
+                    Finish setup
+                    <ArrowRight size={14} aria-hidden="true" />
+                  </A>
+                )
+              }
+            >
+              {found.preparing
+                ? "Its computer is being prepared. Runs start by themselves when setup finishes."
+                : "Its setup isn't finished yet. Finish setup to let it start runs."}
             </Row>
           );
         }}

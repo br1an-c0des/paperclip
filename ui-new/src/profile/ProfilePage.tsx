@@ -14,8 +14,8 @@ import { InitialsDisc } from "@/ui/Avatar";
 import { buttonClass } from "@/ui/Button";
 import { PageHeader } from "@/ui/PageHeader";
 import { Segmented } from "@/ui/Segmented";
-import { StatusCapsule } from "@/ui/Status";
-import { shownStatus, STATUS_META } from "@/ui/status-meta";
+import { TaskStatusCapsule } from "@/ui/Status";
+import { STATUS_META } from "@/ui/status-meta";
 import { actionLabel, chartDays, completionRate, displayName, profileSlug, totalTokens, windowOf } from "./profile-model";
 import "./Profile.css";
 
@@ -275,7 +275,7 @@ function RecentTasks(props: { data: UserProfileResponse }) {
               <li>
                 <A class="prof-row" href={`/${company().issuePrefix}/issues/${encodeURIComponent(issue.identifier ?? issue.id)}`}>
                   <Show when={issue.status in STATUS_META}>
-                    <StatusCapsule status={shownStatus(issue)} size="row" />
+                    <TaskStatusCapsule task={issue} size="row" />
                   </Show>
                   <span class="mono muted prof-id">{issue.identifier ?? issue.id.slice(0, 8)}</span>
                   <span class="prof-row-title">{issue.title}</span>

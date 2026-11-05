@@ -1,7 +1,7 @@
 import type { IssueDisplayStatus, IssuePriority } from "@paperclipai/shared";
 import { Show, type JSX, type ParentProps } from "solid-js";
 import { Grain } from "./Grain";
-import { gradientVar, PRIORITY_META, STATUS_META, type Gradient } from "./status-meta";
+import { gradientVar, PRIORITY_META, STATUS_META, statusLook, type Gradient, type StatusSource } from "./status-meta";
 import "./Status.css";
 
 /*
@@ -14,13 +14,18 @@ import "./Status.css";
  * headers, `tiny` 5×12 inside tone pills. */
 export type CapsuleSize = "tiny" | "row" | "pill" | "group";
 
-/** A gradient capsule. `hollow` draws only its outline, for a status that waits on a schedule (Monitoring). */
-export function Capsule(props: { gradient: Gradient; size?: CapsuleSize; live?: boolean; grain?: boolean; hollow?: boolean }) {
+/**
+ * A gradient capsule. `hollow` draws only its outline, for a status that waits on a schedule
+ * (Monitoring); `queued` cuts it into a stack of three, for a blocked task waiting in line behind
+ * work that's going (the "in queue" look). `title` is a hover hint; the capsule stays aria-hidden.
+ */
+export function Capsule(props: { gradient: Gradient; size?: CapsuleSize; live?: boolean; grain?: boolean; hollow?: boolean; queued?: boolean; title?: string }) {
   return (
     <span
       class={`capsule capsule--${props.size ?? "pill"}`}
-      classList={{ live: props.live, grained: props.grain, hollow: props.hollow }}
+      classList={{ live: props.live, grained: props.grain, hollow: props.hollow, queued: props.queued }}
       style={{ background: gradientVar(props.gradient) }}
+      title={props.title}
       aria-hidden="true"
     >
       <Show when={props.grain}>
@@ -30,10 +35,29 @@ export function Capsule(props: { gradient: Gradient; size?: CapsuleSize; live?: 
   );
 }
 
-/** A status's capsule. Pass what the task shows (`shownStatus`), so Monitoring draws as Monitoring. */
-export function StatusCapsule(props: { status: IssueDisplayStatus; size?: CapsuleSize; live?: boolean; grain?: boolean }) {
+/**
+ * A status's capsule. Pass what the task shows (`shownStatus`), so Monitoring draws as Monitoring,
+ * and `queued` for a blocked task covered by active work (`isQueued`), which draws Ion in a stack.
+ */
+export function StatusCapsule(props: { status: IssueDisplayStatus; queued?: boolean; size?: CapsuleSize; live?: boolean; grain?: boolean; title?: string }) {
   const meta = () => STATUS_META[props.status] ?? STATUS_META.backlog;
-  return <Capsule gradient={meta().gradient} hollow={meta().hollow} size={props.size} live={props.live} grain={props.grain} />;
+  return (
+    <Capsule
+      gradient={props.queued ? "ion" : meta().gradient}
+      hollow={!props.queued && meta().hollow}
+      queued={props.queued}
+      size={props.size}
+      live={props.live}
+      grain={props.grain}
+      title={props.title}
+    />
+  );
+}
+
+/** A task's own capsule, through `statusLook`: Monitoring, the in-queue look, and its full label as a hint. */
+export function TaskStatusCapsule(props: { task: StatusSource; size?: CapsuleSize; live?: boolean; grain?: boolean }) {
+  const look = () => statusLook(props.task);
+  return <StatusCapsule status={look().status} queued={look().queued} size={props.size} live={props.live} grain={props.grain} title={look().title} />;
 }
 
 /** Capsule, label and muted count on --ground (board 1's status filters, board 8's counts). */

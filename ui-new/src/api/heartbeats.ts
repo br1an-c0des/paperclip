@@ -75,10 +75,50 @@ export type WorkspaceOperationRow = Omit<WorkspaceOperation, "startedAt" | "fini
   updatedAt: string;
 };
 
+/** The run as Stop reads it and the cancel answers it: enough to check the Stop landed. */
+export type StoppedRun = { id: string; companyId: string; status: string; resultJson: Record<string, unknown> | null };
+
+/**
+ * Whether the cancel's answer carries this Stop's intent, recorded and not yet sent to the native
+ * session (`resultJson.nativeCancellation`), which a correlated Stop may settle later
+ * (ui/src/api/heartbeats.ts `cancel`, upstream #18899).
+ */
+export function hasPendingNativeStop(run: StoppedRun | null, runId: string, cancellationRequestId: string) {
+  const value = run?.resultJson?.nativeCancellation;
+  const intent = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  return (
+    !!run &&
+    run.id === runId &&
+    intent?.schema === "paperclip.native-cancellation.v1" &&
+    intent.runId === runId &&
+    intent.companyId === run.companyId &&
+    intent.intentId === `native-cancellation:${cancellationRequestId}` &&
+    intent.scope === "run" &&
+    intent.dispatchState === "pending" &&
+    intent.dispatched === false &&
+    typeof intent.intentAuditId === "string" &&
+    intent.intentAuditId.length > 0
+  );
+}
+
 export const heartbeatsApi = {
   liveRuns: (companyId: string) => api.get<LiveRun[]>(`/companies/${companyId}/live-runs`),
-  /** Stops a queued or running run. */
-  cancel: (runId: string) => api.post<unknown>(`/heartbeat-runs/${runId}/cancel`, {}),
+  /** One run, for Stop to read what it was asked before (`resultJson.startupCancellation`). */
+  get: (runId: string, signal?: AbortSignal) => api.get<StoppedRun>(`/heartbeat-runs/${runId}`, { signal }),
+  /**
+   * Stops a queued or running run, or a failed native run that still owns a retry
+   * (`execution.canStop`). A correlated Stop sends a `cancellationRequestId` the UI saved first
+   * (tasks/run-stop.ts); its answer must be the cancelled run, or carry the Stop's pending intent,
+   * or the Stop didn't land. A native session still starting answers 409 `native_stop_pending`: the
+   * Stop is recorded and settles as cancelled when the session opens (upstream #19189).
+   */
+  cancel: async (runId: string, options?: { cancellationRequestId: string }) => {
+    const run = await api.post<StoppedRun | null>(`/heartbeat-runs/${runId}/cancel`, options ?? {});
+    if (options && run?.status !== "cancelled" && !hasPendingNativeStop(run, runId, options.cancellationRequestId)) {
+      throw new Error("Stop wasn't accepted because the run changed.");
+    }
+    return run;
+  },
   recordWatchdogDecision: (input: WatchdogDecisionInput) =>
     api.post<unknown>(`/heartbeat-runs/${input.runId}/watchdog-decisions`, {
       decision: input.decision,

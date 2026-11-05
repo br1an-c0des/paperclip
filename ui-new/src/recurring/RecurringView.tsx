@@ -21,7 +21,7 @@ import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
-import { Capsule, StatusCapsule } from "@/ui/Status";
+import { Capsule, TaskStatusCapsule } from "@/ui/Status";
 import { Switch } from "@/ui/Switch";
 import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
@@ -520,7 +520,7 @@ function RoutineRow(props: {
             {(task) => (
               <li class="tl-row rv-kid" onClick={(event) => !(event.target as Element).closest("a") && props.onOpenTask(task)}>
                 <div class="tl-pin-col tl-name rv-kid-name">
-                  <StatusCapsule status={shownStatus(task)} size="row" live={shownStatus(task) === "in_progress"} />
+                  <TaskStatusCapsule task={task} size="row" live={shownStatus(task) === "in_progress"} />
                   <span class="tl-id mono">{task.identifier}</span>
                   <a
                     class="tl-title"

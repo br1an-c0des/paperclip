@@ -4,6 +4,7 @@ import {
   buildTaskGroups,
   groupDefaults,
   moveUpdate,
+  noteCapsule,
   rowsById,
   shownRows,
   startsCollapsed,
@@ -75,6 +76,24 @@ describe("buildTaskGroups", () => {
     const blocker = { id: "x", identifier: "TES-9", title: "Analytics" };
     const [group] = buildTaskGroups([task("a", "blocked", { blockedBy: [blocker] as CompactIssue["blockedBy"] })], new Set());
     expect(group!.rows[0]!.note).toEqual({ tone: "red", label: "Blocked by TES-9" });
+  });
+
+  it("notes a blocked task covered by an active sub-task in the run tone, still under Blocked", () => {
+    const blockerAttention = {
+      state: "covered",
+      reason: "active_child",
+      unresolvedBlockerCount: 1,
+      coveredBlockerCount: 1,
+      stalledBlockerCount: 0,
+      attentionBlockerCount: 0,
+      sampleBlockerIdentifier: "TES-5",
+      sampleStalledBlockerIdentifier: null,
+    } as CompactIssue["blockerAttention"];
+    const blocker = { id: "x", identifier: "TES-5", title: "Sub" };
+    const [group] = buildTaskGroups([task("a", "blocked", { blockerAttention, blockedBy: [blocker] as CompactIssue["blockedBy"] })], new Set());
+    expect(group!.key).toBe("blocked");
+    expect(group!.rows[0]!.note).toEqual({ tone: "run", label: "Waiting on active sub-task TES-5", title: "Blocked · waiting on active sub-task TES-5" });
+    expect(noteCapsule("run")).toEqual({ gradient: "ion", queued: true });
   });
 });
 

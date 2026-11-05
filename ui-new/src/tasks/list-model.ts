@@ -1,5 +1,5 @@
 import type { CompactIssue, IssueDisplayStatus, IssuePriority, IssueStatus } from "@paperclipai/shared";
-import { PRIORITY_META, shownStatus, STATUS_META, STATUS_ORDER } from "@/ui/status-meta";
+import { PRIORITY_META, shownStatus, STATUS_META, STATUS_ORDER, statusLook, statusNote, type Gradient } from "@/ui/status-meta";
 import type { GroupBy } from "./view-state";
 import type { WorkspaceLookup } from "./workspaces";
 
@@ -21,7 +21,8 @@ import type { WorkspaceLookup } from "./workspaces";
  * the group, or added from it, is given.
  */
 
-export type RowNote = { tone: "red" | "green" | "cyan"; label: string };
+/** A row's note pill; `title` is its hover hint. */
+export type RowNote = { tone: "red" | "green" | "cyan" | "run"; label: string; title?: string };
 
 export type TaskRow = {
   task: CompactIssue;
@@ -124,14 +125,27 @@ export function startsCollapsed(group: Pick<TaskGroup, "mark">) {
   return group.mark.kind === "status" && COLLAPSED_BY_DEFAULT.has(group.mark.status);
 }
 
+/**
+ * A blocked row's note. Covered by active work (the in-queue look), it says what it waits on, in the
+ * run tone; otherwise it names its blockers in red, with the server's reason as the hint.
+ */
 function rowNote(task: CompactIssue): RowNote | null {
+  if (task.status !== "blocked") return null;
+  const look = statusLook(task);
+  if (look.queued) return { tone: "run", label: statusNote(look) ?? "Waiting on active work", title: look.title };
   const blockers = task.blockedBy ?? [];
-  if (task.status === "blocked" && blockers.length > 0) {
+  if (blockers.length > 0) {
     const first = blockers[0]!;
     const label = blockers.length === 1 ? `Blocked by ${first.identifier ?? first.title}` : `Blocked by ${blockers.length} tasks`;
-    return { tone: "red", label };
+    return { tone: "red", label, ...(look.title !== look.label ? { title: look.title } : {}) };
   }
   return null;
+}
+
+/** The capsule in a row note's pill: the in-queue stack for one waiting on active work. */
+export function noteCapsule(tone: RowNote["tone"]): { gradient: Gradient; queued?: true } {
+  if (tone === "run") return { gradient: "ion", queued: true };
+  return { gradient: tone === "red" ? "flare" : tone === "green" ? "lagoon" : "tide" };
 }
 
 function labelIdsOf(task: CompactIssue) {
