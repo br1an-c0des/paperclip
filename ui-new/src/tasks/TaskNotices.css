@@ -45,6 +45,17 @@
   font-weight: 700;
 }
 
+/* A provider failure's own message, and what failed (ProviderFailureNotice.tsx) */
+.tn-message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tn-facts {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .tn-action {
   display: flex;
   gap: 6px;

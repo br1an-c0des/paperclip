@@ -15,6 +15,7 @@ import { useTaskPeople } from "./people";
 import { pauseDetail, retryCountdown, taskNotices, WAITING_TEXT, type TaskNotice } from "./recovery";
 import { useTaskRetry } from "./retry";
 import { TreeControlDialog, useTreeControlState } from "./TaskActions";
+import { ProviderFailureNotice } from "./ProviderFailureNotice";
 import { TaskRecovery } from "./TaskRecovery";
 import "./TaskNotices.css";
 import { TaskIntegrations } from "./integrations/TaskIntegrations";
@@ -26,6 +27,7 @@ import { TaskIntegrations } from "./integrations/TaskIntegrations";
  * (releasing its pause, with the agents woken), Resume agent for a paused assignee (and a fresh
  * wake, since the pause dropped the assignment's), and the project access notice from the
  * 2026-10-24 upstream sync, which links to the agent's project access and retries once it's added.
+ * A provider's refusal shows as its own notice (ProviderFailureNotice.tsx), with Retry.
  */
 
 export function TaskNotices(props: { taskId: string }) {
@@ -138,7 +140,7 @@ function Notice(props: {
 }) {
   const company = useCompany();
   // A second-by-second clock while the retry countdown is on screen.
-  const now = useNow(() => props.notice.kind === "interrupted" && props.notice.state === "retry_scheduled");
+  const now = useNow(() => (props.notice.kind === "interrupted" || props.notice.kind === "provider-failure") && props.notice.state === "retry_scheduled");
   const retryButton = (label = "Retry") => (
     <Button size="compact" icon={<RotateCcw size={14} aria-hidden="true" />} disabled={props.retrying} onClick={() => props.onRetry()}>
       {props.retrying ? "Retrying…" : label}
@@ -161,10 +163,26 @@ function Notice(props: {
               title={found.state === "failed" ? "Interrupted" : `${retryCountdown(found.nextRetryAt, now())}…`}
               action={found.canRetry ? retryButton(found.state === "failed" ? "Retry" : "Retry now") : undefined}
             >
-              {found.state === "failed"
-                ? "The agent couldn't finish its last attempt. Anything you sent is saved."
-                : "The last attempt didn't finish, so the agent will try again by itself."}
+              {found.state === "retry_scheduled"
+                ? "The last attempt didn't finish, so the agent will try again by itself."
+                : found.workspaceFailure
+                  ? `Couldn't prepare the task folders. ${found.workspaceFailure}`
+                  : "The agent couldn't finish its last attempt. Anything you sent is saved."}
             </Row>
+          );
+        }}
+      </Match>
+      <Match when={props.notice.kind === "provider-failure" && props.notice}>
+        {(notice) => {
+          const found = notice() as Extract<TaskNotice, { kind: "provider-failure" }>;
+          return (
+            <ProviderFailureNotice
+              failure={found.failure}
+              tone={found.state === "retry_scheduled" ? "amber" : "red"}
+              action={found.canRetry ? retryButton(found.state === "retry_scheduled" ? "Retry now" : "Retry") : undefined}
+            >
+              {found.state === "retry_scheduled" ? `${retryCountdown(found.nextRetryAt, now())} by itself.` : undefined}
+            </ProviderFailureNotice>
           );
         }}
       </Match>

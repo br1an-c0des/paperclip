@@ -1,5 +1,6 @@
 import type { Agent, Issue, PauseReason, Project, TaskInterruptionPresentation } from "@paperclipai/shared";
 import type { TreeControlState } from "@/api/task-actions";
+import { providerFailureOf, type ProviderFailure } from "./provider-failure";
 
 /*
  * The health notices at the top of an open task (`tasks/recovery`), and which fix each offers. The
@@ -10,7 +11,11 @@ import type { TreeControlState } from "@/api/task-actions";
  * ui/src/components/IssueChatThread.tsx.
  *
  * - An attempt that failed offers Retry when the server says it can be retried; a scheduled retry
- *   counts down and offers Retry to go now.
+ *   counts down and offers Retry to go now. When the task's folders couldn't be prepared
+ *   (`workspaceFailure`, since the 2026-11-03 sync) it says so, with the server's reason.
+ * - A provider's refusal (`providerFailure`, since the same sync) takes the place of the plain
+ *   interruption, or of the wait it caused (a sign-in, a model), as in the old UI's
+ *   ExecutionBlockerNotice: who refused and why, with Retry when the server allows one.
  * - A task stopped because its agent may not read the project explains that and links to the
  *   agent's project access; once access is added, it offers Retry.
  * - Interruptions waiting on someone (an approval, a reconnect, an assignee, a model, a budget) say
@@ -23,7 +28,14 @@ import type { TreeControlState } from "@/api/task-actions";
 export type TaskNotice =
   | { kind: "hidden" }
   | { kind: "project-access"; agentId: string; projectId: string | null; ready: boolean; canRetry: boolean }
-  | { kind: "interrupted"; state: "failed" | "retry_scheduled"; canRetry: boolean; nextRetryAt: string | null }
+  | { kind: "interrupted"; state: "failed" | "retry_scheduled"; canRetry: boolean; nextRetryAt: string | null; workspaceFailure: string | null }
+  | {
+      kind: "provider-failure";
+      failure: ProviderFailure;
+      state: "failed" | "retry_scheduled" | "waiting_for_user";
+      canRetry: boolean;
+      nextRetryAt: string | null;
+    }
   | { kind: "waiting"; action: Exclude<NonNullable<TaskInterruptionPresentation["userAction"]>, "project_access" | "resume"> }
   | { kind: "tree-paused"; scope: "leaf" | "subtree"; isRoot: boolean; rootIssueId: string }
   | { kind: "agent-paused"; agentId: string; agentName: string; reason: PauseReason | null; canResume: boolean }
@@ -46,6 +58,7 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
   const { task } = input;
   const interruption = task.interruption ?? null;
   if (task.hiddenAt) notices.push({ kind: "hidden" });
+  const failure = providerFailureOf(interruption?.providerFailure);
 
   if (interruption?.projectAccess) {
     const access = interruption.projectAccess;
@@ -56,8 +69,16 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
       ready: access.ready,
       canRetry: access.ready && interruption.canRetry,
     });
+  } else if (failure && interruption && (interruption.state === "failed" || interruption.state === "retry_scheduled" || interruption.state === "waiting_for_user")) {
+    notices.push({ kind: "provider-failure", failure, state: interruption.state, canRetry: interruption.canRetry, nextRetryAt: interruption.nextRetryAt });
   } else if (interruption?.responsibility === "system" && (interruption.state === "failed" || interruption.state === "retry_scheduled")) {
-    notices.push({ kind: "interrupted", state: interruption.state, canRetry: interruption.canRetry, nextRetryAt: interruption.nextRetryAt });
+    notices.push({
+      kind: "interrupted",
+      state: interruption.state,
+      canRetry: interruption.canRetry,
+      nextRetryAt: interruption.nextRetryAt,
+      workspaceFailure: interruption.workspaceFailure?.message || null,
+    });
   } else if (interruption?.state === "waiting_for_user" && interruption.userAction && interruption.userAction !== "resume" && interruption.userAction !== "project_access") {
     notices.push({ kind: "waiting", action: interruption.userAction });
   }

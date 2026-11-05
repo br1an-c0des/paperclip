@@ -8,6 +8,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { Capsule, TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
+import { interruptionReason } from "./provider-failure";
 import "./retry.css";
 
 /*
@@ -16,7 +17,9 @@ import "./retry.css";
  * the system is responsible for (ui/src/components/IssueRow.tsx), and Retry is offered where the
  * task's own notice offers it (ui/src/components/ExecutionBlockerNotice.tsx): an attempt that failed
  * or is waiting to try again, when the server says it can be retried. Interruptions waiting on you
- * (an approval, a reconnect, project access) are left to the task panel.
+ * (an approval, a reconnect, project access) are left to the task panel. What stopped it (a
+ * provider's refusal, or folders that couldn't be prepared, since the 2026-11-03 sync) is the pill's
+ * tooltip; the panel's notice has the whole of it.
  *
  * A retry is one `POST /issues/:id/retry` with an idempotency key, kept while the request might
  * still land so a resend doesn't start a second attempt (ui/src/hooks/useTaskRetry.ts). The answer
@@ -24,14 +27,14 @@ import "./retry.css";
  * fetched again.
  */
 
-export type RetryOffer = { state: "failed" | "retry_scheduled"; canRetry: boolean };
+export type RetryOffer = { state: "failed" | "retry_scheduled"; canRetry: boolean; reason: string | null };
 
 /** What a row shows for the task's interruption, or null for none worth showing. */
 export function retryOffer(task: Pick<CompactIssue, "interruption">): RetryOffer | null {
   const interruption = task.interruption;
   if (!interruption || interruption.responsibility !== "system") return null;
   if (interruption.state !== "failed" && interruption.state !== "retry_scheduled") return null;
-  return { state: interruption.state, canRetry: interruption.canRetry };
+  return { state: interruption.state, canRetry: interruption.canRetry, reason: interruptionReason(interruption) };
 }
 
 type Retryable = Pick<CompactIssue, "id" | "identifier" | "title" | "interruption">;
@@ -100,7 +103,7 @@ export function RetryMark(props: { task: Retryable; retry: TaskRetry }) {
   return (
     <Show when={offer()}>
       {(found) => (
-        <span class="retry-mark">
+        <span class="retry-mark" title={found().reason ?? undefined}>
           <TonePill
             tone={found().state === "failed" ? "red" : "amber"}
             compact

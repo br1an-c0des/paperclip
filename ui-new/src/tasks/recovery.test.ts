@@ -34,7 +34,7 @@ describe("taskNotices", () => {
 
   it("offers Retry on a failed attempt when the server allows it", () => {
     expect(taskNotices(input({ task: { interruption: interruption({}) } }))).toEqual([
-      { kind: "interrupted", state: "failed", canRetry: true, nextRetryAt: null },
+      { kind: "interrupted", state: "failed", canRetry: true, nextRetryAt: null, workspaceFailure: null },
     ]);
     const scheduled = interruption({ state: "retry_scheduled", nextRetryAt: "2026-10-26T10:00:40.000Z" });
     expect(taskNotices(input({ task: { interruption: scheduled } }))[0]).toMatchObject({ kind: "interrupted", state: "retry_scheduled" });
@@ -94,5 +94,41 @@ describe("retryCountdown", () => {
     expect(retryCountdown("2026-10-26T10:00:40.000Z", now)).toBe("Trying again in 40s");
     expect(retryCountdown("2026-10-26T10:02:30.000Z", now)).toBe("Trying again in 3m");
     expect(retryCountdown(null, now)).toBe("Trying again soon");
+  });
+});
+
+describe("provider and workspace failures", () => {
+  const providerFailure = {
+    schema: "paperclip.provider-failure.v1",
+    provider: "openai",
+    phase: "startup",
+    category: "authentication",
+    message: "Invalid API key",
+    httpStatus: 401,
+    retryability: "requires_action",
+  } as const;
+
+  it("shows a provider's refusal in place of the plain interruption, or of the wait it caused", () => {
+    expect(taskNotices(input({ task: { interruption: interruption({ providerFailure }) } }))).toEqual([
+      { kind: "provider-failure", failure: providerFailure, state: "failed", canRetry: true, nextRetryAt: null },
+    ]);
+    const waiting = interruption({ providerFailure, responsibility: "user", state: "waiting_for_user", userAction: "reconnect", canRetry: false });
+    expect(kinds(input({ task: { interruption: waiting } }))).toEqual(["provider-failure"]);
+    expect(kinds(input({ task: { interruption: interruption({ providerFailure, state: "working" }) } }))).toEqual([]);
+  });
+
+  it("ignores a provider failure that isn't in the server's shape", () => {
+    const broken = { ...providerFailure, schema: "something-else" } as never;
+    expect(kinds(input({ task: { interruption: interruption({ providerFailure: broken }) } }))).toEqual(["interrupted"]);
+  });
+
+  it("carries the reason the task's folders couldn't be prepared", () => {
+    const notices = taskNotices(input({ task: { interruption: interruption({ workspaceFailure: { message: "No space left" } }) } }));
+    expect(notices[0]).toMatchObject({ kind: "interrupted", workspaceFailure: "No space left" });
+  });
+
+  it("keeps the project access notice first", () => {
+    const access = interruption({ providerFailure, projectAccess: { agentId: "a1", projectId: "p1", ready: false } });
+    expect(kinds(input({ task: { interruption: access } }))).toEqual(["project-access"]);
   });
 });
