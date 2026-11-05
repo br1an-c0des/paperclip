@@ -1,3 +1,4 @@
+import { confirmMcpAttachmentCleanup, recordMcpAttachmentCleanup, type McpAttachmentCleanup } from "../services/public-mcp/upload-cleanup.js";
 import { notifyDeferredExecutionWork } from "../services/deferred-execution-notifications.js";
 import { notifyNativeRecoveryNotices } from "../services/native-recovery-notice-notifications.js";
 import { notifyNativeStatusReassessment } from "../services/native-status-reassessment-notifications.js";
@@ -13,8 +14,10 @@ import { parseObject } from "../adapters/utils.js";
 import { prepareRestrictedWorkspaceRetry } from "../services/restricted-workspace-retry.js";
 import { issueSummariesQuerySchema, type IssueSummary } from "@paperclipai/shared";
 import { listIssueSummaries } from "../services/issue-summaries.js";
+import { listIssueStatusBlockerAttention } from "../services/issue-status-presentation.js";
 import { assertNoCaseHandoffMutation } from "../services/heartbeat/case-handoff-lifecycle.js";
 import { assertLegacyRunTaskOwnership } from "../legacy-run-task-ownership.js";
+import { runRetainsIssueIdentity } from "../services/task-repository-acquisition.js";
 import { withConversationReadState } from "../services/agent-chat-read-state.js";
 import { markIssueReadSchema } from "@paperclipai/shared";
 import { enqueueFastResponse } from "../services/fast-responses.js";
@@ -24,6 +27,7 @@ import { monitorPoliciesEqual, applyActorMonitorScheduledBy, assertCanManageIssu
 import type { IssuePrivacyConstraints } from "@paperclipai/shared";
 import { canActorReadHeartbeatRun } from "../services/heartbeat-run-privacy.js";
 import {
+  childCreatedByRequest,
   loadCreationSourceAgent,
   loadRunBoundIssue,
   resolveIssueCreationSource,
@@ -6049,6 +6053,9 @@ export function issueRoutes(
       payload?: unknown;
     },
     runId: string | null,
+    // Candidate only: resolveConfirmationFromComment re-verifies the comment
+    // and re-runs this audience under its locks before any mutation.
+    relayedHumanUserId?: string | null,
   ) {
     const reviewRestriction = await resolvePendingReviewInteractionRestriction(
       issue,
@@ -6078,6 +6085,7 @@ export function issueRoutes(
                 type: "agent",
                 agentId: actor.agentId,
                 runId: runId || actor.runId,
+                relayedHumanUserId,
               }
             : { type: "user", userId: actor.actorId },
         interaction,
@@ -6123,6 +6131,7 @@ export function issueRoutes(
     res: Response,
     issue: Parameters<typeof assertAgentIssueMutationAllowed>[2] & { conversationAgentId?: string | null; conversationUserId?: string | null },
     interactionId: string,
+    relayedHumanUserId?: string | null,
   ) {
     if (issue.conversationAgentId && req.actor.type === "board" && req.actor.userId !== issue.conversationUserId) {
       throw forbidden("Only the conversation owner can respond to chat interactions");
@@ -6147,6 +6156,7 @@ export function issueRoutes(
         issue,
         current,
         runId,
+        relayedHumanUserId,
       );
     if (!resolutionAuthorization) return false;
     return { interactionSvc, current, resolutionAuthorization } as const;
@@ -7432,13 +7442,20 @@ export function issueRoutes(
       )
       .orderBy(asc(agentWakeupRequests.requestedAt));
 
+    // A saved card response (an approval, an answer, a declined connection)
+    // is a read-only receipt. It must never hide the user's own later
+    // messages, which are separately queued and remain editable and sendable.
+    let receipt: IssueQueueState | null = null;
     for (const wake of rows) {
       if (
         readObject(wake.payload).issueId !== issue.id ||
         (queuedCommentIdsFromWakePayload(wake.payload).length === 0 && !queuedInteractionId(wake.payload))
       )
         continue;
+      const isReceipt = Boolean(queuedInteractionId(wake.payload));
+      if (isReceipt && receipt) continue;
       if (wake.status === "deferred_issue_execution") {
+        if (isReceipt) { receipt = { wake, state: "deferred", queueRun: null }; continue; }
         return { wake, state: "deferred", queueRun: null };
       }
       if (!wake.runId) continue;
@@ -7456,9 +7473,10 @@ export function issueRoutes(
         )
         .limit(1)
         .then((runRows) => runRows[0] ?? null);
-      if (queueRun) return { wake, state: "queued", queueRun };
+      if (queueRun && isReceipt) receipt = { wake, state: "queued", queueRun };
+      else if (queueRun) return { wake, state: "queued", queueRun };
     }
-    return null;
+    return receipt;
   }
 
   async function queueCommentsForWake(
@@ -7717,6 +7735,10 @@ export function issueRoutes(
         interruptedIssueId: input.issueId,
         interruptedByActorType: input.actor.actorType,
         interruptedByActorId: input.actor.actorId,
+        ...(input.actor.actorType === "user" ? {
+          cancelledByActorType: "user",
+          cancelledByUserId: input.actor.actorId,
+        } : {}),
       },
       eventMessage: "run interrupted by board comment",
       eventPayload: {
@@ -7865,6 +7887,8 @@ export function issueRoutes(
   //                   this request did not set the flag. The caller continues but
   //                   must not install the guard, or it can clear the flag that
   //                   the other request still owns.
+  //   "deferred"   - an authorized cross-task comment/update leaves restoration
+  //                   to the target's executor. No workspace flag was changed.
   //   null          - this function sent an error response, so the caller stops.
   // it runs only after the route already authorized the request on the issue.
   async function reopenClosedIssueExecutionWorkspaceOrRespond(
@@ -7872,11 +7896,22 @@ export function issueRoutes(
     res: Response,
     issue: { id: string; companyId: string; projectId?: string | null },
     workspace: Pick<ExecutionWorkspace, "id">,
+    options: { deferForOtherTask?: boolean } = {},
   ): Promise<{
-    outcome: "reopened" | "already-open";
-    generation: number;
+    outcome: "reopened" | "already-open" | "deferred";
+    generation: number | null;
   } | null> {
     const actor = getActorInfo(req);
+    if (options.deferForOtherTask && req.actor.type === "agent" && req.actor.runId) {
+      const run = await heartbeat.getRun(req.actor.runId);
+      if (run?.status === "running" && run.companyId === issue.companyId && run.agentId === req.actor.agentId
+        && !runRetainsIssueIdentity(run, issue.id)) {
+        // Task authority permits a scanner's comment or follow-up. Its run
+        // cannot restore another task's files. The target's admitted executor
+        // restores the workspace with its own run identity when work resumes.
+        return { outcome: "deferred", generation: null };
+      }
+    }
     const result =
       await executionWorkspacesSvc.reopenClosedIsolatedExecutionWorkspaceForIssue(
         {
@@ -8392,16 +8427,26 @@ export function issueRoutes(
     }
     const rows = await listIssueSummaries(db, companyId, parsed.data.ids, await issueReadSqlCondition(db, req.actor));
     const visible = await filterIssuesForActor(req, rows);
-    const summaries: IssueSummary[] = visible.map((row) => ({
-      id: row.id,
-      companyId: row.companyId,
-      title: row.title,
-      identifier: row.identifier,
-      status: row.status as IssueSummary["status"],
-      displayStatus: row.displayStatus,
-      updatedAt: row.updatedAt,
-      externalConversationState: row.externalConversationState,
-    }));
+    // Blocked rows carry glyph-only blocker state so every task view resolves
+    // the same glyph (covered → "in queue") as the task pane. At most five IDs.
+    const blockerAttention = await listIssueStatusBlockerAttention(db, companyId, visible, async (ids) => new Set(
+      (await filterIssuesForActor(req, await listIssueSummaries(db, companyId, ids, await issueReadSqlCondition(db, req.actor))))
+        .map((row) => row.id),
+    ));
+    const summaries: IssueSummary[] = visible.map((row) => {
+      const attention = blockerAttention.get(row.id);
+      return {
+        id: row.id,
+        companyId: row.companyId,
+        title: row.title,
+        identifier: row.identifier,
+        status: row.status as IssueSummary["status"],
+        displayStatus: row.displayStatus,
+        updatedAt: row.updatedAt,
+        externalConversationState: row.externalConversationState,
+        ...(attention ? { blockerAttention: attention } : {}),
+      };
+    });
     res.setHeader("Cache-Control", "private, no-store");
     res.json(summaries);
   });
@@ -13209,6 +13254,7 @@ export function issueRoutes(
         entityId: issue.id,
         details: {
           parentId: parent.id,
+          createdByRequest: childCreatedByRequest(issueId, issue.id),
           identifier: issue.identifier,
           title: issue.title,
           ...buildCreateIssueActivityStatusDetails(issue, res),
@@ -13489,6 +13535,7 @@ export function issueRoutes(
           entityId: issue.id,
           details: {
             parentId: sourceIssue.id,
+            createdByRequest: true,
             identifier: issue.identifier,
             title: issue.title,
             inheritedExecutionWorkspaceFromIssueId: sourceIssue.id,
@@ -14986,6 +15033,7 @@ export function issueRoutes(
             res,
             existing,
             closedExecutionWorkspace,
+            { deferForOtherTask: true },
           );
         if (reopenOutcome === null) {
           return;
@@ -16343,6 +16391,7 @@ export function issueRoutes(
     for (const attachment of attachments) {
       try {
         await storage.deleteObject(attachment.companyId, attachment.objectKey);
+        await recordMcpAttachmentCleanup(db, await confirmMcpAttachmentCleanup(db, storage, attachment));
       } catch (err) {
         logger.warn(
           { err, issueId: id, attachmentId: attachment.id },
@@ -17431,8 +17480,12 @@ export function issueRoutes(
       const issue = await getAccessibleResource(req, res, svc.getById(req.params.id as string), "Issue not found");
       if (!issue) return;
       if (req.actor.type !== "agent") throw forbidden("Conversational resolution requires the responding agent run");
+      const [replyComment] = await db.select({ authorUserId: issueComments.authorUserId }).from(issueComments).where(and(
+        eq(issueComments.id, req.body.commentId), eq(issueComments.companyId, issue.companyId),
+        eq(issueComments.issueId, issue.id), eq(issueComments.authorType, "user"),
+      ));
       const authorization = await getIssueThreadInteractionResolutionAuthorization(
-        req, res, issue, req.params.interactionId as string,
+        req, res, issue, req.params.interactionId as string, replyComment?.authorUserId ?? null,
       );
       if (!authorization) return;
       const actor = getActorInfo(req);
@@ -18992,6 +19045,7 @@ export function issueRoutes(
             res,
             issue,
             closedExecutionWorkspace,
+            { deferForOtherTask: true },
           );
         if (reopenOutcome === null) {
           return;
@@ -20227,8 +20281,10 @@ export function issueRoutes(
     if (!(await assertDeliverableMutationAllowedByRunContext(req, res, issue)))
       return;
 
+    let mcpCleanup: McpAttachmentCleanup | null = null;
     try {
       await storage.deleteObject(attachment.companyId, attachment.objectKey);
+      mcpCleanup = await confirmMcpAttachmentCleanup(db, storage, attachment);
     } catch (err) {
       logger.warn(
         { err, attachmentId },
@@ -20236,7 +20292,7 @@ export function issueRoutes(
       );
     }
 
-    const removed = await svc.removeAttachment(attachmentId);
+    const removed = await svc.removeAttachment(attachmentId, { mcpCleanup });
     if (!removed) {
       res.status(404).json({ error: "Attachment not found" });
       return;

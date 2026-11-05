@@ -22,7 +22,7 @@ function render(url: string) {
   </Routes></MemoryRouter>));
   return { host, cleanup: () => { flushSync(() => root.unmount()); host.remove(); } };
 }
-it.each([["mine", "mine"], ["unread", "unread"], ["blocked", "blocked"], ["recent", "recent"], ["everything", "all"]])("opens saved %s links in the original Inbox owner", async (view, tab) => {
+it.each([["mine", "mine"], ["blocked", "blocked"], ["recent", "recent"], ["everything", "all"]])("opens saved %s links in the original Inbox owner", async (view, tab) => {
   const { host, cleanup } = render(`/ORG/issues?view=${view}&sort=oldest#saved`);
   try {
     await vi.waitFor(() => expect(host.textContent).toContain(`Inbox owner:${tab}`));
@@ -30,8 +30,23 @@ it.each([["mine", "mine"], ["unread", "unread"], ["blocked", "blocked"], ["recen
     expect(host.textContent).not.toContain("Coordinator tasks");
   } finally { cleanup(); }
 });
+it.each(["inbox", "unread", "needs_attention", "all"])("keeps the %s task view in Coordinator", view => {
+  const { host, cleanup } = render(`/ORG/issues?view=${view}`);
+  try { expect(host.textContent).toContain("Coordinator tasks"); expect(host.textContent).not.toContain("Inbox owner"); }
+  finally { cleanup(); }
+});
 it.each(["workspace=workspace", "originKind=routine_execution"])("keeps organization-scoped task links out of Inbox: %s", filter => {
   const { host, cleanup } = render(`/ORG/issues?view=mine&${filter}`);
   try { expect(host.textContent).toContain("Coordinator tasks"); expect(host.textContent).not.toContain("Inbox owner"); }
   finally { cleanup(); }
+});
+
+it.each(["mine", "blocked", "recent", "everything"])("keeps shared %s label links on the Coordinator collection", async view => {
+  const url = `/ORG/issues?view=${view}&label=qa&label=review&sortField=taskId&sortDir=asc&keep=value#saved`;
+  const { host, cleanup } = render(url);
+  try {
+    await vi.waitFor(() => expect(host.textContent).toContain("Coordinator tasks"));
+    expect(host.textContent).not.toContain("Inbox owner");
+    expect(host.querySelector("output")?.textContent).toBe(url.replace(`view=${view}`, "view=all"));
+  } finally { cleanup(); }
 });

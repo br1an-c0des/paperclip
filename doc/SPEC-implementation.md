@@ -39,6 +39,7 @@ These decisions close open questions from `SPEC.md` for V1.
 | Org graph | Strict tree (`reports_to` nullable root); no multi-manager reporting |
 | Visibility | Issues remain company-open by default. Opt-in `private` issues use task ACLs; deployment exposure flags remain independent of work-object privacy. |
 | Communication | Tasks + comments only (no separate chat system) |
+| Composer shortcuts | Task replies and new tasks submit with Enter; Shift+Enter adds a new line. The off-by-default `enableLegacyComposerSubmit` preference in Experimental settings restores Command/Ctrl+Enter submission and Enter for a new line. |
 | Experimental voice transport | Speko browser voice can create or resume a task through the existing chat-connection delivery/publication pipeline. The selected Paperclip agent retains execution authority. Phone support remains gated on live continuation qualification. |
 | Task ownership | Single assignee; atomic checkout required for `in_progress` transition |
 | Task watchdogs | A task watchdog is an explicitly configured, issue-subtree-scoped verification and recovery capacity. It may restore live task paths inside the watched subtree; for issue-thread interaction resolution it is an ordinary agent subject to the same audience and containment checks, not board authority, active-run output monitoring, or general liveness recovery. |
@@ -47,7 +48,7 @@ These decisions close open questions from `SPEC.md` for V1.
 | Plugin framework | Local/self-hosted early plugin runtime is in scope; cloud marketplace and packaged public distribution remain out of scope |
 | Auth | Mode-dependent human auth (`local_trusted` implicit board in current code; authenticated mode uses sessions), API keys for agents |
 | Budget period | Monthly UTC calendar window |
-| Budget enforcement | Soft alerts + hard limit auto-pause |
+| Budget enforcement | Best-effort admission, soft alerts and asynchronous threshold auto-pause |
 | Deployment modes | Canonical model is `local_trusted` + `authenticated` with `private/public` exposure policy (see `doc/DEPLOYMENT-MODES.md`) |
 
 Low-trust agent presets are containment controls for hostile automated work, not
@@ -451,6 +452,7 @@ retain their titles and default to no generation request.
   - `standard`: normal autonomous execution. Agents may investigate, edit files, create artifacts, and complete the task.
   - `ask`: answer-only execution. Agents may use tools for investigation or temporary scratch work, but the deliverable is an issue-thread answer; they must not write implementation code or produce an implementation plan.
   - `planning`: plan-only execution. Agents create or revise the plan without implementation work. Accepting a fresh confirmation for the issue's current `plan` revision atomically changes this mode to `standard`, so the continuation may implement the approved plan on the source issue.
+- Harness-proposed plans: a native run's own proposed-plan surface (Codex plan collaboration mode `plan` item or `<proposed_plan>` block, Claude Code ExitPlanMode) emits the canonical `plan.proposed` event. A completed proposal is saved as the issue's `plan` document and gated by a `request_confirmation` bound to that revision, in `planning` and `standard` work mode alike. A `planning` run starts the harness in its native plan mode. Synchronization never changes the issue status mid-run; the run finalizer turns the pending confirmation into the review wait. An agent-initiated proposal on a `standard` issue leaves the work mode unchanged.
 - Work mode is explicit persisted state. Titles, descriptions, and requested deliverables never select or change it. A `standard` task may deliver a requested plan, including a canonical `plan` document, and complete without entering `planning` mode. Existing explicit approval requirements still apply.
 - `billing_code` text null
 - `assignee_adapter_overrides` jsonb null
@@ -1374,6 +1376,13 @@ Invites tab does not hide this Cloud action.
 
 ## 10.3 Agents
 
+Saving an existing agent's configuration with a healthy saved AI account checks
+current account access, installation, provider/model compatibility, and environment
+selection without allocating a computer or running a provider hello test. Use
+**Test** to verify the runtime. Unverified legacy-account adoption, task connection
+adoption, and Copilot's account-specific model checks retain their live validation.
+A configuration save confirms persistence; it does not certify runtime readiness.
+
 The Harness / Runtime configuration page offers **Upgrade runner** for existing
 legacy Claude, Codex, and Grok Build agents when the target environment selects Paperclip
 Runner by default. The action uses the normal authorized agent PATCH with
@@ -1729,12 +1738,31 @@ Scheduler must skip invocation when:
 - an existing run is active
 - hard budget limit has been hit
 
-Budget admission and accounting serialize under the company accounting lock.
-The dispatch boundary rechecks current company, agent, and project policies and
-reserves capacity before paid work starts. Accounting commits budget blocks and
-durable stop intent without waiting for provider shutdown or reconciling unrelated
-agents. An asynchronous worker cancels only work in the affected scope; committed
-stop intent survives policy changes and restart until existing stop proof succeeds.
+Paid-operation settlement and receipt ingestion use operation-scoped transactions.
+They do not acquire the company accounting mutex or update shared company/agent
+spend counters. The ledger, reservation transition and accounting acknowledgement
+commit atomically. Duplicate evidence uses stable identities; a conflicting
+receipt is not another charge. Monthly and lifetime totals read the canonical
+ledger and retained historical baselines.
+
+Admission reads current company, agent and project controls plus coherent budget
+exposure. Reservations record an operation's estimated obligation, rather than
+an exclusive claim on shared remaining capacity. Concurrent admissions may see
+the same available balance and both start. Budget enforcement is best effort,
+not a guaranteed bound on final billed spend. Manual Stop, lifecycle authority,
+permissions and provider-dispatch ownership retain their final gates.
+
+Financial changes append independent durable evaluation inputs. The existing
+worker coalesces notifications over one second and publishes budget holds,
+incidents and durable Stop intent from a consistent snapshot. Policy/control
+publication is fenced separately from settlement. Inputs arriving or committing
+later stay pending; no global sequence watermark consumes them. Limited-budget
+admission refuses relevant unevaluated inputs older than fifteen seconds.
+Unchanged idle decisions do not expire; unknown accounting retains its separate
+conservative admission restriction. Provider reporting and cancellation delays
+remain additional to evaluation lag. Cancellation delivery is asynchronous and
+scoped; committed per-run Stop survives policy changes and restart until existing
+stop proof succeeds. Budget resume cannot clear a manual hold.
 
 Accepted cumulative per-run usage checkpoints contribute observed running spend
 before the final ledger charge. Admission counts each unfinished operation's
@@ -1835,7 +1863,7 @@ for contracts, recovery behavior, Storybook, and acceptance workflows.
 ## 13.2 Enforcement Rules
 
 - soft alert default threshold: 80%
-- hard limit: at 100%, trigger:
+- at 100%, the asynchronous evaluator triggers:
   - set agent status to `paused`
   - block new checkout/invocation for that agent
   - emit high-priority activity event
