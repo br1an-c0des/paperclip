@@ -1,4 +1,4 @@
-import type { CaseHandoff, HandoffCaseInput, HandoffCaseResult, IssueLabel } from "@paperclipai/shared";
+import type { CaseHandoff, HandoffCaseInput, HandoffCaseResult, IssueBlockerAttention, IssueLabel } from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
@@ -30,6 +30,8 @@ export type CaseWorkIssue = {
   statusVersion: number;
   assigneeAgentId: string | null;
   assigneeAgentName: string | null;
+  /** The blockers' state, without their names, on a blocked task (since the 2026-11-05 sync, #19329). */
+  blockerAttention?: IssueBlockerAttention;
 };
 
 /** A case as the company's case list returns it. */
@@ -66,7 +68,8 @@ export type CaseIssueLink = {
   issueId: string;
   role: CaseLinkRole;
   createdAt: string;
-  issue: { id: string; identifier: string | null; title: string; status: string };
+  /** `blockerAttention` comes on blocked tasks, without the blockers' names (since the 2026-11-05 sync, #19329). */
+  issue: { id: string; identifier: string | null; title: string; status: string; blockerAttention?: IssueBlockerAttention };
 };
 
 /** One of the case's tasks' documents, listed by reference: the document lives on the task. */

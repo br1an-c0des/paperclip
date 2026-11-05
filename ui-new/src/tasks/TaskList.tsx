@@ -11,11 +11,12 @@ import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { Capsule, LabelPill, PriorityBars, RunningPill, StatusCapsule, TonePill } from "@/ui/Status";
-import { PRIORITY_META, shownStatus, STATUS_META } from "@/ui/status-meta";
+import { PRIORITY_META, statusLook } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
 import {
   groupDefaults,
   moveUpdate,
+  noteCapsule,
   rowsById,
   shownRows,
   takesAdds,
@@ -23,6 +24,7 @@ import {
   updatedLabel,
   type GroupMark,
   type GroupValue,
+  type RowNote,
   type TaskGroup,
   type TaskRow,
 } from "./list-model";
@@ -63,6 +65,18 @@ function readPin() {
 
 export function plainClick(event: MouseEvent) {
   return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+}
+
+/** A row's or card's note: "Blocked by TES-9", or "Waiting on active sub-task TES-5" in the run tone. */
+export function NotePill(props: { note: RowNote }) {
+  const capsule = () => noteCapsule(props.note.tone);
+  return (
+    <span class="tl-note" title={props.note.title}>
+      <TonePill tone={props.note.tone} compact icon={<Capsule gradient={capsule().gradient} queued={capsule().queued} size="tiny" />}>
+        {props.note.label}
+      </TonePill>
+    </span>
+  );
 }
 
 /** A menu or popover owns the keyboard while it's open. */
@@ -497,9 +511,10 @@ function Row(props: {
   extra?: JSX.Element;
 }) {
   const task = () => props.row.task;
-  // The stored status is what the menu sets; the capsule shows what the task shows (Monitoring).
+  // The stored status is what the menu sets; the capsule shows what the task shows (Monitoring,
+  // and the in-queue look for a blocked task covered by active work).
   const status = () => task().status as IssueStatus;
-  const shown = () => shownStatus(task());
+  const look = () => statusLook(task());
   const priority = () => task().priority as IssuePriority;
   const labelIds = () => task().labelIds ?? task().labels?.map((label) => label.id) ?? [];
   const labelNames = () => (task().labels ?? []).map((label) => label.name).join(", ");
@@ -549,11 +564,11 @@ function Row(props: {
           </Show>
         </button>
         <Menu>
-          <Menu.Trigger class="tl-status" aria-label={`Status: ${STATUS_META[shown()].label}. Change status`}>
-            <StatusCapsule status={shown()} size="row" />
+          <Menu.Trigger class="tl-status" aria-label={`Status: ${look().title}. Change status`} title={look().title}>
+            <StatusCapsule status={look().status} queued={look().queued} size="row" />
           </Menu.Trigger>
           <Menu.Content label="Status" width={220}>
-            <StatusItems current={status()} onPick={(next) => next !== status() && change({ status: next })} />
+            <StatusItems current={status()} look={look()} onPick={(next) => next !== status() && change({ status: next })} />
           </Menu.Content>
         </Menu>
         <span class="mono tl-id">{task().identifier}</span>
@@ -584,13 +599,7 @@ function Row(props: {
         <Show when={props.row.live}>
           <RunningPill compact />
         </Show>
-        <Show when={props.row.note}>
-          {(note) => (
-            <TonePill tone={note().tone} compact icon={<Capsule gradient={note().tone === "red" ? "flare" : note().tone === "green" ? "lagoon" : "tide"} size="tiny" />}>
-              {note().label}
-            </TonePill>
-          )}
-        </Show>
+        <Show when={props.row.note}>{(note) => <NotePill note={note()} />}</Show>
         <RetryMark task={task()} retry={props.retry} />
       </div>
       <Menu>

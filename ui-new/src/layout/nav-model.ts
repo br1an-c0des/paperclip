@@ -1,4 +1,4 @@
-import type { InstanceExperimentalSettings, IssueDisplayStatus, IssueStatus, IssueSummary } from "@paperclipai/shared";
+import type { InstanceExperimentalSettings, IssueBlockerAttention, IssueDisplayStatus, IssueStatus, IssueSummary } from "@paperclipai/shared";
 
 /*
  * The nav's personal rules, kept apart from the components so they can be tested: the order you
@@ -45,8 +45,20 @@ export function visibleProjects<T extends { id: string }>(projects: readonly T[]
 
 export const RECENT_TASKS_LIMIT = 5;
 
-/** `displayStatus` is what the summaries say it shows (Monitoring), when they say. */
-export type RecentTask = { id: string; identifier: string | null; title: string; status: IssueStatus; displayStatus?: IssueDisplayStatus | null; at: number };
+/**
+ * `displayStatus` is what the summaries say it shows (Monitoring), when they say, and
+ * `blockerAttention` the blockers' state on a blocked one (since the 2026-11-05 sync, #19329), so a
+ * recent task draws the same capsule as everywhere else.
+ */
+export type RecentTask = {
+  id: string;
+  identifier: string | null;
+  title: string;
+  status: IssueStatus;
+  displayStatus?: IssueDisplayStatus | null;
+  blockerAttention?: IssueBlockerAttention;
+  at: number;
+};
 
 /** Puts a task you opened at the top, once, keeping the five newest. */
 export function recordRecent(list: readonly RecentTask[], task: Omit<RecentTask, "at">, at: number): RecentTask[] {
@@ -60,15 +72,24 @@ export function recordRecent(list: readonly RecentTask[], task: Omit<RecentTask,
  */
 export function refreshRecent(
   list: readonly RecentTask[],
-  summaries: readonly (Pick<IssueSummary, "id" | "identifier" | "title" | "status"> & { displayStatus?: IssueDisplayStatus | null })[] | undefined,
+  summaries: readonly (Pick<IssueSummary, "id" | "identifier" | "title" | "status" | "blockerAttention"> & { displayStatus?: IssueDisplayStatus | null })[] | undefined,
 ): RecentTask[] {
   if (!summaries) return [...list];
   const byId = new Map(summaries.map((summary) => [summary.id, summary] as const));
   return list.flatMap((entry) => {
     const summary = byId.get(entry.id);
-    return summary
-      ? [{ ...entry, identifier: summary.identifier, title: summary.title, status: summary.status, displayStatus: summary.displayStatus ?? null }]
-      : [];
+    if (!summary) return [];
+    const { blockerAttention: _before, ...rest } = entry;
+    return [
+      {
+        ...rest,
+        identifier: summary.identifier,
+        title: summary.title,
+        status: summary.status,
+        displayStatus: summary.displayStatus ?? null,
+        ...(summary.blockerAttention ? { blockerAttention: summary.blockerAttention } : {}),
+      },
+    ];
   });
 }
 

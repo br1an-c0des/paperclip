@@ -1,4 +1,4 @@
-import type { Agent, CompactIssue, ExecutionWorkspace, Issue, IssueDisplayStatus, IssueLabel, IssuePriority, IssueStatus } from "@paperclipai/shared";
+import type { Agent, CompactIssue, ExecutionWorkspace, Issue, IssueLabel, IssuePriority, IssueStatus } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Check, ChevronDown, Pencil, Play, Plus, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, Show, type JSX } from "solid-js";
@@ -17,7 +17,7 @@ import { Markdown } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
 import { Popover } from "@/ui/Popover";
 import { LabelPill, PriorityBars } from "@/ui/Status";
-import { STATUS_META } from "@/ui/status-meta";
+import { STATUS_META, statusLook, statusNote, type StatusLook } from "@/ui/status-meta";
 import { Switch } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
 import { agentRunDefaults, effortOptions, supportsOverrides } from "./new-task";
@@ -204,23 +204,30 @@ export function DescriptionEditor(props: { task: Issue; onChange: ChangeTask }) 
  * The pill shows `shown`, what the task shows (Monitoring while it waits on its monitor); the menu,
  * ▸ and ✓ read and set the stored `status`.
  */
-export function StatusControl(props: { status: IssueStatus; shown?: IssueDisplayStatus; onChange: ChangeTask }) {
+/**
+ * The status chip, its next-step arrow and Mark done. `look` is what the task shows (`statusLook`):
+ * Monitoring over In progress, and the in-queue look for a blocked task covered by active work,
+ * with what it waits on beside the chip.
+ */
+export function StatusControl(props: { status: IssueStatus; look?: StatusLook; onChange: ChangeTask }) {
   const next = () => nextStatus(props.status);
-  const shown = () => STATUS_META[props.shown ?? props.status];
-  const derived = () => (props.shown ?? props.status) !== props.status;
+  const look = () => props.look ?? statusLook({ status: props.status });
+  const shown = () => STATUS_META[look().status];
+  const derived = () => look().status !== props.status;
+  const note = () => statusNote(look());
   return (
     <span class="te-status-row">
-      <span class="te-status" data-tone={shown().tone} data-hollow={shown().hollow ? "" : undefined}>
+      <span class="te-status" data-tone={look().tone} data-hollow={shown().hollow ? "" : undefined} data-queued={look().queued ? "" : undefined}>
         <Menu>
           <Menu.Trigger
             class="te-status-main"
-            aria-label={`Status: ${shown().label}${derived() ? `, set to ${STATUS_META[props.status].label}` : ""}. Change status`}
+            aria-label={`Status: ${look().title}${derived() ? `, set to ${STATUS_META[props.status].label}` : ""}. Change status`}
             title={derived() ? `Waiting for its monitor's next check. Its status is ${STATUS_META[props.status].label}.` : undefined}
           >
             {shown().label}
           </Menu.Trigger>
           <Menu.Content label="Status" width={220}>
-            <StatusItems current={props.status} onPick={(status) => status !== props.status && props.onChange({ status })} />
+            <StatusItems current={props.status} look={look()} onPick={(status) => status !== props.status && props.onChange({ status })} />
           </Menu.Content>
         </Menu>
         <Show when={next()}>
@@ -242,6 +249,7 @@ export function StatusControl(props: { status: IssueStatus; shown?: IssueDisplay
           <Check size={14} aria-hidden="true" />
         </button>
       </Show>
+      <Show when={note()}>{(text) => <span class="te-status-note">{text()}</span>}</Show>
     </span>
   );
 }

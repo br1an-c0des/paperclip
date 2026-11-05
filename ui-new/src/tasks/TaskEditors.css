@@ -127,8 +127,15 @@
 /* Status: the pill opens the menu; ▸ steps it on; ✓ marks it done */
 .te-status-row {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+}
+
+/* What a blocked task waits on: "Waiting on active sub-task TES-5". */
+.te-status-note {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .te-status {

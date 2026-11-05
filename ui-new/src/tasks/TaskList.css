@@ -332,8 +332,13 @@
   color: var(--body);
 }
 
-.tl-name .tone-pill {
+.tl-name .tone-pill,
+.tl-note {
   flex-shrink: 0;
+}
+
+.tl-note {
+  display: inline-flex;
 }
 
 .tl-labels {

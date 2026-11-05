@@ -13,8 +13,8 @@ import { useTaskPeople } from "@/tasks/people";
 import { stampLabel } from "@/tasks/thread-model";
 import { Button, buttonClass } from "@/ui/Button";
 import { PageHeader } from "@/ui/PageHeader";
-import { Capsule, StatusCapsule } from "@/ui/Status";
-import { shownStatus, STATUS_META } from "@/ui/status-meta";
+import { Capsule, TaskStatusCapsule } from "@/ui/Status";
+import { STATUS_META } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
 import { afterApproval, approvalFollowUps, approvalStatus, hiredAgentId } from "./approval-model";
 import "./Approvals.css";
@@ -266,7 +266,7 @@ function LinkedTasks(props: { approval: Approval; tasks: { id: string; identifie
                 <li>
                   <A class="apv-task" href={`/${company().issuePrefix}/issues/${encodeURIComponent(task.identifier ?? task.id)}`}>
                     <Show when={task.status in STATUS_META} fallback={<Capsule gradient="ash" size="row" />}>
-                      <StatusCapsule status={shownStatus(task)} size="row" />
+                      <TaskStatusCapsule task={task} size="row" />
                     </Show>
                     <span class="mono muted">{task.identifier ?? task.id.slice(0, 8)}</span>
                     <span class="apv-task-title">{task.title}</span>

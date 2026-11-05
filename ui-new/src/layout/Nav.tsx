@@ -47,8 +47,7 @@ import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { buttonClass } from "@/ui/Button";
 import { Grain } from "@/ui/Grain";
 import { Menu } from "@/ui/Menu";
-import { StatusCapsule } from "@/ui/Status";
-import { shownStatus } from "@/ui/status-meta";
+import { TaskStatusCapsule } from "@/ui/Status";
 import { navSection, setNavHidden, useCompanyOrder, useProjectOrder, useProjectStars, useRecentTasks } from "./nav-prefs";
 import { showStatusLink, visibleProjects } from "./nav-model";
 import { openChatAgentKey } from "@/chat/chat-model";
@@ -389,7 +388,7 @@ export function Nav() {
           <For each={recent()}>
             {(task) => (
               <A class="navi navi--task" href={`${base()}/issues/${encodeURIComponent(task.identifier ?? task.id)}`} title={task.title}>
-                <StatusCapsule status={shownStatus(task)} size="row" />
+                <TaskStatusCapsule task={task} size="row" />
                 <span class="navi-label">{task.title}</span>
                 <span class="navi-note mono">{task.identifier}</span>
               </A>

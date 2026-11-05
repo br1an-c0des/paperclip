@@ -33,7 +33,7 @@ import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery, useLiveRunsQuery } from "@/lib/company-data";
 import { Capsule, RunningPill } from "@/ui/Status";
-import { shownStatus, STATUS_META } from "@/ui/status-meta";
+import { STATUS_META, statusLook, type StatusSource } from "@/ui/status-meta";
 import { Assignee, useTaskPeople } from "./people";
 import { stageKeys } from "./review-stages";
 import { blockerIds, blockersEdit, workspacePickerAvailable } from "./task-edits";
@@ -88,14 +88,29 @@ function elapsed(since: string | Date | null, now: number) {
   return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
-/** A status in its tone. Pass what the task shows (`shownStatus`), so Monitoring reads as Monitoring. */
-export function StatusChip(props: { status: IssueDisplayStatus; small?: boolean }) {
+/**
+ * A status in its tone. Pass what the task shows (`shownStatus`), so Monitoring reads as Monitoring;
+ * for a task, `TaskStatusChip` adds the in-queue look and what a blocked task waits on.
+ */
+export function StatusChip(props: { status: IssueDisplayStatus; queued?: boolean; title?: string; small?: boolean }) {
   const meta = () => STATUS_META[props.status] ?? STATUS_META.backlog;
   return (
-    <span class="td-status" classList={{ "td-status--small": props.small }} data-tone={meta().tone} data-hollow={meta().hollow ? "" : undefined}>
+    <span
+      class="td-status"
+      classList={{ "td-status--small": props.small }}
+      data-tone={props.queued ? "run" : meta().tone}
+      data-hollow={meta().hollow ? "" : undefined}
+      title={props.title && props.title !== meta().label ? props.title : undefined}
+    >
       {meta().label}
     </span>
   );
+}
+
+/** A task's status chip, through `statusLook`. */
+export function TaskStatusChip(props: { task: StatusSource; small?: boolean }) {
+  const look = () => statusLook(props.task);
+  return <StatusChip status={look().status} queued={look().queued} title={look().title} small={props.small} />;
 }
 
 /** One property row. `empty` folds it under "Show N empty fields" until it has a value. */
@@ -150,7 +165,7 @@ export function TaskDetails(props: {
     !!current.executionState?.currentStageType;
   const workspaceEditable = (current: Issue) => workspacePickerAvailable(current.project, settings.data?.enableIsolatedWorkspaces === true);
   const properties: Property[] = [
-    { key: "status", icon: <CircleDot size={15} />, label: "Status", empty: () => false, value: () => <StatusControl status={t().status} shown={shownStatus(t())} onChange={change} /> },
+    { key: "status", icon: <CircleDot size={15} />, label: "Status", empty: () => false, value: () => <StatusControl status={t().status} look={statusLook(t())} onChange={change} /> },
     { key: "assignee", icon: <UserRound size={15} />, label: "Assignee", empty: () => false, value: () => <AssigneeControl task={t()} people={people} onChange={change} /> },
     {
       key: "review",
@@ -377,7 +392,7 @@ export function TaskDetails(props: {
                           {kid.title}
                         </button>
                         <Assignee task={kid} people={people} size={20} />
-                        <StatusChip status={shownStatus(kid)} small />
+                        <TaskStatusChip task={kid} small />
                       </div>
                     )}
                   </For>
@@ -448,7 +463,7 @@ function Relation(props: {
         {props.relation.title}
       </button>
       <span class="td-relation-note">
-        <Show when={props.kind === "blocking"} fallback={<StatusChip status={shownStatus(props.relation)} small />}>
+        <Show when={props.kind === "blocking"} fallback={<TaskStatusChip task={props.relation} small />}>
           <Show when={waiter()}>{(name) => <>{name()} {name() === "You" ? "wait" : "waits"} on this</>}</Show>
         </Show>
       </span>

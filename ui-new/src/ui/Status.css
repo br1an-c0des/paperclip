@@ -37,6 +37,32 @@
   padding: 2px;
 }
 
+/* In queue: the capsule cut into three equal segments with 2px gaps, waiting in line. */
+.capsule.queued {
+  --gap: 2px;
+  --seg: calc((100% - 2 * var(--gap)) / 3);
+  -webkit-mask: linear-gradient(
+    180deg,
+    #000 0 var(--seg),
+    transparent 0 calc(var(--seg) + var(--gap)),
+    #000 0 calc(2 * var(--seg) + var(--gap)),
+    transparent 0 calc(2 * var(--seg) + 2 * var(--gap)),
+    #000 0
+  );
+  mask: linear-gradient(
+    180deg,
+    #000 0 var(--seg),
+    transparent 0 calc(var(--seg) + var(--gap)),
+    #000 0 calc(2 * var(--seg) + var(--gap)),
+    transparent 0 calc(2 * var(--seg) + 2 * var(--gap)),
+    #000 0
+  );
+}
+
+.capsule--tiny.queued {
+  --gap: 1.5px;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;

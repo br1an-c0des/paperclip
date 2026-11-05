@@ -42,9 +42,8 @@ import {
 import { MessageBody } from "./MessageBody";
 import { SourceTrustBadge } from "@/documents/SourceTrustBadge";
 import { useTaskPeople } from "./people";
-import { StatusChip } from "./TaskDetails";
+import { StatusChip, TaskStatusChip } from "./TaskDetails";
 import { plainClick } from "./TaskList";
-import { shownStatus } from "@/ui/status-meta";
 import { createdTasks, duration, stampLabel, suggestedTaskIds, type CreatedTask, type ThreadFilter } from "./thread-model";
 import { commentElementId, nearBottom } from "./task-anchor";
 import { CommentPluginActions, CommentPluginAnnotations } from "@/plugins/CommentPlugins";
@@ -636,7 +635,7 @@ function CreatedTaskCard(props: { task: CreatedTask; at: Date; onOpen: (task: Cr
         <span class="ta-made-title">{props.task.title}</span>
         <span class="ta-made-meta">
           <Show when={props.task.identifier}>{(id) => <span class="mono">{id()}</span>}</Show>
-          <StatusChip status={shownStatus(props.task)} small />
+          <TaskStatusChip task={props.task} small />
         </span>
       </span>
       <ArrowUpRight size={15} aria-hidden="true" class="ta-made-icon" />

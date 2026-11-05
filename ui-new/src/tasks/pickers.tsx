@@ -5,7 +5,7 @@ import { useLabelsQuery } from "@/lib/company-data";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Menu } from "@/ui/Menu";
 import { PriorityBars, StatusCapsule } from "@/ui/Status";
-import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
+import { PRIORITY_META, STATUS_META, type StatusLook } from "@/ui/status-meta";
 import { PRIORITY_ORDER, STATUS_PICK_ORDER } from "./list-model";
 import type { TaskPeople } from "./people";
 import "./pickers.css";
@@ -18,11 +18,19 @@ import "./pickers.css";
 
 const picked = (on: boolean) => (on ? <Check size={14} aria-hidden="true" /> : undefined);
 
-export function StatusItems(props: { current?: IssueStatus; onPick: (status: IssueStatus) => void }) {
+/**
+ * The statuses to set. The current one draws as the task does (`look`, from `statusLook`), so a
+ * monitored or in-queue task's row matches the capsule that opened the menu (upstream #19329).
+ */
+export function StatusItems(props: { current?: IssueStatus; look?: StatusLook; onPick: (status: IssueStatus) => void }) {
+  const icon = (status: IssueStatus) => {
+    const look = props.current === status ? props.look : undefined;
+    return look ? <StatusCapsule status={look.status} queued={look.queued} size="row" /> : <StatusCapsule status={status} size="row" />;
+  };
   return (
     <For each={STATUS_PICK_ORDER}>
       {(status) => (
-        <Menu.Item icon={<StatusCapsule status={status} size="row" />} hint={picked(props.current === status)} onSelect={() => props.onPick(status)}>
+        <Menu.Item icon={icon(status)} hint={picked(props.current === status)} onSelect={() => props.onPick(status)}>
           {STATUS_META[status].label}
         </Menu.Item>
       )}

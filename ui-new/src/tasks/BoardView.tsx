@@ -7,15 +7,15 @@ import { useCompany } from "@/lib/company";
 import { hasOpenDialog, isTextInputTarget } from "@/lib/shortcuts";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Menu } from "@/ui/Menu";
-import { Capsule, LabelPill, PriorityBars, RunningPill, StatusCapsule, TonePill } from "@/ui/Status";
-import { PRIORITY_META, shownStatus } from "@/ui/status-meta";
+import { LabelPill, PriorityBars, RunningPill, TaskStatusCapsule } from "@/ui/Status";
+import { PRIORITY_META } from "@/ui/status-meta";
 import { CARD_SUBTASKS, columnTone, COLUMN_PAGE, moveCursor, neighbourColumn, type CursorMove } from "./board-model";
 import { moveUpdate, takesAdds, takesDrops, type GroupValue, type TaskGroup, type TaskRow } from "./list-model";
 import { assigneeName, type TaskPeople } from "./people";
 import { AssigneeItems, LabelItems, PriorityItems } from "./pickers";
 import { RetryMark, type TaskRetry } from "./retry";
 import type { TaskUpdates } from "./task-updates";
-import { GroupMarkView, hasOpenLayer, latest, openMoreOptions, plainClick, QuickAdd } from "./TaskList";
+import { GroupMarkView, hasOpenLayer, latest, NotePill, openMoreOptions, plainClick, QuickAdd } from "./TaskList";
 import { assigneeKey } from "./view-state";
 import "./BoardView.css";
 
@@ -491,17 +491,7 @@ function Card(props: {
       >
         {task().title}
       </a>
-      <Show when={props.row.note}>
-        {(note) => (
-          <TonePill
-            tone={note().tone}
-            compact
-            icon={<Capsule gradient={note().tone === "red" ? "flare" : note().tone === "green" ? "lagoon" : "tide"} size="tiny" />}
-          >
-            {note().label}
-          </TonePill>
-        )}
-      </Show>
+      <Show when={props.row.note}>{(note) => <NotePill note={note()} />}</Show>
       <RetryMark task={task()} retry={props.retry} />
       <div class="bv-pills">
         <Menu>
@@ -554,7 +544,7 @@ function Card(props: {
             <For each={props.row.children.slice(0, CARD_SUBTASKS)}>
               {(child) => (
                 <li class="bv-subtask">
-                  <StatusCapsule status={shownStatus(child.task)} size="row" />
+                  <TaskStatusCapsule task={child.task} size="row" />
                   <span class="mono bv-subtask-id">{child.task.identifier}</span>
                   <a
                     class="bv-subtask-title"
