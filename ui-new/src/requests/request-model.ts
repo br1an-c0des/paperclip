@@ -340,6 +340,25 @@ const ENDED: Record<string, string> = {
   superseded: "Replaced by a newer request",
 };
 
+/** The Plan revision a plan review asks about. */
+export type PlanReviewTarget = { issueId: string; revisionId: string | null; revisionNumber: number | null };
+
+/**
+ * A plan review (a confirmation targeting the task's `plan` document, upstream's "Approve plan"):
+ * the revision it asks about, or null for any other interaction.
+ */
+export function planReviewTarget(interaction: IssueThreadInteraction): PlanReviewTarget | null {
+  if (interaction.kind !== "request_confirmation") return null;
+  const target = interaction.payload.target;
+  if (target?.type !== "issue_document" || target.key !== "plan") return null;
+  return { issueId: target.issueId || interaction.issueId, revisionId: target.revisionId || null, revisionNumber: target.revisionNumber ?? null };
+}
+
+/** "Plan v3", or "Plan" when the review names no revision. */
+export function planLabel(target: Pick<PlanReviewTarget, "revisionNumber">) {
+  return target.revisionNumber == null ? "Plan" : `Plan v${target.revisionNumber}`;
+}
+
 /** What was decided, and what came of it, for a settled interaction. */
 export function settledLines(interaction: IssueThreadInteraction, ctx: RequestContext, asker: string): Pick<Request, "verdict" | "result"> {
   const at = date(interaction.resolvedAt ?? interaction.updatedAt);
@@ -400,8 +419,19 @@ export function settledLines(interaction: IssueThreadInteraction, ctx: RequestCo
       : { verdict: { text: `${by} declined`, tone: "muted", at }, result: { text: `Sent to ${asker}, which continues without it`, tone: "muted" } };
   }
 
+  const reason = typeof result?.reason === "string" && result.reason.trim() ? `: ${result.reason.trim()}` : "";
+
+  // A plan review settles as the old UI's receipt does (#19252): "Approved Plan v2", "Requested
+  // changes to Plan v2: reason"; "the plan" when it names no revision. The card leads with who.
+  const plan = planReviewTarget(interaction);
+  if (plan && (interaction.status === "accepted" || interaction.status === "rejected")) {
+    const name = plan.revisionNumber == null ? "the plan" : planLabel(plan);
+    return interaction.status === "accepted"
+      ? { verdict: { text: `${by} approved ${name}`, tone: "ok", at }, result: { text: `Sent to ${asker}`, tone: "muted" } }
+      : { verdict: { text: `${by} requested changes to ${name}${reason}`, tone: "mid", at }, result: { text: `Sent to ${asker}`, tone: "muted" } };
+  }
+
   if (interaction.status === "rejected") {
-    const reason = typeof result?.reason === "string" && result.reason.trim() ? `: ${result.reason.trim()}` : "";
     return { verdict: { text: `${by} declined${reason}`, tone: "muted", at }, result: { text: `Sent to ${asker}`, tone: "muted" } };
   }
   return { verdict: { text: `${by} accepted`, tone: "ok", at }, result: { text: `Sent to ${asker}`, tone: "muted" } };

@@ -12,6 +12,7 @@ import { Menu } from "@/ui/Menu";
 import { pushToast } from "@/ui/Toast";
 import { attachmentIds, clearComposerDraft, loadComposerDraft, messageBody, saveComposerDraft, type ComposerAttachment } from "@/tasks/composer/composer-model";
 import { MentionList, useMentionCandidates } from "@/tasks/composer/MentionTextArea";
+import { isPickKey, isSubmitKey } from "@/tasks/composer/submit-key";
 import { activeMention, insertMention, type ActiveMention, type MentionTarget } from "@/tasks/composer/mentions";
 import { newId } from "@/tasks/new-task";
 import "@/tasks/composer/Composer.css";
@@ -19,7 +20,9 @@ import "@/tasks/composer/Composer.css";
 /*
  * The chat's composer (board 12): the message, files by the clip, paste or drop, the mode, and Send.
  *
- * - Enter sends and Shift+Enter starts a new line, as in a chat. `/` lists the commands; `/new`
+ * - Enter sends and Shift+Enter starts a new line, as in a chat, whatever the instance's legacy
+ *   Ctrl+Enter preference says (the old UI's agent chat ignores it too); never while an input method
+ *   is composing (submit-key.ts, including Safari's keyCode 229). `/` lists the commands; `/new`
  *   starts a fresh session (the history stays visible), as does New session in the header.
  * - `@` and a name lists agents, people and tasks to mention, as in a task's composer; while the
  *   list is open, Enter or Tab picks and the arrows move.
@@ -294,7 +297,7 @@ export function ChatComposer(props: {
                 setMentionIndex((current) => (current + (event.key === "ArrowDown" ? 1 : count - 1)) % count);
                 return;
               }
-              if ((event.key === "Enter" && !event.shiftKey && !event.isComposing) || event.key === "Tab") {
+              if (isPickKey(event)) {
                 event.preventDefault();
                 pickMention(candidates()[mentionIndex()]!);
                 return;
@@ -311,7 +314,8 @@ export function ChatComposer(props: {
               setBody(COMMANDS.find((command) => command.name.startsWith(body()))!.name);
               return;
             }
-            if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+            // Always Enter, whatever the legacy Ctrl+Enter preference says, as the old UI's agent chat does.
+            if (isSubmitKey(event, "enter")) {
               event.preventDefault();
               void send("send");
             }

@@ -2,7 +2,6 @@ import type { AgentDetail } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Square, TriangleAlert } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show, untrack } from "solid-js";
-import { heartbeatsApi } from "@/api/heartbeats";
 import { queryKeys } from "@/api/queryKeys";
 import { runsApi } from "@/api/runs";
 import { useNow } from "@/lib/clock";
@@ -14,6 +13,7 @@ import { createRunLog } from "@/runs/run-log-source";
 import { costLabel, elapsedLabel, isActiveRun, runUsage } from "@/runs/run-model";
 import { buildItems } from "@/runs/transcript-model";
 import type { Plan } from "@/runs/activity-model";
+import { stopLabel, stopRun } from "@/tasks/run-stop";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
@@ -148,12 +148,21 @@ export function LiveReply(props: {
     return usage.costUsd ? costLabel(usage.costUsd) : null;
   };
 
+  // A native session still starting records the Stop and settles later (409 `native_stop_pending`,
+  // tasks/run-stop.ts): that reads "Stopping…" until the run ends, not as a failure.
+  const [stopping, setStopping] = createSignal(false);
   const stop = async () => {
+    if (stopping()) return;
+    setStopping(true);
+    let settling = false;
     try {
-      await heartbeatsApi.cancel(props.turn.runId);
-      void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
+      settling = (await stopRun({ runId: props.turn.runId, status: run.data?.status ?? props.turn.status }, company().id)) === "pending";
+      if (settling) pushToast({ tone: "info", title: "Stopping the reply", body: "The Stop is recorded. The reply ends once its session opens." });
     } catch (error) {
       pushToast({ tone: "error", title: "Couldn't stop the reply", body: error instanceof Error ? error.message : String(error) });
+    } finally {
+      if (!settling) setStopping(false);
+      void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
     }
   };
 
@@ -174,9 +183,9 @@ export function LiveReply(props: {
               Transcript
             </button>
             <Show when={active()}>
-              <button type="button" class="ch-pill-btn ch-pill-btn--stop" onClick={() => void stop()}>
+              <button type="button" class="ch-pill-btn ch-pill-btn--stop" disabled={stopping()} onClick={() => void stop()}>
                 <Square size={11} aria-hidden="true" />
-                Stop
+                {stopLabel(run.data?.status ?? props.turn.status, stopping())}
               </button>
             </Show>
           </div>

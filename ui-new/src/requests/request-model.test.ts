@@ -1,6 +1,6 @@
 import type { Approval, IssueThreadInteraction } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { expiryLabel, plainLine, referenceImages, requestFromApproval, requestFromInteraction, requestFromReview, signoffOf, suggestedOwner, taskRequests, type RequestContext } from "./request-model";
+import { expiryLabel, plainLine, planLabel, planReviewTarget, referenceImages, requestFromApproval, requestFromInteraction, requestFromReview, signoffOf, suggestedOwner, taskRequests, type RequestContext } from "./request-model";
 
 const ctx: RequestContext = {
   youId: "me",
@@ -115,6 +115,22 @@ describe("interactions as requests", () => {
 
     const checkbox = interaction({ kind: "request_checkbox_confirmation", payload: { version: 1, prompt: "Keep **which** files?", options: [] } });
     expect(requestFromInteraction(checkbox, ctx)).toMatchObject({ title: "Keep which files?", prompt: { markdown: "Keep **which** files?", ownTitle: false } });
+  });
+
+  it("settles a plan review as the old UI's receipt does, naming the revision (U41)", () => {
+    const target = { type: "issue_document", key: "plan", revisionId: "rev-2", revisionNumber: 2 };
+    const review = interaction({ kind: "request_confirmation", payload: { version: 1, prompt: "Approve the plan?", acceptLabel: "Approve plan", rejectLabel: "Request changes", target } });
+    expect(requestFromInteraction(review, ctx).askVerb).toBe("asks you to approve the plan");
+    expect(planReviewTarget(review)).toEqual({ issueId: "t1", revisionId: "rev-2", revisionNumber: 2 });
+    const approved = { ...review, status: "accepted", resolvedByUserId: "me" } as unknown as IssueThreadInteraction;
+    expect(requestFromInteraction(approved, ctx).verdict).toMatchObject({ text: "You approved Plan v2", tone: "ok" });
+    const changes = { ...review, status: "rejected", resolvedByUserId: "u2", result: { version: 1, outcome: "rejected", reason: " Split step 3 " } } as unknown as IssueThreadInteraction;
+    expect(requestFromInteraction(changes, ctx).verdict).toMatchObject({ text: "Sam K. requested changes to Plan v2: Split step 3" });
+    const unnumbered = { ...approved, payload: { ...review.payload, target: { ...target, revisionNumber: null } } } as unknown as IssueThreadInteraction;
+    expect(requestFromInteraction(unnumbered, ctx).verdict?.text).toBe("You approved the plan");
+    expect(planLabel(planReviewTarget(unnumbered)!)).toBe("Plan");
+    const other = interaction({ kind: "request_confirmation", payload: { version: 1, prompt: "Keep it?", target: { ...target, key: "design" } } });
+    expect(planReviewTarget(other)).toBeNull();
   });
 
   it("knows who may answer", () => {

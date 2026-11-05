@@ -113,6 +113,10 @@ export function TaskSections(props: {
     const target = anchor();
     return target?.kind === "document" ? target.image : null;
   };
+  const openRevision = () => {
+    const target = anchor();
+    return target?.kind === "document" ? target.revision : null;
+  };
 
   const details = () => <TaskDetails taskId={props.taskId} initial={props.initial} hideTitle={props.hideTitle} onOpenTask={props.onOpenTask} />;
   const other = () => (
@@ -126,7 +130,7 @@ export function TaskSections(props: {
         <TaskActivity taskId={props.taskId} title={props.hideTitle || split() ? undefined : props.title} focusCommentId={focusComment()} onOpenTask={props.onOpenTask} />
       </Match>
       <Match when={section() === "files"}>
-        <TaskFiles taskId={props.taskId} openDocKey={openDocument()} openImage={openImage()} />
+        <TaskFiles taskId={props.taskId} openDocKey={openDocument()} openImage={openImage()} openRevision={openRevision()} />
       </Match>
       <Match when={section() === "runs"}>
         <TaskRuns taskId={props.taskId} />

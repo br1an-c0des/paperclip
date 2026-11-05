@@ -20,6 +20,7 @@ import {
   CornerDownRight,
   Ellipsis,
   MessageSquare,
+  NotebookPen,
   ShieldCheck,
   Sparkles,
   X,
@@ -38,13 +39,14 @@ import { TextArea, TextInput } from "@/ui/Field";
 import { Markdown } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
 import { pushToast } from "@/ui/Toast";
+import { documentAnchor } from "@/tasks/task-anchor";
 import { stampLabel } from "@/tasks/thread-model";
 import type { TaskPeople } from "@/tasks/people";
 import { DeclineButton, Footer } from "./card-parts";
 import { ConnectionControls } from "./ConnectionControls";
 import { DecisionControls, DecisionResults } from "./DecisionControls";
 import { JoinControls } from "./JoinControls";
-import { KIND_LABEL, suggestedOwner, type Request, type RequestKind } from "./request-model";
+import { KIND_LABEL, planLabel, planReviewTarget, suggestedOwner, type Request, type RequestKind } from "./request-model";
 import "./RequestCard.css";
 
 /*
@@ -188,6 +190,35 @@ function Subject(props: { subject: NonNullable<Request["subject"]>; onOpen?: () 
   );
 }
 
+/**
+ * A plan review's link to the Plan revision it asks about (U41): "Plan v2". In its own task's
+ * thread or chat it stays on the page, which opens the document on that revision
+ * (`#document-plan&revision=<id>`, task-anchor.ts); elsewhere it goes to the task.
+ */
+function PlanLink(props: { request: Request; inThread?: boolean }) {
+  const company = useCompany();
+  const interaction = () => (props.request.source.type === "interaction" ? props.request.source.interaction : null);
+  const target = () => {
+    const found = interaction();
+    return found ? planReviewTarget(found) : null;
+  };
+  return (
+    <Show when={target()}>
+      {(plan) => {
+        const anchor = () => documentAnchor("plan", null, plan().revisionId);
+        const here = () => props.inThread && plan().issueId === interaction()?.issueId;
+        const href = () => (here() ? anchor() : `/${company().issuePrefix}/issues/${encodeURIComponent(plan().issueId)}${anchor()}`);
+        return (
+          <a class="rq-plan" href={href()} title={plan().revisionNumber == null ? "Open the plan" : `Open revision ${plan().revisionNumber} of the plan`}>
+            <NotebookPen size={12} aria-hidden="true" />
+            {planLabel(plan())}
+          </a>
+        );
+      }}
+    </Show>
+  );
+}
+
 /** The card's body, with the context column beside it when there is one. */
 function Split(props: { aside?: JSX.Element; children: JSX.Element }) {
   return (
@@ -257,16 +288,17 @@ function SettledCard(props: RequestCardProps) {
         menu={<CardMenu label={props.triageLabel ?? "Request actions"} triage={props.triage} />}
       />
       <Split aside={props.aside}>
-        <SettledBody request={props.request} people={props.people} />
+        <SettledBody request={props.request} people={props.people} inThread={props.inThread} />
       </Split>
     </article>
   );
 }
 
-function SettledBody(props: { request: Request; people: TaskPeople }) {
+function SettledBody(props: { request: Request; people: TaskPeople; inThread?: boolean }) {
   return (
     <>
       <div class="rq-settled-title">{props.request.title}</div>
+      <PlanLink request={props.request} inThread={props.inThread} />
       <Show when={props.request.verdict}>
         {(verdict) => (
           <div class="rq-res" data-tone={verdict().tone === "ok" ? "ok" : "plain"}>
@@ -384,6 +416,7 @@ function OpenCard(props: RequestCardProps) {
             <Markdown source={props.request.body!} />
           </div>
         </Show>
+        <PlanLink request={props.request} inThread={props.inThread} />
         <Switch>
           <Match when={props.request.source.type === "approval"}>
             <ApprovalControls request={props.request} people={props.people} onDone={refresh} />

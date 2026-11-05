@@ -129,7 +129,7 @@ export function ChatDocumentCard(props: { document: ChatDocument; people: TaskPe
 }
 
 /** The open document over the chat, in the task panel's viewer and editor. */
-export function ChatDocumentDialog(props: { host: DocumentHost | null; docKey: string | null; title: string; onClose: () => void }) {
+export function ChatDocumentDialog(props: { host: DocumentHost | null; docKey: string | null; revision?: string | null; title: string; onClose: () => void }) {
   return (
     <Dialog
       open={props.host !== null && props.docKey !== null}
@@ -142,7 +142,14 @@ export function ChatDocumentDialog(props: { host: DocumentHost | null; docKey: s
       <Show when={props.host && props.docKey !== null ? { host: props.host, key: props.docKey } : null}>
         {(open) => (
           <Suspense fallback={<p class="ch-muted">Loading the document…</p>}>
-            <DocumentView host={open().host} docKey={open().key} backLabel="Back to the chat" onBack={props.onClose} onDeleted={props.onClose} />
+            <DocumentView
+              host={open().host}
+              docKey={open().key}
+              revision={props.revision ?? null}
+              backLabel="Back to the chat"
+              onBack={props.onClose}
+              onDeleted={props.onClose}
+            />
           </Suspense>
         )}
       </Show>

@@ -116,20 +116,26 @@ describe("sharing a private task", () => {
 describe("links into a task", () => {
   it("reads comment and document fragments", () => {
     expect(parseTaskAnchor("#comment-c1")).toEqual({ kind: "comment", id: "c1" });
-    expect(parseTaskAnchor("#document-plan%20v2")).toEqual({ kind: "document", key: "plan v2", image: null });
+    expect(parseTaskAnchor("#document-plan%20v2")).toEqual({ kind: "document", key: "plan v2", image: null, revision: null });
     expect(parseTaskAnchor("#comment-")).toBeNull();
     expect(parseTaskAnchor("#other")).toBeNull();
     expect(anchorSection({ kind: "comment", id: "c1" })).toBe("activity");
-    expect(anchorSection({ kind: "document", key: "plan", image: null })).toBe("files");
+    expect(anchorSection({ kind: "document", key: "plan", image: null, revision: null })).toBe("files");
   });
 
   it("reads and writes a document gallery's image, 1-based, as the old UI links it", () => {
-    expect(parseTaskAnchor("#document-report&image=2")).toEqual({ kind: "document", key: "report", image: 2 });
-    expect(parseTaskAnchor("#document-report&image=0")).toEqual({ kind: "document", key: "report", image: null });
-    expect(parseTaskAnchor("#document-report&revision=r1&image=3")).toMatchObject({ key: "report", image: 3 });
+    expect(parseTaskAnchor("#document-report&image=2")).toEqual({ kind: "document", key: "report", image: 2, revision: null });
+    expect(parseTaskAnchor("#document-report&image=0")).toEqual({ kind: "document", key: "report", image: null, revision: null });
+    expect(parseTaskAnchor("#document-report&revision=r1&image=3")).toMatchObject({ key: "report", image: 3, revision: "r1" });
     expect(parseTaskAnchor("#document-&image=2")).toBeNull();
     expect(documentAnchor("report", 2)).toBe("#document-report&image=2");
     expect(documentAnchor("plan v2")).toBe("#document-plan%20v2");
+  });
+
+  it("reads and writes a revision, as the old UI's plan-review links do", () => {
+    expect(parseTaskAnchor("#document-plan&revision=rev-2&interaction=i1")).toEqual({ kind: "document", key: "plan", image: null, revision: "rev-2" });
+    expect(documentAnchor("plan", null, "rev-2")).toBe("#document-plan&revision=rev-2");
+    expect(documentAnchor("plan", 2, "rev-2")).toBe("#document-plan&revision=rev-2&image=2");
   });
 
   it("follows the thread only near its foot", () => {
