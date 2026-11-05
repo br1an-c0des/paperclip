@@ -12,7 +12,6 @@ import type {
   AgentKeyCreated,
   AgentPermissions,
   AgentProjectAccess,
-  AgentPublicIdentity,
   AgentRunner,
   AgentRunnerChoice,
   AgentRuntimeState,
@@ -237,9 +236,6 @@ export const agentsApi = {
 
   // The agent itself
   get: (id: string, companyId?: string, signal?: AbortSignal) => api.get<AgentDetail>(agentPath(id, companyId), { signal }),
-  /** Its public signing key, or null until its first managed run creates one. */
-  identity: (id: string, companyId?: string, signal?: AbortSignal) =>
-    api.get<AgentPublicIdentity | null>(agentPath(id, companyId, "/identity"), { signal }),
   update: (id: string, patch: Record<string, unknown>, companyId?: string) => api.patch<Agent>(agentPath(id, companyId), patch),
   /** The narrow model and AI-connection change the roster's bulk edit uses; stale `expected` values are refused. */
   updateRuntimeSettings: (id: string, runtimeSettings: AgentRuntimeSettingsPatch, companyId?: string) =>

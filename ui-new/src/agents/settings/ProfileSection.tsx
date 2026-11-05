@@ -6,16 +6,15 @@ import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { resourceMembershipsApi } from "@/api/resource-memberships";
 import { useCompany } from "@/lib/company";
-import { useAgentsQuery } from "@/lib/company-data";
+import { useAgentsQuery, usePeopleQuery } from "@/lib/company-data";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
 import { Popover } from "@/ui/Popover";
 import { pushToast } from "@/ui/Toast";
-import { managerCandidates, roleLabel, textEdit } from "../agent-model";
+import { creatorLabel, managerCandidates, roleLabel, textEdit } from "../agent-model";
 import { BuiltInCard } from "./BuiltInCard";
 import { ManagerMenu, PaletteGrid, paletteAppearance, RoleMenu } from "./fields";
-import { IdentityCard } from "./IdentityCard";
 import { CardNote, dateTime, failure, refreshAgent, SectionTitle, shortDate, SwitchRow, useAgentSaver } from "../shared";
 
 /*
@@ -35,6 +34,9 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
   createEffect(on(() => props.agent.title, (value) => setTitle(value ?? ""), { defer: true }));
   createEffect(on(() => props.agent.capabilities, (value) => setAbout(value ?? ""), { defer: true }));
 
+  // Who created it, as upstream's Profile panel says ("Created by Ana"); the signing key card is gone with upstream's (#18378).
+  const people = usePeopleQuery();
+  const creator = () => creatorLabel(props.agent, people.data?.users);
   const candidates = createMemo(() => managerCandidates(agents.data ?? [], props.agent.id));
   const manager = () => (agents.data ?? []).find((agent) => agent.id === props.agent.reportsTo);
   const paletteId = () => props.agent.appearance?.paletteId;
@@ -56,7 +58,12 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
             Changes save as you make them.
           </CardNote>
         }
-        footer={<span class="ps-meta">Hired {shortDate(props.agent.createdAt)} · Updated {shortDate(props.agent.updatedAt)}</span>}
+        footer={
+          <span class="ps-meta">
+            Created {shortDate(props.agent.createdAt)}
+            <Show when={creator()}>{(name) => ` by ${name()}`}</Show> · Updated {shortDate(props.agent.updatedAt)}
+          </span>
+        }
       >
         <SettingsRow label="Avatar" help="One of the ClipLab palettes.">
           <Popover open={avatarOpen()} onOpenChange={setAvatarOpen}>
@@ -125,7 +132,6 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
       </SettingsCard>
 
       <ForYouCard agent={props.agent} />
-      <IdentityCard agent={props.agent} />
       <LifecycleCard agent={props.agent} />
     </>
   );

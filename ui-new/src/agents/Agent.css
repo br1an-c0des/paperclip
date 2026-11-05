@@ -814,11 +814,6 @@
   align-self: flex-start;
 }
 
-/* Profile: the signing key */
-.ag-key-id {
-  font-size: 13px;
-}
-
 /* Permissions: containment and the policy */
 .ag-trust {
   gap: 10px;
