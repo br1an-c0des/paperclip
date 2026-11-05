@@ -1,18 +1,19 @@
 import type { AgentDetail } from "@paperclipai/shared";
+import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Check, ChevronDown } from "lucide-solid";
-import { createEffect, createMemo, createSignal, on, Show } from "solid-js";
+import { ArrowUpRight, Check, ChevronDown } from "lucide-solid";
+import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
 import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { resourceMembershipsApi } from "@/api/resource-memberships";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, usePeopleQuery } from "@/lib/company-data";
 import { AgentAvatar } from "@/ui/Avatar";
-import { Button } from "@/ui/Button";
+import { Button, buttonClass } from "@/ui/Button";
 import { SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
 import { Popover } from "@/ui/Popover";
 import { pushToast } from "@/ui/Toast";
-import { creatorLabel, managerCandidates, roleLabel, textEdit } from "../agent-model";
+import { creatorLabel, directReportsOf, managerCandidates, roleLabel, textEdit } from "../agent-model";
 import { BuiltInCard } from "./BuiltInCard";
 import { ManagerMenu, PaletteGrid, paletteAppearance, RoleMenu } from "./fields";
 import { CardNote, dateTime, failure, refreshAgent, SectionTitle, shortDate, SwitchRow, useAgentSaver } from "../shared";
@@ -24,6 +25,7 @@ import { CardNote, dateTime, failure, refreshAgent, SectionTitle, shortDate, Swi
  */
 
 export function ProfileSection(props: { agent: AgentDetail; base: string }) {
+  const company = useCompany();
   const saver = useAgentSaver(() => props.agent);
   const agents = useAgentsQuery();
   const [name, setName] = createSignal(props.agent.name);
@@ -39,6 +41,8 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
   const creator = () => creatorLabel(props.agent, people.data?.users);
   const candidates = createMemo(() => managerCandidates(agents.data ?? [], props.agent.id));
   const manager = () => (agents.data ?? []).find((agent) => agent.id === props.agent.reportsTo);
+  const reports = createMemo(() => directReportsOf(agents.data ?? [], props.agent.id));
+  const agentHref = (urlKey: string) => `/${company().issuePrefix}/agents/${urlKey}`;
   const paletteId = () => props.agent.appearance?.paletteId;
 
   const saveName = async () => {
@@ -118,17 +122,45 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
             onBlur={() => void saver.save(textEdit("capabilities", props.agent.capabilities, about()))}
           />
         </SettingsRow>
-        <SettingsRow label="Reports to" help="Its manager in the org chart.">
-          <ManagerMenu
-            candidates={candidates()}
-            manager={manager()}
-            value={props.agent.reportsTo}
-            onChange={(reportsTo) => void saver.save({ reportsTo })}
-          />
+        <SettingsRow label="Reports to" help="Its manager in the org chart. Its own reports aren't offered, since that would make a loop.">
+          <div class="ag-manager">
+            <ManagerMenu
+              candidates={candidates()}
+              manager={manager()}
+              value={props.agent.reportsTo}
+              onChange={(reportsTo) => void saver.save({ reportsTo })}
+            />
+            <Show when={manager()}>
+              {(found) => (
+                <A class={buttonClass({ size: "compact", ghost: true })} href={agentHref(found().urlKey)} aria-label={`Open ${found().name}`} title={`Open ${found().name}`}>
+                  <ArrowUpRight size={14} aria-hidden="true" />
+                </A>
+              )}
+            </Show>
+          </div>
+          <Show when={agents.isError}>
+            <p class="fhelp ag-warn">Couldn't load the other agents to choose a manager from.</p>
+          </Show>
           <Show when={props.agent.orgChainHealth && props.agent.orgChainHealth.status !== "healthy"}>
             <p class="fhelp ag-warn">{props.agent.orgChainHealth?.repairGuidance ?? "Its chain of command needs attention."}</p>
           </Show>
         </SettingsRow>
+        <Show when={reports().length > 0}>
+          <SettingsRow label="Direct reports" help="Agents that report to it. Change one's manager from its own profile.">
+            <ul class="ag-agent-chips" aria-label="Direct reports">
+              <For each={reports()}>
+                {(report) => (
+                  <li>
+                    <A class="ag-agent-chip" href={agentHref(report.urlKey)}>
+                      <AgentAvatar agent={report} size={20} ring={false} />
+                      <span>{report.name}</span>
+                    </A>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </SettingsRow>
+        </Show>
       </SettingsCard>
 
       <ForYouCard agent={props.agent} />
