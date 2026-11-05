@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { logAsText, mergeChunks, parseLogSlice, streamCounts, utf8Length, type RunLogChunk } from "./run-log";
+import { alignedStart, logAsText, mergeChunks, parseLogSlice, streamCounts, utf8Length, type RunLogChunk } from "./run-log";
 
 const record = (seq: number, chunk: string, stream = "stdout") => JSON.stringify({ ts: `2026-10-26T10:00:0${seq}Z`, stream, chunk, seq });
 
@@ -49,5 +49,20 @@ describe("helpers", () => {
     expect(streamCounts(chunks)).toEqual({ stdout: 1, stderr: 1, system: 0 });
     expect(logAsText(chunks)).toBe("t1 stdout out\nt2 stderr err");
     expect(utf8Length("a→b")).toBe(5);
+  });
+});
+
+describe("alignedStart", () => {
+  it("finds where an aligned tail read began", () => {
+    // 10 bytes of the record before `offset` (1000), then 90 from it.
+    const content = `${"x".repeat(9)}\n${"y".repeat(90)}`;
+    expect(alignedStart(1000, content, 1090)).toBe(990);
+    expect(parseLogSlice(`${record(4, "whole")}\n`).chunks).toHaveLength(1);
+  });
+
+  it("keeps the offset when the server didn't align", () => {
+    expect(alignedStart(1000, "y".repeat(90), 1090)).toBe(1000);
+    expect(alignedStart(1000, "y".repeat(90), undefined)).toBe(1000);
+    expect(alignedStart(5, "y".repeat(90), 10)).toBe(5);
   });
 });

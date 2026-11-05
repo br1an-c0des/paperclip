@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from "
 import { ApiError } from "@/api/client";
 import { runsApi, type RunDetail } from "@/api/runs";
 import { useLiveConnection, useLiveEvent } from "@/lib/live-events";
-import { mergeChunks, parseLogSlice, readSeq, readStream, utf8Length, type RunLogChunk } from "./run-log";
+import { alignedStart, mergeChunks, parseLogSlice, readSeq, readStream, utf8Length, type RunLogChunk } from "./run-log";
 import { isActiveRun } from "./run-model";
 
 /*
@@ -10,7 +10,8 @@ import { isActiveRun } from "./run-model";
  * events from the live-events socket while the run is going. As in the old UI
  * (ui/src/components/transcript/useLiveRunTranscripts.ts), the socket is the live source and the
  * log is polled as a safety net: every 2s while the socket is down, every 15s while it's up. A run
- * whose log is larger than the budget starts at its tail and says how much it skipped.
+ * whose log is larger than the budget starts at its tail, on a whole record (`alignStartToRecord`),
+ * and says how much it skipped.
  */
 
 const PAGE_BYTES = 256_000;
@@ -64,14 +65,22 @@ export function createRunLog(runId: () => string, run: () => RunDetail | undefin
     reading = true;
     controller = new AbortController();
     try {
+      // A first read that starts at the tail asks the server to begin at a whole record, so the
+      // oldest output shown isn't a cut-off fragment.
+      let align = false;
       if (offset === null) {
         const known = current.logBytes ?? current.lastOutputBytes ?? 0;
         offset = known > LOG_BUDGET_BYTES ? known - LOG_BUDGET_BYTES : 0;
+        align = offset > 0;
         setSkippedBytes(offset);
       }
       for (let page = 0; page < LOG_BUDGET_BYTES / PAGE_BYTES; page += 1) {
-        const slice = await runsApi.log(current.id, offset, PAGE_BYTES, { signal: controller.signal });
+        const slice = await runsApi.log(current.id, offset, PAGE_BYTES, { signal: controller.signal, alignStartToRecord: align });
         if (mine !== generation) return;
+        if (align) {
+          setSkippedBytes(alignedStart(offset, slice.content, slice.nextOffset));
+          align = false;
+        }
         const parsed = parseLogSlice(slice.content, carried);
         carried = parsed.rest;
         add(parsed.chunks);

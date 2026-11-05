@@ -114,6 +114,18 @@ export function logAsText(chunks: readonly RunLogChunk[]) {
   return chunks.map((chunk) => `${chunk.ts} ${chunk.stream.padEnd(6)} ${chunk.chunk.replace(/\n$/, "")}`).join("\n");
 }
 
+/**
+ * Where an aligned tail read (`alignStartToRecord`) really started: the server walks back from
+ * `offset` to the start of the record it falls in, so the slice holds that record's prefix ahead of
+ * the bytes from `offset` on (`nextOffset - offset` of them). Falls back to `offset` when the slice
+ * doesn't add up, as from a server that ignores the option.
+ */
+export function alignedStart(offset: number, content: string, nextOffset: number | undefined) {
+  if (nextOffset === undefined || nextOffset < offset) return offset;
+  const prefix = utf8Length(content) - (nextOffset - offset);
+  return prefix > 0 && prefix <= offset ? offset - prefix : offset;
+}
+
 /** Byte length of a string as UTF-8, to advance log offsets correctly past non-ASCII output. */
 export function utf8Length(text: string) {
   return new TextEncoder().encode(text).length;

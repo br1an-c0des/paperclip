@@ -104,8 +104,24 @@ export const runsApi = {
   get:(runId: string, signal?: AbortSignal) => api.get<RunDetail>(`/heartbeat-runs/${runId}`, { signal }),
   events: (runId: string, afterSeq = 0, limit = 200, options?: RequestOptions) =>
     api.get<HeartbeatRunEvent[]>(`/heartbeat-runs/${runId}/events?afterSeq=${afterSeq}&limit=${limit}`, options),
-  log: (runId: string, offset = 0, limitBytes = 256_000, options?: RequestOptions) =>
-    api.get<RunLogSlice>(`/heartbeat-runs/${runId}/log?offset=${offset}&limitBytes=${limitBytes}`, options),
+  /**
+   * The run's conversation only (`?view=conversation`, upstream #17593): the agent's messages, runtime
+   * requests, plan writes as receipts, and turn and run endings. Tool and lifecycle events, and the
+   * `adapter.invoke` event the run modal's Input reads, are left out. The old UI reads it for the
+   * older runs of a task's chat history.
+   */
+  conversationEvents: (runId: string, afterSeq = 0, limit = 200, options?: RequestOptions) =>
+    api.get<HeartbeatRunEvent[]>(`/heartbeat-runs/${runId}/events?view=conversation&afterSeq=${afterSeq}&limit=${limit}`, options),
+  /**
+   * A slice of the stored log. With `alignStartToRecord` (upstream #17756) a read from the middle
+   * starts at the record that `offset` falls in, so the first record is whole; the slice can then be
+   * longer than `limitBytes`, and `nextOffset` is always given.
+   */
+  log: (runId: string, offset = 0, limitBytes = 256_000, options?: RequestOptions & { alignStartToRecord?: boolean }) =>
+    api.get<RunLogSlice>(
+      `/heartbeat-runs/${runId}/log?offset=${offset}&limitBytes=${limitBytes}${options?.alignStartToRecord && offset > 0 ? "&alignStartToRecord=true" : ""}`,
+      options,
+    ),
   /** Instance admins only. The server logs each view as activity. */
   providerTrace: (runId: string, signal?: AbortSignal) =>
     api.get<ProviderTraceInspection>(`/heartbeat-runs/${runId}/provider-trace`, { signal }),
