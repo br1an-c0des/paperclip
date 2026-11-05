@@ -32,13 +32,18 @@ import { api } from "./client";
  * (`?view=comment-inputs`). The full history is read when the reader asks for it.
  */
 
-export type IssueSearch = { q?: string; limit?: number; status?: string };
+/**
+ * `status` filters by the stored status; `displayStatus` by what tasks show, which tells Monitoring
+ * (an in-progress task waiting on its monitor) apart from In progress. Both take a comma list.
+ */
+export type IssueSearch = { q?: string; limit?: number; status?: string; displayStatus?: string };
 
 function searchParams(filters: IssueSearch) {
   const params = new URLSearchParams();
   if (filters.q) params.set("q", filters.q);
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.status) params.set("status", filters.status);
+  if (filters.displayStatus) params.set("displayStatus", filters.displayStatus);
   return params.toString();
 }
 
@@ -51,14 +56,26 @@ export type IssueListFilters = {
   includeRoutineExecutions?: boolean;
   /** Only the tasks this agent took part in, as agent pages link to them (`?participantAgentId=`). */
   participantAgentId?: string;
+  /** Tasks made from this one that aren't its subtasks, such as an agent's follow-ups (`?createdFromIssueId=`). */
+  createdFromIssueId?: string;
+  /** What tasks show, comma separated: tells Monitoring apart from In progress (`?displayStatus=`). */
+  displayStatus?: string;
+  /**
+   * The server's order, most recently updated first unless asked: `created` since the 2026-11-03
+   * sync. Paging in an order that doesn't move (created) keeps pages from shifting while they load.
+   */
+  sortField?: "updated" | "created";
+  sortDir?: "asc" | "desc";
   limit?: number;
   offset?: number;
 };
 
 function listParams(filters: IssueListFilters) {
-  const params = new URLSearchParams({ view: "compact", sortField: "updated", sortDir: "desc" });
+  const params = new URLSearchParams({ view: "compact", sortField: filters.sortField ?? "updated", sortDir: filters.sortDir ?? "desc" });
   if (filters.projectId) params.set("projectId", filters.projectId);
   if (filters.parentId) params.set("parentId", filters.parentId);
+  if (filters.createdFromIssueId) params.set("createdFromIssueId", filters.createdFromIssueId);
+  if (filters.displayStatus) params.set("displayStatus", filters.displayStatus);
   if (filters.participantAgentId) params.set("participantAgentId", filters.participantAgentId);
   if (filters.includeBlockedBy) params.set("includeBlockedBy", "true");
   if (filters.includeRoutineExecutions) params.set("includeRoutineExecutions", "true");
@@ -69,6 +86,9 @@ function listParams(filters: IssueListFilters) {
 
 /** A page of the compact list. Pages past this size are fetched on demand. */
 export const ISSUE_LIST_PAGE_SIZE = 500;
+
+/** `GET /issues/:id/runs?runIds=` takes at most this many ids. */
+export const RUN_IDS_PER_REQUEST = 100;
 
 export const issuesApi = {
   list: (companyId: string, filters: IssueListFilters, signal?: AbortSignal) =>
@@ -150,6 +170,19 @@ export const issuesApi = {
     return (await Promise.all(batches)).flat();
   },
   runs: (id: string, signal?: AbortSignal) => api.get<RunForIssue[]>(`/issues/${id}/runs`, { signal }),
+  /**
+   * Some of a task's runs by id (`?runIds=`, since the 2026-11-01 sync), in one request per 100,
+   * instead of the whole list. Runs that aren't the task's are left out.
+   */
+  runsByIds: async (id: string, runIds: readonly string[], signal?: AbortSignal) => {
+    const ids = [...new Set(runIds)];
+    const batches: Promise<RunForIssue[]>[] = [];
+    for (let start = 0; start < ids.length; start += RUN_IDS_PER_REQUEST) {
+      const params = new URLSearchParams({ runIds: ids.slice(start, start + RUN_IDS_PER_REQUEST).join(",") });
+      batches.push(api.get<RunForIssue[]>(`/issues/${id}/runs?${params}`, { signal }));
+    }
+    return (await Promise.all(batches)).flat();
+  },
   /** The latest 2 runs, newest first. */
   recentRuns: (id: string, signal?: AbortSignal) => api.get<RunForIssue[]>(`/issues/${id}/runs?view=recent`, { signal }),
   costSummary: (id: string, signal?: AbortSignal) => api.get<IssueCostSummary>(`/issues/${id}/cost-summary`, { signal }),

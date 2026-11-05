@@ -3,6 +3,11 @@
  * the mapping can be tested. Agents, Slack messages, emails and the `paperclip` skill link to these,
  * so each one goes to the page that does the same job now. Every redirect keeps the query and the
  * fragment (`#comment-<id>`, `#document-<key>`), which the page it lands on reads.
+ *
+ * The task list's own old parameters need no redirect: `/issues` is still the task list, and it
+ * reads them (tasks/view-url.ts), such as the old Routines page's link to the tasks routines made
+ * (`/issues?view=all&originKind=routine_execution&sortField=created&sortDir=desc`, since the
+ * 2026-11-01 sync).
  */
 
 /** "PAP-123" or a case's "PAP-C7": the company prefix in front of a task or case identifier. */

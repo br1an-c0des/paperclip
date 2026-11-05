@@ -11,6 +11,7 @@ import {
   isAgentCreated,
   parseViewState,
   readViewState,
+  serverSort,
   toggled,
   viewStateKey,
   writeViewState,
@@ -203,5 +204,41 @@ describe("applyFilters, external objects", () => {
   it("reads the filter back from saved state", () => {
     expect(parseViewState(JSON.stringify({ filters: { externalObjects: ["stale", 3] } })).filters.externalObjects).toEqual(["stale"]);
     expect(parseViewState(JSON.stringify({ filters: {} })).filters.externalObjects).toEqual([]);
+  });
+});
+
+describe("Monitoring in the filters", () => {
+  it("filters by what tasks show, so Monitoring and In progress are told apart", () => {
+    const tasks = [task("m", { status: "in_progress", displayStatus: "monitoring" }), task("p", { status: "in_progress" })];
+    expect(applyFilters(tasks, { ...EMPTY_FILTERS, statuses: ["monitoring"] }).map((each) => each.id)).toEqual(["m"]);
+    expect(applyFilters(tasks, { ...EMPTY_FILTERS, statuses: ["in_progress"] }).map((each) => each.id)).toEqual(["p"]);
+  });
+
+  it("drops the display status when a change sets the status", () => {
+    const next = applyUpdate(task("m", { status: "in_progress", displayStatus: "monitoring" }), { status: "in_review" });
+    expect(next).toMatchObject({ status: "in_review", displayStatus: "in_review" });
+    expect(applyUpdate(task("a"), { status: "done" })).not.toHaveProperty("displayStatus");
+  });
+});
+
+describe("recurring task runs", () => {
+  const tasks = [
+    task("routine", { originKind: "routine_execution", originId: "r1" }),
+    task("manual", { originKind: "manual", createdByUserId: "u1" }),
+  ];
+
+  it("keeps only the tasks routines made, even with agents' tasks hidden", () => {
+    expect(applyFilters(tasks, { ...EMPTY_FILTERS, routineOnly: true }).map((each) => each.id)).toEqual(["routine"]);
+    expect(applyFilters(tasks, { ...EMPTY_FILTERS, routineOnly: true, hideAgentCreated: true }).map((each) => each.id)).toEqual(["routine"]);
+    expect(filterCount({ ...EMPTY_FILTERS, routineOnly: true })).toBe(1);
+    expect(parseViewState(JSON.stringify({ filters: { routineOnly: true } })).filters.routineOnly).toBe(true);
+  });
+});
+
+describe("serverSort", () => {
+  it("asks for created or updated order as the view sorts, else most recently updated first", () => {
+    expect(serverSort({ field: "created", dir: "asc" })).toEqual({ field: "created", dir: "asc" });
+    expect(serverSort({ field: "updated", dir: "asc" })).toEqual({ field: "updated", dir: "asc" });
+    expect(serverSort({ field: "priority", dir: "asc" })).toEqual({ field: "updated", dir: "desc" });
   });
 });

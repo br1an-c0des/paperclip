@@ -1,7 +1,7 @@
-import type { CompactIssue, IssuePriority, IssueStatus } from "@paperclipai/shared";
+import type { CompactIssue, IssueDisplayStatus, IssuePriority } from "@paperclipai/shared";
 import { useLocation, useSearchParams } from "@solidjs/router";
 import { createQuery, keepPreviousData, useQueryClient } from "@tanstack/solid-query";
-import { ArrowUpDown, ChevronDown, CircleCheck, CornerDownRight, ListFilter, Plus, Search, UserRound, X } from "lucide-solid";
+import { ArrowUpDown, ChevronDown, CircleCheck, CornerDownRight, ListFilter, Plus, Repeat, Search, UserRound, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
@@ -20,7 +20,7 @@ import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
 import { boardCollapseKey, boardColumns, boardStartsCollapsed, CLOSED_STATUSES } from "./board-model";
 import { BoardView } from "./BoardView";
 import { EXTERNAL_STATUS_FILTERS, matchesExternalStatus } from "./external-objects";
-import { buildTaskGroups, PRIORITY_ORDER, shownRows, startsCollapsed, STATUS_PICK_ORDER, type GroupNames, type TaskGroup } from "./list-model";
+import { buildTaskGroups, PRIORITY_ORDER, shownRows, startsCollapsed, STATUS_FILTER_ORDER, type GroupNames, type TaskGroup } from "./list-model";
 import { useTaskPeople } from "./people";
 import { AssigneeItems, LabelDot, LabelItems, PriorityItems, StatusItems } from "./pickers";
 import { useTaskRetry } from "./retry";
@@ -32,7 +32,7 @@ import { TaskList } from "./TaskList";
 import { TaskModal } from "./TaskModal";
 import { opensAs, taskOpenMode } from "./task-open-mode";
 import { TaskPanel } from "./TaskPanel";
-import { parseListUrl, PREFILTER_PARAMS, withUrlFilters } from "./view-url";
+import { parseListUrl, PREFILTER_PARAMS, sortParams, withUrlFilters } from "./view-url";
 import {
   applyFilters,
   creatorKey,
@@ -41,12 +41,14 @@ import {
   GROUP_BY_OPTIONS,
   LAYOUT_OPTIONS,
   readViewState,
+  serverSort,
   toggled,
   viewStateKey,
   writeViewState,
   type BoardDisplay,
   type SortField,
   type TaskFilters,
+  type TaskSort,
   type TaskLayout,
   type TaskViewState,
 } from "./view-state";
@@ -89,20 +91,37 @@ type ListScope = { projectId?: string };
  * The tasks for a list. A null scope waits, such as while a project is still being looked up. A
  * `?participantAgentId=` in the URL narrows it to the tasks that agent took part in, which the
  * server filters; only then does the query key change.
+ *
+ * The pages are asked for in the order the view sorts by when it sorts by created or updated
+ * (view-state.ts `serverSort`): the URL's sort, else the list's saved one. Any other order than the
+ * server's default (most recently updated first) is a query of its own.
  */
 export function useTaskList(scope: () => ListScope | null) {
   const company = useCompany();
   const location = useLocation();
-  const participant = () => parseListUrl(location.search).participantAgentId;
+  const url = createMemo(() => parseListUrl(location.search));
+  const order = createMemo(() => {
+    const sort: TaskSort = url().sort ?? readViewState(viewStateKey(company().id, scope()?.projectId)).sort;
+    return serverSort(sort);
+  });
   return createQuery(() => {
     const key = queryKeys.issues.view(company().id, scope() ?? {});
-    const agentId = participant();
+    const agentId = url().participantAgentId;
+    const { field, dir } = order();
+    const ordered = field === "updated" && dir === "desc" ? [] : ["sort", field, dir];
     return {
-      queryKey: agentId ? [...key, "participant", agentId] : key,
+      queryKey: [...key, ...(agentId ? ["participant", agentId] : []), ...ordered],
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         issuesApi.listAll(
           company().id,
-          { ...scope(), includeBlockedBy: true, includeRoutineExecutions: true, ...(agentId ? { participantAgentId: agentId } : {}) },
+          {
+            ...scope(),
+            includeBlockedBy: true,
+            includeRoutineExecutions: true,
+            sortField: field,
+            sortDir: dir,
+            ...(agentId ? { participantAgentId: agentId } : {}),
+          },
           signal,
         ),
       enabled: scope() !== null,
@@ -163,7 +182,7 @@ export function TasksView(props: {
 
   // What the URL says: the search, and pre-filters that replace the saved view's.
   const url = createMemo(() => parseListUrl(location.search, people.youId()));
-  const urlFilters = createMemo(() => JSON.stringify([url().filters, url().groupBy]));
+  const urlFilters = createMemo(() => JSON.stringify([url().filters, url().groupBy, url().sort]));
   // The search box keeps its own text and writes it to `?q=`; a change to the URL from elsewhere
   // (the back button, a link) comes back into the box, but the box's own writes don't, so a slow
   // navigation can't undo typing.
@@ -180,7 +199,7 @@ export function TasksView(props: {
     ),
   );
   /** Sets the search, with any other URL changes in the same navigation so neither undoes the other. */
-  const setSearch = (value: string, more: Record<string, undefined> = {}) => {
+  const setSearch = (value: string, more: Record<string, string | undefined> = {}) => {
     setSearchText(value);
     if (value !== urlSearch()) written.add(value);
     setParams({ ...more, q: value || undefined }, { replace: true, scroll: false });
@@ -189,14 +208,14 @@ export function TasksView(props: {
   // The view: saved per list, and read again when the list changes (another project) or the URL's
   // pre-filters do.
   const storageKey = () => viewStateKey(company().id, props.projectId);
-  const [view, setView] = createSignal<TaskViewState>(withUrlFilters(readViewState(storageKey()), url().filters, url().groupBy));
+  const [view, setView] = createSignal<TaskViewState>(withUrlFilters(readViewState(storageKey()), url().filters, url().groupBy, url().sort));
   const [checked, setChecked] = createSignal<ReadonlySet<string>>(new Set());
   const [expanded, setExpanded] = createSignal<ReadonlySet<string>>(new Set());
   createEffect(
     on(
       [storageKey, urlFilters],
       ([key], previous) => {
-        setView(withUrlFilters(readViewState(key), url().filters, url().groupBy));
+        setView(withUrlFilters(readViewState(key), url().filters, url().groupBy, url().sort));
         if (previous?.[0] !== key) {
           setChecked(new Set<string>());
           setExpanded(new Set<string>());
@@ -222,6 +241,18 @@ export function TasksView(props: {
     changeView({ filters: EMPTY_FILTERS });
     dropUrlFilters();
   };
+  // The sort lives in the URL too, as the old list's does, so a link carries it.
+  createEffect(
+    on(
+      () => view().sort,
+      (sort) => {
+        const inUrl = url().sort;
+        if (inUrl?.field === sort.field && inUrl.dir === sort.dir) return;
+        if (!inUrl && !sortParams(sort).sortField) return;
+        setParams(sortParams(sort), { replace: true, scroll: false });
+      },
+    ),
+  );
   const changeBoard = (next: Partial<BoardDisplay>) => changeView({ board: { ...view().board, ...next } });
   const toggleExpanded = (id: string, open: boolean) => {
     const next = new Set(expanded());
@@ -247,7 +278,7 @@ export function TasksView(props: {
   const editedView = () => (currentView() ? undefined : savedViews().find((each) => each.id === view().savedViewId));
   const pickView = (saved: SavedView) => {
     changeView({ groupBy: saved.groupBy, filters: saved.filters, sort: saved.sort, savedViewId: saved.id });
-    setSearch(saved.search, PREFILTER_PARAMS);
+    setSearch(saved.search, { ...PREFILTER_PARAMS, ...sortParams(saved.sort) });
   };
 
   // Workspaces are only looked up when the view needs them: grouped or filtered by workspace, or
@@ -793,6 +824,14 @@ function FilterMenu(props: {
           >
             Hide tasks agents created
           </Menu.CheckboxItem>
+          <Menu.CheckboxItem
+            icon={<Repeat size={14} aria-hidden="true" />}
+            description="Started by a recurring task"
+            checked={props.filters.routineOnly}
+            onChange={() => props.onChange({ routineOnly: !props.filters.routineOnly })}
+          >
+            Recurring task runs
+          </Menu.CheckboxItem>
           <Show when={props.cases}>
             <Menu.CheckboxItem icon={<CaseIcon size={14} />} checked={props.filters.inCase} onChange={() => props.onChange({ inCase: !props.filters.inCase })}>
               In a case
@@ -801,8 +840,8 @@ function FilterMenu(props: {
         </Menu.Group>
         <Menu.Separator />
         <Menu.Group label="Status">
-          <For each={STATUS_PICK_ORDER}>
-            {(status: IssueStatus) => (
+          <For each={STATUS_FILTER_ORDER}>
+            {(status: IssueDisplayStatus) => (
               <Menu.CheckboxItem
                 icon={<StatusCapsule status={status} size="row" />}
                 checked={props.filters.statuses.includes(status)}
