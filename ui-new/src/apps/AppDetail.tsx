@@ -1,7 +1,7 @@
 import type { ConnectionMethodDef, ToolCatalogEntry, ToolConnection } from "@paperclipai/shared";
 import { A, useNavigate } from "@solidjs/router";
 import { createMutation, createQuery } from "@tanstack/solid-query";
-import { RefreshCw } from "lucide-solid";
+import { ExternalLink, RefreshCw } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch, type JSX } from "solid-js";
 import { createStore } from "solid-js/store";
 import { queryKeys } from "@/api/queryKeys";
@@ -29,9 +29,11 @@ import {
   DETAIL_TABS,
   displayName,
   enabledIds,
+  githubRecoveryUrl,
   hostedAt,
   installState,
   installTargets,
+  reviewBadgeCount,
   riskLabel,
   splitCatalog,
   toolMethods,
@@ -48,7 +50,7 @@ import { PoolPage } from "./pools/Pools";
 import { BrowserUsePanel, RailwayPanel, TestCallDialog } from "./TestCall";
 import { appPanel } from "./test-call-model";
 import { poolPluginKey } from "./pools/pool-model";
-import { AgentAccessPicker, AppLogo, failureText, StateTag, useApplications, useGallery, usePendingRequests, useRefreshTools } from "./shared";
+import { AgentAccessPicker, AppLogo, failureText, StateTag, useApplications, useGallery, useRefreshTools } from "./shared";
 
 /*
  * One connection (`/apps/:connectionId/:tab`, the old UI's AppDetail):
@@ -97,7 +99,12 @@ export function AppDetail(props: { connectionId: string; tab: DetailTab; success
   }));
   const applications = useApplications();
   const gallery = useGallery();
-  const pending = usePendingRequests();
+  // The Review badge, for this connection only.
+  const reviewCounts = createQuery(() => ({
+    queryKey: queryKeys.tools.connectionPart(company().id, id(), "review-counts"),
+    queryFn: ({ signal }) => toolsApi.reviewCounts(id(), signal),
+    refetchInterval: 30_000,
+  }));
 
   const row = createMemo(() => {
     const connection = connectionQuery.data;
@@ -105,7 +112,7 @@ export function AppDetail(props: { connectionId: string; tab: DetailTab; success
     return connectionRows([connection], applications.data?.applications ?? [], gallery.data?.apps ?? [])[0] ?? null;
   });
   const canConfigure = () => grants.data?.capabilities.canConfigure === true;
-  const pendingHere = () => (pending.data?.actionRequests ?? []).filter((item) => item.connectionId === id()).length;
+  const pendingHere = () => reviewBadgeCount(reviewCounts.data);
 
   // Back from a provider's sign-in: say so once, then drop the marker from the address.
   createEffect(
@@ -260,9 +267,10 @@ function useConnectionAccess(connection: () => ToolConnection) {
     queryFn: ({ signal }) => toolsApi.catalog(id(), signal),
     enabled: !isAi(),
   }));
+  // This connection's saved profiles only, not the company's with their access summaries.
   const profiles = createQuery(() => ({
-    queryKey: queryKeys.tools.profiles(company().id),
-    queryFn: ({ signal }) => toolsApi.profiles(company().id, signal),
+    queryKey: queryKeys.tools.connectionPart(company().id, id(), "profile-configuration"),
+    queryFn: ({ signal }) => toolsApi.profileConfiguration(id(), signal),
   }));
   const policies = createQuery(() => ({
     queryKey: queryKeys.tools.policies(company().id),
@@ -585,10 +593,28 @@ function NewActions(props: { connection: ToolConnection; canConfigure: boolean }
 // ---------------------------------------------------------------------------------------------
 // Reconnect and settings
 
-/** Restores a connection that needs attention: sign in again, replace its key, or finish setup. */
+/**
+ * Restores a connection that needs attention: sign in again, replace its key, or finish setup. One
+ * that doesn't need a new sign-in (`requiresReauthorization: false`, such as GitHub access that
+ * couldn't be checked) offers Retry access, the health check, and links to GitHub's installation
+ * settings when the check says the installation is suspended.
+ */
 function ReconnectCard(props: { connection: ToolConnection; methods: ConnectionMethodDef[]; canConfigure: boolean }) {
   const company = useCompany();
   const refresh = useRefreshTools();
+  const retryAccess = createMutation(() => ({
+    mutationFn: () => toolsApi.healthCheck(props.connection.id),
+    onSuccess: (result) =>
+      pushToast(
+        result.connection.healthStatus === "ok" || result.connection.healthStatus === "healthy"
+          ? { title: "Access restored", tone: "success" }
+          : { title: "It still needs attention", body: result.connection.healthMessage ?? undefined, tone: "error" },
+      ),
+    onError: (error) => pushToast({ title: "Couldn't check access", body: failureText(error, "Please try again."), tone: "error" }),
+    // The failed check is saved on the connection, so the card shows its message.
+    onSettled: () => refresh(),
+  }));
+  const recoveryUrl = () => githubRecoveryUrl(retryAccess.error);
   const slug = () => connectionSlug(props.connection);
   const method = () => {
     const key = props.connection.config?.connectionMethodKey;
@@ -631,6 +657,21 @@ function ReconnectCard(props: { connection: ToolConnection; methods: ConnectionM
             >
               Finish setup
             </A>
+          </Match>
+          <Match when={props.connection.requiresReauthorization === false && !isDraft()}>
+            <div class="org-row">
+              <Show when={recoveryUrl()}>
+                {(url) => (
+                  <a class={buttonClass({ variant: "primary", size: "compact" })} href={url()} target="_blank" rel="noreferrer noopener">
+                    <ExternalLink size={14} aria-hidden="true" />
+                    Open installation settings on GitHub
+                  </a>
+                )}
+              </Show>
+              <Button size="compact" variant={recoveryUrl() ? "secondary" : "primary"} disabled={retryAccess.isPending} onClick={() => retryAccess.mutate()}>
+                {retryAccess.isPending ? "Checking access…" : "Retry access"}
+              </Button>
+            </div>
           </Match>
           <Match when={props.connection.authKind === "oauth"}>
             <Button size="compact" variant="primary" disabled={signIn.isPending} onClick={() => signIn.mutate()}>

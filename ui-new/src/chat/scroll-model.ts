@@ -6,7 +6,8 @@
  * - Otherwise the thread follows what arrives (messages, the live reply growing, cards, the queue)
  *   only while the reader is already at the foot. Someone reading further up stays where they are,
  *   however often the chat's data refreshes underneath them.
- * - Paging back ("Load earlier messages") never moves the reader to the foot.
+ * - Paging back (scrolling up near the top, or "Load earlier messages") never moves the reader to
+ *   the foot.
  */
 
 /** How close to the foot still counts as reading the newest. */
@@ -20,6 +21,9 @@ export type ScrollMetrics = {
   /** The page's full height (`document.documentElement.scrollHeight`). */
   contentHeight: number;
 };
+
+/** How far above the viewport the top of the thread can be and still load earlier messages. */
+export const NEAR_TOP_PX = 600;
 
 /** Whether the reader is at (or near) the foot of the thread. */
 export function atFoot(metrics: ScrollMetrics, slack = NEAR_FOOT_PX) {

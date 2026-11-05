@@ -1,4 +1,4 @@
-import type { AgentDetail, Issue, IssueComment } from "@paperclipai/shared";
+import type { AgentDetail, Issue } from "@paperclipai/shared";
 import { createInfiniteQuery, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { batch, createEffect, createMemo, createSignal, on, untrack } from "solid-js";
 import { approvalsApi } from "@/api/approvals";
@@ -16,6 +16,7 @@ import { isActiveRun } from "@/runs/run-model";
 import { queuedIds, useQueuedComments } from "@/tasks/composer/QueuedMessages";
 import { useTaskPeople } from "@/tasks/people";
 import { buildChat, shownReplies, type ChatTask, type ReplyTurn } from "./chat-model";
+import { EARLIER_PAGE, FIRST_PAGE, firstPage, historyComments, isChatWindow, listPage, type HistoryPage } from "./history-model";
 
 /*
  * Everything the chat view reads, in one place.
@@ -24,14 +25,12 @@ import { buildChat, shownReplies, type ChatTask, type ReplyTurn } from "./chat-m
  *   means the same.
  * - The chat: `GET /chats/:agent`, null until the first message. Its row is then read like any
  *   task's (`issues.section(id, "core")`), so live task events keep its state fresh.
- * - Messages, newest page first, 50 at a time, with "Load earlier messages". The live events
- *   refresh them through the task's detail key.
+ * - Messages, newest first: the 20 newest, then 50 earlier at a time as the reader scrolls up
+ *   (history-model.ts). The live events refresh them through the task's detail key.
  * - Hand-offs, reports, the agent's requests and approvals on the chat, its documents, and the queue.
  * - Reply turns: the agent's runs on the chat. A run that leaves the live list is kept as finished
  *   until its message arrives (`shownReplies`).
  */
-
-const PAGE = 50;
 
 export type ChatState = ReturnType<typeof useChat>;
 
@@ -81,12 +80,17 @@ export function useChat(agent: () => AgentDetail) {
 
   const comments = createInfiniteQuery(() => ({
     queryKey: queryKeys.issues.section(chatId() ?? "", "comments", "chat"),
-    queryFn: ({ pageParam, signal }) => issuesApi.listComments(chatId()!, { limit: PAGE, after: pageParam ?? undefined }, signal),
+    queryFn: async ({ pageParam, signal }): Promise<HistoryPage> => {
+      if (pageParam) return listPage(await issuesApi.listComments(chatId()!, { limit: EARLIER_PAGE, after: pageParam }, signal), EARLIER_PAGE);
+      const recent = await issuesApi.recentComments(chatId()!, signal);
+      if (isChatWindow(recent)) return firstPage(recent);
+      return listPage(await issuesApi.listComments(chatId()!, { limit: FIRST_PAGE }, signal), FIRST_PAGE);
+    },
     initialPageParam: null as string | null,
-    getNextPageParam: (last: IssueComment[]) => (last.length < PAGE ? undefined : last[last.length - 1]?.id),
+    getNextPageParam: (last: HistoryPage) => last.next ?? undefined,
     enabled: !!chatId(),
   }));
-  const allComments = createMemo(() => comments.data?.pages.flat() ?? []);
+  const allComments = createMemo(() => historyComments(comments.data?.pages));
 
   const handoffs = createQuery(() => ({
     queryKey: queryKeys.chat.handoffs(company().id, chatId() ?? ""),

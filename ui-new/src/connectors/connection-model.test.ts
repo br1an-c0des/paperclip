@@ -9,6 +9,7 @@ import {
   newDraft,
   ownerLabel,
   reconnectDraft,
+  resumeDraft,
   usageLimitValue,
   usagePercent,
   type Connection,
@@ -134,5 +135,15 @@ describe("usage", () => {
     expect(usagePercent({ ...limit, remainingPercent: 70 })).toBe(30);
     expect(usageLimitValue(limit)).toBe("Not reported");
     expect(usagePercent(limit)).toBeNull();
+  });
+});
+
+describe("resumeDraft", () => {
+  it("takes a saved sign-in's details, so the same target resumes the server's attempt", () => {
+    const intent = { provider: "anthropic" as const, method: "subscription" as const, name: "Company Claude", ownership: "shared" as const, agentIds: ["a1"], allAgents: false };
+    const draft = resumeDraft(intent);
+    expect(draft).toEqual({ method: "subscription", name: "Company Claude", ownership: "shared", allAgents: false, agentIds: ["a1"], apiKey: "" });
+    expect(loginIntent(draft)).toEqual(intent);
+    expect(resumeDraft({ ...intent, connectionId: "c9" }).connectionId).toBe("c9");
   });
 });

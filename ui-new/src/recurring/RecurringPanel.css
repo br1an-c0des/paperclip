@@ -383,6 +383,24 @@
   color: var(--run-fg);
 }
 
+/* "started by run …": the agent run that fired the webhook. */
+.rpn-run-by {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 400;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.rpn-run-by:hover {
+  color: var(--body);
+  text-decoration: underline;
+}
+
 .rpn-older {
   align-self: flex-start;
 }

@@ -23,6 +23,7 @@ import {
   type Connection,
 } from "@/connectors/connection-model";
 import { ConnectionSetup } from "@/connectors/ConnectionSetup";
+import { canLookUpIdentity, identityMessage, identityRetryable } from "./ai-identity-model";
 import { PoolsCard } from "./pools/Pools";
 
 /*
@@ -33,7 +34,8 @@ import { PoolsCard } from "./pools/Pools";
  * Lists every connection you can use (`GET ai-connections`), lets you make your own personal one
  * your default (`PUT default`), checks usage where the provider reports it (`GET :id/usage`), shows
  * runs using it (`GET :id/active-runs`), and adds or reconnects a Claude account (ConnectionSetup,
- * which New agent uses too).
+ * which New agent uses too). A Claude subscription's Account panel asks the provider which account
+ * and organization it signs in as (`GET :id/identity`, ai-identity-model.ts).
  */
 
 export function AiConnections() {
@@ -152,6 +154,7 @@ function ConnectionRow(props: {
 }) {
   const company = useCompany();
   const [usageOpen, setUsageOpen] = createSignal(false);
+  const [accountOpen, setAccountOpen] = createSignal(false);
   const status = () => STATUS_META[props.connection.status];
   const runs = createQuery(() => ({
     queryKey: queryKeys.aiConnections.activeRuns(company().id, props.connection.id),
@@ -204,6 +207,11 @@ function ConnectionRow(props: {
               Reconnect
             </Button>
           </Show>
+          <Show when={canLookUpIdentity(props.connection)}>
+            <Button size="compact" variant="quiet" aria-expanded={accountOpen()} onClick={() => setAccountOpen((open) => !open)}>
+              {accountOpen() ? "Hide account" : "Account"}
+            </Button>
+          </Show>
           <Show when={props.connection.usageProbeSupported}>
             <Button size="compact" variant="quiet" aria-expanded={usageOpen()} onClick={() => setUsageOpen((open) => !open)}>
               {usageOpen() ? "Hide usage" : "Usage"}
@@ -211,10 +219,67 @@ function ConnectionRow(props: {
           </Show>
         </div>
       </div>
+      <Show when={accountOpen()}>
+        <AccountPanel connection={props.connection} list={props.list} />
+      </Show>
       <Show when={usageOpen()}>
         <UsagePanel connection={props.connection} />
       </Show>
     </li>
+  );
+}
+
+/** The account the connection signs in as, from the provider; read when the panel opens. */
+function AccountPanel(props: { connection: Connection; list: AiConnectionList }) {
+  const company = useCompany();
+  const identity = createQuery(() => ({
+    queryKey: queryKeys.aiConnections.identity(company().id, props.connection.id, props.connection.grantId),
+    queryFn: ({ signal }) => aiConnectionsApi.accountIdentity(company().id, props.connection.id, props.connection.grantId, signal),
+    enabled: canLookUpIdentity(props.connection),
+    staleTime: 5 * 60_000,
+    retry: false,
+  }));
+  const accountLabel = () => identity.data?.accountLabel ?? props.connection.accountLabel ?? null;
+  const message = () => identityMessage(identity.data, identity.error);
+  const retryable = () => identityRetryable(identity.data, identity.error);
+  return (
+    <section class="cx-usage" aria-label={`Account for ${props.connection.name}`}>
+      <dl class="ap-account">
+        <dt>{providerName(props.connection.provider)} account</dt>
+        <dd>{accountLabel() ?? (identity.isPending ? "Checking…" : "Not available")}</dd>
+        <Show when={identity.data?.organizationLabel}>
+          {(organization) => (
+            <>
+              <dt>Organization</dt>
+              <dd>{organization()}</dd>
+            </>
+          )}
+        </Show>
+        <dt>Sign-in method</dt>
+        <dd>{methodLabel(props.connection.method)}</dd>
+        <dt>Access</dt>
+        <dd>{ownerLabel(props.connection, props.list.currentUserId)}</dd>
+      </dl>
+      <Show when={identity.isPending}>
+        <p class="cap" role="status">
+          Checking the account with the provider…
+        </p>
+      </Show>
+      <Show when={message()}>
+        {(text) => (
+          <p class="cx-note" role={retryable() ? "alert" : undefined}>
+            {text()}
+          </p>
+        )}
+      </Show>
+      <Show when={retryable()}>
+        <div>
+          <Button size="compact" disabled={identity.isFetching} onClick={() => void identity.refetch()}>
+            {identity.isFetching ? "Checking…" : "Check again"}
+          </Button>
+        </div>
+      </Show>
+    </section>
   );
 }
 

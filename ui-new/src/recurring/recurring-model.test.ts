@@ -11,6 +11,7 @@ import {
   placeholderSegments,
   revisionChanges,
   runOutcome,
+  startedByRun,
   templatePlaceholders,
   triggerKinds,
   whenLabel,
@@ -278,5 +279,16 @@ describe("routineSection", () => {
     expect(routineSection("history")).toBe("history");
     expect(routineSection("triggers")).toBeUndefined();
     expect(routineSection(null)).toBeUndefined();
+  });
+});
+
+describe("startedByRun", () => {
+  it("names the agent run that fired the webhook", () => {
+    expect(startedByRun({ createdByRunId: "1a2b3c4d-0000-4000-8000-000000000000" })).toEqual({
+      runId: "1a2b3c4d-0000-4000-8000-000000000000",
+      label: "run 1a2b3c4d",
+    });
+    expect(startedByRun({ createdByRunId: null })).toBeNull();
+    expect(startedByRun({})).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { base64Bytes, describeUnavailable, detectPreview, extension, languageFor } from "./preview";
+import { base64Bytes, describeUnavailable, detectPreview, extension, languageFor, savedAtLabel, workspaceSourceText } from "./preview";
 
 const resource = (displayPath: string, previewKind: "text" | "image" | "video" | "pdf" | "unsupported", contentType: string | null = null) => ({
   displayPath,
@@ -56,5 +56,21 @@ describe("preview detection", () => {
     expect(describeUnavailable("changed_unavailable").title).toMatch(/Changed files/);
     expect(describeUnavailable("workspace_unavailable").title).toBe("Workspace is gone");
     expect(describeUnavailable(null).title).toBe("Workspace unavailable");
+  });
+});
+
+describe("workspace file source", () => {
+  it("says whether the files are live or a saved copy, and from when", () => {
+    expect(workspaceSourceText({ kind: "live", savedAt: null, snapshotId: null })).toEqual({ text: "Live workspace", savedAt: null });
+    expect(workspaceSourceText({ kind: "saved", savedAt: "2026-11-04T15:30:00Z", snapshotId: "s1" })).toEqual({ text: "Saved copy", savedAt: "2026-11-04T15:30:00Z" });
+    expect(workspaceSourceText({ kind: "saved", savedAt: null, snapshotId: "s1" })).toEqual({ text: "Saved copy", savedAt: null });
+    expect(workspaceSourceText(undefined)).toBeNull();
+  });
+
+  it("dates a saved copy, with the year only when it isn't this one", () => {
+    const now = new Date("2026-11-05T12:00:00Z");
+    expect(savedAtLabel("2026-11-04T15:30:00Z", now)).not.toMatch(/2026/);
+    expect(savedAtLabel("2025-11-04T15:30:00Z", now)).toMatch(/2025/);
+    expect(savedAtLabel("not a date", now)).toBe("not a date");
   });
 });

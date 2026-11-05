@@ -1,4 +1,4 @@
-import type { AiAuthMethod, AiConnectionList } from "@paperclipai/shared";
+import type { AiAuthMethod, AiConnectionList, AiConnectionLoginIntent } from "@paperclipai/shared";
 import { createMutation, useQueryClient } from "@tanstack/solid-query";
 import { ExternalLink } from "lucide-solid";
 import { createEffect, createSignal, For, Match, on, Show, Switch } from "solid-js";
@@ -21,6 +21,7 @@ import {
   loginIntent,
   newDraft,
   reconnectDraft,
+  resumeDraft,
   type Connection,
   type Ownership,
   type SetupDraft,
@@ -33,6 +34,9 @@ import "./Connectors.css";
  * Connect (or reconnect) a Claude account. Two steps for a subscription: the details (name, who can
  * use it, which agents), then the browser sign-in. An API key saves from the first step. The sign-in
  * is bound to the details, so going back and changing who can use it starts a new sign-in.
+ *
+ * `resume` is a sign-in saved earlier (often one an agent started for you, upstream #17737): the
+ * details come from it and the dialog opens on the sign-in, which the server picks up where it was.
  */
 
 export function ConnectionSetup(props: {
@@ -40,6 +44,7 @@ export function ConnectionSetup(props: {
   onOpenChange: (open: boolean) => void;
   list: AiConnectionList;
   reconnect?: Connection;
+  resume?: AiConnectionLoginIntent;
   subscriptionSupported: boolean;
   onSaved: (name: string, result: AiConnectionResult) => void;
 }) {
@@ -47,17 +52,20 @@ export function ConnectionSetup(props: {
     <Dialog
       open={props.open}
       onOpenChange={props.onOpenChange}
-      title={props.reconnect ? `Reconnect ${props.reconnect.name}` : "Connect Claude"}
+      title={props.reconnect ? `Reconnect ${props.reconnect.name}` : props.resume ? `Finish connecting ${props.resume.name}` : "Connect Claude"}
       description={
         props.reconnect
           ? "Sign in again to restore this connection. Its name and who can use it stay the same."
-          : "Add a Claude account so agents can run on it."
+          : props.resume
+            ? "Pick up the Claude sign-in that was started for you."
+            : "Add a Claude account so agents can run on it."
       }
       width={620}
     >
       <SetupBody
         list={props.list}
         reconnect={props.reconnect}
+        resume={props.resume}
         subscriptionSupported={props.subscriptionSupported}
         onCancel={() => props.onOpenChange(false)}
         onSaved={props.onSaved}
@@ -69,6 +77,7 @@ export function ConnectionSetup(props: {
 function SetupBody(props: {
   list: AiConnectionList;
   reconnect?: Connection;
+  resume?: AiConnectionLoginIntent;
   subscriptionSupported: boolean;
   onCancel: () => void;
   onSaved: (name: string, result: AiConnectionResult) => void;
@@ -81,9 +90,11 @@ function SetupBody(props: {
   const [draft, setDraft] = createStore<SetupDraft>(
     props.reconnect
       ? reconnectDraft(props.reconnect, props.list.canManageConnections)
-      : newDraft(props.list.canManageConnections, props.subscriptionSupported ? "subscription" : "api_key"),
+      : props.resume
+        ? resumeDraft(props.resume)
+        : newDraft(props.list.canManageConnections, props.subscriptionSupported ? "subscription" : "api_key"),
   );
-  const [nameEdited, setNameEdited] = createSignal(Boolean(props.reconnect));
+  const [nameEdited, setNameEdited] = createSignal(Boolean(props.reconnect || props.resume));
   const [step, setStep] = createSignal<"details" | "sign_in">("details");
   const [browserCode, setBrowserCode] = createSignal("");
   const login = createLocalLogin(() => company().id);
@@ -131,6 +142,8 @@ function SetupBody(props: {
     setStep("sign_in");
     login.begin(loginIntent(draft));
   };
+  // A saved sign-in goes straight to it; the same details resume the server's attempt.
+  if (props.resume) queueMicrotask(continueToSignIn);
   const backToDetails = () => {
     login.pause();
     setStep("details");

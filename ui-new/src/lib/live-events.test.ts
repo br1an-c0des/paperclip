@@ -2,7 +2,7 @@ import type { LiveEvent } from "@paperclipai/shared";
 import { QueryClient } from "@tanstack/solid-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryKeys } from "@/api/queryKeys";
-import { createTrailingRefetch, keysForEvent, LIST_CACHE_HOLD_MS, LIVE_RUNS_HOLD_MS } from "./live-events";
+import { createTrailingRefetch, FRESH_ON_OPEN_MS, keysForEvent, LIST_CACHE_HOLD_MS, LIVE_RUNS_HOLD_MS, RunInterests, skipOnFirstOpen } from "./live-events";
 
 const event = (type: LiveEvent["type"], payload: Record<string, unknown>): LiveEvent => ({
   id: 1,
@@ -102,6 +102,35 @@ describe("keysForEvent", () => {
     expect(keysForEvent("c1", event("heartbeat.run.log", { runId: "r1" }))).toEqual([]);
   });
 
+  it("refreshes only the task's activity when someone else marks it read", () => {
+    for (const action of ["issue.read_marked", "issue.read_unmarked"]) {
+      const keys = keysForEvent("c1", event("activity.logged", { entityType: "issue", entityId: "i1", action, actorType: "user", actorId: "u2" }), { userId: "u1" });
+      expect(keys).toEqual([queryKeys.activity("c1"), queryKeys.issues.section("i1", "activity")]);
+    }
+  });
+
+  it("refreshes your own lists, counts and chat dots when you mark a task read", () => {
+    const keys = keysForEvent(
+      "c1",
+      event("activity.logged", { entityType: "issue", entityId: "i1", action: "issue.read_marked", actorType: "user", actorId: "u1", details: { userId: "u1" } }),
+      { userId: "u1" },
+    );
+    expect(keys).toEqual(
+      expect.arrayContaining([queryKeys.issues.section("i1", "activity"), ["issues", "c1", "inbox"], queryKeys.sidebarBadges("c1"), queryKeys.chat.list("c1")]),
+    );
+    // The Inbox's lists sit under that prefix.
+    expect(queryKeys.inbox.tasks("c1").slice(0, 3)).toEqual(["issues", "c1", "inbox"]);
+    expect(keys).not.toContainEqual(queryKeys.issues.detail("i1"));
+    expect(keys).not.toContainEqual(queryKeys.issues.list("c1"));
+    expect(keys).not.toContainEqual(queryKeys.dashboard("c1"));
+  });
+
+  it("refreshes the Inbox's Updates when a run starts or ends", () => {
+    for (const type of ["heartbeat.run.queued", "heartbeat.run.status"] as const) {
+      expect(keysForEvent("c1", event(type, { agentId: "a1", runId: "r1" }))).toContainEqual(queryKeys.inbox.tasks("c1"));
+    }
+  });
+
   it("ignores ids that aren't strings", () => {
     const keys = keysForEvent("c1", event("agent.status", { agentId: 42 }));
     expect(keys).not.toContainEqual(queryKeys.agents.detail("42"));
@@ -178,5 +207,107 @@ describe("createTrailingRefetch", () => {
     trailing.cancel();
     vi.advanceTimersByTime(LIST_CACHE_HOLD_MS * 2);
     expect(invalidate).not.toHaveBeenCalled();
+  });
+});
+
+describe("RunInterests", () => {
+  const frames = (sent: string[]) => sent.map((raw) => JSON.parse(raw) as Record<string, unknown>);
+
+  it("says hello, then sends the runs held once the server can filter", () => {
+    const sent: string[] = [];
+    const interests = new RunInterests();
+    const release = interests.acquire(["r2", "r1"]);
+    interests.open({ send: (data) => sent.push(data) });
+    expect(frames(sent)).toEqual([{ type: "live.hello", version: 1, capabilities: ["run-interests"] }]);
+    expect(interests.receive({ type: "live.capabilities", version: 1, capabilities: ["run-interests"] })).toBe(true);
+    expect(frames(sent)[1]).toEqual({ type: "live.interests", version: 1, revision: 1, runIds: ["r1", "r2"] });
+    release();
+    expect(frames(sent)[2]).toEqual({ type: "live.interests", version: 1, revision: 2, runIds: [] });
+  });
+
+  it("sends nothing more to a server that doesn't answer the hello", () => {
+    const sent: string[] = [];
+    const interests = new RunInterests();
+    interests.open({ send: (data) => sent.push(data) });
+    interests.acquire(["r1"]);
+    expect(sent).toHaveLength(1);
+    expect(interests.streaming("r1")).toBe(false);
+  });
+
+  it("says a run is streaming once the server acknowledges it, and not after a resync", () => {
+    const interests = new RunInterests();
+    const heard = vi.fn();
+    interests.listen(heard);
+    interests.acquire(["r1"]);
+    interests.open({ send: () => undefined });
+    interests.receive({ type: "live.capabilities", version: 1, capabilities: ["run-interests"] });
+    expect(interests.streaming("r1")).toBe(false);
+    interests.receive({ type: "live.subscribed", version: 1, revision: 1 });
+    expect(interests.streaming("r1")).toBe(true);
+    interests.receive({ type: "live.resync", version: 1, revision: 1, reason: "controller_change" });
+    expect(interests.streaming("r1")).toBe(false);
+    interests.receive({ type: "live.subscribed", version: 1, revision: 2 });
+    expect(interests.streaming("r1")).toBe(true);
+    interests.close();
+    expect(interests.streaming("r1")).toBe(false);
+    expect(heard).toHaveBeenCalled();
+  });
+
+  it("changes the set only when a run's first holder comes or its last goes", () => {
+    const sent: string[] = [];
+    const interests = new RunInterests();
+    interests.open({ send: (data) => sent.push(data) });
+    interests.receive({ type: "live.capabilities", version: 1, capabilities: ["run-interests"] });
+    const first = interests.acquire(["r1"]);
+    const second = interests.acquire(["r1"]);
+    first();
+    first();
+    expect(sent).toHaveLength(3);
+    second();
+    expect(frames(sent).at(-1)).toMatchObject({ revision: 3, runIds: [] });
+  });
+
+  it("sends the set again on a resync and recovers once that is acknowledged", () => {
+    const sent: string[] = [];
+    const recovered = vi.fn();
+    const interests = new RunInterests();
+    interests.acquire(["r1"]);
+    interests.open({ send: (data) => sent.push(data) });
+    interests.receive({ type: "live.capabilities", version: 1, capabilities: ["run-interests"] });
+    interests.receive({ type: "live.subscribed", version: 1, revision: 1 }, recovered);
+    expect(recovered).not.toHaveBeenCalled();
+    expect(interests.receive({ type: "live.resync", version: 1, revision: 1, reason: "controller_change" }, recovered)).toBe(true);
+    expect(frames(sent).at(-1)).toEqual({ type: "live.interests", version: 1, revision: 2, runIds: ["r1"] });
+    // A stale acknowledgement doesn't count; the one for the resent set does, once.
+    interests.receive({ type: "live.subscribed", version: 1, revision: 1 }, recovered);
+    expect(recovered).not.toHaveBeenCalled();
+    interests.receive({ type: "live.subscribed", version: 1, revision: 2 }, recovered);
+    interests.receive({ type: "live.subscribed", version: 1, revision: 2 }, recovered);
+    expect(recovered).toHaveBeenCalledTimes(1);
+    // A resync for a revision never sent, or one already handled, is ignored.
+    interests.receive({ type: "live.resync", version: 1, revision: 1, reason: "delivery_overflow" }, recovered);
+    interests.receive({ type: "live.resync", version: 1, revision: 9, reason: "delivery_overflow" }, recovered);
+    expect(sent).toHaveLength(3);
+  });
+
+  it("passes ordinary events through", () => {
+    expect(new RunInterests().receive({ type: "activity.logged", companyId: "c1", payload: {} })).toBe(false);
+  });
+});
+
+describe("skipOnFirstOpen", () => {
+  const now = 1_000_000;
+  it("leaves the just-loaded session, health, companies and board access alone", () => {
+    for (const key of [queryKeys.health, queryKeys.auth.session, queryKeys.companies.list("u1"), queryKeys.access.currentBoardAccess]) {
+      expect(skipOnFirstOpen(key, now - 1_000, now)).toBe(true);
+      expect(skipOnFirstOpen(key, now - FRESH_ON_OPEN_MS - 1, now)).toBe(false);
+      expect(skipOnFirstOpen(key, 0, now)).toBe(false);
+    }
+  });
+
+  it("refreshes everything else", () => {
+    expect(skipOnFirstOpen(queryKeys.issues.list("c1"), now - 1_000, now)).toBe(false);
+    expect(skipOnFirstOpen(queryKeys.companies.detail("c1"), now - 1_000, now)).toBe(false);
+    expect(skipOnFirstOpen(queryKeys.companySettings.members("c1"), now - 1_000, now)).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-import type { ResolvedWorkspaceResource, WorkspaceFileContent } from "@paperclipai/shared";
+import type { ResolvedWorkspaceResource, WorkspaceFileContent, WorkspaceFileSource } from "@paperclipai/shared";
 import { basename } from "./file-tree";
 
 /*
@@ -193,6 +193,30 @@ export function describeUnavailable(reason: string | null | undefined): { title:
 }
 
 /** "820 B", "14 KB", "2.4 MB". */
+/**
+ * Where the files come from (upstream #18403, `workspace.source`): the live workspace, or a copy
+ * Paperclip saved when the workspace's runner went away (remote workspaces off the web server's
+ * disk). Null from a server that doesn't say.
+ */
+export function workspaceSourceText(source: WorkspaceFileSource | null | undefined): { text: string; savedAt: string | null } | null {
+  if (!source) return null;
+  if (source.kind === "live") return { text: "Live workspace", savedAt: null };
+  return { text: "Saved copy", savedAt: source.savedAt };
+}
+
+/** A saved copy's time, as "Nov 5, 2:30 PM" (with the year when it isn't this one). */
+export function savedAtLabel(savedAt: string, now = new Date()) {
+  const at = new Date(savedAt);
+  if (Number.isNaN(at.getTime())) return savedAt;
+  return at.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    ...(at.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export function fileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;

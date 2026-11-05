@@ -18,6 +18,7 @@ import { pluginsApi } from "@/api/plugins";
 import { ApiError } from "@/api/client";
 import { pushToast } from "@/ui/Toast";
 import { hostStore } from "../host";
+import { keepsLastGood, retryDelay, shouldRetry } from "./retry-policy";
 import { resolveHostNavigationHref, sameOriginPath } from "../model";
 
 /*
@@ -27,7 +28,8 @@ import { resolveHostNavigationHref, sameOriginPath } from "../model";
  * provider naming the plugin and its host context, and the hooks read it from there.
  *
  * - `usePluginData` → `POST /api/plugins/:id/data/:key`, refetched when the key, params, company
- *   or render environment change, retried twice when the worker is starting or slow.
+ *   or render environment change. Failures retry by upstream's policy (retry-policy.ts): transient
+ *   ones with backoff for about 30 seconds, then keeping the last good data for the same read.
  * - `usePluginAction` → `POST /api/plugins/:id/actions/:key`; failures throw `{ code, message }`.
  * - `usePluginStream` → the worker's SSE channel, `GET /api/plugins/:id/bridge/stream/:channel`.
  * - Navigation, location and toasts go through the Solid host (host.ts, ui/Toast).
@@ -68,8 +70,6 @@ function snapshot(environment: PluginRenderEnvironmentContext | null | undefined
   return environment ? { environment: environment.environment, launcherId: environment.launcherId, bounds: environment.bounds } : null;
 }
 
-const RETRYABLE: PluginBridgeErrorCode[] = ["WORKER_UNAVAILABLE", "TIMEOUT"];
-
 export function usePluginData<T = unknown>(key: string, params?: Record<string, unknown>): PluginDataResult<T> {
   const { pluginId, hostContext } = useBridge();
   const companyId = hostContext.companyId;
@@ -80,32 +80,39 @@ export function usePluginData<T = unknown>(key: string, params?: Record<string, 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<PluginBridgeError | null>(null);
   const [tick, setTick] = useState(0);
+  // Which read `data` came from. Data is kept through an outage only for that same read: with
+  // another key, params, company or environment it would stand in for a different answer.
+  const dataRequest = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let attempt = 0;
+    let failures = 0;
+    const requestKey = [pluginId, companyId ?? "", key, paramsKey, environmentKey].join("\u0000");
     setLoading(true);
     const request = () => {
       pluginsApi
         .bridgeGetData(pluginId, key, params, companyId, environment)
         .then((response) => {
           if (cancelled) return;
+          dataRequest.current = requestKey;
           setData(response.data as T);
           setError(null);
           setLoading(false);
         })
         .catch((caught: unknown) => {
           if (cancelled) return;
-          const bridgeError = extractBridgeError(caught);
-          if (RETRYABLE.includes(bridgeError.code) && attempt < 2) {
-            attempt += 1;
-            timer = setTimeout(() => !cancelled && request(), 150 * attempt);
+          if (shouldRetry(failures, caught)) {
+            const delay = retryDelay(failures);
+            failures += 1;
+            timer = setTimeout(() => !cancelled && request(), delay);
             return;
           }
-          setError(bridgeError);
-          setData(null);
           setLoading(false);
+          if (keepsLastGood(caught) && dataRequest.current === requestKey) return;
+          dataRequest.current = null;
+          setError(extractBridgeError(caught));
+          setData(null);
         });
     };
     request();
