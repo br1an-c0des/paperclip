@@ -60,6 +60,8 @@ until one becomes a concrete fix.
 | 21 | [Let a Paperclip Runner run finish after it writes a status card](#21-let-a-paperclip-runner-run-finish-after-it-writes-a-status-card) | candidate | | | 2026-11-02 | | |
 | 22 | [Record a run's usage in the status card ledger](#22-record-a-runs-usage-in-the-status-card-ledger) | candidate | | | 2026-11-02 | | |
 | 23 | [Close a status card's setup task when a legacy run finishes the card](#23-close-a-status-cards-setup-task-when-a-legacy-run-finishes-the-card) | candidate | | | 2026-11-02 | | |
+| 24 | [Keep `displayStatus` in compact issue lists](#24-keep-displaystatus-in-compact-issue-lists) | candidate | | | 2026-11-05 | | |
+| 25 | [Use one effort key for Grok on the Paperclip Runner](#25-use-one-effort-key-for-grok-on-the-paperclip-runner) | candidate | | | 2026-11-05 | | |
 
 ## Details
 
@@ -382,3 +384,27 @@ Found in the status cards live test (M7 round 3, 2026-11-02).
 - **Likely fix:** close the hidden task when the card's write completes the setup, as the Runner
   path does; with a service test.
 - **Fork workaround:** none; pause the agent after setup.
+
+### 24. Keep `displayStatus` in compact issue lists
+
+Found in the Nov 5 integration round (U1, Monitoring status).
+
+- **Problem:** `toCompactIssue` in `server/src/routes/issues.ts` doesn't copy `displayStatus`, although
+  `CompactIssue` declares it. Every `?view=compact` list therefore shows a monitored task as In
+  progress; the full task read and search carry it.
+- **Likely fix:** copy `displayStatus` in `toCompactIssue`, with a route test. The old UI's list
+  grouping probably has the same bug (not verified).
+- **Fork workaround:** `ui-new/src/api/issues.ts` (`withMonitoring`) reads the same list filtered to
+  `displayStatus=monitoring` when a list has tasks in progress without the field, and stops once the
+  server sends it.
+
+### 25. Use one effort key for Grok on the Paperclip Runner
+
+Found in the Nov 5 integration round (U37, effort tables).
+
+- **Problem:** the composer writes `modelReasoningEffort` for `paperclip_runner`, while native Grok
+  translation prefers `reasoningEffort`. It works only because the translation also reads
+  `modelReasoningEffort`. Low priority: nothing is broken today.
+- **Likely fix:** settle on one key, with a test.
+- **Fork workaround:** none needed.
+
