@@ -1,7 +1,7 @@
 import type { AgentDetail } from "@paperclipai/shared";
-import { Navigate, useParams } from "@solidjs/router";
+import { Navigate, useLocation, useNavigate, useParams } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
-import { createMemo, Match, Show, Switch } from "solid-js";
+import { createEffect, createMemo, Match, Show, Switch } from "solid-js";
 import { agentsApi, findAgent } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
@@ -62,6 +62,16 @@ export function AgentPage() {
   const view = createMemo(() => (pluginTab() ? ({ view: "settings", section: "profile" } as const) : agentView(params.rest ?? "")));
   const base = () => `/${company().issuePrefix}/agents/${agent()?.urlKey ?? params.agentKey}`;
   const chatControls = createChatControls();
+  // An old tab name (`/configuration`, `/identity`, `/activity`…) moves to its section's own address,
+  // keeping the query and fragment, so the rail marks where you are.
+  const navigate = useNavigate();
+  const location = useLocation();
+  createEffect(() => {
+    const current = view();
+    if (!agent() || pluginTab() || current?.view !== "settings") return;
+    const first = (params.rest ?? "").replace(/^\/+|\/+$/g, "").split("/")[0];
+    if (first !== current.section) navigate(`${base()}/${current.section}${location.search}${location.hash}`, { replace: true });
+  });
 
   return (
     <Show
