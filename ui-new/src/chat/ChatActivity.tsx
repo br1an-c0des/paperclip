@@ -2,10 +2,10 @@ import type { AgentDetail } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { BadgeCheck, MessageCircle, Play, Repeat, Square, UserPlus, X, type LucideProps } from "lucide-solid";
-import { createMemo, For, Show, type JSX } from "solid-js";
+import { createMemo, createSignal, For, Show, type JSX } from "solid-js";
 import { agentsApi } from "@/api/agents";
 import { chatApi } from "@/api/chat";
-import { heartbeatsApi, type LiveRun } from "@/api/heartbeats";
+import type { LiveRun } from "@/api/heartbeats";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useNow } from "@/lib/clock";
@@ -15,6 +15,7 @@ import { useAgentsQuery } from "@/lib/company-data";
 import { activityLine, type ActivityLine } from "@/org/org-model";
 import { agoLabel, dayLabel, formatDuration } from "@/runs/run-model";
 import type { TaskPeople } from "@/tasks/people";
+import { stopLabel, stopRun } from "@/tasks/run-stop";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { messageTime } from "./chat-model";
@@ -97,12 +98,29 @@ export function ChatActivity(props: {
     return groups;
   });
 
-  const stop = async (runId: string) => {
+  // Stop as task run control does it (tasks/run-stop.ts): a native session still starting records
+  // the Stop and settles later (409 `native_stop_pending`), which reads "Stopping…", not a failure.
+  const [stopping, setStopping] = createSignal<ReadonlySet<string>>(new Set());
+  const mark = (runId: string, on: boolean) =>
+    setStopping((current) => {
+      const next = new Set(current);
+      if (on) next.add(runId);
+      else next.delete(runId);
+      return next;
+    });
+  const stop = async (run: { id: string; status: string }) => {
+    if (stopping().has(run.id)) return;
+    mark(run.id, true);
+    let settling = false;
     try {
-      await heartbeatsApi.cancel(runId);
-      void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
+      settling = (await stopRun({ runId: run.id, status: run.status }, company().id)) === "pending";
+      if (settling) pushToast({ tone: "info", title: "Stopping the run", body: "The Stop is recorded. The run ends as cancelled once its session opens." });
     } catch (error) {
       pushToast({ tone: "error", title: "Couldn't stop the run", body: error instanceof Error ? error.message : String(error) });
+    } finally {
+      // A settling Stop stays marked; the run leaves the live list once it's cancelled.
+      if (!settling) mark(run.id, false);
+      void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
     }
   };
   const runNow = async () => {
@@ -175,9 +193,9 @@ export function ChatActivity(props: {
                   <button type="button" class="ch-pill-btn" onClick={() => commands.openRunModal(run().id)}>
                     Watch run
                   </button>
-                  <button type="button" class="ch-pill-btn ch-pill-btn--stop" onClick={() => void stop(run().id)}>
+                  <button type="button" class="ch-pill-btn ch-pill-btn--stop" disabled={stopping().has(run().id)} onClick={() => void stop(run())}>
                     <Square size={11} aria-hidden="true" />
-                    Stop
+                    {stopLabel(run().status, stopping().has(run().id))}
                   </button>
                 </div>
               </section>
@@ -194,9 +212,9 @@ export function ChatActivity(props: {
             <span class="ch-now-title">Replying to you in this chat</span>
             <span class="ch-muted">{run().status === "queued" ? "About to start, from your message" : `Started ${since(run()) ?? "just now"} ago by your message`}</span>
             <div class="ch-now-actions">
-              <button type="button" class="ch-pill-btn ch-pill-btn--stop" onClick={() => void stop(run().id)}>
+              <button type="button" class="ch-pill-btn ch-pill-btn--stop" disabled={stopping().has(run().id)} onClick={() => void stop(run())}>
                 <Square size={11} aria-hidden="true" />
-                Stop
+                {stopLabel(run().status, stopping().has(run().id))}
               </button>
             </div>
           </section>

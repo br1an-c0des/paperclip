@@ -22,6 +22,8 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
 import { Composer } from "@/tasks/composer/Composer";
 import { QueuedMessages, useQueuedComments } from "@/tasks/composer/QueuedMessages";
+import { canStopRun, stopLabel, stopRun } from "@/tasks/run-stop";
+import { runWait } from "@/tasks/run-waits";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
@@ -247,9 +249,21 @@ function RunView(props: { runId: string }) {
     if (isCompact() && view() !== "transcript") setView("transcript");
   });
 
+  // Stop, as task run control offers it (U45, tasks/run-stop.ts): a failed native run that still
+  // owns its retry offers it too, with a saved cancellation id; a Stop the server records while
+  // the session is still starting settles later, so it reads "Stopping…" until the run moves on.
+  const stoppable = () => !!run.data && canStopRun(run.data);
+  const [settling, setSettling] = createSignal(false);
+  // Settled once the run moves on: a refetch with the same status keeps "Stopping…".
+  const runStatus = createMemo(() => run.data?.status);
+  createEffect(on([() => props.runId, runStatus], () => setSettling(false), { defer: true }));
   const stop = createMutation(() => ({
-    mutationFn: () => heartbeatsApi.cancel(props.runId),
-    onSuccess: () => {
+    mutationFn: () => stopRun({ runId: props.runId, status: run.data!.status, execution: run.data!.execution }, company().id),
+    onSuccess: (result) => {
+      if (result === "pending") {
+        setSettling(true);
+        pushToast({ tone: "info", title: "Stopping the run", body: "The Stop is recorded. The run ends as cancelled once its session opens." });
+      }
       void client.invalidateQueries({ queryKey: queryKeys.runs.detail(props.runId) });
       void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
       if (issueId()) void client.invalidateQueries({ queryKey: queryKeys.issues.section(issueId()!, "runs") });
@@ -479,6 +493,17 @@ function RunView(props: { runId: string }) {
       >
         {(current) => {
           const status = () => runStatusMeta(current().status);
+          // A run waiting on something (a usage limit's reset, a busy workspace) says so (run-waits.ts).
+          const wait = () => {
+            const at = current().scheduledRetryAt as string | Date | null | undefined;
+            return runWait({
+              status: current().status,
+              errorCode: current().errorCode ?? null,
+              resultJson: (current().resultJson as Record<string, unknown> | null) ?? null,
+              execution: current().execution ?? null,
+              scheduledRetryAt: at ? new Date(at).toISOString() : null,
+            });
+          };
           const providerFailure = createMemo(() => runProviderFailure(current().resultJson));
           return (
             <>
@@ -493,10 +518,23 @@ function RunView(props: { runId: string }) {
                     <p class="rm-title disp" aria-hidden="true">
                       {position().title}
                     </p>
-                    <span class="rm-pill" data-tone={status().tone} role="status">
-                      <Capsule gradient={status().gradient} size="tiny" live={status().live} />
-                      {runStatusLabel(current(), now())}
-                    </span>
+                    <Show
+                      when={wait()}
+                      fallback={
+                        <span class="rm-pill" data-tone={status().tone} role="status">
+                          <Capsule gradient={status().gradient} size="tiny" live={status().live} />
+                          {runStatusLabel(current(), now())}
+                        </span>
+                      }
+                    >
+                      {(found) => (
+                        <span class="rm-pill" data-tone="amber" role="status" title={found().until ? `Until ${clockTime(found().until!)}` : undefined}>
+                          <Capsule gradient="ember" size="tiny" />
+                          {found().label}
+                          <Show when={found().until}>{(until) => <> · {clockTime(until())}</>}</Show>
+                        </span>
+                      )}
+                    </Show>
                   </div>
                   <p class="rm-sub">
                     <b>{agent()?.name ?? "An agent"}</b>
@@ -543,10 +581,16 @@ function RunView(props: { runId: string }) {
                     </button>
                     <span class="rm-sep" aria-hidden="true" />
                   </Show>
-                  <Show when={active()}>
-                    <Button variant="danger" size="compact" disabled={stop.isPending} onClick={() => stop.mutate()}>
+                  <Show when={stoppable()}>
+                    <Button
+                      variant="danger"
+                      size="compact"
+                      disabled={stop.isPending || settling()}
+                      title={current().status === "failed" ? "Stop the retry this run would start by itself." : undefined}
+                      onClick={() => stop.mutate()}
+                    >
                       <Square size={12} aria-hidden="true" />
-                      {stop.isPending ? "Stopping…" : "Stop run"}
+                      {stop.isPending || settling() ? stopLabel(current().status, true) : `${stopLabel(current().status, false)} run`}
                     </Button>
                   </Show>
                   <Show when={reruns().resume || reruns().retry || reruns().trace}>
