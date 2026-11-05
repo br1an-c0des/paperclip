@@ -62,6 +62,7 @@ until one becomes a concrete fix.
 | 23 | [Close a status card's setup task when a legacy run finishes the card](#23-close-a-status-cards-setup-task-when-a-legacy-run-finishes-the-card) | candidate | | | 2026-11-02 | | |
 | 24 | [Keep `displayStatus` in compact issue lists](#24-keep-displaystatus-in-compact-issue-lists) | candidate | | | 2026-11-05 | | |
 | 25 | [Use one effort key for Grok on the Paperclip Runner](#25-use-one-effort-key-for-grok-on-the-paperclip-runner) | candidate | | | 2026-11-05 | | |
+| 26 | [Don't mark a blocker `attention_required` with nothing to attend to](#26-dont-mark-a-blocker-attention_required-with-nothing-to-attend-to) | candidate | | | 2026-11-05 | | |
 
 ## Details
 
@@ -407,4 +408,14 @@ Found in the Nov 5 integration round (U37, effort tables).
   `modelReasoningEffort`. Low priority: nothing is broken today.
 - **Likely fix:** settle on one key, with a test.
 - **Fork workaround:** none needed.
+
+### 26. Don't mark a blocker `attention_required` with nothing to attend to
+
+Found in integration round 2 (U44, Nov 5).
+
+- **Problem:** issue summaries and lists can return `blockerAttention.state: "attention_required"`
+  with every count at 0, so the old UI reads "Blocked · 0 blockers need attention". TES-5 shows it.
+- **Likely fix:** derive the state from the counts (or return no attention) when nothing needs it,
+  with a service test.
+- **Fork workaround:** `ui-new` shows plain "Blocked" when the counts are all 0.
 
