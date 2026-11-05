@@ -175,10 +175,4 @@ export const pluginsApi = {
       params,
       renderEnvironment: renderEnvironment ?? undefined,
     }),
-  /**
-   * Whether a task side panel is available for a running agent: the plugin's own route,
-   * `/plugins/:pluginId/api<availabilityPath>` with `:entityId` filled in (useTaskPluginPanels.ts).
-   */
-  panelAvailability: (pluginId: string, availabilityPath: string, entityId: string, signal?: AbortSignal) =>
-    api.get<{ available: boolean }>(`/plugins/${encodeURIComponent(pluginId)}/api${availabilityPath.replace(":entityId", encodeURIComponent(entityId))}`, { signal }),
 };

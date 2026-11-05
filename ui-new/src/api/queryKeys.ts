@@ -430,9 +430,6 @@ export const queryKeys = {
    */
   plugins: {
     uiContributions: ["plugins", "ui-contributions"] as const,
-    /** Whether a plugin's task side panel is available for the agent running a task. */
-    panelAvailability: (pluginId: string, slotId: string, agentId: string, runId: string) =>
-      ["plugins", "panel-availability", pluginId, slotId, agentId, runId] as const,
     /** One plugin's record, health, runtime dashboard, logs and configuration in a company (App settings → Plugins). */
     detail: (pluginId: string) => ["plugins", "detail", pluginId] as const,
     health: (pluginId: string) => ["plugins", "detail", pluginId, "health"] as const,

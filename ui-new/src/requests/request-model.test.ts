@@ -1,6 +1,6 @@
 import type { Approval, IssueThreadInteraction } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { expiryLabel, requestFromApproval, requestFromInteraction, requestFromReview, signoffOf, taskRequests, type RequestContext } from "./request-model";
+import { expiryLabel, requestFromApproval, requestFromInteraction, requestFromReview, signoffOf, suggestedOwner, taskRequests, type RequestContext } from "./request-model";
 
 const ctx: RequestContext = {
   youId: "me",
@@ -269,5 +269,24 @@ describe("review sign-offs as requests", () => {
     expect(approved.verdict).toMatchObject({ text: "Approved", tone: "ok" });
     const sentBack = requestFromReview({ ...task, status: "in_progress", executionState: { ...pending("me"), lastDecisionOutcome: "changes_requested" } }, ctx);
     expect(sentBack.verdict).toMatchObject({ text: "Sent back with notes" });
+  });
+});
+
+describe("suggestedOwner", () => {
+  const names = { youId: "me", agentName: (id: string) => ({ bob: "Bob", ann: "Ann" })[id], personName: (id: string) => `Person ${id}` };
+
+  it("names the chat's agent for a task proposed in a chat with nobody named", () => {
+    expect(suggestedOwner({}, { ...names, chatAgentId: "bob" })).toBe("Bob");
+    expect(suggestedOwner({ assigneeAgentId: null, assigneeUserId: null }, { ...names, chatAgentId: "bob" })).toBe("Bob");
+  });
+
+  it("keeps whoever the task names", () => {
+    expect(suggestedOwner({ assigneeAgentId: "ann" }, { ...names, chatAgentId: "bob" })).toBe("Ann");
+    expect(suggestedOwner({ assigneeUserId: "me" }, { ...names, chatAgentId: "bob" })).toBe("You");
+    expect(suggestedOwner({ assigneeUserId: "u2" }, { ...names, chatAgentId: "bob" })).toBe("Person u2");
+  });
+
+  it("stays unassigned outside a chat", () => {
+    expect(suggestedOwner({}, { ...names, chatAgentId: null })).toBe("Unassigned");
   });
 });
