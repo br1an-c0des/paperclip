@@ -236,6 +236,9 @@ export function keysForEvent(companyId: string, event: LiveEvent, viewer?: LiveV
       ];
     case "agent.session.goal.changed":
       return agentId ? [queryKeys.agents.detail(agentId)] : [];
+    // A new provider rate-limit snapshot for the agent (upstream #19270; shown in ui-new by U40).
+    case "agent.runtime_state.updated":
+      return agentId ? [queryKeys.agents.part(agentId, "runtime-state")] : [];
     case "activity.logged": {
       const details = (payload.details ?? null) as Record<string, unknown> | null;
       const reader = readString(details?.userId) ?? (payload.actorType === "user" ? readString(payload.actorId) : null);

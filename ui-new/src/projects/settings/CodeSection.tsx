@@ -762,7 +762,7 @@ function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
         </Show>
       </Show>
       <Show when={providers().length > 0}>
-        <SettingsRow label="Workspace storage" help={props.project.workspaceProvider?.source === "default" ? `Inherited: ${props.project.workspaceProvider.displayName}` : undefined}>
+        <SettingsRow label="Workspace storage">
           <Menu>
             <Menu.Trigger as={FieldButton} class="ps-field-360" aria-label="Workspace storage">
               {draft.storage === "inherit" ? "The installed default" : draft.storage === "core" ? "Core, on this server" : (providers().find((provider) => provider.id === draft.storage)?.displayName ?? "An unavailable provider")}
