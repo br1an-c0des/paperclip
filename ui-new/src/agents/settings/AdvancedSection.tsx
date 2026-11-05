@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Copy, FileDiff, ListOrdered, RotateCcw } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show, untrack } from "solid-js";
 import { configurationClient } from "@/api/agent-configuration";
+import { ApiError } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
@@ -71,6 +72,8 @@ function ConfigurationLoader(props: { agent: AgentDetail; agentId: string }) {
     gcTime: 0,
     retry: false,
   }));
+  // The document reads every resource it covers; a refusal (403) won't go away on a retry.
+  const denied = () => query.error instanceof ApiError && query.error.status === 403;
   // The first complete load (or the kept draft) seeds the editor; later refetches don't replace it.
   const initial = createMemo<Draft | null>(
     (previous) => previous ?? kept ?? (query.data && !query.isFetching ? { snapshot: query.data, source: editableYaml(query.data) } : null),
@@ -82,12 +85,21 @@ function ConfigurationLoader(props: { agent: AgentDetail; agentId: string }) {
       fallback={
         <section class="card settings-card adv-loading" role={query.isError ? "alert" : "status"}>
           <Show when={query.isError} fallback={<p class="ps-list-note">Loading the configuration…</p>}>
-            <p class="ps-list-note">
-              Couldn't load the configuration. {failure(query.error, "")}{" "}
-              <Button size="compact" onClick={() => void query.refetch()}>
-                Try again
-              </Button>
-            </p>
+            <Show
+              when={!denied()}
+              fallback={
+                <p class="ps-list-note">
+                  You can't read all of {props.agent.name}'s configuration, so it can't be shown as one document. {failure(query.error, "")}
+                </p>
+              }
+            >
+              <p class="ps-list-note">
+                Couldn't load the configuration. {failure(query.error, "")}{" "}
+                <Button size="compact" onClick={() => void query.refetch()}>
+                  Try again
+                </Button>
+              </p>
+            </Show>
           </Show>
         </section>
       }
