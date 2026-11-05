@@ -9,6 +9,7 @@ import {
   ListTodo,
   Play,
   Search,
+  ShieldX,
   Sparkles,
   SquareCheck,
   Terminal,
@@ -18,11 +19,14 @@ import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch, t
 import { createStore, reconcile } from "solid-js/store";
 import type { RunDetail } from "@/api/runs";
 import { Markdown } from "@/ui/Markdown";
+import { toolDuration } from "./activity-model";
+import { ActivityRowView, HealthBanner, PlanCard, ProposalCard, ReasoningSections, StatusChipView } from "./RunActivity";
+import { hasReasoningHeadlines, latestReasoningHeadline, reasoningSummarySections } from "./reasoning-summary";
 import type { RunInvocation } from "./invocation";
 import { capitalize, costLabel, elapsedLabel, formatBytes, formatDuration, tokenCount, triggerLabel } from "./run-model";
 import { RunRequest, type AnswerRequest } from "./RunRequest";
 import { summarizeDecision, type DecisionLookup } from "./tool-decisions";
-import { transcriptSteps, visibleItems, type DiffLine, type ShownItem, type StepKind, type TranscriptItem } from "./transcript-model";
+import { runHealth, transcriptSteps, visibleItems, type DiffLine, type ShownItem, type StepKind, type Subagent, type TranscriptItem } from "./transcript-model";
 import "./RunTranscript.css";
 
 /*
@@ -34,6 +38,12 @@ import "./RunTranscript.css";
  * Tool calls carry the tool gateway's decision on them (allowed, denied, needs approval) when
  * there is one, and a harness's runtime requests (permission or input it asked for mid-turn) can
  * be answered in place while the run goes.
+ *
+ * The runner's own activity (U42) reads as in the old task chat: a tool row says what ran and how
+ * it went (`$ command`, an exit chip, its time, a refusal, an auto-review's approval) with an edit's
+ * diff inline; subagents are a tree with their own calls; dedicated rows, status chips, the plan,
+ * a proposed plan and reasoning headlines come from RunActivity.tsx; an MCP server that failed to
+ * start leads the view.
  */
 
 const STEP_ICONS: Record<StepKind, (props: { size: number }) => JSX.Element> = {
@@ -103,6 +113,9 @@ export function RunTranscript(props: {
             {props.run.runtimeMode === "native" ? " This run used Paperclip's native runtime." : ""}
           </span>
         </p>
+      </Show>
+      <Show when={runHealth(props.items).length > 0}>
+        <HealthBanner failures={runHealth(props.items)} />
       </Show>
       <For each={outcomes()}>{(outcome) => <Outcome item={outcome} />}</For>
 
@@ -254,32 +267,48 @@ function Item(props: {
         )}
       </Match>
       <Match when={props.item.kind === "thinking" && props.item}>
-        {(thinking) => (
-          <details class="rt-think" classList={{ "rt-think--live": thinking().streaming }} open={thinking().streaming}>
-            <summary>
-              <ChevronRight size={13} class="rt-chev" aria-hidden="true" />
-              <Show when={thinking().streaming} fallback={<span>Thought for {formatDuration(new Date(thinking().endTs).getTime() - new Date(thinking().ts).getTime())}</span>}>
-                <span class="rm-pulse" aria-hidden="true" />
-                <span>Thinking now</span>
-              </Show>
-              <i>{thinking().text.split("\n")[0]}</i>
-            </summary>
-            <div class="rt-tb">
-              <p>
-                {thinking().text}
-                <Show when={thinking().streaming}>
-                  <span class="rt-caret" aria-hidden="true">
-                    ▍
-                  </span>
+        {(thinking) => {
+          // A reasoning summary written as headlines (Codex) reads as bullets, led by the latest one.
+          const headlines = () => !!thinking().summary && hasReasoningHeadlines(reasoningSummarySections(thinking().text));
+          return (
+            <details class="rt-think" classList={{ "rt-think--live": thinking().streaming }} open={thinking().streaming}>
+              <summary>
+                <ChevronRight size={13} class="rt-chev" aria-hidden="true" />
+                <Show when={thinking().streaming} fallback={<span>Thought for {formatDuration(new Date(thinking().endTs).getTime() - new Date(thinking().ts).getTime())}</span>}>
+                  <span class="rm-pulse" aria-hidden="true" />
+                  <span>Thinking now</span>
                 </Show>
-              </p>
-            </div>
-          </details>
-        )}
+                <i>{headlines() ? latestReasoningHeadline(thinking().text) : thinking().text.split("\n")[0]}</i>
+              </summary>
+              <div class="rt-tb">
+                <Show
+                  when={headlines()}
+                  fallback={
+                    <p>
+                      {thinking().text}
+                      <Show when={thinking().streaming}>
+                        <span class="rt-caret" aria-hidden="true">
+                          ▍
+                        </span>
+                      </Show>
+                    </p>
+                  }
+                >
+                  <ReasoningSections text={thinking().text} streaming={thinking().streaming} />
+                </Show>
+              </div>
+            </details>
+          );
+        }}
       </Match>
       <Match when={props.item.kind === "tool" && props.item}>
         {(tool) => <Tool item={tool()} decisionFor={props.decisionFor} />}
       </Match>
+      <Match when={props.item.kind === "activity" && props.item}>{(activity) => <ActivityRowView row={activity().row} ts={activity().ts} />}</Match>
+      <Match when={props.item.kind === "chip" && props.item}>{(chip) => <StatusChipView chip={chip().chip} />}</Match>
+      <Match when={props.item.kind === "subagents" && props.item}>{(group) => <Subagents agents={group().agents} decisionFor={props.decisionFor} />}</Match>
+      <Match when={props.item.kind === "plan" && props.item}>{(plan) => <PlanCard plan={plan().plan} />}</Match>
+      <Match when={props.item.kind === "proposal" && props.item}>{(proposal) => <ProposalCard markdown={proposal().markdown} streaming={proposal().streaming} />}</Match>
       <Match when={props.item.kind === "request" && props.item}>
         {(asked) => <RunRequest request={asked().request} live={props.live} onAnswer={props.onAnswer} />}
       </Match>
@@ -346,14 +375,31 @@ function Tool(props: { item: Extract<TranscriptItem, { kind: "tool" }>; decision
   });
   // A call the gateway held or refused opens, so the reader sees why.
   const held = () => summary()?.tone === "red" || summary()?.tone === "amber";
+  // Exit 0 is news only for a command; for reads and searches it's noise.
+  const exit = () => {
+    const code = props.item.exitCode;
+    return code === null || code === undefined || props.item.status === "running" || (code === 0 && props.item.step !== "command") ? null : code;
+  };
+  const time = () => (props.item.durationMs ? toolDuration(props.item.durationMs) : took());
   return (
-    <details class="rt-tool" data-status={props.item.status} open={held() || undefined}>
+    <details class="rt-tool" data-status={props.item.blocked ? "blocked" : props.item.status} open={held() || undefined}>
       <summary>
         <ChevronRight size={13} class="rt-chev" aria-hidden="true" />
-        {STEP_ICONS[props.item.step]({ size: 14 })}
+        <Show when={props.item.blocked} fallback={STEP_ICONS[props.item.step]({ size: 14 })}>
+          <ShieldX size={14} class="rt-blocked-icon" aria-hidden="true" />
+        </Show>
         <span class="rt-tn">{props.item.name}</span>
-        <span class="rt-tt">{props.item.title}</span>
+        <span class="rt-tt" title={props.item.title}>
+          {props.item.step === "command" && props.item.title ? `$ ${props.item.title}` : props.item.title}
+        </span>
         <span class="rt-tm">
+          <Show when={props.item.review}>
+            {(review) => (
+              <span class="rt-dec rt-review" data-tone="green" title="An automatic review approved this call">
+                {review()}
+              </span>
+            )}
+          </Show>
           <Show when={summary()}>
             {(found) => (
               <span class="rt-dec" data-tone={found().tone} title="The tool gateway's decision">
@@ -367,18 +413,34 @@ function Tool(props: { item: Extract<TranscriptItem, { kind: "tool" }>; decision
               <span class="rt-del">−{props.item.removed}</span>
             </Show>
           </Show>
+          <Show when={exit() !== null}>
+            <span class="rt-exit" data-ok={exit() === 0 || undefined}>
+              exit {exit()}
+            </span>
+          </Show>
           <Switch>
             <Match when={props.item.status === "running"}>
               <span class="rt-running">running</span>
             </Match>
-            <Match when={props.item.status === "error"}>
+            <Match when={props.item.blocked}>
+              <span class="rt-failed">blocked</span>
+            </Match>
+            <Match when={props.item.status === "error" && exit() === null}>
               <span class="rt-failed">failed</span>
             </Match>
-            <Match when={!props.item.diff && took()}>{(text) => <span>{text()}</span>}</Match>
+            <Match when={time()}>{(text) => <span>{text()}</span>}</Match>
           </Switch>
         </span>
       </summary>
       <div class="rt-tbody">
+        <Show when={props.item.description}>{(description) => <p class="rt-why">{description()}</p>}</Show>
+        <Show when={props.item.blocked}>
+          {(reason) => (
+            <p class="rt-why rt-why--blocked">
+              <b>Blocked</b> · {reason()}
+            </p>
+          )}
+        </Show>
         <Show when={decision()}>
           {(found) => (
             <div class="rt-decision">
@@ -405,7 +467,14 @@ function Tool(props: { item: Extract<TranscriptItem, { kind: "tool" }>; decision
             </Show>
           }
         >
-          {(lines) => <Diff lines={lines()} />}
+          {(lines) => (
+            <>
+              <Diff lines={lines()} />
+              <Show when={props.item.diffTruncated}>
+                <p class="cap">The diff was shortened for display; the line counts cover the whole change.</p>
+              </Show>
+            </>
+          )}
         </Show>
         <Show when={props.item.output}>
           {(output) => (
@@ -419,6 +488,74 @@ function Tool(props: { item: Extract<TranscriptItem, { kind: "tool" }>; decision
         </Show>
       </div>
     </details>
+  );
+}
+
+const SUBAGENT_STATUS: Record<Subagent["status"], string> = { running: "running", done: "done", error: "failed", stopped: "stopped" };
+
+/**
+ * Subagents dispatched together (upstream #19264): one card each, or a tree under "N subagents".
+ * Each opens to the task it was given, the calls it made and what it reported.
+ */
+function Subagents(props: { agents: Subagent[]; decisionFor?: DecisionLookup }) {
+  return (
+    <section class="rt-subs" aria-label={props.agents.length === 1 ? "Subagent" : `${props.agents.length} subagents`}>
+      <Show when={props.agents.length > 1}>
+        <p class="rt-subs-head">
+          <Bot size={13} aria-hidden="true" />
+          <b>{props.agents.length} subagents</b>
+          <span class="cap">
+            {props.agents.filter((agent) => agent.status === "running").length
+              ? `${props.agents.filter((agent) => agent.status === "running").length} running`
+              : "all finished"}
+          </span>
+        </p>
+      </Show>
+      <For each={props.agents}>
+        {(agent) => (
+          <details class="rt-tool rt-sub" data-status={agent.status === "error" ? "error" : agent.status} open={agent.status === "running" || undefined}>
+            <summary>
+              <ChevronRight size={13} class="rt-chev" aria-hidden="true" />
+              <Bot size={14} aria-hidden="true" />
+              <span class="rt-tn">{agent.role}</span>
+              <span class="rt-sub-desc">{agent.description}</span>
+              <span class="rt-tm">
+                <Show when={agent.tools.length > 0}>
+                  <span>
+                    {agent.tools.length} {agent.tools.length === 1 ? "step" : "steps"}
+                  </span>
+                </Show>
+                <span classList={{ "rt-running": agent.status === "running", "rt-failed": agent.status === "error" }}>{SUBAGENT_STATUS[agent.status]}</span>
+              </span>
+            </summary>
+            <div class="rt-tbody">
+              <Show when={agent.progress}>{(progress) => <p class="rt-why">{progress()}</p>}</Show>
+              <Show when={agent.prompt}>
+                {(prompt) => (
+                  <>
+                    <span class="rt-lbl">Task{agent.model ? ` · ${agent.model}` : ""}</span>
+                    <p class="rt-why">{prompt()}</p>
+                  </>
+                )}
+              </Show>
+              <Show when={agent.tools.length > 0}>
+                <div class="rt-sub-tools">
+                  <For each={agent.tools}>{(tool) => <Tool item={tool} decisionFor={props.decisionFor} />}</For>
+                </div>
+              </Show>
+              <Show when={agent.result}>
+                {(result) => (
+                  <>
+                    <span class="rt-lbl">{agent.status === "error" ? "What went wrong" : "Result"}</span>
+                    <Markdown source={result()} class="rt-md" />
+                  </>
+                )}
+              </Show>
+            </div>
+          </details>
+        )}
+      </For>
+    </section>
   );
 }
 

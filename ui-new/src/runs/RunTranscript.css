@@ -544,6 +544,90 @@ details[open] > summary .rt-chev {
   overflow-wrap: anywhere;
 }
 
+/* How a call went: its exit code, a refusal, what it was for */
+.rt-exit {
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--red-bg);
+  color: var(--red-fg);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.rt-exit[data-ok] {
+  background: var(--well);
+  color: var(--muted);
+}
+
+.rt-tool[data-status="blocked"] {
+  border-color: color-mix(in srgb, var(--red-fg) 35%, transparent);
+}
+
+.rt-blocked-icon {
+  flex-shrink: 0;
+  color: var(--red-fg);
+}
+
+.rt-why {
+  margin: 0;
+  color: var(--body);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.rt-why--blocked {
+  color: var(--red-fg);
+}
+
+/* Subagents: a card each, a tree when several were sent together */
+.rt-subs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rt-subs-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rt-subs-head b {
+  color: var(--body);
+  font-weight: 600;
+}
+
+.rt-subs:has(.rt-subs-head) > .rt-sub {
+  margin-left: 10px;
+}
+
+.rt-sub[data-status="running"] {
+  border-color: color-mix(in srgb, var(--run-fg) 40%, transparent);
+}
+
+.rt-sub-desc {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--body);
+}
+
+.rt-sub-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+}
+
 @container rt (max-width: 520px) {
   .rt-e {
     grid-template-columns: 38px minmax(0, 1fr);
@@ -552,6 +636,14 @@ details[open] > summary .rt-chev {
 
   .rt-og {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* An auto-review's badge gives way to the call's subject */
+  .rt-review {
+    max-width: 7.5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .rt-wait {

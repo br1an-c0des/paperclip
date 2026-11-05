@@ -1,0 +1,448 @@
+/* The runner's activity in a transcript: dedicated rows, status chips, plans, the MCP warning */
+
+/* A dedicated row: as quiet as a system line, tinted only when it stopped the agent */
+.ra-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ra-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 28px;
+}
+
+.ra-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 16px;
+}
+
+.ra-label {
+  flex-shrink: 0;
+  color: var(--body);
+  font-weight: 600;
+}
+
+.ra-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.ra-outcome {
+  min-width: 0;
+  flex-shrink: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ra-outcome::before {
+  content: "· ";
+}
+
+.ra-left {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.ra-pulse {
+  margin-left: 2px;
+}
+
+.ra-row[data-tone="passed"] .ra-icon {
+  color: var(--green-fg);
+}
+
+.ra-row[data-tone="failed"] .ra-icon,
+.ra-row[data-tone="failed"] .ra-label,
+.ra-row[data-tone="blocked"] .ra-icon,
+.ra-row[data-tone="blocked"] .ra-label {
+  color: var(--red-fg);
+}
+
+.ra-note {
+  margin: 0 0 0 24px;
+  padding: 6px 10px;
+  border-left: 2px solid var(--line);
+  color: var(--body);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.ra-row[data-tone="blocked"] .ra-note,
+.ra-row[data-tone="failed"] .ra-note {
+  border-left-color: color-mix(in srgb, var(--red-fg) 60%, transparent);
+}
+
+/* A web search's sources, by site */
+.ra-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-left: 24px;
+}
+
+.ra-source {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  height: 22px;
+  padding: 0 9px;
+  overflow: hidden;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: 11px;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ra-source:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.ra-source:focus-visible,
+.ra-link:focus-visible,
+.ra-health-btn:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 2px;
+}
+
+.ra-more {
+  font-size: 11px;
+}
+
+/* A status notice: a chip between the activity */
+.ra-chips {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+}
+
+.ra-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ra-chip > svg {
+  flex-shrink: 0;
+}
+
+.ra-chip-label {
+  flex-shrink: 0;
+  color: var(--body);
+  font-weight: 600;
+}
+
+.ra-chip-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ra-chip[data-tone="progress"] {
+  border-color: color-mix(in srgb, var(--run-fg) 40%, transparent);
+  background: var(--run-bg);
+}
+
+.ra-chip[data-tone="progress"] .ra-chip-label {
+  color: var(--run-fg);
+}
+
+.ra-chip[data-tone="warning"] {
+  border-color: color-mix(in srgb, var(--amber-fg) 40%, transparent);
+  background: var(--amber-bg);
+}
+
+.ra-chip[data-tone="warning"] .ra-chip-label,
+.ra-chip[data-tone="warning"] > svg {
+  color: var(--amber-fg);
+}
+
+.ra-chip[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--red-fg) 40%, transparent);
+  background: var(--red-bg);
+}
+
+.ra-chip[data-tone="danger"] .ra-chip-label,
+.ra-chip[data-tone="danger"] > svg {
+  color: var(--red-fg);
+}
+
+.ra-fatal b {
+  font-weight: 700;
+}
+
+/* The agent's plan */
+.ra-plan-head {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.ra-count {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.ra-plan-why {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ra-bar {
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--well);
+}
+
+.ra-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--g-lagoon);
+  transition: width 0.15s;
+}
+
+.ra-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ra-step {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 2px 0;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ra-step-mark {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  color: var(--dashed);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.ra-step-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ra-step[data-status="completed"] {
+  color: var(--muted);
+}
+
+.ra-step[data-status="completed"] .ra-step-mark {
+  color: var(--green-fg);
+}
+
+.ra-step[data-current] {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ra-step[data-current] .ra-step-mark {
+  color: var(--run-fg);
+}
+
+.ra-step[data-status="blocked"],
+.ra-step[data-status="failed"],
+.ra-step[data-status="blocked"] .ra-step-mark,
+.ra-step[data-status="failed"] .ra-step-mark {
+  color: var(--red-fg);
+}
+
+.ra-step--more {
+  padding-left: 22px;
+}
+
+.ra-link {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ra-link:hover {
+  color: var(--text);
+}
+
+/* A proposed plan */
+.ra-proposal[data-live] {
+  border-color: color-mix(in srgb, var(--violet-fg) 45%, transparent);
+  background: var(--violet-bg);
+}
+
+.ra-proposal-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.ra-proposal-title b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ra-proposal-md {
+  font-size: 13px;
+}
+
+.ra-proposal-md :is(h1, h2, h3) {
+  margin: 8px 0 4px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.ra-proposal-md h1 {
+  font-size: 16px;
+}
+
+/* MCP servers that didn't start */
+.ra-health {
+  border-color: color-mix(in srgb, var(--amber-fg) 40%, transparent);
+  background: var(--amber-bg);
+  color: var(--body);
+}
+
+.ra-health > svg {
+  color: var(--amber-fg);
+}
+
+.ra-health-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.ra-health-btn b {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.ra-health-chev {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 0.12s;
+}
+
+.ra-health-btn[aria-expanded="true"] .ra-health-chev {
+  transform: rotate(90deg);
+}
+
+.ra-health-line {
+  display: block;
+  margin-top: 4px;
+}
+
+.ra-muted {
+  color: var(--muted);
+}
+
+/* A reasoning summary as headline bullets */
+.ra-rs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ra-rs > li {
+  display: flex;
+  gap: 9px;
+  min-width: 0;
+}
+
+.ra-rs-dot {
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  margin-top: 8px;
+  border-radius: 50%;
+  background: var(--dashed);
+}
+
+.ra-rs > li[data-current] .ra-rs-dot {
+  background: var(--run-fg);
+}
+
+.ra-rs-head {
+  display: block;
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.ra-rs-body {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.ra-rs-body p {
+  margin: 0;
+  font-style: normal;
+}
+
+.ra-prose {
+  margin: 0;
+  color: var(--muted);
+  font-style: italic;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ra-bar > span,
+  .ra-health-chev {
+    transition: none;
+  }
+}
