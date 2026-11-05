@@ -225,6 +225,26 @@ describe("RunInterests", () => {
     interests.open({ send: (data) => sent.push(data) });
     interests.acquire(["r1"]);
     expect(sent).toHaveLength(1);
+    expect(interests.streaming("r1")).toBe(false);
+  });
+
+  it("says a run is streaming once the server acknowledges it, and not after a resync", () => {
+    const interests = new RunInterests();
+    const heard = vi.fn();
+    interests.listen(heard);
+    interests.acquire(["r1"]);
+    interests.open({ send: () => undefined });
+    interests.receive({ type: "live.capabilities", version: 1, capabilities: ["run-interests"] });
+    expect(interests.streaming("r1")).toBe(false);
+    interests.receive({ type: "live.subscribed", version: 1, revision: 1 });
+    expect(interests.streaming("r1")).toBe(true);
+    interests.receive({ type: "live.resync", version: 1, revision: 1, reason: "controller_change" });
+    expect(interests.streaming("r1")).toBe(false);
+    interests.receive({ type: "live.subscribed", version: 1, revision: 2 });
+    expect(interests.streaming("r1")).toBe(true);
+    interests.close();
+    expect(interests.streaming("r1")).toBe(false);
+    expect(heard).toHaveBeenCalled();
   });
 
   it("changes the set only when a run's first holder comes or its last goes", () => {

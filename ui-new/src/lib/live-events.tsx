@@ -343,6 +343,9 @@ type Sender = { send: (data: string) => void };
  * - Each change is sent as the whole set with the next revision; `live.subscribed` acknowledges one.
  * - `live.resync` for a revision already sent means the server dropped events: the set is sent
  *   again, and `onRecovered` runs when that is acknowledged.
+ * - `streaming(id)` says whether the server has acknowledged a set holding that run, so its
+ *   transcript is arriving; `listen` hears when that changes. A view that read history before then
+ *   reads it again, for what came in between.
  *
  * `receive` answers whether a frame was one of these control frames.
  */
@@ -354,6 +357,23 @@ export class RunInterests {
   private acknowledged = 0;
   private lastResync = 0;
   private recovering = false;
+  private sent: string[] = [];
+  private subscribed = new Set<string>();
+  private listeners = new Set<() => void>();
+
+  streaming(runId: string) {
+    return this.subscribed.has(runId);
+  }
+
+  listen(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private setSubscribed(next: Set<string>) {
+    this.subscribed = next;
+    for (const listener of this.listeners) listener();
+  }
 
   acquire(runIds: readonly string[]): () => void {
     const unique = [...new Set(runIds.filter(Boolean))];
@@ -392,6 +412,7 @@ export class RunInterests {
     this.acknowledged = 0;
     this.lastResync = 0;
     this.recovering = false;
+    this.setSubscribed(new Set());
     this.send({ type: "live.hello", version: 1, capabilities: ["run-interests"] });
   }
 
@@ -399,6 +420,7 @@ export class RunInterests {
     this.socket = null;
     this.capable = false;
     this.recovering = false;
+    this.setSubscribed(new Set());
   }
 
   receive(frame: unknown, onRecovered?: () => void): boolean {
@@ -415,6 +437,7 @@ export class RunInterests {
     } else if (value.type === "live.subscribed") {
       if (revision === this.revision && revision !== this.acknowledged) {
         this.acknowledged = revision;
+        this.setSubscribed(new Set(this.sent));
         if (this.recovering) {
           this.recovering = false;
           onRecovered?.();
@@ -424,6 +447,7 @@ export class RunInterests {
       if (Number.isSafeInteger(revision) && revision > this.lastResync && revision <= this.revision) {
         this.lastResync = revision;
         this.recovering = true;
+        this.setSubscribed(new Set());
         this.replace();
       }
     }
@@ -433,7 +457,10 @@ export class RunInterests {
   private replace() {
     if (!this.socket || !this.capable) return;
     this.revision += 1;
-    this.send({ type: "live.interests", version: 1, revision: this.revision, runIds: this.runIds() });
+    this.sent = this.runIds();
+    // Runs dropped from the set stop streaming now; added ones once the server acknowledges.
+    if ([...this.subscribed].some((id) => !this.sent.includes(id))) this.setSubscribed(new Set(this.sent.filter((id) => this.subscribed.has(id))));
+    this.send({ type: "live.interests", version: 1, revision: this.revision, runIds: this.sent });
   }
 
   private send(message: LiveDeliveryClientMessage) {
@@ -613,15 +640,25 @@ export function useLiveEvent(types: LiveEventType[] | null, handler: (event: Liv
 /**
  * Asks for the transcripts (`heartbeat.run.log`, `heartbeat.run.event`) of these runs while the
  * calling view is mounted. Every view that reads a run's live output must hold its run; for the
- * others the socket sends only `heartbeat.run.activity`.
+ * others the socket sends only `heartbeat.run.activity`. Answers whether they're streaming yet
+ * (always false from a server that doesn't negotiate, which sends every transcript anyway).
  */
-export function useRunInterest(runIds: () => readonly string[]) {
+export function useRunInterest(runIds: () => readonly string[]): () => boolean {
   const context = useContext(LiveEventsContext);
-  if (!context) return;
+  if (!context) return () => false;
+  const interests = context.interests;
   const key = createMemo(() => [...new Set(runIds().filter(Boolean))].sort().join(","));
   createEffect(() => {
     const ids = key();
     if (!ids) return;
-    onCleanup(context.interests.acquire(ids.split(",")));
+    onCleanup(interests.acquire(ids.split(",")));
+  });
+  const [version, setVersion] = createSignal(0);
+  onCleanup(interests.listen(() => setVersion((value) => value + 1)));
+  /** Whether the server has acknowledged every one of these runs, so their transcripts arrive. */
+  return createMemo(() => {
+    version();
+    const ids = key();
+    return !!ids && ids.split(",").every((id) => interests.streaming(id));
   });
 }
