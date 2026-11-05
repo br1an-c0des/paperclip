@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createPaperclipRunnerParser } from "./paperclip-runner-parser";
 import { buildTranscript, showsPlainLines } from "./parsers";
 import type { RunLogChunk } from "./run-log";
 import { buildItems } from "./transcript-model";
@@ -76,5 +77,46 @@ describe("the Paperclip runner's transcript", () => {
   it("passes lines that aren't envelopes to the Codex parser", () => {
     const entries = buildTranscript([{ ts: ts(1), stream: "stdout", chunk: "plain words\n" }], "paperclip_runner");
     expect(entries).toEqual([{ kind: "stdout", ts: ts(1), text: "plain words" }]);
+  });
+
+  describe("upstream's Nov 5 changes (U43)", () => {
+    const parse = (eventType: string, payload: Record<string, unknown>) =>
+      createPaperclipRunnerParser().parseLine(JSON.stringify({ type: "paperclip.prp.event", event: { eventType, payload } }), ts(1));
+
+    it("reads a proposed plan as its own family, streaming while it's written", () => {
+      expect(parse("plan.proposed", { schema: "paperclip.plan.proposed.v1", proposalId: "p1", status: "streaming", markdown: "# Fix" })[0]).toMatchObject({
+        kind: "provider_activity",
+        family: "plan_proposal",
+        title: "Plan",
+        status: "running",
+      });
+      expect(parse("plan.proposed", { schema: "paperclip.plan.proposed.v1", proposalId: "p1", status: "completed", markdown: "# Fix" })[0]).toMatchObject({
+        family: "plan_proposal",
+        status: "completed",
+      });
+      expect(parse("plan.updated", { planId: "turn-1", complete: false, steps: [] })[0]).toMatchObject({ family: "plan", status: "running" });
+    });
+
+    it("keeps a file's diffTruncated flag", () => {
+      const [entry] = parse("workspace.change.updated", {
+        schema: "paperclip.workspace.diff.v1",
+        changeSetId: "c1",
+        revision: 1,
+        files: [
+          { path: "a.ts", operation: "modify", additions: 900, deletions: 2, diff: "@@ -1 +1 @@", diffTruncated: true },
+          { path: "b.ts", operation: "modify", additions: 1, deletions: 0, diff: "@@ -1 +1 @@" },
+        ],
+      });
+      expect(entry).toMatchObject({ kind: "workspace_change" });
+      const files = entry!.kind === "workspace_change" ? entry!.files : [];
+      expect(files[0]).toMatchObject({ path: "a.ts", diffTruncated: true });
+      expect(files[1]).not.toHaveProperty("diffTruncated");
+    });
+
+    it("keeps provider rate-limit notices in the run log only", () => {
+      const notice = { schema: "paperclip.provider.notice.v1", noticeId: "n1", severity: "info", category: "provider.rate_limits", scope: "account", recoverable: true, userActionable: false, summary: "Rate limits" };
+      expect(parse("provider.notice.recorded", notice)).toEqual([]);
+      expect(parse("provider.notice.recorded", { ...notice, category: "provider_retry" })).toHaveLength(1);
+    });
   });
 });
