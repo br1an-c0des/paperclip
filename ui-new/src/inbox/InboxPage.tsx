@@ -1,6 +1,6 @@
-import type { AttentionItem, CompactIssue } from "@paperclipai/shared";
+import type { AttentionItem, CompactIssue, DecisionHistoryItem } from "@paperclipai/shared";
 import { A, Navigate, useParams } from "@solidjs/router";
-import { ChevronRight, Inbox as InboxIcon, Search, X } from "lucide-solid";
+import { ChevronRight, CircleAlert, Inbox as InboxIcon, Search, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch } from "solid-js";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
@@ -29,6 +29,8 @@ import {
   type InboxTab,
   type KindFilter,
 } from "./inbox-model";
+import { NO_HISTORY_FILTERS, type HistoryFilters } from "./history-model";
+import { HistoryBar, HistoryList, useDecisionHistory } from "./InboxHistory";
 import { AgingRow, NeedsItem, ShelfRow } from "./InboxItem";
 import { TaskRows } from "./InboxTasks";
 import { useLastSeen } from "./seen";
@@ -37,13 +39,16 @@ import "@/ui/Segmented.css";
 import "./Inbox.css";
 
 /*
- * `/:prefix/inbox/*` (board 14): everything waiting on you, in five tabs.
+ * `/:prefix/inbox/*` (board 14): everything waiting on you, in five tabs, and what was decided.
  *
  * - Needs you: request cards, most urgent first, with a kind filter, in New today and Earlier, then
  *   the aging shelf folded at the bottom (requests idle past their retention days, with Keep).
  *   Cards answer in place, as in the task's thread; "New" marks what arrived since you last looked.
- * - Updates: your tasks, grouped by latest activity (M10), unread first in the count. Alerts: what
- *   broke. Snoozed and Cleared: what you set aside, with Restore.
+ * - Updates: your tasks, grouped by latest activity (M10), unread first in the count, with Retry on
+ *   interrupted ones and a note when part of the read failed. Alerts: what broke. Snoozed and
+ *   Cleared: what you set aside, with Restore.
+ * - History: questions and proposals answered on tasks, with outcome, agent, project and sort
+ *   filters, a page at a time (`InboxHistory.tsx`). The search box searches it on the server.
  * - Search (the magnifier; `/` stays the command palette's) narrows the open tab to what matches every word typed: titles,
  *   tasks, why it's here, who asked, the request's own text.
  * - Keys (inbox-model.ts, `inboxKeyAction`): j/k move, Enter opens the task in the task modal, y
@@ -91,6 +96,18 @@ function Inbox(props: { tab: InboxTab; base: string }) {
   const [agingOpen, setAgingOpen] = createSignal(false);
   const terms = createMemo(() => searchTerms(query()));
 
+  // History's filters; its search is the search box, sent once typing pauses.
+  const [historyFilters, setHistoryFilters] = createSignal<Omit<HistoryFilters, "search">>(NO_HISTORY_FILTERS);
+  const [historySearch, setHistorySearch] = createSignal("");
+  createEffect(
+    on(query, (text) => {
+      const timer = setTimeout(() => setHistorySearch(text), 250);
+      onCleanup(() => clearTimeout(timer));
+    }),
+  );
+  const filters = createMemo((): HistoryFilters => ({ ...historyFilters(), search: historySearch() }));
+  const history = useDecisionHistory(filters, () => props.tab === "history");
+
   /** Whether an item matches the search: the feed's words, and its card's once loaded. */
   const found = (item: AttentionItem) => {
     const request = inbox.requests().get(item.id);
@@ -109,7 +126,7 @@ function Inbox(props: { tab: InboxTab; base: string }) {
   const snoozed = createMemo(() => searched(inbox.groups().snoozed));
   const cleared = createMemo(() => searched(inbox.groups().cleared));
   const taskFound = (task: CompactIssue) => matchesTerms(terms(), [task.identifier, task.title]);
-  const tasks = createMemo(() => (inbox.tasks.data ?? []).filter(taskFound));
+  const tasks = createMemo(() => (inbox.rows() ?? []).filter(taskFound));
   const archived = createMemo(() => inbox.archived().filter(taskFound));
   const updateGroups = createMemo(() => activityGroups(tasks(), (task) => task.lastActivityAt ?? task.updatedAt));
 
@@ -120,7 +137,7 @@ function Inbox(props: { tab: InboxTab; base: string }) {
       case "needs":
         return groups.needs.length;
       case "updates":
-        return inbox.tasks.data ? inbox.unread() : null;
+        return inbox.rows() ? inbox.unread() : null;
       case "alerts":
         return groups.alerts.length;
       case "snoozed":
@@ -143,13 +160,16 @@ function Inbox(props: { tab: InboxTab; base: string }) {
         return [...cleared().map((item) => item.id), ...archived().map((task) => task.id)];
       case "updates":
         return updateGroups().flatMap((group) => group.items.map((task) => task.id));
+      case "history":
+        return history.items().map((item) => item.id);
     }
   });
   const itemsById = createMemo(() => new Map((inbox.feed.data?.items ?? []).map((item) => [item.id, item] as const)));
-  const tasksById = createMemo(() => new Map([...(inbox.tasks.data ?? []), ...inbox.archived()].map((task) => [task.id, task] as const)));
+  const decisionsById = createMemo(() => new Map(history.items().map((item) => [item.id, item] as const)));
+  const tasksById = createMemo(() => new Map([...(inbox.rows() ?? []), ...inbox.archived()].map((task) => [task.id, task] as const)));
 
   // A new tab or filter starts with nothing selected; a row that leaves hands the cursor on.
-  createEffect(on([() => props.tab, kind], () => setSelected(null), { defer: true }));
+  createEffect(on([() => props.tab, kind, historyFilters], () => setSelected(null), { defer: true }));
   let lastIds: string[] = [];
   createEffect(() => {
     const now = ids();
@@ -162,6 +182,25 @@ function Inbox(props: { tab: InboxTab; base: string }) {
   });
 
   let root: HTMLDivElement | undefined;
+  // On a phone the tabs scroll sideways; keep the open one in view (History sits past the edge),
+  // again when the counts arrive and the fonts load, which widen the tabs before it.
+  const showTab = () => {
+    const tab = root?.querySelector<HTMLElement>(".ibx-tabs .tab.active");
+    const bar = tab?.parentElement;
+    if (!tab || !bar) return;
+    const at = tab.getBoundingClientRect();
+    const box = bar.getBoundingClientRect();
+    bar.scrollLeft += at.left + at.width / 2 - (box.left + box.width / 2);
+  };
+  createEffect(
+    on(
+      () => [props.tab, ...INBOX_TABS.map((entry) => tabCount(entry.tab))],
+      () => {
+        requestAnimationFrame(showTab);
+        void document.fonts?.ready.then(showTab);
+      },
+    ),
+  );
   const rowOf = (id: string) => root?.querySelector<HTMLElement>(`[data-inbox-item="${CSS.escape(id)}"]`) ?? null;
   const select = (id: string | null) => {
     setSelected(id);
@@ -176,6 +215,8 @@ function Inbox(props: { tab: InboxTab; base: string }) {
     if (!task) return;
     commands.openTaskModal({ id: task.id, identifier: task.identifier, title: task.title ?? task.identifier ?? "", projectId: item.project?.id ?? null });
   };
+  const openDecision = (item: DecisionHistoryItem) =>
+    commands.openTaskModal({ id: item.issueId, identifier: item.issueIdentifier, title: item.issueTitle, projectId: item.projectId });
   const openTask = (task: CompactIssue) => {
     if (task.isUnreadForMe) inbox.markRead([task.id]);
     commands.openTaskModal({ id: task.id, identifier: task.identifier, title: task.title, projectId: task.projectId });
@@ -215,6 +256,7 @@ function Inbox(props: { tab: InboxTab; base: string }) {
     if (!id) return;
     const item = itemsById().get(id);
     const task = tasksById().get(id);
+    const decision = props.tab === "history" ? decisionsById().get(id) : undefined;
     const archived = inbox.archived().some((entry) => entry.id === id);
     const run = (fn: () => void) => {
       event.preventDefault();
@@ -222,7 +264,8 @@ function Inbox(props: { tab: InboxTab; base: string }) {
     };
     switch (action) {
       case "open":
-        if (item) run(() => openItem(item));
+        if (decision) run(() => openDecision(decision));
+        else if (item) run(() => openItem(item));
         else if (task) run(() => openTask(task));
         break;
       case "clear":
@@ -250,7 +293,7 @@ function Inbox(props: { tab: InboxTab; base: string }) {
   document.addEventListener("keydown", onKeyDown);
   onCleanup(() => document.removeEventListener("keydown", onKeyDown));
 
-  const unreadIds = () => (inbox.tasks.data ?? []).filter((task) => task.isUnreadForMe).map((task) => task.id);
+  const unreadIds = () => (inbox.rows() ?? []).filter((task) => task.isUnreadForMe).map((task) => task.id);
   const fresh = (item: AttentionItem) => isFresh(item, seen.at());
   const needsItem = (item: AttentionItem) => (
     <NeedsItem
@@ -428,8 +471,14 @@ function Inbox(props: { tab: InboxTab; base: string }) {
             </Show>
             <KeyHints keys={[["j k", "move"], ["r", "read"], ["⇧U", "unread"], ["y", "archive"], ["enter", "open"]]} />
           </div>
-          <Show when={!inbox.tasks.isError} fallback={<p class="ibx-empty card">Couldn't load your tasks. {inbox.tasks.error?.message}</p>}>
-            <Show when={inbox.tasks.data} fallback={<p class="ibx-empty card">Loading your tasks…</p>}>
+          <Show when={inbox.tasks.isError && inbox.rows()}>
+            <SourceNote text="Couldn't refresh your tasks. These are the last ones loaded." detail={inbox.tasks.error?.message} onRetry={inbox.retrySources} />
+          </Show>
+          <For each={inbox.rows() ? inbox.notices() : []}>
+            {(notice) => <SourceNote text={notice.text} detail={notice.detail} onRetry={inbox.retrySources} />}
+          </For>
+          <Show when={inbox.rows() || !inbox.tasks.isError} fallback={<p class="ibx-empty card">Couldn't load your tasks. {inbox.tasks.error?.message}</p>}>
+            <Show when={inbox.rows()} fallback={<p class="ibx-empty card">Loading your tasks…</p>}>
               <Show
                 when={updateGroups().length > 0}
                 fallback={
@@ -449,6 +498,15 @@ function Inbox(props: { tab: InboxTab; base: string }) {
               </Show>
             </Show>
           </Show>
+        </Match>
+
+        <Match when={props.tab === "history"}>
+          <div class="ibx-bar">
+            <HistoryBar filters={filters()} people={people} onChange={(change) => setHistoryFilters((current) => ({ ...current, ...change }))} />
+            <span class="ibx-note">Questions and proposals answered on tasks</span>
+            <KeyHints keys={[["j k", "move"], ["enter", "open the task"]]} />
+          </div>
+          <HistoryList data={history} filters={filters()} people={people} selectedId={selected()} onSelect={setSelected} onOpen={openDecision} />
         </Match>
 
         <Match when={props.tab === "snoozed" || props.tab === "cleared"}>
@@ -484,6 +542,24 @@ function Inbox(props: { tab: InboxTab; base: string }) {
           </FeedState>
         </Match>
       </Switch>
+    </div>
+  );
+}
+
+/** A source Updates couldn't read: what's missing, the server's words, and Try again. */
+function SourceNote(props: { text: string; detail?: string; onRetry: () => void }) {
+  return (
+    <div class="ibx-source card" role="status">
+      <CircleAlert size={15} aria-hidden="true" />
+      <p>
+        {props.text}
+        <Show when={props.detail}>
+          <span class="ibx-source-detail"> {props.detail}</span>
+        </Show>
+      </p>
+      <Button size="compact" variant="quiet" onClick={() => props.onRetry()}>
+        Try again
+      </Button>
     </div>
   );
 }

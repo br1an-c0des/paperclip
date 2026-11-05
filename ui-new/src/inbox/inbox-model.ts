@@ -1,4 +1,4 @@
-import type { AttentionItem, AttentionSourceKind, CompactIssue } from "@paperclipai/shared";
+import type { AttentionItem, AttentionSourceKind, CompactIssue, InboxMineSnapshot, InboxSourceError, TaskInterruptionPresentation } from "@paperclipai/shared";
 import type { Request, RequestKind } from "@/requests/request-model";
 
 /*
@@ -7,7 +7,8 @@ import type { Request, RequestKind } from "@/requests/request-model";
  * - Tabs. Needs you holds the requests (questions, proposals, approvals, sign-offs, plus join
  *   requests and recovery actions); Alerts holds what broke (failed runs, budget alerts, agent
  *   errors, stuck blockers), as the requests proposal keeps them apart. Snoozed and Cleared hold what
- *   you set aside, from your per-person dismissals. Updates is your tasks, from the task list.
+ *   you set aside, from your per-person dismissals. Updates is your tasks, from one read
+ *   (`inbox/mine`, below). History is what was decided (`history-model.ts`).
  * - Triage shows at once: a cleared, snoozed or restored item moves tabs before the server answers
  *   (`Pending`), and the next feed puts it where the server says.
  * - Kinds. An item's request kind comes from its card once that has loaded, and from the feed until
@@ -24,7 +25,7 @@ import type { Request, RequestKind } from "@/requests/request-model";
  * - Search narrows the open tab to items whose words match every term typed.
  */
 
-export type InboxTab = "needs" | "updates" | "alerts" | "snoozed" | "cleared";
+export type InboxTab = "needs" | "updates" | "alerts" | "snoozed" | "cleared" | "history";
 
 export const INBOX_TABS: readonly { tab: InboxTab; label: string; path: string }[] = [
   { tab: "needs", label: "Needs you", path: "" },
@@ -32,10 +33,20 @@ export const INBOX_TABS: readonly { tab: InboxTab; label: string; path: string }
   { tab: "alerts", label: "Alerts", path: "alerts" },
   { tab: "snoozed", label: "Snoozed", path: "snoozed" },
   { tab: "cleared", label: "Cleared", path: "cleared" },
+  { tab: "history", label: "History", path: "history" },
 ];
 
 /** The old Inbox's paths, so links into it land on the closest tab. */
-const OLD_PATHS: Record<string, InboxTab> = { mine: "updates", recent: "updates", unread: "updates", all: "updates", new: "updates", blocked: "alerts", requests: "needs" };
+const OLD_PATHS: Record<string, InboxTab> = {
+  mine: "updates",
+  recent: "updates",
+  unread: "updates",
+  all: "updates",
+  new: "updates",
+  blocked: "alerts",
+  requests: "needs",
+  decided: "history",
+};
 
 /** The tab a path under `/inbox/` names: `updates`, `alerts`…, or an old Inbox path. */
 export function tabFromPath(rest: string | undefined): InboxTab {
@@ -346,4 +357,82 @@ export function lastLookedLabel(at: number, now: Date = new Date()) {
   if (at >= today) return `at ${time}`;
   if (at >= today - 24 * 60 * 60 * 1000) return `yesterday at ${time}`;
   return `on ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Updates' one read (`GET /companies/:id/inbox/mine`)
+
+/** What the snapshot says besides its rows: which tasks had a failed run, and each source's error. */
+export type MineSources = {
+  userId: string;
+  /** Tasks behind the latest failed runs whose state was read; their context rows carry it. */
+  failureIssueIds: string[];
+  failureError: InboxSourceError | null;
+  contextError: InboxSourceError | null;
+};
+
+/**
+ * The snapshot as Updates caches it. Its rows are the index projection, which leaves interruption
+ * state out (`interruption: null`); a task behind a failed run gets it from its context row, which
+ * is read in full. The context rows are the rows' parents and those failure tasks.
+ */
+export function splitMine(snapshot: InboxMineSnapshot): { rows: CompactIssue[]; context: CompactIssue[]; sources: MineSources } {
+  const failures = new Set(snapshot.failureIssueIds);
+  const rich = new Map(snapshot.contextIssues.filter((task) => failures.has(task.id)).map((task) => [task.id, task] as const));
+  const rows = snapshot.issues.map((task) => {
+    const full = rich.get(task.id);
+    return full && !task.interruption && full.interruption ? { ...task, interruption: full.interruption } : task;
+  });
+  return {
+    rows,
+    context: snapshot.contextIssues,
+    sources: {
+      userId: snapshot.userId,
+      failureIssueIds: snapshot.failureIssueIds,
+      failureError: snapshot.failureError ?? null,
+      contextError: snapshot.contextError ?? null,
+    },
+  };
+}
+
+/** A task's interruption: its own row's when it carries one, else its context row's. */
+export function interruptionOf(
+  taskId: string,
+  rows: readonly Pick<CompactIssue, "id" | "interruption">[] | undefined,
+  context: readonly Pick<CompactIssue, "id" | "interruption">[] | undefined,
+): TaskInterruptionPresentation | null {
+  return rows?.find((task) => task.id === taskId)?.interruption ?? context?.find((task) => task.id === taskId)?.interruption ?? null;
+}
+
+/** The parent a row's caption names, from the rows or the context rows; null when it didn't load. */
+export function parentOf<T extends Pick<CompactIssue, "id" | "parentId">>(task: Pick<CompactIssue, "parentId">, rows: readonly T[], context: readonly T[]): T | null {
+  if (!task.parentId) return null;
+  return rows.find((row) => row.id === task.parentId) ?? context.find((row) => row.id === task.parentId) ?? null;
+}
+
+export type SourceNotice = { source: "failures" | "context"; text: string; detail: string };
+
+/**
+ * What Updates says about a source that didn't load. The rows still show; what's missing is named.
+ * The server's own message is shown for a refusal (a 4xx); for an outage it's generic.
+ */
+export function sourceNotices(sources: MineSources | undefined): SourceNotice[] {
+  const notices: SourceNotice[] = [];
+  if (sources?.failureError) {
+    notices.push({ source: "failures", text: "Failed runs didn't load, so an interrupted task may not show Retry here.", detail: sources.failureError.message });
+  }
+  if (sources?.contextError) {
+    notices.push({ source: "context", text: "Parent tasks and interruption state didn't load.", detail: sources.contextError.message });
+  }
+  return notices;
+}
+
+/**
+ * Whether Updates keeps showing the rows it has when a fresh read fails, as the old Inbox does: an
+ * outage, a 429 or a 5xx keeps them; a refusal (another 4xx) means they may no longer be yours.
+ */
+export function keepsRowsOnError(error: unknown, hasRows: boolean) {
+  if (!hasRows) return false;
+  const status = (error as { status?: unknown } | null)?.status;
+  return typeof status !== "number" || status === 429 || status >= 500;
 }

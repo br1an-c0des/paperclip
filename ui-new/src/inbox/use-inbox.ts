@@ -2,18 +2,33 @@ import type { AttentionFeed, AttentionItem, AttentionSubject, CompactIssue } fro
 import { createMutation, createQueries, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createMemo, createSignal } from "solid-js";
 import { accessApi } from "@/api/access";
+import { ApiError } from "@/api/client";
 import { decisionsApi } from "@/api/decisions";
 import { inboxApi } from "@/api/inbox";
 import { interactionsApi } from "@/api/interactions";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
+import { useSession } from "@/lib/session";
 import { requestFromDecision } from "@/requests/decision-model";
 import { requestFromJoin } from "@/requests/join-model";
 import { requestFromApproval, requestFromInteraction, requestFromReview, type Request } from "@/requests/request-model";
 import { useReviewTasks } from "@/requests/review-tasks";
 import type { TaskPeople } from "@/tasks/people";
+import { useTaskRetry } from "@/tasks/retry";
 import { pushToast } from "@/ui/Toast";
-import { archivedTasks, groupFeed, snoozeLabel, unreadCount, withStep, type Pending } from "./inbox-model";
+import {
+  archivedTasks,
+  groupFeed,
+  interruptionOf,
+  keepsRowsOnError,
+  snoozeLabel,
+  sourceNotices,
+  splitMine,
+  unreadCount,
+  withStep,
+  type MineSources,
+  type Pending,
+} from "./inbox-model";
 import { useAttentionFeed } from "./needs-you";
 
 /*
@@ -28,12 +43,20 @@ import { useAttentionFeed } from "./needs-you";
  * - Clear, snooze and restore, shown at once and undone from the toast. A step stays shown until a
  *   feed fetched after it lands. It also patches the feed's cache, which the nav's Inbox count reads
  *   (`needs-you.ts`), so the count moves with it; a failed step puts the item back.
- * - Your tasks for Updates, with read state and the inbox archive.
+ * - Your tasks for Updates in one read (`inbox/mine`), with read state and the inbox archive. The
+ *   read is checked against who you are before it's kept, as the old Inbox checks it. Its context
+ *   rows give a task behind a failed run its interruption, for Retry on Updates rows and on failed
+ *   run alerts (`src/tasks/retry.tsx`); a source that failed is named above the rows.
+ * - Cleared's archived tasks: the task list with them less the list without them, read only while
+ *   Cleared is open. A restored task leaves at once and stays out past the server's 2s list cache.
  *
  * Every step refreshes the feed or the task list, and `sidebar-badges`, which other counts still read.
  */
 
 type PendingEntry = Pending & { settledAt?: number };
+
+/** How long the server keeps a compact task list (`ISSUE_LIST_SERVER_CACHE_TTL_MS`), plus a margin. */
+const LIST_CACHE_MS = 2_500;
 
 /** The task a feed item is about: its related task, or the subject when that's a task. */
 export function itemTask(item: AttentionItem) {
@@ -272,17 +295,62 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
     return task ? (interactions[interactionTaskIds().indexOf(task.id)]?.isError ?? false) : false;
   };
 
-  // Updates: your tasks.
+  // Updates: your tasks, in one read. The rows are kept as an array (as the task lists are), so
+  // read state, the archive and a retry patch them in place; the context and sources sit beside.
+  const session = useSession();
   const tasks = createQuery(() => ({
     queryKey: queryKeys.inbox.tasks(companyId()),
+    queryFn: async ({ signal }) => {
+      const id = companyId();
+      const snapshot = await inboxApi.mine(id, signal);
+      const you = session.youId();
+      if (you && snapshot.userId !== you) {
+        void client.invalidateQueries({ queryKey: queryKeys.auth.session });
+        throw new ApiError("Your account changed. Refresh the inbox.", 409, { error: "account_changed" });
+      }
+      const { rows, context, sources } = splitMine(snapshot);
+      client.setQueryData(queryKeys.inbox.mineContext(id), context);
+      client.setQueryData(queryKeys.inbox.mineSources(id), sources);
+      return rows;
+    },
+  }));
+  // Written by the read above, never fetched on their own.
+  const mineContext = createQuery(() => ({
+    queryKey: queryKeys.inbox.mineContext(companyId()),
+    queryFn: () => client.getQueryData<CompactIssue[]>(queryKeys.inbox.mineContext(companyId())) ?? [],
+    enabled: false,
+  }));
+  const mineSources = createQuery(() => ({
+    queryKey: queryKeys.inbox.mineSources(companyId()),
+    queryFn: () => client.getQueryData<MineSources>(queryKeys.inbox.mineSources(companyId())) ?? null,
+    enabled: false,
+  }));
+  /** The rows to show: the last good ones through an outage, none after a refusal. */
+  const rows = () => (!tasks.isError || keepsRowsOnError(tasks.error, !!tasks.data) ? tasks.data : undefined);
+  const notices = createMemo(() => sourceNotices(mineSources.data ?? undefined));
+  const retrySources = () => void tasks.refetch();
+
+  const retry = useTaskRetry();
+  /** A task's interruption, from its Updates row or the failure context; for Retry. */
+  const interruptionFor = (taskId: string) => interruptionOf(taskId, tasks.data, mineContext.data);
+
+  // Cleared: the archived tasks, as the task list with them less the one without them.
+  const tasksUnarchived = createQuery(() => ({
+    queryKey: queryKeys.inbox.tasksUnarchived(companyId()),
     queryFn: ({ signal }) => inboxApi.tasks(companyId(), signal),
+    enabled: options.clearedOpen(),
   }));
   const tasksWithArchived = createQuery(() => ({
     queryKey: queryKeys.inbox.tasksWithArchived(companyId()),
     queryFn: ({ signal }) => inboxApi.tasksWithArchived(companyId(), signal),
     enabled: options.clearedOpen(),
   }));
-  const archived = createMemo(() => archivedTasks(tasksWithArchived.data ?? [], tasks.data ?? []));
+  // Tasks restored here, kept out of the list until the server's lists say so.
+  const [restoring, setRestoring] = createSignal<ReadonlySet<string>>(new Set());
+  const dropRestoring = (ids: readonly string[]) => setRestoring((current) => new Set([...current].filter((id) => !ids.includes(id))));
+  const archived = createMemo(() =>
+    tasksUnarchived.data ? archivedTasks(tasksWithArchived.data ?? [], tasksUnarchived.data).filter((task) => !restoring().has(task.id)) : [],
+  );
 
   const refreshTasks = () => {
     void client.invalidateQueries({ queryKey: ["issues", companyId(), "inbox"] });
@@ -311,9 +379,21 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
       if (input.action === "archive") {
         client.setQueryData<CompactIssue[]>(queryKeys.inbox.tasks(companyId()), (current) => current?.filter((task) => !input.ids.includes(task.id)));
       }
+      if (input.action === "unarchive") setRestoring((current) => new Set([...current, ...input.ids]));
+    },
+    onSuccess: (_result, input) => {
+      // The server keeps a task list for 2s, so a list read straight after can still show it
+      // archived: keep it out of Cleared until a read after that, then read again.
+      if (input.action !== "unarchive") return;
+      setTimeout(() => {
+        void client.invalidateQueries({ queryKey: ["issues", companyId(), "inbox"] }).finally(() => dropRestoring(input.ids));
+      }, LIST_CACHE_MS);
     },
     onSettled: refreshTasks,
-    onError: (error: Error) => pushToast({ tone: "error", title: "Couldn't update your tasks", body: error.message }),
+    onError: (error: Error, input) => {
+      if (input.action === "unarchive") dropRestoring(input.ids);
+      pushToast({ tone: "error", title: "Couldn't update your tasks", body: error.message });
+    },
   }));
 
   const markRead = (ids: readonly string[]) => ids.length > 0 && taskStep.mutate({ action: "read", ids });
@@ -344,7 +424,13 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
     keep,
     refreshFeed,
     tasks,
-    unread: () => unreadCount(tasks.data),
+    rows,
+    mineContext,
+    notices,
+    retrySources,
+    retry,
+    interruptionFor,
+    unread: () => unreadCount(rows()),
     tasksWithArchived,
     archived,
     markRead,
