@@ -1,5 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { hasOpenDialog, isTextInputTarget, resolveShortcut } from "./shortcuts";
+import { hasOpenDialog, isTextInputTarget, resolveShortcut, SHORTCUT_GROUPS, shortcutGroups } from "./shortcuts";
+
+describe("shortcutGroups", () => {
+  const messages = (groups: ReturnType<typeof shortcutGroups>) => groups.find((group) => group.title === "Task replies and new tasks")!;
+
+  it("lists the send keys in the instance's mode, before the dialogs", () => {
+    const enter = shortcutGroups("enter");
+    expect(enter.at(-1)!.title).toBe("In dialogs");
+    expect(enter.at(-2)!.title).toBe("Task replies and new tasks");
+    expect(enter).toHaveLength(SHORTCUT_GROUPS.length + 1);
+    expect(messages(enter).items).toEqual([
+      { keys: ["Enter"], label: "Send or create" },
+      { keys: ["Shift", "Enter"], label: "New line" },
+    ]);
+    const legacy = messages(shortcutGroups("mod-enter")).items;
+    expect(legacy[0]!.keys).toEqual([expect.stringMatching(/^(⌘|Ctrl)$/), "Enter"]);
+    expect(legacy[1]).toEqual({ keys: ["Enter"], label: "New line" });
+  });
+
+  it("covers both modes while the setting is unknown", () => {
+    const unknown = messages(shortcutGroups(null)).items;
+    expect(unknown[0]!.keys).toEqual(["Enter"]);
+    expect(unknown[0]!.label).toMatch(/Command\/Ctrl\+Enter to send/);
+  });
+});
 
 const idle = { goArmed: false, dialogOpen: false };
 const key = (value: string, extra: Partial<KeyboardEvent> = {}) =>

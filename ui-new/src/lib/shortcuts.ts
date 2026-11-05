@@ -1,4 +1,5 @@
 import { onCleanup } from "solid-js";
+import type { SubmitKey } from "@/tasks/composer/submit-key";
 
 /*
  * Global keyboard shortcuts, after ui/src/hooks/useKeyboardShortcuts.ts and the cheatsheet in
@@ -14,7 +15,8 @@ import { onCleanup } from "solid-js";
  *
  * The task list's own keys (j/k, Enter, x, ←/→) live in tasks/TaskList.tsx, the board's (j/k, h/l,
  * Enter, x, Shift+←/→) in tasks/BoardView.tsx and the Inbox's in inbox/InboxPage.tsx; all are
- * listed here for the cheatsheet.
+ * listed here for the cheatsheet. So are the composer's send keys, which follow an instance
+ * setting (messageShortcuts).
  */
 
 export type ShortcutAction =
@@ -104,6 +106,39 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     ],
   },
 ];
+
+/**
+ * The task composer's and the new-task dialog's keys (U48, tasks/composer/submit-key.ts): Enter
+ * sends, or only Cmd/Ctrl+Enter with the instance's "Command/Ctrl+Enter to send" preference.
+ * `null` while the setting is unknown gives wording that covers both.
+ */
+export function messageShortcuts(key: SubmitKey | null): ShortcutGroup {
+  const title = "Task replies and new tasks";
+  if (key === "enter") {
+    return { title, items: [{ keys: ["Enter"], label: "Send or create" }, { keys: ["Shift", "Enter"], label: "New line" }] };
+  }
+  if (key === "mod-enter") {
+    return {
+      title,
+      items: [
+        { keys: [MOD, "Enter"], label: "Send or create (Command/Ctrl+Enter to send is on)" },
+        { keys: ["Enter"], label: "New line" },
+      ],
+    };
+  }
+  return {
+    title,
+    items: [
+      { keys: ["Enter"], label: `Send or create (${MOD}+Enter with Command/Ctrl+Enter to send on)` },
+      { keys: ["Shift", "Enter"], label: "New line" },
+    ],
+  };
+}
+
+/** The cheatsheet's groups, with the message keys in the mode the instance uses, before "In dialogs". */
+export function shortcutGroups(key: SubmitKey | null): ShortcutGroup[] {
+  return [...SHORTCUT_GROUPS.slice(0, -1), messageShortcuts(key), SHORTCUT_GROUPS.at(-1)!];
+}
 
 /** Typing targets, where bare-key shortcuts must not fire. */
 export function isTextInputTarget(target: EventTarget | null) {
