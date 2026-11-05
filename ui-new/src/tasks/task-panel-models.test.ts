@@ -4,7 +4,7 @@ import { matchesExternalStatus, objectName } from "./external-objects";
 import { canDismissRecovery, recoveryCard, resolveBody } from "./recovery-actions";
 import { isMarkdownContent, markdownOutput, reviewDocumentKey, isReviewDocumentKey, reviewProblem } from "./review-documents";
 import { activeGrants, canRevoke, grantedKeys, isSharedAgent, roleRows } from "./share-model";
-import { anchorSection, nearBottom, parseTaskAnchor } from "./task-anchor";
+import { anchorSection, documentAnchor, nearBottom, parseTaskAnchor } from "./task-anchor";
 import { originRoutineId, originTask, originText, requester, reviewPolicyBadge } from "./task-origin";
 
 /* The task panel's small models from M7: origin, recovery cards, sharing, anchors, external objects, review documents. */
@@ -116,11 +116,20 @@ describe("sharing a private task", () => {
 describe("links into a task", () => {
   it("reads comment and document fragments", () => {
     expect(parseTaskAnchor("#comment-c1")).toEqual({ kind: "comment", id: "c1" });
-    expect(parseTaskAnchor("#document-plan%20v2")).toEqual({ kind: "document", key: "plan v2" });
+    expect(parseTaskAnchor("#document-plan%20v2")).toEqual({ kind: "document", key: "plan v2", image: null });
     expect(parseTaskAnchor("#comment-")).toBeNull();
     expect(parseTaskAnchor("#other")).toBeNull();
     expect(anchorSection({ kind: "comment", id: "c1" })).toBe("activity");
-    expect(anchorSection({ kind: "document", key: "plan" })).toBe("files");
+    expect(anchorSection({ kind: "document", key: "plan", image: null })).toBe("files");
+  });
+
+  it("reads and writes a document gallery's image, 1-based, as the old UI links it", () => {
+    expect(parseTaskAnchor("#document-report&image=2")).toEqual({ kind: "document", key: "report", image: 2 });
+    expect(parseTaskAnchor("#document-report&image=0")).toEqual({ kind: "document", key: "report", image: null });
+    expect(parseTaskAnchor("#document-report&revision=r1&image=3")).toMatchObject({ key: "report", image: 3 });
+    expect(parseTaskAnchor("#document-&image=2")).toBeNull();
+    expect(documentAnchor("report", 2)).toBe("#document-report&image=2");
+    expect(documentAnchor("plan v2")).toBe("#document-plan%20v2");
   });
 
   it("follows the thread only near its foot", () => {

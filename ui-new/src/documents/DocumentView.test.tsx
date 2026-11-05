@@ -135,4 +135,22 @@ describe("DocumentView", () => {
     await waitFor(() => expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true));
     expect((screen.getByLabelText("Notes (Markdown)") as HTMLTextAreaElement).value).toBe("Changed");
   });
+
+  it("opens its images in a gallery that steps round, and reports the image for the address", async () => {
+    api.get.mockResolvedValue(doc({ body: "![Chart](/a.png)\n\nText\n\n![Table](/b.png)" }));
+    const onImage = vi.fn();
+    show({ image: null, onImage });
+    const first = await screen.findByRole("button", { name: "Open image 1 of 2: Chart" });
+    fireEvent.click(first);
+    expect(onImage).toHaveBeenLastCalledWith(1);
+  });
+
+  it("opens on a link's image and moves with the arrow keys", async () => {
+    api.get.mockResolvedValue(doc({ body: "![Chart](/a.png)\n\n![Table](/b.png)" }));
+    const onImage = vi.fn();
+    show({ image: 2, onImage });
+    expect(await screen.findByText("Image 2 of 2")).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("button", { name: /Next/ }), { key: "ArrowRight" });
+    expect(onImage).toHaveBeenLastCalledWith(1);
+  });
 });

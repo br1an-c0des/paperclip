@@ -1,0 +1,63 @@
+/* A document's image gallery (ImageGallery.tsx) */
+.ig-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 24px 22px;
+  min-width: 0;
+}
+
+.ig-figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+}
+
+.ig-figure img {
+  display: block;
+  max-width: 100%;
+  max-height: min(70vh, 760px);
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.ig-figure figcaption {
+  font-size: 13px;
+  color: var(--body);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.ig-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ig-count {
+  min-width: 48px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.ig-open {
+  margin-left: auto;
+}
+
+/* Images in a rendered document open the gallery */
+.dv-text .md img[data-gallery] {
+  cursor: zoom-in;
+}
+
+.dv-text .md img[data-gallery]:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 2px;
+}
