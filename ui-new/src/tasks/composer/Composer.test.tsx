@@ -12,6 +12,9 @@ vi.mock("@/api/comments", () => ({ commentsApi: { post: (id: string, data: { bod
 vi.mock("@/api/issues", () => ({ issuesApi: { search: vi.fn(async () => []), update: vi.fn(), uploadAttachment: vi.fn() } }));
 vi.mock("@/api/queued-comments", () => ({ queuedCommentsApi: { get: vi.fn() } }));
 vi.mock("@/api/agents", () => ({ agentsApi: { adapterModels: vi.fn(async () => []) } }));
+// The instance's experimental settings: the legacy submit preference, or never loading.
+let settings: () => Promise<{ enableLegacyComposerSubmit: boolean }> = async () => ({ enableLegacyComposerSubmit: false });
+vi.mock("@/api/instance-settings", () => ({ instanceSettingsApi: { experimental: () => settings() } }));
 let goalAvailability: "available" | "unsupported" = "unsupported";
 const goalProjection = () => ({
   issueId: "t1",
@@ -64,7 +67,62 @@ describe("Composer", () => {
     post.mockClear();
     actOnGoal.mockClear();
     goalAvailability = "unsupported";
+    settings = async () => ({ enableLegacyComposerSubmit: false });
     localStorage.clear();
+  });
+
+  const typed = (text: string) => {
+    const box = screen.getByRole("combobox", { name: "Comment" }) as HTMLTextAreaElement;
+    box.value = text;
+    box.setSelectionRange(text.length, text.length);
+    fireEvent.input(box);
+    return box;
+  };
+  const settled = () => waitFor(() => expect(screen.getByRole("button", { name: "Send" }).title).toMatch(/\(Enter\)$/));
+
+  it("sends with Enter, and leaves Shift+Enter and IME confirmation alone", async () => {
+    mount();
+    await settled();
+    const box = typed("Ship it");
+    expect(box.getAttribute("enterkeyhint")).toBe("send");
+    expect(fireEvent.keyDown(box, { key: "Enter", shiftKey: true })).toBe(true);
+    expect(fireEvent.keyDown(box, { key: "Enter", isComposing: true })).toBe(true);
+    expect(fireEvent.keyDown(box, { key: "Enter", keyCode: 229 })).toBe(true);
+    expect(post).not.toHaveBeenCalled();
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() => expect(post).toHaveBeenCalledWith("t1", expect.objectContaining({ body: "Ship it" })));
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
+  it("picks the highlighted mention with Enter instead of sending", async () => {
+    mount();
+    await settled();
+    const box = typed("Ask @qua");
+    await screen.findByRole("option", { name: /Quant Researcher/ });
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() => expect(box.value).toBe("Ask [@Quant Researcher](agent://a1) "));
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("sends only with Cmd/Ctrl+Enter when the legacy preference is on", async () => {
+    settings = async () => ({ enableLegacyComposerSubmit: true });
+    mount();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send" }).title).toMatch(/\((⌘|Ctrl)\+Enter\)$/));
+    const box = typed("Ship it");
+    expect(box.getAttribute("enterkeyhint")).toBe("enter");
+    expect(fireEvent.keyDown(box, { key: "Enter" })).toBe(true);
+    expect(post).not.toHaveBeenCalled();
+    fireEvent.keyDown(box, { key: "Enter", metaKey: true });
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  });
+
+  it("keeps plain Enter a new line until the settings have loaded", async () => {
+    settings = () => new Promise(() => {});
+    mount();
+    const box = typed("Half written");
+    expect(fireEvent.keyDown(box, { key: "Enter" })).toBe(true);
+    await Promise.resolve();
+    expect(post).not.toHaveBeenCalled();
   });
 
   it("offers mentions as you type @ and inserts the picked one", async () => {

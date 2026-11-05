@@ -51,7 +51,9 @@ import { Capsule, LabelPill, PriorityBars, StatusCapsule } from "@/ui/Status";
 import { PRIORITY_META, STATUS_META } from "@/ui/status-meta";
 import { pushToast } from "@/ui/Toast";
 import { taskActionsApi } from "@/api/task-actions";
+import { createFileDropTarget, FileDropOverlay } from "./composer/file-drop";
 import { MentionTextArea } from "./composer/MentionTextArea";
+import { enterKeyHint, isSubmitKey, submitKeyCap, submitKeyFor } from "./composer/submit-key";
 import { ConnectWebhook, type ConnectTarget } from "@/recurring/ConnectWebhook";
 import { recurringPath, refreshRecurring } from "@/recurring/queries";
 import { templatePlaceholders } from "@/recurring/recurring-model";
@@ -98,7 +100,9 @@ import "./NewTaskDialog.css";
  *   where the adapter allows it, decision 7), a reviewer, and a + menu for approver and watchdog.
  * - Work mode, workspace (when the project and instance allow it: shared, a new worktree, or
  *   another task's worktree to reuse) and review policy as small pills beside Cancel and Create
- *   task (Cmd/Ctrl+Enter).
+ *   task. Enter in the title or description creates it, or Cmd/Ctrl+Enter with the instance's
+ *   legacy preference (composer/submit-key.ts).
+ * - Files dropped anywhere on the screen while it's open are attached here (composer/file-drop.tsx).
  *
  * The draft is kept per company in local storage, so closing the dialog by accident loses nothing;
  * Cancel discards it. The payload rules live in new-task.ts.
@@ -460,19 +464,30 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
     return first ? `First one ${formatFire(first, repeat.timezone)}` : "";
   };
 
+  // Enter sends from the title and the description (Shift+Enter adds a line), or only Cmd/Ctrl+Enter
+  // with the legacy preference (submit-key.ts). Cmd/Ctrl+Enter sends from anywhere in the dialog.
+  // An open mention list takes Enter first and marks it handled.
+  const submitKey = () => submitKeyFor(experimental.data);
+  const onFieldKeyDown = (event: KeyboardEvent) => {
+    if (!isSubmitKey(event, submitKey())) return;
+    event.preventDefault();
+    void submit(false);
+  };
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.isComposing) {
-      event.preventDefault();
-      void submit(false);
-    }
+    if (event.defaultPrevented || !isSubmitKey(event, "mod-enter")) return;
+    event.preventDefault();
+    void submit(false);
   };
 
+  let root: HTMLDivElement | undefined;
   let fileInput: HTMLInputElement | undefined;
   let cameraInput: HTMLInputElement | undefined;
-  const addFiles = (list: FileList | null) => {
+  const addFiles = (list: FileList | File[] | null) => {
     if (!list?.length) return;
     setFiles((current) => [...current, ...Array.from(list)]);
   };
+  // A file dropped anywhere while the dialog is open comes here, not to the task page behind it.
+  const dragging = createFileDropTarget({ element: () => root, enabled: () => !pending(), onFiles: addFiles });
 
   const effortValue = () => draft.effort;
   const assigneeDefaults = () => {
@@ -483,15 +498,8 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
   const shownEffort = () => effortValue() ?? assigneeDefaults().effort;
 
   return (
-    <div
-      class="nt"
-      onKeyDown={onKeyDown}
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={(event) => {
-        event.preventDefault();
-        addFiles(event.dataTransfer?.files ?? null);
-      }}
-    >
+    <div ref={root} class="nt" onKeyDown={onKeyDown}>
+      <FileDropOverlay show={dragging()} newTask />
       <header class="nt-head">
         <Menu>
           <Menu.Trigger class="nt-pill" aria-label={`Project: ${project()?.name ?? "No project"}`}>
@@ -769,6 +777,8 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
           autocomplete="off"
           value={draft.title}
           onInput={(event) => setDraft("title", event.currentTarget.value)}
+          onKeyDown={onFieldKeyDown}
+          enterkeyhint={enterKeyHint(submitKey())}
           autofocus
         />
         <label class="sr-only" for="nt-desc">
@@ -782,6 +792,8 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
           placeholder="Add a description, acceptance criteria or context. Type @ to mention an agent, person or task."
           value={draft.description}
           onInput={(value) => setDraft("description", value)}
+          onKeyDown={onFieldKeyDown}
+          enterKeyHint={enterKeyHint(submitKey())}
         />
       </div>
 
@@ -1033,7 +1045,7 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
             <button type="button" class="nt-create-main" disabled={pending()} onClick={() => void submit(false)}>
               {pending() ? "Creating…" : repeating() ? "Create recurring task" : startingCase() ? "Create and start case" : "Create task"}
               <Show when={!isCompact()}>
-                <kbd aria-hidden="true">{/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘↵" : "Ctrl ↵"}</kbd>
+                <kbd aria-hidden="true">{submitKeyCap(submitKey())}</kbd>
               </Show>
             </button>
             <Menu placement="top-end">

@@ -7,6 +7,7 @@ import { useCompany } from "@/lib/company";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { useTaskPeople, type TaskPeople } from "../people";
 import { activeMention, insertMention, matchesQuery, type ActiveMention, type MentionTarget } from "./mentions";
+import { isComposing, isPickKey } from "./submit-key";
 import "./Composer.css";
 
 /*
@@ -114,7 +115,10 @@ export function MentionTextArea(props: {
   excludeTaskId?: string;
   /** Draw the list under the field instead of above it. */
   below?: boolean;
+  /** Called for keys the mention list doesn't take, such as Enter to send while it's closed. */
   onKeyDown?: (event: KeyboardEvent) => void;
+  /** The soft keyboard's Enter label ("send" where Enter sends, submit-key.ts). */
+  enterKeyHint?: "send" | "enter";
   "aria-label"?: string;
 }) {
   const listId = createUniqueId();
@@ -146,14 +150,14 @@ export function MentionTextArea(props: {
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (open()) {
+    if (open() && !isComposing(event)) {
       const count = candidates().length;
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
         setIndex((current) => (current + (event.key === "ArrowDown" ? 1 : count - 1)) % count);
         return;
       }
-      if ((event.key === "Enter" && !event.metaKey && !event.ctrlKey) || event.key === "Tab") {
+      if (isPickKey(event)) {
         event.preventDefault();
         pick(candidates()[index()]!);
         return;
@@ -186,6 +190,7 @@ export function MentionTextArea(props: {
         aria-controls={open() ? listId : undefined}
         aria-activedescendant={open() ? `${listId}-opt-${index()}` : undefined}
         aria-autocomplete="list"
+        enterkeyhint={props.enterKeyHint}
         onInput={(event) => {
           props.onInput(event.currentTarget.value);
           sync();

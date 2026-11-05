@@ -28,6 +28,46 @@
   outline-offset: 2px;
 }
 
+/* A file dragged anywhere on the screen (file-drop.tsx): above dialogs, and never in the way */
+.cmp-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-overlay) + 2);
+  display: flex;
+  padding: 24px;
+  background: color-mix(in srgb, var(--ground) 82%, transparent);
+  pointer-events: none;
+  animation: fade-in 0.12s ease-out;
+}
+
+.cmp-drop-frame {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px dashed var(--run-fg);
+  border-radius: var(--r-modal);
+  background: color-mix(in srgb, var(--run-bg) 40%, transparent);
+  color: var(--run-fg);
+}
+
+.cmp-drop-frame p {
+  margin: 0;
+}
+
+.cmp-drop-frame .disp {
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.cmp-drop-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .cmp-field {
   position: relative;
 }
