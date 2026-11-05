@@ -105,11 +105,12 @@ describe("runWait", () => {
 
   it("names the usage limit wait, from the held run and from its scheduled retry (#19246)", () => {
     expect(runWait({ ...base, errorCode: "provider_limit_wait", resultJson: { providerLimitWait: { resetAt: "2026-11-05T15:40:00.000Z" } } })).toEqual({
-      label: USAGE_LIMIT_WAIT,
+      label: "Held for usage limit",
       until: "2026-11-05T15:40:00.000Z",
+      held: true,
     });
     const execution = { phase: "retry_scheduled", label: USAGE_LIMIT_WAIT, retryAt: "2026-11-05T15:41:00.000Z" } as never;
-    expect(runWait({ ...base, status: "scheduled_retry", execution })).toEqual({ label: USAGE_LIMIT_WAIT, until: "2026-11-05T15:41:00.000Z" });
+    expect(runWait({ ...base, status: "scheduled_retry", execution })).toEqual({ label: USAGE_LIMIT_WAIT, until: "2026-11-05T15:41:00.000Z", held: false });
   });
 
   it("leaves other runs alone", () => {

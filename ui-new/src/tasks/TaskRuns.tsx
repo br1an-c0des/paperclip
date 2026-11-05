@@ -258,7 +258,7 @@ export function TaskRuns(props: { taskId: string }) {
                         </span>
                         <Show when={!wait() && run.error}>{(error) => <p class="tr-error">{error()}</p>}</Show>
                         <Show when={wait()?.until ?? run.scheduledRetryAt}>
-                          {(at) => <p class="tsec-muted">{wait() ? "Starts" : "Retries"} {stampLabel(at())}</p>}
+                          {(at) => <p class="tsec-muted">{wait()?.held ? "Its retry starts" : wait() ? "Starts" : "Retries"} {stampLabel(at())}</p>}
                         </Show>
                         <Show when={runNextAction(run)}>
                           {(next) => (
