@@ -52,6 +52,9 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
 - **Where:** Runtime section ("Reports to" field); org chart.
 - **What:** set who an agent reports to; inspect the tree.
 - **Requests:** `PATCH /api/agents/:id`, `GET /api/companies/:companyId/org`.
+- Since the 2026-11-05 sync, the agent profile also has a manager picker with linked agent chips, which
+  blocks the agent itself and its reports (`pages/agent-detail/AgentReportingManager.tsx`,
+  `GET /api/companies/:companyId/agents`, `PATCH /api/agents/:id` with `reportsTo`).
 
 ### `agents/primary-agent`: Personal primary agent
 

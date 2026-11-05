@@ -207,6 +207,10 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   `POST /api/heartbeat-runs/:runId/watchdog-decisions`, `GET|DELETE /api/heartbeat-runs/:runId/provider-trace`
   (+ `/download`, `/frames/:frameId/reveal`), `GET /api/companies/:companyId/provider-traces`,
   `GET /api/issues/:id/cost-summary`.
+  Since the 2026-11-05 sync, Stop is offered on a failed native retry (`execution.canStop`): the old UI
+  saves a `cancellationRequestId` and sends it in the cancel body, and checks the run's
+  `nativeCancellation` intent in the reply (`lib/native-run-stop.ts`). A Stop during slow native startup
+  answers 409 `native_stop_pending` and settles as cancelled later.
 - **Source:** `components/IssueRunLedger.tsx`, `components/TaskChatThread.tsx`.
 
 ### `tasks/properties`: Properties panel
@@ -225,6 +229,9 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
 - **Requests:** `PATCH /api/issues/:id` for most fields; `POST /api/companies/:companyId/labels`;
   `PUT|DELETE /api/issues/:id/watchdog`; `POST /api/issues/:id/monitor/check-now`;
   `POST /api/issues/:id/scheduled-retry/retry-now`; `GET /api/companies/:companyId/adapters/:type/models`.
+  Since the 2026-11-05 sync, a "Usage limit" line under the assignee shows the agent's provider
+  rate-limit windows, from `GET /api/agents/:id/runtime-state` (`stateJson.providerRateLimits`), refreshed by
+  the `agent.runtime_state.updated` live event (`components/AgentRateLimitGauge.tsx`).
 - **Notes:** title and description are edited inline in the header and description bubble (same PATCH).
 
 ### `task-coordination/delegation` and `/dependencies`: Subtasks and blockers
@@ -313,9 +320,12 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
 - **Requests:** `POST /api/issues/:issueId/retry` (Retry, with an idempotency key and the run it saw),
   `POST /api/issues/:id/recovery-actions/resolve`, `POST /api/companies/:companyId/issues` (reissue),
   `POST /api/execution-workspaces/:id/reconcile-branch`. The interruption state arrives on the task.
-- **Unused by the old UI:** `GET /api/issues/:id/recovery-actions`,
-  `POST /api/issues/:id/recovery-actions/reconstruct-workspace` (continue from saved sources) and the new
-  `POST /api/issues/:id/recovery-actions/recover-workspace`.
+  Since the 2026-11-05 sync, "Recover saved files" on a native export hold reads
+  `GET /api/issues/:id/recovery-actions` and sends `POST /api/issues/:id/recovery-actions/recover-workspace`
+  with a saved idempotency key (`components/WorkspaceExportRecovery.tsx`); the interruption shows the
+  recovery step (`recoveryStep`) and a Retry wait (`execution.retryWait`).
+- **Unused by the old UI:** `POST /api/issues/:id/recovery-actions/reconstruct-workspace` (continue from
+  saved sources).
 
 ### `tasks/runner-goal`: Runner goal
 
