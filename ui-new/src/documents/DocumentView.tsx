@@ -50,6 +50,11 @@ import {
   type LockHolder,
 } from "./document-model";
 import { documentKeys, type DocumentHost } from "./host";
+import { documentTarget, documentWrite } from "./document-write";
+import { useOptionalCompany } from "@/lib/company";
+import { sendOrQueue, useOptionalWriteQueue, useWritesFor } from "@/lib/offline/WriteQueueProvider";
+import { WriteStatus } from "@/lib/offline/WriteStatus";
+import type { QueuedWrite } from "@/lib/offline/write-queue";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { useThreads } from "./queries";
 import { SourceTrustBadge } from "./SourceTrustBadge";
@@ -65,6 +70,10 @@ import "./DocumentView.css";
  * and the editor shows both versions: keep editing, take theirs, or overwrite with yours. A locked
  * document can't be saved, restored or deleted until someone unlocks it; the header says who holds
  * the lock.
+ *
+ * A save that can't reach the server waits in the write queue (document-write.ts, U13): the
+ * document shows the edit with "Saved offline, will sync", and it's sent when Paperclip is back.
+ * One that then meets someone else's save offers "Edit my version", which reopens it as a conflict.
  *
  * Its images open in a gallery (ImageGallery.tsx), in reading order. A page that keeps the open
  * image in its address (a task's `#document-<key>&image=2`) passes `image` and `onImage`; without
@@ -88,6 +97,11 @@ export function DocumentView(props: {
 }) {
   const client = useQueryClient();
   const phone = () => viewport() === "phone";
+  const company = useOptionalCompany();
+  const writes = useOptionalWriteQueue();
+  // Saves made while Paperclip was out of reach, waiting for it (U13).
+  const pendingSaves = useWritesFor(() => documentTarget(props.host, props.docKey));
+  const pendingSave = () => pendingSaves()[0] ?? null;
 
   const doc = createQuery(() => ({
     queryKey: documentKeys.doc(props.host, props.docKey),
@@ -224,6 +238,30 @@ export function DocumentView(props: {
     setDraft(draftFrom(doc.data));
   };
 
+  /**
+   * A save made offline that came back as a conflict: its text goes back into the editor, on the
+   * revision it started from, and saving it shows both versions as any conflict does.
+   */
+  const editMine = (write: QueuedWrite) => {
+    const body = write.request.body;
+    setFailure(null);
+    setTab("write");
+    setDraft({ key: props.docKey, title: String(body.title ?? doc.data?.title ?? ""), body: String(body.body ?? ""), baseRevisionId: (body.baseRevisionId as string | null) ?? null, isNew: false });
+    writes?.discard(write.id);
+    void save({ close: false });
+  };
+
+  // A save that waited offline has landed: the open edit now starts from the revision it made.
+  createEffect(
+    on(pendingSave, (current, previous) => {
+      if (current || !previous || previous.status === "failed") return;
+      const saved = doc.data;
+      if (saved && saved.body === previous.request.body.body) {
+        setDraft((value) => (value ? { ...value, baseRevisionId: saved.latestRevisionId } : value));
+      }
+    }),
+  );
+
   const stopEditing = () => {
     setDraft(null);
     setConflict(null);
@@ -250,7 +288,24 @@ export function DocumentView(props: {
     setSaving(true);
     setFailure(null);
     try {
-      const result = await documentsApi.upsert(props.host.owner, props.docKey, upsertPayload(current, options.base ?? current.baseRevisionId));
+      const payload = upsertPayload(current, options.base ?? current.baseRevisionId);
+      const companyId = company?.().id;
+      // Out of reach, the save waits in the write queue and the document shows the edit meanwhile (U13).
+      const outcome = await sendOrQueue(
+        companyId ? writes : null,
+        (userId) =>
+          documentWrite({ userId, companyId: companyId!, host: props.host, docKey: props.docKey, payload, name: doc.data ? documentName(doc.data) : props.docKey }),
+        () => documentsApi.upsert(props.host.owner, props.docKey, payload),
+      );
+      if (outcome.queued) {
+        client.setQueryData<IssueDocument>(documentKeys.doc(props.host, props.docKey), (previous) =>
+          previous ? { ...previous, title: payload.title ?? previous.title, body: payload.body } : previous,
+        );
+        setConflict(null);
+        if (options.close) setDraft(null);
+        return;
+      }
+      const result = outcome.result;
       store(result);
       setConflict(null);
       void client.invalidateQueries({ queryKey: documentKeys.revisions(props.host, props.docKey) });
@@ -550,6 +605,18 @@ export function DocumentView(props: {
                     <p class="dv-failure" role="alert">
                       {message()}
                     </p>
+                  )}
+                </Show>
+
+                <Show when={pendingSave()}>
+                  {(write) => (
+                    <div class="ow-note dv-pending">
+                      <WriteStatus
+                        write={write()}
+                        waiting="Saved offline, will sync when Paperclip is back."
+                        action={write().settled && !editing() && blocked() === null ? { label: "Edit my version", run: () => editMine(write()) } : undefined}
+                      />
+                    </div>
                   )}
                 </Show>
 

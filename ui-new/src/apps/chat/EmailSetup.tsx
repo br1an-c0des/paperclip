@@ -17,6 +17,7 @@ import { pushToast } from "@/ui/Toast";
 import { AppLogo, failureText } from "../shared";
 import { SetupSteps } from "./parts";
 import { addressProblem, inboxDomains, suggestUsername } from "./email-model";
+import { readNote } from "@/lib/offline/read-state";
 
 /*
  * Giving an agent an email address (`/apps/chat/connect?provider=agentmail`, the old UI's
@@ -178,7 +179,7 @@ export function EmailSetup(props: { app: AppDefinition | null; agentId: string |
             }}
           >
             <Field label="Agent" help={pending() ? "This inbox's setup already names its agent." : undefined}>
-              <Show when={choices().length > 0} fallback={<p class="cx-static">{agents.isPending ? "Loading agents…" : "No active agents yet."}</p>}>
+              <Show when={choices().length > 0} fallback={<p class="cx-static">{readNote(agents, "No active agents yet.", { loading: "Loading agents…" })}</p>}>
                 <ul class="cx-options" role="radiogroup" aria-label="Agent">
                   <For each={choices()}>
                     {(candidate) => (

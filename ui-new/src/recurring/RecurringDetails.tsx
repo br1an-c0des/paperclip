@@ -54,6 +54,7 @@ import {
 import { InfoTip, ScheduleFields } from "./RepeatMenu";
 import { cronProblem, defaultRepeat, describeCron, formatFire, OPEN_POLICIES, repeatFromCron, scheduleCron, timeZoneLabel, type RepeatDraft } from "./schedule";
 import { triggerState, webhookSender } from "./webhook";
+import { readNote } from "@/lib/offline/read-state";
 
 /*
  * The recurring task's Details (board R2), edited in place:
@@ -298,7 +299,7 @@ function Properties(props: { routine: RoutineDetail; save: Save; onOpenTask: (ta
             <Menu.Item hint={props.routine.goalId ? undefined : <Check size={14} />} onSelect={() => void props.save({ goalId: null }, "Couldn't change the goal")}>
               No goal
             </Menu.Item>
-            <For each={goals.data ?? []} fallback={<p class="nt-menu-note">{goals.isLoading ? "Loading goals…" : "No goals yet."}</p>}>
+            <For each={goals.data ?? []} fallback={<p class="nt-menu-note">{readNote(goals, "No goals yet.", { loading: "Loading goals…" })}</p>}>
               {(candidate) => (
                 <Menu.Item
                   hint={candidate.id === props.routine.goalId ? <Check size={14} /> : undefined}

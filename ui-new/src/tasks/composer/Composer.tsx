@@ -9,6 +9,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { queuedCommentsApi } from "@/api/queued-comments";
 import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
+import { sendOrQueue, useOptionalWriteQueue } from "@/lib/offline/WriteQueueProvider";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Menu } from "@/ui/Menu";
@@ -29,12 +30,14 @@ import {
   type ComposerAttachment,
   type SendMode,
 } from "./composer-model";
+import { commentWrite } from "./comment-write";
 import { activeMention, insertMention, matchesQuery, type ActiveMention, type MentionTarget } from "./mentions";
 import { MentionOption } from "./MentionTextArea";
 import { createFileDropTarget, FileDropOverlay } from "./file-drop";
 import { createRunnerGoal, RunnerGoalCard } from "./RunnerGoal";
 import { goalFromComposer, type GoalCommand } from "./runner-goal-model";
 import { enterKeyHint, isComposing, isPickKey, isSubmitKey, submitHint, submitKeyFor } from "./submit-key";
+import { readNote } from "@/lib/offline/read-state";
 import "./Composer.css";
 
 /*
@@ -53,6 +56,8 @@ import "./Composer.css";
  *   goal the agent keeps working toward instead of sending a message; its card sits above the
  *   composer (RunnerGoal.tsx).
  * - The draft is saved per task.
+ * - A message that can't reach the server (offline, a restart) waits in the write queue with its
+ *   client request id and shows at the end of the thread until it's sent (comment-write.ts, U13).
  *
  * `compact` (the run modal) keeps the text, files and send controls only.
  */
@@ -69,6 +74,7 @@ export function Composer(props: {
   const company = useCompany();
   const client = useQueryClient();
   const people = useTaskPeople();
+  const writes = useOptionalWriteQueue();
   let textarea: HTMLTextAreaElement | undefined;
   let fileInput: HTMLInputElement | undefined;
   let form: HTMLFormElement | undefined;
@@ -257,11 +263,18 @@ export function Composer(props: {
     setProblem(null);
     setSending(true);
     try {
-      if (plan.workMode) await issuesApi.update(props.task.id, { workMode: plan.workMode });
-      const commentId =
-        plan.request.via === "post"
-          ? (await commentsApi.post(props.task.id, plan.request.data)).id
-          : ((await commentsApi.updateWithComment(props.task.id, plan.request.data)).comment?.id ?? null);
+      // Out of reach, the message waits in the write queue and shows at the end of the thread (U13).
+      const outcome = await sendOrQueue(
+        writes,
+        (userId) => commentWrite({ userId, companyId: company().id, task: props.task, plan, clientRequestId: requestId }),
+        async () => {
+          if (plan.workMode) await issuesApi.update(props.task.id, { workMode: plan.workMode });
+          return plan.request.via === "post"
+            ? (await commentsApi.post(props.task.id, plan.request.data)).id
+            : ((await commentsApi.updateWithComment(props.task.id, plan.request.data)).comment?.id ?? null);
+        },
+      );
+      const commentId = outcome.queued ? null : outcome.result;
       if (plan.steer && commentId) await steerIn(commentId);
       batch(() => {
         setBody("");
@@ -703,7 +716,7 @@ function AssigneePicker(props: {
                   <span>Agent default</span>
                   <small>{defaults().model ?? "Its own setting"}</small>
                 </button>
-                <For each={models.data ?? []} fallback={<p class="cmp-who-note">{models.isLoading ? "Loading models…" : "No models listed."}</p>}>
+                <For each={models.data ?? []} fallback={<p class="cmp-who-note">{readNote(models, "No models listed.", { loading: "Loading models…" })}</p>}>
                   {(model) => (
                     <button type="button" class="cmp-radio" role="radio" aria-checked={shown().model === model.id} onClick={() => props.onRunSettings({ ...shown(), model: model.id })}>
                       <span>{model.label}</span>

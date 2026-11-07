@@ -920,3 +920,8 @@
     grid-column: 1 / -1;
   }
 }
+
+/* An answer or decision waiting for the connection (U13). */
+.rq-pending {
+  margin: 8px 0;
+}

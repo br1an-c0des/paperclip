@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/solid-query";
 import { createContext, createEffect, createMemo, createSignal, onCleanup, useContext, type ParentProps } from "solid-js";
 import { queryKeys } from "@/api/queryKeys";
 import { useSession } from "@/lib/session";
+import { connectivity } from "@/lib/offline/connectivity";
 
 /*
  * The live-events socket: one WebSocket per company (`/api/companies/:id/events/ws`), as in
@@ -594,6 +595,8 @@ export function LiveEventsProvider(props: ParentProps<{ companyId: string | null
         stopPolling();
         attempt = 0;
         setConnection("open");
+        // The socket opening proves the server is back (lib/offline/connectivity.ts).
+        connectivity.reportOnline();
         interests.open(next);
         // Events aren't replayed: refresh whatever loaded before the socket opened.
         refreshOnOpen();

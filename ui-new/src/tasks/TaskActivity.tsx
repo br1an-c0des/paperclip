@@ -24,6 +24,9 @@ import { commentInputs, type CommentInput } from "./activity-format";
 import { FeedbackVotes } from "./FeedbackVotes";
 import { Composer } from "./composer/Composer";
 import { QueuedMessages, queuedIds, useQueuedComments } from "./composer/QueuedMessages";
+import { PendingComments } from "./composer/PendingComments";
+import { describeError } from "@/lib/offline/errors";
+import { loadingText } from "@/lib/offline/read-state";
 import {
   CATCH_UP_PAGE,
   catchUpComments,
@@ -265,8 +268,10 @@ export function TaskActivity(props: {
     expanded()
       ? (comments.isPending && !recentComments.data) || (events.isPending && !recentEvents.data) || (runs.isPending && !recentRuns.data)
       : recentComments.isPending || recentEvents.isPending || recentRuns.isPending;
+  // A failed refresh keeps the thread it has; only a thread that never loaded shows the error.
+  const unloaded = (query: { data: unknown; error: unknown }) => (query.data === undefined ? query.error : null);
   const error = () =>
-    (expanded() ? (comments.error ?? events.error) : (recentComments.error ?? recentEvents.error)) as Error | null;
+    (expanded() ? (unloaded(comments) ?? unloaded(events)) : (unloaded(recentComments) ?? unloaded(recentEvents))) as Error | null;
 
   // A search or a filter needs the whole history.
   createEffect(on([filter, search], ([chosen, text]) => (chosen !== "all" || text.trim()) && expandHistory(props.taskId), { defer: true }));
@@ -398,11 +403,11 @@ export function TaskActivity(props: {
 
       <div class="ta-log" role="log" aria-label="Task thread" ref={log} onScroll={() => log && setFollowing(nearBottom(log))}>
         <Switch>
-          <Match when={loading()}>
-            <p class="ta-muted">Loading activity…</p>
-          </Match>
           <Match when={error()}>
-            {(failed) => <p class="ta-muted">The activity couldn't be loaded: {failed().message}</p>}
+            {(failed) => <p class="ta-muted">The activity couldn't be loaded: {describeError(failed())}</p>}
+          </Match>
+          <Match when={loading()}>
+            <p class="ta-muted">{loadingText("Loading activity…")}</p>
           </Match>
           <Match when={true}>
             <Show when={!thread().some((item) => item.kind !== "gap") && live().length === 0}>
@@ -515,6 +520,8 @@ export function TaskActivity(props: {
             <Show when={queue.data}>{(found) => <QueuedMessages taskId={props.taskId} queue={found()} />}</Show>
           </Match>
         </Switch>
+        {/* Messages that haven't reached the server, even while the thread can't load (U13). */}
+        <PendingComments taskId={props.taskId} />
       </div>
       <Show when={!following() && !loading()}>
         <div class="ta-jump">

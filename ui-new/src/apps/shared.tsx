@@ -10,6 +10,7 @@ import { theme } from "@/lib/theme";
 import { AgentAvatar, discGradient } from "@/ui/Avatar";
 import { Switch as Toggle } from "@/ui/Switch";
 import type { AccessDraft, ConnectionState } from "./apps-model";
+import { readNote } from "@/lib/offline/read-state";
 
 /*
  * What the Apps pages share: their queries, the app logo, a connection's state, and the "which
@@ -142,7 +143,7 @@ export function AgentAccessPicker(props: {
         description={props.allDescription ?? "Current and future agents can use it."}
       />
       <Show when={props.value.mode === "specific"}>
-        <Show when={list().length > 0} fallback={<p class="cx-static">{agents.isPending ? "Loading agents…" : "No agents yet."}</p>}>
+        <Show when={list().length > 0} fallback={<p class="cx-static">{readNote(agents, "No agents yet.", { loading: "Loading agents…" })}</p>}>
           <ul class="cx-options">
             <For each={list()}>
               {(agent) => {

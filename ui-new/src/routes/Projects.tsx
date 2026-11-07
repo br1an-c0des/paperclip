@@ -12,6 +12,7 @@ import { HeaderNumber, PageHeader } from "@/ui/PageHeader";
 import { Segmented } from "@/ui/Segmented";
 import { Capsule } from "@/ui/Status";
 import { PROJECT_STATUS } from "./Project";
+import { readNote } from "@/lib/offline/read-state";
 import "./Projects.css";
 
 /*
@@ -67,7 +68,7 @@ export function ProjectsPage() {
         </div>
         <Show
           when={shown().length > 0}
-          fallback={<p class="muted projects-empty">{projects.isPending ? "Loading projects…" : view() === "open" ? "No projects yet." : "No archived projects."}</p>}
+          fallback={<p class="muted projects-empty">{readNote(projects, view() === "open" ? "No projects yet." : "No archived projects.", { loading: "Loading projects…", failed: "The projects couldn't be loaded." })}</p>}
         >
           <ul>
             <For each={shown()}>

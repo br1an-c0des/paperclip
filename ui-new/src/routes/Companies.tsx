@@ -11,6 +11,8 @@ import { findCompanyByPrefix, lastCompanyPrefix, useCompaniesQuery } from "@/lib
 import { InitialsDisc } from "@/ui/Avatar";
 import { buttonClass } from "@/ui/Button";
 import { Grain } from "@/ui/Grain";
+import { describeError } from "@/lib/offline/errors";
+import { loadingText } from "@/lib/offline/read-state";
 import { Splash } from "./Splash";
 import "./Companies.css";
 
@@ -24,7 +26,7 @@ export function CompanyRootRedirect() {
   };
   return (
     <Switch fallback={<Navigate href={companies.data?.length === 0 ? "/onboarding" : "/companies"} />}>
-      <Match when={companies.isLoading}>
+      <Match when={companies.isPending && !companies.error}>
         <Splash title="Loading companies" quiet />
       </Match>
       <Match when={target()}>{(company) => <Navigate href={`/${company().issuePrefix}`} />}</Match>
@@ -73,11 +75,11 @@ export function Companies() {
         </div>
       </header>
       <Switch>
-        <Match when={companies.isLoading}>
-          <p class="muted" role="status">Loading…</p>
+        <Match when={companies.isPending && !companies.error}>
+          <p class="muted" role="status">{loadingText()}</p>
         </Match>
-        <Match when={companies.error}>
-          {(error) => <p class="companies-error" role="alert">{(error() as Error).message}</p>}
+        <Match when={!companies.data && companies.error}>
+          {(error) => <p class="companies-error" role="alert">{describeError(error())}</p>}
         </Match>
         <Match when={companies.data?.length === 0}>
           <section class="card companies-empty">

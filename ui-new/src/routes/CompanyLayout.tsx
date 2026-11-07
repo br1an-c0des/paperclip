@@ -26,6 +26,9 @@ import { NewTaskDialog } from "@/tasks/NewTaskDialog";
 import { GlobalTaskModal } from "@/tasks/TaskModal";
 import { buttonClass } from "@/ui/Button";
 import { pushToast } from "@/ui/Toast";
+import { connectivity } from "@/lib/offline/connectivity";
+import { describeError } from "@/lib/offline/errors";
+import { OFFLINE_WAITING } from "@/lib/offline/read-state";
 import { Splash } from "./Splash";
 import "./CompanyLayout.css";
 
@@ -197,11 +200,11 @@ export function CompanyLayout(props: RouteSectionProps) {
 
   return (
     <Switch>
-      <Match when={companies.isLoading}>
-        <Splash title="Loading" quiet />
+      <Match when={companies.isPending && !companies.error}>
+        <Splash title={connectivity.status() === "offline" ? "Can't reach Paperclip" : "Loading"} quiet={connectivity.status() !== "offline"}>{connectivity.status() === "offline" ? OFFLINE_WAITING : undefined}</Splash>
       </Match>
-      <Match when={companies.error}>
-        {(error) => <Splash title="Couldn't load companies">{(error() as Error).message}</Splash>}
+      <Match when={!companies.data && companies.error}>
+        {(error) => <Splash title="Couldn't load companies">{describeError(error())}</Splash>}
       </Match>
       <Match when={company()}>
         {(current) => (

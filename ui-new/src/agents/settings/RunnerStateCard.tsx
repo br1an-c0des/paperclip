@@ -15,6 +15,7 @@ import { TonePill, type Tone } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { formatCents, formatTokens, runtimeIdentity } from "../agent-model";
 import { dateTime, failure } from "../shared";
+import { readNote } from "@/lib/offline/read-state";
 
 /*
  * Runner information (M5): what the runner keeps between runs. The agent's runtime state (its
@@ -138,7 +139,7 @@ export function RunnerStateCard(props: { agent: AgentDetail }) {
         )}
       </Show>
       <SettingsRow label="Task sessions" help="One provider session per task, and one for your chat with it. The newest first.">
-        <Show when={sortedSessions().length > 0} fallback={<span class="ag-static-text">{sessions.isLoading ? "Loading…" : "No task sessions."}</span>}>
+        <Show when={sortedSessions().length > 0} fallback={<span class="ag-static-text">{readNote(sessions, "No task sessions.")}</span>}>
           <ul class="ps-list ag-sessions">
             <For each={sortedSessions()}>
               {(session) => {

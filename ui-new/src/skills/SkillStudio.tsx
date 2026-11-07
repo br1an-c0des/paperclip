@@ -19,6 +19,7 @@ import { restoreReplacesFiles, restoreSkillVersion } from "./restore";
 import { CompareVersionsDialog, SkillSettingsDialog } from "./SkillActions";
 import { OriginPill, whenLabel } from "./SkillLibrary";
 import { createPayload, draftProblem, newFileProblem, skillOrigin, slugFor, sortedFiles, versionName, type SkillDraft } from "./skills-model";
+import { readNote } from "@/lib/offline/read-state";
 
 /*
  * The Studio (`/:prefix/skills/studio`): skills written in this company.
@@ -410,7 +411,7 @@ function StudioEditor(props: { skill: CompanySkillDetail }) {
             </Show>
           </div>
           <CompareVersionsDialog open={comparing()} onOpenChange={setComparing} skillName={props.skill.name} versions={versions.data ?? []} />
-          <Show when={(versions.data ?? []).length > 0} fallback={<p class="org-muted">{versions.isPending ? "Loading…" : "None yet."}</p>}>
+          <Show when={(versions.data ?? []).length > 0} fallback={<p class="org-muted">{readNote(versions, "None yet.")}</p>}>
             <ul class="sk-versions">
               <For each={(versions.data ?? []).slice(0, 12)}>
                 {(version) => (

@@ -19,6 +19,7 @@ import { pushToast } from "@/ui/Toast";
 import { agentBudgetRequests, agentPolicies, formatCents, formatTokens, monthRange, runUsage, toNumber } from "../agent-model";
 import { dateTime, failure, FootError, refreshAgent, SectionTitle } from "../shared";
 import { runStatusTone } from "./RunnerStateCard";
+import { readNote } from "@/lib/offline/read-state";
 
 /*
  * Budget (board 30's outline): the agent's spending limit, as a budget policy scoped to the agent
@@ -213,7 +214,7 @@ function UsageCard(props: { agent: AgentDetail }) {
         </p>
       </Show>
       <SettingsRow label="Spend">
-        <Show when={mine()} fallback={<span class="ag-static-text">{byAgent.isLoading ? "Loading…" : "Nothing spent this month."}</span>}>
+        <Show when={mine()} fallback={<span class="ag-static-text">{readNote(byAgent, "Nothing spent this month.")}</span>}>
           {(row) => (
             <div class="ag-stats">
               <span>

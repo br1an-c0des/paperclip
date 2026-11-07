@@ -29,6 +29,7 @@ import {
   slugProblem,
   type CatalogKindFilter,
 } from "./skills-model";
+import { readNote } from "@/lib/offline/read-state";
 
 /*
  * The catalog (`/:prefix/skills/catalog`): skills that ship with Paperclip (`GET /skills/catalog`),
@@ -125,7 +126,7 @@ export function SkillCatalog(props: { catalogId: string | null }) {
           </For>
         </section>
         <Show when={props.catalogId}>
-          <Show when={selected()} fallback={<aside class="card sk-detail"><p class="org-muted">{catalog.isPending ? "Loading…" : "That catalog skill wasn't found."}</p></aside>}>
+          <Show when={selected()} fallback={<aside class="card sk-detail"><p class="org-muted">{readNote(catalog, "That catalog skill wasn't found.")}</p></aside>}>
             {(entry) => <CatalogDetail entry={entry()} installed={installed().get(entry().id) ?? null} closeHref={`${base()}${keep()}`} />}
           </Show>
         </Show>

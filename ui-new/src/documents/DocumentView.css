@@ -79,6 +79,11 @@
   flex-wrap: wrap;
 }
 
+/* A save waiting for the connection (U13). */
+.dv-pending {
+  padding: 8px 12px;
+}
+
 .dv-failure {
   margin: 0;
   padding: 8px 12px;

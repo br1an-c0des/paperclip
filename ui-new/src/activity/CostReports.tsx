@@ -36,6 +36,7 @@ import {
   type BillerCard,
   type ProviderCard,
 } from "./usage-model";
+import { readNote } from "@/lib/offline/read-state";
 
 /*
  * The Costs tab's reports beyond the overview, as the old Costs page's tabs show them:
@@ -465,7 +466,7 @@ export function FinanceView(props: { scope: CostScope }) {
             </h2>
             <span class="org-muted org-push">Net · debits · credits</span>
           </div>
-          <Show when={(byBiller.data ?? []).length > 0} fallback={<p class="org-muted org-pad">{byBiller.isPending ? "Loading…" : "Nothing recorded in this range."}</p>}>
+          <Show when={(byBiller.data ?? []).length > 0} fallback={<p class="org-muted org-pad">{readNote(byBiller, "Nothing recorded in this range.")}</p>}>
             <ul class="act-cost-list">
               <For each={byBiller.data}>
                 {(row) => (
@@ -498,7 +499,7 @@ export function FinanceView(props: { scope: CostScope }) {
             </h2>
             <span class="org-muted org-push">Net · debits · credits</span>
           </div>
-          <Show when={(byKind.data ?? []).length > 0} fallback={<p class="org-muted org-pad">{byKind.isPending ? "Loading…" : "Nothing recorded in this range."}</p>}>
+          <Show when={(byKind.data ?? []).length > 0} fallback={<p class="org-muted org-pad">{readNote(byKind, "Nothing recorded in this range.")}</p>}>
             <ul class="act-cost-list">
               <For each={byKind.data}>
                 {(row) => (
@@ -531,7 +532,7 @@ export function FinanceView(props: { scope: CostScope }) {
         </div>
         <Show
           when={(events.data ?? []).length > 0}
-          fallback={<p class="org-muted org-pad">{events.isPending ? "Loading…" : "Nothing recorded in this range. Entries arrive through the API, the CLI or a provider integration."}</p>}
+          fallback={<p class="org-muted org-pad">{readNote(events, "Nothing recorded in this range. Entries arrive through the API, the CLI or a provider integration.")}</p>}
         >
           <ul class="act-cost-list">
             <For each={events.data}>

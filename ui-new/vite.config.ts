@@ -1,4 +1,5 @@
 /// <reference types="vitest/config" />
+import { execFileSync } from "child_process";
 import fs from "fs";
 import type { IncomingMessage, ServerResponse } from "http";
 import path from "path";
@@ -128,6 +129,23 @@ function serviceWorkerBuildId(): Plugin {
   };
 }
 
+// The build the reads saved for offline belong to (src/lib/offline/persisted-cache.ts): records from
+// another build are dropped. The source commit, as the old UI stamps it (ui/src/lib/vite-build-commit.ts),
+// or the time of the build where there's no git (a Docker build without .git). The dev server is "dev"
+// plus the commit.
+function buildStamp(command: "build" | "serve") {
+  let commit = process.env.PAPERCLIP_BUILD_COMMIT?.trim() ?? "";
+  if (!/^[0-9a-f]{40}$/i.test(commit)) {
+    try {
+      commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: import.meta.dirname, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 1000 }).trim();
+    } catch {
+      commit = "";
+    }
+  }
+  if (command === "serve") return `dev-${commit || "local"}`;
+  return commit ? `${commit}-${Date.now().toString(36)}` : `build-${Date.now().toString(36)}`;
+}
+
 // The Paperclip server (`pnpm dev` at the repo root) listens on :3100.
 // Override with PAPERCLIP_API_URL to point at another instance.
 const apiTarget = process.env.PAPERCLIP_API_URL ?? "http://localhost:3100";
@@ -155,7 +173,10 @@ const apiProxy: Record<string, ProxyOptions> = {
   "/_plugins": { target: apiTarget },
 };
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  define: {
+    "import.meta.env.VITE_UI_NEW_BUILD_ID": JSON.stringify(process.env.VITEST ? "test" : buildStamp(command)),
+  },
   // Hot reload has no place in tests, and its runtime module breaks Vitest's loader.
   plugins: [solid({ hot: !process.env.VITEST }), brands(), serviceWorkerBuildId(), pluginTailwind()],
   resolve: {
@@ -185,4 +206,4 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     restoreMocks: true,
   },
-});
+}));

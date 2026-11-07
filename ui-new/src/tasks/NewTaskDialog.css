@@ -10,6 +10,11 @@
   min-width: 0;
 }
 
+/* A task saved while offline, waiting to be created (U13). */
+.nt-waiting {
+  margin-bottom: 10px;
+}
+
 .nt-head {
   display: flex;
   align-items: center;

@@ -3,6 +3,9 @@ import { useLocation, useSearchParams } from "@solidjs/router";
 import { createQuery, keepPreviousData, useQueryClient } from "@tanstack/solid-query";
 import { ArrowUpDown, ChevronDown, CircleCheck, CornerDownRight, ListFilter, Plus, Repeat, Search, UserRound, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
+import { isTemporaryApiError } from "@/api/client";
+import { describeError } from "@/lib/offline/errors";
+import { loadingText } from "@/lib/offline/read-state";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { viewport } from "@/layout/breakpoints";
@@ -157,7 +160,11 @@ export function useTaskByRef(ref: () => string | null) {
   }));
   return {
     task: () => (id() ? task.data : undefined),
-    error: () => (ref() !== null ? (lookup.error ?? (id() ? task.error : null)) : null),
+    // A failed refresh in an outage keeps the task on screen; a refusal (gone, no access) replaces it.
+    error: () => {
+      const failed = ref() !== null ? (lookup.error ?? (id() ? task.error : null)) : null;
+      return failed && id() && task.data && isTemporaryApiError(failed) ? null : failed;
+    },
   };
 }
 
@@ -632,12 +639,12 @@ export function TasksView(props: {
       <Switch>
         <Match when={props.tasks.isError && !props.tasks.data}>
           <section class="card tv-note">
-            <p>The tasks couldn't be loaded: {(props.tasks.error as Error).message}</p>
+            <p>The tasks couldn't be loaded: {describeError(props.tasks.error)}</p>
           </section>
         </Match>
         <Match when={!props.tasks.data}>
           <section class="card tv-note" aria-busy="true">
-            <p class="muted">Loading tasks…</p>
+            <p class="muted">{loadingText("Loading tasks…")}</p>
           </section>
         </Match>
         <Match when={tasks().length === 0}>
