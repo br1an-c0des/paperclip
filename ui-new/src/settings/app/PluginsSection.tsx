@@ -16,6 +16,7 @@ import { Switch } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
 import { bundledRows, discName, isExperimentalPlugin, parseInstallTarget, PLUGIN_STATUS, pluginErrorSummary, pluginName, pluginOn } from "./app-settings-model";
 import { failure, ListRow, SectionTitle, StatePill } from "./shared";
+import { readNote } from "@/lib/offline/read-state";
 
 /*
  * Plugins (board 30's outline): the installed plugins with their status, turned on and off
@@ -78,7 +79,7 @@ export function PluginsSection() {
           when={open()}
           fallback={
             <>
-              <SectionTitle title="Plugins">{installed.isLoading ? "Loading…" : "There's no installed plugin with this address."}</SectionTitle>
+              <SectionTitle title="Plugins">{readNote(installed, "There's no installed plugin with this address.")}</SectionTitle>
               <Button size="compact" onClick={() => setSearch({ plugin: undefined })}>
                 All plugins
               </Button>

@@ -9,6 +9,8 @@ import { TitleEditor, useTaskChange } from "@/tasks/TaskEditors";
 import { TaskSections } from "@/tasks/TaskSections";
 import { TasksView, useTaskByRef, useTaskList } from "@/tasks/TasksView";
 import { HeaderNumber, PageHeader } from "@/ui/PageHeader";
+import { describeError } from "@/lib/offline/errors";
+import { loadingText } from "@/lib/offline/read-state";
 import "./Tasks.css";
 
 /*
@@ -56,12 +58,21 @@ export function TaskPage() {
   const location = useLocation();
   const chatAgent = () => chats.agentIdForRef(params.issueRef) ?? (task.task() ? chats.chatAgentOf(task.task()!) : undefined);
   return (
-    <Switch>
+    <Switch
+      fallback={
+        <>
+          <PageHeader crumbs={<span>Task</span>} title={<span class="mono">{params.issueRef}</span>} />
+          <section class="card task-page-note" aria-busy="true">
+            <p class="muted">{loadingText("Loading the task…")}</p>
+          </section>
+        </>
+      }
+    >
       <Match when={chatAgent()}>{(agentId) => <Navigate href={`${chats.href(agentId())}${location.hash}`} />}</Match>
       <Match when={task.error()}>
         <PageHeader crumbs={<span>Task</span>} title={<span class="mono">{params.issueRef}</span>} />
         <section class="card task-page-note">
-          <p>This task couldn't be loaded: {(task.error() as Error).message}</p>
+          <p>This task couldn't be loaded: {describeError(task.error())}</p>
         </section>
       </Match>
       <Match when={task.task()}>

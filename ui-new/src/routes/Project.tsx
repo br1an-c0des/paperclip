@@ -25,6 +25,8 @@ import { ProjectStarButton } from "@/layout/nav-prefs";
 import { PlannedNote } from "./Planned";
 import { OPEN_STATUSES } from "./Tasks";
 import { projectLegacyTab, withSearchAndHash } from "./legacy-model";
+import { classifyError, describeError } from "@/lib/offline/errors";
+import { loadingText } from "@/lib/offline/read-state";
 
 /*
  * A project's pages under its header card (boards 1 and 8). The project's address is its dashboard
@@ -96,6 +98,13 @@ export function ProjectPage() {
     retry: false,
   }));
   const project = createMemo(() => listed() ?? (single.data?.companyId === company().id ? single.data : undefined));
+  // A read that failed says why; only a project the server doesn't have (or hides) is "not found".
+  const missingNote = () => {
+    const failed = (!projects.data && projects.error) || (single.error && classifyError(single.error) !== "not_found" ? single.error : null);
+    if (failed) return `The project couldn't be loaded. ${describeError(failed)}`;
+    if (projects.isPending || single.isFetching) return loadingText("Loading the project…");
+    return "There's no project with this address, or you can't open it.";
+  };
   // A project's URL key follows its name, so a rename (here in settings, or elsewhere) moves the
   // page to the new address instead of losing the project.
   const navigate = useNavigate();
@@ -196,7 +205,7 @@ export function ProjectPage() {
       >
         <Show when={view() === "dashboard" && project()}>{(found) => <ProjectFacts project={found()} />}</Show>
       </PageHeader>
-      <Show when={project()} fallback={<p class="card pd-empty">{projects.isPending || single.isFetching ? "Loading the project…" : "There's no project with this address, or you can't open it."}</p>}>
+      <Show when={project()} fallback={<p class="card pd-empty">{missingNote()}</p>}>
         {(found) => (
           <Switch fallback={<PlannedNote milestone="M4">This tab is still to come.</PlannedNote>}>
             <Match when={view() === "legacy" && projectLegacyTab(params.tab ?? "")}>

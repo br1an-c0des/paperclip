@@ -39,6 +39,7 @@ import { GitHubAccess, GitHubSettings } from "./GitHubBot";
 import { Card, CopyValue, useChatEndpoint } from "./parts";
 import { SlackTestMessage, SlackTools } from "./SlackSetup";
 import { TaskDefaults } from "./TaskDefaults";
+import { readNote } from "@/lib/offline/read-state";
 
 /*
  * One chat endpoint (`/apps/chat/:endpointId/:tab`, the old UI's ChatEndpointDetail):
@@ -492,7 +493,7 @@ function InboxSettings(props: { endpoint: ChatEndpoint }) {
   const inbox = () => inboxes.data?.find((entry) => entry.id === props.endpoint.id) ?? null;
   return (
     <Card title="Inbox" description={`Email to this address becomes tasks for ${props.endpoint.assignedAgentName}; replies stay in the same task.`}>
-      <Show when={inbox()} fallback={<p class="cx-static">{inboxes.isPending ? "Loading…" : "The inbox details aren't available."}</p>}>
+      <Show when={inbox()} fallback={<p class="cx-static">{readNote(inboxes, "The inbox details aren't available.")}</p>}>
         {(current) => (
           <dl class="ch-facts">
             <dt>Address</dt>

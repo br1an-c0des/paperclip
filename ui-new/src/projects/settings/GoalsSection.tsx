@@ -40,6 +40,7 @@ import {
   type GoalEditorDraft,
 } from "./goal-model";
 import { failure, FootError, refreshProject } from "./shared";
+import { readNote } from "@/lib/offline/read-state";
 import "./goal-editor.css";
 
 /*
@@ -446,7 +447,7 @@ function GoalReach(props: { goalId: string; project: Project; goals: readonly Go
       <div class="gl-reach-row">
         <dt>Serves</dt>
         <dd>
-          <Show when={served().length > 0} fallback={<span class="gl-reach-none">{projects.isPending ? "Loading projects…" : "No project lists it"}</span>}>
+          <Show when={served().length > 0} fallback={<span class="gl-reach-none">{readNote(projects, "No project lists it", { loading: "Loading projects…" })}</span>}>
             <ul class="gl-reach-list">
               <For each={served()}>
                 {(entry) => (

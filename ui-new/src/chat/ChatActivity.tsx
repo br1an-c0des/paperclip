@@ -19,6 +19,7 @@ import { stopLabel, stopRun } from "@/tasks/run-stop";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { messageTime } from "./chat-model";
+import { readNote } from "@/lib/offline/read-state";
 
 /*
  * The column beside the chat (board 12's Activity): what the agent is doing right now, what's up
@@ -226,7 +227,7 @@ export function ChatActivity(props: {
           Up next
         </h3>
         <ul class="ch-next">
-          <For each={upNext.data ?? []} fallback={<li class="ch-muted">{upNext.isPending ? "Loading…" : "Nothing waiting."}</li>}>
+          <For each={upNext.data ?? []} fallback={<li class="ch-muted">{readNote(upNext, "Nothing waiting.")}</li>}>
             {(task) => (
               <li>
                 <button type="button" class="ch-next-row" onClick={() => openTask(task)}>
@@ -242,7 +243,7 @@ export function ChatActivity(props: {
       {props.documents}
 
       <div class="ch-side-sec ch-tl">
-        <For each={days()} fallback={<p class="ch-muted">{activity.isPending ? "Loading activity…" : "No activity yet."}</p>}>
+        <For each={days()} fallback={<p class="ch-muted">{readNote(activity, "No activity yet.", { loading: "Loading activity…" })}</p>}>
           {(group) => (
             <section aria-label={group.day}>
               <h3 class="disp">{group.day}</h3>

@@ -27,6 +27,7 @@ import { DashboardWidgets } from "@/plugins/DashboardPlugins";
 import { activityLine, type ActivityLine } from "@/activity/activity-line";
 import { chartMax, projectProgress, runDayBars, runTotals, shortAgo, taskRef, topSpenders } from "./org-model";
 import { useMinute, useOrgData } from "./queries";
+import { readNote } from "@/lib/offline/read-state";
 import "./Org.css";
 
 /*
@@ -348,7 +349,7 @@ function RecentActivity(props: { data: ReturnType<typeof useOrgData> }) {
         </A>
       </div>
       <ol class="org-activity">
-        <For each={lines()} fallback={<li class="org-muted">{activity.isPending ? "Loading…" : "No activity yet."}</li>}>
+        <For each={lines()} fallback={<li class="org-muted">{readNote(activity, "No activity yet.")}</li>}>
           {(line) => {
             const Icon = line.verb.startsWith("paused") ? Pause : ACTIVITY_ICON[line.tone];
             return (

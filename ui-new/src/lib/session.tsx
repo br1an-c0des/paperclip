@@ -1,7 +1,7 @@
 import type { AuthSession, BoardBootstrapSession } from "@paperclipai/shared";
 import { Navigate, useLocation, useNavigate } from "@solidjs/router";
 import { createQuery, useQueryClient, type QueryClient } from "@tanstack/solid-query";
-import { createContext, createEffect, createSignal, Match, Show, Switch, useContext, type ParentProps } from "solid-js";
+import { createContext, createEffect, createSignal, Match, Switch, useContext, type ParentProps } from "solid-js";
 import { accessApi, boardAccessFromBootstrap } from "@/api/access";
 import { authApi } from "@/api/auth";
 import { isTemporaryApiError } from "@/api/client";
@@ -11,6 +11,9 @@ import { queryKeys } from "@/api/queryKeys";
 import { BootstrapPending } from "@/auth/BootstrapPending";
 import { Button } from "@/ui/Button";
 import { Splash } from "@/routes/Splash";
+import { clearPersistedQueries } from "./offline/persisted-cache";
+import { SyncBanner } from "./offline/SyncBanner";
+import { WriteQueueProvider } from "./offline/WriteQueueProvider";
 
 /*
  * The session gate in front of every board page, after ui/src/components/CloudAccessGate.tsx:
@@ -28,7 +31,14 @@ import { Splash } from "@/routes/Splash";
  * the ordinary reads run. Later reads and live events refresh both as before.
  *
  * While the server is restarting the gate keeps what it has and shows a reconnecting notice, so an
- * outage doesn't unmount the page and lose drafts.
+ * outage doesn't unmount the page and lose drafts. Its three reads keep polling while the app is
+ * offline (`networkMode: "always"`), since they're how it notices the server is back. A reload
+ * while the server is down opens on the session, companies and access saved from the last visit
+ * (offline/persisted-cache.ts).
+ *
+ * Inside the gate sits the write queue (offline/): writes that couldn't reach the server, sent as
+ * the signed-in user once the gate has checked that user with the server since the page loaded.
+ * The connection notice (SyncBanner) says when the server is out of reach and what's waiting.
  */
 
 const RECONNECT_INTERVAL_MS = 3_000;
@@ -73,12 +83,13 @@ export function useYouName() {
     session.isAuthenticatedMode() ? (session.session()?.user.name ?? session.session()?.user.email ?? "You") : "Local board";
 }
 
-/** Signs out, drops every cached query, and goes to the sign-in page. */
+/** Signs out, drops every cached query (and the reads saved for offline), and goes to the sign-in page. */
 export function useSignOut() {
   const client = useQueryClient();
   const navigate = useNavigate();
   return async () => {
     await authApi.signOut();
+    clearPersistedQueries(client);
     client.clear();
     navigate("/auth", { replace: true });
   };
@@ -98,6 +109,7 @@ export function SessionGate(props: ParentProps) {
     queryKey: queryKeys.health,
     queryFn: healthApi.get,
     retry: false,
+    networkMode: "always",
     refetchInterval: (query) => {
       if (query.state.error) return isTemporaryApiError(query.state.error) ? RECONNECT_INTERVAL_MS : false;
       const data = query.state.data;
@@ -118,6 +130,7 @@ export function SessionGate(props: ParentProps) {
     },
     enabled: isAuthenticatedMode(),
     retry: false,
+    networkMode: "always",
     refetchInterval: (query) => (isTemporaryApiError(query.state.error) ? RECONNECT_INTERVAL_MS : false),
   }));
 
@@ -126,6 +139,7 @@ export function SessionGate(props: ParentProps) {
     queryFn: accessApi.currentBoardAccess,
     enabled: isAuthenticatedMode() && !isBootstrapPending() && !!session.data,
     retry: false,
+    networkMode: "always",
     refetchInterval: (query) => (isTemporaryApiError(query.state.error) ? RECONNECT_INTERVAL_MS : false),
   }));
 
@@ -152,6 +166,14 @@ export function SessionGate(props: ParentProps) {
     if (canAccess && health.data?.status === "ok") setOpened(true);
   });
 
+  // Writes go out only once this page has heard from the server who's signed in: a session saved
+  // from the last visit shows the board, but doesn't speak for the user.
+  const mountedAt = Date.now();
+  const verified = () =>
+    health.dataUpdatedAt >= mountedAt &&
+    !health.error &&
+    (!isAuthenticatedMode() || (!!session.data && session.dataUpdatedAt >= mountedAt && !session.error));
+
   const retry = () => {
     for (const query of active()) if (query.error) void query.refetch();
   };
@@ -166,10 +188,10 @@ export function SessionGate(props: ParentProps) {
 
   return (
     <Switch fallback={<SessionContext.Provider value={value}>
-      <Show when={reconnecting()}>
-        <div role="status" class="reconnecting">Connection interrupted. Reconnecting automatically…</div>
-      </Show>
-      {props.children}
+      <WriteQueueProvider userId={value.youId} verified={verified}>
+        <SyncBanner reconnecting={reconnecting()} />
+        {props.children}
+      </WriteQueueProvider>
     </SessionContext.Provider>}>
       <Match when={blockingError()}>
         {(error) => (

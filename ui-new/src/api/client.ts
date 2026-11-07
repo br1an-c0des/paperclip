@@ -4,7 +4,13 @@
  * `ApiUnavailableError` when a proxy or restarting server answers without JSON.
  *
  * Request de-duplication is left to the query layer (TanStack Query shares one fetch per key).
+ *
+ * Every answer and failure is reported to the connectivity store (lib/offline/connectivity.ts), which
+ * decides when the app is offline and when it's back.
  */
+
+import { connectivity } from "@/lib/offline/connectivity";
+import { isTransientError } from "@/lib/offline/errors";
 
 const BASE = "/api";
 
@@ -31,11 +37,12 @@ export class ApiUnavailableError extends Error {
   }
 }
 
-/** True for outages worth retrying: no JSON, a 502–504, or a network failure. */
+/**
+ * True for outages worth retrying: no JSON, a network failure, a 408, 425, 429 or 502–504, or the
+ * gateway's "unavailable" codes (lib/offline/errors.ts).
+ */
 export function isTemporaryApiError(error: unknown): boolean {
-  if (error instanceof ApiUnavailableError) return true;
-  if (error instanceof ApiError) return [502, 503, 504].includes(error.status);
-  return error instanceof TypeError && /fetch|network|load failed/i.test(error.message);
+  return isTransientError(error);
 }
 
 export async function readApiJson<T = unknown>(response: Response): Promise<T> {
@@ -74,11 +81,26 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
   if (init.body !== undefined && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const res = await fetch(`${BASE}${path}`, { credentials: "include", ...init, headers });
-  if (res.status === 204) return undefined as T;
-  const body = await readApiJson<unknown>(res);
-  if (!res.ok) throw new ApiError(errorMessage(body, res.status), res.status, body);
-  return body as T;
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, { credentials: "include", ...init, headers });
+  } catch (error) {
+    connectivity.reportFailure(error);
+    throw error;
+  }
+  try {
+    if (res.status === 204) {
+      connectivity.reportSuccess();
+      return undefined as T;
+    }
+    const body = await readApiJson<unknown>(res);
+    if (!res.ok) throw new ApiError(errorMessage(body, res.status), res.status, body);
+    connectivity.reportSuccess();
+    return body as T;
+  } catch (error) {
+    connectivity.reportFailure(error);
+    throw error;
+  }
 }
 
 const json = (data: unknown) => (data === undefined ? undefined : JSON.stringify(data));

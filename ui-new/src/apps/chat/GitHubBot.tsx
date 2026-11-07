@@ -30,6 +30,7 @@ import {
 } from "./github-model";
 import { Card } from "./parts";
 import { TaskDefaults } from "./TaskDefaults";
+import { readNote } from "@/lib/offline/read-state";
 import "./ChatExtras.css";
 
 /*
@@ -547,7 +548,7 @@ export function GitHubAccess(props: { endpoint: ChatEndpoint; base: string }) {
                   description={configuration.memberAccess === "all_linked" ? "Includes members who link their GitHub account later." : "Only the members turned on below."}
                 />
                 <ul class="ch-list ch-people">
-                  <For each={rows().members} fallback={<li class="cx-static">{links.isPending ? "Loading linked accounts…" : "No members linked yet."}</li>}>
+                  <For each={rows().members} fallback={<li class="cx-static">{readNote(links, "No members linked yet.", { loading: "Loading linked accounts…" })}</li>}>
                     {row}
                   </For>
                 </ul>

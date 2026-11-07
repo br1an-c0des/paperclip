@@ -27,6 +27,7 @@ import {
 } from "./connections-model";
 import { CardHead, CardNoteLine, failure, FootError, SectionTitle, SwitchRow } from "./shared";
 import { TelemetryCard } from "./TelemetryCard";
+import { readNote } from "@/lib/offline/read-state";
 
 /*
  * Connections (board 23): the models Paperclip itself uses on top of your agents, and where run
@@ -145,7 +146,7 @@ function DecisionCard() {
               </A>
             }
           />
-          <Show when={settings()} fallback={<CardNoteLine>{query.isLoading ? "Loading…" : "Not available."}</CardNoteLine>}>
+          <Show when={settings()} fallback={<CardNoteLine>{readNote(query, "Not available.")}</CardNoteLine>}>
             <SettingsRow label="Connection">
               <ConnectionBox connection={selected()} model={selected() ? (query.data!.choices.find((c) => c.grantId === draft.grantId)?.decisionModel ?? null) : null} missing={!!draft.grantId && !selected()}>
                 <ConnectionMenu

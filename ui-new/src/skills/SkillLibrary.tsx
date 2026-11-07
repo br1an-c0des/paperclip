@@ -41,6 +41,7 @@ import {
   type LibrarySort,
   type SkillOrigin,
 } from "./skills-model";
+import { readNote } from "@/lib/offline/read-state";
 
 /*
  * The skill library (`/:prefix/skills`): every skill the company has, with where it comes from
@@ -441,7 +442,7 @@ function SkillDetail(props: { skillId: string; closeHref: string; folders: reado
                       </button>
                     </Show>
                   </div>
-                  <Show when={(versions.data ?? []).length > 0} fallback={<p class="org-muted">{versions.isPending ? "Loading…" : "No saved versions."}</p>}>
+                  <Show when={(versions.data ?? []).length > 0} fallback={<p class="org-muted">{readNote(versions, "No saved versions.")}</p>}>
                     <ul class="sk-versions">
                       <For each={(versions.data ?? []).slice(0, 8)}>
                         {(version) => (

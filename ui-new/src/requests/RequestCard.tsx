@@ -33,6 +33,9 @@ import { interactionsApi, type AcceptInteraction, type ItemVerdict } from "@/api
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
+import { sendOrQueue, useOptionalWriteQueue, useWritesFor } from "@/lib/offline/WriteQueueProvider";
+import { WriteStatus } from "@/lib/offline/WriteStatus";
+import type { AnswerMatch } from "@/lib/offline/write-queue";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
 import { TextArea, TextInput } from "@/ui/Field";
@@ -42,6 +45,7 @@ import { pushToast } from "@/ui/Toast";
 import { documentAnchor } from "@/tasks/task-anchor";
 import { stampLabel } from "@/tasks/thread-model";
 import type { TaskPeople } from "@/tasks/people";
+import { answerWrite } from "./answer-write";
 import { DeclineButton, Footer } from "./card-parts";
 import { ConnectionControls } from "./ConnectionControls";
 import { DecisionControls, DecisionResults } from "./DecisionControls";
@@ -449,12 +453,40 @@ function InteractionControls(props: { request: Request; interaction: IssueThread
     },
     onError: (failure: Error) => setError(failure.message),
   }));
+  // An answer that can't reach the server waits in the write queue and shows here until it's sent
+  // (answer-write.ts, U13); the card takes no other answer meanwhile.
+  const company = useCompany();
+  const writes = useOptionalWriteQueue();
+  const queued = useWritesFor(() => `interaction:${props.interaction.id}`);
+  const pending = () => queued()[0] ?? null;
+  const answer = (match: AnswerMatch, body: Record<string, unknown>, call: () => Promise<unknown>) =>
+    act.mutate(async () => {
+      await sendOrQueue(
+        writes,
+        (userId) => answerWrite({ userId, companyId: company().id, taskId: props.taskId, interactionId: props.interaction.id, title: props.request.title, match, body }),
+        call,
+      );
+    });
   const run = (call: () => Promise<unknown>) => act.mutate(call);
-  const busy = () => act.isPending || !props.request.respond.allowed;
-  const accept = (data?: AcceptInteraction) => run(() => interactionsApi.accept(props.taskId, props.interaction.id, data));
-  const reject = (reason?: string) => run(() => interactionsApi.reject(props.taskId, props.interaction.id, reason));
+  const busy = () => act.isPending || !props.request.respond.allowed || (!!pending() && pending()!.status !== "failed");
+  const accept = (data?: AcceptInteraction) =>
+    answer({ action: "accept", selectedClientKeys: data?.selectedClientKeys, selectedOptionIds: data?.selectedOptionIds }, { ...(data ?? {}) }, () =>
+      interactionsApi.accept(props.taskId, props.interaction.id, data),
+    );
+  const reject = (reason?: string) =>
+    answer({ action: "reject", reason: reason ?? null }, reason ? { reason } : {}, () => interactionsApi.reject(props.taskId, props.interaction.id, reason));
+  const respond = (answers: AskUserQuestionsAnswer[]) =>
+    answer({ action: "respond", answers }, { answers }, () => interactionsApi.respond(props.taskId, props.interaction.id, { answers }));
 
   return (
+    <>
+    <Show when={pending()}>
+      {(write) => (
+        <div class="ow-note rq-pending">
+          <WriteStatus write={write()} waiting="Your answer is saved offline and sent when Paperclip is back." />
+        </div>
+      )}
+    </Show>
     <Switch>
       <Match when={props.interaction.kind === "ask_user_questions"}>
         <QuestionForm
@@ -462,7 +494,7 @@ function InteractionControls(props: { request: Request; interaction: IssueThread
           interaction={props.interaction as AskUserQuestionsInteraction}
           busy={busy()}
           error={error()}
-          onSubmit={(answers) => run(() => interactionsApi.respond(props.taskId, props.interaction.id, { answers }))}
+          onSubmit={respond}
         />
       </Match>
       <Match when={props.interaction.kind === "request_confirmation"}>
@@ -505,6 +537,7 @@ function InteractionControls(props: { request: Request; interaction: IssueThread
         <Footer request={props.request} error={error()} />
       </Match>
     </Switch>
+    </>
   );
 }
 

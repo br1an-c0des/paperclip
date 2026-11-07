@@ -50,6 +50,11 @@ export function CompanyProvider(props: ParentProps<{ company: Company }>) {
   return <CompanyContext.Provider value={() => props.company}>{props.children}</CompanyContext.Provider>;
 }
 
+/** The company, or null outside a company route (a component rendered on its own in a test). */
+export function useOptionalCompany() {
+  return useContext(CompanyContext) ?? null;
+}
+
 /** The company the current page belongs to. */
 export function useCompany() {
   const company = useContext(CompanyContext);

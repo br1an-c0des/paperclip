@@ -42,6 +42,7 @@ import {
 } from "./task-edits";
 import { TaskPicker } from "./TaskPicker";
 import { useTaskUpdates } from "./task-updates";
+import { readNote } from "@/lib/offline/read-state";
 import "./TaskEditors.css";
 
 /*
@@ -468,7 +469,7 @@ function RunSettings(props: { task: Issue; agent: Agent; onChange: ChangeTask })
                 <span>Agent default</span>
                 <small>{defaults().model ? label(defaults().model!) : "Its own setting"}</small>
               </button>
-              <For each={models.data ?? []} fallback={<p class="te-note">{models.isLoading ? "Loading models…" : "No models listed."}</p>}>
+              <For each={models.data ?? []} fallback={<p class="te-note">{readNote(models, "No models listed.", { loading: "Loading models…" })}</p>}>
                 {(model) => (
                   <button type="button" class="te-radio" role="radio" aria-checked={current().model === model.id} onClick={() => set({ model: model.id })}>
                     <span>{model.label}</span>
@@ -661,7 +662,7 @@ export function ProjectControl(props: { task: Issue; onChange: ChangeTask }) {
         {caret()}
       </Menu.Trigger>
       <Menu.Content label="Project" width={260}>
-        <For each={openProjects(projects.data)} fallback={<Menu.Item disabled>{projects.isLoading ? "Loading projects…" : "No projects yet"}</Menu.Item>}>
+        <For each={openProjects(projects.data)} fallback={<Menu.Item disabled>{readNote(projects, "No projects yet", { loading: "Loading projects…" })}</Menu.Item>}>
           {(candidate) => (
             <Menu.Item
               icon={<InitialsDisc name={candidate.name.slice(0, 1)} seed={candidate.id} size={18} />}
@@ -693,7 +694,7 @@ export function GoalControl(props: { task: Issue; onChange: ChangeTask }) {
         {caret()}
       </Menu.Trigger>
       <Menu.Content label="Goal" width={300}>
-        <For each={goals.data ?? []} fallback={<Menu.Item disabled>{goals.isLoading ? "Loading goals…" : "No goals yet"}</Menu.Item>}>
+        <For each={goals.data ?? []} fallback={<Menu.Item disabled>{readNote(goals, "No goals yet", { loading: "Loading goals…" })}</Menu.Item>}>
           {(goal) => (
             <Menu.Item hint={goal.id === props.task.goalId ? <Check size={14} /> : undefined} onSelect={() => goal.id !== props.task.goalId && props.onChange({ goalId: goal.id })}>
               {goal.title}
@@ -880,7 +881,7 @@ export function WorkspaceControl(props: { task: Issue; onChange: ChangeTask }) {
           <Menu.Group label="Reuse a workspace">
             <For
               each={reusable.data ?? []}
-              fallback={<Menu.Item disabled>{reusable.isLoading ? "Loading workspaces…" : "None to reuse"}</Menu.Item>}
+              fallback={<Menu.Item disabled>{readNote(reusable, "None to reuse", { loading: "Loading workspaces…" })}</Menu.Item>}
             >
               {(workspace) => (
                 <Menu.Item

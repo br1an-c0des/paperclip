@@ -23,6 +23,7 @@ import { environmentChoiceAvailable, projectEnvironment, runWorkspacePayload } f
 import { refreshRecurring } from "./queries";
 import { filterRuns, RUN_SOURCE_LABEL, runOutcome, startedByRun, type RunFilter, type RunSource } from "./recurring-model";
 import { formatFire } from "./schedule";
+import { readNote } from "@/lib/offline/read-state";
 
 /*
  * The recurring task's runs (board R3): each run's time, what started it (schedule, webhook, API,
@@ -404,7 +405,7 @@ function RunEnvironmentMenu(props: { project: Project; value: string | null; onP
         <Menu.Separator />
         <For
           each={(environments.data ?? []).filter((entry) => entry.status === "active")}
-          fallback={<p class="nt-menu-note">{environments.isLoading ? "Loading environments…" : "No other environments."}</p>}
+          fallback={<p class="nt-menu-note">{readNote(environments, "No other environments.", { loading: "Loading environments…" })}</p>}
         >
           {(entry) => (
             <Menu.Item onSelect={() => props.onPick(entry.id)} description={entry.description ?? entry.driver} hint={props.value === entry.id ? <Check size={14} /> : undefined}>

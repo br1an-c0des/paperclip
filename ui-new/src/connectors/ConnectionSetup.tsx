@@ -27,6 +27,7 @@ import {
   type SetupDraft,
 } from "./connection-model";
 import { createLocalLogin } from "./local-login";
+import { readNote } from "@/lib/offline/read-state";
 // Its own styles: New agent opens this dialog too, without the Apps pages.
 import "./Connectors.css";
 
@@ -235,7 +236,7 @@ function SetupBody(props: {
               <Show when={!draft.allAgents}>
                 <Show
                   when={agentList().length > 0}
-                  fallback={<p class="cx-static">{agents.isPending ? "Loading agents…" : "No agents yet."}</p>}
+                  fallback={<p class="cx-static">{readNote(agents, "No agents yet.", { loading: "Loading agents…" })}</p>}
                 >
                   <ul class="cx-options">
                     <For each={agentList()}>

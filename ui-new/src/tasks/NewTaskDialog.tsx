@@ -42,6 +42,10 @@ import {
   useProjectsQuery,
 } from "@/lib/company-data";
 import { useSession } from "@/lib/session";
+import { classifySendFailure } from "@/lib/offline/errors";
+import { sendOrQueue, useOptionalWriteQueue, useWritesFor } from "@/lib/offline/WriteQueueProvider";
+import { WriteStatus } from "@/lib/offline/WriteStatus";
+import { taskWrite } from "./task-write";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Dialog } from "@/ui/Dialog";
 import { TextInput } from "@/ui/Field";
@@ -86,6 +90,7 @@ import {
 import { TaskPicker, taskName } from "./TaskPicker";
 import { casesApi } from "@/api/cases";
 import { NewTaskCase } from "@/cases/NewTaskCase";
+import { readNote } from "@/lib/offline/read-state";
 import "./NewTaskDialog.css";
 
 /*
@@ -106,6 +111,10 @@ import "./NewTaskDialog.css";
  *
  * The draft is kept per company in local storage, so closing the dialog by accident loses nothing;
  * Cancel discards it. The payload rules live in new-task.ts.
+ *
+ * A task that can't reach the server waits in the write queue under its idempotency key and is
+ * created when Paperclip is back (task-write.ts, U13); the dialog lists such tasks at its top until
+ * then. One with attached files stays open with its draft instead, since files can't wait offline.
  *
  * Repeat (boards N4–N7) turns it into "New recurring task": the Repeat pill's menu sets a schedule,
  * a webhook or both, and what happens if the last one is still open. Only what a recurring task
@@ -236,6 +245,10 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
   const pending = () => create.isPending || creatingRecurring();
   // A retry of the same submission reuses its key, so the server makes one task.
   let submission: { fingerprint: string; key: string } | null = null;
+  // Tasks made while Paperclip was out of reach, waiting to be created (U13).
+  const writes = useOptionalWriteQueue();
+  const waitingTasks = useWritesFor(() => "new-task");
+  const waitingHere = () => waitingTasks().filter((write) => write.companyId === company().id);
 
   createEffect(on(() => JSON.stringify(draft), () => saveDraft(company().id, unwrap(draft)), { defer: true }));
 
@@ -421,7 +434,25 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
     });
     const caseLink = caseLinkFor(base, casesOn() && !isCompact());
     try {
-      const { issue, failed } = await create.mutateAsync({ payload, caseLink });
+      // Out of reach, the task waits in the write queue under its key and is created when the server
+      // is back (U13). Files can't wait in browser storage, so a task with files stays in the dialog.
+      const outcome =
+        files().length > 0
+          ? { queued: false as const, result: await create.mutateAsync({ payload, caseLink }) }
+          : await sendOrQueue(
+              writes,
+              (userId) =>
+                taskWrite({ userId, companyId: company().id, issuePrefix: company().issuePrefix, payload, idempotencyKey: submission!.key, caseLink }),
+              () => create.mutateAsync({ payload, caseLink }),
+            );
+      if (outcome.queued) {
+        clearDraft(company().id);
+        submission = null;
+        pushToast({ tone: "info", title: "Saved offline", body: `${outcome.write.preview?.title ?? "The task"} is created when Paperclip is back.` });
+        commands.closeNewTask();
+        return;
+      }
+      const { issue, failed } = outcome.result;
       clearDraft(company().id);
       void client.invalidateQueries({ queryKey: queryKeys.issues.list(company().id) });
       if (caseLink) void client.invalidateQueries({ queryKey: queryKeys.cases.all(company().id) });
@@ -437,7 +468,13 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
       commands.closeNewTask();
       if (openAfter) navigate(href);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Couldn't create the task.");
+      setError(
+        files().length > 0 && classifySendFailure(caught) === "pending"
+          ? "Can't reach Paperclip, and attached files can't wait offline. Your draft is kept: create it again when Paperclip is back."
+          : caught instanceof Error
+            ? caught.message
+            : "Couldn't create the task.",
+      );
     }
   };
 
@@ -500,6 +537,14 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
   return (
     <div ref={root} class="nt" onKeyDown={onKeyDown}>
       <FileDropOverlay show={dragging()} newTask />
+      <For each={waitingHere()}>
+        {(write) => (
+          <div class="ow-note nt-waiting">
+            <b>{write.preview?.title ?? "A new task"}</b>
+            <WriteStatus write={write} waiting="Saved offline. It's created when Paperclip is back." />
+          </div>
+        )}
+      </For>
       <header class="nt-head">
         <Menu>
           <Menu.Trigger class="nt-pill" aria-label={`Project: ${project()?.name ?? "No project"}`}>
@@ -1120,7 +1165,7 @@ function GoalPill(props: {
           <b>{label() ?? "Pick"}</b>
         </Menu.Trigger>
         <Menu.Content label="Goal" width={300}>
-          <For each={goals.data ?? []} fallback={<p class="nt-menu-note">{goals.isLoading ? "Loading goals…" : "No goals yet."}</p>}>
+          <For each={goals.data ?? []} fallback={<p class="nt-menu-note">{readNote(goals, "No goals yet.", { loading: "Loading goals…" })}</p>}>
             {(goal) => (
               <Menu.Item onSelect={() => props.onPick(goal)} hint={goal.id === props.value ? <Check size={14} /> : undefined}>
                 {goal.title}
@@ -1416,7 +1461,7 @@ function AssigneeMenu(props: {
               <span>Agent default</span>
               <small>{defaults().model ?? "Its own setting"}</small>
             </button>
-            <For each={models.data ?? []} fallback={<p class="nt-menu-note">{models.isLoading ? "Loading models…" : "No models listed."}</p>}>
+            <For each={models.data ?? []} fallback={<p class="nt-menu-note">{readNote(models, "No models listed.", { loading: "Loading models…" })}</p>}>
               {(model) => (
                 <button type="button" class="nt-radio" role="radio" aria-checked={props.model === model.id} onClick={() => props.onModel(model.id)}>
                   <span>{model.label}</span>

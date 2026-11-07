@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from "solid-js";
-import { ApiError } from "@/api/client";
+import { ApiError, isTemporaryApiError } from "@/api/client";
+import { connectivity } from "@/lib/offline/connectivity";
 import { runsApi, type RunDetail } from "@/api/runs";
 import { useLiveConnection, useLiveEvent } from "@/lib/live-events";
 import { alignedStart, mergeChunks, parseLogSlice, readSeq, readStream, utf8Length, type RunLogChunk } from "./run-log";
@@ -12,6 +13,10 @@ import { isActiveRun } from "./run-model";
  * log is polled as a safety net: every 2s while the socket is down, every 15s while it's up. A run
  * whose log is larger than the budget starts at its tail, on a whole record (`alignStartToRecord`),
  * and says how much it skipped.
+ *
+ * Output is kept for the run's whole time on screen, through socket reconnects and outages (U51,
+ * after #18822): a read that fails because the server is out of reach shows no error, and reading
+ * picks up from the same offset when it's back.
  */
 
 const PAGE_BYTES = 256_000;
@@ -53,6 +58,8 @@ export function createRunLog(runId: () => string, run: () => RunDetail | undefin
   };
 
   let again = false;
+  // The last read failed in an outage before anything loaded.
+  let waiting = false;
   const read = async (): Promise<void> => {
     const current = untrack(run);
     if (!current) return;
@@ -95,11 +102,17 @@ export function createRunLog(runId: () => string, run: () => RunDetail | undefin
       if (mine !== generation || (caught instanceof DOMException && caught.name === "AbortError")) return;
       // A run that hasn't written output yet has no log.
       if (caught instanceof ApiError && caught.status === 404) setError(null);
-      else setError(caught instanceof Error ? caught.message : String(caught));
+      // An outage keeps what's loaded and reads on from the same offset once the server is back
+      // (`onRecovered` below); nothing loaded yet stays "loading" meanwhile, not an error.
+      else if (isTemporaryApiError(caught)) {
+        setError(null);
+        waiting = chunks().length === 0;
+      } else setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       if (mine === generation) {
         reading = false;
-        setLoading(false);
+        if (!waiting) setLoading(false);
+        waiting = false;
         if (again) {
           again = false;
           void read();
@@ -174,10 +187,16 @@ export function createRunLog(runId: () => string, run: () => RunDetail | undefin
     });
     flushTimer ??= window.setTimeout(flush, SOCKET_FLUSH_MS);
   });
+  // Back from an outage: catch up from where reading stopped. The chunks already shown stay, and
+  // `mergeChunks` drops any the socket and the read both delivered.
+  const offRecovered = connectivity.onRecovered(() => {
+    if (untrack(readyRunId)) void read();
+  });
   onCleanup(() => {
     generation += 1;
     controller?.abort();
     window.clearTimeout(flushTimer);
+    offRecovered();
   });
 
   return {

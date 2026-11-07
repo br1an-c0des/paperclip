@@ -6,6 +6,9 @@ import { decisionsApi, type DecisionOutcome, type DecisionTargetSnapshot } from 
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
+import { sendOrQueue, useOptionalWriteQueue, useWritesFor } from "@/lib/offline/WriteQueueProvider";
+import { WriteStatus } from "@/lib/offline/WriteStatus";
+import { decisionWrite } from "./answer-write";
 import type { TaskPeople } from "@/tasks/people";
 import { Button } from "@/ui/Button";
 import { TextArea, TextInput } from "@/ui/Field";
@@ -139,12 +142,40 @@ export function DecisionControls(props: { request: Request; source: Source; peop
     for (const id of Object.keys(outcome.targetSnapshots ?? {})) void client.invalidateQueries({ queryKey: queryKeys.issues.detail(id) });
     props.onDone();
   };
+  // A decision that can't reach the server waits in the write queue with its key and shows here
+  // until it's sent (answer-write.ts, U13). The same choice tried again keeps its key, so it's
+  // decided once.
+  const writes = useOptionalWriteQueue();
+  const queued = useWritesFor(() => `decision:${decision().id}`);
+  const pending = () => queued()[0] ?? null;
+  let attempt: { fingerprint: string; key: string } | null = null;
   const decide = createMutation(() => ({
-    mutationFn: (choice: DecisionOption) => {
+    mutationFn: async (choice: DecisionOption) => {
       const values = Object.fromEntries(Object.entries(inputs()).filter(([, value]) => value.trim()));
-      return decisionsApi.decide(decision().id, { optionId: choice.id, inputValues: values, idempotencyKey: crypto.randomUUID() });
+      const fingerprint = JSON.stringify([decision().id, choice.id, values]);
+      if (attempt?.fingerprint !== fingerprint) attempt = { fingerprint, key: crypto.randomUUID() };
+      const body = { optionId: choice.id, inputValues: values, idempotencyKey: attempt.key };
+      const outcome = await sendOrQueue(
+        writes,
+        (userId) =>
+          decisionWrite({
+            userId,
+            companyId: company().id,
+            decisionId: decision().id,
+            taskId: decision().originIssueId,
+            title: props.request.title,
+            optionLabel: choice.label,
+            body,
+            targetIds: Object.keys(snapshots()),
+          }),
+        () => decisionsApi.decide(decision().id, body),
+      );
+      return outcome.queued ? null : outcome.result;
     },
-    onSuccess: settle,
+    onSuccess: (outcome: DecisionOutcome | null) => {
+      if (outcome) settle(outcome);
+      else setError(null);
+    },
     onError: (failure: Error) => setError(failure.message),
   }));
   const dismiss = createMutation(() => ({
@@ -152,7 +183,7 @@ export function DecisionControls(props: { request: Request; source: Source; peop
     onSuccess: settle,
     onError: (failure: Error) => setError(failure.message),
   }));
-  const busy = () => decide.isPending || dismiss.isPending;
+  const busy = () => decide.isPending || dismiss.isPending || (!!pending() && pending()!.status !== "failed");
   const blocked = (entry: DecisionOption) => heldBack(entry, changed());
   const applyLabel = () => {
     const current = option();
@@ -258,6 +289,13 @@ export function DecisionControls(props: { request: Request; source: Source; peop
           </span>
         </div>
         <TextInput aria-label="Type the task's identifier to confirm" placeholder={treeToken()} value={confirm()} onInput={(event) => setConfirm(event.currentTarget.value)} />
+      </Show>
+      <Show when={pending()}>
+        {(write) => (
+          <div class="ow-note rq-pending">
+            <WriteStatus write={write()} waiting="Your decision is saved offline and applied when Paperclip is back." />
+          </div>
+        )}
       </Show>
       <Footer request={props.request} error={error()}>
         <Button

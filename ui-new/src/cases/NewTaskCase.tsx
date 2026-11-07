@@ -12,6 +12,7 @@ import { isClosedCase } from "./case-model";
 import { CaseIcon, caseTicks, phaseSummary, PhaseTicks } from "./CaseChip";
 import { useCaseIndex } from "./queries";
 import { diagramLoops, parseWorkflowDiagram, workflowSummary } from "./workflow-diagram";
+import { readNote } from "@/lib/offline/read-state";
 import "./cases.css";
 
 /*
@@ -131,7 +132,7 @@ export function NewTaskCase(props: { value: CaseChoice; onChange: (patch: Partia
                   No template
                 </Menu.Item>
                 <Menu.Separator />
-                <For each={workflows.data ?? []} fallback={<p class="nt-menu-note">{workflows.isPending ? "Loading…" : "This company has no workflow templates yet."}</p>}>
+                <For each={workflows.data ?? []} fallback={<p class="nt-menu-note">{readNote(workflows, "This company has no workflow templates yet.")}</p>}>
                   {(workflow) => (
                     <Menu.Item
                       onSelect={() => props.onChange({ caseTemplate: { id: workflow.id, name: workflow.name } })}

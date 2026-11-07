@@ -22,6 +22,7 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
 import { Composer } from "@/tasks/composer/Composer";
 import { QueuedMessages, useQueuedComments } from "@/tasks/composer/QueuedMessages";
+import { PendingComments } from "@/tasks/composer/PendingComments";
 import { canStopRun, stopLabel, stopRun } from "@/tasks/run-stop";
 import { runWait } from "@/tasks/run-waits";
 import { AgentAvatar } from "@/ui/Avatar";
@@ -826,6 +827,7 @@ function RunView(props: { runId: string }) {
                     {(found) => (
                       <>
                         <Show when={queue.data}>{(current) => <QueuedMessages taskId={found().id} queue={current()} />}</Show>
+                        <PendingComments taskId={found().id} />
                         <Composer task={found()} liveRunId={props.runId} compact />
                       </>
                     )}
