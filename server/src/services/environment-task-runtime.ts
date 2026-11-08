@@ -9,6 +9,8 @@ import { settlePluginTaskCredentialHandoff } from "./plugin-task-credential-writ
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { environmentLeases, executionWorkspaces, environments, heartbeatRuns, issues, projects, type Db } from "@paperclipai/db";
 import { freshWorkspaceSchema, environmentTaskOperationSchema, parseEnvironmentTaskResult,
+  environmentTaskErrorData, readEnvironmentTaskErrorDiagnostic, JsonRpcCallError, PLUGIN_RPC_ERROR_CODES,
+  environmentTaskErrorCodeData, PluginEnvironmentTaskError, readEnvironmentTaskErrorCode,
   type HostToWorkerMethodName, type HostToWorkerMethods, type PluginEnvironmentTaskOperation } from "@paperclipai/plugin-sdk";
 import { pluginRegistryService } from "./plugin-registry.js";
 import { remoteTerminationReceipt } from "./remote-execution-termination.js";
@@ -16,6 +18,19 @@ import type { PluginWorkerManager } from "./plugin-worker-manager.js";
 import { NativeExecutionContext } from "./native-runtime/native-execution-context.js";
 import { assertPluginTaskSourceAttachment, assertPluginTaskSourceRecovery } from "./native-runtime/plugin-task-source-recovery.js";
 import { pluginAgentRuntimeIdentity } from "./plugin-agent-runtime-state.js";
+
+export function isSettledReadyRunnerState(state: Record<string, unknown>): boolean {
+  const commands = state.processedCommands;
+  return state.schema === "paperclip.runner.durable.state.v1" && state.lifecycle === "ready" &&
+    Array.isArray(state.outbox) && state.outbox.length === 0 && Number.isSafeInteger(state.nextSourceSeq) &&
+    Number(state.nextSourceSeq) > 0 && state.ackedSourceSeq === Number(state.nextSourceSeq) - 1 &&
+    state.pendingTerminalDelivery == null && state.pendingProviderCleanup == null && state.warmTransition == null &&
+    commands !== null && typeof commands === "object" && !Array.isArray(commands) &&
+    Object.values(commands).every(command => {
+      const status = command !== null && typeof command === "object" ? (command as { status?: unknown }).status : undefined;
+      return typeof status === "string" && status !== "" && status !== "pending" && status !== "indeterminate";
+    });
+}
 
 export async function pluginEnvironmentSupportsTasks(db: Db, workers: PluginWorkerManager, lease: { companyId: string; metadata: Record<string, unknown> | null }) {
   const metadata = lease.metadata ?? {};
@@ -78,6 +93,7 @@ export async function executeEnvironmentTask(db: Db, workers: PluginWorkerManage
   } : null;
   const launches = operation.kind === "submit" || operation.kind === "prepare";
   const scopesProjects = launches || operation.kind === "check_project_auth" || operation.kind === "read_file";
+  const retainedTask = operation.kind === "release" || operation.kind === "resume";
   const resumeFrom = launches || checkpointIdentity ? (operation as { resumeFrom?: string }).resumeFrom : undefined;
   const savedIdentity = metadata.runnerTaskIdentity as Record<string, unknown> | undefined;
   const prior = operation.kind === "prepare" ? operation.priorIdentity : undefined;
@@ -114,6 +130,7 @@ export async function executeEnvironmentTask(db: Db, workers: PluginWorkerManage
     || (activeProbe && (runner.sessionId !== probe.sessionId || (launches && operation.projectIds.length > 0))))) {
     throw new Error("Plugin-provided Runner execution identity mismatch");
   }
+  let stoppedSourceCheckpoint = false;
   if (runner && resumeFrom && !sourceRecovery) {
     const inspectCheckpoint = operation.kind === "read_state";
     const sources = await db.select({ id: environmentLeases.id, runId: environmentLeases.heartbeatRunId, metadata: environmentLeases.metadata }).from(environmentLeases).where(and(
@@ -143,6 +160,7 @@ export async function executeEnvironmentTask(db: Db, workers: PluginWorkerManage
         throw new Error("Plugin Runner retained session is not authorized");
       }
     }
+    stoppedSourceCheckpoint = true;
   }
   if (metadata.driver !== "plugin" || typeof metadata.pluginId !== "string" || typeof metadata.driverKey !== "string") {
     throw new Error("Plugin-provided Runner execution lease has no pinned plugin driver");
@@ -190,7 +208,10 @@ export async function executeEnvironmentTask(db: Db, workers: PluginWorkerManage
     freshWorkspace = await stageProviderFreshWorkspace({ db, companyId: input.companyId,
       issueId: lease.issueId, ...freshWorkspace, existing: freshWorkspace });
   }
-  const projectIds = scopesProjects ? operation.projectIds : [];
+  const savedProjectIds = metadata.runnerTaskProjectIds ?? [];
+  if (retainedTask && (!Array.isArray(savedProjectIds) || savedProjectIds.some(id => typeof id !== "string")))
+    throw new Error("Plugin Runner project scope changed");
+  const projectIds: string[] = scopesProjects ? operation.projectIds : retainedTask ? [...savedProjectIds as string[]] : [];
   if (scopesProjects && Array.isArray(metadata.runnerTaskProjectIds) &&
       JSON.stringify(projectIds) !== JSON.stringify(metadata.runnerTaskProjectIds)) throw new Error("Plugin Runner project scope changed");
   if (activeProbe && projectIds.length > 0) throw new Error("Plugin Runner probe cannot use project mounts");
@@ -259,13 +280,15 @@ export async function executeEnvironmentTask(db: Db, workers: PluginWorkerManage
     if (marked.length !== 1) throw new Error("Plugin warm task attachment lost authority");
   }
   try {
-    if (operation.kind === "describe" && metadata.runnerTaskReused === true) {
+    const stoppedWithoutSession = !!run && metadata.runnerTaskExecutionStopped === true && metadata.runnerTaskSessionRetained !== true;
+    if (operation.kind === "describe" && (metadata.runnerTaskReused === true || stoppedWithoutSession)) {
       const state = parseEnvironmentTaskResult({kind:"status"}, taskId, await callWorker("environmentTask", {
         driverKey: metadata.driverKey, companyId: input.companyId, environmentId: environment?.id ?? null,
         issueId: lease.issueId, config: driverConfig, taskId, runId: run?.id ?? null, agentId: run?.agentId ?? null,
         projectIds, lease: {providerLeaseId: taskId, metadata}, operation:{kind:"status"},
       }));
-      if (state.kind === "status" && state.executionStopped === true) {
+      if (state.kind === "status" && state.executionStopped === true &&
+          (metadata.runnerTaskReused === true || state.sessionStateAvailable !== true)) {
         await executeEnvironmentTask(db, workers, {...input, operation:{kind:"status"}});
         await executeEnvironmentTask(db, workers, {...input, operation:{kind:"complete"}});
         // Preserve the predecessor's stop proof for checkpoint authorization.
@@ -376,7 +399,7 @@ export async function executeEnvironmentTask(db: Db, workers: PluginWorkerManage
       taskId, runId: run?.id ?? (activeProbe ? String(probe.runId) : null), agentId: run?.agentId ?? null, projectIds,
       lease: { providerLeaseId: lease.providerLeaseId, metadata: lease.metadata ?? undefined },
       ...(workspaceBinding ? { workspace: workspaceBinding } : {}),
-      ...(freshWorkspace && scopesProjects ? { fresh: freshWorkspace } : {}), operation,
+      ...(freshWorkspace && (scopesProjects || retainedTask) ? { fresh: freshWorkspace } : {}), operation,
       executionContextSupported: 1 as const,
       ...(executionContext ? { executionContext } : {}),
     };
@@ -385,6 +408,9 @@ export async function executeEnvironmentTask(db: Db, workers: PluginWorkerManage
     const result = await callWorker("environmentTask", params, timeout);
     if (executionContext) context!.assertOpen();
     const parsed = parseEnvironmentTaskResult(operation, taskId, result);
+    if (stoppedSourceCheckpoint && parsed.kind === "state" && isSettledReadyRunnerState(parsed.state)) {
+      parsed.state = { ...parsed.state, lifecycle: "suspended" };
+    }
     if (sourceRecovery && (operation.kind === "prepare" || operation.kind === "submit")) {
       await assertPluginTaskSourceRecovery(db, { companyId: input.companyId, leaseId: lease.id,
         context: context instanceof NativeExecutionContext ? context : undefined, operation });
@@ -453,9 +479,16 @@ export async function executeEnvironmentTask(db: Db, workers: PluginWorkerManage
         eq(environmentLeases.providerLeaseId, taskId), sql`${environmentLeases.metadata}->>'runnerTaskExecutionStopped' = 'true'`));
     }
     return parsed;
-  } catch {
+  } catch (error) {
+    const diagnostic = operation.kind === "submit" && operation.resumeFrom ? readEnvironmentTaskErrorDiagnostic(error) : null;
+    if (diagnostic) throw new JsonRpcCallError({ code: PLUGIN_RPC_ERROR_CODES.WORKER_ERROR,
+      message: "Plugin Runner source state unavailable",
+      data: environmentTaskErrorData({ status: diagnostic.httpStatus, code: diagnostic.errorCode, reason: diagnostic.reason }),
+    });
     // Worker errors and schema diagnostics can contain request credentials.
-    throw new Error("Plugin-provided Runner execution operation unavailable; reconcile the same task before retrying");
+    const code = readEnvironmentTaskErrorCode(error);
+    throw Object.assign(new Error("Plugin-provided Runner execution operation unavailable; reconcile the same task before retrying"),
+      code ? { data: environmentTaskErrorCodeData(new PluginEnvironmentTaskError(code)) } : {});
   }
 }
 

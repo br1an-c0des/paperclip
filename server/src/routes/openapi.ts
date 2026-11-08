@@ -260,6 +260,7 @@ import {
   retryWorkspaceExportSchema,
   reconstructWorkspaceSchema,
   resumeWorkspaceFinalizationSchema,
+  confirmNativeControllerStoppedSchema,
   cancelIssueThreadInteractionSchema,
   // Secret provider configs and remote import
   createSecretProviderConfigSchema,
@@ -309,6 +310,7 @@ import {
   toolPolicyTestRequestSchema,
   createToolMcpGatewaySchema,
   completeConnectionIntentSchema,
+  connectionIntentPayloadSchema,
   connectionRequestInputSchema,
   connectionsSearchInputSchema,
   declineConnectionIntentSchema,
@@ -1685,7 +1687,8 @@ function resolveOperationAuthLevel(
   if (PUBLIC_OPERATIONS.has(key)) return "public";
   if (key === "POST /api/companies/{companyId}/agent-commentary") return "agent_heartbeat";
   if (key === "POST /api/agents/me/chat/messages") return "agent_heartbeat";
-  if (method.toUpperCase() === "GET" && path.startsWith("/api/companies/{companyId}/agent-commentary")) return "board";
+  // Agents may read their own commentary, or all of it with commentary:view; the routes enforce that.
+  if (method.toUpperCase() === "GET" && path.startsWith("/api/companies/{companyId}/agent-commentary")) return "authenticated";
   if (key === "POST /api/mcp/project-tools" || key === "POST /api/companies/{companyId}/slack/tasks/{issueId}/tools") return "agent_run";
   if (RUNTIME_TOOLS_OPERATIONS.has(key)) return "runtime_tools";
   if (INSTANCE_ADMIN_OPERATIONS.has(key)) return "instance_admin";
@@ -2184,7 +2187,11 @@ registry.registerPath({
   path: "/api/companies/{companyId}/exports",
   tags: ["companies"],
   summary: "Export company data",
-  request: { params: z.object({ companyId: z.string() }) },
+  description: "Omitting include exports only the company and agents (projects, skills and issues default to false); set include.projects and include.skills for a reusable company setup.",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    body: jsonBody(companyPortabilityExportSchema),
+  },
   responses: { 200: r.ok(), 401: r.unauthorized },
 });
 
@@ -2193,7 +2200,11 @@ registry.registerPath({
   path: "/api/companies/{companyId}/exports/preview",
   tags: ["companies"],
   summary: "Preview company export",
-  request: { params: z.object({ companyId: z.string() }) },
+  description: "Omitting include exports only the company and agents (projects, skills and issues default to false); set include.projects and include.skills for a reusable company setup.",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    body: jsonBody(companyPortabilityExportSchema),
+  },
   responses: { 200: r.ok(), 401: r.unauthorized },
 });
 
@@ -3440,6 +3451,9 @@ registerCurrentRoute({
   path: "/api/status-cards/{id}",
   tags: ["status-cards"],
   summary: "Update, archive, or restore a status card",
+  description: "Archiving (archived: true) hides the card from the active list but keeps the card, its summary and its update history; it is not deleted. "
+    + "A person views and restores archived cards on the company's Status page (Show archived, then Restore); give them the returned href as a Markdown link. "
+    + "Restoring (archived: false) starts a fresh full summary for a card with a compiled query, so restored content is regenerated before it is current.",
   body: patchStatusCardSchema,
 });
 
@@ -4611,7 +4625,7 @@ registry.registerPath({
   tags: ["issues"],
   summary: "Get an exact issue document revision",
   description:
-    "Available to board users and agents with current issue read access. Returns the specified revision only when its document is linked to this issue under the given key. Document keys are trimmed and lowercased before validation. This read does not restore or modify the document.",
+    "Available to board users and agents with current issue read access. Returns the specified revision only when its document is linked to this issue under the given key. Document keys are trimmed and lowercased before validation. The response also carries the document's current latestRevisionId and latestRevisionNumber, and isLatest says whether this revision is still current; to read the current text, use GET /api/issues/{id}/documents/{key}. This read does not restore or modify the document.",
   request: {
     params: z.object({
       id: z.string(),
@@ -5809,7 +5823,7 @@ registry.registerPath({
   path: "/api/companies/{companyId}/agent-commentary",
   tags: ["agents"],
   summary: "Browse agent suggestions and complaints",
-  description: "Board-only. Requires company membership and commentary:view, granted by default to all human company roles. Source-task privacy filters both previews and counts. Returns items, total, limit and offset; previews contain at most 280 characters and omit full bodies.",
+  description: "Board members need company membership and commentary:view, granted by default to all human company roles. An agent may list only its own commentary (agentId set to itself) unless it holds commentary:view, which is never a default agent grant; otherwise it gets 403 with a remediation naming the Commentary page. Source-task privacy filters both previews and counts. Returns items, total, limit and offset; previews contain at most 280 characters and omit full bodies.",
   request: { params: z.object({ companyId: z.string() }), query: agentCommentaryQuerySchema },
   responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden, 404: r.notFound },
 });
@@ -5819,7 +5833,7 @@ registry.registerPath({
   path: "/api/companies/{companyId}/agent-commentary/{id}",
   tags: ["agents"],
   summary: "Read a full agent commentary message",
-  description: "Same board, permission and task-privacy gates as the list. Returns the full body with agent, task and run context. Foreign-company and invisible entries return 404.",
+  description: "Same permission and task-privacy gates as the list. An agent may read its own entry, or any entry with commentary:view; another agent's entry returns 403 with a remediation. Returns the full body with agent, task and run context. Foreign-company and invisible entries return 404.",
   request: { params: z.object({ companyId: z.string(), id: z.string().uuid() }) },
   responses: { 200: r.ok(), 401: r.unauthorized, 403: r.forbidden, 404: r.notFound },
 });
@@ -6166,6 +6180,25 @@ registry.registerPath({
   summary: "List runs for an issue",
   request: { params: z.object({ id: z.string() }), query: z.object({ view: z.literal("recent").optional().describe("At most two recent run summaries."), runIds: z.string().optional().describe("Comma-separated list of 1 to 100 run UUIDs. Returns only those runs linked to this accessible issue.") }) },
   responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden, 404: r.notFound },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/issues/{id}/context-usage",
+  tags: ["activity"],
+  summary: "Latest context-window usage for an issue's agent session",
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized, 403: r.forbidden, 404: r.notFound },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/issues/{id}/context/compact",
+  tags: ["issues"],
+  summary: "Ask the assignee agent to compact its context window",
+  description: "Board only. Queues a short run that resumes the assignee's runner session and compacts it (Codex and Claude on the Paperclip runner). Unavailable while the agent is running on the task.",
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 202: r.ok(), 401: r.unauthorized, 403: r.forbidden, 404: r.notFound, 409: r.conflict, 422: r.unprocessable },
 });
 
 registry.registerPath({
@@ -7092,7 +7125,7 @@ registry.registerPath({
   tags: ["instance"],
   summary:
     "Get process task-drain status, with optional bounded upgrade-readiness or idle-safety reports for instance operators",
-  description: "With idleSleepSafety=1, scheduledWake=domain-deadlines-v1 requires signed Cloud authority with idleCapabilities.deadlineCatalog=domain_deadlines_v1 and returns a mandatory deadlineProof even when no wake is scheduled. Cloud must acknowledge any returned durable alarm and revalidate the report before stopping the instance.",
+  description: "With idleSleepSafety=1, the exact current idle owner can retire idle native sessions before a fresh safety inspection. Busy or failed retirement prevents sleep. Native retirement is skipped for diagnostic inspection. scheduledWake=domain-deadlines-v1 requires signed Cloud authority with idleCapabilities.deadlineCatalog=domain_deadlines_v1 and returns a mandatory deadlineProof even when no wake is scheduled. Cloud must acknowledge any returned durable alarm and revalidate the report before stopping the instance.",
   request: { query: z.object({ upgradeReadiness: z.literal("1").optional().describe("Instance operators can request a bounded aggregate report of current remote-runner recovery eligibility. This read does not hold admission or detach runners."), ownerId: z.string().uuid().optional(), idleSleepSafety: z.literal("1").optional().describe("Instance admins can request a conservative durable-work report while admission and ingress are held. Unknown or present work must prevent automatic sleep."), scheduledWake: z.enum(["1", "2", "domain-deadlines-v1"]).optional().describe("Cloud control callers may request routine deadlines (1), routines and issue monitors (2), or the domain deadline catalog (domain-deadlines-v1). The domain catalog requires signed Cloud authority with idleCapabilities.deadlineCatalog=domain_deadlines_v1 and returns a deadlineProof even when no wake is scheduled. Cloud must acknowledge any returned durable alarm and revalidate this report before stopping the instance.") }) },
   responses: { 200: r.ok(), 401: r.unauthorized, 403: r.forbidden },
 });
@@ -9566,7 +9599,7 @@ registry.registerPath({
           agentId: z.string(),
           runId: z.string(),
           companyId: z.string(),
-          projectId: z.string(),
+          projectId: z.string().nullable().optional(),
         }),
       }),
     ),
@@ -11007,6 +11040,15 @@ registerCurrentRoute({
 
 registerCurrentRoute({
   method: "post",
+  path: "/api/issues/{id}/recovery-actions/confirm-controller-stopped",
+  tags: ["issues"],
+  summary: "Confirm that a native run's previous server stopped when its host was not recorded",
+  body: confirmNativeControllerStoppedSchema,
+  responses: { 202: r.ok(), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden, 404: r.notFound, 409: r.conflict },
+});
+
+registerCurrentRoute({
+  method: "post",
   path: "/api/issues/{id}/recovery-actions/retry-workspace-export",
   tags: ["issues"],
   summary: "Retry only workspace export for a repaired accepted native result",
@@ -11262,6 +11304,7 @@ registerCurrentRoute({
   body: z
     .object({
       phase: z.enum(["requested", "authorizing", "needs_retry"]),
+      setupAccess: connectionIntentPayloadSchema.shape.setupAccess,
     })
     .strict(),
   responses: {
