@@ -1,5 +1,5 @@
 {
-  "upstreamCommit": "d3713d827f70ddba63a323e57c562384dbd648ba",
+  "upstreamCommit": "f6cb3e43f4b16eab72093a06bf4070be10116ee8",
   "routes": [
     {
       "path": "/oauth-handoff",
@@ -4835,6 +4835,7 @@
         ],
         "via": [
           "api/companies-query.ts",
+          "components/AgentChatPin.tsx",
           "components/CommandPalette.tsx",
           "components/IssuesList.tsx",
           "components/LegacyIssuesList.tsx",
@@ -4928,7 +4929,8 @@
           }
         ],
         "via": [
-          "components/AgentConfigForm.tsx"
+          "components/AgentConfigForm.tsx",
+          "components/useAdapterLoginCancellation.ts"
         ]
       },
       {
@@ -4940,7 +4942,8 @@
           }
         ],
         "via": [
-          "components/AgentConfigForm.tsx"
+          "components/AgentConfigForm.tsx",
+          "components/useAdapterLoginCancellation.ts"
         ]
       },
       {
@@ -4976,7 +4979,8 @@
           }
         ],
         "via": [
-          "components/AgentConfigForm.tsx"
+          "components/AgentConfigForm.tsx",
+          "components/useAdapterLoginCancellation.ts"
         ]
       },
       {
@@ -4988,7 +4992,8 @@
           }
         ],
         "via": [
-          "components/AgentConfigForm.tsx"
+          "components/AgentConfigForm.tsx",
+          "components/useAdapterLoginCancellation.ts"
         ]
       },
       {
@@ -5188,6 +5193,7 @@
         "via": [
           "components/AgentConfigForm.tsx",
           "components/CommandPalette.tsx",
+          "components/CoordinatorSidebar.tsx",
           "components/IssuesList.tsx",
           "components/LegacyIssuesList.tsx",
           "components/NewIssueDialog.tsx",
@@ -5197,7 +5203,6 @@
           "components/ai-connections/AiConnectionCredentialStep.tsx",
           "components/new-agent/AgentBasicsDialog.tsx",
           "components/new-agent/ExternalAgentInviteDialog.tsx",
-          "hooks/useAgentChatEnabled.ts",
           "hooks/useChatConnectorsEnabled.ts",
           "hooks/useClassicTaskInterfaceEnabled.ts",
           "hooks/useCombinedInboxTasksEnabled.ts",
@@ -5293,6 +5298,21 @@
         ]
       },
       {
+        "key": "api/issues.ts::issuesApi.list",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/companies/:companyId/issues"
+          }
+        ],
+        "via": [
+          "components/AnnouncementWell.tsx",
+          "components/CommandPalette.tsx",
+          "components/NewIssueDialog.tsx",
+          "plugins/bridge-init.ts"
+        ]
+      },
+      {
         "key": "api/tools.ts::toolsApi.getConnection",
         "requests": [
           {
@@ -5355,20 +5375,6 @@
         "via": [
           "components/AppConnectionSidebar.tsx",
           "features/connections/ConnectionSetupFlow.tsx"
-        ]
-      },
-      {
-        "key": "api/issues.ts::issuesApi.list",
-        "requests": [
-          {
-            "method": "GET",
-            "path": "/api/companies/:companyId/issues"
-          }
-        ],
-        "via": [
-          "components/CommandPalette.tsx",
-          "components/NewIssueDialog.tsx",
-          "plugins/bridge-init.ts"
         ]
       },
       {
@@ -6294,6 +6300,19 @@
         ]
       },
       {
+        "key": "api/connection-intents.ts::connectionIntentsApi.setPhase",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/connection-intents/:interactionId/phase"
+          }
+        ],
+        "via": [
+          "features/connections/ConnectionSetupFlow.tsx",
+          "features/connections/remote-mcp/RemoteMcpProductionSetup.tsx"
+        ]
+      },
+      {
         "key": "api/connection-intents.ts::connectionIntentsApi.setupOptions",
         "requests": [
           {
@@ -6856,6 +6875,31 @@
           {
             "method": "GET",
             "path": "/api/issues/:id/comments"
+          }
+        ],
+        "via": [
+          "lib/issue-comment-window-query.ts",
+          "lib/issueDetailCache.ts"
+        ]
+      },
+      {
+        "key": "api/issues.ts::issuesApi.recentComments",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/issues/:id/recent-comments"
+          }
+        ],
+        "via": [
+          "lib/issue-comment-window-query.ts"
+        ]
+      },
+      {
+        "key": "api/issues.ts::issuesApi.getCore",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/issues/:id"
           }
         ],
         "via": [
@@ -9080,18 +9124,6 @@
           ]
         },
         {
-          "key": "api/adapters.ts::adaptersApi.list",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/adapters"
-            }
-          ],
-          "via": [
-            "components/ConfigureBuiltInAgentModal.tsx"
-          ]
-        },
-        {
           "key": "api/agents.ts::agentsApi.adapterModels",
           "requests": [
             {
@@ -9316,11 +9348,35 @@
           ]
         },
         {
+          "key": "api/issues.ts::issuesApi.confirmControllerStopped",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/recovery-actions/confirm-controller-stopped"
+            }
+          ],
+          "via": [
+            "components/WorkspaceExportRecovery.tsx"
+          ]
+        },
+        {
           "key": "api/issues.ts::issuesApi.recoverWorkspace",
           "requests": [
             {
               "method": "POST",
               "path": "/api/issues/:id/recovery-actions/recover-workspace"
+            }
+          ],
+          "via": [
+            "components/WorkspaceExportRecovery.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.resumeWorkspaceFinalization",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/recovery-actions/resume-workspace-finalization"
             }
           ],
           "via": [
@@ -10406,18 +10462,6 @@
       ],
       "calls": [
         {
-          "key": "api/adapters.ts::adaptersApi.list",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/adapters"
-            }
-          ],
-          "via": [
-            "components/ConfigureBuiltInAgentModal.tsx"
-          ]
-        },
-        {
           "key": "api/agents.ts::agentsApi.adapterModels",
           "requests": [
             {
@@ -11146,7 +11190,7 @@
           ],
           "via": [
             "components/ai-connections/AiConnectionPoolConnector.tsx",
-            "components/ai-connections/ManagedAiConnectionDetails.tsx",
+            "components/ai-connections/useAiConnectionDefaults.ts",
             "pages/apps/AppsConnect.tsx"
           ]
         },
@@ -11189,19 +11233,6 @@
           ]
         },
         {
-          "key": "api/ai-connections.ts::aiConnectionsApi.setDefault",
-          "requests": [
-            {
-              "method": "PUT",
-              "path": "/api/companies/:companyId/ai-connections/default"
-            }
-          ],
-          "via": [
-            "components/ai-connections/ManagedAiConnectionDetails.tsx",
-            "features/connections/ConnectionIntentInteractionBody.tsx"
-          ]
-        },
-        {
           "key": "api/heartbeats.ts::heartbeatsApi.cancel",
           "requests": [
             {
@@ -11223,6 +11254,19 @@
           ],
           "via": [
             "components/ai-connections/ManagedAiConnectionDetails.tsx"
+          ]
+        },
+        {
+          "key": "api/ai-connections.ts::aiConnectionsApi.setDefault",
+          "requests": [
+            {
+              "method": "PUT",
+              "path": "/api/companies/:companyId/ai-connections/default"
+            }
+          ],
+          "via": [
+            "components/ai-connections/useAiConnectionDefaults.ts",
+            "features/connections/ConnectionIntentInteractionBody.tsx"
           ]
         },
         {
@@ -11957,7 +12001,7 @@
           ],
           "via": [
             "components/ai-connections/AiConnectionPoolConnector.tsx",
-            "components/ai-connections/ManagedAiConnectionDetails.tsx"
+            "components/ai-connections/useAiConnectionDefaults.ts"
           ]
         },
         {
@@ -11998,19 +12042,6 @@
           ]
         },
         {
-          "key": "api/ai-connections.ts::aiConnectionsApi.setDefault",
-          "requests": [
-            {
-              "method": "PUT",
-              "path": "/api/companies/:companyId/ai-connections/default"
-            }
-          ],
-          "via": [
-            "components/ai-connections/ManagedAiConnectionDetails.tsx",
-            "features/connections/ConnectionIntentInteractionBody.tsx"
-          ]
-        },
-        {
           "key": "api/heartbeats.ts::heartbeatsApi.cancel",
           "requests": [
             {
@@ -12032,6 +12063,19 @@
           ],
           "via": [
             "components/ai-connections/ManagedAiConnectionDetails.tsx"
+          ]
+        },
+        {
+          "key": "api/ai-connections.ts::aiConnectionsApi.setDefault",
+          "requests": [
+            {
+              "method": "PUT",
+              "path": "/api/companies/:companyId/ai-connections/default"
+            }
+          ],
+          "via": [
+            "components/ai-connections/useAiConnectionDefaults.ts",
+            "features/connections/ConnectionIntentInteractionBody.tsx"
           ]
         },
         {
@@ -12762,7 +12806,7 @@
           ],
           "via": [
             "components/ai-connections/AiConnectionPoolConnector.tsx",
-            "components/ai-connections/ManagedAiConnectionDetails.tsx"
+            "components/ai-connections/useAiConnectionDefaults.ts"
           ]
         },
         {
@@ -12804,19 +12848,6 @@
           ]
         },
         {
-          "key": "api/ai-connections.ts::aiConnectionsApi.setDefault",
-          "requests": [
-            {
-              "method": "PUT",
-              "path": "/api/companies/:companyId/ai-connections/default"
-            }
-          ],
-          "via": [
-            "components/ai-connections/ManagedAiConnectionDetails.tsx",
-            "features/connections/ConnectionIntentInteractionBody.tsx"
-          ]
-        },
-        {
           "key": "api/heartbeats.ts::heartbeatsApi.cancel",
           "requests": [
             {
@@ -12838,6 +12869,19 @@
           ],
           "via": [
             "components/ai-connections/ManagedAiConnectionDetails.tsx"
+          ]
+        },
+        {
+          "key": "api/ai-connections.ts::aiConnectionsApi.setDefault",
+          "requests": [
+            {
+              "method": "PUT",
+              "path": "/api/companies/:companyId/ai-connections/default"
+            }
+          ],
+          "via": [
+            "components/ai-connections/useAiConnectionDefaults.ts",
+            "features/connections/ConnectionIntentInteractionBody.tsx"
           ]
         },
         {
@@ -13561,7 +13605,7 @@
           ],
           "via": [
             "components/ai-connections/AiConnectionPoolConnector.tsx",
-            "components/ai-connections/ManagedAiConnectionDetails.tsx",
+            "components/ai-connections/useAiConnectionDefaults.ts",
             "pages/apps/AppsConnect.tsx"
           ]
         },
@@ -13604,19 +13648,6 @@
           ]
         },
         {
-          "key": "api/ai-connections.ts::aiConnectionsApi.setDefault",
-          "requests": [
-            {
-              "method": "PUT",
-              "path": "/api/companies/:companyId/ai-connections/default"
-            }
-          ],
-          "via": [
-            "components/ai-connections/ManagedAiConnectionDetails.tsx",
-            "features/connections/ConnectionIntentInteractionBody.tsx"
-          ]
-        },
-        {
           "key": "api/heartbeats.ts::heartbeatsApi.cancel",
           "requests": [
             {
@@ -13638,6 +13669,19 @@
           ],
           "via": [
             "components/ai-connections/ManagedAiConnectionDetails.tsx"
+          ]
+        },
+        {
+          "key": "api/ai-connections.ts::aiConnectionsApi.setDefault",
+          "requests": [
+            {
+              "method": "PUT",
+              "path": "/api/companies/:companyId/ai-connections/default"
+            }
+          ],
+          "via": [
+            "components/ai-connections/useAiConnectionDefaults.ts",
+            "features/connections/ConnectionIntentInteractionBody.tsx"
           ]
         },
         {
@@ -14577,30 +14621,6 @@
           ]
         },
         {
-          "key": "api/ai-connections.ts::aiConnectionsApi.list",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/companies/:companyId/ai-connections"
-            }
-          ],
-          "via": [
-            "components/ai-connections/ManagedAiConnectionDetails.tsx"
-          ]
-        },
-        {
-          "key": "api/ai-connections.ts::aiConnectionsApi.setDefault",
-          "requests": [
-            {
-              "method": "PUT",
-              "path": "/api/companies/:companyId/ai-connections/default"
-            }
-          ],
-          "via": [
-            "components/ai-connections/ManagedAiConnectionDetails.tsx"
-          ]
-        },
-        {
           "key": "api/heartbeats.ts::heartbeatsApi.cancel",
           "requests": [
             {
@@ -14634,6 +14654,30 @@
           ],
           "via": [
             "components/ai-connections/ManagedAiConnectionDetails.tsx"
+          ]
+        },
+        {
+          "key": "api/ai-connections.ts::aiConnectionsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/ai-connections"
+            }
+          ],
+          "via": [
+            "components/ai-connections/useAiConnectionDefaults.ts"
+          ]
+        },
+        {
+          "key": "api/ai-connections.ts::aiConnectionsApi.setDefault",
+          "requests": [
+            {
+              "method": "PUT",
+              "path": "/api/companies/:companyId/ai-connections/default"
+            }
+          ],
+          "via": [
+            "components/ai-connections/useAiConnectionDefaults.ts"
           ]
         },
         {
@@ -18438,6 +18482,18 @@
           ]
         },
         {
+          "key": "api/issues.ts::issuesApi.confirmControllerStopped",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/recovery-actions/confirm-controller-stopped"
+            }
+          ],
+          "via": [
+            "components/WorkspaceExportRecovery.tsx"
+          ]
+        },
+        {
           "key": "api/issues.ts::issuesApi.recoverWorkspace",
           "requests": [
             {
@@ -18455,6 +18511,18 @@
             {
               "method": "GET",
               "path": "/api/issues/:id/recovery-actions"
+            }
+          ],
+          "via": [
+            "components/WorkspaceExportRecovery.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.resumeWorkspaceFinalization",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/recovery-actions/resume-workspace-finalization"
             }
           ],
           "via": [
@@ -18574,7 +18642,8 @@
             }
           ],
           "via": [
-            "components/coordinator/CoordinatorTaskCommitment.tsx"
+            "components/coordinator/CoordinatorTaskCommitment.tsx",
+            "components/task-chat/TaskChatBlockerLinks.tsx"
           ]
         },
         {
@@ -18700,6 +18769,30 @@
           ],
           "via": [
             "components/issue-properties/IssuePropertiesArtifactsTab.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.compactContext",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/context/compact"
+            }
+          ],
+          "via": [
+            "components/issue-properties/context-usage-row.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.getContextUsage",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:id/context-usage"
+            }
+          ],
+          "via": [
+            "components/issue-properties/context-usage-row.tsx"
           ]
         },
         {
@@ -19067,7 +19160,6 @@
           ],
           "via": [
             "hooks/useConversationHistoryPages.ts",
-            "hooks/useIssueHistoryWindow.ts",
             "pages/IssueDetail.tsx"
           ]
         },
@@ -19141,18 +19233,6 @@
           ],
           "via": [
             "hooks/useEmailThread.ts"
-          ]
-        },
-        {
-          "key": "api/issues.ts::issuesApi.recentComments",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/issues/:id/recent-comments"
-            }
-          ],
-          "via": [
-            "hooks/useIssueHistoryWindow.ts"
           ]
         },
         {
@@ -21171,18 +21251,6 @@
       ],
       "calls": [
         {
-          "key": "api/access.ts::accessApi.getCurrentBoardAccess",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/cli-auth/me"
-            }
-          ],
-          "via": [
-            "components/CoordinatorWorkspaceSetting.tsx"
-          ]
-        },
-        {
           "key": "api/instanceSettings.ts::instanceSettingsApi.getExperimental",
           "requests": [
             {
@@ -21191,7 +21259,6 @@
             }
           ],
           "via": [
-            "components/CoordinatorWorkspaceSetting.tsx",
             "pages/InstanceExperimentalSettings.tsx"
           ]
         },
@@ -24830,18 +24897,6 @@
       ],
       "calls": [
         {
-          "key": "api/adapters.ts::adaptersApi.list",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/adapters"
-            }
-          ],
-          "via": [
-            "components/ConfigureBuiltInAgentModal.tsx"
-          ]
-        },
-        {
           "key": "api/agents.ts::agentsApi.adapterModels",
           "requests": [
             {
@@ -26456,6 +26511,18 @@
           ]
         },
         {
+          "key": "api/issues.ts::issuesApi.confirmControllerStopped",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/recovery-actions/confirm-controller-stopped"
+            }
+          ],
+          "via": [
+            "components/WorkspaceExportRecovery.tsx"
+          ]
+        },
+        {
           "key": "api/issues.ts::issuesApi.recoverWorkspace",
           "requests": [
             {
@@ -26473,6 +26540,18 @@
             {
               "method": "GET",
               "path": "/api/issues/:id/recovery-actions"
+            }
+          ],
+          "via": [
+            "components/WorkspaceExportRecovery.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.resumeWorkspaceFinalization",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/recovery-actions/resume-workspace-finalization"
             }
           ],
           "via": [
@@ -26592,7 +26671,8 @@
             }
           ],
           "via": [
-            "components/coordinator/CoordinatorTaskCommitment.tsx"
+            "components/coordinator/CoordinatorTaskCommitment.tsx",
+            "components/task-chat/TaskChatBlockerLinks.tsx"
           ]
         },
         {
@@ -26717,6 +26797,30 @@
           ],
           "via": [
             "components/issue-properties/IssuePropertiesArtifactsTab.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.compactContext",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/context/compact"
+            }
+          ],
+          "via": [
+            "components/issue-properties/context-usage-row.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.getContextUsage",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:id/context-usage"
+            }
+          ],
+          "via": [
+            "components/issue-properties/context-usage-row.tsx"
           ]
         },
         {
@@ -27083,7 +27187,6 @@
           ],
           "via": [
             "hooks/useConversationHistoryPages.ts",
-            "hooks/useIssueHistoryWindow.ts",
             "pages/IssueDetail.tsx"
           ]
         },
@@ -27157,18 +27260,6 @@
           ],
           "via": [
             "hooks/useEmailThread.ts"
-          ]
-        },
-        {
-          "key": "api/issues.ts::issuesApi.recentComments",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/issues/:id/recent-comments"
-            }
-          ],
-          "via": [
-            "hooks/useIssueHistoryWindow.ts"
           ]
         },
         {
@@ -28214,18 +28305,6 @@
       ],
       "calls": [
         {
-          "key": "api/adapters.ts::adaptersApi.list",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/adapters"
-            }
-          ],
-          "via": [
-            "components/ConfigureBuiltInAgentModal.tsx"
-          ]
-        },
-        {
           "key": "api/agents.ts::agentsApi.adapterModels",
           "requests": [
             {
@@ -29096,6 +29175,32 @@
           ]
         },
         {
+          "key": "api/access.ts::accessApi.listUserDirectory",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/user-directory"
+            }
+          ],
+          "via": [
+            "components/RoutineResponsibleUser.tsx",
+            "pages/RoutineDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/routines.ts::routinesApi.update",
+          "requests": [
+            {
+              "method": "PATCH",
+              "path": "/api/routines/:id"
+            }
+          ],
+          "via": [
+            "components/RoutineResponsibleUser.tsx",
+            "pages/RoutineDetail.tsx"
+          ]
+        },
+        {
           "key": "api/issues.ts::issuesApi.list",
           "requests": [
             {
@@ -29244,18 +29349,6 @@
           ]
         },
         {
-          "key": "api/access.ts::accessApi.listUserDirectory",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/companies/:companyId/user-directory"
-            }
-          ],
-          "via": [
-            "pages/RoutineDetail.tsx"
-          ]
-        },
-        {
           "key": "api/agents.ts::agentsApi.list",
           "requests": [
             {
@@ -29333,18 +29426,6 @@
             {
               "method": "POST",
               "path": "/api/routines/:id/run"
-            }
-          ],
-          "via": [
-            "pages/RoutineDetail.tsx"
-          ]
-        },
-        {
-          "key": "api/routines.ts::routinesApi.update",
-          "requests": [
-            {
-              "method": "PATCH",
-              "path": "/api/routines/:id"
             }
           ],
           "via": [
@@ -31352,18 +31433,6 @@
       ],
       "calls": [
         {
-          "key": "api/adapters.ts::adaptersApi.list",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/adapters"
-            }
-          ],
-          "via": [
-            "components/ConfigureBuiltInAgentModal.tsx"
-          ]
-        },
-        {
           "key": "api/agents.ts::agentsApi.adapterModels",
           "requests": [
             {
@@ -31719,7 +31788,6 @@
         "pages/AgentChat.tsx",
         "pages/AgentDetailPage.tsx",
         "pages/DesignGuide.tsx",
-        "pages/InstanceExperimentalSettings.tsx",
         "pages/IssueDetail.tsx",
         "pages/ProjectDetail.tsx",
         "pages/tools/AdvancedToolsRoute.tsx",
@@ -32057,13 +32125,8 @@
       "usedBy": [
         "App shell",
         "pages/AdapterManager.tsx",
-        "pages/AgentDetailPage.tsx",
-        "pages/Agents.tsx",
         "pages/CompanyImport.tsx",
-        "pages/ExecutionWorkspaceDetail.tsx",
-        "pages/NewAgent.tsx",
-        "pages/ProjectDetail.tsx",
-        "pages/Workspaces.tsx"
+        "pages/NewAgent.tsx"
       ],
       "referenced": true
     },
@@ -35653,6 +35716,7 @@
         }
       ],
       "usedBy": [
+        "App shell",
         "App.tsx#AppsConnectEntryRoute",
         "pages/AgentChat.tsx",
         "pages/Dashboard.tsx",
@@ -38386,6 +38450,33 @@
       "usedBy": [],
       "referenced": false
     },
+    "api/issues.ts::issuesApi.compactContext": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/issues/:id/context/compact"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
+    "api/issues.ts::issuesApi.confirmControllerStopped": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/issues/:id/recovery-actions/confirm-controller-stopped"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/AgentDetailPage.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
     "api/issues.ts::issuesApi.count": {
       "requests": [
         {
@@ -38643,6 +38734,19 @@
       ],
       "referenced": true
     },
+    "api/issues.ts::issuesApi.getContextUsage": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/issues/:id/context-usage"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
     "api/issues.ts::issuesApi.getCore": {
       "requests": [
         {
@@ -38651,6 +38755,7 @@
         }
       ],
       "usedBy": [
+        "App shell",
         "pages/AgentChat.tsx",
         "pages/IssueDetail.tsx"
       ],
@@ -39134,8 +39239,7 @@
         }
       ],
       "usedBy": [
-        "pages/AgentChat.tsx",
-        "pages/IssueDetail.tsx"
+        "App shell"
       ],
       "referenced": true
     },
@@ -39305,8 +39409,12 @@
           "path": "/api/issues/:id/recovery-actions/resume-workspace-finalization"
         }
       ],
-      "usedBy": [],
-      "referenced": false
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/AgentDetailPage.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
     },
     "api/issues.ts::issuesApi.retryScheduledRetryNow": {
       "requests": [
