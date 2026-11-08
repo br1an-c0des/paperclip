@@ -28,7 +28,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | # | Entry | Area | Status | Opened |
 | --- | --- | --- | --- | --- |
 | 1 | [Projects can't hold documents or files](#1-projects-cant-hold-documents-or-files) | `projects/*`, `documents-artifacts/library` | Decided | Oct 20, 2026 |
-| 2 | [Agent chat is off unless the instance turns it on](#2-agent-chat-is-off-unless-the-instance-turns-it-on) | `agent-chat/*`, shell navigation | Open | Oct 20, 2026 |
+| 2 | [Agent chat is off unless the instance turns it on](#2-agent-chat-is-off-unless-the-instance-turns-it-on) | `agent-chat/*`, shell navigation | Decided (settled upstream) | Oct 20, 2026 |
 | 3 | [Agents can work on several things at once](#3-agents-can-work-on-several-things-at-once) | `agent-chat/*`, runs | Decided | Oct 20, 2026 |
 | 4 | [A run's full model input only exists when provider tracing is on](#4-a-runs-full-model-input-only-exists-when-provider-tracing-is-on) | `runs-adapters/runs`, `agents/runtime` | Decided | Oct 20, 2026 |
 | 5 | [Agents can have three memory systems that don't know about each other](#5-agents-can-have-three-memory-systems-that-dont-know-about-each-other) | `agents/runtime`, `agents/skills`, `agents/instructions`, Connectors | Open | Oct 22, 2026 |
@@ -125,7 +125,7 @@ for them. If upstream declines, the fork plugin provides them instead
 
 ### 2. Agent chat is off unless the instance turns it on
 
-- **Status:** Open
+- **Status:** Decided: settled upstream on Nov 7, 2026 (#19360)
 - **Area:** `agent-chat/history`, `agent-chat/handoff`, sidebar navigation
 - **Found in:** the agent chat view in the design canvas (screens 12 and 13).
 
@@ -152,7 +152,13 @@ would land on an error.
    page.
 3. **Fall back silently.** With chat off, the sidebar opens agent details as the old UI does.
 
-**Decision.** Not made yet.
+**Decision.** Settled upstream on Nov 7, 2026 (#19360, merged in the
+[Nov 7 sync](../../fork/sync-reports/2026-11-07.md)): Agent Chat is standard. `enableAgentChat` is a
+deprecated compatibility key, `getExperimental()` always returns true, stored or managed off values
+are ignored, and the chat routes no longer answer 404 for "disabled". None of the options is needed:
+`ui-new` drops its chat gate, the "needs the instance's agent chat setting" message and the Features
+switch ([build plan U57](build-plan.md#upstream-changes-to-integrate);
+[decision 12](#12-what-happens-to-each-experimental-flag)).
 
 ### 3. Agents can work on several things at once
 
@@ -543,6 +549,7 @@ UI-only flags:
 | `enableArtifactsV1` | Dropped | The artifact boards set the presentation. |
 | `enablePaperclipDeveloperMode` | Dropped | Maintainer tooling (Honeycomb links). |
 | `enableApps` | Built in | A compatibility key; Apps is always on. |
+| `enableAgentChat` | Built in (compatibility key) | Retired upstream on Nov 7, 2026 (#19360): Agent Chat is standard, and the server always reports the flag on and ignores stored or managed off values. `ui-new` drops its chat gate and the Features switch ([U57](build-plan.md#upstream-changes-to-integrate)); [decision 2](#2-agent-chat-is-off-unless-the-instance-turns-it-on) is settled (decided Nov 7, 2026). Until then it was server-enforced, and decision A had it on in every deployment. |
 | `enableEnvironments` | Built in | Environments are a company settings section (boards 21–25). |
 | `enableIssuePlanDecompositions` | Built in | Shown in a task's history when there is one (M2). |
 | `enableExperimentalFileViewer` | Built in | A task's workspace file browser, for reviewing an agent's work (M2). |
@@ -552,7 +559,6 @@ Server-enforced flags, all following the setting:
 
 | Flag | Notes |
 | --- | --- |
-| `enableAgentChat` | Decision A: on in every `ui-new` deployment. |
 | `enablePublicMcp` | Should be on: the MCP connection replaces chat outside tasks (3.12). Also needed by `enableOpenAiDot` and `enableGrokBot`. |
 | `enableCases` | Decision F: no cases page. When the setting is on, cases show inside the task views: the case chip, the task panel's Case section, Group: Case, and Start case in New task. |
 | `enableConferenceRoomChat` | No surface: team chat and its onboarding are dropped, as with chat outside tasks (3.12). |

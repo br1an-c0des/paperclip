@@ -41,6 +41,10 @@ concurrency `coalesce_if_active`, `always_enqueue`, `skip_if_active`; catch-up `
 - **Requests:** `GET|PATCH /api/routines/:id`, `GET|POST /api/routines/:routineId/description/annotations`
   (+ thread PATCH and comments), `POST /api/companies/:companyId/agent-hires`,
   `POST /api/companies/:companyId/agents`.
+  Since the 2026-11-07 sync, the responsible person is a searchable person picker beside Default
+  agent: `PATCH /api/routines/:id` with `responsibleUserId`, allowed when the detail's
+  `canChangeResponsibleUser` is true (`tasks:assign`, instance admins, local operators). Each change
+  is saved as a revision and logged.
 
 ### `routines/variables` and `/secrets`: Inputs
 

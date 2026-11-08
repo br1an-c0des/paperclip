@@ -143,8 +143,19 @@ cheatsheet, the command palette, global dialogs, and plugin overlays.
   `GET /api/companies/:companyId/attention/history` (cursor-paged decision history). Since the
   2026-11-01 sync, its counts and Needs attention use `GET /api/companies/:companyId/attention/summary`
   and `/attention/tasks`.
+- **Since the 2026-11-07 sync** (#19360, #19363, #19393), Coordinator is the default workspace for
+  everyone and Agent Chat is standard (`enableAgentChat` is a compatibility key, always on). Classic is
+  a per-person opt-in in Experimental settings (`classic_workspace_enabled` on the workspace
+  preference; migration 0433 turns `coordinator_workspace_enabled` on by default), and the old
+  Coordinator experiment value is ignored. Its "Needs you" entry is now **Inbox**, with the inbox icon;
+  the old Inbox item under More is gone and old Inbox URLs redirect into Tasks. **Tasks** now hosts
+  Mine, Unread, Recent, Blocked and Everything through the personal-inbox code (read and unread state,
+  archive and undo, swipe, grouping, saved columns), and **All tasks** is the first-visit default, with
+  the "Last updated" header unhighlighted until someone picks a sort. Organization table columns are
+  saved per person and company. No API changes.
 - **Notes:** upstream's own take on what `ui-new` redesigns: the Inbox's Needs you, requests and agent
-  chat. Not ported. It's to be compared with `ui-new` and designed
+  chat. Not ported. `ui-new` keeps its Inbox separate from Tasks (board 14) and ignores
+  `classic_workspace_enabled`, as decision 47 did the Coordinator preference. It's to be compared with `ui-new` and designed
   ([build plan 3.16](../../build-plan.md#316-upstreams-coordinator-workspace), U36).
 
 ### `shell/misc`: Other shell features

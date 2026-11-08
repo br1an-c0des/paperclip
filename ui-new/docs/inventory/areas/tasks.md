@@ -232,6 +232,12 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   Since the 2026-11-05 sync, a "Usage limit" line under the assignee shows the agent's provider
   rate-limit windows, from `GET /api/agents/:id/runtime-state` (`stateJson.providerRateLimits`), refreshed by
   the `agent.runtime_state.updated` live event (`components/AgentRateLimitGauge.tsx`).
+  Since the 2026-11-07 sync, a Context row ("10% of 258k") shows the agent's context window, with a
+  hover breakdown of tokens, cost and compactions, refreshed every 8 s while a run is active
+  (`GET /api/issues/:id/context-usage`, type `IssueContextUsage`). "Compact now" (board only) queues a
+  short run that compacts the context and does no task work (`POST /api/issues/:id/context/compact`),
+  also while an Agent Chat waits; the transcript shows a compaction divider
+  (`components/issue-properties/context-usage-row.tsx`).
 - **Notes:** title and description are edited inline in the header and description bubble (same PATCH).
 
 ### `task-coordination/delegation` and `/dependencies`: Subtasks and blockers
@@ -324,6 +330,12 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   `GET /api/issues/:id/recovery-actions` and sends `POST /api/issues/:id/recovery-actions/recover-workspace`
   with a saved idempotency key (`components/WorkspaceExportRecovery.tsx`); the interruption shows the
   recovery step (`recoveryStep`) and a Retry wait (`execution.retryWait`).
+  Since the 2026-11-07 sync, when Paperclip can't verify that a killed previous server stopped
+  (`userAction: "confirm_owner_stop"`), a company owner or admin confirms it, with how they checked,
+  through `POST /api/issues/:id/recovery-actions/resume-workspace-finalization` (stop evidence) or
+  `POST /api/issues/:id/recovery-actions/confirm-controller-stopped`; Retry or Recover stays offered on
+  retryable retained holds whose source can't be verified (`retainedSourceFallback`), and a pending
+  native resume shows "resuming" with its time instead of Retry (`components/WorkspaceExportRecovery.tsx`).
 - **Unused by the old UI:** `POST /api/issues/:id/recovery-actions/reconstruct-workspace` (continue from
   saved sources).
 
