@@ -624,6 +624,30 @@ export type TestEnvironmentApi = (
  * Code, Codex and Grok when that didn't prove the sign-in, the harness's CLI on the legacy runner
  * for its hello probe. The two results are merged, one line per check.
  */
+/** How long a setup check may take before the page gives up on it (#19505: two minutes). */
+export const SETUP_CHECK_TIMEOUT_MS = 120_000;
+export const SETUP_CHECK_TIMEOUT_MESSAGE = "The check didn't finish in two minutes. Your setup is saved; test again.";
+
+/**
+ * A setup check that settles within `ms`: a stalled probe or harness test no longer leaves Test
+ * spinning. A result that arrives later is dropped, since the caller has moved on.
+ */
+export function boundedCheck<T>(work: () => Promise<T>, ms = SETUP_CHECK_TIMEOUT_MS): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(SETUP_CHECK_TIMEOUT_MESSAGE)), ms);
+    work().then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (cause: unknown) => {
+        clearTimeout(timer);
+        reject(cause);
+      },
+    );
+  });
+}
+
 export async function testSetup(
   test: TestEnvironmentApi,
   input: { agentId: string; setup: SetupDraft; runner: AgentRunner; runnerChoice: RunnerChoice; environmentId: string | null; adapterConfig: Record<string, unknown> },

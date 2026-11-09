@@ -23,6 +23,7 @@ import {
   isSetupDraft,
   needsRunnerQualification,
   preparing,
+  boundedCheck,
   previewLine,
   profileFromAgent,
   profilePatch,
@@ -323,19 +324,22 @@ export function AgentOnboarding() {
       if (!agent) throw new Error(saveError() ?? "Save the setup first.");
       if (preparing(draft())) throw new Error("The agent's environment is still being prepared. Test again in a moment.");
       const env = environment();
-      if (needsRunnerQualification(setup.harness, setup.runner, runner().recommended, env) && env) {
-        const why = qualificationProblem(await environmentsApi.probe(env.id, company().id));
-        if (why) throw new Error(why);
-        await client.invalidateQueries({ queryKey: queryKeys.agents.adapters(company().id, setup.environmentId || null) });
-      }
       const signature = setupSignature(setup);
-      const result = await testSetup((type, body) => agentsApi.testEnvironment(company().id, type, body), {
-        agentId: agent.id,
-        setup: { ...setup },
-        runner: runner().runner,
-        runnerChoice: setup.runner,
-        environmentId: env?.id ?? null,
-        adapterConfig: setupAdapterConfig(setup, runner().runner, (agent.adapterConfig ?? {}) as Record<string, unknown>),
+      // The whole check is bounded, so a stalled probe or test can be retried (#19505).
+      const result = await boundedCheck(async () => {
+        if (needsRunnerQualification(setup.harness, setup.runner, runner().recommended, env) && env) {
+          const why = qualificationProblem(await environmentsApi.probe(env.id, company().id));
+          if (why) throw new Error(why);
+          await client.invalidateQueries({ queryKey: queryKeys.agents.adapters(company().id, setup.environmentId || null) });
+        }
+        return testSetup((type, body) => agentsApi.testEnvironment(company().id, type, body), {
+          agentId: agent.id,
+          setup: { ...setup },
+          runner: runner().runner,
+          runnerChoice: setup.runner,
+          environmentId: env?.id ?? null,
+          adapterConfig: setupAdapterConfig(setup, runner().runner, (agent.adapterConfig ?? {}) as Record<string, unknown>),
+        });
       });
       setTest({ signature, result });
       return result;

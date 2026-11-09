@@ -2,6 +2,8 @@ import type { AdapterEnvironmentTestResult, AiConnectionList } from "@paperclipa
 import { describe, expect, it, vi } from "vitest";
 import type { AdapterInfo } from "@/api/agents";
 import {
+  boundedCheck,
+  SETUP_CHECK_TIMEOUT_MESSAGE,
   antigravityCandidate,
   defaultBinding,
   defaultProfile,
@@ -79,6 +81,22 @@ function result(status: "pass" | "warn" | "fail", codes: string[] = []): Adapter
     checks: codes.map((code) => ({ code, level: status === "fail" ? "error" : "info", message: code })),
   } as AdapterEnvironmentTestResult;
 }
+
+describe("bounded setup checks", () => {
+  it("gives up on a stalled check and passes a prompt one through", async () => {
+    vi.useFakeTimers();
+    try {
+      const stalled = boundedCheck(() => new Promise<never>(() => {}), 1000);
+      const caught = stalled.catch((cause: Error) => cause.message);
+      await vi.advanceTimersByTimeAsync(1000);
+      await expect(caught).resolves.toBe(SETUP_CHECK_TIMEOUT_MESSAGE);
+      await expect(boundedCheck(async () => "ok", 1000)).resolves.toBe("ok");
+      await expect(boundedCheck(async () => Promise.reject(new Error("no")), 1000)).rejects.toThrow("no");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
 
 describe("harness choices", () => {
   it("offers the loaded, enabled harnesses in board order, with how many agents use each", () => {
