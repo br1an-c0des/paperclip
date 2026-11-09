@@ -1,21 +1,26 @@
-import type { AgentDetail, AgentInstructionCandidate, AgentInstructionsBundle, AgentInstructionsFileDetail } from "@paperclipai/shared";
+import type { AgentDetail, AgentInstructionCandidate, AgentInstructionsBundle, AgentInstructionsFileDetail, AgentInstructionsFileSummary, ToolConnection } from "@paperclipai/shared";
+import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ChevronRight, Copy, Download, File, Folder, History, Plus, Trash2 } from "lucide-solid";
-import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
 import { agentsApi } from "@/api/agents";
+import { toolAccessApi } from "@/api/tool-access";
 import { queryKeys } from "@/api/queryKeys";
 import { MarkdownEditor } from "@/documents/MarkdownEditor";
 import { useCompany } from "@/lib/company";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { SettingsRow, TextInput } from "@/ui/Field";
+import { SettingsCard, SettingsRow, TextInput } from "@/ui/Field";
 import { Markdown } from "@/ui/Markdown";
 import { Popover } from "@/ui/Popover";
 import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
 import { copyText } from "@/tasks/TaskActions";
-import { actionableCandidates, bundleDraft, bundleProblem, bundleSize, bundleUpdate, diffHunks, diffSummary, fileRows, lineDiff, newFileProblem } from "../instructions-model";
+import { connectionSlug } from "@/apps/apps-model";
+import { useGallery } from "@/apps/shared";
+import { instructionsConfigured } from "@/apps/setups/extras-model";
+import { actionableCandidates, bundleDraft, bundleProblem, bundleSize, bundleUpdate, diffHunks, diffSummary, fileDate, fileRows, lineDiff, newFileProblem } from "../instructions-model";
 import { dateTime, failure, SectionTitle, shortDate, useAdapters } from "../shared";
 
 /*
@@ -128,18 +133,81 @@ export function InstructionsSection(props: { agent: AgentDetail }) {
                 </div>
                 <div class="ag-files-foot">{bundleSize(files())}</div>
               </div>
-              <FileEditor agent={props.agent} path={current()} editable={found().editable} entry={current() === found().entryFile} onDeleted={() => setSelected(null)} />
+              <FileEditor agent={props.agent} path={current()} summary={files().find((file) => file.path === current())} editable={found().editable} entry={current() === found().entryFile} onDeleted={() => setSelected(null)} />
             </section>
           )}
         </Show>
         <Show when={bundle.data}>{(found) => <BundleSettings agent={props.agent} bundle={found()} onEntryChanged={() => setSelected(null)} />}</Show>
       </Show>
+      <FromConnections agent={props.agent} />
     </>
   );
 }
 
+/**
+ * "From connections" (the old UI's AgentConnectionInstructions): the instructions the agent's
+ * active connections add to its prompt (`GET tools/profiles/effective/agents/:id`, the same read
+ * as Apps and tools). They're edited on the connection's page; this lists them read-only. Hidden
+ * when no connection brings any.
+ */
+function FromConnections(props: { agent: AgentDetail }) {
+  const company = useCompany();
+  const effective = createQuery(() => ({
+    queryKey: queryKeys.tools.effective(company().id, props.agent.id),
+    queryFn: ({ signal }) => toolAccessApi.effectiveForAgent(company().id, props.agent.id, signal),
+    retry: false,
+  }));
+  const gallery = useGallery();
+  const sources = createMemo(() =>
+    (effective.data?.installedConnections ?? [])
+      .filter((connection) => connection.agentInstructions && connection.enabled && connection.status === "active")
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  );
+  const app = (connection: ToolConnection) => {
+    const slug = connectionSlug(connection);
+    return slug ? (gallery.data?.apps.find((entry) => entry.slug === slug) ?? null) : null;
+  };
+  return (
+    <Switch>
+      <Match when={effective.isError}>
+        <p class="ps-list-note" role="alert">
+          Couldn't load the instructions from its connections. {failure(effective.error, "")}{" "}
+          <button type="button" class="ps-link" onClick={() => void effective.refetch()}>
+            Retry
+          </button>
+        </p>
+      </Match>
+      <Match when={sources().length > 0}>
+        <SettingsCard
+          aria-label="From connections"
+          title="From connections"
+          description="Its apps add these when the connection is available for the task. Access can also depend on the task's responsible person and on action permissions. Edit them on the app's page."
+        >
+          <For each={sources()}>
+            {(connection) => (
+              <SettingsRow label={<A class="ps-link" href={`/${company().issuePrefix}/apps/${connection.id}/permissions`}>{connection.name}</A>}>
+                <div class="ps-stack">
+                  <Show when={!connection.agentInstructions!.enabled}>
+                    <span class="fhelp ag-warn">These instructions are turned off for this connection.</span>
+                  </Show>
+                  <Show
+                    when={!gallery.data || instructionsConfigured(app(connection), connection)}
+                    fallback={<span class="fhelp ag-warn">Finish this connection's setup before agents get its instructions.</span>}
+                  >
+                    <p class="ag-conn-text">{connection.agentInstructions!.text}</p>
+                  </Show>
+                </div>
+              </SettingsRow>
+            )}
+          </For>
+        </SettingsCard>
+      </Match>
+    </Switch>
+  );
+}
+
 /** One file: Edit or Preview, History (entry file), download, delete, and Save. */
-function FileEditor(props: { agent: AgentDetail; path: string; editable: boolean; entry: boolean; onDeleted: () => void }) {
+function FileEditor(props: { agent: AgentDetail; path: string; summary?: AgentInstructionsFileSummary; editable: boolean; entry: boolean; onDeleted: () => void }) {
   const company = useCompany();
   const client = useQueryClient();
   const [mode, setMode] = createSignal<"edit" | "preview">("edit");
@@ -207,8 +275,19 @@ function FileEditor(props: { agent: AgentDetail; path: string; editable: boolean
     <div class="ag-editor">
       <div class="ag-editor-head">
         <span class="mono ag-editor-path">{props.path}</span>
-        <Show when={file.data?.revision && file.data.revision.createdAt && !file.data.revision.createdAt.startsWith("1970")}>
-          <span class="ps-muted-line">Edited {shortDate(file.data!.revision!.createdAt)}</span>
+        <Show
+          when={fileDate(file.data ?? props.summary)}
+          fallback={
+            <Show when={file.data?.revision && file.data.revision.createdAt && !file.data.revision.createdAt.startsWith("1970")}>
+              <span class="ps-muted-line">Edited {shortDate(file.data!.revision!.createdAt)}</span>
+            </Show>
+          }
+        >
+          {(date) => (
+            <span class="ps-muted-line" title={dateTime(date().at)}>
+              {date().label} {shortDate(date().at)}
+            </span>
+          )}
         </Show>
         <div class="ag-editor-actions">
           <Segmented

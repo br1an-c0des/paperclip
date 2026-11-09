@@ -7,7 +7,7 @@ import { createStore, reconcile } from "solid-js/store";
 import { budgetsApi } from "@/api/budgets";
 import { costsApi } from "@/api/costs";
 import { queryKeys } from "@/api/queryKeys";
-import { runPath, runsApi } from "@/api/runs";
+import { runPath, runsApi, type RunSummary } from "@/api/runs";
 import { budgetDirty, budgetDraft, budgetProblem, currentPolicy, parseDollars, WARN_OPTIONS, windowLabel, type BudgetDraft } from "@/projects/settings/settings-model";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
@@ -16,7 +16,7 @@ import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
-import { agentBudgetRequests, agentPolicies, formatCents, formatTokens, monthRange, runUsage, toNumber } from "../agent-model";
+import { agentBudgetRequests, agentPolicies, filterRuns, formatCents, formatTokens, monthRange, RUN_FILTERS, runUsage, toNumber, type RunFilter } from "../agent-model";
 import { dateTime, failure, FootError, refreshAgent, SectionTitle } from "../shared";
 import { runStatusTone } from "./RunnerStateCard";
 import { readNote } from "@/lib/offline/read-state";
@@ -197,14 +197,20 @@ function UsageCard(props: { agent: AgentDetail }) {
     queryFn: ({ signal }) => costsApi.byAgentModel(company().id, range.from, undefined, signal),
     retry: false,
   }));
+  // The last 20 runs, or the last 200 with "Show all runs" (the old Runs tab's list), by status.
+  const [all, setAll] = createSignal(false);
+  const [filter, setFilter] = createSignal<RunFilter>("all");
+  const limit = () => (all() ? 200 : 20);
   const runs = createQuery(() => ({
-    queryKey: queryKeys.agents.runs(company().id, props.agent.id),
-    queryFn: ({ signal }) => runsApi.list(company().id, { agentId: props.agent.id, limit: 20, summary: true }, signal),
+    queryKey: [...queryKeys.agents.runs(company().id, props.agent.id), limit()],
+    queryFn: ({ signal }) => runsApi.list(company().id, { agentId: props.agent.id, limit: limit(), summary: true }, signal),
+    placeholderData: (previous: RunSummary[] | undefined) => previous,
     retry: false,
   }));
   const mine = createMemo(() => (byAgent.data ?? []).find((row) => row.agentId === props.agent.id));
   const models = createMemo(() => (byModel.data ?? []).filter((row) => row.agentId === props.agent.id).sort((a, b) => b.costCents - a.costCents || b.inputTokens - a.inputTokens));
   const recent = createMemo(() => runUsage(runs.data));
+  const shown = createMemo(() => filterRuns(runs.data, filter()).slice(0, all() ? 200 : 8));
 
   return (
     <SettingsCard title="Usage this month" description="From the cost ledger, since the first of the month (UTC).">
@@ -268,8 +274,13 @@ function UsageCard(props: { agent: AgentDetail }) {
       </Show>
       <SettingsRow label="Recent runs" help={runs.data ? `The last ${recent().count}: ${formatTokens(recent().input + recent().cached + recent().output)} tokens${recent().failed ? `, ${recent().failed} failed` : ""}.` : undefined}>
         <Show when={(runs.data ?? []).length > 0} fallback={<span class="ag-static-text">{runs.isLoading ? "Loading…" : runs.isError ? failure(runs.error, "Couldn't load the runs.") : "No runs yet."}</span>}>
+          <div class="ps-stack">
+          <Segmented label="Run status" options={RUN_FILTERS} value={filter()} onChange={setFilter} />
+          <Show when={shown().length === 0}>
+            <span class="ag-static-text">No {RUN_FILTERS.find((entry) => entry.value === filter())!.label.toLowerCase()} runs among the last {(runs.data ?? []).length}.</span>
+          </Show>
           <ul class="ps-list ag-runs">
-            <For each={(runs.data ?? []).slice(0, 8)}>
+            <For each={shown()}>
               {(run) => (
                 <li class="ps-list-row">
                   <TonePill tone={runStatusTone(run.status)} compact>
@@ -287,6 +298,19 @@ function UsageCard(props: { agent: AgentDetail }) {
               )}
             </For>
           </ul>
+          <Show
+            when={all()}
+            fallback={
+              <Show when={(runs.data ?? []).length > 8}>
+                <button type="button" class="ps-link" onClick={() => setAll(true)}>
+                  Show all runs
+                </button>
+              </Show>
+            }
+          >
+            <span class="ps-muted-line">{runs.isFetching ? "Loading runs…" : `Showing the ${(runs.data ?? []).length} most recent runs.`}</span>
+          </Show>
+          </div>
         </Show>
       </SettingsRow>
     </SettingsCard>

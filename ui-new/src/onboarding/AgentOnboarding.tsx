@@ -1,4 +1,4 @@
-import type { AdapterEnvironmentTestResult, Agent, AgentDetail, AgentRunner } from "@paperclipai/shared";
+import type { AdapterEnvironmentTestResult, Agent, AgentDetail } from "@paperclipai/shared";
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ArrowLeft, Check, Plus, RotateCw } from "lucide-solid";
@@ -23,6 +23,7 @@ import {
   isSetupDraft,
   needsRunnerQualification,
   preparing,
+  boundedCheck,
   previewLine,
   profileFromAgent,
   profilePatch,
@@ -31,7 +32,6 @@ import {
   qualificationProblem,
   requiresProviderModel,
   resolveRunner,
-  runnerSwitch,
   selectedSignIn,
   setupAdapterConfig,
   setupEffortOptions,
@@ -324,19 +324,22 @@ export function AgentOnboarding() {
       if (!agent) throw new Error(saveError() ?? "Save the setup first.");
       if (preparing(draft())) throw new Error("The agent's environment is still being prepared. Test again in a moment.");
       const env = environment();
-      if (needsRunnerQualification(setup.harness, setup.runner, runner().recommended, env) && env) {
-        const why = qualificationProblem(await environmentsApi.probe(env.id, company().id));
-        if (why) throw new Error(why);
-        await client.invalidateQueries({ queryKey: queryKeys.agents.adapters(company().id, setup.environmentId || null) });
-      }
       const signature = setupSignature(setup);
-      const result = await testSetup((type, body) => agentsApi.testEnvironment(company().id, type, body), {
-        agentId: agent.id,
-        setup: { ...setup },
-        runner: runner().runner,
-        runnerChoice: setup.runner,
-        environmentId: env?.id ?? null,
-        adapterConfig: setupAdapterConfig(setup, runner().runner, (agent.adapterConfig ?? {}) as Record<string, unknown>),
+      // The whole check is bounded, so a stalled probe or test can be retried (#19505).
+      const result = await boundedCheck(async () => {
+        if (needsRunnerQualification(setup.harness, setup.runner, runner().recommended, env) && env) {
+          const why = qualificationProblem(await environmentsApi.probe(env.id, company().id));
+          if (why) throw new Error(why);
+          await client.invalidateQueries({ queryKey: queryKeys.agents.adapters(company().id, setup.environmentId || null) });
+        }
+        return testSetup((type, body) => agentsApi.testEnvironment(company().id, type, body), {
+          agentId: agent.id,
+          setup: { ...setup },
+          runner: runner().runner,
+          runnerChoice: setup.runner,
+          environmentId: env?.id ?? null,
+          adapterConfig: setupAdapterConfig(setup, runner().runner, (agent.adapterConfig ?? {}) as Record<string, unknown>),
+        });
       });
       setTest({ signature, result });
       return result;
@@ -428,7 +431,6 @@ export function AgentOnboarding() {
 
   // ---- View ---------------------------------------------------------------------------------
   const working = () => busy() !== null || testing();
-  const runnerRow = createMemo(() => runnerSwitch(setup.runner, runner()));
   const resuming = () => !!draftId() && !draft() && !detail.isError;
   const effortLabel = () => efforts().find((option) => option.value === setup.effort)?.label ?? "Auto";
   const previewAgent = () => hired() ?? { id: draftId() ?? "new-agent", name: profile.name || "New agent", appearance: paletteAppearance(profile.paletteId) };
@@ -679,29 +681,10 @@ export function AgentOnboarding() {
                     </Show>
 
                     <Show when={runner().applies}>
-                      <SettingsRow label="Runner" help="Picked for this harness and machine. You can switch it later in the agent's settings.">
-                        <div class="ps-inline">
-                          <TonePill tone={runner().runner === "paperclip" ? "run" : "violet"} compact>
-                            {runnerLabel(runner().runner)}
-                          </TonePill>
-                          <Show when={runnerRow().recommended}>
-                            <span class="ps-muted-line">Recommended here</span>
-                          </Show>
-                          <Switch>
-                            <Match when={runnerRow().offer?.kind === "recommended"}>
-                              <button type="button" class="ps-link" onClick={() => setSetup("runner", "auto")}>
-                                Use the recommended runner
-                              </button>
-                            </Match>
-                            <Match when={runnerRow().offer?.kind === "runner" && (runnerRow().offer as { runner: AgentRunner }).runner}>
-                              {(other) => (
-                                <button type="button" class="ps-link" onClick={() => setSetup("runner", other())}>
-                                  Use the {other() === "paperclip" ? "Paperclip Runner" : "legacy runner"}
-                                </button>
-                              )}
-                            </Match>
-                          </Switch>
-                        </div>
+                      <SettingsRow label="Runner" help="Paperclip picks a qualified runner for this harness and machine. You can switch it later in the agent's settings.">
+                        <TonePill tone={runner().runner === "paperclip" ? "run" : "violet"} compact>
+                          {runnerLabel(runner().runner)}
+                        </TonePill>
                       </SettingsRow>
                     </Show>
 

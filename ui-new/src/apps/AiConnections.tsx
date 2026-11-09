@@ -1,6 +1,6 @@
 import type { AiConnectionList } from "@paperclipai/shared";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { RefreshCw, Star } from "lucide-solid";
+import { Crown, RefreshCw } from "lucide-solid";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { aiConnectionsApi } from "@/api/ai-connections";
 import { healthApi } from "@/api/health";
@@ -53,11 +53,18 @@ export function AiConnections() {
   const connectedCount = () => connections().filter((c) => c.status === "connected").length;
   const attentionCount = () => connections().filter((c) => c.status !== "connected").length;
 
+  // One default per provider (#19845): a failed change stays on its row with Retry until it's
+  // tried again or another one succeeds.
+  const [failed, setFailed] = createSignal<{ grantId: string; message: string } | null>(null);
   const makeDefault = createMutation(() => ({
-    mutationFn: (grantId: string) => aiConnectionsApi.setDefault(company().id, grantId),
-    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.aiConnections.list(company().id) }),
-    onError: (error: Error) => pushToast({ title: "Couldn't change your default", body: error.message, tone: "error" }),
+    mutationFn: (connection: Connection) => aiConnectionsApi.setDefault(company().id, connection.grantId),
+    onSuccess: (_result: unknown, connection: Connection) => {
+      pushToast({ title: `${connection.name} is now your ${providerName(connection.provider)} default`, tone: "success" });
+      return client.invalidateQueries({ queryKey: queryKeys.aiConnections.list(company().id) });
+    },
+    onError: (error: Error, connection: Connection) => setFailed({ grantId: connection.grantId, message: error.message }),
   }));
+  const providerPending = (connection: Connection) => makeDefault.isPending && makeDefault.variables?.provider === connection.provider;
 
   const openSetup = (connection?: Connection) => {
     setReconnecting(connection);
@@ -112,8 +119,13 @@ export function AiConnections() {
                     <ConnectionRow
                       connection={connection}
                       list={data()}
-                      defaultPending={makeDefault.isPending && makeDefault.variables === connection.grantId}
-                      onMakeDefault={() => makeDefault.mutate(connection.grantId)}
+                      defaultPending={providerPending(connection)}
+                      defaultSaving={makeDefault.isPending && makeDefault.variables?.grantId === connection.grantId}
+                      defaultError={failed()?.grantId === connection.grantId ? failed()!.message : null}
+                      onMakeDefault={() => {
+                        setFailed(null);
+                        makeDefault.mutate(connection);
+                      }}
                       onReconnect={() => openSetup(connection)}
                     />
                   )}
@@ -148,7 +160,11 @@ export function AiConnections() {
 function ConnectionRow(props: {
   connection: Connection;
   list: AiConnectionList;
+  /** A default change for this provider is saving. */
   defaultPending: boolean;
+  /** This account's own default change is saving. */
+  defaultSaving: boolean;
+  defaultError: string | null;
   onMakeDefault: () => void;
   onReconnect: () => void;
 }) {
@@ -177,14 +193,26 @@ function ConnectionRow(props: {
         <div class="cx-row-title">
           <span class="cx-row-name">{props.connection.name}</span>
           <Show when={props.connection.isDefault}>
-            <TonePill tone="violet" compact icon={<Star size={12} aria-hidden="true" />}>
-              Your default
+            <TonePill tone={props.connection.status === "connected" ? "violet" : "red"} compact icon={<Crown size={12} aria-hidden="true" />}>
+              {props.connection.status === "connected" ? `Your ${providerName(props.connection.provider)} default` : "Default unavailable"}
             </TonePill>
           </Show>
         </div>
         <p class="cx-row-meta">{meta()}</p>
         <Show when={props.connection.unavailableReason}>
           {(reason) => <p class="cx-row-reason">{reason()}</p>}
+        </Show>
+        <Show when={props.defaultError}>
+          {(message) => (
+            <div class="cx-row-failed" role="alert">
+              <span>
+                Couldn't change your {providerName(props.connection.provider)} default. {message()}
+              </span>
+              <Button size="compact" disabled={props.defaultPending} onClick={props.onMakeDefault}>
+                Retry
+              </Button>
+            </div>
+          )}
         </Show>
         <Show when={(runs.data?.length ?? 0) > 0}>
           <p class="cx-row-runs">
@@ -198,8 +226,8 @@ function ConnectionRow(props: {
         </TonePill>
         <div class="cx-row-actions">
           <Show when={canMakeDefault(props.connection, props.list.currentUserId)}>
-            <Button size="compact" disabled={props.defaultPending} onClick={props.onMakeDefault}>
-              Make default
+            <Button size="compact" disabled={props.defaultPending} icon={<Crown size={14} aria-hidden="true" />} onClick={props.onMakeDefault}>
+              {props.defaultSaving ? "Setting…" : `Set as default for ${providerName(props.connection.provider)}`}
             </Button>
           </Show>
           <Show when={canReconnect(props.connection, props.list)}>

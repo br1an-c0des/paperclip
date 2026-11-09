@@ -837,6 +837,29 @@ export function recommendedForLeads(key: string) {
 const OPEN_RUN = new Set(["queued", "running", "scheduled_retry"]);
 
 /** Spend and tokens in the agent's recent runs, newest first, from the run list. */
+/** The Budget page's run filter, the old Runs tab's status picker in groups. */
+export type RunFilter = "all" | "active" | "succeeded" | "failed" | "cancelled";
+
+export const RUN_FILTERS: { value: RunFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "active", label: "Active" },
+  { value: "succeeded", label: "Succeeded" },
+  { value: "failed", label: "Failed" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+const RUN_FILTER_STATUSES: Record<Exclude<RunFilter, "all">, readonly string[]> = {
+  active: ["queued", "scheduled_retry", "running"],
+  succeeded: ["succeeded"],
+  failed: ["failed", "timed_out", "interrupted"],
+  cancelled: ["cancelled"],
+};
+
+export function filterRuns<T extends Pick<RunSummary, "status">>(runs: readonly T[] | undefined, filter: RunFilter): T[] {
+  const list = runs ?? [];
+  return filter === "all" ? [...list] : list.filter((run) => RUN_FILTER_STATUSES[filter].includes(run.status));
+}
+
 export function runUsage(runs: readonly RunSummary[] | undefined) {
   const list = runs ?? [];
   let input = 0;

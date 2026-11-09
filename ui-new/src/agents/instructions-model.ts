@@ -96,6 +96,17 @@ export function fileRows(files: readonly AgentInstructionsFileSummary[]): FileRo
   return rows;
 }
 
+/**
+ * When a file last changed, or else when it was made (`updatedAt`, `createdAt`, #19535). Older
+ * files may have neither recorded, and no date is made up for them.
+ */
+export function fileDate(file: Pick<AgentInstructionsFileSummary, "createdAt" | "updatedAt"> | null | undefined): { label: "Updated" | "Created"; at: string } | null {
+  const valid = (value: string | undefined): value is string => !!value && Number.isFinite(Date.parse(value)) && !value.startsWith("1970");
+  if (valid(file?.updatedAt)) return { label: "Updated", at: file.updatedAt };
+  if (valid(file?.createdAt)) return { label: "Created", at: file.createdAt };
+  return null;
+}
+
 /** "6 files · 9.4 KB". */
 export function bundleSize(files: readonly AgentInstructionsFileSummary[]) {
   const bytes = files.reduce((sum, file) => sum + (file.size ?? 0), 0);

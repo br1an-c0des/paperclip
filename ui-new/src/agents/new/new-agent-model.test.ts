@@ -2,6 +2,8 @@ import type { AdapterEnvironmentTestResult, AiConnectionList } from "@paperclipa
 import { describe, expect, it, vi } from "vitest";
 import type { AdapterInfo } from "@/api/agents";
 import {
+  boundedCheck,
+  SETUP_CHECK_TIMEOUT_MESSAGE,
   antigravityCandidate,
   defaultBinding,
   defaultProfile,
@@ -19,7 +21,6 @@ import {
   profileProblem,
   provisionalAdapter,
   resolveRunner,
-  runnerSwitch,
   selectedSignIn,
   setupAdapterConfig,
   setupEffortOptions,
@@ -81,6 +82,22 @@ function result(status: "pass" | "warn" | "fail", codes: string[] = []): Adapter
   } as AdapterEnvironmentTestResult;
 }
 
+describe("bounded setup checks", () => {
+  it("gives up on a stalled check and passes a prompt one through", async () => {
+    vi.useFakeTimers();
+    try {
+      const stalled = boundedCheck(() => new Promise<never>(() => {}), 1000);
+      const caught = stalled.catch((cause: Error) => cause.message);
+      await vi.advanceTimersByTimeAsync(1000);
+      await expect(caught).resolves.toBe(SETUP_CHECK_TIMEOUT_MESSAGE);
+      await expect(boundedCheck(async () => "ok", 1000)).resolves.toBe("ok");
+      await expect(boundedCheck(async () => Promise.reject(new Error("no")), 1000)).rejects.toThrow("no");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("harness choices", () => {
   it("offers the loaded, enabled harnesses in board order, with how many agents use each", () => {
     const agents = [
@@ -123,16 +140,6 @@ describe("runner defaulting", () => {
     expect(resolveRunner("claude_local", "auto", undefined)).toMatchObject({ runner: "legacy", recommended: undefined, alternative: null });
     const off = ADAPTERS.map((entry) => (entry.type === "paperclip_runner" ? { ...entry, disabled: true } : entry));
     expect(resolveRunner("claude_local", "auto", off)).toMatchObject({ runner: "legacy", recommended: "legacy", alternative: null });
-  });
-
-  it("offers the other runner while on the recommended one, and a way back when off it", () => {
-    const claude = resolveRunner("claude_local", "auto", ADAPTERS);
-    expect(runnerSwitch("auto", claude)).toEqual({ recommended: true, offer: { kind: "runner", runner: "legacy" } });
-    // A resumed draft that names the recommended runner reads as recommended, not as a detour.
-    expect(runnerSwitch("paperclip", resolveRunner("claude_local", "paperclip", ADAPTERS))).toEqual({ recommended: true, offer: { kind: "runner", runner: "legacy" } });
-    expect(runnerSwitch("legacy", resolveRunner("claude_local", "legacy", ADAPTERS))).toEqual({ recommended: false, offer: { kind: "recommended" } });
-    const only = ADAPTERS.map((entry) => (entry.type === "claude_local" ? { ...entry, supportedRunners: ["paperclip" as const] } : entry));
-    expect(runnerSwitch("auto", resolveRunner("claude_local", "auto", only))).toEqual({ recommended: true, offer: null });
   });
 
   it("has no runner for harnesses only the legacy runner carries", () => {
