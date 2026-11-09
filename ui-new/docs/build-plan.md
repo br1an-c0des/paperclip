@@ -477,6 +477,10 @@ U65; U61, U69 and U80 checks; the phone toolbar width) and `integrate/agents-app
 U73–U75 and U77 checks; U11's remaining differences and "From connections"). The collapsed request
 cards and Inbox grouping from U36 follow once their artboard is approved.
 
+Integration round 4 (Nov 9): `inbox/request-cards` builds the collapsed request cards and Inbox
+grouping from U36 ([board 14b](design/boards.md#board-14b)), and `integrate/run-leftovers` adds the
+compaction divider to the run modal (U58) and the pending-resume wording (U63).
+
 Outcomes: **build** (an agent builds it), **decide** (a question for the user first), **check**
 (verify, then build or close), **design** (needs boards first), **left out** (with the reason),
 **done**. When a line is built or settled, mark it done or left out here and in its row.

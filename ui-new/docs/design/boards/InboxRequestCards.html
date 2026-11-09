@@ -1,0 +1,1125 @@
+<title>Inbox Request Cards</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Fragment+Mono&display=swap">
+<style>
+/* Layout: one reading column of review sections (live Inbox, kind-by-kind pairs, two phones, notes),
+   built from ui-new's Capsule Stack tokens. Dark first, light supported. */
+:root {
+  color-scheme: dark;
+  --ion-a: #8b2cf0; --ion-b: #1f6fe0;
+  --orchid-a: #ff2bd6; --orchid-b: #8b2cf0;
+  --ember-a: #f7b52f; --ember-b: #f5822a;
+  --flare-a: #f2286f; --flare-b: #f2272c;
+  --lagoon-a: #2fd12f; --lagoon-b: #22b5a5;
+  --tide-a: #22b5a5; --tide-b: #4c7896;
+  --on-disc: #ffffff;
+
+  --ground: #0a0a0a;
+  --card: #141414;
+  --card-edge: #1f1f1f;
+  --shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 16px 34px -18px rgba(0,0,0,.95);
+  --shadow-lg: inset 0 1px 0 rgba(255,255,255,.06), 0 34px 80px -20px rgba(0,0,0,.95);
+  --well: #161616;
+  --sel: #262626;
+  --sel-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 1px 3px rgba(0,0,0,.7);
+  --line: #1f1f1f;
+  --row-line: #1a1a1a;
+  --hover: #1a1a1a;
+  --row-hover: #181818;
+  --code: #0f0f0f;
+  --settled: #0f0f0f;
+  --text: #f4f1ea;
+  --body: #c9c6bf;
+  --muted: #8f8c86;
+  --edge: #2c2c2c;
+  --dashed: #4a4843;
+  --primary: #f4f1ea;
+  --on-primary: #0a0a0a;
+  --run-bg: #17142b; --run-fg: #c9c2ff;
+  --violet-bg: rgba(139,44,240,.15); --violet-fg: #dcb8ff;
+  --amber-bg: rgba(247,181,47,.1); --amber-fg: #ffc98a;
+  --red-bg: rgba(242,40,111,.12); --red-fg: #ff9aa8;
+  --green-bg: rgba(47,209,47,.1); --green-fg: #9be59b;
+  --cyan-bg: rgba(34,181,165,.12); --cyan-fg: #8fe3d8;
+  --ash-a: #3a3a3a; --ash-b: #6b6b6b;
+  --frame: #050505;
+  --note-bg: rgba(247,181,47,.07);
+
+  --g-ion: linear-gradient(180deg, var(--ion-a), var(--ion-b));
+  --g-orchid: linear-gradient(180deg, var(--orchid-a), var(--orchid-b));
+  --g-ember: linear-gradient(180deg, var(--ember-a), var(--ember-b));
+  --g-flare: linear-gradient(180deg, var(--flare-a), var(--flare-b));
+  --g-lagoon: linear-gradient(180deg, var(--lagoon-a), var(--lagoon-b));
+  --g-tide: linear-gradient(180deg, var(--tide-a), var(--tide-b));
+  --g-ash: linear-gradient(180deg, var(--ash-a), var(--ash-b));
+
+  --r-pill: 999px; --r-card: 18px; --r-inner: 14px; --r-field: 12px;
+  --font-ui: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --display: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Fragment Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --dtrack: -.045em;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --ground: #f2f2f4; --card: #ffffff; --card-edge: transparent;
+    --shadow: 0 1px 2px rgba(17,17,19,.06), 0 10px 28px -14px rgba(17,17,19,.2);
+    --shadow-lg: 0 2px 6px rgba(17,17,19,.08), 0 30px 70px -24px rgba(17,17,19,.38);
+    --well: #e7e7ea; --sel: #ffffff; --sel-shadow: 0 1px 3px rgba(17,17,19,.12);
+    --line: #ececf0; --row-line: #f0f0f3; --hover: #e7e7ea; --row-hover: #f8f8fa;
+    --code: #f6f6f8; --settled: #ffffff;
+    --text: #111113; --body: #45454d; --muted: #6b6b75; --edge: #cfcfd6; --dashed: #b4b4bd;
+    --primary: #111113; --on-primary: #ffffff;
+    --run-bg: #ecebff; --run-fg: #3b2fc0; --violet-bg: #f6e6ff; --violet-fg: #7a1fb8;
+    --amber-bg: #fff1dc; --amber-fg: #94480a; --red-bg: #fde7ea; --red-fg: #b0102a;
+    --green-bg: #e2f6e5; --green-fg: #17672f; --cyan-bg: #dcf4f1; --cyan-fg: #0e6a61;
+    --ash-a: #c9c9cf; --ash-b: #9a9aa3; --frame: #e4e4e8; --note-bg: #fff6e8;
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ground: #f2f2f4; --card: #ffffff; --card-edge: transparent;
+  --shadow: 0 1px 2px rgba(17,17,19,.06), 0 10px 28px -14px rgba(17,17,19,.2);
+  --shadow-lg: 0 2px 6px rgba(17,17,19,.08), 0 30px 70px -24px rgba(17,17,19,.38);
+  --well: #e7e7ea; --sel: #ffffff; --sel-shadow: 0 1px 3px rgba(17,17,19,.12);
+  --line: #ececf0; --row-line: #f0f0f3; --hover: #e7e7ea; --row-hover: #f8f8fa;
+  --code: #f6f6f8; --settled: #ffffff;
+  --text: #111113; --body: #45454d; --muted: #6b6b75; --edge: #cfcfd6; --dashed: #b4b4bd;
+  --primary: #111113; --on-primary: #ffffff;
+  --run-bg: #ecebff; --run-fg: #3b2fc0; --violet-bg: #f6e6ff; --violet-fg: #7a1fb8;
+  --amber-bg: #fff1dc; --amber-fg: #94480a; --red-bg: #fde7ea; --red-fg: #b0102a;
+  --green-bg: #e2f6e5; --green-fg: #17672f; --cyan-bg: #dcf4f1; --cyan-fg: #0e6a61;
+  --ash-a: #c9c9cf; --ash-b: #9a9aa3; --frame: #e4e4e8; --note-bg: #fff6e8;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--body); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+a { color: inherit; }
+.mono { font-family: var(--font-mono); }
+.disp { font-family: var(--display); letter-spacing: var(--dtrack); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ic { flex-shrink: 0; display: block; }
+:focus-visible { outline: 2px solid var(--run-fg); outline-offset: 2px; }
+
+.page { max-width: 1240px; margin: 0 auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 56px; }
+
+/* Page header */
+.intro { display: grid; gap: 14px; }
+.intro-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.eyebrow { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.intro h1 { margin: 0; color: var(--text); font-family: var(--display); letter-spacing: var(--dtrack); font-size: clamp(30px, 6vw, 44px); font-weight: 800; line-height: 1; text-wrap: balance; }
+.intro p { margin: 0; max-width: 68ch; font-size: 15px; }
+.sample { display: flex; gap: 10px; align-items: flex-start; max-width: 68ch; padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--amber-fg) 40%, transparent); border-radius: var(--r-inner); background: var(--note-bg); color: var(--body); font-size: 13px; }
+.sample b { color: var(--amber-fg); }
+.asks { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; max-width: 72ch; font-size: 14px; }
+.asks li { display: flex; gap: 10px; }
+.asks .num { font-family: var(--font-mono); color: var(--muted); font-size: 12px; padding-top: 2px; }
+
+/* Section heads */
+.sec { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.sec-head { display: grid; gap: 6px; }
+.sec-head h2 { margin: 0; color: var(--text); font-family: var(--display); letter-spacing: -.03em; font-size: 26px; font-weight: 800; line-height: 1.1; text-wrap: balance; }
+.sec-head p { margin: 0; max-width: 72ch; }
+.sec-num { color: var(--muted); font-family: var(--font-mono); font-size: 12px; }
+
+/* Segmented control and tabs */
+.seg { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: var(--r-pill); background: var(--well); max-width: 100%; }
+.seg button { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 11px; border-radius: var(--r-pill); color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] { background: var(--sel); box-shadow: var(--sel-shadow); color: var(--text); font-weight: 800; }
+.seg-label { padding: 0 6px 0 9px; color: var(--muted); font-size: 12px; font-weight: 600; }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: var(--r-pill); border: 1px solid var(--edge); color: var(--text); font-size: 13px; font-weight: 700; white-space: nowrap; text-decoration: none; }
+.btn:hover { background: var(--hover); }
+.btn--primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); font-weight: 800; }
+.btn--primary:hover { background: var(--primary); opacity: .9; }
+.btn--danger { border-color: color-mix(in srgb, var(--red-fg) 55%, transparent); color: var(--red-fg); }
+.btn--quiet { border-color: transparent; color: var(--body); }
+.btn[aria-disabled="true"] { opacity: .45; }
+.btn--icon { width: 32px; padding: 0; border-color: transparent; color: var(--muted); }
+
+/* Fields */
+.fld { width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--edge); border-radius: var(--r-field); background: var(--ground); color: var(--text); font: inherit; font-size: 13px; }
+textarea.fld { height: auto; min-height: 60px; padding: 9px 12px; resize: vertical; }
+.fld::placeholder { color: var(--muted); }
+.fld:focus { outline: none; box-shadow: 0 0 0 2px var(--run-fg); }
+
+/* Avatars */
+.av { --s: 22px; width: var(--s); height: var(--s); flex-shrink: 0; display: inline-grid; place-items: center; border-radius: 50%; color: var(--on-disc); font-size: calc(var(--s) * .4); font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+.av--ion { background: linear-gradient(160deg, var(--ion-a), var(--ion-b)); }
+.av--orchid { background: linear-gradient(160deg, var(--orchid-a), var(--orchid-b)); }
+.av--ember { background: linear-gradient(160deg, var(--ember-a), var(--ember-b)); }
+.av--lagoon { background: linear-gradient(160deg, var(--lagoon-a), var(--lagoon-b)); }
+.av--tide { background: linear-gradient(160deg, var(--tide-a), var(--tide-b)); }
+.av--ash { background: linear-gradient(160deg, var(--ash-a), var(--ash-b)); }
+.av--you { background: var(--primary); color: var(--on-primary); }
+.av--outside { background: var(--ground); color: var(--muted); border: 1.5px dashed var(--dashed); }
+.cap { display: inline-block; flex-shrink: 0; width: 6px; height: 16px; border-radius: var(--r-pill); }
+.cap--ion { background: var(--g-ion); } .cap--orchid { background: var(--g-orchid); } .cap--ember { background: var(--g-ember); }
+.cap--flare { background: var(--g-flare); } .cap--lagoon { background: var(--g-lagoon); } .cap--tide { background: var(--g-tide); } .cap--ash { background: var(--g-ash); }
+.pdisc { width: 22px; height: 22px; flex-shrink: 0; display: inline-grid; place-items: center; border-radius: 50%; color: var(--on-disc); font-size: 10px; font-weight: 800; }
+
+/* ===== Inbox (board 14) ===== */
+.window { border: 1px solid var(--line); border-radius: 24px; background: var(--ground); padding: 18px clamp(12px, 2.4vw, 26px) 26px; box-shadow: var(--shadow); min-width: 0; }
+.ibx { container: ibx / inline-size; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ibx-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 4px 0 2px; }
+.ibx-head h3 { margin: 0; display: flex; align-items: center; gap: 10px; color: var(--text); font-family: var(--display); letter-spacing: var(--dtrack); font-size: 30px; font-weight: 800; line-height: 1; }
+.tabs { display: flex; gap: 2px; padding: 4px; border-radius: var(--r-pill); background: var(--well); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.tab { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: var(--r-pill); color: var(--body); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.tab[aria-current="page"] { background: var(--sel); box-shadow: var(--sel-shadow); color: var(--text); font-weight: 800; }
+.tab .n { color: var(--muted); font-size: 12px; font-weight: 600; }
+.tab .n--hot { color: var(--run-fg); }
+.ibx-head-end { margin-left: auto; }
+.ibx-bar { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; min-width: 0; }
+.glyph { width: 5px; height: 12px; border-radius: var(--r-pill); }
+.kc { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+.ibx-note { color: var(--muted); font-size: 13px; }
+.keys { margin-left: auto; display: flex; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+.keys kbd { font-family: inherit; color: var(--body); }
+.keys kbd + kbd { margin-left: 3px; }
+.ibx-list { container: lst / inline-size; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sub { margin: 8px 0 0; color: var(--muted); font-family: var(--display); font-size: 14px; font-weight: 800; letter-spacing: -.01em; }
+.sub .c { margin-left: 4px; font-weight: 600; }
+.it { border-radius: var(--r-card); min-width: 0; }
+.it.open { margin-block: 4px 8px; }
+
+/* Collapsed row */
+.cr { position: relative; display: grid; grid-template-columns: 118px minmax(0, 1fr) auto 38px 16px; grid-template-areas: "type main meta age chev"; align-items: center; column-gap: 12px; width: 100%; min-height: 50px; padding: 9px 14px 9px 32px; border: 1px solid var(--card-edge); border-radius: 16px; background: var(--card); box-shadow: var(--shadow); color: var(--text); text-align: left; transition: background-color .14s ease; }
+button.cr:hover { background: var(--row-hover); }
+.cr::before { content: ""; position: absolute; left: 14px; top: 11px; bottom: 11px; width: 6px; border-radius: var(--r-pill); background: var(--dashed); }
+[data-kind="question"].cr::before, [data-kind="question"].rq::before { background: var(--g-tide); }
+[data-kind="proposal"].cr::before, [data-kind="proposal"].rq::before { background: var(--g-orchid); }
+[data-kind="approval"].cr::before, [data-kind="approval"].rq::before { background: var(--g-ember); }
+[data-kind="signoff"].cr::before, [data-kind="signoff"].rq::before { background: var(--g-lagoon); }
+.cr-type { grid-area: type; justify-self: start; display: inline-flex; align-items: center; gap: 5px; max-width: 100%; height: 20px; padding: 0 8px; border-radius: var(--r-pill); font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-kind="question"] .cr-type, [data-kind="question"] .rq-kind { background: var(--cyan-bg); color: var(--cyan-fg); }
+[data-kind="proposal"] .cr-type, [data-kind="proposal"] .rq-kind { background: var(--violet-bg); color: var(--violet-fg); }
+[data-kind="approval"] .cr-type, [data-kind="approval"] .rq-kind { background: var(--amber-bg); color: var(--amber-fg); }
+[data-kind="signoff"] .cr-type, [data-kind="signoff"] .rq-kind { background: var(--green-bg); color: var(--green-fg); }
+.cr-main { grid-area: main; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.cr-title { position: relative; display: flex; align-items: center; gap: 7px; min-width: 0; color: var(--text); font-family: var(--display); font-size: 15px; font-weight: 800; letter-spacing: -.015em; line-height: 1.3; }
+.cr-title > span:last-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cr-new { position: absolute; left: -9px; top: 4px; width: 4px; height: 12px; border-radius: var(--r-pill); background: var(--g-ion); }
+.cr-qs { display: flex; flex-direction: column; gap: 2px; }
+.cr-q { display: flex; gap: 8px; min-width: 0; color: var(--body); font-size: 13px; line-height: 1.4; }
+.cr-q .qn { flex-shrink: 0; width: 12px; color: var(--muted); font-family: var(--font-mono); font-size: 11px; padding-top: 1px; }
+.cr-q .qt { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cr-q--more { color: var(--muted); }
+.cr-meta { grid-area: meta; display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.cr-task { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.cr-age { grid-area: age; justify-self: end; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cr-chev { grid-area: chev; color: var(--muted); transition: transform .15s ease; }
+.cr[data-waiting] .cr-title { color: var(--body); }
+.cr[data-waiting]::before { opacity: .45; }
+.cr[data-settled] { background: var(--settled); box-shadow: none; border-color: var(--row-line); }
+.cr[data-settled]::before { opacity: .35; }
+.cr[data-settled] .cr-title { color: var(--body); font-weight: 700; }
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: var(--r-pill); border: 1px solid var(--edge); color: var(--body); font-size: 11px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chip--soon { border-color: color-mix(in srgb, var(--red-fg) 45%, transparent); color: var(--red-fg); }
+.chip--time { border-color: transparent; padding: 0 2px; color: var(--muted); font-weight: 500; }
+.chip--warn { border-color: color-mix(in srgb, var(--amber-fg) 50%, transparent); color: var(--amber-fg); }
+.chip--wait { border-style: dashed; color: var(--muted); }
+.chip--bad { border-color: transparent; background: var(--red-bg); color: var(--red-fg); }
+.chip--mid { border-color: transparent; background: var(--amber-bg); color: var(--amber-fg); }
+.chip--plan .ic { color: var(--violet-fg); }
+.chip--block { border-color: transparent; background: var(--red-bg); color: var(--red-fg); }
+
+/* Selection ring, as Inbox.css draws it */
+.it.sel > .cr, .it.sel > .rq { box-shadow: var(--shadow), 0 0 0 2px var(--primary); }
+
+/* Group header */
+.gh { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 2px 2px 0; min-width: 0; border-radius: 12px; }
+.gh:first-child { margin-top: 0; }
+.gh-fold { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; min-height: 38px; padding: 4px 8px 4px 4px; border-radius: 12px; text-align: left; }
+.gh-fold:hover { background: var(--hover); }
+.gh.sel .gh-fold { box-shadow: inset 0 0 0 2px var(--primary); }
+.gh-chev { color: var(--muted); transition: transform .15s ease; }
+.gh-fold[aria-expanded="true"] .gh-chev { transform: rotate(90deg); }
+.gh-name { display: flex; align-items: baseline; gap: 8px; min-width: 0; color: var(--text); font-family: var(--display); font-size: 15px; font-weight: 800; letter-spacing: -.015em; }
+.gh-name .mono { flex-shrink: 0; font-family: var(--font-mono); color: var(--muted); font-size: 12px; font-weight: 400; letter-spacing: 0; }
+.gh-name .t { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.gh-proj { flex-shrink: 0; color: var(--muted); font-family: var(--font-ui); font-size: 12px; font-weight: 500; letter-spacing: 0; }
+.gh-count { flex-shrink: 0; min-width: 22px; height: 20px; padding: 0 7px; display: inline-grid; place-items: center; border-radius: var(--r-pill); background: var(--well); color: var(--body); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.gh-open { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border-radius: var(--r-pill); color: var(--muted); font-size: 12px; font-weight: 600; text-decoration: none; }
+.gh-open:hover { background: var(--hover); color: var(--text); }
+.gh-none { width: 6px; height: 16px; border-radius: var(--r-pill); border: 1.5px dashed var(--dashed); flex-shrink: 0; }
+.gh-rows { display: flex; flex-direction: column; gap: 8px; }
+
+/* ===== Expanded request card (RequestCard.css, unchanged) ===== */
+.rq { container: rq / inline-size; position: relative; display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 18px 38px; border: 1px solid var(--card-edge); border-radius: var(--r-card); background: var(--card); box-shadow: var(--shadow); text-align: left; }
+.rq::before { content: ""; position: absolute; left: 15px; top: 15px; bottom: 15px; width: 7px; border-radius: var(--r-pill); background: var(--dashed); }
+.rq-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; color: var(--muted); font-size: 12px; }
+.rq-kind, .rq-tag { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: var(--r-pill); font-size: 11px; font-weight: 600; flex-shrink: 0; }
+.rq-tag { border: 1px solid var(--edge); color: var(--body); font-weight: 500; }
+.rq-subj { min-width: 0; overflow: hidden; color: var(--body); white-space: nowrap; text-overflow: ellipsis; text-decoration: none; }
+.rq-subj .mono { margin-right: 2px; color: var(--muted); }
+.rq-new { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: var(--r-pill); background: var(--run-bg); color: var(--run-fg); font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.rq-new::before { content: ""; width: 5px; height: 10px; border-radius: var(--r-pill); background: var(--g-ion); }
+.rq-life { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.rq-life--soon { color: var(--red-fg); }
+.rq-menu, .rq-fold { flex-shrink: 0; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; color: var(--muted); }
+.rq-menu:hover, .rq-fold:hover { background: var(--hover); color: var(--text); }
+.rq-menu:first-child, .rq-top > .rq-menu.push { margin-left: auto; }
+.rq-fold { border: 1px solid var(--edge); }
+.rq-ask { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
+.rq-ask b { color: var(--text); font-weight: 600; }
+.rq h4.rq-h { margin: 0; color: var(--text); font-family: var(--display); letter-spacing: var(--dtrack); font-size: 17px; font-weight: 800; line-height: 1.3; }
+.rq-body { color: var(--body); font-size: 14px; }
+.rq-body p { margin: 0; }
+.rq-next { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: var(--r-inner); background: var(--code); color: var(--muted); font-size: 13px; line-height: 1.45; }
+.rq-next .ic { margin-top: 2px; }
+.rq-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rq-who { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.rq-note { margin: 0; color: var(--muted); font-size: 13px; }
+.rq-q { color: var(--text); font-size: 13px; font-weight: 600; }
+.rq-q small { margin-left: 6px; color: var(--muted); font-weight: 400; font-size: 13px; }
+.rq-help { margin: -4px 0 0; color: var(--muted); font-size: 12px; }
+.rq-opts { display: flex; flex-direction: column; gap: 6px; }
+.rq-opt { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--r-inner); color: var(--body); font-size: 13px; line-height: 1.45; text-align: left; }
+.rq-opt[aria-checked="true"] { border-color: color-mix(in srgb, var(--run-fg) 75%, transparent); background: var(--run-bg); color: var(--text); }
+.rq-opt small { display: block; color: var(--muted); font-size: 12px; }
+.rq-opt-main { flex: 1; min-width: 0; }
+.rq-radio, .rq-check { width: 14px; height: 14px; flex-shrink: 0; margin-top: 2px; border: 2px solid var(--edge); display: grid; place-items: center; }
+.rq-radio { border-radius: 50%; }
+.rq-check { border-radius: 4px; color: var(--on-primary); }
+[aria-checked="true"] > .rq-radio { border: 4px solid var(--run-fg); }
+[aria-checked="true"] > .rq-check { border-color: var(--primary); background: var(--primary); }
+.rq-check .ic { display: none; }
+[aria-checked="true"] > .rq-check .ic { display: block; }
+.rq-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.rq-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid var(--edge); border-radius: var(--r-pill); color: var(--body); font-size: 13px; }
+.rq-chip[aria-pressed="true"] { border-color: color-mix(in srgb, var(--run-fg) 75%, transparent); background: var(--run-bg); color: var(--text); }
+.rq-code { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-inner); background: var(--code); color: var(--body); font-family: var(--font-mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rq-code span { color: var(--muted); }
+.rq-items { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.rq-item { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-inner); }
+.rq-item-head { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.rq-item-head > span { flex: 1; min-width: 160px; color: var(--text); font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+.rq-item-head small { display: block; color: var(--muted); font-weight: 400; }
+.rq-kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
+.rq-kv dt { color: var(--muted); }
+.rq-kv dd { margin: 0; color: var(--body); overflow-wrap: anywhere; }
+.rq-risks { margin: 0; padding-left: 18px; color: var(--body); font-size: 13px; }
+.rq-plan { align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border: 1px solid var(--edge); border-radius: var(--r-pill); color: var(--body); font-size: 12px; font-weight: 500; text-decoration: none; }
+.rq-plan .ic { color: var(--violet-fg); }
+.rq-stage { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+.rq-step { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border: 1px solid var(--edge); border-radius: var(--r-pill); }
+.rq-step--now { border-color: color-mix(in srgb, var(--green-fg) 65%, transparent); background: var(--green-bg); color: var(--green-fg); }
+.rq-diff { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r-inner); overflow: hidden; font-size: 13px; }
+.rq-drow { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: center; padding: 7px 10px; border-top: 1px solid var(--line); color: var(--body); overflow-wrap: anywhere; }
+.rq-drow:first-child { border-top: 0; background: var(--code); color: var(--muted); font-size: 12px; }
+.rq-was { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--dashed); }
+.rq-alert { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--amber-fg) 50%, transparent); border-radius: var(--r-inner); background: var(--amber-bg); color: var(--amber-fg); font-size: 12px; line-height: 1.45; }
+.rq-alert .ic { margin-top: 1px; }
+.rq-opt--danger { border-color: color-mix(in srgb, var(--red-fg) 45%, transparent); }
+.rq-body--quote { padding-left: 12px; border-left: 2px solid var(--line); color: var(--muted); }
+.rq-app { display: flex; align-items: center; gap: 10px; color: var(--body); font-size: 13px; }
+.rq-app b { color: var(--text); font-weight: 600; }
+.rq-logo { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: var(--r-inner); background: linear-gradient(160deg, var(--orchid-a), var(--orchid-b)); color: var(--on-disc); font-size: 14px; font-weight: 800; }
+.rq-res { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--body); font-size: 13px; }
+.rq-res small { color: var(--muted); font-size: 12px; }
+.rq-res[data-tone="ok"] .ic { color: var(--green-fg); }
+.rq-res[data-tone="muted"] { color: var(--muted); }
+.rq-res[data-tone="bad"], .rq-res[data-tone="mid"] { padding: 8px 10px; border: 1px solid; border-radius: var(--r-inner); color: var(--text); }
+.rq-res[data-tone="bad"] { background: var(--red-bg); border-color: color-mix(in srgb, var(--red-fg) 40%, transparent); }
+.rq-res[data-tone="mid"] { background: var(--amber-bg); border-color: color-mix(in srgb, var(--amber-fg) 40%, transparent); }
+.rq-results { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.rq--settled { gap: 8px; padding-top: 12px; padding-bottom: 12px; background: var(--settled); border-color: var(--row-line); box-shadow: none; }
+.rq--settled::before { opacity: .3; }
+.rq--settled[data-issue] { background: var(--card); box-shadow: var(--shadow); }
+.rq--settled[data-issue]::before { opacity: 1; }
+.rq--settled[data-issue="bad"] { border-color: color-mix(in srgb, var(--red-fg) 45%, transparent); }
+.rq--settled[data-issue="mid"] { border-color: color-mix(in srgb, var(--amber-fg) 45%, transparent); }
+.rq-settled-title { color: var(--text); font-size: 14px; font-weight: 500; }
+.rq-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.rq-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.rq-ctx { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.ctx-h { margin: 0; font-family: var(--display); font-size: 12px; font-weight: 800; letter-spacing: -.01em; color: var(--muted); }
+.rel { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 12px 14px; border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--ground); color: var(--text); font-size: 13px; line-height: 1.35; }
+.rel-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.rel-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.rel-top .mono { flex-shrink: 0; }
+.rel-title { font-weight: 500; min-width: 0; }
+.rel-meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.why { margin: 0; line-height: 1.45; }
+@container rq (width >= 760px) {
+  .rq-split { grid-template-columns: minmax(0, 1fr) 280px; gap: 28px; align-items: start; }
+  .rq-ctx { padding: 0 0 0 22px; border-top: 0; border-left: 1px solid var(--line); }
+}
+@container rq (width < 760px) { .rel + .why { display: none; } }
+@container rq (width < 420px) {
+  .rq-who { margin-left: 0; flex-basis: 100%; }
+  .rq-life { margin-left: 0; }
+  .rq-drow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .rq-drow > :first-child { grid-column: 1 / -1; }
+}
+
+/* Phone-width list: three short lines instead of one long one */
+@container lst (width < 560px) {
+  .cr { grid-template-columns: minmax(0, 1fr) auto 14px; grid-template-areas: "type age chev" "main main main" "meta meta meta"; row-gap: 5px; column-gap: 8px; padding: 10px 12px 11px 28px; }
+  .cr::before { left: 12px; top: 12px; bottom: 12px; width: 5px; }
+  .cr-title { align-items: flex-start; font-size: 15px; }
+  .cr-title > span:last-child { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .cr-title .cr-new { left: -8px; }
+  .cr-meta { justify-content: flex-start; flex-wrap: wrap; }
+  .cr-meta:empty { display: none; }
+  .cr-q .qt { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .gh-proj { display: none; }
+  .gh-open .lbl { display: none; }
+}
+@container ibx (width < 640px) {
+  .keys { display: none; }
+  .ibx-head h3 { font-size: 24px; }
+  .ibx-head { gap: 10px; }
+  .kinds { overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
+  .ibx-note.urgent { display: none; }
+  .ibx-head .tabs { order: 3; flex-basis: 100%; }
+  .btn .lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .btn[data-all] { width: 34px; padding: 0; }
+  .gh-fold { flex-wrap: wrap; row-gap: 2px; }
+  .gh-name { align-items: center; flex: 1 1 150px; }
+  .gh-name .t { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+}
+
+/* ===== Kind by kind ===== */
+.kgroup { display: flex; flex-direction: column; gap: 14px; }
+.kgroup > h3 { margin: 10px 0 0; display: flex; align-items: center; gap: 10px; color: var(--text); font-family: var(--display); letter-spacing: -.02em; font-size: 19px; font-weight: 800; }
+.pair { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 18px 26px; padding: 18px; border: 1px solid var(--line); border-radius: 22px; min-width: 0; }
+.pair-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.pair-col .ibx-list { gap: 8px; }
+.pair-lbl { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.pair h4 { margin: 0; color: var(--text); font-family: var(--display); font-size: 16px; font-weight: 800; letter-spacing: -.015em; }
+.pair-src { margin: 0; color: var(--muted); font-family: var(--font-mono); font-size: 11px; overflow-wrap: anywhere; }
+.keep { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; font-size: 13px; }
+.keep li { display: flex; gap: 8px; }
+.keep .ic { margin-top: 3px; color: var(--muted); }
+.keep li.k .ic { color: var(--green-fg); }
+.keep b { color: var(--text); font-weight: 600; }
+@media (max-width: 900px) { .pair { grid-template-columns: minmax(0, 1fr); padding: 14px; } }
+
+/* ===== Phones ===== */
+.phones { display: flex; flex-wrap: wrap; gap: 28px; justify-content: center; align-items: flex-start; }
+.phone-wrap { display: flex; flex-direction: column; gap: 10px; align-items: center; width: 390px; max-width: 100%; }
+.phone { width: 100%; height: 844px; max-height: 844px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--edge); border-radius: 40px; background: var(--ground); padding: 0 14px 40px; box-shadow: var(--shadow-lg); scrollbar-width: thin; }
+.phone-status { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; height: 44px; padding: 0 14px; margin: 0 -14px 4px; background: var(--ground); color: var(--text); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.phone-status i { width: 90px; height: 24px; border-radius: var(--r-pill); background: var(--frame); }
+.phone-cap { color: var(--muted); font-size: 13px; text-align: center; max-width: 34ch; }
+.phone .tabs .tab { height: 28px; padding: 0 10px; }
+
+/* ===== Notes ===== */
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; }
+.panel { padding: 18px 20px; border: 1px solid var(--card-edge); border-radius: var(--r-card); background: var(--card); box-shadow: var(--shadow); min-width: 0; }
+.panel h3 { margin: 0 0 10px; color: var(--text); font-family: var(--display); font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+.panel ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; }
+.qa { display: grid; gap: 10px; }
+.qa-item { display: grid; gap: 6px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--r-inner); background: var(--card); min-width: 0; }
+.qa-q { color: var(--text); font-weight: 700; font-size: 14.5px; }
+.qa-a { font-size: 13.5px; max-width: 80ch; }
+.qa-a b { color: var(--green-fg); font-weight: 700; }
+.find { margin: 0; padding-left: 18px; display: grid; gap: 8px; max-width: 86ch; font-size: 13.5px; }
+.find code { font-family: var(--font-mono); font-size: 12px; color: var(--text); }
+.theme { display: inline-flex; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+</style>
+
+<div class="page">
+  <header class="intro">
+    <div class="intro-top">
+      <span class="eyebrow">ui-new · Capsule Stack · review artboard</span>
+      <div class="seg theme" role="group" aria-label="Theme">
+        <button type="button" data-theme-set="system" aria-pressed="true">System</button>
+        <button type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+        <button type="button" data-theme-set="light" aria-pressed="false">Light</button>
+      </div>
+    </div>
+    <h1>Inbox request cards, collapsed and grouped</h1>
+    <p>A slimmer resting state for every request card in Needs you, a Collapse all control, and grouping by task, agent or project. Expanding a row shows today's ui-new card, unchanged apart from a collapse button in its top row.</p>
+    <div class="sample" role="note"><span><b>Sample data.</b> Harbor Labs, its agents, tasks and requests are made up to cover every request kind. Buttons inside the cards do nothing; options, chips and fields respond so the cards feel real.</span></div>
+    <ol class="asks" aria-label="What was asked">
+      <li><span class="num">1</span><span>A minimal collapsed state for all request cards: the kind capsule, the type, the title and a few crucial indicators. Collapse all at once to scan. Questions list their questions.</span></li>
+      <li><span class="num">2</span><span>Group the cards by task, agent or project, as upstream's new Coordinator Inbox can.</span></li>
+    </ol>
+  </header>
+
+  <section class="sec" aria-labelledby="s1">
+    <div class="sec-head">
+      <span class="sec-num">1 · working prototype</span>
+      <h2 id="s1">Inbox, Needs you</h2>
+      <p>Starts with every card collapsed. Click a row to open it; use Collapse all, the kind filter and Group. With the list focused: <b>j</b>/<b>k</b> or the up and down arrows move, <b>→</b> opens, <b>←</b> closes (and on a group header folds the group), <b>Shift</b> with an arrow opens or closes them all.</p>
+    </div>
+    <div class="window"><div id="inbox-desktop"></div></div>
+  </section>
+
+  <section class="sec" aria-labelledby="s2">
+    <div class="sec-head">
+      <span class="sec-num">2 · every kind</span>
+      <h2 id="s2">Kind by kind</h2>
+      <p>Each collapsed row beside the card it opens into. The expanded side is ui-new's current card (the Inbox's context column is left out here to save room; it stays as it is). Under each row: what it keeps and why.</p>
+    </div>
+    <div id="catalog" class="sec"></div>
+  </section>
+
+  <section class="sec" aria-labelledby="s3">
+    <div class="sec-head">
+      <span class="sec-num">3 · phone, 390 wide</span>
+      <h2 id="s3">Phone</h2>
+      <p>The same rows reflow to three short lines: type and age, a title of up to two lines, then the indicators. Both frames work like the desktop one.</p>
+    </div>
+    <div class="phones">
+      <div class="phone-wrap"><div class="phone"><div class="phone-status"><span>9:41</span><i></i><span>5G</span></div><div id="inbox-phone"></div></div><p class="phone-cap">All collapsed, no grouping: New today, then Earlier.</p></div>
+      <div class="phone-wrap"><div class="phone"><div class="phone-status"><span>9:41</span><i></i><span>5G</span></div><div id="inbox-phone-task"></div></div><p class="phone-cap">Grouped by task, all collapsed. Rows drop the task ID their header already shows.</p></div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="s4">
+    <div class="sec-head">
+      <span class="sec-num">4 · decisions to make</span>
+      <h2 id="s4">Notes and open questions</h2>
+    </div>
+    <div class="cols">
+      <div class="panel">
+        <h3>Kept in the collapsed row</h3>
+        <ul>
+          <li>The kind stripe and a coloured type pill, now naming the specific type (Tool call, Plan review, Budget stop) rather than only the kind.</li>
+          <li>The title, on one line (two on a phone).</li>
+          <li>For questions, each question on its own line, up to three, then "+ n more".</li>
+          <li>Who's asking (avatar), the task ID, and the age.</li>
+          <li>Only the indicators that change what you do first: an expiry under a day, Acts, Blocks, Task changed, Waiting on someone, a count, Plan v2, the budget overrun, Outside agent, and New.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Treated as clutter until opened</h3>
+        <ul>
+          <li>The ask line's sentence ("asks you 3 questions · 40m ago"): the avatar and age carry it.</li>
+          <li>The task's title beside its ID, the Formal tag, "Open until answered" and "Ends if you comment instead".</li>
+          <li>Body text, options and every control, the "what happens next" line, and who can answer.</li>
+          <li>The context column (About HAR-41, why it's here) and the "…" menu. Snooze and clear stay on <b>s</b> and <b>y</b> for the selected row.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="qa" id="qa"></div>
+    <div class="panel">
+      <h3>Found in ui-new's current cards, for the build</h3>
+      <ul class="find" id="findings"></ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const P = {
+    help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+    sparkles: '<path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0L14.06 8.5a2 2 0 0 0 1.44 1.44l6.14 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0z"/>',
+    shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+    badge: '<path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+    down: '<path d="m6 9 6 6 6-6"/>', right: '<path d="m9 18 6-6-6-6"/>', up: '<path d="m18 15-6-6-6 6"/>',
+    users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    corner: '<path d="m15 10 5 5-5 5"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/>',
+    dots: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+    warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+    plan: '<path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.38 5.63a1 1 0 1 0-3-3l-5.02 5a2 2 0 0 0-.5.86l-.84 2.87a.5.5 0 0 0 .62.62l2.87-.84a2 2 0 0 0 .85-.5z"/>',
+    ext: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+    msg: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    collapse: '<path d="m7 20 5-5 5 5"/><path d="m7 4 5 5 5-5"/>',
+    expand: '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',
+    inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>', x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    alert: '<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+    search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+    arrow: '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
+    minus: '<path d="M5 12h14"/>', ban: '<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
+    lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    block: '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/>',
+  };
+  const I = (n, s = 12, cls = "") => `<svg class="ic ${cls}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
+
+  // ---------------------------------------------------------------- sample data (made up)
+  const PEOPLE = {
+    be: { name: "Backend Engineer", ini: "BE", tone: "ion", state: "running" },
+    me: { name: "Mobile Engineer", ini: "ME", tone: "orchid", state: "paused" },
+    qa: { name: "QA Engineer", ini: "QA", tone: "lagoon", state: "idle" },
+    ce: { name: "CEO", ini: "CE", tone: "ember", state: "idle" },
+    pc: { name: "Paperclip", ini: "P", tone: "ash", state: "" },
+    at: { name: "Atlas Reviewer", ini: "AR", tone: "outside", state: "" },
+    you: { name: "You", ini: "YO", tone: "you", state: "" },
+  };
+  const PROJECTS = {
+    chk: { name: "Checkout v2", ini: "C", tone: "ion" },
+    mob: { name: "Mobile app", ini: "M", tone: "orchid" },
+    dat: { name: "Data platform", ini: "D", tone: "lagoon" },
+  };
+  const STATUS = { in_progress: ["In progress", "ion"], in_review: ["In review", "orchid"], todo: ["Todo", "ember"], blocked: ["Blocked", "flare"], backlog: ["Backlog", "ash"], done: ["Done", "lagoon"] };
+  const TASKS = {
+    "HAR-44": { title: "Stripe webhook retries", status: "in_review", project: "chk", who: "Backend Engineer" },
+    "HAR-45": { title: "Roll Checkout v2 out to 10% of traffic", status: "blocked", project: "chk", who: "CEO" },
+    "HAR-39": { title: "Apple Pay on the checkout page", status: "in_review", project: "chk", who: "You" },
+    "HAR-52": { title: "Offline mode for the order list", status: "in_progress", project: "mob", who: "Mobile Engineer" },
+    "HAR-57": { title: "Fix flaky login tests on Android", status: "todo", project: "mob", who: "QA Engineer" },
+    "HAR-41": { title: "Move invoices to the new ledger", status: "blocked", project: "dat", who: "Backend Engineer" },
+    "HAR-50": { title: "Nightly warehouse export", status: "blocked", project: "dat", who: "Backend Engineer" },
+    "HAR-48": { title: "Refund email copy", status: "in_review", project: "chk", who: "Mobile Engineer" },
+    "HAR-27": { title: "Tidy the invoice backlog", status: "in_progress", project: "dat", who: "Backend Engineer" },
+  };
+  const KIND = { question: ["Question", "help"], proposal: ["Proposal", "sparkles"], approval: ["Approval", "shield"], signoff: ["Sign-off", "badge"] };
+
+  /*
+   * One entry per request. `type` is the specific type the collapsed pill names; `chips` are the
+   * collapsed indicators; `shape` picks the expanded card's controls, as RequestCard.tsx draws them.
+   */
+  const ITEMS = [
+    { key: "tool", rank: 1, today: true, fresh: true, kind: "proposal", type: "Tool call", acts: true, task: "HAR-44", asker: "be", verb: "wants to run a tool", age: "6m", ageLong: "6m ago",
+      life: "Expires in 38 minutes", soon: true, chips: [["soon", "clock", "38m left"]],
+      title: "Merge PR #212 into main?", shape: "tool",
+      code: { tool: "github.merge_pull_request", app: "GitHub", risk: "medium", args: '{\n  "repo": "harbor/checkout",\n  "pull": 212,\n  "method": "squash"\n}' },
+      body: "Retries failed Stripe webhooks with backoff and parks the rest in a dead-letter table. All checks passed.",
+      next: "Approving runs this call once. Always allow also approves future calls with this scope: merges to harbor/checkout by Backend Engineer.",
+      who: "People only", why: "Backend Engineer opened PR #212 · checks passed",
+      src: "request_confirmation · toolAction",
+      keeps: [["k", "38m left, in red", "It expires within the hour; nothing else on the row is time-critical."], ["k", "Tool call type", "The pill says approving runs something. The separate Acts tag would repeat it."], ["d", "Tool name, repo and arguments", "Read them before you approve, in the card."]] },
+    { key: "refunds", rank: 2, today: true, kind: "question", type: "Question", task: "HAR-41", asker: "be", verb: "asks you", age: "1h", ageLong: "1h ago",
+      life: "Ends if you comment instead", blocks: "HAR-41", chips: [["block", "block", "Blocks HAR-41"]],
+      title: "Where should refunds issued before the cutover live?", shape: "form",
+      questions: [{ prompt: "Where should refunds issued before the cutover live?", help: "About 1,900 refunds predate the new ledger.", mode: "one",
+        options: [["Move them into the new ledger", "One migration; reports read one place."], ["Leave them in the old tables, read-only", "Faster now; reports join both."]] }],
+      next: "Your answer goes to Backend Engineer, which continues HAR-41.", who: "Anyone", why: "Backend Engineer paused HAR-41 until you answer",
+      src: "ask_user_questions · one question",
+      keeps: [["k", "Blocks HAR-41", "The task is blocked on this answer, so it outranks newer requests."], ["k", "No question list", "With one question the title is the question."], ["d", "Ends if you comment instead", "True of most questions; it reads as noise at rest."]] },
+    { key: "budget", rank: 3, today: true, fresh: true, kind: "approval", type: "Budget stop", formal: true, subject: "Budget: Mobile Engineer", asker: "pc", groupAgent: "me", avatar: "me", verb: "requests approval", age: "12m", ageLong: "12m ago",
+      life: "Open until answered", chips: [["bad", "", "$80.25 of $80"]],
+      title: "Raise Mobile Engineer's limit, or keep it paused?", shape: "budget",
+      kv: [["Scope", "Mobile Engineer"], ["Window", "This month"], ["Limit", "$80.00"], ["Spent", "$80.25"]],
+      next: "Approving here doesn't lift the pause. Raise the limit or keep it paused from the budget controls.", who: "People only", why: "Paperclip paused Mobile Engineer at its monthly limit",
+      src: "approval · budget_override_required",
+      keeps: [["k", "Spend against the limit", "Says how far over it is without opening it."], ["k", "The paused agent's avatar", "Budget stops have no asker worth showing; the agent it stopped is what matters."], ["d", "Scope, window and the note that it's resolved elsewhere", "In the card, with the link to the budget controls."]] },
+    { key: "offline", rank: 4, today: true, fresh: true, kind: "question", type: "Questions", task: "HAR-52", asker: "me", verb: "asks you 3 questions", age: "40m", ageLong: "40m ago",
+      life: "Open until answered", chips: [["", "", "3 questions"]],
+      title: "Offline mode: three choices before I build it", shape: "form", body: "The sync engine works. These decide what's stored on the device and how conflicts resolve.",
+      questions: [
+        { prompt: "How long should cached orders stay on the device?", mode: "one", options: [["24 hours"], ["7 days"], ["Until the next sign-in"]] },
+        { prompt: "When an order is edited offline, how should it sync?", mode: "one", options: [["Automatically; the newest edit wins"], ["Hold it for review if the server copy changed"]] },
+        { prompt: "Which platforms ship first?", mode: "any", options: [["iOS"], ["Android"]] },
+      ],
+      next: "Your answers go to Mobile Engineer, which continues HAR-52.", who: "Anyone", why: "Mobile Engineer is waiting on your answers",
+      src: "ask_user_questions · several questions",
+      keeps: [["k", "Each question, one line", "What you asked for: you can tell whether you know the answers before opening it."], ["k", "3 questions", "The title is the agent's own, so the count isn't in it."], ["d", "The summary, options, Pick one or Pick any", "In the card."]] },
+    { key: "rollout", rank: 5, today: false, kind: "proposal", type: "Proposal", acts: true, task: "HAR-45", asker: "ce", verb: "proposes changes", age: "5h", ageLong: "5h ago",
+      life: "Expires in 5 days", changed: true, chips: [["warn", "warn", "Task changed"], ["", "", "3 options"]],
+      title: "How should we unblock the 10% rollout?", shape: "decision",
+      body: "The rollout waits on HAR-39 (Apple Pay) and HAR-44 (webhook retries). Only the retries are a real risk at 10%.",
+      options: [["Roll out without Apple Pay", "Hide the Apple Pay button behind a flag and ship the rest.", false, true], ["Wait for both", "", true], ["Cancel the rollout and everything under it", "Cancels HAR-45 and its 4 subtasks.", false, false, true]],
+      diff: [["HAR-45 blocked by", "HAR-39", "Removed", true], ["HAR-45 status", "Blocked", "Todo"], ["Comment on HAR-45", "None", '"Rolling out without Apple Pay; it follows…"']],
+      next: "Choosing an option applies its changes now, then tells CEO. Dismiss changes nothing.", who: "People only", why: "HAR-45 has been blocked for 5 hours",
+      src: "decision · options with effects",
+      keeps: [["k", "Task changed", "Some options are held back until you read what changed."], ["k", "3 options", "Sets the expectation that this is a choice, not a yes or no."], ["d", "5 days left", "Shown only when under a day. Far-off expiries don't change the order you work in."]] },
+    { key: "signoff", rank: 6, today: true, kind: "signoff", type: "Sign-off", task: "HAR-39", asker: "be", verb: "handed this to you for review", age: "32m", ageLong: "32m ago",
+      life: "Open until answered", chips: [["", "", "Step 1 of 2"]], rowTitle: "Apple Pay on the checkout page",
+      title: "Your sign-off is needed: approve, or send back", shape: "signoff",
+      stages: [["Review · you", true], ["Approval · CEO", false]], returns: "Returns to Backend Engineer if sent back · round 1 of 3",
+      next: "Approving moves HAR-39 to its next stage: approval · ceo.", who: "You", why: "Backend Engineer handed HAR-39 to you for review",
+      src: "review stage · your turn",
+      keeps: [["k", "The task's title as the row title", "Every sign-off's own title reads \"Your sign-off is needed\"; the type pill already says that."], ["k", "Step 1 of 2", "Tells you someone signs after you."], ["d", "The stages, the note and Returns to…", "In the card."]] },
+    { key: "plan", rank: 7, today: false, kind: "question", type: "Plan review", task: "HAR-57", asker: "qa", verb: "asks you to approve the plan", age: "2h", ageLong: "2h ago",
+      life: "Open until answered", chips: [["plan", "plan", "Plan v2"]],
+      title: "Approve the plan for the flaky Android login tests?", shape: "confirm", plan: "Plan v2", accept: "Approve plan", reject: "Request changes",
+      body: "The flakes come from a race between the token refresh and the first screen. The plan pins the emulator clock and waits for the refresh event instead of a fixed sleep.",
+      next: "Your answer goes to QA Engineer, which continues HAR-57.", who: "Anyone", why: "QA Engineer wrote Plan v2 and is waiting",
+      src: "request_confirmation · target: plan document",
+      keeps: [["k", "Plan v2", "Tells you it's a revision you may have seen before."], ["d", "The plan summary and the link to it", "In the card."]] },
+    { key: "split", rank: 8, today: false, kind: "proposal", type: "Suggested tasks", task: "HAR-41", asker: "be", verb: "suggests 3 tasks", age: "3h", ageLong: "3h ago",
+      life: "Open until answered", chips: [["", "", "3 tasks"]],
+      title: "Split the ledger migration into tasks?", shape: "tasks",
+      tasks: [["Backfill 2024 invoices into the ledger", "Backend Engineer · high priority"], ["Reconcile ledger totals against Stripe", "Backend Engineer · medium priority"], ["Add a reconciliation alert to the dashboard", "Unassigned · low priority", true]],
+      next: "Creating them adds the tasks you pick, then tells Backend Engineer which ones.", who: "Anyone", why: "Suggested tasks need a decision on HAR-41",
+      src: "suggest_tasks",
+      keeps: [["k", "3 tasks", "Agents title these their own way, so the count isn't always in the title."], ["d", "The task titles", "A short list like the questions' was tried; titles of tasks you haven't agreed to yet were noise at rest."]] },
+    { key: "sentry", rank: 9, today: false, kind: "proposal", type: "Connection", task: "HAR-52", asker: "me", verb: "asks to connect an app", age: "4h", ageLong: "4h ago",
+      life: "Open until answered", chips: [],
+      title: "Connect Sentry", shape: "connection", app: "Sentry",
+      next: "Connecting lets Mobile Engineer use the app, then it continues. Access is added for this agent only.", who: "You", why: "Mobile Engineer wants crash reports for HAR-52",
+      src: "connection_intent · new connection",
+      keeps: [["k", "Just the title", "It names the app; nothing else changes what you do first."], ["d", "Ways to connect, Set up in Apps", "In the card."]] },
+    { key: "hire", rank: 10, today: false, kind: "approval", type: "Hire", formal: true, subject: "New agent: Security Reviewer", asker: "ce", verb: "requests approval", age: "1d", ageLong: "yesterday",
+      life: "Open until answered", chips: [],
+      title: "Hire Security Reviewer", shape: "approval",
+      kv: [["Role", "Security reviewer"], ["Runs on", "Claude Code"], ["Does", "Reviews pull requests that touch payments, sign-in and secrets."], ["Skills", "threat-modeling, dependency-audit"]],
+      risks: ["Reads every payments PR, so it needs access to harbor/checkout."],
+      next: "Approving activates Security Reviewer. It can then be assigned work.", who: "People only", why: "Approval is pending a board decision",
+      src: "approval · hire_agent",
+      keeps: [["k", "Hire type and the CEO's avatar", "Enough to know what it is and who wants it."], ["d", "Formal tag", "Every approval is formal; the type says so."], ["d", "Role, model, skills, risks, discussion", "In the card."]] },
+    { key: "join", rank: 11, today: false, kind: "approval", type: "Join request", subject: "New agent", asker: "at", groupAgent: "_outside", verb: "asks to join as an agent", age: "1d", ageLong: "yesterday",
+      life: "Open until answered", chips: [["wait", "", "Outside agent"]],
+      title: "Let Atlas Reviewer join as an agent?", shape: "join", body: "Invited to run code reviews for the payments team.",
+      kv: [["Runs on", "Claude Code"], ["Reaches at", "https://atlas.example.dev/agent"], ["Credentials", "Included, not shown"], ["Says it can", "Review pull requests, comment on diffs and open follow-up tasks."]],
+      next: "Approving creates Atlas Reviewer, reporting to the CEO. It can then claim its API key and be assigned work.", who: "People who approve joins", why: "Someone used your invite link",
+      src: "join request · agent",
+      keeps: [["k", "Outside agent", "It's someone from outside the company, which is worth knowing before anything else."], ["k", "A dashed avatar", "Outside agents don't have a company avatar yet."], ["d", "Address, adapter and the invite message", "In the card."]] },
+    { key: "stuck", rank: 12, today: false, plain: true, kind: "proposal", type: "Stuck work", task: "HAR-50", asker: "pc", noAsk: true, verb: "raised this", age: "1d", ageLong: "yesterday",
+      life: null, chips: [],
+      title: "Choose how HAR-50 continues: retry, reassign or resolve", shape: "plain",
+      body: "The export failed three nights running on the same permissions error.",
+      next: "Recovery action is assigned to a human owner.", who: "", why: "",
+      src: "recovery_action (a plain card, not a request)",
+      keeps: [["k", "Same row as the requests", "It sits in Needs you, so it collapses the same way."], ["d", "Open the task", "In the card. It's the only action, but the row stays read-only like the others."]] },
+  ];
+
+  const EXTRAS = [
+    { key: "confirm", kind: "question", type: "Confirm", task: "HAR-41", asker: "be", verb: "asks you", age: "20m", ageLong: "20m ago", life: "Open until answered", chips: [],
+      title: "OK to run the backfill against production tonight?", shape: "confirm", accept: "Accept", reject: "Reject",
+      body: "It locks the invoices table for about 4 minutes, between 02:00 and 02:10 UTC.",
+      next: "Your answer goes to Backend Engineer, which continues HAR-41.", who: "Anyone", src: "request_confirmation · yes or no",
+      keeps: [["k", "The title, which is the question", "A yes-or-no needs nothing else to scan."]] },
+    { key: "screens", kind: "question", type: "Pick several", task: "HAR-52", asker: "me", verb: "asks you to pick", age: "2h", ageLong: "2h ago", life: "Open until answered", chips: [["", "", "Pick from 4"]],
+      title: "Which screens should work offline?", shape: "checkbox", picks: [["Order list", true], ["Order detail", true], ["Customer search", false], ["Settings", false]],
+      next: "Your answer goes to Mobile Engineer, which continues HAR-52.", who: "Anyone", src: "request_checkbox_confirmation",
+      keeps: [["k", "Pick from 4", "Says it's a short checklist, not a yes or no."]] },
+    { key: "verdicts", kind: "question", type: "Verdicts", task: "HAR-57", asker: "qa", verb: "asks for a verdict on 4 items", age: "3h", ageLong: "3h ago", life: "Open until answered", chips: [["", "", "4 items"]],
+      title: "Quarantine these flaky tests?", shape: "verdicts", items: [["LoginTest.refreshesToken", "Failed 6 of the last 20 runs"], ["LoginTest.rememberMe", "Failed 3 of 20"], ["CheckoutTest.applePaySheet", "Failed 2 of 20"], ["SearchTest.emptyState", "Failed 1 of 20"]],
+      next: "Your answer goes to QA Engineer, which continues HAR-57.", who: "Anyone", src: "request_item_verdicts",
+      keeps: [["k", "4 items", "How much judging it takes."], ["d", "The item names", "Unlike questions, the names alone don't tell you what's asked."]] },
+    { key: "waiting", kind: "question", type: "Question", task: "HAR-45", asker: "ce", verb: "asks you", age: "1h", ageLong: "1h ago", life: "Open until answered", waiting: "Sam K.", chips: [["wait", "", "Waiting on Sam K."]],
+      title: "Is the 10% cohort US-only?", shape: "confirm", accept: "Yes", reject: "No", body: "Legal signed off on US cards only for the first week.",
+      next: "Your answer goes to CEO, which continues HAR-45.", who: "Only Sam K.", src: "any request addressed to someone else",
+      keeps: [["k", "Waiting on Sam K., and a quieter row", "You can read it but not answer, so it shouldn't look like your turn."]] },
+    { key: "archive", kind: "proposal", type: "Archive", subject: null, asker: "ce", verb: "proposes archiving", age: "2d", ageLong: "2 days ago", life: "Expires in 6 hours", soon: false, chips: [["time", "clock", "6h left"], ["", "", "6 items"]],
+      title: "Archive 6 requests that have gone quiet?", shape: "archive",
+      next: "Archiving takes the listed items out of the inbox for good, then tells CEO.", who: "People only", src: "decision · attention_archive_proposal",
+      keeps: [["k", "6h left, in plain text", "Under a day, so it shows; not yet urgent, so it isn't red."], ["k", "6 items", "How much it would clear."]] },
+    { key: "secret", kind: "proposal", type: "Secret", acts: true, task: "HAR-44", asker: "be", verb: "asks for a secret", age: "50m", ageLong: "50m ago", life: "Expires in 2 days", chips: [],
+      title: "Store the Stripe webhook signing secret as STRIPE_WEBHOOK_SECRET?", shape: "confirm", accept: "Accept", reject: "Reject",
+      body: "The retry worker checks each webhook's signature before replaying it.",
+      next: "Approving applies it now, then tells Backend Engineer.", who: "People only", src: "request_confirmation · secretProposal",
+      keeps: [["k", "Secret type", "Says approving writes something; no extra Acts tag."]] },
+    { key: "stalled", kind: "signoff", type: "Sign-off", task: "HAR-48", asker: null, verb: "", age: "3d", ageLong: "3 days ago", life: "Open until answered", chips: [["warn", "", "No reviewer"]],
+      title: "HAR-48 is in review with nobody to review it", shape: "stalled",
+      next: "Nobody can review HAR-48, so you decide: approving marks it done; requesting changes or sending it back returns it to its assignee with your note.", who: "People only", src: "review stage · stalled",
+      keeps: [["k", "No reviewer", "Why it's yours: nobody else is lined up to sign it."], ["k", "No avatar", "Nobody asked; the row leaves the space empty."]] },
+    { key: "partial", kind: "proposal", type: "Proposal", task: "HAR-27", asker: "be", verb: "proposes changes", age: "Oct 18", ageLong: "Oct 18", settled: true, chips: [["mid", "", "Partly applied"]],
+      title: "Close the stale invoice tasks?", shape: "settled", verdict: ["You chose Close all three", "ok", "Oct 18"], result: ["Some changes were applied, some weren't", "mid"],
+      results: [["Set HAR-22 to done", "ok"], ["Set HAR-23 to done", "ok"], ["Skipped HAR-24: it changed since the proposal", "mid"]],
+      src: "settled decision (task thread, History)",
+      keeps: [["k", "Partly applied", "The one settled state that needs a second look."]] },
+    { key: "failed", kind: "proposal", type: "Tool call", task: "HAR-44", asker: "be", verb: "wants to run a tool", age: "9:10", ageLong: "9:10 am", settled: true, chips: [["bad", "", "Failed"]],
+      title: "Merge PR #208 into main?", shape: "settled", verdict: ["You approved and ran it", "ok", "9:10 am"], result: ['The call failed: the required check "e2e" hasn\'t passed', "bad"],
+      src: "settled tool call (task thread, History)",
+      keeps: [["k", "Failed", "Approved isn't the end of it; the call itself didn't run."]] },
+  ];
+
+  const byKey = Object.fromEntries([...ITEMS, ...EXTRAS].map((it) => [it.key, it]));
+
+  // ---------------------------------------------------------------- pieces
+  const avatar = (id, size = 22) => {
+    if (!id) return "";
+    const p = PEOPLE[id];
+    return `<span class="av av--${p.tone}" style="--s:${size}px" title="${esc(p.name)}" aria-label="${esc(p.name)}">${esc(p.ini)}</span>`;
+  };
+  const cap = (status) => `<span class="cap cap--${STATUS[status][1]}" aria-hidden="true"></span>`;
+  const chip = ([tone, icon, text]) => `<span class="chip${tone ? " chip--" + tone : ""}">${icon ? I(icon, 11) : ""}${esc(text)}</span>`;
+  const btn = (label, variant = "", extra = "") => `<button type="button" class="btn${variant ? " btn--" + variant : ""}" title="Sample only: nothing is sent" ${extra}>${label}</button>`;
+
+  /** The collapsed row. `hide` drops what a group header already shows. */
+  function row(it, { tag = "button", hide = "", open = false } = {}) {
+    const [, kindIcon] = KIND[it.kind];
+    const qs = it.shape === "form" && it.questions.length > 1 ? it.questions : null;
+    const shown = qs ? qs.slice(0, 3) : [];
+    const qlines = qs
+      ? `<span class="cr-qs">${shown.map((q, i) => `<span class="cr-q"><span class="qn">${i + 1}</span><span class="qt">${esc(q.prompt)}</span></span>`).join("")}${qs.length > 3 ? `<span class="cr-q cr-q--more"><span class="qn"></span><span class="qt">+ ${qs.length - 3} more</span></span>` : ""}</span>`
+      : "";
+    const who = it.avatar ?? it.asker;
+    const meta = [
+      ...(it.chips || []).map(chip),
+      it.task && hide !== "task" ? `<span class="cr-task mono" title="${esc(TASKS[it.task].title)}">${esc(it.task)}</span>` : "",
+      who && hide !== "agent" ? avatar(who, 20) : "",
+    ].join("");
+    const title = it.rowTitle ?? it.title;
+    const attrs = tag === "button"
+      ? `type="button" data-toggle="${it.key}" data-nav="${it.key}" aria-expanded="${open}" aria-controls="card-${it.key}"`
+      : "";
+    return `<${tag} class="cr" data-kind="${it.kind}" ${it.waiting ? "data-waiting" : ""} ${it.settled ? "data-settled" : ""} ${attrs}>
+      <span class="cr-type">${I(kindIcon, 12)}${esc(it.type)}</span>
+      <span class="cr-main"><span class="cr-title">${it.fresh ? '<span class="cr-new" title="New since you last looked"></span><span class="sr">New: </span>' : ""}<span>${esc(title)}</span></span>${qlines}</span>
+      <span class="cr-meta">${meta}</span>
+      <span class="cr-age" title="${esc(it.ageLong)}">${esc(it.age)}</span>
+      ${tag === "button" ? `<span class="cr-chev">${I("down", 14)}</span>` : "<span></span>"}
+    </${tag}>`;
+  }
+
+  function footer(it, actions, extra = "") {
+    const who = it.who ? `<span class="rq-who">${I("users", 13)}${esc(it.who)}</span>` : "";
+    const body = it.waiting ? `<p class="rq-note">Waiting on ${esc(it.waiting)} Only ${esc(it.waiting)} can answer this.</p>` : actions;
+    return `<div class="rq-next">${I("corner", 14)}<span>${esc(it.next)}</span></div><div class="rq-acts">${body}${extra}${who}</div>`;
+  }
+
+  function controls(it) {
+    switch (it.shape) {
+      case "form":
+        return it.questions.map((q, qi) => {
+          const head = it.questions.length > 1 ? `<div class="rq-q">${esc(q.prompt)}<small>${q.mode === "any" ? "Pick any" : "Pick one"}</small></div>` : "";
+          const help = q.help ? `<p class="rq-help">${esc(q.help)}</p>` : "";
+          const opts = q.mode === "any"
+            ? `<div class="rq-chips" role="group" aria-label="${esc(q.prompt)}">${q.options.map((o) => `<button type="button" class="rq-chip" aria-pressed="false">${esc(o[0])}</button>`).join("")}</div>`
+            : `<div class="rq-opts" role="radiogroup" aria-label="${esc(q.prompt)}">${q.options.map((o) => `<button type="button" class="rq-opt" role="radio" aria-checked="false"><span class="rq-radio"></span><span class="rq-opt-main">${esc(o[0])}${o[1] ? `<small>${esc(o[1])}</small>` : ""}</span></button>`).join("")}</div>`;
+          return head + help + opts + `<input class="fld" aria-label="Other answer" placeholder="Anything else? (optional)" id="o-${it.key}-${qi}-${Math.random().toString(36).slice(2, 7)}">`;
+        }).join("") + footer(it, btn(it.questions.length > 1 ? "Send answers" : "Send answer", "primary"));
+      case "confirm":
+        return (it.plan ? `<a class="rq-plan" href="#s2" onclick="return false">${I("plan", 12)}${esc(it.plan)}</a>` : "") +
+          footer(it, btn(it.accept, "primary") + btn(it.reject));
+      case "checkbox":
+        return `<div class="rq-opts" role="group" aria-label="${esc(it.title)}">${it.picks.map(([l, on]) => `<button type="button" class="rq-opt" role="checkbox" aria-checked="${on}"><span class="rq-check">${I("check", 10)}</span><span class="rq-opt-main">${esc(l)}</span></button>`).join("")}</div>` +
+          footer(it, btn("Confirm", "primary") + btn("Reject"));
+      case "verdicts":
+        return `<ul class="rq-items">${it.items.map(([l, d]) => `<li class="rq-item"><div class="rq-item-head"><span class="mono">${esc(l)}<small>${esc(d)}</small></span><div class="rq-chips" role="radiogroup" aria-label="Verdict on ${esc(l)}">${["Approve", "Reject", "Defer"].map((v) => `<button type="button" class="rq-chip" role="radio" aria-checked="false" aria-pressed="false">${v}</button>`).join("")}</div></div></li>`).join("")}</ul>` +
+          footer(it, btn("Send verdicts", "primary", 'aria-disabled="true"') + btn("Approve all"));
+      case "tasks":
+        return `<div class="rq-opts" role="group" aria-label="Suggested tasks">${it.tasks.map(([t, m, child]) => `<button type="button" class="rq-opt" role="checkbox" aria-checked="true" ${child ? 'style="margin-left:22px;width:calc(100% - 22px)"' : ""}><span class="rq-check">${I("check", 10)}</span><span class="rq-opt-main">${esc(t)}<small>${esc(m)}</small></span></button>`).join("")}</div>` +
+          footer(it, btn(`Create ${it.tasks.length} tasks`, "primary") + btn("Decline"));
+      case "tool":
+        return `<pre class="rq-code"><span>tool </span> ${esc(it.code.tool)}\n<span>app </span> ${esc(it.code.app)}\n<span>risk </span> ${esc(it.code.risk)}\n${esc(it.code.args)}</pre><div class="rq-body"><p>${esc(it.body)}</p></div>` +
+          footer(it, btn("Approve and run", "primary") + btn("Always allow") + btn("Decline"));
+      case "decision":
+        return `<div class="rq-alert" role="status">${I("warn", 14)}<span>HAR-45 changed after this was proposed. Options with strict changes to it are held back.</span></div>` +
+          `<div class="rq-opts" role="radiogroup" aria-label="Options">${it.options.map(([l, d, none, on, danger]) => `<button type="button" class="rq-opt${danger ? " rq-opt--danger" : ""}" role="radio" aria-checked="${!!on}"><span class="rq-radio"></span><span class="rq-opt-main">${esc(l)}${d ? `<small>${esc(d)}</small>` : ""}${none ? "<small>No changes.</small>" : ""}</span></button>`).join("")}</div>` +
+          `<div class="rq-diff" role="table" aria-label="What option 1 changes"><div class="rq-drow" role="row"><span role="columnheader">Change if you apply option 1</span><span role="columnheader">Now</span><span role="columnheader">After</span></div>${it.diff.map(([w, n, a, s]) => `<div class="rq-drow" role="row"><span role="cell">${esc(w)}</span><span role="cell" class="${s ? "rq-was" : ""}">${esc(n)}</span><span role="cell">${esc(a)}</span></div>`).join("")}</div>` +
+          `<div class="rq-body rq-body--quote"><p>Rolling out without Apple Pay; it follows when HAR-39 is signed off.</p></div>` +
+          footer(it, btn("Apply option 1", "primary"));
+      case "archive":
+        return `<div class="rq-opts" role="radiogroup" aria-label="Options"><button type="button" class="rq-opt" role="radio" aria-checked="true"><span class="rq-radio"></span><span class="rq-opt-main">Archive them<small>6 requests idle for more than 30 days.</small></span></button><button type="button" class="rq-opt" role="radio" aria-checked="false"><span class="rq-radio"></span><span class="rq-opt-main">Keep them<small>No changes.</small></span></button></div>` +
+          footer(it, btn("Apply option 1", "primary"));
+      case "connection":
+        return `<div class="rq-app"><span class="rq-logo" aria-hidden="true">S</span><span><b>${esc(it.app)}</b></span></div><p class="rq-note">Mobile Engineer needs Sentry. Set it up in Apps, then pick it here.</p>` +
+          footer(it, `<a class="btn btn--primary" href="#s2" onclick="return false">${I("ext", 14)}Set up in Apps</a>` + btn("Not now", "quiet"));
+      case "approval":
+        return kv(it.kv) + `<ul class="rq-risks" aria-label="Risks">${it.risks.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` +
+          footer(it, btn("Approve", "primary") + btn("Request changes") + btn("Reject", "danger") + btn("Add a note", "quiet")) +
+          `<div>${btn(I("msg", 14) + "Discussion", "quiet")}</div>`;
+      case "budget":
+        return kv(it.kv) + footer(it, `<p class="rq-note">Budget stops are resolved from the budget controls, not approved here.</p>`, `<a class="btn btn--primary" href="#s2" onclick="return false">Open the budget controls</a>`) +
+          `<div>${btn(I("msg", 14) + "Discussion", "quiet")}</div>`;
+      case "signoff":
+        return `<div class="rq-stage">${it.stages.map(([l, now]) => `<span class="rq-step${now ? " rq-step--now" : ""}">${now ? I("badge", 12) : ""}${esc(l)}</span>`).join("")}<span>${esc(it.returns)}</span></div>` +
+          `<textarea class="fld" rows="2" aria-label="Sign-off note" placeholder="What you checked, or what to change (required)" id="n-${it.key}-${Math.random().toString(36).slice(2, 7)}"></textarea>` +
+          footer(it, btn("Approve", "primary", 'aria-disabled="true"') + btn("Send back with notes", "", 'aria-disabled="true"'), btn("Open the task", "quiet"));
+      case "stalled":
+        return `<textarea class="fld" rows="2" aria-label="Sign-off note" placeholder="A note: required to request changes, optional otherwise" id="n-${it.key}-${Math.random().toString(36).slice(2, 7)}"></textarea>` +
+          footer(it, btn("Approve", "primary") + btn("Request changes", "", 'aria-disabled="true"') + btn("Send back to work"), btn("Open the task", "quiet"));
+      case "join":
+        return kv(it.kv) + footer(it, btn("Approve", "primary") + btn("Reject"));
+      case "plain":
+        return `<p class="rq-body" style="margin:0">${esc(it.body)}</p><div class="rq-next">${I("corner", 14)}<span>${esc(it.next)}</span></div><div class="rq-acts">${btn("Open the task", "primary")}</div>`;
+    }
+    return "";
+  }
+  const kv = (rows) => `<dl class="rq-kv">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
+
+  function context(it) {
+    if (!it.task) return `<h5 class="ctx-h">Why it's here</h5><p class="why">${esc(it.why)}</p>`;
+    const t = TASKS[it.task];
+    return `<h5 class="ctx-h">About ${esc(it.task)}</h5><button type="button" class="rel">${cap(t.status)}<span class="rel-main"><span class="rel-top"><span class="mono">${esc(it.task)}</span><span class="rel-title">${esc(t.title)}</span></span><span class="rel-meta"><span>${STATUS[t.status][0]}</span><span>${esc(t.who)}</span></span></span></button>${it.why ? `<p class="why">${esc(it.why)}</p>` : ""}`;
+  }
+
+  /** Today's RequestCard (or PlainCard), plus a collapse button at the end of its top row. */
+  function card(it, { aside = true, foldable = true } = {}) {
+    const [kindLabel, kindIcon] = KIND[it.kind];
+    const label = it.plain ? it.type : kindLabel;
+    const icon = it.plain ? "sparkles" : kindIcon;
+    const subject = it.task
+      ? `<a class="rq-subj" href="#s2" onclick="return false"><span class="mono">${esc(it.task)}</span> <span class="rq-subj-title">${esc(TASKS[it.task].title)}</span></a>`
+      : it.subject ? `<span class="rq-subj">${esc(it.subject)}</span>` : "";
+    const fold = foldable ? `<button type="button" class="rq-fold" data-toggle="${it.key}" data-nav="${it.key}" aria-expanded="true" aria-controls="card-${it.key}" aria-label="Collapse" title="Collapse (←)">${I("up", 14)}</button>` : "";
+    const life = it.life && !it.settled ? `<span class="rq-life${it.soon ? " rq-life--soon" : ""}">${I("clock", 12)}${esc(it.life)}</span>` : "";
+    const menu = `<button type="button" class="rq-menu${life ? "" : " push"}" aria-label="Snooze or clear" title="Snooze or clear">${I("dots", 15)}</button>`;
+    const top = `<div class="rq-top"><span class="rq-kind">${I(icon, 12)}${esc(label)}</span>${it.formal ? '<span class="rq-tag">Formal</span>' : ""}${it.acts && !it.plain ? `<span class="rq-tag">${I("zap", 11)}Acts</span>` : ""}${subject}${it.fresh ? '<span class="rq-new">New</span>' : ""}${life}${menu}${fold}</div>`;
+    if (it.settled) {
+      const v = it.verdict, r = it.result;
+      return `<article class="rq rq--settled" id="card-${it.key}" data-kind="${it.kind}" data-issue="${r[1]}" tabindex="-1" aria-label="${esc(label)}: ${esc(it.title)}">${top}<div class="rq-split"><div class="rq-main"><div class="rq-settled-title">${esc(it.title)}</div><div class="rq-res" data-tone="ok">${I("check", 14)}<span>${esc(v[0])}</span><small>· ${esc(v[2])}</small></div><div class="rq-res" data-tone="${r[1]}">${I("corner", 14)}<span>${esc(r[0])}</span></div>${it.results ? `<ul class="rq-results">${it.results.map(([t, tone]) => `<li class="rq-res" data-tone="${tone}">${I(tone === "ok" ? "check" : "minus", 14)}<span>${esc(t)}</span></li>`).join("")}</ul>` : ""}</div></div></article>`;
+    }
+    const ask = it.asker && !it.noAsk
+      ? `<div class="rq-ask">${avatar(it.asker, 22)}<b>${esc(PEOPLE[it.asker].name)}</b><span>${esc(it.verb)}</span><span>· ${esc(it.ageLong)}</span></div>`
+      : it.plain ? `<div class="rq-ask"><b>Paperclip</b><span>raised this</span></div>` : "";
+    const body = it.body && it.shape !== "tool" && it.shape !== "plain" ? `<div class="rq-body"><p>${esc(it.body)}</p></div>` : "";
+    const main = `${ask}<h4 class="rq-h">${esc(it.title)}</h4>${body}${controls(it)}`;
+    const inner = aside ? `<div class="rq-split"><div class="rq-main">${main}</div><aside class="rq-ctx" aria-label="Context">${context(it)}</aside></div>` : `<div class="rq-main">${main}</div>`;
+    return `<article class="rq" id="card-${it.key}" data-kind="${it.kind}" tabindex="-1" aria-label="${esc(label)} from ${esc(it.asker ? PEOPLE[it.asker].name : "Paperclip")}">${top}${inner}</article>`;
+  }
+
+  // ---------------------------------------------------------------- grouping
+  const groupOf = (it, by) => {
+    if (by === "task") return it.task ? { key: "t:" + it.task, kind: "task", id: it.task } : { key: "t:_", kind: "none", label: "No task" };
+    if (by === "agent") {
+      const a = it.groupAgent ?? it.asker;
+      if (a === "_outside") return { key: "a:_", kind: "none", label: "People and outside agents" };
+      return { key: "a:" + a, kind: "agent", id: a };
+    }
+    const p = it.task ? TASKS[it.task].project : null;
+    return p ? { key: "p:" + p, kind: "project", id: p } : { key: "p:_", kind: "none", label: "No project" };
+  };
+  function groupItems(items, by) {
+    const map = new Map();
+    for (const it of items) {
+      const g = groupOf(it, by);
+      if (!map.has(g.key)) map.set(g.key, { ...g, items: [] });
+      map.get(g.key).items.push(it);
+    }
+    const groups = [...map.values()];
+    groups.forEach((g) => g.items.sort((a, b) => a.rank - b.rank));
+    return groups.sort((a, b) => a.items[0].rank - b.items[0].rank);
+  }
+  function urgentChip(items) {
+    const soon = items.find((it) => it.soon);
+    if (soon) return chip(["soon", "clock", soon.chips.find((c) => c[0] === "soon")[2]]);
+    const block = items.find((it) => it.blocks);
+    if (block) return chip(["block", "block", "Blocks work"]);
+    const fresh = items.filter((it) => it.fresh).length;
+    if (fresh) return chip(["", "", `${fresh} new`]);
+    return "";
+  }
+  function header(g, folded, phone) {
+    let mark = "", name = "", open = "";
+    if (g.kind === "task") {
+      const t = TASKS[g.id];
+      mark = cap(t.status);
+      name = `<span class="mono">${esc(g.id)}</span><span class="t">${esc(t.title)}</span><span class="gh-proj">${esc(PROJECTS[t.project].name)}</span>`;
+      open = `Open ${g.id}`;
+    } else if (g.kind === "agent") {
+      const p = PEOPLE[g.id];
+      mark = avatar(g.id, 22);
+      name = `<span class="t">${esc(p.name)}</span>${p.state ? `<span class="gh-proj">${esc(p.state)}</span>` : ""}`;
+      open = `Open ${p.name}`;
+    } else if (g.kind === "project") {
+      const p = PROJECTS[g.id];
+      mark = `<span class="pdisc av--${p.tone}" aria-hidden="true">${esc(p.ini)}</span>`;
+      name = `<span class="t">${esc(p.name)}</span>`;
+      open = `Open ${p.name}`;
+    } else {
+      mark = '<span class="gh-none" aria-hidden="true"></span>';
+      name = `<span class="t">${esc(g.label)}</span>`;
+    }
+    const link = g.kind === "none" || g.id === "pc" ? "" : `<a class="gh-open" href="#s1" onclick="return false" aria-label="${esc(open)}"><span class="lbl">Open</span>${I("arrow", 12)}</a>`;
+    return `<div class="gh" data-gh="${g.key}"><button type="button" class="gh-fold" data-fold="${g.key}" data-nav="${g.key}" aria-expanded="${!folded}"><span class="gh-chev">${I("right", 14)}</span>${mark}<span class="gh-name">${name}</span><span class="gh-count" aria-label="${g.items.length} requests">${g.items.length}</span>${urgentChip(g.items)}</button>${link}</div>`;
+  }
+
+  // ---------------------------------------------------------------- one working Inbox
+  const FILTERS = [["all", "All"], ["question", "Questions"], ["proposal", "Proposals"], ["approval", "Approvals"], ["signoff", "Sign-offs"]];
+  const GLYPH = { question: "var(--g-tide)", proposal: "var(--g-orchid)", approval: "var(--g-ember)", signoff: "var(--g-lagoon)" };
+  const GROUPS = [["none", "None"], ["task", "Task"], ["agent", "Agent"], ["project", "Project"]];
+
+  function Inbox(root, opts) {
+    const st = { kind: "all", group: opts.group || "none", open: new Set(), folded: new Set(), sel: null, id: opts.id };
+    const visible = () => ITEMS.filter((it) => st.kind === "all" || it.kind === st.kind).sort((a, b) => a.rank - b.rank);
+
+    function sections() {
+      const items = visible();
+      if (st.group === "none") {
+        const today = items.filter((it) => it.today), earlier = items.filter((it) => !it.today);
+        return [["New today", today], ["Earlier", earlier]].filter(([, l]) => l.length).map(([label, list]) => ({ label, items: list }));
+      }
+      return groupItems(items, st.group);
+    }
+    function navOrder() {
+      const out = [];
+      for (const s of sections()) {
+        if (s.key) out.push(s.key);
+        if (!s.key || !st.folded.has(s.key)) s.items.forEach((it) => out.push(it.key));
+      }
+      return out;
+    }
+    const counts = () => {
+      const c = { all: ITEMS.length };
+      ITEMS.forEach((it) => (c[it.kind] = (c[it.kind] || 0) + 1));
+      return c;
+    };
+    const anyOpen = () => visible().some((it) => st.open.has(it.key));
+
+    function itemHTML(it, hide) {
+      const open = st.open.has(it.key);
+      return `<div class="it${open ? " open" : ""}${st.sel === it.key ? " sel" : ""}" data-item="${it.key}">${open ? card(it) : row(it, { hide })}</div>`;
+    }
+
+    function render() {
+      const active = document.activeElement;
+      const hadFocus = root.contains(active);
+      const focusNav = hadFocus ? active.closest("[data-nav]")?.dataset.nav : null;
+      const c = counts();
+      const hide = st.group === "task" ? "task" : st.group === "agent" ? "agent" : "";
+      const list = sections().map((s) => {
+        if (!s.key) return `<h4 class="sub">${s.label}<span class="c">${s.items.length}</span></h4>${s.items.map((it) => itemHTML(it, "")).join("")}`;
+        const folded = st.folded.has(s.key);
+        const head = header(s, folded).replace('class="gh"', `class="gh${st.sel === s.key ? " sel" : ""}"`);
+        return head + (folded ? "" : `<div class="gh-rows">${s.items.map((it) => itemHTML(it, hide)).join("")}</div>`);
+      }).join("");
+      const all = anyOpen();
+      root.innerHTML = `<div class="ibx">
+        <div class="ibx-head">
+          <h3>${I("inbox", opts.phone ? 20 : 24)}Inbox</h3>
+          <nav class="tabs" aria-label="Inbox views"><a class="tab" aria-current="page" href="#s1" onclick="return false">Needs you <span class="n n--hot">${ITEMS.length}</span></a><a class="tab" href="#s1" onclick="return false">Updates <span class="n">4</span></a><a class="tab" href="#s1" onclick="return false">Alerts <span class="n">2</span></a><a class="tab" href="#s1" onclick="return false">Snoozed</a><a class="tab" href="#s1" onclick="return false">Cleared</a><a class="tab" href="#s1" onclick="return false">History</a></nav>
+          <div class="ibx-head-end"><button type="button" class="btn btn--icon" aria-label="Search the inbox" title="Search the inbox">${I("search", 16)}</button></div>
+        </div>
+        <div class="ibx-bar">
+          <div class="seg kinds" role="group" aria-label="Request kinds">${FILTERS.map(([v, l]) => `<button type="button" data-kindf="${v}" aria-pressed="${st.kind === v}">${v !== "all" ? `<span class="glyph" style="background:${GLYPH[v]}" aria-hidden="true"></span>` : ""}${l}<span class="kc">${c[v] || 0}</span></button>`).join("")}</div>
+          <div class="seg" role="group" aria-label="Group requests by"><span class="seg-label" aria-hidden="true">Group</span>${GROUPS.map(([v, l]) => `<button type="button" data-group="${v}" aria-pressed="${st.group === v}">${l}</button>`).join("")}</div>
+          <button type="button" class="btn" data-all="${all ? "collapse" : "expand"}" title="${all ? "Collapse all (Shift+←)" : "Expand all (Shift+→)"}">${I(all ? "collapse" : "expand", 14)}<span class="lbl">${all ? "Collapse all" : "Expand all"}</span></button>
+          <span class="ibx-note urgent">Most urgent first</span>
+          <div class="keys" aria-label="Keyboard shortcuts"><span><kbd>j</kbd><kbd>k</kbd> move</span><span><kbd>←</kbd><kbd>→</kbd> close, open</span><span><kbd>⇧</kbd> all</span><span><kbd>y</kbd> clear</span><span><kbd>s</kbd> snooze</span></div>
+        </div>
+        <div class="ibx-list" role="list" aria-label="Needs you">${list || '<p class="ibx-note">Nothing of this kind needs you.</p>'}</div>
+      </div>`;
+      if (focusNav) {
+        const el = root.querySelector(`[data-nav="${CSS.escape(focusNav)}"]`);
+        if (el) el.focus({ preventScroll: true });
+      }
+    }
+
+    const setOpen = (key, open) => { open ? st.open.add(key) : st.open.delete(key); st.sel = key; };
+    const focusSel = () => {
+      const el = root.querySelector(`[data-nav="${CSS.escape(st.sel)}"]`);
+      if (el) { el.focus({ preventScroll: true }); el.closest(".it, .gh")?.scrollIntoView({ block: "nearest" }); }
+    };
+
+    root.addEventListener("click", (e) => {
+      const t = e.target.closest("button, a");
+      if (!t || !root.contains(t)) return;
+      if (t.dataset.toggle) { setOpen(t.dataset.toggle, !st.open.has(t.dataset.toggle)); render(); focusSel(); return; }
+      if (t.dataset.fold) { const k = t.dataset.fold; st.folded.has(k) ? st.folded.delete(k) : st.folded.add(k); st.sel = k; render(); focusSel(); return; }
+      if (t.dataset.kindf) { st.kind = t.dataset.kindf; render(); return; }
+      if (t.dataset.group) { st.group = t.dataset.group; st.folded.clear(); if (opts.remember) { try { localStorage.setItem("ibx-group", st.group); } catch (_) {} } render(); return; }
+      if (t.dataset.all) { if (t.dataset.all === "collapse") st.open.clear(); else visible().forEach((it) => st.open.add(it.key)); render(); return; }
+    });
+    root.addEventListener("focusin", (e) => {
+      const n = e.target.closest("[data-nav]");
+      const item = e.target.closest("[data-item]");
+      const key = n?.dataset.nav ?? item?.dataset.item;
+      if (key && key !== st.sel) {
+        st.sel = key;
+        root.querySelectorAll(".it.sel, .gh.sel").forEach((el) => el.classList.remove("sel"));
+        root.querySelector(`[data-item="${CSS.escape(key)}"], [data-gh="${CSS.escape(key)}"]`)?.classList.add("sel");
+      }
+    });
+    root.addEventListener("keydown", (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.target.matches("input, textarea")) return;
+      const order = navOrder();
+      const isGroup = (k) => k && k.includes(":");
+      if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault();
+        if (e.key === "ArrowLeft") st.open.clear(); else visible().forEach((it) => st.open.add(it.key));
+        render(); if (st.sel) focusSel(); return;
+      }
+      if (["j", "k", "ArrowDown", "ArrowUp"].includes(e.key)) {
+        if (e.target.closest(".seg, .tabs")) return;
+        e.preventDefault();
+        const i = order.indexOf(st.sel);
+        const step = e.key === "j" || e.key === "ArrowDown" ? 1 : -1;
+        st.sel = i === -1 ? order[step === 1 ? 0 : order.length - 1] : order[Math.min(Math.max(i + step, 0), order.length - 1)];
+        render(); focusSel(); return;
+      }
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        if (e.target.closest(".seg, .tabs, .rq-opts, .rq-chips")) return;
+        const k = st.sel; if (!k) return;
+        e.preventDefault();
+        const right = e.key === "ArrowRight";
+        if (isGroup(k)) { right ? st.folded.delete(k) : st.folded.add(k); }
+        else if (right) st.open.add(k);
+        else if (st.open.has(k)) st.open.delete(k);
+        else if (st.group !== "none") { const it = byKey[k]; st.sel = groupOf(it, st.group).key; }
+        render(); focusSel();
+      }
+    });
+    render();
+    return st;
+  }
+
+  // ---------------------------------------------------------------- catalogue
+  function catalog() {
+    const sets = [
+      ["question", "Questions", ["refunds", "offline", "confirm", "plan", "screens", "verdicts", "waiting"]],
+      ["proposal", "Proposals", ["rollout", "split", "archive", "tool", "secret", "sentry"]],
+      ["approval", "Approvals", ["budget", "hire", "join"]],
+      ["signoff", "Sign-offs", ["signoff", "stalled"]],
+      ["proposal", "In Needs you, not a request", ["stuck"]],
+      ["proposal", "After an answer (task threads and History)", ["partial", "failed"]],
+    ];
+    const names = {
+      refunds: "One question", offline: "Several questions", confirm: "Yes or no", plan: "Plan review", screens: "Pick several", verdicts: "Verdicts on items", waiting: "Waiting on someone else",
+      rollout: "Change preview, several options", split: "Suggested tasks", archive: "Archive proposal", tool: "Tool call", secret: "Secret request", sentry: "Connection request",
+      budget: "Budget stop", hire: "Formal approval: hire an agent", join: "Join request", signoff: "Sign-off, your turn", stalled: "Sign-off with no reviewer", stuck: "Stuck work", partial: "Partly applied", failed: "Approved, then the call failed",
+    };
+    return sets.map(([kind, label, keys]) => `<div class="kgroup"><h3><span class="cap cap--${{ question: "tide", proposal: "orchid", approval: "ember", signoff: "lagoon" }[kind]}" aria-hidden="true"></span>${esc(label)}</h3>${keys.map((k) => {
+      const it = byKey[k];
+      const keeps = (it.keeps || []).map(([t, b, why]) => `<li class="${t}">${I(t === "k" ? "check" : "minus", 12)}<span><b>${esc(b)}.</b> ${esc(why)}</span></li>`).join("");
+      return `<article class="pair" aria-label="${esc(names[k])}">
+        <div class="pair-col">
+          <div><h4>${esc(names[k])}</h4><p class="pair-src">${esc(it.src)}</p></div>
+          <div class="pair-lbl">Collapsed</div>
+          <div class="ibx-list">${row(it, { tag: "div" })}</div>
+          <ul class="keep">${keeps}</ul>
+        </div>
+        <div class="pair-col"><div class="pair-lbl">Expanded: today's card</div>${card(it, { aside: false, foldable: false })}</div>
+      </article>`;
+    }).join("")}</div>`).join("");
+  }
+  document.getElementById("catalog").innerHTML = catalog();
+
+  // Option chips and radios respond, so the expanded cards feel real. Nothing is sent.
+  document.addEventListener("click", (e) => {
+    const opt = e.target.closest(".rq-opt, .rq-chip");
+    if (!opt) return;
+    const role = opt.getAttribute("role");
+    if (role === "radio") {
+      opt.parentElement.querySelectorAll('[role="radio"]').forEach((b) => { b.setAttribute("aria-checked", "false"); if (b.classList.contains("rq-chip")) b.setAttribute("aria-pressed", "false"); });
+      opt.setAttribute("aria-checked", "true");
+      if (opt.classList.contains("rq-chip")) opt.setAttribute("aria-pressed", "true");
+    } else if (role === "checkbox") opt.setAttribute("aria-checked", opt.getAttribute("aria-checked") === "true" ? "false" : "true");
+    else if (opt.classList.contains("rq-chip")) opt.setAttribute("aria-pressed", opt.getAttribute("aria-pressed") === "true" ? "false" : "true");
+  });
+
+  let remembered = "none";
+  try { remembered = localStorage.getItem("ibx-group") || "none"; } catch (_) {}
+  if (!GROUPS.some(([v]) => v === remembered)) remembered = "none";
+  Inbox(document.getElementById("inbox-desktop"), { id: "d", group: remembered, remember: true });
+  Inbox(document.getElementById("inbox-phone"), { id: "p", group: "none", phone: true });
+  Inbox(document.getElementById("inbox-phone-task"), { id: "q", group: "task", phone: true });
+
+  // ---------------------------------------------------------------- notes
+  const QA = [
+    ["Is collapsed the default, and is it remembered?", "Collapsed is the default for everyone. Remember the person's last Collapse all or Expand all choice per company, on this device, as the task list remembers its folds. Single cards you open aren't remembered: the next visit starts from the remembered default."],
+    ["Do new requests arrive collapsed?", "Yes, with the New mark (the Ion capsule before the title) until you've looked, and in place by urgency. Exception: with Expand all on, new arrivals open too, so the mode stays consistent."],
+    ["What does tapping a group header do?", "It folds and unfolds the group, and ← and → do the same with the header selected. The small Open link at the end goes to the task, agent or project. Folds are remembered per grouping, like the old Inbox's group folds."],
+    ["Should any action work without expanding?", "No buttons on the row. A row is for deciding what to open next, and an answer needs the context the card gives (options, what happens next, who's asking). Snooze and clear still work on the selected row with s and y, as today. The only candidate worth revisiting is a tool call's Approve and run when it's about to expire."],
+    ["What sorts the groups?", "Most urgent first, for groups too: a group sits where its most urgent request would, and rows inside keep the Needs you order. The catch-all groups (No task, No project, People and outside agents) sort the same way rather than going last, so a budget stop isn't buried. Grouping replaces the New today and Earlier split; the New marks stay."],
+    ["Which agent does a request belong to?", "Whoever asked, except a budget stop, which belongs to the agent it paused. Join requests and requests from people go under People and outside agents."],
+    ["Do Updates and Alerts get the same treatment?", "Updates is already one row per task, so no. Alerts are plain cards in the same frame, so they could take the same row and Collapse all; Alerts is short, so start with Needs you and add it if Alerts grows."],
+    ["Should the collapsed type pill name the specific type?", "Yes (Tool call, Plan review, Budget stop). The colour still gives the kind for the filter. The expanded card's pill could follow later; this artboard leaves it as today."],
+    ["Does the phone get swipe actions?", "Not in this pass. Rows tap to open; snooze and clear stay in the card's menu. Swipe to clear could come with the phone dock work."],
+  ];
+  document.getElementById("qa").innerHTML = QA.map(([q, a]) => `<div class="qa-item"><div class="qa-q">${esc(q)}</div><div class="qa-a"><b>Recommendation.</b> ${esc(a)}</div></div>`).join("");
+  const FIND = [
+    "ui-new's Inbox has no ← or → keys yet. The old Inbox uses them to fold groups and parent tasks (<code>ui/src/pages/Inbox.tsx</code>), so this design reuses them for cards and group headers.",
+    "Every sign-off's title is the same sentence (\"Your sign-off is needed: approve, or send back\", <code>request-model.ts</code>), which doesn't scan. The collapsed row uses the task's title instead.",
+    "The sign-off \"what happens next\" line lowercases the next stage's whole label, names included: \"approval · ceo\" (<code>after.label.toLowerCase()</code> in <code>requestFromReview</code>).",
+    "The collapsed row can be drawn from the feed before a card loads: <code>AttentionItem.detail</code> carries <code>questionCount</code> and <code>firstQuestionText</code>, and <code>taskCount</code> for suggested tasks. The full question list needs the loaded interaction, which the Inbox already fetches per card.",
+    "Nothing in the request model says a request blocks work. \"Blocks HAR-41\" here comes from the related task's status being Blocked; the boards' \"· blocking the liquidation backfill\" ask-line note isn't in ui-new's cards.",
+    "Upstream's Coordinator groups by <code>relatedIssue</code>, so a sign-off, whose subject is the task itself, lands in \"Other decisions\" there (seen live on TES-3). Group by the request's subject task when there's no related one.",
+    "Kinds the boards don't draw that ui-new renders: verdicts on items, pick several, secret requests, connection and AI-connection requests, archive proposals, stalled sign-offs, join requests, stuck work (recovery actions) and plan reviews with their Plan vN link.",
+    "Board 15's budget stop has a meter and a raise-the-limit field; ui-new's card can't resolve it and links to the budget controls instead, so the collapsed row shows the overrun as text.",
+  ];
+  document.getElementById("findings").innerHTML = FIND.map((f) => `<li>${f}</li>`).join("");
+
+  // ---------------------------------------------------------------- theme
+  const themeBtns = document.querySelectorAll("[data-theme-set]");
+  themeBtns.forEach((b) => b.addEventListener("click", () => {
+    const v = b.dataset.themeSet;
+    if (v === "system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", v);
+    themeBtns.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  }));
+})();
+</script>

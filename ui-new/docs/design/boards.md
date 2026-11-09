@@ -233,6 +233,33 @@ The request card system:
 
 Covers `tasks/interactions`, `approvals/governance`, `approvals/tool-review`.
 
+<a id="board-14b"></a>
+### 14b · Inbox: collapsed request cards and grouping
+
+[InboxRequestCards.html](boards/InboxRequestCards.html) · Approved Nov 9, 2026 ·
+[artboard](https://claude.ai/artifact/LkZSHFaHWZZHDwWzsPcrjC)
+
+A slim collapsed state for every request card, Collapse all, and grouping by task, agent or project,
+from the Coordinator comparison ([U36](../build-plan.md#upstream-changes-to-integrate)). Unlike the
+other boards, this file is a standalone page: open it in a browser (it was published without its
+document skeleton, so it renders in quirks mode from disk, but the layout holds).
+
+- **Collapsed row:** kind stripe, a type pill naming the specific type (Tool call, Plan review,
+  Budget stop), a one-line title (two on a phone), the asker's avatar, the task ID and the age, plus
+  one or two signs per type (the questions themselves on a questions card, "Plan v2", "38m left",
+  "$80.25 of $80", "Step 1 of 2", "Waiting on Sam K."). No actions on the row; the whole row opens the
+  card. The expanded card is today's card plus a collapse button.
+- **Grouping:** None, Task, Agent or Project. Headers show the task (status, ID, title, project), the
+  agent (avatar, running) or the project, with a count and the most urgent sign. Groups are sorted by
+  their most urgent request; catch-alls ("No task", "No project", "People and outside agents") sort
+  like any group. Rows drop what the header shows.
+- **Decided (the artboard's recommendations):** collapsed by default, with Collapse all / Expand all
+  remembered per company on the device; new requests arrive collapsed with the New mark; a group
+  header folds its group, with an Open link; no actions from a collapsed row; a budget stop groups
+  under the agent it paused; Needs you only for now; no phone swipe actions in this pass.
+
+Covers `inbox-search/triage`.
+
 ## Runs
 
 <a id="board-16"></a>
