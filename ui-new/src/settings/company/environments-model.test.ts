@@ -4,6 +4,10 @@ import {
   defaultPatchId,
   agentsOnEnvironment,
   deleteSummary,
+  destroyedSandboxesNote,
+  keptSandboxes,
+  leaseConsentLabel,
+  reusableLeaseLine,
   reassignTargets,
   unlistedAgentCount,
   driverLabel,
@@ -133,6 +137,77 @@ describe("environments", () => {
     expect(deleteSummary(leased, true)).toEqual({ allowed: true, leaseConsent: true, lines: ["2 sandboxes are kept for reuse (Fix login, TES-4). They're destroyed with it."] });
     // Another block stays a block.
     expect(deleteSummary(radius({ canDelete: false, deleteBlockedReasons: ["reusable_sandbox_lease", "instance_default"] }), true).allowed).toBe(false);
+    expect(leaseConsentLabel(leased)).toBe("Destroy the sandboxes kept for reuse. Work left in them is lost.");
+    expect(destroyedSandboxesNote(2, leased)).toBe("Destroyed 2 sandboxes kept for reuse.");
+    expect(destroyedSandboxesNote(0, leased)).toBeNull();
+  });
+
+  describe("a failed run's workspace copy (retain_on_failure)", () => {
+    const holder = (leaseId: string, leasePolicy: string, issueIdentifier: string) => ({
+      leaseId,
+      leasePolicy,
+      executionWorkspaceId: null,
+      executionWorkspaceName: null,
+      issueId: leaseId,
+      issueIdentifier,
+      issueTitle: null,
+    });
+    const kept = (...holders: ReturnType<typeof holder>[]) =>
+      radius({ canDelete: false, deleteBlockedReasons: ["reusable_sandbox_lease"], reusableSandboxLeaseCount: holders.length, reusableSandboxLeaseHolders: holders });
+
+    it("warns that destroying one of several loses its files", () => {
+      const mixed = kept(holder("l1", "reuse_by_environment", "TES-1"), holder("l2", "retain_on_failure", "TES-2"), holder("l3", "reuse_by_environment", "TES-3"));
+      expect(keptSandboxes(mixed)).toEqual({ total: 3, recovery: 1 });
+      expect(reusableLeaseLine(mixed)).toBe("3 sandboxes are kept (TES-1, TES-2, TES-3).");
+      expect(deleteSummary(mixed).lines).toEqual([
+        "3 sandboxes are kept (TES-1, TES-2, TES-3). Close their workspaces first, or destroy them with the delete.",
+        "1 of them is a failed run's workspace copy kept for file recovery; destroying it loses the files only it holds.",
+      ]);
+      expect(deleteSummary(mixed, true)).toEqual({
+        allowed: true,
+        leaseConsent: true,
+        lines: [
+          "3 sandboxes are kept (TES-1, TES-2, TES-3). They're destroyed with it.",
+          "1 of them is a failed run's workspace copy kept for file recovery; destroying it loses the files only it holds.",
+        ],
+      });
+      expect(leaseConsentLabel(mixed)).toBe("Destroy the kept sandboxes, including a failed run's workspace copy. Work and files left in them are lost.");
+      expect(destroyedSandboxesNote(3, mixed)).toBe("Destroyed 3 sandboxes.");
+    });
+
+    it("agrees in number when several are copies", () => {
+      const two = kept(holder("l1", "retain_on_failure", "TES-1"), holder("l2", "retain_on_failure", "TES-2"), holder("l3", "reuse_by_environment", "TES-3"));
+      expect(deleteSummary(two, true).lines[1]).toBe("2 of them are failed runs' workspace copies kept for file recovery; destroying them loses the files only they hold.");
+      expect(leaseConsentLabel(two)).toContain("including 2 failed runs' workspace copies");
+    });
+
+    it("names a lone copy as what it is, and doesn't send the person to close its workspace", () => {
+      const one = kept(holder("l1", "retain_on_failure", "TES-9"));
+      expect(deleteSummary(one).lines).toEqual([
+        "A failed run's workspace copy is kept for file recovery (TES-9). Destroy it with the delete to go ahead.",
+        "Destroying it loses the files only it holds.",
+      ]);
+      expect(deleteSummary(one, true).lines).toEqual([
+        "A failed run's workspace copy is kept for file recovery (TES-9). It's destroyed with it.",
+        "Destroying it loses the files only it holds.",
+      ]);
+      const both = kept(holder("l1", "retain_on_failure", "TES-1"), holder("l2", "retain_on_failure", "TES-2"));
+      expect(deleteSummary(both).lines).toEqual([
+        "2 failed runs' workspace copies are kept for file recovery (TES-1, TES-2). Destroy them with the delete to go ahead.",
+        "Destroying them loses the files only they hold.",
+      ]);
+      expect(leaseConsentLabel(one)).toBe("Destroy the failed run's workspace copy. The files only it holds are lost.");
+      expect(leaseConsentLabel(both)).toBe("Destroy the failed runs' workspace copies. The files only they hold are lost.");
+    });
+
+    it("names the kept sandboxes when another block stands", () => {
+      const blocked = { ...kept(holder("l1", "retain_on_failure", "TES-9")), deleteBlockedReasons: ["instance_default", "reusable_sandbox_lease"] as EnvironmentDeleteBlastRadius["deleteBlockedReasons"] };
+      expect(deleteSummary(blocked, true)).toEqual({
+        allowed: false,
+        leaseConsent: false,
+        lines: ["It's the instance's default environment.", "A failed run's workspace copy is kept for file recovery (TES-9)."],
+      });
+    });
   });
 
   it("finds the agents to move and where they can go", () => {

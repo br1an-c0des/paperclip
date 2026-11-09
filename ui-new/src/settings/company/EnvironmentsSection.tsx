@@ -19,11 +19,13 @@ import {
   agentsOnEnvironment,
   defaultPatchId,
   deleteSummary,
+  destroyedSandboxesNote,
   driverLabel,
   effectiveDefaultId,
   environmentSummary,
   editScope,
   isManaged,
+  leaseConsentLabel,
   reassignTargets,
   sortEnvironments,
   unlistedAgentCount,
@@ -34,8 +36,8 @@ import { CardHead, CardNoteLine, failure, OutlineCard, SectionTitle } from "./sh
  * Environments (board 30's outline): where this organization's agents run. The API is per company,
  * so this moved here from instance settings. Each environment can be probed (what it can do, and on
  * a sandbox the qualification the Paperclip Runner needs), archived or restored, and deleted: this
- * organization's agents that run there move to another environment first, and sandboxes kept for
- * reuse are destroyed with it when the person agrees. The default is the instance's (`PATCH /instance/settings`), so making one
+ * organization's agents that run there move to another environment first, and the sandboxes it keeps
+ * (for reuse, or a failed run's files) are destroyed with it when the person agrees. The default is the instance's (`PATCH /instance/settings`), so making one
  * the default reaches every organization; the section says so where it's shown and set.
  *
  * New environment and Edit open a dialog (EnvironmentDialog.tsx): an SSH host or a sandbox
@@ -261,6 +263,7 @@ function DeleteEnvironmentDialog(props: { environment: Environment | null; envir
   const remove = async () => {
     const environment = props.environment;
     if (!environment) return;
+    const before = radius.data as EnvironmentDeleteBlastRadius | undefined;
     setBusy(true);
     let moved = 0;
     try {
@@ -277,7 +280,7 @@ function DeleteEnvironmentDialog(props: { environment: Environment | null; envir
         title: `Deleted ${environment.name}`,
         body: [
           moved ? `${moved === 1 ? "1 agent" : `${moved} agents`} moved to ${targets().find((entry) => entry.id === target())?.name ?? "the default"}.` : null,
-          destroyed ? `Destroyed ${destroyed === 1 ? "1 sandbox" : `${destroyed} sandboxes`} kept for reuse.` : null,
+          destroyedSandboxesNote(destroyed, before),
         ]
           .filter(Boolean)
           .join(" ") || undefined,
@@ -323,7 +326,7 @@ function DeleteEnvironmentDialog(props: { environment: Environment | null; envir
               <Show when={found().leaseConsent}>
                 <label class="cs-import-pick">
                   <input type="checkbox" checked={destroyLeases()} disabled={busy()} onChange={(event) => setDestroyLeases(event.currentTarget.checked)} />
-                  <span>Destroy the sandboxes kept for reuse. Work left in them is lost.</span>
+                  <span>{leaseConsentLabel(radius.data as EnvironmentDeleteBlastRadius)}</span>
                 </label>
               </Show>
               <Show when={found().allowed && moving().length > 0}>
