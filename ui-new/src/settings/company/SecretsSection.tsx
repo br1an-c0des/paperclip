@@ -195,6 +195,7 @@ function OrganizationSecretsCard(props: {
   onChanged: () => Promise<unknown>;
 }) {
   const company = useCompany();
+  const client = useQueryClient();
   const [params, setParams] = useSearchParams<{ folder?: string; view?: string }>();
   const descriptors = createQuery(() => ({
     queryKey: queryKeys.companySettings.secretProviders(company().id),
@@ -233,7 +234,9 @@ function OrganizationSecretsCard(props: {
     if (!secret) return;
     try {
       await secretsApi.remove(secret.id);
-      await props.onChanged();
+      // The server rejects the pending binding requests that name this secret (#20193), so the
+      // Proposals card drops them too.
+      await Promise.all([props.onChanged(), client.invalidateQueries({ queryKey: queryKeys.companySettings.secretProposals(company().id) })]);
       pushToast({ tone: "success", title: `Deleted ${secret.name}` });
     } catch (caught) {
       pushToast({ tone: "error", title: "Couldn't delete the secret", body: failure(caught, "") || undefined });

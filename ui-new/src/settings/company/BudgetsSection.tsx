@@ -417,7 +417,13 @@ function IncidentsCard(props: { incidents: BudgetIncident[]; loaded: boolean; on
     try {
       await budgetsApi.resolveIncident(company().id, incident.id, action === "raise_budget_and_resume" ? { action, amount: amount! } : { action });
       await props.onSaved();
-      pushToast({ tone: "success", title: action === "keep_paused" ? `${incident.scopeName} stays paused` : `Raised ${incident.scopeName}'s budget and resumed it` });
+      // Raise and resume files a Retry for each run the budget stopped, once its stop settles
+      // (#20144), so the person needn't restart that work by hand.
+      pushToast(
+        action === "keep_paused"
+          ? { tone: "success", title: `${incident.scopeName} stays paused` }
+          : { tone: "success", title: `Raised ${incident.scopeName}'s budget and resumed it`, body: "Tasks the budget stopped are retried on their own." },
+      );
     } catch (caught) {
       pushToast({ tone: "error", title: "Couldn't resolve the incident", body: failure(caught, "") || undefined });
     } finally {
