@@ -1,4 +1,4 @@
-import type { CompactIssue, Issue, IssueDisplayStatus, IssueRelationIssueSummary } from "@paperclipai/shared";
+import type { CompactIssue, Issue, IssueDisplayStatus, IssueLockedStub, IssueRelationIssueSummary } from "@paperclipai/shared";
 import { createQuery } from "@tanstack/solid-query";
 import {
   Box,
@@ -19,6 +19,7 @@ import {
   ListTree,
   Plus,
   Layers3,
+  Lock,
   Send,
   RotateCcw,
   ShieldCheck,
@@ -111,10 +112,17 @@ export function StatusChip(props: { status: IssueDisplayStatus; queued?: boolean
   );
 }
 
-/** A task's status chip, through `statusLook`. */
+/**
+ * A task's status chip, through `statusLook`. Nothing for a task with no status, such as a private
+ * one known only by its identifier, which `statusLook` can't place.
+ */
 export function TaskStatusChip(props: { task: StatusSource; small?: boolean }) {
   const look = () => statusLook(props.task);
-  return <StatusChip status={look().status} queued={look().queued} title={look().title} small={props.small} />;
+  return (
+    <Show when={props.task.status || props.task.displayStatus}>
+      <StatusChip status={look().status} queued={look().queued} title={look().title} small={props.small} />
+    </Show>
+  );
 }
 
 /**
@@ -478,37 +486,69 @@ export function TaskDetails(props: {
   );
 }
 
-function Relation(props: {
+/**
+ * A private task the viewer may not read, which the server sends in `blockedBy` and `blocks` as
+ * `{ id, identifier, locked: true }` in place of its summary (the old UI's `isLockedIssueStub`).
+ */
+export function isLockedRelation(relation: IssueRelationIssueSummary | IssueLockedStub): relation is IssueLockedStub {
+  return (relation as { locked?: unknown }).locked === true;
+}
+
+/**
+ * One dependency row. A locked one shows only its identifier with a lock, as the old UI's
+ * LockedIssueChip does: no title or status, and no link, since opening it would only 404. A locked
+ * blocker can still be removed.
+ */
+export function Relation(props: {
   kind: "blocked-by" | "blocking";
-  relation: IssueRelationIssueSummary;
-  people: ReturnType<typeof useTaskPeople>;
+  relation: IssueRelationIssueSummary | IssueLockedStub;
+  people: Pick<ReturnType<typeof useTaskPeople>, "agent" | "youId" | "personName">;
   onOpen: (task: { id: string; identifier: string | null }) => void;
   onRemove?: () => void;
 }) {
+  const summary = () => (isLockedRelation(props.relation) ? null : props.relation);
   const waiter = () => {
-    const agent = props.people.agent(props.relation.assigneeAgentId);
+    const relation = summary();
+    if (!relation) return null;
+    const agent = props.people.agent(relation.assigneeAgentId);
     if (agent) return agent.name;
-    const userId = props.relation.assigneeUserId;
+    const userId = relation.assigneeUserId;
     if (!userId) return null;
     return userId === props.people.youId() ? "You" : props.people.personName(userId);
   };
+  const name = () => props.relation.identifier ?? summary()?.title ?? "a private task";
   return (
     <div class="td-relation" data-kind={props.kind}>
       <span class="td-relation-kind">{props.kind === "blocked-by" ? "Blocked by" : "Blocking"}</span>
-      <button type="button" class="td-link td-ellipsis" onClick={() => props.onOpen(props.relation)}>
-        <span class="mono td-id">{props.relation.identifier}</span>
-        {props.relation.title}
-      </button>
-      <span class="td-relation-note">
-        <Show when={props.kind === "blocking"} fallback={<TaskStatusChip task={props.relation} small />}>
-          <Show when={waiter()}>{(name) => <>{name()} {name() === "You" ? "wait" : "waits"} on this</>}</Show>
-        </Show>
-      </span>
+      <Show
+        when={summary()}
+        fallback={
+          <span class="td-relation-locked mono" data-testid="locked-relation" title="Private: you don't have access">
+            <Lock size={12} aria-hidden="true" />
+            {props.relation.identifier ?? "Private"}
+            <span class="sr-only">, private, you don't have access</span>
+          </span>
+        }
+      >
+        {(relation) => (
+          <>
+            <button type="button" class="td-link td-ellipsis" onClick={() => props.onOpen(relation())}>
+              <span class="mono td-id">{relation().identifier}</span>
+              {relation().title}
+            </button>
+            <span class="td-relation-note">
+              <Show when={props.kind === "blocking"} fallback={<TaskStatusChip task={relation()} small />}>
+                <Show when={waiter()}>{(name) => <>{name()} {name() === "You" ? "wait" : "waits"} on this</>}</Show>
+              </Show>
+            </span>
+          </>
+        )}
+      </Show>
       <Show when={props.onRemove}>
         <button
           type="button"
           class="td-relation-remove"
-          aria-label={`Stop ${props.relation.identifier ?? props.relation.title} blocking this task`}
+          aria-label={`Stop ${name()} blocking this task`}
           title="Remove this blocker"
           onClick={() => props.onRemove?.()}
         >
