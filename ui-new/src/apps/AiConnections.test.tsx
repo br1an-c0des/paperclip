@@ -77,11 +77,12 @@ describe("AiConnections", () => {
     expect(await screen.findByText("Company Claude subscription")).toBeTruthy();
     expect(screen.getByText("Claude · Subscription · ada@example.com · Shared with the company")).toBeTruthy();
     expect(screen.getByText("Expired")).toBeTruthy();
-    expect(screen.getByText("Your default")).toBeTruthy();
+    // The expired default is marked, crowned, as unavailable.
+    expect(screen.getByText("Default unavailable")).toBeTruthy();
     expect(screen.getByText("Reconnect with a separate sign-in.")).toBeTruthy();
 
-    // Only your own connected personal account offers Make default; only the expired one Reconnect.
-    const makeDefault = screen.getAllByRole("button", { name: "Make default" });
+    // Only your own connected personal account offers to become the default; only the expired one Reconnect.
+    const makeDefault = screen.getAllByRole("button", { name: "Set as default for Claude" });
     expect(makeDefault).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Reconnect" })).toHaveLength(1);
     fireEvent.click(makeDefault[0]!);
@@ -89,5 +90,36 @@ describe("AiConnections", () => {
 
     // Usage is offered where the provider reports it.
     expect(screen.getAllByRole("button", { name: "Usage" })).toHaveLength(1);
+  });
+
+  it("crowns your default and keeps a failed change on its row with Retry", async () => {
+    api.list.mockResolvedValue({
+      ...list,
+      connections: [
+        { ...list.connections[1]!, isDefault: true },
+        { ...list.connections[1]!, id: "c4", grantId: "g4", name: "Second Claude key" },
+        { ...list.connections[1]!, id: "c5", grantId: "g5", name: "Viewer-only key", canSetDefault: false },
+      ],
+    });
+    api.setDefault.mockRejectedValueOnce(new Error("Server said no."));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(() => (
+      <QueryClientProvider client={client}>
+        <AiConnections />
+      </QueryClientProvider>
+    ));
+    expect(await screen.findByText("Your Claude default")).toBeTruthy();
+    // canSetDefault: false hides the action.
+    const set = screen.getAllByRole("button", { name: "Set as default for Claude" });
+    expect(set).toHaveLength(1);
+    fireEvent.click(set[0]!);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't change your Claude default. Server said no.");
+    const retry = screen.getByRole("button", { name: "Retry" }) as HTMLButtonElement;
+    await waitFor(() => expect(retry.disabled).toBe(false));
+    fireEvent.click(retry);
+    await waitFor(() => expect(api.setDefault).toHaveBeenCalledTimes(2));
+    expect(api.setDefault).toHaveBeenLastCalledWith("co1", "g4");
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
   });
 });

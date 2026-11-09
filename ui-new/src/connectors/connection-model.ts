@@ -58,14 +58,17 @@ export function isOwnPersonal(connection: Connection, currentUserId: string) {
 
 /**
  * Only your own connected personal account can be your default (`PUT /default` rejects the rest),
- * and custom-routed accounts are chosen on the agent instead.
+ * and custom-routed accounts are chosen on the agent instead. The list says when you may set one
+ * (`canSetDefault`, #19845: not as a viewer), and an account with an `unavailableReason` can't be.
  */
 export function canMakeDefault(connection: Connection, currentUserId: string) {
   return (
     !connection.isDefault &&
     isOwnPersonal(connection, currentUserId) &&
     connection.status === "connected" &&
-    !connection.routing
+    !connection.routing &&
+    connection.canSetDefault !== false &&
+    !connection.unavailableReason
   );
 }
 

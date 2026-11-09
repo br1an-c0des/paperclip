@@ -779,3 +779,13 @@ button.ap-provider {
 .ap-later > button {
   align-self: flex-start;
 }
+
+/* A personal default that did not save, with Retry (AiConnections). */
+.cx-row-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--red-fg);
+}

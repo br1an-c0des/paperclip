@@ -44,6 +44,10 @@ describe("connection rules", () => {
     expect(canMakeDefault({ ...base, status: "expired" }, "me")).toBe(false);
     expect(canMakeDefault({ ...base, ownerUserId: "ada" }, "me")).toBe(false);
     expect(canMakeDefault({ ...base, ownership: "shared", ownerUserId: undefined }, "me")).toBe(false);
+    // The server says when you may (#19845), and an unavailable account can't be the default.
+    expect(canMakeDefault({ ...base, canSetDefault: false }, "me")).toBe(false);
+    expect(canMakeDefault({ ...base, canSetDefault: true }, "me")).toBe(true);
+    expect(canMakeDefault({ ...base, unavailableReason: "Reconnect it first." }, "me")).toBe(false);
   });
 
   it("offers Reconnect on failing accounts to their owner, or to managers for shared ones", () => {
