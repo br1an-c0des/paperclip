@@ -99,7 +99,7 @@ describe("connection requests", () => {
     const request = requestFromInteraction(intent, intentCtx);
     expect(request).toMatchObject({ shape: "connection", title: "Connect GitHub", askVerb: "asks to connect an app", audience: { kind: "named", label: "You" }, respond: { allowed: true } });
     const theirs = requestFromInteraction({ ...intent, addresseeUserId: "u2" } as ConnectionIntentInteraction, intentCtx);
-    expect(theirs.respond).toEqual({ allowed: false, reason: "Waiting on Sam K. Only Sam K. can answer this." });
+    expect(theirs.respond).toEqual({ allowed: false, reason: "Waiting on Sam K. Only Sam K. can answer this.", waitingOn: "Sam K." });
   });
 
   it("asks for access to an existing connection, and for an AI connection", () => {
