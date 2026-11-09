@@ -25,6 +25,11 @@ import type { BoardAccess } from "./task-edits";
  * was (`native_controller_host_unverified`), an owner or admin confirms it stopped, saying how they
  * checked (`previousServerStop`). A pending provider tool call (#19733) reads on its own and, as a
  * reconciliation cause, isn't offered "Try again".
+ *
+ * Since the 2026-11-09 sync (#20067, #20084): a record saved before Paperclip stored which server
+ * held it (`ownership_owner_unprovable`, eight kinds of record in `evidence.kind`) gets the same
+ * confirmation, bound to the record and the version the board was shown, with words of its own for
+ * each kind (the old UI's WorkspaceExportRecovery.tsx, `OWNER_GONE_RESOURCE`).
  */
 
 export type RecoveryState = "needed" | "in_progress" | "observing";
@@ -70,7 +75,39 @@ export const OUTCOMES: { outcome: RecoveryOutcome; label: string; description: s
  * Causes whose one way on is the board's confirmation that the previous server stopped (the old
  * UI's `isPreviousServerStopCause`): the card offers no other choice for them.
  */
-export const PREVIOUS_SERVER_STOP_CAUSES = new Set(["native_workspace_finalization_owner_unverified", "native_controller_host_unverified"]);
+export const PREVIOUS_SERVER_STOP_CAUSES = new Set([
+  "native_workspace_finalization_owner_unverified",
+  "native_controller_host_unverified",
+  "ownership_owner_unprovable",
+]);
+
+/** A stuck record whose owner Paperclip can't judge, saved before owners were recorded (#20067). */
+export const OWNER_UNPROVABLE_CAUSE = "ownership_owner_unprovable";
+
+export type OwnerGoneResource = { what: string; releasing: string };
+
+/** What the stuck record is, by `evidence.kind`, and what happens once it's confirmed (the old UI's words). */
+export const OWNER_GONE_RESOURCE: Record<string, OwnerGoneResource> = {
+  environment_run_lease_active: { what: "A sandbox lease from this task's earlier run", releasing: "Releasing the sandbox lease…" },
+  legacy_controller_lease: { what: "This task's earlier run", releasing: "Recovering the run…" },
+  environment_teardown_claim: { what: "A sandbox cleanup from this task's earlier run", releasing: "Resuming the sandbox cleanup…" },
+  sandbox_creation_intent: { what: "A sandbox this task's earlier run was creating", releasing: "Reconciling the sandbox…" },
+  workspace_runtime_control_operation: { what: "A workspace service change from this task's earlier run", releasing: "Releasing the workspace…" },
+  native_workspace_finalize_attempt: { what: "A workspace save from this task's earlier run", releasing: "Releasing the workspace save…" },
+  native_finalizer_lease: { what: "The result handling of this task's earlier run", releasing: "Resuming the result handling…" },
+  native_cleanup_lease: { what: "The cleanup of this task's earlier run", releasing: "Resuming the cleanup…" },
+};
+const OWNER_GONE_DEFAULT: OwnerGoneResource = { what: "A resource from this task's earlier run", releasing: "Releasing the resource…" };
+
+/** The words for an unprovable record's kind, or the general ones for a kind this UI doesn't know. */
+export function ownerGoneResource(kind: unknown): OwnerGoneResource {
+  return typeof kind === "string" && Object.hasOwn(OWNER_GONE_RESOURCE, kind) ? OWNER_GONE_RESOURCE[kind] : OWNER_GONE_DEFAULT;
+}
+
+/** The card's headline for an unprovable record: what it is, and that it stays reserved. */
+export function ownerGoneHeadline(kind: unknown) {
+  return `${ownerGoneResource(kind).what} was recorded before Paperclip stored which server held it, so Paperclip can't verify that the server stopped. It stays reserved until then.`;
+}
 
 /** Causes with words of their own, over the kind's. */
 const CAUSES: Record<string, { label: string; headline: string }> = {
@@ -127,7 +164,12 @@ export function recoveryCard(action: IssueRecoveryAction | null | undefined, opt
       : action.status === "escalated" || action.ownerType === "board"
         ? "needed"
         : "in_progress";
-  const cause = action.cause ? CAUSES[action.cause] : undefined;
+  const ownerGone = action.cause === OWNER_UNPROVABLE_CAUSE;
+  const cause = ownerGone
+    ? { label: "Previous server not confirmed stopped", headline: ownerGoneHeadline(action.evidence?.kind) }
+    : action.cause
+      ? CAUSES[action.cause]
+      : undefined;
   const headline =
     cause?.headline ??
     (state === "needed" && action.ownerType === "board" && (action.kind === "active_run_watchdog" || action.kind === "deliberate_wait_without_target")
@@ -149,7 +191,8 @@ export function recoveryCard(action: IssueRecoveryAction | null | undefined, opt
     kindLabel: cause?.label ?? KIND_LABELS[action.kind] ?? action.kind.replace(/_/g, " "),
     headline,
     detail: typeof restoreFailure === "string" && restoreFailure.trim() ? restoreFailure.trim() : null,
-    nextAction: action.nextAction?.trim() || null,
+    // An unprovable record's next step repeats the headline and the confirmation under it.
+    nextAction: ownerGone ? null : action.nextAction?.trim() || null,
     attempts: action.attemptCount > 1 ? `Attempt ${action.attemptCount}${action.maxAttempts ? ` of ${action.maxAttempts}` : ""}` : null,
     outcomes,
   };
@@ -175,10 +218,17 @@ const OPEN = new Set(["active", "escalated"]);
  *   recovery whose copy-back owner waits for an operator (`workspaceOwnerRecovery`, #19742).
  * - `controller`: a run's server recorded before its host was, which an ephemeral server can't
  *   judge by process id (`POST …/recovery-actions/confirm-controller-stopped`).
+ * - `owner-gone`: a record saved before Paperclip stored which server held it
+ *   (`ownership_owner_unprovable`, since the 2026-11-09 sync), confirmed for that record and the
+ *   version the board was shown (`POST …/recovery-actions/confirm-owner-gone`). It needs no run.
  *
- * Gone once the server has recorded a stop (`workspaceOwnerStop`, `controllerStop`) or resumes.
+ * Gone once the server has recorded a stop (`workspaceOwnerStop`, `controllerStop`, `ownerGone`)
+ * or resumes.
  */
-export type PreviousServerStop = { kind: "owner"; runId: string; ownerToken: string } | { kind: "controller"; runId: string };
+export type PreviousServerStop =
+  | { kind: "owner"; runId: string; ownerToken: string }
+  | { kind: "controller"; runId: string }
+  | { kind: "owner-gone"; recordId: string; recordVersion: string | null; resource: OwnerGoneResource };
 
 export function previousServerStop(
   action: IssueRecoveryAction | null | undefined,
@@ -186,6 +236,16 @@ export function previousServerStop(
   companyId: string,
 ): PreviousServerStop | null {
   if (!action || action.companyId !== companyId || action.sourceIssueId !== issueId || !OPEN.has(action.status)) return null;
+  if (action.cause === OWNER_UNPROVABLE_CAUSE) {
+    const { recordId, recordUpdatedAt } = action.evidence;
+    if (action.ownerType !== "board" || typeof recordId !== "string" || !recordId || action.evidence.ownerGone) return null;
+    return {
+      kind: "owner-gone",
+      recordId,
+      recordVersion: typeof recordUpdatedAt === "string" && recordUpdatedAt ? recordUpdatedAt : null,
+      resource: ownerGoneResource(action.evidence.kind),
+    };
+  }
   const runId = action.evidence.runId;
   if (typeof runId !== "string" || !runId) return null;
   const hold = obj(action.evidence.workspaceOwnerRecovery);
@@ -220,12 +280,40 @@ export function stopConfirmationBody(
 ):
   | { kind: "owner"; body: { actionId: string; runId: string; ownerToken: string; controllerAndCopybackStopped: true; stopEvidence: string } }
   | { kind: "controller"; body: { actionId: string; runId: string; stopEvidence: string } }
+  | { kind: "owner-gone"; body: OwnerGoneBody }
   | null {
   const stopEvidence = evidence.trim();
   if (stopEvidence.length < STOP_EVIDENCE_MIN) return null;
-  return stop.kind === "owner"
-    ? { kind: "owner", body: { actionId, runId: stop.runId, ownerToken: stop.ownerToken, controllerAndCopybackStopped: true, stopEvidence } }
-    : { kind: "controller", body: { actionId, runId: stop.runId, stopEvidence } };
+  switch (stop.kind) {
+    case "owner":
+      return { kind: "owner", body: { actionId, runId: stop.runId, ownerToken: stop.ownerToken, controllerAndCopybackStopped: true, stopEvidence } };
+    case "controller":
+      return { kind: "controller", body: { actionId, runId: stop.runId, stopEvidence } };
+    case "owner-gone":
+      // The version shown here: a record refreshed since must be confirmed again (the server refuses a mismatch).
+      return {
+        kind: "owner-gone",
+        body: { actionId, recordId: stop.recordId, stopEvidence, ...(stop.recordVersion ? { recordVersion: stop.recordVersion } : {}) },
+      };
+  }
+}
+
+/** What `confirm-owner-gone` takes (shared `confirmOwnerGoneSchema`). */
+export type OwnerGoneBody = { actionId: string; recordId: string; stopEvidence: string; recordVersion?: string };
+
+/**
+ * What the confirmation form is keyed by: a new action, run, owner token, record or record version
+ * starts a fresh form, so the board never confirms something it wasn't shown.
+ */
+export function stopFormKey(actionId: string, stop: PreviousServerStop) {
+  switch (stop.kind) {
+    case "owner":
+      return `${actionId}:${stop.runId}:${stop.ownerToken}`;
+    case "controller":
+      return `${actionId}:${stop.runId}:controller`;
+    case "owner-gone":
+      return `${actionId}:${stop.recordId}:${stop.recordVersion ?? ""}`;
+  }
 }
 
 /**

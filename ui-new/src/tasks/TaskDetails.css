@@ -328,6 +328,17 @@ a.td-chip:hover {
   color: var(--amber-fg);
 }
 
+/* A private task the viewer may not read: its identifier and a lock, nothing to open. */
+.td-relation-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  margin-right: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .td-relation-note {
   margin-left: auto;
   flex-shrink: 0;
