@@ -202,4 +202,56 @@ describe("tasks made from this one", () => {
     const windowed = windowThread({ comments: [], events: [], runs: [], tasks, names, from: new Date("2026-10-01T11:00:00Z").getTime() });
     expect(windowed.map((item) => item.key)).toEqual(["gap"]);
   });
+
+  it("names the subtask whose agent asked for a sibling (#19312), and a follow-up isn't a subtask", () => {
+    // s2 was asked for by s1's agent; the server put it under t1, beside s1, recording s1 as its origin.
+    const parentView = createdTasks([made("s1", "2026-10-01T10:00:00Z"), made("s2", "2026-10-01T10:30:00Z", { originIssueId: "s1" } as Partial<CompactIssue>)], context);
+    expect(parentView.map((entry) => [entry.task.id, entry.task.subtask, entry.task.via?.identifier])).toEqual([
+      ["s1", true, undefined],
+      ["s2", true, "S1"],
+    ]);
+    // In s1's thread, the same task is a follow-up: made from s1, but t1's child.
+    const requesterView = createdTasks([made("s2", "2026-10-01T10:30:00Z", { originIssueId: "s1" } as Partial<CompactIssue>)], { taskId: "s1", companyId: "c1" });
+    expect(requesterView.map((entry) => [entry.task.id, entry.task.subtask, entry.task.via])).toEqual([["s2", false, undefined]]);
+  });
+});
+
+describe("what the thread adds since the 2026-11-07 sync", () => {
+  const compaction = (runId: string, at: string) => ({ key: `compaction:${runId}:${at}`, runId, at: new Date(at), preTokens: 230_000, postTokens: 38_000 });
+
+  it("puts compaction dividers in time order, with the changes, and finds them by search", () => {
+    const items = buildThread({
+      comments: [comment("c1", "2026-10-01T10:00:00Z"), comment("c2", "2026-10-01T12:00:00Z")],
+      events: [],
+      runs: [run("r1", "succeeded", "2026-10-01T10:30:00Z", "2026-10-01T11:30:00Z")],
+      compactions: [compaction("r1", "2026-10-01T11:00:00Z")],
+      names,
+    });
+    expect(items.map((item) => item.kind)).toEqual(["comment", "compaction", "lines", "comment"]);
+    expect(buildThread({ comments: [], events: [], runs: [], compactions: [compaction("r1", "2026-10-01T11:00:00Z")], names, filter: "comments" })).toEqual([]);
+    expect(buildThread({ comments: [], events: [], runs: [], compactions: [compaction("r1", "2026-10-01T11:00:00Z")], names, search: "compacted" })).toHaveLength(1);
+    const windowed = windowThread({ comments: [], events: [], runs: [], compactions: [compaction("r1", "2026-10-01T09:00:00Z")], names, from: new Date("2026-10-01T10:00:00Z").getTime() });
+    expect(windowed.map((item) => item.key)).toEqual(["gap"]);
+  });
+
+  it("lets a Compact now run's divider stand in for its line", () => {
+    const runs = [run("r1", "succeeded", "2026-10-01T10:30:00Z", "2026-10-01T10:31:00Z"), run("r2", "failed", "2026-10-01T11:30:00Z", "2026-10-01T11:31:00Z")];
+    const items = buildThread({ comments: [], events: [], runs, compactions: [compaction("r1", "2026-10-01T10:30:30Z")], compactionRunIds: new Set(["r1", "r2"]), names });
+    expect(items.map((item) => item.key)).toEqual(["compaction:r1:2026-10-01T10:30:30Z", "lines:run:r2"]);
+  });
+
+  it("names the task this one was created from on its created line", () => {
+    const from = { id: "t9", identifier: "TES-9", title: "Requester" };
+    const items = buildThread({ comments: [], events: [event("e1", "2026-10-01T09:00:00Z", "issue.created"), event("e2", "2026-10-01T09:01:00Z", "issue.checked_out")], runs: [], createdFrom: from, names });
+    const lines = items[0]!.kind === "lines" ? items[0]!.lines : [];
+    expect(lines.map((line) => line.createdFrom)).toEqual([from, undefined]);
+    expect(buildThread({ comments: [], events: [event("e1", "2026-10-01T09:00:00Z", "issue.created")], runs: [], createdFrom: from, names, search: "TES-9" })).toHaveLength(1);
+  });
+
+  it("words a Compact now request", () => {
+    expect(activityLine(event("e1", "", "issue.context_compaction_requested", { compactionRunId: "r1" }, { actorType: "user", actorId: "u1", agentId: null }), names)).toEqual({
+      actor: "You",
+      text: "asked the agent to compact its context",
+    });
+  });
 });

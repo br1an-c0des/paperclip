@@ -1,6 +1,6 @@
 import type { IssueComment, IssueStatus } from "@paperclipai/shared";
 import { createInfiniteQuery, createMutation, createQuery, keepPreviousData, useQueryClient } from "@tanstack/solid-query";
-import { ArrowDown, ArrowUpRight, Ellipsis, ListTree, Search, Square, X } from "lucide-solid";
+import { ArrowDown, ArrowUpRight, Ellipsis, FoldVertical, ListTree, Search, Square, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch } from "solid-js";
 import { approvalsApi } from "@/api/approvals";
 import { commentsApi } from "@/api/comments";
@@ -49,6 +49,9 @@ import { stopLabel, stopRun } from "./run-stop";
 import { plainClick } from "./TaskList";
 import { createdTasks, duration, stampLabel, suggestedTaskIds, type CreatedTask, type ThreadFilter } from "./thread-model";
 import { commentElementId, nearBottom } from "./task-anchor";
+import { compactionDetail, compactionRunIds, runsToRead, useRunCompactions } from "./thread-compactions";
+import { contextUsageQuery } from "./TaskContext";
+import { CopyMessage } from "./CopyMessage";
 import { CommentPluginActions, CommentPluginAnnotations } from "@/plugins/CommentPlugins";
 import "./TaskActivity.css";
 
@@ -57,7 +60,9 @@ import "./TaskActivity.css";
  * changes and finished runs as compact lines between them, agents' requests and the task's
  * approvals as request cards (board 15), tasks an agent made from this one as linked cards, and the
  * live run as a card at the foot with Stop. Runs open in the run modal ("View run"). An agent's
- * comment has thumbs up and down (FeedbackVotes.tsx).
+ * comment has thumbs up and down (FeedbackVotes.tsx); your own has Copy as Markdown, left of its
+ * time (CopyMessage.tsx). A finished run's context compactions divide the thread
+ * (thread-compactions.ts), and the "created this task" line names the task it was created from.
  *
  * It opens on the latest of the task's history and the task row alone (history-window.ts), and
  * reads the rest when the reader asks: "Show earlier activity", a search, or a filter. From then on
@@ -227,10 +232,22 @@ export function TaskActivity(props: {
       shown: suggestedTaskIds(interactions.data ?? []),
     }),
   );
+  // Compaction dividers (U58): the shown runs' compactions, read while the assignee's session counts
+  // any, and the runs Compact now queued (thread-compactions.ts).
+  const contextUsage = createQuery(() => contextUsageQuery(props.taskId, task()?.assigneeAgentId));
+  const requestedCompactions = createMemo(() => compactionRunIds(shownEvents()));
+  const compactions = useRunCompactions(
+    createMemo(() => runsToRead(shownRuns(), { sessionCompacted: (contextUsage.data?.compactions ?? 0) > 0, requested: requestedCompactions() }), [], {
+      equals: (a, b) => a.length === b.length && a.every((id, index) => id === b[index]),
+    }),
+  );
   const live = createMemo(() => (liveRuns.data ?? []).filter((run) => run.issueId === props.taskId));
   // Ticks the live runs' running times.
   const now = useNow(() => live().length > 0);
   const queue = useQueuedComments(() => props.taskId, () => live().length > 0 || !!task()?.assigneeAgentId);
+
+  const openTask = (task: { id: string; identifier: string | null; title: string; projectId: string | null }) =>
+    props.onOpenTask ? props.onOpenTask(task) : commands.openTaskModal({ id: task.id, identifier: task.identifier, title: task.title, projectId: task.projectId });
 
   const names = {
     agent: (id: string) => people.agent(id)?.name,
@@ -256,6 +273,9 @@ export function TaskActivity(props: {
       runs: shownRuns(),
       requests: requests(),
       tasks: madeTasks(),
+      compactions: compactions(),
+      compactionRunIds: requestedCompactions(),
+      createdFrom: task()?.createdFrom?.issue,
       hiddenCommentIds: queuedIds(queue.data),
       names,
       from: from(),
@@ -454,6 +474,25 @@ export function TaskActivity(props: {
                                     </>
                                   )}
                                 </Show>
+                                <Show when={line.createdFrom}>
+                                  {(from) => (
+                                    <>
+                                      {" "}from{" "}
+                                      <a
+                                        class="ta-from"
+                                        href={issuePath(company().issuePrefix, from())}
+                                        title={from().title}
+                                        onClick={(event) => {
+                                          if (!plainClick(event)) return;
+                                          event.preventDefault();
+                                          openTask({ id: from().id, identifier: from().identifier, title: from().title, projectId: null });
+                                        }}
+                                      >
+                                        {from().identifier ?? from().title}
+                                      </a>
+                                    </>
+                                  )}
+                                </Show>
                                 <Show when={line.count}>{(count) => <span class="ta-count"> ×{count()}</span>}</Show>
                               </span>
                               <Show when={line.runId}>
@@ -485,12 +524,21 @@ export function TaskActivity(props: {
                   </Match>
                   <Match when={item.kind === "request" && item}>{(entry) => <RequestCard request={entry().request} taskId={props.taskId} people={people} inThread />}</Match>
                   <Match when={item.kind === "task" && item}>
+                    {(entry) => <CreatedTaskCard task={entry().task} at={entry().at} onOpen={openTask} />}
+                  </Match>
+                  <Match when={item.kind === "compaction" && item}>
                     {(entry) => (
-                      <CreatedTaskCard
-                        task={entry().task}
-                        at={entry().at}
-                        onOpen={(task) => (props.onOpenTask ? props.onOpenTask(task) : commands.openTaskModal({ id: task.id, identifier: task.identifier, title: task.title, projectId: task.projectId }))}
-                      />
+                      <div class="ta-compacted" role="separator" aria-label={`Context compacted, ${stampLabel(entry().at)}`}>
+                        <span class="ta-compacted-label">
+                          <FoldVertical size={14} aria-hidden="true" />
+                          <b>Context compacted</b>
+                          <Show when={compactionDetail(entry().compaction)}>{(detail) => <span>· {detail()}</span>}</Show>
+                          <time datetime={entry().at.toISOString()}>· {stampLabel(entry().at)}</time>
+                          <button type="button" class="ta-view-run" onClick={() => commands.openRunModal(entry().compaction.runId)}>
+                            View run
+                          </button>
+                        </span>
+                      </div>
                     )}
                   </Match>
                 </Switch>
@@ -602,6 +650,9 @@ function Comment(props: {
           <span class="ta-tag">reopened the task</span>
         </Show>
         <CommentPluginActions comment={props.comment} />
+        <Show when={you() && !props.comment.deletedAt}>
+          <CopyMessage text={props.comment.body} class="ta-copy" />
+        </Show>
         <time class="ta-time" datetime={new Date(props.comment.createdAt).toISOString()}>
           {stampLabel(props.comment.createdAt)}
         </time>
@@ -645,7 +696,8 @@ function CreatedTaskCard(props: { task: CreatedTask; at: Date; onOpen: (task: Cr
       <ListTree size={16} aria-hidden="true" class="ta-made-icon" />
       <span class="ta-made-text">
         <span class="ta-made-kicker">
-          {props.task.subtask ? "Subtask created" : "Task created"}
+          {props.task.subtask ? "Subtask created" : "Follow-up created"}
+          <Show when={props.task.via}>{(via) => <> from {via().identifier ?? "another subtask"}</>}</Show>
           <time datetime={props.at.toISOString()}> · {stampLabel(props.at)}</time>
         </span>
         <span class="ta-made-title">{props.task.title}</span>

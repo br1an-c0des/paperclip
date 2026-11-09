@@ -16,6 +16,7 @@ import { activityLine, type ActivityLine } from "@/org/org-model";
 import { agoLabel, dayLabel, formatDuration } from "@/runs/run-model";
 import type { TaskPeople } from "@/tasks/people";
 import { stopLabel, stopRun } from "@/tasks/run-stop";
+import { ChatContextSection } from "@/tasks/TaskContext";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { messageTime } from "./chat-model";
@@ -221,6 +222,9 @@ export function ChatActivity(props: {
           </section>
         )}
       </Show>
+
+      {/* The chat's context window and Compact now (U58, tasks/TaskContext.tsx). */}
+      <Show when={props.chatId}>{(chatId) => <ChatContextSection chatId={chatId()} agentId={props.agent.id} />}</Show>
 
       <section class="ch-side-sec" aria-labelledby={`ch-next-${props.agent.id}`}>
         <h3 class="disp" id={`ch-next-${props.agent.id}`}>

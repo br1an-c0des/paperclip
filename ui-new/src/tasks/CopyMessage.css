@@ -1,0 +1,52 @@
+/* Copy your own message (CopyMessage.tsx): a small ghost icon button left of the time. */
+.copy-msg {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 120ms ease, background 120ms ease;
+}
+
+.ch-msg-head .copy-msg {
+  align-self: center;
+  width: 22px;
+  height: 22px;
+}
+
+.copy-msg:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* Shown while the message is hovered or the control is focused; always on touch screens. */
+:is(.ta-comment, .ch-msg):hover .copy-msg,
+.copy-msg:focus-visible,
+.copy-msg[data-state="copied"],
+.copy-msg[data-state="failed"] {
+  opacity: 1;
+}
+
+.copy-msg[data-state="copied"] {
+  color: var(--green-fg);
+}
+
+.copy-msg[data-state="failed"] {
+  color: var(--red-fg);
+}
+
+@media (hover: none) {
+  .copy-msg {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copy-msg {
+    transition: none;
+  }
+}

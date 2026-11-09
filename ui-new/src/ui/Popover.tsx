@@ -38,12 +38,14 @@ export type PopoverContentProps = ParentProps<{
   /** Hide the ✕ button. */
   hideClose?: boolean;
   class?: string;
+  /** Called as it opens; `preventDefault()` keeps focus where it was (a popover opened by hover). */
+  onOpenAutoFocus?: (event: Event) => void;
 }>;
 
 function Content(props: PopoverContentProps) {
   const mount = useLayerMount();
   const inDialog = useInDialog();
-  const [local] = splitProps(props, ["label", "title", "width", "hideClose", "class", "children"]);
+  const [local] = splitProps(props, ["label", "title", "width", "hideClose", "class", "children", "onOpenAutoFocus"]);
   return (
     <KPopover.Portal mount={mount()}>
       <KPopover.Content
@@ -53,6 +55,7 @@ function Content(props: PopoverContentProps) {
         class={`popover ${local.class ?? ""}`}
         aria-label={local.title ? undefined : local.label}
         style={{ width: layerMode() === "anchored" ? `${local.width ?? 500}px` : undefined }}
+        onOpenAutoFocus={local.onOpenAutoFocus}
       >
         <SheetOnly>
           <span class="layer-handle" aria-hidden="true" />

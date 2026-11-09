@@ -1,0 +1,184 @@
+/* The Context property (TaskContext.tsx): a small bar and "10% of 258k", amber near full, red at it. */
+.ctx-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 32px;
+  margin-left: -8px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  color: var(--text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.ctx-trigger:hover {
+  background: var(--hover);
+}
+
+.ctx-trigger[data-level="near"] .ctx-label {
+  color: var(--amber-fg);
+}
+
+.ctx-trigger[data-level="full"] .ctx-label {
+  color: var(--red-fg);
+}
+
+.ctx-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctx-muted {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.ctx-bar {
+  position: relative;
+  flex-shrink: 0;
+  width: 24px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--pri-off);
+}
+
+.ctx-bar--wide {
+  width: 100%;
+}
+
+.ctx-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--r-pill);
+  background: var(--muted);
+  transition: width 150ms ease;
+}
+
+.ctx-bar[data-level="near"] > span {
+  background: var(--amber-fg);
+}
+
+.ctx-bar[data-level="full"] > span {
+  background: var(--red-fg);
+}
+
+.ctx-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.ctx-card p {
+  margin: 0;
+}
+
+.ctx-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ctx-tokens {
+  min-width: 0;
+  color: var(--body);
+  font-variant-numeric: tabular-nums;
+}
+
+.ctx-percent {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.ctx-percent[data-level="near"],
+.ctx-note[data-level="near"] {
+  color: var(--amber-fg);
+}
+
+.ctx-percent[data-level="full"],
+.ctx-note[data-level="full"] {
+  color: var(--red-fg);
+}
+
+.ctx-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--edge);
+}
+
+.ctx-rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ctx-rows dt {
+  color: var(--muted);
+}
+
+.ctx-rows dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.ctx-compact {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--edge);
+}
+
+.ctx-compact .ctx-muted {
+  font-size: 12px;
+}
+
+.ctx-spin {
+  animation: ctx-spin 900ms linear infinite;
+}
+
+@keyframes ctx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctx-spin {
+    animation: none;
+  }
+
+  .ctx-bar > span {
+    transition: none;
+  }
+}
+
+.ctx-error {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.ctx-retry {
+  color: var(--run-fg);
+  font-weight: 600;
+}
