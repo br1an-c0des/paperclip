@@ -169,6 +169,12 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   `PUT .../queued-comments/order`, `POST .../queued-comments/:commentId/steer`,
   `POST .../queued-comments/interrupt`, `POST /api/heartbeat-runs/:runId/cancel` (stop; "stop and
   finalize" also updates the task).
+- **Since the 2026-11-09 sync** (#19970): your own plain queued follow-up is steered into the live
+  turn after 5 s ("Sending in Xs · Edit · Cancel", one attempt per revision), only while steering is
+  `available` on `paperclip_runner_v1`, never for request-card answers or fresh-session entries
+  (`components/task-chat/queued-message-auto-steer.ts`, `TaskChatQueuedMessages.tsx`). It uses the
+  same `POST .../queued-comments/:commentId/steer`. A run still preparing takes the queue into its
+  first turn (`executionWait.reason: "first_turn_pending"`, #20168).
 
 ### `tasks/interactions`: Agent requests in the thread
 
@@ -247,6 +253,12 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
 - **What:** see parent chain and children with completion; add subtask; add or remove blockers; blocked
   tasks wake when blockers resolve.
 - **Requests:** `GET /api/companies/:companyId/issues` (children, blockers search), `PATCH /api/issues/:id`.
+- **Since the 2026-11-09 sync** (#20098): when a child or blocker stops on a recovery action that
+  needs the board, the parent's page shows "A dependency needs the board" with each such task's link
+  and its own Retry (`components/StalledDependencyNotice.tsx`). The list arrives on the task
+  (`Issue.stalledDependencies`); each row reads the child (`GET /api/issues/:id`) to drop itself once
+  the child's status moves on, and Retry sends `POST /api/issues/:issueId/retry`
+  (`hooks/useTaskRetry.ts`). The waiting agent is woken once per stall (`issue_blocker_stalled`).
 
 ### `task-coordination/tree-control`: Pause, resume, cancel, restore a task tree
 
@@ -336,6 +348,13 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   `POST /api/issues/:id/recovery-actions/confirm-controller-stopped`; Retry or Recover stays offered on
   retryable retained holds whose source can't be verified (`retainedSourceFallback`), and a pending
   native resume shows "resuming" with its time instead of Retry (`components/WorkspaceExportRecovery.tsx`).
+  Since the 2026-11-09 sync, records saved before Paperclip stored which server held them get the
+  cause `ownership_owner_unprovable`, with `evidence.kind`, `recordId` and `recordUpdatedAt`; an owner
+  or admin confirms how they checked through `POST /api/issues/:id/recovery-actions/confirm-owner-gone`
+  (`{actionId, recordId, stopEvidence, recordVersion?}`, answering `queued` or `released`;
+  `components/WorkspaceExportRecovery.tsx`). A Retry waiting on blockers (`retryWait.reason:
+  "dependency_blocked"`) lists each unfinished blocker with a link and what to do
+  (`components/ExecutionBlockerNotice.tsx`).
 - **Unused by the old UI:** `POST /api/issues/:id/recovery-actions/reconstruct-workspace` (continue from
   saved sources).
 

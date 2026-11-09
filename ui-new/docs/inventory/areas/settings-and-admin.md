@@ -63,6 +63,12 @@ agents first (`PATCH /agents/:id { defaultEnvironmentId }`) and destroys reusabl
 `external_reference` to a provider, and `POST /secrets/:id/rotate` takes a new value or a new
 `externalRef` and `providerVersionRef`.
 
+Since the 2026-11-09 sync, each reusable lease holder in an environment's delete preview carries
+`leasePolicy` (`reuse_by_environment` or `retain_on_failure`). The same consented delete also destroys
+retain-on-failure sandboxes, the only copy of a failed run's files, and the old UI says so
+(`pages/CompanyEnvironments.tsx`; #20085, #20099). `DELETE /secrets/:id` now works on a secret that a
+pending binding proposal references, and rejects those proposals (#20193).
+
 ## Skills
 
 | Page | Route (under `/:co`) | What it does |
@@ -91,6 +97,10 @@ sharing (`sharingScope` "public_link" is refused, "not available in this version
 `/reset` (catalog skills only, with `force` and `expectedVersionId`) and `/install-update { force }`;
 `PATCH …/skill-sources/:id/settings` with `connectionId` and `GET …/branches?connectionId=` for a
 source's connection; `POST …/discover` with `Accept: application/x-ndjson` streams scan progress.
+
+Since the 2026-11-09 sync, `GET /api/companies/:companyId/skills/:skillId/update-diff` returns
+`SkillSourceUpdateDiff`, a per-file unified diff between the installed and the latest tracked GitHub
+revision (#20155). The old UI doesn't call it. Skill routes also accept a slug as `skillId` (#19808).
 
 ## Apps and tools ("Connectors")
 
