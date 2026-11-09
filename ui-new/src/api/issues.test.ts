@@ -52,35 +52,58 @@ describe("issuesApi.runsByIds", () => {
   });
 });
 
-describe("Monitoring on compact lists", () => {
-  it("marks in-progress tasks the server lists as monitoring, since compact rows leave the field out", async () => {
+describe("What in-progress tasks show on compact lists", () => {
+  // Compact rows leave `displayStatus` out; full rows of the in-progress tasks carry it.
+  const fullRead = (url: string) => !new URL(url, "http://x").searchParams.has("view");
+
+  it("marks each in-progress task with what it shows: Monitoring, or Todo, Blocked or In review with no run (#19453)", async () => {
     const get = vi.spyOn(api, "get").mockImplementation(async (url: string) =>
-      (url.includes("displayStatus=monitoring") ? [{ id: "m", status: "in_progress" }] : [{ id: "m", status: "in_progress" }, { id: "p", status: "in_progress" }, { id: "t", status: "todo" }]) as never,
+      (fullRead(url)
+        ? [
+            { id: "m", displayStatus: "monitoring" },
+            { id: "w", displayStatus: "todo" },
+            { id: "b", displayStatus: "blocked" },
+            { id: "p", displayStatus: "in_progress" },
+          ]
+        : [
+            { id: "m", status: "in_progress" },
+            { id: "w", status: "in_progress" },
+            { id: "b", status: "in_progress" },
+            { id: "p", status: "in_progress" },
+            { id: "t", status: "todo" },
+          ]) as never,
     );
     const tasks = await issuesApi.listAll("c1", { projectId: "p1" });
-    expect(tasks.map((task) => task.displayStatus ?? null)).toEqual(["monitoring", null, null]);
+    expect(tasks.map((task) => task.displayStatus ?? null)).toEqual(["monitoring", "todo", "blocked", null, null]);
+    expect(get).toHaveBeenCalledTimes(2);
     const second = new URL(String(get.mock.calls[1]![0]), "http://x");
-    expect(Object.fromEntries(second.searchParams)).toMatchObject({ projectId: "p1", displayStatus: "monitoring" });
+    expect(Object.fromEntries(second.searchParams)).toMatchObject({ projectId: "p1", status: "in_progress" });
+    expect(second.searchParams.has("view")).toBe(false);
+    expect(second.searchParams.has("displayStatus")).toBe(false);
   });
 
-  it("asks nothing more when no task is in progress or the rows carry the field", async () => {
+  it("asks nothing more when no task is in progress, the rows carry the field, or the list is one display status", async () => {
     const get = vi.spyOn(api, "get").mockResolvedValue([{ id: "t", status: "todo" }] as never);
     await issuesApi.list("c1", {});
     get.mockResolvedValue([{ id: "p", status: "in_progress", displayStatus: "in_progress" }] as never);
     await issuesApi.list("c1", {});
-    expect(get).toHaveBeenCalledTimes(2);
+    get.mockResolvedValue([{ id: "m", status: "in_progress" }] as never);
+    const monitored = await issuesApi.list("c1", { displayStatus: "monitoring" });
+    expect(get).toHaveBeenCalledTimes(3);
+    expect(monitored[0]!.displayStatus).toBe("monitoring");
   });
 
-  it("marks rows read another way against the company's monitored tasks", async () => {
-    const get = vi.spyOn(api, "get").mockResolvedValue([{ id: "m", status: "in_progress" }] as never);
+  it("marks rows read another way against the company's in-progress tasks", async () => {
+    const get = vi.spyOn(api, "get").mockResolvedValue([{ id: "m", displayStatus: "monitoring" }, { id: "p", displayStatus: "in_review" }] as never);
     const rows = await markMonitoring("c1", [
       { id: "m", status: "in_progress" as const },
       { id: "p", status: "in_progress" as const },
+      { id: "q", status: "in_progress" as const },
     ]);
-    expect(rows.map((row) => ("displayStatus" in row ? row.displayStatus : null))).toEqual(["monitoring", null]);
+    expect(rows.map((row) => ("displayStatus" in row ? row.displayStatus : null))).toEqual(["monitoring", "in_review", null]);
     expect(get).toHaveBeenCalledTimes(1);
     const url = new URL(String(get.mock.calls[0]![0]), "http://x");
     expect(url.pathname).toBe("/companies/c1/issues");
-    expect(Object.fromEntries(url.searchParams)).toMatchObject({ displayStatus: "monitoring", includeRoutineExecutions: "true" });
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({ status: "in_progress", includeRoutineExecutions: "true" });
   });
 });

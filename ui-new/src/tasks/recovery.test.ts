@@ -1,6 +1,6 @@
 import type { TaskInterruptionPresentation } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { pauseDetail, retryCountdown, taskNotices, type NoticeInput } from "./recovery";
+import { pauseDetail, resumeCountdown, retryCountdown, taskNotices, type NoticeInput } from "./recovery";
 
 function interruption(extra: Partial<TaskInterruptionPresentation>): TaskInterruptionPresentation {
   return {
@@ -34,7 +34,7 @@ describe("taskNotices", () => {
 
   it("offers Retry on a failed attempt when the server allows it", () => {
     expect(taskNotices(input({ task: { interruption: interruption({}) } }))).toEqual([
-      { kind: "interrupted", state: "failed", canRetry: true, nextRetryAt: null, workspaceFailure: null, retryWait: null, recoveryStep: null },
+      { kind: "interrupted", state: "failed", canRetry: true, nextRetryAt: null, workspaceFailure: null, retryWait: null, recoveryStep: null, resuming: false },
     ]);
     const scheduled = interruption({ state: "retry_scheduled", nextRetryAt: "2026-10-26T10:00:40.000Z" });
     expect(taskNotices(input({ task: { interruption: scheduled } }))[0]).toMatchObject({ kind: "interrupted", state: "retry_scheduled" });
@@ -161,6 +161,7 @@ describe("provider and workspace failures", () => {
         workspaceFailure: null,
         retryWait: "Retry is waiting for the budget to allow it.",
         recoveryStep: null,
+        resuming: false,
       },
     ]);
   });
@@ -194,5 +195,25 @@ describe("saved-work recovery", () => {
     expect(taskNotices(input({ task: { interruption: interruption({}), executionBlocker: { ...executionBlocker, cause: "other" } } }))[0]).toMatchObject({
       canRetry: true,
     });
+    // Retry stays when the card offers no way on itself: a source that didn't verify (#19840).
+    expect(taskNotices(input({ task: { interruption: interruption({}), executionBlocker }, recoveryOwnsRetry: false }))[0]).toMatchObject({ canRetry: true });
+    expect(taskNotices(input({ task: { interruption: interruption({}), executionBlocker }, recoveryOwnsRetry: true }))[0]).toMatchObject({ canRetry: false });
+  });
+});
+
+describe("a pending native resume (#19503)", () => {
+  it("reads as resuming with its time, not a competing Retry", () => {
+    const resume = interruption({ state: "retry_scheduled", nextRetryAt: "2026-11-06T15:26:18.687Z", canRetry: false });
+    expect(taskNotices(input({ task: { interruption: resume } }))[0]).toMatchObject({ kind: "interrupted", state: "retry_scheduled", canRetry: false, resuming: true });
+    // An ordinary scheduled retry keeps Retry now, and a saved-work step names itself instead.
+    expect(taskNotices(input({ task: { interruption: { ...resume, canRetry: true } } }))[0]).toMatchObject({ resuming: false, canRetry: true });
+    expect(taskNotices(input({ task: { interruption: { ...resume, recoveryStep: "checking_previous_run" } } }))[0]).toMatchObject({ resuming: false });
+    expect(resumeCountdown("2026-11-06T15:26:18.687Z", Date.parse("2026-11-06T15:25:50.000Z"))).toBe("Resuming in 29s");
+    expect(resumeCountdown("2026-11-06T15:30:18.687Z", Date.parse("2026-11-06T15:25:50.000Z"))).toBe("Resuming in 5m");
+  });
+
+  it("asks an owner or admin to confirm the previous server stopped", () => {
+    const waiting = interruption({ responsibility: "user", state: "waiting_for_user", userAction: "confirm_owner_stop", canRetry: false });
+    expect(taskNotices(input({ task: { interruption: waiting } }))).toEqual([{ kind: "waiting", action: "confirm_owner_stop" }]);
   });
 });

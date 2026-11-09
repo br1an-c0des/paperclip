@@ -9,7 +9,7 @@ import { Button } from "@/ui/Button";
 import { TextArea } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
-import { entryLabel, isFixed, moveEntry, queueErrorMessage, queuedSummary, rowDelivery, visibleEntries, type QueueAction } from "./queue-model";
+import { deferredMessage, entryLabel, isFixed, moveEntry, queueErrorMessage, queuedSummary, rowDelivery, visibleEntries, type QueueAction } from "./queue-model";
 import { enterKeyHint, isSubmitKey, submitKeyFor } from "./submit-key";
 import "./QueuedMessages.css";
 
@@ -19,7 +19,10 @@ import "./QueuedMessages.css";
  * the queue starts the next one), edited, moved, or cancelled. The queue polls while a run is
  * going, and every change echoes the queue's revision so a stale tab can't overwrite a newer one.
  * A saved answer to a request card sits in the queue as a fixed receipt, shown by its summary. A
- * long queue scrolls inside the strip instead of covering the conversation (#19321).
+ * long queue scrolls inside the strip instead of covering the conversation (#19321). Where the
+ * runner can't take a message mid-run, a row offers Interrupt in place of Steer (#19450); a queue
+ * waiting for a run that hasn't started offers Send, and when the server keeps it queued the strip
+ * says so (#19370).
  */
 
 export function useQueuedComments(taskId: () => string, active: () => boolean) {
@@ -45,6 +48,10 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
   const [busy, setBusy] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [editing, setEditing] = createSignal<{ id: string; body: string } | null>(null);
+  // The queue a Send left queued (`state: "deferred"`), while it still is.
+  const [deferredQueue, setDeferredQueue] = createSignal<string | null>(null);
+  const deferred = () =>
+    !!deferredQueue() && deferredQueue() === props.queue.queueId && props.queue.state === "deferred" && entries().length > 0 && !props.queue.executionWait?.message;
   const entries = () => visibleEntries(props.queue, delivering());
   const key = () => queryKeys.issues.section(props.taskId, "queued-comments");
   const version = () => ({ queueId: props.queue.queueId!, revision: props.queue.revision });
@@ -53,9 +60,16 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
     if (busy() || !props.queue.queueId) return;
     setBusy(`${action}:${id}`);
     setError(null);
+    setDeferredQueue(null);
     if (delivered.length) setDelivering((now) => new Set([...now, ...delivered]));
     try {
-      client.setQueryData(key(), await call());
+      const next = await call();
+      // A Send the server keeps queued, behind a run that hasn't started, leaves the messages showing.
+      if (action === "interrupt" && next.state === "deferred" && next.entries.length > 0) {
+        setDelivering((now) => new Set([...now].filter((value) => !delivered.includes(value))));
+        setDeferredQueue(next.queueId);
+      }
+      client.setQueryData(key(), next);
       void client.invalidateQueries({ queryKey: queryKeys.issues.section(props.taskId, "comments") });
       return true;
     } catch (failure) {
@@ -134,7 +148,7 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
                                 title={found().hint}
                                 onClick={() => void (found().action === "steer" ? steer(entry) : interrupt())}
                               >
-                                {found().action === "steer" ? "Steer now" : "Interrupt"}
+                                {found().action === "steer" ? "Steer now" : found().action === "send" ? "Send" : "Interrupt"}
                               </Button>
                             )}
                           </Show>
@@ -209,6 +223,11 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
             }}
           </For>
         </ol>
+        <Show when={deferred()}>
+          <p class="qm-status" role="status">
+            {deferredMessage(props.queue)}
+          </p>
+        </Show>
         <Show when={error()}>
           <p class="qm-error" role="alert">
             {error()}

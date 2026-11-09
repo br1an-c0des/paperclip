@@ -118,3 +118,9 @@
   margin: 0;
   color: var(--red-fg);
 }
+
+/* A Send the server kept queued, behind a run that hasn't started (#19370). */
+.qm-status {
+  margin: 0;
+  color: var(--muted);
+}

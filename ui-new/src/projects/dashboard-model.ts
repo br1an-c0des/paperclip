@@ -12,7 +12,7 @@ import type { LiveRun } from "@/api/heartbeats";
 import { isAlert, placement } from "@/inbox/inbox-model";
 import { itemTask } from "@/inbox/use-inbox";
 import type { Request, RequestKind } from "@/requests/request-model";
-import { PRIORITY_META } from "@/ui/status-meta";
+import { PRIORITY_META, shownStatus } from "@/ui/status-meta";
 
 /*
  * The project dashboard's derived blocks (board 8), kept apart from the page so they can be tested:
@@ -208,7 +208,7 @@ export function crew(input: {
       .filter((task) => task.assigneeAgentId === agentId && isOpen(task))
       .sort((a, b) => lastMoved(b) - lastMoved(a));
     const run = runs.find((candidate) => candidate.status === "running" && candidate.agentId === agentId) ?? runs.find((candidate) => candidate.agentId === agentId);
-    const blocked = assigned.find((task) => task.status === "blocked");
+    const blocked = assigned.find((task) => shownStatus(task) === "blocked");
     let state: CrewState = "idle";
     if (run) state = run.status === "running" ? "running" : "queued";
     else if (blocked) state = "blocked";

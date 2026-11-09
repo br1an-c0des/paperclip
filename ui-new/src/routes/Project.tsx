@@ -15,7 +15,7 @@ import { TasksView, useTaskList } from "@/tasks/TasksView";
 import { buttonClass } from "@/ui/Button";
 import { HeaderNumber, PageHeader, Tabs } from "@/ui/PageHeader";
 import { Capsule, TonePill } from "@/ui/Status";
-import type { Gradient } from "@/ui/status-meta";
+import { shownStatus, type Gradient } from "@/ui/status-meta";
 import { WorkloadView } from "@/workload/Workload";
 import { usePluginSlots } from "@/plugins/contributions";
 import { isPluginTab, pluginTabValue } from "@/plugins/model";
@@ -139,7 +139,7 @@ export function ProjectPage() {
 
   const list = () => (project() ? (tasks.data ?? []) : []);
   const open = () => list().filter((task) => OPEN_STATUSES.has(task.status as IssueStatus)).length;
-  const blocked = () => list().filter((task) => task.status === "blocked").length;
+  const blocked = () => list().filter((task) => shownStatus(task) === "blocked").length;
   const running = createMemo(() => {
     const ids = new Set(list().map((task) => task.id));
     return new Set((liveRuns.data ?? []).filter((run) => run.issueId && ids.has(run.issueId)).map((run) => run.agentId)).size;

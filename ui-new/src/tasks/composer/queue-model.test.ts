@@ -1,7 +1,7 @@
 import type { IssueQueuedCommentEntry, IssueQueuedCommentQueue } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@/api/client";
-import { entryLabel, moveEntry, preview, queueErrorMessage, queuedSummary, rowDelivery, visibleEntries } from "./queue-model";
+import { deferredMessage, entryLabel, moveEntry, preview, queueErrorMessage, queuedSummary, rowDelivery, visibleEntries } from "./queue-model";
 
 const entry = (id: string, position: number, extra: Partial<IssueQueuedCommentEntry> = {}): IssueQueuedCommentEntry =>
   ({ comment: { id, body: `Message ${id}` }, position, canEdit: true, canDiscard: true, ...extra }) as IssueQueuedCommentEntry;
@@ -26,10 +26,30 @@ describe("rowDelivery", () => {
     expect(rowDelivery(queue(), fresh)?.action).toBe("interrupt");
   });
 
-  it("says why steering is off, and offers nothing without a run", () => {
-    expect(rowDelivery(queue({ steeringDisposition: "unsupported" }), entry("c1", 0))).toMatchObject({ enabled: false, hint: expect.stringMatching(/can't take/) });
-    expect(rowDelivery(queue({ targetRunId: null }), entry("c1", 0))).toBeNull();
+  it("offers Interrupt where a native run can't take a message now, saying why (#19450)", () => {
+    expect(rowDelivery(queue({ steeringDisposition: "unsupported" }), entry("c1", 0))).toMatchObject({
+      action: "interrupt",
+      enabled: true,
+      hint: expect.stringMatching(/^This agent's runner can't take messages mid-run\. Stop the current run/),
+    });
+    expect(rowDelivery(queue({ steeringDisposition: "temporarily_unavailable" }), entry("c1", 0))).toMatchObject({
+      action: "interrupt",
+      enabled: true,
+      hint: expect.stringMatching(/^Steering isn't available right now\./),
+    });
     expect(rowDelivery(queue({ queueId: null }), entry("c1", 0))?.enabled).toBe(false);
+  });
+
+  it("offers Send for a queue waiting on a run that hasn't started, and nothing else without a run (#19370)", () => {
+    expect(rowDelivery(queue({ targetRunId: null, state: "deferred" }), entry("c1", 0))).toMatchObject({ action: "send", enabled: true });
+    expect(rowDelivery(queue({ targetRunId: null, state: "deferred", queueId: null }), entry("c1", 0))?.enabled).toBe(false);
+    expect(rowDelivery(queue({ targetRunId: null }), entry("c1", 0))).toBeNull();
+    expect(rowDelivery(queue({ targetRunId: null, state: null }), entry("c1", 0))).toBeNull();
+  });
+
+  it("says a kept Send is still queued, in the queue's words when it has them", () => {
+    expect(deferredMessage({ executionWait: null })).toBe("Messages are still queued. They'll send when the task is ready.");
+    expect(deferredMessage({ executionWait: { reason: "workspace_busy", message: "Waiting for the workspace." } })).toBe("Waiting for the workspace.");
   });
 });
 

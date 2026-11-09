@@ -17,6 +17,9 @@ import { RETAINED_EXPORT_CAUSES } from "./recovery";
  *   same one again. A new key needs an explicit click and a freshly confirmed exhausted attempt
  *   ("Try file recovery again", which spent export repairs handed to the board offer, #19208).
  * - Queued, recovering, failed and verified states read apart. Nothing is resent by itself.
+ * - Since the 2026-11-07 sync (#19840): a source that can't be verified says why, and the task's
+ *   Retry stays offered beside it, since Retry renews and re-verifies the recovery. Only a
+ *   verified source makes Recover saved files the way on, which hides Retry.
  */
 
 type Obj = Record<string, unknown>;
@@ -38,7 +41,10 @@ export function isRetainedExport(action: IssueRecoveryAction | null | undefined,
   );
 }
 
-/** The action as the inspection read it, only while it still names the same run and a verified source. */
+/**
+ * The action as the inspection read it, while it still names the same run. The recovery record is
+ * bound by its own identity; whether its source verified (`sourceVerified`) gates only the ask.
+ */
 export function boundAction(
   data: RecoveryActionsInspection | undefined,
   action: Pick<IssueRecoveryAction, "id">,
@@ -54,10 +60,27 @@ export function boundAction(
     state.runId === runId &&
     state.schema === "paperclip.workspace-recovery.v1" &&
     inspected?.actionId === action.id &&
-    inspected.runId === runId &&
-    inspected.status === "verified"
+    inspected.runId === runId
     ? current
     : null;
+}
+
+/** Whether the inspection verified the recorded source, so the files may be recovered from it. */
+export function sourceVerified(data: RecoveryActionsInspection | undefined) {
+  return data?.sourceInspection?.status === "verified";
+}
+
+/**
+ * Why a source didn't verify, in plain words (the old UI's `unverifiedSourceText`), the code kept
+ * for support. Empty for a verified or missing inspection.
+ */
+export function unverifiedSourceText(inspected: RecoveryActionsInspection["sourceInspection"]) {
+  if (!inspected || inspected.status === "verified") return "";
+  if (inspected.status === "not_inspected") return "Paperclip can't check the saved files' source here, because the run recorded too many sources.";
+  const code = inspected.sourceVerification?.reason ?? inspected.failureCode;
+  return code === "allocation_ownership_ambiguous"
+    ? "Paperclip can't confirm that this run alone used the sandbox that holds the saved files."
+    : `Paperclip can't verify the saved files' recorded source (${code}).`;
 }
 
 export type FileRecoveryView = {
@@ -69,6 +92,13 @@ export type FileRecoveryView = {
   check: boolean;
   /** Something to warn about, if anything. */
   alert: string | null;
+  /** Why the source didn't verify, when that's what keeps the ask back; Retry stays the way on. */
+  unverified: string | null;
+  /**
+   * Whether this offers the way on itself (a verified source, files not yet saved), so the task's
+   * Retry gives way (#19840). Otherwise Retry renews the recovery, so a hold never dead-ends.
+   */
+  ownsRetry: boolean;
 };
 
 /**
@@ -81,6 +111,10 @@ export function fileRecoveryView(input: {
   /** Whether the inspection has answered (or failed). */
   inspected: boolean;
   inspectionFailed: boolean;
+  /** Whether the inspection verified the recorded source (`sourceVerified`). */
+  verified: boolean;
+  /** Why it didn't (`unverifiedSourceText`). */
+  unverifiedText?: string;
   pendingKey: string | null;
   acknowledged: boolean;
   checkedUnconfirmed: boolean;
@@ -109,7 +143,8 @@ export function fileRecoveryView(input: {
         : waiting
           ? "File recovery is queued. Waiting for the saved files to be verified."
           : "The saved files need recovering before work can go on.";
-  const canAsk = !!input.current && retryable && !waiting && (!input.pendingKey || (unconfirmed && input.checkedUnconfirmed) || confirmedFailedAttempt);
+  const verified = !!input.current && input.verified;
+  const canAsk = verified && retryable && !waiting && (!input.pendingKey || (unconfirmed && input.checkedUnconfirmed) || confirmedFailedAttempt);
   const alert = sourceChanged
     ? "The recorded files are unavailable or have changed. Look at the recovery before going on."
     : input.current && recovery.status === "blocked" && (serverAcknowledged || recovery.retryable !== true)
@@ -120,6 +155,12 @@ export function fileRecoveryView(input: {
     offer: canAsk ? (confirmedFailedAttempt ? "again" : "recover") : null,
     check: waiting || unconfirmed || failedReceipt || input.inspectionFailed || sourceChanged,
     alert,
+    // Shown after a failed attempt too; hidden only while recovery runs.
+    unverified:
+      input.current && !verified && !saved && !waiting
+        ? `${input.unverifiedText || "Paperclip can't verify the saved files' recorded source."} Paperclip doesn't apply files it can't verify. Retry renews the recovery.`
+        : null,
+    ownsRetry: !input.inspected || (verified && !saved),
   };
 }
 

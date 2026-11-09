@@ -20,6 +20,11 @@ import { providerFailureOf, type ProviderFailure } from "@/ui/provider-failure";
  *   the step (`recoveryStep`: checking the run stopped, saving its files, finishing), alone or before
  *   the retry countdown. An accepted Retry that still waits says why (`retryWait`), over the
  *   provider's refusal. Under a native export hold Retry gives way to Recover saved files.
+ * - Since the 2026-11-07 sync: Retry gives way only while the recovery card offers a way on itself
+ *   (#19840): Recover saved files on a verified source, or the confirmation that the previous
+ *   server stopped. A hold whose source can't be verified keeps Retry, which renews the recovery,
+ *   so it never dead-ends. A native run the coordinator resumes by itself (#19503: scheduled, with
+ *   no Retry and no recovery step) reads "Resuming" with its time, not as a competing Retry.
  * - A task stopped because its agent may not read the project explains that and links to the
  *   agent's project access; once access is added, it offers Retry.
  * - Interruptions waiting on someone (an approval, a reconnect, an assignee, a model, a budget) say
@@ -44,6 +49,11 @@ export type TaskNotice =
       retryWait: string | null;
       /** The saved-work step the scheduled retry waits for (`recoveryStep`), as words. */
       recoveryStep: string | null;
+      /**
+       * Scheduled with no Retry and no saved-work step: the native coordinator resumes the same run
+       * by itself at `nextRetryAt` (#19503), or an accepted Retry is being prepared.
+       */
+      resuming: boolean;
     }
   | {
       kind: "provider-failure";
@@ -88,6 +98,12 @@ export type NoticeInput = {
   tree?: TreeControlState | null;
   /** Whether the task has subtasks, which makes a pause a subtree pause. */
   hasSubtasks: boolean;
+  /**
+   * Whether the recovery card offers its own way on (TaskRecovery.tsx): Recover saved files on a
+   * verified source, or the previous-server confirmation. Retry gives way under a native export
+   * hold only then (#19840). Unknown counts as yes, as in the old UI, until the card says.
+   */
+  recoveryOwnsRetry?: boolean;
 };
 
 const TERMINAL = new Set(["done", "cancelled"]);
@@ -103,8 +119,9 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
     interruption?.responsibility === "system" && interruption.recoveryStep && (interruption.state === "working" || interruption.state === "retry_scheduled")
       ? (RECOVERY_STEP_TEXT[interruption.recoveryStep] ?? null)
       : null;
-  // Under a native export hold the files are recovered first; Retry would only be refused (#18848).
-  const canRetry = !!interruption?.canRetry && !retainedExportHold(task);
+  // Under a native export hold the files are recovered first (#18848), while the card offers that;
+  // otherwise Retry renews the recovery, so it stays (#19840).
+  const canRetry = !!interruption?.canRetry && !(retainedExportHold(task) && input.recoveryOwnsRetry !== false);
   const retryWait = interruption?.retryWait?.message || null;
 
   if (interruption?.projectAccess) {
@@ -134,6 +151,7 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
       workspaceFailure: interruption.workspaceFailure?.message || null,
       retryWait,
       recoveryStep: step,
+      resuming: interruption.state === "retry_scheduled" && !interruption.canRetry && !step && !!interruption.nextRetryAt,
     });
   } else if (interruption?.state === "waiting_for_user" && interruption.userAction && interruption.userAction !== "resume" && interruption.userAction !== "project_access") {
     notices.push({ kind: "waiting", action: interruption.userAction });
@@ -170,6 +188,17 @@ export function retryCountdown(nextRetryAt: string | null, now = Date.now()) {
   const seconds = Math.max(0, Math.ceil((Date.parse(nextRetryAt ?? "") - now) / 1000));
   if (!Number.isFinite(seconds)) return "Trying again soon";
   return `Trying again in ${seconds > 60 ? `${Math.ceil(seconds / 60)}m` : `${seconds}s`}`;
+}
+
+/** "Resuming in 28s" or "in 3m", counted from now. */
+export function resumeCountdown(nextRetryAt: string | null, now = Date.now()) {
+  return retryCountdown(nextRetryAt, now).replace(/^Trying again/, "Resuming");
+}
+
+/** "15:26", the time of day a resume is due. */
+export function timeOfDay(value: string) {
+  const date = new Date(value);
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 /** What each kind of wait needs, in a sentence. */

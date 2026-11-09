@@ -91,3 +91,16 @@
 .tn-files-alert {
   color: var(--red-fg);
 }
+
+/* Confirm the previous server stopped: how it was checked, then Confirm and resume. */
+.tn-stop {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 520px;
+}
+
+.tn-stop .input--area {
+  width: 100%;
+}

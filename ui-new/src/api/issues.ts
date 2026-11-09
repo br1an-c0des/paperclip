@@ -9,6 +9,7 @@ import type {
   IssueComment,
   IssueCostSummary,
   IssueDocument,
+  IssueDisplayStatus,
   IssueDocumentSummary,
   IssueAccessGrant,
   IssueAccessGrantSubjectType,
@@ -103,10 +104,13 @@ async function allPages(companyId: string, filters: Omit<IssueListFilters, "limi
 
 /**
  * The compact list leaves out `displayStatus` (the server's `toCompactIssue` doesn't copy it, though
- * `CompactIssue` has it), so Monitoring would never show in task lists. Until it does, the
- * in-progress tasks of a list that lacks it are checked against the same list filtered to
- * `displayStatus=monitoring`, which the server answers, and marked. Lists with no task in progress,
- * or rows that carry the field, need no second request.
+ * `CompactIssue` has it), so what an in-progress task shows would never reach the task lists:
+ * Monitoring, and since the 2026-11-07 sync (upstream #19453) Todo, Blocked or In review when no
+ * run is going. Only in-progress tasks are projected (`shownStatus` reads it only for them), so a
+ * list with any is checked against the same scope's in-progress tasks read in full
+ * (`?status=in_progress`, without `view`), whose rows carry `displayStatus`, and marked. Lists with
+ * no task in progress, or rows that carry the field, need no second request, and a list filtered to
+ * one display status already knows it.
  */
 async function withMonitoring<T extends Pick<CompactIssue, "id" | "status">>(
   companyId: string,
@@ -114,16 +118,32 @@ async function withMonitoring<T extends Pick<CompactIssue, "id" | "status">>(
   tasks: T[],
   signal?: AbortSignal,
 ): Promise<T[]> {
-  if (filters.displayStatus || !tasks.some((task) => task.status === "in_progress") || tasks.some((task) => "displayStatus" in task)) return tasks;
-  const { limit: _limit, offset: _offset, ...scope } = filters;
-  const monitored = new Set((await allPages(companyId, { ...scope, displayStatus: "monitoring" }, signal)).map((task) => task.id));
-  if (monitored.size === 0) return tasks;
-  return tasks.map((task) => (task.status === "in_progress" && monitored.has(task.id) ? { ...task, displayStatus: "monitoring" as const } : task));
+  if (!tasks.some((task) => task.status === "in_progress") || tasks.some((task) => "displayStatus" in task)) return tasks;
+  const only = filters.displayStatus && !filters.displayStatus.includes(",") ? (filters.displayStatus as IssueDisplayStatus) : null;
+  const { limit: _limit, offset: _offset, displayStatus: _displayStatus, ...scope } = filters;
+  const shown = only ? null : await inProgressShown(companyId, scope, signal);
+  return tasks.map((task) => {
+    const displayStatus = task.status === "in_progress" ? (only ?? shown?.get(task.id)) : undefined;
+    return displayStatus && displayStatus !== "in_progress" ? { ...task, displayStatus } : task;
+  });
+}
+
+/** What each in-progress task of a scope shows, from its full rows. */
+async function inProgressShown(companyId: string, scope: IssueListFilters, signal?: AbortSignal) {
+  const shown = new Map<string, IssueDisplayStatus>();
+  for (let offset = 0; ; offset += ISSUE_LIST_PAGE_SIZE) {
+    const params = new URLSearchParams(listParams({ ...scope, limit: ISSUE_LIST_PAGE_SIZE, offset }));
+    params.delete("view");
+    params.set("status", "in_progress");
+    const page = await api.get<Pick<Issue, "id" | "displayStatus">[]>(`/companies/${companyId}/issues?${params}`, { signal });
+    for (const row of page) if (row.displayStatus) shown.set(row.id, row.displayStatus);
+    if (page.length < ISSUE_LIST_PAGE_SIZE) return shown;
+  }
 }
 
 /**
  * The same marking for compact rows read some other way, such as the inbox's `/inbox/mine`, which
- * compacts its rows the same way: checked against the company's monitored tasks.
+ * compacts its rows the same way: checked against the company's in-progress tasks.
  */
 export function markMonitoring<T extends Pick<CompactIssue, "id" | "status">>(companyId: string, tasks: T[], signal?: AbortSignal) {
   return withMonitoring(companyId, { includeRoutineExecutions: true }, tasks, signal);
@@ -263,6 +283,22 @@ export const issuesApi = {
    */
   recoverWorkspace: (id: string, data: { actionId: string; runId: string; idempotencyKey: string }) =>
     api.post<{ actionId: string; status: string }>(`/issues/${id}/recovery-actions/recover-workspace`, data),
+  /**
+   * An owner's or admin's word that the server which was saving a run's files has stopped, with how
+   * they checked (20 to 12,000 characters), so the saved result can finish without another agent
+   * turn (202). `ownerToken` is the copy-back owner the action records (since the 2026-11-07 sync,
+   * upstream #19717, #19742).
+   */
+  resumeWorkspaceFinalization: (
+    id: string,
+    data: { actionId: string; runId: string; ownerToken: string; controllerAndCopybackStopped: true; stopEvidence: string },
+  ) => api.post<{ runId: string; resultId: string | null; status: "queued" }>(`/issues/${id}/recovery-actions/resume-workspace-finalization`, data),
+  /**
+   * The same word for a run whose server was recorded before its host was, which an ephemeral server
+   * can't judge by process id (`confirmNativeControllerStoppedSchema`, 202).
+   */
+  confirmControllerStopped: (id: string, data: { actionId: string; runId: string; stopEvidence: string }) =>
+    api.post<{ runId: string; status: "queued" }>(`/issues/${id}/recovery-actions/confirm-controller-stopped`, data),
 
   // Who can see a private task (the share sheet).
   /**
