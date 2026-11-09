@@ -878,46 +878,6 @@ a.ch-tl-target {
   border-top: 1px solid var(--line);
 }
 
-/* Off on this instance (decision 2) */
-.ch-off {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 20px 22px;
-  line-height: 1.5;
-  color: var(--body);
-}
-
-.ch-off p {
-  margin: 0;
-  max-width: 640px;
-}
-
-.ch-off-title {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--text);
-  margin-bottom: 4px !important;
-}
-
-.ch-off-icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--well);
-  color: var(--muted);
-}
-
-.ch-off-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
 /* A reply run that ended without a message */
 .ch-quiet {
   display: flex;

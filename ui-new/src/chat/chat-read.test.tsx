@@ -11,7 +11,7 @@ const markRead = vi.fn(async (chatId: string, _through: string) => ({ id: chatId
 vi.mock("@/lib/company", () => ({ useCompany: () => () => ({ id: "co1", issuePrefix: "TES" }) }));
 vi.mock("@/lib/live-events", () => ({ useLiveEvent: () => undefined }));
 vi.mock("@/lib/session", () => ({ useSession: () => ({ youId: () => "me" }) }));
-vi.mock("@/lib/company-data", () => ({ useExperimentalSettingsQuery: () => ({ data: { enableAgentChat: true } }) }));
+vi.mock("@/lib/company-data", () => ({ useAgentsQuery: () => ({ data: [] }) }));
 vi.mock("@/api/chat", () => ({ chatApi: { list: vi.fn(async () => []), markRead: (chatId: string, through: string) => markRead(chatId, through) } }));
 
 const { useChatReadMarker } = await import("./chat-read");

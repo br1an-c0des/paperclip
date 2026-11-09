@@ -52,9 +52,10 @@ describe("the Features card's flags", () => {
     }
   });
 
-  it("gives admins the agent chat switch a fresh instance needs (decision A, M7 audit part B)", () => {
-    expect(listed).toContain("enableAgentChat");
-    expect(featureFlag("enableAgentChat")?.label).toBe("Agent chat");
+  it("has no agent chat switch: chat is always on (U57, upstream #19360)", () => {
+    expect(listed).not.toContain("enableAgentChat");
+    expect(featureFlag("enableAgentChat")).toBeUndefined();
+    expect(LEFT_OUT.enableAgentChat).toMatch(/^Built in/);
   });
 });
 

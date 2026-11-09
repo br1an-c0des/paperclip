@@ -8,7 +8,8 @@ import { markMonitoring } from "./issues";
  *
  * - `GET /companies/:id/chats/:agentRef` reads it without creating it (null before the first
  *   message); `POST` creates it on the first message or upload. `GET /companies/:id/chats` lists
- *   yours. All three answer 404 while the instance's `enableAgentChat` is off (decision 2).
+ *   yours, each with `isUnreadForMe` and `unreadMessageCount`. Chat is always on (U57, upstream
+ *   #19360): `enableAgentChat` is a compatibility key, and the routes no longer answer 404 for it.
  * - Messages are comments on that task, and need a client request id. `/new` as a message starts a
  *   fresh session; the history stays.
  *

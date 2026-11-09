@@ -416,16 +416,28 @@ export function yourChatAgent(task: ChatLike, listed: ReadonlyMap<string, string
 // ---------------------------------------------------------------------------------------------
 // Unread chats
 
+type UnreadChat = { conversationAgentId?: string | null; isUnreadForMe?: boolean; unreadMessageCount?: number };
+
 /**
  * The agents whose chat with you has agent messages you haven't read (`isUnreadForMe` on
- * `GET /companies/:id/chats`, decision 48), skipping the chat open now: reading it marks it read,
- * and its dot would only blink until the list refetches.
+ * `GET /companies/:id/chats`, decision 48), with how many (`unreadMessageCount`, U65), skipping the
+ * chat open now: reading it marks it read, and its badge would only blink until the list refetches.
+ *
+ * Unread is `isUnreadForMe`, as before; the count only says how many. A chat that's unread without a
+ * count (a server from before U65) counts as one.
  */
-export function unreadChatAgents(
-  chats: readonly { conversationAgentId?: string | null; isUnreadForMe?: boolean }[] | undefined,
-  openAgentId?: string | null,
-): Set<string> {
-  const ids = new Set<string>();
-  for (const chat of chats ?? []) if (chat.isUnreadForMe && chat.conversationAgentId && chat.conversationAgentId !== openAgentId) ids.add(chat.conversationAgentId);
-  return ids;
+export function unreadChatCounts(chats: readonly UnreadChat[] | undefined, openAgentId?: string | null): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const chat of chats ?? []) {
+    if (!chat.isUnreadForMe || !chat.conversationAgentId || chat.conversationAgentId === openAgentId) continue;
+    const count = Math.max(1, chat.unreadMessageCount ?? 1);
+    counts.set(chat.conversationAgentId, (counts.get(chat.conversationAgentId) ?? 0) + count);
+  }
+  return counts;
 }
+
+/** A count as a badge shows it: 99 at most. */
+export const badgeCount = (count: number) => (count > 99 ? "99+" : String(count));
+
+/** "3 unread messages", for a badge's label. */
+export const unreadMessagesLabel = (count: number) => `${count} unread ${count === 1 ? "message" : "messages"}`;

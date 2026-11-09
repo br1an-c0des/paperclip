@@ -15,11 +15,11 @@ const companies = [
 vi.mock("@/inbox/needs-you", () => ({ useNeedsYouCount: () => () => 3 }));
 
 const experimental = { enableStatusCards: false };
-const unread = { count: 0 };
+const unread = { messages: 0 };
 
 vi.mock("@/chat/chat-read", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/chat/chat-read")>()),
-  useUnreadChats: () => ({ agentIds: () => new Set<string>(), has: () => false, count: () => unread.count }),
+  useUnreadChats: () => ({ countFor: () => 0, count: () => (unread.messages > 0 ? 1 : 0), messages: () => unread.messages }),
 }));
 
 vi.mock("@/lib/company-data", () => ({
@@ -79,17 +79,21 @@ describe("PhoneDock", () => {
   afterEach(() => {
     cleanup();
     experimental.enableStatusCards = false;
-    unread.count = 0;
+    unread.messages = 0;
   });
 
-  it("marks Agents while a chat has messages you haven't read", () => {
+  it("counts the chat messages you haven't read on Agents", () => {
     renderDock("/TST/inbox");
     expect(screen.getByRole("link", { name: "Agents" }).querySelector(".ch-unread")).toBeNull();
     cleanup();
-    unread.count = 2;
+    unread.messages = 5;
     renderDock("/TST/inbox");
-    const agents = screen.getByRole("link", { name: "Agents, 2 unread chats" });
-    expect(agents.querySelector(".ch-unread")).not.toBeNull();
+    const agents = screen.getByRole("link", { name: "Agents, 5 unread messages" });
+    expect(agents.querySelector(".ch-unread")?.textContent).toBe("5");
+    cleanup();
+    unread.messages = 120;
+    renderDock("/TST/inbox");
+    expect(screen.getByRole("link", { name: "Agents, 120 unread messages" }).querySelector(".ch-unread")?.textContent).toBe("99+");
   });
 
   it("adds Status after Inbox while status cards are on", () => {

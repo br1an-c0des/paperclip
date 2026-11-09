@@ -2,7 +2,8 @@ import { useLocation, useNavigate } from "@solidjs/router";
 import { ChevronUp, Plus } from "lucide-solid";
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from "solid-js";
 import { activeAgents } from "@/api/agents";
-import { ChatUnreadDot, useUnreadChats } from "@/chat/chat-read";
+import { unreadMessagesLabel } from "@/chat/chat-model";
+import { ChatUnreadBadge, useUnreadChats } from "@/chat/chat-read";
 import { agentState, runningAgentIds } from "@/lib/agent-state";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
@@ -19,7 +20,7 @@ import "./PhoneDock.css";
  * The phone's navigation (design/mobile.md, N1, "Floating dock"): one pill at the foot of the
  * screen with Inbox (and its count), Tasks and Agents, and a 56px New task button beside it; Status
  * (status cards) joins them after Inbox while the instance has them on, as in the desktop nav. Agents
- * carries a dot while a chat with an agent has messages you haven't read (chat-read.tsx). Only
+ * carries a badge with how many chat messages from agents you haven't read (chat-read.tsx, U65). Only
  * the current place shows its label; the others are icons with their name for screen readers. The
  * dock slides away while you scroll down and comes back when you scroll up, or when it has focus.
  *
@@ -54,7 +55,7 @@ export function PhoneDock() {
     [
       "Agents",
       running() > 0 ? `${running()} running` : null,
-      unreadChats.count() > 0 ? `${unreadChats.count()} unread ${unreadChats.count() === 1 ? "chat" : "chats"}` : null,
+      unreadChats.messages() > 0 ? unreadMessagesLabel(unreadChats.messages()) : null,
     ]
       .filter(Boolean)
       .join(", ");
@@ -235,9 +236,9 @@ export function PhoneDock() {
           >
             <span class="pdock-icon">
               <AgentsIcon />
-              <Show when={unreadChats.count() > 0}>
+              <Show when={unreadChats.messages() > 0}>
                 <span class="pdock-unread" aria-hidden="true">
-                  <ChatUnreadDot />
+                  <ChatUnreadBadge count={unreadChats.messages()} />
                 </span>
               </Show>
             </span>

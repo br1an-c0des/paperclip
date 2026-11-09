@@ -1,14 +1,14 @@
 import type { IssueComment } from "@paperclipai/shared";
-import { createQuery, useQueryClient } from "@tanstack/solid-query";
+import { useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createMemo, on, onCleanup, untrack } from "solid-js";
 import { chatApi } from "@/api/chat";
 import { ApiError } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
-import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { useLiveEvent } from "@/lib/live-events";
 import { useSession } from "@/lib/session";
-import { newestUnreadable, readThrough, unreadChatAgents } from "./chat-model";
+import { useChatListQuery } from "./chat-index";
+import { badgeCount, newestUnreadable, readThrough, unreadChatCounts, unreadMessagesLabel } from "./chat-model";
 import "./ChatRead.css";
 
 /*
@@ -17,27 +17,22 @@ import "./ChatRead.css";
  *
  * - A chat is unread for you while it has agent messages newer than where you last read
  *   (`isUnreadForMe` on `GET /companies/:id/chats`). Agent replies count, and so do messages an
- *   agent sends from another task's run (briefings and reports).
+ *   agent sends from another task's run (briefings and reports). `unreadMessageCount` says how
+ *   many (U65, upstream #19627).
  * - The open chat marks itself read up to its newest agent message while you can see it: the
  *   window is visible and focused, and you're at the foot of the thread
  *   (`POST /issues/:id/read` with `throughCommentId`).
- * - `useUnreadChats()` gives the agents with unread chats, for a dot beside each in the nav
- *   (`ChatUnreadDot`). It keeps the list fresh from live events: activity on one of your chats, or
- *   a message delivered to a chat of yours that isn't listed yet.
+ * - `useUnreadChats()` gives the agents with unread chats and their counts, for a badge beside each
+ *   in the nav and on the dock (`ChatUnreadBadge`). It keeps the list fresh from live events:
+ *   activity on one of your chats, or a message delivered to a chat of yours that isn't listed yet.
  */
 
-/** The agents whose chats with you have messages you haven't read, and how many chats that is. */
+/** The agents whose chats with you have messages you haven't read, and how many messages. */
 export function useUnreadChats(openAgentId?: () => string | null | undefined) {
   const company = useCompany();
   const client = useQueryClient();
   const session = useSession();
-  const settings = useExperimentalSettingsQuery();
-  const chats = createQuery(() => ({
-    queryKey: queryKeys.chat.list(company().id),
-    queryFn: ({ signal }) => chatApi.list(company().id, signal),
-    enabled: settings.data?.enableAgentChat === true,
-    staleTime: 60_000,
-  }));
+  const chats = useChatListQuery();
   useLiveEvent(["activity.logged"], (event) => {
     const payload = event.payload ?? {};
     if (payload.entityType !== "issue") return;
@@ -47,17 +42,26 @@ export function useUnreadChats(openAgentId?: () => string | null | undefined) {
     const delivered = typeof details?.conversationUserId === "string" && details.conversationUserId === untrack(session.youId);
     if (known || delivered || payload.action === "issue.conversation_opened") void client.invalidateQueries({ queryKey: queryKeys.chat.list(company().id) });
   });
-  const agentIds = createMemo(() => unreadChatAgents(chats.data, openAgentId?.()));
+  const counts = createMemo(() => unreadChatCounts(chats.data, openAgentId?.()));
+  const messages = createMemo(() => [...counts().values()].reduce((sum, count) => sum + count, 0));
   return {
-    agentIds,
-    has: (agentId: string) => agentIds().has(agentId),
-    count: () => agentIds().size,
+    /** Unread messages in your chat with this agent; 0 when it's read. */
+    countFor: (agentId: string) => counts().get(agentId) ?? 0,
+    /** How many chats have unread messages. */
+    count: () => counts().size,
+    /** Unread messages across your chats. */
+    messages,
   };
 }
 
-/** The nav's dot for a chat with messages you haven't read. */
-export function ChatUnreadDot(props: { class?: string }) {
-  return <span class={`ch-unread${props.class ? ` ${props.class}` : ""}`} role="img" aria-label="New messages" title="New messages" />;
+/** The badge for a chat with messages you haven't read: how many, in the run tone. */
+export function ChatUnreadBadge(props: { count: number; class?: string; from?: string }) {
+  const label = () => `${unreadMessagesLabel(props.count)}${props.from ? ` from ${props.from}` : ""}`;
+  return (
+    <span class={`ch-unread${props.class ? ` ${props.class}` : ""}`} role="img" aria-label={label()} title={label()}>
+      {badgeCount(props.count)}
+    </span>
+  );
 }
 
 const RETRY_MS = [1_500, 5_000];

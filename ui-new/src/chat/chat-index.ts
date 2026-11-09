@@ -3,9 +3,19 @@ import { createMemo } from "solid-js";
 import { chatApi } from "@/api/chat";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
-import { useAgentsQuery, useExperimentalSettingsQuery } from "@/lib/company-data";
+import { useAgentsQuery } from "@/lib/company-data";
 import { useSession } from "@/lib/session";
 import { chatPath, yourChatAgent, type ChatLike } from "./chat-model";
+
+/** Your chats (`GET /companies/:id/chats`), one shared query (`chat.list`) for every page that reads them. */
+export function useChatListQuery() {
+  const company = useCompany();
+  return createQuery(() => ({
+    queryKey: queryKeys.chat.list(company().id),
+    queryFn: ({ signal }) => chatApi.list(company().id, signal),
+    staleTime: 60_000,
+  }));
+}
 
 /*
  * Which tasks are your chats, and with whom (`GET /companies/:id/chats`), for pages that get chats
@@ -20,13 +30,7 @@ export function useChatIndex() {
   const company = useCompany();
   const session = useSession();
   const agents = useAgentsQuery();
-  const settings = useExperimentalSettingsQuery();
-  const chats = createQuery(() => ({
-    queryKey: queryKeys.chat.list(company().id),
-    queryFn: ({ signal }) => chatApi.list(company().id, signal),
-    enabled: settings.data?.enableAgentChat === true,
-    staleTime: 60_000,
-  }));
+  const chats = useChatListQuery();
   const byIssue = createMemo(
     () => new Map((chats.data ?? []).flatMap((chat) => (chat.conversationAgentId ? [[chat.id, chat.conversationAgentId] as const] : []))),
   );
@@ -36,8 +40,8 @@ export function useChatIndex() {
   );
   const href = (agentId: string) => chatPath(company().issuePrefix, agents.data?.find((agent) => agent.id === agentId)?.urlKey ?? agentId);
   return {
-    /** Whether the list of your chats has loaded (or isn't coming: chat is off). */
-    settled: () => settings.isSuccess && (settings.data?.enableAgentChat !== true || chats.isSuccess || chats.isError),
+    /** Whether the list of your chats has loaded (or failed to). */
+    settled: () => chats.isSuccess || chats.isError,
     /** Your chats' task ids. */
     ids: createMemo(() => new Set(byIssue().keys())),
     /** The agent a chat is with, by the chat's task id. */

@@ -95,7 +95,7 @@
   max-width: 30vw;
 }
 
-/* An icon with a mark on its corner: Agents' unread-chat dot */
+/* An icon with a mark on its corner: Agents' unread-message count, growing rightwards */
 .pdock-icon {
   position: relative;
   display: inline-flex;
@@ -103,12 +103,16 @@
 
 .pdock-unread {
   position: absolute;
-  top: -3px;
-  right: -4px;
+  top: -7px;
+  left: calc(100% - 10px);
   display: inline-flex;
 }
 
 .pdock-unread .ch-unread {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
   box-shadow: 0 0 0 2px var(--card);
 }
 

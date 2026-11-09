@@ -51,7 +51,7 @@ import { TaskStatusCapsule } from "@/ui/Status";
 import { navSection, setNavHidden, useCompanyOrder, useProjectOrder, useProjectStars, useRecentTasks } from "./nav-prefs";
 import { showStatusLink, visibleProjects } from "./nav-model";
 import { openChatAgentKey } from "@/chat/chat-model";
-import { ChatUnreadDot, useUnreadChats } from "@/chat/chat-read";
+import { ChatUnreadBadge, useUnreadChats } from "@/chat/chat-read";
 import "@/ui/nav.css";
 import "./Nav.css";
 
@@ -72,8 +72,8 @@ import "./Nav.css";
  * switcher lists companies in the order you gave them on the companies page.
  *
  * An agent whose chat has agent messages you haven't read (a reply, or a briefing it sent from a
- * task; decision 48) has a dot beside its name, except the chat open now, which marks itself read
- * (chat/chat-read.tsx).
+ * task; decision 48) has a badge beside its name saying how many (U65), except the chat open now,
+ * which marks itself read (chat/chat-read.tsx).
  *
  * Status (status cards, decision 39, D3) sits under Inbox while the instance has `enableStatusCards`
  * on, as in the old sidebar.
@@ -342,7 +342,7 @@ export function Nav() {
       <Show when={starred().length > 0 || starredProjects().length > 0}>
         <NavSection id="starred" title="Starred">
           <For each={starredProjects()}>{(project) => projectRow(project, starredProjects)}</For>
-          <For each={starred()}>{(agent) => <NavAgent agent={agent} base={base()} running={running()} unread={unreadChats.has(agent.id)} />}</For>
+          <For each={starred()}>{(agent) => <NavAgent agent={agent} base={base()} running={running()} unread={unreadChats.countFor(agent.id)} />}</For>
         </NavSection>
       </Show>
 
@@ -379,7 +379,7 @@ export function Nav() {
         }
       >
         <For each={otherAgents()} fallback={<Show when={navAgents().length === 0}><p class="nav-empty">No agents yet.</p></Show>}>
-          {(agent) => <NavAgent agent={agent} base={base()} running={running()} unread={unreadChats.has(agent.id)} />}
+          {(agent) => <NavAgent agent={agent} base={base()} running={running()} unread={unreadChats.countFor(agent.id)} />}
         </For>
       </NavSection>
 
@@ -456,7 +456,7 @@ function NavProject(props: { project: Project; base: string; list: Project[]; on
   );
 }
 
-function NavAgent(props: { agent: Agent; base: string; running: ReadonlySet<string>; unread: boolean }) {
+function NavAgent(props: { agent: Agent; base: string; running: ReadonlySet<string>; unread: number }) {
   const state = () => agentState(props.agent, props.running);
   const actions = useAgentActions();
   const stars = useAgentStars();
@@ -467,8 +467,8 @@ function NavAgent(props: { agent: Agent; base: string; running: ReadonlySet<stri
       <A class="navi navi--agent" href={`${props.base}/agents/${props.agent.urlKey}`}>
         <AgentAvatar agent={props.agent} size={24} ring={state().key === "running"} />
         <span class="navi-label">{props.agent.name}</span>
-        <Show when={props.unread}>
-          <ChatUnreadDot />
+        <Show when={props.unread > 0}>
+          <ChatUnreadBadge count={props.unread} from={props.agent.name} />
         </Show>
         <span class="navi-state" style={{ color: state().tone }}>
           {state().label}

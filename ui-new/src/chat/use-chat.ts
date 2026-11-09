@@ -3,13 +3,12 @@ import { createInfiniteQuery, createQuery, useQueryClient } from "@tanstack/soli
 import { batch, createEffect, createMemo, createSignal, on, untrack } from "solid-js";
 import { approvalsApi } from "@/api/approvals";
 import { chatApi } from "@/api/chat";
-import { ApiError } from "@/api/client";
 import { interactionsApi } from "@/api/interactions";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useNow } from "@/lib/clock";
 import { useCompany } from "@/lib/company";
-import { useExperimentalSettingsQuery, useLiveRunsQuery } from "@/lib/company-data";
+import { useLiveRunsQuery } from "@/lib/company-data";
 import { useLiveEvent } from "@/lib/live-events";
 import { taskRequests } from "@/requests/request-model";
 import { isActiveRun } from "@/runs/run-model";
@@ -21,8 +20,6 @@ import { EARLIER_PAGE, FIRST_PAGE, firstPage, historyComments, isChatWindow, lis
 /*
  * Everything the chat view reads, in one place.
  *
- * - Whether chat is on: the instance's `enableAgentChat` (decision 2). A 404 from the chat routes
- *   means the same.
  * - The chat: `GET /chats/:agent`, null until the first message. Its row is then read like any
  *   task's (`issues.section(id, "core")`), so live task events keep its state fresh.
  * - Messages, newest first: the 20 newest, then 50 earlier at a time as the reader scrolls up
@@ -38,18 +35,12 @@ export function useChat(agent: () => AgentDetail) {
   const company = useCompany();
   const client = useQueryClient();
   const people = useTaskPeople();
-  const settings = useExperimentalSettingsQuery();
   const liveRuns = useLiveRunsQuery();
 
   const chatQuery = createQuery(() => ({
     queryKey: queryKeys.chat.detail(company().id, agent().id),
     queryFn: ({ signal }) => chatApi.get(company().id, agent().id, signal),
-    enabled: settings.data?.enableAgentChat === true || settings.isError,
-    retry: false,
   }));
-  /** Off on this instance: the setting says so, or the chat routes answer 404. */
-  const off = () =>
-    settings.data?.enableAgentChat === false || (chatQuery.error instanceof ApiError && chatQuery.error.status === 404);
   const found = () => chatQuery.data ?? null;
   const chatId = () => found()?.id ?? null;
 
@@ -100,7 +91,6 @@ export function useChat(agent: () => AgentDetail) {
   const reports = createQuery(() => ({
     queryKey: queryKeys.chat.reports(company().id, agent().id),
     queryFn: ({ signal }) => chatApi.reports(company().id, agent().id, signal),
-    enabled: settings.data?.enableAgentChat === true && !off(),
   }));
   const interactions = createQuery(() => ({
     queryKey: queryKeys.issues.section(chatId() ?? "", "interactions"),
@@ -216,7 +206,7 @@ export function useChat(agent: () => AgentDetail) {
   // note: that loses the reader's place. ChatView mounts afresh for each agent, so the latch never
   // needs resetting; resetting it on `agent().id` fired whenever the agent's row refetched.
   const [ready, setReady] = createSignal(false);
-  const firstLoading = () => settings.isPending || chatQuery.isPending || (!!chatId() && comments.isPending);
+  const firstLoading = () => chatQuery.isPending || (!!chatId() && comments.isPending);
   createEffect(() => !ready() && !firstLoading() && setReady(true));
   const loading = createMemo(() => !ready() && firstLoading());
 
@@ -228,11 +218,9 @@ export function useChat(agent: () => AgentDetail) {
     });
 
   return {
-    off,
     loading,
     /** Only when there's nothing to show: a refetch that fails keeps the thread on screen. */
     error: (): Error | null => {
-      if (off()) return null;
       if (chatQuery.error && chatQuery.data === undefined) return chatQuery.error as Error;
       if (comments.error && comments.data === undefined) return comments.error as Error;
       return null;
