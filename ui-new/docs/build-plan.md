@@ -470,6 +470,12 @@ Integration round 2 (Nov 5): four agents, `integrate/transcripts` (U41 check, U4
 The Nov 7 sync (`d3713d827..f6cb3e43f`, [report](../../fork/sync-reports/2026-11-07.md)) added U57–U80,
 and recorded upstream's Coordinator-first old UI on U36.
 
+Integration round 3 (Nov 8): four agents, `integrate/task-run-state` (U62, U63, U64, U79 check),
+`integrate/task-thread` (U58, U67; U60 and U68 checks), `integrate/chat-lists-routines` (U57, U59,
+U65; U61, U69 and U80 checks; the phone toolbar width) and `integrate/agents-apps` (U70, U72; U71,
+U73–U75 and U77 checks; U11's remaining differences and "From connections"). The collapsed request
+cards and Inbox grouping from U36 follow once their artboard is approved.
+
 Outcomes: **build** (an agent builds it), **decide** (a question for the user first), **check**
 (verify, then build or close), **design** (needs boards first), **left out** (with the reason),
 **done**. When a line is built or settled, mark it done or left out here and in its row.
