@@ -22,6 +22,7 @@ import {
   driverLabel,
   effectiveDefaultId,
   environmentSummary,
+  editScope,
   isManaged,
   reassignTargets,
   sortEnvironments,
@@ -161,14 +162,14 @@ export function EnvironmentsSection() {
                   <Button size="compact" disabled={result() === "running" || environment.status === "archived"} onClick={() => void probe(environment)}>
                     Probe
                   </Button>
-                  <Show when={environment.status === "active" || !isManaged(environment)}>
+                  <Show when={!isManaged(environment) || (environment.status === "active" && (editScope(environment) !== "none" || !isDefault(environment)))}>
                     <Menu placement="bottom-end">
                       <Menu.Trigger as={Button} variant="icon" ghost size="compact" aria-label={`More actions for ${environment.name}`}>
                         <Ellipsis size={16} aria-hidden="true" />
                       </Menu.Trigger>
                       <Menu.Content label="Environment actions" width={260}>
-                        <Show when={environment.status === "active"}>
-                          <Menu.Item onSelect={() => setEditing({ mode: "edit", environment })} description={isManaged(environment) ? "Its variables" : "Settings and variables"}>
+                        <Show when={environment.status === "active" && editScope(environment) !== "none"}>
+                          <Menu.Item onSelect={() => setEditing({ mode: "edit", environment })} description={editScope(environment) === "variables" ? "Its variables" : "Settings and variables"}>
                             Edit…
                           </Menu.Item>
                         </Show>

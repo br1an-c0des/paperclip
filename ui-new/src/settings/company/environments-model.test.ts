@@ -7,6 +7,8 @@ import {
   reassignTargets,
   unlistedAgentCount,
   driverLabel,
+  editScope,
+  isManagedPluginEnvironment,
   effectiveDefaultId,
   emptyEnvironmentForm,
   environmentForm,
@@ -78,6 +80,31 @@ describe("environments", () => {
     expect(effectiveDefaultId(null, [env({ id: "box", name: "Box", driver: "ssh" })])).toBeNull();
     expect(defaultPatchId({ id: "box", driver: "ssh" })).toBe("box");
     expect(defaultPatchId({ id: "local", driver: "local" })).toBeNull();
+  });
+
+  it("tells a managed plugin row from the managed sandbox and the local slot (#19490)", () => {
+    const plugin = env({
+      id: "plug",
+      name: "Remote host",
+      driver: "plugin",
+      config: { pluginKey: "example.remote-host-plugin", driverKey: "tasks", driverConfig: {} },
+      metadata: { managedByPaperclip: true, managedPluginEnvironment: "example.remote-host-plugin:tasks" },
+    });
+    const sandbox = env({ id: "sb", name: "Paperclip", driver: "sandbox", config: { provider: "daytona" }, metadata: { managedByPaperclip: true } });
+    const local = env({ id: "local", name: "Local", driver: "local", metadata: { managedByPaperclip: true } });
+    expect(isManagedPluginEnvironment(plugin)).toBe(true);
+    expect(isManagedPluginEnvironment(sandbox)).toBe(false);
+    // Its variables are hidden and locked; the managed sandbox's and the local slot's are the organization's.
+    expect(editScope(plugin)).toBe("none");
+    expect(editScope(sandbox)).toBe("variables");
+    expect(editScope(local)).toBe("variables");
+    // A plugin row someone made: no form for its plugin settings, so only its variables.
+    expect(editScope(env({ driver: "plugin", config: { pluginKey: "p", driverKey: "d" } }))).toBe("variables");
+    expect(editScope(env({ driver: "ssh" }))).toBe("all");
+    expect(environmentSummary(plugin)).toBe("example.remote-host-plugin · tasks");
+    // Never picked as the local fallback default; an instance default that names it is kept.
+    expect(effectiveDefaultId(null, [plugin, local])).toBe("local");
+    expect(effectiveDefaultId("plug", [plugin, local])).toBe("plug");
   });
 
   it("explains a blocked delete", () => {

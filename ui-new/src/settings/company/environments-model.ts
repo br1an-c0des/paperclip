@@ -23,6 +23,27 @@ export function isManaged(environment: Pick<Environment, "metadata">) {
   return meta(environment).managedByPaperclip === true;
 }
 
+/**
+ * A plugin environment the managed config declares (#19490): marked `managedByPaperclip` like the
+ * managed sandbox and the local slot, plus `managedPluginEnvironment: "<pluginKey>:<driverKey>"`.
+ * It is never the managed sandbox, which is a `sandbox` row.
+ */
+export function isManagedPluginEnvironment(environment: Pick<Environment, "metadata">) {
+  const marker = meta(environment).managedPluginEnvironment;
+  return typeof marker === "string" && marker.length > 0;
+}
+
+/**
+ * What Edit can change. A managed row keeps its name and settings, but its variables are the
+ * organization's (the managed sandbox's env-vars contract), except on a managed plugin row: the
+ * server hides its variables and refuses edits to them on a cloud-managed instance. A plugin row
+ * someone made keeps its plugin settings (this page has no form for them), so only its variables.
+ */
+export function editScope(environment: Pick<Environment, "driver" | "metadata">): "all" | "variables" | "none" {
+  if (isManagedPluginEnvironment(environment)) return "none";
+  return isManaged(environment) || environment.driver === "plugin" ? "variables" : "all";
+}
+
 /*
  * The default environment is instance-wide (`defaultEnvironmentId` in `GET /instance/settings`),
  * while environments are per organization: agents in every organization that haven't picked one
@@ -253,6 +274,10 @@ export function environmentSummary(environment: Environment, providerName?: stri
     const detail = ["template", "image", "region", "workspacePath"].map((key) => text(config[key]).trim()).find(Boolean);
     if (isManaged(environment)) return detail ?? null;
     return [`${providerName ?? (text(config.provider) || "sandbox")} sandbox`, detail].filter(Boolean).join(" · ");
+  }
+  if (environment.driver === "plugin") {
+    const plugin = text(config.pluginKey).trim();
+    return plugin ? [plugin, text(config.driverKey).trim()].filter(Boolean).join(" · ") : null;
   }
   return null;
 }

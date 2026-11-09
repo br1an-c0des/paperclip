@@ -18,7 +18,7 @@ import { Segmented } from "@/ui/Segmented";
 import { TonePill } from "@/ui/Status";
 import { Switch } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
-import { emptyEnvironmentForm, environmentForm, environmentFormProblem, environmentPayload, isManaged, sandboxProviders, type EnvironmentForm } from "./environments-model";
+import { emptyEnvironmentForm, environmentForm, environmentFormProblem, environmentPayload, editScope, sandboxProviders, type EnvironmentForm } from "./environments-model";
 import { EnvVarsEditor } from "./EnvVarsEditor";
 import { failure } from "./shared";
 
@@ -45,7 +45,8 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
   const [showErrors, setShowErrors] = createSignal(false);
 
   const editing = () => (props.edit?.mode === "edit" ? props.edit.environment : null);
-  const managed = () => !!editing() && isManaged(editing()!);
+  // Only the variables: a managed row, or a plugin row whose settings belong to its plugin.
+  const managed = () => !!editing() && editScope(editing()!) === "variables";
   const open = () => !!props.edit;
 
   const capabilities = createQuery(() => ({
@@ -165,7 +166,13 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
       open={open()}
       onOpenChange={(value) => !value && props.onClose()}
       title={editing() ? `Edit ${editing()!.name}` : "New environment"}
-      description={managed() ? "Managed by Paperclip: its name and settings are kept for you; you can add variables." : "A machine agents run on. Saved changes apply to later runs."}
+      description={
+        !managed()
+          ? "A machine agents run on. Saved changes apply to later runs."
+          : editing()!.metadata?.managedByPaperclip === true
+            ? "Managed by Paperclip: its name and settings are kept for you; you can add variables."
+            : "Its settings belong to its plugin; you can add variables."
+      }
       width={680}
       footer={
         <>
