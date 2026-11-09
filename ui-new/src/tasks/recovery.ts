@@ -1,4 +1,13 @@
-import type { Agent, Issue, PauseReason, Project, TaskInterruptionPresentation } from "@paperclipai/shared";
+import type {
+  Agent,
+  Issue,
+  IssueBlockerStalledWakeContext,
+  IssueLockedStub,
+  IssueRelationIssueSummary,
+  PauseReason,
+  Project,
+  TaskInterruptionPresentation,
+} from "@paperclipai/shared";
 import type { TreeControlState } from "@/api/task-actions";
 import { providerFailureOf, type ProviderFailure } from "@/ui/provider-failure";
 
@@ -26,6 +35,14 @@ import { providerFailureOf, type ProviderFailure } from "@/ui/provider-failure";
  *   so it never dead-ends. A native run the coordinator resumes by itself (#19503: scheduled, with
  *   no Retry and no recovery step) reads "Resuming" with its time, not as a competing Retry; the
  *   same rule (`pendingResume`) words it under a provider's refusal and on the list rows' pill.
+ * - Since the 2026-11-09 sync (#20109): a saved Retry that waits only on unfinished blockers reads
+ *   as waiting (`state: "working"`, `retryWait.reason: "dependency_blocked"`, no Retry), and the
+ *   notice lists those blockers from the task's `blockedBy`, each with what to do, as the old UI's
+ *   ExecutionBlockerNotice does. Other waits of a task that hasn't started (a budget hold) show
+ *   their message the same way.
+ * - Also since then (#20098), the children and blockers stopped on a recovery action that needs
+ *   the board (`stalledDependencies`) get their own notice (`stalledDependencyRows`, drawn in
+ *   TaskNotices.tsx), each with its own Retry.
  * - A task stopped because its agent may not read the project explains that and links to the
  *   agent's project access; once access is added, it offers Retry.
  * - Interruptions waiting on someone (an approval, a reconnect, an assignee, a model, a budget) say
@@ -68,6 +85,12 @@ export type TaskNotice =
     }
   /** Paperclip is recovering the previous attempt's saved work before the task goes on. */
   | { kind: "recovering"; step: string }
+  /**
+   * A saved Retry, or a task that hasn't started, waiting on something that clears by itself or
+   * elsewhere (`retryWait` on a working task): the server's message, and for a dependency wait
+   * the unfinished blockers it waits on.
+   */
+  | { kind: "retry-waiting"; reason: string; message: string; blockers: RetryBlocker[] }
   | { kind: "waiting"; action: Exclude<NonNullable<TaskInterruptionPresentation["userAction"]>, "project_access" | "resume"> }
   | { kind: "tree-paused"; scope: "leaf" | "subtree"; isRoot: boolean; rootIssueId: string }
   | { kind: "agent-paused"; agentId: string; agentName: string; reason: PauseReason | null; canResume: boolean }
@@ -114,8 +137,55 @@ export function pendingResume(interruption: InterruptionFacts | null | undefined
   return !!interruption && interruption.state === "retry_scheduled" && !interruption.canRetry && !recoveryStepOf(interruption) && !!interruption.nextRetryAt;
 }
 
+/**
+ * A blocker a saved Retry waits on: its link and what to do about it. A private one the viewer may
+ * not read (`locked`) shows only its identifier, as the old UI's LockedIssueChip does.
+ */
+export type RetryBlocker = { id: string; identifier: string | null; title: string | null; locked: boolean; action: string | null };
+
+/** What to do about a blocker, by its status (the old UI's ExecutionBlockerNotice `blockerAction`). */
+export const BLOCKER_ACTION: Record<string, string> = {
+  blocked: "Blocked: open it to Retry",
+  cancelled: "Cancelled: remove or replace it",
+  done: "Saving its files",
+};
+
+type Blocker = IssueRelationIssueSummary | IssueLockedStub;
+const isLocked = (blocker: Blocker): blocker is IssueLockedStub => (blocker as { locked?: unknown }).locked === true;
+
+/**
+ * The blockers a `dependency_blocked` Retry waits on: the unfinished ones (a locked one counts), or,
+ * when every readable one is done (a finished task still saving its files), all of them. Nothing
+ * for any other wait.
+ */
+export function retryWaitBlockers(retryWait: { reason: string } | null | undefined, blockedBy: readonly Blocker[] | null | undefined): RetryBlocker[] {
+  if (retryWait?.reason !== "dependency_blocked") return [];
+  const all = blockedBy ?? [];
+  const unfinished = all.filter((blocker) => isLocked(blocker) || blocker.status !== "done");
+  return (unfinished.length ? unfinished : all).map((blocker) =>
+    isLocked(blocker)
+      ? { id: blocker.id, identifier: blocker.identifier, title: null, locked: true, action: null }
+      : {
+          id: blocker.id,
+          identifier: blocker.identifier,
+          title: blocker.title,
+          locked: false,
+          action: BLOCKER_ACTION[blocker.status] ?? words(blocker.status),
+        },
+  );
+}
+
+/** "Retry is waiting on TES-12", "on 2 tasks", or for a wait that isn't a dependency, "Waiting to start". */
+export function retryWaitTitle(notice: { reason: string; blockers: readonly RetryBlocker[] }) {
+  if (notice.reason !== "dependency_blocked") return "Waiting to start";
+  if (notice.blockers.length === 1) return `Retry is waiting on ${notice.blockers[0].identifier ?? "a task"}`;
+  return notice.blockers.length > 1 ? `Retry is waiting on ${notice.blockers.length} tasks` : "Retry is waiting on its dependencies";
+}
+
+const words = (value: string) => value.replace(/_/g, " ").replace(/^./, (first) => first.toUpperCase());
+
 export type NoticeInput = {
-  task: Pick<Issue, "status" | "hiddenAt" | "interruption"> & Partial<Pick<Issue, "executionBlocker">>;
+  task: Pick<Issue, "status" | "hiddenAt" | "interruption"> & Partial<Pick<Issue, "executionBlocker" | "blockedBy">>;
   assignee?: Pick<Agent, "id" | "name" | "status" | "pauseReason"> & Partial<Pick<Agent, "lifecycleState">> | null;
   project?: Pick<Project, "name" | "pausedAt"> | null;
   tree?: TreeControlState | null;
@@ -130,6 +200,9 @@ export type NoticeInput = {
 };
 
 const TERMINAL = new Set(["done", "cancelled"]);
+
+const assigneeBudgetPaused = (agent: NoticeInput["assignee"], status: string) =>
+  agent?.status === "paused" && agent.pauseReason === "budget" && !TERMINAL.has(status);
 
 export function taskNotices(input: NoticeInput): TaskNotice[] {
   const notices: TaskNotice[] = [];
@@ -162,6 +235,9 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
     notices.push({ kind: "provider-failure", failure, state: interruption.state, canRetry, nextRetryAt: interruption.nextRetryAt, recoveryStep: step, resuming });
   } else if (step && interruption?.state === "working") {
     notices.push({ kind: "recovering", step });
+  } else if (retryWait && interruption?.state === "working") {
+    const reason = interruption.retryWait!.reason;
+    notices.push({ kind: "retry-waiting", reason, message: retryWait, blockers: retryWaitBlockers(interruption.retryWait, task.blockedBy) });
   } else if (interruption?.responsibility === "system" && (interruption.state === "failed" || interruption.state === "retry_scheduled")) {
     notices.push({
       kind: "interrupted",
@@ -173,7 +249,15 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
       recoveryStep: step,
       resuming,
     });
-  } else if (interruption?.state === "waiting_for_user" && interruption.userAction && interruption.userAction !== "resume" && interruption.userAction !== "project_access") {
+  } else if (
+    interruption?.state === "waiting_for_user" &&
+    interruption.userAction &&
+    interruption.userAction !== "resume" &&
+    interruption.userAction !== "project_access" &&
+    // A budget stop of the assignee itself is told by its paused notice, below (#20143 keeps such
+    // tasks in their status, so this is now the usual way a budget pause shows).
+    !(interruption.userAction === "budget" && assigneeBudgetPaused(input.assignee, task.status))
+  ) {
     notices.push({ kind: "waiting", action: interruption.userAction });
   }
 
@@ -257,4 +341,45 @@ export function pauseDetail(reason: PauseReason | null) {
     default:
       return "";
   }
+}
+
+/*
+ * Stalled dependencies (since the 2026-11-09 sync, upstream #20098; the old UI's
+ * StalledDependencyNotice.tsx): the task's children and blockers that stopped on a recovery action
+ * that needs the board (`Issue.stalledDependencies`). The waiting task's agent is woken once per
+ * stall (`issue_blocker_stalled`); the notice lets the board act on each from here.
+ */
+
+export type StalledDependencyRow = {
+  entry: IssueBlockerStalledWakeContext;
+  /** "Subtask" for a child, "Blocker" for a task this one waits on. */
+  relation: string;
+  /** What the link opens: the identifier, else the id. */
+  ref: string;
+};
+
+/**
+ * The rows still worth showing. The saved list refreshes only with the waiting task, so a row drops
+ * once its child's own state (read separately) has moved on from the status the stall recorded: its
+ * Retry started it, or it was unblocked. A child not read yet stays.
+ */
+export function stalledDependencyRows(
+  entries: readonly IssueBlockerStalledWakeContext[] | null | undefined,
+  childStatus: (issueId: string) => string | undefined,
+): StalledDependencyRow[] {
+  return (entries ?? [])
+    .filter((entry) => {
+      const status = childStatus(entry.stalledIssueId);
+      return status === undefined || status === entry.stalledIssueStatus;
+    })
+    .map((entry) => ({
+      entry,
+      relation: entry.relation === "child" ? "Subtask" : "Blocker",
+      ref: entry.stalledIssueIdentifier ?? entry.stalledIssueId,
+    }));
+}
+
+/** "A dependency needs the board", or "2 dependencies need the board". */
+export function stalledDependencyTitle(count: number) {
+  return count === 1 ? "A dependency needs the board" : `${count} dependencies need the board`;
 }

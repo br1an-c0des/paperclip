@@ -94,6 +94,9 @@ describe("why a run started and where it sits", () => {
     expect(triggerLabel({ invocationSource: "assignment", contextSnapshot: { wakeReason: "issue_commented" } })).toBe("Woken by a comment");
     expect(triggerLabel({ invocationSource: "timer", contextSnapshot: null })).toBe("On a schedule");
     expect(triggerLabel({ invocationSource: "on_demand", contextSnapshot: { wakeReason: "something_new" } })).toBe("Woken: something new");
+    expect(triggerLabel({ invocationSource: "automation", contextSnapshot: { wakeReason: "issue_blocker_stalled" } })).toBe(
+      "Woken because a dependency needs the board",
+    );
   });
 
   it("numbers a run among its task's runs, oldest first", () => {

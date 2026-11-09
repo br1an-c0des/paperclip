@@ -170,6 +170,8 @@ const WAKE_REASONS: Record<string, string> = {
   issue_unblock_requested: "Woken to unblock the task",
   issue_monitor_due: "Woken by the task's monitor",
   issue_recovery_action_restored: "Woken to recover the task",
+  // Since the 2026-11-09 sync (#20098): once per stall of a subtask or blocker that needs the board.
+  issue_blocker_stalled: "Woken because a dependency needs the board",
   retry_failed_run: "Retrying a failed run",
   rerun_with_provider_trace: "Rerun with a provider trace",
   resume_process_lost_run: "Resuming a lost run",

@@ -1,9 +1,9 @@
-import type { Issue } from "@paperclipai/shared";
+import type { Issue, IssueBlockerStalledWakeContext } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
-import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { ArrowRight, EyeOff, LifeBuoy, PauseCircle, RotateCcw, ShieldCheck, ShieldX, TriangleAlert, Wrench } from "lucide-solid";
+import { createQueries, createQuery, useQueryClient } from "@tanstack/solid-query";
+import { ArrowRight, EyeOff, Hourglass, LifeBuoy, Lock, PauseCircle, RotateCcw, ShieldCheck, ShieldX, TriangleAlert, Wrench } from "lucide-solid";
 import { createMemo, createSignal, For, Match, Show, Switch, type JSX } from "solid-js";
-import { issuesApi } from "@/api/issues";
+import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { taskActionsApi } from "@/api/task-actions";
 import { useNow } from "@/lib/clock";
@@ -12,8 +12,22 @@ import { useProjectsQuery } from "@/lib/company-data";
 import { Button } from "@/ui/Button";
 import { pushToast } from "@/ui/Toast";
 import { useTaskPeople } from "./people";
-import { pauseDetail, resumeCountdown, retryCountdown, scheduledLine, taskNotices, timeOfDay, WAITING_TEXT, type TaskNotice } from "./recovery";
-import { useTaskRetry } from "./retry";
+import {
+  pauseDetail,
+  resumeCountdown,
+  retryCountdown,
+  retryWaitTitle,
+  scheduledLine,
+  stalledDependencyRows,
+  stalledDependencyTitle,
+  taskNotices,
+  timeOfDay,
+  WAITING_TEXT,
+  type RetryBlocker,
+  type StalledDependencyRow,
+  type TaskNotice,
+} from "./recovery";
+import { useTaskRetry, type TaskRetry } from "./retry";
 import { TreeControlDialog, useTreeControlState } from "./TaskActions";
 import { ProviderFailureNotice } from "@/ui/ProviderFailureNotice";
 import { TaskRecovery } from "./TaskRecovery";
@@ -28,6 +42,10 @@ import { TaskIntegrations } from "./integrations/TaskIntegrations";
  * wake, since the pause dropped the assignment's), and the project access notice from the
  * 2026-10-24 upstream sync, which links to the agent's project access and retries once it's added.
  * A provider's refusal shows as its own notice (ui/ProviderFailureNotice.tsx), with Retry.
+ *
+ * Since the 2026-11-09 sync: a saved Retry held by unfinished blockers lists them, each with what to
+ * do (#20109), and the children and blockers stopped on a recovery action that needs the board get
+ * "A dependency needs the board", each with its own Retry (#20098, `StalledDependencies`).
  */
 
 export function TaskNotices(props: { taskId: string }) {
@@ -124,6 +142,9 @@ export function TaskNotices(props: { taskId: string }) {
         </div>
       )}
     </Show>
+    <Show when={task()?.stalledDependencies?.length ? task()!.stalledDependencies : undefined}>
+      {(stalled) => <StalledDependencies entries={stalled()} retry={retry} />}
+    </Show>
     <Show when={task()?.activeRecoveryAction && task()}>
       {(current) => (
         <div class="tn">
@@ -199,6 +220,27 @@ function Notice(props: {
             {(notice() as Extract<TaskNotice, { kind: "recovering" }>).step}…
           </Row>
         )}
+      </Match>
+      <Match when={props.notice.kind === "retry-waiting" && props.notice}>
+        {(notice) => {
+          const found = notice() as Extract<TaskNotice, { kind: "retry-waiting" }>;
+          return (
+            <Row
+              tone="amber"
+              icon={<Hourglass size={16} />}
+              title={retryWaitTitle(found)}
+              extra={
+                <Show when={found.blockers.length > 0}>
+                  <ul class="tn-deps" data-testid="retry-waiting-on">
+                    <For each={found.blockers}>{(blocker) => <WaitingBlocker blocker={blocker} />}</For>
+                  </ul>
+                </Show>
+              }
+            >
+              {found.message}
+            </Row>
+          );
+        }}
       </Match>
       <Match when={props.notice.kind === "provider-failure" && props.notice}>
         {(notice) => {
@@ -373,21 +415,129 @@ function ProjectAccessNotice(props: {
   );
 }
 
+/** A blocker a saved Retry waits on: its link, title and what to do; a private one only its identifier. */
+function WaitingBlocker(props: { blocker: RetryBlocker }) {
+  const company = useCompany();
+  return (
+    <li class="tn-dep">
+      <Show
+        when={!props.blocker.locked}
+        fallback={
+          <span class="tn-dep-locked mono" title="Private: you don't have access">
+            <Lock size={12} aria-hidden="true" />
+            {props.blocker.identifier ?? "Private"}
+          </span>
+        }
+      >
+        <A class="tn-dep-link mono" href={issuePath(company().issuePrefix, props.blocker)}>
+          {props.blocker.identifier ?? "Task"}
+        </A>
+        <span class="tn-dep-title">{props.blocker.title}</span>
+        <span class="tn-dep-action">{props.blocker.action}</span>
+      </Show>
+    </li>
+  );
+}
+
+/**
+ * "A dependency needs the board" (#20098; the old UI's StalledDependencyNotice): each child or
+ * blocker stopped on a recovery action that needs the board, with its link, title, the recovery's
+ * next step and its own Retry. Each one's state is read on its own (`GET /issues/:id`): Retry is
+ * offered when that task allows it, and its row drops once its status moves on.
+ */
+function StalledDependencies(props: { entries: IssueBlockerStalledWakeContext[]; retry: TaskRetry }) {
+  const children = createQueries(() => ({
+    queries: props.entries.map((entry) => ({
+      queryKey: queryKeys.issues.detail(entry.stalledIssueId),
+      queryFn: ({ signal }: { signal: AbortSignal }) => issuesApi.get(entry.stalledIssueId, signal),
+    })),
+  }));
+  const child = (issueId: string) => children[props.entries.findIndex((entry) => entry.stalledIssueId === issueId)];
+  const rows = createMemo(() => stalledDependencyRows(props.entries, (issueId) => child(issueId)?.data?.status));
+  return (
+    <Show when={rows().length > 0}>
+      <div class="tn">
+        <Row
+          tone="amber"
+          icon={<TriangleAlert size={16} />}
+          title={stalledDependencyTitle(rows().length)}
+          label="Stalled dependencies"
+          extra={
+            <ul class="tn-deps" data-testid="stalled-dependency-notice">
+              <For each={rows()}>{(row) => <StalledDependency row={row} child={child(row.entry.stalledIssueId)} retry={props.retry} />}</For>
+            </ul>
+          }
+        />
+      </div>
+    </Show>
+  );
+}
+
+function StalledDependency(props: {
+  row: StalledDependencyRow;
+  child: { data?: Issue; error: Error | null; isFetching: boolean; refetch: () => unknown } | undefined;
+  retry: TaskRetry;
+}) {
+  const company = useCompany();
+  const entry = () => props.row.entry;
+  const issue = () => props.child?.data;
+  const canRetry = () => issue()?.interruption?.canRetry === true;
+  const busy = () => props.retry.busy(entry().stalledIssueId);
+  return (
+    <li class="tn-dep" data-testid="stalled-dependency-row">
+      <span class="tn-dep-relation">{props.row.relation}</span>
+      <A class="tn-dep-link mono" href={`/${company().issuePrefix}/issues/${props.row.ref}`}>
+        {entry().stalledIssueIdentifier ?? "Task"}
+      </A>
+      <span class="tn-dep-title">{entry().stalledIssueTitle}</span>
+      <Show when={canRetry() && issue()}>
+        {(found) => (
+          <button
+            type="button"
+            class="retry-button"
+            disabled={busy()}
+            aria-label={`Retry ${entry().stalledIssueIdentifier ?? "task"}`}
+            onClick={() => void props.retry.retry(found())}
+          >
+            <RotateCcw size={12} stroke-width={2.2} aria-hidden="true" />
+            {busy() ? "Retrying…" : "Retry"}
+          </button>
+        )}
+      </Show>
+      <Show when={entry().recoveryAction.nextAction}>{(next) => <span class="tn-dep-note">{next()}</span>}</Show>
+      <Show when={props.child?.error && !issue()}>
+        <span class="tn-dep-note tn-files-alert" role="alert">
+          Couldn't load this task's state: {props.child?.error?.message}{" "}
+          <button type="button" class="retry-button" disabled={props.child?.isFetching} onClick={() => void props.child?.refetch()}>
+            Reload
+          </button>
+        </span>
+      </Show>
+    </li>
+  );
+}
+
 function Row(props: {
   tone: "red" | "amber" | "green" | "neutral";
   icon: JSX.Element;
   title: JSX.Element;
   action?: JSX.Element;
-  children: JSX.Element;
+  /** Block content under the text, such as a list of tasks. */
+  extra?: JSX.Element;
+  label?: string;
+  children?: JSX.Element;
 }) {
   return (
-    <section class="tn-row" data-tone={props.tone} role={props.tone === "red" ? "alert" : "status"}>
+    <section class="tn-row" data-tone={props.tone} role={props.tone === "red" ? "alert" : "status"} aria-label={props.label}>
       <span class="tn-icon" aria-hidden="true">
         {props.icon}
       </span>
       <div class="tn-text">
         <b>{props.title}</b>
-        <span>{props.children}</span>
+        <Show when={props.children}>
+          <span>{props.children}</span>
+        </Show>
+        {props.extra}
       </div>
       <Show when={props.action}>
         <div class="tn-action">{props.action}</div>

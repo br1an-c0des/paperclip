@@ -1,6 +1,17 @@
-import type { TaskInterruptionPresentation } from "@paperclipai/shared";
+import type { IssueBlockerStalledWakeContext, TaskInterruptionPresentation } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { pauseDetail, resumeCountdown, retryCountdown, scheduledLine, taskNotices, type NoticeInput } from "./recovery";
+import {
+  pauseDetail,
+  resumeCountdown,
+  retryCountdown,
+  retryWaitBlockers,
+  retryWaitTitle,
+  scheduledLine,
+  stalledDependencyRows,
+  stalledDependencyTitle,
+  taskNotices,
+  type NoticeInput,
+} from "./recovery";
 
 function interruption(extra: Partial<TaskInterruptionPresentation>): TaskInterruptionPresentation {
   return {
@@ -81,6 +92,20 @@ describe("taskNotices", () => {
     expect(kinds(input({ task: { interruption: resume } }))).toEqual(["paused"]);
     const agent = { id: "a1", name: "Sam", status: "paused" as const, pauseReason: null };
     expect(kinds(input({ task: { interruption: resume }, assignee: agent }))).toEqual(["agent-paused"]);
+  });
+
+  it("tells a pause's stop once, with the task in its own status (#20143, #20281)", () => {
+    // New todo work for a manually paused agent waits: the task stays todo, with Resume agent.
+    const resume = interruption({ responsibility: "user", state: "waiting_for_user", userAction: "resume", canRetry: false });
+    const manual = { id: "a1", name: "Sam", status: "paused" as const, pauseReason: "manual" as const };
+    expect(taskNotices(input({ task: { status: "todo", interruption: resume }, assignee: manual }))).toEqual([
+      { kind: "agent-paused", agentId: "a1", agentName: "Sam", reason: "manual", canResume: true },
+    ]);
+    // A budget stop keeps the task in progress; the paused notice says it, not a second budget line.
+    const budget = interruption({ responsibility: "user", state: "waiting_for_user", userAction: "budget", canRetry: false });
+    expect(kinds(input({ task: { interruption: budget }, assignee: { ...manual, pauseReason: "budget" } }))).toEqual(["agent-paused"]);
+    // A budget hold elsewhere (the company's or project's) still says what's needed.
+    expect(kinds(input({ task: { interruption: budget }, assignee: { ...manual, status: "active" as never, pauseReason: null } }))).toEqual(["waiting"]);
   });
 
   it("doesn't call a setup draft paused, and links to Finish setup once its computer is ready (#19322)", () => {
@@ -229,5 +254,89 @@ describe("a pending native resume (#19503)", () => {
   it("asks an owner or admin to confirm the previous server stopped", () => {
     const waiting = interruption({ responsibility: "user", state: "waiting_for_user", userAction: "confirm_owner_stop", canRetry: false });
     expect(taskNotices(input({ task: { interruption: waiting } }))).toEqual([{ kind: "waiting", action: "confirm_owner_stop" }]);
+  });
+});
+
+const blocker = (id: string, status: string, extra: Record<string, unknown> = {}) =>
+  ({ id, identifier: id.toUpperCase(), title: `Task ${id}`, status, priority: "medium", assigneeAgentId: null, assigneeUserId: null, ...extra }) as never;
+
+describe("a saved Retry waiting on its blockers (#20109)", () => {
+  const message = "Retry is waiting on a blocked task this one depends on. Retry or unblock it; this task continues when it is done. Your Retry is saved.";
+  const waiting = interruption({ state: "working", canRetry: false, retryWait: { reason: "dependency_blocked", message } });
+
+  it("names the unfinished blockers, each with what to do, and offers no Retry of its own", () => {
+    const blockedBy = [blocker("tes-1", "blocked"), blocker("tes-2", "cancelled"), blocker("tes-3", "done"), blocker("tes-4", "in_progress")];
+    expect(taskNotices(input({ task: { interruption: waiting, blockedBy } }))).toEqual([
+      {
+        kind: "retry-waiting",
+        reason: "dependency_blocked",
+        message,
+        blockers: [
+          { id: "tes-1", identifier: "TES-1", title: "Task tes-1", locked: false, action: "Blocked: open it to Retry" },
+          { id: "tes-2", identifier: "TES-2", title: "Task tes-2", locked: false, action: "Cancelled: remove or replace it" },
+          { id: "tes-4", identifier: "TES-4", title: "Task tes-4", locked: false, action: "In progress" },
+        ],
+      },
+    ]);
+  });
+
+  it("shows the finished ones still saving their files when nothing else is left", () => {
+    const [notice] = taskNotices(input({ task: { interruption: waiting, blockedBy: [blocker("tes-3", "done")] } }));
+    expect(notice).toMatchObject({ kind: "retry-waiting", blockers: [{ identifier: "TES-3", action: "Saving its files" }] });
+  });
+
+  it("shows a private blocker by its identifier only", () => {
+    const blockedBy = [{ id: "p1", identifier: "TES-9", locked: true }, blocker("tes-3", "done")] as never;
+    expect(retryWaitBlockers({ reason: "dependency_blocked" }, blockedBy)).toEqual([{ id: "p1", identifier: "TES-9", title: null, locked: true, action: null }]);
+  });
+
+  it("lists no blockers for another kind of wait, and calls a task that hasn't started waiting to start", () => {
+    const budget = interruption({ state: "working", canRetry: false, retryWait: { reason: "budget.blocked", message: "Waiting for the budget to allow new work." } });
+    const [notice] = taskNotices(input({ task: { interruption: budget, blockedBy: [blocker("tes-1", "blocked")] } }));
+    expect(notice).toEqual({ kind: "retry-waiting", reason: "budget.blocked", message: "Waiting for the budget to allow new work.", blockers: [] });
+    expect(retryWaitTitle(notice as never)).toBe("Waiting to start");
+  });
+
+  it("titles the wait by what it waits on", () => {
+    const one = retryWaitBlockers({ reason: "dependency_blocked" }, [blocker("tes-1", "blocked")]);
+    expect(retryWaitTitle({ reason: "dependency_blocked", blockers: one })).toBe("Retry is waiting on TES-1");
+    const two = retryWaitBlockers({ reason: "dependency_blocked" }, [blocker("tes-1", "blocked"), blocker("tes-2", "todo")]);
+    expect(retryWaitTitle({ reason: "dependency_blocked", blockers: two })).toBe("Retry is waiting on 2 tasks");
+    expect(retryWaitTitle({ reason: "dependency_blocked", blockers: [] })).toBe("Retry is waiting on its dependencies");
+  });
+
+  it("leaves a failed Retry wait to the interrupted notice", () => {
+    const failed = interruption({ state: "failed", retryWait: { reason: "remote_cleanup", message: "Retry is waiting for the previous environment to stop." } });
+    expect(taskNotices(input({ task: { interruption: failed } }))[0]).toMatchObject({ kind: "interrupted", retryWait: "Retry is waiting for the previous environment to stop." });
+  });
+});
+
+describe("stalled dependencies (#20098)", () => {
+  const entry = (id: string, relation: "child" | "blocker", status = "blocked"): IssueBlockerStalledWakeContext => ({
+    stalledIssueId: id,
+    stalledIssueIdentifier: id === "anon" ? null : id.toUpperCase(),
+    stalledIssueTitle: `Task ${id}`,
+    stalledIssueStatus: status,
+    relation,
+    recoveryAction: { id: `ra-${id}`, kind: "stranded_assigned_issue", cause: "retry_exhausted", status: "escalated", ownerType: "board", nextAction: "Retry it or choose its next step." },
+  });
+
+  it("lists each one with its relation and link", () => {
+    expect(stalledDependencyRows([entry("tes-5", "child"), entry("anon", "blocker")], () => undefined)).toEqual([
+      { entry: entry("tes-5", "child"), relation: "Subtask", ref: "TES-5" },
+      { entry: entry("anon", "blocker"), relation: "Blocker", ref: "anon" },
+    ]);
+  });
+
+  it("drops a row once its task's own status has moved on", () => {
+    const statuses: Record<string, string> = { "tes-5": "blocked", "tes-6": "in_progress" };
+    const rows = stalledDependencyRows([entry("tes-5", "child"), entry("tes-6", "child")], (id) => statuses[id]);
+    expect(rows.map((row) => row.ref)).toEqual(["TES-5"]);
+    expect(stalledDependencyRows(null, () => undefined)).toEqual([]);
+  });
+
+  it("says how many need the board", () => {
+    expect(stalledDependencyTitle(1)).toBe("A dependency needs the board");
+    expect(stalledDependencyTitle(3)).toBe("3 dependencies need the board");
   });
 });

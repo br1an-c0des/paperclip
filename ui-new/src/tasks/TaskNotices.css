@@ -104,3 +104,70 @@
 .tn-stop .input--area {
   width: 100%;
 }
+
+/* Tasks listed in a notice: the blockers a saved Retry waits on, and stalled dependencies. */
+.tn-deps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tn-dep {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
+.tn-dep-relation {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tn-dep-link {
+  color: var(--text);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.tn-dep-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tn-dep-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tn-dep-title {
+  flex: 1 1 120px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tn-dep-action {
+  color: var(--tone-fg);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tn-dep-note {
+  flex-basis: 100%;
+  color: var(--body);
+  font-size: 12px;
+}
+
+.tn-dep .retry-button {
+  background: var(--card);
+}
