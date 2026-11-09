@@ -7,7 +7,7 @@ import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { viewport } from "@/layout/breakpoints";
 import { hasOpenDialog, isTextInputTarget } from "@/lib/shortcuts";
-import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
+import { AgentAvatar, PersonAvatar } from "@/ui/Avatar";
 import { TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { Capsule, LabelPill, PriorityBars, RunningPill, StatusCapsule, TonePill } from "@/ui/Status";
@@ -467,7 +467,15 @@ export function GroupMarkView(props: { mark: GroupMark; people: TaskPeople }) {
           )}
         </Match>
         <Match when={props.mark.kind === "user" && props.mark}>
-          {(mark) => <InitialsDisc name={mark().you ? "You" : props.people.personName(mark().userId)} seed={mark().userId} size={24} you={mark().you} />}
+          {(mark) => (
+            <PersonAvatar
+              name={mark().you ? "You" : props.people.personName(mark().userId)}
+              seed={mark().userId}
+              image={props.people.personImage(mark().userId)}
+              size={24}
+              you={mark().you}
+            />
+          )}
         </Match>
         <Match when={props.mark.kind === "unassigned"}>
           <span class="assignee-none tl-mark-disc" aria-hidden="true" />

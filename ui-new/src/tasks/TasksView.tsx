@@ -13,7 +13,7 @@ import { Dock } from "@/layout/Panel";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery, useLabelsQuery, useProjectsQuery } from "@/lib/company-data";
-import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
+import { AgentAvatar, InitialsDisc, PersonAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
@@ -877,7 +877,7 @@ function FilterMenu(props: {
         <Menu.Group label="Assignee">
           <Show when={props.people.youId()}>
             {(id) => (
-              <Menu.CheckboxItem icon={<InitialsDisc name="You" seed={id()} size={20} you />} {...assignee(`user:${id()}`)}>
+              <Menu.CheckboxItem icon={<PersonAvatar name="You" seed={id()} image={props.people.personImage(id())} size={20} you />} {...assignee(`user:${id()}`)}>
                 You
               </Menu.CheckboxItem>
             )}
@@ -891,7 +891,7 @@ function FilterMenu(props: {
           </For>
           <For each={props.people.otherPeople()}>
             {(person) => (
-              <Menu.CheckboxItem icon={<InitialsDisc name={person.name} seed={person.id} size={20} />} {...assignee(`user:${person.id}`)}>
+              <Menu.CheckboxItem icon={<PersonAvatar name={person.name} seed={person.id} image={person.image} size={20} />} {...assignee(`user:${person.id}`)}>
                 {person.name}
               </Menu.CheckboxItem>
             )}

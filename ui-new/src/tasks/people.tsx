@@ -3,7 +3,7 @@ import { createMemo, Match, Switch } from "solid-js";
 import { personName } from "@/api/access";
 import { useAgentsQuery, useLiveRunsQuery, usePeopleQuery } from "@/lib/company-data";
 import { useSession } from "@/lib/session";
-import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
+import { AgentAvatar, PersonAvatar } from "@/ui/Avatar";
 import "./people.css";
 
 /*
@@ -23,6 +23,9 @@ export function useTaskPeople() {
   const namesById = createMemo(
     () => new Map((people.data?.users ?? []).map((entry) => [entry.principalId, personName(entry)] as const)),
   );
+  const imagesById = createMemo(
+    () => new Map((people.data?.users ?? []).flatMap((entry) => (entry.user?.image ? [[entry.principalId, entry.user.image] as const] : []))),
+  );
   const liveIssueIds = createMemo(
     () => new Set((liveRuns.data ?? []).flatMap((run) => (run.issueId ? [run.issueId] : []))),
   );
@@ -33,7 +36,7 @@ export function useTaskPeople() {
   const otherPeople = createMemo(() =>
     (people.data?.users ?? [])
       .filter((entry) => entry.principalId !== session.youId())
-      .map((entry) => ({ id: entry.principalId, name: personName(entry) }))
+      .map((entry) => ({ id: entry.principalId, name: personName(entry), image: entry.user?.image ?? null }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   );
 
@@ -44,6 +47,8 @@ export function useTaskPeople() {
     /** The company's people other than you, by name. */
     otherPeople,
     personName: (id: string) => namesById().get(id) ?? (id === "local-board" ? "Board" : `User ${id.slice(0, 6)}`),
+    /** A person's photo from the directory, when they've uploaded one (PersonAvatar checks it). */
+    personImage: (id: string): string | null => imagesById().get(id) ?? null,
     youId: () => session.youId(),
     liveIssueIds,
   };
@@ -59,7 +64,7 @@ export function assigneeName(task: Assigned, people: TaskPeople) {
   return "Unassigned";
 }
 
-/** The assignee cell: an agent's avatar, a person's disc, or a dashed empty disc. */
+/** The assignee cell: an agent's avatar, a person's photo or disc, or a dashed empty disc. */
 export function Assignee(props: { task: Assigned; people: TaskPeople; size?: 20 | 24 }) {
   const size = () => props.size ?? 24;
   const agent = () => props.people.agent(props.task.assigneeAgentId);
@@ -69,7 +74,7 @@ export function Assignee(props: { task: Assigned; people: TaskPeople; size?: 20 
       <Switch fallback={<span class="assignee-none" style={{ width: `${size()}px`, height: `${size()}px` }} aria-hidden="true" />}>
         <Match when={agent()}>{(found) => <AgentAvatar agent={found()} size={size()} />}</Match>
         <Match when={props.task.assigneeUserId}>
-          {(id) => <InitialsDisc name={props.people.personName(id())} seed={id()} size={size()} you={you()} />}
+          {(id) => <PersonAvatar name={props.people.personName(id())} seed={id()} image={props.people.personImage(id())} size={size()} you={you()} />}
         </Match>
       </Switch>
       <span class="assignee-name" classList={{ "assignee-name--none": !agent() && !props.task.assigneeUserId }}>
