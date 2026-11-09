@@ -395,9 +395,11 @@ Found in the Nov 5 integration round (U1, Monitoring status).
   progress; the full task read and search carry it.
 - **Likely fix:** copy `displayStatus` in `toCompactIssue`, with a route test. The old UI's list
   grouping probably has the same bug (not verified).
-- **Fork workaround:** `ui-new/src/api/issues.ts` (`withMonitoring`) reads the same list filtered to
-  `displayStatus=monitoring` when a list has tasks in progress without the field, and stops once the
-  server sends it.
+- **Fork workaround:** `ui-new/src/api/issues.ts` (`withMonitoring`) reads the same scope's in-progress
+  tasks in full (`?status=in_progress`, no `view`) when a list has tasks in progress without the
+  field, and stops once the server sends it. Since the Nov 7 sync (#19453) every in-progress task
+  without a run projects to another status, so this extra read now carries more weight: it runs on
+  every list refetch and returns full rows.
 
 ### 25. Use one effort key for Grok on the Paperclip Runner
 
