@@ -1,9 +1,12 @@
 import type { AttentionItem, CompactIssue, DecisionHistoryItem } from "@paperclipai/shared";
 import { A, Navigate, useParams } from "@solidjs/router";
-import { ChevronRight, CircleAlert, Inbox as InboxIcon, Search, X } from "lucide-solid";
+import { ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleAlert, Inbox as InboxIcon, Search, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch } from "solid-js";
+import { runningAgentIds } from "@/lib/agent-state";
+import { useNow } from "@/lib/clock";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
+import { useLiveRunsQuery } from "@/lib/company-data";
 import { hasOpenDialog, isTextInputTarget } from "@/lib/shortcuts";
 import { useTaskPeople } from "@/tasks/people";
 import { Button } from "@/ui/Button";
@@ -29,7 +32,11 @@ import {
   type InboxTab,
   type KindFilter,
 } from "./inbox-model";
+import { groupItems, groupOf, hiddenByGroup, urgentSign, type InboxGroup } from "./group-model";
 import { NO_HISTORY_FILTERS, type HistoryFilters } from "./history-model";
+import { GROUP_BY_OPTIONS, readCardsMode, readFolds, readGroupBy, writeCardsMode, writeFolds, writeGroupBy, type CardsMode, type GroupBy } from "./inbox-prefs";
+import { GroupHeader, type HeaderEntry } from "./InboxRow";
+import { rowModel } from "./row-model";
 import { HistoryBar, HistoryList, useDecisionHistory } from "./InboxHistory";
 import { AgingRow, NeedsItem, ShelfRow } from "./InboxItem";
 import { TaskRows } from "./InboxTasks";
@@ -44,6 +51,10 @@ import "./Inbox.css";
  * - Needs you: request cards, most urgent first, with a kind filter, in New today and Earlier, then
  *   the aging shelf folded at the bottom (requests idle past their retention days, with Keep).
  *   Cards answer in place, as in the task's thread; "New" marks what arrived since you last looked.
+ *   Board 14b: each card rests as a slim row (`InboxRow.tsx`, `row-model.ts`) that opens to the
+ *   card; Collapse all / Expand all and Group (None, Task, Agent, Project) are remembered per company
+ *   on this device (`inbox-prefs.ts`), and grouping replaces New today and Earlier with group
+ *   headers that fold (`group-model.ts`).
  * - Updates: your tasks, grouped by latest activity (M10), unread first in the count, with Retry on
  *   interrupted ones and a note when part of the read failed. Alerts: what broke. Snoozed and
  *   Cleared: what you set aside, with Restore.
@@ -52,7 +63,9 @@ import "./Inbox.css";
  * - Search (the magnifier; `/` stays the command palette's) narrows the open tab to what matches every word typed: titles,
  *   tasks, why it's here, who asked, the request's own text.
  * - Keys (inbox-model.ts, `inboxKeyAction`): j/k move, Enter opens the task in the task modal, y
- *   clears, s snoozes until tomorrow morning, a answers, r and Shift+U read state, u restores.
+ *   clears, s snoozes until tomorrow morning, a answers, r and Shift+U read state, u restores. In
+ *   Needs you → opens the selected card and ← closes it (on a group header they unfold and fold it;
+ *   ← on a closed row in a group goes to its header), and Shift with either opens or closes them all.
  *
  * The old Inbox's paths (`/inbox/mine`, `/inbox/unread`…) land on the closest tab.
  */
@@ -94,6 +107,51 @@ function Inbox(props: { tab: InboxTab; base: string }) {
   const [searching, setSearching] = createSignal(false);
   const [query, setQuery] = createSignal("");
   const [agingOpen, setAgingOpen] = createSignal(false);
+
+  // Board 14b: cards rest collapsed unless the last Collapse all / Expand all said otherwise; a card
+  // opened or closed on its own is an override for this visit only. Grouping and its folds are
+  // remembered too, the folds apart for each grouping.
+  const [cardsMode, setCardsMode] = createSignal<CardsMode>(readCardsMode(company().id));
+  const [overrides, setOverrides] = createSignal<ReadonlyMap<string, boolean>>(new Map());
+  const [groupBy, setGroupByState] = createSignal<GroupBy>(readGroupBy(company().id));
+  const [folds, setFoldsState] = createSignal<ReadonlySet<string>>(readFolds(company().id, groupBy()));
+  createEffect(
+    on(
+      () => company().id,
+      (id) => {
+        setCardsMode(readCardsMode(id));
+        setOverrides(new Map());
+        const by = readGroupBy(id);
+        setGroupByState(by);
+        setFoldsState(readFolds(id, by));
+      },
+      { defer: true },
+    ),
+  );
+  const isOpen = (id: string) => overrides().get(id) ?? cardsMode() === "expanded";
+  const setOpen = (id: string, open: boolean) =>
+    setOverrides((current) => {
+      const next = new Map(current);
+      next.set(id, open);
+      return next;
+    });
+  const setAll = (mode: CardsMode) => {
+    setCardsMode(mode);
+    setOverrides(new Map());
+    writeCardsMode(company().id, mode);
+  };
+  const setGroupBy = (by: GroupBy) => {
+    setGroupByState(by);
+    writeGroupBy(company().id, by);
+    setFoldsState(readFolds(company().id, by));
+  };
+  const toggleFold = (key: string, folded?: boolean) => {
+    const next = new Set(folds());
+    if (folded ?? !next.has(key)) next.add(key);
+    else next.delete(key);
+    setFoldsState(next);
+    writeFolds(company().id, groupBy(), next);
+  };
   const terms = createMemo(() => searchTerms(query()));
 
   // History's filters; its search is the search box, sent once typing pauses.
@@ -122,6 +180,37 @@ function Inbox(props: { tab: InboxTab; base: string }) {
   const today = createMemo(() => arrivals().find((group) => group.key === "today")?.items ?? []);
   const earlier = createMemo(() => arrivals().find((group) => group.key === "earlier")?.items ?? []);
   const aging = createMemo(() => filterByKind(searched(inbox.groups().aging), kind(), kindOf));
+
+  // The collapsed rows, refreshed each minute for their ages and expiries.
+  const clock = useNow();
+  const minute = createMemo(() => Math.floor(clock() / 60_000));
+  const entries = createMemo(() => {
+    const now = new Date(minute() * 60_000);
+    const requests = inbox.requests();
+    return new Map(
+      needs().map((item): [string, HeaderEntry] => {
+        const task = inbox.taskOf(item);
+        return [item.id, { item, task, fresh: isFresh(item, seen.at()), row: rowModel({ item, request: requests.get(item.id), task, now }) }];
+      }),
+    );
+  });
+  const liveRuns = useLiveRunsQuery();
+  const running = createMemo(() => runningAgentIds(liveRuns.data));
+  const grouped = createMemo((): InboxGroup<HeaderEntry>[] => {
+    const by = groupBy();
+    if (by === "none") return [];
+    const all = entries();
+    return groupItems(
+      needs().flatMap((item) => (all.has(item.id) ? [all.get(item.id)!] : [])),
+      (entry) => groupOf({ task: entry.task, project: entry.item.project, owner: entry.row.owner }, by),
+    );
+  });
+  const groupsByKey = createMemo(() => new Map(grouped().map((group) => [group.key, group] as const)));
+  // Keys, not group objects, so a group's rows aren't drawn again each time the rows are recomputed.
+  const groupKeys = createMemo(() => grouped().map((group) => group.key), [], { equals: (a, b) => a.length === b.length && a.every((key, index) => key === b[index]) });
+  const groupItemsOf = (key: string) => groupsByKey().get(key)?.items.map((entry) => entry.item) ?? [];
+  const groupOfItem = (id: string) => grouped().find((group) => group.items.some((entry) => entry.item.id === id))?.key ?? null;
+  const anyOpen = () => needs().some((item) => isOpen(item.id));
   const alerts = createMemo(() => searched(inbox.groups().alerts));
   const snoozed = createMemo(() => searched(inbox.groups().snoozed));
   const cleared = createMemo(() => searched(inbox.groups().cleared));
@@ -150,8 +239,11 @@ function Inbox(props: { tab: InboxTab; base: string }) {
   /** The rows of the current tab, in the order they're drawn, as the keys move through them. */
   const ids = createMemo((): string[] => {
     switch (props.tab) {
-      case "needs":
-        return [...today(), ...earlier(), ...(agingOpen() ? aging() : [])].map((item) => item.id);
+      case "needs": {
+        const shelf = (agingOpen() ? aging() : []).map((item) => item.id);
+        if (groupBy() === "none") return [...[...today(), ...earlier()].map((item) => item.id), ...shelf];
+        return [...grouped().flatMap((group) => [group.key, ...(folds().has(group.key) ? [] : group.items.map((entry) => entry.item.id))]), ...shelf];
+      }
       case "alerts":
         return alerts().map((item) => item.id);
       case "snoozed":
@@ -169,7 +261,7 @@ function Inbox(props: { tab: InboxTab; base: string }) {
   const tasksById = createMemo(() => new Map([...(inbox.rows() ?? []), ...inbox.archived()].map((task) => [task.id, task] as const)));
 
   // A new tab or filter starts with nothing selected; a row that leaves hands the cursor on.
-  createEffect(on([() => props.tab, kind, historyFilters], () => setSelected(null), { defer: true }));
+  createEffect(on([() => props.tab, kind, historyFilters, groupBy], () => setSelected(null), { defer: true }));
   let lastIds: string[] = [];
   createEffect(() => {
     const now = ids();
@@ -222,12 +314,17 @@ function Inbox(props: { tab: InboxTab; base: string }) {
     commands.openTaskModal({ id: task.id, identifier: task.identifier, title: task.title, projectId: task.projectId });
   };
 
-  /** Moves focus into the selected card's first answer control. */
+  /** Moves focus into the selected card's first answer control, opening a collapsed card first. */
   const answer = (id: string) => {
-    const control = rowOf(id)?.querySelector<HTMLElement>(
-      ".ibx-main .rq-opt:not(:disabled), .ibx-main .rq-chip:not(:disabled), .ibx-main input:not(:disabled), .ibx-main textarea:not(:disabled), .ibx-main .rq-acts button:not(:disabled)",
-    );
-    control?.focus();
+    const focus = () =>
+      rowOf(id)
+        ?.querySelector<HTMLElement>(
+          ".ibx-main .rq-opt:not(:disabled), .ibx-main .rq-chip:not(:disabled), .ibx-main input:not(:disabled), .ibx-main textarea:not(:disabled), .ibx-main .rq-acts button:not(:disabled)",
+        )
+        ?.focus();
+    if (isOpen(id)) return focus();
+    setOpen(id, true);
+    queueMicrotask(focus);
   };
 
   let searchInput: HTMLInputElement | undefined;
@@ -243,8 +340,38 @@ function Inbox(props: { tab: InboxTab; base: string }) {
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
     if (isTextInputTarget(event.target) || hasOpenDialog() || hasOpenLayer()) return;
-    const action = inboxKeyAction(event.key);
+    const action = inboxKeyAction(event.key, event.shiftKey);
     if (!action) return;
+    if (action === "expand" || action === "collapse" || action === "expand-all" || action === "collapse-all") {
+      if (props.tab !== "needs") return;
+      // Arrows move between options, chips and segments in their own groups.
+      if ((event.target as Element | null)?.closest?.('.rq-opts, .rq-chips, [role="radiogroup"], .seg, .tabs, [role="tablist"]')) return;
+      if (action === "expand-all" || action === "collapse-all") {
+        event.preventDefault();
+        setAll(action === "expand-all" ? "expanded" : "collapsed");
+        const id = selected();
+        if (id) queueMicrotask(() => select(id));
+        return;
+      }
+      const id = selected();
+      if (!id) return;
+      if (groupsByKey().has(id)) {
+        event.preventDefault();
+        toggleFold(id, action === "collapse");
+        return;
+      }
+      if (!needs().some((item) => item.id === id)) return;
+      event.preventDefault();
+      if (action === "expand") setOpen(id, true);
+      else if (isOpen(id)) setOpen(id, false);
+      else if (groupBy() !== "none") {
+        const header = groupOfItem(id);
+        if (header) select(header);
+        return;
+      }
+      queueMicrotask(() => select(id));
+      return;
+    }
     // Enter on a button or link inside a row is that control's own press.
     if (action === "open" && event.key === "Enter" && (event.target as Element | null)?.closest?.("button, a, [role=radio], [role=checkbox]")) return;
     if (action === "next" || action === "previous") {
@@ -306,8 +433,37 @@ function Inbox(props: { tab: InboxTab; base: string }) {
       fresh={fresh(item)}
       onSelect={() => setSelected(item.id)}
       onOpen={() => openItem(item)}
+      open={isOpen(item.id)}
+      onToggle={(open) => {
+        setOpen(item.id, open);
+        queueMicrotask(() => select(item.id));
+      }}
+      row={entries().get(item.id)?.row}
+      hide={hiddenByGroup(groupBy())}
+      now={new Date(minute() * 60_000)}
     />
   );
+  /** Where a group header's Open goes, and how it opens in place. */
+  const headerLink = (group: InboxGroup<HeaderEntry>): { href: string; open?: () => void } | null => {
+    const prefix = company().issuePrefix;
+    if (group.kind === "task") {
+      const task = group.items[0]?.task;
+      if (!task) return null;
+      return {
+        href: `/${prefix}/issues/${encodeURIComponent(task.identifier ?? task.id)}`,
+        open: () => commands.openTaskModal({ id: task.id, identifier: task.identifier, title: task.title ?? task.identifier ?? "", projectId: group.items[0]?.item.project?.id ?? null }),
+      };
+    }
+    if (group.kind === "agent" && group.id) {
+      const agent = people.agent(group.id);
+      return agent ? { href: `/${prefix}/agents/${agent.urlKey}` } : null;
+    }
+    if (group.kind === "project") {
+      const project = group.items[0]?.item.project;
+      return project ? { href: `/${prefix}/projects/${project.urlKey}` } : null;
+    }
+    return null;
+  };
   const searchNote = (count: number) => (terms().length ? <span class="ibx-note">{count === 1 ? "1 match" : `${count} matches`}</span> : null);
 
   return (
@@ -378,19 +534,78 @@ function Inbox(props: { tab: InboxTab; base: string }) {
                 )}
               </For>
             </div>
-            <span class="ibx-note">Most urgent first</span>
+            <div class="seg ibx-groupby" role="group" aria-label="Group requests by">
+              <span class="ibx-seg-label" aria-hidden="true">
+                Group
+              </span>
+              <For each={GROUP_BY_OPTIONS}>
+                {(option) => (
+                  <button type="button" aria-pressed={groupBy() === option.value} onClick={() => setGroupBy(option.value)}>
+                    {option.label}
+                  </button>
+                )}
+              </For>
+            </div>
+            <Button
+              size="compact"
+              class="ibx-all"
+              title={anyOpen() ? "Collapse all (Shift+←)" : "Expand all (Shift+→)"}
+              icon={anyOpen() ? <ChevronsDownUp size={14} aria-hidden="true" /> : <ChevronsUpDown size={14} aria-hidden="true" />}
+              onClick={() => setAll(anyOpen() ? "collapsed" : "expanded")}
+            >
+              <span class="ibx-all-label">{anyOpen() ? "Collapse all" : "Expand all"}</span>
+            </Button>
+            <span class="ibx-note ibx-note--urgent">Most urgent first</span>
             {searchNote(needs().length + aging().length)}
-            <KeyHints keys={[["j k", "move"], ["y", "clear"], ["s", "snooze"], ["a", "answer"], ["enter", "open the task"]]} />
+            <KeyHints keys={[["j k", "move"], ["← →", "close, open"], ["⇧", "all"], ["y", "clear"], ["s", "snooze"], ["a", "answer"], ["enter", "open the task"]]} />
           </div>
           <FeedState
             inbox={inbox}
             empty={terms().length ? "Nothing waiting on you matches the search." : kind() === "all" ? "Nothing needs you right now." : "Nothing of this kind needs you."}
             count={needs().length + aging().length}
           >
+            <div class="ibx-list">
             <Show when={needs().length === 0}>
               <p class="ibx-empty card">{kind() === "all" && !terms().length ? "Nothing new needs you. Older requests are below." : "Nothing recent matches. Older requests are below."}</p>
             </Show>
-            <Show when={today().length > 0}>
+            <Show when={groupBy() !== "none"}>
+              <For each={groupKeys()}>
+                {(key) => {
+                  const group = () => groupsByKey().get(key);
+                  const rowsId = `ibx-gh-rows-${key.replace(/[^\w-]/g, "-")}`;
+                  return (
+                    <Show when={group()}>
+                      {(found) => (
+                        <section class="ibx-group" aria-label={found().label}>
+                          <GroupHeader
+                            group={found()}
+                            folded={folds().has(key)}
+                            selected={selected() === key}
+                            sign={urgentSign(found().items)}
+                            people={people}
+                            displayStatus={found().kind === "task" && found().id ? inbox.displayStatusFor(found().id!) : null}
+                            running={found().kind === "agent" && !!found().id && running().has(found().id!)}
+                            href={headerLink(found())?.href ?? null}
+                            onOpen={headerLink(found())?.open}
+                            onFold={() => {
+                              setSelected(key);
+                              toggleFold(key);
+                            }}
+                            onSelect={() => setSelected(key)}
+                          />
+                          <Show when={!folds().has(key)}>
+                            <div class="ibx-gh-rows" id={rowsId}>
+                              <For each={groupItemsOf(key)}>{(item) => needsItem(item)}</For>
+                            </div>
+                          </Show>
+                        </section>
+                      )}
+                    </Show>
+                  );
+                }}
+              </For>
+            </Show>
+            <Show when={groupBy() === "none" && today().length > 0}>
               <section class="ibx-group" aria-labelledby="ibx-today">
                 <h2 class="ibx-sub" id="ibx-today">
                   New today <span class="ibx-sub-count">{today().length}</span>
@@ -400,7 +615,7 @@ function Inbox(props: { tab: InboxTab; base: string }) {
                 </div>
               </section>
             </Show>
-            <Show when={earlier().length > 0}>
+            <Show when={groupBy() === "none" && earlier().length > 0}>
               <section class="ibx-group" aria-labelledby="ibx-earlier">
                 <h2 class="ibx-sub" id="ibx-earlier">
                   Earlier <span class="ibx-sub-count">{earlier().length}</span>
@@ -410,6 +625,7 @@ function Inbox(props: { tab: InboxTab; base: string }) {
                 </div>
               </section>
             </Show>
+            </div>
             <Show when={aging().length > 0}>
               <section class="ibx-group ibx-aging" aria-label={agingLabel(aging())}>
                 <button type="button" class="ibx-fold" aria-expanded={agingOpen()} aria-controls="ibx-aging-rows" onClick={() => setAgingOpen((open) => !open)}>

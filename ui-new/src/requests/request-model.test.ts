@@ -137,6 +137,7 @@ describe("interactions as requests", () => {
     expect(requestFromInteraction({ ...question, addresseeUserId: "u2" } as IssueThreadInteraction, ctx).respond).toEqual({
       allowed: false,
       reason: "Waiting on Sam K. Only Sam K. can answer this.",
+      waitingOn: "Sam K.",
     });
     expect(requestFromInteraction({ ...question, effectiveResolverPolicy: "not_creator", createdByAgentId: null, createdByUserId: "me" } as IssueThreadInteraction, ctx).respond.allowed).toBe(false);
     expect(requestFromInteraction({ ...question, addresseeUserId: "me" } as IssueThreadInteraction, ctx).audience.label).toBe("You");
@@ -294,7 +295,7 @@ describe("review sign-offs as requests", () => {
       respond: { allowed: true },
     });
     expect(request.asker).toEqual({ agentId: "a1", userId: null, name: "Quant Researcher" });
-    expect(request.next).toBe("Approving moves TRA-44 to its next stage: approval · ceo.");
+    expect(request.next).toBe("Approving moves TRA-44 to its next stage: approval · CEO.");
     expect(request.createdAt.toISOString()).toBe("2026-10-26T11:30:00.000Z");
     expect(request.source.type === "review" && request.source.signoff.steps.map((step) => step.label)).toEqual(["Review · you", "Approval · CEO"]);
   });
@@ -302,7 +303,7 @@ describe("review sign-offs as requests", () => {
   it("waits on someone else; a stalled review is any person's to decide", () => {
     const theirs = requestFromReview({ ...task, executionState: pending("u2") }, ctx);
     expect(theirs.title).toBe("Review pending with Sam K.");
-    expect(theirs.respond).toEqual({ allowed: false, reason: "Waiting on Sam K." });
+    expect(theirs.respond).toEqual({ allowed: false, reason: "Waiting on Sam K.", waitingOn: "Sam K." });
 
     const stalled = requestFromReview({ ...task, executionState: pending("u2") }, ctx, { stalled: true, whyNow: "Nobody can review it" });
     expect(stalled.title).toBe("TRA-44 is in review with nobody to review it");

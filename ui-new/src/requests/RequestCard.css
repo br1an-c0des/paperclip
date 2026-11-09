@@ -150,6 +150,29 @@
   margin-left: 0;
 }
 
+/* Board 14b's collapse button ends the top row of a card the Inbox can fold back to its row. */
+.rq-fold {
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.rq-fold:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.rq-life + .rq-fold,
+.rq-menu + .rq-fold {
+  margin-left: 0;
+}
+
 .rq-ask {
   display: flex;
   align-items: center;

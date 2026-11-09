@@ -14,7 +14,9 @@ import type { Request, RequestKind } from "@/requests/request-model";
  * - Kinds. An item's request kind comes from its card once that has loaded, and from the feed until
  *   then, so the filter counts don't wait on every card.
  * - Keys, after the old Decisions page and Inbox: j/k move, Enter opens the task, y (or x) clears,
- *   s snoozes, a answers, r and Shift+U mark read and unread, u restores.
+ *   s snoozes, a answers, r and Shift+U mark read and unread, u restores; in Needs you → and ←
+ *   open and close a card or unfold and fold a group, and Shift with them opens or closes all
+ *   (board 14b).
  * - The aging shelf (decision 39, D5): a request idle past its retention days (30 unless a queue
  *   says otherwise) leaves Needs you for a collapsed "Older than 30 days" group at its bottom, until
  *   you Keep it. The server flags `shelf` whether or not the item is kept, so a kept item counts as
@@ -175,10 +177,29 @@ export function filterByKind<T>(items: readonly T[], kind: KindFilter, kindOf: (
   return kind === "all" ? [...items] : items.filter((item) => kindOf(item) === kind);
 }
 
-export type InboxKey = "next" | "previous" | "open" | "clear" | "snooze" | "answer" | "read" | "unread" | "restore";
+export type InboxKey =
+  | "next"
+  | "previous"
+  | "open"
+  | "clear"
+  | "snooze"
+  | "answer"
+  | "read"
+  | "unread"
+  | "restore"
+  | "expand"
+  | "collapse"
+  | "expand-all"
+  | "collapse-all";
 
-/** The triage action a key stands for, or null. Modifier keys and typing are checked by the caller. */
-export function inboxKeyAction(key: string): InboxKey | null {
+/**
+ * The triage action a key stands for, or null. Modifier keys and typing are checked by the caller.
+ * → and ← open and close the selected card, or unfold and fold a selected group header (board
+ * 14b); with Shift they open or close them all.
+ */
+export function inboxKeyAction(key: string, shift = false): InboxKey | null {
+  if (key === "ArrowRight") return shift ? "expand-all" : "expand";
+  if (key === "ArrowLeft") return shift ? "collapse-all" : "collapse";
   switch (key) {
     case "j":
     case "ArrowDown":

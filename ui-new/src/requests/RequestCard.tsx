@@ -14,6 +14,7 @@ import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-que
 import {
   BadgeCheck,
   Check,
+  ChevronUp,
   CircleAlert,
   CircleHelp,
   Clock,
@@ -99,6 +100,10 @@ export type RequestCardProps = {
   onSettled?: () => void;
   /** Arrived since you last looked: draws the "New" pill. */
   fresh?: boolean;
+  /** Board 14b (Inbox only): a collapse button ends the top row, folding the card back to its row. */
+  onCollapse?: () => void;
+  /** The card's element id, for the row that opens it (`aria-controls`). */
+  cardId?: string;
 };
 
 /** The prompt's element id, so a control group can be labelled by the rendered Markdown. */
@@ -248,7 +253,7 @@ function Asker(props: { request: Request; people: TaskPeople }) {
   );
 }
 
-function Top(props: { request: Request; inThread?: boolean; menu?: JSX.Element; label?: JSX.Element; onOpenSubject?: () => void; fresh?: boolean }) {
+function Top(props: { request: Request; inThread?: boolean; menu?: JSX.Element; label?: JSX.Element; onOpenSubject?: () => void; fresh?: boolean; onCollapse?: () => void }) {
   return (
     <div class="rq-top">
       <span class="rq-kind">
@@ -277,19 +282,32 @@ function Top(props: { request: Request; inThread?: boolean; menu?: JSX.Element; 
         </span>
       </Show>
       {props.menu}
+      <Show when={props.onCollapse}>
+        {(collapse) => <CollapseButton onCollapse={collapse()} />}
+      </Show>
     </div>
+  );
+}
+
+/** Board 14b's collapse button, for cards the Inbox folds to a row. */
+export function CollapseButton(props: { onCollapse: () => void }) {
+  return (
+    <button type="button" class="rq-fold" aria-label="Collapse" title="Collapse (←)" aria-expanded="true" onClick={() => props.onCollapse()}>
+      <ChevronUp size={14} aria-hidden="true" />
+    </button>
   );
 }
 
 function SettledCard(props: RequestCardProps) {
   const issue = () => (props.request.result?.tone === "bad" ? "bad" : props.request.result?.tone === "mid" ? "mid" : undefined);
   return (
-    <article class="rq rq--settled" data-kind={props.request.kind} data-issue={issue()} aria-label={`${KIND_LABEL[props.request.kind]}: ${props.request.title}`}>
+    <article id={props.cardId} class="rq rq--settled" data-kind={props.request.kind} data-issue={issue()} aria-label={`${KIND_LABEL[props.request.kind]}: ${props.request.title}`}>
       <Top
         request={props.request}
         inThread={props.inThread}
         onOpenSubject={props.onOpenSubject}
         menu={<CardMenu label={props.triageLabel ?? "Request actions"} triage={props.triage} />}
+        onCollapse={props.onCollapse}
       />
       <Split aside={props.aside}>
         <SettledBody request={props.request} people={props.people} inThread={props.inThread} />
@@ -388,13 +406,14 @@ function OpenCard(props: RequestCardProps) {
   const menuLabel = () => (hasOwn() ? (props.triage || yours() ? "Request actions" : "Set aside or skip") : (props.triageLabel ?? "Request actions"));
 
   return (
-    <article class="rq" classList={{ "rq--compact": props.inThread }} data-kind={props.request.kind} aria-label={`${KIND_LABEL[props.request.kind]} from ${props.request.asker.name}`}>
+    <article id={props.cardId} class="rq" classList={{ "rq--compact": props.inThread }} data-kind={props.request.kind} aria-label={`${KIND_LABEL[props.request.kind]} from ${props.request.asker.name}`}>
       <Top
         request={props.request}
         inThread={props.inThread}
         onOpenSubject={props.onOpenSubject}
         fresh={props.fresh}
         menu={<CardMenu label={menuLabel()} own={hasOwn() ? ownItems : undefined} triage={props.triage} />}
+        onCollapse={props.onCollapse}
       />
       <Split aside={props.aside}>
         <Show when={props.request.asker.name}>

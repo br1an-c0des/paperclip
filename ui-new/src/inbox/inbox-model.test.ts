@@ -202,6 +202,10 @@ describe("keyboard triage", () => {
     expect(inboxKeyAction("U")).toBe("unread");
     expect(inboxKeyAction("u")).toBe("restore");
     expect(inboxKeyAction("q")).toBeNull();
+    expect(inboxKeyAction("ArrowRight")).toBe("expand");
+    expect(inboxKeyAction("ArrowLeft")).toBe("collapse");
+    expect(inboxKeyAction("ArrowRight", true)).toBe("expand-all");
+    expect(inboxKeyAction("ArrowLeft", true)).toBe("collapse-all");
   });
 
   it("moves the cursor, stopping at the ends", () => {

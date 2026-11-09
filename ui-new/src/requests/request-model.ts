@@ -84,8 +84,8 @@ export type Request = {
   lifetime: string;
   lifetimeSoon: boolean;
   state: RequestState;
-  /** Whether you can answer it, and if not, why. */
-  respond: { allowed: boolean; reason: string | null };
+  /** Whether you can answer it, and if not, why; `waitingOn` names who it waits on when that's someone else. */
+  respond: { allowed: boolean; reason: string | null; waitingOn?: string | null };
   /** For settled requests: what was decided, and what came of it. */
   verdict: { text: string; tone: Tone; at: Date | null } | null;
   result: { text: string; tone: Tone } | null;
@@ -144,10 +144,11 @@ function audienceOf(interaction: IssueThreadInteraction, ctx: RequestContext): R
 function respondOf(interaction: IssueThreadInteraction, ctx: RequestContext): Request["respond"] {
   if (interaction.addresseeUserId && interaction.addresseeUserId !== ctx.youId) {
     const name = ctx.personName(interaction.addresseeUserId);
-    return { allowed: false, reason: `Waiting on ${name.replace(/\.$/, "")}. Only ${name} can answer this.` };
+    return { allowed: false, reason: `Waiting on ${name.replace(/\.$/, "")}. Only ${name} can answer this.`, waitingOn: name };
   }
   if (interaction.addresseeAgentId) {
-    return { allowed: false, reason: `Waiting on ${ctx.agentName(interaction.addresseeAgentId) ?? "an agent"}.` };
+    const name = ctx.agentName(interaction.addresseeAgentId) ?? "an agent";
+    return { allowed: false, reason: `Waiting on ${name}.`, waitingOn: name };
   }
   if (interaction.effectiveResolverPolicy === "not_creator" && interaction.createdByUserId && interaction.createdByUserId === ctx.youId) {
     return { allowed: false, reason: "You asked this, so someone else answers it." };
@@ -602,6 +603,11 @@ export type ReviewTask = {
 /** Where a review sits, from the attention feed: stalled when nobody can review it, and why now. */
 export type ReviewContext = { stalled?: boolean; whyNow?: string | null; since?: Date | string | null };
 
+/** A stage's label inside a sentence: "approval · CEO". Only the stage word is lowered; names keep their case. */
+export function stepLabelInline(label: string) {
+  return label.replace(/^\w+/, (word) => word.toLowerCase());
+}
+
 /**
  * A task waiting on a review stage, as a sign-off request. On your turn you approve or send it back
  * with the comment the server asks for (`issue-execution-policy.ts`): approving moves the task to
@@ -638,7 +644,7 @@ export function requestFromReview(task: ReviewTask, ctx: RequestContext, review:
     ? `Nobody can review ${identifier}, so you decide: approving marks it done; requesting changes or sending it back returns it to its assignee with your note.`
     : canSign
       ? after && steps.some((step) => step.now)
-        ? `Approving moves ${identifier} to its next stage: ${after.label.toLowerCase()}.`
+        ? `Approving moves ${identifier} to its next stage: ${stepLabelInline(after.label)}.`
         : `Approving finishes ${identifier}.`
       : `Open ${identifier} to see the review.`;
 
@@ -673,7 +679,7 @@ export function requestFromReview(task: ReviewTask, ctx: RequestContext, review:
       ? { allowed: false, reason: null }
       : canSign || stalled
         ? { allowed: true, reason: null }
-        : { allowed: false, reason: signoff.waitingOn ? `Waiting on ${signoff.waitingOn.replace(/\.$/, "")}.` : null },
+        : { allowed: false, reason: signoff.waitingOn ? `Waiting on ${signoff.waitingOn.replace(/\.$/, "")}.` : null, waitingOn: signoff.waitingOn },
     verdict,
     result: null,
     createdAt: new Date(review.since ?? task.updatedAt),

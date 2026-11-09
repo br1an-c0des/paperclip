@@ -2,7 +2,7 @@ import type { AttentionItem, AttentionSubject, IssueDisplayStatus } from "@paper
 import { AlarmClock, Archive, CircleAlert, Clock, CornerDownRight, Ellipsis, RotateCcw, Sparkles, X } from "lucide-solid";
 import { For, Match, Show, Switch, type JSX } from "solid-js";
 import { useCompany } from "@/lib/company";
-import { budgetIncidentHref, RequestCard } from "@/requests/RequestCard";
+import { budgetIncidentHref, CollapseButton, RequestCard } from "@/requests/RequestCard";
 import { expiryLabel, type Request } from "@/requests/request-model";
 import type { TaskPeople } from "@/tasks/people";
 import { RetryMark } from "@/tasks/retry";
@@ -11,6 +11,8 @@ import { Menu } from "@/ui/Menu";
 import { StatusCapsule } from "@/ui/Status";
 import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { DEFAULT_SNOOZE, SNOOZE_PRESETS, snoozedUntil, snoozeLabel, type Pending } from "./inbox-model";
+import { CollapsedRow } from "./InboxRow";
+import type { RowModel } from "./row-model";
 import { itemTask, type Inbox } from "./use-inbox";
 
 /*
@@ -152,8 +154,21 @@ export function NeedsItem(props: {
   fresh?: boolean;
   onSelect: () => void;
   onOpen: () => void;
+  /**
+   * Board 14b, Needs you only: the item folds to its collapsed row (`row`) while `open` is false,
+   * and its card gets a collapse button. Without `onToggle` it's always the card, as Alerts draws it.
+   */
+  open?: boolean;
+  onToggle?: (open: boolean) => void;
+  row?: RowModel;
+  /** What the row leaves to its group header. */
+  hide?: "task" | "who" | null;
+  now?: Date;
 }) {
   const task = () => props.inbox.taskOf(props.item);
+  const cardId = () => `ibx-card-${props.item.id.replace(/[^\w-]/g, "-")}`;
+  const collapsed = () => !!props.onToggle && !!props.row && props.open === false;
+  const collapse = () => (props.onToggle ? () => props.onToggle!(false) : undefined);
   const retryTask = () => {
     const found = task();
     const interruption = found ? props.inbox.interruptionFor(found.id) : null;
@@ -163,13 +178,29 @@ export function NeedsItem(props: {
   return (
     <div
       class="ibx-item"
-      classList={{ "ibx-item--selected": props.selected }}
+      classList={{ "ibx-item--selected": props.selected, "ibx-item--open": !!props.onToggle && !collapsed() }}
       data-inbox-item={props.item.id}
       tabindex="-1"
       onFocusIn={() => props.onSelect()}
       onPointerDown={() => props.onSelect()}
     >
       <div class="ibx-main">
+        <Show
+          when={!collapsed()}
+          fallback={
+            <CollapsedRow
+              item={props.item}
+              row={props.row!}
+              task={task()}
+              hide={props.hide ?? null}
+              fresh={!!props.fresh}
+              people={props.people}
+              now={props.now ?? new Date()}
+              controls={cardId()}
+              onOpen={() => props.onToggle?.(true)}
+            />
+          }
+        >
         <Switch
           fallback={
             <PlainCard
@@ -177,6 +208,8 @@ export function NeedsItem(props: {
               hasTask={!!task()}
               fresh={props.fresh}
               onOpen={props.onOpen}
+              cardId={cardId()}
+              onCollapse={collapse()}
               menu={<TriageMenu item={props.item} inbox={props.inbox} />}
               retry={
                 <Show when={retryTask()}>{(found) => <RetryMark task={found()} retry={props.inbox.retry} />}</Show>
@@ -194,6 +227,8 @@ export function NeedsItem(props: {
                 triage={() => <TriageItems item={props.item} inbox={props.inbox} />}
                 triageLabel="Snooze or clear"
                 fresh={props.fresh}
+                cardId={cardId()}
+                onCollapse={collapse()}
                 aside={<Context item={props.item} inbox={props.inbox} people={props.people} showWhy={request().kind !== "signoff"} onOpen={props.onOpen} />}
                 onOpenSubject={props.onOpen}
                 onSettled={props.inbox.refreshFeed}
@@ -201,11 +236,19 @@ export function NeedsItem(props: {
             )}
           </Match>
           <Match when={waitsOnCard()}>
-            <div class="rq ibx-loading" aria-busy="true">
+            <div id={cardId()} class="rq ibx-loading" aria-busy="true">
+              <Show when={collapse()}>
+                {(fold) => (
+                  <div class="rq-top">
+                    <CollapseButton onCollapse={fold()} />
+                  </div>
+                )}
+              </Show>
               <span class="rq-note">Loading the request…</span>
             </div>
           </Match>
         </Switch>
+        </Show>
       </div>
     </div>
   );
@@ -219,7 +262,17 @@ function noActionNote(item: AttentionItem) {
 }
 
 /** Items without a request card (stuck work, alerts, and any card whose source didn't load): what and why, and the task. */
-function PlainCard(props: { item: AttentionItem; hasTask: boolean; fresh?: boolean; onOpen: () => void; menu: JSX.Element; aside: JSX.Element; retry?: JSX.Element }) {
+function PlainCard(props: {
+  item: AttentionItem;
+  hasTask: boolean;
+  fresh?: boolean;
+  onOpen: () => void;
+  menu: JSX.Element;
+  aside: JSX.Element;
+  retry?: JSX.Element;
+  cardId?: string;
+  onCollapse?: () => void;
+}) {
   const company = useCompany();
   const budget = () => props.item.sourceKind === "budget_alert" || props.item.subject.kind === "budget_incident";
   const alert = () => ["failed_run", "budget_alert", "agent_error_alert", "blocker_attention"].includes(props.item.sourceKind);
@@ -229,7 +282,7 @@ function PlainCard(props: { item: AttentionItem; hasTask: boolean; fresh?: boole
   };
   const lifetime = () => (props.item.expiresAt ? expiryLabel(new Date(props.item.expiresAt), new Date()) : null);
   return (
-    <article class="rq" data-kind={alert() ? "alert" : "proposal"} aria-label={`${sourceLabel(props.item)}: ${itemTitle(props.item)}`}>
+    <article id={props.cardId} class="rq" data-kind={alert() ? "alert" : "proposal"} aria-label={`${sourceLabel(props.item)}: ${itemTitle(props.item)}`}>
       <div class="rq-top">
         <span class="rq-kind">
           <Show when={alert()} fallback={<Sparkles size={12} aria-hidden="true" />}>
@@ -249,6 +302,7 @@ function PlainCard(props: { item: AttentionItem; hasTask: boolean; fresh?: boole
           )}
         </Show>
         {props.menu}
+        <Show when={props.onCollapse}>{(collapse) => <CollapseButton onCollapse={collapse()} />}</Show>
       </div>
       <div class="rq-split">
         <div class="rq-main">
