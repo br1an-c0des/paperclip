@@ -515,7 +515,7 @@ follow-ups that decisions 47 and 48 listed are moved here.
 | U33 | **Decision history in the Inbox** (`GET …/attention/history`, cursor-paged). | 10-29 | #17983 | `inbox-search/triage` | done (Nov 5, `integrate/inbox-shell`): a History tab at `/inbox/history` with filters; covers interactions and Decisions, not approvals |
 | U34 | **Chat task default**: an unassigned task made in chat goes to the chat's agent. Check `ui-new`'s chat task creation. | 10-29 | #17983 | `agent-chat/history + /handoff` | checked (Nov 5): no conflict; a suggested task in a chat now names the chat's agent |
 | U35 | **Onboarding** against the new approval-before-tasks and first-task rules (server-only changes). | 10-29 | #17914, #17940 | Companies and onboarding | checked (Nov 5): matches |
-| U36 | **The Coordinator workspace**, and the requests it uses (`pending-questions`, `decision-receipts`, `chat-handoffs`, document revisions, `attention/history`, `workspace-preferences/me`). Since Nov 7 it's the old UI's default for everyone: "Needs you" is renamed Inbox, Mine, Unread, Recent, Blocked and Everything move inside Tasks, All tasks is the first-visit default, and Classic is a per-person opt-in (`classic_workspace_enabled`). | 10-29, 11-01, 11-07 | #17983, #19360, #19363, #19393 | `shell/coordinator-workspace`, `inbox-search/triage`, `tasks/views` | design ([3.16](#316-upstreams-coordinator-workspace)). Nov 7: keep `ui-new`'s design (Inbox separate from Tasks, board 14) and compare against the merged Coordinator right after this sync; `ui-new` ignores `classic_workspace_enabled`, as decision 47 did the Coordinator preference (decided Nov 7) |
+| U36 | **The Coordinator workspace**, and the requests it uses (`pending-questions`, `decision-receipts`, `chat-handoffs`, document revisions, `attention/history`, `workspace-preferences/me`). Since Nov 7 it's the old UI's default for everyone: "Needs you" is renamed Inbox, Mine, Unread, Recent, Blocked and Everything move inside Tasks, All tasks is the first-visit default, and Classic is a per-person opt-in (`classic_workspace_enabled`). | 10-29, 11-01, 11-07 | #17983, #19360, #19363, #19393 | `shell/coordinator-workspace`, `inbox-search/triage`, `tasks/views` | decided (Nov 8, after using it on TES): `ui-new` keeps its own layout, and the Coordinator workspace isn't ported. Two of its ideas come into the Inbox: a minimal collapsed state for every request card, with Collapse all, and grouping by task, agent or project. A design artboard comes first, for review; the build follows. Earlier (Nov 7): Inbox separate from Tasks (board 14), `classic_workspace_enabled` ignored, as decision 47 did the Coordinator preference |
 | U37 | **Recheck the mirrored effort tables** after the model catalog refresh (decision 13's rule). Probably handled on Oct 26, not confirmed. | 10-26 | #17809 | `tasks/run-control` | done (Nov 5): Codex's `gpt-5.6` alias and case, and Claude and Grok efforts on the Runner, fixed |
 | U38 | **Unread chat dot on phones.** | 11-01 | #18374 | `agent-chat/history + /handoff` | done (M7 round 3, status cards: the dock's Agents entry) |
 | U39 | **Stale decision text:** decision 1 named pipelines (removed upstream), decision 4 the removed "Run with provider trace" button. | 10-22 | `907774889`, #17211 | — | done (Nov 3) |
@@ -915,7 +915,7 @@ yet.
 ### 3.16 Upstream's Coordinator workspace
 
 Raised Oct 29, 2026, when the upstream sync outlined #17983 (`71f0c0c99`, Oct 26–29); the user wants it
-investigated and designed for `ui-new`. Not started.
+investigated and designed for `ui-new`. Compared on Nov 8; decided (below).
 
 - **What upstream built:** a per-person workspace, off by default and turned on in the old UI's
   Settings > Experimental (stored as a workspace preference, `GET|PUT …/workspace-preferences/me`, not
@@ -940,7 +940,7 @@ investigated and designed for `ui-new`. Not started.
   cards and chat; decide what to adopt, merge or leave (and, under decision 12, what to do with its
   per-person switch); then design boards for the parts `ui-new` takes. Decided Nov 7: keep
   `ui-new`'s Inbox separate from Tasks (board 14), ignore `classic_workspace_enabled`, and run this
-  comparison right after the Nov 7 sync, against the merged Coordinator. Tracked as
+  comparison right after the Nov 7 sync, against the merged Coordinator. **Decided Nov 8**, after the user used the merged Coordinator on TES: `ui-new`'s overall direction stays, and the Coordinator workspace isn't ported. Two ideas come into the Inbox: a slimmer collapsed state for every request card (capsule, kind, title and a few crucial signs; a questions card collapses to its list of questions), with Collapse all, and grouping the cards by task, agent or project. They're designed as a review artboard first. Tracked as
   [U36](#upstream-changes-to-integrate); the area guide entry is
   [`shell/coordinator-workspace`](inventory/areas/app-shell.md#shellcoordinator-workspace-coordinator-workspace).
 

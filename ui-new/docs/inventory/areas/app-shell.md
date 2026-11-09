@@ -154,9 +154,10 @@ cheatsheet, the command palette, global dialogs, and plugin overlays.
   the "Last updated" header unhighlighted until someone picks a sort. Organization table columns are
   saved per person and company. No API changes.
 - **Notes:** upstream's own take on what `ui-new` redesigns: the Inbox's Needs you, requests and agent
-  chat. Not ported. `ui-new` keeps its Inbox separate from Tasks (board 14) and ignores
-  `classic_workspace_enabled`, as decision 47 did the Coordinator preference. It's to be compared with `ui-new` and designed
-  ([build plan 3.16](../../build-plan.md#316-upstreams-coordinator-workspace), U36).
+  chat. Decided Nov 8 ([build plan 3.16](../../build-plan.md#316-upstreams-coordinator-workspace), U36):
+  not ported. `ui-new` keeps its layout and takes two ideas into its Inbox: a minimal collapsed state
+  for every request card, with Collapse all, and grouping by task, agent or project. It ignores
+  `classic_workspace_enabled`, as decision 47 did the Coordinator preference.
 
 ### `shell/misc`: Other shell features
 
