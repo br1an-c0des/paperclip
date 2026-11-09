@@ -184,6 +184,7 @@ export function windowThread(input: Omit<Parameters<typeof buildThread>[0], "mor
     runs: rest.runs.filter((run) => time(runAt(run)) >= from),
     requests: rest.requests?.filter((request) => request.state !== "settled" || request.createdAt.getTime() >= from),
     tasks: rest.tasks?.filter((made) => made.at.getTime() >= from),
+    compactions: rest.compactions?.filter((compaction) => compaction.at.getTime() >= from),
   });
   const at = items.findIndex((item) => itemTime(item as ThreadItem) >= from);
   items.splice(at === -1 ? items.length : at, 0, { kind: "gap", key: "gap" });

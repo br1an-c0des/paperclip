@@ -2,6 +2,7 @@ import type { CompactIssue, Issue, IssueDisplayStatus, IssueRelationIssueSummary
 import { createQuery } from "@tanstack/solid-query";
 import {
   Box,
+  Brain,
   Calendar,
   ChevronDown,
   CircleDot,
@@ -60,6 +61,7 @@ import { requester } from "./task-origin";
 import { PlanDecompositions } from "./PlanDecompositions";
 import { ExternalObjects } from "./ExternalObjects";
 import { UsageLimitValue, useUsageLimit } from "./UsageLimit";
+import { ContextUsageValue, useTaskContext } from "./TaskContext";
 import "./TaskDetails.css";
 
 /*
@@ -152,8 +154,18 @@ export function TaskDetails(props: {
   const now = useNow(() => !!run());
   const kids = () => subtasks.data ?? [];
   const kidsDone = () => kids().filter((kid) => kid.status === "done").length;
+  // A subtask another subtask's agent asked for lands here, beside its requester (agents' trees stop
+  // at parent → child since the 2026-11-07 sync, upstream #19312); its recorded origin names that
+  // subtask. The list's rows carry `originIssueId`, though `CompactIssue` doesn't name it.
+  const kidOrigin = (kid: CompactIssue) => {
+    const origin = (kid as CompactIssue & { originIssueId?: string | null }).originIssueId;
+    if (!origin || origin === props.taskId) return null;
+    return kids().find((other) => other.id === origin)?.identifier ?? null;
+  };
   // The assignee's provider usage limit (U40), while it has a current window to show.
   const usage = useUsageLimit(() => task()?.assigneeAgentId);
+  // The assignee session's context window (U58), once a harness has reported one.
+  const context = useTaskContext(() => props.taskId, () => task()?.assigneeAgentId, () => task()?.status);
   const usageHref = () => {
     const agent = people.agent(task()?.assigneeAgentId);
     return agent ? `/${company().issuePrefix}/agents/${agent.urlKey ?? agent.id}/runtime` : undefined;
@@ -186,6 +198,7 @@ export function TaskDetails(props: {
       absent: () => !usage(),
       value: () => <Show when={usage()}>{(limit) => <UsageLimitValue limit={limit()} href={usageHref()} />}</Show>,
     },
+    { key: "context", icon: <Brain size={15} />, label: "Context", empty: () => false, absent: () => !context.visible(), value: () => <ContextUsageValue context={context} /> },
     {
       key: "review",
       icon: <Eye size={15} />,
@@ -410,6 +423,7 @@ export function TaskDetails(props: {
                         <button type="button" class="td-link td-ellipsis" onClick={() => props.onOpenTask(kid)}>
                           <span class="mono td-id">{kid.identifier}</span>
                           {kid.title}
+                          <Show when={kidOrigin(kid)}>{(from) => <span class="td-muted"> · from {from()}</span>}</Show>
                         </button>
                         <Assignee task={kid} people={people} size={20} />
                         <TaskStatusChip task={kid} small />

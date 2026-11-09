@@ -38,6 +38,8 @@ const LABELS: Record<string, string> = {
   "issue.updated": "updated this task",
   "issue.checked_out": "checked out this task",
   "issue.released": "released this task",
+  // Compact now (U58, upstream #19378).
+  "issue.context_compaction_requested": "asked the agent to compact its context",
   "issue.comment_cancelled": "cancelled a queued comment",
   "issue.queued_comment_edited": "edited a queued comment",
   "issue.queued_comments_reordered": "reordered queued comments",

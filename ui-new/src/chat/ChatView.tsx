@@ -19,6 +19,7 @@ import { documentName, isPlanKey } from "@/documents/document-model";
 import { RequestCard } from "@/requests/RequestCard";
 import { QueuedMessages } from "@/tasks/composer/QueuedMessages";
 import { MessageBody } from "@/tasks/MessageBody";
+import { CopyMessage } from "@/tasks/CopyMessage";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
@@ -611,6 +612,9 @@ function Message(props: {
           <div class="ch-msg-head">
             <span class="ch-name">{name()}</span>
             <Show when={props.entry.comment.presentation?.title}>{(title) => <span class="ch-tag">{title()}</span>}</Show>
+            <Show when={author().kind === "you" && !props.entry.comment.deletedAt}>
+              <CopyMessage text={props.entry.comment.body} />
+            </Show>
             <time class="ch-muted" datetime={new Date(props.entry.comment.createdAt).toISOString()}>
               {messageTime(props.entry.comment.createdAt)}
             </time>

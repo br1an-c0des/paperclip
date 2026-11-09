@@ -22,3 +22,93 @@
   font-family: var(--font-mono);
   font-size: 0.92em;
 }
+
+/* GitHub links: the icon stays with the label's first word */
+.msg a[data-github-link] {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.msg .gh-lead {
+  white-space: nowrap;
+}
+
+.msg a[data-github-link] .gh-icon {
+  display: inline-block;
+  margin-right: 3px;
+  vertical-align: -2px;
+}
+
+.msg a[data-github-link="pull_request"],
+.msg a[data-github-link="issue"],
+.msg a[data-github-link="repository"] {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+/* Patch code blocks: kept inside the message, scrolling sideways, each line in its colour */
+.msg pre.patch {
+  max-width: 100%;
+  padding: 8px 0;
+  overflow-x: auto;
+}
+
+.msg pre.patch code {
+  display: block;
+  min-width: max-content;
+}
+
+.msg .patch-line {
+  display: block;
+  padding: 0 14px;
+  white-space: pre;
+}
+
+.msg .patch-line[data-patch-line="add"] {
+  background: var(--green-bg);
+  color: var(--green-fg);
+}
+
+.msg .patch-line[data-patch-line="remove"] {
+  background: var(--red-bg);
+  color: var(--red-fg);
+}
+
+.msg .patch-line[data-patch-line="hunk"] {
+  background: var(--run-bg);
+  color: var(--run-fg);
+}
+
+.msg .patch-line[data-patch-line="skip"],
+.msg .patch-line[data-patch-line="file"] {
+  color: var(--muted);
+}
+
+/* Two or more images on their own lines: a grid of thumbnails, each opening the full image */
+.msg .msg-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 8px;
+  max-width: 560px;
+}
+
+.msg .msg-thumb {
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--well);
+}
+
+.msg .msg-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+}
+
+.msg .msg-thumb:hover {
+  border-color: var(--edge);
+}

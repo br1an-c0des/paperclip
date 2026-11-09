@@ -7,6 +7,7 @@ import type {
   Issue,
   IssueAttachment,
   IssueComment,
+  IssueContextUsage,
   IssueCostSummary,
   IssueDocument,
   IssueDisplayStatus,
@@ -376,3 +377,19 @@ export type RunForIssue = {
 export function issuePath(prefix: string, issue: Pick<Issue, "id" | "identifier">) {
   return `/${prefix}/issues/${issue.identifier ?? issue.id}`;
 }
+
+/*
+ * The context window of the agent session working on a task, and Compact now (since the 2026-11-07
+ * sync, upstream #19273, #19378, #19801; ui/src/components/issue-properties/context-usage-row.tsx).
+ * The reading is the assignee's current session; it's null until a harness has reported a window.
+ * Its `compaction` says whether the board can compact now, and why not.
+ */
+export const issueContextApi = {
+  usage: (id: string, signal?: AbortSignal) => api.get<IssueContextUsage | null>(`/issues/${id}/context-usage`, { signal }),
+  /**
+   * Board only (the conversation's owner, for an Agent Chat): queues a short run that resumes the
+   * assignee's session and asks its harness to compact, and changes nothing on the task. 409 while
+   * the agent is busy or a compaction is already pending, 422 when it can't compact.
+   */
+  compact: (id: string) => api.post<{ requestId: string; runId: string }>(`/issues/${id}/context/compact`, {}),
+};
