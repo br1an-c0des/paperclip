@@ -7,6 +7,7 @@ import type {
   AppDefinition,
   ToolConnection,
 } from "@paperclipai/shared";
+import { PAPERCLIP_RUNNER_DEFAULT_MODELS } from "@paperclipai/adapter-utils/paperclip-runner-permissions";
 
 /*
  * View model for AI connection pools (src/apps/pools/): a plugin-provided AI connection that hands
@@ -61,12 +62,13 @@ export function emptyConfig(name = "AI connection pool"): AiConnectionPoolConfig
 
 /**
  * A member for one AI connection: its grant (shared, or delegated for a personal one) and the
- * harness and model its turns run on, the old UI's defaults per provider.
+ * harness and model its turns run on, the old UI's defaults per provider (Codex on the Runner's
+ * default model, `PAPERCLIP_RUNNER_DEFAULT_MODELS`).
  */
 export function memberOf(account: AiManagedConnectionSummary, id: string = crypto.randomUUID()): AiConnectionPoolMember {
   const profile: AiConnectionPoolMember["profile"] =
     account.provider === "openai"
-      ? { provider: "codex", model: "gpt-5.6-sol" }
+      ? { provider: "codex", model: PAPERCLIP_RUNNER_DEFAULT_MODELS.codex }
       : account.provider === "anthropic"
         ? { provider: "acpx", acpxAgent: "claude", model: "claude-sonnet-5" }
         : account.provider === "xai"

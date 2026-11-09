@@ -56,7 +56,7 @@ describe("members", () => {
     });
     expect(memberOf(account({ ownership: "personal", provider: "openai" }), "m2")).toMatchObject({
       binding: { mode: "delegated" },
-      profile: { provider: "codex" },
+      profile: { provider: "codex", model: "gpt-6.1-sol" },
     });
   });
 
