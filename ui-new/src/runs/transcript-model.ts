@@ -8,6 +8,7 @@ import {
   mcpStartupFailure,
   modelRow,
   noticeCategory,
+  noticeDetail,
   planFromPayload,
   researchRow,
   reviewRow,
@@ -19,6 +20,7 @@ import {
   type RowStatus,
   type StatusChip,
 } from "./activity-model";
+import { tokenCount } from "./compactions";
 
 /*
  * The run modal's Transcript view (board 16): transcript entries grouped into what the board draws.
@@ -29,6 +31,8 @@ import {
  *   switches, waits, verification checks, hook and auto-review decisions as dedicated rows; harness
  *   status notices as chips; subagents as a tree with the calls each made; the agent's native plan
  *   and a plan it proposed; MCP servers that failed to start, which lead the view.
+ * - Where the agent compacted its context, a "Context compacted · 230k → 38k tokens" divider (U58),
+ *   as in the task thread; it closes a stretch of steps rather than folding into one.
  * - Diffs, notes (stderr, system lines and other harness events), the finish line and the outcome.
  * - Long stretches of steps between two messages fold behind "Show N more steps", with a summary
  *   such as "read 6 files · ran 4 commands · edited 2 files".
@@ -106,6 +110,17 @@ export type TranscriptItem =
       chip: StatusChip;
       /** The notice, so the chip can be re-read once later work says how it ended. */
       payload: Record<string, unknown>;
+    }
+  | {
+      /**
+       * Where the agent compacted its context (U58, `context.compacted`): a divider, "Context
+       * compacted · 230k → 38k tokens", with the sizes when the run's readings tell them.
+       */
+      kind: "compaction";
+      key: string;
+      ts: string;
+      preTokens: number | null;
+      postTokens: number | null;
     }
   | {
       /** Subagents dispatched together (upstream #19264), each with the tool calls it made. */
@@ -675,6 +690,11 @@ export function buildItems(source: readonly TranscriptEntry[], streaming: boolea
         items.push({ kind: "note", key: `file:${entry.referenceId}`, ts: entry.ts, tone: "info", label: "File", lines: [entry.path] });
         break;
       case "provider_activity": {
+        // A compaction divides the run where it happened, as in the task thread (runner-entries.ts sizes it).
+        if (entry.eventType === "context.compacted") {
+          items.push({ kind: "compaction", key: keyFor("compaction", entry.ts), ts: entry.ts, preTokens: tokenCount(entry.payload.preTokens), postTokens: tokenCount(entry.payload.postTokens) });
+          break;
+        }
         // The runner reports each tool it runs as started, progressed and completed events: one step.
         const execution = entry.family === "tool_execution" ? toolExecution(entry) : null;
         if (execution) {
@@ -924,7 +944,9 @@ function isWork(item: TranscriptItem) {
 /**
  * Status chips read again with what came after them: a retry followed by real work recovered; of
  * several retries in a row only the latest shows; a fatal error that ended the retries tells the
- * whole story; and a retry or compaction still going when the run ended was cut short.
+ * whole story; a retry or compaction still going when the run ended was cut short; and a completed
+ * compaction that a compaction divider follows is shown by the divider alone, as in the old UI's
+ * task chat (ui/src/components/task-chat/transcript-adapter.ts).
  */
 function settleChips(items: TranscriptItem[], live: boolean): TranscriptItem[] {
   if (!items.some((item) => item.kind === "chip")) return items;
@@ -942,6 +964,7 @@ function settleChips(items: TranscriptItem[], live: boolean): TranscriptItem[] {
       if (signal?.kind === "chip") return;
       item.chip = statusChip(item.payload, { resolved: !!signal, stopped: !signal && !live }) ?? item.chip;
     } else if (category === "context_compaction") {
+      if (noticeDetail(item.payload, "Phase") === "completed" && later.some((next) => next.kind === "compaction")) return;
       item.chip = statusChip(item.payload, { stopped: !live }) ?? item.chip;
     }
     out.push(item);
@@ -980,9 +1003,9 @@ export function stepSummary(items: readonly TranscriptItem[]) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/** Items that count as steps, for the Transcript tab's "41 steps". */
+/** Items that count as steps, for the Transcript tab's "41 steps"; a compaction divides them, it isn't one. */
 export function stepCount(items: readonly TranscriptItem[]) {
-  return items.filter((item) => item.kind !== "started" && item.kind !== "finished" && item.kind !== "outcome" && item.kind !== "health" && item.kind !== "plan").length;
+  return items.filter((item) => item.kind !== "started" && item.kind !== "finished" && item.kind !== "outcome" && item.kind !== "health" && item.kind !== "plan" && item.kind !== "compaction").length;
 }
 
 /**

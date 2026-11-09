@@ -1,5 +1,6 @@
 import type { TranscriptEntry } from "@paperclipai/adapter-utils";
 import { proposedPlanMarkdown } from "./activity-model";
+import { contextSignal, createCompactionTracker } from "./compactions";
 import { createPaperclipRunnerParser } from "./paperclip-runner-parser";
 
 /*
@@ -10,7 +11,11 @@ import { createPaperclipRunnerParser } from "./paperclip-runner-parser";
  * - a verification check (`item.completed` of kind `verification`, upstream #19262), which the
  *   parser would show as a plain line, becomes a `verification` activity;
  * - Codex's plan-mode deltas (`item.delta` of kind `plan`, #19291), which the parser would show as
- *   a line per delta, build up one streaming `plan_proposal` until `plan.proposed` completes it.
+ *   a line per delta, build up one streaming `plan_proposal` until `plan.proposed` completes it;
+ * - a context compaction (`context.compacted`, U58), which the parser would show as a generic
+ *   activity, becomes one "Context compacted" activity sized from the context readings around it
+ *   (compactions.ts, as for the task thread's dividers), once per compaction. Its "after" size can
+ *   come from a later reading, filled in on the same payload as the rest of the log is read.
  *
  * The copy itself stays as upstream has it, so it can be checked line for line at each sync.
  */
@@ -24,6 +29,7 @@ export function createRunnerTranscriptParser() {
   const parser = createPaperclipRunnerParser();
   let proposals = new Map<string, string>();
   let completed = new Set<string>();
+  let compactions = createCompactionTracker();
 
   const extra = (line: string, ts: string): TranscriptEntry[] | null => {
     if (!line.includes("paperclip.prp.event")) return null;
@@ -38,6 +44,18 @@ export function createRunnerTranscriptParser() {
     const eventType = text(event.eventType);
     const payload = record(event.payload);
     const itemId = text(event.itemId) ?? text(record(payload.item).id) ?? null;
+
+    const context = contextSignal(event);
+    if (context?.kind === "reading") {
+      // The parser still reads the usage item; only its context size is noted here.
+      compactions.reading(context.usedTokens);
+      return null;
+    }
+    if (context?.kind === "compacted") {
+      const compaction = compactions.compacted(context, { ...payload });
+      if (!compaction) return [];
+      return [{ kind: "provider_activity", ts, family: "context", eventType: "context.compacted", status: "completed", title: "Context compacted", summary: "Context compacted", payload: compaction }];
+    }
 
     if (eventType === "item.completed" && payload.kind === "verification") {
       const check = record(payload.verification);
@@ -91,6 +109,7 @@ export function createRunnerTranscriptParser() {
       parser.reset();
       proposals = new Map();
       completed = new Set();
+      compactions = createCompactionTracker();
     },
   };
 }

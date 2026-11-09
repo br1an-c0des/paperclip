@@ -8,8 +8,10 @@ import "./ProviderFailureNotice.css";
  * message, when it failed (before work started or during it), the HTTP status and provider code,
  * and the request id to quote to the provider. The task panel shows it for an interrupted task
  * (tasks/TaskNotices.tsx), and the run modal for a run that ended on one (runs/RunModal.tsx).
- * `children` adds a line, such as the task's own retry countdown; without one, it says when the
- * provider will take requests again, when it said. `action` is a button, such as Retry.
+ * `children` adds a line, such as the task's own countdown (`scheduledLine` in tasks/recovery.ts,
+ * which reads "Resuming in 28s by itself." for a pending native resume, with no Retry, as the task's
+ * recovery notice does); without one, it says when the provider will take requests again, when it
+ * said. `action` is a button, such as Retry.
  */
 
 export function ProviderFailureNotice(props: {

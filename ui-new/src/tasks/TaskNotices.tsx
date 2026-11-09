@@ -12,7 +12,7 @@ import { useProjectsQuery } from "@/lib/company-data";
 import { Button } from "@/ui/Button";
 import { pushToast } from "@/ui/Toast";
 import { useTaskPeople } from "./people";
-import { pauseDetail, resumeCountdown, retryCountdown, taskNotices, timeOfDay, WAITING_TEXT, type TaskNotice } from "./recovery";
+import { pauseDetail, resumeCountdown, retryCountdown, scheduledLine, taskNotices, timeOfDay, WAITING_TEXT, type TaskNotice } from "./recovery";
 import { useTaskRetry } from "./retry";
 import { TreeControlDialog, useTreeControlState } from "./TaskActions";
 import { ProviderFailureNotice } from "@/ui/ProviderFailureNotice";
@@ -203,18 +203,13 @@ function Notice(props: {
       <Match when={props.notice.kind === "provider-failure" && props.notice}>
         {(notice) => {
           const found = notice() as Extract<TaskNotice, { kind: "provider-failure" }>;
-          const countdown = () => retryCountdown(found.nextRetryAt, now());
           return (
             <ProviderFailureNotice
               failure={found.failure}
               tone={found.state === "retry_scheduled" ? "amber" : "red"}
               action={found.canRetry ? retryButton(found.state === "retry_scheduled" ? "Retry now" : "Retry") : undefined}
             >
-              {found.state === "retry_scheduled"
-                ? found.recoveryStep
-                  ? `${found.recoveryStep}. ${countdown()}…`
-                  : `${countdown()} by itself.`
-                : undefined}
+              {found.state === "retry_scheduled" ? scheduledLine(found, now()) : undefined}
             </ProviderFailureNotice>
           );
         }}

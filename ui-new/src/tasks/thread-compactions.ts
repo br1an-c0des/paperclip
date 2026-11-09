@@ -3,7 +3,7 @@ import { createQueries } from "@tanstack/solid-query";
 import { createMemo, type Accessor } from "solid-js";
 import type { RunForIssue } from "@/api/issues";
 import { runsApi } from "@/api/runs";
-import { formatTokens } from "./context-usage";
+import { compactionDetail, contextSignal, createCompactionTracker, type ContextSizes } from "@/runs/compactions";
 
 /*
  * Compaction dividers in the task thread (U58, upstream #19273, #19378): where a finished run's
@@ -20,18 +20,17 @@ import { formatTokens } from "./context-usage";
  * longer counts any are missed.
  */
 
-export type Compaction = {
+export type Compaction = ContextSizes & {
   /** Unique within the thread. */
   key: string;
   runId: string;
   at: Date;
-  preTokens: number | null;
-  postTokens: number | null;
 };
+
+export { compactionDetail };
 
 type JsonRecord = Record<string, unknown>;
 const record = (value: unknown): JsonRecord | null => (value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : null);
-const count = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null);
 
 /** Only runner runs report compactions. */
 const RUNNER_ADAPTER = "paperclip_runner";
@@ -40,61 +39,29 @@ const RUNNER_ADAPTER = "paperclip_runner";
 const PAGE = 1000;
 const MAX_PAGES = 5;
 
-/**
- * A run's compactions, from its conversation events in order. Ported from the old UI's projection
- * (ui/src/components/transcript/native-run-events.ts): the "before" size is the event's own or the
- * last context reading; the "after" size is the event's own or the next, smaller reading. The same
- * compaction reported twice with no reading between (an item's start and end) counts once.
- */
+/** A run's compactions, from its conversation events in order, sized by the shared tracker (runs/compactions.ts). */
 export function runCompactions(runId: string, events: readonly Pick<HeartbeatRunEvent, "seq" | "runId" | "eventType" | "payload" | "createdAt">[]): Compaction[] {
   const ordered = [...events].sort((a, b) => a.seq - b.seq);
+  const tracker = createCompactionTracker();
   const found: Compaction[] = [];
-  let latest: number | null = null;
-  let awaiting: Compaction | null = null;
-  let last: { id: unknown } | null = null;
-  let readingSinceLast = false;
   for (const event of ordered) {
     const envelope = record(event.payload?.prpEvent);
-    if (!envelope || envelope.schema !== "paperclip.prp.event.v1") continue;
-    if (envelope.eventType !== event.eventType) continue;
-    const payload = record(envelope.payload);
-    if (!payload) continue;
-    if (event.eventType === "item.completed" && payload.kind === "usage") {
-      const context = record(record(payload.usage)?.context);
-      const used = count(context?.usedTokens);
-      const windowTokens = count(context?.windowTokens);
-      if (used === null || !windowTokens) continue;
-      readingSinceLast = true;
-      if (awaiting && used < (latest ?? Infinity)) {
-        awaiting.postTokens = used;
-        awaiting = null;
-      }
-      latest = used;
+    if (!envelope || envelope.eventType !== event.eventType) continue;
+    const signal = contextSignal(envelope);
+    if (!signal) continue;
+    if (signal.kind === "reading") {
+      tracker.reading(signal.usedTokens);
       continue;
     }
-    if (event.eventType !== "context.compacted" || payload.schema !== "paperclip.context.compacted.v1") continue;
-    if (last && last.id === payload.compactionId && !readingSinceLast) continue;
-    readingSinceLast = false;
-    last = { id: payload.compactionId };
-    const at = typeof envelope.emittedAt === "string" ? new Date(envelope.emittedAt) : new Date(event.createdAt);
-    const compaction: Compaction = {
+    const at = signal.emittedAt ? new Date(signal.emittedAt) : new Date(event.createdAt);
+    const compaction = tracker.compacted(signal, {
       key: `compaction:${runId}:${event.seq}`,
       runId,
       at: Number.isNaN(at.getTime()) ? new Date(event.createdAt) : at,
-      preTokens: count(payload.preTokens) ?? latest,
-      postTokens: count(payload.postTokens),
-    };
-    if (compaction.postTokens === null) awaiting = compaction;
-    found.push(compaction);
+    });
+    if (compaction) found.push(compaction);
   }
   return found;
-}
-
-/** "230k → 38k tokens", "from 230k tokens", or nothing when neither size is known. */
-export function compactionDetail(compaction: Pick<Compaction, "preTokens" | "postTokens">) {
-  if (compaction.preTokens !== null && compaction.postTokens !== null) return `${formatTokens(compaction.preTokens)} → ${formatTokens(compaction.postTokens)} tokens`;
-  if (compaction.preTokens !== null) return `from ${formatTokens(compaction.preTokens)} tokens`;
-  return null;
 }
 
 /** The runs Compact now queued for this task, from its activity. */

@@ -55,7 +55,7 @@ import {
   useTaskChange,
   WorkspaceControl,
 } from "./TaskEditors";
-import { MonitorControl, ScheduledRetryControl, WatchdogControl } from "./TaskExecution";
+import { MonitorControl, ScheduledRetryControl, scheduledRetryLabel, WatchdogControl } from "./TaskExecution";
 import { hasOrigin, OriginValue, RequesterValue, ReviewPolicyBadge } from "./TaskAbout";
 import { requester } from "./task-origin";
 import { PlanDecompositions } from "./PlanDecompositions";
@@ -254,7 +254,10 @@ export function TaskDetails(props: {
     {
       key: "retry",
       icon: <RotateCcw size={15} />,
-      label: "Scheduled retry",
+      // "Workspace" while it waits for a busy workspace, as the old UI labels it (TaskExecution.tsx).
+      get label() {
+        return scheduledRetryLabel(t());
+      },
       empty: (current) => current.scheduledRetry?.status !== "scheduled_retry",
       value: () => <ScheduledRetryControl task={t()} />,
     },

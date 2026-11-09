@@ -55,6 +55,40 @@
   padding-left: 64px;
 }
 
+/* "Context compacted · 230k → 38k tokens": where the agent compacted its context, as in the task
+   thread (U58, tasks/TaskActivity.css .ta-compacted) */
+.rt-compacted {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rt-compacted::before,
+.rt-compacted::after {
+  content: "";
+  flex: 1 1 24px;
+  height: 1px;
+  background: var(--edge);
+}
+
+.rt-compacted-label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  text-align: center;
+}
+
+.rt-compacted-label b {
+  color: var(--body);
+  font-weight: 700;
+}
+
 /* Cards: the prompt and the outcome */
 .rt-card {
   display: flex;

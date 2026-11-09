@@ -19,12 +19,21 @@ function interruption(extra: Partial<TaskInterruptionPresentation>): TaskInterru
 
 describe("retryOffer", () => {
   it("offers Retry on an attempt the system couldn't finish", () => {
-    expect(retryOffer({ interruption: interruption({}) })).toEqual({ state: "failed", canRetry: true, reason: null });
+    expect(retryOffer({ interruption: interruption({}) })).toEqual({ state: "failed", canRetry: true, reason: null, resumesAt: null });
     expect(retryOffer({ interruption: interruption({ state: "retry_scheduled", canRetry: false }) })).toEqual({
       state: "retry_scheduled",
       canRetry: false,
       reason: null,
+      resumesAt: null,
     });
+  });
+
+  it("tells a pending native resume (#19503) by the recovery notice's rule", () => {
+    const at = "2026-11-06T15:26:18.687Z";
+    expect(retryOffer({ interruption: interruption({ state: "retry_scheduled", canRetry: false, nextRetryAt: at }) })?.resumesAt).toBe(at);
+    // A Retry to press, or a saved-work step, is something else.
+    expect(retryOffer({ interruption: interruption({ state: "retry_scheduled", canRetry: true, nextRetryAt: at }) })?.resumesAt).toBeNull();
+    expect(retryOffer({ interruption: interruption({ state: "retry_scheduled", canRetry: false, nextRetryAt: at, recoveryStep: "saving_previous_files" }) })?.resumesAt).toBeNull();
   });
 
   it("says what stopped it: a provider's refusal or folders that couldn't be prepared", () => {
@@ -77,6 +86,15 @@ describe("RetryMark", () => {
     const retry: TaskRetry = { retry: vi.fn(async () => undefined), busy: () => false };
     const { container } = render(() => <RetryMark task={task({ state: "retry_scheduled", canRetry: false })} retry={retry} />);
     expect(container.textContent).toBe("Trying again soon");
+    expect(container.querySelector("button")).toBeNull();
+  });
+
+  it("reads a pending native resume as resuming, with its time and no Retry", () => {
+    const retry: TaskRetry = { retry: vi.fn(async () => undefined), busy: () => false };
+    const at = new Date(2026, 10, 6, 15, 26).toISOString();
+    const { container } = render(() => <RetryMark task={task({ state: "retry_scheduled", canRetry: false, nextRetryAt: at })} retry={retry} />);
+    expect(container.textContent).toBe("Resuming soon");
+    expect(container.querySelector(".retry-mark")?.getAttribute("title")).toBe("The last attempt stopped, and Paperclip resumes it by itself at 15:26.");
     expect(container.querySelector("button")).toBeNull();
   });
 });
