@@ -42,6 +42,7 @@ import {
 } from "./task-edits";
 import { TaskPicker } from "./TaskPicker";
 import { useTaskUpdates } from "./task-updates";
+import { outsideLineage, useTaskLineage } from "./workspace-lineage";
 import { readNote } from "@/lib/offline/read-state";
 import "./TaskEditors.css";
 
@@ -849,6 +850,11 @@ export function WorkspaceControl(props: { task: Issue; onChange: ChangeTask }) {
       taskActionsApi.reusableWorkspaces(company().id, { projectId: props.task.projectId!, projectWorkspaceId: props.task.projectWorkspaceId }, signal),
     enabled: open() && available() && !!props.task.projectId,
   }));
+  // A subtask never shares its parent's or an ancestor's workspace (U61): the server would release it
+  // at the next run, so those aren't offered. Until the lineage loads, nothing is listed.
+  const lineage = useTaskLineage(() => props.task.parentId, () => open() && available());
+  const lineageReady = () => !props.task.parentId || lineage.data !== undefined || lineage.isError;
+  const choices = createMemo(() => (lineageReady() ? outsideLineage(reusable.data ?? [], lineage.data) : []));
   const pick = (next: WorkspaceChoice, workspace?: ExecutionWorkspace) => props.onChange(workspaceEdit(next, workspace));
   const value = () => (
     <Show when={props.task.currentExecutionWorkspace} fallback={<span class="te-muted">{available() ? CHOICE_LABEL[choice()] : "None"}</span>}>
@@ -880,8 +886,16 @@ export function WorkspaceControl(props: { task: Issue; onChange: ChangeTask }) {
           </Menu.Item>
           <Menu.Group label="Reuse a workspace">
             <For
-              each={reusable.data ?? []}
-              fallback={<Menu.Item disabled>{readNote(reusable, "None to reuse", { loading: "Loading workspaces…" })}</Menu.Item>}
+              each={choices()}
+              fallback={
+                <Menu.Item disabled>
+                  {!lineageReady()
+                    ? "Loading workspaces…"
+                    : props.task.parentId && (reusable.data?.length ?? 0) > 0
+                      ? "None outside the parent task's own"
+                      : readNote(reusable, "None to reuse", { loading: "Loading workspaces…" })}
+                </Menu.Item>
+              }
             >
               {(workspace) => (
                 <Menu.Item
