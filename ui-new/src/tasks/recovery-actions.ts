@@ -1,4 +1,5 @@
-import type { IssueRecoveryAction, IssueRecoveryActionKind } from "@paperclipai/shared";
+import { requiresExecutionReconciliation, type IssueRecoveryAction, type IssueRecoveryActionKind } from "@paperclipai/shared";
+import { RETAINED_EXPORT_CAUSES } from "./recovery";
 import type { BoardAccess } from "./task-edits";
 
 /*
@@ -18,6 +19,12 @@ import type { BoardAccess } from "./task-edits";
  * native export hold (#18848, #19208) says the files need recovering, with Recover saved files
  * under the card (recover-files.ts). When automatic recovery spends its attempts the server hands
  * the action to the board, and its next step says so.
+ *
+ * Since the 2026-11-07 sync: when a restart killed the server that was saving a run's files and the
+ * next one can't prove it stopped (#19717, #19742), or a run's server was recorded before its host
+ * was (`native_controller_host_unverified`), an owner or admin confirms it stopped, saying how they
+ * checked (`previousServerStop`). A pending provider tool call (#19733) reads on its own and, as a
+ * reconciliation cause, isn't offered "Try again".
  */
 
 export type RecoveryState = "needed" | "in_progress" | "observing";
@@ -60,31 +67,28 @@ export const OUTCOMES: { outcome: RecoveryOutcome; label: string; description: s
 ];
 
 /**
- * Causes that need the run's effects reconciled first (shared `EXECUTION_RECONCILIATION_CAUSES`,
- * copied as decision 10 allows): "Try again" isn't offered for them.
+ * Causes whose one way on is the board's confirmation that the previous server stopped (the old
+ * UI's `isPreviousServerStopCause`): the card offers no other choice for them.
  */
-const RECONCILIATION_CAUSES = new Set([
-  "uncertain_provider_action",
-  "uncertain_external_action",
-  "uncertain_control_plane_action",
-  "completed_action_context_missing",
-  "continuation_evidence_incomplete",
-  "execution_finalization_deadline_exceeded",
-  "execution_recovery_budget_exhausted",
-  "provider_effect_inventory_unavailable",
-  "provider_failure_meaning_unverified",
-  "provider_ownership_unverified",
-  "native_provider_terminal_failed",
-  "native_event_replay_conflict",
-  "native_session_cleanup_quarantined",
-  "native_session_retry_exhausted",
-  "native_restart_recovery_blocked",
-  "native_continuation_requires_reconciliation",
-  "legacy_execution_requires_reconciliation",
-]);
+export const PREVIOUS_SERVER_STOP_CAUSES = new Set(["native_workspace_finalization_owner_unverified", "native_controller_host_unverified"]);
 
 /** Causes with words of their own, over the kind's. */
 const CAUSES: Record<string, { label: string; headline: string }> = {
+  native_workspace_finalization_owner_unverified: {
+    label: "Previous server not confirmed stopped",
+    headline: "The previous server stopped while it was saving this task's files, and Paperclip can't verify that it stopped. The agent's result is saved.",
+  },
+  native_controller_host_unverified: {
+    label: "Previous server not confirmed stopped",
+    headline:
+      "This run's previous server was recorded before Paperclip stored which host it ran on, so Paperclip can't verify that it stopped. The run's saved state is kept.",
+  },
+  // Since the 2026-11-07 sync (#19733): a reconciliation cause, so no "Try again".
+  native_provider_side_effect_pending: {
+    label: "A tool call needs checking",
+    headline:
+      "The saved session has a tool call whose result never came back, so Paperclip didn't retry or replace the session. Check whether it ran and record the outcome; the saved session and workspace are unchanged.",
+  },
   remote_workspace_restore_failed: {
     label: "Saved workspace couldn't be restored",
     headline: "The saved workspace couldn't be restored into a new sandbox. The saved version was kept.",
@@ -134,9 +138,10 @@ export function recoveryCard(action: IssueRecoveryAction | null | undefined, opt
     state !== "needed"
       ? []
       : OUTCOMES.filter((option) => {
-          if (action.cause === "native_workspace_finalization_owner_unverified") return false;
+          if (action.cause && PREVIOUS_SERVER_STOP_CAUSES.has(action.cause)) return false;
           if (action.cause === "native_workspace_sync_out_retry_exhausted" && !option.boardOnly) return false;
-          if (option.outcome === "todo" && action.cause && RECONCILIATION_CAUSES.has(action.cause)) return false;
+          // Causes that need the run's effects reconciled first (shared `EXECUTION_RECONCILIATION_CAUSES`).
+          if (option.outcome === "todo" && requiresExecutionReconciliation(action.cause)) return false;
           return !option.boardOnly || options.board;
         });
   return {
@@ -155,6 +160,85 @@ export function resolveBody(actionId: string, outcome: RecoveryOutcome) {
   const falsePositive = outcome.startsWith("false_positive_");
   const status = (falsePositive ? outcome.slice("false_positive_".length) : outcome) as "todo" | "done" | "in_review";
   return { actionId, outcome: falsePositive ? ("false_positive" as const) : ("restored" as const), sourceIssueStatus: status };
+}
+
+type Obj = Record<string, unknown>;
+const obj = (value: unknown): Obj => (value && typeof value === "object" && !Array.isArray(value) ? (value as Obj) : {});
+const OPEN = new Set(["active", "escalated"]);
+
+/**
+ * The confirmation an action waits for, after the old UI's WorkspaceExportRecovery.tsx, or null:
+ *
+ * - `owner`: the server saving the run's files was killed and can't report its stop. Confirmed
+ *   with its recorded owner token (`POST …/recovery-actions/resume-workspace-finalization`), on a
+ *   board-owned `native_workspace_finalization_owner_unverified` action, or on a retained-export
+ *   recovery whose copy-back owner waits for an operator (`workspaceOwnerRecovery`, #19742).
+ * - `controller`: a run's server recorded before its host was, which an ephemeral server can't
+ *   judge by process id (`POST …/recovery-actions/confirm-controller-stopped`).
+ *
+ * Gone once the server has recorded a stop (`workspaceOwnerStop`, `controllerStop`) or resumes.
+ */
+export type PreviousServerStop = { kind: "owner"; runId: string; ownerToken: string } | { kind: "controller"; runId: string };
+
+export function previousServerStop(
+  action: IssueRecoveryAction | null | undefined,
+  issueId: string,
+  companyId: string,
+): PreviousServerStop | null {
+  if (!action || action.companyId !== companyId || action.sourceIssueId !== issueId || !OPEN.has(action.status)) return null;
+  const runId = action.evidence.runId;
+  if (typeof runId !== "string" || !runId) return null;
+  const hold = obj(action.evidence.workspaceOwnerRecovery);
+  if (action.cause && RETAINED_EXPORT_CAUSES.has(action.cause)) {
+    const token = obj(hold.owner).token;
+    return action.kind === "active_run_watchdog" &&
+      (action.ownerType === "board" || action.ownerType === "system") &&
+      hold.state === "operator_required" &&
+      !action.evidence.workspaceOwnerStop &&
+      typeof token === "string" &&
+      token.length > 0
+      ? { kind: "owner", runId, ownerToken: token }
+      : null;
+  }
+  if (action.ownerType !== "board") return null;
+  if (action.cause === "native_controller_host_unverified") return action.evidence.controllerStop ? null : { kind: "controller", runId };
+  if (action.cause === "native_workspace_finalization_owner_unverified") {
+    const token = obj(action.evidence.owner).token;
+    return typeof token === "string" && !action.evidence.workspaceOwnerStop && hold.state !== "resuming" ? { kind: "owner", runId, ownerToken: token } : null;
+  }
+  return null;
+}
+
+/** The fewest characters the server takes for how the stop was checked (`stopEvidence`). */
+export const STOP_EVIDENCE_MIN = 20;
+
+/** What the confirmation sends, or null while `evidence` is too short. */
+export function stopConfirmationBody(
+  stop: PreviousServerStop,
+  actionId: string,
+  evidence: string,
+):
+  | { kind: "owner"; body: { actionId: string; runId: string; ownerToken: string; controllerAndCopybackStopped: true; stopEvidence: string } }
+  | { kind: "controller"; body: { actionId: string; runId: string; stopEvidence: string } }
+  | null {
+  const stopEvidence = evidence.trim();
+  if (stopEvidence.length < STOP_EVIDENCE_MIN) return null;
+  return stop.kind === "owner"
+    ? { kind: "owner", body: { actionId, runId: stop.runId, ownerToken: stop.ownerToken, controllerAndCopybackStopped: true, stopEvidence } }
+    : { kind: "controller", body: { actionId, runId: stop.runId, stopEvidence } };
+}
+
+/**
+ * Who may confirm that a previous server stopped, after the old UI's `canBoardConfirmOwnerStop`
+ * (the server's `runtime:confirm_owner_stop`): a local trusted instance, instance admins, and the
+ * company's owners and admins. The server checks again.
+ */
+export function canConfirmServerStop(companyId: string, access: BoardAccess | null | undefined, localTrusted: boolean) {
+  if (localTrusted) return true;
+  if (!access) return false;
+  if (access.source === "local_implicit" || access.isInstanceAdmin) return true;
+  const membership = access.memberships?.find((item) => item.companyId === companyId && item.status === "active");
+  return membership?.membershipRole === "owner" || membership?.membershipRole === "admin";
 }
 
 /**

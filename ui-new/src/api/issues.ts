@@ -283,6 +283,22 @@ export const issuesApi = {
    */
   recoverWorkspace: (id: string, data: { actionId: string; runId: string; idempotencyKey: string }) =>
     api.post<{ actionId: string; status: string }>(`/issues/${id}/recovery-actions/recover-workspace`, data),
+  /**
+   * An owner's or admin's word that the server which was saving a run's files has stopped, with how
+   * they checked (20 to 12,000 characters), so the saved result can finish without another agent
+   * turn (202). `ownerToken` is the copy-back owner the action records (since the 2026-11-07 sync,
+   * upstream #19717, #19742).
+   */
+  resumeWorkspaceFinalization: (
+    id: string,
+    data: { actionId: string; runId: string; ownerToken: string; controllerAndCopybackStopped: true; stopEvidence: string },
+  ) => api.post<{ runId: string; resultId: string | null; status: "queued" }>(`/issues/${id}/recovery-actions/resume-workspace-finalization`, data),
+  /**
+   * The same word for a run whose server was recorded before its host was, which an ephemeral server
+   * can't judge by process id (`confirmNativeControllerStoppedSchema`, 202).
+   */
+  confirmControllerStopped: (id: string, data: { actionId: string; runId: string; stopEvidence: string }) =>
+    api.post<{ runId: string; status: "queued" }>(`/issues/${id}/recovery-actions/confirm-controller-stopped`, data),
 
   // Who can see a private task (the share sheet).
   /**

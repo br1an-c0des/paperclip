@@ -12,7 +12,7 @@ import { useProjectsQuery } from "@/lib/company-data";
 import { Button } from "@/ui/Button";
 import { pushToast } from "@/ui/Toast";
 import { useTaskPeople } from "./people";
-import { pauseDetail, retryCountdown, taskNotices, WAITING_TEXT, type TaskNotice } from "./recovery";
+import { pauseDetail, resumeCountdown, retryCountdown, taskNotices, timeOfDay, WAITING_TEXT, type TaskNotice } from "./recovery";
 import { useTaskRetry } from "./retry";
 import { TreeControlDialog, useTreeControlState } from "./TaskActions";
 import { ProviderFailureNotice } from "@/ui/ProviderFailureNotice";
@@ -39,6 +39,8 @@ export function TaskNotices(props: { taskId: string }) {
   const tree = useTreeControlState(() => props.taskId);
   const [resumeOpen, setResumeOpen] = createSignal(false);
   const [resumingAgent, setResumingAgent] = createSignal(false);
+  // Whether the recovery card offers its own way on, which Retry then gives way to (#19840).
+  const [recoveryOwnsRetry, setRecoveryOwnsRetry] = createSignal(true);
 
   const query = createQuery(() => ({
     queryKey: queryKeys.issues.detail(props.taskId),
@@ -55,7 +57,14 @@ export function TaskNotices(props: { taskId: string }) {
   const notices = createMemo(() => {
     const current = task();
     if (!current) return [];
-    return taskNotices({ task: current, assignee: assignee(), project: project(), tree: tree.data, hasSubtasks: hasSubtasks() });
+    return taskNotices({
+      task: current,
+      assignee: assignee(),
+      project: project(),
+      tree: tree.data,
+      hasSubtasks: hasSubtasks(),
+      recoveryOwnsRetry: !!current.activeRecoveryAction && recoveryOwnsRetry(),
+    });
   });
 
   const resumeAgent = async (agentId: string) => {
@@ -118,7 +127,7 @@ export function TaskNotices(props: { taskId: string }) {
     <Show when={task()?.activeRecoveryAction && task()}>
       {(current) => (
         <div class="tn">
-          <TaskRecovery task={current()} />
+          <TaskRecovery task={current()} onOwnsRetry={setRecoveryOwnsRetry} />
         </div>
       )}
     </Show>
@@ -158,17 +167,20 @@ function Notice(props: {
           const found = notice() as Extract<TaskNotice, { kind: "interrupted" }>;
           const scheduled = found.state === "retry_scheduled";
           const title = () => {
+            if (scheduled && found.resuming) return `${resumeCountdown(found.nextRetryAt, now())}…`;
             if (scheduled) return found.recoveryStep ? "Recovering saved work" : `${retryCountdown(found.nextRetryAt, now())}…`;
             return found.retryWait ? "Retry is waiting" : "Interrupted";
           };
           return (
             <Row
-              tone={scheduled || found.retryWait ? "amber" : "red"}
-              icon={found.recoveryStep ? <LifeBuoy size={16} /> : <TriangleAlert size={16} />}
+              tone={found.resuming ? "neutral" : scheduled || found.retryWait ? "amber" : "red"}
+              icon={found.recoveryStep ? <LifeBuoy size={16} /> : found.resuming ? <RotateCcw size={16} /> : <TriangleAlert size={16} />}
               title={title()}
               action={found.canRetry ? retryButton(scheduled ? "Retry now" : "Retry") : undefined}
             >
-              {scheduled
+              {scheduled && found.resuming
+                ? `The last attempt stopped, and Paperclip resumes it by itself at ${timeOfDay(found.nextRetryAt!)}. Anything you sent is saved.`
+                : scheduled
                 ? found.recoveryStep
                   ? `${found.recoveryStep}. ${retryCountdown(found.nextRetryAt, now())}…`
                   : "The last attempt didn't finish, so the agent will try again by itself."
