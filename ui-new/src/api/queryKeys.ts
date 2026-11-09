@@ -353,6 +353,7 @@ export const queryKeys = {
     versions: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId, "versions"] as const,
     file: (companyId: string, skillId: string, path: string) => ["company-skills", companyId, "skill", skillId, "file", path] as const,
     updateStatus: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId, "update-status"] as const,
+    updateDiff: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId, "update-diff"] as const,
     forkPrecheck: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId, "fork-precheck"] as const,
     folders: (companyId: string) => ["company-skills", companyId, "folders"] as const,
     sources: (companyId: string) => ["skill-sources", companyId] as const,

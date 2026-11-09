@@ -621,6 +621,154 @@
   color: var(--red-fg);
 }
 
+.sk-change[data-change="not_compared"] {
+  color: var(--muted);
+}
+
+/* What changed in a pending update (SkillUpdateDiff.tsx): the task thread's patch colours, each
+   file's lines scrolling sideways inside their own box */
+.sk-whatchanged {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sk-whatchanged-sum {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sk-whatchanged-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.sk-whatchanged-error p {
+  margin: 0;
+}
+
+.sk-patch-add {
+  color: var(--green-fg);
+}
+
+.sk-patch-del {
+  color: var(--red-fg);
+}
+
+.sk-patch-file {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  overflow: hidden;
+}
+
+.sk-patch-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.sk-patch-file[open] > .sk-patch-head {
+  border-bottom: 1px solid var(--line);
+}
+
+.sk-patch-path {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sk-patch-head .sk-change {
+  margin-left: 0;
+}
+
+.sk-patch-counts {
+  margin-left: auto;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.sk-patch-note {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.sk-patch {
+  max-height: 60vh;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.6;
+  overscroll-behavior-x: contain;
+}
+
+.sk-patch:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: -2px;
+}
+
+.sk-patch-rows {
+  width: max-content;
+  min-width: 100%;
+}
+
+.sk-patch-row {
+  display: grid;
+  grid-template-columns: 4ch 4ch 2ch max-content;
+  padding-right: 12px;
+}
+
+.sk-patch-row[data-kind="add"] {
+  background: var(--green-bg);
+  color: var(--green-fg);
+}
+
+.sk-patch-row[data-kind="remove"] {
+  background: var(--red-bg);
+  color: var(--red-fg);
+}
+
+.sk-patch-row[data-kind="hunk"] {
+  background: var(--run-bg);
+  color: var(--run-fg);
+}
+
+.sk-patch-row[data-kind="note"] {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.sk-patch-row[data-kind="hunk"] .sk-patch-text,
+.sk-patch-row[data-kind="note"] .sk-patch-text {
+  padding-left: 0;
+}
+
+.sk-patch-num {
+  padding-right: 6px;
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+}
+
+.sk-patch-sign {
+  text-align: center;
+  user-select: none;
+}
+
+.sk-patch-text {
+  white-space: pre;
+}
+
 /* Folders */
 .sk-folders {
   display: flex;

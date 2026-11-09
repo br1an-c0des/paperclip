@@ -74,22 +74,29 @@ export function sortEnvironments(environments: readonly Environment[] | undefine
 const BLOCKED: Record<string, string> = {
   managed_local: "It's the built-in local environment.",
   instance_default: "It's the instance's default environment.",
-  reusable_sandbox_lease: "Sandboxes kept for reuse still depend on it.",
   pending_sandbox_cleanup: "A sandbox is still being cleaned up. Try again shortly.",
 };
 
 /**
- * Why a delete isn't allowed, or what it would affect when it is. Sandboxes kept for reuse are the
- * one block a person can lift: with `destroyLeases` the delete destroys them first, as the old
- * page's consent box does; `leaseConsent` says that's the only thing in the way.
+ * Why a delete isn't allowed, or what it would affect when it is. Kept sandboxes are the one block
+ * a person can lift: with `destroyLeases` the delete destroys them first, as the old page's consent
+ * box does; `leaseConsent` says that's the only thing in the way. Some of them may be a failed
+ * run's workspace copy, the only copy of its files (`retain_on_failure`, #20085), and the summary
+ * says destroying one loses them.
  */
 export function deleteSummary(radius: EnvironmentDeleteBlastRadius, destroyLeases = false): { allowed: boolean; lines: string[]; leaseConsent: boolean } {
   const leaseOnly = radius.deleteBlockedReasons.length > 0 && radius.deleteBlockedReasons.every((reason) => reason === "reusable_sandbox_lease");
+  const kept = keptSandboxes(radius);
   if (!radius.canDelete && !(leaseOnly && destroyLeases)) {
+    if (leaseOnly) {
+      // Closing a workspace frees a sandbox kept for reuse, not a failed run's copy.
+      const next = kept.recovery === kept.total ? `Destroy ${kept.total === 1 ? "it" : "them"} with the delete to go ahead.` : "Close their workspaces first, or destroy them with the delete.";
+      return { allowed: false, leaseConsent: true, lines: [`${reusableLeaseLine(radius)} ${next}`, ...recoveryLine(kept)] };
+    }
     return {
       allowed: false,
-      leaseConsent: leaseOnly,
-      lines: leaseOnly ? [`${reusableLeaseLine(radius)} Close their workspaces first, or destroy them with the delete.`] : radius.deleteBlockedReasons.map((reason) => BLOCKED[reason] ?? reason),
+      leaseConsent: false,
+      lines: radius.deleteBlockedReasons.map((reason) => (reason === "reusable_sandbox_lease" ? reusableLeaseLine(radius) : (BLOCKED[reason] ?? reason))),
     };
   }
   const refs = radius.staticReferences;
@@ -100,16 +107,62 @@ export function deleteSummary(radius: EnvironmentDeleteBlastRadius, destroyLease
   count(refs.issueSelectionCount, "task uses it", "tasks use it");
   count(refs.executionWorkspaceSelectionCount, "workspace uses it", "workspaces use it");
   count(refs.secretBindingCount, "secret is bound to it", "secrets are bound to it");
-  if (leaseOnly) lines.push(`${reusableLeaseLine(radius)} ${(radius.reusableSandboxLeaseCount || radius.reusableSandboxLeaseHolders?.length || 0) === 1 ? "It's" : "They're"} destroyed with it.`);
+  if (leaseOnly) lines.push(`${reusableLeaseLine(radius)} ${kept.total === 1 ? "It's" : "They're"} destroyed with it.`, ...recoveryLine(kept));
   if (radius.activeRuntimeUse.hasActiveRuntimeUse) lines.push("It's in use right now.");
   return { allowed: true, lines, leaseConsent: leaseOnly };
 }
 
-/** "2 sandboxes are kept for reuse (Workspace A, PAP-12)." */
-function reusableLeaseLine(radius: EnvironmentDeleteBlastRadius) {
-  const count = radius.reusableSandboxLeaseCount || radius.reusableSandboxLeaseHolders?.length || 0;
+/** How many sandboxes the environment keeps, and how many of them hold a failed run's files. */
+export function keptSandboxes(radius: EnvironmentDeleteBlastRadius) {
+  const holders = radius.reusableSandboxLeaseHolders ?? [];
+  const total = radius.reusableSandboxLeaseCount || holders.length;
+  const recovery = Math.min(total, holders.filter((holder) => holder.leasePolicy === "retain_on_failure").length);
+  return { total, recovery };
+}
+
+/**
+ * "2 sandboxes are kept for reuse (Workspace A, PAP-12)." Once one of them is a failed run's
+ * workspace copy, "for reuse" no longer fits: "3 sandboxes are kept (…).", or when all of them are,
+ * "A failed run's workspace copy is kept for file recovery (PAP-12)."
+ */
+export function reusableLeaseLine(radius: EnvironmentDeleteBlastRadius) {
+  const { total, recovery } = keptSandboxes(radius);
   const holders = [...new Set((radius.reusableSandboxLeaseHolders ?? []).map((holder) => holder.executionWorkspaceName ?? holder.issueIdentifier).filter(Boolean))];
-  return `${count === 1 ? "A sandbox is" : `${count} sandboxes are`} kept for reuse${holders.length ? ` (${holders.slice(0, 3).join(", ")}${holders.length > 3 ? "…" : ""})` : ""}.`;
+  const named = holders.length ? ` (${holders.slice(0, 3).join(", ")}${holders.length > 3 ? "…" : ""})` : "";
+  if (recovery > 0 && recovery === total) {
+    return `${total === 1 ? "A failed run's workspace copy is" : `${total} failed runs' workspace copies are`} kept for file recovery${named}.`;
+  }
+  return `${total === 1 ? "A sandbox is" : `${total} sandboxes are`} kept${recovery ? "" : " for reuse"}${named}.`;
+}
+
+/**
+ * The old page's warning (#20085): "1 of them is a failed run's workspace copy kept for file
+ * recovery; destroying it loses the files only it holds." Its plural keeps the singular noun; this
+ * one agrees ("2 of them are failed runs' workspace copies …").
+ */
+function recoveryLine({ total, recovery }: { total: number; recovery: number }): string[] {
+  if (!recovery) return [];
+  if (recovery === total) return [`Destroying ${total === 1 ? "it loses the files only it holds" : "them loses the files only they hold"}.`];
+  return [
+    recovery === 1
+      ? "1 of them is a failed run's workspace copy kept for file recovery; destroying it loses the files only it holds."
+      : `${recovery} of them are failed runs' workspace copies kept for file recovery; destroying them loses the files only they hold.`,
+  ];
+}
+
+/** The consent box's label. */
+export function leaseConsentLabel(radius: EnvironmentDeleteBlastRadius) {
+  const { total, recovery } = keptSandboxes(radius);
+  if (!recovery) return "Destroy the sandboxes kept for reuse. Work left in them is lost.";
+  if (recovery === total) return total === 1 ? "Destroy the failed run's workspace copy. The files only it holds are lost." : "Destroy the failed runs' workspace copies. The files only they hold are lost.";
+  return `Destroy the kept sandboxes, including ${recovery === 1 ? "a failed run's workspace copy" : `${recovery} failed runs' workspace copies`}. Work and files left in them are lost.`;
+}
+
+/** The success toast's note: "Destroyed 2 sandboxes kept for reuse." */
+export function destroyedSandboxesNote(destroyed: number, radius: EnvironmentDeleteBlastRadius | undefined) {
+  if (!destroyed) return null;
+  const forReuse = !radius || keptSandboxes(radius).recovery === 0;
+  return `Destroyed ${destroyed === 1 ? "1 sandbox" : `${destroyed} sandboxes`}${forReuse ? " kept for reuse" : ""}.`;
 }
 
 /**
