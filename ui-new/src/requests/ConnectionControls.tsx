@@ -17,7 +17,10 @@ import type { Request } from "./request-model";
  * - Access to an existing connection: the tools it would get, then Grant access or Not now.
  * - A new connection: reuse one you already have (`…/complete`), or set one up in Apps, which opens
  *   in a new tab while the card is marked "authorizing" (`…/phase`) and checks every few seconds for
- *   the new connection. The provider's sign-in page opens from Apps, not from here.
+ *   the new connection. The provider's sign-in page opens from Apps, not from here. A new tool
+ *   connection defaults to all agents there, as in the old UI's task setup (#19352); reusing one
+ *   adds access for the requesting agent only. Apps doesn't run the setup for this request, so the
+ *   card has no draft audience (`setupAccess`) to save.
  * - An AI connection: use one of yours for the agent (`/agents/:id/connection-intents/:id/adopt`)
  *   when its sign-in needs adopting, continue with a repaired one, or set one up in Apps → AI
  *   connections.
@@ -200,7 +203,14 @@ export function ConnectionControls(props: { request: Request; interaction: Conne
                 )}
               </For>
             </div>
-            <Show when={adopting()}>
+            <Show
+              when={adopting()}
+              fallback={
+                <Show when={!ai()}>
+                  <p class="rq-note">Reusing one adds access for {payload().requestingAgentName}. A new connection is for all agents unless you pick fewer.</p>
+                </Show>
+              }
+            >
               <p class="rq-note">This replaces {payload().requestingAgentName}'s own sign-in with your account. The model stays the same.</p>
             </Show>
           </Match>
@@ -210,7 +220,7 @@ export function ConnectionControls(props: { request: Request; interaction: Conne
                 ? `${payload().requestingAgentName} needs a working AI connection. Set one up in Apps, then pick it here.`
                 : authorizing()
                   ? "Finish connecting in the tab that opened. The new connection shows up here."
-                  : "You don't have a connection to reuse yet. Set one up in Apps; it shows up here once it's connected."}
+                  : "You don't have a connection to reuse yet. Set one up in Apps; it shows up here once it's connected. New connections are for all agents unless you pick fewer."}
             </p>
           </Match>
         </Switch>
