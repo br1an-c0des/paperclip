@@ -1,7 +1,7 @@
 import type { AgentDetail } from "@paperclipai/shared";
 import { A, useLocation, useNavigate } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
-import { Activity, MessageCircleOff, NotebookPen, Repeat, RotateCcw, Search, Send, SlidersHorizontal, X } from "lucide-solid";
+import { Activity, NotebookPen, Repeat, RotateCcw, Search, Send, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch } from "solid-js";
 import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
@@ -20,7 +20,7 @@ import { RequestCard } from "@/requests/RequestCard";
 import { QueuedMessages } from "@/tasks/composer/QueuedMessages";
 import { MessageBody } from "@/tasks/MessageBody";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
-import { Button, buttonClass } from "@/ui/Button";
+import { Button } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
 import { documentAnchor, parseTaskAnchor } from "@/tasks/task-anchor";
 import { Capsule, TaskStatusCapsule } from "@/ui/Status";
@@ -60,8 +60,7 @@ import "./Chat.css";
  * down; a message the agent sent from another task (a briefing or report, build plan 3.13) names
  * that task and its recurring task. Reading the chat marks it read (chat-read.tsx).
  *
- * While the instance's `enableAgentChat` is off, the chat routes answer 404, so the view says so and
- * points to the agent's settings (decision 2, option 2).
+ * Chat is always on (U57): `enableAgentChat` is a compatibility key the server always reports as on.
  */
 
 /** Shared between the header's buttons and the view. */
@@ -151,7 +150,7 @@ function ChatThread(props: ChatViewProps) {
   }));
   let composer: { focus: () => void; send: (body: string) => Promise<boolean> } | undefined;
 
-  createEffect(() => props.controls.setAvailable(!state.off() && !state.loading() && !state.error()));
+  createEffect(() => props.controls.setAvailable(!state.loading() && !state.error()));
   createEffect(on(() => props.controls.searching(), (open) => !open && state.setSearch("")));
   props.controls.bindNewSession(() => {
     if (!state.chat()) return composer?.focus();
@@ -240,7 +239,7 @@ function ChatThread(props: ChatViewProps) {
   };
   window.addEventListener("scroll", onScroll, { passive: true });
   onCleanup(() => window.removeEventListener("scroll", onScroll));
-  const shown = createMemo(() => !state.off() && !state.loading() && !state.error());
+  const shown = createMemo(() => !state.loading() && !state.error());
   // Reading the chat marks it read up to the newest agent message you've seen (chat-read.tsx).
   // Its scroll check is added after `onScroll`, so it sees where the reader is now.
   useChatReadMarker({
@@ -347,9 +346,6 @@ function ChatThread(props: ChatViewProps) {
 
   return (
     <Switch>
-      <Match when={state.off()}>
-        <ChatOff agent={props.agent} base={props.base} />
-      </Match>
       <Match when={state.loading()}>
         <section class="card ch-note" role="status">
           <p class="ch-muted">Loading the conversation…</p>
@@ -744,33 +740,5 @@ function TaskCard(props: {
         {statusTag(shown())}
       </span>
     </a>
-  );
-}
-
-/** Decision 2's fallback: chat is off on this instance, so say so and point to the settings. */
-function ChatOff(props: { agent: AgentDetail; base: string }) {
-  return (
-    <section class="card ch-off" role="status">
-      <span class="ch-off-icon" aria-hidden="true">
-        <MessageCircleOff size={20} />
-      </span>
-      <div>
-        <p class="ch-off-title disp">Agent chat is off on this instance</p>
-        <p>
-          Chatting with {props.agent.name} needs the instance's agent chat setting (<span class="mono">enableAgentChat</span>), which an instance
-          admin turns on in the experimental settings. Until then, {props.agent.name}'s settings, sessions and spend are under Manage agent, and you
-          can give it work as a task.
-        </p>
-        <div class="ch-off-links">
-          <A class={buttonClass({ size: "compact", variant: "primary" })} href={`${props.base}/profile`}>
-            <SlidersHorizontal size={14} aria-hidden="true" />
-            Manage agent
-          </A>
-          <A class={buttonClass({ size: "compact" })} href={`${props.base}/runtime`}>
-            Sessions and runs
-          </A>
-        </div>
-      </div>
-    </section>
   );
 }

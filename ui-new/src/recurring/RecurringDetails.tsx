@@ -21,6 +21,7 @@ import {
 } from "lucide-solid";
 import { createMemo, createSignal, For, Match, Show, Switch as Branch, type JSX } from "solid-js";
 import { activeAgents } from "@/api/agents";
+import { ApiError } from "@/api/client";
 import { openProjects } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
 import { routinesApi } from "@/api/routines";
@@ -30,7 +31,8 @@ import { useAgentsQuery, useGoalsQuery, useProjectsQuery } from "@/lib/company-d
 import { copyText } from "@/tasks/TaskActions";
 import { useTaskPeople } from "@/tasks/people";
 import { TaskPicker, taskName } from "@/tasks/TaskPicker";
-import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
+import { PersonPicker, type PickedPerson } from "@/tasks/PersonPicker";
+import { AgentAvatar, InitialsDisc, PersonAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { TextArea, TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
@@ -62,8 +64,9 @@ import { readNote } from "@/lib/offline/read-state";
  * - On or paused, and the next run; archived ones say so.
  * - A recurring task a plugin manages says so, with what has moved from the plugin's defaults and a
  *   link to the plugin's settings, where its own controls are (repair, reset).
- * - Title and properties: assignee (agents only), project, priority, goal, parent task, folder, and
- *   the person its runs act for (read only: the server sets it when the routine is made).
+ * - Title and properties: assignee (agents only), the person its runs act for (U59: a person picker
+ *   for those the server lets change it, read only for the rest), project, priority, goal, parent
+ *   task and folder.
  * - The description, with its `{{placeholders}}` as chips.
  * - Triggers: each schedule, webhook and API trigger with a switch and when it last fired; a
  *   schedule edits with the Repeat menu's fields, a webhook copies its URL and rotates its secret
@@ -196,8 +199,6 @@ function Properties(props: { routine: RoutineDetail; save: Save; onOpenTask: (ta
   const goal = () => goals.data?.find((candidate) => candidate.id === props.routine.goalId);
   const folder = () => folders.data?.folders.find((candidate) => candidate.id === props.routine.folderId);
   const priority = () => (props.routine.priority in PRIORITY_META ? (props.routine.priority as (typeof PRIORITIES)[number]) : "medium");
-  const people = useTaskPeople();
-  const responsibleName = (id: string) => people.personName(id);
   const move = async (folderId: string | null) => {
     try {
       await routinesApi.moveToFolder(company().id, props.routine.id, folderId);
@@ -237,6 +238,7 @@ function Properties(props: { routine: RoutineDetail; save: Save; onOpenTask: (ta
           </Menu.Content>
         </Menu>
       </Prop>
+      <RunsFor routine={props.routine} />
       <Prop icon={<FolderKanban size={15} />} label="Project">
         <Menu>
           <Menu.Trigger class="tl-cell rpn-cell" aria-label={`Project: ${project()?.name ?? "none"}. Change project`}>
@@ -364,23 +366,91 @@ function Properties(props: { routine: RoutineDetail; save: Save; onOpenTask: (ta
           </Menu.Content>
         </Menu>
       </Prop>
-      <Prop icon={<UserCheck size={15} />} label="Runs for">
-        <span class="td-inline rpn-responsible">
-          <Show when={props.routine.responsibleUserId} fallback={<span class="rpn-muted">Nobody yet</span>}>
-            {(id) => (
-              <>
-                <InitialsDisc name={responsibleName(id())} seed={id()} size={20} you={id() === people.youId()} />
-                {id() === people.youId() ? "You" : responsibleName(id())}
-              </>
-            )}
-          </Show>
-          <InfoTip
-            label="About who it runs for"
-            text="Its runs act for this person: they use their connections and count toward what they're allowed to do. Paperclip sets it when the recurring task is made, from the parent task's person or whoever made it."
-          />
-        </span>
-      </Prop>
     </dl>
+  );
+}
+
+/**
+ * Who its runs act for (U59, upstream #19128): a searchable person picker, saved with
+ * `PATCH /routines/:id` and `responsibleUserId` against the latest revision. Only someone the server
+ * says may change it (`canChangeResponsibleUser`: people who can assign tasks, instance admins and
+ * local operators) gets the picker; everyone else sees it read only, with why.
+ */
+function RunsFor(props: { routine: RoutineDetail }) {
+  const company = useCompany();
+  const client = useQueryClient();
+  const people = useTaskPeople();
+  const [open, setOpen] = createSignal(false);
+  const [saving, setSaving] = createSignal(false);
+  const id = () => props.routine.responsibleUserId;
+  const you = () => !!id() && id() === people.youId();
+  const name = () => {
+    const current = id();
+    return current ? (you() ? "You" : people.personName(current)) : "Nobody yet";
+  };
+  const editable = () => props.routine.canChangeResponsibleUser === true && props.routine.status !== "archived";
+  const reason = () =>
+    props.routine.status === "archived"
+      ? "Restore it to change who it runs for."
+      : "Only people who can assign tasks, and instance admins, can change who it runs for.";
+
+  const pick = async (person: PickedPerson) => {
+    setOpen(false);
+    if (person.id === id()) return;
+    setSaving(true);
+    try {
+      await routinesApi.update(props.routine.id, { responsibleUserId: person.id, baseRevisionId: props.routine.latestRevisionId });
+    } catch (error) {
+      const stale = error instanceof ApiError && error.status === 409;
+      pushToast({
+        tone: "error",
+        title: `Couldn't make it run for ${person.name}`,
+        body: stale ? "Someone changed this recurring task meanwhile. It's been reloaded: try again." : error instanceof Error ? error.message : undefined,
+      });
+    } finally {
+      setSaving(false);
+      refreshRecurring(client, company().id);
+    }
+  };
+
+  const shown = () => (
+    <Show when={id()} fallback={<span class="rpn-muted">Nobody yet</span>}>
+      {(current) => (
+        <>
+          <PersonAvatar name={name()} seed={current()} image={people.personImage(current())} size={20} you={you()} />
+          {saving() ? "Saving…" : name()}
+        </>
+      )}
+    </Show>
+  );
+
+  return (
+    <Prop icon={<UserCheck size={15} />} label="Runs for">
+      <span class="td-inline rpn-responsible">
+        <Show
+          when={editable()}
+          fallback={
+            <span class="rpn-readonly">
+              <span class="rpn-cell rpn-readonly-value">{shown()}</span>
+              <span class="rpn-readonly-why">{reason()}</span>
+            </span>
+          }
+        >
+          <Popover open={open()} onOpenChange={setOpen}>
+            <Popover.Trigger class="tl-cell rpn-cell" disabled={saving()} aria-label={`Runs for: ${name()}. Change who it runs for`}>
+              {shown()}
+            </Popover.Trigger>
+            <Popover.Content label="Runs for" width={340} hideClose>
+              <PersonPicker label="Runs for" selected={id()} onPick={(person) => void pick(person)} />
+            </Popover.Content>
+          </Popover>
+        </Show>
+        <InfoTip
+          label="About who it runs for"
+          text="Its runs act for this person: they use their connections and count toward what they're allowed to do. Automatic runs use this person; a run someone starts by hand uses whoever starts it."
+        />
+      </span>
+    </Prop>
   );
 }
 

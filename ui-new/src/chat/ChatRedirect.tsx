@@ -2,10 +2,10 @@ import { Navigate, useParams } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
 import { Show } from "solid-js";
 import { agentsApi } from "@/api/agents";
-import { chatApi } from "@/api/chat";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
-import { useAgentsQuery, useExperimentalSettingsQuery } from "@/lib/company-data";
+import { useAgentsQuery } from "@/lib/company-data";
+import { useChatListQuery } from "./chat-index";
 import { chatPath } from "./chat-model";
 
 /*
@@ -26,20 +26,13 @@ export function ChatRedirect() {
 export function ChatsHomeRedirect() {
   const company = useCompany();
   const agents = useAgentsQuery();
-  const settings = useExperimentalSettingsQuery();
   const primary = createQuery(() => ({
     queryKey: queryKeys.agents.primary(company().id),
     queryFn: ({ signal }) => agentsApi.primaryAgent(company().id, signal),
     retry: false,
   }));
-  const chats = createQuery(() => ({
-    queryKey: queryKeys.chat.list(company().id),
-    queryFn: ({ signal }) => chatApi.list(company().id, signal),
-    enabled: settings.data?.enableAgentChat === true,
-    staleTime: 60_000,
-  }));
-  const ready = () =>
-    !agents.isLoading && !primary.isLoading && !settings.isLoading && (settings.data?.enableAgentChat !== true || !chats.isLoading);
+  const chats = useChatListQuery();
+  const ready = () => !agents.isLoading && !primary.isLoading && !chats.isLoading;
   const target = () => {
     const live = (agents.data ?? []).filter((agent) => agent.status !== "terminated");
     const primaryAgent = live.find((agent) => agent.id === primary.data?.primaryAgentId);

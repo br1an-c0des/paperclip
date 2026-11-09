@@ -2,7 +2,17 @@ import type { LiveEvent } from "@paperclipai/shared";
 import { QueryClient } from "@tanstack/solid-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryKeys } from "@/api/queryKeys";
-import { createTrailingRefetch, FRESH_ON_OPEN_MS, keysForEvent, LIST_CACHE_HOLD_MS, LIVE_RUNS_HOLD_MS, RunInterests, skipOnFirstOpen } from "./live-events";
+import {
+  changesTaskMentions,
+  createTrailingRefetch,
+  FRESH_ON_OPEN_MS,
+  isMentionQuery,
+  keysForEvent,
+  LIST_CACHE_HOLD_MS,
+  LIVE_RUNS_HOLD_MS,
+  RunInterests,
+  skipOnFirstOpen,
+} from "./live-events";
 
 const event = (type: LiveEvent["type"], payload: Record<string, unknown>): LiveEvent => ({
   id: 1,
@@ -137,6 +147,34 @@ describe("keysForEvent", () => {
   });
 });
 
+describe("changesTaskMentions (U80)", () => {
+  const task = (payload: Record<string, unknown>) => event("activity.logged", { entityType: "issue", entityId: "i1", ...payload });
+
+  it("goes by the server's taskIdentityChanged flag when there is one", () => {
+    expect(changesTaskMentions(task({ action: "issue.updated", taskIdentityChanged: true }))).toBe(true);
+    expect(changesTaskMentions(task({ action: "issue.created", taskIdentityChanged: false }))).toBe(false);
+  });
+
+  it("classifies events without the flag from their action and details", () => {
+    expect(changesTaskMentions(task({ action: "issue.created" }))).toBe(true);
+    expect(changesTaskMentions(task({ action: "issue.deleted" }))).toBe(true);
+    expect(changesTaskMentions(task({ action: "issue.updated", details: { title: "Renamed" } }))).toBe(true);
+    expect(changesTaskMentions(task({ action: "issue.updated", details: { status: "done" } }))).toBe(false);
+    expect(changesTaskMentions(task({ action: "issue.comment_added" }))).toBe(false);
+  });
+
+  it("is false for anything but task activity", () => {
+    expect(changesTaskMentions(event("activity.logged", { entityType: "agent", action: "issue.created" }))).toBe(false);
+    expect(changesTaskMentions(event("heartbeat.run.status", { issueId: "i1" }))).toBe(false);
+  });
+
+  it("keeps the @task matches under the task lists, apart from the search key", () => {
+    expect(isMentionQuery(queryKeys.issues.mentions("c1", "x", 5))).toBe(true);
+    expect(isMentionQuery(queryKeys.issues.search("c1", "x", 5))).toBe(false);
+    expect(queryKeys.issues.mentions("c1", "x", 5).slice(0, 2)).toEqual([...queryKeys.issues.list("c1")]);
+  });
+});
+
 describe("createTrailingRefetch", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
@@ -198,6 +236,29 @@ describe("createTrailingRefetch", () => {
     trailing.add(keysForEvent("c1", event("agent.status", { agentId: "a1" })));
     vi.advanceTimersByTime(LIST_CACHE_HOLD_MS * 2);
     expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  it("leaves the @task matches alone after a burst that can't change them, and refreshes them after one that can", () => {
+    const client = new QueryClient();
+    const trailing = createTrailingRefetch(client);
+    const mentions = queryKeys.issues.mentions("c1", "bug", 5);
+    const search = queryKeys.issues.search("c1", "bug", 8);
+    const seed = () => {
+      client.setQueryData(mentions, []);
+      client.setQueryData(search, []);
+    };
+    const invalidated = (key: readonly unknown[]) => client.getQueryCache().find({ queryKey: key, exact: true })?.state.isInvalidated;
+    seed();
+    trailing.add(taskEvent("issue.comment_added"), { mentions: false });
+    vi.advanceTimersByTime(LIST_CACHE_HOLD_MS);
+    expect(invalidated(search)).toBe(true);
+    expect(invalidated(mentions)).toBe(false);
+
+    seed();
+    trailing.add(taskEvent("issue.comment_added"), { mentions: false });
+    trailing.add(taskEvent("issue.created"), { mentions: true });
+    vi.advanceTimersByTime(LIST_CACHE_HOLD_MS);
+    expect(invalidated(mentions)).toBe(true);
   });
 
   it("drops a burst in progress when cancelled", () => {

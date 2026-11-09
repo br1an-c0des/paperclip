@@ -34,7 +34,7 @@ export function useMentionCandidates(mention: () => ActiveMention | null, exclud
     ),
   );
   const tasks = createQuery(() => ({
-    queryKey: queryKeys.issues.search(company().id, term(), 5),
+    queryKey: queryKeys.issues.mentions(company().id, term(), 5),
     queryFn: ({ signal }) => issuesApi.search(company().id, { q: term(), limit: 5 }, signal),
     enabled: !!mention() && term().length > 0,
     placeholderData: keepPreviousData,

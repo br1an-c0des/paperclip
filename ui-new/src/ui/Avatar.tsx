@@ -8,8 +8,8 @@ import "./Avatar.css";
 /*
  * Avatars (design-system.md, "Avatars"). Agents are ClipLab characters, rendered by the server as
  * PNGs (`/api/agent-avatars/...`) with the pose picked from the agent's status. Below 24px, or when
- * the image fails, a gradient initials disc stands in. People get an initials disc; the signed-in
- * person's is --primary.
+ * the image fails, a gradient initials disc stands in. People get their photo (`PersonAvatar`), or
+ * an initials disc; the signed-in person's is --primary.
  */
 
 /** Gradient pairs the boards use for initials discs, at 160deg. */
@@ -62,7 +62,39 @@ export function InitialsDisc(props: { name: string; seed?: string; size?: number
   );
 }
 
-export type AvatarAgent = { id: string; name: string; appearance?: AgentAppearance | null; status?: string };
+/**
+ * A person's uploaded photo, as upstream's task lists accept it (#18607): only Paperclip's own asset
+ * URLs (`/api/assets/:id/content`), so a profile can't point the board at an outside address.
+ */
+export function personPhotoUrl(value: string | null | undefined): string | null {
+  return value && /^\/api\/assets\/[^/?#]+\/content$/.test(value) ? value : null;
+}
+
+/** A person: their photo when they have one, else their initials disc (yours in --primary). */
+export function PersonAvatar(props: { name: string; seed?: string; image?: string | null; size?: number; you?: boolean; label?: string }) {
+  const size = () => props.size ?? 26;
+  const src = () => personPhotoUrl(props.image);
+  const [failed, setFailed] = createSignal<string | null>(null);
+  return (
+    <Show when={src() && failed() !== src() ? src() : null} fallback={<InitialsDisc name={props.name} seed={props.seed} size={size()} you={props.you} label={props.label} />}>
+      {(url) => (
+        <img
+          class="person-avatar"
+          src={url()}
+          alt={props.label ?? ""}
+          aria-hidden={props.label ? undefined : "true"}
+          width={size()}
+          height={size()}
+          decoding="async"
+          loading="lazy"
+          onError={() => setFailed(url())}
+        />
+      )}
+    </Show>
+  );
+}
+
+export type AvatarAgent ={ id: string; name: string; appearance?: AgentAppearance | null; status?: string };
 
 /**
  * An agent's ClipLab avatar. `ring` draws the 2px Ion ring of a running agent; by default it follows

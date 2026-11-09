@@ -15,6 +15,15 @@
   color: var(--on-primary);
 }
 
+/* A person's photo, in the same round footprint as their initials disc */
+.person-avatar {
+  display: block;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--well);
+}
+
 .agent-avatar {
   display: inline-flex;
   flex-shrink: 0;

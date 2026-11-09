@@ -98,6 +98,25 @@
   font-size: 14px;
 }
 
+/* Runs for, when you can't change it: the person, and why underneath */
+.rpn-readonly {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rpn-readonly-value {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+}
+
+.rpn-readonly-why {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .rpn-desc {
   margin: 0;
   color: var(--body);

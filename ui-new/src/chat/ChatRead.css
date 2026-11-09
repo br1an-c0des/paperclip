@@ -1,9 +1,17 @@
-/* A chat with messages you haven't read: a small dot beside the agent */
+/* A chat with messages you haven't read: a small count pill beside the agent, in the run tone */
 .ch-unread {
   flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
   background: var(--run-fg);
+  color: var(--run-bg);
   box-shadow: 0 0 0 2px var(--ground);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }

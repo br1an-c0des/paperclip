@@ -119,12 +119,20 @@
   }
 }
 
-/* Phones (M1): one row of quick filters that scrolls sideways, with search behind its icon */
+/*
+ * Phones (M1): one row of quick filters that scrolls sideways, with search behind its icon. It runs
+ * to the screen's edges through main's phone gutter (Shell.css: 12px, or the safe area), and no
+ * further, so the page doesn't scroll sideways.
+ */
 .tv-toolbar--phone {
+  --tv-gutter-left: max(12px, env(safe-area-inset-left, 0px));
+  --tv-gutter-right: max(12px, env(safe-area-inset-right, 0px));
   flex-wrap: nowrap;
   overflow-x: auto;
-  margin-inline: -16px;
-  padding-inline: 16px;
+  margin-left: calc(-1 * var(--tv-gutter-left));
+  margin-right: calc(-1 * var(--tv-gutter-right));
+  padding-left: var(--tv-gutter-left);
+  padding-right: var(--tv-gutter-right);
   scrollbar-width: none;
 }
 

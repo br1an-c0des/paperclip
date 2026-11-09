@@ -2,6 +2,7 @@ import type { IssueComment } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import type { Request } from "@/requests/request-model";
 import {
+  badgeCount,
   buildChat,
   chatDocumentLink,
   chatMessageSource,
@@ -13,7 +14,8 @@ import {
   readThrough,
   shownReplies,
   statusTag,
-  unreadChatAgents,
+  unreadChatCounts,
+  unreadMessagesLabel,
   yourChatAgent,
   type ChatEntry,
   type ChatTask,
@@ -308,16 +310,39 @@ describe("read state", () => {
     expect(readThrough(null, { unread: true, marked: null })).toBeNull();
   });
 
-  it("lists the agents with unread chats, except the one open", () => {
+  it("counts unread messages by agent, except the chat open", () => {
     const chats = [
-      { conversationAgentId: "a1", isUnreadForMe: true },
-      { conversationAgentId: "a2", isUnreadForMe: false },
-      { conversationAgentId: "a3", isUnreadForMe: true },
-      { conversationAgentId: null, isUnreadForMe: true },
+      { conversationAgentId: "a1", isUnreadForMe: true, unreadMessageCount: 3 },
+      { conversationAgentId: "a2", isUnreadForMe: false, unreadMessageCount: 0 },
+      { conversationAgentId: "a3", isUnreadForMe: true, unreadMessageCount: 1 },
+      { conversationAgentId: null, isUnreadForMe: true, unreadMessageCount: 4 },
     ];
-    expect([...unreadChatAgents(chats)]).toEqual(["a1", "a3"]);
-    expect([...unreadChatAgents(chats, "a3")]).toEqual(["a1"]);
-    expect(unreadChatAgents(undefined).size).toBe(0);
+    expect([...unreadChatCounts(chats)]).toEqual([
+      ["a1", 3],
+      ["a3", 1],
+    ]);
+    expect([...unreadChatCounts(chats, "a3")]).toEqual([["a1", 3]]);
+    expect(unreadChatCounts(undefined).size).toBe(0);
+  });
+
+  it("goes by isUnreadForMe, and counts an unread chat without a count as one", () => {
+    expect([...unreadChatCounts([{ conversationAgentId: "a1", isUnreadForMe: true }])]).toEqual([["a1", 1]]);
+    expect(unreadChatCounts([{ conversationAgentId: "a1", isUnreadForMe: false, unreadMessageCount: 2 }]).size).toBe(0);
+    // Two chats with one agent (an earlier session) add up.
+    expect(
+      unreadChatCounts([
+        { conversationAgentId: "a1", isUnreadForMe: true, unreadMessageCount: 2 },
+        { conversationAgentId: "a1", isUnreadForMe: true, unreadMessageCount: 5 },
+      ]).get("a1"),
+    ).toBe(7);
+  });
+
+  it("caps a badge at 99+ and labels it", () => {
+    expect(badgeCount(7)).toBe("7");
+    expect(badgeCount(99)).toBe("99");
+    expect(badgeCount(100)).toBe("99+");
+    expect(unreadMessagesLabel(1)).toBe("1 unread message");
+    expect(unreadMessagesLabel(4)).toBe("4 unread messages");
   });
 
   it("knows which agent's chat the address shows", () => {

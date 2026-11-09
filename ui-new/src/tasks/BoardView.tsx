@@ -5,7 +5,7 @@ import { issuePath } from "@/api/issues";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { hasOpenDialog, isTextInputTarget } from "@/lib/shortcuts";
-import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
+import { AgentAvatar, PersonAvatar } from "@/ui/Avatar";
 import { Menu } from "@/ui/Menu";
 import { LabelPill, PriorityBars, RunningPill, TaskStatusCapsule } from "@/ui/Status";
 import { PRIORITY_META } from "@/ui/status-meta";
@@ -407,7 +407,7 @@ function AssigneeDisc(props: { task: CompactIssue; people: TaskPeople }) {
       <Match when={agent()}>{(found) => <AgentAvatar agent={found()} size={24} />}</Match>
       <Match when={props.task.assigneeUserId}>
         {(id) => (
-          <InitialsDisc name={props.people.personName(id())} seed={id()} size={24} you={id() === props.people.youId()} />
+          <PersonAvatar name={props.people.personName(id())} seed={id()} image={props.people.personImage(id())} size={24} you={id() === props.people.youId()} />
         )}
       </Match>
     </Switch>

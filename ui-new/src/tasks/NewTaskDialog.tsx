@@ -20,7 +20,7 @@ import {
   UserCheck,
   X,
 } from "lucide-solid";
-import { batch, createEffect, createMemo, createSignal, For, on, Show, type JSX } from "solid-js";
+import { batch, createEffect, createMemo, createSignal, For, on, Show, untrack, type JSX } from "solid-js";
 import { createStore, unwrap } from "solid-js/store";
 import { personName } from "@/api/access";
 import { activeAgents, agentsApi } from "@/api/agents";
@@ -46,6 +46,7 @@ import { classifySendFailure } from "@/lib/offline/errors";
 import { sendOrQueue, useOptionalWriteQueue, useWritesFor } from "@/lib/offline/WriteQueueProvider";
 import { WriteStatus } from "@/lib/offline/WriteStatus";
 import { taskWrite } from "./task-write";
+import { inLineage, outsideLineage, useTaskLineage } from "./workspace-lineage";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Dialog } from "@/ui/Dialog";
 import { TextInput } from "@/ui/Field";
@@ -1053,6 +1054,7 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
         <Show when={showWorkspace()}>
           <WorkspacePill
             projectId={draft.projectId}
+            parentId={draft.parentId}
             value={draft.workspace}
             reused={draft.reuseWorkspace}
             onPick={(value, reused) =>
@@ -1247,10 +1249,13 @@ function RolePill(props: {
 
 /**
  * The workspace pill: the project's shared checkout, a new worktree, or another task's worktree to
- * reuse (`reuse_existing`, the workspaces the server says can be reused in this project).
+ * reuse (`reuse_existing`, the workspaces the server says can be reused in this project). A subtask
+ * gets its own workspace (U61): with a parent set, the parent's and its ancestors' workspaces are
+ * left out, since the server would drop them silently, and a pick of one already made is undone.
  */
 function WorkspacePill(props: {
   projectId: string | null;
+  parentId: string | null;
   value: WorkspaceMode;
   reused: ReusedWorkspace | null;
   onPick: (value: WorkspaceMode, reused?: ReusedWorkspace) => void;
@@ -1263,6 +1268,18 @@ function WorkspacePill(props: {
     enabled: open() && !!props.projectId,
     retry: false,
   }));
+  const lineage = useTaskLineage(
+    () => props.parentId,
+    () => open() || props.value === "reuse_existing",
+  );
+  // Wait for the parent's lineage before listing, so its workspaces never show for a moment. If it
+  // can't be read, list them all: the server still keeps the subtask off them.
+  const lineageReady = () => !props.parentId || lineage.data !== undefined || lineage.isError;
+  const choices = createMemo(() => (lineageReady() ? outsideLineage(reusable.data ?? [], lineage.data) : []));
+  createEffect(() => {
+    const reused = props.reused;
+    if (props.value === "reuse_existing" && reused && inLineage({ id: reused.id }, lineage.data)) untrack(() => props.onPick("reuse_existing"));
+  });
   const label = () =>
     props.value === "reuse_existing" ? (props.reused ? `Reuse ${props.reused.name}` : "Reuse a worktree") : (WORKSPACES.find((option) => option.value === props.value)?.label ?? "Workspace");
   return (
@@ -1288,8 +1305,18 @@ function WorkspacePill(props: {
         </Menu.Group>
         <Menu.Group label="Reuse another task's worktree">
           <For
-            each={reusable.data ?? []}
-            fallback={<Menu.Item disabled>{reusable.isLoading ? "Loading worktrees…" : reusable.isError ? "Couldn't load the worktrees" : "None to reuse"}</Menu.Item>}
+            each={choices()}
+            fallback={
+              <Menu.Item disabled>
+                {reusable.isLoading || !lineageReady()
+                  ? "Loading worktrees…"
+                  : reusable.isError
+                    ? "Couldn't load the worktrees"
+                    : props.parentId && (reusable.data?.length ?? 0) > 0
+                      ? "None outside the parent task's own"
+                      : "None to reuse"}
+              </Menu.Item>
+            }
           >
             {(workspace) => (
               <Menu.Item

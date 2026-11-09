@@ -2,7 +2,7 @@ import type { IssuePriority, IssueStatus } from "@paperclipai/shared";
 import { Check } from "lucide-solid";
 import { For, Show } from "solid-js";
 import { useLabelsQuery } from "@/lib/company-data";
-import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
+import { AgentAvatar, PersonAvatar } from "@/ui/Avatar";
 import { Menu } from "@/ui/Menu";
 import { PriorityBars, StatusCapsule } from "@/ui/Status";
 import { PRIORITY_META, STATUS_META, type StatusLook } from "@/ui/status-meta";
@@ -60,7 +60,7 @@ export function AssigneeItems(props: { people: TaskPeople; current?: string; onP
       <Show when={you()}>
         {(id) => (
           <Menu.Item
-            icon={<InitialsDisc name="You" seed={id()} size={20} you />}
+            icon={<PersonAvatar name="You" seed={id()} image={props.people.personImage(id())} size={20} you />}
             hint={picked(props.current === `user:${id()}`)}
             onSelect={() => props.onPick({ agentId: null, userId: id() })}
           >
@@ -88,7 +88,7 @@ export function AssigneeItems(props: { people: TaskPeople; current?: string; onP
           <For each={props.people.otherPeople()}>
             {(person) => (
               <Menu.Item
-                icon={<InitialsDisc name={person.name} seed={person.id} size={20} />}
+                icon={<PersonAvatar name={person.name} seed={person.id} image={person.image} size={20} />}
                 hint={picked(props.current === `user:${person.id}`)}
                 onSelect={() => props.onPick({ agentId: null, userId: person.id })}
               >

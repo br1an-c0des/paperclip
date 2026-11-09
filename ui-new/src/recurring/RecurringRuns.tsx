@@ -12,6 +12,7 @@ import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useExperimentalSettingsQuery, useProjectsQuery } from "@/lib/company-data";
 import { workspaceChoiceAvailable, type ReusedWorkspace, type WorkspaceMode } from "@/tasks/new-task";
+import { outsideLineage, useTaskLineage } from "@/tasks/workspace-lineage";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { TextArea, TextInput } from "@/ui/Field";
@@ -284,6 +285,7 @@ export function RunNowForm(props: { routine: RoutineDetail; onDone: () => void; 
             <span>Workspace</span>
             <RunWorkspaceMenu
               projectId={found().id}
+              parentId={props.routine.parentIssueId}
               value={workspace()}
               reused={reused()}
               onPick={(value, workspace) => {
@@ -320,9 +322,14 @@ export function RunNowForm(props: { routine: RoutineDetail; onDone: () => void; 
   );
 }
 
-/** Where the run works: the project's checkout, a new worktree, or another task's worktree to reuse. */
+/**
+ * Where the run works: the project's checkout, a new worktree, or another task's worktree to reuse.
+ * The run's task goes under the recurring task's parent task, so that task's and its ancestors'
+ * workspaces aren't offered (U61): the server would drop them silently.
+ */
 function RunWorkspaceMenu(props: {
   projectId: string;
+  parentId: string | null;
   value: WorkspaceMode;
   reused: ReusedWorkspace | null;
   onPick: (value: WorkspaceMode, reused?: ReusedWorkspace) => void;
@@ -335,6 +342,9 @@ function RunWorkspaceMenu(props: {
     enabled: open(),
     retry: false,
   }));
+  const lineage = useTaskLineage(() => props.parentId, open);
+  const lineageReady = () => !props.parentId || lineage.data !== undefined || lineage.isError;
+  const choices = createMemo(() => (lineageReady() ? outsideLineage(reusable.data ?? [], lineage.data) : []));
   const label = () =>
     props.value === "reuse_existing"
       ? props.reused
@@ -360,8 +370,18 @@ function RunWorkspaceMenu(props: {
         </Menu.Group>
         <Menu.Group label="Reuse another task's worktree">
           <For
-            each={reusable.data ?? []}
-            fallback={<Menu.Item disabled>{reusable.isLoading ? "Loading worktrees…" : reusable.isError ? "Couldn't load the worktrees" : "None to reuse"}</Menu.Item>}
+            each={choices()}
+            fallback={
+              <Menu.Item disabled>
+                {reusable.isLoading || !lineageReady()
+                  ? "Loading worktrees…"
+                  : reusable.isError
+                    ? "Couldn't load the worktrees"
+                    : props.parentId && (reusable.data?.length ?? 0) > 0
+                      ? "None outside the parent task's own"
+                      : "None to reuse"}
+              </Menu.Item>
+            }
           >
             {(entry) => (
               <Menu.Item

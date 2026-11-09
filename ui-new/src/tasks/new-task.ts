@@ -15,7 +15,8 @@ import { buildAdapterOverrides } from "./run-overrides";
  *   each adapter's effort key; nothing is sent at "Agent default" (decisions 7 and 13).
  * - The workspace choice is sent only when the project has execution workspaces on and the instance
  *   has `enableIsolatedWorkspaces` (decision 12: follows the setting). Reusing another task's
- *   worktree sends that workspace's id, its mode and its project workspace.
+ *   worktree sends that workspace's id, its mode and its project workspace. A subtask can't reuse
+ *   its parent's or an ancestor's (U61, workspace-lineage.ts), so the dialog doesn't offer them.
  * - Review policy "Anyone approves" is the server's default, sent as nothing.
  * - Tasks have no due date (decision 6).
  * - Start a case (board C5) adds a line to the description asking the assignee to set up a case
