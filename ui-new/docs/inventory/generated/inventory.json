@@ -1,5 +1,5 @@
 {
-  "upstreamCommit": "f6cb3e43f4b16eab72093a06bf4070be10116ee8",
+  "upstreamCommit": "3ef45fdd927264d77e8854902a63f9f503d4ba49",
   "routes": [
     {
       "path": "/oauth-handoff",
@@ -7609,6 +7609,18 @@
           ]
         },
         {
+          "key": "api/issues.ts::issuesApi.get",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:id"
+            }
+          ],
+          "via": [
+            "components/StalledDependencyNotice.tsx"
+          ]
+        },
+        {
           "key": "api/heartbeats.ts::heartbeatsApi.get",
           "requests": [
             {
@@ -7874,6 +7886,18 @@
           ],
           "via": [
             "hooks/useRetryNowMutation.ts"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.retryTask",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/retry"
+            }
+          ],
+          "via": [
+            "hooks/useTaskRetry.ts"
           ]
         }
       ]
@@ -9353,6 +9377,18 @@
             {
               "method": "POST",
               "path": "/api/issues/:id/recovery-actions/confirm-controller-stopped"
+            }
+          ],
+          "via": [
+            "components/WorkspaceExportRecovery.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.confirmOwnerGone",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/recovery-actions/confirm-owner-gone"
             }
           ],
           "via": [
@@ -17895,6 +17931,7 @@
           ],
           "via": [
             "components/DecisionResolver.tsx",
+            "components/StalledDependencyNotice.tsx",
             "pages/IssueDetail.tsx"
           ]
         },
@@ -18487,6 +18524,18 @@
             {
               "method": "POST",
               "path": "/api/issues/:id/recovery-actions/confirm-controller-stopped"
+            }
+          ],
+          "via": [
+            "components/WorkspaceExportRecovery.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.confirmOwnerGone",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/recovery-actions/confirm-owner-gone"
             }
           ],
           "via": [
@@ -22067,7 +22116,8 @@
             }
           ],
           "via": [
-            "components/ActiveAgentsPanel.tsx"
+            "components/ActiveAgentsPanel.tsx",
+            "components/StalledDependencyNotice.tsx"
           ]
         },
         {
@@ -22375,6 +22425,18 @@
           ]
         },
         {
+          "key": "api/issues.ts::issuesApi.retryTask",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/retry"
+            }
+          ],
+          "via": [
+            "hooks/useTaskRetry.ts"
+          ]
+        },
+        {
           "key": "api/access.ts::accessApi.listUserDirectory",
           "requests": [
             {
@@ -22497,7 +22559,8 @@
             }
           ],
           "via": [
-            "components/ActiveAgentsPanel.tsx"
+            "components/ActiveAgentsPanel.tsx",
+            "components/StalledDependencyNotice.tsx"
           ]
         },
         {
@@ -22778,6 +22841,18 @@
           ],
           "via": [
             "hooks/useRetryNowMutation.ts"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.retryTask",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/retry"
+            }
+          ],
+          "via": [
+            "hooks/useTaskRetry.ts"
           ]
         }
       ]
@@ -23930,7 +24005,8 @@
             }
           ],
           "via": [
-            "components/ActiveAgentsPanel.tsx"
+            "components/ActiveAgentsPanel.tsx",
+            "components/StalledDependencyNotice.tsx"
           ]
         },
         {
@@ -24404,6 +24480,18 @@
           ],
           "via": [
             "hooks/useRetryNowMutation.ts"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.retryTask",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/retry"
+            }
+          ],
+          "via": [
+            "hooks/useTaskRetry.ts"
           ]
         },
         {
@@ -25925,6 +26013,7 @@
           ],
           "via": [
             "components/DecisionResolver.tsx",
+            "components/StalledDependencyNotice.tsx",
             "pages/IssueDetail.tsx"
           ]
         },
@@ -26516,6 +26605,18 @@
             {
               "method": "POST",
               "path": "/api/issues/:id/recovery-actions/confirm-controller-stopped"
+            }
+          ],
+          "via": [
+            "components/WorkspaceExportRecovery.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.confirmOwnerGone",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/recovery-actions/confirm-owner-gone"
             }
           ],
           "via": [
@@ -38477,6 +38578,20 @@
       ],
       "referenced": true
     },
+    "api/issues.ts::issuesApi.confirmOwnerGone": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/issues/:id/recovery-actions/confirm-owner-gone"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/AgentDetailPage.tsx",
+        "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
     "api/issues.ts::issuesApi.count": {
       "requests": [
         {
@@ -38715,6 +38830,7 @@
         "pages/DecisionQueuePage.tsx",
         "pages/DesignGuide.tsx",
         "pages/ExecutionWorkspaceDetail.tsx",
+        "pages/IssueChatLongThreadPerf.tsx",
         "pages/IssueDetail.tsx",
         "pages/WhatNeedsMe.tsx"
       ],
@@ -39442,7 +39558,11 @@
       ],
       "usedBy": [
         "pages/AgentChat.tsx",
+        "pages/Dashboard.tsx",
+        "pages/DashboardLive.tsx",
+        "pages/DesignGuide.tsx",
         "pages/Inbox.tsx",
+        "pages/IssueChatLongThreadPerf.tsx",
         "pages/IssueDetail.tsx",
         "pages/Issues.tsx"
       ],
