@@ -6,7 +6,8 @@ import { ApiError } from "@/api/client";
  * ui/src/components/task-chat/TaskChatQueuedMessages.tsx.
  *
  * - While a run is going, a message can be steered into it, if the runner supports steering.
- *   Legacy runners, and answers that need a fresh session, interrupt the run instead.
+ *   Legacy runners, runners that can't steer now, and answers that need a fresh session, interrupt
+ *   the run instead. Before a run starts, the queue can be sent.
  * - Messages the agent hasn't seen can be edited, moved and cancelled. Answers to a request card
  *   are fixed receipts: they can't be edited or moved, and while one waits the queue isn't
  *   reordered, as in the old UI. A receipt never hides the messages queued after it.
@@ -16,22 +17,48 @@ import { ApiError } from "@/api/client";
 
 export type QueueAction = "steer" | "interrupt" | "edit" | "discard" | "move";
 
-export type RowDelivery = { action: "steer" | "interrupt"; enabled: boolean; hint: string } | null;
+/**
+ * What a row offers: Steer into the run that's going, Interrupt it to start the next one with the
+ * queue, or Send a queue that waits for a run that hasn't started (the same request as Interrupt,
+ * with no run to stop).
+ */
+export type RowDelivery = { action: "steer" | "interrupt" | "send"; enabled: boolean; hint: string } | null;
 
-/** Steer or Interrupt for one message, while a run is going; null when there's no run to reach. */
+const INTERRUPT_HINT = "Stop the current run and start the next one with the queued messages";
+
+/**
+ * Steer, Interrupt or Send for one message, after the old UI's TaskChatQueuedMessages.tsx; null
+ * when there's nothing to reach.
+ *
+ * Since the 2026-11-07 sync: where a native run can't take a message mid-run (steering
+ * `unsupported` or `temporarily_unavailable`), Interrupt takes the place of a disabled Steer
+ * (#19450), and the server treats it as a hand-off, not a failed attempt (#19633). A queue deferred
+ * behind a run that hasn't started (no run to steer, `state: "deferred"`) offers Send, which the
+ * server now accepts, keeping the messages queued until that run is done (#19370).
+ */
 export function rowDelivery(queue: IssueQueuedCommentQueue, entry: IssueQueuedCommentEntry): RowDelivery {
-  if (!queue.targetRunId) return null;
+  if (!queue.targetRunId) {
+    return queue.state === "deferred" ? { action: "send", enabled: !!queue.queueId, hint: "Send the queued messages now" } : null;
+  }
   if (queue.protocol === "legacy" || entry.source?.requiresFreshSession) {
-    return { action: "interrupt", enabled: !!queue.queueId, hint: "Stop the current run and start the next one with the queued messages" };
+    return { action: "interrupt", enabled: !!queue.queueId, hint: INTERRUPT_HINT };
   }
   switch (queue.steeringDisposition) {
     case "available":
       return { action: "steer", enabled: !!queue.queueId, hint: "Send this message into the run that's going now" };
     case "unsupported":
-      return { action: "steer", enabled: false, hint: "This agent's runner can't take messages mid-run" };
+      return { action: "interrupt", enabled: !!queue.queueId, hint: `This agent's runner can't take messages mid-run. ${INTERRUPT_HINT}` };
     default:
-      return { action: "steer", enabled: false, hint: "Steering isn't available right now. Try again in a moment" };
+      return { action: "interrupt", enabled: !!queue.queueId, hint: `Steering isn't available right now. ${INTERRUPT_HINT}` };
   }
+}
+
+/**
+ * What the strip says after a Send the server kept queued (`state: "deferred"`, #19370): the
+ * queue's own wait when it names one, else the old UI's words.
+ */
+export function deferredMessage(queue: Pick<IssueQueuedCommentQueue, "executionWait">) {
+  return queue.executionWait?.message || "Messages are still queued. They'll send when the task is ready.";
 }
 
 /** Fixed answers to a request card can't be edited or moved. */
