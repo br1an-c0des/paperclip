@@ -21,6 +21,8 @@ export type CrashPointDefinition = {
   environments: readonly CrashPointEnvironment[];
   kinds: readonly string[];
   invariants: readonly CrashPointInvariant[];
+  /** What a run must go through first when one plain task does not reach the point. */
+  prerequisite?: string;
 };
 
 export const CRASH_POINT_NAME_PATTERN = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.(before|after)_[a-z0-9_]+$/;
@@ -62,6 +64,12 @@ export const CRASH_POINTS = {
     kinds: ["native_restart_recovery_claim"],
     invariants: ["I4", "I6"],
   },
+  "runner.semantic_tool.after_input_before_dispatch": {
+    description: "The controller received a dynamic tool call (for example write_document) from the Runner and has not dispatched it. On Daytona the Runner and Codex outlive the controller, so with --hold-ms Codex keeps the call pending through the outage (restart chaos t03); a local restart also stops the Runner.",
+    environments: ["local", "daytona"],
+    kinds: ["native_executor_claim"],
+    invariants: ["I4", "I7"],
+  },
   "native.result.after_accept_before_finalize": {
     description: "The run's result and its workspace_finalizing finalization row are committed; finalization has not started. The accepted result must be finalized exactly once.",
     environments: ["local", "daytona"],
@@ -97,18 +105,21 @@ export const CRASH_POINTS = {
     environments: ["daytona"],
     kinds: ["environment_teardown_claim", "environment_pending_cleanup"],
     invariants: ["I2", "I7"],
+    prerequisite: "A pending_cleanup lease: a provider release that failed or could not be verified. A plain task's release succeeds and never claims a teardown.",
   },
   "environment.teardown.after_destroy_before_lease": {
     description: "A reusable sandbox was destroyed at the provider; its lease row is not released.",
     environments: ["daytona"],
     kinds: ["environment_run_lease_active", "environment_retained_hold"],
     invariants: ["I2"],
+    prerequisite: "A reuse_by_environment lease that expires or is replaced (destroyReusableSandboxLease). The chaos Daytona environment's leases are ephemeral by default.",
   },
   "environment.stop_retain.after_claim_before_stop": {
     description: "A stop-and-retain intent and its claim are committed; the provider stop has not been retried.",
     environments: ["daytona"],
     kinds: ["environment_stop_and_retain_intent"],
     invariants: ["I2", "I7"],
+    prerequisite: "A stop-and-retain intent: run with --daytona-reuse-lease, so each per-turn run stops and keeps its reusable sandbox.",
   },
   "environment.lease.after_release_before_runtime_services": {
     description: "The run's environment leases are released; its workspace runtime services are not.",

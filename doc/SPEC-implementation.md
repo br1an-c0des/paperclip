@@ -1520,6 +1520,20 @@ timestamps, including on repeated release. For unfinished issues it clears the
 agent assignee; only `in_progress` changes to `todo`. Existing company access,
 assignee/run ownership checks, and the `issue.released` activity event still apply.
 
+A status change releases the checkout and execution locks but does not stop the
+run that holds them. An agent request (`PATCH /issues/:issueId` or a recovery
+resolution) that sets a status other than `in_progress` (even its current value) on
+a task whose lock is held by a different queued or running run is refused with
+`409` and code `issue_status_change_live_run`;
+otherwise the run would keep going with no task bound to it, which is the effect
+of interrupting another agent's run. The denial is final and names the person's
+controls on the linked task: the run's Stop or Interrupt, or More task actions,
+then Pause subtree on the parent. The lock-holding run, board users, and paths
+that stop the run themselves (cancelling the task, reassigning it, and completing
+through `PATCH` a task whose Runner goal is paused first) are unaffected. The write
+is conditional on the lock the check saw; a run that acquires the lock in between returns `409`
+`issue_execution_lock_changed`.
+
 `POST /issues/:issueId/admin/force-release` is an operator recovery endpoint for stale harness locks. It requires board access to the issue company, clears checkout and execution run lock fields, and may clear the agent assignee when `clearAssignee=true` is passed. The route must write an `issue.admin_force_release` activity log entry containing the previous checkout and execution run IDs.
 
 ## 10.5 Projects
@@ -1769,7 +1783,10 @@ hard stop refuses new work even while evaluation lags.
 waits on another run's cleanup or accounting completeness. Only these refuse it:
 
 - spend at the limit (ledger plus observed running spend), or unpriced usage
-  under a blocking policy (the hard stop);
+  a provider reported, under a blocking policy (the hard stop). A charge that
+  accounting settled without its receipt (lost, closure evidence that never
+  arrived, or a failed capture) is recorded and shown in Costs, but it is never
+  a company gate;
 - an explicit pause of the company, project or agent;
 - an inactive company.
 
@@ -1792,6 +1809,18 @@ native finalization coordinator, or workspace finalization). That wait is
 per task, ends when the owner releases them, and wakes the successor through
 the work-intent promotion path. A predecessor run row that no longer exists
 owns nothing and never holds its successor.
+
+**Accepted work intents are delivered exactly once.** An accepted work intent
+(an assignment, a comment, a Retry or a recovery) ends in one of four terminal
+outcomes only: delivered, consumed by a later run that received it, task
+cancelled, or a reached hard stop. Every other refusal is temporary. The intent
+is saved as a deferred wake whose `executionWait` names the refusal and the
+event that clears it (a lifted pause, a released lock, settled accounting, a
+released task-tree hold, or resumed scheduling). Each such event promotes
+deferred intents through one promotion function, and the ownership reconciler
+promotes any intent whose hold cleared without that event. Promotion re-runs
+normal admission. Consumption is recorded per comment or intent id, so a
+promotion never delivers an intent that a later run already received.
 
 Accepted cumulative per-run usage checkpoints contribute observed running spend
 before the final ledger charge. Admission counts each unfinished operation's
@@ -1974,12 +2003,12 @@ its display label after fifteen minutes. Elapsed time never discards a late
 receipt. It settles the debt only for a native run whose recovery has ended
 (terminal failure or an accepted result) and whose closure evidence has not
 arrived after ten minutes (the remote runner reconnect grace plus a margin): the known usage is recorded as unpriced with
-provenance saying closure evidence never arrived, an activity entry names the
-run, and the blocking unpriced-usage policy keeps counting that charge unless
-a control-plane restart caused it. A restart-derived receipt (the run replaced
-its receipt source, recovered from a restart, or lost a provider turn on
-restore) never hard-stops or pauses a company under the blocking policy,
-whatever its token count; its activity entry and provenance remain the notice. A lost
+provenance saying closure evidence never arrived, and an activity entry names
+the run. Like any charge accounting settled without its receipt, it never
+hard-stops or pauses a company under the blocking policy, whatever its token
+count; its activity entry and provenance remain the notice. A verified local
+process stop closes the receipt source for a failed, cancelled, timed-out or
+interrupted run alike, so a restart-cancelled run settles at once. A lost
 receipt that already carries a provider-reported cost settles at that cost as
 an estimate marked as a lower bound, not as unpriced. A failed native run that
 never started provider work (no usage receipt, no replaced receipt source, and a
