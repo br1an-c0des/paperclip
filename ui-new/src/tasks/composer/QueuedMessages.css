@@ -78,6 +78,15 @@
   color: var(--run-fg);
 }
 
+/* "Sending in Xs" before a follow-up is steered in on its own (U84); steady digits, no jitter */
+.qm-countdown {
+  padding: 0 4px;
+  color: var(--run-fg);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .qm-more {
   width: 28px;
   height: 28px;
