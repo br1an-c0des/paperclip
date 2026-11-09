@@ -9,6 +9,7 @@ import { TitleEditor, useTaskChange } from "@/tasks/TaskEditors";
 import { TaskSections } from "@/tasks/TaskSections";
 import { TasksView, useTaskByRef, useTaskList } from "@/tasks/TasksView";
 import { HeaderNumber, PageHeader } from "@/ui/PageHeader";
+import { shownStatus } from "@/ui/status-meta";
 import { describeError } from "@/lib/offline/errors";
 import { loadingText } from "@/lib/offline/read-state";
 import "./Tasks.css";
@@ -25,7 +26,7 @@ export function TasksPage() {
   const company = useCompany();
   const tasks = useTaskList(() => ({}));
   const open = () => (tasks.data ?? []).filter((task) => OPEN_STATUSES.has(task.status as IssueStatus)).length;
-  const blocked = () => (tasks.data ?? []).filter((task) => task.status === "blocked").length;
+  const blocked = () => (tasks.data ?? []).filter((task) => shownStatus(task) === "blocked").length;
   return (
     <>
       <PageHeader

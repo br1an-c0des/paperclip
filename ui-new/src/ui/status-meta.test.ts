@@ -43,6 +43,28 @@ describe("statusLook", () => {
     expect(shownStatus({ status: "in_progress", displayStatus: "monitoring" })).toBe("monitoring");
   });
 
+  it("shows what an in-progress task with no run waits on (#19453)", () => {
+    for (const shown of ["todo", "in_review", "blocked", "monitoring", "in_progress"] as const) {
+      expect(shownStatus({ status: "in_progress", displayStatus: shown })).toBe(shown);
+    }
+    expect(statusLook({ status: "in_progress", displayStatus: "todo" })).toMatchObject({ status: "todo", label: "Todo", tone: "amber" });
+    // Projected to Blocked, it words and queues the blockers as a stored Blocked does.
+    expect(statusLook({ status: "in_progress", displayStatus: "blocked", blockerAttention: attention({}) })).toMatchObject({
+      status: "blocked",
+      queued: true,
+      title: "Blocked · waiting on active sub-task TES-5",
+    });
+  });
+
+  it("lets a saved or optimistic status change win over a stale projection", () => {
+    for (const status of ["done", "cancelled", "blocked", "in_review", "todo", "backlog"] as const) {
+      expect(shownStatus({ status, displayStatus: "in_progress" })).toBe(status);
+    }
+    expect(statusLook({ status: "todo", displayStatus: "blocked", blockerAttention: attention({}) })).toMatchObject({ status: "todo", queued: false, title: "Todo" });
+    expect(shownStatus({ status: "in_progress" })).toBe("in_progress");
+    expect(shownStatus({ status: "done", displayStatus: null })).toBe("done");
+  });
+
   it("only queues blocked tasks", () => {
     expect(isQueued({ status: "todo", blockerAttention: attention({}) })).toBe(false);
     expect(isQueued({ status: "blocked", blockerAttention: attention({ state: "stalled", reason: "stalled_review" }) })).toBe(false);

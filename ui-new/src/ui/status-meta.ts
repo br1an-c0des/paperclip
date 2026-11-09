@@ -11,6 +11,12 @@ import type { IssueBlockerAttention, IssueDisplayStatus, IssuePriority, IssueSta
  * status picker still reads and sets that. It draws Ion like In progress, as an outline: in
  * progress, but waiting on a schedule, like the boards' dashed scheduled outlines.
  *
+ * In progress only with a run (since the 2026-11-07 sync, upstream #19453): an agent's in-progress
+ * task with no queued or running run is shown as what it waits on, through the same
+ * `displayStatus`: Blocked (recovery), In review (a pending answer or review), Monitoring, or Todo.
+ * As in the old UI (task-status-presentation.ts), the projection is read only while the stored
+ * status is `in_progress`, so a saved or optimistic status change wins over a stale projection.
+ *
  * In queue (since the 2026-11-05 sync, upstream #19329) is a look, not a status: a blocked task
  * whose blockers are all being worked on (`blockerAttention.state` "covered": an active sub-task or
  * dependency) has nothing for anyone to do but wait. It keeps the Blocked label and group, and draws
@@ -47,9 +53,12 @@ export const STATUS_ORDER: IssueDisplayStatus[] = [
   "cancelled",
 ];
 
-/** The status a task shows: the server's display status (Monitoring) when it sends one, else the stored one. */
+/**
+ * The status a task shows: while it's stored as in progress, the server's display status when it
+ * sends one (Monitoring, or Todo, Blocked or In review with no run going); otherwise the stored one.
+ */
 export function shownStatus(task: { status: string; displayStatus?: IssueDisplayStatus | null }): IssueDisplayStatus {
-  const shown = task.displayStatus ?? task.status;
+  const shown = task.status === "in_progress" ? (task.displayStatus ?? task.status) : task.status;
   return (Object.hasOwn(STATUS_META, shown) ? shown : task.status) as IssueDisplayStatus;
 }
 
@@ -71,7 +80,7 @@ export type StatusLook = {
 
 /** A blocked task covered by active work: an active sub-task or dependency, and nothing stuck. */
 export function isQueued(task: StatusSource) {
-  return task.status === "blocked" && task.blockerAttention?.state === "covered";
+  return shownStatus(task) === "blocked" && task.blockerAttention?.state === "covered";
 }
 
 /**
@@ -118,7 +127,7 @@ export function statusLook(task: StatusSource): StatusLook {
     status,
     queued,
     label: meta.label,
-    title: task.status === "blocked" ? blockedTitle(task.blockerAttention) : meta.label,
+    title: status === "blocked" ? blockedTitle(task.blockerAttention) : meta.label,
     tone: queued ? "run" : meta.tone,
   };
 }
