@@ -17,7 +17,7 @@ import { stopLabel, stopRun } from "@/tasks/run-stop";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
-import { renderMarkdown } from "@/ui/Markdown";
+import { followAppLink, renderMarkdown, useKnownPrefixes, useOptionalNavigate } from "@/ui/Markdown";
 import type { ReplyTurn } from "./chat-model";
 import { EMPTY_REPLY, mergeEvents, pickReply, prpEventsFromOutput, recentSteps, replyFromEvents, replyFromTranscript, type ReplyEvent } from "./reply-model";
 
@@ -93,6 +93,19 @@ function useStoredEvents(runId: () => string) {
   return events;
 }
 
+/** The reply's text so far; in-app links (`data-app-link`, U86) open through the router. */
+export function LiveText(props: { html: string; caret: boolean }) {
+  const navigate = useOptionalNavigate();
+  return (
+    <div
+      class="md msg ch-live-text"
+      classList={{ "ch-live-text--caret": props.caret }}
+      innerHTML={props.html}
+      onClick={(event) => followAppLink(event, navigate)}
+    />
+  );
+}
+
 export function LiveReply(props: {
   turn: ReplyTurn;
   agent: AgentDetail;
@@ -125,7 +138,9 @@ export function LiveReply(props: {
   });
   const reply = createMemo(() => pickReply(fromOutputEvents(), fromStoredEvents(), fromTranscript()));
   const steps = createMemo(() => recentSteps(reply().steps));
-  const html = createMemo(() => (reply().text ? renderMarkdown(reply().text) : ""));
+  // `//PAP/...` links to a known company open in the board (U86), as in a finished message.
+  const prefixes = useKnownPrefixes(company);
+  const html = createMemo(() => (reply().text ? renderMarkdown(reply().text, { knownPrefixes: prefixes() }) : ""));
   const health = () => reply().health ?? [];
 
   // The plan is docked only while the reply runs (upstream #19252 hides it once the run ends).
@@ -248,7 +263,7 @@ export function LiveReply(props: {
             </Show>
           }
         >
-          <div class="md msg ch-live-text" classList={{ "ch-live-text--caret": active() }} innerHTML={html()} />
+          <LiveText html={html()} caret={active()} />
         </Show>
       </div>
     </article>
