@@ -121,8 +121,8 @@ describe("environments", () => {
       deleteBlockedReasons: ["reusable_sandbox_lease"],
       reusableSandboxLeaseCount: 2,
       reusableSandboxLeaseHolders: [
-        { leaseId: "l1", executionWorkspaceId: "w", executionWorkspaceName: "Fix login", issueId: null, issueIdentifier: null, issueTitle: null },
-        { leaseId: "l2", executionWorkspaceId: null, executionWorkspaceName: null, issueId: "i", issueIdentifier: "TES-4", issueTitle: "x" },
+        { leaseId: "l1", leasePolicy: "reuse_by_environment", executionWorkspaceId: "w", executionWorkspaceName: "Fix login", issueId: null, issueIdentifier: null, issueTitle: null },
+        { leaseId: "l2", leasePolicy: "reuse_by_environment", executionWorkspaceId: null, executionWorkspaceName: null, issueId: "i", issueIdentifier: "TES-4", issueTitle: "x" },
       ],
     });
     expect(deleteSummary(leased)).toEqual({
