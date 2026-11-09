@@ -61,6 +61,67 @@ export function deferredMessage(queue: Pick<IssueQueuedCommentQueue, "executionW
   return queue.executionWait?.message || "Messages are still queued. They'll send when the task is ready.";
 }
 
+/*
+ * Automatic steering (U84, upstream #19970, ui/src/components/task-chat/queued-message-auto-steer.ts).
+ * Your own plain follow-up waits a few seconds, "Sending in Xs" with Edit and Cancel, and is then
+ * steered into the run that's going. Only while the runner can take it (`paperclip_runner_v1` with
+ * steering `available`: Codex and Pi), never an answer to a request card, a message that needs a
+ * fresh session, someone else's message, one being edited, or one not yet saved. Each revision of a
+ * message gets one attempt, so a saved edit starts a new countdown and a failure isn't retried.
+ * Steer and Interrupt stay as buttons.
+ */
+
+/** How long a queued follow-up waits before it's steered in, so its author can still edit or cancel it. */
+export const AUTO_STEER_DELAY_MS = 5_000;
+
+function time(value: Date | string | null | undefined) {
+  return value == null ? Number.NaN : Date.parse(String(value));
+}
+
+/** The revision of a message that one automatic attempt is limited to. */
+export function autoSteerKey(entry: IssueQueuedCommentEntry) {
+  return `${entry.comment.id}:${String(entry.comment.updatedAt ?? entry.comment.createdAt)}`;
+}
+
+/** Whether this message may be steered in on its own now, after upstream's rules. */
+export function autoSteerEligible(input: {
+  queue: IssueQueuedCommentQueue;
+  entry: IssueQueuedCommentEntry;
+  cancelledIds: ReadonlySet<string>;
+  attemptedKeys: ReadonlySet<string>;
+  editingId: string | null;
+}) {
+  const { queue, entry } = input;
+  return (
+    queue.steeringDisposition === "available" &&
+    !!queue.queueId &&
+    !!queue.targetRunId &&
+    queue.protocol === "paperclip_runner_v1" &&
+    entry.canEdit &&
+    entry.source?.kind !== "interaction" &&
+    !entry.source?.requiresFreshSession &&
+    !entry.comment.id.startsWith("optimistic-") &&
+    !input.cancelledIds.has(entry.comment.id) &&
+    !input.attemptedKeys.has(autoSteerKey(entry)) &&
+    input.editingId !== entry.comment.id
+  );
+}
+
+/**
+ * When the message may be sent: the delay after its last change, but never sooner than the delay
+ * after this view first offered it, so a message that waited while steering was unavailable still
+ * shows its whole countdown before it goes.
+ */
+export function autoSteerDeadline(entry: IssueQueuedCommentEntry, firstOfferedAt: number, delayMs = AUTO_STEER_DELAY_MS) {
+  const changed = Math.max(time(entry.comment.createdAt), time(entry.comment.updatedAt ?? entry.comment.createdAt));
+  return Math.max(Number.isFinite(changed) ? changed : 0, firstOfferedAt) + delayMs;
+}
+
+/** The whole seconds a countdown shows, never below zero. */
+export function secondsLeft(deadline: number, now: number) {
+  return Math.max(0, Math.ceil((deadline - now) / 1000));
+}
+
 /** Fixed answers to a request card can't be edited or moved. */
 export function isFixed(entry: IssueQueuedCommentEntry) {
   return entry.source?.kind === "interaction";

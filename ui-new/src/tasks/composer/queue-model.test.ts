@@ -1,7 +1,21 @@
 import type { IssueQueuedCommentEntry, IssueQueuedCommentQueue } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@/api/client";
-import { deferredMessage, entryLabel, moveEntry, preview, queueErrorMessage, queuedSummary, rowDelivery, visibleEntries } from "./queue-model";
+import {
+  AUTO_STEER_DELAY_MS,
+  autoSteerDeadline,
+  autoSteerEligible,
+  autoSteerKey,
+  deferredMessage,
+  entryLabel,
+  moveEntry,
+  preview,
+  queueErrorMessage,
+  queuedSummary,
+  rowDelivery,
+  secondsLeft,
+  visibleEntries,
+} from "./queue-model";
 
 const entry = (id: string, position: number, extra: Partial<IssueQueuedCommentEntry> = {}): IssueQueuedCommentEntry =>
   ({ comment: { id, body: `Message ${id}` }, position, canEdit: true, canDiscard: true, ...extra }) as IssueQueuedCommentEntry;
@@ -108,5 +122,66 @@ describe("words", () => {
     expect(queueErrorMessage(new ApiError("x", 409, {}), "steer")).toMatch(/changed in another tab/);
     expect(queueErrorMessage(new ApiError("x", 422, { code: "queued_comment_already_dispatching" }), "discard")).toMatch(/Too late/);
     expect(queueErrorMessage(new Error("boom"), "interrupt")).toMatch(/still queued/);
+  });
+});
+
+describe("automatic steering (U84, #19970)", () => {
+  const at = "2026-11-09T12:00:00.000Z";
+  const mine = (extra: Partial<IssueQueuedCommentEntry> = {}) =>
+    entry("c1", 0, { comment: { id: "c1", body: "Also check the tests", createdAt: at, updatedAt: at } as unknown as IssueQueuedCommentEntry["comment"], ...extra });
+  const eligible = (current: IssueQueuedCommentQueue, item: IssueQueuedCommentEntry, extra: { cancelled?: string[]; attempted?: string[]; editingId?: string | null } = {}) =>
+    autoSteerEligible({ queue: current, entry: item, cancelledIds: new Set(extra.cancelled), attemptedKeys: new Set(extra.attempted), editingId: extra.editingId ?? null });
+
+  it("offers your own plain follow-up while a native runner can take it", () => {
+    expect(eligible(queue(), mine())).toBe(true);
+  });
+
+  it("needs steering available on paperclip_runner_v1, with a queue and a run", () => {
+    expect(eligible(queue({ steeringDisposition: "temporarily_unavailable" }), mine())).toBe(false);
+    expect(eligible(queue({ steeringDisposition: "unsupported" }), mine())).toBe(false);
+    expect(eligible(queue({ protocol: "legacy" }), mine())).toBe(false);
+    expect(eligible(queue({ queueId: null }), mine())).toBe(false);
+    expect(eligible(queue({ targetRunId: null }), mine())).toBe(false);
+  });
+
+  it("never sends someone else's message, a request-card answer, a fresh-session entry or an unsaved one", () => {
+    expect(eligible(queue(), mine({ canEdit: false }))).toBe(false);
+    expect(eligible(queue(), mine({ source: { kind: "interaction", interactionId: "x", interactionKind: "ask_user_questions" } }))).toBe(false);
+    expect(eligible(queue(), mine({ source: { requiresFreshSession: true } as never }))).toBe(false);
+    const optimistic = mine();
+    optimistic.comment = { ...optimistic.comment, id: "optimistic-1" };
+    expect(eligible(queue(), optimistic)).toBe(false);
+  });
+
+  it("waits while it's being edited, and stops once cancelled", () => {
+    expect(eligible(queue(), mine(), { editingId: "c1" })).toBe(false);
+    expect(eligible(queue(), mine(), { editingId: "c2" })).toBe(true);
+    expect(eligible(queue(), mine(), { cancelled: ["c1"] })).toBe(false);
+  });
+
+  it("tries each revision once: a saved edit is a new revision", () => {
+    const first = mine();
+    expect(eligible(queue(), first, { attempted: [autoSteerKey(first)] })).toBe(false);
+    const edited = mine();
+    edited.comment = { ...edited.comment, updatedAt: "2026-11-09T12:00:09.000Z" as never };
+    expect(autoSteerKey(edited)).not.toBe(autoSteerKey(first));
+    expect(eligible(queue(), edited, { attempted: [autoSteerKey(first)] })).toBe(true);
+  });
+
+  it("counts down five seconds from the last change, but never less than five from when it was offered", () => {
+    const changed = Date.parse(at);
+    expect(AUTO_STEER_DELAY_MS).toBe(5_000);
+    expect(autoSteerDeadline(mine(), changed - 60_000)).toBe(changed + 5_000);
+    // A message that waited while steering was unavailable still gets its whole countdown.
+    expect(autoSteerDeadline(mine(), changed + 30_000)).toBe(changed + 35_000);
+    const undated = mine();
+    undated.comment = { ...undated.comment, createdAt: undefined as never, updatedAt: undefined as never };
+    expect(autoSteerDeadline(undated, 1_000, 2_000)).toBe(3_000);
+  });
+
+  it("shows whole seconds left, never below zero", () => {
+    expect(secondsLeft(10_000, 5_000)).toBe(5);
+    expect(secondsLeft(10_000, 7_100)).toBe(3);
+    expect(secondsLeft(10_000, 12_000)).toBe(0);
   });
 });

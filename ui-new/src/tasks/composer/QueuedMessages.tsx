@@ -1,7 +1,7 @@
 import type { IssueQueuedCommentEntry, IssueQueuedCommentQueue } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ArrowDown, ArrowUp, Clock, CornerDownRight, Ellipsis, Pencil, Square, Trash2 } from "lucide-solid";
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, on, Show } from "solid-js";
 import { ApiError } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import { queuedCommentsApi } from "@/api/queued-comments";
@@ -9,6 +9,7 @@ import { Button } from "@/ui/Button";
 import { TextArea } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
+import { createAutoSteer } from "./auto-steer";
 import { deferredMessage, entryLabel, isFixed, moveEntry, queueErrorMessage, queuedSummary, rowDelivery, visibleEntries, type QueueAction } from "./queue-model";
 import { enterKeyHint, isSubmitKey, submitKeyFor } from "./submit-key";
 import "./QueuedMessages.css";
@@ -23,6 +24,12 @@ import "./QueuedMessages.css";
  * runner can't take a message mid-run, a row offers Interrupt in place of Steer (#19450); a queue
  * waiting for a run that hasn't started offers Send, and when the server keeps it queued the strip
  * says so (#19370).
+ *
+ * Since the 2026-11-09 sync (U84, #19970): your own plain follow-up is steered into the live run on
+ * its own after five seconds. Its row reads "Sending in Xs" with Edit and Cancel in place of Steer
+ * now; Cancel keeps it queued, with Steer now back. The rules are in queue-model.ts, the countdown in
+ * auto-steer.ts. A run still starting takes the queue into its first turn when Interrupt is pressed
+ * (#20168), and the strip's head says so through the queue's `executionWait.message`.
  */
 
 export function useQueuedComments(taskId: () => string, active: () => boolean) {
@@ -84,6 +91,20 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
 
   const steer = (entry: IssueQueuedCommentEntry) =>
     run("steer", entry.comment.id, () => queuedCommentsApi.steer(props.taskId, entry.comment.id, { ...version(), targetRunId: props.queue.targetRunId! }), [entry.comment.id]);
+  const auto = createAutoSteer({
+    queue: () => props.queue,
+    entries,
+    editingId: () => editing()?.id ?? null,
+    busy: () => !!busy(),
+    steer: (entry) => void steer(entry),
+  });
+  // A new countdown is announced once; the ticking seconds aren't a live region.
+  const [announcement, setAnnouncement] = createSignal("");
+  createEffect(
+    on(auto.counting, (counting) => {
+      if (counting) setAnnouncement("A queued message will be sent into the current run in a few seconds. Edit or Cancel to keep it.");
+    }),
+  );
   const interrupt = () =>
     run("interrupt", "all", () => queuedCommentsApi.interrupt(props.taskId, { ...version(), targetRunId: props.queue.targetRunId }), entries().map((entry) => entry.comment.id));
   const discard = (entry: IssueQueuedCommentEntry) => run("discard", entry.comment.id, () => queuedCommentsApi.discard(props.taskId, entry.comment.id, version()), [entry.comment.id]);
@@ -138,7 +159,16 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
                           </span>
                         </Show>
                         <div class="qm-acts">
-                          <Show when={delivery()}>
+                          <Show when={auto.secondsLeft(entry.comment.id) !== null}>
+                            <span class="qm-countdown">Sending in {auto.secondsLeft(entry.comment.id)}s</span>
+                            <Button size="compact" variant="quiet" title="Edit it before it's sent" onClick={() => setEditing({ id: entry.comment.id, body: entry.comment.body })}>
+                              Edit
+                            </Button>
+                            <Button size="compact" variant="quiet" title="Keep this message in the queue" onClick={() => auto.cancel(entry.comment.id)}>
+                              Cancel
+                            </Button>
+                          </Show>
+                          <Show when={auto.secondsLeft(entry.comment.id) === null && delivery()}>
                             {(found) => (
                               <Button
                                 size="compact"
@@ -152,7 +182,7 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
                               </Button>
                             )}
                           </Show>
-                          <Show when={entry.canEdit && !fixed}>
+                          <Show when={entry.canEdit && !fixed && auto.secondsLeft(entry.comment.id) === null}>
                             <Button size="compact" variant="quiet" disabled={!!busy()} onClick={() => setEditing({ id: entry.comment.id, body: entry.comment.body })}>
                               Edit
                             </Button>
@@ -228,6 +258,9 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
             {deferredMessage(props.queue)}
           </p>
         </Show>
+        <p class="sr-only" aria-live="polite">
+          {announcement()}
+        </p>
         <Show when={error()}>
           <p class="qm-error" role="alert">
             {error()}
