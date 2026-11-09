@@ -5,6 +5,7 @@ import {
   honchoConfig,
   honchoWorkspace,
   instructionsChanged,
+  instructionsConfigured,
   instructionsProblem,
   isHoncho,
   isSheetsRobotConnection,
@@ -22,6 +23,26 @@ import {
 const template = { id: "honcho.usage", version: 1, text: "Use Honcho to recall context." };
 
 describe("agent instructions", () => {
+  it("reaches agents only once the method's required public fields are filled", () => {
+    const methods = [
+      {
+        key: "cloud",
+        tenantFields: [
+          { key: "workspaceId", label: "Workspace", type: "text", required: true },
+          { key: "token", label: "Token", type: "password", required: true },
+        ],
+      },
+      { key: "local", tenantFields: [] },
+    ] as unknown as ConnectionMethodDef[];
+    const connection = (config: Record<string, unknown>) => ({ config, transportConfig: null }) as unknown as ToolConnection;
+    expect(instructionsConfigured({ methods }, connection({ connectionMethodKey: "cloud", methodConfig: {} }))).toBe(false);
+    expect(instructionsConfigured({ methods }, connection({ connectionMethodKey: "cloud", methodConfig: { workspaceId: " w1 " } }))).toBe(true);
+    // The first method when none is named; secrets never count.
+    expect(instructionsConfigured({ methods }, connection({ methodConfig: { workspaceId: "w1" } }))).toBe(true);
+    expect(instructionsConfigured({ methods }, connection({ connectionMethodKey: "local" }))).toBe(true);
+    expect(instructionsConfigured(null, connection({}))).toBe(true);
+  });
+
   it("starts a new connection with the app's instruction, on", () => {
     expect(defaultInstructions(template)).toEqual({ enabled: true, text: template.text, template: { id: "honcho.usage", version: 1 } });
     expect(defaultInstructions(undefined)).toBeNull();

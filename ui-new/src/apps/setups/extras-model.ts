@@ -53,6 +53,22 @@ export function instructionsChanged(value: ConnectionAgentInstructions, template
   return value.text !== template.text || value.template?.id !== template.id || value.template?.version !== template.version;
 }
 
+/**
+ * Whether a connection's instructions can reach agents: the server leaves them out until every
+ * required public field of its method is filled (the shared `connectionInstructionContext`, which
+ * returns null then). An app this Paperclip doesn't list has no fields to fill.
+ */
+export function instructionsConfigured(app: Pick<AppDefinition, "methods"> | null | undefined, connection: Pick<ToolConnection, "config" | "transportConfig">) {
+  const config = { ...connection.transportConfig, ...connection.config } as Record<string, unknown>;
+  const method = app?.methods.find((entry) => entry.key === config.connectionMethodKey) ?? app?.methods[0];
+  const values = config.methodConfig && typeof config.methodConfig === "object" && !Array.isArray(config.methodConfig) ? (config.methodConfig as Record<string, unknown>) : {};
+  return [...(method?.tenantFields ?? []), ...(method?.extensionFields ?? [])].every((field) => {
+    if (field.secret || field.type === "password" || !field.required) return true;
+    const value = values[field.key] ?? field.defaultValue;
+    return !(value === undefined || value === null || (typeof value === "string" && !value.trim()));
+  });
+}
+
 /** The app's instruction again, keeping whether it's on. */
 export function resetInstructions(value: ConnectionAgentInstructions, template: ConnectionInstructionTemplate): ConnectionAgentInstructions {
   return { ...defaultInstructions(template)!, enabled: value.enabled };

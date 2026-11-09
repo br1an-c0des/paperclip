@@ -204,6 +204,15 @@
   color: var(--amber-fg);
 }
 
+/* A connection's instructions on the Instructions page ("From connections"). */
+.ag-conn-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .ag-ok {
   display: inline-flex;
   align-items: center;

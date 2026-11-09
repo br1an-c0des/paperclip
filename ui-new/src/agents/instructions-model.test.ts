@@ -1,6 +1,17 @@
 import type { AgentInstructionCandidate, AgentInstructionsFileSummary } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { actionableCandidates, bundleDraft, bundleSize, bundleUpdate, diffHunks, diffSummary, fileRows, lineDiff, newFileProblem } from "./instructions-model";
+import { actionableCandidates, bundleDraft, bundleSize, bundleUpdate, diffHunks, diffSummary, fileDate, fileRows, lineDiff, newFileProblem } from "./instructions-model";
+
+describe("fileDate", () => {
+  it("prefers the last change, then creation, and invents neither", () => {
+    expect(fileDate({ createdAt: "2026-11-01T10:00:00Z", updatedAt: "2026-11-06T10:00:00Z" })).toEqual({ label: "Updated", at: "2026-11-06T10:00:00Z" });
+    expect(fileDate({ createdAt: "2026-11-01T10:00:00Z" })).toEqual({ label: "Created", at: "2026-11-01T10:00:00Z" });
+    expect(fileDate({ updatedAt: "not a date" })).toBeNull();
+    expect(fileDate({ updatedAt: "1970-01-01T00:00:00Z" })).toBeNull();
+    expect(fileDate({})).toBeNull();
+    expect(fileDate(undefined)).toBeNull();
+  });
+});
 
 const file = (path: string, size = 10, isEntryFile = false) => ({ path, size, isEntryFile }) as AgentInstructionsFileSummary;
 

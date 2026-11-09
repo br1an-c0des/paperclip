@@ -6,6 +6,7 @@ import { createMemo, createSignal, Show, type JSX } from "solid-js";
 import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { runPath } from "@/api/runs";
+import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useLiveRunsQuery } from "@/lib/company-data";
 import { AgentAvatar } from "@/ui/Avatar";
@@ -32,6 +33,7 @@ import { AgentStarButton } from "./AgentStar";
 
 export function AgentHeader(props: { agent: AgentDetail; base: string; view: "chat" | "settings"; chatActions?: JSX.Element }) {
   const company = useCompany();
+  const commands = useCommands();
   const client = useQueryClient();
   const agents = useAgentsQuery();
   const liveRuns = useLiveRunsQuery();
@@ -158,6 +160,11 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
                 <MoreHorizontal size={16} aria-hidden="true" />
               </Menu.Trigger>
               <Menu.Content label="Agent actions" width={260}>
+                <Show when={!retired() && props.agent.status !== "pending_approval"}>
+                  <Menu.Item description={`Assigned to ${props.agent.name}`} onSelect={() => commands.openNewTask({ assigneeAgentId: props.agent.id })}>
+                    New task
+                  </Menu.Item>
+                </Show>
                 <Show when={!retired() && !paused()}>
                   <Menu.Item
                     description="Starts a run now"

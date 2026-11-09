@@ -1,6 +1,7 @@
 import type { AgentConfigRevision, BudgetPolicySummary } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import type { AdapterInfo } from "@/api/agents";
+import type { RunSummary } from "@/api/runs";
 import {
   agentBudgetRequests,
   agentView,
@@ -28,6 +29,7 @@ import {
   runtimeIdentity,
   runtimeProblem,
   runUsage,
+  filterRuns,
   skillToggle,
   textEdit,
 } from "./agent-model";
@@ -403,6 +405,15 @@ describe("skills and runs", () => {
     expect(recommendedForLeads("paperclipai/paperclip/para-memory-files")).toBe(true);
     expect(recommendedForLeads("paperclipai/paperclip/paperclip")).toBe(false);
     expect(recommendedForLeads("paperclipai/paperclip/first-task")).toBe(false);
+  });
+
+  it("filters runs by status group", () => {
+    const runs = ["queued", "running", "succeeded", "failed", "timed_out", "interrupted", "cancelled"].map((status) => ({ status }) as RunSummary);
+    expect(filterRuns(runs, "all")).toHaveLength(7);
+    expect(filterRuns(runs, "active").map((run) => run.status)).toEqual(["queued", "running"]);
+    expect(filterRuns(runs, "failed").map((run) => run.status)).toEqual(["failed", "timed_out", "interrupted"]);
+    expect(filterRuns(runs, "cancelled").map((run) => run.status)).toEqual(["cancelled"]);
+    expect(filterRuns(undefined, "succeeded")).toEqual([]);
   });
 
   it("adds up run usage", () => {
