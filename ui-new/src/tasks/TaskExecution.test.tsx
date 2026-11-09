@@ -9,7 +9,7 @@ let liveRuns: { id: string; issueId: string; status: string }[] = [];
 vi.mock("@/lib/company-data", () => ({ useLiveRunsQuery: () => ({ get data() { return liveRuns; } }) }));
 vi.mock("@/api/task-actions", () => ({ taskActionsApi: { checkMonitorNow: vi.fn(), retryScheduledNow: vi.fn() } }));
 
-const { dateTime, MonitorControl, relativeTime, ScheduledRetryControl } = await import("./TaskExecution");
+const { dateTime, MonitorControl, relativeTime, ScheduledRetryControl, scheduledRetryLabel } = await import("./TaskExecution");
 
 describe("execution times", () => {
   const now = new Date(2026, 9, 26, 10, 0).getTime();
@@ -62,11 +62,14 @@ describe("the monitor and scheduled retry rows (U79)", () => {
     mount(() => <ScheduledRetryControl task={waiting} />);
     expect(screen.getByText("Waiting for workspace")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Retry now" })).toBeNull();
+    // Its row is labelled Workspace, as in the old UI; nothing is being retried.
+    expect(scheduledRetryLabel(waiting)).toBe("Workspace");
   });
 
   it("keeps Retry now for other scheduled retries", () => {
     const retrying = { id: "t1", scheduledRetry: { status: "scheduled_retry", scheduledRetryReason: "transient_failure", scheduledRetryAt: nextCheckAt, scheduledRetryAttempt: 1 } } as unknown as Issue;
     mount(() => <ScheduledRetryControl task={retrying} />);
     expect(screen.getByRole("button", { name: "Retry now" })).toBeTruthy();
+    expect(scheduledRetryLabel(retrying)).toBe("Scheduled retry");
   });
 });

@@ -4,6 +4,7 @@ import {
   CircleAlert,
   FilePen,
   FileText,
+  FoldVertical,
   Globe,
   Info,
   ListTodo,
@@ -20,6 +21,7 @@ import { createStore, reconcile } from "solid-js/store";
 import type { RunDetail } from "@/api/runs";
 import { Markdown } from "@/ui/Markdown";
 import { toolDuration } from "./activity-model";
+import { compactionDetail } from "./compactions";
 import { ActivityRowView, HealthBanner, PlanCard, ProposalCard, ReasoningSections, StatusChipView } from "./RunActivity";
 import { hasReasoningHeadlines, latestReasoningHeadline, reasoningSummarySections } from "./reasoning-summary";
 import type { RunInvocation } from "./invocation";
@@ -43,7 +45,8 @@ import "./RunTranscript.css";
  * it went (`$ command`, an exit chip, its time, a refusal, an auto-review's approval) with an edit's
  * diff inline; subagents are a tree with their own calls; dedicated rows, status chips, the plan,
  * a proposed plan and reasoning headlines come from RunActivity.tsx; an MCP server that failed to
- * start leads the view.
+ * start leads the view. Where the agent compacted its context, a "Context compacted · 230k → 38k
+ * tokens" divider marks the point in the run, as the task thread's does (U58).
  */
 
 const STEP_ICONS: Record<StepKind, (props: { size: number }) => JSX.Element> = {
@@ -306,6 +309,17 @@ function Item(props: {
       </Match>
       <Match when={props.item.kind === "activity" && props.item}>{(activity) => <ActivityRowView row={activity().row} ts={activity().ts} />}</Match>
       <Match when={props.item.kind === "chip" && props.item}>{(chip) => <StatusChipView chip={chip().chip} />}</Match>
+      <Match when={props.item.kind === "compaction" && props.item}>
+        {(compaction) => (
+          <div class="rt-compacted" role="separator" aria-label={["Context compacted", compactionDetail(compaction())].filter(Boolean).join(", ")}>
+            <span class="rt-compacted-label">
+              <FoldVertical size={14} aria-hidden="true" />
+              <b>Context compacted</b>
+              <Show when={compactionDetail(compaction())}>{(detail) => <span>· {detail()}</span>}</Show>
+            </span>
+          </div>
+        )}
+      </Match>
       <Match when={props.item.kind === "subagents" && props.item}>{(group) => <Subagents agents={group().agents} decisionFor={props.decisionFor} />}</Match>
       <Match when={props.item.kind === "plan" && props.item}>{(plan) => <PlanCard plan={plan().plan} />}</Match>
       <Match when={props.item.kind === "proposal" && props.item}>{(proposal) => <ProposalCard markdown={proposal().markdown} streaming={proposal().streaming} />}</Match>

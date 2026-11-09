@@ -29,6 +29,7 @@ import type { ChangeTask } from "./TaskEditors";
  * for that run to save its work (#19519), so it reads "Monitor waits for current run", keeps its
  * scheduled time, and offers no Check now until the run clears. A wait for a busy workspace
  * (`workspace_busy`, #19507) is a quiet status here, with nothing to press: work starts by itself.
+ * Its row reads "Workspace · Waiting for workspace", as in the old UI, not "Scheduled retry".
  */
 
 /** What the monitor says while a run of the task is going, after the old UI's IssueMonitorBanner. */
@@ -273,6 +274,20 @@ export function MonitorControl(props: { task: Issue; onChange: ChangeTask }) {
   );
 }
 
+/** A wait for a busy workspace (`workspace_busy`, #19507), which starts work by itself. */
+export function waitsForWorkspace(task: Pick<Issue, "scheduledRetry">) {
+  return task.scheduledRetry?.status === "scheduled_retry" && task.scheduledRetry.scheduledRetryReason === "workspace_busy";
+}
+
+/**
+ * The row's label: "Workspace" while the wait is for a busy workspace, as the old UI labels it
+ * (ui/src/components/issue-properties/IssueProperties.tsx), since nothing is being retried;
+ * "Scheduled retry" otherwise.
+ */
+export function scheduledRetryLabel(task: Pick<Issue, "scheduledRetry">) {
+  return waitsForWorkspace(task) ? "Workspace" : "Scheduled retry";
+}
+
 /** Shown while the agent's last run is set to try again later. */
 export function ScheduledRetryControl(props: { task: Issue }) {
   const client = useQueryClient();
@@ -280,7 +295,7 @@ export function ScheduledRetryControl(props: { task: Issue }) {
   const retry = () => props.task.scheduledRetry ?? null;
   const continuation = () => retry()?.scheduledRetryReason === "max_turns_continuation";
   // Another task is using the workspace; work starts by itself when it's free (#19507).
-  const workspaceBusy = () => retry()?.scheduledRetryReason === "workspace_busy";
+  const workspaceBusy = () => waitsForWorkspace(props.task);
   const label = () => {
     const at = retry()?.scheduledRetryAt;
     const what = continuation() ? "Continues" : "Retries";

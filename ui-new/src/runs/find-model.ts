@@ -1,3 +1,4 @@
+import { compactionDetail } from "./compactions";
 import { transcriptSteps, visibleItems, type ShowOptions, type TranscriptItem } from "./transcript-model";
 
 /*
@@ -41,6 +42,8 @@ export function itemText(item: TranscriptItem): string {
       return item.markdown;
     case "health":
       return item.failures.map((failure) => `${failure.server} ${failure.reason ?? ""}`).join("\n");
+    case "compaction":
+      return ["Context compacted", compactionDetail(item) ?? ""].join("\n");
   }
 }
 

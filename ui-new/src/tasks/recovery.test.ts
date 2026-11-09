@@ -1,6 +1,6 @@
 import type { TaskInterruptionPresentation } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { pauseDetail, resumeCountdown, retryCountdown, taskNotices, type NoticeInput } from "./recovery";
+import { pauseDetail, resumeCountdown, retryCountdown, scheduledLine, taskNotices, type NoticeInput } from "./recovery";
 
 function interruption(extra: Partial<TaskInterruptionPresentation>): TaskInterruptionPresentation {
   return {
@@ -128,7 +128,7 @@ describe("provider and workspace failures", () => {
 
   it("shows a provider's refusal in place of the plain interruption, or of the wait it caused", () => {
     expect(taskNotices(input({ task: { interruption: interruption({ providerFailure }) } }))).toEqual([
-      { kind: "provider-failure", failure: providerFailure, state: "failed", canRetry: true, nextRetryAt: null, recoveryStep: null },
+      { kind: "provider-failure", failure: providerFailure, state: "failed", canRetry: true, nextRetryAt: null, recoveryStep: null, resuming: false },
     ]);
     const waiting = interruption({ providerFailure, responsibility: "user", state: "waiting_for_user", userAction: "reconnect", canRetry: false });
     expect(kinds(input({ task: { interruption: waiting } }))).toEqual(["provider-failure"]);
@@ -210,6 +210,20 @@ describe("a pending native resume (#19503)", () => {
     expect(taskNotices(input({ task: { interruption: { ...resume, recoveryStep: "checking_previous_run" } } }))[0]).toMatchObject({ resuming: false });
     expect(resumeCountdown("2026-11-06T15:26:18.687Z", Date.parse("2026-11-06T15:25:50.000Z"))).toBe("Resuming in 29s");
     expect(resumeCountdown("2026-11-06T15:30:18.687Z", Date.parse("2026-11-06T15:25:50.000Z"))).toBe("Resuming in 5m");
+  });
+
+  it("reads as resuming under a provider's refusal too, by the same rule", () => {
+    const providerFailure = { schema: "paperclip.provider-failure.v1", provider: "anthropic", phase: "turn", category: "overloaded", message: "Overloaded", retryability: "transient" } as const;
+    const resume = interruption({ state: "retry_scheduled", nextRetryAt: "2026-11-06T15:26:18.687Z", canRetry: false, providerFailure });
+    const [notice] = taskNotices(input({ task: { interruption: resume } }));
+    expect(notice).toMatchObject({ kind: "provider-failure", canRetry: false, resuming: true });
+    const now = Date.parse("2026-11-06T15:25:50.000Z");
+    expect(scheduledLine(notice as Extract<typeof notice, { kind: "provider-failure" }>, now)).toBe("Resuming in 29s by itself.");
+    expect(scheduledLine({ nextRetryAt: "2026-11-06T15:26:18.687Z", recoveryStep: null, resuming: false }, now)).toBe("Trying again in 29s by itself.");
+    expect(scheduledLine({ nextRetryAt: "2026-11-06T15:26:18.687Z", recoveryStep: "Saving files from the previous attempt", resuming: false }, now)).toBe(
+      "Saving files from the previous attempt. Trying again in 29s…",
+    );
+    expect(taskNotices(input({ task: { interruption: { ...resume, canRetry: true } } }))[0]).toMatchObject({ kind: "provider-failure", resuming: false });
   });
 
   it("asks an owner or admin to confirm the previous server stopped", () => {

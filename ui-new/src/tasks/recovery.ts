@@ -24,7 +24,8 @@ import { providerFailureOf, type ProviderFailure } from "@/ui/provider-failure";
  *   (#19840): Recover saved files on a verified source, or the confirmation that the previous
  *   server stopped. A hold whose source can't be verified keeps Retry, which renews the recovery,
  *   so it never dead-ends. A native run the coordinator resumes by itself (#19503: scheduled, with
- *   no Retry and no recovery step) reads "Resuming" with its time, not as a competing Retry.
+ *   no Retry and no recovery step) reads "Resuming" with its time, not as a competing Retry; the
+ *   same rule (`pendingResume`) words it under a provider's refusal and on the list rows' pill.
  * - A task stopped because its agent may not read the project explains that and links to the
  *   agent's project access; once access is added, it offers Retry.
  * - Interruptions waiting on someone (an approval, a reconnect, an assignee, a model, a budget) say
@@ -62,6 +63,8 @@ export type TaskNotice =
       canRetry: boolean;
       nextRetryAt: string | null;
       recoveryStep: string | null;
+      /** A pending native resume (`pendingResume`): its countdown reads "Resuming", not "Trying again". */
+      resuming: boolean;
     }
   /** Paperclip is recovering the previous attempt's saved work before the task goes on. */
   | { kind: "recovering"; step: string }
@@ -91,6 +94,26 @@ export function retainedExportHold(task: Pick<Issue, "executionBlocker">) {
   return !!blocker?.workspaceRepairRequired && RETAINED_EXPORT_CAUSES.has(blocker.cause);
 }
 
+type InterruptionFacts = Pick<TaskInterruptionPresentation, "responsibility" | "state" | "canRetry" | "nextRetryAt"> &
+  Partial<Pick<TaskInterruptionPresentation, "recoveryStep">>;
+
+/** The saved-work step a system wait is for, as words, while it's working or scheduled (#19260). */
+export function recoveryStepOf(interruption: InterruptionFacts | null | undefined): string | null {
+  return interruption?.responsibility === "system" && interruption.recoveryStep && (interruption.state === "working" || interruption.state === "retry_scheduled")
+    ? (RECOVERY_STEP_TEXT[interruption.recoveryStep] ?? null)
+    : null;
+}
+
+/**
+ * A pending native resume (#19503): scheduled, with no Retry and no saved-work step, so the native
+ * coordinator resumes the same run by itself at `nextRetryAt`. It reads "Resuming", never as a
+ * retry to press, wherever the task's interruption shows: the task's notice, under a provider's
+ * refusal, and the list rows' pill. API gap: an accepted Retry still being prepared looks the same.
+ */
+export function pendingResume(interruption: InterruptionFacts | null | undefined): boolean {
+  return !!interruption && interruption.state === "retry_scheduled" && !interruption.canRetry && !recoveryStepOf(interruption) && !!interruption.nextRetryAt;
+}
+
 export type NoticeInput = {
   task: Pick<Issue, "status" | "hiddenAt" | "interruption"> & Partial<Pick<Issue, "executionBlocker">>;
   assignee?: Pick<Agent, "id" | "name" | "status" | "pauseReason"> & Partial<Pick<Agent, "lifecycleState">> | null;
@@ -114,11 +137,8 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
   const interruption = task.interruption ?? null;
   if (task.hiddenAt) notices.push({ kind: "hidden" });
   const failure = providerFailureOf(interruption?.providerFailure);
-  // The saved-work step names what a system wait is for, while it's working or scheduled (#19260).
-  const step =
-    interruption?.responsibility === "system" && interruption.recoveryStep && (interruption.state === "working" || interruption.state === "retry_scheduled")
-      ? (RECOVERY_STEP_TEXT[interruption.recoveryStep] ?? null)
-      : null;
+  const step = recoveryStepOf(interruption);
+  const resuming = pendingResume(interruption);
   // Under a native export hold the files are recovered first (#18848), while the card offers that;
   // otherwise Retry renews the recovery, so it stays (#19840).
   const canRetry = !!interruption?.canRetry && !(retainedExportHold(task) && input.recoveryOwnsRetry !== false);
@@ -139,7 +159,7 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
     !retryWait &&
     (interruption.state === "failed" || interruption.state === "retry_scheduled" || interruption.state === "waiting_for_user")
   ) {
-    notices.push({ kind: "provider-failure", failure, state: interruption.state, canRetry, nextRetryAt: interruption.nextRetryAt, recoveryStep: step });
+    notices.push({ kind: "provider-failure", failure, state: interruption.state, canRetry, nextRetryAt: interruption.nextRetryAt, recoveryStep: step, resuming });
   } else if (step && interruption?.state === "working") {
     notices.push({ kind: "recovering", step });
   } else if (interruption?.responsibility === "system" && (interruption.state === "failed" || interruption.state === "retry_scheduled")) {
@@ -151,7 +171,7 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
       workspaceFailure: interruption.workspaceFailure?.message || null,
       retryWait,
       recoveryStep: step,
-      resuming: interruption.state === "retry_scheduled" && !interruption.canRetry && !step && !!interruption.nextRetryAt,
+      resuming,
     });
   } else if (interruption?.state === "waiting_for_user" && interruption.userAction && interruption.userAction !== "resume" && interruption.userAction !== "project_access") {
     notices.push({ kind: "waiting", action: interruption.userAction });
@@ -193,6 +213,16 @@ export function retryCountdown(nextRetryAt: string | null, now = Date.now()) {
 /** "Resuming in 28s" or "in 3m", counted from now. */
 export function resumeCountdown(nextRetryAt: string | null, now = Date.now()) {
   return retryCountdown(nextRetryAt, now).replace(/^Trying again/, "Resuming");
+}
+
+/**
+ * The line under a provider's refusal while the task goes on by itself: the saved-work step and its
+ * countdown; "Resuming in 28s by itself." for a pending native resume; else "Trying again in 40s by
+ * itself."
+ */
+export function scheduledLine(notice: { nextRetryAt: string | null; recoveryStep: string | null; resuming: boolean }, now = Date.now()) {
+  if (notice.recoveryStep) return `${notice.recoveryStep}. ${retryCountdown(notice.nextRetryAt, now)}…`;
+  return `${notice.resuming ? resumeCountdown(notice.nextRetryAt, now) : retryCountdown(notice.nextRetryAt, now)} by itself.`;
 }
 
 /** "15:26", the time of day a resume is due. */

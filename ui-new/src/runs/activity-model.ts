@@ -14,7 +14,7 @@ const str = (value: unknown) => (typeof value === "string" && value.trim() ? val
 const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined);
 
 /** A provider notice's `details` entry, by name. */
-function noticeDetail(payload: Payload, name: string) {
+export function noticeDetail(payload: Payload, name: string) {
   const details = Array.isArray(payload.details) ? payload.details : [];
   for (const raw of details) {
     const detail = raw && typeof raw === "object" ? (raw as Payload) : null;

@@ -9,6 +9,7 @@ import { useCompany } from "@/lib/company";
 import { Capsule, TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { providerFailureOf, providerFailureTitle } from "@/ui/provider-failure";
+import { pendingResume, timeOfDay } from "./recovery";
 import "./retry.css";
 
 /*
@@ -27,7 +28,13 @@ import "./retry.css";
  * fetched again.
  */
 
-export type RetryOffer = { state: "failed" | "retry_scheduled"; canRetry: boolean; reason: string | null };
+export type RetryOffer = {
+  state: "failed" | "retry_scheduled";
+  canRetry: boolean;
+  reason: string | null;
+  /** When a pending native resume (`pendingResume`, recovery.ts) is due; null for anything else. */
+  resumesAt: string | null;
+};
 
 /**
  * What stopped an interrupted task, in a line for a row's tooltip: the provider's refusal, or the
@@ -49,7 +56,24 @@ export function retryOffer(task: Pick<CompactIssue, "interruption">): RetryOffer
   const interruption = task.interruption;
   if (!interruption || interruption.responsibility !== "system") return null;
   if (interruption.state !== "failed" && interruption.state !== "retry_scheduled") return null;
-  return { state: interruption.state, canRetry: interruption.canRetry, reason: interruptionReason(interruption) };
+  return {
+    state: interruption.state,
+    canRetry: interruption.canRetry,
+    reason: interruptionReason(interruption),
+    resumesAt: pendingResume(interruption) ? interruption.nextRetryAt : null,
+  };
+}
+
+/** The pill's words: "Interrupted", "Resuming soon" for a pending native resume, or "Trying again soon". */
+export function retryPillLabel(offer: RetryOffer) {
+  if (offer.state === "failed") return "Interrupted";
+  return offer.resumesAt ? "Resuming soon" : "Trying again soon";
+}
+
+/** The pill's tooltip: what stopped it, or when a pending resume is due. */
+export function retryPillTitle(offer: RetryOffer) {
+  if (offer.reason) return offer.reason;
+  return offer.resumesAt ? `The last attempt stopped, and Paperclip resumes it by itself at ${timeOfDay(offer.resumesAt)}.` : undefined;
 }
 
 type Retryable = Pick<CompactIssue, "id" | "identifier" | "title" | "interruption">;
@@ -128,20 +152,21 @@ export type TaskRetry = ReturnType<typeof useTaskRetry>;
 
 /**
  * The interruption on a row or card: a red "Interrupted" or amber "Trying again soon" pill, and
- * Retry beside it when the server allows one.
+ * Retry beside it when the server allows one. A pending native resume reads "Resuming soon", with
+ * its time in the tooltip and no Retry, as the task's recovery notice does (#19503).
  */
 export function RetryMark(props: { task: Retryable; retry: TaskRetry }) {
   const offer = () => retryOffer(props.task);
   return (
     <Show when={offer()}>
       {(found) => (
-        <span class="retry-mark" title={found().reason ?? undefined}>
+        <span class="retry-mark" title={retryPillTitle(found())}>
           <TonePill
             tone={found().state === "failed" ? "red" : "amber"}
             compact
             icon={<Capsule gradient={found().state === "failed" ? "flare" : "ember"} size="tiny" />}
           >
-            {found().state === "failed" ? "Interrupted" : "Trying again soon"}
+            {retryPillLabel(found())}
           </TonePill>
           <Show when={found().canRetry}>
             <button
