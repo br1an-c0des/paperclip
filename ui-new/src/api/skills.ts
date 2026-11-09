@@ -28,6 +28,7 @@ import type {
   CompanySkillProjectScanResult,
   CompanySkillStarResult,
   CompanySkillUpdateStatus,
+  SkillSourceUpdateDiff,
   CompanySkillVersion,
   CompanySkillVersionCreateRequest,
   CompanySkillVersionSummary,
@@ -125,6 +126,12 @@ export const skillsApi = {
   /** Whether the skill's origin has a newer version (imported and catalog skills). */
   updateStatus: (companyId: string, skillId: string, signal?: AbortSignal) =>
     api.get<CompanySkillUpdateStatus>(`${skill(companyId, skillId)}/update-status`, { signal }),
+  /**
+   * What a pending update changes, file by file: unified line diffs between the installed and the
+   * latest tracked GitHub revisions (#20155). Unsupported (with a reason) for other origins.
+   */
+  updateDiff: (companyId: string, skillId: string, signal?: AbortSignal) =>
+    api.get<SkillSourceUpdateDiff>(`${skill(companyId, skillId)}/update-diff`, { signal }),
   /** `force` installs an update held for local edits, discarding them. */
   installUpdate: (companyId: string, skillId: string, options: { force?: boolean } = {}) =>
     api.post<CompanySkill>(`${skill(companyId, skillId)}/install-update`, options.force ? { force: true } : {}),

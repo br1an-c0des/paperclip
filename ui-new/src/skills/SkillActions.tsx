@@ -1,7 +1,7 @@
 import type { CompanySkillAuditResult, CompanySkillDetail, CompanySkillVersion, CompanySkillVersionSummary } from "@paperclipai/shared";
 import { useNavigate } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Check, Download, FileText, GitFork, RotateCcw, Star } from "lucide-solid";
+import { Check, Download, FileDiff, FileText, GitFork, RotateCcw, Star } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
 import { createStore } from "solid-js/store";
 import { ApiError } from "@/api/client";
@@ -32,6 +32,7 @@ import {
   type SkillSettingsDraft,
 } from "./skill-settings-model";
 import { comparedPaths, compareSelection, fileChange, slugFor, updateLine, versionName } from "./skills-model";
+import { UpdateDiffDialog } from "./SkillUpdateDiff";
 import "@/documents/DocumentView.css";
 
 /*
@@ -42,7 +43,9 @@ import "@/documents/DocumentView.css";
  *   the agents that use the original onto the copy. The copy opens in the Studio.
  * - Updates (`GET …/update-status`, `POST …/install-update`) for skills from a source, the catalog or
  *   a URL: whether a newer version is out, why it's held, and installing it (anyway, with `force`,
- *   when it's held for edits made here). A catalog skill resets to the catalog's files.
+ *   when it's held for edits made here). A catalog skill resets to the catalog's files. For a skill
+ *   from GitHub, What changed (`GET …/update-diff`, SkillUpdateDiff.tsx) shows the pending update
+ *   file by file before it's installed.
  * - Settings (`PATCH …`, `POST …/rename`): name, description, tagline, categories, author,
  *   homepage, icon, colour and who sees it (skill-settings-model.ts).
  * - The safety check (`POST …/audit`).
@@ -98,6 +101,9 @@ export function UpdateBlock(props: { skill: Pick<CompanySkillDetail, "id" | "nam
   const [installing, setInstalling] = createSignal(false);
   const [forcing, setForcing] = createSignal(false);
   const [resetting, setResetting] = createSignal(false);
+  const [reviewing, setReviewing] = createSignal(false);
+  // The diff covers skills from a tracked GitHub source; for any other skill it only says so.
+  const canReview = () => !!status.data?.hasUpdate && props.skill.sourceType === "github";
 
   const install = async (force = false) => {
     setInstalling(true);
@@ -105,6 +111,7 @@ export function UpdateBlock(props: { skill: Pick<CompanySkillDetail, "id" | "nam
       await skillsApi.installUpdate(company().id, props.skill.id, { force });
       refresh(props.skill.id);
       void client.invalidateQueries({ queryKey: queryKeys.skills.updateStatus(company().id, props.skill.id) });
+      void client.invalidateQueries({ queryKey: queryKeys.skills.updateDiff(company().id, props.skill.id) });
       pushToast({ tone: "success", title: `Updated ${props.skill.name}`, body: "Agents using it get the new version on their next run." });
     } catch (error) {
       pushToast({ tone: "error", title: "Couldn't install the update", body: failureText(error, "") });
@@ -153,6 +160,11 @@ export function UpdateBlock(props: { skill: Pick<CompanySkillDetail, "id" | "nam
                     Install anyway…
                   </Button>
                 </Show>
+                <Show when={canReview()}>
+                  <Button size="compact" icon={<FileDiff size={14} aria-hidden="true" />} onClick={() => setReviewing(true)}>
+                    What changed
+                  </Button>
+                </Show>
                 <Show when={canReset(props.skill)}>
                   <Button size="compact" icon={<RotateCcw size={14} aria-hidden="true" />} disabled={installing()} onClick={() => setResetting(true)}>
                     Reset to catalog…
@@ -172,6 +184,7 @@ export function UpdateBlock(props: { skill: Pick<CompanySkillDetail, "id" | "nam
         danger
         onConfirm={() => install(true)}
       />
+      <UpdateDiffDialog open={reviewing()} onOpenChange={setReviewing} skill={props.skill} />
       <ResetDialog open={resetting()} onOpenChange={setResetting} skill={props.skill} modified={!!status.data?.userModifiedAt || status.data?.updateHoldReason === "local_modifications"} />
     </section>
   );
