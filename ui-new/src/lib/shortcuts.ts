@@ -89,6 +89,10 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     title: "Inbox",
     items: [
       { keys: ["J", "K"], label: "Next or previous" },
+      { keys: ["→"], label: "Open the card (unfold a group)" },
+      { keys: ["←"], label: "Close the card (fold a group)" },
+      { keys: ["Shift", "→"], label: "Open every card" },
+      { keys: ["Shift", "←"], label: "Close every card" },
       { keys: ["Enter"], label: "Open the task" },
       { keys: ["Y"], label: "Clear (archive in Updates)" },
       { keys: ["S"], label: "Snooze until tomorrow" },
