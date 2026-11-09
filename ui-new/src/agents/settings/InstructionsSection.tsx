@@ -185,7 +185,7 @@ function FromConnections(props: { agent: AgentDetail }) {
         >
           <For each={sources()}>
             {(connection) => (
-              <SettingsRow label={<A href={`/${company().issuePrefix}/apps/${connection.id}/permissions`}>{connection.name}</A>}>
+              <SettingsRow label={<A class="ps-link" href={`/${company().issuePrefix}/apps/${connection.id}/permissions`}>{connection.name}</A>}>
                 <div class="ps-stack">
                   <Show when={!connection.agentInstructions!.enabled}>
                     <span class="fhelp ag-warn">These instructions are turned off for this connection.</span>
