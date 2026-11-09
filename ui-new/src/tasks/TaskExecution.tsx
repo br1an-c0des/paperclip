@@ -4,6 +4,7 @@ import { ChevronDown, Clock, RotateCcw } from "lucide-solid";
 import { createSignal, For, Show } from "solid-js";
 import { queryKeys } from "@/api/queryKeys";
 import { taskActionsApi } from "@/api/task-actions";
+import { useLiveRunsQuery } from "@/lib/company-data";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { TextArea, TextInput } from "@/ui/Field";
@@ -23,7 +24,16 @@ import type { ChangeTask } from "./TaskEditors";
  * - Monitor: a re-check scheduled for a time, optionally on an external service, kept in the
  *   execution policy beside the review stages; Check now runs it at once.
  * - Scheduled retry: when the agent's last run is set to try again later, Retry now pulls it forward.
+ *
+ * Since the 2026-11-07 sync (U79): a monitor that comes due while a run of the task is going waits
+ * for that run to save its work (#19519), so it reads "Monitor waits for current run", keeps its
+ * scheduled time, and offers no Check now until the run clears. A wait for a busy workspace
+ * (`workspace_busy`, #19507) is a quiet status here, with nothing to press: work starts by itself.
  */
+
+/** What the monitor says while a run of the task is going, after the old UI's IssueMonitorBanner. */
+export const MONITOR_RUN_WAIT = "Monitor waits for current run";
+export const MONITOR_RUN_WAIT_HINT = "The check can start after the current run finishes saving its work.";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -164,14 +174,19 @@ export function MonitorControl(props: { task: Issue; onChange: ChangeTask }) {
   const [notes, setNotes] = createSignal("");
   const [service, setService] = createSignal("");
   const [checking, setChecking] = createSignal(false);
+  const liveRuns = useLiveRunsQuery();
+  // A run of this task, queued or running: the monitor's check waits for it (#19519).
+  const runGoing = () => (liveRuns.data ?? []).some((run) => run.issueId === props.task.id);
   const policyMonitor = () => props.task.executionPolicy?.monitor ?? null;
   const state = () => props.task.executionState?.monitor ?? null;
   const nextCheckAt = () => state()?.nextCheckAt ?? props.task.monitorNextCheckAt ?? policyMonitor()?.nextCheckAt ?? null;
   const serviceName = () => policyMonitor()?.serviceName ?? state()?.serviceName ?? null;
   const attempts = () => props.task.monitorAttemptCount ?? state()?.attemptCount ?? 0;
+  const waitsForRun = () => !!nextCheckAt() && runGoing();
   const summary = () => {
     const next = nextCheckAt();
     if (!next) return state()?.status === "cleared" ? "Cleared" : null;
+    if (waitsForRun()) return MONITOR_RUN_WAIT;
     return [`Next check ${relativeTime(next)}`, serviceName(), attempts() > 0 ? `attempt ${attempts()}` : null].filter(Boolean).join(" · ");
   };
   const set = (monitor: Parameters<typeof withMonitor>[1]) => {
@@ -208,7 +223,7 @@ export function MonitorControl(props: { task: Issue; onChange: ChangeTask }) {
         setOpen(next);
       }}
     >
-      <Popover.Trigger class="te-trigger" aria-label={`Monitor: ${summary() ?? "none"}. Change`} title={nextCheckAt() ? dateTime(nextCheckAt()!) : undefined}>
+      <Popover.Trigger class="te-trigger" aria-label={`Monitor: ${summary() ?? "none"}. Change`} title={nextCheckAt() ? (waitsForRun() ? `${MONITOR_RUN_WAIT_HINT} Scheduled for ${dateTime(nextCheckAt()!)}.` : dateTime(nextCheckAt()!)) : undefined}>
         <Show when={summary()} fallback={<span class="te-muted">None</span>}>
           {(text) => (
             <>
@@ -229,6 +244,11 @@ export function MonitorControl(props: { task: Issue; onChange: ChangeTask }) {
           }}
         >
           <p class="te-note">Have the agent re-check this task at a set time, such as when an outside service should be done.</p>
+          <Show when={waitsForRun()}>
+            <p class="te-note" role="status">
+              {MONITOR_RUN_WAIT_HINT} Scheduled for {dateTime(nextCheckAt()!)}.
+            </p>
+          </Show>
           <TextInput type="datetime-local" aria-label="Check at" value={at()} onInput={(event) => setAt(event.currentTarget.value)} />
           <TextInput aria-label="What to re-check" placeholder="What should the agent re-check?" value={notes()} onInput={(event) => setNotes(event.currentTarget.value)} />
           <TextInput aria-label="External service (optional)" placeholder="External service (optional)" value={service()} onInput={(event) => setService(event.currentTarget.value)} />
@@ -237,9 +257,11 @@ export function MonitorControl(props: { task: Issue; onChange: ChangeTask }) {
               <Button variant="quiet" size="compact" onClick={() => set(null)}>
                 Clear
               </Button>
-              <Button size="compact" disabled={checking()} onClick={() => void checkNow()}>
-                {checking() ? "Checking…" : "Check now"}
-              </Button>
+              <Show when={!waitsForRun()}>
+                <Button size="compact" disabled={checking()} onClick={() => void checkNow()}>
+                  {checking() ? "Checking…" : "Check now"}
+                </Button>
+              </Show>
             </Show>
             <Button variant="primary" size="compact" type="submit" disabled={!at()}>
               Schedule
@@ -257,6 +279,8 @@ export function ScheduledRetryControl(props: { task: Issue }) {
   const [busy, setBusy] = createSignal(false);
   const retry = () => props.task.scheduledRetry ?? null;
   const continuation = () => retry()?.scheduledRetryReason === "max_turns_continuation";
+  // Another task is using the workspace; work starts by itself when it's free (#19507).
+  const workspaceBusy = () => retry()?.scheduledRetryReason === "workspace_busy";
   const label = () => {
     const at = retry()?.scheduledRetryAt;
     const what = continuation() ? "Continues" : "Retries";
@@ -276,16 +300,25 @@ export function ScheduledRetryControl(props: { task: Issue }) {
   };
   return (
     <Show when={retry()?.status === "scheduled_retry"} fallback={<span class="te-muted">None</span>}>
-      <span class="te-inline te-wrap">
-        <RotateCcw size={14} aria-hidden="true" class="te-caret" />
-        <span title={retry()?.scheduledRetryAt ? dateTime(retry()!.scheduledRetryAt!) : undefined}>{label()}</span>
-        <Show when={(retry()?.scheduledRetryAttempt ?? 0) > 0}>
-          <span class="te-muted">attempt {retry()!.scheduledRetryAttempt}</span>
-        </Show>
-        <button type="button" class="te-chip" disabled={busy()} onClick={() => void now()}>
-          {busy() ? "Retrying…" : continuation() ? "Continue now" : "Retry now"}
-        </button>
-      </span>
+      <Show
+        when={!workspaceBusy()}
+        fallback={
+          <span class="te-muted" title="Another task is using this workspace. Work starts by itself when it's free.">
+            Waiting for workspace
+          </span>
+        }
+      >
+        <span class="te-inline te-wrap">
+          <RotateCcw size={14} aria-hidden="true" class="te-caret" />
+          <span title={retry()?.scheduledRetryAt ? dateTime(retry()!.scheduledRetryAt!) : undefined}>{label()}</span>
+          <Show when={(retry()?.scheduledRetryAttempt ?? 0) > 0}>
+            <span class="te-muted">attempt {retry()!.scheduledRetryAttempt}</span>
+          </Show>
+          <button type="button" class="te-chip" disabled={busy()} onClick={() => void now()}>
+            {busy() ? "Retrying…" : continuation() ? "Continue now" : "Retry now"}
+          </button>
+        </span>
+      </Show>
     </Show>
   );
 }
