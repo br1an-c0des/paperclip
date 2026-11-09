@@ -1,11 +1,12 @@
-import { cleanup, render } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseGitHubLink, patchLines } from "./message-format";
 
 afterEach(cleanup);
 
 vi.mock("@/lib/company", () => ({ useCompany: () => () => ({ id: "co1", issuePrefix: "TES" }) }));
-vi.mock("@solidjs/router", () => ({ useNavigate: () => () => undefined }));
+const navigate = vi.fn();
+vi.mock("@solidjs/router", () => ({ useNavigate: () => navigate }));
 
 const { MessageBody } = await import("./MessageBody");
 
@@ -68,5 +69,18 @@ describe("image grids (U68, #19626)", () => {
     cleanup();
     const single = render(() => <MessageBody source={"![a](/a.png)"} />);
     expect(single.container.querySelector(".msg-images")).toBeNull();
+  });
+});
+
+describe("//PREFIX/... links (U86, #19986)", () => {
+  it("opens the company's own pages in the board, through the router", () => {
+    const { container } = render(() => <MessageBody source={"See [the task](//TES/issues/TES-4#document-plan) and [its run](//TES/agents/a1/runs/r1)."} />);
+    const [task, run] = Array.from(container.querySelectorAll("a"));
+    expect(task!.getAttribute("href")).toBe("/TES/issues/TES-4#document-plan");
+    expect(task!.classList.contains("task-link")).toBe(true);
+    expect(run!.getAttribute("href")).toBe("/TES/agents/a1/runs/r1");
+    expect(run!.hasAttribute("target")).toBe(false);
+    fireEvent.click(run!);
+    expect(navigate).toHaveBeenCalledWith("/TES/agents/a1/runs/r1");
   });
 });
