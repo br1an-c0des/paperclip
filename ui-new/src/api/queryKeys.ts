@@ -70,6 +70,11 @@ export const queryKeys = {
      */
     section: (issueId: string, section: string, ...rest: string[]) => ["issues", "detail", issueId, section, ...rest] as const,
     search: (companyId: string, q: string, limit: number) => ["issues", companyId, "search", q, limit] as const,
+    /**
+     * The composer's @task matches. Apart from `search`, as live events refresh them only when a
+     * task is created, deleted, hidden, unhidden or renamed (U80, lib/live-events.tsx).
+     */
+    mentions: (companyId: string, q: string, limit: number) => ["issues", companyId, "mentions", q, limit] as const,
     labels: (companyId: string) => ["issues", companyId, "labels"] as const,
     /** The runner goal for the task's assignee, or for the agent the composer is about to hand it to. */
     runnerGoal: (issueId: string, agentId: string | null) => ["issues", "detail", issueId, "runner-goal", agentId ?? "__assignee__"] as const,

@@ -1,4 +1,6 @@
 import type { LiveDeliveryClientMessage, LiveEvent, LiveEventType } from "@paperclipai/shared";
+// A runtime import from the shared package, as Avatar.tsx's: the classification must match the server's.
+import { issueActivityChangesTaskIdentity, TASK_IDENTITY_CHANGED_FIELD } from "@paperclipai/shared/issue-activity-identity";
 import type { QueryClient, QueryKey } from "@tanstack/solid-query";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createContext, createEffect, createMemo, createSignal, onCleanup, useContext, type ParentProps } from "solid-js";
@@ -17,7 +19,9 @@ import { connectivity } from "@/lib/offline/connectivity";
  *   alone (`skipOnFirstOpen`).
  * - While the tab is hidden the socket is closed; coming back refreshes active queries.
  * - Each event invalidates the query keys it affects (`invalidateForEvent`), then goes to
- *   subscribers (`useLiveEvent`), so a subscriber sees fresh data.
+ *   subscribers (`useLiveEvent`), so a subscriber sees fresh data. The composer's @task matches,
+ *   though under the task lists, refetch only for a created, deleted, hidden or renamed task
+ *   (`changesTaskMentions`, U80).
  * - Task lists, tasks and the live runs are fetched once more after a burst of events settles
  *   (`createTrailingRefetch`): the refetch an event starts can come back with them as they were.
  * - Run transcripts (`heartbeat.run.log`, `heartbeat.run.event`) come only for the runs on screen
@@ -260,15 +264,45 @@ export function keysForEvent(companyId: string, event: LiveEvent, viewer?: LiveV
   }
 }
 
-function invalidateForEvent(client: QueryClient, companyId: string, event: LiveEvent, trailing: TrailingRefetch, viewer: LiveViewer) {
-  const keys = keysForEvent(companyId, event, viewer);
-  for (const queryKey of keys) {
-    void client.invalidateQueries({ queryKey }, { cancelRefetch: false });
-  }
-  trailing.add(keys);
+/** The composer's @task matches (`queryKeys.issues.mentions`), under the company's task lists. */
+export function isMentionQuery(queryKey: QueryKey) {
+  return queryKey[0] === "issues" && queryKey[2] === "mentions";
 }
 
-export type TrailingRefetch = { add: (keys: readonly QueryKey[]) => void; cancel: () => void };
+/**
+ * Whether an event can change the composer's @task matches (U80, upstream #19931): a task created,
+ * deleted, hidden, unhidden or renamed. Authenticated sockets send task activity without `details`,
+ * so the server adds the closed `taskIdentityChanged` flag; an event with details (local trusted
+ * mode) or from a server without the flag is classified from its action and details, as the old
+ * UI's LiveUpdatesProvider does. The matches show only identifiers and titles, so a comment, a run
+ * or a status change doesn't refetch them.
+ */
+export function changesTaskMentions(event: LiveEvent): boolean {
+  if (event.type !== "activity.logged") return false;
+  const payload = event.payload ?? {};
+  if (payload.entityType !== "issue") return false;
+  const flag = payload[TASK_IDENTITY_CHANGED_FIELD];
+  if (typeof flag === "boolean") return flag;
+  return issueActivityChangesTaskIdentity(payload.action, payload.details);
+}
+
+/** Leaves the @task matches out of an invalidation, unless the events can change them. */
+const mentionFilter = (mentions: boolean) => (mentions ? {} : { predicate: (query: { queryKey: QueryKey }) => !isMentionQuery(query.queryKey) });
+
+function invalidateForEvent(client: QueryClient, companyId: string, event: LiveEvent, trailing: TrailingRefetch, viewer: LiveViewer) {
+  const keys = keysForEvent(companyId, event, viewer);
+  const mentions = changesTaskMentions(event);
+  for (const queryKey of keys) {
+    void client.invalidateQueries({ queryKey, ...mentionFilter(mentions) }, { cancelRefetch: false });
+  }
+  trailing.add(keys, { mentions });
+}
+
+export type TrailingRefetch = {
+  /** `mentions`: whether these events can change the composer's @task matches (`changesTaskMentions`). */
+  add: (keys: readonly QueryKey[], options?: { mentions?: boolean }) => void;
+  cancel: () => void;
+};
 
 /**
  * How long after a run event the live runs are fetched once more. The server doesn't cache them,
@@ -301,7 +335,7 @@ export function createTrailingRefetch(client: QueryClient, delayMs = LIST_CACHE_
     trailingGroup(client, liveRunsDelayMs, (key) => key[0] === "live-runs", () => true),
   ];
   return {
-    add: (eventKeys) => groups.forEach((group) => group.add(eventKeys)),
+    add: (eventKeys, options) => groups.forEach((group) => group.add(eventKeys, options)),
     cancel: () => groups.forEach((group) => group.cancel()),
   };
 }
@@ -313,18 +347,23 @@ function trailingGroup(
   exact: (key: QueryKey) => boolean,
 ): TrailingRefetch {
   const keys = new Map<string, QueryKey>();
+  // Whether any event in the burst can change the @task matches; only then are they fetched again.
+  let mentions = false;
   let timer: number | undefined;
   const run = () => {
     timer = undefined;
     const due = [...keys.values()];
+    const filter = mentionFilter(mentions);
     keys.clear();
-    for (const queryKey of due) void client.invalidateQueries({ queryKey, exact: exact(queryKey) });
+    mentions = false;
+    for (const queryKey of due) void client.invalidateQueries({ queryKey, exact: exact(queryKey), ...filter });
   };
   return {
-    add: (eventKeys) => {
+    add: (eventKeys, options) => {
       const taken = eventKeys.filter(takes);
       if (taken.length === 0) return;
       for (const key of taken) keys.set(JSON.stringify(key), key);
+      mentions ||= options?.mentions !== false;
       window.clearTimeout(timer);
       timer = window.setTimeout(run, delayMs);
     },
@@ -332,6 +371,7 @@ function trailingGroup(
       window.clearTimeout(timer);
       timer = undefined;
       keys.clear();
+      mentions = false;
     },
   };
 }
