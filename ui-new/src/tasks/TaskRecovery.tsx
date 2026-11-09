@@ -3,7 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ChevronDown, LifeBuoy } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { ApiError } from "@/api/client";
-import { issuesApi } from "@/api/issues";
+import { confirmOwnerGone, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
@@ -30,6 +30,7 @@ import {
   resolveBody,
   STOP_EVIDENCE_MIN,
   stopConfirmationBody,
+  stopFormKey,
   type PreviousServerStop,
   type RecoveryOutcome,
 } from "./recovery-actions";
@@ -46,10 +47,10 @@ import { useBoardAccess } from "./TaskActions";
  * Since the 2026-11-07 sync, an action waiting for word that the previous server stopped gets
  * Confirm the previous server stopped, for owners and admins (`previousServerStop`), and the card
  * tells the task's notices whether it offers its own way on (`onOwnsRetry`), so the task's Retry
- * gives way only then (#19840).
+ * gives way only then (#19840). Since the 2026-11-09 sync the same confirmation covers a record
+ * saved before Paperclip stored which server held it (`ownership_owner_unprovable`), keyed by the
+ * record's version so a refreshed record starts a fresh form.
  */
-
-const stopKey = (stop: PreviousServerStop) => (stop.kind === "owner" ? stop.ownerToken : "controller");
 
 const STATE_TONE = { needed: "amber", in_progress: "neutral", observing: "neutral" } as const;
 const STATE_TITLE = { needed: "Recovery needed", in_progress: "Recovery in progress", observing: "Watching the run" } as const;
@@ -119,7 +120,7 @@ export function TaskRecovery(props: { task: Issue; onOwnsRetry?: (owns: boolean)
             </span>
             <Show when={stop()}>
               {(found) => (
-                <Show keyed when={`${props.task.activeRecoveryAction!.id}:${found().runId}:${stopKey(found())}`}>
+                <Show keyed when={stopFormKey(props.task.activeRecoveryAction!.id, found())}>
                   <ConfirmServerStopped stop={found()} action={props.task.activeRecoveryAction!} task={props.task} />
                 </Show>
               )}
@@ -319,6 +320,12 @@ const STOP_COPY = {
   },
 } as const;
 
+/** The form's words: an unprovable record's "resuming" line names what's released (#20067). */
+function stopCopy(stop: PreviousServerStop) {
+  if (stop.kind !== "owner-gone") return STOP_COPY[stop.kind];
+  return { ...STOP_COPY.controller, resuming: stop.resource.releasing };
+}
+
 /**
  * Confirm the previous server stopped (#19717, #19742): a server that can no longer report can't
  * confirm its own stop, so an owner or admin does, once, saying how they checked. The saved result
@@ -331,9 +338,9 @@ function ConfirmServerStopped(props: { stop: PreviousServerStop; action: IssueRe
   const [open, setOpen] = createSignal(false);
   const [evidence, setEvidence] = createSignal("");
   const [sending, setSending] = createSignal(false);
-  const [done, setDone] = createSignal(false);
+  const [done, setDone] = createSignal<string | null>(null);
   const [failure, setFailure] = createSignal<string | null>(null);
-  const copy = () => STOP_COPY[props.stop.kind];
+  const copy = () => stopCopy(props.stop);
   const allowed = () => {
     const current = access();
     return canConfirmServerStop(props.task.companyId, current.access, current.localTrusted);
@@ -346,9 +353,15 @@ function ConfirmServerStopped(props: { stop: PreviousServerStop; action: IssueRe
     setSending(true);
     setFailure(null);
     try {
+      let line = copy().resuming;
       if (data.kind === "owner") await issuesApi.resumeWorkspaceFinalization(props.task.id, data.body);
-      else await issuesApi.confirmControllerStopped(props.task.id, data.body);
-      setDone(true);
+      else if (data.kind === "controller") await issuesApi.confirmControllerStopped(props.task.id, data.body);
+      else {
+        const receipt = await confirmOwnerGone(props.task.id, data.body);
+        // Let go by another path meanwhile: the server closes the request with nothing to confirm.
+        if (receipt.status === "released") line = "It was already released, so no confirmation was needed.";
+      }
+      setDone(line);
       setOpen(false);
     } catch (error) {
       setFailure(error instanceof Error ? error.message : "The confirmation wasn't accepted. Open the task again and try again.");
@@ -362,7 +375,7 @@ function ConfirmServerStopped(props: { stop: PreviousServerStop; action: IssueRe
 
   return (
     <div class="tn-files" data-testid="previous-server-stop">
-      <Show when={!done()} fallback={<span role="status">{copy().resuming}</span>}>
+      <Show when={!done()} fallback={<span role="status">{done()}</span>}>
         <Show
           when={allowed()}
           fallback={<span class="tn-recovery-meta">A company owner or admin can confirm that the previous server stopped.</span>}

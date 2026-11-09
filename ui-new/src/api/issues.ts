@@ -393,3 +393,13 @@ export const issueContextApi = {
    */
   compact: (id: string) => api.post<{ requestId: string; runId: string }>(`/issues/${id}/context/compact`, {}),
 };
+
+/**
+ * An owner's or admin's word that the server holding a record Paperclip can't judge (saved before it
+ * stored which server held it, cause `ownership_owner_unprovable`) has stopped, with how they checked
+ * (20 to 12,000 characters), so recovery releases the record (202; since the 2026-11-09 sync, upstream
+ * #20067, #20084). `recordVersion` is the version the board was shown (`evidence.recordUpdatedAt`): a
+ * record refreshed since is refused with 409. `released` means it was already let go.
+ */
+export const confirmOwnerGone = (id: string, data: { actionId: string; recordId: string; stopEvidence: string; recordVersion?: string }) =>
+  api.post<{ recordId: string; status: "queued" | "released" }>(`/issues/${id}/recovery-actions/confirm-owner-gone`, data);
