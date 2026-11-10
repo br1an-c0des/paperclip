@@ -1,6 +1,6 @@
 import type { Approval, IssueThreadInteraction } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { expiryLabel, plainLine, planLabel, planReviewTarget, referenceImages, requestFromApproval, requestFromInteraction, requestFromReview, signoffOf, suggestedOwner, taskRequests, type RequestContext } from "./request-model";
+import { answerRefusal, expiryLabel, plainLine, refusalCode, SIGN_IN_NEEDED, planLabel, planReviewTarget, referenceImages, requestFromApproval, requestFromInteraction, requestFromReview, signoffOf, suggestedOwner, taskRequests, type RequestContext } from "./request-model";
 
 const ctx: RequestContext = {
   youId: "me",
@@ -97,6 +97,74 @@ describe("interactions as requests", () => {
     expect(request).toMatchObject({ shape: "tool_call", outcome: "apply_and_remember", acts: true, lifetime: "Expires in 10 minutes", lifetimeSoon: true, audience: { label: "People only" } });
     const failed = { ...tool, status: "accepted", resolvedByUserId: "me", result: { version: 1, outcome: "accepted", toolAction: { status: "failed", errorMessage: "checks failed" } } } as unknown as IssueThreadInteraction;
     expect(requestFromInteraction(failed, ctx)).toMatchObject({ verdict: { text: "You approved and ran it", tone: "ok" }, result: { text: "The call failed: checks failed", tone: "bad" } });
+  });
+
+  describe("an approved call waiting on sign-in (U99, #20340)", () => {
+    const waiting = (toolAction: Record<string, unknown>, payloadTool: Record<string, unknown> = {}) =>
+      interaction({
+        kind: "request_confirmation",
+        status: "accepted",
+        resolvedByUserId: "me",
+        payload: { version: 1, prompt: "Send the weekly digest?", toolAction: { previewMarkdown: "", expiresAt: null, connectionId: "conn-1", appDisplayName: "Gmail", ...payloadTool } },
+        result: { version: 1, outcome: "accepted", toolAction },
+      });
+
+    it("keeps the approval and asks to reconnect the app, not 'Running the call…'", () => {
+      const request = requestFromInteraction(waiting({ status: "approved", errorCode: "approved_action_connection_required" }), ctx);
+      expect(request).toMatchObject({
+        state: "settled",
+        verdict: { text: "You approved · Sign-in needed", tone: "mid" },
+        result: { text: SIGN_IN_NEEDED, tone: "mid" },
+        reconnect: { connectionId: "conn-1", appName: "Gmail" },
+      });
+      expect(SIGN_IN_NEEDED).toBe("Your approval is saved. Reconnect the app to continue. Paperclip will check the account and action again before it runs.");
+    });
+
+    it("names the app generically when the call doesn't, and keeps the connection it has", () => {
+      const request = requestFromInteraction(waiting({ status: "approved", errorCode: "approved_action_connection_required" }, { appDisplayName: null, connectionId: null }), ctx);
+      expect(request.reconnect).toEqual({ connectionId: null, appName: "app" });
+    });
+
+    it("an approved call without the code is still running, with nothing to reconnect", () => {
+      const request = requestFromInteraction(waiting({ status: "approved" }), ctx);
+      expect(request).toMatchObject({ result: { text: "Running the call…" }, reconnect: null });
+    });
+
+    it("an open review reads null expiresAt as open until answered", () => {
+      const open = requestFromInteraction(interaction({ kind: "request_confirmation", payload: { version: 1, prompt: "Send it?", toolAction: { previewMarkdown: "", expiresAt: null } } }), ctx);
+      expect(open).toMatchObject({ lifetime: "Open until answered", reconnect: null });
+    });
+  });
+
+  describe("answer refusals", () => {
+    const refused = (message: string, body: unknown) => Object.assign(new Error(message), { status: 409, body });
+
+    it("a reviewed call that changed before it ran: the server's reason, settled, no retry (#20340)", () => {
+      const changed = refused("The app connection or destination changed. A new review is required.", {
+        error: "The app connection or destination changed. A new review is required.",
+        details: { code: "approved_tool_target_changed" },
+      });
+      expect(refusalCode(changed)).toBe("approved_tool_target_changed");
+      expect(answerRefusal(changed)).toEqual({ message: "The app connection or destination changed. A new review is required.", settled: true });
+      const managed = refused("Approved tool action managed arguments changed after review; request a new approval", { code: "approved_tool_managed_arguments_changed" });
+      expect(answerRefusal(managed)).toEqual({ message: "Approved tool action managed arguments changed after review; request a new approval.", settled: true });
+    });
+
+    it("falls back to the code's own words when the server gave none", () => {
+      expect(answerRefusal(refused("approved_tool_target_changed", { details: { code: "approved_tool_target_changed" } }))).toEqual({
+        message: "The reviewed action is no longer current. A new review is required.",
+        settled: true,
+      });
+      expect(answerRefusal(refused("Request failed: 409", { code: "approved_tool_managed_arguments_changed" })).message).toBe(
+        "The call's arguments changed after review. A new review is required.",
+      );
+      expect(answerRefusal(refused("Request failed: 409", { code: "interaction_already_resolved" }))).toEqual({ message: "This request is no longer waiting for a decision.", settled: true });
+    });
+
+    it("anything else keeps its message and may be tried again", () => {
+      expect(answerRefusal(refused("Agent is offline", { error: "Agent is offline" }))).toEqual({ message: "Agent is offline", settled: false });
+      expect(answerRefusal(null)).toEqual({ message: "Couldn't send the answer. Try again.", settled: false });
+    });
   });
 
   it("keeps a confirmation's prompt as Markdown, with a plain title from its first line (#18851)", () => {

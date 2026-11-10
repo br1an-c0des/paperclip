@@ -14,8 +14,8 @@ import { feedKind } from "./inbox-model";
  * - Only the signs that change what you do first: an expiry under a day (red under an hour), Blocks
  *   when the request's task is Blocked, then the kind's own: "3 questions", "Plan v2", "Pick from 4",
  *   "4 items", "Task changed", "3 options", "3 tasks", "$80.25 of $80", "Outside agent",
- *   "Step 1 of 2", "No reviewer", "Waiting on …" (a quieter row), and once settled "Partly applied"
- *   or "Failed".
+ *   "Step 1 of 2", "No reviewer", "Waiting on …" (a quieter row), and once settled "Partly applied",
+ *   "Failed", or "Sign-in needed" for an approved app call waiting on its app (U99, #20340).
  *
  * A row is drawn from the attention feed at once (`AttentionItem.detail` carries the question count,
  * the first question and the suggested-task count) and fills in when the request loads.
@@ -217,6 +217,8 @@ function budgetOf(request: Request) {
 
 /** A settled request's one sign: what still needs a look. */
 export function settledSign(request: Request): RowSign | null {
+  // An approved call waiting for its app to be signed in again (U99, #20340): not failed, but it needs you.
+  if (request.reconnect) return { tone: "warn", icon: "warn", text: "Sign-in needed" };
   if (request.source.type === "decision" && request.source.decision.executionStatus === "partial") return { tone: "mid", text: "Partly applied" };
   if (request.result?.tone === "bad" || request.verdict?.text === "Failed") return { tone: "bad", text: "Failed" };
   if (request.result?.tone === "mid") return { tone: "mid", text: request.source.type === "decision" ? "Partly applied" : "Didn't run" };

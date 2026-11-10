@@ -89,6 +89,11 @@ export type Request = {
   /** For settled requests: what was decided, and what came of it. */
   verdict: { text: string; tone: Tone; at: Date | null } | null;
   result: { text: string; tone: Tone } | null;
+  /**
+   * An approved app call waiting for its connection to be signed in again (U99, #20340): the app to
+   * reconnect, on its permissions page. The approval is kept and runs once the app is back.
+   */
+  reconnect?: { connectionId: string | null; appName: string } | null;
   createdAt: Date;
 };
 
@@ -360,6 +365,78 @@ export function planLabel(target: Pick<PlanReviewTarget, "revisionNumber">) {
   return target.revisionNumber == null ? "Plan" : `Plan v${target.revisionNumber}`;
 }
 
+/** The code an approved app call carries while its connection needs signing in again (#20340). */
+export const CONNECTION_REQUIRED = "approved_action_connection_required";
+
+/** The old UI's sentence for it, which is also the server's `errorMessage`. */
+export const SIGN_IN_NEEDED = "Your approval is saved. Reconnect the app to continue. Paperclip will check the account and action again before it runs.";
+
+/**
+ * An approved app call that waits for its app to be signed in again: `result.toolAction.status`
+ * still "approved", with `errorCode: "approved_action_connection_required"`. The old UI's
+ * "Approved · Sign-in needed" (IssueThreadInteractionCard.tsx `waiting_connection`).
+ */
+export function isWaitingForSignIn(interaction: IssueThreadInteraction) {
+  if (interaction.kind !== "request_confirmation" || interaction.status !== "accepted") return false;
+  const tool = interaction.result?.toolAction;
+  return tool?.status === "approved" && tool.errorCode === CONNECTION_REQUIRED;
+}
+
+/** The app to reconnect for a call waiting on sign-in, or null. */
+export function reconnectOf(interaction: IssueThreadInteraction): Request["reconnect"] {
+  if (interaction.kind !== "request_confirmation" || !isWaitingForSignIn(interaction)) return null;
+  const tool = interaction.payload.toolAction;
+  return { connectionId: tool?.connectionId ?? null, appName: tool?.appDisplayName?.trim() || "app" };
+}
+
+const MOVED_ON = "This request is no longer waiting for a decision.";
+
+/**
+ * Refusals that mean the request moved on, so trying again can't help (the old UI's
+ * INTERACTION_SETTLED_CODES, lib/interaction-resolution-error.ts). Since #20340 an approval is also
+ * refused when the app call it reviewed changed before it ran: its account, credentials,
+ * destination or tool (`approved_tool_target_changed`), or the arguments Paperclip manages
+ * (`approved_tool_managed_arguments_changed`). The server says which and asks for a new review.
+ */
+const SETTLED_REFUSALS: Record<string, string> = {
+  interaction_not_found: MOVED_ON,
+  interaction_already_resolved: MOVED_ON,
+  interaction_superseded: MOVED_ON,
+  interaction_stale_target: MOVED_ON,
+  interaction_issue_closed: MOVED_ON,
+  approved_tool_target_changed: "The reviewed action is no longer current. A new review is required.",
+  approved_tool_managed_arguments_changed: "The call's arguments changed after review. A new review is required.",
+};
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+/** The server's refusal code, from the body or its details. */
+export function refusalCode(error: unknown): string | null {
+  const body = record(record(error)?.body);
+  if (!body) return null;
+  if (typeof body.code === "string" && body.code) return body.code;
+  const details = record(body.details);
+  return typeof details?.code === "string" && details.code ? details.code : null;
+}
+
+/**
+ * What a card says when an answer is refused, and whether the request moved on (`settled`): then
+ * it's read again rather than retried. A settled refusal keeps the server's reason ("The app
+ * connection or destination changed. A new review is required."), else the code's own words.
+ */
+export function answerRefusal(error: unknown): { message: string; settled: boolean } {
+  const code = refusalCode(error);
+  const reason = error instanceof Error ? error.message.trim() : "";
+  if (code && code in SETTLED_REFUSALS) {
+    // A bare code or a status line isn't a reason.
+    const usable = !!reason && reason !== code && !/^Request failed: \d+$/.test(reason) && !/^[a-z]+(?:_[a-z]+)+$/.test(reason);
+    return { message: usable ? (/[.!?]$/.test(reason) ? reason : `${reason}.`) : SETTLED_REFUSALS[code]!, settled: true };
+  }
+  return { message: reason || "Couldn't send the answer. Try again.", settled: false };
+}
+
 /** What was decided, and what came of it, for a settled interaction. */
 export function settledLines(interaction: IssueThreadInteraction, ctx: RequestContext, asker: string): Pick<Request, "verdict" | "result"> {
   const at = date(interaction.resolvedAt ?? interaction.updatedAt);
@@ -377,6 +454,10 @@ export function settledLines(interaction: IssueThreadInteraction, ctx: RequestCo
 
   if (interaction.kind === "request_confirmation" && interaction.result?.toolAction) {
     const tool = interaction.result.toolAction;
+    // Approved, then the app's sign-in lapsed before the call ran (#20340): the approval is kept.
+    if (isWaitingForSignIn(interaction)) {
+      return { verdict: { text: `${by} approved · Sign-in needed`, tone: "mid", at }, result: { text: SIGN_IN_NEEDED, tone: "mid" } };
+    }
     const verdict = { text: interaction.status === "rejected" ? `${by} declined` : `${by} approved${tool.rememberedAction ? " and always allowed it" : " and ran it"}`, tone: interaction.status === "rejected" ? "muted" : "ok", at } as const;
     if (tool.status === "failed") return { verdict, result: { text: `The call failed${tool.errorMessage ? `: ${tool.errorMessage}` : ""}`, tone: "bad" } };
     if (tool.status === "executed") return { verdict, result: { text: tool.resultSummary ?? "The call ran", tone: "ok" } };
@@ -459,6 +540,7 @@ export function requestFromInteraction(interaction: IssueThreadInteraction, ctx:
     state,
     respond: state === "settled" ? { allowed: false, reason: null } : respondOf(interaction, ctx),
     ...settled,
+    reconnect: state === "settled" ? reconnectOf(interaction) : null,
     createdAt: new Date(interaction.createdAt),
   };
 }

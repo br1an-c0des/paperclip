@@ -111,6 +111,21 @@ describe("RequestCard", () => {
     expect(screen.queryByRole("button", { name: /Send/ })).toBeNull();
   });
 
+  it("an approved call waiting on sign-in offers Reconnect <app>, to its permissions page (U99, #20340)", () => {
+    mount({
+      ...question,
+      kind: "request_confirmation",
+      status: "accepted",
+      resolvedByUserId: "me",
+      payload: { version: 1, prompt: "Send the weekly digest?", toolAction: { previewMarkdown: "", expiresAt: null, connectionId: "conn-1", appDisplayName: "Gmail" } },
+      result: { version: 1, outcome: "accepted", toolAction: { status: "approved", errorCode: "approved_action_connection_required" } },
+    } as unknown as IssueThreadInteraction);
+    expect(screen.getByText("You approved · Sign-in needed")).toBeTruthy();
+    expect(screen.getByText(/Your approval is saved\. Reconnect the app to continue\./)).toBeTruthy();
+    expect(screen.queryByText("Running the call…")).toBeNull();
+    expect(screen.getByRole("link", { name: "Reconnect Gmail" }).getAttribute("href")).toBe("/TRA/apps/conn-1/permissions");
+  });
+
   it("links a plan review to the Plan revision it asks about, open or settled (U41)", () => {
     const review = {
       ...question,
