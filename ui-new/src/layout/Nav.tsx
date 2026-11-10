@@ -79,9 +79,9 @@ import "./Nav.css";
  * Your nav (nav-prefs.tsx): projects and agents you've starred sit in Starred above the rest; each
  * project's "…" moves it up or down (your order, kept on the server), stars it or leaves it (out of
  * your nav); each agent's "…" runs it now, pauses or resumes it (org/actions.ts) and stars it.
- * Project rows wait until your order and stars have loaded, so they never reshuffle, and they're
- * keyed by project id, so a refetch of the list updates them in place instead of rebuilding them
- * (and remounting the plugin items under each one). Every section folds from its heading, and `[`
+ * Project rows wait until your order and stars have loaded, so they never reshuffle. Project and
+ * agent rows are keyed by id, so a refetch updates them in place instead of rebuilding them (which
+ * remounted the plugin items under each project and closed an open "…" menu). Every section folds from its heading, and `[`
  * hides the whole nav (the shell then offers it back). The company menu
  * lists companies in the order you gave them on the companies page.
  *
@@ -280,9 +280,10 @@ export function Nav() {
   const stars = useAgentStars();
   const projectStars = useProjectStars();
   const projectOrder = useProjectOrder();
-  const starred = createMemo(() => starredAgents(stars.memberships.data, activeAgents(agents.data)));
+  const agentsById = createMemo(() => new Map(activeAgents(agents.data).map((agent) => [agent.id, agent] as const)));
+  const starred = createMemo(() => starredAgents(stars.memberships.data, [...agentsById().values()]));
   const starredIds = createMemo(() => new Set(starred().map((agent) => agent.id)));
-  const navAgents = createMemo(() => sortAgentsForNav(activeAgents(agents.data), running()));
+  const navAgents = createMemo(() => sortAgentsForNav([...agentsById().values()], running()));
   const otherAgents = createMemo(() => navAgents().filter((agent) => !starredIds().has(agent.id)));
   const runningCount = () => navAgents().filter((agent) => agentState(agent, running()).key === "running").length;
   const openChatAgentId = createMemo(() => {
@@ -302,23 +303,32 @@ export function Nav() {
   // at once from the saved reads (lib/offline/persisted-cache.ts); a read that fails doesn't hold them.
   const projectsArranged = () => projectOrder.settled() && !projectStars.memberships.isLoading;
 
-  // Rows are keyed by project id, not by the project object. Every refetch of the list (a page that
+  // Project and agent rows are keyed by id, not by the object. Every refetch of a list (a page that
   // reads it mounting after 30 seconds, the window regaining focus, a live event, a reload's saved
   // list being replaced) brings new objects, since solid-query keeps no structural sharing; keyed by
-  // object, <For> rebuilt every row, and each row's plugin items mounted again as new React roots,
-  // showing until their plugin's config hid them. A row now stays mounted while its project is
-  // listed, and its name and count follow the latest object.
+  // object, <For> rebuilt every row: each project's plugin items mounted again as new React roots,
+  // showing until their plugin's config hid them, and an agent's open "…" menu closed. A row now
+  // stays mounted while its project or agent is listed, follows the latest object for its id, and
+  // moves when the order changes (running agents go first).
   const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((id, index) => id === b[index]);
-  const starredProjectIds = createMemo(() => starredProjects().map((project) => project.id), [], { equals: sameIds });
-  const otherProjectIds = createMemo(() => otherProjects().map((project) => project.id), [], { equals: sameIds });
+  const idsOf = (list: () => readonly { id: string }[]) => createMemo(() => list().map((item) => item.id), [], { equals: sameIds });
+  // The latest object for an id; the last one stays while a refetch that dropped it removes the row.
+  const latest = <T,>(byId: () => ReadonlyMap<string, T>, id: string) => createMemo<T | undefined>((last) => byId().get(id) ?? last);
+  const starredProjectIds = idsOf(starredProjects);
+  const otherProjectIds = idsOf(otherProjects);
+  const starredAgentIds = idsOf(starred);
+  const otherAgentIds = idsOf(otherAgents);
   const projectRow = (id: string, list: () => Project[]) => {
-    // The latest object for this id; the last one stays while a refetch that dropped it removes the row.
-    const project = createMemo<Project | undefined>((last) => projectsById().get(id) ?? last);
+    const project = latest(projectsById, id);
     return (
       <Show when={project()}>
         {(current) => <NavProject project={current()} base={base()} list={list()} onMove={(delta) => projectOrder.move(list(), id, delta)} />}
       </Show>
     );
+  };
+  const agentRow = (id: string) => {
+    const agent = latest(agentsById, id);
+    return <Show when={agent()}>{(current) => <NavAgent agent={current()} base={base()} running={running()} unread={unreadChats.countFor(id)} />}</Show>;
   };
 
   return (
@@ -381,7 +391,7 @@ export function Nav() {
             <Show when={projectsArranged()}>
               <For each={starredProjectIds()}>{(id) => projectRow(id, starredProjects)}</For>
             </Show>
-            <For each={starred()}>{(agent) => <NavAgent agent={agent} base={base()} running={running()} unread={unreadChats.countFor(agent.id)} />}</For>
+            <For each={starredAgentIds()}>{agentRow}</For>
           </NavSection>
         </Show>
 
@@ -419,8 +429,8 @@ export function Nav() {
             </Show>
           }
         >
-          <For each={otherAgents()} fallback={<Show when={navAgents().length === 0}><p class="nav-empty">No agents yet.</p></Show>}>
-            {(agent) => <NavAgent agent={agent} base={base()} running={running()} unread={unreadChats.countFor(agent.id)} />}
+          <For each={otherAgentIds()} fallback={<Show when={navAgents().length === 0}><p class="nav-empty">No agents yet.</p></Show>}>
+            {agentRow}
           </For>
         </NavSection>
 
