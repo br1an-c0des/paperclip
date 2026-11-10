@@ -9,6 +9,8 @@ import type {
   AgentInstructionsBundle,
   AgentInstructionsFileDetail,
   AgentInstructionSnapshot,
+  AgentInteractionPermissionsPatch,
+  AgentInteractionPermissionsState,
   AgentKeyCreated,
   AgentPermissions,
   AgentProjectAccess,
@@ -331,7 +333,17 @@ export const agentsApi = {
   projectAccess: (id: string, signal?: AbortSignal) => api.get<AgentProjectAccess>(`/agents/${encodeURIComponent(id)}/project-access`, { signal }),
   addProjectAccess: (id: string, projectIds: string[]) =>
     api.post<AgentProjectAccess>(`/agents/${encodeURIComponent(id)}/project-access`, { projectIds }),
-  keys: (id: string, companyId?: string, signal?: AbortSignal) => api.get<AgentKey[]>(agentPath(id, companyId, "/keys"), { signal }),
+  /**
+   * The agent's deny-only interaction switches (U105, upstream #20411): sparse `overrides` and the
+   * resolved `effective` map. Only this route changes `permissions.interactions`; the agent and
+   * `/permissions` routes refuse it (422).
+   */
+  interactionPermissions: (id: string, signal?: AbortSignal) =>
+    api.get<AgentInteractionPermissionsState>(`/agents/${encodeURIComponent(id)}/interaction-permissions`, { signal }),
+  /** Board only. A nonempty partial map; omitted keys keep their value and `null` resets one to its default. */
+  updateInteractionPermissions: (id: string, patch: AgentInteractionPermissionsPatch) =>
+    api.patch<AgentInteractionPermissionsState>(`/agents/${encodeURIComponent(id)}/interaction-permissions`, patch),
+  keys:(id: string, companyId?: string, signal?: AbortSignal) => api.get<AgentKey[]>(agentPath(id, companyId, "/keys"), { signal }),
   createKey: (id: string, name: string, companyId?: string) => api.post<AgentKeyCreated>(agentPath(id, companyId, "/keys"), { name }),
   revokeKey: (id: string, keyId: string, companyId?: string) =>
     api.delete<{ ok: true }>(agentPath(id, companyId, `/keys/${encodeURIComponent(keyId)}`)),

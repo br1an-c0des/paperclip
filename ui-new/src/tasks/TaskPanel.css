@@ -22,7 +22,13 @@
   color: var(--dashed);
 }
 
+/* On a phone the parent task (U104) is the header's context, so the project disc steps aside. */
+:root[data-viewport="phone"] .tp-head:has(.tparent, .tparent-locked) :is(.tp-project, .tp-project + .tp-sep) {
+  display: none;
+}
+
 .tp-id {
+  flex-shrink: 0;
   font-size: 13px;
   color: var(--body);
 }

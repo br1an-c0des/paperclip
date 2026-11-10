@@ -16,6 +16,7 @@ import { Popover } from "@/ui/Popover";
 import { pushToast } from "@/ui/Toast";
 import { taskAssignHelp } from "../agent-model";
 import { CardNote, failure, refreshAgent, SectionTitle, SwitchRow, useAgentSaver } from "../shared";
+import { InteractionsCard } from "./InteractionsCard";
 import {
   BOUNDARY_TYPES,
   boundaryEditable,
@@ -43,6 +44,10 @@ import {
  * takes one target here (a project, a task and its subtasks, or one task), as upstream's community
  * edition edits it; "View policy" lists the rest of the boundary (agents, tools, secrets, where
  * output is promoted), which only the API or the EE extension sets.
+ *
+ * Below Trust, the Interactions card (U105, InteractionsCard.tsx) holds the eleven deny-only
+ * switches for how the agent deals with other agents. They save through their own route; the
+ * `/permissions` body here never carries `interactions`, which that route refuses.
  */
 
 export function PermissionsSection(props: { agent: AgentDetail }) {
@@ -73,7 +78,7 @@ export function PermissionsSection(props: { agent: AgentDetail }) {
 
   return (
     <>
-      <SectionTitle title="Permissions and trust">What {props.agent.name} may do without asking, and which projects it can reach.</SectionTitle>
+      <SectionTitle title="Permissions and trust">What {props.agent.name} may do without asking, which projects it can reach, and how it deals with other agents.</SectionTitle>
       <ProjectAccessCard agent={props.agent} />
       <SettingsCard
         title="Trust"
@@ -94,6 +99,7 @@ export function PermissionsSection(props: { agent: AgentDetail }) {
           onChange={(value) => change({ canAssignTasks: value })}
         />
       </SettingsCard>
+      <InteractionsCard agent={props.agent} />
     </>
   );
 }

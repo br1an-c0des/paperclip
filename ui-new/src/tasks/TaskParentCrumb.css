@@ -1,0 +1,79 @@
+/* The parent task in the task panel's and modal's header (U104). */
+.tparent {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  max-width: 40%;
+  margin-left: 4px;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.tparent:hover {
+  background: var(--well);
+  color: var(--text);
+}
+
+.tparent:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 1px;
+}
+
+.tparent-id {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.tparent-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tparent-sep {
+  color: var(--dashed);
+}
+
+/* A private parent: its number and a lock, nothing to open (like a locked dependency). */
+.tparent-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 4px;
+  padding: 2px 7px;
+  border: 1px dashed var(--dashed);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: default;
+  user-select: none;
+}
+
+.tparent-locked-phone {
+  display: none;
+}
+
+/* On a phone the parent's number gives way to its title, and a private parent reads "Private". */
+:root[data-viewport="phone"] .tparent-id,
+:root[data-viewport="phone"] .tparent-locked-id {
+  display: none;
+}
+
+:root[data-viewport="phone"] .tparent-locked-phone {
+  display: inline;
+}
+
+/* A phone's header is short of room: the parent takes what's left, and (TaskPanel.css,
+   TaskModal.css) the project disc steps aside for it. */
+:root[data-viewport="phone"] .tparent {
+  flex: 0 1 auto;
+  max-width: none;
+  margin-left: 0;
+  padding-inline: 4px;
+}

@@ -38,6 +38,8 @@ export const queryKeys = {
     /** One part of an agent: "runtime-state", "task-sessions", "keys", "config-revisions", "skills"… */
     part: (agentId: string, part: string, ...rest: string[]) => ["agents", "detail", agentId, part, ...rest] as const,
     projectAccess: (agentId: string) => ["agents", "detail", agentId, "project-access"] as const,
+    /** The interaction switches (U105), under the agent so refreshing it refreshes them. */
+    interactionPermissions: (agentId: string) => ["agents", "detail", agentId, "interaction-permissions"] as const,
     instructionsBundle: (agentId: string) => ["agents", "detail", agentId, "instructions-bundle"] as const,
     instructionsFile: (agentId: string, path: string) => ["agents", "detail", agentId, "instructions-bundle", "file", path] as const,
     instructionHistory: (agentId: string, path: string) => ["agents", "detail", agentId, "instructions-bundle", "history", path] as const,
