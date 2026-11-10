@@ -212,8 +212,9 @@
  * A docked panel (Shell.tsx, Panel.tsx): the shell takes the window's height and no more, so the
  * page doesn't scroll. Main scrolls on its own, and the dock column holds the panel from main's top
  * padding to the same gap at the bottom. With room for both (`shell--beside`) the column follows
- * main, 16px from the list: main's scrollbar sits in that gap. Without, it lies over main's right
- * edge, as the dock's own column does (Panel.css).
+ * main, 16px from the list: main's scroll capsule (ui/ScrollCapsule.tsx), which stands in for its
+ * scrollbar, sits in that gap. Without, the panel lies over main's right edge, as the dock's own
+ * column does (Panel.css), and the capsule sits just left of it.
  */
 .shell--split {
   grid-template-rows: 100dvh;
@@ -222,8 +223,12 @@
 
 .shell--split .shell-main {
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--edge) transparent;
+}
+
+/* Main's capsule runs as far as the panel beside it: from main's top padding to the same gap below. */
+.shell > .shell-main-capsule > .scroll-list-rail {
+  top: var(--main-pad-top);
+  bottom: var(--main-pad-top);
 }
 
 /* Shown as soon as a panel is in it, so the panel can take focus before the split class lands */
@@ -248,7 +253,9 @@
   display: contents;
 }
 
+/* Positioned, so the scroll capsules over its frames (Panel.tsx) move with it, as it slides in too. */
 .shell-dock .panel {
+  position: relative;
   pointer-events: auto;
 }
 

@@ -9,6 +9,7 @@ import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
 import { copyText } from "@/tasks/TaskActions";
 import { setTaskOpenMode } from "@/tasks/task-open-mode";
+import { TASK_SECTION_SCROLLERS } from "@/tasks/TaskSections";
 import { InitialsDisc } from "@/ui/Avatar";
 import { Dialog } from "@/ui/Dialog";
 import { Menu } from "@/ui/Menu";
@@ -80,7 +81,7 @@ export function RecurringPanel(props: {
     <Show
       when={props.asModal}
       fallback={
-        <Panel label={`Recurring task: ${title()}`} onClose={props.onClose} toolbar flush header={header()} actions={actions(false)}>
+        <Panel label={`Recurring task: ${title()}`} onClose={props.onClose} toolbar flush scrollers={TASK_SECTION_SCROLLERS} header={header()} actions={actions(false)}>
           {body()}
         </Panel>
       }

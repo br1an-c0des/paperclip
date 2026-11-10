@@ -218,6 +218,60 @@ describe("phone breakpoint", () => {
     expect(screen.queryByRole("complementary")).toBeNull();
   });
 
+  it("gives main and the panel's scrollers the scroll capsule while split, and takes it away after", async () => {
+    resizeTo(1440);
+    const [open, setOpen] = createSignal(true);
+    const [section, setSection] = createSignal<"details" | "activity">("details");
+    render(() => (
+      <Shell nav={<p>Left nav</p>}>
+        <Dock>
+          <p>The list</p>
+          <Show when={open()}>
+            <Panel label="Task TST-1" onClose={() => setOpen(false)} flush scrollers=".scroller">
+              <Show when={section() === "details"} fallback={<div class="scroller">Activity</div>}>
+                <div class="scroller">Details</div>
+                <div class="not-a-scroller">Rail</div>
+              </Show>
+            </Panel>
+          </Show>
+        </Dock>
+      </Shell>
+    ));
+    const shell = document.querySelector(".shell")!;
+    const main = screen.getByRole("main");
+    const panel = screen.getByRole("complementary", { name: "Task TST-1" });
+    await waitFor(() => expect(shell.classList.contains("shell--split")).toBe(true));
+    expect(main.hasAttribute("data-scroll-capsule")).toBe(true);
+    expect(shell.querySelector(":scope > .scroll-capsule.shell-main-capsule")).toBeTruthy();
+    expect(panel.querySelectorAll(":scope > .scroll-capsule")).toHaveLength(1);
+    expect(screen.getByText("Details").hasAttribute("data-scroll-capsule")).toBe(true);
+    expect(screen.getByText("Rail").hasAttribute("data-scroll-capsule")).toBe(false);
+
+    // Switching sections moves the capsule to the new section's scroller.
+    setSection("activity");
+    await waitFor(() => expect(screen.getByText("Activity").hasAttribute("data-scroll-capsule")).toBe(true));
+    expect(panel.querySelectorAll(":scope > .scroll-capsule")).toHaveLength(1);
+
+    setOpen(false);
+    await waitFor(() => expect(shell.classList.contains("shell--split")).toBe(false));
+    expect(main.hasAttribute("data-scroll-capsule")).toBe(false);
+    expect(document.querySelector(".scroll-capsule")).toBeNull();
+  });
+
+  it("gives a panel's own body the capsule when it doesn't name its scrollers", async () => {
+    resizeTo(1440);
+    render(() => (
+      <Shell nav={<p>Left nav</p>}>
+        <Dock>
+          <Panel label="Task TST-1" onClose={() => {}}>
+            <p>Details</p>
+          </Panel>
+        </Dock>
+      </Shell>
+    ));
+    await waitFor(() => expect(document.querySelector(".panel-body")!.hasAttribute("data-scroll-capsule")).toBe(true));
+  });
+
   it("keeps a phone's panel a full-screen page, without splitting", () => {
     resizeTo(375);
     render(() => (
@@ -233,5 +287,8 @@ describe("phone breakpoint", () => {
     expect(panel.classList.contains("panel--page")).toBe(true);
     expect(document.querySelector(".shell-dock")).toBeNull();
     expect(document.querySelector(".shell")!.classList.contains("shell--split")).toBe(false);
+    // A phone keeps the page's own scrolling: no capsules.
+    expect(document.querySelector(".scroll-capsule")).toBeNull();
+    expect(document.querySelector("[data-scroll-capsule]")).toBeNull();
   });
 });

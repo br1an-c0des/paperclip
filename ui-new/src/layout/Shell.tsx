@@ -1,6 +1,7 @@
 import { ChevronsLeft, ChevronsRight, PanelLeftOpen } from "lucide-solid";
 import { batch, createEffect, createSignal, on, onCleanup, onMount, Show, type JSX, type ParentProps } from "solid-js";
 import { buttonClass } from "@/ui/Button";
+import { ScrollCapsule } from "@/ui/ScrollCapsule";
 import { isCompact, MEDIA } from "./breakpoints";
 import { dockBeside } from "./panel-model";
 import { ShellDockContext } from "./Panel";
@@ -48,7 +49,9 @@ import "./Shell.css";
  * and the panel fills the column from main's top padding to the same gap at the bottom, scrolling
  * inside. With room for both (panel-model.ts `dockBeside`), the column sits beside main
  * (`shell--beside`); without, it lies over main's right edge. Main picks up the page's scroll
- * position as it splits, and hands it back when the panel closes on the same page.
+ * position as it splits, and hands it back when the panel closes on the same page. While split, main
+ * and the panel's frames show the scroll capsule in place of their scrollbars (ui/ScrollCapsule.tsx):
+ * main's runs down its right edge, or, while the panel lies over that edge, just left of the panel.
  */
 
 /** The fold's two steps (Shell.css and Nav.css keep the same timings). */
@@ -196,6 +199,8 @@ export function Shell(
   // The split class is set here, not in `classList`, so the scroll position can move across in the
   // same step: read before the layout changes, written after.
   let splitPath: string | undefined;
+  // Main's scroll capsule comes and goes with the class, once main scrolls on its own.
+  const [splitOn, setSplitOn] = createSignal(false);
   createEffect(
     on(
       split,
@@ -206,7 +211,9 @@ export function Shell(
           shellEl.classList.add("shell--split");
           mainEl.scrollTop = y;
           splitPath = window.location.pathname;
+          setSplitOn(true);
         } else {
+          setSplitOn(false);
           const y = mainEl.scrollTop;
           shellEl.classList.remove("shell--split");
           // Only on the same page: a link elsewhere starts its page at the top.
@@ -302,6 +309,16 @@ export function Shell(
           </Show>
           {props.children}
         </main>
+        <Show when={splitOn() && mainEl}>
+          {(main) => (
+            <ScrollCapsule
+              scroller={main()}
+              class="shell-main-capsule"
+              // Lying over main, the panel covers its right edge: the capsule sits just left of it.
+              right={() => (beside() ? undefined : (dockHost()?.getBoundingClientRect().left ?? Infinity) - 4)}
+            />
+          )}
+        </Show>
         <Show when={!isCompact()}>
           <div ref={setDockHost} class="shell-dock" />
         </Show>
