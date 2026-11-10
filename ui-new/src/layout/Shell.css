@@ -50,7 +50,7 @@
 /*
  * The seam between nav and main (Shell.tsx): a 10px strip holding the resize handle (NavResizer),
  * drawn as a pill line when you point at it, drag it or focus it, and the round tab that folds the
- * nav to the rail and back, which appears on it as you point at the seam. While a drag would snap
+ * nav to the rail and back, which appears on it as you point at the nav or the seam. While a drag would snap
  * the nav to the rail, open the rail out or hide the nav, the nav dims to say so.
  */
 .shell-seam {
@@ -98,6 +98,16 @@
   opacity: 1;
   pointer-events: auto;
   transition-delay: 0.15s;
+}
+
+/* Pointing anywhere over the nav shows it too, so it's easy to find (not on touch, where a tap
+   would leave it showing). */
+@media (hover: hover) {
+  .shell-nav:hover + .shell-seam .shell-seam-tab {
+    opacity: 1;
+    pointer-events: auto;
+    transition-delay: 0.15s;
+  }
 }
 
 .shell-seam-tab:focus-visible {
