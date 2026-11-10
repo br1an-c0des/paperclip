@@ -16,6 +16,7 @@ import {
   Plug,
   Plus,
   Radar,
+  Repeat,
   Search,
   Settings2,
   Star,
@@ -50,31 +51,40 @@ import { Menu } from "@/ui/Menu";
 import { ScrollList } from "@/ui/ScrollList";
 import { TaskStatusCapsule } from "@/ui/Status";
 import { navSection, setNavHidden, useCompanyOrder, useProjectOrder, useProjectStars, useRecentTasks } from "./nav-prefs";
-import { showStatusLink, visibleProjects } from "./nav-model";
+import { isProjectPage, showStatusLink, visibleProjects } from "./nav-model";
 import { openChatAgentKey } from "@/chat/chat-model";
 import { ChatUnreadBadge, useUnreadChats } from "@/chat/chat-read";
 import "@/ui/nav.css";
 import "./Nav.css";
 
 /*
- * The left nav (board 1, on every board): company switcher with search and new task; Org dashboard
- * and Inbox with its badge (what's waiting on you, as the Inbox's Needs you tab counts it); what
- * you starred; projects with their task counts; agents with their live state; the tasks you opened
- * lately; you and settings at the bottom. The item owning the current page is raised with the --sel
+ * The left nav (board 1, on every board): the company row, the tools row (search and new task),
+ * Inbox with its badge (what's waiting on you, as the Inbox's Needs you tab counts it); what you
+ * starred; projects with their task counts; agents with their live state; the tasks you opened
+ * lately; Apps and you at the bottom. The item owning the current page is raised with the --sel
  * pill: the router marks it `.active` for every page under it, and `aria-current` on the exact page.
  *
- * "Org dashboard" stays raised on every organization page (the roster at `/agents`, workload and the
- * org tabs; `isOrgPage`), as boards 20 and 33 draw it. The + beside "Projects" opens New project (board N1).
+ * The company row ("layout B") is the company's disc and name, a link to its dashboard that took
+ * over from the old "Org dashboard" item: it stays raised on every organization page (the roster at
+ * `/agents`, workload and the org tabs; `isOrgPage`), as boards 20 and 33 draw it, with
+ * `aria-current` on the dashboard itself. The Repeat button at its end, and only that, opens the
+ * company menu. A plugin's `organizationSwitcher` replaces the whole row (it draws the current
+ * company and its own menu, as the old sidebar's company row did). Under it, the tools row: a
+ * search field that opens the ⌘K palette and New task (`C`). Company settings is on the dashboard
+ * header and in the palette; the You row holds only your menu.
+ *
+ * A project row opens the project's tasks (its List view, `/projects/:key/issues`) and stays raised
+ * on all the project's pages (`isProjectPage`). The + beside "Projects" opens New project (board N1).
  *
  * Your nav (nav-prefs.tsx): projects and agents you've starred sit in Starred above the rest; each
  * project's "…" moves it up or down (your order, kept on the server), stars it or leaves it (out of
  * your nav); each agent's "…" runs it now, pauses or resumes it (org/actions.ts) and stars it.
  * Project rows wait until your order and stars have loaded, so they never reshuffle. Every section
- * folds from its heading, and `[` hides the whole nav (the shell then offers it back). The switcher
+ * folds from its heading, and `[` hides the whole nav (the shell then offers it back). The company menu
  * lists companies in the order you gave them on the companies page.
  *
- * Three zones: the company switcher, Org dashboard, Inbox and Status stay pinned at the top; Apps,
- * you and settings stay pinned at the bottom; between them Starred, Projects, Agents, Recent tasks
+ * Three zones: the company row, the tools row, Inbox and Status stay pinned at the top; Apps and
+ * you stay pinned at the bottom; between them Starred, Projects, Agents, Recent tasks
  * and plugins' sections each scroll on their own, without the browser's scrollbar: a slim
  * gradient capsule shows where you are, or on a touch screen the edge with more beyond it glows
  * (ui/ScrollList.tsx). A short list keeps its height; long ones share what's left (Nav.css).
@@ -87,21 +97,10 @@ import "./Nav.css";
  * Status (status cards, decision 39, D3) sits under Inbox while the instance has `enableStatusCards`
  * on, as in the old sidebar.
  *
- * Plugins' global toolbar buttons sit under the company switcher; the switcher offers Create
+ * Plugins' global toolbar buttons sit under the tools row; the company menu offers Create
  * organization (the onboarding page) when you may create one. The You menu holds View profile and,
  * with `enableServerInfoDebugView` on, the server's restart time, commit and checkout state.
  */
-
-function OrgIcon() {
-  return (
-    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
-      <rect x="3" y="3" width="7" height="9" rx="3.5" />
-      <rect x="14" y="3" width="7" height="5" rx="2.5" />
-      <rect x="14" y="12" width="7" height="9" rx="3.5" />
-      <rect x="3" y="16" width="7" height="5" rx="2.5" />
-    </svg>
-  );
-}
 
 function InboxIcon() {
   return (
@@ -112,32 +111,44 @@ function InboxIcon() {
   );
 }
 
-function SettingsIcon() {
+/** The palette's shortcut as this keyboard writes it. "Ctrl K" is wider, so it gives way sooner (Nav.css). */
+const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+const PALETTE_HINT = IS_MAC ? "⌘K" : "Ctrl K";
+
+/**
+ * The company row: the company's disc and name link to its dashboard, raised on every organization
+ * page as "Org dashboard" was; the Repeat button at its end opens the company menu.
+ */
+function CompanyRow() {
+  const company = useCompany();
+  const location = useLocation();
+  /** Every organization page (the roster, workload, the org tabs) raises the company row. */
+  const orgPage = () => isOrgPage(location.pathname, company().issuePrefix);
   return (
-    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-      <path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1" />
-      <circle cx="15" cy="6" r="2" />
-      <circle cx="9" cy="12" r="2" />
-      <circle cx="17" cy="18" r="2" />
-    </svg>
+    <div class="company-row">
+      <A class="navi company-link" href={`/${company().issuePrefix}/dashboard`} classList={{ active: orgPage() }} title={company().name}>
+        <span class="company-mark grained" aria-hidden="true">
+          <InitialsDisc name={company().name.slice(0, 1)} seed={company().id} size={28} />
+          <Grain />
+        </span>
+        <span class="company-name disp">{company().name}</span>
+      </A>
+      <CompanyMenu />
+    </div>
   );
 }
 
-function CompanySwitcher() {
+/** The company menu: companies in your order, All companies, and Create organization. */
+function CompanyMenu() {
   const company = useCompany();
   const companies = useCompaniesQuery();
   const order = useCompanyOrder();
   const navigate = useNavigate();
   const canCreate = useCanCreateCompany();
   return (
-    <Menu>
-      <Menu.Trigger class="company-switch" aria-label={`Company: ${company().name}. Switch company`}>
-        <span class="company-switch-mark grained" aria-hidden="true">
-          <InitialsDisc name={company().name.slice(0, 1)} seed={company().id} size={28} />
-          <Grain />
-        </span>
-        <span class="company-switch-name disp">{company().name}</span>
-        <ChevronDown size={14} aria-hidden="true" class="company-switch-caret" />
+    <Menu placement="bottom-end">
+      <Menu.Trigger class={buttonClass({ variant: "icon", ghost: true }) + " company-switch"} aria-label="Switch company" title="Switch company">
+        <Repeat size={16} aria-hidden="true" />
       </Menu.Trigger>
       <Menu.Content label="Companies" width={260}>
         <Menu.Group label="Companies">
@@ -209,13 +220,6 @@ function YouRow() {
           </Show>
         </Menu.Content>
       </Menu>
-      <A
-        class={buttonClass({ variant: "icon", ghost: true })}
-        href={`/${company().issuePrefix}/company/settings`}
-        aria-label="Settings"
-      >
-        <SettingsIcon />
-      </A>
     </div>
   );
 }
@@ -270,8 +274,6 @@ export function Nav() {
   const location = useLocation();
 
   const base = () => `/${company().issuePrefix}`;
-  /** Every organization page (the roster, workload, the org tabs) raises "Org dashboard". */
-  const orgPage = () => isOrgPage(location.pathname, company().issuePrefix);
   const running = createMemo(() => runningAgentIds(liveRuns.data));
   const stars = useAgentStars();
   const projectStars = useProjectStars();
@@ -310,34 +312,37 @@ export function Nav() {
       <div class="nav-zone nav-zone--top">
         <div class="nav-top">
           <PluginOrganizationSwitcher>
-            <CompanySwitcher />
+            <CompanyRow />
           </PluginOrganizationSwitcher>
-          <button
-            type="button"
-            class={buttonClass({ variant: "icon", ghost: true })}
-            aria-label="Search and commands"
-            aria-keyshortcuts="Control+K Meta+K"
-            onClick={() => commands.setPaletteOpen(true)}
-          >
-            <Search size={16} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            class={buttonClass({ variant: "icon" })}
-            aria-label="New task"
-            aria-keyshortcuts="C"
-            onClick={() => commands.openNewTask()}
-          >
-            <Plus size={16} stroke-width={2.2} aria-hidden="true" />
-          </button>
+          <div class="nav-tools">
+            <button
+              type="button"
+              class="nav-search"
+              aria-label="Search and commands"
+              aria-keyshortcuts="Control+K Meta+K"
+              onClick={() => commands.setPaletteOpen(true)}
+            >
+              <Search size={15} aria-hidden="true" />
+              <span class="nav-search-label">Search…</span>
+              <kbd class="nav-search-kbd" classList={{ "nav-search-kbd--long": !IS_MAC }} aria-hidden="true">
+                {PALETTE_HINT}
+              </kbd>
+            </button>
+            <button
+              type="button"
+              class={buttonClass({ variant: "secondary" }) + " nav-new-task"}
+              aria-label="New task"
+              aria-keyshortcuts="C"
+              onClick={() => commands.openNewTask()}
+            >
+              <Plus size={15} stroke-width={2.4} aria-hidden="true" />
+              Task
+            </button>
+          </div>
         </div>
         <GlobalToolbarPlugins />
 
         <div class="nav-group">
-          <A class="navi" href={`${base()}/dashboard`} classList={{ active: orgPage() }}>
-            <OrgIcon />
-            Org dashboard
-          </A>
           <A class="navi navi--badged" href={`${base()}/inbox`}>
             <InboxIcon />
             Inbox
@@ -440,13 +445,16 @@ export function Nav() {
 function NavProject(props: { project: Project; base: string; list: Project[]; onMove: (delta: -1 | 1) => void }) {
   const stars = useProjectStars();
   const navigate = useNavigate();
+  const location = useLocation();
   const href = () => `${props.base}/projects/${props.project.urlKey}`;
+  // The row opens the project's tasks (its List view) and stays raised on all of its pages.
+  const onProject = () => isProjectPage(location.pathname, props.base.slice(1), props.project);
   const index = () => props.list.findIndex((entry) => entry.id === props.project.id);
   const starred = () => stars.starred(props.project.id);
   return (
     <>
       <div class="nav-row">
-        <A class="navi navi--disc" href={href()}>
+        <A class="navi navi--disc" href={`${href()}/issues`} classList={{ active: onProject() }}>
           <InitialsDisc name={props.project.name.slice(0, 1)} seed={props.project.id} size={24} />
           <span class="navi-label">{props.project.name}</span>
           <Show when={props.project.taskCount !== undefined}>

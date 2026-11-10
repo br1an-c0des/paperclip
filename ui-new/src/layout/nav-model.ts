@@ -40,6 +40,24 @@ export function visibleProjects<T extends { id: string }>(projects: readonly T[]
   return projects.filter((project) => memberships.projectMemberships?.[project.id] !== "left");
 }
 
+/**
+ * Whether a page is one of this project's (`/:prefix/projects/:key/...`: its dashboard, tasks, board,
+ * settings), addressed by its URL key or its id. Its nav row links to the task list but stays raised
+ * on all of them.
+ */
+export function isProjectPage(pathname: string, prefix: string, project: { id: string; urlKey: string }): boolean {
+  const base = `/${prefix.toLowerCase()}/projects/`;
+  if (!pathname.toLowerCase().startsWith(base)) return false;
+  const segment = pathname.slice(base.length).split("/", 1)[0]!;
+  let key: string;
+  try {
+    key = decodeURIComponent(segment).toLowerCase();
+  } catch {
+    key = segment.toLowerCase();
+  }
+  return key !== "" && (key === project.urlKey.toLowerCase() || key === project.id.toLowerCase());
+}
+
 // ---------------------------------------------------------------------------------------------
 // Recent tasks
 
