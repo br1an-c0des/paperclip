@@ -1,0 +1,40 @@
+/* The Interactions card (U105): two groups of switch rows under a small heading each. */
+.ix-group + .ix-group {
+  border-top: 1px solid var(--line);
+}
+
+.ix-group-title {
+  margin: 0;
+  padding: 14px 20px 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* The first row under a heading sits right below it, without a rule. */
+.ix-group-title + .frow {
+  border-top: 0;
+  padding-top: 8px;
+}
+
+.ix-override {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--amber-fg);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ix-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.ix-foot > .btn {
+  margin-left: auto;
+}
