@@ -1,0 +1,9 @@
+/* A settings section beside the settings sidebar (SettingsBody.tsx): no rail column, the full width. */
+.settings-body--wide {
+  padding-top: 0;
+}
+
+.settings-body--wide > .rail-content {
+  flex: 1 1 100%;
+  max-width: none;
+}

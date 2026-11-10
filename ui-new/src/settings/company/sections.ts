@@ -4,7 +4,13 @@
  *
  * Plugin settings pages keep the old UI's address, `/company/settings/<routePath>`, so any other
  * first segment is a plugin page candidate; the page checks it against the installed plugins.
+ *
+ * `companySettingsEntries` is the section list itself, headings and plugin pages included, which
+ * both the page's rail on a phone and the settings sidebar draw (company-sections.ts).
  */
+
+import type { SettingsEntry } from "../SettingsBody";
+import type { PluginSettingsPage } from "./plugin-pages";
 
 export type SectionKey = "general" | "members" | "connections" | "secrets" | "budgets" | "environments" | "transfer";
 
@@ -19,6 +25,20 @@ export const SECTIONS: readonly SectionDef[] = [
   { key: "environments", label: "Environments", path: "/environments" },
   { key: "transfer", label: "Import and export", path: "/transfer" },
 ];
+
+/** The overview of plugin pages, shown when no plugin adds one; the segment no plugin is expected to claim. */
+export const PLUGINS_PATH = "plugins";
+
+/** The section list under `base`: the organization's sections, then the pages plugins add. */
+export function companySettingsEntries(base: string, pages: readonly Pick<PluginSettingsPage, "label" | "routePath">[]): SettingsEntry[] {
+  return [
+    { heading: "Organization" },
+    ...SECTIONS.map((section) => ({ key: section.key, label: section.label, href: `${base}${section.path}`, end: section.path === "" })),
+    { heading: "From plugins" },
+    ...pages.map((page) => ({ key: `plugin:${page.routePath}`, label: page.label, href: `${base}/${page.routePath}`, tag: "plugin" })),
+    ...(pages.length === 0 ? [{ key: PLUGINS_PATH, label: "Plugin pages", href: `${base}/${PLUGINS_PATH}`, tag: "none" }] : []),
+  ];
+}
 
 export type Route =
   | { kind: "section"; key: SectionKey }

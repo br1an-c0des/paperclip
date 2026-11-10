@@ -10,6 +10,9 @@ import "./Shell.css";
  * 248px nav column is the only fixed track, and main is `minmax(0, 1fr)`. Side panels dock beside
  * the list they were opened from, inside main (<Dock> in Panel.tsx).
  *
+ * App settings and Company settings put their own sidebar in the nav slot (SettingsNav.tsx), with
+ * the same width, handle and hiding.
+ *
  * `navHidden` (`[`, or Hide navigation in the You menu) drops the nav column; a button at the top
  * left of main brings it back.
  *
@@ -27,8 +30,10 @@ import "./Shell.css";
 
 export function Shell(
   props: ParentProps<{
-    /** The left nav, on tablet and desktop. */
+    /** The left nav, on tablet and desktop: the main nav, or in settings the settings sidebar. */
     nav: JSX.Element;
+    /** The nav landmark's name ("Main" by default). */
+    navLabel?: string;
     /** The floating dock that replaces the nav on a phone. */
     dock?: JSX.Element;
     navHidden?: boolean;
@@ -52,7 +57,7 @@ export function Shell(
       style={props.navWidth ? { "--nav-w": `${props.navWidth}px` } : undefined}
     >
       <Show when={!isCompact() && !props.navHidden}>
-        <nav class="shell-nav" id="shell-nav" aria-label="Main">
+        <nav class="shell-nav" id="shell-nav" aria-label={props.navLabel ?? "Main"}>
           {props.nav}
         </nav>
         <Show when={props.onNavWidth}>
