@@ -323,6 +323,7 @@ export const WAITING_TEXT: Record<Extract<TaskNotice, { kind: "waiting" }>["acti
   choose_model: "The provider turned down the agent's model. Choose another model to carry on.",
   budget: "Stopped by a budget limit. It carries on when the budget resets or is raised.",
   confirm_owner_stop: "Paperclip can't tell whether the previous server stopped. An owner or admin needs to confirm it stopped before the agent can go on.",
+  confirm_run_stopped: "Paperclip can't confirm that the previous run stopped. An owner or admin needs to confirm it stopped before your Retry starts.",
 };
 
 /** Why an agent was paused, after the old UI's IssueAssigneePausedNotice. */
