@@ -20,8 +20,16 @@ import "./Menu.css";
 
 type RootProps = ComponentProps<typeof KMenu>;
 
+/*
+ * An anchored menu leaves the page's scrollbar alone. Kobalte's menus are modal, and a modal menu
+ * also locks the page's scroll by hiding its scrollbar and padding <html> to make up the width;
+ * anything sized to the window (fixed layers, toasts) still moves, and the page shifts if the
+ * padding doesn't match the scrollbar exactly. The menu stays modal (focus stays in it, outside
+ * clicks close it, the page is hidden from screen readers) and follows its trigger if the page
+ * scrolls. A bottom sheet on a phone still locks the page under it.
+ */
 function Root(props: RootProps) {
-  return <KMenu gutter={8} placement="bottom-start" {...props} />;
+  return <KMenu gutter={8} placement="bottom-start" preventScroll={layerMode() === "sheet"} {...props} />;
 }
 
 function Content(props: ParentProps<{ label?: string; width?: number; class?: string }>) {

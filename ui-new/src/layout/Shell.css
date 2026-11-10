@@ -209,6 +209,75 @@
 }
 
 /*
+ * A docked panel (Shell.tsx, Panel.tsx): the shell takes the window's height and no more, so the
+ * page doesn't scroll. Main scrolls on its own, and the dock column holds the panel from main's top
+ * padding to the same gap at the bottom. With room for both (`shell--beside`) the column follows
+ * main, 16px from the list: main's scrollbar sits in that gap. Without, it lies over main's right
+ * edge, as the dock's own column does (Panel.css).
+ */
+.shell--split {
+  grid-template-rows: 100dvh;
+  height: 100dvh;
+}
+
+.shell--split .shell-main {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--edge) transparent;
+}
+
+/* Shown as soon as a panel is in it, so the panel can take focus before the split class lands */
+.shell-dock {
+  grid-area: main;
+  justify-self: end;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  width: min(620px + var(--main-pad-end), 100%);
+  min-height: 0;
+  padding: var(--main-pad-top) var(--main-pad-end) var(--main-pad-top) 0;
+  pointer-events: none;
+}
+
+.shell-dock:empty {
+  display: none;
+}
+
+/* The portal's own wrapper (Panel.tsx) steps aside, so the panel lays out in the column. */
+.shell-dock > div {
+  display: contents;
+}
+
+.shell-dock .panel {
+  pointer-events: auto;
+}
+
+.shell--split:not(.shell--beside) .shell-dock .panel:not(:focus-visible) {
+  box-shadow: var(--shadow-lg);
+}
+
+.shell--split.shell--beside {
+  grid-template-columns: var(--nav-w) minmax(0, 1fr) calc(628px + var(--main-pad-end));
+  grid-template-areas: "nav main dock";
+}
+
+.shell--split.shell--beside.shell--bare {
+  grid-template-columns: minmax(0, 1fr) calc(628px + var(--main-pad-end));
+  grid-template-areas: "main dock";
+}
+
+.shell--split.shell--beside .shell-main {
+  padding-right: 8px;
+}
+
+.shell--split.shell--beside .shell-dock {
+  grid-area: dock;
+  justify-self: stretch;
+  width: auto;
+  padding-left: 8px;
+}
+
+/*
  * Phone: one column and no left nav. The floating dock (PhoneDock.css) sits over the foot of main,
  * so main leaves room for it: the dock's 56px, its 18px gap to the edge, a little air, and the
  * safe area below (the home indicator).

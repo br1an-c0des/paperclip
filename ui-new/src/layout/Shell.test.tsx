@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
-import { createRoot, createSignal } from "solid-js";
+import { createRoot, createSignal, Show } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import { layerMode } from "@/ui/layer";
 import { isCompact, viewport, watchViewport } from "./breakpoints";
 import type { NavMode } from "./nav-model";
-import { Panel } from "./Panel";
+import { Dock, Panel } from "./Panel";
 import { Shell } from "./Shell";
 
 // The test setup answers `min-width` queries from `window.innerWidth`, and its listeners never fire,
@@ -189,5 +189,49 @@ describe("phone breakpoint", () => {
       </Shell>
     ));
     expect(screen.queryByRole("separator")).toBeNull();
+  });
+
+  it("docks a panel in the shell's column and splits main from it while it's open", async () => {
+    resizeTo(1440);
+    const [open, setOpen] = createSignal(true);
+    render(() => (
+      <Shell nav={<p>Left nav</p>}>
+        <Dock>
+          <p>The list</p>
+          <Show when={open()}>
+            <Panel label="Task TST-1" onClose={() => setOpen(false)}>
+              <p>Details</p>
+            </Panel>
+          </Show>
+        </Dock>
+      </Shell>
+    ));
+    const shell = document.querySelector(".shell")!;
+    const panel = screen.getByRole("complementary", { name: "Task TST-1" });
+    expect(panel.closest(".shell-dock")).toBeTruthy();
+    expect(panel.closest(".shell-main")).toBeNull();
+    await waitFor(() => expect(shell.classList.contains("shell--split")).toBe(true));
+    expect(document.activeElement).toBe(panel);
+
+    screen.getByRole("button", { name: "Close" }).click();
+    await waitFor(() => expect(shell.classList.contains("shell--split")).toBe(false));
+    expect(screen.queryByRole("complementary")).toBeNull();
+  });
+
+  it("keeps a phone's panel a full-screen page, without splitting", () => {
+    resizeTo(375);
+    render(() => (
+      <Shell nav={<p>Left nav</p>}>
+        <Dock>
+          <Panel label="Task TST-1" onClose={() => {}}>
+            <p>Details</p>
+          </Panel>
+        </Dock>
+      </Shell>
+    ));
+    const panel = screen.getByRole("complementary", { name: "Task TST-1" });
+    expect(panel.classList.contains("panel--page")).toBe(true);
+    expect(document.querySelector(".shell-dock")).toBeNull();
+    expect(document.querySelector(".shell")!.classList.contains("shell--split")).toBe(false);
   });
 });
