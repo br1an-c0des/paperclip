@@ -38,7 +38,10 @@ const INTERRUPT_HINT = "Stop the current run and start the next one with the que
  */
 export function rowDelivery(queue: IssueQueuedCommentQueue, entry: IssueQueuedCommentEntry): RowDelivery {
   if (!queue.targetRunId) {
-    return queue.state === "deferred" ? { action: "send", enabled: !!queue.queueId, hint: "Send the queued messages now" } : null;
+    // A chat message held in the outbox (the agent's daily limit, #20292) has no queue to send:
+    // the outbox delivers it when work can resume, and the strip's head says why it waits.
+    if (!queue.queueId) return null;
+    return queue.state === "deferred" ? { action: "send", enabled: true, hint: "Send the queued messages now" } : null;
   }
   if (queue.protocol === "legacy" || entry.source?.requiresFreshSession) {
     return { action: "interrupt", enabled: !!queue.queueId, hint: INTERRUPT_HINT };
@@ -156,6 +159,66 @@ export function queuedSummary(count: number) {
 export function entryLabel(entry: IssueQueuedCommentEntry) {
   if (!isFixed(entry)) return preview(entry.comment.body);
   return entry.source?.summary?.trim() || preview(entry.comment.body) || "Saved response";
+}
+
+/*
+ * A queued row's text and pictures (U100, upstream #20367, TaskChatQueuedMessages.tsx): the message
+ * as compact Markdown, with images standing on their own lines taken out of the text and shown as
+ * thumbnails after it, up to three and "+N" for the rest. Only Paperclip's own files are shown as
+ * thumbnails (`/api/attachments/:id/content`, `/api/assets/:id/content`, as the composer inserts
+ * them); an image woven into a sentence stays in the text, where the row leaves it out.
+ */
+
+const IMAGE_EMBED = /!\[((?:\\.|[^\]\\])*)\]\(([^()\s]+)\)/g;
+const PAPERCLIP_IMAGE = /^\/api\/(?:attachments|assets)\/[^/?#\\]+\/content(?:\?[^#\\]*)?$/;
+export const SHOWN_THUMBNAILS = 3;
+
+export type QueuedImage = { name: string; url: string };
+
+function isImageLine(line: string) {
+  return line.trim().length > 0 && line.replace(IMAGE_EMBED, "").trim().length === 0;
+}
+
+/** Images on lines of their own, in order, once each, that are Paperclip's own files. */
+export function queuedImages(body: string): QueuedImage[] {
+  const seen = new Set<string>();
+  const images: QueuedImage[] = [];
+  for (const line of body.split("\n")) {
+    if (!isImageLine(line)) continue;
+    for (const [, name = "", url = ""] of line.matchAll(IMAGE_EMBED)) {
+      if (seen.has(url) || !PAPERCLIP_IMAGE.test(url)) continue;
+      seen.add(url);
+      images.push({ name: name.replace(/\\([[\]])/g, "$1"), url });
+    }
+  }
+  return images;
+}
+
+/** The message without its lines of images. */
+export function withoutImageLines(body: string) {
+  return body
+    .split("\n")
+    .filter((line) => !isImageLine(line))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * What a row shows: Markdown text (empty when the message is only pictures) and its thumbnails,
+ * with how many more there are. A fixed answer shows its receipt's one line, without pictures.
+ */
+export function queuedBody(entry: IssueQueuedCommentEntry): { text: string; images: QueuedImage[]; more: number } {
+  if (isFixed(entry)) return { text: entryLabel(entry), images: [], more: 0 };
+  const images = queuedImages(entry.comment.body);
+  return { text: withoutImageLines(entry.comment.body), images: images.slice(0, SHOWN_THUMBNAILS), more: Math.max(0, images.length - SHOWN_THUMBNAILS) };
+}
+
+/** The row's plain words, for its tooltip and a control's name: "Images" for a message of pictures only. */
+export function queuedPlain(entry: IssueQueuedCommentEntry) {
+  if (isFixed(entry)) return entryLabel(entry);
+  const text = withoutImageLines(entry.comment.body).replace(IMAGE_EMBED, "").replace(/\s+/g, " ").trim();
+  return text || (queuedImages(entry.comment.body).length ? "Images" : "");
 }
 
 /** The first line of a message, for the queue row. */

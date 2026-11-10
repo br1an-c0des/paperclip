@@ -62,6 +62,102 @@
   white-space: nowrap;
 }
 
+/*
+ * A plain message (U100, #20367): its Markdown clamped to one line, then its thumbnails; on a
+ * narrow strip the text takes two lines with the thumbnails under it.
+ */
+.qm {
+  container: qm / inline-size;
+}
+
+.qm-body {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  padding: 4px 0;
+}
+
+.qm-md.md {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.qm-md.md :is(p, ul, ol, pre, blockquote, table, h1, h2, h3, h4, h5, h6) {
+  margin: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.qm-md.md :is(ul, ol) {
+  padding-left: 18px;
+}
+
+.qm-md.md pre {
+  padding: 0;
+  background: none;
+  white-space: pre-wrap;
+}
+
+.qm-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.qm-thumb {
+  display: block;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--well);
+}
+
+.qm-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.qm-thumb:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 1px;
+}
+
+.qm-thumb-more {
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+@container qm (width < 520px) {
+  .qm-body {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .qm-md.md {
+    width: 100%;
+    -webkit-line-clamp: 2;
+  }
+}
+
 /* A saved answer to a request card: its receipt's summary, not a quote */
 .qm-text--receipt {
   color: var(--muted);

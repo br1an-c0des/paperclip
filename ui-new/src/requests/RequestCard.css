@@ -567,6 +567,13 @@
   border-color: color-mix(in srgb, var(--amber-fg) 40%, transparent);
 }
 
+/* An approved call waiting on sign-in: Reconnect, under its sentence (U99) */
+.rq-reconnect {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* Set aside: one line in the history, which opens the card again */
 .rq-aside {
   display: flex;

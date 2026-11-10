@@ -13,6 +13,7 @@ import { createRunLog } from "@/runs/run-log-source";
 import { costLabel, elapsedLabel, isActiveRun, runUsage } from "@/runs/run-model";
 import { buildItems } from "@/runs/transcript-model";
 import type { Plan } from "@/runs/activity-model";
+import { LiveRunStatusLine } from "@/tasks/LiveRunStatus";
 import { stopLabel, stopRun } from "@/tasks/run-stop";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Capsule } from "@/ui/Status";
@@ -34,6 +35,10 @@ import { EMPTY_REPLY, mergeEvents, pickReply, prpEventsFromOutput, recentSteps, 
  * "Thinking…"; a status notice that's still going (a retry, a compaction) shows under the steps;
  * an MCP server that failed to start is a warning at the top. The agent's native plan goes to the
  * chat (`onPlan`), which docks it above the composer (ChatPlanDock.tsx).
+ *
+ * Since the 2026-11-10 sync (U107, #20460): a quiet line under the head says what the run is doing,
+ * from the run's live status: "Using Bash", the agent's latest words, or a status message such as a
+ * storage wait, with how long since its last sign of life (tasks/LiveRunStatus.tsx).
  */
 
 /** A burst of event signals costs one read. */
@@ -205,6 +210,8 @@ export function LiveReply(props: {
             </Show>
           </div>
         </div>
+        {/* What the run is doing: a tool, its latest words or a status such as a storage wait (U107). */}
+        <LiveRunStatusLine runId={props.turn.runId} run={run.data} active={active()} />
         <Show when={health().length > 0}>
           <p class="ch-live-health" role="status">
             <TriangleAlert size={13} aria-hidden="true" />

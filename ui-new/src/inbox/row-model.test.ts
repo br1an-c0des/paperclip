@@ -214,6 +214,20 @@ describe("the collapsed row, kind by kind", () => {
     expect(row(request)).toMatchObject({ settled: true, signs: [{ tone: "bad", text: "Failed" }] });
   });
 
+  it("a settled tool call waiting for its app to be signed in again (U99, #20340)", () => {
+    const request = requestFromInteraction(
+      interaction({
+        kind: "request_confirmation",
+        status: "accepted",
+        resolvedByUserId: "me",
+        payload: { version: 1, prompt: "Send the weekly digest?", toolAction: { expiresAt: null, previewMarkdown: "", connectionId: "conn-1", appDisplayName: "Gmail" } },
+        result: { version: 1, outcome: "accepted", toolAction: { status: "approved", errorCode: "approved_action_connection_required" } },
+      }),
+      ctx,
+    );
+    expect(row(request)).toMatchObject({ type: "Tool call", settled: true, expiry: null, signs: [{ tone: "warn", icon: "warn", text: "Sign-in needed" }] });
+  });
+
   it("a budget stop: spend against the limit, and the agent it paused", () => {
     const approval = {
       id: "ap1",

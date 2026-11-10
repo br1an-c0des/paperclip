@@ -51,7 +51,7 @@ import { DeclineButton, Footer } from "./card-parts";
 import { ConnectionControls } from "./ConnectionControls";
 import { DecisionControls, DecisionResults } from "./DecisionControls";
 import { JoinControls } from "./JoinControls";
-import { KIND_LABEL, planLabel, planReviewTarget, suggestedOwner, type Request, type RequestKind } from "./request-model";
+import { answerRefusal, KIND_LABEL, planLabel, planReviewTarget, suggestedOwner, type Request, type RequestKind } from "./request-model";
 import "./RequestCard.css";
 
 /*
@@ -68,6 +68,9 @@ import "./RequestCard.css";
  *   through `/decisions/:id/*` (DecisionControls.tsx); join requests through
  *   `/companies/:id/join-requests/:id/*` (JoinControls.tsx).
  * - A question you asked can be withdrawn from the "…" menu (`…/cancel`).
+ * - Since the 2026-11-10 sync (U99, #20340): an approved app call whose app needs signing in again
+ *   settles as "You approved · Sign-in needed" with Reconnect <app> (its permissions page), and an
+ *   approval refused because the reviewed call changed says so and reads the card again.
  * - `inThread` hides the subject, which would repeat the page.
  * - Slots for the pages that list cards (board 14): `triage` adds items to the "…" menu in the top
  *   row (the Inbox's snooze and clear); `aside` draws the context column beside the card's body,
@@ -345,6 +348,7 @@ function SettledBody(props: { request: Request; people: TaskPeople; inThread?: b
           </div>
         )}
       </Show>
+      <Show when={props.request.reconnect}>{(app) => <Reconnect app={app()} />}</Show>
       <Show when={props.request.source.type === "decision" && (props.request.source as Extract<Request["source"], { type: "decision" }>)}>
         {(source) => <DecisionResults request={props.request} source={source()} />}
       </Show>
@@ -352,6 +356,26 @@ function SettledBody(props: { request: Request; people: TaskPeople; inThread?: b
         <ApprovalDiscussion approvalId={(props.request.source as { type: "approval"; approval: { id: string } }).approval.id} people={props.people} />
       </Show>
     </>
+  );
+}
+
+/**
+ * "Reconnect Gmail" for an approved call waiting on sign-in (U99, #20340), to the app's permissions
+ * page, where its account is signed in again. The old UI shows nothing when the call names no
+ * connection, so neither does this.
+ */
+function Reconnect(props: { app: NonNullable<Request["reconnect"]> }) {
+  const company = useCompany();
+  return (
+    <Show when={props.app.connectionId}>
+      {(id) => (
+        <div class="rq-reconnect">
+          <a class={buttonClass({ variant: "primary", size: "compact" })} href={`/${company().issuePrefix}/apps/${encodeURIComponent(id())}/permissions`}>
+            Reconnect {props.app.appName}
+          </a>
+        </div>
+      )}
+    </Show>
   );
 }
 
@@ -470,7 +494,16 @@ function InteractionControls(props: { request: Request; interaction: IssueThread
       setError(null);
       props.onDone();
     },
-    onError: (failure: Error) => setError(failure.message),
+    // A refusal that means the request moved on (answered elsewhere, or the reviewed app call
+    // changed, #20340) says so without inviting a retry, and the card is read again. Reading it again
+    // can redraw the card, so the reason also goes to a toast.
+    onError: (failure: Error) => {
+      const refusal = answerRefusal(failure);
+      setError(refusal.message);
+      if (!refusal.settled) return;
+      pushToast({ tone: "warn", title: "This request moved on", body: refusal.message });
+      props.onDone();
+    },
   }));
   // An answer that can't reach the server waits in the write queue and shows here until it's sent
   // (answer-write.ts, U13); the card takes no other answer meanwhile.
