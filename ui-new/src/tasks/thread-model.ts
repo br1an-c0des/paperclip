@@ -1,6 +1,7 @@
 import type { ActivityEvent, CompactIssue, Issue, IssueComment, IssueThreadInteraction } from "@paperclipai/shared";
 import type { RunForIssue } from "@/api/issues";
 import type { Request } from "@/requests/request-model";
+import { runErrorCodeLabel, runFailureCause } from "@/runs/run-model";
 import { activityLine, type ActivityLine, type ActivityNames } from "./activity-format";
 import { runWait } from "./run-waits";
 import type { Compaction } from "./thread-compactions";
@@ -77,7 +78,7 @@ function runText(run: RunForIssue): { text: string; tone?: "red" | "green" } {
     case "succeeded":
       return { text: `finished a run${suffix}`, tone: "green" };
     case "failed":
-      return { text: `run failed${suffix}${run.error ? `: ${run.error}` : ""}`, tone: "red" };
+      return { text: `run failed${suffix}${failureText(run)}`, tone: "red" };
     case "timed_out":
       return { text: `run timed out${suffix}`, tone: "red" };
     case "cancelled":
@@ -90,6 +91,18 @@ function runText(run: RunForIssue): { text: string; tone?: "red" | "green" } {
     default:
       return { text: `run ${run.status.replace(/_/g, " ")}${suffix}` };
   }
+}
+
+/**
+ * A failed run's error after the colon, with the cause of a generic adapter failure as the run lines
+ * show it (`runErrorCodeLabel`, #20483): ": adapter failed (40001)" in place of the bare "Adapter
+ * failed", or after a more specific error ("…: Out of credit · adapter failed (40001)").
+ */
+function failureText(run: RunForIssue) {
+  const error = run.error?.trim() ?? "";
+  const cause = run.errorCode === "adapter_failed" && runFailureCause(run) ? runErrorCodeLabel(run) : null;
+  if (!cause) return error ? `: ${error}` : "";
+  return !error || error.toLowerCase() === "adapter failed" ? `: ${cause}` : `: ${error} · ${cause}`;
 }
 
 /** "45s", "18m 12s", "2h 5m"; empty without both ends. */
