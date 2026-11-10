@@ -81,7 +81,7 @@ describe("QueuedMessages", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(interrupt).toHaveBeenCalledWith("t1", { queueId: "q1", revision: "rev1", targetRunId: null }));
     expect(await screen.findByText("Messages are still queued. They'll send when the task is ready.")).toBeTruthy();
-    expect(screen.getByText("“Message c1”")).toBeTruthy();
+    expect(screen.getByText("Message c1")).toBeTruthy();
   });
 });
 
@@ -122,7 +122,7 @@ describe("QueuedMessages automatic steering (U84, #19970)", () => {
     expect(screen.getByRole("button", { name: "Steer now" })).toBeTruthy();
     await advance(10_000);
     expect(steer).not.toHaveBeenCalled();
-    expect(screen.getByText("“Message c1”")).toBeTruthy();
+    expect(screen.getByText("Message c1")).toBeTruthy();
   });
 
   it("Edit stops the countdown while the editor is open", async () => {
@@ -133,6 +133,44 @@ describe("QueuedMessages automatic steering (U84, #19970)", () => {
     expect(steer).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.getByText("Sending in 5s")).toBeTruthy();
+  });
+
+  it("draws a message as Markdown without its images, with thumbnails and +N (U100, #20367)", () => {
+    const body = "Use **this** layout, see [the spec](https://example.com/spec).\n\n" + [1, 2, 3, 4].map((n) => `![Screen ${n}](/api/attachments/a${n}/content)`).join("\n");
+    const { container } = mount(queue({ entries: [{ ...entry("c1", 0), canEdit: false, comment: { id: "c1", body } } as IssueQueuedCommentEntry] }));
+    const text = container.querySelector(".qm-md")!;
+    expect(text.querySelector("strong")?.textContent).toBe("this");
+    expect(text.querySelector("a")?.getAttribute("href")).toBe("https://example.com/spec");
+    expect(text.textContent).not.toContain("![");
+    expect(text.querySelector("img")).toBeNull();
+    const thumbs = screen.getByRole("group", { name: "Queued images" });
+    expect(Array.from(thumbs.querySelectorAll("img")).map((image) => image.getAttribute("src"))).toEqual(["/api/attachments/a1/content", "/api/attachments/a2/content", "/api/attachments/a3/content"]);
+    expect(thumbs.textContent).toContain("+1");
+    // The U84 controls stay beside it.
+    expect(screen.getByRole("button", { name: "Steer now" })).toBeTruthy();
+  });
+
+  it("leaves an inline image out of the row's text", () => {
+    const { container } = mount(queue({ entries: [{ ...entry("c1", 0), canEdit: false, comment: { id: "c1", body: "Before ![x](https://example.com/x.png) after" } } as IssueQueuedCommentEntry] }));
+    expect(container.querySelector(".qm-md")?.textContent?.replace(/\s+/g, " ").trim()).toBe("Before after");
+    expect(container.querySelector("img")).toBeNull();
+  });
+
+  it("shows a chat message held at the daily limit with why it waits, and nothing to send (U101, #20292)", () => {
+    const held = queue({
+      queueId: null,
+      targetRunId: null,
+      state: "deferred",
+      steeringDisposition: "unsupported",
+      executionWait: { reason: "daily_limit", message: "The agent has reached its daily limit. Your message is saved until work can resume." },
+      entries: [{ ...entry("c1", 0), canEdit: false, canDiscard: false }],
+    });
+    mount(held);
+    expect(screen.getByText(/The agent has reached its daily limit\. Your message is saved until work can resume\./)).toBeTruthy();
+    expect(screen.getByText("Message c1")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^(Send|Steer now|Interrupt|Edit)$/ })).toBeNull();
+    expect((screen.getByRole("button", { name: "More for queued message 1" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByText(/Sending in/)).toBeNull();
   });
 
   it("leaves a failed attempt queued, says so, and doesn't retry", async () => {

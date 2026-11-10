@@ -1,16 +1,29 @@
 import type { IssueQueuedCommentEntry, IssueQueuedCommentQueue } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ArrowDown, ArrowUp, Clock, CornerDownRight, Ellipsis, Pencil, Square, Trash2 } from "lucide-solid";
-import { createEffect, createSignal, For, on, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
 import { ApiError } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import { queuedCommentsApi } from "@/api/queued-comments";
 import { Button } from "@/ui/Button";
 import { TextArea } from "@/ui/Field";
+import { followAppLink, renderMarkdown, useKnownPrefixes, useOptionalNavigate } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { createAutoSteer } from "./auto-steer";
-import { deferredMessage, entryLabel, isFixed, moveEntry, queueErrorMessage, queuedSummary, rowDelivery, visibleEntries, type QueueAction } from "./queue-model";
+import {
+  deferredMessage,
+  entryLabel,
+  isFixed,
+  moveEntry,
+  queueErrorMessage,
+  queuedBody,
+  queuedPlain,
+  queuedSummary,
+  rowDelivery,
+  visibleEntries,
+  type QueueAction,
+} from "./queue-model";
 import { enterKeyHint, isSubmitKey, submitKeyFor } from "./submit-key";
 import "./QueuedMessages.css";
 
@@ -30,6 +43,11 @@ import "./QueuedMessages.css";
  * now; Cancel keeps it queued, with Steer now back. The rules are in queue-model.ts, the countdown in
  * auto-steer.ts. A run still starting takes the queue into its first turn when Interrupt is pressed
  * (#20168), and the strip's head says so through the queue's `executionWait.message`.
+ *
+ * Since the 2026-11-10 sync: a row draws its message as compact Markdown with thumbnails of its
+ * pictures (U100, #20367), and a chat message held at the agent's daily limit (U101, #20292) shows
+ * in the strip with the head saying why; that queue has no id, so it offers nothing to send, edit,
+ * move or cancel: the outbox delivers it.
  */
 
 export function useQueuedComments(taskId: () => string, active: () => boolean) {
@@ -44,6 +62,48 @@ export function useQueuedComments(taskId: () => string, active: () => boolean) {
 /** The comment ids waiting in the queue, so the thread can leave them out. */
 export function queuedIds(queue: IssueQueuedCommentQueue | undefined) {
   return new Set((queue?.entries ?? []).map((entry) => entry.comment.id));
+}
+
+/** Rendered Markdown without its images: the row's text leaves pictures to the thumbnails (U100). */
+export function withoutImages(html: string) {
+  if (!html.includes("<img")) return html;
+  const holder = document.createElement("template");
+  holder.innerHTML = html;
+  for (const image of Array.from(holder.content.querySelectorAll("img"))) image.remove();
+  return holder.innerHTML;
+}
+
+/**
+ * A plain message's row (U100, #20367): its Markdown on one line (two on a narrow strip), clamped,
+ * then up to three thumbnails of the pictures it carries and "+N" for the rest. Each thumbnail opens
+ * the picture in a new tab; links in the text open as they would in the thread.
+ */
+function QueuedBody(props: { entry: IssueQueuedCommentEntry }) {
+  const prefixes = useKnownPrefixes();
+  const navigate = useOptionalNavigate();
+  const body = createMemo(() => queuedBody(props.entry));
+  const html = createMemo(() => (body().text ? withoutImages(renderMarkdown(body().text, { knownPrefixes: prefixes() })) : ""));
+  return (
+    <div class="qm-body" title={queuedPlain(props.entry) || undefined}>
+      <Show when={html()}>
+        <div class="md qm-md" innerHTML={html()} onClick={(event) => followAppLink(event, navigate)} />
+      </Show>
+      <Show when={body().images.length > 0}>
+        <div class="qm-thumbs" role="group" aria-label="Queued images">
+          <For each={body().images}>
+            {(image) => (
+              <a class="qm-thumb" href={image.url} target="_blank" rel="noopener noreferrer" title={image.name || "Image"}>
+                <img src={image.url} alt={image.name || "Image"} loading="lazy" />
+              </a>
+            )}
+          </For>
+          <Show when={body().more > 0}>
+            <span class="qm-thumb-more">+{body().more}</span>
+          </Show>
+        </div>
+      </Show>
+    </div>
+  );
 }
 
 export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommentQueue }) {
@@ -146,14 +206,7 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
                     fallback={
                       <>
                         <CornerDownRight size={14} class="qm-glyph" aria-hidden="true" />
-                        <Show
-                          when={fixed}
-                          fallback={
-                            <span class="qm-text" title={entry.comment.body}>
-                              “{entryLabel(entry)}”
-                            </span>
-                          }
-                        >
+                        <Show when={fixed} fallback={<QueuedBody entry={entry} />}>
                           <span class="qm-text qm-text--receipt" title={entryLabel(entry)}>
                             {entryLabel(entry)}
                           </span>
@@ -183,12 +236,12 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
                             )}
                           </Show>
                           <Show when={entry.canEdit && !fixed && auto.secondsLeft(entry.comment.id) === null}>
-                            <Button size="compact" variant="quiet" disabled={!!busy()} onClick={() => setEditing({ id: entry.comment.id, body: entry.comment.body })}>
+                            <Button size="compact" variant="quiet" disabled={!!busy() || !props.queue.queueId} onClick={() => setEditing({ id: entry.comment.id, body: entry.comment.body })}>
                               Edit
                             </Button>
                           </Show>
                           <Menu placement="bottom-end">
-                            <Menu.Trigger class="qm-more" aria-label={`More for queued message ${index() + 1}`} disabled={!!busy()}>
+                            <Menu.Trigger class="qm-more" aria-label={`More for queued message ${index() + 1}`} disabled={!!busy() || !props.queue.queueId}>
                               <Ellipsis size={15} aria-hidden="true" />
                             </Menu.Trigger>
                             <Menu.Content label="Queued message" width={220}>

@@ -11,10 +11,14 @@ import {
   moveEntry,
   preview,
   queueErrorMessage,
+  queuedBody,
+  queuedImages,
+  queuedPlain,
   queuedSummary,
   rowDelivery,
   secondsLeft,
   visibleEntries,
+  withoutImageLines,
 } from "./queue-model";
 
 const entry = (id: string, position: number, extra: Partial<IssueQueuedCommentEntry> = {}): IssueQueuedCommentEntry =>
@@ -56,7 +60,8 @@ describe("rowDelivery", () => {
 
   it("offers Send for a queue waiting on a run that hasn't started, and nothing else without a run (#19370)", () => {
     expect(rowDelivery(queue({ targetRunId: null, state: "deferred" }), entry("c1", 0))).toMatchObject({ action: "send", enabled: true });
-    expect(rowDelivery(queue({ targetRunId: null, state: "deferred", queueId: null }), entry("c1", 0))?.enabled).toBe(false);
+    // No queue id: a chat message held in the outbox (U101), which has nothing to send.
+    expect(rowDelivery(queue({ targetRunId: null, state: "deferred", queueId: null }), entry("c1", 0))).toBeNull();
     expect(rowDelivery(queue({ targetRunId: null }), entry("c1", 0))).toBeNull();
     expect(rowDelivery(queue({ targetRunId: null, state: null }), entry("c1", 0))).toBeNull();
   });
@@ -183,5 +188,49 @@ describe("automatic steering (U84, #19970)", () => {
     expect(secondsLeft(10_000, 5_000)).toBe(5);
     expect(secondsLeft(10_000, 7_100)).toBe(3);
     expect(secondsLeft(10_000, 12_000)).toBe(0);
+  });
+});
+
+describe("a queued row's Markdown and pictures (U100, #20367)", () => {
+  const body = (text: string, extra: Partial<IssueQueuedCommentEntry> = {}) => entry("c1", 0, { comment: { id: "c1", body: text } as IssueQueuedCommentEntry["comment"], ...extra });
+
+  it("takes Paperclip's images on their own lines out of the text, as thumbnails", () => {
+    const message = "Use **this** layout:\n\n![Screen 1](/api/attachments/a1/content)\n![Screen 2](/api/assets/a2/content?v=2) ![Screen 2](/api/assets/a2/content?v=2)\n\nThanks";
+    expect(queuedImages(message)).toEqual([
+      { name: "Screen 1", url: "/api/attachments/a1/content" },
+      { name: "Screen 2", url: "/api/assets/a2/content?v=2" },
+    ]);
+    expect(queuedBody(body(message))).toEqual({ text: "Use **this** layout:\n\nThanks", images: queuedImages(message), more: 0 });
+    expect(queuedPlain(body(message))).toBe("Use **this** layout: Thanks");
+  });
+
+  it("leaves out other images, and keeps an image woven into a sentence in the text", () => {
+    expect(queuedImages("![x](https://example.com/x.png)\n![y](/api/attachments/a1/other)\n![z](/api/issues/a1/content)")).toEqual([]);
+    expect(withoutImageLines("![x](https://example.com/x.png)\nSee ![inline](/api/attachments/a1/content) here")).toBe("See ![inline](/api/attachments/a1/content) here");
+    expect(queuedImages("See ![inline](/api/attachments/a1/content) here")).toEqual([]);
+    expect(queuedPlain(body("See ![inline](/api/attachments/a1/content) here"))).toBe("See here");
+    expect(queuedImages("![A \\[draft\\]](/api/attachments/a1/content)")).toEqual([{ name: "A [draft]", url: "/api/attachments/a1/content" }]);
+  });
+
+  it("shows three thumbnails, then counts the rest", () => {
+    const message = [1, 2, 3, 4, 5].map((n) => `![${n}](/api/attachments/a${n}/content)`).join("\n");
+    const shown = queuedBody(body(message));
+    expect(shown.text).toBe("");
+    expect(shown.images.map((image) => image.name)).toEqual(["1", "2", "3"]);
+    expect(shown.more).toBe(2);
+    expect(queuedPlain(body(message))).toBe("Images");
+  });
+
+  it("a fixed answer keeps its receipt's one line, without pictures", () => {
+    const fixed = body("Declined\n![x](/api/attachments/a1/content)", { source: { kind: "interaction", summary: "Declined: Slack connection" } as IssueQueuedCommentEntry["source"] });
+    expect(queuedBody(fixed)).toEqual({ text: "Declined: Slack connection", images: [], more: 0 });
+  });
+});
+
+describe("a chat message held at the agent's daily limit (U101, #20292)", () => {
+  it("offers nothing to send or steer: the outbox delivers it, and the queue has no id", () => {
+    const held = queue({ queueId: null, targetRunId: null, state: "deferred", executionWait: { reason: "daily_limit", message: "The agent has reached its daily limit. Your message is saved until work can resume." } });
+    expect(rowDelivery(held, entry("c1", 0, { canEdit: false, canDiscard: false }))).toBeNull();
+    expect(autoSteerEligible({ queue: held, entry: entry("c1", 0), cancelledIds: new Set(), attemptedKeys: new Set(), editingId: null })).toBe(false);
   });
 });
