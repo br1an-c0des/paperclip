@@ -495,11 +495,14 @@ function InteractionControls(props: { request: Request; interaction: IssueThread
       props.onDone();
     },
     // A refusal that means the request moved on (answered elsewhere, or the reviewed app call
-    // changed, #20340) says so without inviting a retry, and the card is read again.
+    // changed, #20340) says so without inviting a retry, and the card is read again. Reading it again
+    // can redraw the card, so the reason also goes to a toast.
     onError: (failure: Error) => {
       const refusal = answerRefusal(failure);
       setError(refusal.message);
-      if (refusal.settled) props.onDone();
+      if (!refusal.settled) return;
+      pushToast({ tone: "warn", title: "This request moved on", body: refusal.message });
+      props.onDone();
     },
   }));
   // An answer that can't reach the server waits in the write queue and shows here until it's sent

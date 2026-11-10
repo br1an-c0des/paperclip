@@ -1,13 +1,15 @@
-/* What a live run is doing (U107): one quiet, truncated line */
+/* What a live run is doing (U107): quiet, at most two lines, so a phone still reads the wait's time */
 .lrs {
   min-width: 0;
   margin: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
+  overflow-wrap: anywhere;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
