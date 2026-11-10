@@ -44,6 +44,11 @@ export type DialogProps = ParentProps<{
   hideClose?: boolean;
   /** What takes focus on open, such as a title field; by default the first focusable element. */
   initialFocus?: () => HTMLElement | null | undefined;
+  /**
+   * Where focus goes on close when what had it on open is gone, such as the item of a menu that
+   * opened the dialog: by default the page body.
+   */
+  returnFocus?: () => HTMLElement | null | undefined;
   /** A class for the dialog card, for dialogs that lay out their own body, like the run modal. */
   class?: string;
 }>;
@@ -61,10 +66,12 @@ export function Dialog(props: DialogProps) {
     ),
   );
   const restoreFocus = (event: Event) => {
-    if (props.trigger || !returnFocus?.isConnected) return;
-    event.preventDefault();
-    returnFocus.focus();
+    if (props.trigger) return;
+    const target = returnFocus?.isConnected ? returnFocus : props.returnFocus?.();
     returnFocus = null;
+    if (!target?.isConnected) return;
+    event.preventDefault();
+    target.focus();
   };
   return (
     <KDialog open={props.open} onOpenChange={props.onOpenChange} modal preventScroll>

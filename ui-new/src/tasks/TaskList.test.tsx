@@ -1,7 +1,11 @@
-import type { CompactIssue } from "@paperclipai/shared";
-import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import type { CompactIssue, IssueLabel } from "@paperclipai/shared";
+import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { issuesApi } from "@/api/issues";
+import { queryKeys } from "@/api/queryKeys";
+import { taskActionsApi } from "@/api/task-actions";
 import { buildTaskGroups } from "./list-model";
 import type { TaskPeople } from "./people";
 import type { TaskRetry } from "./retry";
@@ -10,6 +14,11 @@ import { TaskList } from "./TaskList";
 
 vi.mock("@/lib/company", () => ({ useCompany: () => () => ({ id: "company", issuePrefix: "TES" }) }));
 vi.mock("@/lib/commands", () => ({ useCommands: () => ({ openNewTask: () => {} }) }));
+vi.mock("@/api/task-actions", () => ({ taskActionsApi: { createLabel: vi.fn() } }));
+vi.mock("@/api/issues", async (original) => ({
+  ...(await original<typeof import("@/api/issues")>()),
+  issuesApi: { listLabels: vi.fn() },
+}));
 
 // jsdom doesn't scroll; the list scrolls the cursor into view.
 Element.prototype.scrollIntoView = () => {};
@@ -104,5 +113,67 @@ describe("TaskList subtasks", () => {
     expect(document.activeElement).toBe(parent);
     fireEvent.keyDown(parent, { key: "ArrowLeft" });
     expect([...expanded()]).toEqual([]);
+  });
+});
+
+describe("TaskList labels menu", () => {
+  afterEach(cleanup);
+
+  const bug = { id: "l1", name: "Bug", color: "#f2286f" } as IssueLabel;
+  const created = { id: "l2", name: "M7 test label", color: "#6366f1" } as IssueLabel;
+
+  function renderRow() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    client.setQueryData(queryKeys.issues.labels("company"), [bug]);
+    const update = vi.fn();
+    const onOpen = vi.fn();
+    const row = task("t", { labelIds: ["l1"], labels: [bug] } as Partial<CompactIssue>);
+    render(() => (
+      <QueryClientProvider client={client}>
+        <TaskList
+          groups={buildTaskGroups([row], new Set())}
+          people={people}
+          updates={{ update, create: vi.fn() } as unknown as TaskUpdates}
+          retry={{ retry: vi.fn(), busy: () => false } as unknown as TaskRetry}
+          onOpen={onOpen}
+          isOpen={() => true}
+          onToggleGroup={() => {}}
+          checked={new Set()}
+          onCheckedChange={() => {}}
+          expanded={new Set()}
+          onToggleExpanded={() => {}}
+        />
+      </QueryClientProvider>
+    ));
+    return { client, update, onOpen, row };
+  }
+
+  const press = (element: Element) => {
+    fireEvent.pointerDown(element, { button: 0, pointerType: "mouse" });
+    fireEvent.pointerUp(element, { button: 0, pointerType: "mouse" });
+    fireEvent.click(element);
+  };
+
+  it("creates a label from a row's menu and adds it to that row's task", async () => {
+    vi.mocked(taskActionsApi.createLabel).mockResolvedValue(created);
+    vi.mocked(issuesApi.listLabels).mockResolvedValue([bug, created]);
+    const { client, update, onOpen, row } = renderRow();
+
+    press(screen.getByRole("button", { name: "Labels: Bug. Change labels" }));
+    expect(await screen.findByRole("menuitemcheckbox", { name: /Bug/ })).toBeTruthy();
+    press(screen.getByRole("menuitem", { name: /New label…/ }));
+
+    const name = await screen.findByRole("textbox", { name: "Label name" });
+    fireEvent.input(name, { target: { value: "  M7 test label " } });
+    // A click inside the dialog reaches the row through Solid's delegation, but doesn't open the task.
+    fireEvent.click(screen.getByRole("dialog"));
+    fireEvent.click(screen.getByRole("button", { name: "Create and add" }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(taskActionsApi.createLabel).toHaveBeenCalledWith("company", { name: "M7 test label", color: "#6366f1" });
+    expect(update).toHaveBeenCalledWith([{ task: row, data: { labelIds: ["l1", "l2"] } }]);
+    expect(client.getQueryData<IssueLabel[]>(queryKeys.issues.labels("company"))?.map((label) => label.id)).toEqual(["l1", "l2"]);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(onOpen).not.toHaveBeenCalled();
   });
 });
