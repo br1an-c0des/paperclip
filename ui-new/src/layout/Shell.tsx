@@ -1,7 +1,9 @@
 import { ChevronsLeft, ChevronsRight, PanelLeftOpen } from "lucide-solid";
-import { batch, createEffect, createSignal, on, onCleanup, Show, type JSX, type ParentProps } from "solid-js";
+import { batch, createEffect, createSignal, on, onCleanup, onMount, Show, type JSX, type ParentProps } from "solid-js";
 import { buttonClass } from "@/ui/Button";
 import { isCompact, MEDIA } from "./breakpoints";
+import { dockBeside } from "./panel-model";
+import { ShellDockContext } from "./Panel";
 import { NAV_RAIL_WIDTH, NAV_WIDTH_DEFAULT, NAV_WIDTH_MAX, NAV_WIDTH_MIN, navDragHint, navDrop, navKeyDrop, type NavDrop, type NavMode } from "./nav-model";
 import "./Shell.css";
 
@@ -39,6 +41,14 @@ import "./Shell.css";
  *
  * `main` is a size container named `main`, so content responds to the space it's given with
  * `@container main (...)`, not to the viewport.
+ *
+ * A <Dock>'s panel (Panel.tsx) goes into the shell's dock column, after main. While one is there on
+ * tablet and desktop, the shell splits (`shell--split`): it takes the window's height and no more,
+ * so the page itself doesn't scroll; main scrolls on its own, header, toolbar and list together;
+ * and the panel fills the column from main's top padding to the same gap at the bottom, scrolling
+ * inside. With room for both (panel-model.ts `dockBeside`), the column sits beside main
+ * (`shell--beside`); without, it lies over main's right edge. Main picks up the page's scroll
+ * position as it splits, and hands it back when the panel closes on the same page.
  */
 
 /** The fold's two steps (Shell.css and Nav.css keep the same timings). */
@@ -155,6 +165,59 @@ export function Shell(
   const columnWidth = () => (fold.column() === "rail" ? NAV_RAIL_WIDTH : (props.navWidth ?? NAV_WIDTH_DEFAULT));
   const toggle = () => props.onNavMode?.(fold.shown() === "rail" ? "full" : "rail");
 
+  // The dock column (above): how many panels are docked in it, and whether it fits beside main.
+  let shellEl: HTMLDivElement | undefined;
+  let mainEl: HTMLElement | undefined;
+  const [dockHost, setDockHost] = createSignal<HTMLElement>();
+  const [holds, setHolds] = createSignal(0);
+  const [shellWidth, setShellWidth] = createSignal(typeof window === "undefined" ? 0 : window.innerWidth);
+  const split = () => !isCompact() && holds() > 0;
+  const beside = () => dockBeside(shellWidth(), columnWidth(), Boolean(bare()));
+  const dock = {
+    host: () => (isCompact() ? undefined : dockHost()),
+    hold: () => {
+      setHolds((count) => count + 1);
+      let held = true;
+      return () => {
+        if (!held) return;
+        held = false;
+        setHolds((count) => count - 1);
+      };
+    },
+  };
+
+  onMount(() => {
+    if (!shellEl || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => setShellWidth(entry.contentRect.width));
+    observer.observe(shellEl);
+    onCleanup(() => observer.disconnect());
+  });
+
+  // The split class is set here, not in `classList`, so the scroll position can move across in the
+  // same step: read before the layout changes, written after.
+  let splitPath: string | undefined;
+  createEffect(
+    on(
+      split,
+      (now) => {
+        if (!shellEl || !mainEl) return;
+        if (now) {
+          const y = window.scrollY;
+          shellEl.classList.add("shell--split");
+          mainEl.scrollTop = y;
+          splitPath = window.location.pathname;
+        } else {
+          const y = mainEl.scrollTop;
+          shellEl.classList.remove("shell--split");
+          // Only on the same page: a link elsewhere starts its page at the top.
+          if (window.location.pathname === splitPath) window.scrollTo(0, y);
+          splitPath = undefined;
+        }
+      },
+      { defer: true },
+    ),
+  );
+
   const drop = (result: NavDrop, startWidth: number) => {
     switch (result.kind) {
       case "width":
@@ -172,72 +235,79 @@ export function Shell(
   };
 
   return (
-    <div
-      class="shell"
-      classList={{
-        "shell--bare": bare(),
-        "shell--nodock": props.noDock,
-        "shell--rail": fold.column() === "rail",
-        "shell--sliding": fold.phase() === "narrow" || fold.phase() === "widen",
-        [`shell--hint-${hint()}`]: hint() !== null,
-      }}
-      style={{ "--nav-w": `${columnWidth()}px` }}
-    >
-      <Show when={!isCompact() && !props.navHidden}>
-        <nav class="shell-nav" id="shell-nav" aria-label={props.navLabel ?? "Main"} data-mode={fold.shown()} data-fold={fold.phase() ?? undefined}>
-          <Show when={fold.shown() === "rail"} fallback={props.nav}>
-            {props.rail}
-          </Show>
-        </nav>
-        <Show when={props.onNavWidth}>
-          <div class="shell-seam">
-            <NavResizer
-              mode={fold.shown()}
-              width={props.navWidth ?? NAV_WIDTH_DEFAULT}
-              canRail={props.canRail !== false && !!props.onNavMode}
-              onResize={(width) => props.onNavWidth?.(width, false)}
-              onHint={setHint}
-              onDrop={drop}
-              onReset={() => {
-                props.onNavWidth?.(NAV_WIDTH_DEFAULT, true);
-                if (fold.shown() === "rail") props.onNavMode?.("full");
-              }}
-            />
-            <Show when={props.canRail !== false && props.onNavMode}>
-              <button
-                type="button"
-                class="shell-seam-tab"
-                aria-label={fold.shown() === "rail" ? "Expand sidebar" : "Collapse sidebar"}
-                aria-keyshortcuts="["
-                aria-controls="shell-nav"
-                title={fold.shown() === "rail" ? "Expand sidebar ( [ )" : "Collapse sidebar ( [ )"}
-                onClick={toggle}
-              >
-                <Show when={fold.shown() === "rail"} fallback={<ChevronsLeft size={14} stroke-width={2.2} aria-hidden="true" />}>
-                  <ChevronsRight size={14} stroke-width={2.2} aria-hidden="true" />
-                </Show>
-              </button>
+    <ShellDockContext.Provider value={dock}>
+      <div
+        ref={shellEl}
+        class="shell"
+        classList={{
+          "shell--beside": beside(),
+          "shell--bare": bare(),
+          "shell--nodock": props.noDock,
+          "shell--rail": fold.column() === "rail",
+          "shell--sliding": fold.phase() === "narrow" || fold.phase() === "widen",
+          [`shell--hint-${hint()}`]: hint() !== null,
+        }}
+        style={{ "--nav-w": `${columnWidth()}px` }}
+      >
+        <Show when={!isCompact() && !props.navHidden}>
+          <nav class="shell-nav" id="shell-nav" aria-label={props.navLabel ?? "Main"} data-mode={fold.shown()} data-fold={fold.phase() ?? undefined}>
+            <Show when={fold.shown() === "rail"} fallback={props.nav}>
+              {props.rail}
             </Show>
-          </div>
+          </nav>
+          <Show when={props.onNavWidth}>
+            <div class="shell-seam">
+              <NavResizer
+                mode={fold.shown()}
+                width={props.navWidth ?? NAV_WIDTH_DEFAULT}
+                canRail={props.canRail !== false && !!props.onNavMode}
+                onResize={(width) => props.onNavWidth?.(width, false)}
+                onHint={setHint}
+                onDrop={drop}
+                onReset={() => {
+                  props.onNavWidth?.(NAV_WIDTH_DEFAULT, true);
+                  if (fold.shown() === "rail") props.onNavMode?.("full");
+                }}
+              />
+              <Show when={props.canRail !== false && props.onNavMode}>
+                <button
+                  type="button"
+                  class="shell-seam-tab"
+                  aria-label={fold.shown() === "rail" ? "Expand sidebar" : "Collapse sidebar"}
+                  aria-keyshortcuts="["
+                  aria-controls="shell-nav"
+                  title={fold.shown() === "rail" ? "Expand sidebar ( [ )" : "Collapse sidebar ( [ )"}
+                  onClick={toggle}
+                >
+                  <Show when={fold.shown() === "rail"} fallback={<ChevronsLeft size={14} stroke-width={2.2} aria-hidden="true" />}>
+                    <ChevronsRight size={14} stroke-width={2.2} aria-hidden="true" />
+                  </Show>
+                </button>
+              </Show>
+            </div>
+          </Show>
         </Show>
-      </Show>
-      <main class="shell-main">
-        <Show when={bare()}>
-          <button
-            type="button"
-            class={`${buttonClass({ variant: "icon", ghost: true })} shell-show-nav`}
-            aria-label="Show navigation"
-            aria-keyshortcuts="Shift+[ ["
-            title="Show navigation ( Shift [ )"
-            onClick={() => props.onShowNav?.()}
-          >
-            <PanelLeftOpen size={16} aria-hidden="true" />
-          </button>
+        <main ref={mainEl} class="shell-main">
+          <Show when={bare()}>
+            <button
+              type="button"
+              class={`${buttonClass({ variant: "icon", ghost: true })} shell-show-nav`}
+              aria-label="Show navigation"
+              aria-keyshortcuts="Shift+[ ["
+              title="Show navigation ( Shift [ )"
+              onClick={() => props.onShowNav?.()}
+            >
+              <PanelLeftOpen size={16} aria-hidden="true" />
+            </button>
+          </Show>
+          {props.children}
+        </main>
+        <Show when={!isCompact()}>
+          <div ref={setDockHost} class="shell-dock" />
         </Show>
-        {props.children}
-      </main>
-      <Show when={isCompact()}>{props.dock}</Show>
-    </div>
+        <Show when={isCompact()}>{props.dock}</Show>
+      </div>
+    </ShellDockContext.Provider>
   );
 }
 
