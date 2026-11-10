@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSettingsPath, sectionHref, transferRedirect } from "./sections";
+import { companySettingsEntries, parseSettingsPath, sectionHref, transferRedirect } from "./sections";
 
 describe("parseSettingsPath", () => {
   it("opens General at the root", () => {
@@ -45,5 +45,30 @@ describe("sectionHref", () => {
     expect(sectionHref("/TES/company/settings", "general")).toBe("/TES/company/settings");
     expect(sectionHref("/TES/company/settings", "members", "invites")).toBe("/TES/company/settings/members#invites");
     expect(transferRedirect("/TES/company/settings", "import")).toBe("/TES/company/settings/transfer#import");
+  });
+});
+
+describe("companySettingsEntries", () => {
+  const base = "/TES/company/settings";
+  const rows = (entries: ReturnType<typeof companySettingsEntries>) =>
+    entries.map((entry) => ("heading" in entry ? `# ${entry.heading}` : `${entry.label} ${entry.href}${entry.tag ? ` (${entry.tag})` : ""}${entry.end ? " end" : ""}`));
+
+  it("lists the organization's sections, then the plugins' pages", () => {
+    expect(rows(companySettingsEntries(base, [{ label: "Linear sync", routePath: "linear-sync" }]))).toEqual([
+      "# Organization",
+      "General /TES/company/settings end",
+      "Members /TES/company/settings/members",
+      "Connections /TES/company/settings/connections",
+      "Secrets /TES/company/settings/secrets",
+      "Budgets /TES/company/settings/budgets",
+      "Environments /TES/company/settings/environments",
+      "Import and export /TES/company/settings/transfer",
+      "# From plugins",
+      "Linear sync /TES/company/settings/linear-sync (plugin)",
+    ]);
+  });
+
+  it("points to the plugin pages overview when no plugin adds one", () => {
+    expect(rows(companySettingsEntries(base, [])).slice(-2)).toEqual(["# From plugins", "Plugin pages /TES/company/settings/plugins (none)"]);
   });
 });

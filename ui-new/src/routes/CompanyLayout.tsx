@@ -7,7 +7,8 @@ import { queryKeys } from "@/api/queryKeys";
 import { isCompact } from "@/layout/breakpoints";
 import { desktopArea, detailParent, isDetailPage } from "@/layout/dock-model";
 import { navHidden, navWidth, setNavHidden, setNavWidth, useOpenTask, useRecordRecentTasks } from "@/layout/nav-prefs";
-import { Nav } from "@/layout/Nav";
+import { ShellNav, useRememberAppPath } from "@/layout/SettingsNav";
+import { settingsArea } from "@/layout/settings-nav-model";
 import { PhoneDock } from "@/layout/PhoneDock";
 import { Shell } from "@/layout/Shell";
 import { CommandsProvider, useCommands } from "@/lib/commands";
@@ -44,6 +45,9 @@ import "./CompanyLayout.css";
  * Skills, Activity) open under an "On desktop" note; the installed app gets Refresh, Share and Open
  * in browser at the top (shell/pwa.tsx).
  *
+ * In App settings and Company settings the left nav gives way to that area's own sidebar, with Back
+ * to app at the top; `ShellNav` (layout/SettingsNav.tsx) picks it from the address. Every page you open outside settings is remembered for Back to app.
+ *
  * The task the page has open (its page, or a list's panel) is recorded in the nav's recent tasks,
  * and the task keys act on it: `y` archives it from your inbox, `g c` goes to its comment box, `]`
  * closes the panel and opens it again.
@@ -59,6 +63,8 @@ function CompanyShell(props: ParentProps) {
   const [search, setSearch] = useSearchParams<{ task?: string; section?: string }>();
   const openTask = useOpenTask();
   useRecordRecentTasks(openTask);
+  useRememberAppPath();
+  const area = () => settingsArea(location.pathname, company().issuePrefix);
 
   const fullTaskPage = () => !search.task && isDetailPage(location.pathname, company().issuePrefix) && /\/issues\//.test(location.pathname);
   // `]` remembers the panel it closed on this page, to open it again.
@@ -156,7 +162,8 @@ function CompanyShell(props: ParentProps) {
 
   return (
     <Shell
-      nav={<Nav />}
+      nav={<ShellNav />}
+      navLabel={area() ? "Settings" : "Main"}
       dock={<Show when={!detail()}><PhoneDock /></Show>}
       navHidden={navHidden()}
       onShowNav={() => setNavHidden(false)}

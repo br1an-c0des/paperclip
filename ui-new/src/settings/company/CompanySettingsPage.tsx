@@ -1,17 +1,17 @@
 import { A, Navigate, useLocation, useParams } from "@solidjs/router";
 import { createEffect, createMemo, Match, on, Switch } from "solid-js";
 import { useCompany } from "@/lib/company";
-import { RailLayout, SectionRail, type RailEntry } from "@/ui/PageHeader";
 import { OrgHeader } from "@/org/OrgHeader";
 import { BudgetsSection } from "./BudgetsSection";
 import { ConnectionsSection } from "./ConnectionsSection";
 import { EnvironmentsSection } from "./EnvironmentsSection";
 import { GeneralSection } from "./GeneralSection";
 import { MembersSection } from "./MembersSection";
-import { usePluginSettingsPages } from "./plugin-pages";
 import { PluginPageSection, PluginsOverview } from "./PluginSection";
 import { SecretsSection } from "./SecretsSection";
-import { parseSettingsPath, sectionHref, SECTIONS } from "./sections";
+import { SettingsBody } from "../SettingsBody";
+import { useCompanySettingsSections } from "./company-sections";
+import { parseSettingsPath, PLUGINS_PATH, sectionHref } from "./sections";
 import { CardNoteLine, SectionTitle } from "./shared";
 import { TransferSection } from "./TransferSection";
 import "@/projects/settings/ProjectSettings.css";
@@ -20,9 +20,11 @@ import "./CompanySettings.css";
 
 /*
  * Company settings (boards 21–25 and board 30's outline): the organization's header and tabs, then
- * one page with a section rail and a URL per section under `/:prefix/company/settings`. The old
- * UI's addresses land on the matching section (sections.ts), and `/company/export` and
- * `/company/import` on Import and export.
+ * one section at a time, with a URL per section under `/:prefix/company/settings`. The sections are
+ * listed in the settings sidebar that replaces the left nav here (layout/SettingsNav.tsx); on a
+ * phone, which has no nav, the page keeps them as a rail above the section (../SettingsBody.tsx).
+ * Both come from one list (company-sections.ts). The old UI's addresses land on the matching
+ * section (sections.ts), and `/company/export` and `/company/import` on Import and export.
  *
  * "From plugins" lists the settings pages installed plugins add, at the old UI's address
  * (`/company/settings/<routePath>`), where each plugin draws its own page. App (instance)
@@ -30,28 +32,15 @@ import "./CompanySettings.css";
  * one; it sends the old instance Environments addresses here.
  */
 
-/** The overview of plugin pages; the segment no plugin is expected to claim. */
-const PLUGINS_PATH = "plugins";
-
 export function CompanySettingsPage() {
-  const company = useCompany();
   const params = useParams<{ rest?: string }>();
   const location = useLocation();
-  const base = () => `/${company().issuePrefix}/company/settings`;
-  const plugins = usePluginSettingsPages();
+  const { base, plugins, entries } = useCompanySettingsSections();
   const route = createMemo(() => parseSettingsPath(params.rest, location.search));
   const pluginPage = createMemo(() => {
     const current = route();
     return current.kind === "plugin" ? plugins.pages().find((page) => page.routePath === current.routePath) : undefined;
   });
-
-  const entries = createMemo<RailEntry[]>(() => [
-    { heading: "Organization" },
-    ...SECTIONS.map((section) => ({ label: section.label, href: `${base()}${section.path}`, end: section.path === "" })),
-    { heading: "From plugins" },
-    ...plugins.pages().map((page) => ({ label: page.label, href: `${base()}/${page.routePath}`, tag: "plugin" })),
-    ...(plugins.pages().length === 0 ? [{ label: "Plugin pages", href: `${base()}/${PLUGINS_PATH}`, tag: "none" }] : []),
-  ]);
 
   // An old address or an Invite people link names a card: bring it into view once it's drawn.
   createEffect(
@@ -71,7 +60,7 @@ export function CompanySettingsPage() {
   return (
     <div class="org-page cs-page">
       <OrgHeader />
-      <RailLayout rail={<SectionRail label="Organization settings" entries={entries()} />}>
+      <SettingsBody label="Organization settings" entries={entries()}>
         <Switch>
           <Match when={route().kind === "redirect" && route()}>
             {(found) => {
@@ -125,7 +114,7 @@ export function CompanySettingsPage() {
             )}
           </Match>
         </Switch>
-      </RailLayout>
+      </SettingsBody>
     </div>
   );
 }

@@ -1,16 +1,15 @@
 import { Navigate, useLocation, useParams } from "@solidjs/router";
-import { createQuery } from "@tanstack/solid-query";
 import { Settings2, ShieldCheck } from "lucide-solid";
 import { createMemo, Match, Show, Switch } from "solid-js";
-import { accessApi } from "@/api/access";
-import { queryKeys } from "@/api/queryKeys";
 import { findCompanyByPrefix, lastCompanyPrefix, useCompaniesQuery, useCompany } from "@/lib/company";
 import { useSession } from "@/lib/session";
-import { PageHeader, RailLayout, SectionRail } from "@/ui/PageHeader";
+import { PageHeader } from "@/ui/PageHeader";
 import { Splash } from "@/routes/Splash";
+import { SettingsBody } from "../SettingsBody";
 import { AccountSection } from "./AccountSection";
 import { AdminsSection } from "./AdminsSection";
-import { APP_SETTINGS_PATH, appSettingsRoute, defaultSection, legacySettingsSuffix, visibleSections, type AppSectionKey } from "./app-settings-model";
+import { useAppSettingsSections } from "./app-sections";
+import { APP_SETTINGS_PATH, appSettingsRoute, defaultSection, legacySettingsSuffix, type AppSectionKey } from "./app-settings-model";
 import { GeneralSection } from "./GeneralSection";
 import { HarnessesSection } from "./HarnessesSection";
 import { OrganizationsSection } from "./OrganizationsSection";
@@ -18,7 +17,10 @@ import { PluginsSection } from "./PluginsSection";
 import "./AppSettings.css";
 
 /*
- * App settings (boards 28–30): your account and this instance, as one page with a section rail.
+ * App settings (boards 28–30): your account and this instance, one section at a time. The sections
+ * are listed in the settings sidebar that replaces the left nav here (layout/SettingsNav.tsx); on a
+ * phone, which has no nav, the page keeps them as a rail above the section (../SettingsBody.tsx).
+ * Both come from one list (app-sections.ts).
  * It lives at the old UI's address for instance settings, `/:companyPrefix/company/settings/instance`,
  * with a URL per section (`/account`, `/general`, `/organizations`, `/admins`, `/harnesses`,
  * `/plugins`). The old section addresses (`/profile`, `/access`, `/adapters`, `/experimental`,
@@ -35,12 +37,8 @@ export function AppSettingsPage() {
   const location = useLocation();
   const company = useCompany();
   const session = useSession();
-  const access = createQuery(() => ({ queryKey: queryKeys.access.currentBoardAccess, queryFn: accessApi.currentBoardAccess }));
-
-  const isAdmin = () => access.data?.isInstanceAdmin === true;
-  const sections = createMemo(() => visibleSections(isAdmin(), session.health()?.hiddenSettings));
+  const { access, isAdmin, sections, base, entries } = useAppSettingsSections();
   const shown = createMemo(() => new Set(sections().flatMap((entry) => ("heading" in entry ? [] : [entry.key]))));
-  const base = () => `/${company().issuePrefix}${APP_SETTINGS_PATH}`;
   const route = () => appSettingsRoute(params.rest ?? "");
   const current = (): AppSectionKey | null => {
     const value = route();
@@ -90,22 +88,7 @@ export function AppSettingsPage() {
           </Match>
           <Match when={current()}>
             {(section) => (
-              <RailLayout
-                rail={
-                  <div class="as-rail-col">
-                    <SectionRail
-                      label="App settings"
-                      entries={sections().map((entry) => ("heading" in entry ? entry : { label: entry.label, href: `${base()}/${entry.key}` }))}
-                    />
-                    <Show when={isAdmin()}>
-                      <div class="as-rail-note">
-                        <span class="as-rail-note-title">No Experimental page</span>
-                        The switches still worth changing are under General → Features.
-                      </div>
-                    </Show>
-                  </div>
-                }
-              >
+              <SettingsBody label="App settings" entries={entries()}>
                 <Switch>
                   <Match when={section() === "account"}>
                     <AccountSection isAdmin={isAdmin()} />
@@ -126,7 +109,7 @@ export function AppSettingsPage() {
                     <PluginsSection />
                   </Match>
                 </Switch>
-              </RailLayout>
+              </SettingsBody>
             )}
           </Match>
         </Switch>

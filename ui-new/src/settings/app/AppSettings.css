@@ -24,46 +24,6 @@
 }
 
 /* The rail column: the section links and, under them, the Experimental note */
-.as-rail-col {
-  flex: 0 0 210px;
-  display: flex;
-  flex-direction: column;
-  position: sticky;
-  top: 14px;
-  min-width: 0;
-}
-
-.as-rail-col .rail {
-  position: static;
-  flex: none;
-}
-
-.as-rail-note {
-  margin-top: 16px;
-  padding: 12px;
-  border: 1px dashed var(--edge);
-  border-radius: var(--r-card);
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.as-rail-note-title {
-  display: block;
-  font-weight: 600;
-}
-
-@container rail-layout (max-width: 720px) {
-  .as-rail-col {
-    position: static;
-    flex: 1 1 100%;
-  }
-
-  .as-rail-note {
-    display: none;
-  }
-}
-
 .as-sec-title h2 {
   font-size: 24px;
   font-weight: 800;
