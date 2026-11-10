@@ -8,13 +8,15 @@ import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
 import { InitialsDisc } from "@/ui/Avatar";
 import { TaskHeaderActions } from "./TaskActions";
+import { TaskParentCrumb } from "./TaskParentCrumb";
 import { setTaskOpenMode } from "./task-open-mode";
 import { TaskSections } from "./TaskSections";
 import "./TaskPanel.css";
 
 /*
  * A task opened beside the list (boards 2, 3 and 5), inside the list's <Dock>. The toolbar steps
- * to the previous and next task in the list, names the project and task, and holds the task's
+ * to the previous and next task in the list, names the project, the parent task (U104,
+ * TaskParentCrumb.tsx) and the task, and holds the task's
  * actions (privacy and the More menu), "Open as modal" and "Open full page".
  *
  * "Open as modal" is the setting that chooses between this panel and the modal (boards 6 and 7,
@@ -59,6 +61,7 @@ export function TaskPanel(props: {
               </>
             )}
           </Show>
+          <TaskParentCrumb taskId={props.task.id} onOpenTask={props.onOpenTask} />
           <span class="mono tp-id">{props.task.identifier}</span>
         </div>
       }

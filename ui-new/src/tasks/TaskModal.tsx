@@ -13,6 +13,7 @@ import { useProjectsQuery } from "@/lib/company-data";
 import { InitialsDisc } from "@/ui/Avatar";
 import { Dialog } from "@/ui/Dialog";
 import { TaskHeaderActions } from "./TaskActions";
+import { TaskParentCrumb } from "./TaskParentCrumb";
 import { setTaskOpenMode } from "./task-open-mode";
 import { TaskSections } from "./TaskSections";
 import "./TaskModal.css";
@@ -25,7 +26,8 @@ import "./TaskModal.css";
  *
  * Lists open it when the "open tasks as a modal" setting is on; pages without a list always do.
  * From a list it steps to the previous and next task, and "Dock to side panel" switches the setting
- * back. It goes through ui/Dialog, so it's a full-screen sheet on a phone.
+ * back. It goes through ui/Dialog, so it's a full-screen sheet on a phone. The header names the
+ * project, the parent task (U104, TaskParentCrumb.tsx) and the task.
  */
 
 /**
@@ -130,6 +132,7 @@ export function TaskModal(props: {
             </>
           )}
         </Show>
+        <TaskParentCrumb taskId={props.task.id} onOpenTask={props.onOpenTask} />
         <span class="mono tmodal-id">{props.task.identifier}</span>
         <div class="tmodal-actions">
           <TaskHeaderActions taskId={props.task.id} onHidden={props.onClose} />
