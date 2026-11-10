@@ -24,6 +24,8 @@ export function SavedViewsMenu(props: {
   onUpdate: (view: SavedView) => void;
   onRename: (view: SavedView, name: string) => void;
   onDelete: (view: SavedView) => void;
+  /** Classes for the trigger, such as the toolbar step that folds it to its icon. */
+  class?: string;
 }) {
   const [saving, setSaving] = createSignal(false);
   const [managing, setManaging] = createSignal(false);
@@ -32,10 +34,20 @@ export function SavedViewsMenu(props: {
   return (
     <>
       <Menu>
-        <Menu.Trigger as={Button} classList={{ "tv-filter--on": !!props.current }} aria-label={`Saved views: ${label()}`}>
+        <Menu.Trigger
+          as={Button}
+          class={props.class}
+          classList={{ "tv-filter--on": !!props.current }}
+          aria-label={`Saved views: ${label()}`}
+          title={`Saved views: ${label()}`}
+        >
           <Bookmark size={14} aria-hidden="true" fill={props.current ? "currentColor" : "none"} />
-          <span class="sv-label">{label()}</span>
+          <span class="sv-label tv-text">{label()}</span>
           <ChevronDown size={12} stroke-width={2} aria-hidden="true" class="tv-caret" />
+          {/* An edited view, once the toolbar folds the label away */}
+          <Show when={props.edited && !props.current}>
+            <span class="tv-mark" aria-hidden="true" />
+          </Show>
         </Menu.Trigger>
         <Menu.Content label="Saved views" width={260}>
           <Menu.Group label="Saved views">
