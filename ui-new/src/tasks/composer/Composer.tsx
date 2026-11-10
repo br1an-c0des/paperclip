@@ -94,12 +94,18 @@ export function Composer(props: {
   const [pickerClosedAt, setPickerClosedAt] = createSignal<number | null>(null);
   const [goalMode, setGoalMode] = createSignal(false);
   let requestId = newId();
+  // The task the box holds, kept outside `props`. The composer's parent may hand it its task
+  // through a <Show> (TaskActivity, RunModal), whose accessor throws once the <Show> lets go, as it
+  // does while a task opened in place loads. So what runs at or after unmount reads this instead:
+  // the cleanup, and a send that finishes after a switch.
+  let shownTaskId = props.task.id;
 
   // Each task keeps its own draft: switching tasks saves this one and loads the next.
   createEffect(
     on(
       () => props.task.id,
       (taskId, previous) => {
+        shownTaskId = taskId;
         if (previous) saveComposerDraft(previous, { body: untrack(body), attachments: untrack(attachments) });
         const draft = loadComposerDraft(taskId);
         batch(() => {
@@ -125,7 +131,7 @@ export function Composer(props: {
       onCleanup(() => window.clearTimeout(timer));
     }),
   );
-  onCleanup(() => saveComposerDraft(props.task.id, { body: body(), attachments: attachments() }));
+  onCleanup(() => saveComposerDraft(shownTaskId, { body: body(), attachments: attachments() }));
 
   const current = (): Assignee => ({ agentId: props.task.assigneeAgentId, userId: props.task.assigneeUserId });
   const target = () => assignee() ?? current();
@@ -250,11 +256,13 @@ export function Composer(props: {
 
   const send = async (mode: SendMode) => {
     if (sending()) return;
+    // The task it's sent to, read once: the open task may change, or go, before the server answers.
+    const task = props.task;
     const goalSend = props.compact ? null : goalFromComposer({ body: body(), goalMode: goalMode(), attachmentCount: attachments().length });
     if (goalSend) return sendGoal(goalSend);
     const plan = planSend(
       { body: body(), attachments: attachments(), workMode: workMode(), assignee: assignee(), runSettings: runSettings(), reopen: reopen() },
-      { task: props.task, mode, clientRequestId: requestId, adapterTypeOf: (id) => people.agent(id)?.adapterType },
+      { task, mode, clientRequestId: requestId, adapterTypeOf: (id) => people.agent(id)?.adapterType },
     );
     if (!plan.ok) {
       setProblem(plan.problem);
@@ -266,27 +274,30 @@ export function Composer(props: {
       // Out of reach, the message waits in the write queue and shows at the end of the thread (U13).
       const outcome = await sendOrQueue(
         writes,
-        (userId) => commentWrite({ userId, companyId: company().id, task: props.task, plan, clientRequestId: requestId }),
+        (userId) => commentWrite({ userId, companyId: company().id, task, plan, clientRequestId: requestId }),
         async () => {
-          if (plan.workMode) await issuesApi.update(props.task.id, { workMode: plan.workMode });
+          if (plan.workMode) await issuesApi.update(task.id, { workMode: plan.workMode });
           return plan.request.via === "post"
-            ? (await commentsApi.post(props.task.id, plan.request.data)).id
-            : ((await commentsApi.updateWithComment(props.task.id, plan.request.data)).comment?.id ?? null);
+            ? (await commentsApi.post(task.id, plan.request.data)).id
+            : ((await commentsApi.updateWithComment(task.id, plan.request.data)).comment?.id ?? null);
         },
       );
       const commentId = outcome.queued ? null : outcome.result;
-      if (plan.steer && commentId) await steerIn(commentId);
-      batch(() => {
-        setBody("");
-        setAttachments([]);
-        setAssignee(null);
-        setRunSettings(null);
-        setReopenChoice(null);
-      });
-      clearComposerDraft(props.task.id);
-      requestId = newId();
-      queueMicrotask(resize);
-      void client.invalidateQueries({ queryKey: queryKeys.issues.detail(props.task.id) });
+      if (plan.steer && commentId) await steerIn(task.id, commentId);
+      // Another task opened meanwhile: the box holds its draft now, so only the sent one is cleared.
+      if (shownTaskId === task.id) {
+        batch(() => {
+          setBody("");
+          setAttachments([]);
+          setAssignee(null);
+          setRunSettings(null);
+          setReopenChoice(null);
+        });
+        requestId = newId();
+        queueMicrotask(resize);
+      }
+      clearComposerDraft(task.id);
+      void client.invalidateQueries({ queryKey: queryKeys.issues.detail(task.id) });
       void client.invalidateQueries({ queryKey: queryKeys.issues.list(company().id) });
       void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
     } catch (error) {
@@ -310,32 +321,36 @@ export function Composer(props: {
       setProblem("Pick an agent for the goal: goals are for agents.");
       return;
     }
+    const task = props.task;
     setProblem(null);
     setSending(true);
     try {
       if (reassignment && plan.command.action !== "focus") {
         const adapterType = people.agent(reassignment.agentId)?.adapterType ?? null;
         const settings = runSettings();
-        await issuesApi.update(props.task.id, {
+        await issuesApi.update(task.id, {
           assigneeAgentId: reassignment.agentId,
           assigneeUserId: null,
-          assigneeAdapterOverrides: settings ? mergeRunOverrides(props.task.assigneeAdapterOverrides, adapterType, settings, true) : null,
+          assigneeAdapterOverrides: settings ? mergeRunOverrides(task.assigneeAdapterOverrides, adapterType, settings, true) : null,
           deferWakeForGoal: true,
         });
-        batch(() => {
-          setAssignee(null);
-          setRunSettings(null);
-        });
-        void client.invalidateQueries({ queryKey: queryKeys.issues.detail(props.task.id) });
+        if (shownTaskId === task.id)
+          batch(() => {
+            setAssignee(null);
+            setRunSettings(null);
+          });
+        void client.invalidateQueries({ queryKey: queryKeys.issues.detail(task.id) });
         void client.invalidateQueries({ queryKey: queryKeys.issues.list(company().id) });
       }
       await goal.run(plan.command);
-      batch(() => {
-        setBody("");
-        setGoalMode(false);
-      });
-      clearComposerDraft(props.task.id);
-      queueMicrotask(resize);
+      if (shownTaskId === task.id) {
+        batch(() => {
+          setBody("");
+          setGoalMode(false);
+        });
+        queueMicrotask(resize);
+      }
+      clearComposerDraft(task.id);
     } catch (error) {
       setProblem(error instanceof Error ? error.message : String(error));
     } finally {
@@ -344,16 +359,16 @@ export function Composer(props: {
   };
 
   /** Steers a just-posted message into the running turn, if it's still waiting in the queue. */
-  const steerIn = async (commentId: string) => {
-    const latest = await queuedCommentsApi.get(props.task.id);
+  const steerIn = async (taskId: string, commentId: string) => {
+    const latest = await queuedCommentsApi.get(taskId);
     const queued = latest.entries.some((entry) => entry.comment.id === commentId);
     if (!queued || !latest.queueId || !latest.targetRunId || latest.steeringDisposition !== "available") {
       if (queued) pushToast({ tone: "info", title: "Queued for the next turn", body: "This run can't take messages mid-run, so it waits for the next turn." });
       return;
     }
     try {
-      const next = await queuedCommentsApi.steer(props.task.id, commentId, { queueId: latest.queueId, revision: latest.revision, targetRunId: latest.targetRunId });
-      client.setQueryData(queryKeys.issues.section(props.task.id, "queued-comments"), next);
+      const next = await queuedCommentsApi.steer(taskId, commentId, { queueId: latest.queueId, revision: latest.revision, targetRunId: latest.targetRunId });
+      client.setQueryData(queryKeys.issues.section(taskId, "queued-comments"), next);
     } catch (error) {
       pushToast({ tone: "error", title: "Couldn't steer the message", body: `${error instanceof Error ? error.message : String(error)} It's queued for the next turn.` });
     }

@@ -71,13 +71,16 @@ export function createRunnerGoal(options: { taskId: () => string; agentId: () =>
 
   /** Applies one action to the goal. Throws with a message the composer or the card shows. */
   const act = async (action: RunnerGoalAction, objective?: string, revision?: number) => {
+    // The task and its key, read once: the composer's task may change, or go, while this waits.
+    const taskId = options.taskId();
+    const at = key();
     setError(null);
     const projection = await current();
     if (!projection?.agentId) throw new Error(projection?.capability.reason ?? "Pick an agent to set a goal.");
     if (!goalAvailable(projection.capability)) throw new Error(projection.capability.reason ?? "This agent's runner doesn't support goals.");
     setPending(true);
     try {
-      const accepted = await runnerGoalApi.act(options.taskId(), {
+      const accepted = await runnerGoalApi.act(taskId, {
         requestId: newRequestId(),
         agentId: projection.agentId,
         expectedRevision: revision ?? projection.revision,
@@ -85,11 +88,11 @@ export function createRunnerGoal(options: { taskId: () => string; agentId: () =>
         ...(objective ? { objective } : {}),
         ...(action === "replace" ? { confirmReplace: true } : {}),
       });
-      client.setQueryData(key(), accepted.projection);
+      client.setQueryData(at, accepted.projection);
     } catch (failure) {
       const body = failure instanceof ApiError ? (failure.body as { current?: RunnerGoalProjection } | null) : null;
       if (failure instanceof ApiError && failure.status === 409 && body?.current) {
-        client.setQueryData(key(), body.current);
+        client.setQueryData(at, body.current);
         throw new Error("The goal changed while you were working on it. Check it and try again.");
       }
       throw failure instanceof Error ? failure : new Error("The goal action couldn't be applied.");

@@ -16,6 +16,7 @@ import { Menu } from "@/ui/Menu";
 import { PageHeader } from "@/ui/PageHeader";
 import { RunningPill, TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
+import { checkingSetup } from "@/tasks/recovery";
 import { headerSummary, harnessType, modelLabel } from "./agent-model";
 import { builtInFor } from "./built-in-model";
 import { isSetupDraft } from "./new/new-agent-model";
@@ -77,7 +78,10 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
       setBusy(false);
     }
   };
-  const paused = () => props.agent.status === "paused";
+  // Parked while its setup is checked again (#20361): not paused by anyone, and Resume can't finish
+  // the check, so it reads as finishing its setup and offers Pause, as the old UI's header does.
+  const checking = () => checkingSetup(props.agent);
+  const paused = () => props.agent.status === "paused" && !checking();
   const retired = () => props.agent.status === "terminated";
   // A setup draft saved by New agent can't run until it's hired, so finishing setup is all it offers.
   const draft = () => isSetupDraft(props.agent);
@@ -165,7 +169,7 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
                     New task
                   </Menu.Item>
                 </Show>
-                <Show when={!retired() && !paused()}>
+                <Show when={!retired() && props.agent.status !== "paused"}>
                   <Menu.Item
                     description="Starts a run now"
                     onSelect={() => void act(() => agentsApi.invoke(props.agent.id, company().id), `Started a run for ${props.agent.name}`, "Couldn't start a run")}
@@ -312,10 +316,37 @@ function StateOf(props: { agent: AgentDetail; running: boolean; queued: boolean 
           </Show>
         }
       >
-        <TonePill tone="amber" compact>
-          {props.agent.pauseReason === "budget" ? "Paused · budget" : "Paused"}
-        </TonePill>
+        <Show
+          when={setupCheckState(props.agent)}
+          fallback={
+            <TonePill tone="amber" compact>
+              {props.agent.pauseReason === "budget" ? "Paused · budget" : "Paused"}
+            </TonePill>
+          }
+        >
+          {(state) => (
+            <span title={state().title}>
+              <TonePill tone={state().tone} compact>
+                {state().label}
+              </TonePill>
+            </span>
+          )}
+        </Show>
       </Show>
     </Show>
   );
+}
+
+/**
+ * The header's state for an agent whose setup is being checked again (#20361), in the task
+ * notice's words (TaskNotices `agent-checking`), or null for any other agent. A failed check names
+ * its error on hover; More offers Retry setup.
+ */
+export function setupCheckState(agent: Pick<AgentDetail, "status" | "pauseReason" | "lifecycleState" | "lifecycleError">) {
+  if (!checkingSetup(agent)) return null;
+  const error = agent.lifecycleError?.trim() || null;
+  const note = "Runs start once its setup check passes.";
+  return error
+    ? { label: "Setup check failed", tone: "red" as const, title: `${error} ${note}` }
+    : { label: "Finishing setup", tone: "cyan" as const, title: note };
 }

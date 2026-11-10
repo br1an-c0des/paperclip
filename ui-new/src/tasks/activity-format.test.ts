@@ -7,6 +7,16 @@ const names = { agent: () => undefined, person: (id: string) => `User ${id}`, yo
 const event = (details: Record<string, unknown>) =>
   ({ action: "issue.execution_waiting", details, actorType: "system", actorId: "execution-admission", agentId: "a1" }) as unknown as ActivityEvent;
 
+describe("stop confirmations", () => {
+  const confirmed = (action: string) =>
+    activityLine({ action, details: { runId: "r1", alreadyStopped: false }, actorType: "user", actorId: "u1", agentId: null } as unknown as ActivityEvent, names);
+
+  it("reads a confirmed run stop in the old UI's words, not the raw action (#20310)", () => {
+    expect(confirmed("issue.run_stop_confirmed")).toMatchObject({ actor: "You", text: "confirmed the previous run stopped" });
+    expect(confirmed("issue.workspace_owner_stop_confirmed")?.text).toBe("confirmed the previous server stopped");
+  });
+});
+
 describe("issue.execution_waiting (#20338)", () => {
   it("reads as Paperclip holding the Retry, with the reason in words, not the raw action", () => {
     expect(activityLine(event({ requestId: "w1", reason: "budget.blocked" }), names)).toEqual({

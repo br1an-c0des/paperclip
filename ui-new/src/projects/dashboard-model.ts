@@ -332,6 +332,8 @@ const WAITING_FOR: Record<string, string> = {
   resume: "Paused until someone resumes it",
   budget: "Stopped by the budget",
   project_access: "Its agent can't read this project",
+  confirm_owner_stop: "Needs an owner or admin to confirm the previous server stopped",
+  confirm_run_stopped: "Needs an owner or admin to confirm its last run stopped",
 };
 
 function days(ms: number) {

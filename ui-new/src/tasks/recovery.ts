@@ -263,6 +263,15 @@ const TERMINAL = new Set(["done", "cancelled"]);
 /** Lifecycle states in which a parked agent is having its setup checked, not paused by anyone (#20361). */
 export const SETUP_CHECK_STATES = new Set(["preparing", "verifying", "resuming"]);
 
+/**
+ * An agent parked while its setup is checked again (#20361): stored paused, with no pause reason,
+ * in a setup-check lifecycle state. The task notice and the agent's header say it's finishing its
+ * setup rather than paused, and offer no Resume, which can't finish verification.
+ */
+export function checkingSetup(agent: (Pick<Agent, "status" | "pauseReason"> & Partial<Pick<Agent, "lifecycleState">>) | null | undefined) {
+  return agent?.status === "paused" && !agent.pauseReason && SETUP_CHECK_STATES.has(agent.lifecycleState ?? "");
+}
+
 const assigneeBudgetPaused = (agent: NoticeInput["assignee"], status: string) =>
   agent?.status === "paused" && agent.pauseReason === "budget" && !TERMINAL.has(status);
 
@@ -363,7 +372,7 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
       // computer's preparation goes on by itself; a verifying or parked draft waits for its wizard.
       const preparing = agent.lifecycleState === "preparing" || agent.lifecycleState === "pausing";
       notices.push({ kind: "agent-setup", agentId: agent.id, agentName: agent.name, preparing });
-    } else if (!agent.pauseReason && SETUP_CHECK_STATES.has(agent.lifecycleState ?? "")) {
+    } else if (checkingSetup(agent)) {
       // Parked while its setup is checked again (#20361): Resume changes operator holds and can't
       // finish verification, so point to the task's connection card, as the old UI does.
       notices.push({ kind: "agent-checking", agentId: agent.id, agentName: agent.name, error: agent.lifecycleError?.trim() || null });

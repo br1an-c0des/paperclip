@@ -113,6 +113,18 @@ describe("buildThread", () => {
     const failed = buildThread({ ...input, search: "credit" });
     expect(failed[0]?.kind === "lines" && failed[0].lines[0]).toMatchObject({ text: "run failed · 45s: Out of credit", tone: "red" });
   });
+
+  it("names a generic adapter failure's cause, as the run lines do (#20483)", () => {
+    const line = (extra: Partial<RunForIssue>) => {
+      const [item] = buildThread({ comments: [], events: [], runs: [run("r1", "failed", "2026-10-01T11:00:00Z", "2026-10-01T11:00:45Z", extra)], names });
+      return item?.kind === "lines" ? item.lines[0]?.text : undefined;
+    };
+    expect(line({ error: "Adapter failed", errorCode: "adapter_failed", failureCause: "40001" })).toBe("run failed · 45s: adapter failed (40001)");
+    expect(line({ error: "Codex exited", errorCode: "adapter_failed", failureCause: "40001" })).toBe("run failed · 45s: Codex exited · adapter failed (40001)");
+    // An older run with no recorded cause, or another code, keeps its error as it was.
+    expect(line({ error: "Adapter failed", errorCode: "adapter_failed" })).toBe("run failed · 45s: Adapter failed");
+    expect(line({ error: "Out of credit", errorCode: "provider_quota" })).toBe("run failed · 45s: Out of credit");
+  });
 });
 
 describe("duration and stampLabel", () => {

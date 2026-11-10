@@ -303,4 +303,10 @@ describe("stuckWork", () => {
     const [item] = input([task("t", { status: "todo", interruption: { state: "waiting_for_user", userAction: "budget" } as never })]);
     expect(item!.detail).toBe("Stopped by the budget");
   });
+
+  it("says when a run needs confirming as stopped before it can go on", () => {
+    const waiting = (userAction: string) => input([task("t", { status: "todo", interruption: { state: "waiting_for_user", userAction } as never })])[0]!.detail;
+    expect(waiting("confirm_run_stopped")).toBe("Needs an owner or admin to confirm its last run stopped");
+    expect(waiting("confirm_owner_stop")).toBe("Needs an owner or admin to confirm the previous server stopped");
+  });
 });

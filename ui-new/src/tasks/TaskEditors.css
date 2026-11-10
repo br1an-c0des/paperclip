@@ -61,6 +61,16 @@
   white-space: nowrap;
 }
 
+/* A private parent: a lock and its number, no link (as the locked dependencies show) */
+.te-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 /* A property's value as a button: the value, then a muted caret */
 .te-trigger {
   display: inline-flex;
