@@ -46,6 +46,10 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   of the change, per-agent save results and retry (`components/agents/AgentBulkSettingsSheet.tsx`;
   `PATCH /api/agents/:id` with `runtimeSettings`, `GET /api/companies/:companyId/ai-connections`,
   `GET /api/companies/:companyId/adapters/:type/models`).
+  Since the 2026-11-10 sync (#20317), the roster filters by model (or "Harness default"), status,
+  harness and connection, each with All and an active count, on both layouts and the org chart; bulk
+  selection survives hidden rows (`components/agents/AgentRosterFilters.tsx`,
+  `lib/agent-roster-filters.ts`, which also reads `GET /api/companies/:companyId/ai-connections`).
 
 ### `agents/organization`: Reporting relationships
 
@@ -119,6 +123,10 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   context) for tasks it touched.
 - **Requests:** `POST /api/agents/:id/pause|resume|terminate|clear-error|approve|lifecycle/retry`,
   `POST /api/agents/:id/runtime-state/reset-session`.
+- **Since the 2026-11-10 sync** (#20361, #20375): an agent whose verification needs an AI account
+  default parks without a `pauseReason`, and the task's paused banner stays hidden while the agent is
+  `preparing`, `verifying` or `resuming`; a `connection_intent` card on the task repairs it. Moving an
+  agent to a plugin environment pauses it automatically instead of answering 409.
 
 ### `agents/instructions`: Instructions
 
@@ -158,6 +166,9 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   (`BuiltInBundlePanel`) and limit what can change. Since the 2026-10-22 sync, existing Claude and
   Codex agents are offered "Upgrade to Paperclip Runner", which saves the switch together with any
   unsaved changes.
+  Since the 2026-11-10 sync (#20417, #20410), the Codex and Claude sign-in panels also work on a saved
+  agent's computer from an environment plugin: the login-session requests take `agentId`, and
+  `components/AgentLoginTarget.tsx` adds a "Sign-in computer" picker (`EnvironmentCapabilities.loginPtyDrivers`).
 
 ### `agents/secrets`: Secrets
 
@@ -186,6 +197,12 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   the 2026-10-24 sync, project access: which projects a low-trust agent may read, and adding projects
   to that scope while keeping its other restrictions (`components/AgentProjectAccessSettings.tsx`).
 - **Requests:** `PATCH /api/agents/:id/permissions`, `GET|POST /api/agents/:id/project-access`.
+- **Since the 2026-11-10 sync** (not used by the old UI): eleven deny-only interaction switches per
+  agent (`agent.permissions.interactions`, `AGENT_INTERACTION_PERMISSION_KEYS`), read and set with
+  `GET` and `PATCH /api/agents/:id/interaction-permissions` (board only; `null` resets a switch;
+  answers `{agentId, companyId, overrides, effective}`; #20411, #20422). `PATCH /api/agents/:id` and
+  `/permissions` now refuse `permissions.interactions` (422). Single grants go through
+  `PATCH /api/agents/:id/permission-grants` with `{permissionKey, enabled}` (board only, #20323).
 
 ### `agents/api-keys`: API keys
 
@@ -279,6 +296,8 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   - `GET /api/issues/:id/recent-comments` returns a chat's 20 newest comments with
     `oldestCommentId`; older ones page in on scroll (`GET /api/issues/:id/comments`,
     `hooks/useConversationHistoryPages.ts`).
+- **Since the 2026-11-10 sync** (#20292): a message held at the agent's daily limit waits in the
+  outbox (a `deferred` queue with its `executionWait.message`) instead of being dropped.
 
 ## Switches that change this area
 

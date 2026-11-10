@@ -75,6 +75,9 @@ cheatsheet, the command palette, global dialogs, and plugin overlays.
   `openOnboarding`).
 - **Requests:** the creation requests listed in each area guide, plus the agent configuration form's
   adapter, model and AI-connection requests.
+- **Since the 2026-11-10 sync** (#20453): on self-hosted instances, after 5 done tasks in a company, a
+  one-time dialog asks to star Paperclip on GitHub (`components/GitHubStarPrompt.tsx`; it reads
+  `GET /api/health` and `GET /api/companies/:companyId/issues`, and remembers the answer in the browser).
 
 ### `shell/live-updates`: Live updates and toasts
 
@@ -165,6 +168,8 @@ cheatsheet, the command palette, global dialogs, and plugin overlays.
 - Dev-server restart banner and worktree banner (development instances).
 - Mobile bottom navigation.
 - Breadcrumbs set by each page (`BreadcrumbContext`).
+  Since the 2026-11-10 sync, a task's breadcrumbs show its immediate parent (#20366), and the
+  unprefixed `/approvals/:approvalId` redirects to the company's approval page.
 - Primary agent provider (`GET|PUT /api/companies/:companyId/primary-agent/me`).
 
 ## Switches that change this area

@@ -89,6 +89,10 @@ Agent Chat (`/:co/chats/:agentRef`) reuses `TaskDetailSurface` in a conversation
   Decisions page). Since the 2026-11-03 sync, the Mine tab opens from one snapshot,
   `GET /api/companies/:companyId/inbox/mine` (`InboxMineSnapshot`: the Mine rows, their context tasks
   and the latest failed runs, with per-source errors), instead of separate startup reads.
+  Since the 2026-11-10 sync, Mine reads only the execution workspaces its rows reference,
+  `GET /api/companies/:companyId/execution-workspaces?summary=true&ids=` (up to 100;
+  `executionWorkspacesApi.listSummariesByIds`, #20388), and a Retry that didn't start shows its reason
+  instead of opening the task (#20283).
 - **Notes:** archiving is "out of my inbox", not completing the task. Read state for non-task items
   (approvals, failed runs, join requests) is browser-only local storage. Keyboard: `j`/`k`, `a` or `y`
   archive, `r` mark read, `U` mark unread, Enter open, left/right collapse. Blocked view groups by blocker
@@ -148,6 +152,12 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   (link, title, number, status), once each. The feed reads the runs it shows in batches with
   `GET /api/issues/:issueId/runs?runIds=` (`activityApi.runsByIdsForIssue`, up to 100 IDs per
   request).
+- **Since the 2026-11-10 sync** (#20355, #20286, #20450): the old UI reads a task chat's whole first
+  frame in one request, `GET /api/companies/:companyId/issues/chat-bootstrap?ids=` (up to 10;
+  `issuesApi.chatBootstrap`, `hooks/useRecentTaskOpenWarmup.ts`) or `GET /api/issues/:ref/chat-bootstrap`,
+  preloaded on hover and from Recents; the individual reads above remain (`lib/issue-chat-history-queries.ts`).
+  A deferred request whose wait reason changes logs `issue.execution_waiting` (#20338), which refreshes
+  open pages.
 
 ### `tasks/discussion`: Comment and reassign
 
@@ -175,6 +185,10 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   (`components/task-chat/queued-message-auto-steer.ts`, `TaskChatQueuedMessages.tsx`). It uses the
   same `POST .../queued-comments/:commentId/steer`. A run still preparing takes the queue into its
   first turn (`executionWait.reason: "first_turn_pending"`, #20168).
+- **Since the 2026-11-10 sync** (#20367, #20292): each queued row renders its Markdown without images,
+  plus up to three thumbnails of `/api/attachments/:id/content` or `/api/assets/:id/content` images and
+  "+N" (`TaskChatQueuedMessages.tsx`). A chat message held at the agent's daily limit waits as a
+  `deferred` queue with no queue id or target run, and its `executionWait.message` shows under the queue.
 
 ### `tasks/interactions`: Agent requests in the thread
 
@@ -217,6 +231,11 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   saves a `cancellationRequestId` and sends it in the cancel body, and checks the run's
   `nativeCancellation` intent in the reply (`lib/native-run-stop.ts`). A Stop during slow native startup
   answers 409 `native_stop_pending` and settles as cancelled later.
+  Since the 2026-11-10 sync, a generic `adapter_failed` run carries `failureCause` (a bounded code such
+  as `40001` or `ECONNRESET`), shown as "adapter failed (40001)" in the run ledger (#20483), and the
+  live run status (`currentStatusMessage`, `currentToolName`, `lastAssistantSnippet`) covers storage
+  waits: phase `waiting_for_storage`, "Waiting for file storage before starting the run log (45s so
+  far)" (#20460).
 - **Source:** `components/IssueRunLedger.tsx`, `components/TaskChatThread.tsx`.
 
 ### `tasks/properties`: Properties panel
@@ -259,6 +278,8 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   (`Issue.stalledDependencies`); each row reads the child (`GET /api/issues/:id`) to drop itself once
   the child's status moves on, and Retry sends `POST /api/issues/:issueId/retry`
   (`hooks/useTaskRetry.ts`). The waiting agent is woken once per stall (`issue_blocker_stalled`).
+- **Since the 2026-11-10 sync** (#20366): the task's breadcrumbs show its immediate parent, truncated,
+  with a non-interactive lock chip for a private parent (`components/BreadcrumbBar.tsx`).
 
 ### `task-coordination/tree-control`: Pause, resume, cancel, restore a task tree
 
@@ -317,7 +338,8 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   runtime services; reconcile the workspace branch; worktree picker in the composer.
 - **Requests:** `GET /api/companies/:companyId/execution-workspaces`,
   `POST /api/execution-workspaces/:id/runtime-commands/:action`,
-  `POST /api/execution-workspaces/:id/reconcile-branch`.
+  `POST /api/execution-workspaces/:id/reconcile-branch`. Since the 2026-11-10 sync, the summaries
+  accept `?summary=true&ids=` (up to 100, #20388).
 - **Notes:** flags `enableIsolatedWorkspaces`, `enableEnvironments`. See [projects](projects.md) for
   workspace pages.
 
@@ -355,6 +377,19 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   `components/WorkspaceExportRecovery.tsx`). A Retry waiting on blockers (`retryWait.reason:
   "dependency_blocked"`) lists each unfinished blocker with a link and what to do
   (`components/ExecutionBlockerNotice.tsx`).
+  Since the 2026-11-10 sync, a native run cut off before its runner's process was recorded presents
+  `userAction: "confirm_run_stopped"` (`canRetry: false`); an owner or admin confirms that no agent is
+  still working through `POST /api/issues/:id/recovery-actions/confirm-run-stopped` (`{runId,
+  stopEvidence}`, answering `{runId, alreadyStopped, presentation}`; `components/ExecutionBlockerNotice.tsx`),
+  and the parked Retry starts at once. A board-owned native recovery that can't verify the original
+  host (`native_restart_recovery_blocked`, `evidence.reason: "controller_process_space_unverified"`)
+  gets a containment form that sends `POST /api/issues/:id/recovery-actions/resolve` with
+  `outcome: "restored"` and `executionReconciliation` (`components/IssueRecoveryActionCard.tsx`,
+  `NativeControllerContainmentRecovery`). Retry answers `scheduledRetry {outcome, message}`
+  (`hooks/useTaskRetry.ts`); a budget-held Retry presents `userAction: "budget"`; the interruption
+  names a failed setup command (`setupFailure`) or a rejected model (`rejectedModel`); and the paused
+  notice stays hidden while an agent's setup is repaired through a `connection_intent` card
+  (`agentSetup: true`).
 - **Unused by the old UI:** `POST /api/issues/:id/recovery-actions/reconstruct-workspace` (continue from
   saved sources).
 

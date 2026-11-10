@@ -73,6 +73,12 @@ Reference:
 
 - **Where:** a task's "Review request" for an ask-first app call; Apps → Review (Tier 2).
 - **What:** approve once, always allow the displayed scope, or decline.
+  Since the 2026-11-10 sync (#20340), ordinary reviews have no implicit one-hour deadline (`expiresAt`
+  may be null), and an approved call whose connection needs signing in again is kept
+  (`result.toolAction.status: "approved"`, `errorCode: "approved_action_connection_required"`): the
+  card reads "Approved · Sign-in needed" with "Reconnect <app>" to the app's permissions tab
+  (`components/IssueThreadInteractionCard.tsx`). New refusal codes: `approved_tool_target_changed`
+  and `approved_tool_managed_arguments_changed`.
 - **Notes:** listed here because it is the same kind of "waiting on you" item; the requests belong to the
   Apps area.
 
