@@ -29,6 +29,7 @@ import {
   type TaskRow,
 } from "./list-model";
 import { Assignee, assigneeName, type TaskPeople } from "./people";
+import { NewLabelDialog } from "./NewLabelDialog";
 import { AssigneeItems, LabelDot, LabelItems, PriorityItems, StatusItems } from "./pickers";
 import { RetryMark, type TaskRetry } from "./retry";
 import type { TaskUpdates } from "./task-updates";
@@ -527,6 +528,9 @@ function Row(props: {
   const labelIds = () => task().labelIds ?? task().labels?.map((label) => label.id) ?? [];
   const labelNames = () => (task().labels ?? []).map((label) => label.name).join(", ");
   const change = (data: Record<string, unknown>) => void props.updates.update([{ task: task(), data }]);
+  // The labels menu's "New label…" dialog, mounted only while it's open.
+  const [creatingLabel, setCreatingLabel] = createSignal(false);
+  let labelsTrigger: HTMLButtonElement | undefined;
 
   const open = (event: MouseEvent) => {
     if (!plainClick(event)) return;
@@ -534,9 +538,11 @@ function Row(props: {
     props.onOpen(task());
   };
   // A click anywhere on the row opens the task too, unless it was on a control inside it.
-  // Shift-click ticks a range of rows, ⌘/Ctrl-click ticks one.
-  const openFromRow = (event: MouseEvent) => {
+  // Shift-click ticks a range of rows, ⌘/Ctrl-click ticks one. Clicks in the row's portalled
+  // menus and dialog reach the row through Solid's event delegation, but aren't inside it.
+  const openFromRow = (event: MouseEvent & { currentTarget: HTMLElement }) => {
     if (event.defaultPrevented || event.button !== 0) return;
+    if (!event.currentTarget.contains(event.target as Node)) return;
     if ((event.target as Element).closest("a, button, input, [role='menu']")) return;
     if (event.shiftKey) return props.onCheck("range");
     if (event.metaKey || event.ctrlKey) return props.onCheck("toggle");
@@ -634,7 +640,7 @@ function Row(props: {
         </Menu.Content>
       </Menu>
       <Menu>
-        <Menu.Trigger class="tl-cell tl-labels" aria-label={labelNames() ? `Labels: ${labelNames()}. Change labels` : "No labels. Add a label"}>
+        <Menu.Trigger ref={labelsTrigger} class="tl-cell tl-labels" aria-label={labelNames() ? `Labels: ${labelNames()}. Change labels` : "No labels. Add a label"}>
           <For each={task().labels ?? []} fallback={<span class="tl-labels-add">Add label</span>}>
             {(label) => <LabelPill name={label.name} color={label.color} />}
           </For>
@@ -644,8 +650,20 @@ function Row(props: {
             checked={(id) => labelIds().includes(id)}
             onChange={(id, on) => change({ labelIds: on ? [...labelIds(), id] : labelIds().filter((each) => each !== id) })}
           />
+          <Menu.Separator />
+          <Menu.Item icon={<Plus size={15} />} onSelect={() => setCreatingLabel(true)}>
+            New label…
+          </Menu.Item>
         </Menu.Content>
       </Menu>
+      <Show when={creatingLabel()}>
+        <NewLabelDialog
+          open
+          onClose={() => setCreatingLabel(false)}
+          onCreated={(id) => change({ labelIds: [...labelIds(), id] })}
+          returnFocus={() => labelsTrigger}
+        />
+      </Show>
       <span class="tl-updated">{updatedLabel(task().lastActivityAt ?? task().updatedAt)}</span>
     </div>
   );

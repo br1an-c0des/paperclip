@@ -1,5 +1,5 @@
-import type { Agent, CompactIssue, ExecutionWorkspace, Issue, IssueLabel, IssuePriority, IssueStatus } from "@paperclipai/shared";
-import { createQuery, useQueryClient } from "@tanstack/solid-query";
+import type { Agent, CompactIssue, ExecutionWorkspace, Issue, IssuePriority, IssueStatus } from "@paperclipai/shared";
+import { createQuery } from "@tanstack/solid-query";
 import { Check, ChevronDown, Lock, Pencil, Play, Plus, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, Show, type JSX } from "solid-js";
 import { agentsApi } from "@/api/agents";
@@ -11,7 +11,6 @@ import { useExperimentalSettingsQuery, useGoalsQuery, useLiveRunsQuery, useProje
 import { ConfirmDialog } from "@/documents/ConfirmDialog";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
-import { Dialog } from "@/ui/Dialog";
 import { TextArea, TextInput } from "@/ui/Field";
 import { Markdown } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
@@ -19,8 +18,8 @@ import { Popover } from "@/ui/Popover";
 import { LabelPill, PriorityBars } from "@/ui/Status";
 import { STATUS_META, statusLook, statusNote, type StatusLook } from "@/ui/status-meta";
 import { Switch } from "@/ui/Switch";
-import { pushToast } from "@/ui/Toast";
 import { agentRunDefaults, effortOptions, supportsOverrides } from "./new-task";
+import { NewLabelDialog } from "./NewLabelDialog";
 import type { TaskPeople } from "./people";
 import { Assignee, assigneeName } from "./people";
 import { AssigneeItems, LabelItems, PriorityItems, StatusItems } from "./pickers";
@@ -274,6 +273,7 @@ export function PriorityControl(props: { priority: IssuePriority; onChange: Chan
 export function LabelsControl(props: { task: Issue; onChange: ChangeTask }) {
   const ids = () => props.task.labelIds ?? (props.task.labels ?? []).map((label) => label.id);
   const [creating, setCreating] = createSignal(false);
+  let trigger: HTMLButtonElement | undefined;
   return (
     <span class="te-labels">
       <For each={props.task.labels ?? []}>
@@ -292,7 +292,7 @@ export function LabelsControl(props: { task: Issue; onChange: ChangeTask }) {
         )}
       </For>
       <Menu>
-        <Menu.Trigger class="te-add" aria-label="Add a label">
+        <Menu.Trigger ref={trigger} class="te-add" aria-label="Add a label">
           <Plus size={14} aria-hidden="true" />
           <Show when={(props.task.labels ?? []).length === 0}>Add label</Show>
         </Menu.Trigger>
@@ -307,70 +307,13 @@ export function LabelsControl(props: { task: Issue; onChange: ChangeTask }) {
           </Menu.Item>
         </Menu.Content>
       </Menu>
-      <NewLabelDialog open={creating()} onClose={() => setCreating(false)} onCreated={(id) => props.onChange({ labelIds: [...ids(), id] })} />
+      <NewLabelDialog
+        open={creating()}
+        onClose={() => setCreating(false)}
+        onCreated={(id) => props.onChange({ labelIds: [...ids(), id] })}
+        returnFocus={() => trigger}
+      />
     </span>
-  );
-}
-
-const LABEL_COLORS = ["#6366f1", "#22b5a5", "#f5822a", "#f2286f", "#8b2cf0", "#2fd12f"];
-
-/** A new company label (`POST /companies/:id/labels`), added to the task once it exists. */
-function NewLabelDialog(props: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
-  const company = useCompany();
-  const client = useQueryClient();
-  const [name, setName] = createSignal("");
-  const [color, setColor] = createSignal(LABEL_COLORS[0]!);
-  const [busy, setBusy] = createSignal(false);
-  const close = () => {
-    setName("");
-    props.onClose();
-  };
-  const create = async () => {
-    const trimmed = name().trim();
-    if (!trimmed) return;
-    setBusy(true);
-    try {
-      const created = await taskActionsApi.createLabel(company().id, { name: trimmed, color: color() });
-      client.setQueryData<IssueLabel[]>(queryKeys.issues.labels(company().id), (current) =>
-        current?.some((label) => label.id === created.id) ? current : [...(current ?? []), created],
-      );
-      void client.invalidateQueries({ queryKey: queryKeys.issues.labels(company().id) });
-      props.onCreated(created.id);
-      close();
-    } catch (error) {
-      pushToast({ tone: "error", title: "Couldn't create the label", body: (error as Error).message });
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Dialog
-      open={props.open}
-      onOpenChange={(open) => !open && close()}
-      title="New label"
-      width={420}
-      footer={
-        <>
-          <Button variant="quiet" onClick={close}>
-            Cancel
-          </Button>
-          <Button variant="primary" disabled={busy() || !name().trim()} onClick={() => void create()}>
-            {busy() ? "Creating…" : "Create and add"}
-          </Button>
-        </>
-      }
-    >
-      <form
-        class="te-row"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void create();
-        }}
-      >
-        <input type="color" class="te-color" aria-label="Label color" value={color()} onInput={(event) => setColor(event.currentTarget.value)} />
-        <TextInput aria-label="Label name" placeholder="Label name" value={name()} onInput={(event) => setName(event.currentTarget.value)} autofocus />
-      </form>
-    </Dialog>
   );
 }
 

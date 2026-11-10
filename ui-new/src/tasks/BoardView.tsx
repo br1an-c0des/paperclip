@@ -11,6 +11,7 @@ import { LabelPill, PriorityBars, RunningPill, TaskStatusCapsule } from "@/ui/St
 import { PRIORITY_META } from "@/ui/status-meta";
 import { CARD_SUBTASKS, columnTone, COLUMN_PAGE, moveCursor, neighbourColumn, type CursorMove } from "./board-model";
 import { moveUpdate, takesAdds, takesDrops, type GroupValue, type TaskGroup, type TaskRow } from "./list-model";
+import { NewLabelDialog } from "./NewLabelDialog";
 import { assigneeName, type TaskPeople } from "./people";
 import { AssigneeItems, LabelItems, PriorityItems } from "./pickers";
 import { RetryMark, type TaskRetry } from "./retry";
@@ -436,6 +437,9 @@ function Card(props: {
   const labelNames = () => (task().labels ?? []).map((label) => label.name).join(", ");
   const change = (data: Record<string, unknown>) => void props.updates.update([{ task: task(), data }]);
   const who = () => assigneeName(task(), props.people);
+  // The labels menu's "New label…" dialog, mounted only while it's open.
+  const [creatingLabel, setCreatingLabel] = createSignal(false);
+  let labelsTrigger: HTMLButtonElement | undefined;
   const percent = () => (props.row.subtasks > 0 ? Math.round((props.row.subtasksDone / props.row.subtasks) * 100) : 0);
 
   const open = (event: MouseEvent) => {
@@ -450,9 +454,12 @@ function Card(props: {
     event.preventDefault();
     props.onOpen(task());
   };
-  // A click anywhere on the card opens the task too, unless it was on a control inside it.
-  const openFromCard = (event: MouseEvent) => {
+  // A click anywhere on the card opens the task too, unless it was on a control inside it. Clicks in
+  // the card's portalled menus and dialog reach the card through Solid's event delegation, but
+  // aren't inside it.
+  const openFromCard = (event: MouseEvent & { currentTarget: HTMLElement }) => {
     if (event.defaultPrevented || event.button !== 0) return;
+    if (!event.currentTarget.contains(event.target as Node)) return;
     if ((event.target as Element).closest("a, button, input, [role='menu']")) return;
     if (event.shiftKey) return props.onCheck("range");
     if (event.metaKey || event.ctrlKey) return props.onCheck("toggle");
@@ -518,7 +525,7 @@ function Card(props: {
           </Menu.Content>
         </Menu>
         <Menu>
-          <Menu.Trigger class="bv-labels" aria-label={labelNames() ? `Labels: ${labelNames()}. Change labels` : "No labels. Add a label"}>
+          <Menu.Trigger ref={labelsTrigger} class="bv-labels" aria-label={labelNames() ? `Labels: ${labelNames()}. Change labels` : "No labels. Add a label"}>
             <For each={task().labels ?? []} fallback={<span class="bv-pill bv-pill--add">+ Label</span>}>
               {(label) => <LabelPill name={label.name} color={label.color} />}
             </For>
@@ -528,8 +535,20 @@ function Card(props: {
               checked={(id) => labelIds().includes(id)}
               onChange={(id, on) => change({ labelIds: on ? [...labelIds(), id] : labelIds().filter((each) => each !== id) })}
             />
+            <Menu.Separator />
+            <Menu.Item icon={<Plus size={15} />} onSelect={() => setCreatingLabel(true)}>
+              New label…
+            </Menu.Item>
           </Menu.Content>
         </Menu>
+        <Show when={creatingLabel()}>
+          <NewLabelDialog
+            open
+            onClose={() => setCreatingLabel(false)}
+            onCreated={(id) => change({ labelIds: [...labelIds(), id] })}
+            returnFocus={() => labelsTrigger}
+          />
+        </Show>
       </div>
       <Show when={props.row.subtasks > 0}>
         <div class="bv-subtasks">
