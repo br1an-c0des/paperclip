@@ -7,6 +7,7 @@ import { readNativeWorkspaceSyncReference } from "./native-runtime/native-worksp
 import { readSystemRecovery, SystemRecoveryFailure } from "./system-recovery-state.js";
 import type { NativeWorkspaceFinalizationOwnership } from "./native-runtime/native-workspace-finalization-ownership.js";
 import { readStopOnlyCleanup } from "./sandbox-stop-and-retain.js";
+import { isAbandonedPreparedRemoteWorkspace } from "./remote-workspace-abandoned-preparation.js";
 import { LEGACY_WORKSPACE_RECOVERY_SCHEMA, SETTLED_WORKSPACE_RESTORE_HOLD_KEY } from "./workspace-restore-recovery-state.js";
 import { ENVIRONMENT_LEASE_POLICIES, EXECUTION_RECONCILIATION_CAUSES, readRemoteWorkspaceAuthority, remoteWorkspaceRunReferenceSchema, type EnvironmentLeasePolicy,
   type WorkspaceSourceVerificationFailure } from "@paperclipai/shared";
@@ -109,6 +110,7 @@ export async function inspectWorkspaceRecoverySource(db: Db, input: WorkspaceRec
     || remoteAuthority.location.remoteCwd !== remoteReference.remoteCwd
     || (remoteReference.state === "prepared" ? !remoteAuthority.dirty || remoteAuthority.writerRunId !== run.id
       : remoteAuthority.dirty || remoteAuthority.writerRunId !== null || remoteAuthority.snapshotId !== remoteReference.snapshotId))) {
+    if (await isAbandonedPreparedRemoteWorkspace(db, run)) throw new SystemRecoveryFailure("source_unavailable", "use_alternative_strategy");
     throw invalid("workspace_reference_mismatch");
   }
   if (remoteReference?.state === "saved") {
@@ -190,9 +192,8 @@ export async function inspectWorkspaceRecoverySource(db: Db, input: WorkspaceRec
     const priors = predecessorRuns.length ? await db.select().from(heartbeatRuns).where(and(
       eq(heartbeatRuns.companyId, input.companyId), inArray(heartbeatRuns.id, predecessorRuns))) : [];
     const priorOwners = predecessorRuns.length ? await db.select({ runId: nativeRunFinalizations.runId,
-      phase: nativeRunFinalizations.phase, leaseOwner: nativeRunFinalizations.leaseOwner }).from(nativeRunFinalizations).where(and(
-        eq(nativeRunFinalizations.companyId, input.companyId), inArray(nativeRunFinalizations.runId, predecessorRuns),
-        eq(nativeRunFinalizations.issueId, input.issueId))) : [];
+      issueId: nativeRunFinalizations.issueId, phase: nativeRunFinalizations.phase, leaseOwner: nativeRunFinalizations.leaseOwner }).from(nativeRunFinalizations).where(and(
+        eq(nativeRunFinalizations.companyId, input.companyId), inArray(nativeRunFinalizations.runId, predecessorRuns))) : [];
     for (const predecessor of predecessors) {
       const prior = priors.find(item => item.id === predecessor.heartbeatRunId);
       const priorReference = readNativeWorkspaceSyncReference(prior?.runnerProfileJson?.nativeWorkspaceSync);
@@ -203,7 +204,8 @@ export async function inspectWorkspaceRecoverySource(db: Db, input: WorkspaceRec
         : priorRemote?.state === "saved" && Boolean(priorRemote.snapshotId) && Boolean(remoteDescriptor)
           && priorRemote.epoch < remoteDescriptor!.epoch;
       const priorOwner = priorOwners.find(item => item.runId === predecessor.heartbeatRunId);
-      if (!prior || prior.runtimeMode !== "native" || prior.agentId !== run.agentId || prior.nativeIssueId !== input.issueId ||
+      if (!prior || prior.runtimeMode !== "native" || prior.agentId !== run.agentId ||
+          !predecessor.issueId || prior.nativeIssueId !== predecessor.issueId || priorOwner?.issueId !== predecessor.issueId ||
           !terminalWorkspaceRunStates.includes(prior.status) || adapterExecutionControls.has(prior.id) ||
           (prior.controllerLeaseExpiresAt && prior.controllerLeaseExpiresAt > new Date()) ||
           !priorOwner || priorOwner.leaseOwner || !["committed", "terminal_failure", "applied"].includes(priorOwner.phase) ||

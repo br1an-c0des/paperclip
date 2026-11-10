@@ -106,6 +106,8 @@ import { summarySlotRoutes } from "./routes/summary-slots.js";
 import { statusCardRoutes } from "./routes/status-cards.js";
 import { teamsCatalogRoutes } from "./routes/teams-catalog.js";
 import { agentRoutes } from "./routes/agents.js";
+import { agentInteractionPermissionRoutes } from "./routes/agent-interaction-permissions.js";
+import { agentPermissionGrantRoutes } from "./routes/agent-permission-grants.js";
 import { resolveAgentRunnerTargetForCompany } from "./services/agent-runner-selection.js";
 import type { SetupTokenSessionService } from "./services/setup-token-session.js";
 import {
@@ -126,6 +128,7 @@ import { workflowRoutes } from "./routes/workflows.js";
 import { fileResourceRoutes } from "./routes/file-resources.js";
 import { createRemoteWorkspaceFiles } from "./services/remote-workspace-files.js";
 import { createSavedWorkspaceLoader } from "./services/remote-workspaces.js";
+import { createSavedWorkspaceArchiveOpener } from "./services/saved-workspace-archive.js";
 import { routineRoutes } from "./routes/routines.js";
 import { environmentRoutes } from "./routes/environments.js";
 import { executionWorkspaceRoutes } from "./routes/execution-workspaces.js";
@@ -754,6 +757,7 @@ export async function createApp(
   // start route drives a live login instead of the fixed 503.
   const setupTokenLoginTransport = buildSetupTokenLoginTransport({
     sandbox: createProductionSetupTokenSandboxProvider({
+      db,
       environments: environmentService(db),
       environmentRuntime: environmentRuntimeService(db, {
         pluginWorkerManager: workerManager,
@@ -795,6 +799,8 @@ export async function createApp(
       },
     }),
   );
+  api.use(agentPermissionGrantRoutes(db));
+  api.use(agentInteractionPermissionRoutes(db));
   api.use(assetRoutes(db, opts.storageService));
   api.use(agentProfileAvatarRoutes(db, opts.storageService));
   api.use(projectToolRoutes(db));
@@ -807,6 +813,7 @@ export async function createApp(
   api.use(fileResourceRoutes(db, { remoteFiles: createRemoteWorkspaceFiles(db, {
     environmentRuntime: environmentRuntimeService(db, { pluginWorkerManager: workerManager }),
     loadSavedWorkspace: createSavedWorkspaceLoader(db, opts.storageService),
+    openSavedWorkspaceArchive: createSavedWorkspaceArchiveOpener(db, opts.storageService),
   }) }));
   api.use(routineRoutes(db, { pluginWorkerManager: workerManager }));
   api.use(
