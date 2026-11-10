@@ -506,11 +506,14 @@ and the header (U103–U105).
 
 Integration round 6 (Nov 10): `tasks/notices-3` (U93–U98, U102; U96 check), `requests/queue-live`
 (U99, U100, U107; U101 check) and `agents/roster-permissions` (U103–U105) settle every Nov 10 line.
-Found along the way: opening another task in place fails while the Activity section is mounted (Solid's
-"stale value from <Show>"; the address changes but the panel stays), which also breaks the Details
-Parent row; that row shows an empty title for a private parent. Small leftovers: the project
-dashboard's `WAITING_FOR` lacks `confirm_run_stopped`, the agent header's `resuming` wording, a label
-for `issue.run_stop_confirmed`, and the failure cause on the thread's run row.
+Found along the way, and fixed Nov 10 (`tasks/switch-fix`): opening another task in place failed while
+the Activity section was mounted, because the composer's unmount cleanup read its task through a
+`<Show>` accessor that had already let go (since Oct 26); a send that finished after a switch could
+also post to the new task and wipe its draft. The composer, chat composer and Runner goal now read the
+task once. Also fixed: a private parent in Details shows as a lock, the dashboard words
+`confirm_run_stopped` and `confirm_owner_stop`, the agent header and Profile read "Finishing setup"
+during a setup check, `issue.run_stop_confirmed` has a label, and the thread's run row shows the
+failure cause.
 
 Outcomes: **build** (an agent builds it), **decide** (a question for the user first), **check**
 (verify, then build or close), **design** (needs boards first), **left out** (with the reason),
