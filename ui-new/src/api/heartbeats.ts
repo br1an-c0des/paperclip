@@ -27,6 +27,25 @@ export type LiveRun = {
   issueId?: string | null;
   startedAt: string | null;
   createdAt: string;
+} & LiveRunStatus;
+
+/**
+ * What an active run says it's doing (U107, upstream #20460). The server keeps it in memory, not in
+ * the database, and adds it to active runs on `GET /companies/:id/live-runs`, `/issues/:id/live-runs`,
+ * `/issues/:id/active-run` and `GET /heartbeat-runs/:id`; `heartbeat.run.progress` events carry each
+ * change. Gone when the run ends, the status expires, or the server restarts. A storage outage shows
+ * here as phase `waiting_for_storage`: "Waiting for file storage before starting the run log (45s so
+ * far)".
+ */
+export type LiveRunStatus = {
+  currentStatusMessage?: string | null;
+  currentStatusUpdatedAt?: string | null;
+  currentToolName?: string | null;
+  lastAssistantSnippet?: string | null;
+  /** The run's last sign of life: a status, a log line, an event. */
+  lastEventAt?: string | null;
+  /** The last output stored for the run. */
+  lastOutputAt?: string | null;
 };
 
 export type WatchdogDecision = "continue" | "snooze" | "dismissed_false_positive";

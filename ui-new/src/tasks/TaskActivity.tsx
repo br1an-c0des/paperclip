@@ -52,6 +52,7 @@ import { commentElementId, nearBottom } from "./task-anchor";
 import { compactionDetail, compactionRunIds, runsToRead, useRunCompactions } from "./thread-compactions";
 import { contextUsageQuery } from "./TaskContext";
 import { CopyMessage } from "./CopyMessage";
+import { LiveRunStatusLine } from "./LiveRunStatus";
 import { CommentPluginActions, CommentPluginAnnotations } from "@/plugins/CommentPlugins";
 import "./TaskActivity.css";
 
@@ -562,6 +563,8 @@ export function TaskActivity(props: {
                     <Square size={12} aria-hidden="true" />
                     {stopLabel(run.status, stopping().has(run.id))}
                   </Button>
+                  {/* What it's doing: a tool, its latest words or a status such as a storage wait (U107). */}
+                  <LiveRunStatusLine class="lrs--row" runId={run.id} run={run} active />
                 </article>
               )}
             </For>
