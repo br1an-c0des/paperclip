@@ -5,7 +5,8 @@ import type { InstanceExperimentalSettings, IssueBlockerAttention, IssueDisplayS
  * gave projects and companies (`GET|PUT /sidebar-preferences/me` and
  * `/companies/:id/sidebar-preferences/me`, as the old sidebar keeps it), which projects show (you can
  * leave a project to drop it from your nav), the tasks you opened lately, which task a page has
- * open, and which of the nav's switchable entries show.
+ * open, which of the nav's switchable entries show, and how the nav folds: full, the icon rail or
+ * hidden, by `[`, Shift+`[`, the seam's tab, a drag, or a narrow window.
  */
 
 /** Status (status cards) shows only while the instance has them on; hidden until the settings arrive. */
@@ -150,7 +151,10 @@ export function openTaskRef(pathname: string, search: string, prefix: string): s
 export const NAV_WIDTH_DEFAULT = 248;
 export const NAV_WIDTH_MIN = 200;
 export const NAV_WIDTH_MAX = 420;
-/** Dragged this far past the minimum, the nav folds away (as `[` does). */
+/**
+ * Where there's no rail to fold to (the settings sidebars), dragging this far past the minimum
+ * hides the nav, as Shift+`[` does.
+ */
 export const NAV_COLLAPSE_AT = NAV_WIDTH_MIN - 80;
 
 /** A width the nav can take: whole pixels between the minimum and the maximum. */
@@ -162,4 +166,103 @@ export function clampNavWidth(width: number): number {
 /** A saved width, or the default when there's none or it isn't a number. */
 export function parseNavWidth(raw: unknown): number {
   return typeof raw === "number" ? clampNavWidth(raw) : NAV_WIDTH_DEFAULT;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Full, rail or hidden (NavRail.tsx; nav-prefs.tsx keeps the state, Shell.tsx draws it)
+
+/** The nav with labels, or folded to its icons. */
+export type NavMode = "full" | "rail";
+
+/**
+ * What the nav remembers, and what it shows for now:
+ *
+ * - `mode`: full or rail, saved per browser.
+ * - `hidden`: the nav hidden entirely (Shift+`[`), saved per browser; it comes back as it was.
+ * - `override`: while the window is too narrow for the full nav it shows the rail by itself; `[`
+ *   (or the seam) then switches it for as long as the window stays narrow, without touching
+ *   `mode`. With room again, the saved `mode` is back.
+ */
+export type NavFold = { mode: NavMode; hidden: boolean; override: NavMode | null };
+
+/** The rail's width: the nav's padding either side of a 40px column of icons (NavRail.css). */
+export const NAV_RAIL_WIDTH = 68;
+/** Narrower than this (and wider than a phone, where the dock takes over), the nav shows as the rail. */
+export const NAV_AUTO_RAIL_BELOW = 1100;
+/** A drag that leaves the nav narrower than this hides it, from the full nav or the rail. */
+export const NAV_HIDE_BELOW = 40;
+/** Dragging the rail's edge past this width opens the full nav. */
+export const NAV_RAIL_OPEN_AT = 140;
+
+/** Whether a window this wide shows the rail by itself (the phone breakpoint is the shell's). */
+export function autoRail(windowWidth: number): boolean {
+  return windowWidth < NAV_AUTO_RAIL_BELOW;
+}
+
+/** A saved mode, or full when there's none or it isn't one. */
+export function parseNavMode(raw: unknown): NavMode {
+  return raw === "rail" ? "rail" : "full";
+}
+
+/** Full or rail, as the nav shows now (whether it's hidden is `fold.hidden`). */
+export function shownNavMode(fold: NavFold, narrow: boolean): NavMode {
+  return narrow ? (fold.override ?? "rail") : fold.mode;
+}
+
+/** Shows the nav as `mode`: saved, or while the window is narrow, only until it's wide again. */
+export function setNavFoldMode(fold: NavFold, narrow: boolean, mode: NavMode): NavFold {
+  return narrow ? { ...fold, hidden: false, override: mode } : { mode, hidden: false, override: null };
+}
+
+/** `[`: full to rail and back. A hidden nav comes back instead, as you left it. */
+export function toggleNavRail(fold: NavFold, narrow: boolean): NavFold {
+  if (fold.hidden) return { ...fold, hidden: false };
+  return setNavFoldMode(fold, narrow, shownNavMode(fold, narrow) === "rail" ? "full" : "rail");
+}
+
+/** Shift+`[`: hides the nav, or shows it again as it was. */
+export function toggleNavHidden(fold: NavFold): NavFold {
+  return { ...fold, hidden: !fold.hidden };
+}
+
+/** The window crossed the threshold: a switch made while it was narrow lasts only until then. */
+export function navRoomChanged(fold: NavFold): NavFold {
+  return fold.override === null ? fold : { ...fold, override: null };
+}
+
+/** What letting go of the nav's edge does: a new width, the rail, the full nav, hidden, or nothing. */
+export type NavDrop = { kind: "width"; width: number } | { kind: "rail" } | { kind: "full" } | { kind: "hide" } | { kind: "none" };
+
+/**
+ * The end of a drag of the nav's edge, by the width it was dragged to. From the full nav: under the
+ * narrowest width it snaps to the rail, and well past that, under 40px, it hides. From the rail:
+ * past 140px it opens the full nav (at its last width), and under 40px it hides. Without a rail (the
+ * settings sidebars) it hides past `NAV_COLLAPSE_AT`, as before the rail.
+ */
+export function navDrop(from: NavMode, width: number, canRail = true): NavDrop {
+  if (!Number.isFinite(width)) return { kind: "none" };
+  if (!canRail) return width < NAV_COLLAPSE_AT ? { kind: "hide" } : { kind: "width", width: clampNavWidth(width) };
+  if (width < NAV_HIDE_BELOW) return { kind: "hide" };
+  if (from === "rail") return width > NAV_RAIL_OPEN_AT ? { kind: "full" } : { kind: "none" };
+  return width < NAV_WIDTH_MIN ? { kind: "rail" } : { kind: "width", width: clampNavWidth(width) };
+}
+
+/** What letting go now would do, while the edge is dragged, when it isn't a new width. */
+export function navDragHint(from: NavMode, width: number, canRail = true): "rail" | "full" | "hide" | null {
+  const drop = navDrop(from, width, canRail);
+  return drop.kind === "rail" || drop.kind === "full" || drop.kind === "hide" ? drop.kind : null;
+}
+
+/**
+ * A key on the focused edge (arrows, Shift for bigger steps, Home and End): a new width, or past
+ * the narrowest width the rail; from the rail, → or End opens the full nav.
+ */
+export function navKeyDrop(from: NavMode, width: number, key: string, shift: boolean, canRail = true): NavDrop | null {
+  const step = shift ? 48 : 16;
+  if (from === "rail") return key === "ArrowRight" || key === "End" ? { kind: "full" } : null;
+  if (key === "ArrowLeft") return canRail && width <= NAV_WIDTH_MIN ? { kind: "rail" } : { kind: "width", width: clampNavWidth(width - step) };
+  if (key === "ArrowRight") return { kind: "width", width: clampNavWidth(width + step) };
+  if (key === "Home") return { kind: "width", width: NAV_WIDTH_MIN };
+  if (key === "End") return { kind: "width", width: NAV_WIDTH_MAX };
+  return null;
 }

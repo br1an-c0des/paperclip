@@ -425,6 +425,33 @@
   font-size: 11px;
 }
 
+/*
+ * Folding to the rail and back (Shell.tsx): first everything the rail doesn't keep fades over 90ms
+ * (`data-fold="out"`): the labels, counts, badges, the lists, New task and Apps, leaving the icons,
+ * discs and avatars where the rail puts them. Unfolding, once the column is wide again, they fade
+ * back in (`"in"`).
+ */
+.shell-nav[data-fold="out"] :is(.company-name, .company-switch, .nav-search-label, .nav-search-kbd, .nav-new-task, .navi-text, .navi-badge, .nav-you-name, .nav-zone--lists, .nav-zone--bottom > .nav-group, .plugin-global-toolbar) {
+  opacity: 0;
+  transition: opacity 0.09s ease-out;
+}
+
+.shell-nav[data-fold="out"] .nav-search {
+  border-color: transparent;
+  background: transparent;
+  transition: border-color 0.09s ease-out, background-color 0.09s ease-out;
+}
+
+.shell-nav[data-fold="in"] :is(.company-name, .company-switch, .nav-search-label, .nav-search-kbd, .nav-new-task, .navi-text, .navi-badge, .nav-you-name, .nav-zone--lists, .nav-zone--bottom > .nav-group, .plugin-global-toolbar) {
+  animation: nav-label-in 0.09s ease-out both;
+}
+
+@keyframes nav-label-in {
+  from {
+    opacity: 0;
+  }
+}
+
 /* The You menu's server details (enableServerInfoDebugView). */
 .nav-server {
   display: flex;

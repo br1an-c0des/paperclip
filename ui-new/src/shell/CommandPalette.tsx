@@ -1,4 +1,7 @@
-import { useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate } from "@solidjs/router";
+import { isCompact } from "@/layout/breakpoints";
+import { navHidden, navMode, setNavHidden, setNavMode } from "@/layout/nav-prefs";
+import { settingsArea } from "@/layout/settings-nav-model";
 import { createQuery, keepPreviousData } from "@tanstack/solid-query";
 import { Search } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
@@ -15,7 +18,7 @@ import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { profilePath } from "@/profile/profile-model";
 import { searchPath } from "@/search/search-url";
 import { useSession } from "@/lib/session";
-import { filterPalette, quickFilterGroup, searchHandOff, type PaletteGroup } from "./palette";
+import { filterPalette, quickFilterGroup, searchHandOff, type PaletteCommand, type PaletteGroup } from "./palette";
 import "./CommandPalette.css";
 
 /*
@@ -26,6 +29,9 @@ import "./CommandPalette.css";
  *
  * The last entry hands what's typed to the Search page (`/:prefix/search?q=…`, boards S1–S3), which
  * looks through comments, documents, files, agents and projects too; Shift+Enter runs it directly.
+ *
+ * Actions include the nav's: Collapse sidebar or Expand sidebar (`[`) and Hide or Show navigation
+ * (Shift+`[`); in settings, whose sidebar has no rail, only hiding.
  *
  * There's no board for it yet ("Design still coming"); it uses the dialog and menu styles.
  */
@@ -69,6 +75,35 @@ export function CommandPalette() {
 
   const base = () => `/${company().issuePrefix}`;
   const close = () => commands.setPaletteOpen(false);
+  const location = useLocation();
+  // The nav's own commands, as `[` and Shift+`[` do them (desktop and tablet; a phone has the dock).
+  // A settings sidebar has no rail, so there only hiding is offered.
+  const navCommands = (): PaletteCommand[] => {
+    if (isCompact()) return [];
+    const inSettings = !!settingsArea(location.pathname, company().issuePrefix);
+    const rail = navMode() === "rail";
+    const fold: PaletteCommand = {
+      id: "nav-fold",
+      label: rail ? "Expand sidebar" : "Collapse sidebar",
+      hint: "[",
+      keywords: "nav navigation rail icons labels fold",
+      run: () => {
+        close();
+        setNavMode(rail ? "full" : "rail");
+      },
+    };
+    const hide: PaletteCommand = {
+      id: "nav-hide",
+      label: navHidden() ? "Show navigation" : "Hide navigation",
+      hint: "Shift [",
+      keywords: "nav sidebar",
+      run: () => {
+        close();
+        setNavHidden(!navHidden());
+      },
+    };
+    return inSettings ? [hide] : [fold, hide];
+  };
   const go = (path: string) => () => {
     close();
     navigate(path);
@@ -100,6 +135,7 @@ export function CommandPalette() {
             commands.setShortcutsOpen(true);
           },
         },
+        ...navCommands(),
       ],
     },
     {

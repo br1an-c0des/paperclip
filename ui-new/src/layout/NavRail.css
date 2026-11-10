@@ -1,0 +1,578 @@
+/*
+ * The icon rail (NavRail.tsx), measured from design/nav-rail-options.html, direction 2. Everything
+ * the rail draws is here and under `.nav-rail`, so its look can change (direction 3's floating capsule,
+ * say) without touching the shell.
+ *
+ * 68px: the shell's 14px nav padding either side of a 40px column. The column sits 1px left of the
+ * padding's centre (`margin-left: -1px`), so the company disc, the You avatar and the search icon
+ * land on the x they have in the full nav (33px from the edge; Nav.css: 14px padding, then 5px, 4px
+ * and 12px before the disc, avatar and search icon). Inbox and Status, 34px there, sit 1px left.
+ * The heights match too: the 40px company row, 8px, the 38px search, 22px, then Inbox and Status, as
+ * the full nav stacks them.
+ */
+
+.nav-rail {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 40px;
+  min-height: 0;
+  margin-left: -1px;
+}
+
+.rail-w {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 40px;
+  flex-shrink: 0;
+}
+
+.rail-gap--tools {
+  height: 8px;
+  flex-shrink: 0;
+}
+
+.rail-gap--group {
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.rail-gap--row {
+  height: 2px;
+  flex-shrink: 0;
+}
+
+.rail-sep {
+  flex-shrink: 0;
+  width: 20px;
+  height: 1px;
+  margin: 14px 10px;
+  background: var(--edge);
+}
+
+.rail-push {
+  flex: 1;
+  min-height: 12px;
+}
+
+/* An icon: a 38px circle (40px for the company disc and you), raised with --sel like a nav pill. */
+.rail-i {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  color: var(--body);
+  text-decoration: none;
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.rail-i--big {
+  width: 40px;
+  height: 40px;
+}
+
+.rail-i:hover,
+.rail-i[aria-expanded="true"] {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.rail-i.sel,
+.rail-i[aria-current="page"] {
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+  color: var(--text);
+}
+
+.rail-i:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 2px;
+}
+
+/* Search looks like the full nav's field, folded to a circle. */
+.rail-i--search {
+  border: 1px solid var(--edge);
+  background: var(--card);
+  color: var(--muted);
+}
+
+.rail-i--search:hover {
+  border-color: var(--dashed);
+  background: var(--card);
+  color: var(--body);
+}
+
+/* Inbox's count on the icon's corner, growing rightwards (capped at 99+). */
+.rail-badge {
+  position: absolute;
+  top: 0;
+  left: calc(50% + 3px);
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(135deg, #ff2bd6, #f7b52f);
+  box-shadow: 0 0 0 2px var(--ground);
+  color: #111113;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Agents' unread replies, on the same corner (chat/ChatRead.css draws the badge). */
+.rail-unread {
+  position: absolute;
+  top: 0;
+  left: calc(50% + 4px);
+  display: inline-flex;
+}
+
+.rail-unread .ch-unread {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+}
+
+/* While any agent runs, a breathing 2px Ion ring around Agents. */
+.rail-i--ringed::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  padding: 2px;
+  background: var(--g-ion);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: rail-breathe-ring 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes rail-breathe-ring {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* The company disc carries the grain, as in the full nav's company row. */
+.nav-rail .company-mark {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+/*
+ * Labels: the Capsule Stack tooltip (--sel, --edge, 14px radius, --shadow-lg), one line high, 8px
+ * right of the rail (each slot is 40px at 13–53px; the rail ends at 68px) and centred on the icon.
+ * 400ms after the pointer settles; at once while the rail is warm and on keyboard focus; never while
+ * the slot's flyout, card or menu is open. Never interactive.
+ */
+.rail-tip {
+  position: absolute;
+  left: calc(100% + 23px);
+  top: 50%;
+  z-index: var(--z-tooltip);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  white-space: nowrap;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+  background: var(--sel);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0;
+  transform: translate(-4px, -50%);
+  pointer-events: none;
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+  transition-delay: 0s;
+}
+
+.rail-tip b {
+  font-weight: 700;
+}
+
+.rail-tip-note {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.rail-tip-note--run {
+  color: var(--run-fg);
+  font-weight: 700;
+}
+
+.rail-tip .rail-kbd:last-child {
+  margin-right: -5px;
+}
+
+.rail-w:hover > .rail-tip {
+  opacity: 1;
+  transform: translate(0, -50%);
+  transition-delay: 0.4s;
+}
+
+.nav-rail[data-warm] .rail-w:hover > .rail-tip,
+.rail-w:has(> .rail-i:focus-visible) > .rail-tip {
+  opacity: 1;
+  transform: translate(0, -50%);
+  transition-delay: 0s;
+}
+
+.rail-w[data-open] > .rail-tip,
+.rail-w:has(> .rail-i[aria-expanded="true"]) > .rail-tip {
+  display: none;
+}
+
+@media (hover: none) {
+  .rail-tip {
+    display: none;
+  }
+}
+
+.rail-kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: var(--ground);
+  color: var(--body);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/*
+ * Flyouts and the company card (Menu.css's card: --card, --edge, 18px radius, 6px padding,
+ * --shadow-lg), 8px right of the rail and top-aligned with the icon, lifted by `--lift` to stay in
+ * the window. They fade in and slide 6px over 140ms. While one is open a bridge spans the gap from
+ * the icon, so the pointer can cross it without leaving the slot.
+ */
+.rail-pop {
+  position: absolute;
+  left: calc(100% + 23px);
+  top: calc(-6px + var(--lift, 0px));
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 284px;
+  max-height: calc(100dvh - 24px);
+  padding: 6px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  animation: rail-pop-in 0.14s ease-out;
+}
+
+.rail-card {
+  width: 270px;
+}
+
+.rail-w[data-open]::after {
+  content: "";
+  position: absolute;
+  left: 100%;
+  top: -6px;
+  width: 24px;
+  height: calc(100% + 12px);
+}
+
+@keyframes rail-pop-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+
+.rail-pop-head {
+  flex-shrink: 0;
+  padding: 8px 10px 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rail-pop-sep {
+  flex-shrink: 0;
+  height: 1px;
+  margin: 4px;
+  background: var(--line);
+}
+
+/* A row: a menu item (38px, 12px radius) that is a link. */
+.rail-row {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 12px;
+  color: var(--text);
+  text-decoration: none;
+  outline: none;
+}
+
+.rail-row:hover,
+.rail-row:focus-visible {
+  background: var(--well);
+}
+
+.rail-row:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--run-fg);
+}
+
+/* The page you're on, as the full nav raises its row. */
+.rail-row[aria-current="page"],
+.rail-row--here {
+  font-weight: 800;
+}
+
+.rail-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-row-icon {
+  display: inline-flex;
+  justify-content: center;
+  width: 22px;
+  flex-shrink: 0;
+  color: var(--body);
+}
+
+.rail-row-hint {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.rail-row-count {
+  margin-left: auto;
+  color: var(--body);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rail-row-state {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Avatars in a card: the running ring's gap and the unread badge's edge take the card's color. */
+.rail-row--agent .agent-avatar:not(.agent-avatar--ring) {
+  padding: 2px;
+}
+
+.rail-pop .agent-avatar--ring > * {
+  box-shadow: 0 0 0 2px var(--card);
+  background: var(--card);
+}
+
+.rail-pop .ch-unread {
+  box-shadow: none;
+}
+
+/* The company card's top: the company and its dashboard. */
+.rail-card-top {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+  padding: 8px 8px 10px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 12px 12px 0 0;
+  color: var(--text);
+  text-decoration: none;
+  outline: none;
+}
+
+.rail-card-top:hover,
+.rail-card-top:focus-visible {
+  background: var(--well);
+}
+
+.rail-card-top:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--run-fg);
+}
+
+.rail-card-top .company-mark {
+  width: 30px;
+  height: 30px;
+}
+
+.rail-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rail-card-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.rail-card-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rail-card-note .rail-kbd {
+  min-width: 18px;
+  height: 18px;
+  font-size: 10px;
+}
+
+/* A flyout's head: the title, and New project or how many agents run. */
+.rail-fly-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 2px 4px 2px 10px;
+}
+
+.rail-fly-head h2 {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.rail-fly-note {
+  margin-left: auto;
+  padding-right: 6px;
+  color: var(--run-fg);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rail-fly-add {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.rail-fly-add:hover,
+.rail-fly-add:focus-visible {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* The rows scroll on their own when there are many (ui/ScrollList.tsx). */
+.rail-fly .scroll-list {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.rail-fly-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rail-fly-empty {
+  padding: 6px 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* A flyout's foot: its pages, as pill buttons. */
+.rail-fly-foot {
+  flex-shrink: 0;
+  display: flex;
+  gap: 6px;
+  padding: 2px 4px;
+}
+
+.rail-fly-foot a {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  outline: none;
+}
+
+.rail-fly-foot a:hover,
+.rail-fly-foot a:focus-visible {
+  background: var(--well);
+}
+
+.rail-fly-foot a:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--run-fg);
+}
+
+/* While the nav folds, the rail's own places (the separator, Projects, Agents) fade in. */
+.shell-nav[data-fold="narrow"] .nav-rail :is(.rail-sep, .rail-w:has(> [aria-haspopup="dialog"]):not(.rail-w--company)) {
+  animation: rail-item-in 0.2s ease-out both;
+}
+
+@keyframes rail-item-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-i--ringed::before,
+  .rail-pop,
+  .shell-nav[data-fold] .nav-rail * {
+    animation: none;
+  }
+
+  .rail-tip {
+    transition: none;
+  }
+}

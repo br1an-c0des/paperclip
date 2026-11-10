@@ -83,6 +83,10 @@ describe("hasOpenDialog", () => {
 describe("shortcuts on an open task", () => {
   it("needs a task for y and g c, and a panel to toggle for ]", () => {
     expect(resolveShortcut(key("["), idle)).toBe("toggle-nav");
+    // Shift+[ hides the nav: "{" on most layouts, or the key's position with Shift.
+    expect(resolveShortcut(key("{"), idle)).toBe("hide-nav");
+    expect(resolveShortcut({ ...key("["), shiftKey: true }, idle)).toBe("hide-nav");
+    expect(resolveShortcut({ ...key("ü"), shiftKey: true, code: "BracketLeft" }, idle)).toBe("hide-nav");
     expect(resolveShortcut(key("]"), idle)).toBeNull();
     expect(resolveShortcut(key("]"), { ...idle, panelToggle: true })).toBe("toggle-panel");
     expect(resolveShortcut(key("y"), idle)).toBeNull();
