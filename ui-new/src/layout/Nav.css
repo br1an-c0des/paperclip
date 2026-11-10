@@ -63,50 +63,138 @@
   flex-shrink: 0;
 }
 
+/*
+ * The top zone (board 1, "layout B"): the company row, full width, with the company menu's Repeat
+ * button at its end; below it the tools row, search field and New task.
+ */
 .nav-top {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.company-switch {
-  flex: 1;
+.company-row {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 2px;
   min-width: 0;
+}
+
+/* The company link is a nav pill (ui/nav.css), so it takes the --sel raise on organization pages. */
+.navi.company-link {
+  flex: 1;
+  min-width: 0;
+  gap: 9px;
   height: 40px;
-  padding: 0 8px 0 5px;
-  border-radius: var(--r-pill);
-  text-align: left;
+  padding: 0 12px 0 5px;
 }
 
-.company-switch:hover,
-.company-switch[aria-expanded="true"] {
-  background: var(--hover);
-}
-
-.company-switch-mark {
+.company-mark {
   width: 28px;
   height: 28px;
   flex-shrink: 0;
   border-radius: 50%;
 }
 
-.company-switch-name {
+.company-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text);
   font-size: 15px;
   font-weight: 800;
   letter-spacing: -0.01em;
 }
 
-.company-switch-caret {
+.company-switch {
   flex-shrink: 0;
   color: var(--muted);
+}
+
+.company-switch:hover:not(:disabled),
+.company-switch[aria-expanded="true"] {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.nav-tools {
+  container-type: inline-size;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Search looks like a field (ui/Field.css `.input`) but is a button that opens the palette. */
+.nav-search {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 6px 0 11px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  /* The nav sits on --ground, so the field takes --card to stand out, as a field does on a card. */
+  background: var(--card);
+  color: var(--muted);
+  font-size: 14px;
+  text-align: left;
+}
+
+.nav-search:hover {
+  border-color: var(--dashed);
+  color: var(--body);
+}
+
+.nav-search svg {
+  flex-shrink: 0;
+}
+
+.nav-search-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-search-kbd {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  height: 22px;
+  padding: 0 5px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: var(--ground);
+  color: var(--body);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* A narrow nav (it resizes from 200px) keeps "Search…" readable and drops the shortcut hint:
+   "⌘K" below the default width, the wider "Ctrl K" a little sooner. */
+@container (max-width: 215px) {
+  .nav-search-kbd {
+    display: none;
+  }
+}
+
+@container (max-width: 230px) {
+  .nav-search-kbd--long {
+    display: none;
+  }
+}
+
+.nav-new-task.btn {
+  flex-shrink: 0;
+  gap: 3px;
+  padding: 0 12px 0 9px;
 }
 
 .nav-group {
@@ -211,7 +299,6 @@
 .nav-you {
   display: flex;
   align-items: center;
-  gap: 4px;
 }
 
 .nav-you-trigger {

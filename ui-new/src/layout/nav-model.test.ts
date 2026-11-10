@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampNavWidth, inStoredOrder, moveId, NAV_WIDTH_DEFAULT, NAV_WIDTH_MAX, NAV_WIDTH_MIN, parseNavWidth, openTaskRef, parseRecent, recordRecent, refreshRecent, showStatusLink, visibleProjects, type RecentTask } from "./nav-model";
+import { clampNavWidth, inStoredOrder, isProjectPage, moveId, NAV_WIDTH_DEFAULT, NAV_WIDTH_MAX, NAV_WIDTH_MIN, parseNavWidth, openTaskRef, parseRecent, recordRecent, refreshRecent, showStatusLink, visibleProjects, type RecentTask } from "./nav-model";
 
 const items = [{ id: "a" }, { id: "b" }, { id: "c" }];
 
@@ -24,6 +24,21 @@ describe("visibleProjects", () => {
   it("drops projects you left", () => {
     expect(visibleProjects(items, { projectMemberships: { b: "left", c: "joined" } }).map((item) => item.id)).toEqual(["a", "c"]);
     expect(visibleProjects(items, undefined)).toHaveLength(3);
+  });
+});
+
+describe("isProjectPage", () => {
+  const project = { id: "p1", urlKey: "trading-bench" };
+  it("is true on every page of the project, by key or id", () => {
+    for (const path of ["/TES/projects/trading-bench", "/TES/projects/trading-bench/issues", "/tes/projects/Trading-Bench/board", "/TES/projects/trading-bench/settings/x", "/TES/projects/p1/issues"]) {
+      expect(isProjectPage(path, "TES", project), path).toBe(true);
+    }
+  });
+
+  it("is false elsewhere", () => {
+    for (const path of ["/TES/projects", "/TES/projects/", "/TES/projects/trading-bench-2/issues", "/TES/issues", "/NOR/projects/trading-bench"]) {
+      expect(isProjectPage(path, "TES", project), path).toBe(false);
+    }
   });
 });
 

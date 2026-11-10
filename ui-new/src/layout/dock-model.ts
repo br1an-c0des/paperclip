@@ -48,9 +48,9 @@ export function dockPlace(pathname: string, prefix: string): DockPlace | null {
 }
 
 /**
- * The organization's pages, which the nav's "Org dashboard" item owns (boards 19, 20, 33): the
- * dashboard, the agents roster (not an agent's own page), workload, and the org tabs' other pages.
- * Settings has its own nav button.
+ * The organization's pages, which the nav's company row owns (boards 19, 20, 33; it took over from
+ * "Org dashboard"): the dashboard, the agents roster (not an agent's own page), workload, and the
+ * org tabs' other pages. Settings isn't one: it opens from the dashboard header and the palette.
  */
 const ORG_PAGES = /^\/(?:dashboard|org|agents|workload|skills|apps|activity)(?:\/|$)/;
 
