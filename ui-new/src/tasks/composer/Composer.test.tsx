@@ -1,6 +1,7 @@
 import type { Issue } from "@paperclipai/shared";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
+import { createSignal, Show } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 afterEach(cleanup);
@@ -60,6 +61,21 @@ function mount() {
       <Composer task={task} />
     </QueryClientProvider>
   ));
+}
+
+/**
+ * The composer as the Activity section mounts it: under a `<Show>` of the task, which drops the
+ * task while the next one opened in place is still loading.
+ */
+function mountSwitchable(first: Issue | undefined = task) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const [current, setCurrent] = createSignal<Issue | undefined>(first);
+  render(() => (
+    <QueryClientProvider client={client}>
+      <Show when={current()}>{(found) => <Composer task={found()} />}</Show>
+    </QueryClientProvider>
+  ));
+  return setCurrent;
 }
 
 describe("Composer", () => {
@@ -161,6 +177,42 @@ describe("Composer", () => {
     first.unmount();
     mount();
     expect((screen.getByRole("combobox", { name: "Comment" }) as HTMLTextAreaElement).value).toBe("Half written");
+  });
+
+  it("survives the task it shows being dropped while the next one loads, and keeps its draft", async () => {
+    const setCurrent = mountSwitchable();
+    typed("Half written");
+    // Opening another task in place: its row isn't cached yet, so the section's <Show> lets go.
+    expect(() => setCurrent(undefined)).not.toThrow();
+    expect(screen.queryByRole("combobox", { name: "Comment" })).toBeNull();
+    expect(() => setCurrent({ ...task, id: "t2", identifier: "TRA-2" } as Issue)).not.toThrow();
+    const box = screen.getByRole("combobox", { name: "Comment" }) as HTMLTextAreaElement;
+    expect(box.id).toBe("cmp-t2");
+    expect(box.value).toBe("");
+    // Back on the first task, its draft is there.
+    setCurrent(undefined);
+    setCurrent(task);
+    expect((screen.getByRole("combobox", { name: "Comment" }) as HTMLTextAreaElement).value).toBe("Half written");
+  });
+
+  it("finishes a send on the task it was sent from after the task changes", async () => {
+    let settle: (value: { id: string; body: string }) => void = () => {};
+    post.mockImplementationOnce(() => new Promise((resolve) => (settle = resolve)));
+    const setCurrent = mountSwitchable();
+    await settled();
+    const box = typed("Ship it");
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() => expect(post).toHaveBeenCalledWith("t1", expect.objectContaining({ body: "Ship it" })));
+    // Another task opens before the server answers; it has a draft of its own.
+    localStorage.setItem(`paperclip.ui-new.composer-draft.t2`, JSON.stringify({ body: "Other draft", attachments: [] }));
+    setCurrent({ ...task, id: "t2", identifier: "TRA-2" } as Issue);
+    expect(box.value).toBe("Other draft");
+    settle({ id: "c-new", body: "Ship it" });
+    // The sent message cleared its own draft, not the open task's box.
+    await waitFor(() => expect(localStorage.getItem("paperclip.ui-new.composer-draft.t1")).toBeNull());
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(box.value).toBe("Other draft");
+    expect(localStorage.getItem("paperclip.ui-new.composer-draft.t2")).not.toBeNull();
   });
 
   it("offers no Goal pill when the agent's runner doesn't support goals", async () => {

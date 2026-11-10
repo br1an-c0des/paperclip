@@ -69,9 +69,13 @@ export function ChatComposer(props: {
   const [dragging, setDragging] = createSignal(false);
   const [modeChoice, setModeChoice] = createSignal<IssueWorkMode | null>(null);
   let requestId = newId();
+  // The draft the box holds, kept outside `props`: the agent comes through a <Show> (AgentPage),
+  // whose accessor throws once it lets go, so the cleanup and a finished send read this instead.
+  let shownKey = draftKey();
 
   createEffect(
     on(draftKey, (key, previous) => {
+      shownKey = key;
       if (previous) saveComposerDraft(previous, { body: body(), attachments: attachments() });
       const draft = loadComposerDraft(key);
       batch(() => {
@@ -91,7 +95,7 @@ export function ChatComposer(props: {
       onCleanup(() => window.clearTimeout(timer));
     }),
   );
-  onCleanup(() => saveComposerDraft(draftKey(), { body: body(), attachments: attachments() }));
+  onCleanup(() => saveComposerDraft(shownKey, { body: body(), attachments: attachments() }));
 
   const mode = () => modeChoice() ?? props.chat?.workMode ?? "standard";
   const modeMeta = () => MODES.find((entry) => entry.value === mode()) ?? MODES[0]!;
@@ -185,14 +189,18 @@ export function ChatComposer(props: {
     if (attachments().some((item) => item.status === "error")) return setProblem("Remove the files that didn't upload, or try them again.");
     const text = messageBody(body(), attachments());
     if (!text) return setProblem("Write a message first.");
+    const key = draftKey();
     if (await post(text, attachments(), how)) {
-      batch(() => {
-        setBody("");
-        setAttachments([]);
-        setModeChoice(null);
-      });
-      clearComposerDraft(draftKey());
-      queueMicrotask(resize);
+      // Another chat opened meanwhile: the box holds its draft now, so only the sent one is cleared.
+      if (shownKey === key) {
+        batch(() => {
+          setBody("");
+          setAttachments([]);
+          setModeChoice(null);
+        });
+        queueMicrotask(resize);
+      }
+      clearComposerDraft(key);
     }
   };
 
