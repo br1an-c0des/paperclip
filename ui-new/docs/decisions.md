@@ -75,6 +75,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 46 | [Gaps found building tier 2 and the plugin stylesheet](#46-gaps-found-building-tier-2-and-the-plugin-stylesheet) | Tier 2, `shell/plugins` | Open | Oct 29, 2026 |
 | 47 | [Upstream sync 2026-10-29](#47-upstream-sync-2026-10-29) | Skills, `shell/coordinator-workspace`, `agents/configuration-yaml` | Decided | Nov 1, 2026 |
 | 48 | [Upstream sync 2026-11-01](#48-upstream-sync-2026-11-01) | Skills, chat, plugins, settings | Decided | Nov 1, 2026 |
+| 49 | [The left nav: company row, settings sidebars and an icon rail](#49-the-left-nav-company-row-settings-sidebars-and-an-icon-rail) | `shell/navigation`, `shell/contextual-sidebars`, `shell/company` | Decided | Nov 9, 2026 |
 
 ## Entries
 
@@ -1717,3 +1718,30 @@ Both are handled in `ui-new` for now.
   [Upstream changes to integrate](build-plan.md#upstream-changes-to-integrate): `expectedVersionId`
   on Studio saves (U31), plugin task side panels (U30), `attention/summary` (U32), the Antigravity
   and Kimi labels (U22), and `live.hello` (U28).
+
+### 49. The left nav: company row, settings sidebars and an icon rail
+
+- **Status:** Decided 2026-11-09
+- **Area:** `shell/navigation`, `shell/contextual-sidebars`, `shell/company`
+- **Found in:** using the nav after M7; mockups in
+  [design/nav-rail-options.html](design/nav-rail-options.html)
+  ([private link](https://claude.ai/artifact/CcwHRkYm4cJ9X3iWFiv3Bi)).
+
+- **What we found:** "Org dashboard" duplicated the company switcher's job, the settings icon beside
+  You duplicated the dashboard header's Settings, settings pages showed their section rail beside
+  the full nav, and the nav had no state between full and hidden.
+- **Decision:**
+  - **Company row:** the company's disc and name link to the dashboard (raised on org pages, in
+    place of Org dashboard); only a `Repeat` button opens the company menu. Search and + Task sit
+    in a row below ("layout B"). The settings icon beside You is gone. A project row opens the
+    project's task list.
+  - **Settings sidebars:** App settings and Company settings replace the left nav with their own
+    sidebar, with Back to app at the top; the page headers stay as they are.
+  - **Icon rail (direction 2, flyout lists):** a 68px rail with Company, Search, Inbox, Status,
+    Projects and Agents, and You. Labels on hover; Projects and Agents open flyout lists **on
+    hover** (and on click or keyboard); the company icon opens a hover card with Switch company.
+    `[` toggles full and rail, Shift+`[` hides the nav. The nav folds to the rail by itself in
+    narrow windows. Plugins appear only in the full nav. Full or rail is kept per browser.
+  - **Not yet:** settings sidebars don't fold to a rail; revisit after trying the move from the
+    rail into settings. Direction 3 (the floating capsule) is kept as a style to try later.
+
