@@ -78,6 +78,9 @@ const LABELS: Record<string, string> = {
   "issue.thread_interaction_expired": "let the request expire",
   "issue.thread_interaction_item_verdicts_submitted": "submitted verdicts on the request",
   "issue.stalled_review_decided": "recorded a review verdict",
+  // The old UI's words for these confirmations (its Inbox and notice cards), as done.
+  "issue.run_stop_confirmed": "confirmed the previous run stopped",
+  "issue.workspace_owner_stop_confirmed": "confirmed the previous server stopped",
   "heartbeat.invoked": "started a run",
   "heartbeat.cancelled": "stopped a run",
   "approval.created": "requested approval",
