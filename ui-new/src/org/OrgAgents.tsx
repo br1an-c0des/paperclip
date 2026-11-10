@@ -1,8 +1,9 @@
 import type { Agent } from "@paperclipai/shared";
 import { A, Navigate, useNavigate, useParams, useSearchParams } from "@solidjs/router";
-import { ArrowUpDown, Check, Crown, Ellipsis, MessageCircle, Network, Pencil, Search } from "lucide-solid";
+import { ArrowUpDown, Check, Crown, Ellipsis, ListFilter, MessageCircle, Network, Pencil, Search } from "lucide-solid";
 import { createQuery } from "@tanstack/solid-query";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
+import { aiConnectionsApi } from "@/api/ai-connections";
 import { orgApi } from "@/api/org";
 import { queryKeys } from "@/api/queryKeys";
 import { isCompact } from "@/layout/breakpoints";
@@ -39,6 +40,22 @@ import {
   type OrgSort,
 } from "./org-model";
 import { useMinute, useOrgData, RUN_WINDOW_DAYS, type OrgAgent } from "./queries";
+import {
+  activeRosterCount,
+  buildRosterIndex,
+  EMPTY_ROSTER_FILTERS,
+  matchesRoster,
+  ROSTER_ALL_LABELS,
+  ROSTER_FIELD_LABELS,
+  ROSTER_FIELDS,
+  rosterCounts,
+  rosterFiltersFromSearch,
+  rosterSearchPatch,
+  toggleRosterFilter,
+  type RosterField,
+  type RosterFilters,
+  type RosterOption,
+} from "./roster-filters";
 import "./Org.css";
 
 /*
@@ -49,7 +66,10 @@ import "./Org.css";
  * filters, and one stacked row per agent.
  *
  * The filter is in the address (`?filter=paused`) so the dashboard and old links can open it; the
- * old UI's `/agents/:tab` pages redirect here (`AgentsTabRedirect`).
+ * old UI's `/agents/:tab` pages redirect here (`AgentsTabRedirect`). The Filter menu narrows the
+ * roster by model, status, harness and AI connection (U103, roster-filters.ts), also in the address
+ * (`?model=…&connection=…`); the state tabs count what those filters leave. A selection keeps agents
+ * a filter hides, and the selection bar says how many.
  */
 
 export function AgentsTabRedirect() {
@@ -64,17 +84,41 @@ export function OrgAgents() {
   const base = () => `/${company().issuePrefix}`;
   const data = useOrgData();
   const actions = useAgentActions();
-  const [search, setSearch] = useSearchParams<{ filter?: string }>();
+  const [search, setSearch] = useSearchParams<{ filter?: string } & Partial<Record<RosterField, string>>>();
   const filter = (): OrgFilter => (isOrgFilter(search.filter) ? search.filter : "all");
   const setFilter = (value: OrgFilter) => setSearch({ filter: value === "all" ? undefined : value }, { replace: true });
+  const roster = createMemo(() => rosterFiltersFromSearch(search), undefined, {
+    equals: (a, b) => ROSTER_FIELDS.every((field) => a[field] === b[field]),
+  });
+  const setRoster = (next: RosterFilters) => setSearch(rosterSearchPatch(next), { replace: true });
+  const rosterActive = () => activeRosterCount(roster());
+  // Connection and pool names, once the Filter menu has been opened or a connection filter is set.
+  const [filterMenuOpened, setFilterMenuOpened] = createSignal(false);
+  const connections = createQuery(() => ({
+    queryKey: queryKeys.aiConnections.list(company().id),
+    queryFn: () => aiConnectionsApi.list(company().id),
+    enabled: filterMenuOpened() || Boolean(roster().connection),
+  }));
+  const rosterIndex = createMemo(() => buildRosterIndex(data.agents.data ?? [], connections.data));
   const [query, setQuery] = createSignal("");
   const [sort, setSort] = createSignal<OrgSort>("status");
   const [selected, setSelected] = createSignal<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = createSignal<{ harness: string; label: string; agents: Agent[] } | null>(null);
   const [budgetOpen, setBudgetOpen] = createSignal(false);
 
-  const counts = createMemo(() => filterCounts(data.rows()));
-  const searched = createMemo(() => data.rows().filter((row) => matchesSearch(row.agent, query())));
+  /** The rows the model, status, harness and connection filters let through. */
+  const narrowed = createMemo(() => data.rows().filter((row) => matchesRoster(rosterIndex().byAgentId.get(row.agent.id), roster())));
+  const counts = createMemo(() => filterCounts(narrowed()));
+  const choiceCounts = createMemo(() =>
+    rosterCounts(
+      data
+        .rows()
+        .filter((row) => matchesFilter(row.state, row.builtIn, filter()))
+        .map((row) => rosterIndex().byAgentId.get(row.agent.id)),
+      roster(),
+    ),
+  );
+  const searched = createMemo(() => narrowed().filter((row) => matchesSearch(row.agent, query())));
   const shown = createMemo(() => sortRows(searched().filter((row) => matchesFilter(row.state, row.builtIn, filter())).map((row) => ({ ...row, name: row.agent.name })), sort()));
   const team = createMemo(() => shown().filter((row) => !row.builtIn));
   const builtIns = createMemo(() => shown().filter((row) => row.builtIn));
@@ -170,6 +214,20 @@ export function OrgAgents() {
             <Search size={14} aria-hidden="true" />
             <input type="search" placeholder="Search agents" aria-label="Search agents" value={query()} onInput={(event) => setQuery(event.currentTarget.value)} />
           </label>
+          <RosterFilterMenu
+            filters={roster()}
+            options={rosterIndex().options}
+            counts={choiceCounts()}
+            connectionError={connections.isError}
+            onRetryConnections={() => void connections.refetch()}
+            onOpen={() => setFilterMenuOpened(true)}
+            onChange={setRoster}
+          />
+          <Show when={rosterActive() > 0}>
+            <Button size="compact" ghost onClick={() => setRoster(EMPTY_ROSTER_FILTERS)}>
+              Clear filters
+            </Button>
+          </Show>
           <Menu placement="bottom-end">
             <Menu.Trigger class={buttonClass({ size: "compact" })}>
               <ArrowUpDown size={14} aria-hidden="true" />
@@ -200,7 +258,7 @@ export function OrgAgents() {
             {selectedRows().length} {selectedRows().length === 1 ? "agent" : "agents"} selected
           </span>
           <Show when={hiddenSelected() > 0}>
-            <span class="org-muted">{hiddenSelected()} hidden by the filter</span>
+            <span class="org-muted">{hiddenSelected()} hidden by the filters</span>
           </Show>
           <span class="org-selbar-rule" aria-hidden="true" />
           <Button size="compact" disabled={actions.busy() !== null || actionTargets("pause", selectedAgents()).length === 0} onClick={() => void actions.pause(selectedAgents())}>
@@ -273,11 +331,19 @@ export function OrgAgents() {
             <p class="org-empty">Loading agents…</p>
           </Match>
           <Match when={shown().length === 0}>
-            <p class="org-empty">{data.rows().length === 0 ? "No agents yet. Hire one to get started." : "No agents match this filter."}</p>
+            <p class="org-empty">
+              {data.rows().length === 0 ? "No agents yet. Hire one to get started." : rosterActive() > 0 ? "No agents match these filters." : "No agents match this filter."}
+              <Show when={data.rows().length > 0 && rosterActive() > 0}>
+                {" "}
+                <button type="button" class="org-empty-clear" onClick={() => setRoster(EMPTY_ROSTER_FILTERS)}>
+                  Clear filters
+                </button>
+              </Show>
+            </p>
           </Match>
         </Switch>
         <For each={team()}>{(row) => <AgentRow row={row} data={data} checked={selected().has(row.agent.id)} onToggle={() => toggle(row.agent.id)} actions={actions} />}</For>
-        <Show when={builtIns().length > 0 || (data.builtInsAvailable().length > 0 && (filter() === "all" || filter() === "builtin") && !query().trim())}>
+        <Show when={builtIns().length > 0 || (data.builtInsAvailable().length > 0 && (filter() === "all" || filter() === "builtin") && !query().trim() && rosterActive() === 0)}>
           <div class="org-group-head">
             <h3 class="disp">Built-in agents</h3>
             <span class="org-muted">
@@ -286,7 +352,7 @@ export function OrgAgents() {
             </span>
           </div>
           <For each={builtIns()}>{(row) => <AgentRow row={row} data={data} checked={selected().has(row.agent.id)} onToggle={() => toggle(row.agent.id)} actions={actions} />}</For>
-          <Show when={(filter() === "all" || filter() === "builtin") && !query().trim()}>
+          <Show when={(filter() === "all" || filter() === "builtin") && !query().trim() && rosterActive() === 0}>
             <AvailableBuiltIns />
           </Show>
         </Show>
@@ -312,6 +378,70 @@ export function OrgAgents() {
       </Show>
       <BudgetDialog open={budgetOpen()} onOpenChange={setBudgetOpen} agents={selectedAgents()} onSave={(cents) => actions.setBudget(selectedAgents(), cents)} />
     </div>
+  );
+}
+
+/**
+ * The Filter menu (U103): model, status, harness and connection, each All or one choice with how
+ * many agents it would show. It stays open while choices are picked, as the task list's does.
+ */
+function RosterFilterMenu(props: {
+  filters: RosterFilters;
+  options: Record<RosterField, RosterOption[]>;
+  counts: Record<RosterField, ReadonlyMap<string, number>>;
+  connectionError: boolean;
+  onRetryConnections: () => void;
+  onOpen: () => void;
+  onChange: (next: RosterFilters) => void;
+}) {
+  const active = () => activeRosterCount(props.filters);
+  /** A value from the address that no agent has any more stays listed, so it can be turned off. */
+  const choices = (field: RosterField) => {
+    const current = props.filters[field];
+    const options = props.options[field];
+    return current && !options.some((option) => option.value === current)
+      ? [...options, { value: current, label: `Previously selected ${ROSTER_FIELD_LABELS[field].toLowerCase()}` }]
+      : options;
+  };
+  return (
+    <Menu onOpenChange={(open) => open && props.onOpen()}>
+      <Menu.Trigger as={Button} size="compact" class="org-filter" classList={{ "org-filter--on": active() > 0 }}>
+        <ListFilter size={14} aria-hidden="true" />
+        {active() > 0 ? `${active()} ${active() === 1 ? "filter" : "filters"}` : "Filter"}
+      </Menu.Trigger>
+      <Menu.Content label="Filter agents by attribute" width={290}>
+        <For each={ROSTER_FIELDS}>
+          {(field, index) => (
+            <>
+              <Show when={index() > 0}>
+                <Menu.Separator />
+              </Show>
+              <Menu.Group label={ROSTER_FIELD_LABELS[field]}>
+                <Menu.CheckboxItem checked={!props.filters[field]} onChange={() => props.onChange({ ...props.filters, [field]: "" })}>
+                  {ROSTER_ALL_LABELS[field]}
+                </Menu.CheckboxItem>
+                <For each={choices(field)}>
+                  {(option) => (
+                    <Menu.CheckboxItem
+                      checked={props.filters[field] === option.value}
+                      hint={String(props.counts[field].get(option.value) ?? 0)}
+                      onChange={() => props.onChange(toggleRosterFilter(props.filters, field, option.value))}
+                    >
+                      {option.label}
+                    </Menu.CheckboxItem>
+                  )}
+                </For>
+                <Show when={field === "connection" && props.connectionError}>
+                  <Menu.Item closeOnSelect={false} description="Choices show generic names until then." onSelect={props.onRetryConnections}>
+                    Couldn't load connection names. Retry
+                  </Menu.Item>
+                </Show>
+              </Menu.Group>
+            </>
+          )}
+        </For>
+      </Menu.Content>
+    </Menu>
   );
 }
 

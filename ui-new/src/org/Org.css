@@ -1191,6 +1191,27 @@ a.org-act-target:hover {
   font-size: 14px;
 }
 
+/* The Filter menu's trigger while a model, status, harness or connection filter is set (U103) */
+.org-filter--on {
+  border-color: color-mix(in srgb, var(--run-fg) 45%, transparent);
+  background: var(--run-bg);
+  color: var(--run-fg);
+}
+
+.org-empty-clear {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--run-fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.org-empty-clear:hover {
+  text-decoration: underline;
+}
+
 .org-selbar {
   display: flex;
   align-items: center;
