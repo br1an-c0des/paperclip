@@ -79,8 +79,10 @@ import "./Nav.css";
  * Your nav (nav-prefs.tsx): projects and agents you've starred sit in Starred above the rest; each
  * project's "…" moves it up or down (your order, kept on the server), stars it or leaves it (out of
  * your nav); each agent's "…" runs it now, pauses or resumes it (org/actions.ts) and stars it.
- * Project rows wait until your order and stars have loaded, so they never reshuffle. Every section
- * folds from its heading, and `[` hides the whole nav (the shell then offers it back). The company menu
+ * Project rows wait until your order and stars have loaded, so they never reshuffle, and they're
+ * keyed by project id, so a refetch of the list updates them in place instead of rebuilding them
+ * (and remounting the plugin items under each one). Every section folds from its heading, and `[`
+ * hides the whole nav (the shell then offers it back). The company menu
  * lists companies in the order you gave them on the companies page.
  *
  * Three zones: the company row, the tools row, Inbox and Status stay pinned at the top; Apps and
@@ -291,21 +293,33 @@ export function Nav() {
   const inboxCount = () => needsYou() ?? 0;
 
   // Projects you haven't left, in your order; starred ones move up to Starred.
-  const shownProjects = createMemo(() => projectOrder.ordered(visibleProjects(openProjects(projects.data), projectStars.memberships.data)));
-  const starredProjects = createMemo(() => {
-    const ids = projectStars.memberships.data?.starredProjectIds ?? [];
-    const byId = new Map(openProjects(projects.data).map((project) => [project.id, project] as const));
-    return ids.flatMap((id) => byId.get(id) ?? []);
-  });
+  const projectsById = createMemo(() => new Map(openProjects(projects.data).map((project) => [project.id, project] as const)));
+  const shownProjects = createMemo(() => projectOrder.ordered(visibleProjects([...projectsById().values()], projectStars.memberships.data)));
+  const starredProjects = createMemo(() => (projectStars.memberships.data?.starredProjectIds ?? []).flatMap((id) => projectsById().get(id) ?? []));
   const otherProjects = createMemo(() => shownProjects().filter((project) => !projectStars.starred(project.id)));
   // Project rows wait for your order and your memberships (stars, projects you left), so they're
   // drawn once as you arranged them instead of shuffling as each read lands. A reload has all three
   // at once from the saved reads (lib/offline/persisted-cache.ts); a read that fails doesn't hold them.
   const projectsArranged = () => projectOrder.settled() && !projectStars.memberships.isLoading;
 
-  const projectRow = (project: Project, list: () => Project[]) => (
-    <NavProject project={project} base={base()} list={list()} onMove={(delta) => projectOrder.move(list(), project.id, delta)} />
-  );
+  // Rows are keyed by project id, not by the project object. Every refetch of the list (a page that
+  // reads it mounting after 30 seconds, the window regaining focus, a live event, a reload's saved
+  // list being replaced) brings new objects, since solid-query keeps no structural sharing; keyed by
+  // object, <For> rebuilt every row, and each row's plugin items mounted again as new React roots,
+  // showing until their plugin's config hid them. A row now stays mounted while its project is
+  // listed, and its name and count follow the latest object.
+  const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((id, index) => id === b[index]);
+  const starredProjectIds = createMemo(() => starredProjects().map((project) => project.id), [], { equals: sameIds });
+  const otherProjectIds = createMemo(() => otherProjects().map((project) => project.id), [], { equals: sameIds });
+  const projectRow = (id: string, list: () => Project[]) => {
+    // The latest object for this id; the last one stays while a refetch that dropped it removes the row.
+    const project = createMemo<Project | undefined>((last) => projectsById().get(id) ?? last);
+    return (
+      <Show when={project()}>
+        {(current) => <NavProject project={current()} base={base()} list={list()} onMove={(delta) => projectOrder.move(list(), id, delta)} />}
+      </Show>
+    );
+  };
 
   return (
     <>
@@ -365,7 +379,7 @@ export function Nav() {
         <Show when={starred().length > 0 || starredProjects().length > 0}>
           <NavSection id="starred" title="Starred">
             <Show when={projectsArranged()}>
-              <For each={starredProjects()}>{(project) => projectRow(project, starredProjects)}</For>
+              <For each={starredProjectIds()}>{(id) => projectRow(id, starredProjects)}</For>
             </Show>
             <For each={starred()}>{(agent) => <NavAgent agent={agent} base={base()} running={running()} unread={unreadChats.countFor(agent.id)} />}</For>
           </NavSection>
@@ -392,7 +406,7 @@ export function Nav() {
             <span class="navi-note">company</span>
           </A>
           <Show when={projectsArranged()}>
-            <For each={otherProjects()}>{(project) => projectRow(project, otherProjects)}</For>
+            <For each={otherProjectIds()}>{(id) => projectRow(id, otherProjects)}</For>
           </Show>
         </NavSection>
 
