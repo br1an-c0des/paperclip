@@ -11,6 +11,7 @@ The canvas stays where design work happens; this folder is the version the code 
 | [tokens.css](tokens.css) | The tokens as CSS custom properties, ready to copy into `ui-new` |
 | [style-guide.html](style-guide.html) | The tokens and components drawn in both themes; open it in a browser from disk |
 | [nav-scroll-options.html](nav-scroll-options.html) | Four ways for the left nav's lists to show there's more without a scrollbar; the nav uses the scroll capsule with a mouse and the ion edge glow on touch (`ui/ScrollList.tsx`) |
+| [nav-rail-options.html](nav-rail-options.html) | Three directions for folding the left nav to an icon rail (Company, Search, Inbox, Status, Projects, Agents, You): labels on hover, flyout lists, and a floating capsule; recommends the flyout lists, with `[` switching between the full nav and the rail |
 | [boards/](boards/) | The 56 desktop board sources and the canvas index (`canvas.json`) |
 | [mobile/](mobile/) | The 17 phone board sources and their canvas index (`canvas.json`) |
 
