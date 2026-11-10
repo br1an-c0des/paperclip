@@ -1,6 +1,6 @@
 /*
  * Shell grid. Desktop measurements come from the boards: the nav is 248px (you can drag it from 200
- * to 420px; `--nav-w` is set on the shell) with 18px/14px padding,
+ * to 420px, or fold it to the 68px rail; `--nav-w` is set on the shell) with 18px/14px padding,
  * and main has 14px above, 20px on the right and 4px on the left (the nav's own padding makes up
  * the gutter between them). Content cards inside main are 16px apart.
  */
@@ -48,11 +48,12 @@
 }
 
 /*
- * The nav's resize handle (Shell.tsx NavResizer): a 10px strip over the seam between nav and main,
- * drawn as a pill line when you point at it, drag it or focus it. Past the narrowest width the nav
- * dims, to say letting go will fold it away.
+ * The seam between nav and main (Shell.tsx): a 10px strip holding the resize handle (NavResizer),
+ * drawn as a pill line when you point at it, drag it or focus it, and the round tab that folds the
+ * nav to the rail and back, which appears on it as you point at the seam. While a drag would snap
+ * the nav to the rail, open the rail out or hide the nav, the nav dims to say so.
  */
-.shell-nav-resize {
+.shell-seam {
   grid-area: nav;
   justify-self: end;
   position: sticky;
@@ -61,9 +62,57 @@
   width: 10px;
   height: 100dvh;
   margin-right: -6px;
+}
+
+.shell-nav-resize {
+  position: absolute;
+  inset: 0;
   cursor: col-resize;
   touch-action: none;
   outline: none;
+}
+
+/* The tab: on the seam at the search row's height, centred on the line. It takes the pointer only
+   while the seam is pointed at, so its unseen footprint never covers the nav or main. */
+.shell-seam-tab {
+  position: absolute;
+  top: 68px;
+  left: -9px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: var(--sel-shadow);
+  color: var(--body);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease 0s;
+}
+
+.shell-seam:hover .shell-seam-tab,
+.shell-seam-tab:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 0.15s;
+}
+
+.shell-seam-tab:focus-visible {
+  transition-delay: 0s;
+}
+
+.shell-seam-tab:hover {
+  background: var(--sel);
+  color: var(--text);
+}
+
+/* Not while dragging: the tab would sit under the pointer's path. */
+:root.nav-resizing .shell-seam-tab {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .shell-nav-resize::after {
@@ -79,7 +128,7 @@
   transition: opacity 0.15s ease 0s;
 }
 
-.shell-nav-resize:hover::after {
+.shell-seam:hover .shell-nav-resize::after {
   opacity: 1;
   transition-delay: 0.15s;
 }
@@ -91,9 +140,45 @@
   background: linear-gradient(to bottom, var(--ion-a), var(--ion-b));
 }
 
-.shell--folding .shell-nav {
-  opacity: 0.45;
+/* A drag that would snap to the rail or open it out dims the nav a little; one that would hide it, more. */
+.shell--hint-rail .shell-nav,
+.shell--hint-full .shell-nav {
+  opacity: 0.6;
   transition: opacity 0.12s ease;
+}
+
+.shell--hint-hide .shell-nav {
+  opacity: 0.3;
+  transition: opacity 0.12s ease;
+}
+
+/*
+ * The rail (NavRail.css draws it): a 68px column. Its labels, flyouts and the company card reach out
+ * over main, so the nav doesn't clip them and sits above main's content. While the nav folds or
+ * unfolds, the column's width moves over 200ms (Shell.tsx `createNavFold`).
+ */
+.shell--rail .shell-nav {
+  z-index: var(--z-popover);
+  overflow: visible;
+}
+
+/* The seam stays above the rail's column, so its handle and tab can still be reached. */
+.shell--rail .shell-seam {
+  z-index: calc(var(--z-popover) + 1);
+}
+
+.shell--sliding {
+  transition: grid-template-columns 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.shell--sliding .shell-nav {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell--sliding {
+    transition: none;
+  }
 }
 
 /* While dragging: the resize cursor everywhere, and no text selected on the way. */
@@ -103,7 +188,7 @@
   user-select: none !important;
 }
 
-/* The nav hidden (`[`): main takes the width, and a button at its top left brings the nav back. */
+/* The nav hidden (Shift+`[`): main takes the width, and a button at its top left brings the nav back. */
 .shell--bare {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "main";

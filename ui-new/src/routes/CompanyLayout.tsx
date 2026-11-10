@@ -6,7 +6,8 @@ import { inboxApi } from "@/api/inbox";
 import { queryKeys } from "@/api/queryKeys";
 import { isCompact } from "@/layout/breakpoints";
 import { desktopArea, detailParent, isDetailPage } from "@/layout/dock-model";
-import { navHidden, navWidth, setNavHidden, setNavWidth, useOpenTask, useRecordRecentTasks } from "@/layout/nav-prefs";
+import { navHidden, navMode, navWidth, setNavHidden, setNavMode, setNavWidth, toggleNavRailPref, useOpenTask, useRecordRecentTasks } from "@/layout/nav-prefs";
+import { NavRail } from "@/layout/NavRail";
 import { ShellNav, useRememberAppPath } from "@/layout/SettingsNav";
 import { settingsArea } from "@/layout/settings-nav-model";
 import { PhoneDock } from "@/layout/PhoneDock";
@@ -47,6 +48,12 @@ import "./CompanyLayout.css";
  *
  * In App settings and Company settings the left nav gives way to that area's own sidebar, with Back
  * to app at the top; `ShellNav` (layout/SettingsNav.tsx) picks it from the address. Every page you open outside settings is remembered for Back to app.
+ *
+ * The main nav folds to the icon rail (layout/NavRail.tsx) with `[`, the seam's tab or a drag, and
+ * by itself in a window narrower than 1100px (layout/nav-prefs.tsx); Shift+`[` hides it. A settings
+ * sidebar has no rail: it shows at its full width even while the main nav is a rail, and Back to app
+ * returns to the rail. There `[` and Shift+`[` both hide and show the sidebar (the same hiding as the
+ * main nav's), leaving full or rail as it was.
  *
  * The task the page has open (its page, or a list's panel) is recorded in the nav's recent tasks,
  * and the task keys act on it: `y` archives it from your inbox, `g c` goes to its comment box, `]`
@@ -137,6 +144,12 @@ function CompanyShell(props: ParentProps) {
         case "go-dashboard":
           return navigate(`${base}/dashboard`);
         case "toggle-nav":
+          // `[`: the main nav folds to the rail and back. A settings sidebar has no rail, so there
+          // it hides and shows the sidebar instead, leaving the main nav's full or rail alone.
+          if (isCompact()) return;
+          if (area()) return setNavHidden(!navHidden());
+          return toggleNavRailPref();
+        case "hide-nav":
           if (!isCompact()) setNavHidden(!navHidden());
           return;
         case "toggle-panel":
@@ -163,6 +176,11 @@ function CompanyShell(props: ParentProps) {
   return (
     <Shell
       nav={<ShellNav />}
+      rail={<NavRail />}
+      navMode={navMode()}
+      canRail={!area()}
+      navKey={area() ?? "app"}
+      onNavMode={setNavMode}
       navLabel={area() ? "Settings" : "Main"}
       dock={<Show when={!detail()}><PhoneDock /></Show>}
       navHidden={navHidden()}

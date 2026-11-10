@@ -7,8 +7,9 @@ import type { SubmitKey } from "@/tasks/composer/submit-key";
  *
  * - Cmd/Ctrl+K opens the command palette, from anywhere.
  * - `c` new task, `/` search, `?` the cheatsheet, `g` then `i` the Inbox, `g` then `d` the Org
- *   dashboard, `[` hides or shows the nav. These don't fire while typing in a field or while a
- *   dialog is open.
+ *   dashboard, `[` folds the nav to its icon rail and back, Shift+`[` hides or shows it. These
+ *   don't fire while typing in a field or while a dialog is open. (In settings, whose sidebar has
+ *   no rail, `[` hides and shows the sidebar; routes/CompanyLayout.tsx.)
  * - With a task open (its page, or a list's panel): `]` closes the panel and opens it again, `y`
  *   archives the task from your inbox (back to the Inbox from its page), and `g` then `c` goes to
  *   its thread's comment box. Without one these keys are left to the page (the Inbox's `y` clears).
@@ -27,6 +28,7 @@ export type ShortcutAction =
   | "go-inbox"
   | "go-dashboard"
   | "toggle-nav"
+  | "hide-nav"
   | "toggle-panel"
   | "archive-task"
   | "focus-composer";
@@ -44,7 +46,8 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["C"], label: "New task" },
       { keys: ["/"], label: "Search" },
       { keys: ["?"], label: "Keyboard shortcuts" },
-      { keys: ["["], label: "Hide or show the nav" },
+      { keys: ["["], label: "Collapse or expand the sidebar" },
+      { keys: ["Shift", "["], label: "Hide or show the nav" },
     ],
   },
   {
@@ -160,7 +163,7 @@ export function hasOpenDialog(root: ParentNode = document) {
   return root.querySelector('[data-layer="dialog"]') !== null;
 }
 
-type KeyInput = Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "target">;
+type KeyInput = Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "target"> & Partial<Pick<KeyboardEvent, "shiftKey" | "code">>;
 
 /**
  * The action a keypress triggers, given whether `g` was just pressed. Returns "arm-g" for the first
@@ -184,6 +187,8 @@ export function resolveShortcut(
   if (key === "c") return "new-task";
   if (event.key === "/") return "search";
   if (event.key === "?") return "cheatsheet";
+  // Shift+[ types "{" on most layouts; the key's position (`code`) covers the rest.
+  if (event.key === "{" || (event.shiftKey && (event.key === "[" || event.code === "BracketLeft"))) return "hide-nav";
   if (event.key === "[") return "toggle-nav";
   if (event.key === "]" && state.panelToggle) return "toggle-panel";
   if (key === "y" && state.taskOpen) return "archive-task";

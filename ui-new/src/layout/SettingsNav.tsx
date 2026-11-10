@@ -28,7 +28,9 @@ import "./SettingsNav.css";
 
 /*
  * The settings sidebar: in App settings and Company settings it takes the left nav's place, in the
- * same shell slot, so it keeps the nav's width, its resize handle and `[` to hide it (Shell.tsx).
+ * same shell slot, so it keeps the nav's width, its resize handle and its hiding (Shell.tsx). It has
+ * no icon rail: it shows at full width even while the main nav is folded to the rail, and there
+ * `[` and Shift+`[` hide and show it instead (routes/CompanyLayout.tsx).
  * `ShellNav` picks it or the main nav from the address (settings-nav-model.ts), for CompanyLayout.
  *
  * At the top, Back to app returns to the last page you had open outside settings

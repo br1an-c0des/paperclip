@@ -5,6 +5,8 @@ import {
   ArrowUp,
   Building2,
   ChevronDown,
+  ChevronsLeft,
+  ChevronsRight,
   Ellipsis,
   Keyboard,
   LogOut,
@@ -25,10 +27,8 @@ import {
   UserRoundMinus,
   Zap,
 } from "lucide-solid";
-import { createMemo, For, Show, type JSX, type ParentProps } from "solid-js";
-import { activeAgents } from "@/api/agents";
-import { openProjects } from "@/api/projects";
-import { agentState, runningAgentIds, sortAgentsForNav } from "@/lib/agent-state";
+import { For, Show, type JSX, type ParentProps } from "solid-js";
+import { agentState } from "@/lib/agent-state";
 import { useCommands } from "@/lib/commands";
 import { useCompaniesQuery, useCompany } from "@/lib/company";
 import { useNeedsYouCount } from "@/inbox/needs-you";
@@ -36,12 +36,11 @@ import { isOrgPage } from "./dock-model";
 import { NavPlugins, NavProjectPlugins } from "@/plugins/NavPlugins";
 import { GlobalToolbarPlugins, PluginOrganizationSwitcher } from "@/plugins/ShellPlugins";
 import { useAgentStars } from "@/agents/AgentStar";
-import { starredAgents } from "@/agents/star-model";
 import { useCanCreateCompany } from "@/onboarding/can-create";
 import { actionTargets, useAgentActions } from "@/org/actions";
 import { profilePath } from "@/profile/profile-model";
 import { ServerInfo } from "@/shell/ServerInfo";
-import { useAgentsQuery, useExperimentalSettingsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
+import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { useSession, useSignOut, useYouName } from "@/lib/session";
 import { theme, toggleTheme } from "@/lib/theme";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
@@ -50,10 +49,10 @@ import { Grain } from "@/ui/Grain";
 import { Menu } from "@/ui/Menu";
 import { ScrollList } from "@/ui/ScrollList";
 import { TaskStatusCapsule } from "@/ui/Status";
-import { navSection, setNavHidden, useCompanyOrder, useProjectOrder, useProjectStars, useRecentTasks } from "./nav-prefs";
-import { isProjectPage, showStatusLink, visibleProjects } from "./nav-model";
-import { openChatAgentKey } from "@/chat/chat-model";
-import { ChatUnreadBadge, useUnreadChats } from "@/chat/chat-read";
+import { navSection, setNavHidden, setNavMode, useCompanyOrder, useProjectStars, useRecentTasks } from "./nav-prefs";
+import { useNavLists } from "./nav-lists";
+import { isProjectPage, showStatusLink } from "./nav-model";
+import { ChatUnreadBadge } from "@/chat/chat-read";
 import "@/ui/nav.css";
 import "./Nav.css";
 
@@ -81,9 +80,14 @@ import "./Nav.css";
  * your nav); each agent's "…" runs it now, pauses or resumes it (org/actions.ts) and stars it.
  * Project rows wait until your order and stars have loaded, so they never reshuffle. Project and
  * agent rows are keyed by id, so a refetch updates them in place instead of rebuilding them (which
- * remounted the plugin items under each project and closed an open "…" menu). Every section folds from its heading, and `[`
- * hides the whole nav (the shell then offers it back). The company menu
+ * remounted the plugin items under each project and closed an open "…" menu); nav-lists.ts holds
+ * these lists for the rail's flyouts too. Every section folds from its heading. The company menu
  * lists companies in the order you gave them on the companies page.
+ *
+ * `[` folds the whole nav to the icon rail (NavRail.tsx) and back, and Shift+`[` hides it (the shell
+ * then offers it back); the You menu has both, as Collapse sidebar and Hide navigation. While it
+ * folds, the labels fade first (Nav.css, `[data-fold]`), then the column narrows (Shell.tsx). Plugins
+ * live only here: the rail has no plugin sections, project plugin items or toolbar buttons.
  *
  * Three zones: the company row, the tools row, Inbox and Status stay pinned at the top; Apps and
  * you stay pinned at the bottom; between them Starred, Projects, Agents, Recent tasks
@@ -140,13 +144,25 @@ function CompanyRow() {
   );
 }
 
+/**
+ * What the company menu offers, for it and the rail's company card (NavRail.tsx): the companies in
+ * the order you gave them on the companies page, and whether you may create one.
+ */
+export function useCompanyChoices() {
+  const companies = useCompaniesQuery();
+  const order = useCompanyOrder();
+  const canCreate = useCanCreateCompany();
+  return {
+    ordered: () => order.ordered(companies.data ?? []),
+    canCreate: () => canCreate().allowed,
+  };
+}
+
 /** The company menu: companies in your order, All companies, and Create organization. */
 function CompanyMenu() {
   const company = useCompany();
-  const companies = useCompaniesQuery();
-  const order = useCompanyOrder();
+  const choices = useCompanyChoices();
   const navigate = useNavigate();
-  const canCreate = useCanCreateCompany();
   return (
     <Menu placement="bottom-end">
       <Menu.Trigger class={buttonClass({ variant: "icon", ghost: true }) + " company-switch"} aria-label="Switch company" title="Switch company">
@@ -154,7 +170,7 @@ function CompanyMenu() {
       </Menu.Trigger>
       <Menu.Content label="Companies" width={260}>
         <Menu.Group label="Companies">
-          <For each={order.ordered(companies.data ?? [])}>
+          <For each={choices.ordered()}>
             {(item) => (
               <Menu.Item
                 onSelect={() => navigate(`/${item.issuePrefix}`)}
@@ -170,7 +186,7 @@ function CompanyMenu() {
         <Menu.Item onSelect={() => navigate("/companies")} icon={<Building2 size={16} />} description="Change their order there">
           All companies
         </Menu.Item>
-        <Show when={canCreate().allowed}>
+        <Show when={choices.canCreate()}>
           <Menu.Item onSelect={() => navigate("/onboarding")} icon={<Plus size={16} />}>
             Create organization
           </Menu.Item>
@@ -180,13 +196,63 @@ function CompanyMenu() {
   );
 }
 
-function YouRow() {
+/**
+ * The You menu's content, for the full nav's You row and the rail's avatar: your profile, App
+ * settings, the theme, the shortcuts, Collapse sidebar (`[`, Expand sidebar on the rail) and Hide
+ * navigation (Shift+`[`), the style guide, the server's details, and Sign out.
+ */
+export function YouMenuContent(props: { rail?: boolean }) {
   const session = useSession();
   const company = useCompany();
   const commands = useCommands();
   const navigate = useNavigate();
-  const name = useYouName();
   const signOut = useSignOut();
+  return (
+    <Menu.Content label="Account and appearance" width={260}>
+      <Menu.Item onSelect={() => navigate(profilePath(company().issuePrefix, { id: session.youId() }))} icon={<UserRound size={16} />}>
+        View profile
+      </Menu.Item>
+      <Menu.Item onSelect={() => navigate(`/${company().issuePrefix}/company/settings/instance`)} icon={<Settings2 size={16} />}>
+        App settings
+      </Menu.Item>
+      <Menu.Item onSelect={toggleTheme} icon={theme() === "dark" ? <Sun size={16} /> : <Moon size={16} />}>
+        {theme() === "dark" ? "Use light theme" : "Use dark theme"}
+      </Menu.Item>
+      <Menu.Item onSelect={() => commands.setShortcutsOpen(true)} icon={<Keyboard size={16} />} hint="?">
+        Keyboard shortcuts
+      </Menu.Item>
+      <Menu.Item onSelect={() => navigate("/style-guide")} icon={<Palette size={16} />}>
+        Style guide
+      </Menu.Item>
+      <Menu.Separator />
+      <Show
+        when={props.rail}
+        fallback={
+          <Menu.Item onSelect={() => setNavMode("rail")} icon={<ChevronsLeft size={16} />} hint="[">
+            Collapse sidebar
+          </Menu.Item>
+        }
+      >
+        <Menu.Item onSelect={() => setNavMode("full")} icon={<ChevronsRight size={16} />} hint="[">
+          Expand sidebar
+        </Menu.Item>
+      </Show>
+      <Menu.Item onSelect={() => setNavHidden(true)} icon={<PanelLeftClose size={16} />} hint="Shift [">
+        Hide navigation
+      </Menu.Item>
+      <ServerInfo />
+      <Show when={session.isAuthenticatedMode()}>
+        <Menu.Separator />
+        <Menu.Item onSelect={() => void signOut()} icon={<LogOut size={16} />}>
+          Sign out
+        </Menu.Item>
+      </Show>
+    </Menu.Content>
+  );
+}
+
+function YouRow() {
+  const name = useYouName();
   return (
     <div class="nav-you">
       <Menu placement="top-start">
@@ -194,33 +260,7 @@ function YouRow() {
           <InitialsDisc name={name()} you size={30} />
           <span class="nav-you-name">{name()}</span>
         </Menu.Trigger>
-        <Menu.Content label="Account and appearance" width={260}>
-          <Menu.Item onSelect={() => navigate(profilePath(company().issuePrefix, { id: session.youId() }))} icon={<UserRound size={16} />}>
-            View profile
-          </Menu.Item>
-          <Menu.Item onSelect={() => navigate(`/${company().issuePrefix}/company/settings/instance`)} icon={<Settings2 size={16} />}>
-            App settings
-          </Menu.Item>
-          <Menu.Item onSelect={toggleTheme} icon={theme() === "dark" ? <Sun size={16} /> : <Moon size={16} />}>
-            {theme() === "dark" ? "Use light theme" : "Use dark theme"}
-          </Menu.Item>
-          <Menu.Item onSelect={() => commands.setShortcutsOpen(true)} icon={<Keyboard size={16} />} hint="?">
-            Keyboard shortcuts
-          </Menu.Item>
-          <Menu.Item onSelect={() => setNavHidden(true)} icon={<PanelLeftClose size={16} />} hint="[">
-            Hide navigation
-          </Menu.Item>
-          <Menu.Item onSelect={() => navigate("/style-guide")} icon={<Palette size={16} />}>
-            Style guide
-          </Menu.Item>
-          <ServerInfo />
-          <Show when={session.isAuthenticatedMode()}>
-            <Menu.Separator />
-            <Menu.Item onSelect={() => void signOut()} icon={<LogOut size={16} />}>
-              Sign out
-            </Menu.Item>
-          </Show>
-        </Menu.Content>
+        <YouMenuContent />
       </Menu>
     </div>
   );
@@ -267,69 +307,29 @@ export function Nav() {
   const company = useCompany();
   const commands = useCommands();
   const needsYou = useNeedsYouCount();
-  const projects = useProjectsQuery();
-  const agents = useAgentsQuery();
-  const liveRuns = useLiveRunsQuery();
   const recent = useRecentTasks();
   const experimental = useExperimentalSettingsQuery();
 
-  const location = useLocation();
-
   const base = () => `/${company().issuePrefix}`;
-  const running = createMemo(() => runningAgentIds(liveRuns.data));
-  const stars = useAgentStars();
-  const projectStars = useProjectStars();
-  const projectOrder = useProjectOrder();
-  const agentsById = createMemo(() => new Map(activeAgents(agents.data).map((agent) => [agent.id, agent] as const)));
-  const starred = createMemo(() => starredAgents(stars.memberships.data, [...agentsById().values()]));
-  const starredIds = createMemo(() => new Set(starred().map((agent) => agent.id)));
-  const navAgents = createMemo(() => sortAgentsForNav([...agentsById().values()], running()));
-  const otherAgents = createMemo(() => navAgents().filter((agent) => !starredIds().has(agent.id)));
-  const runningCount = () => navAgents().filter((agent) => agentState(agent, running()).key === "running").length;
-  const openChatAgentId = createMemo(() => {
-    const key = openChatAgentKey(location.pathname, company().issuePrefix);
-    return key ? (navAgents().find((agent) => agent.urlKey === key || agent.id === key)?.id ?? null) : null;
-  });
-  const unreadChats = useUnreadChats(openChatAgentId);
   const inboxCount = () => needsYou() ?? 0;
-
-  // Projects you haven't left, in your order; starred ones move up to Starred.
-  const projectsById = createMemo(() => new Map(openProjects(projects.data).map((project) => [project.id, project] as const)));
-  const shownProjects = createMemo(() => projectOrder.ordered(visibleProjects([...projectsById().values()], projectStars.memberships.data)));
-  const starredProjects = createMemo(() => (projectStars.memberships.data?.starredProjectIds ?? []).flatMap((id) => projectsById().get(id) ?? []));
-  const otherProjects = createMemo(() => shownProjects().filter((project) => !projectStars.starred(project.id)));
-  // Project rows wait for your order and your memberships (stars, projects you left), so they're
-  // drawn once as you arranged them instead of shuffling as each read lands. A reload has all three
-  // at once from the saved reads (lib/offline/persisted-cache.ts); a read that fails doesn't hold them.
-  const projectsArranged = () => projectOrder.settled() && !projectStars.memberships.isLoading;
-
-  // Project and agent rows are keyed by id, not by the object. Every refetch of a list (a page that
-  // reads it mounting after 30 seconds, the window regaining focus, a live event, a reload's saved
-  // list being replaced) brings new objects, since solid-query keeps no structural sharing; keyed by
-  // object, <For> rebuilt every row: each project's plugin items mounted again as new React roots,
-  // showing until their plugin's config hid them, and an agent's open "…" menu closed. A row now
-  // stays mounted while its project or agent is listed, follows the latest object for its id, and
-  // moves when the order changes (running agents go first).
-  const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((id, index) => id === b[index]);
-  const idsOf = (list: () => readonly { id: string }[]) => createMemo(() => list().map((item) => item.id), [], { equals: sameIds });
-  // The latest object for an id; the last one stays while a refetch that dropped it removes the row.
-  const latest = <T,>(byId: () => ReadonlyMap<string, T>, id: string) => createMemo<T | undefined>((last) => byId().get(id) ?? last);
-  const starredProjectIds = idsOf(starredProjects);
-  const otherProjectIds = idsOf(otherProjects);
-  const starredAgentIds = idsOf(starred);
-  const otherAgentIds = idsOf(otherAgents);
+  // Projects and agents as the rail's flyouts list them too; rows keyed by id (nav-lists.ts).
+  const lists = useNavLists();
+  const { starredProjects, otherProjects, starredProjectIds, otherProjectIds, starredAgentIds, otherAgentIds, projectsArranged } = lists;
+  const starred = lists.starredAgents;
   const projectRow = (id: string, list: () => Project[]) => {
-    const project = latest(projectsById, id);
+    const project = lists.latestProject(id);
     return (
       <Show when={project()}>
-        {(current) => <NavProject project={current()} base={base()} list={list()} onMove={(delta) => projectOrder.move(list(), id, delta)} />}
+        {(current) => <NavProject project={current()} base={base()} list={list()} onMove={(delta) => lists.projectOrder.move(list(), id, delta)} />}
       </Show>
     );
   };
   const agentRow = (id: string) => {
-    const agent = latest(agentsById, id);
-    return <Show when={agent()}>{(current) => <NavAgent agent={current()} base={base()} running={running()} unread={unreadChats.countFor(id)} />}</Show>;
+    const agent = lists.latestAgent(id);
+    return <Show when={agent()}>{(current) => <NavAgent agent={current()} base={base()} running={lists.running()} unread={lists.unreadChats.countFor(id)} />}</Show>;
   };
+  const runningCount = lists.runningCount;
+  const navAgents = lists.navAgents;
 
   return (
     <>
@@ -369,7 +369,7 @@ export function Nav() {
         <div class="nav-group">
           <A class="navi navi--badged" href={`${base()}/inbox`}>
             <InboxIcon />
-            Inbox
+            <span class="navi-text">Inbox</span>
             <Show when={inboxCount() > 0}>
               <span class="navi-badge" aria-label={`${inboxCount()} waiting`}>
                 {inboxCount() > 99 ? "99+" : inboxCount()}
@@ -379,7 +379,7 @@ export function Nav() {
           <Show when={showStatusLink(experimental.data)}>
             <A class="navi" href={`${base()}/status`}>
               <Radar size={16} aria-hidden="true" />
-              Status
+              <span class="navi-text">Status</span>
             </A>
           </Show>
         </div>
@@ -456,7 +456,7 @@ export function Nav() {
           {/* Was the temporary Connectors page; Apps and tools (the org's Apps tab) took its place. */}
           <A class="navi" href={`${base()}/apps`}>
             <Plug size={16} aria-hidden="true" />
-            Apps
+            <span class="navi-text">Apps</span>
           </A>
         </div>
 
