@@ -47,6 +47,7 @@ import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { buttonClass } from "@/ui/Button";
 import { Grain } from "@/ui/Grain";
 import { Menu } from "@/ui/Menu";
+import { ScrollList } from "@/ui/ScrollList";
 import { TaskStatusCapsule } from "@/ui/Status";
 import { navSection, setNavHidden, useCompanyOrder, useProjectOrder, useProjectStars, useRecentTasks } from "./nav-prefs";
 import { showStatusLink, visibleProjects } from "./nav-model";
@@ -67,9 +68,17 @@ import "./Nav.css";
  *
  * Your nav (nav-prefs.tsx): projects and agents you've starred sit in Starred above the rest; each
  * project's "…" moves it up or down (your order, kept on the server), stars it or leaves it (out of
- * your nav); each agent's "…" runs it now, pauses or resumes it (org/actions.ts) and stars it. Every
- * section folds from its heading, and `[` hides the whole nav (the shell then offers it back). The
- * switcher lists companies in the order you gave them on the companies page.
+ * your nav); each agent's "…" runs it now, pauses or resumes it (org/actions.ts) and stars it.
+ * Project rows wait until your order and stars have loaded, so they never reshuffle. Every section
+ * folds from its heading, and `[` hides the whole nav (the shell then offers it back). The switcher
+ * lists companies in the order you gave them on the companies page.
+ *
+ * Three zones: the company switcher, Org dashboard, Inbox and Status stay pinned at the top; Apps,
+ * you and settings stay pinned at the bottom; between them Starred, Projects, Agents, Recent tasks
+ * and plugins' sections each scroll on their own, without the browser's scrollbar: a slim
+ * gradient capsule shows where you are, or on a touch screen the edge with more beyond it glows
+ * (ui/ScrollList.tsx). A short list keeps its height; long ones share what's left (Nav.css).
+ * The nav's right edge drags to resize it (Shell.tsx).
  *
  * An agent whose chat has agent messages you haven't read (a reply, or a briefing it sent from a
  * task; decision 48) has a badge beside its name saying how many (U65), except the chat open now,
@@ -216,7 +225,7 @@ function NavSection(props: ParentProps<{ id: string; title: string; note?: JSX.E
   const section = navSection(props.id);
   const headId = () => `nav-${props.id}-h`;
   return (
-    <div class="nav-group" role="group" aria-labelledby={headId()}>
+    <div class="nav-group nav-group--scroll" role="group" aria-labelledby={headId()}>
       <div class="nav-head" classList={{ "nav-head--action": props.action }}>
         <h2 id={headId()}>
           <button type="button" class="nav-fold" aria-expanded={!section.folded()} onClick={section.toggle}>
@@ -227,7 +236,9 @@ function NavSection(props: ParentProps<{ id: string; title: string; note?: JSX.E
         {props.note}
         {props.head}
       </div>
-      <Show when={!section.folded()}>{props.children}</Show>
+      <Show when={!section.folded()}>
+        <ScrollList class="nav-list">{props.children}</ScrollList>
+      </Show>
     </div>
   );
 }
@@ -285,6 +296,10 @@ export function Nav() {
     return ids.flatMap((id) => byId.get(id) ?? []);
   });
   const otherProjects = createMemo(() => shownProjects().filter((project) => !projectStars.starred(project.id)));
+  // Project rows wait for your order and your memberships (stars, projects you left), so they're
+  // drawn once as you arranged them instead of shuffling as each read lands. A reload has all three
+  // at once from the saved reads (lib/offline/persisted-cache.ts); a read that fails doesn't hold them.
+  const projectsArranged = () => projectOrder.settled() && !projectStars.memberships.isLoading;
 
   const projectRow = (project: Project, list: () => Project[]) => (
     <NavProject project={project} base={base()} list={list()} onMove={(delta) => projectOrder.move(list(), project.id, delta)} />
@@ -292,122 +307,132 @@ export function Nav() {
 
   return (
     <>
-      <div class="nav-top">
-        <PluginOrganizationSwitcher>
-          <CompanySwitcher />
-        </PluginOrganizationSwitcher>
-        <button
-          type="button"
-          class={buttonClass({ variant: "icon", ghost: true })}
-          aria-label="Search and commands"
-          aria-keyshortcuts="Control+K Meta+K"
-          onClick={() => commands.setPaletteOpen(true)}
-        >
-          <Search size={16} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          class={buttonClass({ variant: "icon" })}
-          aria-label="New task"
-          aria-keyshortcuts="C"
-          onClick={() => commands.openNewTask()}
-        >
-          <Plus size={16} stroke-width={2.2} aria-hidden="true" />
-        </button>
-      </div>
-      <GlobalToolbarPlugins />
-
-      <div class="nav-group">
-        <A class="navi" href={`${base()}/dashboard`} classList={{ active: orgPage() }}>
-          <OrgIcon />
-          Org dashboard
-        </A>
-        <A class="navi navi--badged" href={`${base()}/inbox`}>
-          <InboxIcon />
-          Inbox
-          <Show when={inboxCount() > 0}>
-            <span class="navi-badge" aria-label={`${inboxCount()} waiting`}>
-              {inboxCount() > 99 ? "99+" : inboxCount()}
-            </span>
-          </Show>
-        </A>
-        <Show when={showStatusLink(experimental.data)}>
-          <A class="navi" href={`${base()}/status`}>
-            <Radar size={16} aria-hidden="true" />
-            Status
-          </A>
-        </Show>
-      </div>
-
-      <Show when={starred().length > 0 || starredProjects().length > 0}>
-        <NavSection id="starred" title="Starred">
-          <For each={starredProjects()}>{(project) => projectRow(project, starredProjects)}</For>
-          <For each={starred()}>{(agent) => <NavAgent agent={agent} base={base()} running={running()} unread={unreadChats.countFor(agent.id)} />}</For>
-        </NavSection>
-      </Show>
-
-      <NavSection
-        id="projects"
-        title="Projects"
-        action
-        head={
+      <div class="nav-zone nav-zone--top">
+        <div class="nav-top">
+          <PluginOrganizationSwitcher>
+            <CompanySwitcher />
+          </PluginOrganizationSwitcher>
           <button
             type="button"
-            class={buttonClass({ variant: "icon", size: "compact", ghost: true }) + " nav-head-add"}
-            aria-label="New project"
-            onClick={() => commands.openNewProject()}
+            class={buttonClass({ variant: "icon", ghost: true })}
+            aria-label="Search and commands"
+            aria-keyshortcuts="Control+K Meta+K"
+            onClick={() => commands.setPaletteOpen(true)}
           >
-            <Plus size={14} stroke-width={2.2} aria-hidden="true" />
+            <Search size={16} aria-hidden="true" />
           </button>
-        }
-      >
-        <A class="navi navi--disc" href={`${base()}/issues`}>
-          <span class="navi-all" aria-hidden="true" />
-          All tasks
-          <span class="navi-note">company</span>
-        </A>
-        <For each={otherProjects()}>{(project) => projectRow(project, otherProjects)}</For>
-      </NavSection>
+          <button
+            type="button"
+            class={buttonClass({ variant: "icon" })}
+            aria-label="New task"
+            aria-keyshortcuts="C"
+            onClick={() => commands.openNewTask()}
+          >
+            <Plus size={16} stroke-width={2.2} aria-hidden="true" />
+          </button>
+        </div>
+        <GlobalToolbarPlugins />
 
-      <NavSection
-        id="agents"
-        title="Agents"
-        note={
-          <Show when={runningCount() > 0}>
-            <span class="nav-head-note">{runningCount()} running</span>
+        <div class="nav-group">
+          <A class="navi" href={`${base()}/dashboard`} classList={{ active: orgPage() }}>
+            <OrgIcon />
+            Org dashboard
+          </A>
+          <A class="navi navi--badged" href={`${base()}/inbox`}>
+            <InboxIcon />
+            Inbox
+            <Show when={inboxCount() > 0}>
+              <span class="navi-badge" aria-label={`${inboxCount()} waiting`}>
+                {inboxCount() > 99 ? "99+" : inboxCount()}
+              </span>
+            </Show>
+          </A>
+          <Show when={showStatusLink(experimental.data)}>
+            <A class="navi" href={`${base()}/status`}>
+              <Radar size={16} aria-hidden="true" />
+              Status
+            </A>
           </Show>
-        }
-      >
-        <For each={otherAgents()} fallback={<Show when={navAgents().length === 0}><p class="nav-empty">No agents yet.</p></Show>}>
-          {(agent) => <NavAgent agent={agent} base={base()} running={running()} unread={unreadChats.countFor(agent.id)} />}
-        </For>
-      </NavSection>
-
-      <Show when={recent().length > 0}>
-        <NavSection id="recent" title="Recent tasks">
-          <For each={recent()}>
-            {(task) => (
-              <A class="navi navi--task" href={`${base()}/issues/${encodeURIComponent(task.identifier ?? task.id)}`} title={task.title}>
-                <TaskStatusCapsule task={task} size="row" />
-                <span class="navi-label">{task.title}</span>
-                <span class="navi-note mono">{task.identifier}</span>
-              </A>
-            )}
-          </For>
-        </NavSection>
-      </Show>
-
-      <NavPlugins />
-
-      <div class="nav-group">
-        {/* Was the temporary Connectors page; Apps and tools (the org's Apps tab) took its place. */}
-        <A class="navi" href={`${base()}/apps`}>
-          <Plug size={16} aria-hidden="true" />
-          Apps
-        </A>
+        </div>
       </div>
 
-      <YouRow />
+      <div class="nav-zone nav-zone--lists">
+        <Show when={starred().length > 0 || starredProjects().length > 0}>
+          <NavSection id="starred" title="Starred">
+            <Show when={projectsArranged()}>
+              <For each={starredProjects()}>{(project) => projectRow(project, starredProjects)}</For>
+            </Show>
+            <For each={starred()}>{(agent) => <NavAgent agent={agent} base={base()} running={running()} unread={unreadChats.countFor(agent.id)} />}</For>
+          </NavSection>
+        </Show>
+
+        <NavSection
+          id="projects"
+          title="Projects"
+          action
+          head={
+            <button
+              type="button"
+              class={buttonClass({ variant: "icon", size: "compact", ghost: true }) + " nav-head-add"}
+              aria-label="New project"
+              onClick={() => commands.openNewProject()}
+            >
+              <Plus size={14} stroke-width={2.2} aria-hidden="true" />
+            </button>
+          }
+        >
+          <A class="navi navi--disc" href={`${base()}/issues`}>
+            <span class="navi-all" aria-hidden="true" />
+            All tasks
+            <span class="navi-note">company</span>
+          </A>
+          <Show when={projectsArranged()}>
+            <For each={otherProjects()}>{(project) => projectRow(project, otherProjects)}</For>
+          </Show>
+        </NavSection>
+
+        <NavSection
+          id="agents"
+          title="Agents"
+          note={
+            <Show when={runningCount() > 0}>
+              <span class="nav-head-note">{runningCount()} running</span>
+            </Show>
+          }
+        >
+          <For each={otherAgents()} fallback={<Show when={navAgents().length === 0}><p class="nav-empty">No agents yet.</p></Show>}>
+            {(agent) => <NavAgent agent={agent} base={base()} running={running()} unread={unreadChats.countFor(agent.id)} />}
+          </For>
+        </NavSection>
+
+        <Show when={recent().length > 0}>
+          <NavSection id="recent" title="Recent tasks">
+            <For each={recent()}>
+              {(task) => (
+                <A class="navi navi--task" href={`${base()}/issues/${encodeURIComponent(task.identifier ?? task.id)}`} title={task.title}>
+                  <TaskStatusCapsule task={task} size="row" />
+                  <span class="navi-label">{task.title}</span>
+                  <span class="navi-note mono">{task.identifier}</span>
+                </A>
+              )}
+            </For>
+          </NavSection>
+        </Show>
+
+        <NavPlugins />
+      </div>
+
+      <div class="nav-zone nav-zone--bottom">
+        <div class="nav-group">
+          {/* Was the temporary Connectors page; Apps and tools (the org's Apps tab) took its place. */}
+          <A class="navi" href={`${base()}/apps`}>
+            <Plug size={16} aria-hidden="true" />
+            Apps
+          </A>
+        </div>
+
+        <YouRow />
+      </div>
     </>
   );
 }

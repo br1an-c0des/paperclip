@@ -4,6 +4,7 @@ import { useCompany } from "@/lib/company";
 import { usePluginLaunchers, usePluginSlots } from "./contributions";
 import { PluginLauncherOutlet } from "./PluginLaunchers";
 import { PluginSlotOutlet } from "./PluginSlot";
+import { ScrollList } from "@/ui/ScrollList";
 import "./plugins.css";
 
 /*
@@ -20,13 +21,15 @@ export function NavPlugins() {
   const launchers = usePluginLaunchers(() => ({ placementZones: ["sidebar"] }));
   return (
     <Show when={entries.slots().length > 0 || launchers.launchers().length > 0}>
-      <div class="nav-group" aria-label="From plugins" role="group">
+      <div class="nav-group nav-group--scroll" aria-label="From plugins" role="group">
         <div class="nav-head">
           <h2>Plugins</h2>
         </div>
-        <PluginSlotOutlet slotTypes={["sidebar"]} context={context()} class="plugin-nav" missing="placeholder" errorBehavior="hidden" />
-        <PluginLauncherOutlet placementZones={["sidebar"]} context={context()} class="plugin-nav" errorBehavior="hidden" />
-        <PluginSlotOutlet slotTypes={["sidebarPanel"]} context={context()} class="plugin-nav-panels" itemClass="plugin-nav-panel" missing="placeholder" errorBehavior="hidden" />
+        <ScrollList class="nav-list">
+          <PluginSlotOutlet slotTypes={["sidebar"]} context={context()} class="plugin-nav" missing="placeholder" errorBehavior="hidden" />
+          <PluginLauncherOutlet placementZones={["sidebar"]} context={context()} class="plugin-nav" errorBehavior="hidden" />
+          <PluginSlotOutlet slotTypes={["sidebarPanel"]} context={context()} class="plugin-nav-panels" itemClass="plugin-nav-panel" missing="placeholder" errorBehavior="hidden" />
+        </ScrollList>
       </div>
     </Show>
   );

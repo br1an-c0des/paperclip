@@ -6,7 +6,7 @@ import { inboxApi } from "@/api/inbox";
 import { queryKeys } from "@/api/queryKeys";
 import { isCompact } from "@/layout/breakpoints";
 import { desktopArea, detailParent, isDetailPage } from "@/layout/dock-model";
-import { navHidden, setNavHidden, useOpenTask, useRecordRecentTasks } from "@/layout/nav-prefs";
+import { navHidden, navWidth, setNavHidden, setNavWidth, useOpenTask, useRecordRecentTasks } from "@/layout/nav-prefs";
 import { Nav } from "@/layout/Nav";
 import { PhoneDock } from "@/layout/PhoneDock";
 import { Shell } from "@/layout/Shell";
@@ -155,7 +155,16 @@ function CompanyShell(props: ParentProps) {
   };
 
   return (
-    <Shell nav={<Nav />} dock={<Show when={!detail()}><PhoneDock /></Show>} navHidden={navHidden()} onShowNav={() => setNavHidden(false)} noDock={detail()}>
+    <Shell
+      nav={<Nav />}
+      dock={<Show when={!detail()}><PhoneDock /></Show>}
+      navHidden={navHidden()}
+      onShowNav={() => setNavHidden(false)}
+      navWidth={navWidth()}
+      onNavWidth={setNavWidth}
+      onHideNav={() => setNavHidden(true)}
+      noDock={detail()}
+    >
       <PhoneTopBar
         showLead={detail()}
         lead={

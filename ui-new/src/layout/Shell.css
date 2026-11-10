@@ -1,5 +1,6 @@
 /*
- * Shell grid. Desktop measurements come from the boards: the nav is 248px with 18px/14px padding,
+ * Shell grid. Desktop measurements come from the boards: the nav is 248px (you can drag it from 200
+ * to 420px; `--nav-w` is set on the shell) with 18px/14px padding,
  * and main has 14px above, 20px on the right and 4px on the left (the nav's own padding makes up
  * the gutter between them). Content cards inside main are 16px apart.
  */
@@ -22,11 +23,18 @@
   top: 0;
   align-self: start;
   height: 100dvh;
+  /* The nav's sections scroll on their own (Nav.css); the nav itself scrolls only when the window
+     is too short for even that, and then without a scrollbar. */
   overflow-y: auto;
+  scrollbar-width: none;
   padding: 18px 14px;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 18px;
+}
+
+.shell-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .shell-main {
@@ -37,6 +45,62 @@
   flex-direction: column;
   gap: 16px;
   padding: var(--main-pad-top) var(--main-pad-end) 48px 4px;
+}
+
+/*
+ * The nav's resize handle (Shell.tsx NavResizer): a 10px strip over the seam between nav and main,
+ * drawn as a pill line when you point at it, drag it or focus it. Past the narrowest width the nav
+ * dims, to say letting go will fold it away.
+ */
+.shell-nav-resize {
+  grid-area: nav;
+  justify-self: end;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  width: 10px;
+  height: 100dvh;
+  margin-right: -6px;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.shell-nav-resize::after {
+  content: "";
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+  left: 4px;
+  width: 2px;
+  border-radius: var(--r-pill);
+  background: var(--edge);
+  opacity: 0;
+  transition: opacity 0.15s ease 0s;
+}
+
+.shell-nav-resize:hover::after {
+  opacity: 1;
+  transition-delay: 0.15s;
+}
+
+.shell-nav-resize--active::after,
+.shell-nav-resize:focus-visible::after {
+  opacity: 1;
+  transition-delay: 0s;
+  background: linear-gradient(to bottom, var(--ion-a), var(--ion-b));
+}
+
+.shell--folding .shell-nav {
+  opacity: 0.45;
+  transition: opacity 0.12s ease;
+}
+
+/* While dragging: the resize cursor everywhere, and no text selected on the way. */
+:root.nav-resizing,
+:root.nav-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 /* The nav hidden (`[`): main takes the width, and a button at its top left brings the nav back. */

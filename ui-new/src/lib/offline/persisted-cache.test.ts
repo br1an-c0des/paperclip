@@ -39,6 +39,16 @@ describe("persistScope", () => {
     expect(persistScope(["issues", "detail", "t1"], { companyId: COMPANY }, "u1", companies)).toBe(COMPANY);
   });
 
+  it("keeps the nav's order and your stars, so a reload doesn't reshuffle the nav", () => {
+    expect(persistScope(["sidebar-preferences", "company-order", "u1"], { orderedIds: [] }, "u1", companies)).toBeNull();
+    expect(persistScope(["sidebar-preferences", "project-order", COMPANY, "u1"], { orderedIds: [] }, "u1", companies)).toBe(COMPANY);
+    expect(persistScope(["resource-memberships", COMPANY, "me"], { starredProjectIds: [] }, "u1", companies)).toBe(COMPANY);
+    expect(persistScope(["sidebar-preferences", "company-order", "u2"], { orderedIds: [] }, "u1", companies)).toBeUndefined();
+    expect(persistScope(["sidebar-preferences", "project-order", COMPANY, "u2"], { orderedIds: [] }, "u1", companies)).toBeUndefined();
+    expect(persistScope(["sidebar-preferences", "project-order", OTHER, "u1"], { orderedIds: [] }, "u1", companies)).toBeUndefined();
+    expect(persistScope(["resource-memberships", OTHER, "me"], {}, "u1", companies)).toBeUndefined();
+  });
+
   it("keeps nothing else, and nothing of another user or company", () => {
     expect(persistScope(["issues", "comments", "t1"], [], "u1", companies)).toBeUndefined();
     expect(persistScope(["issues", "documents", "t1"], [], "u1", companies)).toBeUndefined();

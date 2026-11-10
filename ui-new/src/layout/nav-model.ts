@@ -125,3 +125,23 @@ export function openTaskRef(pathname: string, search: string, prefix: string): s
   const task = new URLSearchParams(search).get("task");
   return task || null;
 }
+
+// ---------------------------------------------------------------------------------------------
+// The nav's width (you drag its right edge; Shell.tsx)
+
+export const NAV_WIDTH_DEFAULT = 248;
+export const NAV_WIDTH_MIN = 200;
+export const NAV_WIDTH_MAX = 420;
+/** Dragged this far past the minimum, the nav folds away (as `[` does). */
+export const NAV_COLLAPSE_AT = NAV_WIDTH_MIN - 80;
+
+/** A width the nav can take: whole pixels between the minimum and the maximum. */
+export function clampNavWidth(width: number): number {
+  if (!Number.isFinite(width)) return NAV_WIDTH_DEFAULT;
+  return Math.round(Math.min(NAV_WIDTH_MAX, Math.max(NAV_WIDTH_MIN, width)));
+}
+
+/** A saved width, or the default when there's none or it isn't a number. */
+export function parseNavWidth(raw: unknown): number {
+  return typeof raw === "number" ? clampNavWidth(raw) : NAV_WIDTH_DEFAULT;
+}

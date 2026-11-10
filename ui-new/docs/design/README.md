@@ -10,6 +10,7 @@ The canvas stays where design work happens; this folder is the version the code 
 | [design-system.md](design-system.md) | Capsule Stack: tokens, type, layout, status system, components, interaction rules |
 | [tokens.css](tokens.css) | The tokens as CSS custom properties, ready to copy into `ui-new` |
 | [style-guide.html](style-guide.html) | The tokens and components drawn in both themes; open it in a browser from disk |
+| [nav-scroll-options.html](nav-scroll-options.html) | Four ways for the left nav's lists to show there's more without a scrollbar; the nav uses the scroll capsule with a mouse and the ion edge glow on touch (`ui/ScrollList.tsx`) |
 | [boards/](boards/) | The 56 desktop board sources and the canvas index (`canvas.json`) |
 | [mobile/](mobile/) | The 17 phone board sources and their canvas index (`canvas.json`) |
 

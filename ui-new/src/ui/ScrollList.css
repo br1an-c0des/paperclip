@@ -1,0 +1,175 @@
+/*
+ * ScrollList.tsx: a list that scrolls without the browser's scrollbar, in one of two looks.
+ *
+ * Mouse or trackpad: the scroll capsule. An 8px rail just outside the list's right edge (the
+ * container leaves room for it) holds a 4px track and a capsule in the ion gradient (in progress,
+ * running, live), sized to how much of the list is in view. It fades in while you point at the list
+ * or scroll it, and widens a little under the pointer to say it can be dragged.
+ *
+ * Touch: the ion edge glow. A 2px hairline in the ion gradient glows at an edge with more beyond
+ * it, the top one leaning violet and the bottom one blue.
+ *
+ * In both, the rows fade out over the last 20px before an edge with more beyond it, so a half-shown
+ * row dissolves instead of being cut off.
+ */
+
+@property --glow-fade-above {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --glow-fade-below {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.scroll-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.scroll-list-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  /* Room for a raised row's shadow and focus ring, which the scroller would otherwise clip. */
+  margin: -3px -4px;
+  padding: 3px 4px;
+}
+
+.scroll-list-body::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Both looks: the rows fade out over the last 20px before an edge with more beyond it */
+
+.scroll-list-body {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--glow-fade-above),
+    #000 calc(100% - var(--glow-fade-below)),
+    transparent 100%
+  );
+  transition: --glow-fade-above 0.2s ease, --glow-fade-below 0.2s ease;
+}
+
+.scroll-list[data-more-above] > .scroll-list-body {
+  --glow-fade-above: 20px;
+}
+
+.scroll-list[data-more-below] > .scroll-list-body {
+  --glow-fade-below: 20px;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   The scroll capsule (the rail's top and bottom match ScrollList.tsx `watchScroll`'s track) */
+
+.scroll-list-rail {
+  position: absolute;
+  z-index: 1;
+  top: 1px;
+  bottom: 1px;
+  right: -8px;
+  width: 8px;
+  cursor: default;
+  touch-action: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.scroll-list-rail::before {
+  content: "";
+  position: absolute;
+  inset: 0 2px;
+  border-radius: var(--r-pill);
+  background: var(--hover);
+}
+
+.scroll-list-thumb {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: var(--thumb-top, 0px);
+  height: var(--thumb-size, 0px);
+  border-radius: var(--r-pill);
+  background: linear-gradient(to bottom, var(--ion-a), var(--ion-b));
+  transition: left 0.12s ease, right 0.12s ease;
+}
+
+.scroll-list-rail:hover .scroll-list-thumb,
+.scroll-list--dragging .scroll-list-thumb {
+  left: 1px;
+  right: 1px;
+}
+
+/* Shown only when the list scrolls, while you point at it, scroll it or drag the capsule. */
+:is(.scroll-list[data-more-above], .scroll-list[data-more-below]):is(:hover, [data-scrolling], .scroll-list--dragging) > .scroll-list-rail {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   The ion edge glow, for touch screens */
+
+@media (hover: none), (pointer: coarse) {
+  .scroll-list-rail {
+    display: none;
+  }
+
+  .scroll-list::before,
+  .scroll-list::after {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    left: 10px;
+    right: 10px;
+    height: 2px;
+    border-radius: var(--r-pill);
+    background: linear-gradient(90deg, transparent, var(--ion-a), var(--ion-b), transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .scroll-list::before {
+    top: -1px;
+    box-shadow: 0 2px 16px 1px color-mix(in srgb, var(--ion-a) 45%, transparent);
+  }
+
+  .scroll-list::after {
+    bottom: -1px;
+    box-shadow: 0 -2px 16px 1px color-mix(in srgb, var(--ion-b) 45%, transparent);
+  }
+
+  .scroll-list[data-more-above]::before,
+  .scroll-list[data-more-below]::after {
+    opacity: 1;
+  }
+
+  /* On paper the glow is gentler: the hairline carries it. */
+  .light .scroll-list::before {
+    box-shadow: 0 2px 12px 0 color-mix(in srgb, var(--ion-a) 25%, transparent);
+  }
+
+  .light .scroll-list::after {
+    box-shadow: 0 -2px 12px 0 color-mix(in srgb, var(--ion-b) 25%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-list::before,
+  .scroll-list::after,
+  .scroll-list-body,
+  .scroll-list-rail,
+  .scroll-list-thumb {
+    transition: none;
+  }
+}

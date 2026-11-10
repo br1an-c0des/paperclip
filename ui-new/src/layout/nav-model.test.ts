@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inStoredOrder, moveId, openTaskRef, parseRecent, recordRecent, refreshRecent, showStatusLink, visibleProjects, type RecentTask } from "./nav-model";
+import { clampNavWidth, inStoredOrder, moveId, NAV_WIDTH_DEFAULT, NAV_WIDTH_MAX, NAV_WIDTH_MIN, parseNavWidth, openTaskRef, parseRecent, recordRecent, refreshRecent, showStatusLink, visibleProjects, type RecentTask } from "./nav-model";
 
 const items = [{ id: "a" }, { id: "b" }, { id: "c" }];
 
@@ -79,5 +79,21 @@ describe("showStatusLink", () => {
     expect(showStatusLink({ enableStatusCards: true })).toBe(true);
     expect(showStatusLink({ enableStatusCards: false })).toBe(false);
     expect(showStatusLink(undefined)).toBe(false);
+  });
+});
+
+describe("the nav's width", () => {
+  it("keeps whole pixels between the narrowest and widest", () => {
+    expect(clampNavWidth(300.4)).toBe(300);
+    expect(clampNavWidth(50)).toBe(NAV_WIDTH_MIN);
+    expect(clampNavWidth(2000)).toBe(NAV_WIDTH_MAX);
+    expect(clampNavWidth(Number.NaN)).toBe(NAV_WIDTH_DEFAULT);
+  });
+
+  it("reads a saved width, or the default", () => {
+    expect(parseNavWidth(320)).toBe(320);
+    expect(parseNavWidth(999)).toBe(NAV_WIDTH_MAX);
+    expect(parseNavWidth("320")).toBe(NAV_WIDTH_DEFAULT);
+    expect(parseNavWidth(null)).toBe(NAV_WIDTH_DEFAULT);
   });
 });

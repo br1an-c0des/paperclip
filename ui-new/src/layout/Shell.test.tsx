@@ -1,5 +1,5 @@
-import { cleanup, render, screen } from "@solidjs/testing-library";
-import { createRoot } from "solid-js";
+import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import { createRoot, createSignal } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import { layerMode } from "@/ui/layer";
 import { isCompact, viewport, watchViewport } from "./breakpoints";
@@ -87,5 +87,45 @@ describe("phone breakpoint", () => {
     expect(screen.getByRole("complementary", { name: "Task TST-1" }).classList.contains("panel--page")).toBe(false);
     expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+  });
+
+  it("resizes the nav from its edge with the keys, and resets on a double click", () => {
+    resizeTo(1440);
+    const [width, setWidth] = createSignal(248);
+    const saved: number[] = [];
+    render(() => (
+      <Shell
+        nav={<p>Left nav</p>}
+        navWidth={width()}
+        onNavWidth={(next, done) => {
+          setWidth(Math.min(420, Math.max(200, next)));
+          if (done) saved.push(width());
+        }}
+      >
+        <p>Page</p>
+      </Shell>
+    ));
+    const handle = screen.getByRole("separator", { name: "Resize navigation" });
+    expect(handle.getAttribute("aria-valuenow")).toBe("248");
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    expect(handle.getAttribute("aria-valuenow")).toBe("264");
+    fireEvent.keyDown(handle, { key: "ArrowLeft", shiftKey: true });
+    expect(width()).toBe(216);
+    fireEvent.keyDown(handle, { key: "End" });
+    expect(width()).toBe(420);
+    fireEvent.dblClick(handle);
+    expect(width()).toBe(248);
+    expect(saved).toEqual([264, 216, 420, 248]);
+    expect((document.querySelector(".shell") as HTMLElement).style.getPropertyValue("--nav-w")).toBe("248px");
+  });
+
+  it("has no resize handle when the shell isn't given a width to change", () => {
+    resizeTo(1440);
+    render(() => (
+      <Shell nav={<p>Left nav</p>}>
+        <p>Page</p>
+      </Shell>
+    ));
+    expect(screen.queryByRole("separator")).toBeNull();
   });
 });

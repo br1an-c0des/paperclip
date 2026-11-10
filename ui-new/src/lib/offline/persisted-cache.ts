@@ -7,9 +7,11 @@ import { classifyError, isTransientError } from "./errors";
  * the server is down still opens the board on the last data instead of an empty page.
  *
  * - **Allowlist.** Health, the session (who you are: name, email, picture, nothing else), board
- *   access, your companies, the instance's settings and plugin pages; per company the agents,
- *   projects, labels, people, sidebar counts, your inbox and the task list; and the 20 tasks opened
- *   last. Nothing else: no comments, documents, run output, secrets or credentials. Fields that
+ *   access, your companies and their order, the instance's settings and plugin pages; per company
+ *   the agents, projects, labels, people, sidebar counts, your inbox and the task list; the nav's
+ *   personal reads (your project order, your stars and the projects you left), so a reload draws
+ *   the nav as you arranged it at once instead of reshuffling it as they arrive; and the 20 tasks
+ *   opened last. Nothing else: no comments, documents, run output, secrets or credentials. Fields that
  *   could carry those are stripped from what is saved (`EXCLUDED_FIELDS`).
  * - **Scope.** One record per user and company, plus one for the user (`…:<user>:root`). A reload
  *   restores only the last signed-in user's records, and only companies in their saved list.
@@ -117,6 +119,11 @@ export function persistScope(key: readonly unknown[], data: unknown, userId: str
   if (hashKey(key) === hashKey(companiesKeyFor(userId))) return null;
   if (root === "instance" && key.length === 2 && (second === "experimental-settings" || second === "general-settings")) return null;
   if (root === "plugins" && second === "ui-contributions" && key.length === 2) return null;
+  // Your nav's order (layout/nav-prefs.tsx): companies in your record, projects in the company's.
+  if (root === "sidebar-preferences" && second === "company-order" && key.length === 3) return third === userId ? null : undefined;
+  if (root === "sidebar-preferences" && second === "project-order" && key.length === 4) {
+    return key[3] === userId && typeof third === "string" && companyIds.includes(third) ? third : undefined;
+  }
   if (isTaskDetail(key)) {
     const companyId = object(data)?.companyId;
     return typeof companyId === "string" && companyIds.includes(companyId) ? companyId : undefined;
@@ -125,6 +132,8 @@ export function persistScope(key: readonly unknown[], data: unknown, userId: str
   if (typeof second !== "string" || !companyIds.includes(second)) return undefined;
   if (key.length === 2 && (root === "agents" || root === "sidebar-badges" || root === "goals")) return second;
   if (root === "projects" && key.length === 3 && third === "list") return second;
+  // Your memberships: the projects and agents you starred, and the projects you left.
+  if (root === "resource-memberships" && key.length === 3 && third === "me") return second;
   if (root === "issues" && key.length === 3 && third === "labels") return second;
   // Your inbox: its task rows and the attention feed.
   if (root === "issues" && key.length === 4 && third === "inbox" && (key[3] === "mine" || key[3] === "mine-context")) return second;

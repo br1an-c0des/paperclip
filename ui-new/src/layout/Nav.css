@@ -1,5 +1,68 @@
 /* The left nav, measured from board 1. Items are the shared 38px `.navi` pills (ui/nav.css). */
 
+/*
+ * Three zones (Nav.tsx): pinned at the top, the lists, pinned at the bottom. The lists zone takes
+ * the height between, and each section in it scrolls its own rows under a heading that stays put.
+ * A section is as tall as its rows while they fit; when they don't, the sections shrink in
+ * proportion to their length, each keeping room for a row and a half. Folding a section gives its
+ * room to the others. If the window is too short
+ * even for that, the lists zone scrolls as a whole.
+ */
+.nav-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  flex-shrink: 0;
+}
+
+.nav-zone--lists {
+  flex: 1 1 auto;
+  min-height: 140px;
+  gap: 14px;
+  /* Room around the lists for the rows' shadows and focus rings, and on the right for each list's
+     scroll capsule (ui/ScrollList.css). */
+  margin: 0 -8px -3px -4px;
+  padding: 0 8px 3px 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.nav-zone--lists::-webkit-scrollbar {
+  display: none;
+}
+
+.nav-zone--bottom {
+  gap: 4px;
+}
+
+.nav-group--scroll {
+  flex: 0 1 auto;
+  min-height: 0;
+  /* A row and a half under the heading, or the whole section when it's shorter (Chrome and Edge). */
+  min-height: calc-size(max-content, min(size, 96px));
+}
+
+/* Plugin panels are cards, not rows (plugins/NavPlugins.tsx): the section keeps room for a whole one. */
+.nav-group--scroll:has(.plugin-nav-panel > .plugin-area:not(:empty)) {
+  min-height: calc-size(max-content, min(size, 210px));
+}
+
+.nav-group--scroll > .nav-head {
+  flex-shrink: 0;
+}
+
+.nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Rows keep their height; the list scrolls instead. */
+.nav-list > * {
+  flex-shrink: 0;
+}
+
 .nav-top {
   display: flex;
   align-items: center;
@@ -146,11 +209,9 @@
 }
 
 .nav-you {
-  margin-top: auto;
   display: flex;
   align-items: center;
   gap: 4px;
-  padding-top: 12px;
 }
 
 .nav-you-trigger {

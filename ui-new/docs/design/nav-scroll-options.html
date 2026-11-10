@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nav Scroll Options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Capsule Stack tokens (ui-new/src/styles/tokens.css), the parts these sketches use. */
+:root {
+  --ion-a: #8b2cf0; --ion-b: #1f6fe0; --orchid-a: #ff2bd6; --ember-a: #f7b52f;
+  --ground: #f2f2f4; --card: #fff; --hover: #e7e7ea; --sel: #fff; --text: #111113; --body: #45454d;
+  --muted: #6b6b75; --edge: #cfcfd6; --dashed: #b4b4bd; --run-fg: #3b2fc0; --line: #ececf0;
+  --sel-shadow: 0 1px 3px rgba(17,17,19,.12);
+}
+:root[data-theme="dark"] {
+  --ground: #0a0a0a; --card: #141414; --hover: #1a1a1a; --sel: #262626; --text: #f4f1ea; --body: #c9c6bf;
+  --muted: #8f8c86; --edge: #2c2c2c; --dashed: #4a4843; --run-fg: #c9c2ff; --line: #1f1f1f;
+  --sel-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 1px 3px rgba(0,0,0,.7);
+}
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--ground); color: var(--text); font: 14px/1.4 'Hanken Grotesk', system-ui, sans-serif; padding: 28px 16px 48px; }
+header { max-width: 1180px; margin: 0 auto 24px; display: flex; gap: 16px; align-items: end; justify-content: space-between; flex-wrap: wrap; }
+h1 { font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
+header p { color: var(--muted); max-width: 640px; margin-top: 4px; }
+button.theme { border: 0; border-radius: 999px; padding: 8px 14px; background: var(--hover); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+.grid { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+figure { display: flex; flex-direction: column; gap: 10px; }
+figcaption b { display: block; font-size: 15px; }
+figcaption span { color: var(--muted); font-size: 13px; }
+.tag { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: linear-gradient(135deg, var(--ion-a), var(--ion-b)); color: #fff; font-size: 11px; font-weight: 700; vertical-align: 2px; }
+
+/* A mini nav: the scroller and an outer frame for overlays. */
+.frame { position: relative; height: 420px; border-radius: 18px; background: var(--ground); outline: 1px solid var(--line); overflow: hidden; }
+.nav { height: 100%; overflow-y: auto; padding: 14px 8px 14px 12px; display: flex; flex-direction: column; gap: 2px; }
+.h { padding: 14px 12px 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.i { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px 0 7px; border-radius: 999px; color: var(--body); font-weight: 600; flex-shrink: 0; }
+.i.sel { background: var(--sel); box-shadow: var(--sel-shadow); color: var(--text); }
+.i:hover { background: var(--hover); }
+.d { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; }
+.i small { margin-left: auto; color: var(--muted); font-weight: 500; }
+
+/* 1. Ghost pill + fade (what's built) */
+@property --fa { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fb { syntax: "<length>"; inherits: false; initial-value: 0px; }
+.v1 .nav, .v4 .nav { mask-image: linear-gradient(to bottom, transparent, #000 var(--fa), #000 calc(100% - var(--fb)), transparent); transition: --fa .2s, --fb .2s; scrollbar-gutter: stable; }
+.v1 .nav[data-above], .v4 .nav[data-above] { --fa: 36px; }
+.v1 .nav[data-below], .v4 .nav[data-below] { --fb: 36px; }
+.v1 .nav::-webkit-scrollbar { width: 6px; }
+.v1 .nav::-webkit-scrollbar-thumb { border: 1px solid transparent; border-radius: 999px; background: transparent; background-clip: padding-box; }
+.v1 .nav:hover::-webkit-scrollbar-thumb, .v1 .nav[data-scrolling]::-webkit-scrollbar-thumb { background-color: var(--edge); }
+
+/* 2. Ion edge glow: no bar; a hairline of the "running" gradient where the list goes on. */
+.v2 .nav { scrollbar-width: none; }
+.v2 .nav::-webkit-scrollbar { display: none; }
+.v2 .frame::before, .v2 .frame::after { content: ""; position: absolute; left: 18px; right: 18px; height: 2px; border-radius: 999px; background: linear-gradient(90deg, transparent, var(--ion-a), var(--ion-b), transparent); opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 1; }
+.v2 .frame::before { top: 0; box-shadow: 0 2px 18px 2px rgba(139,44,240,.45); }
+.v2 .frame::after { bottom: 0; box-shadow: 0 -2px 18px 2px rgba(31,111,224,.45); }
+.v2 .frame[data-above]::before, .v2 .frame[data-below]::after { opacity: 1; }
+
+/* 3. Scroll capsule: no bar; a slim capsule on the seam shows where you are, like a status capsule. */
+.v3 .nav { scrollbar-width: none; padding-right: 16px; }
+.v3 .nav::-webkit-scrollbar { display: none; }
+.v3 .rail { position: absolute; top: 18px; bottom: 18px; right: 5px; width: 4px; border-radius: 999px; background: var(--hover); opacity: .0; transition: opacity .25s; }
+.v3 .frame:hover .rail, .v3 .frame[data-scrolling] .rail { opacity: 1; }
+.v3 .thumb { position: absolute; left: 0; right: 0; border-radius: 999px; background: linear-gradient(to bottom, var(--ion-a), var(--ion-b)); }
+
+/* 4. Fade + "more" chip: the fade, plus a small pill that scrolls the rest into view. */
+.v4 .nav { scrollbar-width: none; }
+.v4 .nav::-webkit-scrollbar { display: none; }
+.chip { position: absolute; left: 50%; bottom: 10px; translate: -50% 6px; display: flex; align-items: center; gap: 4px; padding: 4px 10px; border: 0; border-radius: 999px; background: var(--sel); box-shadow: var(--sel-shadow); color: var(--muted); font: 600 12px 'Hanken Grotesk', sans-serif; cursor: pointer; opacity: 0; transition: opacity .2s, translate .2s; pointer-events: none; }
+.v4 .frame[data-below] .chip { opacity: 1; translate: -50% 0; pointer-events: auto; }
+.chip:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Nav scroll options</h1>
+    <p>Four ways for the left nav to say "there's more" without a heavy scrollbar. Scroll each list. The nav uses 3 with a mouse or trackpad and 2 on touch screens (ui/ScrollList.tsx).</p>
+  </div>
+  <button class="theme" type="button" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'">Toggle light / dark</button>
+</header>
+<div class="grid">
+  <figure class="v1"><div class="frame"><div class="nav"></div></div>
+    <figcaption><b>1. Ghost pill + fade</b><span>Rows fade out at an edge with more beyond. A 4px pill thumb appears only while you scroll or hover.</span></figcaption></figure>
+  <figure class="v2"><div class="frame"><div class="nav"></div></div>
+    <figcaption><b>2. Ion edge glow <span class="tag">Built: touch</span></b><span>No scrollbar. A hairline in the "running" gradient glows at the edge that continues: bolder, more on-brand.</span></figcaption></figure>
+  <figure class="v3"><div class="frame"><div class="nav"></div><div class="rail"><div class="thumb"></div></div></div>
+    <figcaption><b>3. Scroll capsule <span class="tag">Built: desktop</span></b><span>A slim gradient capsule on the nav's seam shows where you are. It could share the seam with the resize handle.</span></figcaption></figure>
+  <figure class="v4"><div class="frame"><div class="nav"></div><button class="chip" type="button">More ↓</button></div>
+    <figcaption><b>4. Fade + "More" chip</b><span>The fade, plus a floating pill that pages down. The most explicit, and the busiest.</span></figcaption></figure>
+</div>
+<script>
+const projects = [["Website relaunch", "#ff2bd6", 12], ["Billing service", "#1f6fe0", 4], ["Mobile app", "#2fd12f", 9], ["Research", "#f7b52f", 2], ["Onboarding flow", "#8b2cf0", 7]];
+const agents = ["Bob", "Ada", "Grace", "Linus", "Margaret", "Ken", "Barbara", "Alan", "Radia", "Dennis"];
+const html = `<div class="i sel"><span class="d" style="background:var(--hover)"></span>Org dashboard</div><div class="i"><span class="d" style="background:var(--hover)"></span>Inbox<small>6</small></div>`
+  + `<div class="h">Projects</div>` + projects.map(([n, c, k]) => `<div class="i"><span class="d" style="background:linear-gradient(135deg,${c},#1f6fe0)"></span>${n}<small>${k}</small></div>`).join("")
+  + `<div class="h">Agents</div>` + agents.map((n, i) => `<div class="i"><span class="d" style="background:linear-gradient(135deg,#8b2cf0,${i % 2 ? '#22b5a5' : '#f5822a'})"></span>${n}<small>${i % 3 ? 'idle' : 'running'}</small></div>`).join("");
+for (const fig of document.querySelectorAll("figure")) {
+  const nav = fig.querySelector(".nav"), frame = fig.querySelector(".frame"), thumb = fig.querySelector(".thumb"), chip = fig.querySelector(".chip");
+  nav.innerHTML = html;
+  let idle;
+  const update = () => {
+    const max = nav.scrollHeight - nav.clientHeight;
+    for (const el of [nav, frame]) { el.toggleAttribute("data-above", nav.scrollTop > 1); el.toggleAttribute("data-below", max - nav.scrollTop > 1); }
+    if (thumb) { const rail = thumb.parentElement.clientHeight, size = Math.max(28, rail * nav.clientHeight / nav.scrollHeight); thumb.style.height = size + "px"; thumb.style.top = (max ? (rail - size) * nav.scrollTop / max : 0) + "px"; }
+  };
+  nav.addEventListener("scroll", () => { update(); for (const el of [nav, frame]) el.setAttribute("data-scrolling", ""); clearTimeout(idle); idle = setTimeout(() => { nav.removeAttribute("data-scrolling"); frame.removeAttribute("data-scrolling"); }, 900); }, { passive: true });
+  chip?.addEventListener("click", () => nav.scrollBy({ top: nav.clientHeight * 0.8, behavior: "smooth" }));
+  update();
+}
+</script>
+</body>
+</html>

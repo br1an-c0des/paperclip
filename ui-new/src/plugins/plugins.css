@@ -214,6 +214,11 @@ button.plugin-launcher-navi {
   font-size: 12px;
 }
 
+/* A panel whose plugin chose to draw nothing (a setting turned it off) leaves no empty frame. */
+.plugin-nav-panel:has(> .plugin-area:empty):not(:has(.plugin-placeholder, .plugin-error)) {
+  display: none;
+}
+
 .plugin-project-items {
   padding-left: 34px;
   font-size: 12px;

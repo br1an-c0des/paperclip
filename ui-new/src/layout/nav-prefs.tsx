@@ -11,7 +11,7 @@ import { useSession } from "@/lib/session";
 import { useTaskByRef } from "@/tasks/TasksView";
 import { buttonClass } from "@/ui/Button";
 import { pushToast } from "@/ui/Toast";
-import { inStoredOrder, moveId, openTaskRef, parseRecent, recordRecent, refreshRecent, type RecentTask } from "./nav-model";
+import { clampNavWidth, inStoredOrder, moveId, openTaskRef, parseNavWidth, parseRecent, recordRecent, refreshRecent, type RecentTask } from "./nav-model";
 import "@/agents/AgentStar.css";
 
 /*
@@ -21,7 +21,8 @@ import "@/agents/AgentStar.css";
  *   and the projects list.
  * - The order of your projects and companies, kept on the server per person
  *   (`/companies/:id/sidebar-preferences/me`, `/sidebar-preferences/me`).
- * - Which nav sections you folded, and whether the nav is hidden (`[`), per browser.
+ * - Which nav sections you folded, whether the nav is hidden (`[`), and how wide you dragged it,
+ *   per browser.
  * - The tasks you opened lately, per browser and company, refreshed from
  *   `GET /companies/:id/issues/summaries`.
  */
@@ -143,6 +144,8 @@ function useOrder(input: {
     onSuccess: (saved) => client.setQueryData(input.key(), saved),
   }));
   return {
+    /** False while your order is loading for the first time (a fetch with nothing to show yet). */
+    settled: () => !order.isLoading,
     ordered: <T extends { id: string }>(items: readonly T[]) => inStoredOrder(items, order.data?.orderedIds),
     /** Moves one item, saving the whole visible order (what isn't shown keeps its place after). */
     move: <T extends { id: string }>(items: readonly T[], id: string, delta: -1 | 1) => {
@@ -222,6 +225,19 @@ export { navHidden };
 export function setNavHidden(hidden: boolean) {
   setNavHiddenSignal(hidden);
   writeJson(HIDDEN_KEY, hidden);
+}
+
+const WIDTH_KEY = "paperclip.ui-new.nav-width";
+const [navWidth, setNavWidthSignal] = createSignal<number>(parseNavWidth(readJson<unknown>(WIDTH_KEY, null)));
+
+/** How wide the left nav is, as you dragged it. */
+export { navWidth };
+
+/** Sets the nav's width; `save` keeps it for the next visit (at the end of a drag, not every move). */
+export function setNavWidth(width: number, save = true) {
+  const next = clampNavWidth(width);
+  setNavWidthSignal(next);
+  if (save) writeJson(WIDTH_KEY, next);
 }
 
 // ---------------------------------------------------------------------------------------------
