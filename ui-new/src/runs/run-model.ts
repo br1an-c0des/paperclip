@@ -1,3 +1,4 @@
+import { normalizeRunFailureCause, readRunFailureCause } from "@paperclipai/shared";
 import type { Gradient } from "@/ui/status-meta";
 
 /*
@@ -37,6 +38,31 @@ export function words(value: string) {
 
 export function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/*
+ * Run failure lines (since the 2026-11-10 sync, upstream #20483): a generic `adapter_failed` run
+ * now records a bounded cause (`failureCause`, a SQLSTATE such as `40001`, a transport code such as
+ * `ECONNRESET`, or a provider status), on the task's runs (`RunForIssue.failureCause`) and in the
+ * run's own result (`resultJson.failureCause`). The old run ledger reads "adapter failed (40001)".
+ */
+
+/** The run's failure cause when it has the server's closed shape, else null (shared `normalizeRunFailureCause`). */
+export function runFailureCause(run: { failureCause?: unknown; resultJson?: Record<string, unknown> | null }) {
+  return normalizeRunFailureCause(run.failureCause) ?? readRunFailureCause(run.resultJson);
+}
+
+/**
+ * The run's error code as its failure line shows it: "adapter failed (40001)" for a generic adapter
+ * failure with a recorded cause, "adapter failed" for one without (older runs), and the code itself
+ * for anything else. Null without a code.
+ */
+export function runErrorCodeLabel(run: { errorCode?: string | null; failureCause?: unknown; resultJson?: Record<string, unknown> | null }) {
+  const code = run.errorCode?.trim();
+  if (!code) return null;
+  if (code !== "adapter_failed") return code;
+  const cause = runFailureCause(run);
+  return cause ? `adapter failed (${cause})` : "adapter failed";
 }
 
 /** "1 step", "41 steps". */

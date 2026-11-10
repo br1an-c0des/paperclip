@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/solid-query";
 import { RotateCcw } from "lucide-solid";
 import { createSignal, onCleanup, Show } from "solid-js";
 import { ApiError } from "@/api/client";
-import { issuesApi } from "@/api/issues";
+import { issuesApi, type TaskRetryReceipt } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { Capsule, TonePill } from "@/ui/Status";
@@ -25,7 +25,10 @@ import "./retry.css";
  * A retry is one `POST /issues/:id/retry` with an idempotency key, kept while the request might
  * still land so a resend doesn't start a second attempt (ui/src/hooks/useTaskRetry.ts). The answer
  * carries the task's new interruption, which goes straight into the cached lists; then they're
- * fetched again.
+ * fetched again. Since the 2026-11-10 sync (#20283) the answer also says what became of a scheduled
+ * retry (`scheduledRetry`): the toast says "Trying TES-4 again" only when work started, and
+ * otherwise gives the server's reason, wherever this hook is used (the task's notices, list rows,
+ * and each stalled dependency's Retry).
  */
 
 export type RetryOffer = {
@@ -41,14 +44,25 @@ export type RetryOffer = {
  * task's folders that couldn't be prepared (`workspaceFailure`, upstream #18770). Null for neither.
  */
 export function interruptionReason(
-  interruption: { providerFailure?: unknown; workspaceFailure?: { message: string } | null; retryWait?: { message: string } | null } | null | undefined,
+  interruption:
+    | {
+        providerFailure?: unknown;
+        workspaceFailure?: { message: string } | null;
+        setupFailure?: { message: string } | null;
+        retryWait?: { message: string } | null;
+      }
+    | null
+    | undefined,
 ) {
   // An accepted Retry that still waits says why, over what stopped the attempt (#18845).
   if (interruption?.retryWait?.message) return interruption.retryWait.message;
   const failure = providerFailureOf(interruption?.providerFailure);
   if (failure) return providerFailureTitle(failure);
   const workspace = interruption?.workspaceFailure?.message;
-  return workspace ? `Couldn't prepare the task folders: ${workspace}` : null;
+  if (workspace) return `Couldn't prepare the task folders: ${workspace}`;
+  // A setup command that exited non-zero (#20478): its message names the command.
+  const setup = interruption?.setupFailure?.message;
+  return setup ? `Couldn't set up the task workspace: ${setup}` : null;
 }
 
 /** What a row shows for the task's interruption, or null for none worth showing. */
@@ -77,6 +91,24 @@ export function retryPillTitle(offer: RetryOffer) {
 }
 
 type Retryable = Pick<CompactIssue, "id" | "identifier" | "title" | "interruption">;
+
+/** Upstream's words for a Retry on an attempt that was replaced meanwhile (#20283). */
+export const STALE_RETRY_MESSAGE = "This attempt was already replaced, so Retry did not start new work. The task now shows its current state.";
+
+/**
+ * What a Retry receipt came to (#20283, the old UI's `taskRetryNotStartedReason`): it started work,
+ * or it didn't and the reason says why. A receipt that wasn't accepted means the attempt was
+ * replaced; an accepted one whose scheduled retry wasn't promoted (held by a gate, still waiting,
+ * or none left to promote) carries the server's message.
+ */
+export function retryReceiptOutcome(receipt: Pick<TaskRetryReceipt, "accepted" | "stale" | "scheduledRetry">): { started: true } | { started: false; stale: boolean; reason: string } {
+  if (!receipt.accepted || receipt.stale) return { started: false, stale: true, reason: STALE_RETRY_MESSAGE };
+  const scheduled = receipt.scheduledRetry;
+  if (scheduled && scheduled.outcome !== "promoted" && scheduled.outcome !== "already_promoted") {
+    return { started: false, stale: false, reason: scheduled.message || "Retry didn't start new work." };
+  }
+  return { started: true };
+}
 
 /** When the task is read again after an accepted Retry: once the admission has run, and after its grace. */
 export const RETRY_FOLLOW_UPS_MS = [1_000, 10_000];
@@ -130,8 +162,11 @@ export function useTaskRetry() {
       const receipt = await issuesApi.retry(task.id, { idempotencyKey, observedRunId });
       keys.delete(slot);
       setInterruption(task.id, receipt.presentation);
-      if (receipt.stale) pushToast({ tone: "info", title: `${ref} has moved on`, body: "Its latest run changed since this was shown." });
-      else pushToast({ tone: "success", title: `Trying ${ref} again` });
+      // Say what actually happened (#20283): a Retry that didn't start work says why.
+      const outcome = retryReceiptOutcome(receipt);
+      if (outcome.started) pushToast({ tone: "success", title: `Trying ${ref} again` });
+      else if (outcome.stale) pushToast({ tone: "info", title: `${ref} has moved on`, body: outcome.reason });
+      else pushToast({ tone: "info", title: `${ref} hasn't started`, body: outcome.reason });
       // The run is admitted after the receipt, so its wait (`retryWait`) shows up a moment later:
       // read the task again twice, as the old UI's useTaskRetry does, rather than poll.
       if (receipt.accepted && !receipt.stale) followUp(task.id);

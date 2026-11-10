@@ -1,7 +1,12 @@
 import type { IssueBlockerStalledWakeContext, TaskInterruptionPresentation } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import {
+  budgetWaitText,
   pauseDetail,
+  rejectedModelText,
+  setupFailureText,
+  waitingText,
+  WAITING_TEXT,
   resumeCountdown,
   retryCountdown,
   retryWaitBlockers,
@@ -45,7 +50,7 @@ describe("taskNotices", () => {
 
   it("offers Retry on a failed attempt when the server allows it", () => {
     expect(taskNotices(input({ task: { interruption: interruption({}) } }))).toEqual([
-      { kind: "interrupted", state: "failed", canRetry: true, nextRetryAt: null, workspaceFailure: null, retryWait: null, recoveryStep: null, resuming: false },
+      { kind: "interrupted", state: "failed", canRetry: true, nextRetryAt: null, workspaceFailure: null, setupFailure: null, retryWait: null, recoveryStep: null, resuming: false },
     ]);
     const scheduled = interruption({ state: "retry_scheduled", nextRetryAt: "2026-10-26T10:00:40.000Z" });
     expect(taskNotices(input({ task: { interruption: scheduled } }))[0]).toMatchObject({ kind: "interrupted", state: "retry_scheduled" });
@@ -67,7 +72,7 @@ describe("taskNotices", () => {
 
   it("says what a wait needs", () => {
     const waiting = interruption({ responsibility: "user", state: "waiting_for_user", userAction: "choose_model", canRetry: false });
-    expect(taskNotices(input({ task: { interruption: waiting } }))).toEqual([{ kind: "waiting", action: "choose_model" }]);
+    expect(taskNotices(input({ task: { interruption: waiting } }))).toEqual([{ kind: "waiting", action: "choose_model", rejectedModel: null, attempted: true }]);
   });
 
   it("offers Resume where a tree pause was made", () => {
@@ -153,7 +158,17 @@ describe("provider and workspace failures", () => {
 
   it("shows a provider's refusal in place of the plain interruption, or of the wait it caused", () => {
     expect(taskNotices(input({ task: { interruption: interruption({ providerFailure }) } }))).toEqual([
-      { kind: "provider-failure", failure: providerFailure, state: "failed", canRetry: true, nextRetryAt: null, recoveryStep: null, resuming: false },
+      {
+        kind: "provider-failure",
+        failure: providerFailure,
+        state: "failed",
+        canRetry: true,
+        nextRetryAt: null,
+        recoveryStep: null,
+        resuming: false,
+        rejectedModel: null,
+        budgetWait: false,
+      },
     ]);
     const waiting = interruption({ providerFailure, responsibility: "user", state: "waiting_for_user", userAction: "reconnect", canRetry: false });
     expect(kinds(input({ task: { interruption: waiting } }))).toEqual(["provider-failure"]);
@@ -184,6 +199,7 @@ describe("provider and workspace failures", () => {
         canRetry: false,
         nextRetryAt: null,
         workspaceFailure: null,
+        setupFailure: null,
         retryWait: "Retry is waiting for the budget to allow it.",
         recoveryStep: null,
         resuming: false,
@@ -253,7 +269,89 @@ describe("a pending native resume (#19503)", () => {
 
   it("asks an owner or admin to confirm the previous server stopped", () => {
     const waiting = interruption({ responsibility: "user", state: "waiting_for_user", userAction: "confirm_owner_stop", canRetry: false });
-    expect(taskNotices(input({ task: { interruption: waiting } }))).toEqual([{ kind: "waiting", action: "confirm_owner_stop" }]);
+    expect(taskNotices(input({ task: { interruption: waiting } }))).toEqual([
+      { kind: "waiting", action: "confirm_owner_stop", rejectedModel: null, attempted: true },
+    ]);
+  });
+});
+
+describe("since the 2026-11-10 sync", () => {
+  const user = (extra: Partial<TaskInterruptionPresentation>) =>
+    interruption({ responsibility: "user", state: "waiting_for_user", canRetry: false, ...extra });
+
+  it("asks an owner or admin to confirm a run that never recorded its process stopped (#20310)", () => {
+    const parked = user({
+      userAction: "confirm_run_stopped",
+      observedRunId: "run-9",
+      retryWait: { reason: "process_identity_missing", message: "Paperclip can't verify the previous run stopped." },
+    });
+    expect(taskNotices(input({ task: { interruption: parked } }))).toEqual([
+      { kind: "confirm-run-stopped", runId: "run-9", message: "Paperclip can't verify the previous run stopped." },
+    ]);
+    // The old UI's words when the server gives none.
+    expect(taskNotices(input({ task: { interruption: user({ userAction: "confirm_run_stopped", observedRunId: "run-9" }) } }))[0]).toMatchObject({
+      message: "Paperclip can't confirm that the previous run stopped. Your message is saved.",
+    });
+    // Without a run to confirm there's nothing to send: the plain wait.
+    expect(kinds(input({ task: { interruption: user({ userAction: "confirm_run_stopped", observedRunId: null }) } }))).toEqual(["waiting"]);
+  });
+
+  it("names a failed workspace setup command (#20478)", () => {
+    const setupFailure = {
+      step: "workspace_provision",
+      command: "pnpm install",
+      exitCode: 1,
+      output: "ERR_PNPM_NO_LOCKFILE",
+      message: 'The project\'s workspace provision command "pnpm install" failed with exit code 1: ERR_PNPM_NO_LOCKFILE',
+    } as const;
+    const [notice] = taskNotices(input({ task: { interruption: interruption({ setupFailure }) } }));
+    expect(notice).toMatchObject({ kind: "interrupted", setupFailure });
+    expect(setupFailureText(setupFailure)).toBe(
+      'Couldn\'t set up the task workspace. The project\'s workspace provision command "pnpm install" failed with exit code 1: ERR_PNPM_NO_LOCKFILE. Fix the command in the project\'s workspace settings, then retry.',
+    );
+    expect(setupFailureText({ message: "It failed." }, "Trying again in 40s")).toBe("It failed. Trying again in 40s…");
+  });
+
+  it("names the model the provider rejected (#20488)", () => {
+    const rejected = user({ userAction: "choose_model", rejectedModel: "gpt-9" });
+    const [notice] = taskNotices(input({ task: { interruption: rejected } }));
+    expect(notice).toMatchObject({ kind: "waiting", rejectedModel: "gpt-9" });
+    expect(waitingText(notice as never)).toBe('The provider rejected the model "gpt-9". Choose a supported model or clear the task\'s model override, then retry.');
+    expect(waitingText({ action: "choose_model", rejectedModel: null, attempted: true })).toBe(WAITING_TEXT.choose_model);
+    expect(rejectedModelText("gpt-9")).toContain('"gpt-9"');
+  });
+
+  it("words a budget hold by whether an attempt ran, and keeps it under a provider's refusal (#20338)", () => {
+    expect(waitingText({ action: "budget", rejectedModel: null, attempted: true })).toBe(
+      "Couldn't finish this attempt. Your message is saved. It's waiting for the budget to allow new work. Raise the budget in Costs.",
+    );
+    const fresh = user({ userAction: "budget", observedRunId: null, sourceRunIds: [] });
+    expect(taskNotices(input({ task: { interruption: fresh } }))).toEqual([{ kind: "waiting", action: "budget", rejectedModel: null, attempted: false }]);
+    expect(budgetWaitText(false)).toBe("This task hasn't started. It's waiting for the budget to allow new work. Raise the budget in Costs.");
+    const providerFailure = {
+      schema: "paperclip.provider-failure.v1",
+      provider: "openai",
+      phase: "turn",
+      category: "rate_limit",
+      message: "Too many requests",
+      retryability: "transient",
+    } as const;
+    expect(taskNotices(input({ task: { interruption: user({ userAction: "budget", providerFailure }) } }))[0]).toMatchObject({
+      kind: "provider-failure",
+      budgetWait: true,
+    });
+  });
+
+  it("points a parked setup check to the connection card, not Resume agent (#20361)", () => {
+    for (const lifecycleState of ["preparing", "verifying", "resuming"] as const) {
+      const assignee = { id: "a1", name: "Rae", status: "paused" as const, pauseReason: null, lifecycleState, lifecycleError: "Connect an account" };
+      expect(taskNotices(input({ task: { status: "todo" }, assignee }))).toEqual([
+        { kind: "agent-checking", agentId: "a1", agentName: "Rae", error: "Connect an account" },
+      ]);
+    }
+    // An operator pause still offers Resume agent.
+    const manual = { id: "a1", name: "Rae", status: "paused" as const, pauseReason: "manual" as const, lifecycleState: "verifying" as const };
+    expect(taskNotices(input({ task: { status: "todo" }, assignee: manual }))[0]).toMatchObject({ kind: "agent-paused", canResume: true });
   });
 });
 

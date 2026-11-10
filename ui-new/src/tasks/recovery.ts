@@ -52,6 +52,19 @@ import { providerFailureOf, type ProviderFailure } from "@/ui/provider-failure";
  * - A paused assignee offers Resume agent, except after a budget stop or a company archive, which
  *   clear themselves. A setup draft (`pauseReason: "setup"`) isn't paused by anyone: the notice says
  *   it's still being set up, and links to Finish setup unless its computer is still being prepared.
+ *
+ * Since the 2026-11-10 sync:
+ * - A Retry parked because the previous native run never recorded its process (#20310) waits for an
+ *   owner or admin to confirm it stopped (`confirm_run_stopped`): the notice carries the form
+ *   (`confirm-run-stopped`, TaskRecovery.tsx's ConfirmServerStopped), and the Retry starts once
+ *   they confirm.
+ * - A workspace setup command that exited non-zero is named (`setupFailure`, #20478), with its
+ *   command and output, and a link to the project's workspace settings.
+ * - A rejected model is named (`rejectedModel`, #20488) in the choose-model wait.
+ * - A budget-held Retry (#20338) says whether an attempt ran, and links to Costs.
+ * - An agent parked while its setup is checked again (no `pauseReason`, lifecycle `preparing`,
+ *   `verifying` or `resuming`, #20361) isn't called paused and gets no Resume agent, which can't
+ *   finish verification: the notice points to the task's connection card instead.
  */
 
 export type TaskNotice =
@@ -63,6 +76,8 @@ export type TaskNotice =
       canRetry: boolean;
       nextRetryAt: string | null;
       workspaceFailure: string | null;
+      /** A workspace setup command that exited non-zero (`setupFailure`, #20478). */
+      setupFailure: SetupFailure | null;
       /** Why an accepted Retry still waits (`retryWait`), in the server's words. */
       retryWait: string | null;
       /** The saved-work step the scheduled retry waits for (`recoveryStep`), as words. */
@@ -82,6 +97,10 @@ export type TaskNotice =
       recoveryStep: string | null;
       /** A pending native resume (`pendingResume`): its countdown reads "Resuming", not "Trying again". */
       resuming: boolean;
+      /** The model the provider rejected, on a choose-model wait (#20488). */
+      rejectedModel: string | null;
+      /** A budget hold keeps the refusal on screen (#20338): the line that says so, with Costs. */
+      budgetWait: boolean;
     }
   /** Paperclip is recovering the previous attempt's saved work before the task goes on. */
   | { kind: "recovering"; step: string }
@@ -91,11 +110,28 @@ export type TaskNotice =
    * the unfinished blockers it waits on.
    */
   | { kind: "retry-waiting"; reason: string; message: string; blockers: RetryBlocker[] }
-  | { kind: "waiting"; action: Exclude<NonNullable<TaskInterruptionPresentation["userAction"]>, "project_access" | "resume"> }
+  | {
+      kind: "waiting";
+      action: Exclude<NonNullable<TaskInterruptionPresentation["userAction"]>, "project_access" | "resume">;
+      /** The model the provider rejected (`rejectedModel`, #20488), on a choose-model wait. */
+      rejectedModel: string | null;
+      /** Whether an attempt ran before the wait, which a budget hold words differently (#20338). */
+      attempted: boolean;
+    }
+  /**
+   * A Retry parked because the previous run never recorded its process (#20310): an owner or admin
+   * confirms it stopped (`POST /issues/:id/recovery-actions/confirm-run-stopped`), and the Retry starts.
+   */
+  | { kind: "confirm-run-stopped"; runId: string; message: string }
   | { kind: "tree-paused"; scope: "leaf" | "subtree"; isRoot: boolean; rootIssueId: string }
   | { kind: "agent-paused"; agentId: string; agentName: string; reason: PauseReason | null; canResume: boolean }
   /** The assignee is a setup draft, not paused by anyone: `preparing` while its computer gets ready. */
   | { kind: "agent-setup"; agentId: string; agentName: string; preparing: boolean }
+  /**
+   * The assignee is parked while its setup is checked again (#20361): no operator pause, so no
+   * Resume agent. A missing AI account is fixed in the task's connection card.
+   */
+  | { kind: "agent-checking"; agentId: string; agentName: string; error: string | null }
   | { kind: "project-paused"; projectName: string | null }
   | { kind: "paused" };
 
@@ -105,6 +141,29 @@ export const RECOVERY_STEP_TEXT: Record<NonNullable<TaskInterruptionPresentation
   saving_previous_files: "Saving files from the previous attempt",
   finishing_recovery: "Finishing recovery of saved work",
 };
+
+/** A failed workspace setup command (`setupFailure`, #20478), bounded and redacted by the server. */
+export type SetupFailure = NonNullable<TaskInterruptionPresentation["setupFailure"]>;
+
+/** What each setup step is, for the command's disclosure. */
+export const SETUP_STEP_TEXT: Record<SetupFailure["step"], string> = {
+  workspace_provision: "Workspace setup command",
+  workspace_seed: "Workspace seed command",
+  workspace_runtime_provision: "Runtime setup command",
+};
+
+/** The server's message without a trailing full stop, so the sentence around it reads once. */
+const sentence = (message: string) => message.trim().replace(/[.\s]+$/, "");
+
+/**
+ * The interrupted notice's text for a failed setup command, in the old UI's words: "Couldn't set
+ * up the task workspace. <message>. Fix the command in the project's workspace settings, then
+ * retry.", or while a retry is scheduled, "<message>. Trying again in 40s…".
+ */
+export function setupFailureText(failure: Pick<SetupFailure, "message">, countdown: string | null = null) {
+  if (countdown) return `${sentence(failure.message)}. ${countdown}…`;
+  return `Couldn't set up the task workspace. ${sentence(failure.message)}. Fix the command in the project's workspace settings, then retry.`;
+}
 
 /**
  * A native export hold (`workspaceRepairRequired` on a retained-export cause): the files must be
@@ -186,7 +245,7 @@ const words = (value: string) => value.replace(/_/g, " ").replace(/^./, (first) 
 
 export type NoticeInput = {
   task: Pick<Issue, "status" | "hiddenAt" | "interruption"> & Partial<Pick<Issue, "executionBlocker" | "blockedBy">>;
-  assignee?: Pick<Agent, "id" | "name" | "status" | "pauseReason"> & Partial<Pick<Agent, "lifecycleState">> | null;
+  assignee?: Pick<Agent, "id" | "name" | "status" | "pauseReason"> & Partial<Pick<Agent, "lifecycleState" | "lifecycleError">> | null;
   project?: Pick<Project, "name" | "pausedAt"> | null;
   tree?: TreeControlState | null;
   /** Whether the task has subtasks, which makes a pause a subtree pause. */
@@ -201,8 +260,15 @@ export type NoticeInput = {
 
 const TERMINAL = new Set(["done", "cancelled"]);
 
+/** Lifecycle states in which a parked agent is having its setup checked, not paused by anyone (#20361). */
+export const SETUP_CHECK_STATES = new Set(["preparing", "verifying", "resuming"]);
+
 const assigneeBudgetPaused = (agent: NoticeInput["assignee"], status: string) =>
   agent?.status === "paused" && agent.pauseReason === "budget" && !TERMINAL.has(status);
+
+/** The model a choose-model wait names (#20488), or null. */
+const rejectedModelOf = (interruption: TaskInterruptionPresentation) =>
+  (interruption.userAction === "choose_model" && interruption.rejectedModel?.trim()) || null;
 
 export function taskNotices(input: NoticeInput): TaskNotice[] {
   const notices: TaskNotice[] = [];
@@ -232,7 +298,17 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
     !retryWait &&
     (interruption.state === "failed" || interruption.state === "retry_scheduled" || interruption.state === "waiting_for_user")
   ) {
-    notices.push({ kind: "provider-failure", failure, state: interruption.state, canRetry, nextRetryAt: interruption.nextRetryAt, recoveryStep: step, resuming });
+    notices.push({
+      kind: "provider-failure",
+      failure,
+      state: interruption.state,
+      canRetry,
+      nextRetryAt: interruption.nextRetryAt,
+      recoveryStep: step,
+      resuming,
+      rejectedModel: rejectedModelOf(interruption),
+      budgetWait: interruption.state === "waiting_for_user" && interruption.userAction === "budget",
+    });
   } else if (step && interruption?.state === "working") {
     notices.push({ kind: "recovering", step });
   } else if (retryWait && interruption?.state === "working") {
@@ -245,9 +321,16 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
       canRetry,
       nextRetryAt: interruption.nextRetryAt,
       workspaceFailure: interruption.workspaceFailure?.message || null,
+      setupFailure: interruption.setupFailure?.message ? interruption.setupFailure : null,
       retryWait,
       recoveryStep: step,
       resuming,
+    });
+  } else if (interruption?.state === "waiting_for_user" && interruption.userAction === "confirm_run_stopped" && interruption.observedRunId) {
+    notices.push({
+      kind: "confirm-run-stopped",
+      runId: interruption.observedRunId,
+      message: interruption.retryWait?.message || "Paperclip can't confirm that the previous run stopped. Your message is saved.",
     });
   } else if (
     interruption?.state === "waiting_for_user" &&
@@ -258,7 +341,12 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
     // tasks in their status, so this is now the usual way a budget pause shows).
     !(interruption.userAction === "budget" && assigneeBudgetPaused(input.assignee, task.status))
   ) {
-    notices.push({ kind: "waiting", action: interruption.userAction });
+    notices.push({
+      kind: "waiting",
+      action: interruption.userAction,
+      rejectedModel: rejectedModelOf(interruption),
+      attempted: !!interruption.observedRunId || interruption.sourceRunIds.length > 0,
+    });
   }
 
   let pauseShown = false;
@@ -275,6 +363,10 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
       // computer's preparation goes on by itself; a verifying or parked draft waits for its wizard.
       const preparing = agent.lifecycleState === "preparing" || agent.lifecycleState === "pausing";
       notices.push({ kind: "agent-setup", agentId: agent.id, agentName: agent.name, preparing });
+    } else if (!agent.pauseReason && SETUP_CHECK_STATES.has(agent.lifecycleState ?? "")) {
+      // Parked while its setup is checked again (#20361): Resume changes operator holds and can't
+      // finish verification, so point to the task's connection card, as the old UI does.
+      notices.push({ kind: "agent-checking", agentId: agent.id, agentName: agent.name, error: agent.lifecycleError?.trim() || null });
     } else {
       // Budget pauses clear when the budget allows, archive pauses when the company is restored.
       const canResume = agent.pauseReason !== "budget" && agent.pauseReason !== "company_archived";
@@ -325,6 +417,29 @@ export const WAITING_TEXT: Record<Extract<TaskNotice, { kind: "waiting" }>["acti
   confirm_owner_stop: "Paperclip can't tell whether the previous server stopped. An owner or admin needs to confirm it stopped before the agent can go on.",
   confirm_run_stopped: "Paperclip can't confirm that the previous run stopped. An owner or admin needs to confirm it stopped before your Retry starts.",
 };
+
+/** The choose-model sentence naming the rejected model, in the old UI's words (#20488). */
+export function rejectedModelText(model: string) {
+  return `The provider rejected the model "${model}". Choose a supported model or clear the task's model override, then retry.`;
+}
+
+/** The line a budget hold adds: it waits for the budget, which is raised in Costs (#20338). */
+export const BUDGET_WAIT_LINE = "It's waiting for the budget to allow new work. Raise the budget in Costs.";
+
+/**
+ * A budget-held task in the old UI's words (#20338): one that already ran says its attempt didn't
+ * finish and the message is saved; one refused before its first run says it hasn't started.
+ */
+export function budgetWaitText(attempted: boolean) {
+  return attempted ? `Couldn't finish this attempt. Your message is saved. ${BUDGET_WAIT_LINE}` : `This task hasn't started. ${BUDGET_WAIT_LINE}`;
+}
+
+/** The waiting notice's sentence: the rejected model or the budget hold when known, else the kind's. */
+export function waitingText(notice: Pick<Extract<TaskNotice, { kind: "waiting" }>, "action" | "rejectedModel" | "attempted">) {
+  if (notice.action === "choose_model" && notice.rejectedModel) return rejectedModelText(notice.rejectedModel);
+  if (notice.action === "budget") return budgetWaitText(notice.attempted);
+  return WAITING_TEXT[notice.action];
+}
 
 /** Why an agent was paused, after the old UI's IssueAssigneePausedNotice. */
 export function pauseDetail(reason: PauseReason | null) {

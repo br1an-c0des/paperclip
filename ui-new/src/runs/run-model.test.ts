@@ -5,6 +5,8 @@ import {
   formatBytes,
   formatDuration,
   runDurationMs,
+  runErrorCodeLabel,
+  runFailureCause,
   runPosition,
   runStatusLabel,
   runStatusMeta,
@@ -20,6 +22,22 @@ const run = (status: string, startedAt: string | null, finishedAt: string | null
   startedAt,
   finishedAt,
   createdAt: "2026-10-26T10:00:00Z",
+});
+
+describe("run failure lines (#20483)", () => {
+  it("names a generic adapter failure's cause, from the task's runs or the run's result", () => {
+    expect(runErrorCodeLabel({ errorCode: "adapter_failed", failureCause: "40001" })).toBe("adapter failed (40001)");
+    expect(runErrorCodeLabel({ errorCode: "adapter_failed", resultJson: { failureCause: "ECONNRESET" } })).toBe("adapter failed (ECONNRESET)");
+    // Older runs have no cause and keep the plain label.
+    expect(runErrorCodeLabel({ errorCode: "adapter_failed", resultJson: {} })).toBe("adapter failed");
+  });
+
+  it("ignores a cause outside the server's closed shape, and leaves other codes as they are", () => {
+    expect(runFailureCause({ failureCause: "select * from runs" })).toBeNull();
+    expect(runFailureCause({ resultJson: { failureCause: "x".repeat(81) } })).toBeNull();
+    expect(runErrorCodeLabel({ errorCode: "process_lost", failureCause: "40001" })).toBe("process_lost");
+    expect(runErrorCodeLabel({ errorCode: null })).toBeNull();
+  });
 });
 
 describe("run status and timing", () => {

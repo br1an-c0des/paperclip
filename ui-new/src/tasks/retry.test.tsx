@@ -1,7 +1,40 @@
 import type { TaskInterruptionPresentation } from "@paperclipai/shared";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import { RetryMark, retryOffer, type TaskRetry } from "./retry";
+import { interruptionReason, RetryMark, retryOffer, retryReceiptOutcome, STALE_RETRY_MESSAGE, type TaskRetry } from "./retry";
+
+describe("retryReceiptOutcome (#20283)", () => {
+  const receipt = (extra: Partial<Parameters<typeof retryReceiptOutcome>[0]>) => ({ accepted: true, stale: false, ...extra });
+
+  it("counts a Retry as started when nothing was scheduled, or the scheduled run was promoted", () => {
+    expect(retryReceiptOutcome(receipt({}))).toEqual({ started: true });
+    expect(retryReceiptOutcome(receipt({ scheduledRetry: { outcome: "promoted", message: "Retry promoted" } }))).toEqual({ started: true });
+    expect(retryReceiptOutcome(receipt({ scheduledRetry: { outcome: "already_promoted", message: "Already promoted" } }))).toEqual({ started: true });
+  });
+
+  it("says why a Retry didn't start, in the server's words", () => {
+    for (const outcome of ["gate_suppressed", "waiting", "no_scheduled_retry"] as const) {
+      expect(retryReceiptOutcome(receipt({ scheduledRetry: { outcome, message: "The company budget is paused." } }))).toEqual({
+        started: false,
+        stale: false,
+        reason: "The company budget is paused.",
+      });
+    }
+  });
+
+  it("calls a replaced attempt stale, in upstream's words", () => {
+    expect(retryReceiptOutcome(receipt({ stale: true }))).toEqual({ started: false, stale: true, reason: STALE_RETRY_MESSAGE });
+    expect(retryReceiptOutcome(receipt({ accepted: false }))).toEqual({ started: false, stale: true, reason: STALE_RETRY_MESSAGE });
+  });
+});
+
+describe("interruptionReason", () => {
+  it("names a failed setup command (#20478) after the folders' own failure", () => {
+    const setupFailure = { message: 'The project\'s workspace provision command "pnpm i" failed with exit code 1' };
+    expect(interruptionReason({ setupFailure })).toBe('Couldn\'t set up the task workspace: The project\'s workspace provision command "pnpm i" failed with exit code 1');
+    expect(interruptionReason({ setupFailure, workspaceFailure: { message: "Disk full" } })).toBe("Couldn't prepare the task folders: Disk full");
+  });
+});
 
 function interruption(extra: Partial<TaskInterruptionPresentation>): TaskInterruptionPresentation {
   return {

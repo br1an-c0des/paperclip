@@ -7,7 +7,7 @@ import { runsApi } from "@/api/runs";
 import { useNow } from "@/lib/clock";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
-import { canResumeRun, canRetryRun, resumePayload, retryOutcome } from "@/runs/run-model";
+import { canResumeRun, canRetryRun, resumePayload, retryOutcome, runErrorCodeLabel } from "@/runs/run-model";
 import { RunWatchdog } from "@/runs/RunWatchdog";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
@@ -256,7 +256,15 @@ export function TaskRuns(props: { taskId: string }) {
                             {" "}· <span title={run.livenessReason ?? undefined}>{words(run.livenessState!)}</span>
                           </Show>
                         </span>
-                        <Show when={!wait() && run.error}>{(error) => <p class="tr-error">{error()}</p>}</Show>
+                        <Show when={!wait() && run.error}>
+                          {(error) => (
+                            <p class="tr-error">
+                              {error()}
+                              {/* "adapter failed (40001)": the cause of a generic failure (#20483). */}
+                              <Show when={run.errorCode === "adapter_failed" && runErrorCodeLabel(run)}>{(code) => <span class="mono"> · {code()}</span>}</Show>
+                            </p>
+                          )}
+                        </Show>
                         <Show when={wait()?.until ?? run.scheduledRetryAt}>
                           {(at) => <p class="tsec-muted">{wait()?.held ? "Its retry starts" : wait() ? "Starts" : "Retries"} {stampLabel(at())}</p>}
                         </Show>

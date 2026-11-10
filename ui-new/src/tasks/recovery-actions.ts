@@ -30,6 +30,16 @@ import type { BoardAccess } from "./task-edits";
  * held it (`ownership_owner_unprovable`, eight kinds of record in `evidence.kind`) gets the same
  * confirmation, bound to the record and the version the board was shown, with words of its own for
  * each kind (the old UI's WorkspaceExportRecovery.tsx, `OWNER_GONE_RESOURCE`).
+ *
+ * Since the 2026-11-10 sync:
+ * - The same confirmation, without a recovery action, for a Retry parked because the previous
+ *   native run never recorded its process (#20310, `confirm_run_stopped` on the task's interruption;
+ *   `POST …/recovery-actions/confirm-run-stopped`). It's drawn in the task's notices.
+ * - Original-host containment (#19813): a board-owned watchdog on `native_restart_recovery_blocked`
+ *   whose controller's process space couldn't be verified (`evidence.reason:
+ *   "controller_process_space_unverified"`). The server refuses any other way out of it, so the
+ *   card offers none; an owner or admin records that the controller and provider stopped, with the
+ *   reviewed action outcome and evidence, bound to the server's authority digest. It doesn't retry.
  */
 
 export type RecoveryState = "needed" | "in_progress" | "observing";
@@ -109,6 +119,27 @@ export function ownerGoneHeadline(kind: unknown) {
   return `${ownerGoneResource(kind).what} was recorded before Paperclip stored which server held it, so Paperclip can't verify that the server stopped. It stays reserved until then.`;
 }
 
+/** The native restart hold that needs original-host containment, with its reason (#19813). */
+const CONTAINMENT_CAUSE_KEY = "native_restart_recovery_blocked";
+export const CONTAINMENT_CAUSE = CONTAINMENT_CAUSE_KEY;
+export const CONTAINMENT_REASON = "controller_process_space_unverified";
+
+/**
+ * Whether the action is the original-host containment hold (the old UI's
+ * NativeControllerContainmentRecovery gate, without the digest): the server refuses every outcome
+ * but recorded containment for it, so the card offers none.
+ */
+export function isContainmentHold(action: Pick<IssueRecoveryAction, "kind" | "ownerType" | "cause" | "evidence" | "status"> | null | undefined) {
+  return (
+    !!action &&
+    action.kind === "active_run_watchdog" &&
+    action.ownerType === "board" &&
+    action.cause === CONTAINMENT_CAUSE &&
+    action.evidence?.reason === CONTAINMENT_REASON &&
+    (action.status === "active" || action.status === "escalated")
+  );
+}
+
 /** Causes with words of their own, over the kind's. */
 const CAUSES: Record<string, { label: string; headline: string }> = {
   native_workspace_finalization_owner_unverified: {
@@ -125,6 +156,12 @@ const CAUSES: Record<string, { label: string; headline: string }> = {
     label: "A tool call needs checking",
     headline:
       "The saved session has a tool call whose result never came back, so Paperclip didn't retry or replace the session. Check whether it ran and record the outcome; the saved session and workspace are unchanged.",
+  },
+  // Since the 2026-11-10 sync (#19813): only with `evidence.reason` CONTAINMENT_REASON (see `recoveryCard`).
+  [CONTAINMENT_CAUSE_KEY]: {
+    label: "Original execution not confirmed stopped",
+    headline:
+      "Paperclip can't verify that this run's original controller and provider stopped, because it can't compare process IDs across hosts or kernel sessions. Work stays held until an owner or admin records that both stopped.",
   },
   remote_workspace_restore_failed: {
     label: "Saved workspace couldn't be restored",
@@ -165,9 +202,10 @@ export function recoveryCard(action: IssueRecoveryAction | null | undefined, opt
         ? "needed"
         : "in_progress";
   const ownerGone = action.cause === OWNER_UNPROVABLE_CAUSE;
+  const containment = isContainmentHold(action);
   const cause = ownerGone
     ? { label: "Previous server not confirmed stopped", headline: ownerGoneHeadline(action.evidence?.kind) }
-    : action.cause
+    : action.cause && (action.cause !== CONTAINMENT_CAUSE || containment)
       ? CAUSES[action.cause]
       : undefined;
   const headline =
@@ -177,7 +215,7 @@ export function recoveryCard(action: IssueRecoveryAction | null | undefined, opt
       : (KIND_HEADLINES[action.kind] ?? KIND_HEADLINES.missing_disposition));
   const restoreFailure = action.evidence?.restoreFailure;
   const outcomes =
-    state !== "needed"
+    state !== "needed" || containment
       ? []
       : OUTCOMES.filter((option) => {
           if (action.cause && PREVIOUS_SERVER_STOP_CAUSES.has(action.cause)) return false;
@@ -228,6 +266,8 @@ const OPEN = new Set(["active", "escalated"]);
 export type PreviousServerStop =
   | { kind: "owner"; runId: string; ownerToken: string }
   | { kind: "controller"; runId: string }
+  /** A run that never recorded its process (#20310): from the task's interruption, with no action. */
+  | { kind: "run"; runId: string }
   | { kind: "owner-gone"; recordId: string; recordVersion: string | null; resource: OwnerGoneResource };
 
 export function previousServerStop(
@@ -280,6 +320,7 @@ export function stopConfirmationBody(
 ):
   | { kind: "owner"; body: { actionId: string; runId: string; ownerToken: string; controllerAndCopybackStopped: true; stopEvidence: string } }
   | { kind: "controller"; body: { actionId: string; runId: string; stopEvidence: string } }
+  | { kind: "run"; body: { runId: string; stopEvidence: string } }
   | { kind: "owner-gone"; body: OwnerGoneBody }
   | null {
   const stopEvidence = evidence.trim();
@@ -289,6 +330,9 @@ export function stopConfirmationBody(
       return { kind: "owner", body: { actionId, runId: stop.runId, ownerToken: stop.ownerToken, controllerAndCopybackStopped: true, stopEvidence } };
     case "controller":
       return { kind: "controller", body: { actionId, runId: stop.runId, stopEvidence } };
+    case "run":
+      // `confirmRunStoppedSchema` takes the run and the evidence only.
+      return { kind: "run", body: { runId: stop.runId, stopEvidence } };
     case "owner-gone":
       // The version shown here: a record refreshed since must be confirmed again (the server refuses a mismatch).
       return {
@@ -303,10 +347,13 @@ export type OwnerGoneBody = { actionId: string; recordId: string; stopEvidence: 
 
 /**
  * What the confirmation form is keyed by: a new action, run, owner token, record or record version
- * starts a fresh form, so the board never confirms something it wasn't shown.
+ * starts a fresh form, so the board never confirms something it wasn't shown. A run's stop has no
+ * action, so it's keyed by its task's id (the old UI keys it by task and run).
  */
 export function stopFormKey(actionId: string, stop: PreviousServerStop) {
   switch (stop.kind) {
+    case "run":
+      return `${actionId}:${stop.runId}:run`;
     case "owner":
       return `${actionId}:${stop.runId}:${stop.ownerToken}`;
     case "controller":
@@ -340,4 +387,79 @@ export function canDismissRecovery(companyId: string, access: BoardAccess | null
   if (!access.memberships?.length) return access.companyIds.includes(companyId);
   const membership = access.memberships.find((item) => item.companyId === companyId && item.status === "active");
   return !!membership && membership.membershipRole !== "viewer" && membership.membershipRole != null;
+}
+
+/*
+ * Original-host containment (#19813; the old UI's NativeControllerContainmentRecovery in
+ * IssueRecoveryActionCard.tsx).
+ */
+
+/** The run and the server's controller authority the containment is bound to. Never typed in. */
+export type ControllerContainment = { runId: string; digest: string };
+
+const DIGEST = /^[0-9a-f]{64}$/;
+
+/**
+ * The containment the board can record for the task's action, or null: the hold itself
+ * (`isContainmentHold`), for this task, with the run and a well-formed authority digest
+ * (`evidence.controllerAuthority.digest`).
+ */
+export function controllerContainment(action: IssueRecoveryAction | null | undefined, issueId: string, companyId: string): ControllerContainment | null {
+  if (!action || action.companyId !== companyId || action.sourceIssueId !== issueId || !isContainmentHold(action)) return null;
+  const runId = action.evidence.runId;
+  const digest = obj(action.evidence.controllerAuthority).digest;
+  return typeof runId === "string" && runId && typeof digest === "string" && DIGEST.test(digest) ? { runId, digest } : null;
+}
+
+export type ContainmentOutcome = "completed" | "not_performed" | "mixed";
+
+/** The reviewed outcomes of the run's external actions, in the old UI's words. */
+export const CONTAINMENT_OUTCOMES: { value: ContainmentOutcome; label: string }[] = [
+  { value: "completed", label: "All completed" },
+  { value: "not_performed", label: "None performed" },
+  { value: "mixed", label: "Some completed and some not performed" },
+];
+
+export type ContainmentDraft = { controllerStopped: boolean; providerStopped: boolean; actionOutcome: ContainmentOutcome | ""; evidence: string };
+
+/** What `resolve` takes to record containment (shared `resolveIssueRecoveryActionSchema`). */
+export type ContainmentBody = {
+  actionId: string;
+  outcome: "restored";
+  sourceIssueStatus: string;
+  executionReconciliation: {
+    runId: string;
+    controllerStopped: true;
+    providerStopped: true;
+    controllerAuthorityDigest: string;
+    actionOutcome: ContainmentOutcome;
+    outcomeEvidence: string;
+  };
+};
+
+/**
+ * What recording containment sends, or null until both stops are confirmed, the outcome is chosen
+ * and the evidence has 20 characters. The task keeps its status: containment doesn't retry.
+ */
+export function containmentBody(containment: ControllerContainment, actionId: string, sourceIssueStatus: string, draft: ContainmentDraft): ContainmentBody | null {
+  const outcomeEvidence = draft.evidence.trim();
+  if (!draft.controllerStopped || !draft.providerStopped || !draft.actionOutcome || outcomeEvidence.length < STOP_EVIDENCE_MIN) return null;
+  return {
+    actionId,
+    outcome: "restored",
+    sourceIssueStatus,
+    executionReconciliation: {
+      runId: containment.runId,
+      controllerStopped: true,
+      providerStopped: true,
+      controllerAuthorityDigest: containment.digest,
+      actionOutcome: draft.actionOutcome,
+      outcomeEvidence,
+    },
+  };
+}
+
+/** A new action, run or authority snapshot starts a fresh form, so old confirmations never carry over. */
+export function containmentFormKey(actionId: string, containment: ControllerContainment) {
+  return `${actionId}:${containment.runId}:${containment.digest}`;
 }

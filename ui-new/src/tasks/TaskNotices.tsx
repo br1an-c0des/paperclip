@@ -1,7 +1,7 @@
 import type { Issue, IssueBlockerStalledWakeContext } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createQueries, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { ArrowRight, EyeOff, Hourglass, LifeBuoy, Lock, PauseCircle, RotateCcw, ShieldCheck, ShieldX, TriangleAlert, Wrench } from "lucide-solid";
+import { ArrowRight, EyeOff, Hourglass, LifeBuoy, Lock, PauseCircle, PlugZap, RotateCcw, ShieldCheck, ShieldX, TriangleAlert, Wrench } from "lucide-solid";
 import { createMemo, createSignal, For, Match, Show, Switch, type JSX } from "solid-js";
 import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
@@ -13,24 +13,29 @@ import { Button } from "@/ui/Button";
 import { pushToast } from "@/ui/Toast";
 import { useTaskPeople } from "./people";
 import {
+  BUDGET_WAIT_LINE,
   pauseDetail,
+  rejectedModelText,
   resumeCountdown,
   retryCountdown,
   retryWaitTitle,
   scheduledLine,
+  SETUP_STEP_TEXT,
+  setupFailureText,
   stalledDependencyRows,
   stalledDependencyTitle,
   taskNotices,
   timeOfDay,
-  WAITING_TEXT,
+  waitingText,
   type RetryBlocker,
+  type SetupFailure,
   type StalledDependencyRow,
   type TaskNotice,
 } from "./recovery";
 import { useTaskRetry, type TaskRetry } from "./retry";
 import { TreeControlDialog, useTreeControlState } from "./TaskActions";
 import { ProviderFailureNotice } from "@/ui/ProviderFailureNotice";
-import { TaskRecovery } from "./TaskRecovery";
+import { ConfirmServerStopped, TaskRecovery } from "./TaskRecovery";
 import "./TaskNotices.css";
 import { TaskIntegrations } from "./integrations/TaskIntegrations";
 
@@ -46,6 +51,12 @@ import { TaskIntegrations } from "./integrations/TaskIntegrations";
  * Since the 2026-11-09 sync: a saved Retry held by unfinished blockers lists them, each with what to
  * do (#20109), and the children and blockers stopped on a recovery action that needs the board get
  * "A dependency needs the board", each with its own Retry (#20098, `StalledDependencies`).
+ *
+ * Since the 2026-11-10 sync: a Retry parked on a run that never recorded its process carries the
+ * stop confirmation (#20310); a failed setup command is named, with its command and output behind
+ * a disclosure and a link to the project's workspace settings (#20478); a rejected model is named
+ * (#20488); a budget hold links to Costs (#20338); and an agent parked while its setup is checked
+ * points to the task's connection card instead of Resume agent (#20361).
  */
 
 export function TaskNotices(props: { taskId: string }) {
@@ -122,6 +133,7 @@ export function TaskNotices(props: { taskId: string }) {
                 notice={notice}
                 task={current()}
                 projectName={project()?.name ?? null}
+                projectKey={project()?.urlKey ?? null}
                 assigneeName={assignee()?.name ?? null}
                 retrying={retry.busy(props.taskId)}
                 onRetry={() => void retry.retry(current())}
@@ -161,6 +173,8 @@ function Notice(props: {
   notice: TaskNotice;
   task: Issue;
   projectName: string | null;
+  /** The project's URL key, for the link to its workspace settings. */
+  projectKey: string | null;
   assigneeName: string | null;
   retrying: boolean;
   onRetry: () => void;
@@ -171,6 +185,12 @@ function Notice(props: {
   const company = useCompany();
   // A second-by-second clock while the retry countdown is on screen.
   const now = useNow(() => (props.notice.kind === "interrupted" || props.notice.kind === "provider-failure") && props.notice.state === "retry_scheduled");
+  const costsLink = () => (
+    <A class="btn btn--secondary btn--compact" href={`/${company().issuePrefix}/activity/costs`}>
+      Open Costs
+      <ArrowRight size={14} aria-hidden="true" />
+    </A>
+  );
   const retryButton = (label = "Retry") => (
     <Button size="compact" icon={<RotateCcw size={14} aria-hidden="true" />} disabled={props.retrying} onClick={() => props.onRetry()}>
       {props.retrying ? "Retrying…" : label}
@@ -190,26 +210,35 @@ function Notice(props: {
           const title = () => {
             if (scheduled && found.resuming) return `${resumeCountdown(found.nextRetryAt, now())}…`;
             if (scheduled) return found.recoveryStep ? "Recovering saved work" : `${retryCountdown(found.nextRetryAt, now())}…`;
-            return found.retryWait ? "Retry is waiting" : "Interrupted";
+            if (found.retryWait) return "Retry is waiting";
+            return !found.workspaceFailure && found.setupFailure ? "Workspace setup failed" : "Interrupted";
           };
+          // The setup command's failure, unless a saved-work step, a resume, a Retry wait or the
+          // folders' own failure says more (the old UI's order).
+          const setup = () => (found.recoveryStep || found.resuming || found.retryWait || found.workspaceFailure ? null : found.setupFailure);
           return (
             <Row
               tone={found.resuming ? "neutral" : scheduled || found.retryWait ? "amber" : "red"}
               icon={found.recoveryStep ? <LifeBuoy size={16} /> : found.resuming ? <RotateCcw size={16} /> : <TriangleAlert size={16} />}
               title={title()}
               action={found.canRetry ? retryButton(scheduled ? "Retry now" : "Retry") : undefined}
+              extra={<Show when={setup()}>{(failure) => <SetupFailureDetails failure={failure()} projectKey={props.projectKey} />}</Show>}
             >
               {scheduled && found.resuming
                 ? `The last attempt stopped, and Paperclip resumes it by itself at ${timeOfDay(found.nextRetryAt!)}. Anything you sent is saved.`
                 : scheduled
                 ? found.recoveryStep
                   ? `${found.recoveryStep}. ${retryCountdown(found.nextRetryAt, now())}…`
-                  : "The last attempt didn't finish, so the agent will try again by itself."
+                  : setup()
+                    ? setupFailureText(setup()!, retryCountdown(found.nextRetryAt, now()))
+                    : "The last attempt didn't finish, so the agent will try again by itself."
                 : found.retryWait
                   ? found.retryWait
                   : found.workspaceFailure
                     ? `Couldn't prepare the task folders. ${found.workspaceFailure}`
-                    : "The agent couldn't finish its last attempt. Anything you sent is saved."}
+                    : setup()
+                      ? setupFailureText(setup()!)
+                      : "The agent couldn't finish its last attempt. Anything you sent is saved."}
             </Row>
           );
         }}
@@ -249,9 +278,17 @@ function Notice(props: {
             <ProviderFailureNotice
               failure={found.failure}
               tone={found.state === "retry_scheduled" ? "amber" : "red"}
-              action={found.canRetry ? retryButton(found.state === "retry_scheduled" ? "Retry now" : "Retry") : undefined}
+              action={
+                found.canRetry ? retryButton(found.state === "retry_scheduled" ? "Retry now" : "Retry") : found.budgetWait ? costsLink() : undefined
+              }
             >
-              {found.state === "retry_scheduled" ? scheduledLine(found, now()) : undefined}
+              {found.state === "retry_scheduled"
+                ? scheduledLine(found, now())
+                : found.budgetWait
+                  ? BUDGET_WAIT_LINE
+                  : found.rejectedModel
+                    ? rejectedModelText(found.rejectedModel)
+                    : undefined}
             </ProviderFailureNotice>
           );
         }}
@@ -263,11 +300,41 @@ function Notice(props: {
         }}
       </Match>
       <Match when={props.notice.kind === "waiting" && props.notice}>
-        {(notice) => (
-          <Row tone="amber" icon={<PauseCircle size={16} />} title="Waiting on someone">
-            {WAITING_TEXT[(notice() as Extract<TaskNotice, { kind: "waiting" }>).action]}
-          </Row>
-        )}
+        {(notice) => {
+          const found = notice() as Extract<TaskNotice, { kind: "waiting" }>;
+          const budget = found.action === "budget";
+          return (
+            <Row
+              tone={budget && found.attempted ? "red" : "amber"}
+              icon={<PauseCircle size={16} />}
+              title={budget ? "Waiting for the budget" : found.action === "choose_model" && found.rejectedModel ? "Model rejected" : "Waiting on someone"}
+              action={budget ? costsLink() : undefined}
+            >
+              {waitingText(found)}
+            </Row>
+          );
+        }}
+      </Match>
+      <Match when={props.notice.kind === "confirm-run-stopped" && props.notice}>
+        {(notice) => {
+          const found = notice() as Extract<TaskNotice, { kind: "confirm-run-stopped" }>;
+          return (
+            <Row
+              tone="amber"
+              icon={<Hourglass size={16} />}
+              title="Retry is waiting for a stop check"
+              label="Confirm the previous run stopped"
+              extra={
+                // A new task or run starts a fresh form (the old UI keys it by task and run).
+                <Show keyed when={`${props.task.id}:${found.runId}`}>
+                  <ConfirmServerStopped stop={{ kind: "run", runId: found.runId }} actionId={null} task={props.task} />
+                </Show>
+              }
+            >
+              {found.message}
+            </Row>
+          );
+        }}
       </Match>
       <Match when={props.notice.kind === "tree-paused" && props.notice}>
         {(notice) => {
@@ -340,6 +407,17 @@ function Notice(props: {
           );
         }}
       </Match>
+      <Match when={props.notice.kind === "agent-checking" && props.notice}>
+        {(notice) => {
+          const found = notice() as Extract<TaskNotice, { kind: "agent-checking" }>;
+          return (
+            <Row tone="neutral" icon={<PlugZap size={16} />} title={`${found.agentName} is finishing its setup`}>
+              {found.error ? `${found.error} ` : ""}Runs start once its setup check passes. If it needs an AI account, connect one in the
+              connection card on this task; Resume agent can't finish setup.
+            </Row>
+          );
+        }}
+      </Match>
       <Match when={props.notice.kind === "project-paused" && props.notice}>
         {(notice) => (
           <Row tone="amber" icon={<PauseCircle size={16} />} title={`${(notice() as Extract<TaskNotice, { kind: "project-paused" }>).projectName ?? "The project"} is paused`}>
@@ -353,6 +431,37 @@ function Notice(props: {
         </Row>
       </Match>
     </Switch>
+  );
+}
+
+/**
+ * A failed setup command's details (#20478), behind a disclosure: which command, its exit status
+ * and the tail of its output, as the server bounded and redacted them, and a link to the project's
+ * workspace settings (Code and workspaces), where the command is set.
+ */
+function SetupFailureDetails(props: { failure: SetupFailure; projectKey: string | null }) {
+  const company = useCompany();
+  return (
+    <div class="tn-setup" data-testid="setup-failure">
+      <details>
+        <summary>Command and output</summary>
+        <dl class="tn-setup-facts">
+          <dt>{SETUP_STEP_TEXT[props.failure.step] ?? "Setup command"}</dt>
+          <dd class="mono">{props.failure.command}</dd>
+          <dt>Exit code</dt>
+          <dd class="mono">{props.failure.exitCode ?? "none"}</dd>
+        </dl>
+        <Show when={props.failure.output}>{(output) => <pre class="tn-setup-output mono">{output()}</pre>}</Show>
+      </details>
+      <Show when={props.projectKey}>
+        {(key) => (
+          <A class="tn-setup-link" href={`/${company().issuePrefix}/projects/${key()}/settings/code`}>
+            Open the project's workspace settings
+            <ArrowRight size={12} aria-hidden="true" />
+          </A>
+        )}
+      </Show>
+    </div>
   );
 }
 

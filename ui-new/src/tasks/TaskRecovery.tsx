@@ -3,7 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ChevronDown, LifeBuoy } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { ApiError } from "@/api/client";
-import { confirmOwnerGone, issuesApi } from "@/api/issues";
+import { confirmOwnerGone, confirmRunStopped, issuesApi, recordControllerContainment } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
@@ -25,12 +25,18 @@ import {
 import {
   canConfirmServerStop,
   canDismissRecovery,
+  CONTAINMENT_OUTCOMES,
+  containmentBody,
+  containmentFormKey,
+  controllerContainment,
   previousServerStop,
   recoveryCard,
   resolveBody,
   STOP_EVIDENCE_MIN,
   stopConfirmationBody,
   stopFormKey,
+  type ContainmentOutcome,
+  type ControllerContainment,
   type PreviousServerStop,
   type RecoveryOutcome,
 } from "./recovery-actions";
@@ -50,6 +56,11 @@ import { useBoardAccess } from "./TaskActions";
  * gives way only then (#19840). Since the 2026-11-09 sync the same confirmation covers a record
  * saved before Paperclip stored which server held it (`ownership_owner_unprovable`), keyed by the
  * record's version so a refreshed record starts a fresh form.
+ *
+ * Since the 2026-11-10 sync: original-host containment (#19813) gets its own form
+ * (`ContainmentForm`), keyed by the server's authority snapshot, in place of the next-step menu;
+ * and ConfirmServerStopped also confirms a run that never recorded its process (#20310), from the
+ * task's notices, with no recovery action.
  */
 
 const STATE_TONE = { needed: "amber", in_progress: "neutral", observing: "neutral" } as const;
@@ -75,6 +86,8 @@ export function TaskRecovery(props: { task: Issue; onOwnsRetry?: (owns: boolean)
     return null;
   };
   const stop = createMemo(() => previousServerStop(props.task.activeRecoveryAction, props.task.id, props.task.companyId));
+  // Original-host containment (#19813): its own form, and no other way out.
+  const containment = createMemo(() => controllerContainment(props.task.activeRecoveryAction, props.task.id, props.task.companyId));
   const retained = () => {
     const action = props.task.activeRecoveryAction;
     return !stop() && isRetainedExport(action, props.task.id, props.task.companyId) ? action : null;
@@ -121,7 +134,14 @@ export function TaskRecovery(props: { task: Issue; onOwnsRetry?: (owns: boolean)
             <Show when={stop()}>
               {(found) => (
                 <Show keyed when={stopFormKey(props.task.activeRecoveryAction!.id, found())}>
-                  <ConfirmServerStopped stop={found()} action={props.task.activeRecoveryAction!} task={props.task} />
+                  <ConfirmServerStopped stop={found()} actionId={props.task.activeRecoveryAction!.id} task={props.task} />
+                </Show>
+              )}
+            </Show>
+            <Show when={containment()}>
+              {(found) => (
+                <Show keyed when={containmentFormKey(props.task.activeRecoveryAction!.id, found())}>
+                  <ContainmentForm containment={found()} action={props.task.activeRecoveryAction!} task={props.task} />
                 </Show>
               )}
             </Show>
@@ -312,11 +332,24 @@ const STOP_COPY = {
     question: "How did you confirm that the previous server and its file copy stopped?",
     placeholder: "For example: the old server process exited and was not restarted.",
     resuming: "Restoring saved work…",
+    confirm: "Confirm the previous server stopped",
+    nobody: "A company owner or admin can confirm that the previous server stopped.",
   },
   controller: {
     question: "How did you confirm that the previous server stopped?",
     placeholder: "For example: the old server container was replaced and is no longer running.",
-    resuming: "Resuming the run…",
+    // Since the 2026-11-10 sync (#19813), in the old UI's words: recovery checks again after it.
+    resuming: "Controller stop recorded. Checking recovery…",
+    confirm: "Confirm the previous server stopped",
+    nobody: "A company owner or admin can confirm that the previous server stopped.",
+  },
+  // A run that never recorded its process (#20310), in the old UI's words.
+  run: {
+    question: "How did you confirm that no agent is still working on this task?",
+    placeholder: "For example: no codex or claude process for this task is running on the server host.",
+    resuming: "Starting your Retry…",
+    confirm: "Confirm it stopped",
+    nobody: "A company owner or admin can confirm that the previous run stopped.",
   },
 } as const;
 
@@ -330,8 +363,12 @@ function stopCopy(stop: PreviousServerStop) {
  * Confirm the previous server stopped (#19717, #19742): a server that can no longer report can't
  * confirm its own stop, so an owner or admin does, once, saying how they checked. The saved result
  * then finishes without another agent turn. Nothing is sent until they submit.
+ *
+ * Since the 2026-11-10 sync the same form confirms a run that never recorded its process (#20310,
+ * `stop.kind: "run"`), from the task's notice: it has no recovery action (`actionId` is null), and
+ * the task's parked Retry starts once it's confirmed.
  */
-function ConfirmServerStopped(props: { stop: PreviousServerStop; action: IssueRecoveryAction; task: Issue }) {
+export function ConfirmServerStopped(props: { stop: PreviousServerStop; actionId: string | null; task: Issue }) {
   const client = useQueryClient();
   const company = useCompany();
   const access = useBoardAccess();
@@ -341,11 +378,12 @@ function ConfirmServerStopped(props: { stop: PreviousServerStop; action: IssueRe
   const [done, setDone] = createSignal<string | null>(null);
   const [failure, setFailure] = createSignal<string | null>(null);
   const copy = () => stopCopy(props.stop);
+  const formId = () => props.actionId ?? `${props.task.id}-${props.stop.kind === "owner-gone" ? props.stop.recordId : props.stop.runId}`;
   const allowed = () => {
     const current = access();
     return canConfirmServerStop(props.task.companyId, current.access, current.localTrusted);
   };
-  const body = () => stopConfirmationBody(props.stop, props.action.id, evidence());
+  const body = () => stopConfirmationBody(props.stop, props.actionId ?? "", evidence());
 
   const confirm = async () => {
     const data = body();
@@ -353,10 +391,14 @@ function ConfirmServerStopped(props: { stop: PreviousServerStop; action: IssueRe
     setSending(true);
     setFailure(null);
     try {
-      let line = copy().resuming;
+      let line: string = copy().resuming;
       if (data.kind === "owner") await issuesApi.resumeWorkspaceFinalization(props.task.id, data.body);
       else if (data.kind === "controller") await issuesApi.confirmControllerStopped(props.task.id, data.body);
-      else {
+      else if (data.kind === "run") {
+        const receipt = await confirmRunStopped(props.task.id, data.body);
+        // The answer carries the task's interruption after the confirmation; show it at once.
+        client.setQueryData<Issue>(queryKeys.issues.detail(props.task.id), (old) => (old ? { ...old, interruption: receipt.presentation } : old));
+      } else {
         const receipt = await confirmOwnerGone(props.task.id, data.body);
         // Let go by another path meanwhile: the server closes the request with nothing to confirm.
         if (receipt.status === "released") line = "It was already released, so no confirmation was needed.";
@@ -376,15 +418,12 @@ function ConfirmServerStopped(props: { stop: PreviousServerStop; action: IssueRe
   return (
     <div class="tn-files" data-testid="previous-server-stop">
       <Show when={!done()} fallback={<span role="status">{done()}</span>}>
-        <Show
-          when={allowed()}
-          fallback={<span class="tn-recovery-meta">A company owner or admin can confirm that the previous server stopped.</span>}
-        >
+        <Show when={allowed()} fallback={<span class="tn-recovery-meta">{copy().nobody}</span>}>
           <Show
             when={open()}
             fallback={
               <Button size="compact" variant="primary" onClick={() => setOpen(true)}>
-                Confirm the previous server stopped
+                {copy().confirm}
               </Button>
             }
           >
@@ -395,11 +434,11 @@ function ConfirmServerStopped(props: { stop: PreviousServerStop; action: IssueRe
                 void confirm();
               }}
             >
-              <label class="tn-recovery-meta" for={`previous-server-stop-${props.action.id}`}>
+              <label class="tn-recovery-meta" for={`previous-server-stop-${formId()}`}>
                 {copy().question}
               </label>
               <TextArea
-                id={`previous-server-stop-${props.action.id}`}
+                id={`previous-server-stop-${formId()}`}
                 rows={3}
                 maxLength={12000}
                 placeholder={copy().placeholder}
@@ -417,6 +456,124 @@ function ConfirmServerStopped(props: { stop: PreviousServerStop; action: IssueRe
               </span>
             </form>
           </Show>
+        </Show>
+      </Show>
+      <Show when={failure()}>{(text) => <span class="tn-files-alert" role="alert">{text()}</span>}</Show>
+    </div>
+  );
+}
+
+/**
+ * Verify the original execution stopped (#19813; the old UI's NativeControllerContainmentRecovery):
+ * Paperclip can't compare process ids across hosts or kernel sessions, so an owner or admin
+ * confirms, separately, that the controller and the provider with its tools stopped on their
+ * original host, chooses the reviewed outcome of the run's external actions, and says what they
+ * found. The authority digest comes from the server's snapshot and is never shown or typed. It
+ * settles the hold without retrying; Retry stays a separate step.
+ */
+export function ContainmentForm(props: { containment: ControllerContainment; action: IssueRecoveryAction; task: Issue }) {
+  const client = useQueryClient();
+  const company = useCompany();
+  const access = useBoardAccess();
+  const [controllerStopped, setControllerStopped] = createSignal(false);
+  const [providerStopped, setProviderStopped] = createSignal(false);
+  const [actionOutcome, setActionOutcome] = createSignal<ContainmentOutcome | "">("");
+  const [evidence, setEvidence] = createSignal("");
+  const [sending, setSending] = createSignal(false);
+  const [done, setDone] = createSignal(false);
+  const [failure, setFailure] = createSignal<string | null>(null);
+  const allowed = () => {
+    const current = access();
+    return canConfirmServerStop(props.task.companyId, current.access, current.localTrusted);
+  };
+  const body = () =>
+    containmentBody(props.containment, props.action.id, props.task.status, {
+      controllerStopped: controllerStopped(),
+      providerStopped: providerStopped(),
+      actionOutcome: actionOutcome(),
+      evidence: evidence(),
+    });
+  const id = (part: string) => `containment-${props.action.id}-${part}`;
+
+  const record = async () => {
+    const data = body();
+    if (!data || sending()) return;
+    setSending(true);
+    setFailure(null);
+    try {
+      await recordControllerContainment(props.task.id, data);
+      setDone(true);
+      pushToast({ tone: "success", title: "Containment recorded", body: "Use Retry when you want another attempt." });
+    } catch (error) {
+      setFailure(error instanceof Error ? error.message : "The containment wasn't recorded. Open the task again and try again.");
+    } finally {
+      setSending(false);
+      void client.invalidateQueries({ queryKey: queryKeys.issues.detail(props.task.id) });
+      void client.invalidateQueries({ queryKey: queryKeys.issues.section(props.task.id, "runs") });
+      void client.invalidateQueries({ queryKey: queryKeys.issues.list(company().id) });
+    }
+  };
+
+  return (
+    <div class="tn-files" data-testid="controller-containment">
+      <span>
+        Stop both the controller and the provider on the original host before recording evidence. The saved lease must also expire and the
+        environment and workspace cleanup must finish. Recording containment doesn't retry the task.
+      </span>
+      <Show when={!done()} fallback={<span role="status">Containment recorded. Use Retry when you want another attempt.</span>}>
+        <Show
+          when={allowed()}
+          fallback={<span class="tn-recovery-meta">A company owner, company admin or instance admin must review this original-host execution.</span>}
+        >
+          <form
+            class="tn-stop"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void record();
+            }}
+          >
+            <label class="tn-check">
+              <input type="checkbox" checked={controllerStopped()} onChange={(event) => setControllerStopped(event.currentTarget.checked)} />
+              <span>I verified the original controller stopped on its original host.</span>
+            </label>
+            <label class="tn-check">
+              <input type="checkbox" checked={providerStopped()} onChange={(event) => setProviderStopped(event.currentTarget.checked)} />
+              <span>I verified the original provider and its tools stopped on their original host.</span>
+            </label>
+            <label class="tn-recovery-meta" for={id("outcome")}>
+              Reviewed external action outcomes
+            </label>
+            <select
+              id={id("outcome")}
+              class="input"
+              value={actionOutcome()}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                setActionOutcome(CONTAINMENT_OUTCOMES.some((option) => option.value === value) ? (value as ContainmentOutcome) : "");
+              }}
+            >
+              <option value="">Select only after reviewing the effects</option>
+              <For each={CONTAINMENT_OUTCOMES}>{(option) => <option value={option.value}>{option.label}</option>}</For>
+            </select>
+            <label class="tn-recovery-meta" for={id("evidence")}>
+              Original-host containment evidence, and actions that must not be repeated
+            </label>
+            <TextArea id={id("evidence")} rows={3} maxLength={12000} value={evidence()} onInput={(event) => setEvidence(event.currentTarget.value)} />
+            <span class="tn-recovery-meta">
+              If any action's outcome is still unknown, keep this hold. After the evidence and cleanup settle, use the task's Retry separately.
+            </span>
+            <span class="tn-files-actions">
+              <Button
+                type="submit"
+                size="compact"
+                variant="primary"
+                disabled={!body() || sending()}
+                title={body() ? undefined : `Confirm both stops, choose the outcome, and describe the evidence in at least ${STOP_EVIDENCE_MIN} characters`}
+              >
+                {sending() ? "Recording…" : "Record containment"}
+              </Button>
+            </span>
+          </form>
         </Show>
       </Show>
       <Show when={failure()}>{(text) => <span class="tn-files-alert" role="alert">{text()}</span>}</Show>
