@@ -63,6 +63,7 @@ until one becomes a concrete fix.
 | 24 | [Keep `displayStatus` in compact issue lists](#24-keep-displaystatus-in-compact-issue-lists) | candidate | | | 2026-11-05 | | |
 | 25 | [Use one effort key for Grok on the Paperclip Runner](#25-use-one-effort-key-for-grok-on-the-paperclip-runner) | candidate | | | 2026-11-05 | | |
 | 26 | [Don't mark a blocker `attention_required` with nothing to attend to](#26-dont-mark-a-blocker-attention_required-with-nothing-to-attend-to) | candidate | | | 2026-11-05 | | |
+| 27 | [Kitchen Sink example: hide config-gated items until the config loads](#27-kitchen-sink-example-hide-config-gated-items-until-the-config-loads) | candidate | | | 2026-11-09 | | |
 
 ## Details
 
@@ -421,3 +422,17 @@ Found in integration round 2 (U44, Nov 5).
   with a service test.
 - **Fork workaround:** `ui-new` shows plain "Blocked" when the counts are all 0.
 
+### 27. Kitchen Sink example: hide config-gated items until the config loads
+
+Found while fixing the projects-nav flash (Nov 9).
+
+- **Problem:** `packages/plugins/examples/plugin-kitchen-sink-example/src/ui/index.tsx` checks
+  `if (config.data && config.data.showX === false) return null`, so each sidebar entry, sidebar
+  panel, project sidebar item and comment annotation or menu item renders until its
+  `plugin-config` read answers, then disappears when the config turns it off. With
+  `showProjectSidebarItem: false`, a "Kitchen Sink" line shows under each project for about 125ms
+  on every page load. As the example plugin authors copy, it teaches the pattern.
+- **Likely fix:** return null while the config is loading (`if (!config.data || config.data.showX
+  === false) return null`).
+- **Fork workaround:** none. `ui-new` keys the nav's project rows by id, so the items mount only once
+  per page load instead of on every refetch; the one flash on first load remains.
