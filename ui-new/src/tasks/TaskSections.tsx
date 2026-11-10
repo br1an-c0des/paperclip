@@ -45,7 +45,14 @@ import "./TaskSections.css";
  * Sections are a list (SECTIONS), so another one is one entry and one Match below.
  */
 
-export type TaskSection = "details" | "case" | "activity" | "files" | "runs" | "workspace";
+/**
+ * What scrolls on its own in the sections, for the docked panel's scroll capsules (Panel.tsx
+ * `scrollers`): Details, the activity thread, the other sections' shared frame, and the body and the
+ * notices above a section, which scroll when the panel is too short for them.
+ */
+export const TASK_SECTION_SCROLLERS = ".td-main, .ta-log, .tsec-scroll, .tsec-body, .tsec-body--fill > .tsec-lead";
+
+export type TaskSection ="details" | "case" | "activity" | "files" | "runs" | "workspace";
 
 const SECTIONS: { id: TaskSection; label: string; short?: string; icon: () => JSX.Element }[] = [
   { id: "details", label: "Details", short: "Details", icon: () => <Layers size={16} aria-hidden="true" /> },

@@ -10,7 +10,7 @@ import { InitialsDisc } from "@/ui/Avatar";
 import { TaskHeaderActions } from "./TaskActions";
 import { TaskParentCrumb } from "./TaskParentCrumb";
 import { setTaskOpenMode } from "./task-open-mode";
-import { TaskSections } from "./TaskSections";
+import { TASK_SECTION_SCROLLERS, TaskSections } from "./TaskSections";
 import "./TaskPanel.css";
 
 /*
@@ -41,6 +41,7 @@ export function TaskPanel(props: {
       onClose={props.onClose}
       toolbar
       flush
+      scrollers={TASK_SECTION_SCROLLERS}
       header={
         <div class="tp-head">
           <button type="button" class="btn btn--icon btn--ghost btn--compact" aria-label="Previous task" disabled={!props.onPrevious} onClick={() => props.onPrevious?.()}>

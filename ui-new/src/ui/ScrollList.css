@@ -11,6 +11,10 @@
  *
  * In both, the rows fade out over the last 20px before an edge with more beyond it, so a half-shown
  * row dissolves instead of being cut off.
+ *
+ * ScrollCapsule.tsx lays the same capsule and glows over a scroller that's already there (main and
+ * the docked panel while the shell is split): see "The overlay" below. It has no fade, since what
+ * it scrolls (a page header, sticky group headers) isn't a list of rows.
  */
 
 @property --glow-fade-above {
@@ -105,7 +109,8 @@
 }
 
 .scroll-list-rail:hover .scroll-list-thumb,
-.scroll-list--dragging .scroll-list-thumb {
+.scroll-list--dragging .scroll-list-thumb,
+.scroll-capsule--dragging .scroll-list-thumb {
   left: 1px;
   right: 1px;
 }
@@ -117,6 +122,39 @@
 }
 
 /* ---------------------------------------------------------------------------------------------
+   The overlay (ScrollCapsule.tsx): a frame over the scroller's box, placed inline, that lets
+   pointers through. Its rail runs down the scroller's right edge, over its padding, where a native
+   scrollbar would be; the scroller's own scrollbar is hidden while the overlay is attached. */
+
+.scroll-capsule {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.scroll-capsule > .scroll-list-rail {
+  top: 4px;
+  bottom: 4px;
+  right: 0;
+}
+
+:is(.scroll-capsule[data-more-above], .scroll-capsule[data-more-below]):is([data-hover], [data-scrolling], .scroll-capsule--dragging) > .scroll-list-rail,
+:is(.scroll-capsule[data-more-above], .scroll-capsule[data-more-below]) > .scroll-list-rail:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+html [data-scroll-capsule] {
+  scrollbar-width: none;
+}
+
+html [data-scroll-capsule]::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------------------------
    The ion edge glow, for touch screens */
 
 @media (hover: none), (pointer: coarse) {
@@ -124,8 +162,8 @@
     display: none;
   }
 
-  .scroll-list::before,
-  .scroll-list::after {
+  :is(.scroll-list, .scroll-capsule)::before,
+  :is(.scroll-list, .scroll-capsule)::after {
     content: "";
     position: absolute;
     z-index: 1;
@@ -139,34 +177,43 @@
     transition: opacity 0.2s ease;
   }
 
-  .scroll-list::before {
+  :is(.scroll-list, .scroll-capsule)::before {
     top: -1px;
     box-shadow: 0 2px 16px 1px color-mix(in srgb, var(--ion-a) 45%, transparent);
   }
 
-  .scroll-list::after {
+  :is(.scroll-list, .scroll-capsule)::after {
     bottom: -1px;
     box-shadow: 0 -2px 16px 1px color-mix(in srgb, var(--ion-b) 45%, transparent);
   }
 
-  .scroll-list[data-more-above]::before,
-  .scroll-list[data-more-below]::after {
+  :is(.scroll-list, .scroll-capsule)[data-more-above]::before,
+  :is(.scroll-list, .scroll-capsule)[data-more-below]::after {
     opacity: 1;
   }
 
   /* On paper the glow is gentler: the hairline carries it. */
-  .light .scroll-list::before {
+  .light :is(.scroll-list, .scroll-capsule)::before {
     box-shadow: 0 2px 12px 0 color-mix(in srgb, var(--ion-a) 25%, transparent);
   }
 
-  .light .scroll-list::after {
+  .light :is(.scroll-list, .scroll-capsule)::after {
     box-shadow: 0 -2px 12px 0 color-mix(in srgb, var(--ion-b) 25%, transparent);
+  }
+
+  /* The overlay's frame is the scroller's own box, so its hairlines sit just inside it. */
+  .scroll-capsule::before {
+    top: 0;
+  }
+
+  .scroll-capsule::after {
+    bottom: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .scroll-list::before,
-  .scroll-list::after,
+  :is(.scroll-list, .scroll-capsule)::before,
+  :is(.scroll-list, .scroll-capsule)::after,
   .scroll-list-body,
   .scroll-list-rail,
   .scroll-list-thumb {

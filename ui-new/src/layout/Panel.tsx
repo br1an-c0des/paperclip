@@ -1,7 +1,8 @@
 import { ChevronLeft, X } from "lucide-solid";
-import { createContext, createEffect, createSignal, onCleanup, onMount, Show, useContext, type JSX, type ParentProps } from "solid-js";
+import { createContext, createEffect, createSignal, For, onCleanup, onMount, Show, useContext, type JSX, type ParentProps } from "solid-js";
 import { Portal } from "solid-js/web";
 import { useLayerMount } from "@/ui/layer";
+import { ScrollCapsule } from "@/ui/ScrollCapsule";
 import { isCompact } from "./breakpoints";
 import "./Panel.css";
 
@@ -13,6 +14,8 @@ import "./Panel.css";
  * phone-sized viewport it becomes a full-screen page over everything, the dock included, with a
  * back control in place of the close button (build plan, "Desktop first, ready for mobile"). It isn't modal: the list beside it stays usable.
  * Escape closes it, and focus moves into it when it opens and back to where it was when it closes.
+ * Docked in the shell's column, what scrolls inside it (the body, or `scrollers` in it) shows the
+ * scroll capsule in place of a scrollbar (ui/ScrollCapsule.tsx), as main beside it does.
  *
  *   <Dock>
  *     <TaskList />
@@ -66,6 +69,12 @@ export function Panel(
     toolbar?: boolean;
     /** The body has no padding of its own, for content that lays out its own columns. */
     flush?: boolean;
+    /**
+     * A selector for the elements inside the body that scroll on their own, for content that does
+     * its own scrolling (a flush body). Docked in the shell's column, each gets the scroll capsule
+     * in place of its scrollbar. Without it, the body itself does.
+     */
+    scrollers?: string;
   }>,
 ) {
   const dock = useContext(DockContext);
@@ -99,10 +108,14 @@ export function Panel(
   const host = () => (docked() ? dock?.() : mount() ?? document.body);
 
   // Docked in the shell's column: the shell splits while the panel is there.
-  createEffect(() => {
+  const inShell = () => {
     const target = host();
-    if (shell && target && target === shell.host()) onCleanup(shell.hold());
+    return Boolean(shell && target && target === shell.host());
+  };
+  createEffect(() => {
+    if (shell && inShell()) onCleanup(shell.hold());
   });
+  let body: HTMLDivElement | undefined;
 
   return (
     <Show when={host()}>
@@ -144,13 +157,45 @@ export function Panel(
                   </button>
                 </Show>
               </header>
-              <div class="panel-body" classList={{ "panel-body--flush": props.flush }}>
+              <div ref={body} class="panel-body" classList={{ "panel-body--flush": props.flush }}>
                 {props.children}
               </div>
+              <Show when={inShell()}>
+                <PanelCapsules body={() => body} selector={props.scrollers} />
+              </Show>
             </aside>
           </Portal>
         );
       }}
     </Show>
   );
+}
+
+/**
+ * The scroll capsules of a panel docked in the shell's column (ui/ScrollCapsule.tsx): one for each
+ * element matching `selector` inside the body, or for the body itself. Sections come and go as you
+ * switch them, so the body is watched for elements matching and leaving.
+ */
+function PanelCapsules(props: { body: () => HTMLElement | undefined; selector?: string }) {
+  const [scrollers, setScrollers] = createSignal<HTMLElement[]>([]);
+  onMount(() => {
+    const body = props.body();
+    if (!body) return;
+    let pending: number | undefined;
+    const scan = () => {
+      pending = undefined;
+      const next = props.selector ? Array.from(body.querySelectorAll<HTMLElement>(props.selector)) : [body];
+      setScrollers((current) => (current.length === next.length && current.every((element, index) => element === next[index]) ? current : next));
+    };
+    const watch = new MutationObserver(() => {
+      pending ??= requestAnimationFrame(scan);
+    });
+    watch.observe(body, { childList: true, subtree: true });
+    scan();
+    onCleanup(() => {
+      watch.disconnect();
+      if (pending !== undefined) cancelAnimationFrame(pending);
+    });
+  });
+  return <For each={scrollers()}>{(scroller) => <ScrollCapsule scroller={scroller} />}</For>;
 }
