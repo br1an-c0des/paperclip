@@ -11,7 +11,26 @@ import { useSession } from "@/lib/session";
 import { useTaskByRef } from "@/tasks/TasksView";
 import { buttonClass } from "@/ui/Button";
 import { pushToast } from "@/ui/Toast";
-import { clampNavWidth, inStoredOrder, moveId, openTaskRef, parseNavWidth, parseRecent, recordRecent, refreshRecent, type RecentTask } from "./nav-model";
+import {
+  clampNavWidth,
+  inStoredOrder,
+  moveId,
+  NAV_AUTO_RAIL_BELOW,
+  navRoomChanged,
+  openTaskRef,
+  parseNavMode,
+  parseNavWidth,
+  parseRecent,
+  recordRecent,
+  refreshRecent,
+  setNavFoldMode,
+  shownNavMode,
+  toggleNavHidden,
+  toggleNavRail,
+  type NavFold,
+  type NavMode,
+  type RecentTask,
+} from "./nav-model";
 import "@/agents/AgentStar.css";
 
 /*
@@ -21,8 +40,10 @@ import "@/agents/AgentStar.css";
  *   and the projects list.
  * - The order of your projects and companies, kept on the server per person
  *   (`/companies/:id/sidebar-preferences/me`, `/sidebar-preferences/me`).
- * - Which nav sections you folded, whether the nav is hidden (`[`), and how wide you dragged it,
- *   per browser.
+ * - Which nav sections you folded, whether the nav is full or the icon rail (`[`), whether it's
+ *   hidden (Shift+`[`), and how wide you dragged it, per browser. A window narrower than
+ *   `NAV_AUTO_RAIL_BELOW` shows the rail by itself; `[` there switches it only until the window
+ *   is wide again, and your saved choice is untouched (nav-model.ts `NavFold`).
  * - The tasks you opened lately, per browser and company, refreshed from
  *   `GET /companies/:id/issues/summaries`.
  */
@@ -217,14 +238,58 @@ export function navSection(key: string) {
   };
 }
 
-const [navHidden, setNavHiddenSignal] = createSignal<boolean>(readJson<boolean>(HIDDEN_KEY, false) === true);
+const MODE_KEY = "paperclip.ui-new.nav-mode";
 
-/** Whether you hid the left nav (`[`, or its own button). */
-export { navHidden };
+const [fold, setFoldSignal] = createSignal<NavFold>({
+  mode: parseNavMode(readJson<unknown>(MODE_KEY, null)),
+  hidden: readJson<boolean>(HIDDEN_KEY, false) === true,
+  override: null,
+});
+
+// Whether the window is too narrow for the full nav (nav-model.ts `autoRail`), kept by a media query.
+const ROOM_QUERY = `(min-width: ${NAV_AUTO_RAIL_BELOW}px)`;
+const narrowNow = () => typeof window !== "undefined" && typeof window.matchMedia === "function" && !window.matchMedia(ROOM_QUERY).matches;
+const [narrow, setNarrow] = createSignal<boolean>(narrowNow());
+if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+  window.matchMedia(ROOM_QUERY).addEventListener("change", () => recheckNavRoom());
+}
+
+/** Reads the window's room again (the media query does it live; tests set `innerWidth` and call it). */
+export function recheckNavRoom() {
+  const next = narrowNow();
+  if (next === narrow()) return;
+  setNarrow(next);
+  updateFold(navRoomChanged(fold()));
+}
+
+function updateFold(next: NavFold) {
+  const before = fold();
+  setFoldSignal(next);
+  if (next.mode !== before.mode) writeJson(MODE_KEY, next.mode);
+  if (next.hidden !== before.hidden) writeJson(HIDDEN_KEY, next.hidden);
+}
+
+/** Whether you hid the left nav (Shift+`[`, Hide navigation, or a drag past the edge). */
+export const navHidden = () => fold().hidden;
+
+/** Whether the window is too narrow for the full nav, so it shows the rail unless you said otherwise. */
+export const navNarrow = narrow;
+
+/** Full or rail, as the nav shows now: your saved choice, or the rail in a narrow window. */
+export const navMode = () => shownNavMode(fold(), narrow());
 
 export function setNavHidden(hidden: boolean) {
-  setNavHiddenSignal(hidden);
-  writeJson(HIDDEN_KEY, hidden);
+  if (hidden !== fold().hidden) updateFold(toggleNavHidden(fold()));
+}
+
+/** Shows the nav full or as the rail (saved; in a narrow window, until there's room again). */
+export function setNavMode(mode: NavMode) {
+  updateFold(setNavFoldMode(fold(), narrow(), mode));
+}
+
+/** `[`: full to rail and back, or a hidden nav back as it was. */
+export function toggleNavRailPref() {
+  updateFold(toggleNavRail(fold(), narrow()));
 }
 
 const WIDTH_KEY = "paperclip.ui-new.nav-width";
