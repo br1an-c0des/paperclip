@@ -171,3 +171,89 @@
 .tn-dep .retry-button {
   background: var(--card);
 }
+
+/* A failed workspace setup command (#20478): its command and output, then the settings link. */
+.tn-setup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tn-setup details {
+  max-width: 100%;
+}
+
+.tn-setup summary {
+  cursor: pointer;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tn-setup-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 10px;
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.tn-setup-facts dt {
+  color: var(--muted);
+}
+
+.tn-setup-facts dd {
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.tn-setup-output {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  max-height: 160px;
+  overflow: auto;
+  border-radius: var(--r-inner);
+  background: var(--card);
+  color: var(--body);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tn-setup-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--tone-fg);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tn-setup-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Original-host containment (#19813): the two stop confirmations. */
+.tn-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text);
+}
+
+.tn-check input {
+  flex-shrink: 0;
+  margin: 3px 0 0;
+  accent-color: var(--tone-fg);
+}
+
+.tn-stop select.input {
+  width: 100%;
+}

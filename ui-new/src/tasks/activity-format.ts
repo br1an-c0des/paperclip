@@ -105,6 +105,23 @@ const REVIEW_DECISIONS: Record<string, string> = {
   send_back: "sent the review back to work",
 };
 
+/**
+ * Why Paperclip held a saved request back (`issue.execution_waiting`, since the 2026-11-10 sync,
+ * upstream #20338): logged by the system when a deferred request's wait reason changes. The task's
+ * notice says what to do; the thread only notes the hold. Reasons the server names
+ * (`retryWait.reason` on the task's interruption) read in words; others read generally.
+ */
+const EXECUTION_WAITS: Record<string, string> = {
+  "budget.blocked": "held the Retry until the budget allows new work",
+  dependency_blocked: "held the Retry until its blockers finish",
+  process_identity_missing: "held the Retry until the previous run is confirmed stopped",
+  execution_recovery: "held the Retry while the previous attempt is recovered",
+};
+
+export function executionWaitText(reason: unknown) {
+  return (typeof reason === "string" && EXECUTION_WAITS[reason]) || "held the Retry until it can start";
+}
+
 type Details = Record<string, unknown>;
 
 function record(value: unknown): Details | null {
@@ -226,6 +243,8 @@ export function activityLine(event: Pick<ActivityEvent, "action" | "details" | "
       const decision = typeof details.action === "string" ? details.action : "";
       return { actor, text: REVIEW_DECISIONS[decision] ?? LABELS[event.action]! };
     }
+    case "issue.execution_waiting":
+      return { actor, text: executionWaitText(details.reason) };
   }
   if (event.action.startsWith("issue.document_")) {
     const key = typeof details.key === "string" ? details.key : null;

@@ -2,6 +2,10 @@ import type { IssueRecoveryAction } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import {
   canConfirmServerStop,
+  containmentBody,
+  containmentFormKey,
+  controllerContainment,
+  isContainmentHold,
   OWNER_GONE_RESOURCE,
   ownerGoneHeadline,
   ownerGoneResource,
@@ -131,5 +135,91 @@ describe("confirm an unrecorded owner stopped", () => {
     expect(canConfirmServerStop("c1", member("admin"), false)).toBe(true);
     expect(canConfirmServerStop("c1", member("member"), false)).toBe(false);
     expect(canConfirmServerStop("c1", member("viewer"), false)).toBe(false);
+  });
+});
+
+/*
+ * Since the 2026-11-10 sync: a run that never recorded its process (#20310), and original-host
+ * containment (#19813).
+ */
+
+describe("confirm a run that never recorded its process stopped (#20310)", () => {
+  it("sends only the run and the evidence, once there's enough of it", () => {
+    const stop = { kind: "run", runId: "run-9" } as const;
+    expect(stopConfirmationBody(stop, "", "checked")).toBeNull();
+    expect(stopConfirmationBody(stop, "", "  No codex process for this task is running on the host.  ")).toEqual({
+      kind: "run",
+      body: { runId: "run-9", stopEvidence: "No codex process for this task is running on the host." },
+    });
+  });
+
+  it("keys its form by task and run", () => {
+    expect(stopFormKey("t1", { kind: "run", runId: "run-9" })).toBe("t1:run-9:run");
+    expect(stopFormKey("t1", { kind: "run", runId: "run-10" })).not.toBe(stopFormKey("t1", { kind: "run", runId: "run-9" }));
+  });
+});
+
+describe("original-host containment (#19813)", () => {
+  const DIGEST = "a".repeat(64);
+  const RUN = "00000000-0000-4000-8000-000000000041";
+  const hold = (evidence: Record<string, unknown> = {}, patch: Partial<IssueRecoveryAction> = {}) =>
+    unprovable(
+      {},
+      {
+        cause: "native_restart_recovery_blocked",
+        evidence: { runId: RUN, reason: "controller_process_space_unverified", controllerAuthority: { schema: "paperclip.native-controller-authority.v1", digest: DIGEST }, ...evidence },
+        nextAction: "Verify the original execution stopped.",
+        ...patch,
+      },
+    );
+  const draft = { controllerStopped: true, providerStopped: true, actionOutcome: "mixed" as const, evidence: "Verified both stopped; reviewed every action." };
+
+  it("offers no other way out of the hold, which the server refuses", () => {
+    const card = recoveryCard(hold(), { board: true });
+    expect(card?.outcomes).toEqual([]);
+    expect(card?.kindLabel).toBe("Original execution not confirmed stopped");
+    // The same cause for another reason keeps the card's usual choices (no Try again: it reconciles).
+    const other = recoveryCard(hold({ reason: "some_other_hold" }), { board: true });
+    expect(other?.outcomes.map((option) => option.outcome)).toEqual(["done", "in_review", "false_positive_done", "false_positive_in_review"]);
+    expect(other?.kindLabel).toBe("Silent run");
+  });
+
+  it("is offered on the board's hold for this task with a well-formed digest", () => {
+    expect(isContainmentHold(hold())).toBe(true);
+    expect(controllerContainment(hold(), "t1", "c1")).toEqual({ runId: RUN, digest: DIGEST });
+    expect(controllerContainment(hold(), "t2", "c1")).toBeNull();
+    expect(controllerContainment(hold({ reason: "remote_controller_process_space_unverified" }), "t1", "c1")).toBeNull();
+    expect(controllerContainment(hold({ controllerAuthority: { digest: "not-a-digest" } }), "t1", "c1")).toBeNull();
+    expect(controllerContainment(hold({}, { ownerType: "agent" }), "t1", "c1")).toBeNull();
+    expect(controllerContainment(hold({}, { status: "resolved" }), "t1", "c1")).toBeNull();
+  });
+
+  it("sends both stops, the reviewed outcome and the evidence, with the task's own status", () => {
+    const containment = controllerContainment(hold(), "t1", "c1")!;
+    expect(containmentBody(containment, "ra1", "in_progress", draft)).toEqual({
+      actionId: "ra1",
+      outcome: "restored",
+      sourceIssueStatus: "in_progress",
+      executionReconciliation: {
+        runId: RUN,
+        controllerStopped: true,
+        providerStopped: true,
+        controllerAuthorityDigest: DIGEST,
+        actionOutcome: "mixed",
+        outcomeEvidence: "Verified both stopped; reviewed every action.",
+      },
+    });
+  });
+
+  it("waits for both confirmations, an outcome and 20 characters of evidence", () => {
+    const containment = controllerContainment(hold(), "t1", "c1")!;
+    expect(containmentBody(containment, "ra1", "todo", { ...draft, controllerStopped: false })).toBeNull();
+    expect(containmentBody(containment, "ra1", "todo", { ...draft, providerStopped: false })).toBeNull();
+    expect(containmentBody(containment, "ra1", "todo", { ...draft, actionOutcome: "" })).toBeNull();
+    expect(containmentBody(containment, "ra1", "todo", { ...draft, evidence: "   too short    " })).toBeNull();
+  });
+
+  it("starts a fresh form for a new authority snapshot", () => {
+    expect(containmentFormKey("ra1", { runId: RUN, digest: DIGEST })).not.toBe(containmentFormKey("ra1", { runId: RUN, digest: "b".repeat(64) }));
   });
 });

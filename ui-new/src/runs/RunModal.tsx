@@ -53,6 +53,7 @@ import {
   resumePayload,
   retryOutcome,
   runDurationMs,
+  runErrorCodeLabel,
   runPosition,
   runStatusLabel,
   runStatusMeta,
@@ -665,7 +666,9 @@ function RunView(props: { runId: string }) {
                     {(error) => (
                       <p class="rm-alert" data-tone={status().tone === "red" ? "red" : "amber"}>
                         {error()}
-                        <Show when={current().errorCode}>{(code) => <span class="mono"> · {code()}</span>}</Show>
+                        <Show when={runErrorCodeLabel({ errorCode: current().errorCode, resultJson: (current().resultJson as Record<string, unknown> | null) ?? null })}>
+                          {(code) => <span class="mono"> · {code()}</span>}
+                        </Show>
                       </p>
                     )}
                   </Show>

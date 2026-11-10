@@ -343,6 +343,11 @@ export type TaskRetryReceipt = {
   requestId: string | null;
   accepted: boolean;
   stale: boolean;
+  /**
+   * What happened to a scheduled retry (since the 2026-11-10 sync, upstream #20283): `promoted` and
+   * `already_promoted` mean it started; the others mean it didn't, and `message` says why.
+   */
+  scheduledRetry?: { outcome: "promoted" | "already_promoted" | "gate_suppressed" | "waiting" | "no_scheduled_retry"; message: string };
   presentation: TaskInterruptionPresentation | null;
 };
 
@@ -361,6 +366,8 @@ export type RunForIssue = {
   invocationSource: string;
   errorCode?: string | null;
   error?: string | null;
+  /** A bounded code naming why a generic failure (such as `adapter_failed`) failed, e.g. `40001` (since the 2026-11-10 sync, #20483). */
+  failureCause?: string | null;
   usageJson: Record<string, unknown> | null;
   resultJson: Record<string, unknown> | null;
   retryOfRunId?: string | null;
@@ -403,3 +410,44 @@ export const issueContextApi = {
  */
 export const confirmOwnerGone = (id: string, data: { actionId: string; recordId: string; stopEvidence: string; recordVersion?: string }) =>
   api.post<{ recordId: string; status: "queued" | "released" }>(`/issues/${id}/recovery-actions/confirm-owner-gone`, data);
+
+/*
+ * Since the 2026-11-10 sync.
+ */
+
+/**
+ * An owner's or admin's word that a run which never recorded its process has stopped, with how they
+ * checked (20 to 12,000 characters, `confirmRunStoppedSchema`; upstream #20310). `runId` is the
+ * interruption's `observedRunId`. The parked Retry then starts; `alreadyStopped` means a stop was
+ * already on record, and `presentation` is the task's interruption afterwards. Refused with 409
+ * while a runner for the run is still running.
+ */
+export const confirmRunStopped = (id: string, data: { runId: string; stopEvidence: string }) =>
+  api.post<{ runId: string; alreadyStopped: boolean; presentation: TaskInterruptionPresentation | null }>(
+    `/issues/${id}/recovery-actions/confirm-run-stopped`,
+    data,
+  );
+
+/**
+ * Records original-host containment of a native run (upstream #19813): the board's word that the
+ * controller and the provider stopped on their original host, the reviewed outcome of the run's
+ * external actions and its evidence, bound to the server's authority digest
+ * (`evidence.controllerAuthority.digest`, never typed in). It settles the recovery action without
+ * changing the task's status or retrying. Board only (`runtime:confirm_owner_stop`).
+ */
+export const recordControllerContainment = (
+  id: string,
+  data: {
+    actionId: string;
+    outcome: "restored";
+    sourceIssueStatus: string;
+    executionReconciliation: {
+      runId: string;
+      controllerStopped: true;
+      providerStopped: true;
+      controllerAuthorityDigest: string;
+      actionOutcome: "completed" | "not_performed" | "mixed";
+      outcomeEvidence: string;
+    };
+  },
+) => api.post<{ issue: Issue; recoveryAction: IssueRecoveryAction }>(`/issues/${id}/recovery-actions/resolve`, data);
