@@ -21,7 +21,7 @@ this**.
 
 - Before the go-ahead on the outline, only read: `git fetch` is the one command that changes
   anything. Don't run `git sync-master`, create a branch, merge or install.
-- The only push before the result is approved is fast-forwarding `master` (`git sync-master`, step 4).
+- The only push before the result is approved is fast-forwarding `master` (step 4).
 - Never commit to `master`, never rebase, never force-push, never push the sync branch.
 - Never touch `new-ui` until the user approves the result.
 - Use `corepack pnpm`, not `pnpm`.
@@ -98,9 +98,16 @@ without the go-ahead.
 
 ## 4. Update master (after the go-ahead)
 
+Don't run `git sync-master`: it checks out `master`, which swaps the files under any dev server
+running from this checkout. Fast-forward `master` without a checkout instead:
+
 ```bash
 git status --porcelain                  # still empty
-git sync-master
+git fetch upstream
+git merge-base --is-ancestor origin/master upstream/master   # must succeed (a fast-forward), else stop and report
+git push origin upstream/master:master
+git branch -f master upstream/master
+git branch --set-upstream-to=origin/master master            # branch -f leaves it tracking upstream
 git log --oneline --no-merges $TIP..master | wc -l
 ```
 
@@ -122,10 +129,17 @@ Work over `$BASE..$TIP`. The outline already covers the summary by theme; add:
 
 ## 6. Merge on a sync branch
 
+Work in a separate worktree so the main checkout (and any dev servers running from it) stays on
+`new-ui`:
+
 ```bash
-git checkout -b sync/$(date +%F) new-ui      # add -2, -3 if the name exists
+git worktree add -b sync/$(date +%F) ../paperclip-sync/$(date +%F) new-ui   # add -2, -3 if the name exists
+cd ../paperclip-sync/$(date +%F)
 git merge $TIP --no-ff --no-commit
 ```
+
+Run steps 6–9 there. A fresh worktree needs `corepack pnpm install` and
+`corepack pnpm --filter @paperclipai/plugin-sdk build` before the checks.
 
 Resolve each conflict according to the policy below. Keep a note for each one: the file, what each
 side wanted, what you did and why.
@@ -252,10 +266,12 @@ an outcome the user has seen.
 
 ## 10. Finish (only after the user approves the result)
 
+In the main checkout (on `new-ui`):
+
 ```bash
-git checkout new-ui
 git merge --ff-only sync/<date>     # if new-ui moved meanwhile: git merge sync/<date> --no-edit
 git push origin new-ui
+git worktree remove ../paperclip-sync/<date>   # git worktree unlock first if it's locked
 git branch -d sync/<date>
 ```
 

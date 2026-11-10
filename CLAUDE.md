@@ -69,14 +69,38 @@ or package code.
 ## Common commands
 
 ```bash
-corepack pnpm dev                                    # server + old UI on :3100
+PAPERCLIP_AGENT_JWT_SECRET=$(openssl rand -hex 32) corepack pnpm dev  # server + old UI on :3100; without the secret (or BETTER_AUTH_SECRET) agent runs get no API key
 corepack pnpm --filter @paperclipai/ui-new dev       # new UI on :5174
+corepack pnpm --filter @paperclipai/ui-new exec vite --port 5181 --strictPort  # a second new UI, e.g. for an agent (5181–5184)
 corepack pnpm --filter @paperclipai/ui-new typecheck
+corepack pnpm --filter @paperclipai/ui-new test
 corepack pnpm --filter @paperclipai/ui-new inventory # regenerate the existing-UI inventory
-git sync-master                                      # fast-forward master from upstream and push it
+corepack pnpm --filter @paperclipai/plugin-sdk build # after install, a sync, or in a fresh worktree; else the server dies with "does not provide an export named …"
+git sync-master                                      # fast-forward master from upstream and push it (checks out master: see Gotchas)
 ```
 
 To sync with upstream, run the `upstream-sync` skill (`/upstream-sync`). It first outlines the
 unsynced upstream commits (features, bug fixes) and waits for your go-ahead. Then it merges on a
 `sync/<date>` branch, checks upstream's changes against FORK-PATCHES.md, regenerates the inventory,
 and moves `new-ui` only after approval. `git sync-ui` merges straight into `new-ui` and is the manual fallback.
+
+## Gotchas
+
+- Git worktrees here, including agents' `isolation: "worktree"`, start from `master`. Before working:
+  `git merge-base --is-ancestor new-ui HEAD || git reset --hard new-ui`.
+- `git sync-master` checks out `master`, so don't run it in a checkout the dev servers run from. Instead:
+  `git fetch upstream && git push origin upstream/master:master && git branch -f master upstream/master && git branch --set-upstream-to=origin/master master`.
+- Finished agent worktrees can be locked: `git worktree unlock <path>` before `git worktree remove`.
+- Stop a dev server by its port (`ss -ltnp | grep ':5181 '`), not `pkill -f <pattern>`, which also matches and kills the
+  shell running it.
+- Playwright's Chromium (in `~/.cache/ms-playwright`) needs `libnss3`, `libnspr4` and `libasound2t64`. If
+  `ldd` on its binary reports them missing, ask the user to run `sudo apt install -y libnss3 libnspr4 libasound2t64`
+  rather than extracting them into a temporary folder, which is gone after a restart.
+
+## Testing against the local instance
+
+- The test company is TES (`c3948f92-4af2-414f-81c4-88f1c59bf2ab`). Never change the agent Bob
+  (`8997b521-5718-4fce-988f-e79a301dc876`).
+- Browser checks stub every write (POST/PATCH/PUT/DELETE) with Playwright's `page.route`. Never wake an agent,
+  start a real run, or run a real OAuth flow.
+- Name throwaway data with an "M7 test" prefix and keep it. Throwaway agents stay paused.
