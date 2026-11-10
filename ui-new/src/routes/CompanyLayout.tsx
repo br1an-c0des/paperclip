@@ -16,7 +16,7 @@ import { CommandsProvider, useCommands } from "@/lib/commands";
 import { CompanyProvider, findCompanyByPrefix, rememberCompany, useCompaniesQuery, useCompany } from "@/lib/company";
 import { LiveEventsProvider } from "@/lib/live-events";
 import { useLiveToasts } from "@/lib/live-toasts";
-import { useGlobalShortcuts } from "@/lib/shortcuts";
+import { focusPageSearch, useGlobalShortcuts } from "@/lib/shortcuts";
 import { RunModal } from "@/runs/RunModal";
 import { AppShellOverlays } from "@/plugins/ShellPlugins";
 import { Announcements } from "@/shell/Announcements";
@@ -134,7 +134,9 @@ function CompanyShell(props: ParentProps) {
           if (!commands.newTask()) commands.setPaletteOpen(!commands.paletteOpen());
           return;
         case "search":
-          return commands.setPaletteOpen(true);
+          // The page's own search box where it has one (the task list's), else the palette.
+          if (!focusPageSearch()) commands.setPaletteOpen(true);
+          return;
         case "new-task":
           return commands.openNewTask();
         case "cheatsheet":

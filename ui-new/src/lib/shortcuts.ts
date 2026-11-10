@@ -6,7 +6,8 @@ import type { SubmitKey } from "@/tasks/composer/submit-key";
  * ui/src/components/KeyboardShortcutsCheatsheet.tsx:
  *
  * - Cmd/Ctrl+K opens the command palette, from anywhere.
- * - `c` new task, `/` search, `?` the cheatsheet, `g` then `i` the Inbox, `g` then `d` the Org
+ * - `c` new task, `/` search (the page's own search box where it has one, such as the task list's,
+ *   else the palette), `?` the cheatsheet, `g` then `i` the Inbox, `g` then `d` the Org
  *   dashboard, `[` folds the nav to its icon rail and back, Shift+`[` hides or shows it. These
  *   don't fire while typing in a field or while a dialog is open. (In settings, whose sidebar has
  *   no rail, `[` hides and shows the sidebar; routes/CompanyLayout.tsx.)
@@ -156,6 +157,21 @@ export function isTextInputTarget(target: EventTarget | null) {
   if (tag !== "INPUT") return false;
   const type = (target as HTMLInputElement).type;
   return !["checkbox", "radio", "button", "submit", "reset", "range", "color", "file"].includes(type);
+}
+
+/** The event a page's search slot (`data-page-search`) gets when `/` asks it to open and take focus. */
+export const PAGE_SEARCH_EVENT = "pagesearch";
+
+/**
+ * Hands `/` to the page's own search, as the old UI's `data-page-search-target` did: the first
+ * element marked `data-page-search` gets a `pagesearch` event, and opens and focuses its field.
+ * Returns false when the page has none, so the caller opens the palette instead.
+ */
+export function focusPageSearch(root: ParentNode = document) {
+  const slot = root.querySelector("[data-page-search]");
+  if (!slot) return false;
+  slot.dispatchEvent(new CustomEvent(PAGE_SEARCH_EVENT));
+  return true;
 }
 
 /** A dialog that owns the keyboard: the shared Dialog wrapper marks its content `data-layer`. */

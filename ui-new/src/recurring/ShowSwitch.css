@@ -35,6 +35,11 @@
   padding-right: 8px;
 }
 
+/* Shown only where the task list's toolbar folds the switch to icons (TasksView.css) */
+.rshow-fold-icon {
+  display: none;
+}
+
 .rshow-count {
   display: inline-grid;
   place-items: center;

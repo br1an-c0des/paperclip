@@ -19,6 +19,16 @@
   white-space: nowrap;
 }
 
+.seg button:has(.seg-icon) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.seg-icon {
+  display: inline-flex;
+}
+
 .seg button:hover {
   color: var(--text);
 }

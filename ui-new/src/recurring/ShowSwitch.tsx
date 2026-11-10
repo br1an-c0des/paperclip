@@ -1,5 +1,5 @@
 import { useSearchParams } from "@solidjs/router";
-import { Repeat } from "lucide-solid";
+import { ListChecks, Repeat } from "lucide-solid";
 import { Show } from "solid-js";
 import { useRoutinesQuery } from "./queries";
 import "./ShowSwitch.css";
@@ -8,6 +8,9 @@ import "./ShowSwitch.css";
  * Show: Tasks or Recurring, at the start of the task list's toolbar (board R1). It's kept in the
  * URL (`?show=recurring`), so the old `/routines` links can land on it. Recurring counts the
  * recurring tasks that aren't archived.
+ *
+ * Its labels are `rshow-text`, and Tasks has an icon (`rshow-fold-icon`) that stays hidden, so the
+ * task list's toolbar can fold the switch to icons when it's short of room (TasksView.css).
  */
 
 export function showsRecurring(show: string | undefined) {
@@ -32,12 +35,20 @@ export function ShowSwitch(props: { projectId?: string }) {
   };
   return (
     <div class="rshow" role="group" aria-label="Show" onKeyDown={onKeyDown}>
-      <button type="button" aria-pressed={!recurring()} tabindex={recurring() ? -1 : 0} onClick={() => pick(false)}>
-        Tasks
+      <button type="button" aria-pressed={!recurring()} tabindex={recurring() ? -1 : 0} aria-label="Tasks" title="Tasks" onClick={() => pick(false)}>
+        <ListChecks size={14} aria-hidden="true" class="rshow-fold-icon" />
+        <span class="rshow-text">Tasks</span>
       </button>
-      <button type="button" aria-pressed={recurring()} tabindex={recurring() ? 0 : -1} onClick={() => pick(true)}>
+      <button
+        type="button"
+        aria-pressed={recurring()}
+        tabindex={recurring() ? 0 : -1}
+        aria-label={routines.data ? `Recurring, ${count()}` : "Recurring"}
+        title="Recurring tasks"
+        onClick={() => pick(true)}
+      >
         <Repeat size={14} aria-hidden="true" />
-        Recurring
+        <span class="rshow-text">Recurring</span>
         <Show when={routines.data}>
           <span class="rshow-count">{count()}</span>
         </Show>

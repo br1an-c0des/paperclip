@@ -1,7 +1,7 @@
 import type { CompactIssue, IssueDisplayStatus, IssuePriority } from "@paperclipai/shared";
 import { useLocation, useSearchParams } from "@solidjs/router";
 import { createQuery, keepPreviousData, useQueryClient } from "@tanstack/solid-query";
-import { ArrowUpDown, ChevronDown, CircleCheck, CornerDownRight, ListFilter, Plus, Repeat, Search, UserRound, X } from "lucide-solid";
+import { ArrowUpDown, ChevronDown, CircleCheck, Columns3, CornerDownRight, Kanban, List, ListFilter, Plus, Repeat, Rows3, Search, UserRound, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
 import { isTemporaryApiError } from "@/api/client";
 import { describeError } from "@/lib/offline/errors";
@@ -24,6 +24,7 @@ import { boardCollapseKey, boardColumns, boardStartsCollapsed, CLOSED_STATUSES }
 import { BoardView } from "./BoardView";
 import { EXTERNAL_STATUS_FILTERS, matchesExternalStatus } from "./external-objects";
 import { buildTaskGroups, PRIORITY_ORDER, shownRows, startsCollapsed, STATUS_FILTER_ORDER, type GroupNames, type TaskGroup } from "./list-model";
+import { ListSearch } from "./ListSearch";
 import { useTaskPeople } from "./people";
 import { AssigneeItems, LabelDot, LabelItems, PriorityItems, StatusItems } from "./pickers";
 import { useTaskRetry } from "./retry";
@@ -39,6 +40,8 @@ import { parseListUrl, PREFILTER_PARAMS, sortParams, withUrlFilters } from "./vi
 import {
   applyFilters,
   creatorKey,
+  DEFAULT_SORT,
+  DEFAULT_VIEW_STATE,
   EMPTY_FILTERS,
   filterCount,
   GROUP_BY_OPTIONS,
@@ -442,7 +445,8 @@ export function TasksView(props: {
     return id ? (people.agent(id)?.name ?? "an agent") : null;
   };
 
-  const searchField = () => (
+  // On phones the search opens under the toolbar, behind its icon.
+  const phoneSearchField = () => (
     <label class="tv-search">
       <Search size={14} aria-hidden="true" />
       <TextInput
@@ -457,171 +461,207 @@ export function TasksView(props: {
         }}
         placeholder="Search tasks"
         aria-label="Search tasks"
-        autofocus={phone()}
+        autofocus
       />
     </label>
+  );
+  const groupText = () => (groupBy() === "none" ? "No grouping" : `${layout() === "board" ? "Columns" : "Group"}: ${groupLabel()}`);
+  const layoutOptions = LAYOUT_OPTIONS.map((option) => ({
+    ...option,
+    icon: option.value === "board" ? <Kanban size={14} aria-hidden="true" /> : <List size={14} aria-hidden="true" />,
+  }));
+
+  /*
+   * The toolbar folds in steps as the room beside its optional controls shrinks (TasksView.css),
+   * so it stays on one line, beside a docked panel too. Each control carries the step it folds at
+   * (`tv-f1`…`tv-f6`): its label (`tv-text`) gives way to its icon, named and titled with the full
+   * label, and a dot (`tv-mark`) or count (`tv-badge`) keeps a setting in force in view. The
+   * controls only some lists have are marked `tv-x-*`; the wrappers leave room for them, so the
+   * same steps serve every list. Phones keep their own toolbar.
+   */
+  const toolbar = () => (
+    <div class="tv-toolbar" classList={{ "tv-toolbar--phone": phone(), "tv-toolbar--fold": !phone() }} role="toolbar" aria-label="Task list">
+      <Show when={phone()}>
+        <Button
+          variant="icon"
+          class="tv-toggle"
+          aria-pressed={searchOpen() || !!search()}
+          aria-label="Search tasks"
+          onClick={() => setSearchOpen(!searchOpen())}
+        >
+          <Search size={15} aria-hidden="true" />
+        </Button>
+      </Show>
+      <Show when={!phone()}>
+        <ShowSwitch projectId={props.projectId} />
+      </Show>
+      <Show when={!props.layout && !phone()}>
+        <span class="tv-x-layout">
+          <Segmented label="Layout" options={layoutOptions} value={view().layout} onChange={(next) => changeView({ layout: next })} />
+        </span>
+      </Show>
+      <Show when={!phone()}>
+      <SavedViewsMenu
+        class="tv-f3"
+        views={savedViews()}
+        current={currentView()}
+        edited={editedView()}
+        onPick={pickView}
+        onSave={(name) => {
+          const views = addView(savedViews(), name, settings());
+          storeViews(views);
+          changeView({ savedViewId: views.at(-1)!.id });
+        }}
+        onUpdate={(saved) => storeViews(updateView(savedViews(), saved.id, settings()))}
+        onRename={(saved, name) => storeViews(renameView(savedViews(), saved.id, name))}
+        onDelete={(saved) => storeViews(deleteView(savedViews(), saved.id))}
+      />
+      </Show>
+      <Menu>
+        <Menu.Trigger as={Button} class="tv-f2" aria-label={groupText()} title={groupText()}>
+          <Show when={layout() === "board"} fallback={<Rows3 size={14} aria-hidden="true" class="tv-fold-icon" />}>
+            <Columns3 size={14} aria-hidden="true" class="tv-fold-icon" />
+          </Show>
+          <span class="tv-text">{groupText()}</span>
+          <ChevronDown size={12} stroke-width={2} aria-hidden="true" class="tv-caret" />
+          <Show when={groupBy() !== DEFAULT_VIEW_STATE.groupBy}>
+            <span class="tv-mark" aria-hidden="true" />
+          </Show>
+        </Menu.Trigger>
+        <Menu.Content label={layout() === "board" ? "Columns by" : "Group by"} width={220}>
+          <For each={groupOptions()}>
+            {(option) => (
+              <Menu.Item
+                hint={groupBy() === option.value ? "✓" : undefined}
+                onSelect={() => {
+                  changeView({ groupBy: option.value });
+                  // Picking a grouping takes over from the URL's.
+                  if (url().groupBy) setParams({ group: undefined }, { replace: true, scroll: false });
+                }}
+              >
+                {option.label}
+              </Menu.Item>
+            )}
+          </For>
+        </Menu.Content>
+      </Menu>
+      <Show when={casesOn() && !phone()}>
+        <Button
+          class="tv-toggle tv-f1 tv-x-case"
+          aria-pressed={filters().inCase}
+          aria-label="In a case"
+          title={filters().inCase ? "Show every task" : "Show only tasks in a case"}
+          onClick={() => changeFilters({ inCase: !filters().inCase })}
+        >
+          <CaseIcon size={14} />
+          <span class="tv-text">In a case</span>
+        </Button>
+      </Show>
+      <Show when={phone()}>
+        <FilterMenu
+          filters={filters()}
+          external={externalOn()}
+          cases={casesOn()}
+          people={people}
+          creators={creatorKeys()}
+          projects={props.projectId ? [] : projectOptions()}
+          workspaces={workspaceOptions()}
+          onOpenChange={setFilterMenuOpen}
+          onChange={changeFilters}
+        />
+        <Show when={youKey()}>
+          {(key) => (
+            <Button
+              class="tv-toggle"
+              aria-pressed={mine()}
+              onClick={() => changeFilters({ assignees: mine() ? [] : [key()] })}
+            >
+              <UserRound size={14} aria-hidden="true" />
+              Assigned to me
+            </Button>
+          )}
+        </Show>
+      </Show>
+      <SortMenu sort={view().sort} onChange={(sort) => changeView({ sort })} />
+      <Show when={layout() === "board"}>
+        <Button
+          variant="icon"
+          ghost
+          class="tv-toggle tv-x-subtasks"
+          aria-pressed={view().board.subtasks}
+          aria-label="Show subtasks on cards"
+          title="Show subtasks on cards"
+          onClick={() => changeBoard({ subtasks: !view().board.subtasks })}
+        >
+          <CornerDownRight size={16} aria-hidden="true" />
+        </Button>
+      </Show>
+      <span class="tv-toolbar-end">
+        <Show when={!phone()}>
+        <FilterMenu
+          filters={filters()}
+          external={externalOn()}
+          cases={casesOn()}
+          people={people}
+          creators={creatorKeys()}
+          projects={props.projectId ? [] : projectOptions()}
+          workspaces={workspaceOptions()}
+          onOpenChange={setFilterMenuOpen}
+          onChange={changeFilters}
+          onClear={clearFilters}
+        />
+        </Show>
+        <Show when={activeFilters() > 0}>
+          <Button ghost size="compact" class="tv-f1 tv-x-clear" aria-label="Clear filters" title="Clear filters" onClick={clearFilters}>
+            <X size={14} aria-hidden="true" class="tv-fold-icon" />
+            <span class="tv-text">Clear filters</span>
+          </Button>
+        </Show>
+        <Show when={layout() === "board"}>
+          <Button
+            ghost
+            size="compact"
+            class="tv-toggle tv-f1 tv-x-closed"
+            aria-pressed={view().board.closed}
+            aria-label="Closed"
+            title={view().board.closed ? "Hide the Done and Cancelled columns" : "Show the Done and Cancelled columns"}
+            onClick={() => changeBoard({ closed: !view().board.closed })}
+          >
+            <CircleCheck size={14} aria-hidden="true" />
+            <span class="tv-text">Closed</span>
+          </Button>
+        </Show>
+      </span>
+      <Show when={!phone()}>
+        <ListSearch value={search()} onInput={(value) => setSearch(value)} label="Search tasks" />
+      </Show>
+      {/* On phones the dock's round button adds a task. */}
+      <Show when={!phone()}>
+        <Button
+          variant="primary"
+          class="tv-new tv-f6"
+          aria-label="New task"
+          title="New task"
+          onClick={() => commands.openNewTask(props.projectId ? { projectId: props.projectId } : {})}
+        >
+          <Plus size={15} stroke-width={2.4} aria-hidden="true" />
+          <span class="tv-text">Task</span>
+        </Button>
+      </Show>
+    </div>
   );
 
   return (
     <Show when={!recurring()} fallback={<RecurringView projectId={props.projectId} tasks={props.tasks} />}>
-      <div class="tv-toolbar" classList={{ "tv-toolbar--phone": phone() }} role="toolbar" aria-label="Task list">
-        <Show when={phone()}>
-          <Button
-            variant="icon"
-            class="tv-toggle"
-            aria-pressed={searchOpen() || !!search()}
-            aria-label="Search tasks"
-            onClick={() => setSearchOpen(!searchOpen())}
-          >
-            <Search size={15} aria-hidden="true" />
-          </Button>
-        </Show>
-        <Show when={!phone()}>
-          <ShowSwitch projectId={props.projectId} />
-        </Show>
-        <Show when={!props.layout && !phone()}>
-          <Segmented
-            label="Layout"
-            options={LAYOUT_OPTIONS}
-            value={view().layout}
-            onChange={(next) => changeView({ layout: next })}
-          />
-        </Show>
-        <Show when={!phone()}>
-        <SavedViewsMenu
-          views={savedViews()}
-          current={currentView()}
-          edited={editedView()}
-          onPick={pickView}
-          onSave={(name) => {
-            const views = addView(savedViews(), name, settings());
-            storeViews(views);
-            changeView({ savedViewId: views.at(-1)!.id });
-          }}
-          onUpdate={(saved) => storeViews(updateView(savedViews(), saved.id, settings()))}
-          onRename={(saved, name) => storeViews(renameView(savedViews(), saved.id, name))}
-          onDelete={(saved) => storeViews(deleteView(savedViews(), saved.id))}
-        />
-        </Show>
-        <Menu>
-          <Menu.Trigger as={Button}>
-            {groupBy() === "none" ? "No grouping" : `${layout() === "board" ? "Columns" : "Group"}: ${groupLabel()}`}
-            <ChevronDown size={12} stroke-width={2} aria-hidden="true" class="tv-caret" />
-          </Menu.Trigger>
-          <Menu.Content label={layout() === "board" ? "Columns by" : "Group by"} width={220}>
-            <For each={groupOptions()}>
-              {(option) => (
-                <Menu.Item
-                  hint={groupBy() === option.value ? "✓" : undefined}
-                  onSelect={() => {
-                    changeView({ groupBy: option.value });
-                    // Picking a grouping takes over from the URL's.
-                    if (url().groupBy) setParams({ group: undefined }, { replace: true, scroll: false });
-                  }}
-                >
-                  {option.label}
-                </Menu.Item>
-              )}
-            </For>
-          </Menu.Content>
-        </Menu>
-        <Show when={casesOn() && !phone()}>
-          <Button
-            class="tv-toggle"
-            aria-pressed={filters().inCase}
-            title={filters().inCase ? "Show every task" : "Show only tasks in a case"}
-            onClick={() => changeFilters({ inCase: !filters().inCase })}
-          >
-            <CaseIcon size={14} />
-            In a case
-          </Button>
-        </Show>
-        <Show when={phone()}>
-          <FilterMenu
-            filters={filters()}
-            external={externalOn()}
-            cases={casesOn()}
-            people={people}
-            creators={creatorKeys()}
-            projects={props.projectId ? [] : projectOptions()}
-            workspaces={workspaceOptions()}
-            onOpenChange={setFilterMenuOpen}
-            onChange={changeFilters}
-          />
-          <Show when={youKey()}>
-            {(key) => (
-              <Button
-                class="tv-toggle"
-                aria-pressed={mine()}
-                onClick={() => changeFilters({ assignees: mine() ? [] : [key()] })}
-              >
-                <UserRound size={14} aria-hidden="true" />
-                Assigned to me
-              </Button>
-            )}
-          </Show>
-        </Show>
-        <SortMenu sort={view().sort} onChange={(sort) => changeView({ sort })} />
-        <Show when={layout() === "board"}>
-          <Button
-            variant="icon"
-            ghost
-            class="tv-toggle"
-            aria-pressed={view().board.subtasks}
-            aria-label="Show subtasks on cards"
-            title="Show subtasks on cards"
-            onClick={() => changeBoard({ subtasks: !view().board.subtasks })}
-          >
-            <CornerDownRight size={16} aria-hidden="true" />
-          </Button>
-        </Show>
-        <span class="tv-toolbar-end">
-          <Show when={!phone()}>
-          <FilterMenu
-            filters={filters()}
-            external={externalOn()}
-            cases={casesOn()}
-            people={people}
-            creators={creatorKeys()}
-            projects={props.projectId ? [] : projectOptions()}
-            workspaces={workspaceOptions()}
-            onOpenChange={setFilterMenuOpen}
-            onChange={changeFilters}
-          />
-          </Show>
-          <Show when={activeFilters() > 0}>
-            <Button ghost size="compact" onClick={clearFilters}>
-              Clear filters
-            </Button>
-          </Show>
-          <Show when={layout() === "board"}>
-            <Button
-              ghost
-              size="compact"
-              class="tv-toggle"
-              aria-pressed={view().board.closed}
-              title={view().board.closed ? "Hide the Done and Cancelled columns" : "Show the Done and Cancelled columns"}
-              onClick={() => changeBoard({ closed: !view().board.closed })}
-            >
-              <CircleCheck size={14} aria-hidden="true" />
-              Closed
-            </Button>
-          </Show>
-        </span>
-        <Show when={!phone()}>{searchField()}</Show>
-        {/* On phones the dock's round button adds a task. */}
-        <Show when={!phone()}>
-          <Button
-            variant="primary"
-            class="tv-new"
-            onClick={() => commands.openNewTask(props.projectId ? { projectId: props.projectId } : {})}
-          >
-            <Plus size={15} stroke-width={2.4} aria-hidden="true" />
-            Task
-          </Button>
-        </Show>
-      </div>
-      <Show when={phone() && (searchOpen() || search())}>{searchField()}</Show>
+      <Show when={!phone()} fallback={toolbar()}>
+        {/* The room the folding steps measure, less the optional controls (TasksView.css) */}
+        <div class="tv-room">
+          <div class="tv-room-icons">
+            <div class="tv-room-search">{toolbar()}</div>
+          </div>
+        </div>
+      </Show>
+      <Show when={phone() && (searchOpen() || search())}>{phoneSearchField()}</Show>
       <Show when={participantName()}>
         {(name) => (
           <div class="tv-scope">
@@ -734,12 +774,18 @@ function SortMenu(props: { sort: TaskViewState["sort"]; onChange: (sort: TaskVie
   const label = () => SORT_OPTIONS.find((option) => option.value === props.sort.field)?.label ?? "Updated";
   const dirs = () => dirLabels(props.sort.field);
   const pick = (field: SortField) => props.onChange(field === props.sort.field ? props.sort : { field, dir: defaultDir(field) });
+  const name = () => `Sort: ${label()}, ${dirs()[props.sort.dir].toLowerCase()}`;
+  const moved = () => props.sort.field !== DEFAULT_SORT.field || props.sort.dir !== DEFAULT_SORT.dir;
   return (
     <Menu>
-      <Menu.Trigger as={Button} aria-label={`Sort: ${label()}, ${dirs()[props.sort.dir].toLowerCase()}`}>
+      <Menu.Trigger as={Button} class="tv-f1" aria-label={name()} title={name()}>
         <ArrowUpDown size={14} aria-hidden="true" />
-        Sort: {label()}
+        <span class="tv-text">Sort: {label()}</span>
         <ChevronDown size={12} stroke-width={2} aria-hidden="true" class="tv-caret" />
+        {/* Another order than the default, once the toolbar folds the label away */}
+        <Show when={moved()}>
+          <span class="tv-mark" aria-hidden="true" />
+        </Show>
       </Menu.Trigger>
       <Menu.Content label="Sort tasks" width={240}>
         <Menu.Group label="Sort by">
@@ -787,9 +833,12 @@ function FilterMenu(props: {
   cases: boolean;
   onOpenChange: (open: boolean) => void;
   onChange: (next: Partial<TaskFilters>) => void;
+  /** Offer Clear filters at the top too, for the tightest toolbar, which drops its own button. */
+  onClear?: () => void;
 }) {
   const labels = useLabelsQuery();
   const count = () => filterCount(props.filters);
+  const text = () => (count() > 0 ? `${count()} ${count() === 1 ? "filter" : "filters"}` : "Filter");
   const assignee = (key: string) => ({
     checked: props.filters.assignees.includes(key),
     onChange: () => props.onChange({ assignees: toggled(props.filters.assignees, key) }),
@@ -811,11 +860,21 @@ function FilterMenu(props: {
   });
   return (
     <Menu onOpenChange={props.onOpenChange}>
-      <Menu.Trigger as={Button} classList={{ "tv-filter--on": count() > 0 }}>
+      <Menu.Trigger as={Button} class="tv-f5" classList={{ "tv-filter--on": count() > 0 }} aria-label={text()} title={text()}>
         <ListFilter size={14} aria-hidden="true" />
-        {count() > 0 ? `${count()} ${count() === 1 ? "filter" : "filters"}` : "Filter"}
+        <span class="tv-text">{text()}</span>
+        {/* The count, once the toolbar folds the label away */}
+        <Show when={count() > 0}>
+          <span class="tv-badge" aria-hidden="true">
+            {count()}
+          </span>
+        </Show>
       </Menu.Trigger>
       <Menu.Content label="Filter tasks" width={270}>
+        <Show when={props.onClear && count() > 0}>
+          <Menu.Item onSelect={() => props.onClear?.()}>Clear filters</Menu.Item>
+          <Menu.Separator />
+        </Show>
         <Menu.Group label="Show">
           <Menu.CheckboxItem
             icon={<RunningPill compact label="Live" />}

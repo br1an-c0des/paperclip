@@ -108,6 +108,322 @@
   flex-wrap: wrap;
 }
 
+/*
+ * Folding (TasksView.tsx `toolbar`): on tablet and desktop the toolbar keeps to one line by folding
+ * labels to icons in steps, least needed first, as main narrows (beside a docked panel, say):
+ *
+ *   1. Sort, In a case, Clear filters and the board's Closed
+ *   2. Group (Columns on the board)
+ *   3. Views
+ *   4. Search, to its magnifying glass (ListSearch.tsx)
+ *   5. Show (Tasks | Recurring), the layout switch and Filter
+ *   6. + Task, and the recurring count
+ *   7. Tighter: 30px buttons and gaps of 3px, and Clear filters only in the Filter menu; past
+ *      that, the row scrolls sideways
+ *
+ * The steps measure the room the always-there controls have, not main itself: three wrappers, each
+ * main's width, pad off what only some lists show (`tv-x-*`: the layout switch, In a case, Clear
+ * filters, the board's two switches). `tv-room` leaves them out at their labelled widths, for
+ * step 1; `tv-room-icons` folded, for steps 2–4; `tv-room-search` also leaves room for the search
+ * while it's open as a field in a folded toolbar, for steps 5–7, so opening it folds what follows.
+ * The toolbar reaches back across the padding to main's full width.
+ *
+ * Each threshold is what the always-there controls measured at the step before (Show 197px with its
+ * count, Views 110, Group 140, Sort 160, Filter 88, Search 240, + Task 85, gaps 6), plus a little for longer labels (Group: Parent task). A label longer still
+ * (a long saved view's name is cut at 64px once folding starts) wraps the row as before.
+ */
+.tv-room {
+  container: tvroom-labels / inline-size;
+  --tv-xl: calc(var(--tv-xl-layout, 0px) + var(--tv-xl-case, 0px) + var(--tv-xl-clear, 0px) + var(--tv-x-subtasks, 0px) + var(--tv-xl-closed, 0px));
+  --tv-xi: calc(var(--tv-xl-layout, 0px) + var(--tv-xi-case, 0px) + var(--tv-xi-clear, 0px) + var(--tv-x-subtasks, 0px) + var(--tv-xi-closed, 0px));
+  padding-right: var(--tv-xl);
+}
+
+/* Each optional control's width with its gap: labelled (`xl`), then folded (`xi`). The layout
+   switch counts at its labelled width throughout, so from step 5 the index folds about 46px early. */
+.tv-room:has(.tv-x-layout) {
+  --tv-xl-layout: 118px;
+}
+
+.tv-room:has(.tv-x-case) {
+  --tv-xl-case: 118px;
+  --tv-xi-case: 44px;
+}
+
+/* With filters on, Clear filters, and "2 filters" in place of "Filter" */
+.tv-room:has(.tv-x-clear) {
+  --tv-xl-clear: 136px;
+  --tv-xi-clear: 62px;
+}
+
+.tv-room:has(.tv-x-subtasks) {
+  --tv-x-subtasks: 42px;
+}
+
+.tv-room:has(.tv-x-closed) {
+  --tv-xl-closed: 96px;
+  --tv-xi-closed: 38px;
+}
+
+.tv-room:has(.tv-search-slot--open) {
+  --tv-xs: 202px;
+}
+
+.tv-room-icons {
+  container: tvroom-icons / inline-size;
+  margin-right: calc(-1 * var(--tv-xl));
+  padding-right: var(--tv-xi);
+}
+
+.tv-room-search {
+  container: tvroom-search / inline-size;
+  padding-right: var(--tv-xs, 0px);
+}
+
+.tv-room-search > .tv-toolbar {
+  margin-right: calc(-1 * (var(--tv-xi) + var(--tv-xs, 0px)));
+}
+
+.tv-x-layout {
+  display: contents;
+}
+
+/* What only a folded control shows, and the parts of the search only a folded toolbar uses */
+.tv-fold-icon,
+.tv-mark,
+.tv-badge,
+.tv-toolbar .tv-search-toggle,
+.tv-toolbar .seg-icon {
+  display: none;
+}
+
+.tv-toolbar--fold .btn {
+  position: relative;
+}
+
+.tv-toolbar--fold :is(.seg, .rshow) {
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+}
+
+.tv-toolbar--fold .tv-search-toggle {
+  width: 38px;
+  height: 38px;
+}
+
+.tv-search-slot {
+  display: flex;
+  flex-shrink: 0;
+}
+
+/* A setting in force, on a folded control: a dot, or the filter count */
+.tv-mark {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--run-fg);
+  box-shadow: 0 0 0 2px var(--card);
+}
+
+.tv-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: var(--r-pill);
+  background: var(--run-fg);
+  box-shadow: 0 0 0 2px var(--ground);
+  color: var(--card);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 17px;
+  text-align: center;
+}
+
+@container tvroom-labels (width < 1080px) {
+  .tv-toolbar--fold .tv-f1 > :is(.tv-text, .tv-caret) {
+    display: none;
+  }
+
+  .tv-toolbar--fold .tv-f1 > :is(.tv-fold-icon, .tv-mark, .tv-badge) {
+    display: block;
+  }
+
+  .tv-toolbar--fold .tv-f1 {
+    width: 38px;
+    padding: 0;
+  }
+
+  .tv-toolbar--fold .tv-f1.btn--compact {
+    width: 32px;
+  }
+
+  /* A long saved view's name gives way sooner, so the steps can count on its width */
+  .tv-toolbar--fold .sv-label {
+    max-width: 64px;
+  }
+}
+
+@container tvroom-icons (width < 958px) {
+  .tv-toolbar--fold .tv-f2 > :is(.tv-text, .tv-caret) {
+    display: none;
+  }
+
+  .tv-toolbar--fold .tv-f2 > :is(.tv-fold-icon, .tv-mark, .tv-badge) {
+    display: block;
+  }
+
+  .tv-toolbar--fold .tv-f2 {
+    width: 38px;
+    padding: 0;
+  }
+}
+
+@container tvroom-icons (width < 852px) {
+  .tv-toolbar--fold .tv-f3 > :is(.tv-text, .tv-caret) {
+    display: none;
+  }
+
+  .tv-toolbar--fold .tv-f3 > :is(.tv-fold-icon, .tv-mark, .tv-badge) {
+    display: block;
+  }
+
+  .tv-toolbar--fold .tv-f3 {
+    width: 38px;
+    padding: 0;
+  }
+}
+
+/* Search: the magnifying glass, until it's open (pressed, `/`, focused or holding a search) */
+@container tvroom-icons (width < 772px) {
+  .tv-toolbar--fold .tv-search-slot:not(.tv-search-slot--open) > .tv-search {
+    display: none;
+  }
+
+  .tv-toolbar--fold .tv-search-slot:not(.tv-search-slot--open) > .tv-search-toggle {
+    display: inline-flex;
+  }
+
+  /* Open here, the field gives up width before the row runs out of room, and the row only then
+     scrolls (step 7's fallback) */
+  .tv-toolbar--fold:has(.tv-search-slot--open) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-block: -5px;
+    padding-block: 5px;
+    scrollbar-width: none;
+  }
+
+  .tv-toolbar--fold .tv-search-slot--open {
+    flex: 0 1 240px;
+    min-width: 160px;
+  }
+
+  .tv-toolbar--fold .tv-search-slot--open > .tv-search {
+    width: 100%;
+  }
+}
+
+@container tvroom-search (width < 566px) {
+  .tv-toolbar--fold :is(.rshow-text, .seg-text) {
+    display: none;
+  }
+
+  .tv-toolbar--fold :is(.rshow-fold-icon, .seg-icon) {
+    display: block;
+  }
+
+  .tv-toolbar--fold .rshow button {
+    padding: 0 10px;
+  }
+
+  .tv-toolbar--fold .rshow button:has(.rshow-count) {
+    padding-right: 6px;
+  }
+
+  .tv-toolbar--fold .seg button {
+    padding: 0 9px;
+  }
+
+  .tv-toolbar--fold .tv-f5 > :is(.tv-text, .tv-caret) {
+    display: none;
+  }
+
+  .tv-toolbar--fold .tv-f5 > :is(.tv-fold-icon, .tv-mark, .tv-badge) {
+    display: block;
+  }
+
+  .tv-toolbar--fold .tv-f5 {
+    width: 38px;
+    padding: 0;
+  }
+}
+
+@container tvroom-search (width < 412px) {
+  .tv-toolbar--fold .rshow-count {
+    display: none;
+  }
+
+  .tv-toolbar--fold .rshow button:has(.rshow-count) {
+    padding: 0 10px;
+  }
+
+  .tv-toolbar--fold .tv-f6 > :is(.tv-text, .tv-caret) {
+    display: none;
+  }
+
+  .tv-toolbar--fold .tv-f6 {
+    width: 38px;
+    padding: 0;
+  }
+}
+
+/* The tightest: smaller buttons and gaps, and should even that not do, the row scrolls sideways
+   rather than wrap (as on phones) */
+@container tvroom-search (width < 342px) {
+  .tv-toolbar--fold,
+  .tv-toolbar--fold .tv-toolbar-end {
+    gap: 3px;
+  }
+
+  .tv-toolbar--fold {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-block: -5px;
+    padding-block: 5px;
+    scrollbar-width: none;
+  }
+
+  .tv-toolbar--fold::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tv-toolbar--fold .btn:is(.tv-f1, .tv-f2, .tv-f3, .tv-f5, .tv-f6, .tv-search-toggle, .tv-x-subtasks) {
+    width: 30px;
+    height: 30px;
+  }
+
+  .tv-toolbar--fold .rshow {
+    padding: 3px;
+  }
+
+  .tv-toolbar--fold :is(.rshow, .seg) button {
+    height: 26px;
+    padding: 0 6px;
+  }
+
+  /* Clear filters moves into the Filter menu, which offers it at the top */
+  .tv-toolbar--fold .tv-x-clear {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
   .tv-toolbar-end {
     margin-left: 0;
