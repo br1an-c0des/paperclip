@@ -69,6 +69,11 @@
   display: inline;
 }
 
+/* A phone's header is short of room: the parent takes what's left, and (TaskPanel.css,
+   TaskModal.css) the project disc steps aside for it. */
 :root[data-viewport="phone"] .tparent {
-  max-width: 55%;
+  flex: 0 1 auto;
+  max-width: none;
+  margin-left: 0;
+  padding-inline: 4px;
 }

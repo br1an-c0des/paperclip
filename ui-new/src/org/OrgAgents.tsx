@@ -223,7 +223,8 @@ export function OrgAgents() {
             onOpen={() => setFilterMenuOpened(true)}
             onChange={setRoster}
           />
-          <Show when={rosterActive() > 0}>
+          {/* A phone's toolbar has no room for it; the menu's All choices and the empty list clear them there. */}
+          <Show when={rosterActive() > 0 && !isCompact()}>
             <Button size="compact" ghost onClick={() => setRoster(EMPTY_ROSTER_FILTERS)}>
               Clear filters
             </Button>
@@ -440,6 +441,10 @@ function RosterFilterMenu(props: {
             </>
           )}
         </For>
+        <Show when={active() > 0}>
+          <Menu.Separator />
+          <Menu.Item onSelect={() => props.onChange(EMPTY_ROSTER_FILTERS)}>Clear filters</Menu.Item>
+        </Show>
       </Menu.Content>
     </Menu>
   );

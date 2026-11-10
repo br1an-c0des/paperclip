@@ -82,3 +82,8 @@
 [data-mode="sheet"] .tmodal-project-name {
   display: none;
 }
+
+/* On a phone the parent task (U104) is the header's context, so the project disc steps aside. */
+:root[data-viewport="phone"] .tmodal-head:has(.tparent, .tparent-locked) :is(.tmodal-project, .tmodal-project + .tmodal-sep) {
+  display: none;
+}

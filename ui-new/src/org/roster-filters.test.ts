@@ -49,6 +49,11 @@ describe("rosterValues", () => {
     expect(rosterValues(agent({ adapterConfig: {} }))?.model.label).toBe("Harness default");
   });
 
+  it("files a process or HTTP agent's model as managed externally, as the roster shows it", () => {
+    expect(rosterValues(agent({ adapterType: "process", adapterConfig: {} }))?.model).toEqual({ value: "external", label: "Managed externally" });
+    expect(rosterValues(agent({ adapterType: "http", adapterConfig: { model: "x" } }))?.model.value).toBe("external");
+  });
+
   it("reads the status and the harness, with a Runner agent under the harness it runs", () => {
     const values = rosterValues(agent({ status: "paused", adapterType: "paperclip_runner", adapterConfig: { provider: "acpx", acpxAgent: "claude" } }));
     expect(values?.status).toEqual({ value: "paused", label: "Paused" });

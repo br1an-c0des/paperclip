@@ -1192,7 +1192,7 @@ a.org-act-target:hover {
 }
 
 /* The Filter menu's trigger while a model, status, harness or connection filter is set (U103) */
-.org-filter--on {
+.btn.org-filter--on {
   border-color: color-mix(in srgb, var(--run-fg) 45%, transparent);
   background: var(--run-bg);
   color: var(--run-fg);

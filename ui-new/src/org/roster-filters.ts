@@ -12,7 +12,9 @@ import { agentConnection, agentDefaultModel } from "./bulk-model";
  * The connection kinds are derived as the old UI derives them: a setup draft that hasn't picked
  * its harness is "Not configured"; process and HTTP agents are "Managed externally"; an agent with
  * no binding runs on "Local credentials"; then the responsible user's default, a pool (by name),
- * or an assigned connection (by name). Retired agents and hires waiting for approval have no
+ * or an assigned connection (by name). One deliberate difference: a process or HTTP agent's model
+ * is "Managed externally", as the roster's own column says, where upstream counts it as the
+ * harness default. Retired agents and hires waiting for approval have no
  * values, so any attribute filter hides them, as upstream's index leaves them out.
  */
 
@@ -74,8 +76,16 @@ export function rosterValues(agent: RosterAgent, names = connectionNames(undefin
       value: `connection:${binding.connectionId}`,
       label: names.connections.get(`${binding.connectionId}\u0000${binding.grantId}`) ?? "Assigned connection",
     };
+  // A process or HTTP agent's model is the roster's "Managed externally" here too (org-model.ts
+  // `harnessAndModel`); upstream files it under Harness default.
   return {
-    model: pending ? { value: "unconfigured", label: "Not available yet" } : model ? { value: `model:${model}`, label: model } : { value: "default", label: "Harness default" },
+    model: pending
+      ? { value: "unconfigured", label: "Not available yet" }
+      : connection.value === "external"
+        ? { value: "external", label: "Managed externally" }
+        : model
+          ? { value: `model:${model}`, label: model }
+          : { value: "default", label: "Harness default" },
     status: { value: agent.status, label: STATUS_LABELS[agent.status] ?? agent.status.charAt(0).toUpperCase() + agent.status.slice(1) },
     harness: { value: harness, label: harnessLabel(harness) },
     connection,
