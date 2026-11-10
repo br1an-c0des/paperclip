@@ -13,6 +13,7 @@ import { Button, buttonClass } from "@/ui/Button";
 import { SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
 import { Popover } from "@/ui/Popover";
 import { pushToast } from "@/ui/Toast";
+import { checkingSetup } from "@/tasks/recovery";
 import { creatorLabel, directReportsOf, managerCandidates, roleLabel, textEdit } from "../agent-model";
 import { BuiltInCard } from "./BuiltInCard";
 import { ManagerMenu, PaletteGrid, paletteAppearance, RoleMenu } from "./fields";
@@ -236,6 +237,27 @@ function ForYouCard(props: { agent: AgentDetail }) {
   );
 }
 
+/**
+ * The Lifecycle card's state, in words. An agent parked while its setup is checked again (#20361)
+ * reads as the header's pill does: finishing its setup, or a failed check (its error shows below).
+ */
+export function lifecycleStateText(agent: Pick<AgentDetail, "status" | "pauseReason" | "lifecycleState" | "lifecycleError">) {
+  if (checkingSetup(agent)) return agent.lifecycleError?.trim() ? "Setup check failed" : "Finishing setup";
+  return (
+    (
+      {
+        active: "Active",
+        idle: "Idle",
+        running: "Running",
+        paused: agent.pauseReason === "budget" ? "Paused: it reached its budget" : "Paused",
+        error: "Error",
+        pending_approval: "Waiting for approval",
+        terminated: "Retired",
+      } as Record<string, string>
+    )[agent.status] ?? agent.status
+  );
+}
+
 /** State, the last heartbeat, and the lifecycle actions the header's menu also has. */
 function LifecycleCard(props: { agent: AgentDetail }) {
   const company = useCompany();
@@ -253,23 +275,18 @@ function LifecycleCard(props: { agent: AgentDetail }) {
       setBusy(false);
     }
   };
-  const paused = () => props.agent.status === "paused";
-  const stateText = () =>
-    ({
-      active: "Active",
-      idle: "Idle",
-      running: "Running",
-      paused: props.agent.pauseReason === "budget" ? "Paused: it reached its budget" : "Paused",
-      error: "Error",
-      pending_approval: "Waiting for approval",
-      terminated: "Retired",
-    })[props.agent.status] ?? props.agent.status;
+  // A setup check isn't a pause and Resume can't finish it (#20361), so it offers Pause, as the header does.
+  const checking = () => checkingSetup(props.agent);
+  const paused = () => props.agent.status === "paused" && !checking();
 
   return (
     <SettingsCard title="Lifecycle" description="Pause or resume it, clear an error, or reset its sessions. Retire it from the header's menu.">
       <SettingsRow label="State">
         <div class="ps-stack">
-          <span>{stateText()}</span>
+          <span>{lifecycleStateText(props.agent)}</span>
+          <Show when={checking()}>
+            <span class="fhelp">Runs start once its setup check passes.</span>
+          </Show>
           <Show when={props.agent.errorReason}>
             <span class="fhelp ag-warn">{props.agent.errorReason}</span>
           </Show>
