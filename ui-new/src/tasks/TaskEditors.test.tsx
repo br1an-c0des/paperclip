@@ -1,7 +1,7 @@
 import type { Issue } from "@paperclipai/shared";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DescriptionEditor, StatusControl, TitleEditor } from "./TaskEditors";
+import { DescriptionEditor, ParentControl, StatusControl, TitleEditor } from "./TaskEditors";
 
 afterEach(cleanup);
 
@@ -59,5 +59,26 @@ describe("DescriptionEditor", () => {
     render(() => <DescriptionEditor task={{ ...task, description: null }} onChange={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "Add a description" }));
     expect(screen.getByRole("textbox", { name: "Description, in Markdown" })).toBeTruthy();
+  });
+});
+
+describe("ParentControl", () => {
+  const child = (ancestors: unknown[]) => ({ id: "t1", identifier: "TES-7", parentId: "p1", ancestors }) as unknown as Issue;
+
+  it("links the parent and opens it in place", () => {
+    const onOpenTask = vi.fn();
+    render(() => <ParentControl task={child([{ id: "p1", identifier: "TES-2", title: "Set up the sample repo" }])} onOpenTask={onOpenTask} onChange={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /^TES-2\s*Set up the sample repo$/ }));
+    expect(onOpenTask).toHaveBeenCalledWith({ id: "p1", identifier: "TES-2" });
+    expect(screen.getByRole("button", { name: "Change the parent task" })).toBeTruthy();
+  });
+
+  it("shows a private parent as a lock with its number and no link, and can still change it", () => {
+    render(() => <ParentControl task={child([{ id: "p1", identifier: "TES-2", locked: true }])} onOpenTask={() => {}} onChange={() => {}} />);
+    const chip = screen.getByTestId("locked-relation");
+    expect(chip.textContent).toBe("TES-2");
+    expect(chip.getAttribute("aria-label")).toBe("Parent task TES-2, private, you don't have access");
+    expect(screen.queryByRole("button", { name: /TES-2/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Change the parent task" })).toBeTruthy();
   });
 });

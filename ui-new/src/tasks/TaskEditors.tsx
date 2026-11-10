@@ -1,6 +1,6 @@
 import type { Agent, CompactIssue, ExecutionWorkspace, Issue, IssueLabel, IssuePriority, IssueStatus } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Check, ChevronDown, Pencil, Play, Plus, X } from "lucide-solid";
+import { Check, ChevronDown, Lock, Pencil, Play, Plus, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, Show, type JSX } from "solid-js";
 import { agentsApi } from "@/api/agents";
 import { openProjects } from "@/api/projects";
@@ -40,6 +40,7 @@ import {
   type Patch,
   type WorkspaceChoice,
 } from "./task-edits";
+import { parentCrumb, parentLabel } from "./parent-crumb";
 import { TaskPicker } from "./TaskPicker";
 import { useTaskUpdates } from "./task-updates";
 import { outsideLineage, useTaskLineage } from "./workspace-lineage";
@@ -711,18 +712,40 @@ export function GoalControl(props: { task: Issue; onChange: ChangeTask }) {
   );
 }
 
-/** The parent task: a search to pick one, and Remove. */
+/**
+ * The parent task: a search to pick one, and Remove. A private parent is a lock with its number
+ * and no link, as in the header (TaskParentCrumb) and the locked dependencies (TaskDetails); it can
+ * still be changed or removed.
+ */
 export function ParentControl(props: { task: Issue; onOpenTask: (task: { id: string; identifier: string | null }) => void; onChange: ChangeTask }) {
   const [open, setOpen] = createSignal(false);
-  const parent = () => (props.task.parentId ? props.task.ancestors?.find((ancestor) => ancestor.id === props.task.parentId) : undefined);
+  const parent = createMemo(() => parentCrumb(props.task));
+  const link = () => {
+    const found = parent();
+    return found?.kind === "link" ? found : null;
+  };
+  const locked = () => {
+    const found = parent();
+    return found?.kind === "locked" ? found : null;
+  };
   return (
     <span class="te-inline">
-      <Show when={parent()}>
+      <Show when={link()}>
         {(found) => (
-          <button type="button" class="td-link" onClick={() => props.onOpenTask(found())}>
-            <span class="mono td-id">{found().identifier}</span>
+          <button type="button" class="td-link" title={found().title} onClick={() => props.onOpenTask({ id: found().id, identifier: found().identifier })}>
+            <Show when={found().identifier}>
+              <span class="mono td-id">{found().identifier}</span>
+            </Show>
             <span class="te-ellipsis">{found().title}</span>
           </button>
+        )}
+      </Show>
+      <Show when={locked()}>
+        {(found) => (
+          <span class="te-locked mono" data-testid="locked-relation" role="img" title="Private: you don't have access" aria-label={parentLabel(found())}>
+            <Lock size={12} aria-hidden="true" />
+            <span aria-hidden="true">{found().identifier ?? "Private"}</span>
+          </span>
         )}
       </Show>
       <Popover open={open()} onOpenChange={setOpen}>
