@@ -1,4 +1,4 @@
-import type { IssueQueuedCommentQueue } from "@paperclipai/shared";
+import type { IssueComment, IssueQueuedCommentQueue } from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
@@ -23,4 +23,10 @@ export const queuedCommentsApi = {
     api.post<IssueQueuedCommentQueue>(`/issues/${issueId}/queued-comments/interrupt`, data),
   discard: (issueId: string, commentId: string, data: Version) =>
     api.delete<IssueQueuedCommentQueue>(`/issues/${issueId}/queued-comments/${commentId}`, data),
+  /**
+   * Cancels your own queued message without a queue id, before the server has acknowledged its
+   * queue (#20553): the comment-cancel route finds the queue and checks author and dispatch state.
+   * Returns the removed comment, not the queue.
+   */
+  cancel: (issueId: string, commentId: string) => api.delete<IssueComment>(`/issues/${issueId}/comments/${commentId}?mode=cancel`),
 };

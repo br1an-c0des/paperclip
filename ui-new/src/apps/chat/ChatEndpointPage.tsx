@@ -433,8 +433,8 @@ function Behaviour(props: { endpoint: ChatEndpoint }) {
             checked={props.endpoint.requireAtMention ?? false}
             disabled={update.isPending}
             onChange={(requireAtMention) => update.mutate({ requireAtMention })}
-            label="Answer only when @mentioned"
-            description="In channels, including thread replies. Direct messages never need a mention."
+            label="Require at-mention in channels"
+            description="A channel message needs an @mention of this bot to start a conversation. Replies in existing threads and direct messages don't."
           />
         </Show>
         <Show when={props.endpoint.provider === "microsoft-teams"}>

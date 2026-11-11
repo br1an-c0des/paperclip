@@ -12,12 +12,25 @@ afterEach(() => {
 
 const interrupt = vi.fn();
 const steer = vi.fn();
+const discard = vi.fn();
+const cancel = vi.fn();
+const edit = vi.fn();
+const reorder = vi.fn();
 vi.mock("@/api/queued-comments", () => ({
-  queuedCommentsApi: { get: vi.fn(), interrupt: (...args: unknown[]) => interrupt(...args), steer: (...args: unknown[]) => steer(...args) },
+  queuedCommentsApi: {
+    get: vi.fn(),
+    interrupt: (...args: unknown[]) => interrupt(...args),
+    steer: (...args: unknown[]) => steer(...args),
+    discard: (...args: unknown[]) => discard(...args),
+    cancel: (...args: unknown[]) => cancel(...args),
+    edit: (...args: unknown[]) => edit(...args),
+    reorder: (...args: unknown[]) => reorder(...args),
+  },
 }));
 vi.mock("@/api/instance-settings", () => ({ instanceSettingsApi: { experimental: async () => ({ enableLegacyComposerSubmit: false }) } }));
 
-const { QueuedMessages } = await import("./QueuedMessages");
+const { QueuedMessages, queuedIds } = await import("./QueuedMessages");
+const { ApiError } = await import("@/api/client");
 
 const entry = (id: string, position: number): IssueQueuedCommentEntry =>
   ({ comment: { id, body: `Message ${id}` }, position, canEdit: true, canDiscard: true }) as IssueQueuedCommentEntry;
@@ -82,6 +95,90 @@ describe("QueuedMessages", () => {
     await waitFor(() => expect(interrupt).toHaveBeenCalledWith("t1", { queueId: "q1", revision: "rev1", targetRunId: null }));
     expect(await screen.findByText("Messages are still queued. They'll send when the task is ready.")).toBeTruthy();
     expect(screen.getByText("Message c1")).toBeTruthy();
+  });
+});
+
+describe("QueuedMessages round 7 (U117, U118, U127)", () => {
+  const pick = async (trigger: string, item: RegExp) => {
+    const button = screen.getByRole("button", { name: trigger });
+    fireEvent.pointerDown(button, { button: 0, pointerType: "mouse" });
+    fireEvent.click(button);
+    const found = await screen.findByRole("menuitem", { name: item });
+    fireEvent.pointerDown(found, { button: 0, pointerType: "mouse" });
+    fireEvent.pointerUp(found, { button: 0, pointerType: "mouse" });
+    fireEvent.click(found);
+  };
+  // Someone else's message, so no countdown runs.
+  const plain = (id: string, position: number) => ({ ...entry(id, position), canEdit: false });
+
+  it("cancels your own saved message before the queue is acknowledged, through the comment route (U117, #20553)", async () => {
+    cancel.mockResolvedValue({ id: "c1" });
+    mount(queue({ queueId: null, entries: [entry("c1", 0)] }));
+    const more = screen.getByRole("button", { name: "More for queued message 1" }) as HTMLButtonElement;
+    expect(more.disabled).toBe(false);
+    await pick("More for queued message 1", /Cancel message/);
+    await waitFor(() => expect(cancel).toHaveBeenCalledWith("t1", "c1"));
+    expect(discard).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByText("Message c1")).toBeNull());
+  });
+
+  it("keeps Move and Edit off until the queue has an id", async () => {
+    mount(queue({ queueId: null, entries: [entry("c1", 0), entry("c2", 1)] }));
+    const more = screen.getByRole("button", { name: "More for queued message 2" });
+    fireEvent.pointerDown(more, { button: 0, pointerType: "mouse" });
+    fireEvent.click(more);
+    const up = await screen.findByRole("menuitem", { name: /Move up/ });
+    expect(up.getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByRole("menuitem", { name: /Cancel message/ }).getAttribute("aria-disabled")).not.toBe("true");
+  });
+
+  it("shows why an edit wasn't saved under the editor, and keeps it open (U118, #20583)", async () => {
+    edit.mockRejectedValue(new ApiError("x", 409, { error: "x", details: { code: "queued_comment_revision_conflict" } }));
+    mount(queue({ entries: [entry("c1", 0)] }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" })); // stop the countdown
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const box = screen.getByRole("textbox", { name: "Edit queued message" }) as HTMLTextAreaElement;
+    fireEvent.input(box, { target: { value: "Changed text" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/save again to apply it to the latest queue/);
+    expect(alert.closest("form")).toBeTruthy();
+    expect((screen.getByRole("textbox", { name: "Edit queued message" }) as HTMLTextAreaElement).value).toBe("Changed text");
+  });
+
+  it("keeps an edit's text when the message was already sent (U118, #20583)", async () => {
+    edit.mockRejectedValue(new ApiError("x", 409, { error: "x", details: { code: "queued_comment_stale_target" } }));
+    mount(queue({ entries: [entry("c1", 0)] }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.input(screen.getByRole("textbox", { name: "Edit queued message" }), { target: { value: "My new words" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/already sent or removed\. Your text is still here; you can queue it as a new message/);
+    expect(screen.getByText("My new words")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy text" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText("My new words")).toBeNull();
+  });
+
+  it("leaves messages a starting run's first turn takes out of the strip, and keeps their place in a reorder (U127, #20822)", async () => {
+    const booting = queue({
+      state: "deferred",
+      steeringDisposition: "temporarily_unavailable",
+      entries: [plain("boot", 0), plain("a", 1), plain("b", 2)],
+      firstTurnCommentIds: ["boot"],
+    });
+    reorder.mockResolvedValue(booting);
+    mount(booting);
+    expect(screen.queryByText("Message boot")).toBeNull();
+    expect(screen.getByText("2 messages queued")).toBeTruthy();
+    await pick("More for queued message 2", /Move up/);
+    await waitFor(() => expect(reorder).toHaveBeenCalledWith("t1", { queueId: "q1", revision: "rev1", orderedCommentIds: ["boot", "b", "a"] }));
+  });
+
+  it("shows nothing when the first turn takes every queued message", () => {
+    const { container } = mount(queue({ state: "deferred", entries: [plain("boot", 0)], firstTurnCommentIds: ["boot"] }));
+    expect(container.querySelector(".qm")).toBeNull();
+    expect([...queuedIds(queue({ entries: [plain("boot", 0), plain("a", 1)], firstTurnCommentIds: ["boot"] }))]).toEqual(["a"]);
   });
 });
 

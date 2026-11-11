@@ -132,6 +132,12 @@ export const toolAccessApi = {
   /** The token comes back once, in full; afterwards only its prefix. */
   createGatewayToken: (companyId: string, gatewayId: string, input: GatewayTokenInput) =>
     api.post<ToolMcpGatewayTokenCreated>(`/tool-gateway/gateways/${enc(gatewayId)}/tokens`, { ...input, companyId }),
+  /**
+   * Generates and returns, once, the value of a token an agent created for you (`pendingReveal`).
+   * Person-only; 409 when already revealed, revoked or expired.
+   */
+  revealGatewayToken: (companyId: string, tokenId: string) =>
+    api.post<ToolMcpGatewayTokenCreated>(`/tool-gateway/gateway-tokens/${enc(tokenId)}/reveal`, { companyId }),
   revokeGatewayToken: (companyId: string, tokenId: string) =>
     api.post<ToolMcpGatewayToken>(`/tool-gateway/gateway-tokens/${enc(tokenId)}/revoke`, { companyId }),
 

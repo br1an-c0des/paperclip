@@ -4,6 +4,7 @@ import type { ToolActivityEvent } from "@/api/tool-access";
 import {
   activityLine,
   allowedToolsLabel,
+  canReveal,
   defaultTokenName,
   endpointUrl,
   expiryFromDate,
@@ -57,6 +58,21 @@ describe("tokens", () => {
     expect(tokensLabel(g, NOW)).toBe("2 active tokens (1 expiring)");
     expect(tokensLabel({ ...g, tokens: [] }, NOW)).toBe("no active tokens");
     expect(lastUsed(g)).toBe("2026-10-27T00:00:00.000Z");
+  });
+
+  it("holds an agent-created token until its person reveals it (U115, #20613)", () => {
+    const waiting = token({ pendingReveal: true, responsibleUserId: "u1", expiresAt: new Date(NOW + 3 * DAY).toISOString() });
+    expect(tokenStatus(waiting, NOW)).toBe("pending");
+    expect(tokenStatus({ ...waiting, expiresAt: new Date(NOW - 1).toISOString() }, NOW)).toBe("expired");
+    expect(tokenStatus({ ...waiting, revokedAt: "2026-10-01" }, NOW)).toBe("revoked");
+    expect(canReveal(waiting, "u1", NOW)).toBe(true);
+    expect(canReveal(waiting, "u2", NOW)).toBe(false);
+    expect(canReveal(waiting, null, NOW)).toBe(true);
+    expect(canReveal({ ...waiting, responsibleUserId: null }, "u2", NOW)).toBe(true);
+    expect(canReveal({ ...waiting, pendingReveal: false }, "u1", NOW)).toBe(false);
+    expect(canReveal({ ...waiting, expiresAt: new Date(NOW - 1).toISOString() }, "u1", NOW)).toBe(false);
+    // A token with no value yet doesn't count as active.
+    expect(tokensLabel(gateway({ tokens: [waiting] as never }), NOW)).toBe("no active tokens");
   });
 
   it("names a new token and its expiry", () => {

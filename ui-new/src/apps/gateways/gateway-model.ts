@@ -21,9 +21,14 @@ import { connectionState, displayName } from "../apps-model";
 export const EXPIRING_DAYS = 14;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export type TokenStatus = "active" | "expiring" | "expired" | "revoked";
+/**
+ * `pending`: a token an agent created for its responsible person, with no value until that person
+ * reveals it once (U115, upstream #20613). It can't connect until then.
+ */
+export type TokenStatus = "pending" | "active" | "expiring" | "expired" | "revoked";
 
 export const TOKEN_STATUS: Record<TokenStatus, { label: string; tone: Tone | null }> = {
+  pending: { label: "Not revealed", tone: "amber" },
   active: { label: "Active", tone: "green" },
   expiring: { label: "Expiring", tone: "amber" },
   expired: { label: "Expired", tone: null },
@@ -36,12 +41,24 @@ function toTime(value: Date | string | null | undefined) {
   return Number.isNaN(time) ? null : time;
 }
 
-export function tokenStatus(token: Pick<ToolMcpGatewayToken, "revokedAt" | "expiresAt">, now = Date.now()): TokenStatus {
+export function tokenStatus(token: Pick<ToolMcpGatewayToken, "revokedAt" | "expiresAt" | "pendingReveal">, now = Date.now()): TokenStatus {
   if (token.revokedAt) return "revoked";
   const expires = toTime(token.expiresAt);
+  // An unrevealed token that expired can never be revealed, so it shows as expired.
+  if (expires !== null && expires <= now) return "expired";
+  if (token.pendingReveal) return "pending";
   if (expires === null) return "active";
-  if (expires <= now) return "expired";
   return expires - now <= EXPIRING_DAYS * DAY_MS ? "expiring" : "active";
+}
+
+/**
+ * Whether you can reveal this token: it's waiting for its value, and acts for you (only the
+ * responsible person can reveal it; the server answers 403 to anyone else). With no user id (a
+ * local_trusted board) or no responsible person on the token, the server decides.
+ */
+export function canReveal(token: Pick<ToolMcpGatewayToken, "revokedAt" | "expiresAt" | "pendingReveal" | "responsibleUserId">, userId: string | null, now = Date.now()) {
+  if (tokenStatus(token, now) !== "pending") return false;
+  return !token.responsibleUserId || !userId || token.responsibleUserId === userId;
 }
 
 /** "pcgw_ab12•••": the token is shown in full once, then only its prefix. */

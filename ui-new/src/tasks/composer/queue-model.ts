@@ -18,6 +18,16 @@ import { ApiError } from "@/api/client";
 export type QueueAction = "steer" | "interrupt" | "edit" | "discard" | "move";
 
 /**
+ * Whether a message's Cancel can be sent. Before the server acknowledges a queue (no queue id yet)
+ * you can still cancel your own saved message: the comment-cancel route finds its queue and checks
+ * the author and dispatch state in one go (U117, upstream #20553). A chat message held at the daily
+ * limit comes with `canDiscard: false`, since the outbox owns it.
+ */
+export function canCancel(entry: IssueQueuedCommentEntry) {
+  return entry.canDiscard && !entry.comment.id.startsWith("optimistic-");
+}
+
+/**
  * What a row offers: Steer into the run that's going, Interrupt it to start the next one with the
  * queue, or Send a queue that waits for a run that hasn't started (the same request as Interrupt,
  * with no run to stop).
@@ -130,20 +140,56 @@ export function isFixed(entry: IssueQueuedCommentEntry) {
   return entry.source?.kind === "interaction";
 }
 
-/** The entries still to show, without those already being delivered. */
-export function visibleEntries(queue: IssueQueuedCommentQueue | null | undefined, delivering: ReadonlySet<string>) {
-  return (queue?.entries ?? []).filter((entry) => !delivering.has(entry.comment.id)).sort((a, b) => a.position - b.position);
+/*
+ * Messages a starting run's first turn takes (U127, upstream #20822, ui/src/pages/IssueDetail.tsx):
+ * the queue lists them in `firstTurnCommentIds` while the run boots (a sandbox, say) and after its
+ * first turn sealed them. They're sent, not waiting for Steer or Interrupt, so the strip leaves them
+ * out and the thread shows them at their send time. The server still orders its whole queue, so a
+ * reorder keeps them, and anything else the strip hides, in their place.
+ */
+
+/** The messages the target run's first turn takes, which show as sent. */
+export function firstTurnIds(queue: Pick<IssueQueuedCommentQueue, "targetRunId" | "firstTurnCommentIds"> | null | undefined): ReadonlySet<string> {
+  return new Set(queue?.targetRunId ? (queue.firstTurnCommentIds ?? []) : []);
 }
 
-/** The new order after moving one message up (-1) or down (+1), or null when it can't move. */
-export function moveEntry(entries: readonly IssueQueuedCommentEntry[], commentId: string, delta: -1 | 1): string[] | null {
+function byPosition(entries: readonly IssueQueuedCommentEntry[]) {
+  return [...entries].sort((a, b) => a.position - b.position);
+}
+
+/** The entries still to show, without those being delivered or taken by a starting run's first turn. */
+export function visibleEntries(queue: IssueQueuedCommentQueue | null | undefined, delivering: ReadonlySet<string>) {
+  const taken = firstTurnIds(queue);
+  return byPosition((queue?.entries ?? []).filter((entry) => !delivering.has(entry.comment.id) && !taken.has(entry.comment.id)));
+}
+
+/**
+ * The whole queue's order for the server: the shown messages in their new order, and the ones the
+ * strip hides (taken by a first turn, being delivered) kept in their place.
+ */
+export function fullOrder(queueEntries: readonly IssueQueuedCommentEntry[], shownOrder: readonly string[]) {
+  const shown = new Set(shownOrder);
+  let next = 0;
+  return byPosition(queueEntries).map((entry) => (shown.has(entry.comment.id) ? shownOrder[next++]! : entry.comment.id));
+}
+
+/**
+ * The queue's new order after moving one shown message up (-1) or down (+1), or null when it can't
+ * move. `queueEntries` is the whole queue the server orders, when the strip shows only part of it.
+ */
+export function moveEntry(
+  entries: readonly IssueQueuedCommentEntry[],
+  commentId: string,
+  delta: -1 | 1,
+  queueEntries: readonly IssueQueuedCommentEntry[] = entries,
+): string[] | null {
   if (entries.some(isFixed)) return null;
   const from = entries.findIndex((entry) => entry.comment.id === commentId);
   const to = from + delta;
   if (from < 0 || to < 0 || to >= entries.length) return null;
   const ids = entries.map((entry) => entry.comment.id);
   [ids[from], ids[to]] = [ids[to]!, ids[from]!];
-  return ids;
+  return fullOrder(queueEntries, ids);
 }
 
 /** "1 message queued", "3 messages queued". */
@@ -234,13 +280,30 @@ function errorCode(error: unknown): string | null {
   return typeof body.details?.code === "string" ? body.details.code : null;
 }
 
-/** What to say when a queue action fails, after the old UI's messages. */
+/**
+ * Whether a failure means the message is gone (already sent or removed), so an edit's text can only
+ * be queued as a new message (U118, upstream #20583).
+ */
+export function targetGone(error: unknown) {
+  const code = errorCode(error);
+  return code === "queued_comment_stale_target" || code === "queued_comment_not_pending";
+}
+
+/**
+ * What to say when a queue action fails, after the old UI's messages (ui/src/api/errors.ts). A 409
+ * on an edit says why it wasn't saved (U118, upstream #20583): the queue changed (save again), or the
+ * message was already sent or removed (queue the text as new). The edit's text is kept either way.
+ */
 export function queueErrorMessage(error: unknown, action: QueueAction) {
   const code = errorCode(error);
   if (code === "queued_comment_already_dispatching") return "Too late: this message is already being sent.";
-  if (code === "queued_comment_revision_conflict" || (error instanceof ApiError && error.status === 409)) {
-    return "The queue changed in another tab. It's been refreshed; try again.";
+  const conflict = code === "queued_comment_revision_conflict" || code === "queued_comment_stale_queue" || (error instanceof ApiError && error.status === 409);
+  if (action === "edit") {
+    if (targetGone(error)) return "This queued message was already sent or removed. Your text is still here; you can queue it as a new message.";
+    if (conflict) return "The queue changed in another session. Your edit is still here; save again to apply it to the latest queue.";
   }
+  if (targetGone(error)) return "This message was already sent or removed. The queue has been refreshed.";
+  if (conflict) return "The queue changed in another tab. It's been refreshed; try again.";
   switch (action) {
     case "steer":
       return "Couldn't steer. The message is still queued.";

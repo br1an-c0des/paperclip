@@ -6,6 +6,7 @@ import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { toolAccessApi } from "@/api/tool-access";
 import { dateTime, shortDate } from "@/agents/shared";
 import { useCompany } from "@/lib/company";
+import { useSession } from "@/lib/session";
 import { useAgentsQuery, useProjectsQuery } from "@/lib/company-data";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
@@ -20,6 +21,7 @@ import { failureText, useApplications, useConnections } from "../shared";
 import { ToolActivity } from "./Activity";
 import {
   allowedToolsLabel,
+  canReveal,
   defaultExpiry,
   defaultTokenName,
   endpointUrl,
@@ -43,7 +45,8 @@ import { GatewayDialog, useGatewayToggle, useRefreshGateways } from "./Gateways"
  *
  * - Overview: on or off, its apps, tokens and health, who can use it, and how a client connects.
  * - Apps and tools: the apps its access profile includes, each linking to its connection.
- * - Tokens: issue a token (shown in full once), and the token history with revoke.
+ * - Tokens: issue a token (shown in full once), reveal one an agent created for you (once, U115,
+ *   #20613), and the token history with revoke.
  * - Activity: calls through it in the last 30 days.
  * - Advanced: transport details, its raw configuration, and archiving it.
  *
@@ -303,12 +306,31 @@ function Tokens(props: { gateway: ToolMcpGatewayWithTokens; onIssued: (token: To
       }),
     onSuccess: (token) => {
       setCreated(token);
+      setRevealed(false);
       setIssuing(false);
       setNote("");
       props.onIssued(token);
       pushToast({ title: "Token issued", body: "Copy it now. Once you leave this page only its first characters are shown.", tone: "success" });
     },
     onError: (error) => pushToast({ title: "Couldn't issue the token", body: failureText(error, "Please try again."), tone: "error" }),
+    onSettled: () => refresh(),
+  }));
+  // A token an agent made for you gets its value only when you reveal it here, once (U115, #20613).
+  const session = useSession();
+  // Revealed here: out of the waiting list at once, before the refreshed list says so.
+  const [revealedIds, setRevealedIds] = createSignal<ReadonlySet<string>>(new Set());
+  const pending = createMemo(() => tokens().filter((token) => !revealedIds().has(token.id) && canReveal(token, session.userId())));
+  const [revealed, setRevealed] = createSignal(false);
+  const reveal = createMutation(() => ({
+    mutationFn: (token: ToolMcpGatewayToken) => toolAccessApi.revealGatewayToken(company().id, token.id),
+    onSuccess: (token) => {
+      setRevealedIds((ids) => new Set([...ids, token.id]));
+      setCreated(token);
+      setRevealed(true);
+      props.onIssued(token);
+      pushToast({ title: "Token revealed", body: "Copy it now. It won't be shown again.", tone: "success" });
+    },
+    onError: (error) => pushToast({ title: "Couldn't reveal the token", body: failureText(error, "Please try again."), tone: "error" }),
     onSettled: () => refresh(),
   }));
   const revoke = createMutation(() => ({
@@ -373,11 +395,48 @@ function Tokens(props: { gateway: ToolMcpGatewayWithTokens; onIssued: (token: To
             </div>
           </form>
         </Show>
+        <Show when={pending().length > 0}>
+          <div class="tl-form" role="group" aria-label="Tokens waiting to be revealed">
+            <p class="cx-note">
+              <b>Waiting for you to reveal.</b> An agent created {pending().length === 1 ? "this token" : "these tokens"} for you. Its value is made when you reveal it,
+              and shown only once; until then it can't connect.
+            </p>
+            <ul class="ap-rows">
+              <For each={pending()}>
+                {(token) => (
+                  <li class="ap-row">
+                    <div class="ap-row-main">
+                      <span class="ap-row-name">{token.name}</span>
+                      <span class="ap-row-meta">
+                        <span class="mono">{maskedToken(token)}</span> · made {shortDate(token.createdAt)}
+                        {token.expiresAt ? ` · expires ${shortDate(token.expiresAt)}` : " · no expiry"}
+                      </span>
+                    </div>
+                    <span class="tl-row-side">
+                      <Button size="compact" variant="primary" aria-label={`Reveal token ${token.name}`} disabled={reveal.isPending} onClick={() => reveal.mutate(token)}>
+                        {reveal.isPending && reveal.variables?.id === token.id ? "Revealing…" : "Reveal"}
+                      </Button>
+                    </span>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </div>
+        </Show>
         <Show when={created()}>
           {(token) => (
             <div class="tl-form">
               <p class="cx-note cx-note--warn">
-                <b>Copy the new token now.</b> It's in Client snippets for this visit; after that only its first characters are shown.
+                <Show
+                  when={revealed()}
+                  fallback={
+                    <>
+                      <b>Copy the new token now.</b> It's in Client snippets for this visit; after that only its first characters are shown.
+                    </>
+                  }
+                >
+                  <b>Copy {token().name} now.</b> This is the only time its value is shown. It's in Client snippets for this visit.
+                </Show>
               </p>
               <CopyBlock value={token().token} label="token" />
               <div>
