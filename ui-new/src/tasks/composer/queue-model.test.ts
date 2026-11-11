@@ -6,8 +6,11 @@ import {
   autoSteerDeadline,
   autoSteerEligible,
   autoSteerKey,
+  canCancel,
   deferredMessage,
   entryLabel,
+  firstTurnIds,
+  fullOrder,
   moveEntry,
   preview,
   queueErrorMessage,
@@ -17,6 +20,7 @@ import {
   queuedSummary,
   rowDelivery,
   secondsLeft,
+  targetGone,
   visibleEntries,
   withoutImageLines,
 } from "./queue-model";
@@ -86,6 +90,31 @@ describe("visibleEntries and moveEntry", () => {
     const fixed = [entry("a", 0), entry("b", 1, { source: { kind: "interaction", interactionId: "x", interactionKind: "k" } })];
     expect(moveEntry(fixed, "a", 1)).toBeNull();
   });
+
+  it("leaves out messages a starting run's first turn takes, and keeps their place in a reorder (U127, #20822)", () => {
+    const all = [entry("boot", 0), entry("a", 1), entry("b", 2)];
+    const booting = queue({ state: "deferred", entries: all, firstTurnCommentIds: ["boot"] });
+    expect([...firstTurnIds(booting)]).toEqual(["boot"]);
+    const shown = visibleEntries(booting, new Set());
+    expect(shown.map((item) => item.comment.id)).toEqual(["a", "b"]);
+    expect(moveEntry(shown, "b", -1, booting.entries)).toEqual(["boot", "b", "a"]);
+    // Without a run to take them, the ids mean nothing.
+    expect(firstTurnIds(queue({ targetRunId: null, firstTurnCommentIds: ["c1"] })).size).toBe(0);
+    expect(firstTurnIds(null).size).toBe(0);
+  });
+
+  it("keeps messages the strip hides in their place in the whole order", () => {
+    const all = [entry("a", 0), entry("x", 1), entry("b", 2), entry("c", 3)];
+    expect(fullOrder(all, ["c", "a", "b"])).toEqual(["c", "x", "a", "b"]);
+  });
+});
+
+describe("canCancel (U117, #20553)", () => {
+  it("lets you cancel your own saved message, never one the outbox holds or one not yet saved", () => {
+    expect(canCancel(entry("c1", 0))).toBe(true);
+    expect(canCancel(entry("c1", 0, { canDiscard: false }))).toBe(false);
+    expect(canCancel(entry("optimistic-1", 0))).toBe(false);
+  });
 });
 
 describe("entryLabel", () => {
@@ -121,6 +150,20 @@ describe("words", () => {
     expect(queuedSummary(3)).toBe("3 messages queued");
     expect(preview("\n  First line\nsecond")).toBe("First line");
     expect(preview("x".repeat(200), 10)).toHaveLength(10);
+  });
+
+  it("says why an edit wasn't saved (U118, #20583)", () => {
+    for (const code of ["queued_comment_revision_conflict", "queued_comment_stale_queue"]) {
+      expect(queueErrorMessage(new ApiError("x", 409, { details: { code } }), "edit")).toMatch(/save again to apply it to the latest queue/);
+    }
+    for (const code of ["queued_comment_stale_target", "queued_comment_not_pending"]) {
+      const failure = new ApiError("x", 409, { error: "x", details: { code } });
+      expect(targetGone(failure)).toBe(true);
+      expect(queueErrorMessage(failure, "edit")).toMatch(/already sent or removed\. Your text is still here; you can queue it as a new message/);
+      expect(queueErrorMessage(failure, "discard")).toMatch(/already sent or removed/);
+    }
+    expect(queueErrorMessage(new ApiError("x", 409, {}), "edit")).toMatch(/save again/);
+    expect(targetGone(new ApiError("x", 409, { code: "queued_comment_revision_conflict" }))).toBe(false);
   });
 
   it("explains failures", () => {
