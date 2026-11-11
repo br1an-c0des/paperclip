@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CommandsProvider } from "@/lib/commands";
 import { CompanyProvider } from "@/lib/company";
-import { PhoneDock } from "./PhoneDock";
+import { openTasksSwitcher, PhoneDock, tasksSwitcherOpener } from "./PhoneDock";
 
 const companies = [
   { id: "c1", name: "Test Shell Co", issuePrefix: "TST" },
@@ -186,5 +186,22 @@ describe("PhoneDock", () => {
     renderDock("/TST/issues");
     fireEvent.click(screen.getByRole("button", { name: /Tasks/ }));
     expect(screen.getByRole("link", { name: "Search everything" }).getAttribute("href")).toBe("/TST/search");
+  });
+
+  it("opens from another screen's button, marks its project, and gives focus back", async () => {
+    const opener = document.createElement("button");
+    document.body.append(opener);
+    expect(openTasksSwitcher(opener)).toBe(false);
+    renderDock("/TST/projects/trading-bench");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(openTasksSwitcher(opener, { kind: "project", key: "trading-bench" })).toBe(true);
+    const sheet = await screen.findByRole("dialog", { name: "Switch project" });
+    expect(tasksSwitcherOpener()).toBe(opener);
+    expect(screen.getByRole("link", { name: /Trading bench/ }).getAttribute("aria-current")).toBe("page");
+    fireEvent.keyDown(sheet, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(tasksSwitcherOpener()).toBeNull();
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
   });
 });

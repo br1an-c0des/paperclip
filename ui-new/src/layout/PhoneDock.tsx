@@ -10,7 +10,7 @@ import { useCompany } from "@/lib/company";
 import { useNeedsYouCount } from "@/inbox/needs-you";
 import { useAgentsQuery, useExperimentalSettingsQuery, useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
 import { InitialsDisc } from "@/ui/Avatar";
-import { dockHiddenAfterScroll, dockPlace, tapTasks, tasksScope, type SheetView } from "./dock-model";
+import { dockHiddenAfterScroll, dockPlace, tapTasks, tasksScope, type SheetView, type TasksScope } from "./dock-model";
 import { AgentsIcon, InboxIcon, StatusIcon, TasksIcon } from "./dock-icons";
 import { showStatusLink } from "./nav-model";
 import { TasksSheet } from "./TasksSheet";
@@ -26,7 +26,28 @@ import "./PhoneDock.css";
  *
  * Tapping Tasks again while in Tasks opens the switcher sheet (TasksSheet.tsx): projects, the
  * company dropdown and You. The sheet sits under the dock, so Tasks also closes it.
+ *
+ * Other phone screens open the same switcher with `openTasksSwitcher`: the project header's name
+ * (mobile.md M1, M12, "tap its name to switch"). The switcher then marks that project as current,
+ * and closing it puts focus back on the opener.
  */
+
+type SwitcherRequest = { opener: HTMLElement | null; scope: TasksScope | null };
+
+const [switcherRequest, setSwitcherRequest] = createSignal<SwitcherRequest | null>(null);
+let mountedDocks = 0;
+
+/** Opens the dock's Tasks switcher from elsewhere. False when no dock is showing (not a phone). */
+export function openTasksSwitcher(opener: HTMLElement | null, scope: TasksScope | null = null): boolean {
+  if (mountedDocks === 0) return false;
+  setSwitcherRequest({ opener, scope });
+  return true;
+}
+
+/** The element that opened the switcher with `openTasksSwitcher`, while it's open. */
+export function tasksSwitcherOpener(): HTMLElement | null {
+  return switcherRequest()?.opener ?? null;
+}
 
 export function PhoneDock() {
   const company = useCompany();
@@ -75,6 +96,17 @@ export function PhoneDock() {
   const [scrollHidden, setScrollHidden] = createSignal(false);
   const [focused, setFocused] = createSignal(false);
   const hidden = () => scrollHidden() && sheet() === "closed" && !focused();
+
+  // A request from another screen opens the projects view; it lasts until the sheet closes.
+  onMount(() => {
+    mountedDocks += 1;
+    onCleanup(() => {
+      mountedDocks -= 1;
+      setSwitcherRequest(null);
+    });
+  });
+  createEffect(on(switcherRequest, (request) => request && setSheet("projects"), { defer: true }));
+  createEffect(on(sheet, (view) => view === "closed" && setSwitcherRequest(null), { defer: true }));
 
   createEffect(
     on(
@@ -128,8 +160,9 @@ export function PhoneDock() {
 
   let tasksButton: HTMLButtonElement | undefined;
   const closeSheet = (returnFocus = true) => {
+    const opener = switcherRequest()?.opener;
     setSheet("closed");
-    if (returnFocus) tasksButton?.focus({ preventScroll: true });
+    if (returnFocus) (opener?.isConnected ? opener : tasksButton)?.focus({ preventScroll: true });
   };
 
   // Tasks is a link from elsewhere (to tasksHref) and this button once you're in Tasks.
@@ -164,7 +197,7 @@ export function PhoneDock() {
           view={sheet() as Exclude<SheetView, "closed">}
           onView={setSheet}
           onClose={closeSheet}
-          scope={scope()}
+          scope={scope() ?? switcherRequest()?.scope ?? null}
         />
       </Show>
       <div class="pdock-bar">
