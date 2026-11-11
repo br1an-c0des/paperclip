@@ -1,5 +1,5 @@
 {
-  "upstreamCommit": "bf0220d34a156c81853755c3d1365ddc527037de",
+  "upstreamCommit": "4baff8322538cd4c7b465b4915b233c85531c3fc",
   "routes": [
     {
       "path": "/oauth-handoff",
@@ -5186,7 +5186,8 @@
         ],
         "via": [
           "components/AgentConfigForm.tsx",
-          "components/ai-connections/AiConnectionCredentialStep.tsx"
+          "components/ai-connections/AiConnectionCredentialStep.tsx",
+          "plugins/useAgentEnvironmentSlots.ts"
         ]
       },
       {
@@ -5200,7 +5201,8 @@
         "via": [
           "components/AgentConfigForm.tsx",
           "components/AgentLoginTarget.tsx",
-          "components/ai-connections/AiConnectionCredentialStep.tsx"
+          "components/ai-connections/AiConnectionCredentialStep.tsx",
+          "plugins/useAgentEnvironmentSlots.ts"
         ]
       },
       {
@@ -5315,7 +5317,8 @@
         "via": [
           "components/AgentContextualSidebar.tsx",
           "components/AgentConversationsSidebar.tsx",
-          "components/new-agent/AgentBasicsDialog.tsx"
+          "components/new-agent/AgentBasicsDialog.tsx",
+          "plugins/useAgentEnvironmentSlots.ts"
         ]
       },
       {
@@ -5722,6 +5725,18 @@
           {
             "method": "POST",
             "path": "/api/companies/:companyId/projects"
+          }
+        ],
+        "via": [
+          "components/NewProjectDialog.tsx"
+        ]
+      },
+      {
+        "key": "api/projects.ts::projectsApi.environmentOptions",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/companies/:companyId/project-environments"
           }
         ],
         "via": [
@@ -6792,18 +6807,6 @@
         ]
       },
       {
-        "key": "api/issues.ts::issuesApi.chatBootstrap",
-        "requests": [
-          {
-            "method": "GET",
-            "path": "/api/companies/:companyId/issues/chat-bootstrap"
-          }
-        ],
-        "via": [
-          "hooks/useRecentTaskOpenWarmup.ts"
-        ]
-      },
-      {
         "key": "api/issues.ts::issuesApi.summaries",
         "requests": [
           {
@@ -6897,6 +6900,18 @@
         ],
         "via": [
           "lib/connectivity.ts"
+        ]
+      },
+      {
+        "key": "api/issues.ts::issuesApi.chatBootstrap",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/companies/:companyId/issues/chat-bootstrap"
+          }
+        ],
+        "via": [
+          "lib/issue-chat-bootstrap.ts"
         ]
       },
       {
@@ -16518,6 +16533,18 @@
           ],
           "via": [
             "pages/apps/gateways/panels/GatewayActivityPanel.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.revealGatewayToken",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/tool-gateway/gateway-tokens/:tokenId/reveal"
+            }
+          ],
+          "via": [
+            "pages/apps/gateways/panels/TokensPanel.tsx"
           ]
         },
         {
@@ -28492,18 +28519,6 @@
           ]
         },
         {
-          "key": "api/environments.ts::environmentsApi.list",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/companies/:companyId/environments"
-            }
-          ],
-          "via": [
-            "components/ProjectProperties.tsx"
-          ]
-        },
-        {
           "key": "api/instanceSettings.ts::instanceSettingsApi.getExperimental",
           "requests": [
             {
@@ -28524,6 +28539,18 @@
             {
               "method": "POST",
               "path": "/api/projects/:projectId/workspaces"
+            }
+          ],
+          "via": [
+            "components/ProjectProperties.tsx"
+          ]
+        },
+        {
+          "key": "api/projects.ts::projectsApi.environmentOptions",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/project-environments"
             }
           ],
           "via": [
@@ -36796,7 +36823,6 @@
         "pages/ExecutionWorkspaceDetail.tsx",
         "pages/IssueDetail.tsx",
         "pages/NewAgent.tsx",
-        "pages/ProjectDetail.tsx",
         "pages/RoutineDetail.tsx",
         "pages/Routines.tsx"
       ],
@@ -40095,6 +40121,19 @@
       ],
       "referenced": true
     },
+    "api/projects.ts::projectsApi.environmentOptions": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/companies/:companyId/project-environments"
+        }
+      ],
+      "usedBy": [
+        "App shell",
+        "pages/ProjectDetail.tsx"
+      ],
+      "referenced": true
+    },
     "api/projects.ts::projectsApi.get": {
       "requests": [
         {
@@ -42603,6 +42642,18 @@
       ],
       "usedBy": [],
       "referenced": false
+    },
+    "api/tools.ts::toolsApi.revealGatewayToken": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/tool-gateway/gateway-tokens/:tokenId/reveal"
+        }
+      ],
+      "usedBy": [
+        "pages/apps/gateways/GatewayDetail.tsx"
+      ],
+      "referenced": true
     },
     "api/tools.ts::toolsApi.reviewProfileNewTools": {
       "requests": [
