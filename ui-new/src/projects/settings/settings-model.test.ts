@@ -322,6 +322,16 @@ describe("task checkouts", () => {
     expect(checkoutPolicy(p, draft)).toEqual({ enabled: true, branchPolicy: { keep: true } });
   });
 
+  it("reads the environment from the project's own field, and clears it through the policy", () => {
+    const p = project({ environmentId: "env-1", executionWorkspacePolicy: { enabled: true } });
+    expect(checkoutDraft(p).environmentId).toBe("env-1");
+    expect(checkoutDirty(p, checkoutDraft(p))).toBe(false);
+    expect(checkoutPolicy(p, { ...checkoutDraft(p), environmentId: "" }).environmentId).toBeNull();
+    expect(checkoutPolicy(p, { ...checkoutDraft(p), environmentId: "env-2" }).environmentId).toBe("env-2");
+    const legacy = project({ executionWorkspacePolicy: { enabled: true, environmentId: "env-3" } });
+    expect(checkoutDraft(legacy).environmentId).toBe("env-3");
+  });
+
   it("writes the worktree strategy as git_worktree, clearing emptied fields", () => {
     const p = project({ executionWorkspacePolicy: { enabled: true, workspaceStrategy: { type: "git_worktree", baseRef: "origin/main", branchTemplate: "x" } } });
     const policy = checkoutPolicy(p, { ...checkoutDraft(p), branchTemplate: "", teardownCommand: "git worktree prune", isolatedByDefault: true, concurrency: "serialize" });
