@@ -1,0 +1,242 @@
+/*
+ * The phone project header (design/mobile.md M1, M12, M13), measured from the phone boards' header
+ * card: 12px from the screen's edges, 10/10/12/18px inside, 8px between lines, a 30px name, 44px tap
+ * targets, and the views in a --well track below a divider that runs to the card's edges.
+ */
+.pph {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 10px 12px 18px;
+}
+
+.pph-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pph-crumb {
+  flex-shrink: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.pph-crumbs .tone-pill,
+.pph-crumbs .project-status {
+  flex-shrink: 0;
+}
+
+.pph-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.pph-icons {
+  display: flex;
+  margin-left: auto;
+}
+
+.pph-ib {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--body);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.pph-ib:active,
+.pph-ib[data-expanded] {
+  background: var(--hover);
+}
+
+/* The name is a button that opens the Tasks switcher; its 44px box sits 8px into the card's gutter. */
+.pph-title {
+  min-width: 0;
+  margin: -4px 0 0 -8px;
+  font-size: inherit;
+}
+
+.pph-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pph-name:active,
+.pph-name[aria-expanded="true"] {
+  background: var(--hover);
+}
+
+.pph-name-text {
+  min-width: 0;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.pph-caret {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.pph-desc {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: -2px 8px 0 0;
+}
+
+/* Folded to three 14px lines; Markdown can hold lists and headings, so it folds by height. */
+.pph-desc-text {
+  align-self: stretch;
+  max-height: calc(3 * 1.45 * 14px);
+  overflow: hidden;
+}
+
+.pph-desc-text .md {
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.pph-desc-text--open {
+  max-height: none;
+}
+
+.pph-desc-more {
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pph-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 8px;
+}
+
+.pph-numbers {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pph-num {
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.pph-red,
+.pph-red .pph-num {
+  color: var(--red-fg);
+}
+
+.pph-agents {
+  display: flex;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 8px;
+}
+
+/* 38px avatars overlapping by 8px, each with its state bar in the corner. */
+.pph-av {
+  position: relative;
+  display: block;
+  width: 38px;
+  height: 38px;
+  margin-left: -8px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.pph-av .agent-avatar,
+.pph-av img {
+  display: block;
+  width: 38px;
+  height: 38px;
+}
+
+.pph-av-state {
+  position: absolute;
+  right: 3px;
+  bottom: 6px;
+  width: 5px;
+  height: 12px;
+  border-radius: var(--r-pill);
+  box-shadow: 0 0 0 2px var(--card);
+}
+
+.pph-av-more {
+  display: grid;
+  place-items: center;
+  margin-left: -4px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  box-shadow: 0 0 0 2px var(--card);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pph .plugin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pph-views {
+  margin: 4px -10px 0 -18px;
+  padding: 12px 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.pph-views .tabs {
+  flex-wrap: nowrap;
+}
+
+.pph-views .tab {
+  flex: 1 1 auto;
+  justify-content: center;
+  height: 36px;
+  padding: 0 12px;
+}

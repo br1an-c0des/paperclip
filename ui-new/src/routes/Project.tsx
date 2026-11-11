@@ -7,8 +7,10 @@ import { findProject, projectsApi } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
+import { isCompact } from "@/layout/breakpoints";
 import { ProjectDashboard } from "@/projects/ProjectDashboard";
 import { ProjectDocs } from "@/projects/ProjectDocs";
+import { ProjectPhoneHeader } from "@/projects/ProjectPhoneHeader";
 import { ProjectSettings } from "@/projects/settings/ProjectSettings";
 import { updatedLabel } from "@/tasks/list-model";
 import { TasksView, useTaskList } from "@/tasks/TasksView";
@@ -47,6 +49,9 @@ import { loadingText } from "@/lib/offline/read-state";
  * The old project tabs moved into settings: `/configuration` to Details, `/budget` to Budget, and
  * `/workspaces` (and one workspace's page) to Code and workspaces. The star beside the title puts
  * the project in your nav's Starred group.
+ *
+ * On a phone the header is ProjectPhoneHeader (mobile.md M1, M12, M13): the name opens the Tasks
+ * switcher, and the views are Overview, List and Docs, with the rest under More.
  */
 
 const PROJECT_TABS = [
@@ -153,10 +158,33 @@ export function ProjectPage() {
     return latest === null ? null : updatedLabel(new Date(latest));
   };
 
+  const pluginTabs = () => plugins.slots().map((slot) => ({ label: slot.displayName, href: `${base()}/${pluginTabValue(slot)}` }));
+  const pluginActions = (found: Project) => (
+    <>
+      <PluginSlotOutlet slotTypes={["toolbarButton", "contextMenuItem"]} context={pluginContext(found)} class="plugin-toolbar" errorBehavior="hidden" />
+      <PluginLauncherOutlet placementZones={["toolbarButton"]} context={pluginContext(found)} class="plugin-toolbar" errorBehavior="hidden" />
+    </>
+  );
+
   return (
     <>
-      {/* `project-head` only scopes the phone layout (ProjectDashboard.css); it adds no box. */}
-      <div class="project-head">
+      <Show
+        when={!isCompact()}
+        fallback={
+          <ProjectPhoneHeader
+            project={project()}
+            fallbackName={params.projectKey}
+            base={base()}
+            tab={params.tab ?? ""}
+            status={<Show when={project()}>{(found) => <ProjectStatusPill project={found()} />}</Show>}
+            target={project()?.targetDate ? targetLabel(project()!.targetDate!) : null}
+            numbers={project() && tasks.data ? { open: open(), running: running(), blocked: blocked() } : null}
+            tasks={project() ? tasks.data : undefined}
+            pluginTabs={pluginTabs()}
+            plugins={<Show when={project()}>{(found) => pluginActions(found())}</Show>}
+          />
+        }
+      >
         <PageHeader
           crumbs={<span>Projects</span>}
           title={project()?.name ?? params.projectKey}
@@ -179,14 +207,7 @@ export function ProjectPage() {
           }
           actions={
             <>
-              <Show when={project()}>
-                {(found) => (
-                  <>
-                    <PluginSlotOutlet slotTypes={["toolbarButton", "contextMenuItem"]} context={pluginContext(found())} class="plugin-toolbar" errorBehavior="hidden" />
-                    <PluginLauncherOutlet placementZones={["toolbarButton"]} context={pluginContext(found())} class="plugin-toolbar" errorBehavior="hidden" />
-                  </>
-                )}
-              </Show>
+              <Show when={project()}>{(found) => pluginActions(found())}</Show>
               <Show when={view() === "dashboard" && project()}>
                 <A class={buttonClass({ size: "compact" })} href={`${base()}/settings`}>
                   <Pencil size={14} aria-hidden="true" />
@@ -200,14 +221,14 @@ export function ProjectPage() {
               label="Project"
               items={[
                 ...PROJECT_TABS.map((item) => ({ label: item.label, href: `${base()}${item.path}` })),
-                ...plugins.slots().map((slot) => ({ label: slot.displayName, href: `${base()}/${pluginTabValue(slot)}` })),
+                ...pluginTabs(),
               ]}
             />
           }
         >
           <Show when={view() === "dashboard" && project()}>{(found) => <ProjectFacts project={found()} />}</Show>
         </PageHeader>
-      </div>
+      </Show>
       <Show when={project()} fallback={<p class="card pd-empty">{missingNote()}</p>}>
         {(found) => (
           <Switch fallback={<PlannedNote milestone="M4">This tab is still to come.</PlannedNote>}>
@@ -242,26 +263,33 @@ export function ProjectPage() {
   );
 }
 
-/** The dashboard's header line: status, target date and who can see the project (board 8). */
-function ProjectFacts(props: { project: Project }) {
+/** The project's status: a tone pill, or a quiet label for backlog and cancelled. */
+function ProjectStatusPill(props: { project: Project }) {
   const status = () => PROJECT_STATUS[props.project.status] ?? PROJECT_STATUS.backlog;
   return (
+    <Show
+      when={status().tone}
+      fallback={
+        <span class="project-status">
+          <Capsule gradient={status().gradient} size="tiny" />
+          {status().label}
+        </span>
+      }
+    >
+      {(tone) => (
+        <TonePill tone={tone()} compact icon={<Capsule gradient={status().gradient} size="tiny" live={props.project.status === "in_progress"} />}>
+          {status().label}
+        </TonePill>
+      )}
+    </Show>
+  );
+}
+
+/** The dashboard's header line: status, target date and who can see the project (board 8). */
+function ProjectFacts(props: { project: Project }) {
+  return (
     <div class="ph-numbers project-facts">
-      <Show
-        when={status().tone}
-        fallback={
-          <span class="project-status">
-            <Capsule gradient={status().gradient} size="tiny" />
-            {status().label}
-          </span>
-        }
-      >
-        {(tone) => (
-          <TonePill tone={tone()} compact icon={<Capsule gradient={status().gradient} size="tiny" live={props.project.status === "in_progress"} />}>
-            {status().label}
-          </TonePill>
-        )}
-      </Show>
+      <ProjectStatusPill project={props.project} />
       <Show when={props.project.targetDate}>
         {(target) => (
           <span class="project-fact">

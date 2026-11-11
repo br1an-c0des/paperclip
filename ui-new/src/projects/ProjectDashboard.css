@@ -539,6 +539,18 @@ a.pd-well-aside {
   background: none;
 }
 
+/*
+ * The phone header shows the description (ProjectPhoneHeader), so the Brief leaves its copy out,
+ * and the whole well when that copy was all it had: no AI brief, its notes, or goals.
+ */
+:root[data-viewport="phone"] .pd-well--brief .pd-brief {
+  display: none;
+}
+
+:root[data-viewport="phone"] .pd-well--brief:not(:has(> :not(.pd-well-head, .pd-brief))) {
+  display: none;
+}
+
 :root[data-viewport="phone"] .pd-waiting {
   order: 2;
 }
@@ -619,49 +631,6 @@ a.pd-well-aside {
 
 :root[data-viewport="phone"] .pd-crew-pop {
   display: none;
-}
-
-/*
- * The project header on a phone (mobile.md M1, M12; decision 45): a tighter card, a 30px title, and
- * the views on one line that scrolls sideways instead of wrapping onto a second.
- */
-.project-head {
-  display: contents;
-}
-
-:root[data-viewport="phone"] .project-head .ph {
-  gap: 10px 14px;
-  padding: 12px 12px 12px 18px;
-}
-
-:root[data-viewport="phone"] .project-head .ph-text {
-  flex-basis: 100%;
-}
-
-:root[data-viewport="phone"] .project-head .ph-title {
-  font-size: 30px;
-  line-height: 1.05;
-}
-
-:root[data-viewport="phone"] .project-head .ph-tabs {
-  min-width: 0;
-  margin: 0 -12px 0 -18px;
-  padding: 10px 12px 0;
-}
-
-:root[data-viewport="phone"] .project-head .tabs {
-  flex-wrap: nowrap;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-:root[data-viewport="phone"] .project-head .tabs::-webkit-scrollbar {
-  display: none;
-}
-
-:root[data-viewport="phone"] .project-head .tab {
-  flex-shrink: 0;
 }
 
 /* The dashboard's header line (board 8): status, target date, visibility. */
