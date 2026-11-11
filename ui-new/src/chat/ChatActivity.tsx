@@ -19,6 +19,7 @@ import { stopLabel, stopRun } from "@/tasks/run-stop";
 import { ChatContextSection } from "@/tasks/TaskContext";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
+import { useQueuedHold } from "./admission-hold";
 import { messageTime } from "./chat-model";
 import { readNote } from "@/lib/offline/read-state";
 
@@ -27,7 +28,8 @@ import { readNote } from "@/lib/offline/read-state";
  * next, and what it did lately, by day.
  *
  * - Right now: replying in this chat, working on a task (with Watch run and Stop), or idle (with
- *   Run now). Runs come from the company's live runs.
+ *   Run now). Runs come from the company's live runs; a queued one's named hold (maintenance, agent
+ *   setup…) comes from its run detail (admission-hold.ts).
  * - Up next: its assigned tasks waiting to start (`status=todo`).
  * - Documents: the chat's own, the plan first, once it has any (ChatDocuments.tsx).
  * - The timeline: its activity (`/activity?agentId=`), worded as the Org dashboard words it, with
@@ -68,6 +70,9 @@ export function ChatActivity(props: {
   const now = useNow(() => props.replyRuns.length > 0 || props.otherRuns.length > 0);
 
   const work = () => props.otherRuns.find((run) => run.status === "running") ?? props.otherRuns[0];
+  // A queued run's named hold (maintenance, agent setup…), from its run detail (decision 50, U120).
+  const replyHold = useQueuedHold(() => props.replyRuns[0]);
+  const workHold = useQueuedHold(work);
   const workTask = createQuery(() => ({
     queryKey: queryKeys.issues.section(work()?.issueId ?? "", "core"),
     queryFn: ({ signal }) => issuesApi.getCore(work()!.issueId!, signal),
@@ -189,8 +194,8 @@ export function ChatActivity(props: {
                   )}
                 </Show>
                 <span class="ch-muted">
-                  {/* No "Queued" while the run is admitted, and no time until it has started (U120). */}
-                  {run().startedAt ? `Started ${since(run()) ?? "just now"} ago` : "Starting"}
+                  {/* No "Queued" while the run is admitted, and no time until it has started; only a named hold says so (U120). */}
+                  {run().startedAt ? `Started ${since(run()) ?? "just now"} ago` : (workHold() ?? "Starting")}
                 </span>
                 <div class="ch-now-actions">
                   <button type="button" class="ch-pill-btn" onClick={() => commands.openRunModal(run().id)}>
@@ -213,7 +218,7 @@ export function ChatActivity(props: {
               Working now
             </span>
             <span class="ch-now-title">Replying to you in this chat</span>
-            <span class="ch-muted">{run().startedAt ? `Started ${since(run()) ?? "just now"} ago by your message` : "From your message"}</span>
+            <span class="ch-muted">{run().startedAt ? `Started ${since(run()) ?? "just now"} ago by your message` : (replyHold() ?? "From your message")}</span>
             <div class="ch-now-actions">
               <button type="button" class="ch-pill-btn ch-pill-btn--stop" disabled={stopping().has(run().id)} onClick={() => void stop(run())}>
                 <Square size={11} aria-hidden="true" />

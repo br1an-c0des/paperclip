@@ -53,6 +53,7 @@ import { compactionDetail, compactionRunIds, runsToRead, useRunCompactions } fro
 import { contextUsageQuery } from "./TaskContext";
 import { CopyMessage } from "./CopyMessage";
 import { LiveRunStatusLine } from "./LiveRunStatus";
+import { useQueuedHold } from "@/chat/admission-hold";
 import { CommentPluginActions, CommentPluginAnnotations } from "@/plugins/CommentPlugins";
 import "./TaskActivity.css";
 
@@ -549,10 +550,7 @@ export function TaskActivity(props: {
               {(run) => (
                 <article class="ta-live" aria-label="Live run">
                   <Capsule gradient="ion" size="tiny" live />
-                  <span class="ta-live-who">
-                    {/* Working from the moment it's admitted, as the chat's live reply reads (U120, #20559). */}
-                    {run.agentName} is working
-                  </span>
+                  <LiveRunWho run={run} />
                   <span class="ta-muted">
                     Run {run.id.slice(0, 8)}
                     <Show when={run.startedAt}>{(start) => <> · {duration(start(), new Date(now()))}</>}</Show>
@@ -591,6 +589,16 @@ export function TaskActivity(props: {
       </Show>
     </section>
   );
+}
+
+/**
+ * Who the live run line is about. Working from the moment it's admitted, as the chat's live reply
+ * reads (U120, #20559); only a queued run's named hold, read from its run detail, says otherwise
+ * (decision 50, chat/admission-hold.ts).
+ */
+export function LiveRunWho(props: { run: { id: string; status: string; agentName: string } }) {
+  const hold = useQueuedHold(() => props.run);
+  return <span class="ta-live-who">{hold() ? `${props.run.agentName} · ${hold()}` : `${props.run.agentName} is working`}</span>;
 }
 
 function Comment(props: {
