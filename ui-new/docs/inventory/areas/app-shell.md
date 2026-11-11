@@ -122,6 +122,9 @@ cheatsheet, the command palette, global dialogs, and plugin overlays.
 - **Source:** `PluginSlotMount`, `PluginSlotOutlet`, `PluginLauncherOutlet`, `PluginAppShellOverlays`,
   `plugins/`.
 - **Notes:** a new UI must keep these mount points (or a subset) for installed plugins to keep working.
+- **Since the second 2026-11-10 sync:** an agent `detailTab` slot can declare
+  `agentEnvironmentDriver`; the tab shows only for agents whose environment uses that plugin driver,
+  read from the environments list (`pluginDriver`, `plugins/useAgentEnvironmentSlots.ts`).
 - **Since the 2026-11-01 sync:** a task side panel can declare
   `taskSidePanel.activation: { namespace, activityKey }`. Runtime activity that matches opens it,
   read from `GET /api/heartbeat-runs/:runId/events?view=plugin-panels` (`heartbeatsApi.taskPanelActivations`,

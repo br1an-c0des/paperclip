@@ -128,6 +128,9 @@ connection's pending action requests and quarantined catalog entries (the connec
 instead of `tools/apps/attention`); `GET /api/tool-connections/:connectionId/profile-configuration`
 gives a connection's saved profiles without access summaries (App detail uses it instead of
 `tools/profiles`).
+Since the second 2026-11-10 sync: a gateway client token an agent created for its responsible person
+has `pendingReveal`; the person reveals its value once on the gateway's Tokens tab with
+`POST /api/tool-gateway/gateway-tokens/:tokenId/reveal` (`toolsApi.revealGatewayToken`).
 Upstream recipes: `maps/feature-map/connection-setup.md`, `gateways-profiles.md`, `chat-channels.md`,
 `app-permissions.md`.
 

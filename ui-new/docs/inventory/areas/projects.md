@@ -38,7 +38,10 @@ for the new-project dialog and memberships. Upstream recipes: `maps/feature-map/
   - *Archive* from the project page; archived projects stay in task filters.
 - **Requests:** `POST /api/companies/:companyId/projects`,
   `GET /api/companies/:companyId/project-repositories`, `GET /api/companies/:companyId/projects`,
-  `PATCH /api/projects/:id` (archive).
+  `PATCH /api/projects/:id` (archive). Since the second 2026-11-10 sync, New project also picks the
+  execution environment from `GET /api/companies/:companyId/project-environments` (environments
+  grouped by the storage plugin they share, with a default) and sends `environmentId` with
+  `expectedStorageProviderPluginId`.
 - **Notes:** creation is also part of onboarding (`components/OnboardingWizard.tsx`). Recently opened
   projects are tracked locally for the sidebar.
 
@@ -77,7 +80,10 @@ for the new-project dialog and memberships. Upstream recipes: `maps/feature-map/
 - **Requests:** `GET|PATCH /api/projects/:id`, `PUT /api/projects/:id/repositories`,
   `GET|PUT /api/projects/:id/git-authorization`,
   `GET|POST /api/companies/:companyId/secrets`, `GET /api/companies/:companyId/user-secret-definitions`,
-  `GET /api/companies/:companyId/environments`, `GET|POST /api/projects/:id/access-members`,
+  `GET /api/companies/:companyId/project-environments` (since the second 2026-11-10 sync, in place of
+  `GET /api/companies/:companyId/environments`: the environment choices grouped by storage; the
+  choice is saved as `Project.environmentId`, no longer in `executionWorkspacePolicy`),
+  `GET|POST /api/projects/:id/access-members`,
   `DELETE /api/projects/:id/access-members/:memberId`, `POST /api/companies/:companyId/assets/images`.
 - **Notes:** attaching a GitHub repository also imports skills from it (see upstream `projects.md`,
   "Automatic repository skills"). Isolated checkouts depend on flags `enableIsolatedWorkspaces` and
