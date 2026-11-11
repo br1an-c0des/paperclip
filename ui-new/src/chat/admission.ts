@@ -10,8 +10,10 @@ import { isActiveRun } from "@/runs/run-model";
  * execution projection with a `cause`), or a wait for the AI provider.
  *
  * The execution projection comes with `GET /heartbeat-runs/:id`; the company's live runs don't carry
- * it, so the lists that read those (the chat's Activity column, a task's live run line) just leave
- * "Queued" out.
+ * it. So the places that read those (the chat's Activity column, a task's live run line) read the
+ * run detail for each run that's still queued there, under the key the reply card and the run modal
+ * read, and stop once it starts or leaves the list (decision 50; the hook is admission-hold.ts).
+ * With no named hold they keep "Starting" and "is working".
  */
 
 export type AdmissionRun = {
@@ -27,4 +29,26 @@ export function admissionHold(run: AdmissionRun | null | undefined): string | nu
   if (!label) return null;
   if (execution!.phase === "waiting_for_provider") return label;
   return run.status === "queued" && execution!.cause ? label : null;
+}
+
+/** How often a queued run's detail is read again when no live event has refreshed it. */
+export const QUEUED_HOLD_REFRESH_MS = 15_000;
+
+/** Whether a live-runs row reads its run detail for a hold: only while it's queued. */
+export function readsHold(live: { status: string } | null | undefined): boolean {
+  return live?.status === "queued";
+}
+
+/**
+ * The hold a live-runs row names, from its run detail once that's read. A row that has started
+ * names none (the list's own wording takes over), and neither does one whose detail isn't read yet.
+ */
+export function liveRunHold(live: { status: string } | null | undefined, detail: AdmissionRun | null | undefined): string | null {
+  if (!readsHold(live) || !detail) return null;
+  return admissionHold(detail);
+}
+
+/** The fallback refresh while the detail still says queued (or isn't read yet); none after. */
+export function holdRefreshInterval(detail: { status: string } | null | undefined): number | false {
+  return !detail || detail.status === "queued" ? QUEUED_HOLD_REFRESH_MS : false;
 }
