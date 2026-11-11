@@ -64,7 +64,7 @@ until one becomes a concrete fix.
 | 25 | [Use one effort key for Grok on the Paperclip Runner](#25-use-one-effort-key-for-grok-on-the-paperclip-runner) | candidate | | | 2026-11-05 | | |
 | 26 | [Don't mark a blocker `attention_required` with nothing to attend to](#26-dont-mark-a-blocker-attention_required-with-nothing-to-attend-to) | candidate | | | 2026-11-05 | | |
 | 27 | [Kitchen Sink example: hide config-gated items until the config loads](#27-kitchen-sink-example-hide-config-gated-items-until-the-config-loads) | candidate | | | 2026-11-09 | | |
-| 28 | [Let Claude Runner agents pass verification in the Docker image](#28-let-claude-runner-agents-pass-verification-in-the-docker-image) | building | `fix/runner-docker-provider-authority` | | 2026-11-10 | | |
+| 28 | [Let Claude Runner agents pass verification in the Docker image](#28-let-claude-runner-agents-pass-verification-in-the-docker-image) | ready | `fix/runner-docker-provider-authority` | | 2026-11-10 | | |
 
 ## Details
 
@@ -474,3 +474,13 @@ was closed by an automated pipeline as already fixed, which it isn't.
 - **Fork workaround:** none in code. On the deployment, put Claude agents on the legacy runner
   (with `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` as a company secret if the AI connection
   isn't enough) until a fixed upstream image is synced and deployed; then move them back.
+- **Built 2026-11-10:** commit `96f6f4fd4` off `master` at `69c69e4c2`. The rule from #15912 moves
+  into `sourceWorkspaceProviderRoot` in `installed-provider-authority.ts`;
+  `resolveInstalledProviderAuthority` uses it, and runnerd's `acpxProviderPackageAuthority` calls
+  the same function (native asset agents still excluded). The regression came from #15994, which
+  added the server-side authority without the rule. Tests: `installed-provider-authority.test.ts`
+  fails without the fix (1 of 10) and passes with it; runnerd's seven authority tests (22 passed)
+  and `installation-integrity.test.ts` (80 passed); `tsc --noEmit` clean. In the deployed
+  `sha-d0057ee` container, the full `verifyQualifiedAcpxInstallation` passes for Claude and Codex
+  with the new root and fails with the old one. No fixed image was built. The PR draft is
+  `PR_DESCRIPTION.md` in `~/coding/paperclip-fixes/runner-docker-provider-authority`.
