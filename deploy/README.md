@@ -59,7 +59,10 @@ sudo chown "$(id -u):$(id -g)" /srv/paperclip/home
 deploy/deploy.sh
 ```
 
-Then open `PAPERCLIP_PUBLIC_URL` and create the first account.
+Then open `PAPERCLIP_PUBLIC_URL`, create an account, and choose **Claim this instance**. On a
+`private` deployment the first signed-in person to claim it becomes the admin, so do this before
+anyone else can reach it. (`public` deployments use `paperclipai auth bootstrap-ceo` instead; see
+`doc/DEPLOYMENT-MODES.md`.)
 
 ### Settings (`deploy/.env`)
 
@@ -70,7 +73,8 @@ Then open `PAPERCLIP_PUBLIC_URL` and create the first account.
 | `PAPERCLIP_PUBLIC_URL` | The exact URL people open, including `https://` |
 | `PAPERCLIP_DEPLOYMENT_EXPOSURE` | `private` (Tailscale/VPN/LAN) or `public` (internet, behind Caddy) |
 | `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, `PAPERCLIP_TOOL_ACTION_SIGNING_SECRET` | Generate each with `openssl rand -hex 32`. Keep them stable: changing `BETTER_AUTH_SECRET` signs everyone out. |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | At least one, for agents |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | API keys for agents. Leave `ANTHROPIC_API_KEY` empty to use a Claude subscription instead: sign in from Apps → AI connections after setup. A set key takes precedence over the subscription. |
+| `PAPERCLIP_PORT` | Host port, default 3100. Use another one (e.g. 3200) when a dev server already runs on 3100 on the same machine. |
 | `GITHUB_TOKEN` | Optional fallback for cloning private repos. A company secret named `GITHUB_TOKEN` (set in the UI) takes precedence and is scoped to one company. |
 
 ## Access
@@ -98,6 +102,35 @@ paperclip.example.com {
 Set `PAPERCLIP_PUBLIC_URL=https://paperclip.example.com` and
 `PAPERCLIP_DEPLOYMENT_EXPOSURE=public`. Public mode enables stricter checks, including auth rate
 limiting.
+
+## On the dev machine (WSL with Docker Desktop)
+
+The deployment can run on the same Windows + WSL machine you develop on, beside the dev server:
+
+- **Docker:** Docker Desktop on Windows with WSL integration on for the Ubuntu distro. Run every
+  command from Ubuntu as usual. The containers run in Docker Desktop's own distro and bind-mount
+  the data folder from Ubuntu's disk. Keep `PAPERCLIP_DATA_ROOT` on Ubuntu's disk (e.g.
+  `~/paperclip-data`), not under `/mnt/c`.
+- **A clean checkout:** the image is built from the working tree as it is, so build from a separate
+  worktree that holds only committed `new-ui`, never from the checkout you're editing:
+
+  ```bash
+  git worktree add --detach ~/coding/paperclip-deploy new-ui   # once; deploy/.env lives here
+  cd ~/coding/paperclip-deploy && git checkout --detach new-ui && deploy/deploy.sh   # each update
+  ```
+
+- **Ports:** set `PAPERCLIP_PORT=3200` so it doesn't collide with the dev server on 3100.
+- **Tailscale on Windows:** WSL forwards `localhost` to Windows, so `tailscale serve` on Windows
+  can front it. For example, the deployment on 443 and dev on other ports:
+
+  ```bash
+  tailscale serve --bg --https=443 http://localhost:3200     # deployed Paperclip
+  tailscale serve --bg --https=10000 http://localhost:5174   # dev ui-new
+  tailscale serve --bg --https=8443 http://localhost:3100    # dev server and old UI
+  ```
+
+- **Staying up:** the stack restarts whenever Docker Desktop starts (`restart: unless-stopped`), so
+  turn on Docker Desktop's "Start when you sign in". It's down while the PC sleeps.
 
 ## Updating
 
