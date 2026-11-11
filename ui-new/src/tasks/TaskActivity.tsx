@@ -550,7 +550,8 @@ export function TaskActivity(props: {
                 <article class="ta-live" aria-label="Live run">
                   <Capsule gradient="ion" size="tiny" live />
                   <span class="ta-live-who">
-                    {run.agentName} {run.status === "queued" ? "is about to start" : "is working"}
+                    {/* Working from the moment it's admitted, as the chat's live reply reads (U120, #20559). */}
+                    {run.agentName} is working
                   </span>
                   <span class="ta-muted">
                     Run {run.id.slice(0, 8)}

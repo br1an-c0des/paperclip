@@ -20,6 +20,7 @@ import {
   Clock,
   CornerDownRight,
   Ellipsis,
+  FileText,
   MessageSquare,
   NotebookPen,
   ShieldCheck,
@@ -51,7 +52,7 @@ import { DeclineButton, Footer } from "./card-parts";
 import { ConnectionControls } from "./ConnectionControls";
 import { DecisionControls, DecisionResults } from "./DecisionControls";
 import { JoinControls } from "./JoinControls";
-import { answerRefusal, KIND_LABEL, planLabel, planReviewTarget, suggestedOwner, type Request, type RequestKind } from "./request-model";
+import { answerRefusal, documentLabel, documentReviewTarget, KIND_LABEL, planLabel, planReviewTarget, suggestedOwner, type Request, type RequestKind } from "./request-model";
 import "./RequestCard.css";
 
 /*
@@ -203,27 +204,38 @@ function Subject(props: { subject: NonNullable<Request["subject"]>; onOpen?: () 
 }
 
 /**
- * A plan review's link to the Plan revision it asks about (U41): "Plan v2". In its own task's
- * thread or chat it stays on the page, which opens the document on that revision
- * (`#document-plan&revision=<id>`, task-anchor.ts); elsewhere it goes to the task.
+ * A request's link to the document it asks about: a plan review's "Plan v2" (U41), or since the
+ * 2026-11-10 sync (U119, upstream #20590) any other saved document a confirmation asks the person
+ * to review, "Design notes v2". In its own task's thread or chat it stays on the page, which opens
+ * the document on that revision (`#document-<key>&revision=<id>`, task-anchor.ts); elsewhere it
+ * goes to the task.
  */
 function PlanLink(props: { request: Request; inThread?: boolean }) {
   const company = useCompany();
   const interaction = () => (props.request.source.type === "interaction" ? props.request.source.interaction : null);
   const target = () => {
     const found = interaction();
-    return found ? planReviewTarget(found) : null;
+    if (!found) return null;
+    const plan = planReviewTarget(found);
+    if (plan) {
+      const revision = plan.revisionNumber == null ? "Open the plan" : `Open revision ${plan.revisionNumber} of the plan`;
+      return { ...plan, key: "plan", plan: true, text: planLabel(plan), title: revision };
+    }
+    const document = documentReviewTarget(found);
+    if (!document) return null;
+    const title = document.revisionNumber == null ? `Open ${document.label}` : `Open revision ${document.revisionNumber} of ${document.label}`;
+    return { ...document, plan: false, text: documentLabel(document), title };
   };
   return (
     <Show when={target()}>
-      {(plan) => {
-        const anchor = () => documentAnchor("plan", null, plan().revisionId);
-        const here = () => props.inThread && plan().issueId === interaction()?.issueId;
-        const href = () => (here() ? anchor() : `/${company().issuePrefix}/issues/${encodeURIComponent(plan().issueId)}${anchor()}`);
+      {(doc) => {
+        const anchor = () => documentAnchor(doc().key, null, doc().revisionId);
+        const here = () => props.inThread && doc().issueId === interaction()?.issueId;
+        const href = () => (here() ? anchor() : `/${company().issuePrefix}/issues/${encodeURIComponent(doc().issueId)}${anchor()}`);
         return (
-          <a class="rq-plan" href={href()} title={plan().revisionNumber == null ? "Open the plan" : `Open revision ${plan().revisionNumber} of the plan`}>
-            <NotebookPen size={12} aria-hidden="true" />
-            {planLabel(plan())}
+          <a class="rq-plan" href={href()} title={doc().title} data-document={doc().key}>
+            {doc().plan ? <NotebookPen size={12} aria-hidden="true" /> : <FileText size={12} aria-hidden="true" />}
+            <span class="rq-plan-label">{doc().text}</span>
           </a>
         );
       }}

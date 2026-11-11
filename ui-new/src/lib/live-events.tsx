@@ -289,12 +289,73 @@ export function changesTaskMentions(event: LiveEvent): boolean {
 /** Leaves the @task matches out of an invalidation, unless the events can change them. */
 const mentionFilter = (mentions: boolean) => (mentions ? {} : { predicate: (query: { queryKey: QueryKey }) => !isMentionQuery(query.queryKey) });
 
+/**
+ * Task actions that can change what other tasks show of this one in their `blockedBy` and `blocks`
+ * rows (its status, retry or recovery), as the old UI lists them (#20836).
+ */
+const RELATION_SUMMARY_ACTIONS = new Set([
+  "issue.updated",
+  "issue.deleted",
+  "issue.status_decision_recorded",
+  "issue.checked_out",
+  "issue.released",
+  "issue.recovery_action_resolved",
+  "issue.recovery_generation_replaced",
+  "issue.retry_requested",
+  "issue.scheduled_retry_retry_now",
+]);
+
+/**
+ * The task ids and identifiers a task event changes what other tasks embed of, or nothing. An
+ * authenticated socket can send only the task's id; local trusted mode adds its identifier.
+ */
+export function relationSummaryRefs(event: LiveEvent): string[] {
+  if (event.type !== "activity.logged") return [];
+  const payload = event.payload ?? {};
+  const entityId = readString(payload.entityId);
+  const action = readString(payload.action);
+  if (payload.entityType !== "issue" || !entityId || !action || !RELATION_SUMMARY_ACTIONS.has(action)) return [];
+  const details = (payload.details ?? null) as Record<string, unknown> | null;
+  const identifier = readString(details?.identifier) ?? readString(details?.issueIdentifier);
+  return identifier && identifier !== entityId ? [entityId, identifier] : [entityId];
+}
+
+/**
+ * Dependent tasks refresh when a blocker changes (U130, upstream #20836): every cached task detail
+ * whose `blockedBy` or `blocks` names a changed task is refetched, so an open task's blocker rows
+ * don't keep the blocker's old status. The changed task's own detail is refreshed by its key.
+ */
+export function invalidateRelationEmbedders(client: QueryClient, refs: readonly string[]) {
+  if (refs.length === 0) return;
+  const changed = new Set(refs);
+  const names = (summaries: unknown) =>
+    Array.isArray(summaries) &&
+    summaries.some((summary) => {
+      const record = summary && typeof summary === "object" ? (summary as Record<string, unknown>) : null;
+      return !!record && (changed.has(readString(record.id) ?? "") || changed.has(readString(record.identifier) ?? ""));
+    });
+  void client.invalidateQueries(
+    {
+      queryKey: ["issues", "detail"],
+      predicate: (query) => {
+        // The detail itself, not its sections (`issues.section`), which sit under its key.
+        if (query.queryKey.length !== 3) return false;
+        const data = query.state.data as Record<string, unknown> | null | undefined;
+        if (!data || typeof data !== "object" || changed.has(readString(data.id) ?? "")) return false;
+        return names(data.blockedBy) || names(data.blocks);
+      },
+    },
+    { cancelRefetch: false },
+  );
+}
+
 function invalidateForEvent(client: QueryClient, companyId: string, event: LiveEvent, trailing: TrailingRefetch, viewer: LiveViewer) {
   const keys = keysForEvent(companyId, event, viewer);
   const mentions = changesTaskMentions(event);
   for (const queryKey of keys) {
     void client.invalidateQueries({ queryKey, ...mentionFilter(mentions) }, { cancelRefetch: false });
   }
+  invalidateRelationEmbedders(client, relationSummaryRefs(event));
   trailing.add(keys, { mentions });
 }
 

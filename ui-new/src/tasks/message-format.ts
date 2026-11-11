@@ -7,8 +7,43 @@
  * - `diff` and `patch` code blocks colour their lines (upstream #19478, ui/src/lib/patch.ts): added
  *   green, removed red, hunk headers and file headers muted.
  *
- * Both are copied from the old UI as upstream has them, so they can be checked at each sync.
+ * - Since the 2026-11-10 sync (U113, upstream #20593, #20654): a pull request link's mark shows its
+ *   state once it's known, and a card shows its title, author and last update (LinkPreview.tsx).
+ *   Which links get one is `recognizeLinkPreview` (`@paperclipai/shared`); the words are below.
+ *
+ * All are copied from the old UI as upstream has them, so they can be checked at each sync.
  */
+
+import type { LinkPreview, LinkPreviewState, LinkPreviewTarget } from "@paperclipai/shared";
+import { agoLabel, dayLabel } from "@/runs/run-model";
+
+/** A pull request's state in words, as the old UI's `linkPreviewStateLabel`. */
+export const LINK_PREVIEW_STATE_LABEL: Record<LinkPreviewState, string> = {
+  unknown: "Status unknown",
+  open: "Open",
+  draft: "Draft",
+  merged: "Merged",
+  closed: "Closed",
+  conflicts: "Merge conflicts",
+};
+
+/** "octocat · Updated 2h ago", "Updated Nov 3": who opened it and when it last changed, or null. */
+export function previewMeta(preview: Pick<LinkPreview, "author" | "updatedAt">, now: Date = new Date()): string | null {
+  const updated = preview.updatedAt && Number.isFinite(Date.parse(preview.updatedAt)) ? new Date(preview.updatedAt) : null;
+  const when = updated ? (now.getTime() - updated.getTime() < 86_400_000 ? agoLabel(updated, now) : dayLabel(updated, now)) : null;
+  const parts = [preview.author?.trim() || null, when ? `Updated ${when}` : null].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/** The link's accessible name once its preview is known: "acme/app#12 Merged: Fix the build". */
+export function previewLinkLabel(target: Pick<LinkPreviewTarget, "label">, preview: Pick<LinkPreview, "state" | "title"> | null) {
+  return preview ? `${target.label} ${LINK_PREVIEW_STATE_LABEL[preview.state]}: ${preview.title}` : null;
+}
+
+/** The mark's accessible name: what it opens, and the state when it's known. */
+export function previewMarkLabel(target: Pick<LinkPreviewTarget, "label">, state: LinkPreviewState) {
+  return state === "unknown" ? `Pull request ${target.label}: show its status` : `Pull request ${target.label}: ${LINK_PREVIEW_STATE_LABEL[state]}. Show details`;
+}
 
 export interface GitHubLink {
   kind: "github" | "repository" | "pull_request" | "issue";

@@ -1,6 +1,6 @@
 import type { Issue } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { PARENT_TITLE_LIMIT, parentCrumb, parentLabel, truncateTitle } from "./parent-crumb";
+import { crumbLabel, PARENT_TITLE_LIMIT, parentCrumb, parentLabel, truncateTitle } from "./parent-crumb";
 
 type Ancestors = NonNullable<Issue["ancestors"]>;
 const ancestor = (id: string, identifier: string | null, title: string) => ({ id, identifier, title }) as Ancestors[number];
@@ -54,5 +54,10 @@ describe("parentCrumb", () => {
     expect(crumb).toEqual({ kind: "locked", id: "p1", identifier: "TES-12" });
     expect(parentLabel(crumb!)).toBe("Parent task TES-12, private, you don't have access");
     expect(parentLabel({ kind: "locked", id: "p1", identifier: null })).toBe("Parent task, private, you don't have access");
+  });
+
+  it("names the header crumb by its title alone, and a private one without its number (U128, #20804)", () => {
+    expect(crumbLabel(parentCrumb(task("p1", [ancestor("p1", "TES-12", "Prepare")]))!)).toBe("Parent task: Prepare");
+    expect(crumbLabel({ kind: "locked", id: "p1", identifier: "TES-12" })).toBe("Parent task, private, you don't have access");
   });
 });

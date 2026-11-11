@@ -141,6 +141,26 @@ describe("RequestCard", () => {
     expect(screen.getByRole("link", { name: "Plan v2" })).toBeTruthy();
   });
 
+  it("links a review request's own document, so the person can open what it asks them to review (U119, #20590)", () => {
+    const review = {
+      ...question,
+      kind: "request_confirmation",
+      title: "Review draft",
+      payload: { version: 1, prompt: "Review the unpublished draft.", target: { type: "issue_document", key: "draft", revisionId: "draft-revision-1" } },
+    } as unknown as IssueThreadInteraction;
+    const open = mount(review);
+    const link = screen.getByRole("link", { name: "draft" });
+    expect(link.getAttribute("href")).toBe("#document-draft&revision=draft-revision-1");
+    expect(link.getAttribute("title")).toBe("Open draft");
+    open.unmount();
+    // The agent's label and the revision, on another task's document: that task's page.
+    mount({
+      ...review,
+      payload: { ...review.payload, target: { type: "issue_document", issueId: "other", key: "design", label: "Design notes", revisionId: "r3", revisionNumber: 3 } },
+    } as unknown as IssueThreadInteraction);
+    expect(screen.getByRole("link", { name: "Design notes v3" }).getAttribute("href")).toBe("/TRA/issues/other#document-design&revision=r3");
+  });
+
   it("adds the page's triage to its menu, draws the context column and opens the subject in place", async () => {
     const client = new QueryClient();
     const onOpen = vi.fn();

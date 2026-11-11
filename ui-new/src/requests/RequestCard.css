@@ -500,7 +500,7 @@
   font-weight: 500;
 }
 
-/* A plan review's "Plan v2" link (U41). */
+/* A plan review's "Plan v2" link (U41), or another document's (U119). */
 .rq-plan {
   align-self: flex-start;
   display: inline-flex;
@@ -518,7 +518,16 @@
 }
 
 .rq-plan svg {
+  flex-shrink: 0;
   color: var(--violet-fg);
+}
+
+/* Any other document a request asks about (U119) can have a long name. */
+.rq-plan-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rq-plan:hover,

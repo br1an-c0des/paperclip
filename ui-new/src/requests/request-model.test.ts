@@ -1,6 +1,6 @@
 import type { Approval, IssueThreadInteraction } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { answerRefusal, expiryLabel, plainLine, refusalCode, SIGN_IN_NEEDED, planLabel, planReviewTarget, referenceImages, requestFromApproval, requestFromInteraction, requestFromReview, signoffOf, suggestedOwner, taskRequests, type RequestContext } from "./request-model";
+import { answerRefusal, documentLabel, documentReviewTarget, expiryLabel, plainLine, refusalCode, SIGN_IN_NEEDED, planLabel, planReviewTarget, referenceImages, requestFromApproval, requestFromInteraction, requestFromReview, signoffOf, suggestedOwner, taskRequests, type RequestContext } from "./request-model";
 
 const ctx: RequestContext = {
   youId: "me",
@@ -199,6 +199,18 @@ describe("interactions as requests", () => {
     expect(planLabel(planReviewTarget(unnumbered)!)).toBe("Plan");
     const other = interaction({ kind: "request_confirmation", payload: { version: 1, prompt: "Keep it?", target: { ...target, key: "design" } } });
     expect(planReviewTarget(other)).toBeNull();
+  });
+
+  it("names the document any other review asks about, not the plan (U119, #20590)", () => {
+    const target = { type: "issue_document", key: "draft", revisionId: "rev-1" };
+    const review = interaction({ kind: "request_confirmation", payload: { version: 1, prompt: "Review the draft?", target } });
+    expect(documentReviewTarget(review)).toEqual({ issueId: "t1", key: "draft", label: "draft", revisionId: "rev-1", revisionNumber: null });
+    expect(documentLabel(documentReviewTarget(review)!)).toBe("draft");
+    const labelled = interaction({ kind: "request_item_verdicts", payload: { version: 1, prompt: "Each item?", items: [], target: { ...target, label: " Design notes ", revisionNumber: 2, issueId: "t9" } } });
+    expect(documentReviewTarget(labelled)).toMatchObject({ issueId: "t9", label: "Design notes", revisionNumber: 2 });
+    expect(documentLabel(documentReviewTarget(labelled)!)).toBe("Design notes v2");
+    expect(documentReviewTarget(interaction({ kind: "request_confirmation", payload: { version: 1, prompt: "Plan?", target: { ...target, key: "plan" } } }))).toBeNull();
+    expect(documentReviewTarget(interaction({ kind: "request_confirmation", payload: { version: 1, prompt: "File?", target: { type: "issue_attachment", attachmentId: "a1" } } }))).toBeNull();
   });
 
   it("knows who may answer", () => {

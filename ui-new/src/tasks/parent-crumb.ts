@@ -4,8 +4,12 @@ import type { Issue } from "@paperclipai/shared";
  * The parent task in the task header (U104), after the old UI's breadcrumbs (#20366,
  * ui/src/components/BreadcrumbBar.tsx, IssueDetail.tsx): only the immediate parent, its title cut
  * to 48 characters (counted as code points, so an emoji isn't split) with the whole title kept for
- * hover and screen readers, and a private parent shown as a lock with its number and no link. The
- * Details "Parent" row (TaskEditors.tsx `ParentControl`) stays where the parent is changed.
+ * hover and screen readers, and a private parent shown as a lock and no link. The Details "Parent"
+ * row (TaskEditors.tsx `ParentControl`) stays where the parent is changed, and keeps its number.
+ *
+ * Since the 2026-11-11 sync (U128, upstream #20804) the crumb is the title alone at every width, with
+ * no task number, and a private parent reads "Private", so following the link doesn't change what
+ * the header calls the parent.
  */
 
 /** How many characters of the parent's title the header shows, the old UI's limit. */
@@ -38,8 +42,14 @@ export function parentCrumb(task: Pick<Issue, "parentId" | "ancestors"> | undefi
   return { kind: "link", id: parent.id, identifier: parent.identifier ?? null, title, label: truncateTitle(title) };
 }
 
-/** The parent's accessible name: its whole title and its number, as the old UI labels the crumb. */
+/** The parent's accessible name in the Details "Parent" row: its whole title and its number. */
 export function parentLabel(crumb: ParentCrumb) {
   if (crumb.kind === "locked") return `Parent task ${crumb.identifier ?? ""}, private, you don't have access`.replace(" ,", ",");
   return `Parent task: ${[crumb.title, crumb.identifier].filter(Boolean).join(" ")}`;
+}
+
+/** The header crumb's accessible name: its whole title, without its number (U128, #20804). */
+export function crumbLabel(crumb: ParentCrumb) {
+  if (crumb.kind === "locked") return "Parent task, private, you don't have access";
+  return `Parent task: ${crumb.title}`;
 }

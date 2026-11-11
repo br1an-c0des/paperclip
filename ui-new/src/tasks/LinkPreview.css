@@ -1,0 +1,116 @@
+/* A pull request link's status mark (U113): the icon before the link, coloured by its state. */
+.msg .gh-pr {
+  white-space: nowrap;
+}
+
+.lp-mark {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  margin-right: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  vertical-align: -2px;
+  cursor: pointer;
+}
+
+/* A finger-sized target around the small icon. */
+.lp-mark::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
+.lp-mark:hover {
+  color: var(--text);
+}
+
+.lp-mark:focus-visible {
+  outline: 2px solid var(--run-fg);
+  outline-offset: 2px;
+}
+
+.lp-mark[data-state="open"],
+.lp-card[data-state="open"] .lp-icon,
+.lp-card[data-state="open"] .lp-state {
+  color: var(--green-fg);
+}
+
+.lp-mark[data-state="merged"],
+.lp-card[data-state="merged"] .lp-icon,
+.lp-card[data-state="merged"] .lp-state {
+  color: var(--violet-fg);
+}
+
+.lp-mark[data-state="conflicts"],
+.lp-card[data-state="conflicts"] .lp-icon,
+.lp-card[data-state="conflicts"] .lp-state {
+  color: var(--amber-fg);
+}
+
+/* The card */
+.lp-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.lp-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Room for the close button, when the card was opened by a click or tap. */
+.lp-popover:has(> .popover-close) .lp-head {
+  padding-right: 28px;
+}
+
+.lp-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.lp-label {
+  min-width: 0;
+}
+
+.lp-state {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.lp-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.lp-meta,
+.lp-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.lp-url {
+  color: var(--muted);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.lp-url:hover,
+.lp-url:focus-visible {
+  color: var(--text);
+  text-decoration: underline;
+}

@@ -1,12 +1,16 @@
-import { cleanup, fireEvent, render } from "@solidjs/testing-library";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseGitHubLink, patchLines } from "./message-format";
+import type { LinkPreviewResult } from "@paperclipai/shared";
+import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import { LINK_PREVIEW_STATE_LABEL, parseGitHubLink, patchLines, previewMeta } from "./message-format";
 
 afterEach(cleanup);
 
 vi.mock("@/lib/company", () => ({ useCompany: () => () => ({ id: "co1", issuePrefix: "TES" }) }));
 const navigate = vi.fn();
 vi.mock("@solidjs/router", () => ({ useNavigate: () => navigate }));
+const previews = vi.hoisted(() => ({ get: vi.fn() }));
+vi.mock("@/api/link-previews", () => ({ linkPreviewsApi: previews }));
 
 const { MessageBody } = await import("./MessageBody");
 
@@ -27,7 +31,8 @@ describe("GitHub links (U68, #19476)", () => {
     const [pull, issue] = Array.from(container.querySelectorAll("a"));
     expect(pull!.dataset.githubLink).toBe("pull_request");
     expect(pull!.textContent).toBe("GitHub pull request: paperclipai/paperclip#19476");
-    expect(pull!.querySelector("svg")).not.toBeNull();
+    // A pull request's icon is its status mark, just before the link (U113).
+    expect(pull!.closest(".gh-pr")?.querySelector(".gh-pr-mark svg")).not.toBeNull();
     expect(pull!.getAttribute("target")).toBe("_blank");
     expect(issue!.dataset.githubLink).toBe("issue");
     expect(issue!.textContent).toBe("GitHub issue: the fix");
@@ -40,6 +45,93 @@ describe("GitHub links (U68, #19476)", () => {
     expect(link.dataset.githubLink).toBe("repository");
     expect(link.querySelectorAll("svg path")).toHaveLength(2);
     expect(link.textContent).toBe("GitHub repository: the repo");
+  });
+});
+
+describe("pull request previews (U113, #20593, #20654)", () => {
+  const PR = "https://github.com/Acme/App/pull/12";
+  const merged: LinkPreviewResult = {
+    preview: {
+      target: { provider: "github", kind: "pull_request", canonicalUrl: "https://github.com/acme/app/pull/12", label: "Acme/App#12" },
+      title: "Fix the build",
+      state: "merged",
+      author: "octocat",
+      updatedAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+    },
+    maxAgeMs: 300_000,
+  };
+
+  beforeEach(() => previews.get.mockReset());
+
+  function mount(source: string, client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
+    render(() => (
+      <QueryClientProvider client={client}>
+        <MessageBody source={source} />
+      </QueryClientProvider>
+    ));
+    return client;
+  }
+
+  it("words a pull request's state and its card's meta line", () => {
+    expect(LINK_PREVIEW_STATE_LABEL.conflicts).toBe("Merge conflicts");
+    const now = new Date("2026-11-11T12:00:00Z");
+    expect(previewMeta({ author: "octocat", updatedAt: "2026-11-11T10:00:00Z" }, now)).toBe("octocat · Updated 2h ago");
+    expect(previewMeta({ author: null, updatedAt: "2026-11-03T10:00:00Z" }, now)).toBe("Updated Nov 3");
+    expect(previewMeta({ author: " ", updatedAt: "not a date" }, now)).toBeNull();
+  });
+
+  it("reads nothing until someone asks, then opens the card from the mark, tap or click", async () => {
+    previews.get.mockResolvedValue(merged);
+    mount(`See ${PR}.`);
+    const mark = screen.getByRole("button", { name: "Pull request Acme/App#12: show its status" });
+    expect(mark.dataset.state).toBe("unknown");
+    expect(previews.get).not.toHaveBeenCalled();
+    fireEvent.click(mark);
+    const card = await screen.findByRole("dialog", { name: "Pull request Acme/App#12" });
+    await waitFor(() => expect(card.textContent).toContain("Fix the build"));
+    expect(previews.get).toHaveBeenCalledTimes(1);
+    expect(previews.get.mock.calls[0]!.slice(0, 2)).toEqual(["co1", "https://github.com/acme/app/pull/12"]);
+    expect(card.textContent).toContain("Merged");
+    expect(card.textContent).toContain("octocat · Updated 2h ago");
+    expect(card.querySelector("a")!.getAttribute("href")).toBe("https://github.com/acme/app/pull/12");
+    // The mark and the link take the state.
+    expect(mark.dataset.state).toBe("merged");
+    expect(mark.getAttribute("aria-label")).toBe("Pull request Acme/App#12: Merged. Show details");
+    const link = screen.getByRole("link", { name: "Acme/App#12 Merged: Fix the build" });
+    expect(link.dataset.linkState).toBe("merged");
+    expect(link.hasAttribute("title")).toBe(false);
+  });
+
+  it("asks once per link: every copy of it reads the cached answer", async () => {
+    previews.get.mockResolvedValue(merged);
+    const client = mount(`First ${PR}, then [the same one](${PR}/files).`);
+    const [first, second] = screen.getAllByRole("button", { name: /^Pull request Acme\/App#12/ });
+    fireEvent.click(first!);
+    await waitFor(() => expect(second!.dataset.state).toBe("merged"));
+    // A second message with the link, later on: no new read.
+    mount(`Again: ${PR}`, client);
+    const marks = screen.getAllByRole("button", { name: "Pull request Acme/App#12: Merged. Show details" });
+    expect(marks).toHaveLength(3);
+    fireEvent.click(marks[2]!);
+    await screen.findAllByRole("dialog");
+    expect(previews.get).toHaveBeenCalledTimes(1);
+  });
+
+  it("says when GitHub has no details, without an error", async () => {
+    // A plain function: vitest fails a test when a mock's returned promise rejects, even if it's caught.
+    const original = previews.get;
+    (previews as { get: unknown }).get = () => Promise.reject(new Error("Request failed: 502"));
+    onTestFinished(() => void ((previews as { get: unknown }).get = original));
+    mount(PR);
+    fireEvent.click(screen.getByRole("button", { name: /^Pull request Acme\/App#12/ }));
+    await screen.findByText("No details from GitHub for this pull request.");
+    expect(screen.getByRole("button", { name: "Pull request Acme/App#12: show its status" }).dataset.state).toBe("unknown");
+  });
+
+  it("leaves issue and repository links as they were", () => {
+    mount("[an issue](https://github.com/acme/app/issues/3) and [the repo](https://github.com/acme/app)");
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(document.querySelectorAll("a svg")).toHaveLength(2);
   });
 });
 

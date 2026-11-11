@@ -15,6 +15,7 @@ import {
   askRefusal,
   boundAction,
   fileRecoveryView,
+  sandboxDiskFullRest,
   isRetainedExport,
   readSavedRequest,
   requestStorageKey,
@@ -190,7 +191,7 @@ function storage() {
  * Recover saved files for a native export hold. Board members who aren't viewers may ask; the ask
  * is read against a fresh inspection first, and its key is saved before it's sent.
  */
-function RecoverSavedFiles(props: { action: IssueRecoveryAction; task: Issue; canAsk: boolean; onOwnsRetry: (owns: boolean) => void }) {
+export function RecoverSavedFiles(props: { action: IssueRecoveryAction; task: Issue; canAsk: boolean; onOwnsRetry: (owns: boolean) => void }) {
   const client = useQueryClient();
   const people = useTaskPeople();
   const runId = props.action.evidence.runId as string;
@@ -223,6 +224,8 @@ function RecoverSavedFiles(props: { action: IssueRecoveryAction; task: Issue; ca
       pendingKey: saved()?.idempotencyKey ?? null,
       acknowledged: acknowledged(),
       checkedUnconfirmed: checkedUnconfirmed(),
+      // A save that rested on a full sandbox disk hands over to Retry (U129, #20819).
+      diskFull: sandboxDiskFullRest(current() ?? props.action),
     }),
   );
   // Someone who can't ask, or a source that didn't verify, leaves the task's Retry as the way on.

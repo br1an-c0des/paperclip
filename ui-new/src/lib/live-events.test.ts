@@ -6,10 +6,12 @@ import {
   changesTaskMentions,
   createTrailingRefetch,
   FRESH_ON_OPEN_MS,
+  invalidateRelationEmbedders,
   isMentionQuery,
   keysForEvent,
   LIST_CACHE_HOLD_MS,
   LIVE_RUNS_HOLD_MS,
+  relationSummaryRefs,
   RunInterests,
   skipOnFirstOpen,
 } from "./live-events";
@@ -370,5 +372,43 @@ describe("skipOnFirstOpen", () => {
     expect(skipOnFirstOpen(queryKeys.issues.list("c1"), now - 1_000, now)).toBe(false);
     expect(skipOnFirstOpen(queryKeys.companies.detail("c1"), now - 1_000, now)).toBe(false);
     expect(skipOnFirstOpen(queryKeys.companySettings.members("c1"), now - 1_000, now)).toBe(false);
+  });
+});
+
+describe("dependent tasks refresh when a blocker changes (U130, #20836)", () => {
+  it("names the changed task by id, and by identifier when the event carries it", () => {
+    expect(relationSummaryRefs(event("activity.logged", { entityType: "issue", entityId: "b1", action: "issue.updated" }))).toEqual(["b1"]);
+    expect(relationSummaryRefs(event("activity.logged", { entityType: "issue", entityId: "b1", action: "issue.released", details: { identifier: "TES-8" } }))).toEqual(["b1", "TES-8"]);
+    expect(relationSummaryRefs(event("activity.logged", { entityType: "issue", entityId: "b1", action: "issue.comment_added" }))).toEqual([]);
+    expect(relationSummaryRefs(event("activity.logged", { entityType: "agent", entityId: "b1", action: "issue.updated" }))).toEqual([]);
+    expect(relationSummaryRefs(event("heartbeat.run.status", { issueId: "b1" }))).toEqual([]);
+  });
+
+  it("refetches every cached task detail that embeds the changed task, and nothing else", () => {
+    const client = new QueryClient();
+    const blocker = { id: "b1", identifier: "TES-8", title: "Blocker", status: "blocked" };
+    client.setQueryData(queryKeys.issues.detail("TES-9"), { id: "d1", identifier: "TES-9", blockedBy: [blocker], blocks: [] });
+    client.setQueryData(queryKeys.issues.detail("d1"), { id: "d1", identifier: "TES-9", blockedBy: [blocker], blocks: [] });
+    client.setQueryData(queryKeys.issues.detail("p1"), { id: "p1", identifier: "TES-7", blockedBy: [], blocks: [blocker] });
+    client.setQueryData(queryKeys.issues.detail("b1"), { id: "b1", identifier: "TES-8", blockedBy: [], blocks: [] });
+    client.setQueryData(queryKeys.issues.detail("o1"), { id: "o1", identifier: "TES-1", blockedBy: [{ id: "x", identifier: "TES-2" }], blocks: [] });
+    client.setQueryData(queryKeys.issues.section("d1", "activity"), [{ id: "b1" }]);
+    invalidateRelationEmbedders(client, relationSummaryRefs(event("activity.logged", { entityType: "issue", entityId: "b1", action: "issue.updated" })));
+    const invalidated = (key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
+    expect(invalidated(queryKeys.issues.detail("TES-9"))).toBe(true);
+    expect(invalidated(queryKeys.issues.detail("d1"))).toBe(true);
+    expect(invalidated(queryKeys.issues.detail("p1"))).toBe(true);
+    expect(invalidated(queryKeys.issues.detail("b1"))).toBe(false);
+    expect(invalidated(queryKeys.issues.detail("o1"))).toBe(false);
+    expect(invalidated(queryKeys.issues.section("d1", "activity"))).toBe(false);
+    client.clear();
+  });
+
+  it("finds a dependent by the blocker's identifier too", () => {
+    const client = new QueryClient();
+    client.setQueryData(queryKeys.issues.detail("d1"), { id: "d1", blockedBy: [{ identifier: "TES-8" }], blocks: [] });
+    invalidateRelationEmbedders(client, ["b1", "TES-8"]);
+    expect(client.getQueryState(queryKeys.issues.detail("d1"))?.isInvalidated).toBe(true);
+    client.clear();
   });
 });

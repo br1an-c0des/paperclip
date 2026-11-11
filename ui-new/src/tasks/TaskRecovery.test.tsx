@@ -12,19 +12,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({
   confirmRunStopped: vi.fn(),
   recordControllerContainment: vi.fn(),
+  recoveryActions: vi.fn(),
+  recoverWorkspace: vi.fn(),
 }));
 vi.mock("@/api/issues", () => ({
   confirmRunStopped: api.confirmRunStopped,
   recordControllerContainment: api.recordControllerContainment,
   confirmOwnerGone: vi.fn(),
-  issuesApi: {},
+  issuesApi: { recoveryActions: api.recoveryActions, recoverWorkspace: api.recoverWorkspace },
 }));
 let localTrusted = true;
 vi.mock("./TaskActions", () => ({ useBoardAccess: () => () => ({ access: null, localTrusted, youId: "u1" }) }));
 vi.mock("@/lib/company", () => ({ useCompany: () => () => ({ id: "c1", issuePrefix: "TES" }) }));
-vi.mock("./people", () => ({ useTaskPeople: () => ({}) }));
+vi.mock("./people", () => ({ useTaskPeople: () => ({ youId: () => "u1" }) }));
 
-const { ConfirmServerStopped, ContainmentForm } = await import("./TaskRecovery");
+const { ConfirmServerStopped, ContainmentForm, RecoverSavedFiles } = await import("./TaskRecovery");
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -105,5 +107,49 @@ describe("original-host containment (#19813)", () => {
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
     expect(screen.queryByRole("button")).toBeNull();
     expect(document.body.textContent).toContain("A company owner, company admin or instance admin");
+  });
+});
+
+describe("Recover saved files on a full sandbox disk (U129, #20758, #20819)", () => {
+  const failure = { code: "export_interrupted", retryClass: "user_action_required", cause: { label: "sandbox_disk_full", code: "ENOSPC", status: null } };
+  const held = {
+    id: "ra1",
+    companyId: "c1",
+    sourceIssueId: "t1",
+    kind: "active_run_watchdog",
+    status: "active",
+    ownerType: "board",
+    cause: "native_workspace_sync_out_retry_exhausted",
+    evidence: {
+      runId: "run-1",
+      workspaceRecovery: { schema: "paperclip.workspace-recovery.v1", runId: "run-1", status: "blocked", retryable: true },
+      systemRecovery: { state: "exhausted", preservationOperationIds: [], failure },
+    },
+  } as unknown as IssueRecoveryAction;
+  const verified = {
+    active: held,
+    actions: [held],
+    sourceInspection: { schema: "paperclip.workspace-source-inspection.v1", actionId: "ra1", runId: "run-1", status: "verified" },
+  };
+
+  it("says to free space and use Retry, offers no recovery of its own, and leaves Retry showing", async () => {
+    api.recoveryActions.mockReset().mockResolvedValue(verified);
+    const owns = vi.fn();
+    mount(() => <RecoverSavedFiles action={held} task={task} canAsk onOwnsRetry={owns} />);
+    await screen.findByText("The sandbox disk was full when Paperclip saved the files. Free space, then use Retry to save them and finish the task.");
+    expect(screen.queryByRole("button", { name: "Recover saved files" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Try file recovery again" })).toBeNull();
+    expect(owns).toHaveBeenLastCalledWith(false);
+    expect(owns).not.toHaveBeenCalledWith(true);
+    expect(api.recoverWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("still offers Recover saved files when the disk wasn't the cause", async () => {
+    const other = { ...held, evidence: { ...held.evidence, systemRecovery: { state: "exhausted", failure: { ...failure, cause: { label: "other" } } } } } as IssueRecoveryAction;
+    api.recoveryActions.mockReset().mockResolvedValue({ ...verified, active: other, actions: [other] });
+    const owns = vi.fn();
+    mount(() => <RecoverSavedFiles action={other} task={task} canAsk onOwnsRetry={owns} />);
+    await screen.findByRole("button", { name: "Recover saved files" });
+    expect(owns).toHaveBeenLastCalledWith(true);
   });
 });

@@ -19,6 +19,7 @@ import { AgentAvatar } from "@/ui/Avatar";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { followAppLink, renderMarkdown, useKnownPrefixes, useOptionalNavigate } from "@/ui/Markdown";
+import { admissionHold, type AdmissionRun } from "./admission";
 import type { ReplyTurn } from "./chat-model";
 import { EMPTY_REPLY, mergeEvents, pickReply, prpEventsFromOutput, recentSteps, replyFromEvents, replyFromTranscript, type ReplyEvent } from "./reply-model";
 
@@ -39,6 +40,10 @@ import { EMPTY_REPLY, mergeEvents, pickReply, prpEventsFromOutput, recentSteps, 
  * Since the 2026-11-10 sync (U107, #20460): a quiet line under the head says what the run is doing,
  * from the run's live status: "Using Bash", the agent's latest words, or a status message such as a
  * storage wait, with how long since its last sign of life (tasks/LiveRunStatus.tsx).
+ *
+ * Since the 2026-11-10 sync (U120, #20559): while the server admits the reply it already reads
+ * "Bob is replying" and "Thinking…", not "about to reply"; only a hold the server names (agent
+ * setup, maintenance, a restart) shows in its place (admission.ts).
  */
 
 /** A burst of event signals costs one read. */
@@ -126,7 +131,8 @@ export function LiveReply(props: {
     queryFn: ({ signal }) => runsApi.get(props.turn.runId, signal),
   }));
   const active = () => isActiveRun(props.turn.status) && (!run.data || isActiveRun(run.data.status));
-  const queued = () => (run.data?.status ?? props.turn.status) === "queued";
+  // Ordinary admission reads as the reply already under way; only a hold the server names says so (U120).
+  const hold = () => (active() ? admissionHold({ status: run.data?.status ?? props.turn.status, execution: (run.data as { execution?: AdmissionRun["execution"] } | undefined)?.execution }) : null);
   const now = useNow(active);
 
   // The reply streams the run's output and event signals, so the socket asks for its transcript.
@@ -195,7 +201,7 @@ export function LiveReply(props: {
         <div class="ch-live-head">
           <Capsule gradient="ion" size="tiny" live={active()} />
           <span class="ch-live-who">
-            {queued() ? `${props.agent.name} is about to reply` : active() ? `${props.agent.name} is replying` : `${props.agent.name} replied`}
+            {active() ? `${props.agent.name} is replying` : `${props.agent.name} replied`}
           </span>
           <span class="ch-muted">{[elapsed(), cost()].filter(Boolean).join(" · ")}</span>
           <div class="ch-live-actions">
@@ -262,7 +268,7 @@ export function LiveReply(props: {
               when={active() && reply().headline}
               fallback={
                 <Show when={steps().shown.length === 0}>
-                  <p class="ch-muted">{queued() ? "Waiting to start…" : active() ? "Thinking…" : "Finishing up…"}</p>
+                  <p class="ch-muted">{hold() ? `${hold()}…` : active() ? "Thinking…" : "Finishing up…"}</p>
                 </Show>
               }
             >

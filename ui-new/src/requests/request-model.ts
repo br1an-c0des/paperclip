@@ -365,6 +365,33 @@ export function planLabel(target: Pick<PlanReviewTarget, "revisionNumber">) {
   return target.revisionNumber == null ? "Plan" : `Plan v${target.revisionNumber}`;
 }
 
+/** A saved document, other than the plan, that a request asks the person to review. */
+export type DocumentReviewTarget = PlanReviewTarget & { key: string; label: string };
+
+/**
+ * The document a confirmation asks about (U119, upstream #20590): a request, pick-several or verdict
+ * card whose target is one of a task's saved documents other than the plan, which plan reviews link
+ * already (`planReviewTarget`). The card links it as `#document-<key>`, so the person can open what
+ * they're asked to review. Its label is the agent's, else the document's key.
+ */
+export function documentReviewTarget(interaction: IssueThreadInteraction): DocumentReviewTarget | null {
+  if (interaction.kind !== "request_confirmation" && interaction.kind !== "request_checkbox_confirmation" && interaction.kind !== "request_item_verdicts") return null;
+  const target = interaction.payload.target;
+  if (target?.type !== "issue_document" || target.key === "plan" || !target.key) return null;
+  return {
+    issueId: target.issueId || interaction.issueId,
+    key: target.key,
+    label: target.label?.trim() || target.key,
+    revisionId: target.revisionId || null,
+    revisionNumber: target.revisionNumber ?? null,
+  };
+}
+
+/** "Design notes v2", or the label alone when the request names no revision. */
+export function documentLabel(target: Pick<DocumentReviewTarget, "label" | "revisionNumber">) {
+  return target.revisionNumber == null ? target.label : `${target.label} v${target.revisionNumber}`;
+}
+
 /** The code an approved app call carries while its connection needs signing in again (#20340). */
 export const CONNECTION_REQUIRED = "approved_action_connection_required";
 
