@@ -1,5 +1,5 @@
 import type { AgentDetail } from "@paperclipai/shared";
-import { A } from "@solidjs/router";
+import { A, useNavigate } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Crown, Eye, MessageCircle, MoreHorizontal, Pause, Play, SlidersHorizontal, Wrench } from "lucide-solid";
 import { createMemo, createSignal, Show, type JSX } from "solid-js";
@@ -36,6 +36,7 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
   const company = useCompany();
   const commands = useCommands();
   const client = useQueryClient();
+  const navigate = useNavigate();
   const agents = useAgentsQuery();
   const liveRuns = useLiveRunsQuery();
   const [busy, setBusy] = createSignal(false);
@@ -77,6 +78,25 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
     } finally {
       setBusy(false);
     }
+  };
+  // Once the server accepts it, the agent leaves the roster and its address (a URL key) no longer
+  // resolves while cleanup (`terminating`, `cleaning_up`) runs, so go back to the agents index, as
+  // the old UI does since #20667 (U121). A failure stays here with the reason.
+  const retire = async () => {
+    const name = props.agent.name;
+    const agentId = props.agent.id;
+    setBusy(true);
+    try {
+      await agentsApi.terminate(agentId, company().id);
+    } catch (caught) {
+      pushToast({ tone: "error", title: "Couldn't retire the agent", body: failure(caught, "") || undefined });
+      setBusy(false);
+      return;
+    }
+    navigate(`/${company().issuePrefix}/agents`, { replace: true });
+    pushToast({ tone: "success", title: `Retired ${name}` });
+    void refreshAgent(client, company().id, agentId);
+    void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
   };
   // Parked while its setup is checked again (#20361): not paused by anyone, and Resume can't finish
   // the check, so it reads as finishing its setup and offers Pause, as the old UI's header does.
@@ -246,7 +266,7 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
               disabled={busy()}
               onClick={() => {
                 setRetireOpen(false);
-                void act(() => agentsApi.terminate(props.agent.id, company().id), `Retired ${props.agent.name}`, "Couldn't retire the agent");
+                void retire();
               }}
             >
               Retire agent
