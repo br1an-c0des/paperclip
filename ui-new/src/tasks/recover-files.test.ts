@@ -8,6 +8,7 @@ import {
   isRetainedExport,
   readSavedRequest,
   requestStorageKey,
+  sandboxDiskFullRest,
   saveRequest,
   sourceVerified,
   unverifiedSourceText,
@@ -120,6 +121,37 @@ describe("Recover saved files", () => {
     });
     expect(view(saved)).toMatchObject({ offer: null, message: "Saved files recovered. Task recovery is still being checked." });
     expect(view(null)).toMatchObject({ offer: null, check: true, alert: expect.stringMatching(/unavailable or have changed/) });
+  });
+
+  it("hands a save that rested on a full sandbox disk to Retry (U129, #20758, #20819)", () => {
+    const failure = { code: "export_interrupted", retryClass: "user_action_required", cause: { label: "sandbox_disk_full", code: "ENOSPC", status: null } };
+    const diskFull = action({ systemRecovery: { state: "exhausted", preservationOperationIds: [], failure } });
+    expect(sandboxDiskFullRest(diskFull)).toBe(true);
+    expect(sandboxDiskFullRest(action({ systemRecovery: { state: "exhausted", failure: { ...failure, retryClass: "transient" } } }))).toBe(false);
+    expect(sandboxDiskFullRest(action({ systemRecovery: { state: "exhausted", failure: { ...failure, cause: { label: "other" } } } }))).toBe(false);
+    expect(sandboxDiskFullRest(action({ systemRecovery: { state: "running", failure } }))).toBe(false);
+    expect(sandboxDiskFullRest(null)).toBe(false);
+
+    // Verified and retryable, which would offer Recover saved files: the disk-full rest offers Retry instead.
+    expect(view(diskFull, { diskFull: true })).toEqual({
+      message: "The sandbox disk was full when Paperclip saved the files. Free space, then use Retry to save them and finish the task.",
+      offer: null,
+      check: false,
+      alert: null,
+      unverified: null,
+      ownsRetry: false,
+    });
+    // Before the inspection answers, too.
+    expect(view(diskFull, { diskFull: true, inspected: false, verified: false })).toMatchObject({ offer: null, ownsRetry: false });
+    // After a confirmed failed attempt: no Try file recovery again, no "needs service help".
+    const tried = action({
+      workspaceRecovery: { schema: "paperclip.workspace-recovery.v1", runId: "run-1", status: "blocked", retryable: true, requestIds: ["k1"] },
+      systemRecovery: { state: "exhausted", failure },
+    });
+    expect(view(tried, { pendingKey: "k1", diskFull: true })).toMatchObject({ offer: null, alert: null, ownsRetry: false, message: expect.stringMatching(/^The sandbox disk was full/) });
+    // A save running again (after Retry) says so.
+    const saving = action({ workspaceRecovery: { schema: "paperclip.workspace-recovery.v1", runId: "run-1", status: "recovering", retryable: true }, systemRecovery: { state: "exhausted", failure } });
+    expect(view(saving, { diskFull: true }).message).toBe("Recovering saved files. Work stays paused until they're verified.");
   });
 
   it("keeps one saved request per person, action and run", () => {

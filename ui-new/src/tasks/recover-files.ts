@@ -20,6 +20,11 @@ import { RETAINED_EXPORT_CAUSES } from "./recovery";
  * - Since the 2026-11-07 sync (#19840): a source that can't be verified says why, and the task's
  *   Retry stays offered beside it, since Retry renews and re-verifies the recovery. Only a
  *   verified source makes Recover saved files the way on, which hides Retry.
+ * - Since the 2026-11-11 sync (U129, #20758, #20819): a save that rested because the sandbox disk
+ *   was still full (`systemRecovery.state: "exhausted"`, `failure.retryClass:
+ *   "user_action_required"`, `failure.cause.label: "sandbox_disk_full"`) isn't asked for again here.
+ *   The task's Retry saves the files and then applies the run's accepted result, so the card says to
+ *   free space and use Retry, offers no Recover saved files, and leaves Retry showing.
  */
 
 type Obj = Record<string, unknown>;
@@ -63,6 +68,13 @@ export function boundAction(
     inspected.runId === runId
     ? current
     : null;
+}
+
+/** A saved-files recovery that rested because the sandbox disk was still full (#20758), which Retry resumes. */
+export function sandboxDiskFullRest(action: Pick<IssueRecoveryAction, "evidence"> | null | undefined) {
+  const system = obj(action?.evidence.systemRecovery);
+  const failure = obj(system.failure);
+  return system.state === "exhausted" && failure.retryClass === "user_action_required" && obj(failure.cause).label === "sandbox_disk_full";
 }
 
 /** Whether the inspection verified the recorded source, so the files may be recovered from it. */
@@ -118,6 +130,8 @@ export function fileRecoveryView(input: {
   pendingKey: string | null;
   acknowledged: boolean;
   checkedUnconfirmed: boolean;
+  /** The save rested on a full sandbox disk (`sandboxDiskFullRest`): Retry is the way on (#20819). */
+  diskFull?: boolean;
 }): FileRecoveryView {
   const recovery = obj(input.current?.evidence.workspaceRecovery);
   const system = obj(input.current?.evidence.systemRecovery);
@@ -133,10 +147,13 @@ export function fileRecoveryView(input: {
   const waiting = !failedReceipt && !saved && (restoring || input.acknowledged || serverAcknowledged);
   const unconfirmed = !!input.pendingKey && !input.acknowledged && !serverAcknowledged;
   const sourceChanged = input.inspected && !input.inspectionFailed && !input.current;
+  const diskFull = !!input.diskFull && !saved;
 
   const message = saved
     ? "Saved files recovered. Task recovery is still being checked."
-    : failedReceipt
+    : diskFull && !waiting
+      ? "The sandbox disk was full when Paperclip saved the files. Free space, then use Retry to save them and finish the task."
+      : failedReceipt
       ? "File recovery hasn't finished. The saved files stay protected."
       : restoring
         ? "Recovering saved files. Work stays paused until they're verified."
@@ -144,10 +161,10 @@ export function fileRecoveryView(input: {
           ? "File recovery is queued. Waiting for the saved files to be verified."
           : "The saved files need recovering before work can go on.";
   const verified = !!input.current && input.verified;
-  const canAsk = verified && retryable && !waiting && (!input.pendingKey || (unconfirmed && input.checkedUnconfirmed) || confirmedFailedAttempt);
+  const canAsk = verified && retryable && !waiting && !diskFull && (!input.pendingKey || (unconfirmed && input.checkedUnconfirmed) || confirmedFailedAttempt);
   const alert = sourceChanged
     ? "The recorded files are unavailable or have changed. Look at the recovery before going on."
-    : input.current && recovery.status === "blocked" && (serverAcknowledged || recovery.retryable !== true)
+    : input.current && !diskFull && recovery.status === "blocked" && (serverAcknowledged || recovery.retryable !== true)
       ? "File recovery hasn't finished and needs service help. The saved files stay protected."
       : null;
   return {
@@ -160,7 +177,7 @@ export function fileRecoveryView(input: {
       input.current && !verified && !saved && !waiting
         ? `${input.unverifiedText || "Paperclip can't verify the saved files' recorded source."} Paperclip doesn't apply files it can't verify. Retry renews the recovery.`
         : null,
-    ownsRetry: !input.inspected || (verified && !saved),
+    ownsRetry: !diskFull && (!input.inspected || (verified && !saved)),
   };
 }
 
