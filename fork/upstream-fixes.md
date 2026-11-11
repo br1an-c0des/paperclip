@@ -64,6 +64,7 @@ until one becomes a concrete fix.
 | 25 | [Use one effort key for Grok on the Paperclip Runner](#25-use-one-effort-key-for-grok-on-the-paperclip-runner) | candidate | | | 2026-11-05 | | |
 | 26 | [Don't mark a blocker `attention_required` with nothing to attend to](#26-dont-mark-a-blocker-attention_required-with-nothing-to-attend-to) | candidate | | | 2026-11-05 | | |
 | 27 | [Kitchen Sink example: hide config-gated items until the config loads](#27-kitchen-sink-example-hide-config-gated-items-until-the-config-loads) | candidate | | | 2026-11-09 | | |
+| 28 | [Let Claude Runner agents pass verification in the Docker image](#28-let-claude-runner-agents-pass-verification-in-the-docker-image) | building | `fix/runner-docker-provider-authority` | | 2026-11-10 | | |
 
 ## Details
 
@@ -445,3 +446,31 @@ Found while fixing the projects-nav flash (Nov 9).
   === false) return null`).
 - **Fork workaround:** none. `ui-new` keys the nav's project rows by id, so the items mount only once
   per page load instead of on every refetch; the one flash on first load remains.
+
+### 28. Let Claude Runner agents pass verification in the Docker image
+
+Found setting up the fork's deployment (Nov 10). Reported upstream as
+[#18557](https://github.com/paperclipai/paperclip/issues/18557) (open, "ready for review", no pull
+request yet); [#20630](https://github.com/paperclipai/paperclip/issues/20630) is the same error and
+was closed by an automated pipeline as already fixed, which it isn't.
+
+- **Problem:** in upstream's Docker image, a Claude agent on the Paperclip Runner fails its
+  environment test with "ACPX provider package @agentclientprotocol/claude-agent-acp resolves
+  outside the selected provider root", stays in `verifying` and never runs. In the server process
+  `PAPERCLIP_ACPX_PROVIDER_PACKAGE_ROOT` is unset, so `verifyQualifiedAcpxInstallation`
+  (`packages/paperclip-runner/src/drivers/acpx/installation-integrity.ts`) takes its authority from
+  `resolveInstalledProviderAuthority` (`installed-provider-authority.ts`), which returns the server
+  package (`/app/server`). The image is a pnpm workspace, so `/app/server/node_modules/@agentclientprotocol/claude-agent-acp`
+  is a symlink into `/app/node_modules/.pnpm/...`, outside that root. Runs launched through runnerd
+  don't fail: `acpxProviderPackageAuthority` (`live/runnerd-codex-transport.ts`) already widens the
+  root to the workspace for source and Docker builds (#15912). `codex-acp` has the same layout.
+- **Likely fix:** give the server-side authority the same workspace rule as
+  `acpxProviderPackageAuthority` (or share one helper), keeping the rest of the admission checks,
+  with a test on a vendored server inside a pnpm workspace layout.
+- **Evidence:** reproduced in the deployed fork image (upstream `sha-d0057ee`): in the container,
+  `createAcpxPackageJsonResolver("/app/server", "/app/server/package.json")("@agentclientprotocol/claude-agent-acp")`
+  throws this error, and with root `/app` it resolves. A commenter on #18557 confirms it on `master`
+  at `358977454b` (2026-11-10).
+- **Fork workaround:** none in code. On the deployment, put Claude agents on the legacy runner
+  (with `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` as a company secret if the AI connection
+  isn't enough) until a fixed upstream image is synced and deployed; then move them back.
