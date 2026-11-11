@@ -1,4 +1,4 @@
-import type { AdapterEnvironmentTestResult, Agent, AgentDetail } from "@paperclipai/shared";
+import type { AdapterEnvironmentTestResult, Agent, AgentDetail, AgentRunner } from "@paperclipai/shared";
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ArrowLeft, Check, Plus, RotateCw } from "lucide-solid";
@@ -13,7 +13,7 @@ import { healthApi } from "@/api/health";
 import { issuesApi } from "@/api/issues";
 import { projectsApi } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
-import { modelLabel, runnerLabel } from "@/agents/agent-model";
+import { modelLabel, runnerLabel, runnerOptions } from "@/agents/agent-model";
 import {
   defaultBinding,
   draftCreateRequest,
@@ -32,6 +32,8 @@ import {
   qualificationProblem,
   requiresProviderModel,
   resolveRunner,
+  runnerChoiceSupported,
+  runnerHelp,
   selectedSignIn,
   setupAdapterConfig,
   setupEffortOptions,
@@ -209,6 +211,16 @@ export function AgentOnboarding() {
     const effort = setup.effort;
     if (effort && !efforts().some((option) => option.value === effort)) setSetup("effort", "");
   });
+
+  // The runner row's pick is explicit (`setup.runner`), saved to the draft and part of the Test's
+  // signature like the other choices. A pick the chosen environment can't carry goes back to auto.
+  const pickRunner = (value: AgentRunner) => {
+    if (value !== runner().runner) setSetup("runner", value);
+  };
+  createEffect(() => {
+    if (!runnerChoiceSupported(setup.harness, setup.runner, adapters.data)) setSetup("runner", "auto");
+  });
+  const qualifies = () => needsRunnerQualification(setup.harness, setup.runner, runner().recommended, environment());
 
   // ---- Saving -------------------------------------------------------------------------------
   const [busy, setBusy] = createSignal<"continue" | "hire" | "launch" | null>(null);
@@ -681,10 +693,17 @@ export function AgentOnboarding() {
                     </Show>
 
                     <Show when={runner().applies}>
-                      <SettingsRow label="Runner" help="Paperclip picks a qualified runner for this harness and machine. You can switch it later in the agent's settings.">
-                        <TonePill tone={runner().runner === "paperclip" ? "run" : "violet"} compact>
-                          {runnerLabel(runner().runner)}
-                        </TonePill>
+                      <SettingsRow label="Runner" help={runnerHelp(setup.harness, runner(), { qualifies: qualifies() })}>
+                        <Show
+                          when={runner().alternative}
+                          fallback={
+                            <TonePill tone={runner().runner === "paperclip" ? "run" : "violet"} compact>
+                              {runnerLabel(runner().runner)}
+                            </TonePill>
+                          }
+                        >
+                          <Segmented label="Runner" options={runnerOptions(runner().recommended)} value={runner().runner} onChange={pickRunner} />
+                        </Show>
                       </SettingsRow>
                     </Show>
 

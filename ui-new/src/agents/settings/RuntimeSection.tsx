@@ -31,6 +31,8 @@ import {
   requalifyProblem,
   runnerLabel,
   runnerOffer,
+  runnerOptions,
+  runnerSwitchable,
   runtimeChanges,
   runtimeDraft,
   runtimeEffortOptions,
@@ -40,6 +42,7 @@ import {
   type RuntimeDraft,
 } from "../agent-model";
 import { failure, FootError, refreshAgent, SectionTitle, shortDate, SwitchRow } from "../shared";
+import { resolveRunner } from "../new/new-agent-model";
 import { extrasChanges, extrasConfig, extrasDraft, fieldVisible, harnessFields, isSecretField, type ExtrasDraft, type ExtraValue, type HarnessField } from "../harness-model";
 import { EnvironmentMenu, HarnessDisc, instanceDefaultEnvironment, ModelMenu, TestChecks } from "./fields";
 import { HarnessChangeDialog } from "./HarnessChange";
@@ -164,6 +167,9 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
 
   const config = () => props.agent.adapterConfig as Record<string, unknown>;
   const stagedRunner = () => draft.runner;
+  /** The runner the Runner row shows: the staged switch, or the agent's own. */
+  const shownRunner = () => stagedRunner() ?? identity().runner;
+  const recommendedRunner = () => resolveRunner(identity().harness, "auto", adapters.data).recommended;
 
   return (
     <>
@@ -231,30 +237,35 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
         <SettingsRow label="Runner" help="What starts and supervises the harness for each run.">
           <Show when={identity().runnerApplies} fallback={<span class="ag-static-text">Not applicable: {identity().harnessLabel} runs only on the legacy runner.</span>}>
             <div class="ps-stack">
-              <div class="ps-inline">
-                <TonePill tone={identity().runner === "paperclip" ? "run" : "violet"} compact>
-                  {runnerLabel(identity().runner)}
-                </TonePill>
-                <Show when={stagedRunner() && stagedRunner() !== identity().runner}>
-                  <span class="ag-changed">→ {runnerLabel(stagedRunner()!)} when you save</span>
-                </Show>
-                <Show when={offer().kind === "legacy-available" && !stagedRunner()}>
-                  <button type="button" class="ps-link" onClick={() => setDraft("runner", "legacy")}>
-                    Switch to the legacy runner
-                  </button>
-                </Show>
-                <Show when={stagedRunner() === "legacy"}>
-                  <button type="button" class="ps-link" onClick={() => setDraft("runner", null)}>
-                    Undo
-                  </button>
-                </Show>
-              </div>
+              {/* Where the adapters allow a switch either way, the runner is a choice like the other settings, staged until you save. */}
+              <Show
+                when={runnerSwitchable(offer())}
+                fallback={
+                  <TonePill tone={identity().runner === "paperclip" ? "run" : "violet"} compact>
+                    {runnerLabel(identity().runner)}
+                  </TonePill>
+                }
+              >
+                <Segmented
+                  label="Runner"
+                  options={runnerOptions(recommendedRunner())}
+                  value={shownRunner()}
+                  onChange={(value) => setDraft("runner", value === identity().runner ? null : value)}
+                />
+              </Show>
+              <Show when={shownRunner() !== identity().runner}>
+                <span class="ag-changed">Changed from {runnerLabel(identity().runner)}. Switches when you save.</span>
+              </Show>
               <span class="fhelp">
-                {identity().runner === "paperclip"
-                  ? runnerDetail(config())
+                {shownRunner() === "paperclip"
+                  ? identity().runner === "paperclip"
+                    ? runnerDetail(config())
+                    : offer().kind === "qualify"
+                      ? `Saving probes ${environment()?.name ?? "the environment"} first, and switches only if the Runner qualifies there. The model and instructions stay.`
+                      : "Paperclip Runner starts and supervises the harness for each run. The model and instructions stay."
                   : offer().kind === "none" && offer().reason === "not-supported-here"
                     ? "Paperclip Runner isn't available for this harness in this environment."
-                    : `Runs the ${identity().harnessLabel} program directly.`}
+                    : `Runs the ${identity().harnessLabel} program directly.${identity().runner === "paperclip" ? " The model and instructions stay." : ""}`}
               </span>
             </div>
           </Show>

@@ -21,6 +21,8 @@ import {
   profileProblem,
   provisionalAdapter,
   resolveRunner,
+  runnerChoiceSupported,
+  runnerHelp,
   selectedSignIn,
   setupAdapterConfig,
   setupEffortOptions,
@@ -152,6 +154,65 @@ describe("runner defaulting", () => {
     expect(needsRunnerQualification("claude_local", "auto", "paperclip", sandbox)).toBe(false);
     expect(needsRunnerQualification("claude_local", "legacy", "legacy", sandbox)).toBe(false);
     expect(needsRunnerQualification("claude_local", "auto", "legacy", { driver: "local" as const, config: {} })).toBe(false);
+  });
+});
+
+describe("runner choice", () => {
+  // A local Linux deployment: Claude Code on either runner, the Paperclip Runner by default (#20710's case).
+  const pick = (runner: SetupDraft["runner"]) => setup({ runner });
+
+  it("follows an explicit pick through the resolution, the efforts, the save, the test and the hire", () => {
+    const legacy = resolveRunner("claude_local", "legacy", ADAPTERS);
+    expect(legacy).toMatchObject({ runner: "legacy", recommended: "paperclip", alternative: "paperclip" });
+    // Back to the Paperclip Runner, picked rather than left on auto.
+    expect(resolveRunner("claude_local", "paperclip", ADAPTERS)).toMatchObject({ runner: "paperclip", alternative: "legacy" });
+
+    const draft = { id: "agent-1", adapterConfig: {}, runtimeConfig: {}, metadata: { setupAdapterPending: true } };
+    expect(setupPatch(draft, pick("legacy"), "legacy")).toMatchObject({ adapterType: "claude_local", runner: "legacy", adapterConfig: { maxTurnsPerRun: 1000 } });
+    expect(setupPatch(draft, pick("paperclip"), "paperclip").adapterConfig).not.toHaveProperty("maxTurnsPerRun");
+    expect(hireRequest(draft, profile, pick("legacy"), "legacy")).toMatchObject({ runner: "legacy" });
+    expect(hireRequest(draft, profile, pick("auto"), "paperclip")).not.toHaveProperty("runner");
+
+    // Picking a runner is a change of setup: it's saved, and an earlier Test no longer counts.
+    expect(setupSignature(pick("legacy"))).not.toBe(setupSignature(pick("paperclip")));
+    expect(setupSignature(pick("auto"))).not.toBe(setupSignature(pick("paperclip")));
+    // Pi's effort scale follows the runner the pick resolves to.
+    const pi = [adapter("pi_local", { supportedRunners: ["paperclip", "legacy"], defaultRunner: "paperclip" }), adapter("paperclip_runner")];
+    expect(setupEffortOptions("pi_local", "", resolveRunner("pi_local", "legacy", pi).runner).map((option) => option.value)).toContain("minimal");
+    expect(setupEffortOptions("pi_local", "", resolveRunner("pi_local", "auto", pi).runner).map((option) => option.value)).not.toContain("minimal");
+  });
+
+  it("qualifies a sandbox only while the runner is left on auto", () => {
+    const sandbox = { driver: "sandbox" as const, config: { image: `repo/img@sha256:${"a".repeat(64)}` } };
+    expect(needsRunnerQualification("claude_local", "legacy", "legacy", sandbox)).toBe(false);
+    expect(needsRunnerQualification("claude_local", "paperclip", "legacy", sandbox)).toBe(false);
+  });
+
+  it("keeps a pick the environment can carry, and lets go of one it can't", () => {
+    expect(runnerChoiceSupported("claude_local", "legacy", ADAPTERS)).toBe(true);
+    expect(runnerChoiceSupported("claude_local", "paperclip", ADAPTERS)).toBe(true);
+    expect(runnerChoiceSupported("claude_local", "auto", [])).toBe(true);
+    // While the environment's adapters load, a pick stands.
+    expect(runnerChoiceSupported("claude_local", "paperclip", undefined)).toBe(true);
+    // An environment where only the legacy runner carries it, or where the Runner is off.
+    const legacyHere = [adapter("claude_local"), adapter("paperclip_runner")];
+    expect(runnerChoiceSupported("claude_local", "paperclip", legacyHere)).toBe(false);
+    expect(runnerChoiceSupported("claude_local", "legacy", legacyHere)).toBe(true);
+    const off = ADAPTERS.map((entry) => (entry.type === "paperclip_runner" ? { ...entry, disabled: true } : entry));
+    expect(runnerChoiceSupported("claude_local", "paperclip", off)).toBe(false);
+    // No choice to keep for the harnesses without one.
+    expect(runnerChoiceSupported("gemini_local", "paperclip", ADAPTERS)).toBe(true);
+    expect(runnerChoiceSupported("kimi_runtime", "legacy", ADAPTERS)).toBe(true);
+  });
+
+  it("says what each runner is when there's a choice, and why there isn't one otherwise", () => {
+    expect(runnerHelp("claude_local", resolveRunner("claude_local", "auto", ADAPTERS))).toBe(
+      "Paperclip Runner supervises each run of Claude Code; the legacy runner runs the program directly. You can switch later in the agent's settings.",
+    );
+    expect(runnerHelp("claude_local", resolveRunner("claude_local", "auto", undefined))).toBe("Paperclip picks a runner once it knows what this machine supports.");
+    const legacyOnly = [adapter("claude_local"), adapter("paperclip_runner")];
+    expect(runnerHelp("claude_local", resolveRunner("claude_local", "auto", legacyOnly))).toBe("The only runner that carries Claude Code here.");
+    expect(runnerHelp("claude_local", resolveRunner("claude_local", "auto", legacyOnly), { qualifies: true })).toContain("Test checks whether Paperclip Runner qualifies");
   });
 });
 
@@ -410,7 +471,14 @@ describe("drafts and outcome", () => {
       createdAgentId: undefined,
       name: "Ada",
       harness: "claude_local",
+      runner: "paperclip",
     });
+    // `runner` picks the runner, as the old UI reads it; anything else leaves it on auto.
+    expect(legacyHireParams({ adapterType: "claude_local", runner: "legacy" }).runner).toBe("legacy");
+    expect(legacyHireParams({ adapterType: "paperclip_runner", runnerProvider: "claude", runner: "legacy" }).runner).toBe("legacy");
+    expect(legacyHireParams({ adapterType: "claude_local", runner: "auto" }).runner).toBeUndefined();
+    expect(legacyHireParams({ adapterType: "gemini_local", runner: "paperclip" }).runner).toBeUndefined();
+    expect(legacyHireParams({ runner: "legacy" }).runner).toBeUndefined();
     expect(legacyHireParams({ adapterType: "http" }).harness).toBeUndefined();
     expect(legacyHireParams({ createdAgentId: "a2" }).createdAgentId).toBe("a2");
     expect(legacyHireParams({ adapterType: "paperclip_runner", runnerProvider: "kimi" }).harness).toBe("kimi_runtime");
