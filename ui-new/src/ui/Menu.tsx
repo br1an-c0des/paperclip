@@ -32,11 +32,34 @@ function Root(props: RootProps) {
   return <KMenu gutter={8} placement="bottom-start" preventScroll={layerMode() === "sheet"} {...props} />;
 }
 
+/*
+ * A bottom sheet ignores a release it didn't see pressed. A mouse opens a menu on pointer down
+ * (Kobalte), and an item picks on pointer up; a sheet rises over the page, so the release of the
+ * press that opened it can land on an item under the pointer and pick it (a row near the foot of the
+ * page once opened its Delete dialog). A touch opens on the tap's click, after its release, so it
+ * never did this. Only a sheet guards: an anchored menu keeps press, drag and release to pick.
+ */
+function guardStrayRelease(element: HTMLElement) {
+  let pressed = false;
+  element.addEventListener("pointerdown", () => (pressed = true), true);
+  element.addEventListener(
+    "pointerup",
+    (event) => {
+      // Kobalte's item handlers are delegated to the document, so stopping here in the capture
+      // phase keeps the release from picking anything.
+      if (!pressed && element.dataset.mode === "sheet") event.stopPropagation();
+      pressed = false;
+    },
+    true,
+  );
+}
+
 function Content(props: ParentProps<{ label?: string; width?: number; class?: string }>) {
   const mount = useLayerMount();
   return (
     <KMenu.Portal mount={mount()}>
       <KMenu.Content
+        ref={guardStrayRelease}
         data-layer="menu"
         data-mode={layerMode()}
         class={props.class}
