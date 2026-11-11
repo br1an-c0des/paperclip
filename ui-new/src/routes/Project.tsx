@@ -155,56 +155,59 @@ export function ProjectPage() {
 
   return (
     <>
-      <PageHeader
-        crumbs={<span>Projects</span>}
-        title={project()?.name ?? params.projectKey}
-        titleHref={base()}
-        titleHint="Project dashboard"
-        titleAside={<Show when={project() && !project()!.archivedAt}>{<ProjectStarButton project={project()!} size={17} />}</Show>}
-        numbers={
-          <Show when={project() && tasks.data}>
-            <HeaderNumber value={open()} label="open" />
-            <Show when={running() > 0}>
-              <HeaderNumber value={running()} label={running() === 1 ? "agent running" : "agents running"} />
+      {/* `project-head` only scopes the phone layout (ProjectDashboard.css); it adds no box. */}
+      <div class="project-head">
+        <PageHeader
+          crumbs={<span>Projects</span>}
+          title={project()?.name ?? params.projectKey}
+          titleHref={base()}
+          titleHint="Project dashboard"
+          titleAside={<Show when={project() && !project()!.archivedAt}>{<ProjectStarButton project={project()!} size={17} />}</Show>}
+          numbers={
+            <Show when={project() && tasks.data}>
+              <HeaderNumber value={open()} label="open" />
+              <Show when={running() > 0}>
+                <HeaderNumber value={running()} label={running() === 1 ? "agent running" : "agents running"} />
+              </Show>
+              <Show when={blocked() > 0}>
+                <HeaderNumber value={blocked()} label="blocked" tone="red" />
+              </Show>
+              <Show when={updated()}>
+                {(label) => <span class="muted">Updated {label() === "Just now" || label() === "Yesterday" ? label().toLowerCase() : label()}</span>}
+              </Show>
             </Show>
-            <Show when={blocked() > 0}>
-              <HeaderNumber value={blocked()} label="blocked" tone="red" />
-            </Show>
-            <Show when={updated()}>
-              {(label) => <span class="muted">Updated {label() === "Just now" || label() === "Yesterday" ? label().toLowerCase() : label()}</span>}
-            </Show>
-          </Show>
-        }
-        actions={
-          <>
-            <Show when={project()}>
-              {(found) => (
-                <>
-                  <PluginSlotOutlet slotTypes={["toolbarButton", "contextMenuItem"]} context={pluginContext(found())} class="plugin-toolbar" errorBehavior="hidden" />
-                  <PluginLauncherOutlet placementZones={["toolbarButton"]} context={pluginContext(found())} class="plugin-toolbar" errorBehavior="hidden" />
-                </>
-              )}
-            </Show>
-            <Show when={view() === "dashboard" && project()}>
-              <A class={buttonClass({ size: "compact" })} href={`${base()}/settings`}>
-                <Pencil size={14} aria-hidden="true" />
-                Edit project
-              </A>
-            </Show>
-          </>
-        }
-        tabs={
-          <Tabs
-            label="Project"
-            items={[
-              ...PROJECT_TABS.map((item) => ({ label: item.label, href: `${base()}${item.path}` })),
-              ...plugins.slots().map((slot) => ({ label: slot.displayName, href: `${base()}/${pluginTabValue(slot)}` })),
-            ]}
-          />
-        }
-      >
-        <Show when={view() === "dashboard" && project()}>{(found) => <ProjectFacts project={found()} />}</Show>
-      </PageHeader>
+          }
+          actions={
+            <>
+              <Show when={project()}>
+                {(found) => (
+                  <>
+                    <PluginSlotOutlet slotTypes={["toolbarButton", "contextMenuItem"]} context={pluginContext(found())} class="plugin-toolbar" errorBehavior="hidden" />
+                    <PluginLauncherOutlet placementZones={["toolbarButton"]} context={pluginContext(found())} class="plugin-toolbar" errorBehavior="hidden" />
+                  </>
+                )}
+              </Show>
+              <Show when={view() === "dashboard" && project()}>
+                <A class={buttonClass({ size: "compact" })} href={`${base()}/settings`}>
+                  <Pencil size={14} aria-hidden="true" />
+                  Edit project
+                </A>
+              </Show>
+            </>
+          }
+          tabs={
+            <Tabs
+              label="Project"
+              items={[
+                ...PROJECT_TABS.map((item) => ({ label: item.label, href: `${base()}${item.path}` })),
+                ...plugins.slots().map((slot) => ({ label: slot.displayName, href: `${base()}/${pluginTabValue(slot)}` })),
+              ]}
+            />
+          }
+        >
+          <Show when={view() === "dashboard" && project()}>{(found) => <ProjectFacts project={found()} />}</Show>
+        </PageHeader>
+      </div>
       <Show when={project()} fallback={<p class="card pd-empty">{missingNote()}</p>}>
         {(found) => (
           <Switch fallback={<PlannedNote milestone="M4">This tab is still to come.</PlannedNote>}>

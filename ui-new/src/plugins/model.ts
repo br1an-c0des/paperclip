@@ -1,4 +1,5 @@
 import type {
+  Environment,
   PluginLauncherDeclaration,
   PluginLauncherPlacementZone,
   PluginUiSlotDeclaration,
@@ -94,6 +95,35 @@ export function resolveSlots(contributions: readonly PluginUiContribution[] | un
     }
   }
   return rows.sort(byOrderThenName);
+}
+
+/**
+ * The environment an agent runs in for plugin tabs: its own default, else the instance's (upstream
+ * #20657, `useAgentEnvironmentSlots`). Undefined while that isn't known; null when there's none.
+ */
+export function agentEnvironmentId(
+  agent: { defaultEnvironmentId?: string | null } | undefined,
+  instanceDefaultId: string | null | undefined,
+): string | null | undefined {
+  if (!agent) return undefined;
+  if (agent.defaultEnvironmentId) return agent.defaultEnvironmentId;
+  return instanceDefaultId === undefined ? undefined : instanceDefaultId;
+}
+
+/**
+ * Agent tabs that set `agentEnvironmentDriver` show only when the agent's environment uses that
+ * plugin's driver (`pluginDriver`, which environments report even with their config redacted).
+ * Tabs without the field always show.
+ */
+export function slotsForAgentEnvironment<T extends Pick<ResolvedPluginSlot, "pluginKey" | "agentEnvironmentDriver">>(
+  slots: readonly T[],
+  environment: Pick<Environment, "driver" | "pluginDriver"> | null | undefined,
+): T[] {
+  return slots.filter(
+    (slot) =>
+      !slot.agentEnvironmentDriver ||
+      (environment?.driver === "plugin" && environment.pluginDriver?.pluginKey === slot.pluginKey && environment.pluginDriver.driverKey === slot.agentEnvironmentDriver),
+  );
 }
 
 /** Every ready plugin's launchers for the requested zones, sorted like slots. */

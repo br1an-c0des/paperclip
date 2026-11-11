@@ -288,6 +288,8 @@ export const queryKeys = {
     closeReadiness: (workspaceId: string) => ["execution-workspaces", "close-readiness", workspaceId] as const,
   },
   projectRepositories: (companyId: string) => ["project-repositories", companyId] as const,
+  /** The environments by the workspace storage they share, as the old UI keys them. */
+  projectEnvironments: (companyId: string) => ["project-environments", companyId] as const,
   artifacts: {
     /** A project's artifacts grouped by task, or one task's group in full. */
     project: (companyId: string, projectId: string, groupIssueId?: string) =>

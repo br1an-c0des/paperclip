@@ -126,6 +126,20 @@ export function startsCollapsed(group: Pick<TaskGroup, "mark">) {
 }
 
 /**
+ * A private task the viewer can't read. The server sends it in `blockedBy` (and `blocks`) as
+ * `{ id, identifier, locked: true }`, with no title or status, though the type doesn't say so
+ * (TaskDetails' `isLockedRelation`).
+ */
+export function isLockedBlocker(blocker: object): boolean {
+  return (blocker as { locked?: unknown }).locked === true;
+}
+
+/** How a note names a blocker: its identifier, else its title; a private one without either as "a private task". */
+export function blockerName(blocker: { identifier?: string | null; title?: string | null }): string {
+  return blocker.identifier ?? (isLockedBlocker(blocker) ? null : blocker.title) ?? "a private task";
+}
+
+/**
  * A blocked row's note. Covered by active work (the in-queue look), it says what it waits on, in the
  * run tone; otherwise it names its blockers in red, with the server's reason as the hint.
  */
@@ -136,7 +150,7 @@ function rowNote(task: CompactIssue): RowNote | null {
   const blockers = task.blockedBy ?? [];
   if (blockers.length > 0) {
     const first = blockers[0]!;
-    const label = blockers.length === 1 ? `Blocked by ${first.identifier ?? first.title}` : `Blocked by ${blockers.length} tasks`;
+    const label = blockers.length === 1 ? `Blocked by ${blockerName(first)}` : `Blocked by ${blockers.length} tasks`;
     return { tone: "red", label, ...(look.title !== look.label ? { title: look.title } : {}) };
   }
   return null;

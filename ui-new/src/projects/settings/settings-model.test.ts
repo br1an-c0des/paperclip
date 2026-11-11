@@ -9,7 +9,8 @@ import {
   checkoutDirty,
   checkoutDraft,
   checkoutPolicy,
-  storageLocked,
+  storageAvailability,
+  storageEnvironmentNames,
   currentPolicy,
   emptyGoalDraft,
   envDirty,
@@ -312,7 +313,7 @@ describe("code", () => {
 
 describe("task checkouts", () => {
   it("reads the effective policy, defaulting to shared checkouts", () => {
-    expect(checkoutDraft(project())).toMatchObject({ enabled: false, isolatedByDefault: false, concurrency: "auto", storage: "core" });
+    expect(checkoutDraft(project())).toMatchObject({ enabled: false, isolatedByDefault: false, concurrency: "auto" });
   });
 
   it("keeps fields the page doesn't show, and only writes what was picked", () => {
@@ -330,19 +331,59 @@ describe("task checkouts", () => {
     expect(policy.workspaceStrategy).toMatchObject({ type: "git_worktree", baseRef: "origin/main", branchTemplate: null, teardownCommand: "git worktree prune" });
   });
 
-  it("moves a Core project to a plugin, and keeps a plugin-backed project on its plugin", () => {
+  it("keeps the project's storage as it was saved, and drops a legacy run environment", () => {
     const core = project({ executionWorkspacePolicy: { enabled: true } });
-    expect(storageLocked(core)).toBe(false);
     expect("storageProviderPluginId" in checkoutPolicy(core, checkoutDraft(core))).toBe(false);
-    expect(checkoutPolicy(core, { ...checkoutDraft(core), storage: "plug" }).storageProviderPluginId).toBe("plug");
     const savedCore = project({ executionWorkspacePolicy: { enabled: true, storageProviderPluginId: null } });
-    expect(checkoutDraft(savedCore).storage).toBe("core");
     expect(checkoutPolicy(savedCore, checkoutDraft(savedCore)).storageProviderPluginId).toBeNull();
+    const plugged = project({ executionWorkspacePolicy: { enabled: true, storageProviderPluginId: "plug", environmentId: "env-1" } });
+    const policy = checkoutPolicy(plugged, { ...checkoutDraft(plugged), enabled: false });
+    expect(policy.storageProviderPluginId).toBe("plug");
+    expect("environmentId" in policy).toBe(false);
+  });
+});
 
-    const plugged = project({ executionWorkspacePolicy: { enabled: true, storageProviderPluginId: "plug" } });
-    expect(checkoutDraft(plugged).storage).toBe("plug");
-    expect(storageLocked(plugged)).toBe(true);
-    expect(checkoutPolicy(plugged, { ...checkoutDraft(plugged), storage: "core" }).storageProviderPluginId).toBe("plug");
+describe("workspace storage", () => {
+  const providers = (...ids: string[]) => ({
+    source: "core" as const,
+    pluginId: null,
+    displayName: "Core / local",
+    providers: ids.map((id) => ({ id, displayName: `Plugin ${id}`, isDefault: false })),
+    effectivePolicy: null,
+    error: null,
+  });
+
+  it("shows nothing without a storage plugin", () => {
+    expect(storageAvailability(project({ executionWorkspacePolicy: { enabled: true }, workspaceProvider: providers() }))).toEqual({ kind: "hidden" });
+    expect(storageAvailability(project())).toEqual({ kind: "hidden" });
+  });
+
+  it("lists the core or plugin storage when a plugin is installed or the project uses one", () => {
+    expect(storageAvailability(project({ workspaceProvider: providers("plug") }))).toEqual({ kind: "list", pluginId: null, storageName: "Core / local" });
+    expect(
+      storageAvailability(project({ executionWorkspacePolicy: { enabled: true, storageProviderPluginId: "plug" }, workspaceProvider: { ...providers("plug"), source: "project", pluginId: "plug", displayName: "Plugin plug" } })),
+    ).toEqual({ kind: "list", pluginId: "plug", storageName: "Plugin plug" });
+  });
+
+  it("says the plugin is unavailable when the project's plugin is gone", () => {
+    expect(storageAvailability(project({ executionWorkspacePolicy: { enabled: true, storageProviderPluginId: "gone" }, workspaceProvider: providers("plug") }))).toEqual({
+      kind: "unavailable",
+      pluginId: "gone",
+    });
+    expect(storageAvailability(project({ executionWorkspacePolicy: { enabled: true, storageProviderPluginId: "gone" } }))).toEqual({ kind: "unavailable", pluginId: "gone" });
+  });
+
+  it("names the environments that share the project's storage", () => {
+    const options = {
+      groups: [
+        { storageProviderPluginId: null, environments: [{ id: "a", name: "Local" }, { id: "b", name: "SSH box" }] },
+        { storageProviderPluginId: "plug", environments: [{ id: "c", name: "Cloud sandbox" }] },
+      ],
+    };
+    expect(storageEnvironmentNames(options, null)).toEqual(["Local", "SSH box"]);
+    expect(storageEnvironmentNames(options, "plug")).toEqual(["Cloud sandbox"]);
+    expect(storageEnvironmentNames(options, "other")).toEqual([]);
+    expect(storageEnvironmentNames(undefined, null)).toEqual([]);
   });
 });
 

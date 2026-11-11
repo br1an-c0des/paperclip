@@ -1,9 +1,10 @@
-import type { Project, RoutineDetail, RoutineVariable } from "@paperclipai/shared";
+import type { RoutineDetail, RoutineVariable } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Braces, CalendarClock, Check, ChevronDown, GitBranch, Play, Server, Webhook } from "lucide-solid";
 import { createMemo, createSignal, For, Show, type JSX } from "solid-js";
 import { activeAgents } from "@/api/agents";
 import { environmentsApi } from "@/api/environments";
+import { instanceSettingsApi } from "@/api/instance-settings";
 import { issuePath } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { routinesApi } from "@/api/routines";
@@ -20,7 +21,7 @@ import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
-import { environmentChoiceAvailable, projectEnvironment, runWorkspacePayload } from "./details-model";
+import { defaultRunEnvironment, environmentChoiceAvailable, runWorkspacePayload } from "./details-model";
 import { refreshRecurring } from "./queries";
 import { filterRuns, RUN_SOURCE_LABEL, runOutcome, startedByRun, type RunFilter, type RunSource } from "./recurring-model";
 import { formatFire } from "./schedule";
@@ -300,7 +301,7 @@ export function RunNowForm(props: { routine: RoutineDetail; onDone: () => void; 
         {(found) => (
           <div class="rpn-runnow-row">
             <span>Environment</span>
-            <RunEnvironmentMenu project={found()} value={environmentId()} onPick={setEnvironmentId} />
+            <RunEnvironmentMenu agent={agent()} value={environmentId()} onPick={setEnvironmentId} />
           </div>
         )}
       </Show>
@@ -401,16 +402,21 @@ function RunWorkspaceMenu(props: {
   );
 }
 
-/** The environment the run works in: the project's, or another active one. */
-function RunEnvironmentMenu(props: { project: Project; value: string | null; onPick: (environmentId: string | null) => void }) {
+/**
+ * The environment the run works in: the default (the agent's, else the instance's; a project has no
+ * run environment since #20835), or another active one.
+ */
+function RunEnvironmentMenu(props: { agent: { defaultEnvironmentId?: string | null } | undefined; value: string | null; onPick: (environmentId: string | null) => void }) {
   const company = useCompany();
   const environments = createQuery(() => ({
     queryKey: queryKeys.projectSettings.environments(company().id),
     queryFn: ({ signal }) => environmentsApi.list(company().id, signal),
   }));
-  const fallback = () => projectEnvironment(props.project, environments.data);
+  const instance = createQuery(() => ({ queryKey: queryKeys.companySettings.instanceSettings, queryFn: instanceSettingsApi.settings }));
+  const fallback = createMemo(() => defaultRunEnvironment(props.agent, instance.data?.defaultEnvironmentId, environments.data));
   const chosen = () => environments.data?.find((entry) => entry.id === props.value);
-  const label = () => (props.value ? (chosen()?.name ?? "An environment") : `Project default${fallback() ? ` · ${fallback()!.name}` : ""}`);
+  const label = () => (props.value ? (chosen()?.name ?? "An environment") : `Default${fallback() ? ` · ${fallback()!.environment.name}` : ""}`);
+  const defaultHelp = () => (fallback()?.source === "agent" ? "The agent's own environment" : "The instance default");
   return (
     <Menu>
       <Menu.Trigger class="field rpn-assign" aria-label={`Environment: ${label()}`}>
@@ -419,8 +425,8 @@ function RunEnvironmentMenu(props: { project: Project; value: string | null; onP
         <ChevronDown size={14} aria-hidden="true" class="field-caret" />
       </Menu.Trigger>
       <Menu.Content label="Environment" width={300}>
-        <Menu.Item onSelect={() => props.onPick(null)} description="Where the project's tasks run" hint={props.value ? undefined : <Check size={14} />}>
-          Project default
+        <Menu.Item onSelect={() => props.onPick(null)} description={defaultHelp()} hint={props.value ? undefined : <Check size={14} />}>
+          Default
         </Menu.Item>
         <Menu.Separator />
         <For

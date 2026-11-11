@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PluginUiContribution } from "@/api/plugins";
 import {
+  agentEnvironmentId,
   hostContextFor,
   launcherDisplayName,
   launcherNavigationTarget,
@@ -11,6 +12,7 @@ import {
   resolveRouteSidebarSlot,
   resolveSlots,
   routeSidebarPageTitle,
+  slotsForAgentEnvironment,
 } from "./model";
 
 const wiki: PluginUiContribution = {
@@ -63,6 +65,31 @@ describe("resolveSlots", () => {
 
   it("names a detail tab as the old UI's addresses do", () => {
     expect(pluginTabValue({ pluginKey: "acme.wiki", id: "agent-notes" })).toBe("plugin:acme.wiki:agent-notes");
+  });
+});
+
+describe("agent tabs by environment", () => {
+  const tabs = [
+    { id: "always", pluginKey: "acme.cloud" },
+    { id: "gated", pluginKey: "acme.cloud", agentEnvironmentDriver: "vm" },
+  ];
+  const ids = (environment: Parameters<typeof slotsForAgentEnvironment>[1]) => slotsForAgentEnvironment(tabs, environment).map((slot) => slot.id);
+
+  it("shows a gated tab only when the agent's environment is that plugin's driver", () => {
+    expect(ids({ driver: "plugin", pluginDriver: { pluginKey: "acme.cloud", driverKey: "vm" } })).toEqual(["always", "gated"]);
+    expect(ids({ driver: "plugin", pluginDriver: { pluginKey: "acme.cloud", driverKey: "other" } })).toEqual(["always"]);
+    expect(ids({ driver: "plugin", pluginDriver: { pluginKey: "someone.else", driverKey: "vm" } })).toEqual(["always"]);
+    expect(ids({ driver: "plugin" })).toEqual(["always"]);
+    expect(ids({ driver: "local" })).toEqual(["always"]);
+    expect(ids(undefined)).toEqual(["always"]);
+  });
+
+  it("uses the agent's own environment, else the instance default", () => {
+    expect(agentEnvironmentId(undefined, "inst")).toBeUndefined();
+    expect(agentEnvironmentId({ defaultEnvironmentId: "own" }, "inst")).toBe("own");
+    expect(agentEnvironmentId({ defaultEnvironmentId: null }, "inst")).toBe("inst");
+    expect(agentEnvironmentId({}, null)).toBeNull();
+    expect(agentEnvironmentId({}, undefined)).toBeUndefined();
   });
 });
 

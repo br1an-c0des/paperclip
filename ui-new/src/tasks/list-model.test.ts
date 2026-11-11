@@ -1,6 +1,7 @@
 import type { CompactIssue } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import {
+  blockerName,
   buildTaskGroups,
   groupDefaults,
   moveUpdate,
@@ -76,6 +77,13 @@ describe("buildTaskGroups", () => {
     const blocker = { id: "x", identifier: "TES-9", title: "Analytics" };
     const [group] = buildTaskGroups([task("a", "blocked", { blockedBy: [blocker] as CompactIssue["blockedBy"] })], new Set());
     expect(group!.rows[0]!.note).toEqual({ tone: "red", label: "Blocked by TES-9" });
+  });
+
+  it("names a private blocker by its identifier, else as a private task", () => {
+    const note = (blocker: object) => buildTaskGroups([task("a", "blocked", { blockedBy: [blocker] as CompactIssue["blockedBy"] })], new Set())[0]!.rows[0]!.note;
+    expect(note({ id: "x", identifier: "TES-7", locked: true })).toEqual({ tone: "red", label: "Blocked by TES-7" });
+    expect(note({ id: "x", identifier: null, locked: true })).toEqual({ tone: "red", label: "Blocked by a private task" });
+    expect(blockerName({ identifier: null, title: "Visible" })).toBe("Visible");
   });
 
   it("notes a blocked task covered by an active sub-task in the run tone, still under Blocked", () => {

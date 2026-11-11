@@ -304,6 +304,16 @@ a.ps-list-meta {
   white-space: nowrap;
 }
 
+/* The environments that can use the project's storage. */
+.ps-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 /* Goals */
 .ps-goals {
   display: flex;

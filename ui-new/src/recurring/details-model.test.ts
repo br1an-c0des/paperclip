@@ -1,9 +1,10 @@
-import type { Project, RoutineVariable } from "@paperclipai/shared";
+import type { Environment, Project, RoutineVariable } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import {
   activityLabel,
   activitySummary,
   cleanOptions,
+  defaultRunEnvironment,
   mergeActivity,
   parseOptionLines,
   pluginDefaultDrift,
@@ -136,5 +137,21 @@ describe("runWorkspacePayload", () => {
     expect(runWorkspacePayload(project, { workspace: "shared_workspace", reused: null, environmentId: "e1" }, { workspaces: false })).toEqual({
       executionWorkspaceSettings: { environmentId: "e1" },
     });
+  });
+});
+
+describe("defaultRunEnvironment", () => {
+  const env = (id: string, driver: Environment["driver"] = "ssh") => ({ id, name: `Env ${id}`, driver, status: "active", metadata: null }) as unknown as Environment;
+  const environments = [env("local", "local"), env("ssh"), env("sandbox", "sandbox")];
+
+  it("follows the agent's own environment first", () => {
+    expect(defaultRunEnvironment({ defaultEnvironmentId: "ssh" }, "sandbox", environments)).toMatchObject({ source: "agent", environment: { id: "ssh" } });
+  });
+
+  it("falls back to the instance default, then the local environment", () => {
+    expect(defaultRunEnvironment({ defaultEnvironmentId: null }, "sandbox", environments)).toMatchObject({ source: "instance", environment: { id: "sandbox" } });
+    expect(defaultRunEnvironment({ defaultEnvironmentId: "gone" }, null, environments)).toMatchObject({ source: "instance", environment: { id: "local" } });
+    expect(defaultRunEnvironment(undefined, "elsewhere", environments)).toMatchObject({ source: "instance", environment: { id: "local" } });
+    expect(defaultRunEnvironment(undefined, null, undefined)).toBeUndefined();
   });
 });

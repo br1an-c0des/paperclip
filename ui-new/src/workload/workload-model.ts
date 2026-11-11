@@ -1,7 +1,8 @@
-import type { Agent, CompactIssue, IssuePriority, IssueStatus, Project } from "@paperclipai/shared";
+import type { Agent, CompactIssue, IssuePriority, IssueRelationIssueSummary, IssueStatus, Project } from "@paperclipai/shared";
 import type { LiveRun } from "@/api/heartbeats";
 import type { WorkloadRun } from "@/api/workload";
 import { isAgentBlocked } from "@/lib/agent-state";
+import { blockerName, isLockedBlocker } from "@/tasks/list-model";
 import { discGradient } from "@/ui/Avatar";
 import { gradientVar, shownStatus, STATUS_META } from "@/ui/status-meta";
 
@@ -68,6 +69,14 @@ const QUEUE_STATUS_RANK: Partial<Record<IssueStatus, number>> = { in_progress: 0
 export const isOpenTask = (task: Pick<WorkloadTask, "status">) => OPEN.has(task.status);
 const time = (value: Date | string | null | undefined) => (value ? new Date(value).getTime() : NaN);
 const taskLabel = (task: Pick<WorkloadTask, "identifier" | "title">) => task.identifier ?? task.title;
+
+/**
+ * The first blocker still open. A private one (a locked stub: no status, title or assignee) isn't
+ * counted: its state is unknown and it can't be shown as anyone's work.
+ */
+function openBlocker<T extends Pick<IssueRelationIssueSummary, "id" | "status">>(blockers: readonly T[] | undefined, except?: string): T | undefined {
+  return (blockers ?? []).find((candidate) => !isLockedBlocker(candidate) && !RESOLVED.has(candidate.status) && candidate.id !== except);
+}
 
 /** Agents the workload shows at all: not terminated, not waiting for hire approval. */
 export function visibleAgents<T extends Pick<WorkloadAgent, "status">>(agents: readonly T[]) {
@@ -334,9 +343,10 @@ export function waitingChains(input: WorkloadInput): Chain[] {
 
   for (const task of tasks.values()) {
     if (!isOpenTask(task)) continue;
-    const blocker = (task.blockedBy ?? []).find((candidate) => !RESOLVED.has(candidate.status));
+    // A private blocker can't be shown as a holder (no title, status or assignee), so it makes no chain.
+    const blocker = openBlocker(task.blockedBy);
     if (blocker) {
-      const deeper = (blocker.terminalBlockers ?? []).find((candidate) => !RESOLVED.has(candidate.status) && candidate.id !== blocker.id);
+      const deeper = openBlocker(blocker.terminalBlockers, blocker.id);
       const nodes: ChainNode[] = [];
       if (deeper) nodes.push(holderNode(deeper, statusNote(deeper, running), input.youId, !deeper.assigneeAgentId && !deeper.assigneeUserId));
       const blockerNode = holderNode(blocker, statusNote(blocker, running), input.youId, !blocker.assigneeAgentId && !blocker.assigneeUserId);
@@ -672,7 +682,9 @@ export function todayLanes(input: WorkloadInput, agentIds: readonly string[]): {
 
     if (state.key === "blocked" && state.taskId) {
       const task = tasks.get(state.taskId)!;
-      const blocker = (task.blockedBy ?? []).find((candidate) => !RESOLVED.has(candidate.status));
+      const blocker = openBlocker(task.blockedBy);
+      const hidden = (task.blockedBy ?? []).find(isLockedBlocker);
+      const waitingOn = blocker ? taskLabel(blocker) : hidden ? blockerName(hidden) : null;
       // From its last update, but not over a run it made after that.
       const lastRunEnd = Math.max(window.start, ...bars.filter((bar) => bar.kind === "run").map((bar) => bar.end));
       const since = Math.min(now, Math.max(lastRunEnd, time(task.updatedAt) || window.start));
@@ -680,8 +692,8 @@ export function todayLanes(input: WorkloadInput, agentIds: readonly string[]): {
         kind: "blocked",
         start: since,
         end: now,
-        label: blocker ? `Waiting on ${taskLabel(blocker)}` : "Blocked",
-        tip: `${taskLabel(task)} is blocked${blocker ? ` by ${taskLabel(blocker)}` : ""} · last update ${sinceLabel(time(task.updatedAt), now)}`,
+        label: waitingOn ? `Waiting on ${waitingOn}` : "Blocked",
+        tip: `${taskLabel(task)} is blocked${waitingOn ? ` by ${waitingOn}` : ""} · last update ${sinceLabel(time(task.updatedAt), now)}`,
         series: null,
         runId: null,
         taskId: task.id,
