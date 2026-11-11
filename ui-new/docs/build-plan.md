@@ -533,6 +533,15 @@ storage gets `409 project_storage_locked`. Beside it: messages a starting run's 
 sent, the parent crumb without its ID, the full-disk file-recovery note, and smaller checks. Suggested
 grouping: projects (U126), the thread and notices (U127–U130), apps (U131, U132).
 
+Integration round 7 (Nov 11): `integrate/projects-agents` (U126, U114, U121 check; the locked-blocker
+counts and names from round 5; the project header on phones), `integrate/thread-tasks` (U113, U119,
+U128, U129; U120 and U130 checks) and `integrate/queues-apps` (U115, U127, U131; U117, U118, U122 and
+U132 checks; the phone-width menu click). Beside them, `onboarding/runner-choice` fixes the Connect
+Claude dialog closing when onboarding's company record refetches on window focus (a keyed `Match` on
+the company object), and adds an explicit Runner choice (Paperclip Runner or legacy) to onboarding,
+New agent and the agent's Runtime settings, since Claude on the Paperclip Runner fails verification in
+the Docker image (upstream fix 28, #20710).
+
 Outcomes: **build** (an agent builds it), **decide** (a question for the user first), **check**
 (verify, then build or close), **design** (needs boards first), **left out** (with the reason),
 **done**. When a line is built or settled, mark it done or left out here and in its row.
