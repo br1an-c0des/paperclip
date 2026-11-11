@@ -10,6 +10,7 @@ import type {
 } from "@paperclipai/shared";
 import type { LiveRun } from "@/api/heartbeats";
 import { isAlert, placement } from "@/inbox/inbox-model";
+import { blockerName } from "@/tasks/list-model";
 import { itemTask } from "@/inbox/use-inbox";
 import type { Request, RequestKind } from "@/requests/request-model";
 import { PRIORITY_META, shownStatus } from "@/ui/status-meta";
@@ -371,7 +372,8 @@ export function stuckWork(input: {
       items.push({ task, reason: "interrupted", detail: WAITING_FOR[interruption.userAction] ?? "Waiting for someone to act", action: "open" });
     } else if (task.status === "blocked") {
       const blockers = (task.blockedBy ?? []).filter((blocker) => blocker.status !== "done" && blocker.status !== "cancelled");
-      const by = blockers.length > 0 ? `Blocked by ${blockers.map((blocker) => blocker.identifier ?? blocker.title).join(", ")}` : "Blocked, with no blocking task set";
+      // A private blocker has no status, so it stays in: the task is still waiting on it.
+      const by = blockers.length > 0 ? `Blocked by ${blockers.map(blockerName).join(", ")}` : "Blocked, with no blocking task set";
       const who = assignee ? ` · ${assignee} is waiting` : "";
       items.push({ task, reason: "blocked", detail: `${by} for ${since(age)}${who}`, action: "open" });
     } else if (task.status === "in_review" && task.reviewAttention?.state === "stalled") {

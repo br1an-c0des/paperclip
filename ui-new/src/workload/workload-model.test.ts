@@ -160,6 +160,23 @@ describe("waitingChains", () => {
     expect(chains[0]!.summary).toBe("T2 waits on T1, which waits on T0. Nobody is assigned to T0.");
   });
 
+  it("makes no chain from a private blocker, which isn't counted as open", () => {
+    const locked = { id: "t8", identifier: null, locked: true } as unknown as typeof blocker;
+    const chains = waitingChains(
+      input({
+        tasks: [
+          task("t2", { status: "blocked", blockedBy: [locked] }),
+          task("t3", { status: "blocked", blockedBy: [locked, blocker] }),
+          task("t4", { status: "blocked", blockedBy: [{ ...blocker, terminalBlockers: [locked] }] }),
+        ],
+      }),
+    );
+    expect(chains.map((chain) => [chain.key, chain.nodes.map((node) => node.label)])).toEqual([
+      ["blocked:t3", ["T1", "T3"]],
+      ["blocked:t4", ["T1", "T4"]],
+    ]);
+  });
+
   it("ignores resolved blockers and puts reviews waiting on you first", () => {
     const chains = waitingChains(
       input({
@@ -291,6 +308,13 @@ describe("todayLanes", () => {
     const ce = lane("ce");
     expect(ce.state.label).toBe("Paused");
     expect(ce.bars).toEqual([expect.objectContaining({ kind: "paused", start: window.start, end: window.end })]);
+  });
+
+  it("says a task blocked only by a private one waits on a private task", () => {
+    const locked = { id: "t8", identifier: null, locked: true } as unknown as typeof blocker;
+    const only = input({ agents, tasks: [task("t2", { status: "blocked", assigneeAgentId: "ml", blockedBy: [locked], updatedAt: new Date(at(27, 11, 30)) })], runs: [], liveRuns: [] });
+    const [ml] = todayLanes(only, ["ml"]).lanes;
+    expect(ml!.bars).toEqual([expect.objectContaining({ kind: "blocked", label: "Waiting on a private task", tip: expect.stringContaining("T2 is blocked by a private task") })]);
   });
 
   it("says when an idle agent last finished, and what waits on your review", () => {

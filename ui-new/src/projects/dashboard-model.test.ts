@@ -282,6 +282,17 @@ describe("stuckWork", () => {
     ]);
     expect(items[0]!.detail).toBe("Its last run failed · it can be retried");
     expect(items[1]!.detail).toBe("Blocked by TES-9 for 5 hours · Builder is waiting");
+    const locked = input([
+      task("blocked", {
+        status: "blocked",
+        updatedAt: new Date(NOW.getTime() - 5 * 60 * 60 * 1000),
+        blockedBy: [
+          { id: "b1", identifier: null, locked: true },
+          { id: "b2", identifier: "TES-7", locked: true },
+        ] as never,
+      }),
+    ]);
+    expect(locked[0]!.detail).toBe("Blocked by a private task, TES-7 for 5 hours");
     expect(items[3]!.detail).toBe("No activity for 4 days · assigned to Builder");
     expect(items[4]!.detail).toBe("Medium priority · no assignee for 10 days");
   });
