@@ -64,7 +64,7 @@ until one becomes a concrete fix.
 | 25 | [Use one effort key for Grok on the Paperclip Runner](#25-use-one-effort-key-for-grok-on-the-paperclip-runner) | candidate | | | 2026-11-05 | | |
 | 26 | [Don't mark a blocker `attention_required` with nothing to attend to](#26-dont-mark-a-blocker-attention_required-with-nothing-to-attend-to) | candidate | | | 2026-11-05 | | |
 | 27 | [Kitchen Sink example: hide config-gated items until the config loads](#27-kitchen-sink-example-hide-config-gated-items-until-the-config-loads) | candidate | | | 2026-11-09 | | |
-| 28 | [Let Claude Runner agents pass verification in the Docker image](#28-let-claude-runner-agents-pass-verification-in-the-docker-image) | ready | `fix/runner-docker-provider-authority` | | 2026-11-10 | | |
+| 28 | [Let Claude Runner agents pass verification in the Docker image](#28-let-claude-runner-agents-pass-verification-in-the-docker-image) | submitted | `fix/runner-docker-provider-authority` | [#20710](https://github.com/paperclipai/paperclip/pull/20710) | 2026-11-10 | 2026-11-10 | |
 
 ## Details
 
@@ -484,3 +484,5 @@ was closed by an automated pipeline as already fixed, which it isn't.
   `sha-d0057ee` container, the full `verifyQualifiedAcpxInstallation` passes for Claude and Codex
   with the new root and fails with the old one. No fixed image was built. The PR draft is
   `PR_DESCRIPTION.md` in `~/coding/paperclip-fixes/runner-docker-provider-authority`.
+- **Submitted 2026-11-10** as [#20710](https://github.com/paperclipai/paperclip/pull/20710). Once
+  merged and in a published image: sync, redeploy, and move Claude agents back to the Paperclip Runner.
