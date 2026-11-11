@@ -25,6 +25,8 @@ import {
   revisionConfigChanges,
   runnerCapable,
   runnerOffer,
+  runnerOptions,
+  runnerSwitchable,
   runtimeDraft,
   runtimeIdentity,
   runtimeProblem,
@@ -120,6 +122,19 @@ describe("harness and runner", () => {
     expect(runnerOffer(bob(), [upgradeable, runner], null)).toEqual({ kind: "legacy-available" });
     expect(runnerOffer(bob(), [adapter("claude_local", { supportedRunners: ["paperclip"] }), runner], null)).toEqual({ kind: "none" });
     expect(runnerOffer(agent("process"), [adapter("process"), runner], null)).toEqual({ kind: "none" });
+  });
+
+  it("offers the runner as a choice wherever a switch either way is allowed", () => {
+    expect(runnerSwitchable({ kind: "upgrade" })).toBe(true);
+    expect(runnerSwitchable({ kind: "qualify" })).toBe(true);
+    expect(runnerSwitchable({ kind: "legacy-available" })).toBe(true);
+    expect(runnerSwitchable({ kind: "none", reason: "not-supported-here" })).toBe(false);
+    expect(runnerOptions("paperclip")).toEqual([
+      { value: "paperclip", label: "Paperclip Runner (recommended)" },
+      { value: "legacy", label: "Legacy runner" },
+    ]);
+    expect(runnerOptions("legacy").map((option) => option.label)).toEqual(["Paperclip Runner", "Legacy runner"]);
+    expect(runnerOptions(undefined)[0]!.label).toBe("Paperclip Runner");
   });
 
   it("qualifies only sandboxes pinned to an image digest or a Daytona snapshot", () => {

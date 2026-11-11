@@ -81,6 +81,17 @@ export function runnerLabel(runner: AgentRunner) {
   return runner === "paperclip" ? "Paperclip Runner" : "Legacy runner";
 }
 
+/**
+ * The runner choice as a segmented control's options (New agent, onboarding, Model and runtime):
+ * Paperclip Runner first, marked when the server recommends it here.
+ */
+export function runnerOptions(recommended: AgentRunner | undefined): { value: AgentRunner; label: string }[] {
+  return [
+    { value: "paperclip", label: recommended === "paperclip" ? `${runnerLabel("paperclip")} (recommended)` : runnerLabel("paperclip") },
+    { value: "legacy", label: runnerLabel("legacy") },
+  ];
+}
+
 /** What runs the agent: the harness and, for harnesses that have a choice, the runner. */
 export type RuntimeIdentity = {
   harness: string;
@@ -132,6 +143,11 @@ export function runnerOffer(
   if (harness.defaultRunner === "paperclip" && harness.supportedRunners?.includes("paperclip")) return { kind: "upgrade" };
   if (environment?.status === "active" && canQualifyRunnerEnvironment(environment)) return { kind: "qualify" };
   return { kind: "none", reason: "not-supported-here" };
+}
+
+/** Whether Model and runtime offers the runner as a choice: a switch either way that the adapters allow here. */
+export function runnerSwitchable(offer: RunnerOffer) {
+  return offer.kind === "upgrade" || offer.kind === "qualify" || offer.kind === "legacy-available";
 }
 
 /** A sandbox with an immutable image (or a Daytona snapshot) can be qualified for the Runner (ui/src/lib/qualify-claude-setup.ts). */

@@ -1,4 +1,3 @@
-import type { Company } from "@paperclipai/shared";
 import { A, useNavigate, useParams } from "@solidjs/router";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createSignal, Match, Show, Switch } from "solid-js";
@@ -31,7 +30,8 @@ export function OnboardingPage() {
       <Match when={params.companyPrefix && companies.isLoading}>
         <Splash title="Loading" quiet />
       </Match>
-      <Match when={params.companyPrefix && companies.error}>
+      {/* A failed refetch keeps the data it had: only an organization that never loaded is an error here. */}
+      <Match when={params.companyPrefix && !companies.data && companies.error}>
         {(error) => <Splash title="Couldn't load your organizations">{failure(error(), "Refresh to try again.")}</Splash>}
       </Match>
       <Match when={params.companyPrefix && !company()}>
@@ -46,9 +46,14 @@ export function OnboardingPage() {
           There's no organization {params.companyPrefix} you can open.
         </Splash>
       </Match>
-      <Match when={company()} keyed>
-        {(found: Company) => (
-          <CompanyProvider company={found}>
+      {/*
+       * Not keyed: a refetch (coming back to the tab, say) brings the company as a new object, and
+       * rebuilding onboarding on it lost the step and an open Connect Claude dialog. The provider
+       * reads the current record instead.
+       */}
+      <Match when={company()}>
+        {(found) => (
+          <CompanyProvider company={found()}>
             <AgentOnboarding />
           </CompanyProvider>
         )}

@@ -176,11 +176,7 @@ export function resolveRunner(harness: string, choice: RunnerChoice, adapters: r
   }
   const name = harnessLabel(harness);
   if (!runnerCapable(harness)) return { applies: false, runner: "legacy", recommended: "legacy", alternative: null, label: name };
-  const adapter = adapters?.find((entry) => entry.type === harness);
-  const native = adapters?.find((entry) => entry.type === "paperclip_runner");
-  const nativeUsable = !!native && !native.disabled && !native.overriddenBuiltin;
-  const supported = (adapter?.supportedRunners ?? ["legacy"]).filter((runner) => runner !== "paperclip" || nativeUsable);
-  const recommended = adapter?.defaultRunner === "paperclip" && !nativeUsable ? "legacy" : adapter?.defaultRunner;
+  const { supported, recommended } = runnersHere(harness, adapters);
   const runner = choice === "auto" ? (recommended ?? "legacy") : choice;
   const other: AgentRunner = runner === "paperclip" ? "legacy" : "paperclip";
   return {
@@ -190,6 +186,42 @@ export function resolveRunner(harness: string, choice: RunnerChoice, adapters: r
     alternative: supported.includes(other) ? other : null,
     label: `${name} · ${runnerLabel(runner)}`,
   };
+}
+
+/** The runners that can carry a harness here, and the one the server recommends; the Paperclip Runner only while its adapter is enabled. */
+function runnersHere(harness: string, adapters: readonly AdapterInfo[] | undefined) {
+  const adapter = adapters?.find((entry) => entry.type === harness);
+  const native = adapters?.find((entry) => entry.type === "paperclip_runner");
+  const nativeUsable = !!native && !native.disabled && !native.overriddenBuiltin;
+  const supported = (adapter?.supportedRunners ?? ["legacy"]).filter((runner) => runner !== "paperclip" || nativeUsable);
+  const recommended: AgentRunner | undefined = adapter?.defaultRunner === "paperclip" && !nativeUsable ? "legacy" : adapter?.defaultRunner;
+  return { known: !!adapter, supported, recommended };
+}
+
+/**
+ * Whether a runner choice can still be kept: "auto" always can, and a picked runner while the
+ * harness can run on it in the chosen environment. Until the adapters for it have loaded, a pick
+ * stands. A pick that can't be kept (after a change of environment, say) goes back to "auto".
+ */
+export function runnerChoiceSupported(harness: string, choice: RunnerChoice, adapters: readonly AdapterInfo[] | undefined) {
+  if (choice === "auto" || !runnerCapable(harness) || isRunnerOnly(harness)) return true;
+  const here = runnersHere(harness, adapters);
+  return !here.known || here.supported.includes(choice);
+}
+
+/**
+ * The Runner row's help on New agent and onboarding. With a choice, what each runner is and that it
+ * can change later; without one, why there's nothing to pick.
+ */
+export function runnerHelp(harness: string, resolution: RunnerResolution, options: { qualifies?: boolean } = {}) {
+  const name = harnessLabel(harness);
+  if (resolution.alternative) {
+    // The recommended runner is marked on the control itself (runnerOptions).
+    return `Paperclip Runner supervises each run of ${name}; the legacy runner runs the program directly. You can switch later in the agent's settings.`;
+  }
+  if (options.qualifies) return `Test checks whether Paperclip Runner qualifies on this sandbox, and uses it if it does. Otherwise ${name} runs on the legacy runner.`;
+  if (!resolution.recommended) return "Paperclip picks a runner once it knows what this machine supports.";
+  return `The only runner that carries ${name} here.`;
 }
 
 /**
@@ -720,7 +752,8 @@ export function hireOutcome(response: { agent: Pick<Agent, "status">; approval: 
 /**
  * The old UI's `/agents/new?…` parameters: `setupAgentId` resumes a draft, `createdAgentId` is a
  * finished hire (its page), `name` and `adapterType` (with `runnerProvider` for a Paperclip Runner
- * link) prefill the profile and harness.
+ * link) prefill the profile and harness, and `runner` (`paperclip` or `legacy`; a Paperclip Runner
+ * link means `paperclip`) picks the runner, as the old UI's NewAgentSetup reads them.
  */
 export function legacyHireParams(search: Record<string, string | string[] | undefined>) {
   const one = (key: string) => {
@@ -728,7 +761,10 @@ export function legacyHireParams(search: Record<string, string | string[] | unde
     return typeof value === "string" && value ? value : undefined;
   };
   let harness = one("adapterType");
+  const asked = one("runner");
+  let runner: AgentRunner | undefined = asked === "paperclip" || asked === "legacy" ? asked : undefined;
   if (harness === "paperclip_runner") {
+    runner ??= "paperclip";
     const provider = one("runnerProvider") ?? "codex";
     harness = (
       { codex: "codex_local", claude: "claude_local", opencode: "opencode_local", pi: "pi_local", kimi: "kimi_runtime", antigravity: "antigravity_runtime" } as Record<string, string>
@@ -739,5 +775,6 @@ export function legacyHireParams(search: Record<string, string | string[] | unde
     createdAgentId: one("createdAgentId"),
     name: one("name"),
     harness: harness && offered(harness) ? harness : undefined,
+    runner: harness && runnerCapable(harness) ? runner : undefined,
   };
 }

@@ -1,4 +1,4 @@
-import type { AdapterEnvironmentTestResult, Agent, AgentDetail } from "@paperclipai/shared";
+import type { AdapterEnvironmentTestResult, Agent, AgentDetail, AgentRunner } from "@paperclipai/shared";
 import { A, Navigate, useNavigate, useSearchParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ArrowLeft, Check, Info, Plus, RotateCw } from "lucide-solid";
@@ -23,7 +23,7 @@ import { Segmented } from "@/ui/Segmented";
 import { TonePill } from "@/ui/Status";
 import { Tooltip } from "@/ui/Tooltip";
 import { pushToast } from "@/ui/Toast";
-import { managerCandidates, modelLabel, roleLabel, runnerLabel } from "../agent-model";
+import { managerCandidates, modelLabel, roleLabel, runnerLabel, runnerOptions } from "../agent-model";
 import {
   EnvironmentMenu,
   harnessMark,
@@ -63,6 +63,8 @@ import {
   requestAdapterType,
   requiresProviderModel,
   resolveRunner,
+  runnerChoiceSupported,
+  runnerHelp,
   selectedSignIn,
   setupAdapterConfig,
   setupEffortOptions,
@@ -223,6 +225,16 @@ export function NewAgentPage() {
     if (effort && !efforts().some((option) => option.value === effort)) setSetup("effort", "");
   });
 
+  // The runner row's pick is explicit (`setup.runner`), saved to the draft and part of the Test's
+  // signature like the other choices. A pick the chosen environment can't carry goes back to auto.
+  const pickRunner = (value: AgentRunner) => {
+    if (value !== runner().runner) setSetup("runner", value);
+  };
+  createEffect(() => {
+    if (!runnerChoiceSupported(setup.harness, setup.runner, adapters.data)) setSetup("runner", "auto");
+  });
+  const qualifies = () => needsRunnerQualification(setup.harness, setup.runner, runner().recommended, environment());
+
   const candidates = createMemo(() => managerCandidates(agents.data ?? [], draftId() ?? "").filter((agent) => !isSetupDraft(agent)));
   const manager = () => agents.data?.find((agent) => agent.id === profile.reportsTo);
   const drafts = createMemo(() => unfinishedDrafts(agents.data).filter((agent) => agent.id !== draftId()));
@@ -302,7 +314,11 @@ export function NewAgentPage() {
         batch(() => {
           setDraftId(created.id);
           setProfile("name", created.name);
-          if (legacy.harness && !setup.harness) pickHarness(legacy.harness);
+          if (legacy.harness && !setup.harness) {
+            pickHarness(legacy.harness);
+            // A `?runner=` link picks the runner too.
+            if (legacy.runner) setSetup("runner", legacy.runner);
+          }
         });
         setSearch({ setupAgentId: created.id, name: undefined, adapterType: undefined, runnerProvider: undefined, runner: undefined }, { replace: true });
         void client.invalidateQueries({ queryKey: queryKeys.agents.list(company().id) });
@@ -731,10 +747,17 @@ export function NewAgentPage() {
                       </Show>
 
                       <Show when={runner().applies}>
-                        <SettingsRow label="Runner" help="Paperclip picks a qualified runner for this harness and machine. You can switch it later in the agent's settings.">
-                          <TonePill tone={runner().runner === "paperclip" ? "run" : "violet"} compact>
-                            {runnerLabel(runner().runner)}
-                          </TonePill>
+                        <SettingsRow label="Runner" help={runnerHelp(setup.harness, runner(), { qualifies: qualifies() })}>
+                          <Show
+                            when={runner().alternative}
+                            fallback={
+                              <TonePill tone={runner().runner === "paperclip" ? "run" : "violet"} compact>
+                                {runnerLabel(runner().runner)}
+                              </TonePill>
+                            }
+                          >
+                            <Segmented label="Runner" options={runnerOptions(runner().recommended)} value={runner().runner} onChange={pickRunner} />
+                          </Show>
                         </SettingsRow>
                       </Show>
 
