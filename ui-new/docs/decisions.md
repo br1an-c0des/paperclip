@@ -1745,3 +1745,25 @@ Both are handled in `ui-new` for now.
   - **Not yet:** settings sidebars don't fold to a rail; revisit after trying the move from the
     rail into settings. Direction 3 (the floating capsule) is kept as a style to try later.
 
+### 50. Gaps found in integration round 7
+
+- **Status:** Recorded 2026-11-11
+- **Area:** `tasks/thread`, `agent-chat/history + /handoff`, `tasks/run-control`, `shell/navigation`
+- **Found in:** integration round 7 (build plan U113, U120, U122).
+
+- **Named holds outside the run detail (U120).** A queued run's execution `cause` (maintenance,
+  agent setup, a server restart, the previous run stopping) is only on `GET /heartbeat-runs/:id`.
+  The company live-runs list (`GET /companies/:companyId/live-runs`) doesn't carry it, so the chat's
+  Activity column and the task's live run line read "Starting" or "is working" for every admitted run,
+  and only the chat's reply card can name a hold. Options: read the run detail for queued runs (one
+  request each), or ask upstream to add the execution projection to live runs. Left as is for now.
+- **Pull request previews (U113).** Previews aren't kept across a reload: the old UI keeps them in
+  its persisted query cache (#20654), and `ui-new`'s `lib/offline/persisted-cache.ts` allowlist
+  doesn't include `link-preview` yet, so a reload shows the plain mark until the next hover. A
+  still-streaming chat reply (`LiveText`) shows no previews; the finished message does. Both are
+  small follow-ups.
+- **Page pins (U122).** `ui-new`'s Starred section pins projects and agents, kept on the server. The
+  old sidebar's restored pinned links can also pin pages (Routines, Skills, Artifacts, Activity,
+  Settings, Cases) and mix pages and agents in one dragged order, and an agent pin opens its chat.
+  Left out for now; it's a design question (where page pins sit, and their order) if wanted.
+
