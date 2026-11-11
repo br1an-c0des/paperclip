@@ -189,7 +189,8 @@ export function ChatActivity(props: {
                   )}
                 </Show>
                 <span class="ch-muted">
-                  {run().status === "queued" ? "Queued" : `Started ${since(run()) ?? "just now"} ago`}
+                  {/* No "Queued" while the run is admitted, and no time until it has started (U120). */}
+                  {run().startedAt ? `Started ${since(run()) ?? "just now"} ago` : "Starting"}
                 </span>
                 <div class="ch-now-actions">
                   <button type="button" class="ch-pill-btn" onClick={() => commands.openRunModal(run().id)}>
@@ -212,7 +213,7 @@ export function ChatActivity(props: {
               Working now
             </span>
             <span class="ch-now-title">Replying to you in this chat</span>
-            <span class="ch-muted">{run().status === "queued" ? "About to start, from your message" : `Started ${since(run()) ?? "just now"} ago by your message`}</span>
+            <span class="ch-muted">{run().startedAt ? `Started ${since(run()) ?? "just now"} ago by your message` : "From your message"}</span>
             <div class="ch-now-actions">
               <button type="button" class="ch-pill-btn ch-pill-btn--stop" disabled={stopping().has(run().id)} onClick={() => void stop(run())}>
                 <Square size={11} aria-hidden="true" />
