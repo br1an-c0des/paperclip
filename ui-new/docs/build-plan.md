@@ -444,9 +444,10 @@ Progress:
   decision D), the sign-in flows (need an instance that requires sign-in to check live), and
   `shell/coordinator-workspace` (to investigate and design, 3.16). Still open from earlier: the
   Workspaces summary card, the phone toolbar width (`.tv-toolbar--phone` is 394px at 390; fixed
-  Nov 8), the project header on phones (fitted Nov 11: tighter card, 30px title, views on one
-  scrolling line; the full M1/M12 phone header from `mobile/ProjectOverview.dc.html` is still a
-  redesign to do), and the agent page's "From connections" instructions (built Nov 8:
+  Nov 8), the project header on phones (built Nov 11, `projects/phone-header`: the M1, M12 and M13
+  header, with the name opening the dock's Tasks switcher, status and date in the crumb line, search
+  and More, the description on Overview, key numbers and the agents on it, and Overview, List and
+  Docs), and the agent page's "From connections" instructions (built Nov 8:
   the Instructions page lists each active connection's instructions).
 - **Upstream changes to integrate:** the [table below](#upstream-changes-to-integrate), from the
   Nov 3 audit of every sync report since Oct 15 and the Nov 3 sync.
