@@ -1757,7 +1757,11 @@ Both are handled in `ui-new` for now.
   Activity column and the task's live run line read "Starting" or "is working" for every admitted run,
   and only the chat's reply card can name a hold. Options: read the run detail for queued runs (one
   request each), or ask upstream to add the execution projection to live runs. **Decided Nov 11:**
-  read the run detail for each run that's still queued, and stop once it starts.
+  read the run detail for each run that's still queued, and stop once it starts. **Done Nov 11**
+  (`runs/named-holds`): the Activity column's task and reply rows and the task's live run line
+  ("Bob · Waiting for agent setup") read `GET /heartbeat-runs/:id` under the shared run-detail key
+  while a row is queued, with a 15-second fallback; nothing is read for running rows, so a provider
+  wait on a running run still shows only in the chat's reply card.
 - **Pull request previews (U113).** Previews aren't kept across a reload: the old UI keeps them in
   its persisted query cache (#20654), and `ui-new`'s `lib/offline/persisted-cache.ts` allowlist
   doesn't include `link-preview` yet, so a reload shows the plain mark until the next hover. A
