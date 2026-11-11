@@ -1,11 +1,9 @@
-import { recognizeLinkPreview, type LinkPreviewTarget } from "@paperclipai/shared";
 import { useNavigate } from "@solidjs/router";
-import { createEffect, createMemo, createSignal, For } from "solid-js";
-import { Portal } from "solid-js/web";
+import { createEffect, createMemo, createSignal } from "solid-js";
 import { useCompany } from "@/lib/company";
 import { APP_LINK_ATTRIBUTE, followAppLink, renderMarkdown, useKnownPrefixes } from "@/ui/Markdown";
 import { decorateMentions, taskRefFromHref } from "./composer/mentions";
-import { LinkPreviewMark } from "./LinkPreview";
+import { decoratePreviewLink, PreviewMarks, previewTargetFor, type PreviewLink } from "./LinkPreview";
 import { parseGitHubLink, patchLines, type GitHubLink } from "./message-format";
 import "./MessageBody.css";
 
@@ -51,32 +49,6 @@ const SPOKEN: Record<GitHubLink["kind"], string> = {
   repository: "GitHub repository: ",
   github: "GitHub: ",
 };
-
-/** A pull request link with its status mark's slot, just before it. */
-type PreviewLink = { anchor: HTMLAnchorElement; slot: HTMLElement; target: LinkPreviewTarget };
-
-/**
- * Wraps a pull request link with a slot for its status mark (U113), and returns it. The wrapper
- * keeps the mark on the label's first line; the label itself can still wrap.
- */
-function decoratePreviewLink(link: HTMLAnchorElement, github: GitHubLink, target: LinkPreviewTarget): PreviewLink {
-  const href = link.getAttribute("href")!;
-  link.dataset.githubLink = github.kind;
-  link.dataset.linkPreview = target.canonicalUrl;
-  // No native tooltip: the card says what the link is, and the tooltip would cover it.
-  if (github.label && link.textContent?.trim() === href) link.textContent = github.label;
-  const spoken = document.createElement("span");
-  spoken.className = "sr-only";
-  spoken.textContent = SPOKEN[github.kind];
-  link.prepend(spoken);
-  const wrapper = document.createElement("span");
-  wrapper.className = "gh-pr";
-  const slot = document.createElement("span");
-  slot.className = "gh-pr-mark";
-  link.replaceWith(wrapper);
-  wrapper.append(slot, link);
-  return { anchor: link, slot, target };
-}
 
 function decorateGitHubLink(link: HTMLAnchorElement, github: GitHubLink) {
   const href = link.getAttribute("href")!;
@@ -197,8 +169,8 @@ export function MessageBody(props: { source: string; class?: string }) {
       }
       const github = link.dataset.githubLink || link.querySelector("img") ? null : parseGitHubLink(href);
       if (!github) continue;
-      const target = github.kind === "pull_request" ? recognizeLinkPreview(href) : null;
-      if (target) found.push(decoratePreviewLink(link, github, target));
+      const target = previewTargetFor(href);
+      if (target) found.push(decoratePreviewLink(link, target));
       else decorateGitHubLink(link, github);
     }
     // Links decorated before (the effect ran again over the same message) keep their marks.
@@ -215,13 +187,7 @@ export function MessageBody(props: { source: string; class?: string }) {
         innerHTML={html()}
         onClick={(event) => followAppLink(event, navigate, `a.task-link, a[${APP_LINK_ATTRIBUTE}]`)}
       />
-      <For each={previews()}>
-        {(entry) => (
-          <Portal mount={entry.slot} ref={(container) => (container.style.display = "contents")}>
-            <LinkPreviewMark anchor={entry.anchor} target={entry.target} />
-          </Portal>
-        )}
-      </For>
+      <PreviewMarks links={previews()} />
     </>
   );
 }

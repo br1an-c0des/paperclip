@@ -1,14 +1,14 @@
-import type { LinkPreviewResult, LinkPreviewState, LinkPreviewTarget } from "@paperclipai/shared";
+import { recognizeLinkPreview, type LinkPreviewResult, type LinkPreviewState, type LinkPreviewTarget } from "@paperclipai/shared";
 import { createQuery, QueryClientContext } from "@tanstack/solid-query";
 import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, TriangleAlert, type LucideProps } from "lucide-solid";
-import { createEffect, createSignal, onCleanup, onMount, Show, useContext, type JSX } from "solid-js";
-import { Dynamic } from "solid-js/web";
+import { createEffect, createSignal, For, onCleanup, onMount, Show, useContext, type JSX } from "solid-js";
+import { Dynamic, Portal } from "solid-js/web";
 import { linkPreviewsApi } from "@/api/link-previews";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { useSession } from "@/lib/session";
 import { Popover } from "@/ui/Popover";
-import { LINK_PREVIEW_STATE_LABEL, previewLinkLabel, previewMarkLabel, previewMeta } from "./message-format";
+import { LINK_PREVIEW_STATE_LABEL, parseGitHubLink, previewLinkLabel, previewMarkLabel, previewMeta } from "./message-format";
 import "./LinkPreview.css";
 
 /*
@@ -26,6 +26,10 @@ import "./LinkPreview.css";
  *   counts as no preview for a minute rather than an error.
  *
  * Without a query client (tests of other screens) the mark is the plain icon.
+ *
+ * Which links get a mark, and the slot it's drawn into, are here too (`decoratePreviewLinks`,
+ * `PreviewMarks`), so a finished message (MessageBody.tsx) and a reply still streaming
+ * (chat/LiveReply.tsx `LiveText`) treat pull request links alike.
  */
 
 const HOVER_OPEN_MS = 350;
@@ -41,9 +45,65 @@ const STATE_ICON: Record<LinkPreviewState, (props: LucideProps) => JSX.Element> 
   conflicts: TriangleAlert,
 };
 
+/** A pull request link that gets a status mark: GitHub's pull request page, as upstream recognizes it. */
+export function previewTargetFor(href: string | null | undefined): LinkPreviewTarget | null {
+  return parseGitHubLink(href)?.kind === "pull_request" ? recognizeLinkPreview(href) : null;
+}
+
+/** A pull request link with its status mark's slot, just before it. */
+export type PreviewLink = { anchor: HTMLAnchorElement; slot: HTMLElement; target: LinkPreviewTarget };
+
+/**
+ * Wraps a pull request link with a slot for its status mark, and returns it. The wrapper keeps the
+ * mark on the label's first line; the label itself can still wrap. A bare URL reads as its label.
+ */
+export function decoratePreviewLink(link: HTMLAnchorElement, target: LinkPreviewTarget): PreviewLink {
+  const href = link.getAttribute("href")!;
+  link.dataset.githubLink = "pull_request";
+  link.dataset.linkPreview = target.canonicalUrl;
+  // No native tooltip: the card says what the link is, and the tooltip would cover it.
+  if (link.textContent?.trim() === href) link.textContent = target.label;
+  const spoken = document.createElement("span");
+  spoken.className = "sr-only";
+  spoken.textContent = "GitHub pull request: ";
+  link.prepend(spoken);
+  const wrapper = document.createElement("span");
+  wrapper.className = "gh-pr";
+  const slot = document.createElement("span");
+  slot.className = "gh-pr-mark";
+  link.replaceWith(wrapper);
+  wrapper.append(slot, link);
+  return { anchor: link, slot, target };
+}
+
+/** Decorates every pull request link under `root` not decorated yet (links around images stay as they are). */
+export function decoratePreviewLinks(root: ParentNode): PreviewLink[] {
+  const found: PreviewLink[] = [];
+  for (const link of root.querySelectorAll<HTMLAnchorElement>("a[href]")) {
+    if (link.dataset.githubLink || link.querySelector("img")) continue;
+    const target = previewTargetFor(link.getAttribute("href"));
+    if (target) found.push(decoratePreviewLink(link, target));
+  }
+  return found;
+}
+
+/** The marks, each drawn into its link's slot. Keyed by entry: a link kept from one render to the next keeps its mark. */
+export function PreviewMarks(props: { links: PreviewLink[] }) {
+  return (
+    <For each={props.links}>
+      {(entry) => (
+        <Portal mount={entry.slot} ref={(container) => (container.style.display = "contents")}>
+          <LinkPreviewMark anchor={entry.anchor} target={entry.target} />
+        </Portal>
+      )}
+    </For>
+  );
+}
+
+/** Whose preview this is: the signed-in user, or `local-board` without sign-in, as the saved reads name them (persisted-cache.ts). */
 function viewerId(): () => string | null {
   try {
-    return useSession().userId;
+    return useSession().youId;
   } catch {
     return () => null;
   }

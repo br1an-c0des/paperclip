@@ -14,6 +14,7 @@ import { costLabel, elapsedLabel, isActiveRun, runUsage } from "@/runs/run-model
 import { buildItems } from "@/runs/transcript-model";
 import type { Plan } from "@/runs/activity-model";
 import { LiveRunStatusLine } from "@/tasks/LiveRunStatus";
+import { decoratePreviewLinks, PreviewMarks, type PreviewLink } from "@/tasks/LinkPreview";
 import { stopLabel, stopRun } from "@/tasks/run-stop";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Capsule } from "@/ui/Status";
@@ -21,6 +22,7 @@ import { pushToast } from "@/ui/Toast";
 import { followAppLink, renderMarkdown, useKnownPrefixes, useOptionalNavigate } from "@/ui/Markdown";
 import { admissionHold, type AdmissionRun } from "./admission";
 import type { ReplyTurn } from "./chat-model";
+import { morphChildren } from "./live-morph";
 import { EMPTY_REPLY, mergeEvents, pickReply, prpEventsFromOutput, recentSteps, replyFromEvents, replyFromTranscript, type ReplyEvent } from "./reply-model";
 
 /*
@@ -103,16 +105,36 @@ function useStoredEvents(runId: () => string) {
   return events;
 }
 
-/** The reply's text so far; in-app links (`data-app-link`, U86) open through the router. */
+/**
+ * The reply's text so far; in-app links (`data-app-link`, U86) open through the router. A pull
+ * request link has its status mark and card as in a finished message (U113, tasks/LinkPreview.tsx),
+ * read only once the card opens. Each chunk updates the text in place (live-morph.ts), so a link
+ * already written keeps its mark, and an open card stays open, while the text after it grows.
+ */
 export function LiveText(props: { html: string; caret: boolean }) {
   const navigate = useOptionalNavigate();
+  let root: HTMLDivElement | undefined;
+  const [links, setLinks] = createSignal<PreviewLink[]>([]);
+  createEffect(() => {
+    const next = document.createElement("div");
+    next.innerHTML = props.html;
+    const found = decoratePreviewLinks(next);
+    if (!root) return;
+    morphChildren(root, next);
+    // Links kept from the last chunk keep their entries, so their marks stay mounted.
+    const shown = (entry: PreviewLink) => root!.contains(entry.slot);
+    setLinks((previous) => [...previous.filter(shown), ...found.filter(shown)]);
+  });
   return (
-    <div
-      class="md msg ch-live-text"
-      classList={{ "ch-live-text--caret": props.caret }}
-      innerHTML={props.html}
-      onClick={(event) => followAppLink(event, navigate)}
-    />
+    <>
+      <div
+        ref={root}
+        class="md msg ch-live-text"
+        classList={{ "ch-live-text--caret": props.caret }}
+        onClick={(event) => followAppLink(event, navigate)}
+      />
+      <PreviewMarks links={links()} />
+    </>
   );
 }
 
