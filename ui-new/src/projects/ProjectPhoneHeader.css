@@ -113,23 +113,21 @@
   margin: -2px 8px 0 0;
 }
 
+/* Folded to three 14px lines; Markdown can hold lists and headings, so it folds by height. */
 .pph-desc-text {
-  display: -webkit-box;
-  margin: 0;
+  align-self: stretch;
+  max-height: calc(3 * 1.45 * 14px);
   overflow: hidden;
+}
+
+.pph-desc-text .md {
   color: var(--body);
   font-size: 14px;
   line-height: 1.45;
-  white-space: pre-line;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
 }
 
 .pph-desc-text--open {
-  display: block;
-  -webkit-line-clamp: unset;
-  line-clamp: none;
+  max-height: none;
 }
 
 .pph-desc-more {

@@ -539,6 +539,18 @@ a.pd-well-aside {
   background: none;
 }
 
+/*
+ * The phone header shows the description (ProjectPhoneHeader), so the Brief leaves its copy out,
+ * and the whole well when that copy was all it had: no AI brief, its notes, or goals.
+ */
+:root[data-viewport="phone"] .pd-well--brief .pd-brief {
+  display: none;
+}
+
+:root[data-viewport="phone"] .pd-well--brief:not(:has(> :not(.pd-well-head, .pd-brief))) {
+  display: none;
+}
+
 :root[data-viewport="phone"] .pd-waiting {
   order: 2;
 }

@@ -10,6 +10,7 @@ import { useAgentsQuery, useLiveRunsQuery } from "@/lib/company-data";
 import { useProjectStars } from "@/layout/nav-prefs";
 import { openTasksSwitcher, tasksSwitcherOpener } from "@/layout/PhoneDock";
 import { AgentAvatar } from "@/ui/Avatar";
+import { Markdown } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
 import { crew, type CrewState, type ProjectTask } from "./dashboard-model";
 import { docsNumbers, headerAgents, headerSearch, phoneView } from "./phone-header-model";
@@ -219,11 +220,14 @@ export function ProjectPhoneHeader(props: {
   );
 }
 
-/** The project's description (M12), folded to three lines with a way to read the rest. */
+/**
+ * The project's description (M12), in Markdown as everywhere else, folded to three lines with a way
+ * to read the rest. The dashboard's Brief leaves its copy out on a phone (ProjectDashboard.css).
+ */
 function Description(props: { text: string }) {
   const [open, setOpen] = createSignal(false);
   const [folds, setFolds] = createSignal(false);
-  let body: HTMLParagraphElement | undefined;
+  let body: HTMLDivElement | undefined;
   // Whether it runs past three lines, measured when it changes and when the card resizes.
   createEffect(
     on(
@@ -241,9 +245,9 @@ function Description(props: { text: string }) {
   );
   return (
     <div class="pph-desc">
-      <p ref={body} id="pph-desc" class="pph-desc-text" classList={{ "pph-desc-text--open": open() }}>
-        {props.text}
-      </p>
+      <div ref={body} id="pph-desc" class="pph-desc-text" classList={{ "pph-desc-text--open": open() }}>
+        <Markdown source={props.text} />
+      </div>
       <Show when={folds() || open()}>
         <button type="button" class="pph-desc-more" aria-expanded={open()} aria-controls="pph-desc" onClick={() => setOpen(!open())}>
           {open() ? "Show less" : "Show more"}
