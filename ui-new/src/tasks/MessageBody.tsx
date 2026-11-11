@@ -1,8 +1,11 @@
+import { recognizeLinkPreview, type LinkPreviewTarget } from "@paperclipai/shared";
 import { useNavigate } from "@solidjs/router";
-import { createEffect, createMemo } from "solid-js";
+import { createEffect, createMemo, createSignal, For } from "solid-js";
+import { Portal } from "solid-js/web";
 import { useCompany } from "@/lib/company";
 import { APP_LINK_ATTRIBUTE, followAppLink, renderMarkdown, useKnownPrefixes } from "@/ui/Markdown";
 import { decorateMentions, taskRefFromHref } from "./composer/mentions";
+import { LinkPreviewMark } from "./LinkPreview";
 import { parseGitHubLink, patchLines, type GitHubLink } from "./message-format";
 import "./MessageBody.css";
 
@@ -15,6 +18,11 @@ import "./MessageBody.css";
  * inside the message, scrolling sideways (#19478); and two or more images standing on their own
  * lines share a grid of thumbnails (as #19626 groups a run's image results), each opening in full in
  * a new tab as before.
+ *
+ * Since the 2026-11-10 sync (U113, #20593): a pull request link's icon is a status mark that
+ * shows the pull request's state once it's known, and opens a card with its title, author and last
+ * update (LinkPreview.tsx). The mark sits just before the link, outside it, so it can be tapped
+ * without following the link; it's drawn into a slot the decoration leaves for it.
  */
 
 /*
@@ -43,6 +51,32 @@ const SPOKEN: Record<GitHubLink["kind"], string> = {
   repository: "GitHub repository: ",
   github: "GitHub: ",
 };
+
+/** A pull request link with its status mark's slot, just before it. */
+type PreviewLink = { anchor: HTMLAnchorElement; slot: HTMLElement; target: LinkPreviewTarget };
+
+/**
+ * Wraps a pull request link with a slot for its status mark (U113), and returns it. The wrapper
+ * keeps the mark on the label's first line; the label itself can still wrap.
+ */
+function decoratePreviewLink(link: HTMLAnchorElement, github: GitHubLink, target: LinkPreviewTarget): PreviewLink {
+  const href = link.getAttribute("href")!;
+  link.dataset.githubLink = github.kind;
+  link.dataset.linkPreview = target.canonicalUrl;
+  // No native tooltip: the card says what the link is, and the tooltip would cover it.
+  if (github.label && link.textContent?.trim() === href) link.textContent = github.label;
+  const spoken = document.createElement("span");
+  spoken.className = "sr-only";
+  spoken.textContent = SPOKEN[github.kind];
+  link.prepend(spoken);
+  const wrapper = document.createElement("span");
+  wrapper.className = "gh-pr";
+  const slot = document.createElement("span");
+  slot.className = "gh-pr-mark";
+  link.replaceWith(wrapper);
+  wrapper.append(slot, link);
+  return { anchor: link, slot, target };
+}
 
 function decorateGitHubLink(link: HTMLAnchorElement, github: GitHubLink) {
   const href = link.getAttribute("href")!;
@@ -141,6 +175,8 @@ export function MessageBody(props: { source: string; class?: string }) {
   const prefixes = useKnownPrefixes(company);
   const html = createMemo(() => renderMarkdown(decorateMentions(props.source, company().issuePrefix), { knownPrefixes: prefixes() }));
   let root: HTMLDivElement | undefined;
+  // Pull request links and their marks' slots, drawn below through portals (U113).
+  const [previews, setPreviews] = createSignal<PreviewLink[]>([]);
 
   // Task links point at this board's task page and stay in the tab. A fragment such as
   // `#document-plan` is kept, so the page (or the chat it redirects to) can open the document.
@@ -148,6 +184,7 @@ export function MessageBody(props: { source: string; class?: string }) {
   createEffect(() => {
     html();
     if (!root) return;
+    const found: PreviewLink[] = [];
     for (const link of root.querySelectorAll<HTMLAnchorElement>("a[href]")) {
       const href = link.getAttribute("href");
       const ref = parseGitHubLink(href) ? null : taskRefFromHref(href);
@@ -159,18 +196,32 @@ export function MessageBody(props: { source: string; class?: string }) {
         continue;
       }
       const github = link.dataset.githubLink || link.querySelector("img") ? null : parseGitHubLink(href);
-      if (github) decorateGitHubLink(link, github);
+      if (!github) continue;
+      const target = github.kind === "pull_request" ? recognizeLinkPreview(href) : null;
+      if (target) found.push(decoratePreviewLink(link, github, target));
+      else decorateGitHubLink(link, github);
     }
+    // Links decorated before (the effect ran again over the same message) keep their marks.
+    setPreviews((previous) => [...previous.filter((entry) => root!.contains(entry.anchor)), ...found]);
     for (const code of root.querySelectorAll<HTMLElement>("pre:not(.patch) > code.language-diff, pre:not(.patch) > code.language-patch")) decoratePatch(code);
     groupImages(root);
   });
 
   return (
-    <div
-      ref={root}
-      class={props.class ? `md msg ${props.class}` : "md msg"}
-      innerHTML={html()}
-      onClick={(event) => followAppLink(event, navigate, `a.task-link, a[${APP_LINK_ATTRIBUTE}]`)}
-    />
+    <>
+      <div
+        ref={root}
+        class={props.class ? `md msg ${props.class}` : "md msg"}
+        innerHTML={html()}
+        onClick={(event) => followAppLink(event, navigate, `a.task-link, a[${APP_LINK_ATTRIBUTE}]`)}
+      />
+      <For each={previews()}>
+        {(entry) => (
+          <Portal mount={entry.slot} ref={(container) => (container.style.display = "contents")}>
+            <LinkPreviewMark anchor={entry.anchor} target={entry.target} />
+          </Portal>
+        )}
+      </For>
+    </>
   );
 }

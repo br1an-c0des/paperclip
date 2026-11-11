@@ -481,4 +481,9 @@ export const queryKeys = {
    * don't reload a dozen requests; the editor reloads it itself.
    */
   agentConfiguration: (companyId: string, agentId: string) => ["agent-configuration-yaml", companyId, agentId] as const,
+  /**
+   * A GitHub pull request's preview on a message's link (U113, api/link-previews.ts), per viewer
+   * and company as the old UI keys it. Outside every company prefix, so no live event refetches it.
+   */
+  linkPreview: (companyId: string, userId: string | null, url: string) => ["link-preview", companyId, userId, url] as const,
 };
