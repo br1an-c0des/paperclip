@@ -381,7 +381,7 @@ export function effectivePolicy(project: Pick<Project, "executionWorkspacePolicy
   return project.workspaceProvider?.effectivePolicy ?? project.executionWorkspacePolicy ?? null;
 }
 
-export function checkoutDraft(project: Pick<Project, "executionWorkspacePolicy" | "workspaceProvider" | "environmentId">): CheckoutDraft {
+export function checkoutDraft(project: Pick<Project, "executionWorkspacePolicy" | "workspaceProvider">): CheckoutDraft {
   const policy = effectivePolicy(project);
   const stored = project.executionWorkspacePolicy;
   const strategy = policy?.workspaceStrategy ?? null;
@@ -389,9 +389,8 @@ export function checkoutDraft(project: Pick<Project, "executionWorkspacePolicy" 
     enabled: policy?.enabled === true,
     isolatedByDefault: policy?.defaultMode === "isolated_workspace",
     concurrency: policy?.sharedWorkspaceConcurrency ?? "auto",
-    // Since #20651 the project keeps its environment in `environmentId` (migration 0464 moved it out of
-    // the policy); older servers still answer with it in the policy.
-    environmentId: project.environmentId ?? policy?.environmentId ?? "",
+    // #20835 removed `Project.environmentId`; the policy field is only a legacy value now (build plan U126).
+    environmentId: policy?.environmentId ?? "",
     baseRef: strategy?.baseRef ?? "",
     branchTemplate: strategy?.branchTemplate ?? "",
     worktreeParentDir: strategy?.worktreeParentDir ?? "",
@@ -402,7 +401,7 @@ export function checkoutDraft(project: Pick<Project, "executionWorkspacePolicy" 
   };
 }
 
-export function checkoutDirty(project: Pick<Project, "executionWorkspacePolicy" | "workspaceProvider" | "environmentId">, draft: CheckoutDraft) {
+export function checkoutDirty(project: Pick<Project, "executionWorkspacePolicy" | "workspaceProvider">, draft: CheckoutDraft) {
   return JSON.stringify(checkoutDraft(project)) !== JSON.stringify(draft);
 }
 
@@ -411,7 +410,7 @@ export function checkoutDirty(project: Pick<Project, "executionWorkspacePolicy" 
  * old UI builds it, so fields this page doesn't show are kept. Concurrency is only written once it's
  * been picked; "Auto" is what no value means.
  */
-export function checkoutPolicy(project: Pick<Project, "executionWorkspacePolicy" | "workspaceProvider" | "environmentId">, draft: CheckoutDraft): ProjectExecutionWorkspacePolicy {
+export function checkoutPolicy(project: Pick<Project, "executionWorkspacePolicy" | "workspaceProvider">, draft: CheckoutDraft): ProjectExecutionWorkspacePolicy {
   const stored = project.executionWorkspacePolicy;
   const effective = effectivePolicy(project);
   const policy: ProjectExecutionWorkspacePolicy = { ...(stored ?? {}), enabled: draft.enabled };
@@ -420,8 +419,8 @@ export function checkoutPolicy(project: Pick<Project, "executionWorkspacePolicy"
     policy.defaultMode = draft.isolatedByDefault ? "isolated_workspace" : "shared_workspace";
   }
   if (draft.concurrency !== "auto" || stored?.sharedWorkspaceConcurrency) policy.sharedWorkspaceConcurrency = draft.concurrency;
-  // The server still reads `environmentId` from the policy as the project's environment (null clears it).
-  if (draft.environmentId || stored?.environmentId !== undefined || project.environmentId) policy.environmentId = draft.environmentId || null;
+  // Since #20835 (migration 0466) the server strips this and runs follow the agent; see build plan U126.
+  if (draft.environmentId || stored?.environmentId !== undefined) policy.environmentId = draft.environmentId || null;
   const before = checkoutDraft(project);
   const strategyKeys = ["baseRef", "branchTemplate", "worktreeParentDir", "provisionCommand", "runtimeProvisionCommand", "teardownCommand"] as const;
   if (stored?.workspaceStrategy || strategyKeys.some((key) => draft[key] !== before[key])) {

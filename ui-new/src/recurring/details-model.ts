@@ -172,9 +172,9 @@ export function environmentChoiceAvailable(project: Pick<Project, "id"> | null |
 }
 
 /** The environment the project's tasks run in, if it names one. */
-export function projectEnvironment(project: Pick<Project, "executionWorkspacePolicy" | "environmentId"> | null | undefined, environments: readonly Environment[] | undefined) {
-  // Since #20651 the project keeps it in `environmentId`; older servers answer with it in the policy.
-  const id = project?.environmentId ?? project?.executionWorkspacePolicy?.environmentId ?? null;
+export function projectEnvironment(project: Pick<Project, "executionWorkspacePolicy"> | null | undefined, environments: readonly Environment[] | undefined) {
+  // #20835 removed `Project.environmentId` and project run environments; only a legacy policy value is left (U126).
+  const id = project?.executionWorkspacePolicy?.environmentId ?? null;
   return id ? environments?.find((environment) => environment.id === id) : undefined;
 }
 
