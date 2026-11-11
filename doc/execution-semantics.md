@@ -235,6 +235,15 @@ Workspace readiness accepts a completed operation enclosed by a successful
 finalize from the same company, workspace, issue, and run. A nested snapshot
 that finishes before that finalize finishes does not leave a permanent wait.
 Unfinished operations and work after the finalize still require a later save.
+Saved-work recovery ("Recover saved files") ends with its own successful
+finalize for the recovered run. That finalize settles the task's finished
+workspace operations from the same run that started before it, including on a
+workspace that a legacy done child shares with its parent. So the dependents
+of a recovered done child stop waiting, and a saved Retry starts on the next
+dependency pass. Recovery finalizes already saved by earlier releases count,
+with no migration. The recovery finalize never counts as a workspace-wide
+save: another task that started work on a shared workspace while the recovery
+waited for sandbox teardown still waits for its own save.
 
 Daytona file export can preserve an already captured workspace archive when the
 guarded download copy runs out of sandbox capacity. It removes partial copies,
@@ -833,6 +842,8 @@ Use it for:
 
 Blocked issues should stay idle while blockers remain unresolved. Paperclip should not create a queued heartbeat run for that issue until the final blocker is done and the `issue_blockers_resolved` wake can start real work.
 
+Once the last blocker is resolved, the dependency sweep wakes the assignee once for that blocked cycle, whether the blocker cleared by reaching `done` or by settling its workspace finalize (including a "Recover saved files" finalize that has no workspace). The sweep normally skips an issue that its assignee agent blocked itself while its blockers were already resolved, because that agent is waiting on something outside the blocker graph. A native completion that Paperclip refused because dependencies were unresolved (`durable_dependency_blocker_bound`) is not such a wait: the dependency owns its wake, so the sweep wakes it once readiness holds, including for issues already sitting `blocked` when a release that changes readiness is deployed.
+
 `cancelled` is terminal for the blocker issue itself, but it does not satisfy the dependency. A cancelled blocker edge remains unresolved until the edge is removed or replaced, and Paperclip must surface blocker attention on the dependent regardless of whether that dependent is currently displayed as `blocked`, `todo`, `backlog`, or another non-terminal agent-owned status.
 
 If a parent is truly waiting on a child, model that with blockers. Do not rely on the parent/child relationship alone.
@@ -1344,8 +1355,15 @@ provider cannot run the selected model (`requested_model_unsupported`,
 `grok_model_mismatch`) is a model rejection, not a startup interruption. It
 stops on its first attempt as `native_provider_model_rejected`, with no
 same-run bootstrap retry, and leaves an active board recovery action that asks
-for a supported model. Other `session.open` rejections keep the bounded
-startup retry. An indeterminate `session.open` outcome stays unclassified.
+for a supported model. A definite rejection whose startup `providerFailure`
+is `requires_action` for `authentication`, `permission` or `invalid_request`
+stops on its first attempt as `native_provider_startup_rejected`. On a remote
+execution target, any definite rejection with a startup `providerFailure` stops
+the same way, because a remote same-run bootstrap cannot prove ownership. No
+provider work began, so the board offers Retry, which starts a new run with a
+fresh provider session. Other local `session.open` rejections keep the bounded
+startup retry and end with Retry when it is spent. An
+indeterminate `session.open` outcome stays unclassified.
 
 ### Workspace scan failures before provider startup
 
@@ -1422,11 +1440,13 @@ status, errno-style code), never by provider text. On exhaustion, the task gets 
 specific recovery notice, and generic recovery does not grant another budget.
 
 An environment provider that refuses a new lease with a transient status (HTTP
-408, 425, 429, 500, 502, 503 or 504, or a closed connection errno) before provider
-dispatch uses the same bounded bootstrap budget (`environment_provider_unavailable`).
-The status comes only from structured fields: the worker's validated acquisition
-envelope or the in-process error's status; message text is never parsed, and
-other statuses stay `setup_failed`. Each retry is a new creation attempt with its
+408, 425, 429, 500, 502, 503 or 504, or a closed connection errno), or whose
+acquisition reached its own deadline, before provider dispatch uses the same
+bounded bootstrap budget (`environment_provider_unavailable`). The status comes
+only from structured fields: the worker's validated acquisition envelope, its
+acquisition diagnostic (a first failure at or after the expired budget), or the
+in-process error's status; message text is never parsed, and other statuses and
+earlier setup failures stay `setup_failed`. Each retry is a new creation attempt with its
 own durable creation record and provider name. A provisional allocation whose
 cleanup could not be confirmed stays owned by its own record, which the creation
 reconciler settles; a retry neither reuses nor abandons it. The task shows the
@@ -1449,6 +1469,22 @@ folder), or an exhausted budget leaves a board-owned recovery action. Stranded-w
 recovery names this failure for the statuses it scans; for other statuses, such as
 a `blocked` task woken by a reply, the failure path records the action directly.
 
+A restore needs about one workspace of sandbox disk, not two. The uploaded
+archive is a disposable copy of a saved version that control-plane storage
+already holds, and the sandbox checks every file against that version's
+manifest. Extraction writes the files from the last to the first and shortens the
+archive behind each one, so the archive and the restored tree together need the
+workspace size plus the largest file. Before the upload, a reclaim step takes the
+root's restore lock and checks the epoch fence. It removes what an earlier attempt
+on that root left when it died: a `<root>.restoring-*` partial tree, an archive it
+was uploading or consuming, and archive staging that names the same root. Each
+attempt names its staging before its upload starts. Staging that an earlier
+release left without that name is kept. A sandbox that still cannot hold one copy
+fails with `reason=sandbox_disk_full` at the stage that ran out of space (`helper`,
+`upload`, or a restore script stage). A retry on the same disk would fail again,
+so it is not retried automatically. The board recovery action's Retry works once
+the sandbox has room for the workspace.
+
 A retained sandbox can still hold a workspace's earlier root after the workspace
 moved to another allocation, for example when child tasks that an older release
 bound to a parent's workspace saved newer work on their own sandboxes. When the parent wakes on its
@@ -1458,7 +1494,12 @@ recorded use of that root on this sandbox is an earlier epoch that ended in a
 quiesced, committed final save, and the folder carries a Paperclip preparation or
 restore receipt. Its files are then already part of the saved lineage being
 restored. Any other occupant (no receipt, a later unsaved use, or a sandbox that
-never saved that root) is still refused with `reason=occupied_root`. The replaced
+never saved that root) is still refused with `reason=occupied_root`, and none of
+its files are removed. After that proof, the reclaim step removes the root's files
+before the saved archive is uploaded, so the old copy never shares the disk with
+the new one. Its receipt and `.paperclip-runtime` stay until the restored root is
+published, so a restore interrupted after the removal proves the same root again
+and finishes from the saved version. The replaced
 root's `.paperclip-runtime` state, such as a retained runner session, is never in
 a snapshot and belongs to the sandbox, so it moves into the restored root. Only the
 old preparation or restore receipt and export staging are dropped. A retained
@@ -2979,6 +3020,47 @@ replacement behavior. When a replacement does archive remote continuity state
 and the remote move fails, the local state is not moved, and the run error keeps
 the bounded, redacted exit status and output of that move.
 
+When the provider state backup fails to save after the run's result was
+accepted, and the run used a per-turn sandbox (no reusable lease), that backup
+was the only copy of the provider session. The server records
+`nativeProviderStateUnsaved` with the code `native_provider_state_incompatible`
+in that run's runner profile. The run's status, result and task outcome do not
+change. The next run on the session does not rebind that checkpoint: it starts
+a fresh provider session in the same workspace with the full task context,
+without first trying to resume, and its transcript shows the session as started
+rather than resumed. A failure before the result is accepted, a backup that
+saves after a retry, a retained sandbox, an SSH host, and records saved without
+the key keep the resume path described next.
+
+A Runner that keeps no control-plane state for the saved session (none is live
+and no archived authority epoch matches it) reports a typed refusal. This
+happens when a follow-up run starts in a new sandbox and the previous run's
+harness backup was not saved. Resuming again reads the same empty state. When the
+saved session has no turn or runtime request in flight, the driver classifies
+the refusal as `provider_state_incompatible`. The checkpoint's recovery policy
+then decides: a replacement session when the policy allows it, otherwise the run
+ends with `native_provider_state_incompatible`, and Retry or the next message
+continues in a fresh provider session in the same workspace. A session with
+work in flight keeps the unclassified behavior.
+
+A follow-up after a governed wait (`allow_replacement_after_governed_wait`)
+normally requires the same provider session. For this one refusal it continues
+on its own in a fresh provider session in the same run, without a Retry, when
+all of these hold: the driver reports the Runner's typed missing-state refusal
+for a session with nothing in flight; the reconciled checkpoint is the untouched
+rebind of the previous run (no cursor progress, turn, runtime request, proposed
+result, terminal, or governed wait of the follow-up run, and the at-most-once
+recovery marker present); and the control plane proves from durable rows,
+across every runner instance, that the follow-up run has no provider event,
+source-sequenced runner event, tool invocation, or accepted result. The follow-up
+has not started a turn, so a fresh session cannot repeat provider work or a tool
+side effect; only the earlier conversation context is lost. The fresh session
+gets the full task prompt, the interaction responses, the stored fresh-session
+handoff, and queued input, as any replacement does, and the run log records the
+existing provider session continuity break with the reason. Any other
+incompatible state, a control plane without that proof, or a checkpoint saved
+without those fields keeps `native_provider_state_incompatible` and its Retry.
+
 Bootstrap retries, exact-checkpoint resumes, and fresh replacement sessions share three total provider attempts, including the original attempt. Linked run IDs, controller restarts, and duplicate wakes do not reset this budget. A resume after a graceful shutdown drain suspended the run for reattachment does not consume an attempt, because the run did not cause that restart. A crash restart (no drain record) consumes an attempt only when the attempt it interrupted spent provider work without progress. This is one rule over recorded outcomes, not over intents. The attempt counts as started only when the provider accepted a turn: a `turn.accepted` event or the provider's own `turn.started`. A startup still marked `beforeSpawn`, a runner that spawned but was never admitted, and a `turn.start` the provider did not accept are not charged. Progress means that an accepted turn then completed work: a tool execution or a completed item other than a usage report. An accepted turn with only usage, a failure, or no events is charged, so a resume that fails each time still uses up the budget. The first restart judges the original execution. Each later restart claim records the run's event-log position, and the next claim judges only the attempt recorded after it; a normal retry in between starts a new attempt (at its `native.process_start_requested`), so earlier work does not count for it. A reattachment adopts a provider that already started, so for it only progress counts. A resume that launches a new runner and that the controller died before starting used no provider work, so the next claim replaces it and the attempt ends at the attempt that resume was to run as. Uncharged restarts stop after 12 controller generations, so a crash loop that never starts the provider, or that makes progress and then crashes the controller each time, is still bounded. Legacy runs follow the same rule: a preparation interrupted before provider work started (`providerWorkStarted: false`) is retried in its own `interrupted_preparation` lane, which never spends the failure retry budget and is bounded at 12 retries. This holds for a hard kill as well as a graceful drain: once the killed controller's recorded process is proven gone, restart recovery fails the run as `process_lost` with the bootstrap certificate and schedules it in that lane. A run saved by an older release without a controller process stamp cannot be proven and stays in the charged lane. Exact-checkpoint resumes retain the 30-second delay. Replacement scheduling and predecessor lineage commit together, with one successor per predecessor and admission through the normal task locks, authorization, pause, approval, and budget gates.
 
 A due failed remote retry can retain its provider PID after heartbeat completion
@@ -3808,6 +3890,16 @@ input does not keep the worker active; a committed change starts a fresh pass
 once the current pass reaches its tail. A pass is never restarted midway, so on
 a busy instance, where changes commit continuously, every candidate is still
 visited: the due re-arms and fallbacks of older exhausted holds included.
+Discovery is instance-wide and draws from separate lanes, each paged by its own
+cursor: unfinished saves, exhausted holds whose re-arm or fallback is due, and
+this pass. Each lane with work takes one free slot before any lane takes a
+second, and the lane that goes first rotates on each run. A save that another
+server owns, a long local export, or hundreds of holds whose saved input waits
+therefore cannot starve a due hold: it is reached within a few runs of the
+worker. The due lane wraps at its tail, so a hold that becomes due
+by time alone (a lease expiry or a re-arm backoff) is reached even after the
+pass completed with no committed change. Lane positions are kept in memory; a
+restart starts each lane from its first candidate, with no migration.
 Shutdown joins this worker's exports before closing the database. Repeated Retry
 during physical preservation binds the canonical intent
 without changing the attempt's generation or revision. Progress writes preserve
@@ -4543,6 +4635,10 @@ If shutdown cannot be proven, the run retains its checkpoint and the named
 `native_governed_wait_settlement_pending` condition. The existing bounded
 same-run recovery schedule owns further settlement; it grants no replacement
 or tool replay. The task explains that work is saved and shutdown is pending.
+The active recovery action that schedules this same run's resume is the
+authority for that resume, not a hold against it: the dispatch gate of the
+resumed run (including a resolved-interaction continuation) skips only that
+action and keeps every other reconciliation hold on the task.
 Exhausted or gated recovery holds continuation and names the shutdown problem.
 Actual provider failures and integrity failures retain their existing meaning.
 Accounting keeps its separate receipt and reconciliation requirements.
@@ -4606,7 +4702,27 @@ recovery then reclaims the retained sandbox's inactive provider cache and saves 
 files again with no provider turn. The export Retry stays available. A read-only
 fallback that only lost its connection (a closed transport, a provider 5xx or rate
 limit, or a sandbox state change) reports its own cause instead, and finalization
-keeps its bounded retry for it.
+keeps its bounded retry for it. When saved-work recovery's own save still finds the
+disk full after a confirmed reclaim, or with nothing to reclaim, the recovery
+generation ends at once as
+`export_interrupted` with cause `sandbox_disk_full` (retry class
+`user_action_required`) and goes to the board. It is not retried on the automatic
+schedule, and it never falls back to the last save, so the run's unsaved files stay
+in the retained sandbox and the workspace keeps its previous saved version. The
+board's Retry saves again. Once the save succeeds, the accepted Retry applies the
+run's saved accepted result and finishes the run and task from it, with no new
+agent turn and no provider spend. Retry admission waits (`finalizing_saved_result`)
+while any saved-work hold of that run is still saving, then preserved-result
+finalization coalesces the Retry into the source run (`finalize_result`, activity
+`issue.saved_result_finalization_resumed`). This applies to any accepted Retry
+(`evaluate`) of a terminal run whose coordinator still holds an accepted,
+succeeded result, whose saved-work recovery completed with a verified receipt,
+and which has no recorded Stop, newer run, current execution or other owner. A
+record that lacks any of these, including one written by an older server, keeps
+the previous behaviour: the Retry starts one run. If the save still finds the
+disk full, the hold rests again as `sandbox_disk_full` with its Retry.
+A reclaim whose outcome is unknown keeps the scheduled retry, because its journal
+resumes on the next attempt and can still free space.
 
 Native assigned app tools save governed responses above 500,000 encoded bytes before returning
 a bounded reference through PRP. `read_tool_result` retrieves the saved JSON in
@@ -4822,8 +4938,12 @@ and identify `inheritedFromRunId`. The first receipt is immutable history.
 `nativeProviderPackAdmissionState` separately describes current admission proof:
 `pending`, `verified` or `unknown`, with an opaque admission epoch. The mandatory
 coordinator claim atomically sets a new pending epoch before session admission.
-Only the matching owner and epoch can publish post-attachment proof. Failed
-receipt writes leave pending evidence; changed or unsupported admission leaves
+Only the matching owner and epoch can publish post-attachment proof. A write
+that waits for its claim retries a contended write (lock timeout, deadlock or
+serialization abort) up to five times, because the runner's durable checkpoint
+writes hold the same coordinator row. Each attempt re-proves the claim, run and
+epoch in a new transaction. The run log names the database cause of a write
+that still fails. Failed receipt writes leave pending evidence; changed or unsupported admission leaves
 unknown evidence and does not prevent authorized execution. A missing legacy
 receipt remains unknown; the current release cannot supply that missing history.
 Retained recovery needs positively verified prior provenance, captured before
