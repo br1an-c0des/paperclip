@@ -5,6 +5,11 @@
 # Run it through deploy/deploy.sh, which supplies UPSTREAM_SHA. Settings come
 # from deploy/.env (copy .env.example).
 
+# The Compose project name, shown in Docker Desktop and used for container names
+# (paperclip-server-1, paperclip-db-1). Without it Compose names the project
+# after this folder, "deploy".
+name: paperclip
+
 services:
   db:
     image: postgres:17-alpine

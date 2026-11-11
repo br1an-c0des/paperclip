@@ -183,7 +183,9 @@ docker compose exec db pg_dump -U paperclip paperclip | gzip > paperclip-$(date 
 ## Operating
 
 Run these from `deploy/`. Building always goes through `deploy.sh`, which supplies the upstream
-base image; everything else is plain Compose:
+base image; everything else is plain Compose. The Compose project is named `paperclip`
+(`name:` in `docker-compose.yml`), which is what Docker Desktop lists; a stack started before
+Nov 11, 2026 runs as `deploy` and is stopped with `docker compose -p deploy down`.
 
 ```bash
 docker compose logs -f server     # follow server logs
