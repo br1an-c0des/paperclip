@@ -1747,7 +1747,7 @@ Both are handled in `ui-new` for now.
 
 ### 50. Gaps found in integration round 7
 
-- **Status:** Recorded 2026-11-11
+- **Status:** Decided 2026-11-11
 - **Area:** `tasks/thread`, `agent-chat/history + /handoff`, `tasks/run-control`, `shell/navigation`
 - **Found in:** integration round 7 (build plan U113, U120, U122).
 
@@ -1756,14 +1756,17 @@ Both are handled in `ui-new` for now.
   The company live-runs list (`GET /companies/:companyId/live-runs`) doesn't carry it, so the chat's
   Activity column and the task's live run line read "Starting" or "is working" for every admitted run,
   and only the chat's reply card can name a hold. Options: read the run detail for queued runs (one
-  request each), or ask upstream to add the execution projection to live runs. Left as is for now.
+  request each), or ask upstream to add the execution projection to live runs. **Decided Nov 11:**
+  read the run detail for each run that's still queued, and stop once it starts.
 - **Pull request previews (U113).** Previews aren't kept across a reload: the old UI keeps them in
   its persisted query cache (#20654), and `ui-new`'s `lib/offline/persisted-cache.ts` allowlist
   doesn't include `link-preview` yet, so a reload shows the plain mark until the next hover. A
   still-streaming chat reply (`LiveText`) shows no previews; the finished message does. Both are
-  small follow-ups.
+  small follow-ups. **Done Nov 11** (`thread/preview-followups`): both. The streaming text gains
+  only the pull request marks, not the finished message's other touches (task links, icons, diffs,
+  image grids, mentions).
 - **Page pins (U122).** `ui-new`'s Starred section pins projects and agents, kept on the server. The
   old sidebar's restored pinned links can also pin pages (Routines, Skills, Artifacts, Activity,
   Settings, Cases) and mix pages and agents in one dragged order, and an agent pin opens its chat.
-  Left out for now; it's a design question (where page pins sit, and their order) if wanted.
+  **Decided Nov 11:** left out; Starred stays projects and agents.
 
