@@ -1,7 +1,7 @@
 import { QueryClient } from "@tanstack/solid-query";
 import { afterEach, describe, expect, it } from "vitest";
 import { memoryStorage } from "@/test/offline";
-import { displayData, persistScope, QUERY_CACHE_ACTIVE, QUERY_CACHE_MAX_AGE, QUERY_CACHE_MAX_TASKS, startPersistedQueryCache, type PersistedCache } from "./persisted-cache";
+import { displayData, persistScope, previewCurrent, QUERY_CACHE_ACTIVE, QUERY_CACHE_MAX_AGE, QUERY_CACHE_MAX_LINK_PREVIEWS, QUERY_CACHE_MAX_TASKS, startPersistedQueryCache, type PersistedCache } from "./persisted-cache";
 
 const COMPANY = "company-1";
 const OTHER = "company-2";
@@ -168,5 +168,79 @@ describe("startPersistedQueryCache", () => {
     expect(kept).toHaveLength(QUERY_CACHE_MAX_TASKS);
     expect(second.client.getQueryData(["issues", "detail", "t0"])).toBeUndefined();
     expect(second.client.getQueryData(["issues", "detail", `t${QUERY_CACHE_MAX_TASKS + 4}`])).toBeDefined();
+  });
+});
+
+describe("pull request previews (U113, #20654)", () => {
+  const PR = "https://github.com/acme/app/pull/12";
+  const key = (userId: string | null, url = PR, company = COMPANY) => ["link-preview", company, userId, url];
+  const found = (maxAgeMs = 300_000) => ({
+    preview: { target: { provider: "github", kind: "pull_request", canonicalUrl: PR, label: "acme/app#12" }, title: "Fix the build", state: "merged", author: "octocat", updatedAt: null },
+    maxAgeMs,
+  });
+
+  it("are kept per viewer, in their company's record", () => {
+    expect(persistScope(key("u1"), found(), "u1", [COMPANY])).toBe(COMPANY);
+    expect(persistScope(key("u2"), found(), "u1", [COMPANY])).toBeUndefined();
+    expect(persistScope(key(null), found(), "u1", [COMPANY])).toBeUndefined();
+    expect(persistScope(key("u1", PR, OTHER), found(), "u1", [COMPANY])).toBeUndefined();
+    expect(persistScope(["link-preview", COMPANY, "u1"], found(), "u1", [COMPANY])).toBeUndefined();
+  });
+
+  it("count as current only within their maxAgeMs, and only when GitHub described the link", () => {
+    expect(previewCurrent(found(1_000), 5_000, 5_999)).toBe(true);
+    expect(previewCurrent(found(1_000), 5_000, 6_000)).toBe(false);
+    expect(previewCurrent(found(1_000), 5_000, 4_000)).toBe(false);
+    expect(previewCurrent({ preview: null, maxAgeMs: 60_000 }, 5_000, 5_001)).toBe(false);
+    expect(previewCurrent({ preview: found().preview }, 5_000, 5_001)).toBe(false);
+  });
+
+  it("survive a reload without refetching, and an expired one isn't restored", () => {
+    const base = Date.now();
+    let time = base;
+    const first = start(memoryStorage(), { now: () => time });
+    signIn(first.client, "u1");
+    first.client.setQueryData(key("u1"), found(300_000), { updatedAt: time });
+    first.client.setQueryData(key("u1", "https://github.com/acme/app/pull/13"), found(60_000), { updatedAt: time });
+    first.cache.flush();
+
+    time += 59_999;
+    const second = start(first.storage, { now: () => time });
+    expect(second.client.getQueryData(key("u1"))).toMatchObject({ preview: { title: "Fix the build", state: "merged" }, maxAgeMs: 300_000 });
+    expect(second.client.getQueryState(key("u1"))).toMatchObject({ isInvalidated: false, dataUpdatedAt: base });
+    expect(second.client.getQueryData(key("u1", "https://github.com/acme/app/pull/13"))).toBeDefined();
+
+    time += 1;
+    const third = start(first.storage, { now: () => time });
+    expect(third.client.getQueryData(key("u1"))).toBeDefined();
+    expect(third.client.getQueryData(key("u1", "https://github.com/acme/app/pull/13"))).toBeUndefined();
+    time += 240_000;
+    expect(start(first.storage, { now: () => time }).client.getQueryData(key("u1"))).toBeUndefined();
+  });
+
+  it("leaves out the 60-second 'no preview', another viewer's, and expired ones at save", () => {
+    const base = Date.now();
+    let time = base;
+    const first = start(memoryStorage(), { now: () => time });
+    signIn(first.client, "u1");
+    first.client.setQueryData(key("u1"), { preview: null, maxAgeMs: 60_000 }, { updatedAt: time });
+    first.client.setQueryData(key("u2", "https://github.com/acme/app/pull/2"), found(), { updatedAt: time });
+    first.client.setQueryData(key("u1", "https://github.com/acme/app/pull/3"), found(1_000), { updatedAt: time - 1_000 });
+    first.cache.flush();
+    const saved = [...first.storage.data.values()].join("");
+    expect(saved).not.toContain("link-preview");
+  });
+
+  it("keeps the ones learned last, up to the limit", () => {
+    const first = start();
+    signIn(first.client, "u1");
+    for (let index = 0; index < QUERY_CACHE_MAX_LINK_PREVIEWS + 3; index += 1) {
+      first.client.setQueryData(key("u1", `https://github.com/acme/app/pull/${index + 1}`), found(), { updatedAt: Date.now() - 1_000 + index });
+    }
+    first.cache.flush();
+    const second = start(first.storage);
+    expect(second.client.getQueryCache().findAll({ queryKey: ["link-preview"] })).toHaveLength(QUERY_CACHE_MAX_LINK_PREVIEWS);
+    expect(second.client.getQueryData(key("u1", "https://github.com/acme/app/pull/1"))).toBeUndefined();
+    expect(second.client.getQueryData(key("u1", `https://github.com/acme/app/pull/${QUERY_CACHE_MAX_LINK_PREVIEWS + 3}`))).toBeDefined();
   });
 });

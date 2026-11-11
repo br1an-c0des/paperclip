@@ -11,8 +11,15 @@ import { classifyError, isTransientError } from "./errors";
  *   the agents, projects, labels, people, sidebar counts, your inbox and the task list; the nav's
  *   personal reads (your project order, your stars and the projects you left), so a reload draws
  *   the nav as you arranged it at once instead of reshuffling it as they arrive; and the 20 tasks
- *   opened last. Nothing else: no comments, documents, run output, secrets or credentials. Fields that
- *   could carry those are stripped from what is saved (`EXCLUDED_FIELDS`).
+ *   opened last; and the 100 pull request previews (U113) learned last. Nothing else: no comments,
+ *   documents, run output, secrets or credentials. Fields that could carry those are stripped from
+ *   what is saved (`EXCLUDED_FIELDS`).
+ * - **Pull request previews** (since the 2026-11-10 sync, as the old UI keeps them after #20654):
+ *   your own (the key names you), in the company's record, each kept only for the `maxAgeMs` its
+ *   answer gave, so an expired one is never restored as current. A link GitHub couldn't describe,
+ *   or a read that failed, is the 60-second "no preview" and isn't kept. A restored preview isn't
+ *   refetched: it keeps its read time, so opening its card reads again only once `maxAgeMs` has
+ *   passed (LinkPreview.tsx `staleTime`).
  * - **Scope.** One record per user and company, plus one for the user (`…:<user>:root`). A reload
  *   restores only the last signed-in user's records, and only companies in their saved list.
  * - **Age.** Each read is kept 24 hours from when it was fetched. Records from another build are
@@ -30,6 +37,7 @@ export const QUERY_CACHE_PREFIX = "paperclip.ui-new.query-cache.v1:";
 export const QUERY_CACHE_ACTIVE = `${QUERY_CACHE_PREFIX}active`;
 export const QUERY_CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
 export const QUERY_CACHE_MAX_TASKS = 20;
+export const QUERY_CACHE_MAX_LINK_PREVIEWS = 100;
 const MAX_RECORD_CHARS = 1_500_000;
 /** In local_trusted mode there's no session; tasks call the board `local-board`. */
 export const LOCAL_BOARD_USER = "local-board";
@@ -106,6 +114,24 @@ function companyIdsFor(client: QueryClient, userId: string): string[] {
 
 const isTaskDetail = (key: readonly unknown[]) => key[0] === "issues" && key[1] === "detail" && key.length === 3;
 const isTaskRef = (key: readonly unknown[]) => key[0] === "issues" && key[1] === "ref" && key.length === 3;
+const isLinkPreview = (key: readonly unknown[]) => key[0] === "link-preview";
+
+/**
+ * A pull request preview worth keeping (`queryKeys.linkPreview`'s answer): one GitHub described,
+ * still within the `maxAgeMs` it was given at `updatedAt`.
+ */
+export function previewCurrent(data: unknown, updatedAt: number, now: number) {
+  const result = object(data);
+  const maxAgeMs = result?.maxAgeMs;
+  return (
+    !!object(result?.preview) &&
+    typeof maxAgeMs === "number" &&
+    Number.isFinite(maxAgeMs) &&
+    Number.isFinite(updatedAt) &&
+    now - updatedAt >= 0 &&
+    now - updatedAt < maxAgeMs
+  );
+}
 
 /**
  * Which record a read belongs in: null for the user's own record, a company id, or undefined when
@@ -135,6 +161,8 @@ export function persistScope(key: readonly unknown[], data: unknown, userId: str
   // Your memberships: the projects and agents you starred, and the projects you left.
   if (root === "resource-memberships" && key.length === 3 && third === "me") return second;
   if (root === "issues" && key.length === 3 && third === "labels") return second;
+  // Your pull request previews (U113): the key names whose they are.
+  if (isLinkPreview(key) && key.length === 4 && third === userId && typeof key[3] === "string") return second;
   // Your inbox: its task rows and the attention feed.
   if (root === "issues" && key.length === 4 && third === "inbox" && (key[3] === "mine" || key[3] === "mine-context")) return second;
   if (root === "attention" && key.length === 3 && third === "with-dismissed") return second;
@@ -238,6 +266,7 @@ export function startPersistedQueryCache(
         query.data !== undefined &&
         fresh(query.dataUpdatedAt) &&
         !blocked.has(hashKey(query.queryKey)) &&
+        (!isLinkPreview(query.queryKey) || previewCurrent(query.data, query.dataUpdatedAt, now())) &&
         // A task reference rides in the company record of the task it names (see flush).
         (isTaskRef(query.queryKey)
           ? entry.companyId !== null && typeof query.data === "string"
@@ -261,14 +290,15 @@ export function startPersistedQueryCache(
           fetchFailureCount: 0,
           fetchFailureReason: null,
           fetchMeta: null,
-          isInvalidated: true,
+          // A preview keeps its read time and `maxAgeMs`: its card reads again only once that's passed.
+          isInvalidated: !isLinkPreview(query.queryKey),
           status: "success" as const,
           fetchStatus: "idle" as const,
         },
       })),
     });
     // Saved data is a stand-in: each read refetches as soon as a screen uses it.
-    const restored = new Set(queries.map((query) => hashKey(query.queryKey)));
+    const restored = new Set(queries.filter((query) => !isLinkPreview(query.queryKey)).map((query) => hashKey(query.queryKey)));
     void client.invalidateQueries({ predicate: (query) => restored.has(query.queryHash) }, { cancelRefetch: false });
   };
 
@@ -310,6 +340,7 @@ export function startPersistedQueryCache(
       !blocked.has(query.queryHash) &&
       fresh(query.state.dataUpdatedAt) &&
       query.state.dataUpdatedAt >= switchedAt &&
+      (!isLinkPreview(query.queryKey) || previewCurrent(query.state.data, query.state.dataUpdatedAt, now())) &&
       persistScope(query.queryKey, query.state.data, userId, companyIds) !== undefined;
 
     // Reads saved before that aren't in memory any more (garbage-collected) are kept until they age out.
@@ -330,10 +361,21 @@ export function startPersistedQueryCache(
       .filter(([, query]) => isTaskDetail(query.queryKey))
       .sort(([a, x], [b, y]) => (visits.get(b) ?? y.dataUpdatedAt) - (visits.get(a) ?? x.dataUpdatedAt));
     const keptTasks = new Set(tasks.slice(0, QUERY_CACHE_MAX_TASKS).map(([, query]) => String(query.queryKey[2])));
-    const queries = [...merged.values()].filter((query) => {
-      if (isTaskDetail(query.queryKey)) return keptTasks.has(String(query.queryKey[2]));
-      return true;
-    });
+    // The 100 pull request previews learned last.
+    const keptPreviews = new Set(
+      [...merged.entries()]
+        .filter(([, query]) => isLinkPreview(query.queryKey))
+        .sort(([, x], [, y]) => y.dataUpdatedAt - x.dataUpdatedAt)
+        .slice(0, QUERY_CACHE_MAX_LINK_PREVIEWS)
+        .map(([hash]) => hash),
+    );
+    const queries = [...merged.entries()]
+      .filter(([hash, query]) => {
+        if (isTaskDetail(query.queryKey)) return keptTasks.has(String(query.queryKey[2]));
+        if (isLinkPreview(query.queryKey)) return keptPreviews.has(hash);
+        return true;
+      })
+      .map(([, query]) => query);
     // A reference to a kept task goes in that task's company record.
     const refs = [...client.getQueryCache().getAll()]
       .filter((query) => isTaskRef(query.queryKey) && typeof query.state.data === "string" && keptTasks.has(query.state.data) && fresh(query.state.dataUpdatedAt))
