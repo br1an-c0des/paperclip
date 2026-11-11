@@ -16,11 +16,16 @@ function start(storage = memoryStorage(), options: { buildId?: string; now?: () 
   return { client, cache, storage };
 }
 
-/** A board signed in as `userId`, with one company. */
-function signIn(client: QueryClient, userId: string) {
-  client.setQueryData(["health"], { status: "ok", deploymentMode: "authenticated" });
-  client.setQueryData(["auth", "session"], { session: { id: "s1", token: "secret" }, user: { id: userId, name: "Ada", email: "ada@example.com" } });
-  client.setQueryData(["companies", "list", userId], [{ id: COMPANY, name: "Test" }]);
+/**
+ * A board signed in as `userId`, with one company. A test with its own `now` passes it as
+ * `updatedAt`: read at the real time, these reads could land a millisecond after that `now`, look
+ * as if they came from the future, and be left out of the save, taking the company record with them.
+ */
+function signIn(client: QueryClient, userId: string, updatedAt?: number) {
+  const at = updatedAt === undefined ? undefined : { updatedAt };
+  client.setQueryData(["health"], { status: "ok", deploymentMode: "authenticated" }, at);
+  client.setQueryData(["auth", "session"], { session: { id: "s1", token: "secret" }, user: { id: userId, name: "Ada", email: "ada@example.com" } }, at);
+  client.setQueryData(["companies", "list", userId], [{ id: COMPANY, name: "Test" }], at);
 }
 
 afterEach(() => {
@@ -196,10 +201,10 @@ describe("pull request previews (U113, #20654)", () => {
   });
 
   it("survive a reload without refetching, and an expired one isn't restored", () => {
-    const base = Date.now();
+    const base = 1_800_000_000_000;
     let time = base;
     const first = start(memoryStorage(), { now: () => time });
-    signIn(first.client, "u1");
+    signIn(first.client, "u1", time);
     first.client.setQueryData(key("u1"), found(300_000), { updatedAt: time });
     first.client.setQueryData(key("u1", "https://github.com/acme/app/pull/13"), found(60_000), { updatedAt: time });
     first.cache.flush();
@@ -219,10 +224,10 @@ describe("pull request previews (U113, #20654)", () => {
   });
 
   it("leaves out the 60-second 'no preview', another viewer's, and expired ones at save", () => {
-    const base = Date.now();
+    const base = 1_800_000_000_000;
     let time = base;
     const first = start(memoryStorage(), { now: () => time });
-    signIn(first.client, "u1");
+    signIn(first.client, "u1", time);
     first.client.setQueryData(key("u1"), { preview: null, maxAgeMs: 60_000 }, { updatedAt: time });
     first.client.setQueryData(key("u2", "https://github.com/acme/app/pull/2"), found(), { updatedAt: time });
     first.client.setQueryData(key("u1", "https://github.com/acme/app/pull/3"), found(1_000), { updatedAt: time - 1_000 });
