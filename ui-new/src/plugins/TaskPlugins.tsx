@@ -6,6 +6,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { useLiveRunsQuery } from "@/lib/company-data";
 import { useLiveEvent, useRunInterest } from "@/lib/live-events";
+import { useAgentEnvironmentSlots } from "./agent-environment";
 import { usePluginLaunchers, usePluginSlots } from "./contributions";
 import { pluginTabValue, type PluginSlotContext, type ResolvedPluginSlot } from "./model";
 import {
@@ -28,8 +29,9 @@ import "./plugins.css";
  *   `detailTab` slot that opted into the task side panel (`taskSidePanel`, task-panels-model.ts).
  *   A panel is there whenever the task has an agent (the one running it, else its assignee), so it
  *   opens by hand while the agent is idle. One that declares an activation opens itself the first
- *   time the running run's activity asks for it and the plugin says it's ready. Section ids are
- *   `plugin:<pluginKey>:<slotId>`.
+ *   time the running run's activity asks for it and the plugin says it's ready. One that names an
+ *   `agentEnvironmentDriver` is there only when that agent's environment uses the plugin's driver
+ *   (agent-environment.ts). Section ids are `plugin:<pluginKey>:<slotId>`.
  * - Extras above the open section: the plugins' toolbar buttons and launchers for tasks, and their
  *   `taskDetailView` blocks.
  *
@@ -50,16 +52,18 @@ export function useTaskPluginSections(taskId: () => string) {
     queryFn: ({ signal }) => issuesApi.get(taskId(), signal),
   }));
   const tabs = usePluginSlots(() => ({ slotTypes: ["detailTab"], entityType: "issue" }));
-  const panels = usePluginSlots(() => ({ slotTypes: ["detailTab"], entityType: "agent", taskSidePanel: true }));
+  const declared = usePluginSlots(() => ({ slotTypes: ["detailTab"], entityType: "agent", taskSidePanel: true }));
   const liveRuns = useLiveRunsQuery();
   const run = createMemo(() => {
-    if (panels.slots().length === 0) return undefined;
+    if (declared.slots().length === 0) return undefined;
     const current = task.data;
     return (liveRuns.data ?? []).find(
       (entry) => entry.issueId === taskId() && entry.status === "running" && (!current?.executionRunId || entry.id === current.executionRunId),
     );
   });
   const agentId = () => run()?.agentId ?? task.data?.assigneeAgentId ?? null;
+  // A panel that needs a plugin environment driver shows only when that agent runs there (U114).
+  const panels = useAgentEnvironmentSlots(declared.slots, agentId);
 
   // Panels that can open themselves, and the activity the running run has recorded for them.
   const activating = createMemo(() => panels.slots().filter((slot) => slot.taskSidePanel?.activation));

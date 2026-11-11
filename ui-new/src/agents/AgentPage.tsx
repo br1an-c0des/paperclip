@@ -8,6 +8,7 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
 import { ChatHeaderActions, ChatView, createChatControls } from "@/chat/ChatView";
 import { RailLayout, SectionRail } from "@/ui/PageHeader";
+import { useAgentEnvironmentSlots } from "@/plugins/agent-environment";
 import { usePluginSlots } from "@/plugins/contributions";
 import { isPluginTab, pluginTabValue } from "@/plugins/model";
 import { PluginDetailTab } from "@/plugins/PluginSlot";
@@ -39,7 +40,8 @@ import "./Agent.css";
  * `/configuration`, `/permissions?fromTask=…`) so its links keep working.
  *
  * Plugins' agent tabs (`detailTab` slots for agents) sit in the settings rail under "From plugins",
- * at the old UI's addresses, `/agents/:agentKey/plugin:<pluginKey>:<slotId>`.
+ * at the old UI's addresses, `/agents/:agentKey/plugin:<pluginKey>:<slotId>`. A tab that names an
+ * `agentEnvironmentDriver` shows only when the agent's environment uses that plugin driver.
  */
 
 export function AgentPage() {
@@ -113,6 +115,8 @@ export function AgentPage() {
 function AgentSettings(props: { agent: AgentDetail; base: string; section: AgentSectionKey; pluginTab: string | null }) {
   const company = useCompany();
   const plugins = usePluginSlots(() => ({ slotTypes: ["detailTab"], entityType: "agent" }));
+  // Tabs that need a plugin environment driver show only when the agent runs there (U114).
+  const tabs = useAgentEnvironmentSlots(plugins.slots, () => props.agent.id);
   return (
     <RailLayout
       rail={
@@ -124,8 +128,8 @@ function AgentSettings(props: { agent: AgentDetail; base: string; section: Agent
                 ? entry
                 : { label: entry.label, href: `${props.base}/${entry.key}` },
             ),
-            ...(plugins.slots().length > 0 ? [{ heading: "From plugins" }] : []),
-            ...plugins.slots().map((slot) => ({ label: slot.displayName, href: `${props.base}/${pluginTabValue(slot)}`, tag: "plugin" })),
+            ...(tabs.slots().length > 0 ? [{ heading: "From plugins" }] : []),
+            ...tabs.slots().map((slot) => ({ label: slot.displayName, href: `${props.base}/${pluginTabValue(slot)}`, tag: "plugin" })),
           ]}
         />
       }
@@ -134,9 +138,9 @@ function AgentSettings(props: { agent: AgentDetail; base: string; section: Agent
         <Match when={props.pluginTab}>
           {(tab) => (
             <PluginDetailTab
-              slots={plugins.slots()}
+              slots={tabs.slots()}
               tab={tab()}
-              loading={plugins.query.isLoading}
+              loading={plugins.query.isLoading || tabs.loading()}
               context={{ companyId: company().id, companyPrefix: company().issuePrefix, entityId: props.agent.id, entityType: "agent" }}
             />
           )}
