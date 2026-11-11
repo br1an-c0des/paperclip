@@ -3,16 +3,15 @@ import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-que
 import { Book, Check, ChevronDown, FolderOpen, Lock, Plus, Search, X } from "lucide-solid";
 import { batch, createEffect, createMemo, createSignal, createUniqueId, For, Match, on, Show, Switch } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { environmentsApi } from "@/api/environments";
 import { projectsApi } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
+import { readNote } from "@/lib/offline/read-state";
 import { WorkspacePlugins } from "@/plugins/WorkspacePlugins";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { FieldButton, SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
-import { Menu } from "@/ui/Menu";
+import { SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
 import { Popover } from "@/ui/Popover";
 import { Segmented } from "@/ui/Segmented";
 import { Capsule } from "@/ui/Status";
@@ -28,7 +27,8 @@ import {
   newWorkspacePayload,
   sameIds,
   savedRepositories,
-  storageLocked,
+  storageAvailability,
+  storageEnvironmentNames,
   workspaceDraft,
   workspacePatch,
   workspaceProblem,
@@ -51,6 +51,9 @@ import { COMMANDS_EXAMPLE, commandEntries, commandsRequest, commandsText, parseC
  *   (workspace-commands.ts).
  * - Task checkouts follow the instance's `enableIsolatedWorkspaces` (decision 12), and the folder
  *   paths hide under `enableManagedSandboxOnly`, as the old UI does.
+ * - Workspace storage is fixed when the project is created and only shown, with the environments that
+ *   can use it (#20835, build plan U126). A project has no run environment of its own: runs follow
+ *   the agent's default, then the instance's.
  */
 
 export function CodeSection(props: { project: Project }) {
@@ -659,7 +662,6 @@ function WorkspaceForm(props: {
 // ---------------------------------------------------------------------------------------------
 
 function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
-  const company = useCompany();
   const saver = useProjectSaver(() => props.project);
   const [draft, setDraft] = createStore<CheckoutDraft>(checkoutDraft(props.project));
   // Follows the saved policy when it changes and nothing is being edited.
@@ -671,30 +673,6 @@ function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
     ),
   );
   const dirty = () => checkoutDirty(props.project, draft);
-  const environments = createQuery(() => ({
-    queryKey: queryKeys.projectSettings.environments(company().id),
-    queryFn: ({ signal }) => environmentsApi.list(company().id, signal),
-    enabled: props.isolatedEnabled,
-  }));
-  // Local, SSH and real sandboxes; the old UI offers the choice only when there's more than one.
-  const runnable = createMemo(() =>
-    (environments.data ?? []).filter((environment) => {
-      if (environment.status !== "active") return false;
-      if (environment.driver === "local" || environment.driver === "ssh") return true;
-      const provider = typeof environment.config?.provider === "string" ? environment.config.provider : null;
-      return environment.driver === "sandbox" && provider !== null && provider !== "fake";
-    }),
-  );
-  const providers = () => props.project.workspaceProvider?.providers ?? [];
-  const locked = () => storageLocked(props.project);
-  const storageName = (id: string) =>
-    id === "core" ? "Core, on this server" : (providers().find((provider) => provider.id === id)?.displayName ?? "An unavailable provider");
-  const storageHelp = () => {
-    if (locked()) return `This project stays on ${storageName(draft.storage)}; a plugin-backed project can't move.`;
-    if (draft.storage !== "core") return `Once saved, this project stays on ${storageName(draft.storage)} and can't move back to Core.`;
-    return "A project moved to a storage plugin stays on that plugin.";
-  };
-  const environmentName = () => runnable().find((environment) => environment.id === draft.environmentId)?.name ?? "No environment";
   const text = (key: "baseRef" | "branchTemplate" | "worktreeParentDir" | "provisionCommand" | "runtimeProvisionCommand" | "teardownCommand", label: string, placeholder: string, help?: string) => (
     <SettingsRow label={label} help={help} for={`ps-co-${key}`}>
       <TextInput id={`ps-co-${key}`} class="mono" placeholder={placeholder} spellcheck={false} value={draft[key]} onInput={(event) => setDraft(key, event.currentTarget.value)} />
@@ -741,27 +719,6 @@ function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
           <SettingsRow label="Runs in the shared checkout" help={CONCURRENCY_OPTIONS.find((option) => option.value === draft.concurrency)?.help}>
             <Segmented label="Runs in the shared checkout" options={CONCURRENCY_OPTIONS} value={draft.concurrency} onChange={(value) => setDraft("concurrency", value)} />
           </SettingsRow>
-          <Show when={runnable().length > 1}>
-            <SettingsRow label="Runs on" help="The execution environment for this project's task checkouts.">
-              <Menu>
-                <Menu.Trigger as={FieldButton} class="ps-field-360" aria-label={`Runs on: ${environmentName()}`}>
-                  {environmentName()}
-                </Menu.Trigger>
-                <Menu.Content label="Execution environment" width={300}>
-                  <Menu.Item onSelect={() => setDraft("environmentId", "")} hint={draft.environmentId ? undefined : <Check size={14} />}>
-                    No environment
-                  </Menu.Item>
-                  <For each={runnable()}>
-                    {(environment) => (
-                      <Menu.Item onSelect={() => setDraft("environmentId", environment.id)} description={environment.driver} hint={draft.environmentId === environment.id ? <Check size={14} /> : undefined}>
-                        {environment.name}
-                      </Menu.Item>
-                    )}
-                  </For>
-                </Menu.Content>
-              </Menu>
-            </SettingsRow>
-          </Show>
           {text("baseRef", "Base branch", "origin/main")}
           {text("branchTemplate", "Branch name", "{{issue.identifier}}-{{slug}}", "The name each task's branch gets.")}
           {text("worktreeParentDir", "Worktree folder", ".paperclip/worktrees")}
@@ -770,41 +727,57 @@ function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
           {text("teardownCommand", "Teardown command", "bash ./scripts/teardown-worktree.sh", "Runs when a checkout is closed.")}
         </Show>
       </Show>
-      <Show when={providers().length > 0 || locked()}>
-        <SettingsRow label="Workspace storage" help={storageHelp()}>
-          <Show
-            when={!locked()}
-            fallback={
-              <FieldButton class="ps-field-360" aria-label={`Workspace storage: ${storageName(draft.storage)}`} disabled>
-                {storageName(draft.storage)}
-              </FieldButton>
-            }
-          >
-            <Menu>
-              <Menu.Trigger as={FieldButton} class="ps-field-360" aria-label={`Workspace storage: ${storageName(draft.storage)}`}>
-                {storageName(draft.storage)}
-              </Menu.Trigger>
-              <Menu.Content label="Workspace storage" width={300}>
-                <Menu.Item onSelect={() => setDraft("storage", "core")} hint={draft.storage === "core" ? <Check size={14} /> : undefined}>
-                  Core, on this server
-                </Menu.Item>
-                <For each={providers()}>
-                  {(provider) => (
-                    <Menu.Item onSelect={() => setDraft("storage", provider.id)} hint={draft.storage === provider.id ? <Check size={14} /> : undefined}>
-                      {provider.displayName}
-                    </Menu.Item>
-                  )}
-                </For>
-              </Menu.Content>
-            </Menu>
-          </Show>
-          <Show when={props.project.workspaceProvider?.error}>
-            <span class="field-error" role="alert">
-              {props.project.workspaceProvider!.error}
-            </span>
-          </Show>
-        </SettingsRow>
-      </Show>
+      <StorageAvailabilityRow project={props.project} />
     </SettingsCard>
+  );
+}
+
+/**
+ * The project's workspace storage, fixed when it was created (#20835), and the environments that can
+ * use it. Shown only when a storage plugin is installed or the project uses one.
+ */
+function StorageAvailabilityRow(props: { project: Project }) {
+  const company = useCompany();
+  const availability = createMemo(() => storageAvailability(props.project));
+  const options = createQuery(() => ({
+    queryKey: queryKeys.projectEnvironments(company().id),
+    queryFn: ({ signal }) => projectsApi.environmentOptions(company().id, signal),
+    enabled: availability().kind === "list",
+  }));
+  const names = createMemo(() => {
+    const found = availability();
+    return found.kind === "list" ? storageEnvironmentNames(options.data, found.pluginId) : [];
+  });
+  const help = () => {
+    const found = availability();
+    return found.kind === "list"
+      ? `${found.storageName} workspace storage was chosen when this project was created and doesn't change.`
+      : "The workspace storage plugin this project was created with isn't installed. Storage doesn't change after creation.";
+  };
+  return (
+    <Show when={availability().kind !== "hidden"}>
+      <SettingsRow label="Available in" help={help()}>
+        <Switch>
+          <Match when={availability().kind === "unavailable"}>
+            <span class="field-error" role="alert">
+              Storage plugin unavailable
+            </span>
+          </Match>
+          <Match when={names().length > 0}>
+            <ul class="ps-chips" aria-label="Environments that can use this project's storage">
+              <For each={names()}>{(name) => <li class="ps-chip">{name}</li>}</For>
+            </ul>
+          </Match>
+          <Match when={true}>
+            <span class="ps-muted-line">{readNote(options, "No available environments", { loading: "Loading environments…", failed: "Couldn't load the environments." })}</span>
+          </Match>
+        </Switch>
+        <Show when={availability().kind === "list" && props.project.workspaceProvider?.error}>
+          <span class="field-error" role="alert">
+            {props.project.workspaceProvider!.error}
+          </span>
+        </Show>
+      </SettingsRow>
+    </Show>
   );
 }

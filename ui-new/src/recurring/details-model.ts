@@ -1,4 +1,5 @@
 import type { ActivityEvent, Environment, Project, Routine, RoutineVariable } from "@paperclipai/shared";
+import { effectiveDefaultId } from "@/settings/company/environments-model";
 import { modeForExisting, type ReusedWorkspace, type WorkspaceMode } from "@/tasks/new-task";
 
 /*
@@ -171,18 +172,28 @@ export function environmentChoiceAvailable(project: Pick<Project, "id"> | null |
   return environmentsEnabled && Boolean(project);
 }
 
-/** The environment the project's tasks run in, if it names one. */
-export function projectEnvironment(project: Pick<Project, "executionWorkspacePolicy"> | null | undefined, environments: readonly Environment[] | undefined) {
-  // #20835 removed `Project.environmentId` and project run environments; only a legacy policy value is left (U126).
-  const id = project?.executionWorkspacePolicy?.environmentId ?? null;
-  return id ? environments?.find((environment) => environment.id === id) : undefined;
+/**
+ * Where a run goes when Run now picks no environment. A project has no run environment since
+ * #20835 (build plan U126): runs follow the agent's default, then the instance's, then the local
+ * environment (`effectiveDefaultId`). An agent default this company can't see falls through too.
+ */
+export function defaultRunEnvironment(
+  agent: { defaultEnvironmentId?: string | null } | null | undefined,
+  instanceDefaultId: string | null | undefined,
+  environments: readonly Environment[] | undefined,
+): { environment: Environment; source: "agent" | "instance" } | undefined {
+  const own = agent?.defaultEnvironmentId ? environments?.find((environment) => environment.id === agent.defaultEnvironmentId) : undefined;
+  if (own) return { environment: own, source: "agent" };
+  const fallbackId = effectiveDefaultId(instanceDefaultId, environments);
+  const fallback = fallbackId ? environments?.find((environment) => environment.id === fallbackId) : undefined;
+  return fallback ? { environment: fallback, source: "instance" } : undefined;
 }
 
 export type RunWorkspaceDraft = {
   /** The project's default, a new worktree, or another task's worktree. */
   workspace: WorkspaceMode;
   reused: ReusedWorkspace | null;
-  /** An environment other than the project's; null keeps the project's. */
+  /** An environment picked for this run; null follows the agent's or the instance's default. */
   environmentId: string | null;
 };
 
@@ -198,7 +209,8 @@ function defaultProjectWorkspaceId(project: Pick<Project, "executionWorkspacePol
 /**
  * The fields `POST /routines/:id/run` takes for where the run works, as the old Run now dialog sends
  * them (`RoutineRunVariablesDialog`): only when the workspace choice shows (`workspaces`) or an
- * environment was picked. Empty when the run should simply follow the project.
+ * environment was picked. Empty when the run follows the project's workspace and the agent's or
+ * instance's environment.
  */
 export function runWorkspacePayload(
   project: Pick<Project, "id" | "executionWorkspacePolicy" | "workspaces"> | null | undefined,

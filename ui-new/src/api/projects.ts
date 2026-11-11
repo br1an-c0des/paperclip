@@ -1,6 +1,7 @@
 import type {
   Project,
   ProjectAccessMember,
+  ProjectEnvironmentOptions,
   ProjectGitAuthorization,
   ProjectRepositoryOptions,
   ProjectWorkspace,
@@ -66,6 +67,9 @@ export const projectsApi = {
     api.put<ProjectGitAuthorization>(projectPath(projectId, "/git-authorization"), { grantId }),
   repositoryOptions: (companyId: string, signal?: AbortSignal) =>
     api.get<ProjectRepositoryOptions>(`/companies/${encodeURIComponent(companyId)}/project-repositories`, { signal }),
+  /** The company's environments grouped by the workspace storage they can use (null is Core). */
+  environmentOptions: (companyId: string, signal?: AbortSignal) =>
+    api.get<ProjectEnvironmentOptions>(`/companies/${encodeURIComponent(companyId)}/project-environments`, { signal }),
   workspaceOverview: (companyId: string, projectId: string, signal?: AbortSignal) =>
     api.get<WorkspaceOverviewResponse>(
       `/companies/${encodeURIComponent(companyId)}/workspace-overview?projectId=${encodeURIComponent(projectId)}`,

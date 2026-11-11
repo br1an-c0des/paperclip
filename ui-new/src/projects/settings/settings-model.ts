@@ -10,6 +10,7 @@ import type {
   GoalStatus,
   Project,
   ProjectAccessMember,
+  ProjectEnvironmentOptions,
   ProjectExecutionWorkspacePolicy,
   ProjectGitAuthorization,
   ProjectStatus,
@@ -360,20 +361,12 @@ export type CheckoutDraft = {
   enabled: boolean;
   isolatedByDefault: boolean;
   concurrency: SharedWorkspaceConcurrency;
-  /** "" for none. */
-  environmentId: string;
   baseRef: string;
   branchTemplate: string;
   worktreeParentDir: string;
   provisionCommand: string;
   runtimeProvisionCommand: string;
   teardownCommand: string;
-  /**
-   * "core" is core local storage, else a storage plugin's id. Since #19036 a project keeps the
-   * storage it was created with: a project on Core can move to a plugin, and one on a plugin is
-   * locked to it (`storageLocked`).
-   */
-  storage: string;
 };
 
 /** The policy in effect: a workspace provider's effective policy, else the stored one. */
@@ -383,21 +376,17 @@ export function effectivePolicy(project: Pick<Project, "executionWorkspacePolicy
 
 export function checkoutDraft(project: Pick<Project, "executionWorkspacePolicy" | "workspaceProvider">): CheckoutDraft {
   const policy = effectivePolicy(project);
-  const stored = project.executionWorkspacePolicy;
   const strategy = policy?.workspaceStrategy ?? null;
   return {
     enabled: policy?.enabled === true,
     isolatedByDefault: policy?.defaultMode === "isolated_workspace",
     concurrency: policy?.sharedWorkspaceConcurrency ?? "auto",
-    // #20835 removed `Project.environmentId`; the policy field is only a legacy value now (build plan U126).
-    environmentId: policy?.environmentId ?? "",
     baseRef: strategy?.baseRef ?? "",
     branchTemplate: strategy?.branchTemplate ?? "",
     worktreeParentDir: strategy?.worktreeParentDir ?? "",
     provisionCommand: strategy?.provisionCommand ?? "",
     runtimeProvisionCommand: strategy?.runtimeProvisionCommand ?? "",
     teardownCommand: strategy?.teardownCommand ?? "",
-    storage: stored?.storageProviderPluginId ?? "core",
   };
 }
 
@@ -407,8 +396,11 @@ export function checkoutDirty(project: Pick<Project, "executionWorkspacePolicy" 
 
 /**
  * The project's new `executionWorkspacePolicy`: the stored policy with the draft laid over it, as the
- * old UI builds it, so fields this page doesn't show are kept. Concurrency is only written once it's
- * been picked; "Auto" is what no value means.
+ * old UI builds it, so fields this page doesn't show are kept, the storage plugin among them (it's
+ * fixed at creation: the server refuses a change, `409 project_storage_locked`). Concurrency is only
+ * written once it's been picked; "Auto" is what no value means. A legacy `environmentId` is dropped:
+ * since #20835 a project has no run environment (runs follow the agent's or the instance's default)
+ * and the server strips it anyway.
  */
 export function checkoutPolicy(project: Pick<Project, "executionWorkspacePolicy" | "workspaceProvider">, draft: CheckoutDraft): ProjectExecutionWorkspacePolicy {
   const stored = project.executionWorkspacePolicy;
@@ -419,8 +411,7 @@ export function checkoutPolicy(project: Pick<Project, "executionWorkspacePolicy"
     policy.defaultMode = draft.isolatedByDefault ? "isolated_workspace" : "shared_workspace";
   }
   if (draft.concurrency !== "auto" || stored?.sharedWorkspaceConcurrency) policy.sharedWorkspaceConcurrency = draft.concurrency;
-  // Since #20835 (migration 0466) the server strips this and runs follow the agent; see build plan U126.
-  if (draft.environmentId || stored?.environmentId !== undefined) policy.environmentId = draft.environmentId || null;
+  delete policy.environmentId;
   const before = checkoutDraft(project);
   const strategyKeys = ["baseRef", "branchTemplate", "worktreeParentDir", "provisionCommand", "runtimeProvisionCommand", "teardownCommand"] as const;
   if (stored?.workspaceStrategy || strategyKeys.some((key) => draft[key] !== before[key])) {
@@ -428,14 +419,40 @@ export function checkoutPolicy(project: Pick<Project, "executionWorkspacePolicy"
     for (const key of strategyKeys) strategy[key] = draft[key].trim() || null;
     policy.workspaceStrategy = strategy;
   }
-  // Core is only written when it was already saved; a plugin-backed project keeps its plugin.
-  if (draft.storage !== "core" && !storageLocked(project)) policy.storageProviderPluginId = draft.storage;
   return policy;
 }
 
-/** A plugin-backed project stays on its plugin: the server refuses a change (#19036). */
-export function storageLocked(project: Pick<Project, "executionWorkspacePolicy">) {
-  return Boolean(project.executionWorkspacePolicy?.storageProviderPluginId);
+// ---------------------------------------------------------------------------------------------
+// Workspace storage
+
+export type StorageAvailability =
+  /** No storage plugin is installed and the project uses none: nothing to show. */
+  | { kind: "hidden" }
+  /** The project's storage plugin is no longer installed. */
+  | { kind: "unavailable"; pluginId: string }
+  /** List the environments that can use the project's storage; `pluginId` null is Core. */
+  | { kind: "list"; pluginId: string | null; storageName: string };
+
+/**
+ * Workspace storage is fixed when a project is created (#20835: `PATCH /projects/:id` refuses any
+ * change, `409 project_storage_locked`). Settings show it as a fact, with the environments that can
+ * use it, only when a storage plugin is installed or the project uses one, as the old UI's
+ * Configuration does (`ProjectProperties.tsx`).
+ */
+export function storageAvailability(project: Pick<Project, "executionWorkspacePolicy" | "workspaceProvider">): StorageAvailability {
+  const provider = project.workspaceProvider;
+  const pluginId = project.executionWorkspacePolicy?.storageProviderPluginId ?? null;
+  if (!pluginId && !provider?.providers.length) return { kind: "hidden" };
+  const plugin = pluginId ? provider?.providers.find((entry) => entry.id === pluginId) : undefined;
+  if (pluginId && !plugin) return { kind: "unavailable", pluginId };
+  return { kind: "list", pluginId, storageName: plugin?.displayName ?? provider?.displayName ?? "Core / local" };
+}
+
+/** The names of the environments in the group that shares the project's storage (`GET /companies/:id/project-environments`). */
+export function storageEnvironmentNames(options: Pick<ProjectEnvironmentOptions, "groups"> | undefined, pluginId: string | null) {
+  return (options?.groups ?? [])
+    .filter((group) => group.storageProviderPluginId === pluginId)
+    .flatMap((group) => group.environments.map((environment) => environment.name));
 }
 
 // ---------------------------------------------------------------------------------------------
