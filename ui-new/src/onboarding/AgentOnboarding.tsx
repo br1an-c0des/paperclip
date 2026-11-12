@@ -50,7 +50,7 @@ import {
   type SetupDraft,
 } from "@/agents/new/new-agent-model";
 import { EnvironmentMenu, harnessMark, instanceDefaultEnvironment, ModelMenu, PaletteGrid, paletteAppearance, TestChecks } from "@/agents/settings/fields";
-import { failure } from "@/agents/shared";
+import { failure, refreshAgent } from "@/agents/shared";
 import { ConnectionSetup } from "@/connectors/ConnectionSetup";
 import { localLoginSupported } from "@/connectors/connection-model";
 import { useCompany } from "@/lib/company";
@@ -76,6 +76,8 @@ import {
   onboardingTaskHref,
   personalGatewayChoices,
   routedModels,
+  skipDiscards,
+  skipOnboarding,
   type OnboardingStep,
 } from "./onboarding-model";
 // Settings rows, menus and palettes are the agent settings' (and the project settings' they share).
@@ -223,11 +225,13 @@ export function AgentOnboarding() {
   const qualifies = () => needsRunnerQualification(setup.harness, setup.runner, runner().recommended, environment());
 
   // ---- Saving -------------------------------------------------------------------------------
-  const [busy, setBusy] = createSignal<"continue" | "hire" | "launch" | null>(null);
+  const [busy, setBusy] = createSignal<"continue" | "hire" | "launch" | "skip" | null>(null);
   const [problem, setProblem] = createSignal<string | null>(null);
   const [saveError, setSaveError] = createSignal<string | null>(null);
   const [saving, setSaving] = createSignal(false);
   let inFlight: Promise<unknown> = Promise.resolve();
+  /** Set while Skip discards the draft: no save may patch it after it's gone. */
+  let discarding = false;
 
   const remember = (agent: Agent) => {
     client.setQueryData<AgentDetail>(queryKeys.agents.detail(agent.id), (old) => (old ? { ...old, ...agent } : old));
@@ -237,6 +241,7 @@ export function AgentOnboarding() {
 
   const saveSetup = async (): Promise<Agent | null> => {
     await inFlight.catch(() => undefined);
+    if (discarding) return null;
     const agent = draft();
     if (!agent || !setup.harness) return agent ?? null;
     const signature = setupSignature(setup);
@@ -265,7 +270,7 @@ export function AgentOnboarding() {
       () => setupSignature(setup),
       () => {
         window.clearTimeout(saveTimer);
-        if (!draft() || !setup.harness) return;
+        if (discarding || !draft() || !setup.harness) return;
         saveTimer = window.setTimeout(() => void saveSetup(), 500);
       },
       { defer: true },
@@ -436,6 +441,34 @@ export function AgentOnboarding() {
     }
   };
 
+  // ---- Skip -----------------------------------------------------------------------------------
+  // Every Skip goes to the dashboard: the task step needs a hired agent, so the agent and harness
+  // steps can't skip forward. An unhired draft is discarded on the way out (it was never hired, so
+  // there's nothing to confirm); a hired agent stays.
+  const skip = async () => {
+    setBusy("skip");
+    setProblem(null);
+    try {
+      await skipOnboarding(
+        {
+          cancelSave: () => {
+            discarding = true;
+            window.clearTimeout(saveTimer);
+            return inFlight.catch(() => undefined);
+          },
+          discard: (id) => agentsApi.terminate(id, company().id),
+          refresh: (id) => refreshAgent(client, company().id, id),
+          navigate: (href) => navigate(href),
+        },
+        { step: step()!, draft: draft(), prefix: company().issuePrefix },
+      );
+    } catch (caught) {
+      discarding = false;
+      setProblem(failure(caught, "Couldn't discard the draft."));
+      setBusy(null);
+    }
+  };
+
   // ---- Connect Claude, or a custom gateway ---------------------------------------------------
   const [connectOpen, setConnectOpen] = createSignal(false);
   const [gatewayOpen, setGatewayOpen] = createSignal(false);
@@ -494,15 +527,6 @@ export function AgentOnboarding() {
         title={title()}
         organization={company().name}
         aside={preview}
-        leave={
-          <>
-            Finish later from here, or{" "}
-            <A class="ps-link" href={`${base()}/dashboard`}>
-              go to the dashboard
-            </A>
-            .
-          </>
-        }
       >
         <section class="card settings-card na-form ob-card" aria-label={title()}>
           <Show when={detail.isError && step() !== "task"}>
@@ -569,7 +593,7 @@ export function AgentOnboarding() {
                           <Switch fallback="Loading harnesses…">
                             <Match when={adapters.isError}>Couldn't load the harnesses.</Match>
                             <Match when={adapters.isSuccess}>
-                              Claude Code and Codex aren't available on this instance. Finish later, or{" "}
+                              Claude Code and Codex aren't available on this instance. Skip for now, or{" "}
                               <A class="ps-link" href={`${base()}/agents/new`}>
                                 add an agent from New agent
                               </A>{" "}
@@ -763,6 +787,14 @@ export function AgentOnboarding() {
                   {problem()}
                 </span>
               </Show>
+              <Button
+                variant="quiet"
+                disabled={working() || (resuming() && step() !== "task")}
+                title={skipDiscards(step()!, draft()) ? "Discard this draft and go to the dashboard" : "Go to the dashboard"}
+                onClick={() => void skip()}
+              >
+                {busy() === "skip" ? "Leaving…" : "Skip"}
+              </Button>
               <Switch>
                 <Match when={step() === "agent"}>
                   <Button variant="primary" disabled={working() || resuming()} onClick={() => void toModel()}>
