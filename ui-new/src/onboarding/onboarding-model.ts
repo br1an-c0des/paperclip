@@ -175,6 +175,52 @@ export function onboardingTaskHref(prefix: string, issueRef: string) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Skip
+
+/** Where Skip leaves for: the organization's dashboard. */
+export function onboardingDashboardHref(prefix: string) {
+  return `/${prefix}/dashboard`;
+}
+
+/**
+ * The draft Skip discards: on the agent and harness steps, the paused draft that was never hired.
+ * A hired agent (the task step, or a resumed address that turned out to be hired) is never touched,
+ * and neither is a draft that hasn't loaded.
+ */
+export function skipDiscards(step: Exclude<OnboardingStep, "organization">, draft: Pick<Agent, "id" | "status" | "pauseReason"> | undefined): string | null {
+  if (step === "task" || !draft || !isSetupDraft(draft)) return null;
+  return draft.id;
+}
+
+export type SkipDeps = {
+  /** Stops the debounced draft save, and waits for one already sent, so neither outlives the draft. */
+  cancelSave: () => Promise<unknown>;
+  /** Discards the draft (`POST /agents/:id/terminate`, as New agent's "Retire draft…"). */
+  discard: (agentId: string) => Promise<unknown>;
+  /** Refreshes the agents queries once the draft is gone. */
+  refresh: (agentId: string) => Promise<unknown>;
+  navigate: (href: string) => void;
+};
+
+/**
+ * Skip on an agent step: discard the unhired draft, if there is one, then go to the dashboard. The
+ * task step needs a hired agent, so no step skips forward. A failed discard throws before leaving, so
+ * the person stays on the step with the error.
+ */
+export async function skipOnboarding(
+  deps: SkipDeps,
+  input: { step: Exclude<OnboardingStep, "organization">; draft: Pick<Agent, "id" | "status" | "pauseReason"> | undefined; prefix: string },
+) {
+  const discardId = skipDiscards(input.step, input.draft);
+  if (discardId) {
+    await deps.cancelSave();
+    await deps.discard(discardId);
+    void deps.refresh(discardId).catch(() => undefined);
+  }
+  deps.navigate(onboardingDashboardHref(input.prefix));
+}
+
+// ---------------------------------------------------------------------------------------------
 // The first agent's harnesses
 
 /**

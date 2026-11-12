@@ -20,6 +20,9 @@ import {
   personalGatewayChoices,
   reusableProject,
   routedModels,
+  skipDiscards,
+  skipOnboarding,
+  type SkipDeps,
 } from "./onboarding-model";
 import { emptySetup } from "@/agents/new/new-agent-model";
 import type { AiConnectionList } from "@paperclipai/shared";
@@ -76,6 +79,81 @@ describe("onboardingEntry", () => {
     });
     // Gone: a new agent.
     expect(onboardingEntry({ hasCompany: true, agentId: "gone", agents: [] })).toEqual({ step: "agent", draftId: null });
+  });
+});
+
+describe("Skip", () => {
+  const draft = agent({ id: "d1", status: "paused", pauseReason: "setup" });
+  const hired = agent({ id: "a1", status: "idle" });
+
+  /** Records the order of the calls Skip makes. */
+  function deps(overrides: Partial<SkipDeps> = {}) {
+    const calls: string[] = [];
+    const base: SkipDeps = {
+      cancelSave: vi.fn(async () => void calls.push("cancelSave")),
+      discard: vi.fn(async (id: string) => void calls.push(`discard ${id}`)),
+      refresh: vi.fn(async (id: string) => void calls.push(`refresh ${id}`)),
+      navigate: vi.fn((href: string) => void calls.push(`navigate ${href}`)),
+    };
+    return { calls, deps: { ...base, ...overrides } };
+  }
+
+  it("discards only an unhired draft, and only before the task step", () => {
+    expect(skipDiscards("agent", undefined)).toBeNull();
+    expect(skipDiscards("agent", draft)).toBe("d1");
+    expect(skipDiscards("model", draft)).toBe("d1");
+    expect(skipDiscards("model", hired)).toBeNull();
+    expect(skipDiscards("model", { ...draft, status: "terminated" })).toBeNull();
+    expect(skipDiscards("task", hired)).toBeNull();
+    expect(skipDiscards("task", draft)).toBeNull();
+  });
+
+  it("goes straight to the dashboard from the agent step with no draft", async () => {
+    const { calls, deps: d } = deps();
+    await skipOnboarding(d, { step: "agent", draft: undefined, prefix: "TES" });
+    expect(calls).toEqual(["navigate /TES/dashboard"]);
+  });
+
+  it("cancels the pending save, discards the draft and refreshes, then leaves (agent and harness steps)", async () => {
+    for (const step of ["agent", "model"] as const) {
+      const { calls, deps: d } = deps();
+      await skipOnboarding(d, { step, draft, prefix: "TES" });
+      expect(calls).toEqual(["cancelSave", "discard d1", "refresh d1", "navigate /TES/dashboard"]);
+    }
+  });
+
+  it("waits for a save already sent before discarding", async () => {
+    let finishSave!: () => void;
+    const { calls, deps: d } = deps({
+      cancelSave: vi.fn(() => new Promise<void>((resolve) => (finishSave = resolve)).then(() => void calls.push("save settled"))),
+    });
+    const skipping = skipOnboarding(d, { step: "model", draft, prefix: "TES" });
+    await Promise.resolve();
+    expect(d.discard).not.toHaveBeenCalled();
+    finishSave();
+    await skipping;
+    expect(calls).toEqual(["save settled", "discard d1", "refresh d1", "navigate /TES/dashboard"]);
+  });
+
+  it("leaves the hired agent alone on the task step", async () => {
+    const { calls, deps: d } = deps();
+    await skipOnboarding(d, { step: "task", draft: hired, prefix: "TES" });
+    expect(d.cancelSave).not.toHaveBeenCalled();
+    expect(d.discard).not.toHaveBeenCalled();
+    expect(calls).toEqual(["navigate /TES/dashboard"]);
+  });
+
+  it("stays on the step when the discard fails", async () => {
+    const { deps: d } = deps({ discard: vi.fn(async () => Promise.reject(new Error("Agent not found"))) });
+    await expect(skipOnboarding(d, { step: "model", draft, prefix: "TES" })).rejects.toThrow("Agent not found");
+    expect(d.refresh).not.toHaveBeenCalled();
+    expect(d.navigate).not.toHaveBeenCalled();
+  });
+
+  it("still leaves when only the refresh fails", async () => {
+    const { deps: d } = deps({ refresh: vi.fn(async () => Promise.reject(new Error("offline"))) });
+    await skipOnboarding(d, { step: "model", draft, prefix: "TES" });
+    expect(d.navigate).toHaveBeenCalledWith("/TES/dashboard");
   });
 });
 
