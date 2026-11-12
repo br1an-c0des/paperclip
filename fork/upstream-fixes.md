@@ -65,6 +65,7 @@ until one becomes a concrete fix.
 | 26 | [Don't mark a blocker `attention_required` with nothing to attend to](#26-dont-mark-a-blocker-attention_required-with-nothing-to-attend-to) | candidate | | | 2026-11-05 | | |
 | 27 | [Kitchen Sink example: hide config-gated items until the config loads](#27-kitchen-sink-example-hide-config-gated-items-until-the-config-loads) | candidate | | | 2026-11-09 | | |
 | 28 | [Let Claude Runner agents pass verification in the Docker image](#28-let-claude-runner-agents-pass-verification-in-the-docker-image) | submitted | `fix/runner-docker-provider-authority` | [#20710](https://github.com/paperclipai/paperclip/pull/20710) | 2026-11-10 | 2026-11-10 | |
+| 29 | [Don't report the agent JWT secret missing when `BETTER_AUTH_SECRET` covers it](#29-dont-report-the-agent-jwt-secret-missing-when-better_auth_secret-covers-it) | candidate | | | 2026-11-12 | | |
 
 ## Details
 
@@ -486,3 +487,22 @@ was closed by an automated pipeline as already fixed, which it isn't.
   `PR_DESCRIPTION.md` in `~/coding/paperclip-fixes/runner-docker-provider-authority`.
 - **Submitted 2026-11-10** as [#20710](https://github.com/paperclipai/paperclip/pull/20710). Once
   merged and in a published image: sync, redeploy, and move Claude agents back to the Paperclip Runner.
+
+### 29. Don't report the agent JWT secret missing when `BETTER_AUTH_SECRET` covers it
+
+Found redeploying the fork's Docker deployment (Nov 12).
+
+- **Problem:** the startup banner (`server/src/startup-banner.ts`, the "Agent JWT" row) checks only
+  `PAPERCLIP_AGENT_JWT_SECRET`, in the environment or the instance's `.env`, and otherwise prints
+  "missing (run `npx paperclipai onboard`)" in yellow. But agent keys
+  (`server/src/agent-auth-jwt.ts`) and runtime tool tokens (`server/src/runtime-tools-token.ts`)
+  fall back to `BETTER_AUTH_SECRET`, which every authenticated deployment sets, including
+  upstream's own `docker/docker-compose.yml`. So a working Docker deployment warns that agent runs
+  will get no key, and suggests a command that doesn't apply in a container.
+- **Likely fix:** pass when `BETTER_AUTH_SECRET` is set too, with a message such as "set (from
+  BETTER_AUTH_SECRET)", and keep the warning for the case with neither. A small test beside the
+  banner's existing ones.
+- **Related:** #13816 (open) is the opposite case, a genuinely missing secret degrading runs
+  silently; this fix shouldn't weaken that warning. Search for duplicates again before building.
+- **Fork workaround:** none needed; the warning is cosmetic.
+
