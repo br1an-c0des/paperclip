@@ -63,6 +63,13 @@ function item(id: string, sourceKind: AttentionSourceKind, extra: Partial<Attent
     snoozedUntil: null,
     detail: null,
     trainingExampleId: null,
+    audience: { kind: "pool", userId: null, reason: "none" },
+    stale: null,
+    required: false,
+    changeFingerprint: "",
+    closeModes: [],
+    obligationKey: null,
+    obligationLeadId: null,
     ...extra,
   };
 }

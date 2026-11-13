@@ -164,6 +164,11 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
         label: "AI connection routers",
         help: "Lets plugin connections choose task-pinned accounts and harnesses.",
       },
+      {
+        key: "enableMcpTasks",
+        label: "Durable app actions (MCP Tasks)",
+        help: "Connected apps that support MCP Tasks run long actions, such as CI runs or deploys, as tasks Paperclip keeps track of, so a timeout, restart or deploy doesn't lose the result or start the work twice. Turning this off stops new tasks; apps then answer as before.",
+      },
     ],
   },
   {

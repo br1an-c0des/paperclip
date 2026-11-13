@@ -307,8 +307,11 @@ function Inbox(props: { tab: InboxTab; base: string }) {
     if (!task) return;
     commands.openTaskModal({ id: task.id, identifier: task.identifier, title: task.title ?? task.identifier ?? "", projectId: item.project?.id ?? null });
   };
-  const openDecision = (item: DecisionHistoryItem) =>
-    commands.openTaskModal({ id: item.issueId, identifier: item.issueIdentifier, title: item.issueTitle, projectId: item.projectId });
+  // An approval with no linked task has no `issueId` (upstream #20959); there's no task to open.
+  const openDecision = (item: DecisionHistoryItem) => {
+    if (!item.issueId) return;
+    commands.openTaskModal({ id: item.issueId, identifier: item.issueIdentifier, title: item.issueTitle ?? item.issueIdentifier ?? "", projectId: item.projectId });
+  };
   const openTask = (task: CompactIssue) => {
     if (task.isUnreadForMe) inbox.markRead([task.id]);
     commands.openTaskModal({ id: task.id, identifier: task.identifier, title: task.title, projectId: task.projectId });

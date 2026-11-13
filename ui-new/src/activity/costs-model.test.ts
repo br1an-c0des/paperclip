@@ -43,8 +43,8 @@ describe("spend rows", () => {
 
   it("lists projects by spend with work outside a project last", () => {
     const rows = projectCostRows([
-      { projectId: null, projectName: null, costCents: 900, eventCount: 1, estimatedEventCount: 0, ...usage },
-      { projectId: "p", projectName: "Site", costCents: 10, eventCount: 1, estimatedEventCount: 0, ...usage },
+      { projectId: null, projectName: null, costCents: 900, eventCount: 1, estimatedEventCount: 0, unpricedEventCount: 0, ...usage },
+      { projectId: "p", projectName: "Site", costCents: 10, eventCount: 1, estimatedEventCount: 0, unpricedEventCount: 0, ...usage },
     ]);
     expect(rows.map((row) => row.name)).toEqual(["Site", "No project"]);
   });

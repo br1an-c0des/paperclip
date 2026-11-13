@@ -21,6 +21,8 @@ const company = {
   budgetMonthlyCents: 0,
   spentMonthlyCents: 0,
   defaultResponsibleUserId: null,
+  defaultDecisionOwnerUserId: null,
+  budgetOwnerUserId: null,
   requireBoardApprovalForNewAgents: false,
   interactionResolverGovernance: {},
   feedbackDataSharingEnabled: false,

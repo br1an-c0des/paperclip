@@ -190,7 +190,7 @@ function HistoryRow(props: { item: DecisionHistoryItem; people: TaskPeople; sele
       </Show>
       <button type="button" class="ibx-task-open" onClick={() => props.onOpen()}>
         <span class="ibx-row-title">{props.item.title}</span>
-        <Show when={props.item.title !== props.item.issueTitle}>
+        <Show when={props.item.issueTitle && props.item.title !== props.item.issueTitle}>
           <span class="ibx-hist-task">{props.item.issueTitle}</span>
         </Show>
       </button>
