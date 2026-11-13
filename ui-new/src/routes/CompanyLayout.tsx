@@ -16,6 +16,7 @@ import { CommandsProvider, useCommands } from "@/lib/commands";
 import { CompanyProvider, findCompanyByPrefix, rememberCompany, useCompaniesQuery, useCompany } from "@/lib/company";
 import { LiveEventsProvider } from "@/lib/live-events";
 import { useLiveToasts } from "@/lib/live-toasts";
+import { useBrowserTimeZoneSync } from "@/lib/time-zone";
 import { focusPageSearch, useGlobalShortcuts } from "@/lib/shortcuts";
 import { RunModal } from "@/runs/RunModal";
 import { AppShellOverlays } from "@/plugins/ShellPlugins";
@@ -55,6 +56,9 @@ import "./CompanyLayout.css";
  * returns to the rail. There `[` and Shift+`[` both hide and show the sidebar (the same hiding as the
  * main nav's), leaving full or rail as it was.
  *
+ * Once per page load the shell saves the browser's time zone to your workspace preferences when it
+ * differs from the saved one, so chat agents read times in it (lib/time-zone.ts, U143).
+ *
  * The task the page has open (its page, or a list's panel) is recorded in the nav's recent tasks,
  * and the task keys act on it: `y` archives it from your inbox, `g c` goes to its comment box, `]`
  * closes the panel and opens it again.
@@ -71,6 +75,8 @@ function CompanyShell(props: ParentProps) {
   const openTask = useOpenTask();
   useRecordRecentTasks(openTask);
   useRememberAppPath();
+  // Your browser's time zone, for chat agents (U143).
+  useBrowserTimeZoneSync();
   const area = () => settingsArea(location.pathname, company().issuePrefix);
 
   const fullTaskPage = () => !search.task && isDetailPage(location.pathname, company().issuePrefix) && /\/issues\//.test(location.pathname);
