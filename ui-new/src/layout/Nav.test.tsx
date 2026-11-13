@@ -53,7 +53,10 @@ vi.mock("@/layout/nav-prefs", async (importOriginal) => ({
   useRecentTasks: () => () => [],
 }));
 
-vi.mock("@/agents/AgentStar", () => ({ useAgentStars: () => ({ memberships: { data: undefined }, starred: () => false, toggle: () => {} }) }));
+vi.mock("@/agents/AgentStar", () => ({
+  useAgentStars: () => ({ memberships: { data: undefined }, starred: () => false, toggle: () => {} }),
+  useAgentPinOrder: () => ({ order: () => [], save: () => {} }),
+}));
 vi.mock("@/onboarding/can-create", () => ({ useCanCreateCompany: () => () => ({ allowed: true }) }));
 vi.mock("@/org/actions", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/org/actions")>()),

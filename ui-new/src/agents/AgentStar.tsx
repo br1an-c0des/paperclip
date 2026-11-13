@@ -4,16 +4,19 @@ import { Star } from "lucide-solid";
 import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { resourceMembershipsApi } from "@/api/resource-memberships";
+import { createSignal } from "solid-js";
 import { useCompany } from "@/lib/company";
+import { useSession } from "@/lib/session";
 import { buttonClass } from "@/ui/Button";
 import { pushToast } from "@/ui/Toast";
-import { applyAgentMembership, isAgentStarred } from "./star-model";
+import { applyAgentMembership, isAgentStarred, parsePinOrder, pinOrderKey } from "./star-model";
 import "./AgentStar.css";
 
 /*
  * Your starred agents (agents/membership): the star on an agent's page and roster row, and the
  * Starred group in the nav (layout/Nav.tsx). Personal: nobody else sees your stars. The star turns
- * at once and turns back if the server says no (star-model.ts has the rules).
+ * at once and turns back if the server says no (star-model.ts has the rules). Since the 2026-11-13
+ * sync (U144) the Starred agents keep your own order, dragged in the nav (`useAgentPinOrder`).
  */
 
 export function useAgentStars() {
@@ -46,6 +49,61 @@ export function useAgentStars() {
     starred: (agentId: string) => isAgentStarred(memberships.data, agentId),
     toggle: (agent: { id: string; name: string }) =>
       toggle.mutate({ agentId: agent.id, name: agent.name, starred: !isAgentStarred(memberships.data, agent.id) }),
+  };
+}
+
+// Your order of starred agents, per person and company in this browser (star-model.ts `inPinOrder`).
+// One signal per storage key, shared by every nav that reads it, and kept in step with other tabs.
+const pinOrders = new Map<string, ReturnType<typeof createSignal<string[]>>>();
+let listening = false;
+
+function readStored(key: string) {
+  try {
+    return parsePinOrder(localStorage.getItem(key));
+  } catch {
+    return [];
+  }
+}
+
+function pinOrderSignal(key: string) {
+  let found = pinOrders.get(key);
+  if (!found) {
+    found = createSignal(readStored(key));
+    pinOrders.set(key, found);
+  }
+  if (!listening && typeof window !== "undefined") {
+    listening = true;
+    window.addEventListener("storage", (event) => {
+      if (event.key === null) pinOrders.forEach(([, set], stored) => set(readStored(stored)));
+      else pinOrders.get(event.key)?.[1](readStored(event.key));
+    });
+  }
+  return found;
+}
+
+/** Your own order of starred agents (upstream #20830): read, and save a new one from a drag. */
+export function useAgentPinOrder() {
+  const company = useCompany();
+  const session = useSession();
+  const key = () => {
+    const you = session.youId();
+    return you ? pinOrderKey(you, company().id) : null;
+  };
+  return {
+    order: () => {
+      const current = key();
+      return current ? pinOrderSignal(current)[0]() : [];
+    },
+    save: (ids: string[]) => {
+      const current = key();
+      if (!current) return;
+      pinOrderSignal(current)[1](ids);
+      try {
+        localStorage.setItem(current, JSON.stringify(ids));
+      } catch {
+        pushToast({ tone: "warn", title: "Couldn't keep this order", body: "This browser won't store it, so it lasts until the page reloads." });
+      }
+    },
   };
 }
 

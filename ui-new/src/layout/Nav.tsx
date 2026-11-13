@@ -8,6 +8,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Ellipsis,
+  GripVertical,
   Keyboard,
   LogOut,
   Moon,
@@ -48,6 +49,7 @@ import { buttonClass } from "@/ui/Button";
 import { Grain } from "@/ui/Grain";
 import { Menu } from "@/ui/Menu";
 import { ScrollList } from "@/ui/ScrollList";
+import { createSortable, type Sortable } from "@/ui/sortable";
 import { TaskStatusCapsule } from "@/ui/Status";
 import { navSection, setNavHidden, setNavMode, useCompanyOrder, useProjectStars, useRecentTasks } from "./nav-prefs";
 import { useNavLists } from "./nav-lists";
@@ -78,6 +80,8 @@ import "./Nav.css";
  * Your nav (nav-prefs.tsx): projects and agents you've starred sit in Starred above the rest; each
  * project's "…" moves it up or down (your order, kept on the server), stars it or leaves it (out of
  * your nav); each agent's "…" runs it now, pauses or resumes it (org/actions.ts) and stars it.
+ * Starred agents (the chat pins) are in your order: drag one by its grip, on a touch screen too, or
+ * lift it with Space and move it with the arrow keys (U144, upstream #20830; ui/sortable.ts).
  * Project rows wait until your order and stars have loaded, so they never reshuffle. Project and
  * agent rows are keyed by id, so a refetch updates them in place instead of rebuilding them (which
  * remounted the plugin items under each project and closed an open "…" menu); nav-lists.ts holds
@@ -328,6 +332,18 @@ export function Nav() {
     const agent = lists.latestAgent(id);
     return <Show when={agent()}>{(current) => <NavAgent agent={current()} base={base()} running={lists.running()} unread={lists.unreadChats.countFor(id)} />}</Show>;
   };
+  // Starred agents lead in your order, which you drag (U144).
+  const pinSort = createSortable({ ids: starredAgentIds, onReorder: (ids) => lists.reorderStarredAgents(ids) });
+  const starredAgentRow = (id: string) => {
+    const agent = lists.latestAgent(id);
+    return (
+      <Show when={agent()}>
+        {(current) => (
+          <NavAgent agent={current()} base={base()} running={lists.running()} unread={lists.unreadChats.countFor(id)} sortable={starredAgentIds().length > 1 ? pinSort : undefined} />
+        )}
+      </Show>
+    );
+  };
   const runningCount = lists.runningCount;
   const navAgents = lists.navAgents;
 
@@ -391,7 +407,7 @@ export function Nav() {
             <Show when={projectsArranged()}>
               <For each={starredProjectIds()}>{(id) => projectRow(id, starredProjects)}</For>
             </Show>
-            <For each={starredAgentIds()}>{agentRow}</For>
+            <For each={starredAgentIds()}>{starredAgentRow}</For>
           </NavSection>
         </Show>
 
@@ -513,14 +529,20 @@ function NavProject(props: { project: Project; base: string; list: Project[]; on
   );
 }
 
-function NavAgent(props: { agent: Agent; base: string; running: ReadonlySet<string>; unread: number }) {
+function NavAgent(props: { agent: Agent; base: string; running: ReadonlySet<string>; unread: number; sortable?: Sortable }) {
   const state = () => agentState(props.agent, props.running);
   const actions = useAgentActions();
   const stars = useAgentStars();
   const can = (action: "pause" | "resume" | "wake") => actionTargets(action, [props.agent]).length > 0;
   const starred = () => stars.starred(props.agent.id);
+  const offset = () => props.sortable?.offset(props.agent.id) ?? 0;
   return (
-    <div class="nav-row">
+    <div
+      class="nav-row"
+      classList={{ "nav-row--sortable": !!props.sortable, "nav-row--moving": !!props.sortable?.active(props.agent.id) }}
+      data-sort-row={props.sortable ? props.agent.id : undefined}
+      style={{ transform: offset() ? `translateY(${offset()}px)` : undefined }}
+    >
       <A class="navi navi--agent" href={`${props.base}/agents/${props.agent.urlKey}`}>
         <AgentAvatar agent={props.agent} size={24} ring={state().key === "running"} />
         <span class="navi-label">{props.agent.name}</span>
@@ -531,6 +553,23 @@ function NavAgent(props: { agent: Agent; base: string; running: ReadonlySet<stri
           {state().label}
         </span>
       </A>
+      <Show when={props.sortable}>
+        {(sortable) => (
+          <button
+            type="button"
+            class="nav-row-grip"
+            data-sort-handle
+            aria-label={`Reorder ${props.agent.name}`}
+            aria-pressed={sortable().lifted(props.agent.id)}
+            title="Drag to reorder"
+            onPointerDown={(event) => sortable().pointerDown(props.agent.id, event)}
+            onKeyDown={(event) => sortable().keyDown(props.agent.id, event)}
+            onFocusOut={(event) => sortable().focusOut(props.agent.id, event)}
+          >
+            <GripVertical size={14} aria-hidden="true" />
+          </button>
+        )}
+      </Show>
       <RowMenu label={`${props.agent.name}: actions`}>
         <Menu.Item icon={<Zap size={16} />} disabled={!can("wake") || actions.busy() !== null} description="Starts a heartbeat now" onSelect={() => void actions.wake([props.agent])}>
           Run now

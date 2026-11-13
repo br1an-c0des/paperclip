@@ -3,8 +3,8 @@ import { useLocation } from "@solidjs/router";
 import { createMemo } from "solid-js";
 import { activeAgents } from "@/api/agents";
 import { openProjects } from "@/api/projects";
-import { useAgentStars } from "@/agents/AgentStar";
-import { starredAgents } from "@/agents/star-model";
+import { useAgentPinOrder, useAgentStars } from "@/agents/AgentStar";
+import { inPinOrder, starredAgents } from "@/agents/star-model";
 import { openChatAgentKey } from "@/chat/chat-model";
 import { useUnreadChats } from "@/chat/chat-read";
 import { agentState, runningAgentIds, sortAgentsForNav } from "@/lib/agent-state";
@@ -25,6 +25,10 @@ import { visibleProjects } from "./nav-model";
  * plugin's config hid them, and an agent's open "…" menu closed. A row now stays mounted while its
  * project or agent is listed, follows the latest object for its id (`latestProject`,
  * `latestAgent`), and moves when the order changes (running agents go first).
+ *
+ * Starred agents are the chat pins (U66). Since the 2026-11-13 sync (U144, upstream #20830) they
+ * lead in your own order, which the full nav lets you drag (`reorderStarredAgents`), kept per person
+ * in this browser; agents starred since you last arranged them come first.
  */
 
 const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((id, index) => id === b[index]);
@@ -39,12 +43,17 @@ export function useNavLists() {
   const agents = useAgentsQuery();
   const liveRuns = useLiveRunsQuery();
   const stars = useAgentStars();
+  const pinOrder = useAgentPinOrder();
   const projectStars = useProjectStars();
   const projectOrder = useProjectOrder();
 
   const running = createMemo(() => runningAgentIds(liveRuns.data));
   const agentsById = createMemo(() => new Map(activeAgents(agents.data).map((agent) => [agent.id, agent] as const)));
-  const starred = createMemo(() => starredAgents(stars.memberships.data, [...agentsById().values()]));
+  const starred = createMemo(() => {
+    const list = starredAgents(stars.memberships.data, [...agentsById().values()]);
+    const byId = new Map(list.map((agent) => [agent.id, agent] as const));
+    return inPinOrder(list.map((agent) => agent.id), pinOrder.order()).map((id) => byId.get(id)!);
+  });
   const starredIds = createMemo(() => new Set(starred().map((agent) => agent.id)));
   const navAgents = createMemo(() => sortAgentsForNav([...agentsById().values()], running()));
   const otherAgents = createMemo(() => navAgents().filter((agent) => !starredIds().has(agent.id)));
@@ -72,6 +81,8 @@ export function useNavLists() {
     starredAgents: starred,
     otherAgents,
     starredAgentIds: idsOf(starred),
+    /** Saves your order of starred agents after a drag (U144). */
+    reorderStarredAgents: pinOrder.save,
     otherAgentIds: idsOf(otherAgents),
     unreadChats,
     shownProjects,
