@@ -12,14 +12,14 @@ import { useChatEndpoints } from "./parts";
 import "./Chat.css";
 
 /*
- * The chat endpoint pages under `/:prefix/apps/chat` (AppsPage hands them over): setting one up,
+ * The chat endpoint pages under `/:prefix/connections/chat` (AppsPage hands them over): setting one up,
  * and one endpoint's tabs. A provider the instance's flags turn off says so instead (AgentMail is
  * always on; GitHub follows `enableGitHubReviewBots`, the rest `enableChatConnectors`).
  */
 
 export function ChatRoutes(props: { route: ChatRoute }) {
   const company = useCompany();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   return (
     <Switch>
       <Match when={props.route.kind === "redirect" && props.route}>
@@ -40,7 +40,7 @@ export function ChatRoutes(props: { route: ChatRoute }) {
 
 function ConnectRoute() {
   const company = useCompany();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const [params] = useSearchParams<{ provider?: string; agentId?: string; resume?: string }>();
   const flags = useExperimentalSettingsQuery();
   const gallery = useGallery();
@@ -52,7 +52,7 @@ function ConnectRoute() {
         <section class="card ap-later">
           <h2 class="disp">Which chat app?</h2>
           <p>
-            Pick one from the gallery. <A href={base()}>Back to Apps</A>
+            Pick one from the gallery. <A href={base()}>Back to Connections</A>
           </p>
         </section>
       </Match>
@@ -66,7 +66,7 @@ function ConnectRoute() {
           <h2 class="disp">{providerName(provider()!)} chat is turned off</h2>
           <p>
             This Paperclip doesn't have {provider() === "github" ? "GitHub review bots" : "chat connectors"} turned on. An instance admin can turn it on in
-            the app settings' features. <A href={base()}>Back to Apps</A>
+            the app settings' features. <A href={base()}>Back to Connections</A>
           </p>
         </section>
       </Match>
@@ -77,7 +77,7 @@ function ConnectRoute() {
         <section class="card ap-later">
           <h2 class="disp">{providerName(provider()!)} can't be set up here yet</h2>
           <p>
-            Its setup needs steps this board doesn't have yet. <A href={base()}>Back to Apps</A>
+            Its setup needs steps this board doesn't have yet. <A href={base()}>Back to Connections</A>
           </p>
         </section>
       </Match>
@@ -92,7 +92,7 @@ function ConnectRoute() {
  */
 export function ChatEndpointGroup() {
   const company = useCompany();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const flags = useExperimentalSettingsQuery();
   const gallery = useGallery();
   const anyOn = () => flags.data?.enableChatConnectors === true || flags.data?.enableGitHubReviewBots === true;

@@ -13,8 +13,8 @@ import { ADVANCED_TABS, type MoreAppsView } from "./routes-model";
 import "./Advanced.css";
 
 /*
- * The Apps pages M6 round 3 adds (routes-model.ts): Assistants, Gateways, and Advanced (pasting an
- * MCP config, access profiles). AppsPage hands them the view for `/:prefix/apps/<rest>`.
+ * The Connections pages M6 round 3 adds (routes-model.ts): Assistants, Gateways, and Advanced (pasting an
+ * MCP config, access profiles). AppsPage hands them the view for `/:prefix/connections/<rest>`.
  *
  * Advanced isn't gated in the browser: the old UI's gate let every member but viewers in, and the
  * server answers 403 to anyone else, which the pages show.
@@ -35,7 +35,7 @@ export function MoreApps(props: { view: MoreAppsView }) {
   };
   return (
     <Switch>
-      <Match when={pick("redirect")}>{(view) => <Navigate href={`/${company().issuePrefix}/apps${view().to ? `/${view().to}` : ""}`} />}</Match>
+      <Match when={pick("redirect")}>{(view) => <Navigate href={`/${company().issuePrefix}/connections${view().to ? `/${view().to}` : ""}`} />}</Match>
       <Match when={pick("assistant")}>
         <AssistantConnection />
       </Match>
@@ -84,7 +84,7 @@ function AdvancedTabs(props: { active: string }) {
     <nav class="tl-subtabs" aria-label="Advanced">
       <For each={ADVANCED_TABS}>
         {(tab) => (
-          <A href={`/${company().issuePrefix}/apps/advanced/${tab.key}`} activeClass="" inactiveClass="" aria-current={props.active === tab.key ? "page" : undefined}>
+          <A href={`/${company().issuePrefix}/connections/advanced/${tab.key}`} activeClass="" inactiveClass="" aria-current={props.active === tab.key ? "page" : undefined}>
             {tab.label}
           </A>
         )}

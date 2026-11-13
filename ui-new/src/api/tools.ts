@@ -33,7 +33,7 @@ import type {
 import { api } from "./client";
 
 /*
- * Apps and tools (`/api/companies/:companyId/tools/*`, `/api/tool-connections/*`,
+ * Connections (`/api/companies/:companyId/tools/*`, `/api/tool-connections/*`,
  * `/api/tool-gateway/*`), as ui/src/api/tools.ts uses them for the pages ui-new has: the app
  * gallery and your connections, connecting an app (gallery, API key, OAuth, your own MCP server),
  * one connection's tools, agents, installs and settings, and the Ask-first review queue.

@@ -24,7 +24,7 @@ export const ACTION_DOMAINS: readonly { value: string; label: string }[] = [
   { value: "goal.", label: "Goals" },
   { value: "routine.", label: "Recurring tasks" },
   { value: "company.skill", label: "Skills" },
-  { value: "tool_", label: "Apps and tools" },
+  { value: "tool_", label: "Connections" },
   { value: "cost.", label: "Costs" },
   { value: "budget.", label: "Budgets" },
   { value: "company.", label: "Organization" },

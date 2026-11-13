@@ -120,9 +120,12 @@ describe("connection requests", () => {
     expect(superseded.verdict?.text).toBe("Replaced by a newer request");
   });
 
-  it("sends new connections to the app's setup in Apps", () => {
-    expect(setupHref("TES", { serviceSlug: "github" })).toBe("/TES/apps/connect?source=github");
-    expect(setupHref("TES", { serviceSlug: "agentmail", purpose: "channel" }, "/apps/chat/new?type=agentmail")).toBe("/TES/apps/chat/new?type=agentmail");
-    expect(setupHref("TES", { serviceSlug: "anthropic", purpose: "ai" })).toBe("/TES/apps/ai");
+  it("sends new connections to the app's setup in Connections, and the server's old /apps setup paths there too", () => {
+    expect(setupHref("TES", { serviceSlug: "github" })).toBe("/TES/connections/connect?source=github");
+    expect(setupHref("TES", { serviceSlug: "agentmail", purpose: "channel" }, "/apps/chat/new?type=agentmail")).toBe("/TES/connections/chat/new?type=agentmail");
+    expect(setupHref("TES", { serviceSlug: "anthropic", purpose: "ai" })).toBe("/TES/connections/ai");
+    expect(setupHref("TES", { serviceSlug: "slack", purpose: "channel" }, "/TES/apps/chat/connect?provider=slack&agentId=a1")).toBe(
+      "/TES/connections/chat/connect?provider=slack&agentId=a1",
+    );
   });
 });

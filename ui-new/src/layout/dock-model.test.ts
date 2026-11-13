@@ -149,7 +149,7 @@ describe("desktopArea", () => {
     expect(desktopArea("/TST/company/settings", "TST")).toBe("Settings");
     expect(desktopArea("/TST/company/settings/instance/account", "TST")).toBe("App settings");
     expect(desktopArea("/TST/projects/web/settings/budget", "TST")).toBe("Project settings");
-    expect(desktopArea("/TST/apps/advanced", "TST")).toBe("Apps");
+    expect(desktopArea("/TST/connections/advanced", "TST")).toBe("Connections");
     expect(desktopArea("/TST/skills", "TST")).toBe("Skills");
     expect(desktopArea("/TST/activity/runs", "TST")).toBe("Activity");
   });

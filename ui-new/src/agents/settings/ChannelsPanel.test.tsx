@@ -64,8 +64,8 @@ describe("ChannelsPanel", () => {
     expect(screen.queryByText("Telegram")).toBeNull();
     expect(screen.queryByText("Discord")).toBeNull();
     expect(screen.getAllByRole("link", { name: "Open" }).map((link) => link.getAttribute("href"))).toEqual([
-      "/TES/apps/chat/e1/settings",
-      "/TES/apps/chat/inbox-1/settings",
+      "/TES/connections/chat/e1/settings",
+      "/TES/connections/chat/inbox-1/settings",
     ]);
   });
 

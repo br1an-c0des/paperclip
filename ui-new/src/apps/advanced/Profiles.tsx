@@ -20,13 +20,13 @@ import { allowsLabel, assignedLabel, deleteBlocker, isAppProfile, STATUS_LABEL, 
 import { useProfiles } from "./queries";
 
 /*
- * Advanced → Access profiles (`/apps/advanced/profiles`, the old UI's ProfilesIndex): which tools a
+ * Advanced → Access profiles (`/connections/advanced/profiles`, the old UI's ProfilesIndex): which tools a
  * run gets. Each profile with what it allows and who has it; drafts resume in the wizard. Profiles
  * an app's setup made for itself (`app:<connectionId>`) are listed apart: their app's page manages
  * them. "Check an agent's access" shows what one agent can use right now, and why.
  */
 
-export const profilesBase = (prefix: string) => `/${prefix}/apps/advanced/profiles`;
+export const profilesBase = (prefix: string) => `/${prefix}/connections/advanced/profiles`;
 
 export function useProfileActions() {
   const refresh = useRefreshTools();
@@ -186,7 +186,7 @@ export function ProfilesIndex(props: { checkOpen?: boolean }) {
                         {allowsLabel(profile.summary)} · {assignedLabel(profile.summary).text}
                       </span>
                     </div>
-                    <A class="tl-rowlink" href={`/${company().issuePrefix}/apps/${profile.profileKey.slice("app:".length)}/permissions`}>
+                    <A class="tl-rowlink" href={`/${company().issuePrefix}/connections/${profile.profileKey.slice("app:".length)}/permissions`}>
                       Open the app
                     </A>
                   </li>

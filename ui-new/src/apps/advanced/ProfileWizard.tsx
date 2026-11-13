@@ -49,8 +49,8 @@ import { profilesBase } from "./Profiles";
 import { useCompanyCatalog, useProfiles, useTargetNames } from "./queries";
 
 /*
- * New access profile, or finishing one (`/apps/advanced/profiles/new?template=…`,
- * `/apps/advanced/profiles/:id/edit?step=…`, the old UI's ProfileWizard), in three steps:
+ * New access profile, or finishing one (`/connections/advanced/profiles/new?template=…`,
+ * `/connections/advanced/profiles/:id/edit?step=…`, the old UI's ProfileWizard), in three steps:
  *
  * 1. Name: a starting point (a template or another profile), its name and description.
  * 2. Choose tools: per app, all of its tools (and ones it adds later), all but some, or a few; whether
@@ -195,7 +195,7 @@ export function ProfileWizard(props: { profileId?: string; template: TemplateKey
           size="compact"
           crumbs={
             <>
-              <A href={`/${company().issuePrefix}/apps/advanced`}>Advanced</A>
+              <A href={`/${company().issuePrefix}/connections/advanced`}>Advanced</A>
               <span aria-hidden="true">/</span>
               <A href={base()}>Access profiles</A>
             </>
@@ -422,7 +422,7 @@ function ToolsStep(props: {
           </Match>
           <Match when={props.groups.length === 0}>
             <p class="ap-empty">
-              No connected app has tools yet. <A href={`/${company().issuePrefix}/apps`}>Connect an app</A>, then come back; you can save this as a draft meanwhile.
+              No connected app has tools yet. <A href={`/${company().issuePrefix}/connections`}>Connect an app</A>, then come back; you can save this as a draft meanwhile.
             </p>
           </Match>
           <Match when={true}>

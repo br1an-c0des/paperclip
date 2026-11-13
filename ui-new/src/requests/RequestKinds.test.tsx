@@ -95,14 +95,14 @@ describe("connection requests", () => {
     const use = await screen.findByRole("button", { name: "Use this connection" });
     // The one connection there is comes picked.
     await waitFor(() => expect((use as HTMLButtonElement).disabled).toBe(false));
-    expect(screen.getByRole("link", { name: /Set up a new one/ }).getAttribute("href")).toBe("/TRA/apps/connect?source=github");
+    expect(screen.getByRole("link", { name: /Set up a new one/ }).getAttribute("href")).toBe("/TRA/connections/connect?source=github");
     fireEvent.click(use);
     await waitFor(() => expect(api.complete).toHaveBeenCalledWith("ci1", "conn1"));
     fireEvent.click(screen.getByRole("button", { name: "Not now" }));
     await waitFor(() => expect(api.decline).toHaveBeenCalledWith("ci1"));
   });
 
-  it("marks the request authorizing when setup opens in Apps", async () => {
+  it("marks the request authorizing when setup opens in Connections", async () => {
     api.setupOptions.mockResolvedValue({ version: 1, interaction: intent, service: { methods: [] }, existingConnections: [], requestedAgentId: "a1" });
     mount(requestFromInteraction(intent, ctx));
     const connect = await screen.findByRole("link", { name: /Connect GitHub/ });

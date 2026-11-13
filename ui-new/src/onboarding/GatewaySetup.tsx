@@ -166,7 +166,7 @@ function GatewayForm(props: {
             checked={draft.allAgents}
             onChange={(on) => setDraft("allAgents", on)}
             label="Every agent"
-            description={draft.allAgents ? "Current and future agents can use it." : "Only this agent, for now. You can add others in Apps."}
+            description={draft.allAgents ? "Current and future agents can use it." : "Only this agent, for now. You can add others in Connections."}
           />
         </Show>
 

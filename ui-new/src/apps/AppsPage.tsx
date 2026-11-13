@@ -20,36 +20,36 @@ import "@/connectors/Connectors.css";
 import "./Apps.css";
 
 /*
- * `/:prefix/apps/*`, the organization's Apps tab (Tier 2, the old UI's Apps and tools pages):
+ * `/:prefix/connections/*`, the organization's Connections tab (Tier 2, once Apps; the old UI's Apps and tools pages):
  *
- * - Browse (`/apps`): your connections, then the gallery of apps to connect.
- * - AI connections (`/apps/ai`): the accounts agents run on. This was the temporary Connectors page
+ * - Browse (`/connections`): your connections, then the gallery of apps to connect.
+ * - AI connections (`/connections/ai`): the accounts agents run on. This was the temporary Connectors page
  *   (decision 23); `/connectors` sends you here.
- * - Review (`/apps/review`): Ask-first app calls waiting for your OK.
- * - Connect (`/apps/connect?source=…`, `/apps/vercel-connect`, `/apps/byo`, `/apps/app/:applicationId`):
+ * - Review (`/connections/review`): Ask-first app calls waiting for your OK.
+ * - Connect (`/connections/connect?source=…`, `/connections/vercel-connect`, `/connections/byo`, `/connections/app/:applicationId`):
  *   a gallery app, one through a Vercel connector, your own MCP server, or one more account for an
- *   app you have. `/apps/connect?aiLogin=<sessionId>` finishes an AI sign-in started for you
+ *   app you have. `/connections/connect?aiLogin=<sessionId>` finishes an AI sign-in started for you
  *   (ResumeAiLogin.tsx).
- * - A connection (`/apps/:connectionId/:tab`): its tools and who may use them, its review queue, and
+ * - A connection (`/connections/:connectionId/:tab`): its tools and who may use them, its review queue, and
  *   its settings.
  *
- * - Assistants (`/apps/assistant-connection`), Gateways (`/apps/gateways/*`) and Advanced
- *   (`/apps/advanced/*`: pasting an MCP config, access profiles): src/apps/advanced/MoreApps.tsx.
+ * - Assistants (`/connections/assistant-connection`), Gateways (`/connections/gateways/*`) and Advanced
+ *   (`/connections/advanced/*`: pasting an MCP config, access profiles): src/apps/advanced/MoreApps.tsx.
  *
  * The old UI's chat endpoint pages aren't here yet; their addresses say so.
  */
 
-/** `/:prefix/connectors`, the temporary Connectors page's address: its content is AI connections now. */
+/** `/:prefix/connectors`, the temporary Connectors page's address: its content is Connections → AI connections now. */
 export function ConnectorsRedirect() {
   const company = useCompany();
-  return <Navigate href={`/${company().issuePrefix}/apps/ai`} />;
+  return <Navigate href={`/${company().issuePrefix}/connections/ai`} />;
 }
 
 export function AppsPage() {
   const params = useParams<{ rest?: string }>();
   const location = useLocation();
   const company = useCompany();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const view = createMemo(() => appsView(params.rest ?? ""));
   const more = createMemo(() => moreAppsView(params.rest ?? ""));
   const pending = usePendingRequests();
@@ -76,10 +76,10 @@ export function AppsPage() {
   return (
     <Show when={!redirect()} fallback={<Navigate href={target(redirect()!.to)} />}>
       <div class="org-page act-page ap-page">
-        <Show when={!isCompact()} fallback={<h1 class="org-phone-title disp">Apps</h1>}>
+        <Show when={!isCompact()} fallback={<h1 class="org-phone-title disp">Connections</h1>}>
           <OrgHeader />
         </Show>
-        <nav class="act-subnav" aria-label="Apps">
+        <nav class="act-subnav" aria-label="Connections">
           <A href={base()} activeClass="" inactiveClass="" classList={{ active: tab() === "browse" }} aria-current={tab() === "browse" ? "page" : undefined}>
             Browse
           </A>
@@ -137,7 +137,7 @@ export function AppsPage() {
               <section class="card ap-later">
                 <h2 class="disp">{current().name} isn't here yet</h2>
                 <p>
-                  This part of Apps and tools comes in a later round. <A href={base()}>Back to Apps</A>
+                  This part of Connections comes in a later round. <A href={base()}>Back to Connections</A>
                 </p>
               </section>
             )}

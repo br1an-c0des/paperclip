@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { caseLinkTarget, companyLegacyTarget, identifierPrefix, isUuid, legacyToolsTarget, projectLegacyTab, withSearchAndHash } from "./legacy-model";
+import { caseLinkTarget, companyLegacyTarget, connectionsAddress, identifierPrefix, isUuid, legacyToolsTarget, projectLegacyTab, withSearchAndHash } from "./legacy-model";
 
 describe("identifierPrefix", () => {
   it("reads the company prefix of a task or case identifier", () => {
@@ -35,10 +35,10 @@ describe("withSearchAndHash", () => {
 
 describe("legacyToolsTarget", () => {
   it("follows the old UI's Tools redirects", () => {
-    expect(legacyToolsTarget()).toBe("apps/advanced/profiles");
-    expect(legacyToolsTarget("connections")).toBe("apps");
-    expect(legacyToolsTarget("policies")).toBe("apps/advanced/profiles");
-    expect(legacyToolsTarget("mcp")).toBe("apps/advanced/mcp");
+    expect(legacyToolsTarget()).toBe("connections/advanced/profiles");
+    expect(legacyToolsTarget("connections")).toBe("connections");
+    expect(legacyToolsTarget("policies")).toBe("connections/advanced/profiles");
+    expect(legacyToolsTarget("mcp")).toBe("connections/advanced/mcp");
   });
 });
 
@@ -54,9 +54,9 @@ describe("companyLegacyTarget", () => {
     ["approvals", "inbox"],
     ["approvals/pending", "inbox"],
     ["goals", "dashboard"],
-    ["tools", "apps/advanced/profiles"],
-    ["tools/overview", "apps"],
-    ["company/settings/tools/mcp", "apps/advanced/mcp"],
+    ["tools", "connections/advanced/profiles"],
+    ["tools/overview", "connections"],
+    ["company/settings/tools/mcp", "connections/advanced/mcp"],
     ["companies", "/companies"],
     ["board-chat", "chats"],
     ["artifacts", "search?scope=artifacts"],
@@ -103,5 +103,27 @@ describe("projectLegacyTab", () => {
     expect(projectLegacyTab("workspaces")).toBe("settings/code");
     expect(projectLegacyTab("workspaces/w1")).toBe("settings/code");
     expect(projectLegacyTab("issues")).toBeNull();
+  });
+});
+
+describe("connectionsAddress", () => {
+  it("moves Apps' old addresses under Connections, keeping the path, query and fragment", () => {
+    expect(connectionsAddress("/TES/apps")).toBe("/TES/connections");
+    expect(connectionsAddress("/TES/apps/")).toBe("/TES/connections/");
+    expect(connectionsAddress("/TES/apps/ai?x=1#y")).toBe("/TES/connections/ai?x=1#y");
+    expect(connectionsAddress("/TES/apps?success=1")).toBe("/TES/connections?success=1");
+    expect(connectionsAddress("/TES/apps#top")).toBe("/TES/connections#top");
+    // What the server builds: OAuth returns, a setup path, an AI sign-in link.
+    expect(connectionsAddress("/TES/apps/c1/permissions?oauth=failed&code=x")).toBe("/TES/connections/c1/permissions?oauth=failed&code=x");
+    expect(connectionsAddress("/TES/apps/chat/connect?provider=github&resume=e1")).toBe("/TES/connections/chat/connect?provider=github&resume=e1");
+    expect(connectionsAddress("/TES/apps/connect?aiLogin=s1")).toBe("/TES/connections/connect?aiLogin=s1");
+  });
+
+  it("leaves every other address alone", () => {
+    expect(connectionsAddress("/TES/connections/ai")).toBe("/TES/connections/ai");
+    expect(connectionsAddress("/TES/apps-extra")).toBe("/TES/apps-extra");
+    expect(connectionsAddress("/TES/skills/apps")).toBe("/TES/skills/apps");
+    expect(connectionsAddress("/TES/issues?q=/apps")).toBe("/TES/issues?q=/apps");
+    expect(connectionsAddress("/TES")).toBe("/TES");
   });
 });

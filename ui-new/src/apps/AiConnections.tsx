@@ -27,8 +27,8 @@ import { canLookUpIdentity, identityMessage, identityRetryable } from "./ai-iden
 import { PoolsCard } from "./pools/Pools";
 
 /*
- * Apps → AI connections (`/:prefix/apps/ai`): the company's AI accounts, which agents run on. This
- * was the temporary Connectors page (decision 23), folded into Apps; `/:prefix/connectors` sends you
+ * Connections → AI connections (`/:prefix/connections/ai`): the company's AI accounts, which agents run on. This
+ * was the temporary Connectors page (decision 23), folded into Connections (then Apps); `/:prefix/connectors` sends you
  * here. There's no board: it's built from the design system's components.
  *
  * Lists every connection you can use (`GET ai-connections`), lets you make your own personal one

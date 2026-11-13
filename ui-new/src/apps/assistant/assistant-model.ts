@@ -1,7 +1,7 @@
 import type { McpConnection } from "@paperclipai/shared";
 
 /*
- * View model for Apps → Assistants (`/apps/assistant-connection`, the old UI's
+ * View model for Connections → Assistants (`/connections/assistant-connection`, the old UI's
  * AssistantConnection): the invitation and setup steps for each assistant, and the connections that
  * are yours in this organization.
  *

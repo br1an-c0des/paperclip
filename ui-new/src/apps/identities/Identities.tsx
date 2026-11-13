@@ -84,7 +84,7 @@ export function ConnectionIdentities(props: { connection: ToolConnection }) {
       if (!userId) throw new Error("Sign in as a person to connect your own account.");
       const start = await connectionGrantsApi.startPersonal(company().id, props.connection.id, {
         subjectUserId: userId,
-        returnTo: `/${company().issuePrefix}/apps/${props.connection.id}/permissions`,
+        returnTo: `/${company().issuePrefix}/connections/${props.connection.id}/permissions`,
       });
       if (start.handoff) throw new Error("This app signs in through Paperclip Cloud, which this board can't hand off to yet.");
       window.location.assign(start.url);

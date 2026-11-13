@@ -20,7 +20,7 @@ import { addressProblem, inboxDomains, suggestUsername } from "./email-model";
 import { readNote } from "@/lib/offline/read-state";
 
 /*
- * Giving an agent an email address (`/apps/chat/connect?provider=agentmail`, the old UI's
+ * Giving an agent an email address (`/connections/chat/connect?provider=agentmail`, the old UI's
  * EmailEndpointSetup), in two steps:
  *
  * 1. Account: the agent, and an AgentMail account: a saved one, or a new API key (checked, then
@@ -43,7 +43,7 @@ export function EmailSetup(props: { app: AppDefinition | null; agentId: string |
   const company = useCompany();
   const client = useQueryClient();
   const navigate = useNavigate();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const agents = useAgentsQuery();
   const choices = () => activeAgents(agents.data).filter((agent) => agent.status !== "pending_approval");
   const [step, setStep] = createSignal<Step>("account");

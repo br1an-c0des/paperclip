@@ -30,7 +30,7 @@ import { CheckAccessDialog, ProfileActionDialog, profilesBase, useProfileActions
 import { useCompanyCatalog, useProfiles, useTargetNames } from "./queries";
 
 /*
- * One access profile (`/apps/advanced/profiles/:id`, the old UI's ProfileDetail): what it allows,
+ * One access profile (`/connections/advanced/profiles/:id`, the old UI's ProfileDetail): what it allows,
  * tool by tool and why; who has it; whether tools an app adds later are allowed; and the new tools
  * waiting for review. Editing its tools or assignments opens the wizard at that step.
  * `?created=1` greets a profile the wizard just saved; `?review=new-tools` opens the review.
@@ -95,7 +95,7 @@ export function ProfileDetail(props: { profileId: string; created: boolean; revi
                 size="compact"
                 crumbs={
                   <>
-                    <A href={`/${company().issuePrefix}/apps/advanced`}>Advanced</A>
+                    <A href={`/${company().issuePrefix}/connections/advanced`}>Advanced</A>
                     <span aria-hidden="true">/</span>
                     <A href={base()}>Access profiles</A>
                   </>
@@ -133,7 +133,7 @@ export function ProfileDetail(props: { profileId: string; created: boolean; revi
               <Show when={appConnection()}>
                 {(id) => (
                   <p class="card cx-note ap-flash">
-                    An app's setup made this profile. Change its actions and who uses it from <A href={`/${company().issuePrefix}/apps/${id()}/permissions`}>the app's page</A>.
+                    An app's setup made this profile. Change its actions and who uses it from <A href={`/${company().issuePrefix}/connections/${id()}/permissions`}>the app's page</A>.
                   </p>
                 )}
               </Show>
@@ -188,7 +188,7 @@ export function ProfileDetail(props: { profileId: string; created: boolean; revi
                             </span>
                           </div>
                           <Show when={row.degraded}>
-                            <A class="tl-rowlink" href={`/${company().issuePrefix}/apps/${row.connectionId}/permissions`}>
+                            <A class="tl-rowlink" href={`/${company().issuePrefix}/connections/${row.connectionId}/permissions`}>
                               Reconnect
                             </A>
                           </Show>
@@ -229,7 +229,7 @@ export function ProfileDetail(props: { profileId: string; created: boolean; revi
                         <Switch>
                           <Match when={binding.targetType === "gateway"}>
                             <Show when={targets.names().gateways.has(binding.targetId)}>
-                              <RowLink href={`/${company().issuePrefix}/apps/gateways/${binding.targetId}/overview`}>Open the gateway</RowLink>
+                              <RowLink href={`/${company().issuePrefix}/connections/gateways/${binding.targetId}/overview`}>Open the gateway</RowLink>
                             </Show>
                           </Match>
                           <Match when={true}>

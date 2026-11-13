@@ -25,7 +25,7 @@ import {
 } from "./assistant-model";
 
 /*
- * Apps → Assistants (`/apps/assistant-connection`, the old UI's AssistantConnection): connect an
+ * Connections → Assistants (`/connections/assistant-connection`, the old UI's AssistantConnection): connect an
  * outside assistant (Codex, Claude Code, OpenCode, a browser assistant or a headless client) to
  * Paperclip's MCP endpoint, then see and revoke the assistants connected as you.
  *

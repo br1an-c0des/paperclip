@@ -71,7 +71,7 @@ const PAGE = 24;
 export function CatalogSection(props: { rows: CatalogRow[]; source: CatalogSource; gateways: Record<AggregatorId, ToolConnection[]>; loading: boolean; searching: boolean }) {
   const company = useCompany();
   const navigate = useNavigate();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const [shown, setShown] = createSignal(PAGE);
   const [connecting, setConnecting] = createSignal<CatalogRow | null>(null);
   const [managing, setManaging] = createSignal<CatalogRow | null>(null);
@@ -148,7 +148,7 @@ export function CatalogSection(props: { rows: CatalogRow[]; source: CatalogSourc
 export function CatalogConnectDialog(props: { row: CatalogRow; routes: CatalogRoute[]; gateways: Record<AggregatorId, ToolConnection[]>; onClose: () => void }) {
   const company = useCompany();
   const navigate = useNavigate();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const [route, setRoute] = createSignal<CatalogRoute | null>(props.routes.length === 1 ? props.routes[0]! : null);
   const choose = (next: CatalogRoute) => {
     if (props.gateways[next.provider].length === 0) {
@@ -226,7 +226,7 @@ function ComposioSetup(props: { row: CatalogRow; route: CatalogRoute; gateways: 
   }));
   const setupNew = () => {
     props.onClose();
-    navigate(gatewaySetupHref(`/${company().issuePrefix}/apps`, props.route));
+    navigate(gatewaySetupHref(`/${company().issuePrefix}/connections`, props.route));
   };
   return (
     <div class="ap-dialog-body">
@@ -297,7 +297,7 @@ function ArcadeContinue(props: { row: CatalogRow; route: CatalogRoute; gateways:
     <div class="ap-dialog-body">
       <p class="cx-note">Your Arcade gateway is saved. {props.row.name}'s sign-in is managed inside Arcade; an agent may also be asked to authorize it the first time it uses a tool.</p>
       <GatewayPicker id="ap-catalog-arcade" provider="arcade" gateways={props.gateways} value={gateway()?.id ?? ""} onChange={setSelected} />
-      <A class="cx-link" href={gatewaySetupHref(`/${company().issuePrefix}/apps`, props.route)} onClick={props.onClose}>
+      <A class="cx-link" href={gatewaySetupHref(`/${company().issuePrefix}/connections`, props.route)} onClick={props.onClose}>
         Set up another Arcade gateway
       </A>
       <div class="cx-actions">
@@ -324,7 +324,7 @@ function ArcadeContinue(props: { row: CatalogRow; route: CatalogRoute; gateways:
 export function CatalogManageDialog(props: { row: CatalogRow; gateways: Record<AggregatorId, ToolConnection[]>; onClose: () => void }) {
   const company = useCompany();
   const client = useQueryClient();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const all = () => [...props.gateways.composio, ...props.gateways.arcade];
   const groups = createMemo(() =>
     all()

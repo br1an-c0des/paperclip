@@ -320,8 +320,8 @@ describe("connecting", () => {
   });
 
   it("sets a connection up again where its credentials come from", () => {
-    expect(connectHref("/TES/apps", "posthog", { resume: "c1" }, "vercel_connect")).toBe("/TES/apps/vercel-connect?source=posthog&resume=c1");
-    expect(connectHref("/TES/apps", "posthog", { resume: "c1" }, "paperclip_vault")).toBe("/TES/apps/connect?source=posthog&resume=c1");
+    expect(connectHref("/TES/connections", "posthog", { resume: "c1" }, "vercel_connect")).toBe("/TES/connections/vercel-connect?source=posthog&resume=c1");
+    expect(connectHref("/TES/connections", "posthog", { resume: "c1" }, "paperclip_vault")).toBe("/TES/connections/connect?source=posthog&resume=c1");
   });
 
   it("asks for your own OAuth client only where it's needed", () => {

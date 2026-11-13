@@ -1,4 +1,5 @@
 import type { Announcement, AnnouncementAction } from "@paperclipai/shared";
+import { connectionsAddress } from "@/routes/legacy-model";
 
 /*
  * The rules behind announcements (ui/src/hooks/useAnnouncement.ts, lib/announcement-dismissals.ts):
@@ -43,9 +44,9 @@ export function showableAnnouncement(payload: unknown, now = Date.now()): Announ
   return payload as Announcement;
 }
 
-/** Where an action goes: route actions are pages in the current company. */
+/** Where an action goes: route actions are pages in the current company (`/apps` is Connections now). */
 export function actionHref(action: AnnouncementAction, companyPrefix: string) {
-  return action.kind === "external" ? action.url : `/${companyPrefix}${action.path}`;
+  return action.kind === "external" ? action.url : connectionsAddress(`/${companyPrefix}${action.path}`);
 }
 
 // ---------------------------------------------------------------------------------------------

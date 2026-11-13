@@ -9,7 +9,7 @@ import type { InstanceExperimentalSettingsWithManaged, InstanceFeatureKey, Patch
  * it's sorted here.
  *
  * Agent chat (`enableAgentChat`) has no switch: upstream made it a compatibility key the server
- * always reads as on (#19360, U57), so it's built in like Apps.
+ * always reads as on (#19360, U57), so it's built in like Connections (once Apps).
  *
  * Switches save with `PATCH /api/instance/settings/experimental`, the flag's key and its new value.
  * Two kinds of requirement:
@@ -127,7 +127,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
     ],
   },
   {
-    title: "Apps and tools",
+    title: "Connections",
     flags: [
       {
         key: "enablePublicMcp",
@@ -202,7 +202,7 @@ export const LEFT_OUT: Partial<Record<InstanceFeatureKey, string>> = {
   enableArtifactsV1: "Dropped: the artifact boards set the presentation.",
   enableConferenceRoomChat: "Dropped: team chat has no surface.",
   // Built in (decision 12): ui-new always has the feature.
-  enableApps: "Built in: a compatibility key; Apps is always on.",
+  enableApps: "Built in: a compatibility key; Connections (once Apps) is always on.",
   enableAgentChat: "Built in: a compatibility key the server always reads as on (U57, upstream #19360).",
   enableMcpAggregators: "Built in: a compatibility key the server always reads as on.",
   enableEnvironments: "Built in: Environments is a company settings section.",

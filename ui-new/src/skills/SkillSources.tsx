@@ -30,7 +30,7 @@ import { CandidateList, ChooseSkillsDialog, ConnectionField, ProjectRepositories
  * from that exact commit (`POST …/skill-sources`). The repositories the company's GitHub
  * connections can read are offered as picks; when more than one connection can read the chosen
  * repository, the person picks whose access is used. Private repositories need a GitHub
- * connection, which is set up under Apps. A source failing for its connection offers Choose a
+ * connection, which is set up in Connections. A source failing for its connection offers Choose a
  * connection (its settings).
  */
 

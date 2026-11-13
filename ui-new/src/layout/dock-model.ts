@@ -52,7 +52,7 @@ export function dockPlace(pathname: string, prefix: string): DockPlace | null {
  * "Org dashboard"): the dashboard, the agents roster (not an agent's own page), workload, and the
  * org tabs' other pages. Settings isn't one: it opens from the dashboard header and the palette.
  */
-const ORG_PAGES = /^\/(?:dashboard|org|agents|workload|skills|apps|activity)(?:\/|$)/;
+const ORG_PAGES = /^\/(?:dashboard|org|agents|workload|skills|connections|activity)(?:\/|$)/;
 
 export function isOrgPage(pathname: string, prefix: string): boolean {
   const path = companyPath(pathname, prefix);
@@ -90,7 +90,7 @@ export function detailParent(pathname: string, prefix: string): string {
 
 /**
  * Screens outside the phone's scope (design/mobile.md, "Scope": settings of every kind, and the
- * org's Apps, Skills and Activity tabs): they still open, under an "On desktop" note. Returns what
+ * org's Connections, Skills and Activity tabs): they still open, under an "On desktop" note. Returns what
  * to call the area, or null.
  */
 export function desktopArea(pathname: string, prefix: string): string | null {
@@ -101,7 +101,7 @@ export function desktopArea(pathname: string, prefix: string): string | null {
   if (/^\/projects\/[^/]+\/settings(?:\/|$)/.test(path)) return "Project settings";
   const agent = /^\/agents\/[^/]+\/(.+)$/.exec(path);
   if (agent && !isOrgPage(pathname, prefix) && agentView(agent[1]!)?.view === "settings") return "Agent settings";
-  if (/^\/apps(?:\/|$)/.test(path)) return "Apps";
+  if (/^\/connections(?:\/|$)/.test(path)) return "Connections";
   if (/^\/skills(?:\/|$)/.test(path)) return "Skills";
   if (/^\/activity(?:\/|$)/.test(path)) return "Activity";
   return null;

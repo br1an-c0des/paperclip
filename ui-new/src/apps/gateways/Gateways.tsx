@@ -19,7 +19,7 @@ import { failureText, useApplications, useConnections } from "../shared";
 import { allowedToolsLabel, endpointUrl, gatewayApps, isOn, lastUsed, scopeLabel, tokensLabel } from "./gateway-model";
 
 /*
- * Apps → Gateways (`/apps/gateways`, the old UI's GatewaysList): every gateway with its address,
+ * Connections → Gateways (`/connections/gateways`, the old UI's GatewaysList): every gateway with its address,
  * scope, apps, tokens and last use, and a switch that turns the whole gateway off. New gateway asks
  * for a name and the access profile that decides its tools.
  */
@@ -60,7 +60,7 @@ export function GatewaysList() {
   const toggle = useGatewayToggle();
   const [query, setQuery] = createSignal("");
   const [creating, setCreating] = createSignal(false);
-  const base = () => `/${company().issuePrefix}/apps/gateways`;
+  const base = () => `/${company().issuePrefix}/connections/gateways`;
 
   const agentNames = createMemo(() => new Map((agents.data ?? []).map((agent) => [agent.id, agent.name])));
   const projectNames = createMemo(() => new Map((projects.data ?? []).map((project) => [project.id, project.name])));
@@ -226,7 +226,7 @@ export function GatewayDialog(props: { open: boolean; onOpenChange: (open: boole
           help={
             options().length === 0 && profiles.isSuccess ? (
               <>
-                No access profiles yet. <A href={`/${company().issuePrefix}/apps/advanced/profiles/new`}>Create one</A> first.
+                No access profiles yet. <A href={`/${company().issuePrefix}/connections/advanced/profiles/new`}>Create one</A> first.
               </>
             ) : (
               "Decides which tools this gateway allows. You can change it later."
@@ -251,7 +251,7 @@ export function GatewayDialog(props: { open: boolean; onOpenChange: (open: boole
         </Field>
         <Show when={!props.gateway}>
           <p class="cx-note">
-            Need a profile with different tools? <A href={`/${company().issuePrefix}/apps/advanced/profiles`}>Access profiles</A> are under Advanced.
+            Need a profile with different tools? <A href={`/${company().issuePrefix}/connections/advanced/profiles`}>Access profiles</A> are under Advanced.
           </p>
         </Show>
         <button type="submit" hidden />

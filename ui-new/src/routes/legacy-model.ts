@@ -33,14 +33,26 @@ export function withSearchAndHash(target: string, search: string, hash: string) 
 }
 
 /**
- * The old developer Tools pages moved under Apps → Advanced (ui/src/App.tsx,
+ * The old developer Tools pages moved under Connections → Advanced (ui/src/App.tsx,
  * `legacyToolsRedirectTarget`); relative to `/:prefix/`.
  */
 export function legacyToolsTarget(tab?: string | null) {
-  if (!tab) return "apps/advanced/profiles";
-  if (["applications", "connections", "overview", "examples", "runtime", "audit"].includes(tab)) return "apps";
-  if (tab === "policies") return "apps/advanced/profiles";
-  return `apps/advanced/${encodeURIComponent(tab)}`;
+  if (!tab) return "connections/advanced/profiles";
+  if (["applications", "connections", "overview", "examples", "runtime", "audit"].includes(tab)) return "connections";
+  if (tab === "policies") return "connections/advanced/profiles";
+  return `connections/advanced/${encodeURIComponent(tab)}`;
+}
+
+/**
+ * Apps was renamed Connections, and its pages moved from `/:prefix/apps/…` to
+ * `/:prefix/connections/…`. The old addresses stay in use: the server builds them (OAuth returns,
+ * a setup's `setupPath`, an AI sign-in link, a gateway's Tokens page), agents write them in
+ * comments, and the old UI and bookmarks have them. Given a company address (`/TES/apps/ai?x=1#y`),
+ * returns it under `/connections/` with the rest of it (path, query and fragment) kept as is; any
+ * other address comes back unchanged.
+ */
+export function connectionsAddress(address: string) {
+  return address.replace(/^(\/[^/?#]+)\/apps(?=[/?#]|$)/, "$1/connections");
 }
 
 const OLD_TASK_VIEWS = new Set(["active", "all", "backlog", "done"]);

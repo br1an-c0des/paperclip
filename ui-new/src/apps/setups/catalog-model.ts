@@ -14,7 +14,7 @@ import { aggregatorOf, type AggregatorId } from "./setups-model";
  *   These are observations: they don't give agents access, the gateway's actions do.
  * - Connecting one goes through a saved gateway: Composio connects the app in place (start, sign in
  *   to the app in Composio, then confirm); Arcade sends you to Arcade. With no gateway yet, Connect
- *   sets one up first (`/apps/connect?source=composio|arcade`).
+ *   sets one up first (`/connections/connect?source=composio|arcade`).
  *
  * Executor routes appear in the catalog only from observed accounts, and ui-new has no Executor
  * gateway setup, so they're left out.

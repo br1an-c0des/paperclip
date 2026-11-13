@@ -28,7 +28,7 @@ import {
 } from "./connection-model";
 import { createLocalLogin } from "./local-login";
 import { readNote } from "@/lib/offline/read-state";
-// Its own styles: New agent opens this dialog too, without the Apps pages.
+// Its own styles: New agent opens this dialog too, without the Connections pages.
 import "./Connectors.css";
 
 /*

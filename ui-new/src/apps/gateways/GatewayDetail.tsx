@@ -41,7 +41,7 @@ import {
 import { GatewayDialog, useGatewayToggle, useRefreshGateways } from "./Gateways";
 
 /*
- * One gateway (`/apps/gateways/:gatewayId/:tab`, the old UI's GatewayDetail):
+ * One gateway (`/connections/gateways/:gatewayId/:tab`, the old UI's GatewayDetail):
  *
  * - Overview: on or off, its apps, tokens and health, who can use it, and how a client connects.
  * - Apps and tools: the apps its access profile includes, each linking to its connection.
@@ -69,7 +69,7 @@ export function GatewayDetail(props: { gatewayId: string; tab: GatewayTab }) {
   const [snippets, setSnippets] = createSignal(false);
   // Tokens issued on this page, whose secret can still fill a snippet.
   const [issued, setIssued] = createSignal<ToolMcpGatewayTokenCreated[]>([]);
-  const base = () => `/${company().issuePrefix}/apps/gateways`;
+  const base = () => `/${company().issuePrefix}/connections/gateways`;
   const gateway = createMemo(() => gateways.data?.gateways.find((entry) => entry.id === props.gatewayId) ?? null);
   const profile = createMemo(() => profiles.data?.profiles.find((entry) => entry.id === gateway()?.profileId));
   const apps = createMemo(() => gatewayApps(profile(), applications.data?.applications ?? [], connections.data?.connections ?? []));
@@ -113,7 +113,7 @@ export function GatewayDetail(props: { gatewayId: string; tab: GatewayTab }) {
                 size="compact"
                 crumbs={
                   <>
-                    <A href={`/${company().issuePrefix}/apps`}>Apps</A>
+                    <A href={`/${company().issuePrefix}/connections`}>Connections</A>
                     <span aria-hidden="true">/</span>
                     <A href={base()}>Gateways</A>
                   </>
@@ -235,7 +235,7 @@ function Overview(props: {
 
 function AppsCard(props: { apps: GatewayApp[]; profile: ToolProfileWithDetails | undefined; intro?: boolean }) {
   const company = useCompany();
-  const href = (app: GatewayApp) => (app.connection ? `/${company().issuePrefix}/apps/${app.connection.id}/permissions` : `/${company().issuePrefix}/apps/app/${app.application.id}`);
+  const href = (app: GatewayApp) => (app.connection ? `/${company().issuePrefix}/connections/${app.connection.id}/permissions` : `/${company().issuePrefix}/connections/app/${app.application.id}`);
   return (
     <section class="card ap-card" aria-labelledby="gw-apps">
       <header class="chead ap-chead">
@@ -250,7 +250,7 @@ function AppsCard(props: { apps: GatewayApp[]; profile: ToolProfileWithDetails |
           </Show>
         </div>
         <Show when={props.profile}>
-          {(found) => <RowLink href={`/${company().issuePrefix}/apps/advanced/profiles/${found().id}`}>Open the profile</RowLink>}
+          {(found) => <RowLink href={`/${company().issuePrefix}/connections/advanced/profiles/${found().id}`}>Open the profile</RowLink>}
         </Show>
       </header>
       <ul class="ap-rows">
@@ -678,7 +678,7 @@ function Advanced(props: { gateway: ToolMcpGatewayWithTokens; endpoint: string }
     mutationFn: () => toolAccessApi.updateGateway(company().id, props.gateway.id, { status: "archived" }),
     onSuccess: () => {
       pushToast({ title: "Gateway archived", body: `${props.gateway.name} can't be reached any more.`, tone: "success" });
-      navigate(`/${company().issuePrefix}/apps/gateways`);
+      navigate(`/${company().issuePrefix}/connections/gateways`);
     },
     onError: (error) => pushToast({ title: "Couldn't archive the gateway", body: failureText(error, "Please try again."), tone: "error" }),
     onSettled: () => refresh(),

@@ -101,7 +101,7 @@ describe("keysForEvent", () => {
     }
   });
 
-  it("refreshes Apps on tool activity and AI connections on their changes", () => {
+  it("refreshes Connections on tool activity and AI connections on their changes", () => {
     const tool = keysForEvent("c1", event("activity.logged", { entityType: "tool_connection", entityId: "t1", action: "tool_gateway.approval_requested" }));
     expect(tool).toContainEqual(queryKeys.tools.all("c1"));
     expect(queryKeys.tools.connectionPart("c1", "t1", "catalog").slice(0, 2)).toEqual([...queryKeys.tools.all("c1")]);

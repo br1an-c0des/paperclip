@@ -15,7 +15,7 @@ import "./Org.css";
  * it has, Invite people and Hire agent, and the organization's tabs in a track under the card.
  *
  * Workload is board 33 (`src/workload/CompanyWorkload.tsx`), which draws this header too, as do
- * Workspaces (`src/workspaces/`), Skills (`src/skills/`), Apps (`src/apps/`) and Activity (`src/activity/`).
+ * Workspaces (`src/workspaces/`), Skills (`src/skills/`), Connections (`src/apps/`) and Activity (`src/activity/`).
  */
 
 function count(value: number | undefined, one: string, many: string) {
@@ -69,7 +69,7 @@ export function OrgHeader(props: { actions?: JSX.Element }) {
             { label: "Workload", href: `${base()}/workload`, icon: <AlignLeft size={15} aria-hidden="true" /> },
             { label: "Workspaces", href: `${base()}/workspaces`, icon: <FolderGit2 size={15} aria-hidden="true" /> },
             { label: "Skills", href: `${base()}/skills`, icon: <Sparkles size={15} aria-hidden="true" /> },
-            { label: "Apps", href: `${base()}/apps`, icon: <LayoutGrid size={15} aria-hidden="true" /> },
+            { label: "Connections", href: `${base()}/connections`, icon: <LayoutGrid size={15} aria-hidden="true" /> },
             { label: "Activity", href: `${base()}/activity`, icon: <Activity size={15} aria-hidden="true" /> },
             { label: "Settings", href: `${base()}/company/settings`, icon: <Settings size={15} aria-hidden="true" /> },
           ]}

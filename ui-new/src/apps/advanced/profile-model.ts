@@ -12,7 +12,7 @@ import type {
 import type { ProfileEntryInput, ProfileTarget } from "@/api/tool-access";
 
 /*
- * View model for access profiles (`/apps/advanced/profiles*`, the old UI's pages/tools/profiles/).
+ * View model for access profiles (`/connections/advanced/profiles*`, the old UI's pages/tools/profiles/).
  * A profile decides which tools a run gets. The pages speak per app ("All Gmail tools", "All Gmail
  * except 2", "3 of 12 Gmail tools"); the server stores entries (an application, connection, tool,
  * name pattern or risk level, included or excluded). This module translates between the two, counts

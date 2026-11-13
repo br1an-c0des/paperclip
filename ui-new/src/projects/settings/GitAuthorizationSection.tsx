@@ -89,7 +89,7 @@ export function GitAuthorizationSection(props: { project: Project }) {
               >
                 <Show
                   when={current().options.length > 0}
-                  fallback={<span class="ps-muted-line">Connect your GitHub account and install the Connector for this company, under Apps, to authorize the project.</span>}
+                  fallback={<span class="ps-muted-line">Connect your GitHub account and install the Connector for this company, in Connections, to authorize the project.</span>}
                 >
                   <div class="ps-stack">
                     <Menu>

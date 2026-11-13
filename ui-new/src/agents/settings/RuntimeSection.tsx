@@ -529,7 +529,7 @@ function SignInRow(props: { agent: AgentDetail; value: string; saved: string; on
               <span class="ag-changed">{connection()!.status}</span>
             </Show>
           </Show>
-          <A class="ps-link" href={`/${company().issuePrefix}/apps/ai`}>
+          <A class="ps-link" href={`/${company().issuePrefix}/connections/ai`}>
             Manage connections
           </A>
         </div>

@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from "@solidjs/router";
 import { Show } from "solid-js";
 import { findCompanyByPrefix, lastCompanyPrefix, useCompaniesQuery, useCompany } from "@/lib/company";
+import { connectionsAddress } from "@/routes/legacy-model";
 import { legacyActivityHref } from "./log-model";
 
 /*
@@ -10,7 +11,8 @@ import { legacyActivityHref } from "./log-model";
  *   `/activity/budgets|timeline` go to the Activity tabs, the budgets ones to company settings →
  *   Budgets (`legacyActivityHref`).
  * - Without one (`/activity/*`, `/audit/*`, `/costs`, `/budgets`, `/skills/*`): the old UI sent these
- *   to the company you were last in, and so does this, keeping the rest of the address.
+ *   to the company you were last in, and so does this, keeping the rest of the address. `/apps/*`
+ *   (Apps' old address, and the server's OAuth returns) lands on Connections, `/:prefix/connections/*`.
  */
 
 export function LegacyActivityRedirect() {
@@ -33,7 +35,7 @@ export function UnprefixedCompanyRedirect() {
   };
   return (
     <Show when={!companies.isLoading}>
-      <Navigate href={prefix() ? `/${prefix()}${location.pathname}${location.search}${location.hash}` : "/companies"} />
+      <Navigate href={prefix() ? connectionsAddress(`/${prefix()}${location.pathname}${location.search}${location.hash}`) : "/companies"} />
     </Show>
   );
 }

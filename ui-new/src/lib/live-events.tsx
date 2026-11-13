@@ -101,10 +101,10 @@ function activityKeys(
     return keys;
   }
   const keys: QueryKey[] = [queryKeys.activity(companyId), queryKeys.dashboard(companyId), queryKeys.sidebarBadges(companyId)];
-  // Apps and tools (src/apps/): connections, their tools, profiles, policies and Ask-first requests
-  // are logged on `tool_*` entities; one prefix covers every Apps query for the company.
+  // Connections (src/apps/): connections, their tools, profiles, policies and Ask-first requests
+  // are logged on `tool_*` entities; one prefix covers every Connections query for the company.
   if (entityType?.startsWith("tool_")) keys.push(queryKeys.tools.all(companyId));
-  // AI connections (Apps → AI connections), as the old UI's live updates refresh them.
+  // AI connections (Connections → AI connections), as the old UI's live updates refresh them.
   if (action?.startsWith("ai_connection.") || action?.startsWith("connection_grant.")) {
     keys.push(queryKeys.aiConnections.list(companyId), queryKeys.tools.all(companyId));
   }
@@ -173,7 +173,7 @@ function activityKeys(
     case "cost_event":
       keys.push(["costs", companyId]);
       break;
-    // An outside assistant connected to Paperclip's MCP endpoint, or revoked (Apps → Assistants).
+    // An outside assistant connected to Paperclip's MCP endpoint, or revoked (Connections → Assistants).
     case "mcp_connection":
       keys.push(queryKeys.mcp.connections);
       break;

@@ -27,7 +27,7 @@ import {
 } from "./setups-model";
 
 /*
- * Connecting an aggregator gateway, Composio or Arcade (`/apps/connect?source=composio|arcade`, the
+ * Connecting an aggregator gateway, Composio or Arcade (`/connections/connect?source=composio|arcade`, the
  * old UI's remote-MCP provider setup): its steps, the gateway's MCP address (Composio Connect's by
  * default), how it signs in (by itself, a bearer token, headers, or none), whose account it is, and
  * which agents may use it. Signing in leaves for the provider and comes back to the connection's
@@ -86,7 +86,7 @@ export function AggregatorConnect(props: { app: AppDefinition; id: AggregatorId;
       void refresh();
       if (!connectionId) return;
       pushToast({ tone: "success", title: `${info().name} connected`, body: "Its apps and accounts are on its page." });
-      navigate(`/${company().issuePrefix}/apps/${connectionId}/permissions`);
+      navigate(`/${company().issuePrefix}/connections/${connectionId}/permissions`);
     },
     onError: (error) => {
       void refresh();
@@ -204,7 +204,7 @@ export function AggregatorConnect(props: { app: AppDefinition; id: AggregatorId;
         )}
       </Show>
       <div class="cx-actions">
-        <A class={buttonClass({ variant: "quiet" })} href={`/${company().issuePrefix}/apps`}>
+        <A class={buttonClass({ variant: "quiet" })} href={`/${company().issuePrefix}/connections`}>
           Cancel
         </A>
         <span class="ap-actions-end">

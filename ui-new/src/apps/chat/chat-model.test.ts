@@ -49,7 +49,7 @@ describe("chatProviderVisible", () => {
 });
 
 describe("chatRoute", () => {
-  it("reads the chat pages under /apps", () => {
+  it("reads the chat pages under /connections", () => {
     expect(chatRoute("")).toBeNull();
     expect(chatRoute("connections/c1")).toBeNull();
     expect(chatRoute("chat/connect")).toEqual({ kind: "connect" });
@@ -57,7 +57,7 @@ describe("chatRoute", () => {
     expect(chatRoute("chat/e1/reviews/r9")).toEqual({ kind: "detail", endpointId: "e1", tab: "reviews" });
   });
 
-  it("sends unknown or missing tabs to settings, and a bare /chat to Apps", () => {
+  it("sends unknown or missing tabs to settings, and a bare /chat to Connections", () => {
     expect(chatRoute("chat/e1")).toEqual({ kind: "redirect", to: "chat/e1/settings" });
     expect(chatRoute("chat/e1/nope")).toEqual({ kind: "redirect", to: "chat/e1/settings" });
     expect(chatRoute("chat")).toEqual({ kind: "redirect", to: "" });
@@ -69,8 +69,8 @@ describe("chatRoute", () => {
   });
 
   it("builds the connect address with the agent", () => {
-    expect(chatConnectHref("/TES/apps", "slack", { agentId: "a1" })).toBe("/TES/apps/chat/connect?provider=slack&agentId=a1");
-    expect(chatConnectHref("/TES/apps", "slack", { resume: "e1", reconnect: true })).toBe("/TES/apps/chat/connect?provider=slack&resume=e1&reconnect=1");
+    expect(chatConnectHref("/TES/connections", "slack", { agentId: "a1" })).toBe("/TES/connections/chat/connect?provider=slack&agentId=a1");
+    expect(chatConnectHref("/TES/connections", "slack", { resume: "e1", reconnect: true })).toBe("/TES/connections/chat/connect?provider=slack&resume=e1&reconnect=1");
   });
 });
 

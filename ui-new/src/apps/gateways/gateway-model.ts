@@ -11,7 +11,7 @@ import type { Tone } from "@/ui/Status";
 import { connectionState, displayName } from "../apps-model";
 
 /*
- * View model for Gateways (`/apps/gateways`, the old UI's pages/apps/gateways/): a gateway is one
+ * View model for Gateways (`/connections/gateways`, the old UI's pages/apps/gateways/): a gateway is one
  * MCP endpoint that exposes only the tools its access profile allows, handed to a client like
  * Cursor with a token. Token states, what a gateway exposes, the client snippets, and the audit
  * rows its Activity tab and an agent's recent calls show. After gateway-helpers.ts.

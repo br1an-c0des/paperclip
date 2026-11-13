@@ -78,7 +78,7 @@ describe("moreAppsView", () => {
     expect(moreAppsView("advanced/run-your-own")).toEqual({ section: "redirect", to: "" });
   });
 
-  it("leaves the other Apps pages alone", () => {
+  it("leaves the other Connections pages alone", () => {
     expect(moreAppsView("")).toBeNull();
     expect(moreAppsView("review")).toBeNull();
     expect(moreAppsView("abc/permissions")).toBeNull();

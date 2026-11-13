@@ -42,7 +42,7 @@ import "./CompanyLayout.css";
  * app-shell overlays.
  *
  * On a phone: detail pages (a task, an agent, a run, an approval) hide the dock and show Back
- * instead (design/mobile.md, M2, M9 and M11); screens outside the phone's scope (settings, Apps,
+ * instead (design/mobile.md, M2, M9 and M11); screens outside the phone's scope (settings, Connections,
  * Skills, Activity) open under an "On desktop" note; the installed app gets Refresh, Share and Open
  * in browser at the top (shell/pwa.tsx).
  *
