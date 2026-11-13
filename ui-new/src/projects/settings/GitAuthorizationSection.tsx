@@ -1,4 +1,5 @@
 import type { Project } from "@paperclipai/shared";
+import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Check, ShieldCheck } from "lucide-solid";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
@@ -22,6 +23,12 @@ import { failure, FootError } from "./shared";
  *
  * `GET` returns the current grant and only your own eligible grants; `PUT { grantId }` authorizes,
  * `PUT { grantId: null }` revokes.
+ *
+ * Only GitHub App connections are eligible (server/src/services/project-git-authorization.ts,
+ * `eligible`): the grant's `providerTenant.github.installationCount` must be above 0, and only the
+ * Paperclip GitHub App OAuth flow sets it. A connection made with a personal access token
+ * (fine-grained or classic) never appears as an option, so the empty state says so rather than
+ * asking someone who already connected GitHub to connect it.
  */
 
 export function GitAuthorizationSection(props: { project: Project }) {
@@ -85,11 +92,17 @@ export function GitAuthorizationSection(props: { project: Project }) {
               </SettingsRow>
               <SettingsRow
                 label={current().grantId ? "Authorize another account" : "Your GitHub account"}
-                help="Only your own accounts, connected through a GitHub Connector installed for this company."
+                help="Only your own accounts, connected through the Paperclip GitHub App and installed for this company."
               >
                 <Show
                   when={current().options.length > 0}
-                  fallback={<span class="ps-muted-line">Connect your GitHub account and install the Connector for this company, in Connections, to authorize the project.</span>}
+                  fallback={
+                    <span class="ps-muted-line">
+                      A project can only be authorized with a GitHub account connected through the Paperclip GitHub App, in{" "}
+                      <A href={`/${company().issuePrefix}/connections`}>Connections</A>; a personal access token connection can't authorize
+                      it. Public repositories don't need this.
+                    </span>
+                  }
                 >
                   <div class="ps-stack">
                     <Menu>
