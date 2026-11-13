@@ -806,6 +806,12 @@ function analyzeRoutes() {
     if (!node) return;
     if (node.type === "JSXFragment") return visitChildren(node.children, ctx);
     if (node.type === "JSXExpressionContainer") return visitNode(node.expression, ctx);
+    // <Routes>{routeTree}</Routes>: a route tree App keeps in a local const (upstream #21156).
+    if (node.type === "Identifier") {
+      const tree = appJsxLocals.get(node.name);
+      if (tree && !ctx.inlined?.has(node.name)) visitNode(tree, { ...ctx, inlined: new Set([...(ctx.inlined ?? []), node.name]) });
+      return;
+    }
     if (node.type === "ConditionalExpression") {
       visitNode(node.consequent, { ...ctx, conds: [...ctx.conds, src(node.test)] });
       visitNode(node.alternate, { ...ctx, conds: [...ctx.conds, `!(${src(node.test)})`] });
@@ -878,6 +884,15 @@ function analyzeRoutes() {
     return [{ layout: name }];
   };
 
+  // `const x = <JSX/>` declarations in App's body, so a route tree held in one is followed.
+  const appJsxLocals = new Map();
+  for (const stmt of localFunctions.get("App")?.body?.body ?? []) {
+    if (stmt.type !== "VariableDeclaration") continue;
+    for (const d of stmt.declarations) {
+      const init = d.init && unwrapTs(d.init);
+      if (d.id.type === "Identifier" && init && ["JSXElement", "JSXFragment"].includes(init.type)) appJsxLocals.set(d.id.name, init);
+    }
+  }
   visitNode(firstReturn(localFunctions.get("App")), { prefix: "", conds: [], gates: [], layouts: [] });
 
   for (const row of rows) {
