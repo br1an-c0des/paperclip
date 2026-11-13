@@ -57,6 +57,7 @@ import { InfoTip, ScheduleFields } from "./RepeatMenu";
 import { cronProblem, defaultRepeat, describeCron, formatFire, OPEN_POLICIES, repeatFromCron, scheduleCron, timeZoneLabel, type RepeatDraft } from "./schedule";
 import { triggerState, webhookSender } from "./webhook";
 import { readNote } from "@/lib/offline/read-state";
+import { toastConfigurationWarnings } from "@/lib/configuration-warnings";
 
 /*
  * The recurring task's Details (board R2), edited in place:
@@ -95,7 +96,7 @@ export function RecurringDetails(props: { routine: RoutineDetail; onOpenTask: (t
 
   const save: Save = async (patch, failed) => {
     try {
-      await routinesApi.update(props.routine.id, patch);
+      toastConfigurationWarnings(await routinesApi.update(props.routine.id, patch), "Routine saved");
       return true;
     } catch (error) {
       pushToast({ tone: "error", title: failed, body: error instanceof Error ? error.message : undefined });
