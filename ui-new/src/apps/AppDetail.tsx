@@ -26,6 +26,7 @@ import {
   connectHref,
   connectionRows,
   connectionSlug,
+  credentialValuesFor,
   DETAIL_TABS,
   displayName,
   enabledIds,
@@ -631,7 +632,7 @@ function ReconnectCard(props: { connection: ToolConnection; methods: ConnectionM
     onError: (error) => pushToast({ title: "Couldn't start sign-in", body: failureText(error, "Please try again."), tone: "error" }),
   }));
   const replaceKey = createMutation(() => ({
-    mutationFn: () => toolsApi.reconnect(props.connection.id, { ...values }),
+    mutationFn: () => toolsApi.reconnect(props.connection.id, credentialValuesFor(method()!, values)),
     onSuccess: () => pushToast({ title: "Reconnected", tone: "success" }),
     onError: (error) => pushToast({ title: "Couldn't reconnect", body: failureText(error, "Check the key and try again."), tone: "error" }),
     onSettled: () => refresh(),

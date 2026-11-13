@@ -579,6 +579,30 @@ export function connectProblem(method: ConnectionMethodDef | null, draft: Connec
 }
 
 /**
+ * Where the server looks for a credential field's value in `credentialValues`: `credentials.<key>`,
+ * or `env.<key>` for a command whose key goes in its environment. A copy of `credentialConfigPath` in
+ * packages/shared/src/app-definitions.ts, which the server's `credentialFieldsFor` uses to read the
+ * values on connect and reconnect; apps-model.test.ts pins it.
+ */
+export function credentialConfigPath(field: Pick<FieldDef, "key">, method?: Pick<ConnectionMethodDef, "transport" | "keyPlacement"> | null) {
+  if (method?.transport === "local_stdio" && method.keyPlacement?.location === "env") return `env.${field.key}`;
+  return `credentials.${field.key}`;
+}
+
+/**
+ * The filled-in credential fields of a method as the server reads them: `values` is keyed by the
+ * field's `key` (as the forms keep them), the result by its config path. Blank values are left out.
+ */
+export function credentialValuesFor(method: Pick<ConnectionMethodDef, "transport" | "keyPlacement" | "credentialFields">, values: Record<string, string>) {
+  const out: Record<string, string> = {};
+  for (const field of method.credentialFields ?? []) {
+    const value = values[field.key]?.trim();
+    if (value) out[credentialConfigPath(field, method)] = value;
+  }
+  return out;
+}
+
+/**
  * `POST tools/apps/connect` for a gallery app. With `vercelConnector` the credentials come from that
  * Vercel connector (`credentialSource: "vercel_connect"`), and no address, key or OAuth app is sent.
  */
@@ -590,7 +614,7 @@ export function connectPayload(
 ): ConnectToolApp {
   const config = Object.fromEntries(Object.entries(draft.config).filter(([, value]) => filled(value)));
   const vercel = options.vercelConnector !== undefined;
-  const credentials = vercel ? {} : Object.fromEntries(Object.entries(draft.credentials).filter(([, value]) => value.trim()));
+  const credentials = vercel ? {} : credentialValuesFor(method, draft.credentials);
   const clientId = vercel ? "" : draft.oauthClientId.trim();
   const secret = draft.oauthClientSecret.trim();
   return {
