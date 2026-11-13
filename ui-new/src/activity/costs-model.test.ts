@@ -1,6 +1,6 @@
 import type { BudgetPolicySummary, CostByAgent, CostByAgentModel } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { agentCostRows, barPercent, budgetRows, costRange, formatTokens, pricingNote, projectCostRows } from "./costs-model";
+import { agentCostRows, barPercent, budgetRows, costRange, formatTokens, pricingNote, projectCostRows, unpricedMark } from "./costs-model";
 
 describe("cost ranges", () => {
   const now = new Date(2026, 9, 27, 15, 30);
@@ -47,6 +47,18 @@ describe("spend rows", () => {
       { projectId: "p", projectName: "Site", costCents: 10, eventCount: 1, estimatedEventCount: 0, unpricedEventCount: 0, ...usage },
     ]);
     expect(rows.map((row) => row.name)).toEqual(["Site", "No project"]);
+  });
+
+  it("marks usage with no price per row (U147)", () => {
+    const agents = [{ agentId: "a", agentName: "Bob", costCents: 0, eventCount: 3, unpricedEventCount: 3, apiRunCount: 3, subscriptionRunCount: 0, ...usage }] as CostByAgent[];
+    const models = [{ agentId: "a", provider: "openai", billingType: "metered_api", model: "gpt-9", costCents: 0, eventCount: 3, unpricedEventCount: 3, ...usage }] as CostByAgentModel[];
+    const [row] = agentCostRows(agents, models);
+    expect(row).toMatchObject({ unpriced: 3, models: [{ unpriced: 3 }] });
+    expect(unpricedMark(row!)).toEqual({ dash: true, note: "No price" });
+    expect(unpricedMark({ costCents: 120, events: 4, unpriced: 1 })).toEqual({ dash: false, note: "1 without a price" });
+    expect(unpricedMark({ costCents: 0, events: 4, unpriced: 0 })).toBeNull();
+    // Older servers don't send the count: nothing is marked.
+    expect(projectCostRows([{ projectId: "p", projectName: "Site", costCents: 0, eventCount: 1, ...usage } as never])[0]).toMatchObject({ unpriced: 0 });
   });
 
   it("formats tokens and bars", () => {

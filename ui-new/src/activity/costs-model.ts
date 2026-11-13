@@ -6,6 +6,11 @@ import type { BudgetPolicySummary, CostByAgent, CostByAgentModel, CostByProject 
  *
  * Spend is in cents. Runs on a subscription cost nothing per run, so the tokens are often the
  * telling number; both are shown.
+ *
+ * Since the Nov 13 sync (U147, upstream #20889) each agent, model and project row carries
+ * `unpricedEventCount`: usage with no known price, missing from its spend rather than free. A row
+ * with no price at all shows a dash instead of $0.00, and one partly priced says how many reports
+ * had none (`unpricedMark`).
  */
 
 export type RangePreset = "mtd" | "7d" | "30d" | "ytd" | "all" | "custom";
@@ -74,7 +79,17 @@ export function barPercent(value: number, max: number) {
   return max > 0 ? Math.max(value > 0 ? 2 : 0, Math.round((value / max) * 100)) : 0;
 }
 
-export type ModelRow = { key: string; model: string; provider: string; billing: string; costCents: number; tokens: number; events: number };
+export type ModelRow = { key: string; model: string; provider: string; billing: string; costCents: number; tokens: number; events: number; unpriced: number };
+
+/**
+ * How a row's spend reads when some of its usage had no price: `dash` when none of it did (the
+ * spend is unknown, not zero), and a note with how many reports had none. Null when all were priced.
+ */
+export function unpricedMark(row: { costCents: number; events: number; unpriced: number }): { dash: boolean; note: string } | null {
+  if (row.unpriced <= 0) return null;
+  const dash = row.costCents === 0 && row.events > 0 && row.unpriced >= row.events;
+  return { dash, note: dash ? "No price" : `${row.unpriced} without a price` };
+}
 
 export type AgentCostRow = {
   agentId: string | null;
@@ -82,6 +97,8 @@ export type AgentCostRow = {
   costCents: number;
   tokens: number;
   events: number;
+  /** Reports with no known price, whose cost is missing from `costCents`. */
+  unpriced: number;
   /** Runs billed per request and runs covered by a subscription. */
   apiRuns: number;
   subscriptionRuns: number;
@@ -120,6 +137,7 @@ export function agentCostRows(agents: readonly CostByAgent[] | undefined, models
       costCents: row.costCents,
       tokens: totalTokens(row),
       events: row.eventCount,
+      unpriced: row.unpricedEventCount ?? 0,
     });
     byAgent.set(row.agentId, list);
   }
@@ -130,6 +148,7 @@ export function agentCostRows(agents: readonly CostByAgent[] | undefined, models
       costCents: row.costCents,
       tokens: totalTokens(row),
       events: row.eventCount,
+      unpriced: row.unpricedEventCount ?? 0,
       apiRuns: row.apiRunCount,
       subscriptionRuns: row.subscriptionRunCount,
       models: (byAgent.get(row.agentId) ?? []).sort((a, b) => b.costCents - a.costCents || b.tokens - a.tokens),
@@ -137,12 +156,12 @@ export function agentCostRows(agents: readonly CostByAgent[] | undefined, models
     .sort((a, b) => b.costCents - a.costCents || b.tokens - a.tokens || a.name.localeCompare(b.name));
 }
 
-export type ProjectCostRow = { projectId: string | null; name: string; costCents: number; tokens: number; events: number };
+export type ProjectCostRow = { projectId: string | null; name: string; costCents: number; tokens: number; events: number; unpriced: number };
 
 /** Spend per project, most first; work outside any project last. */
 export function projectCostRows(rows: readonly CostByProject[] | undefined): ProjectCostRow[] {
   return [...(rows ?? [])]
-    .map((row) => ({ projectId: row.projectId, name: row.projectName ?? "No project", costCents: row.costCents, tokens: totalTokens(row), events: row.eventCount }))
+    .map((row) => ({ projectId: row.projectId, name: row.projectName ?? "No project", costCents: row.costCents, tokens: totalTokens(row), events: row.eventCount, unpriced: row.unpricedEventCount ?? 0 }))
     .sort((a, b) => Number(a.projectId === null) - Number(b.projectId === null) || b.costCents - a.costCents || b.tokens - a.tokens || a.name.localeCompare(b.name));
 }
 
