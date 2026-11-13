@@ -25,7 +25,7 @@ import {
   withStep,
   type Pending,
 } from "./inbox-model";
-import { needsYouCount } from "./needs-you";
+import { needsYouCount as countFor } from "./needs-you";
 
 function item(id: string, sourceKind: AttentionSourceKind, extra: Partial<AttentionItem> = {}): AttentionItem {
   return {
@@ -143,6 +143,17 @@ describe("placement", () => {
 });
 
 describe("the nav's count", () => {
+  // Routed to the signed-in person, u1 (U133): the count is For you's.
+  const forMe = (entry: AttentionItem): AttentionItem => ({ ...entry, audience: { kind: "user", userId: "u1", reason: "assignee" } });
+  const needsYouCount = (items: AttentionItem[]) => countFor(items.map(forMe), "u1");
+
+  it("counts only what's routed to you", () => {
+    const items = [forMe(item("mine", "approval")), item("pool", "approval"), { ...item("other", "approval"), audience: { kind: "user" as const, userId: "u2", reason: "assignee" as const } }];
+    expect(countFor(items, "u1")).toBe(1);
+    expect(countFor(items, "u2")).toBe(1);
+    expect(countFor(items, null)).toBe(0);
+  });
+
   it("counts what Needs you holds: active requests, not alerts, snoozed or cleared", () => {
     const items = [
       item("question", "issue_thread_interaction"),

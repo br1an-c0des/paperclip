@@ -600,3 +600,107 @@
     display: none;
   }
 }
+
+/* Routing (U133): the view switch, For you's Unassigned line, receipts, and a card's owner block. */
+.ibx-views {
+  align-items: center;
+}
+
+.ibx-views button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ibx-views .infotip {
+  margin: 0 6px 0 2px;
+}
+
+.ibx-unassigned {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 10px 8px 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ibx-unassigned span {
+  flex: 1;
+  min-width: 0;
+  color: var(--body);
+}
+
+.ibx-receipt-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.ibx-receipt-line {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--body);
+}
+
+.ibx-receipt-reason {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.ibx-owner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ibx-owner-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.ibx-owner-line span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ibx-owner-why {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@container ibx (max-width: 640px) {
+  .ibx-views {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .ibx-receipt-reason {
+    display: none;
+  }
+}
+
+:root[data-viewport="phone"] .ibx-views {
+  flex-wrap: nowrap;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+:root[data-viewport="phone"] .ibx-receipt {
+  flex-wrap: wrap;
+}

@@ -1,5 +1,5 @@
-import type { AttentionItem, CompactIssue, DecisionHistoryItem } from "@paperclipai/shared";
-import { A, Navigate, useParams } from "@solidjs/router";
+import type { AttentionItem, AttentionReceipt, CompactIssue, DecisionHistoryItem } from "@paperclipai/shared";
+import { A, Navigate, useParams, useSearchParams } from "@solidjs/router";
 import { ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleAlert, Inbox as InboxIcon, Search, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch } from "solid-js";
 import { runningAgentIds } from "@/lib/agent-state";
@@ -10,6 +10,7 @@ import { useLiveRunsQuery } from "@/lib/company-data";
 import { hasOpenDialog, isTextInputTarget } from "@/lib/shortcuts";
 import { useTaskPeople } from "@/tasks/people";
 import { Button } from "@/ui/Button";
+import { InfoTip } from "@/ui/InfoTip";
 import {
   activityGroups,
   agingLabel,
@@ -40,6 +41,8 @@ import { rowModel } from "./row-model";
 import { HistoryBar, HistoryList, useDecisionHistory } from "./InboxHistory";
 import { AgingRow, NeedsItem, ShelfRow } from "./InboxItem";
 import { TaskRows } from "./InboxTasks";
+import { Receipts, RouteDialogs, UnassignedLine, ViewSwitch } from "./InboxRouting";
+import { claimable, filterByView, viewCounts, viewFromParam, type InboxView } from "./routing-model";
 import { useLastSeen } from "./seen";
 import { useInbox } from "./use-inbox";
 import "@/ui/Segmented.css";
@@ -48,7 +51,12 @@ import "./Inbox.css";
 /*
  * `/:prefix/inbox/*` (board 14): everything waiting on you, in five tabs, and what was decided.
  *
- * - Needs you: request cards, most urgent first, with a kind filter, in New today and Earlier, then
+ * - Needs you (U133): in views by who each request is for (`?view=`: For you by default, then
+ *   Unassigned, Company and Everyone; `routing-model.ts`). For you starts with what someone else
+ *   handled for you (receipts) and a line pointing at Unassigned when requests have no owner. A
+ *   card's "…" is its Close… menu (Transfer, snooze and Archive for you, Withdraw for everyone), and
+ *   its context column says who it's for, with Claim (c). The tab's count is For you's, as the nav's.
+ *   Request cards, most urgent first, with a kind filter, in New today and Earlier, then
  *   the aging shelf folded at the bottom (requests idle past their retention days, with Keep).
  *   Cards answer in place, as in the task's thread; "New" marks what arrived since you last looked.
  *   Board 14b: each card rests as a slim row (`InboxRow.tsx`, `row-model.ts`) that opens to the
@@ -57,9 +65,11 @@ import "./Inbox.css";
  *   headers that fold (`group-model.ts`).
  * - Updates: your tasks, grouped by latest activity (M10), unread first in the count, with Retry on
  *   interrupted ones and a note when part of the read failed. Alerts: what broke. Snoozed and
- *   Cleared: what you set aside, with Restore.
- * - History: questions and proposals answered on tasks, with outcome, agent, project and sort
- *   filters, a page at a time (`InboxHistory.tsx`). The search box searches it on the server.
+ *   Archived (once Cleared; `/inbox/cleared` still lands there): what you hid for yourself, with
+ *   Restore.
+ * - History: questions, proposals and approvals that were decided, by or for you unless you widen it
+ *   to everyone's, with outcome (and Handled for me), agent, project and sort filters, a page at a
+ *   time (`InboxHistory.tsx`). The search box searches it on the server.
  * - Search (the magnifier; `/` stays the command palette's) narrows the open tab to what matches every word typed: titles,
  *   tasks, why it's here, who asked, the request's own text.
  * - Keys (inbox-model.ts, `inboxKeyAction`): j/k move, Enter opens the task in the task modal, y
@@ -99,7 +109,11 @@ export function InboxPage() {
 function Inbox(props: { tab: InboxTab; base: string }) {
   const people = useTaskPeople();
   const commands = useCommands();
-  const inbox = useInbox({ people, clearedOpen: () => props.tab === "cleared" });
+  // Whose requests Needs you shows (U133): For you unless the address says otherwise.
+  const [search, setSearch] = useSearchParams<{ view?: string }>();
+  const view = () => viewFromParam(search.view);
+  const setView = (next: InboxView) => setSearch({ view: next === "mine" ? undefined : next });
+  const inbox = useInbox({ people, clearedOpen: () => props.tab === "cleared", receiptsOpen: () => props.tab === "needs" && view() === "mine" });
   const company = useCompany();
   const seen = useLastSeen(() => company().id);
   const [kind, setKind] = createSignal<KindFilter>("all");
@@ -174,12 +188,17 @@ function Inbox(props: { tab: InboxTab; base: string }) {
   const searched = (items: readonly AttentionItem[]) => (terms().length ? items.filter(found) : [...items]);
 
   const kindOf = (item: AttentionItem) => itemKind(item, inbox.requests().get(item.id));
-  const counts = createMemo(() => kindCounts(searched(inbox.groups().needs), kindOf));
-  const needs = createMemo(() => filterByKind(searched(inbox.groups().needs), kind(), kindOf));
+  const youId = () => people.youId();
+  /** Needs you's requests in the open view, before the kind filter. */
+  const viewed = createMemo(() => filterByView(searched(inbox.groups().needs), view(), youId()));
+  const views = createMemo(() => (inbox.feed.data ? viewCounts(searched(inbox.groups().needs), youId()) : null));
+  const counts = createMemo(() => kindCounts(viewed(), kindOf));
+  const needs = createMemo(() => filterByKind(viewed(), kind(), kindOf));
   const arrivals = createMemo(() => arrivalGroups(needs()));
   const today = createMemo(() => arrivals().find((group) => group.key === "today")?.items ?? []);
   const earlier = createMemo(() => arrivals().find((group) => group.key === "earlier")?.items ?? []);
-  const aging = createMemo(() => filterByKind(searched(inbox.groups().aging), kind(), kindOf));
+  const aging = createMemo(() => filterByKind(filterByView(searched(inbox.groups().aging), view(), youId()), kind(), kindOf));
+  const receipts = () => (view() === "mine" && !terms().length ? inbox.receipts() : []);
 
   // The collapsed rows, refreshed each minute for their ages and expiries.
   const clock = useNow();
@@ -223,8 +242,9 @@ function Inbox(props: { tab: InboxTab; base: string }) {
     const groups = inbox.groups();
     if (!inbox.feed.data && tab !== "updates") return null;
     switch (tab) {
+      // For you's count, as the nav's (`needs-you.ts`); each view's own count is on the switch.
       case "needs":
-        return groups.needs.length;
+        return filterByView(groups.needs, "mine", youId()).length;
       case "updates":
         return inbox.rows() ? inbox.unread() : null;
       case "alerts":
@@ -261,7 +281,7 @@ function Inbox(props: { tab: InboxTab; base: string }) {
   const tasksById = createMemo(() => new Map([...(inbox.rows() ?? []), ...inbox.archived()].map((task) => [task.id, task] as const)));
 
   // A new tab or filter starts with nothing selected; a row that leaves hands the cursor on.
-  createEffect(on([() => props.tab, kind, historyFilters, groupBy], () => setSelected(null), { defer: true }));
+  createEffect(on([() => props.tab, kind, view, historyFilters, groupBy], () => setSelected(null), { defer: true }));
   let lastIds: string[] = [];
   createEffect(() => {
     const now = ids();
@@ -408,6 +428,9 @@ function Inbox(props: { tab: InboxTab; base: string }) {
       case "answer":
         if (item && props.tab === "needs") run(() => answer(id));
         break;
+      case "claim":
+        if (item && props.tab === "needs" && claimable(item) && !inbox.routing()) run(() => inbox.claim(item));
+        break;
       case "restore":
         if (item && (props.tab === "snoozed" || props.tab === "cleared")) run(() => inbox.restore(item));
         else if (task && archived) run(() => inbox.unarchive(task));
@@ -467,6 +490,26 @@ function Inbox(props: { tab: InboxTab; base: string }) {
     }
     return null;
   };
+  /** Needs you's empty state, for the open view, kind and search. */
+  const emptyNeeds = () => {
+    if (terms().length) return view() === "mine" ? "Nothing waiting on you matches the search." : "No requests here match the search.";
+    if (kind() !== "all") return view() === "mine" ? "Nothing of this kind needs you." : "No requests of this kind here.";
+    switch (view()) {
+      case "mine":
+        return "Nothing needs you right now.";
+      case "unassigned":
+        return "Every request has an owner.";
+      case "company":
+        return "Nothing for the company's operators right now.";
+      default:
+        return "No open requests.";
+    }
+  };
+  /** A receipt opens its task, or its approval's page. */
+  const openReceipt = (receipt: AttentionReceipt) => {
+    const issue = receipt.issue;
+    if (issue) commands.openTaskModal({ id: issue.id, identifier: issue.identifier, title: issue.title, projectId: null });
+  };
   const searchNote = (count: number) => (terms().length ? <span class="ibx-note">{count === 1 ? "1 match" : `${count} matches`}</span> : null);
 
   return (
@@ -524,6 +567,7 @@ function Inbox(props: { tab: InboxTab; base: string }) {
       <Switch>
         <Match when={props.tab === "needs"}>
           <div class="ibx-bar">
+            <ViewSwitch view={view()} counts={views()} onChange={setView} />
             <div class="seg ibx-kinds" role="group" aria-label="Request kinds">
               <For each={KIND_FILTERS}>
                 {(filter) => (
@@ -560,16 +604,22 @@ function Inbox(props: { tab: InboxTab; base: string }) {
             </Button>
             <span class="ibx-note ibx-note--urgent">Most urgent first</span>
             {searchNote(needs().length + aging().length)}
-            <KeyHints keys={[["j k", "move"], ["← →", "close, open"], ["⇧", "all"], ["y", "clear"], ["s", "snooze"], ["a", "answer"], ["enter", "open the task"]]} />
+            <KeyHints keys={[["j k", "move"], ["← →", "close, open"], ["⇧", "all"], ["y", "archive"], ["s", "snooze"], ["a", "answer"], ["c", "claim"], ["enter", "open the task"]]} />
           </div>
+          <Show when={view() === "mine" && inbox.feed.data}>
+            <UnassignedLine count={views()?.unassigned ?? 0} onShow={() => setView("unassigned")} />
+          </Show>
+          <Receipts receipts={receipts()} people={people} onDismiss={inbox.dismissReceipt} onOpen={openReceipt} />
           <FeedState
             inbox={inbox}
-            empty={terms().length ? "Nothing waiting on you matches the search." : kind() === "all" ? "Nothing needs you right now." : "Nothing of this kind needs you."}
+            empty={emptyNeeds()}
             count={needs().length + aging().length}
           >
             <div class="ibx-list">
             <Show when={needs().length === 0}>
-              <p class="ibx-empty card">{kind() === "all" && !terms().length ? "Nothing new needs you. Older requests are below." : "Nothing recent matches. Older requests are below."}</p>
+              <p class="ibx-empty card">
+                {kind() === "all" && !terms().length ? (view() === "mine" ? "Nothing new needs you." : "Nothing new here.") : "Nothing recent matches."} Older requests are below.
+              </p>
             </Show>
             <Show when={groupBy() !== "none"}>
               <For each={groupKeys()}>
@@ -722,24 +772,36 @@ function Inbox(props: { tab: InboxTab; base: string }) {
         <Match when={props.tab === "history"}>
           <div class="ibx-bar">
             <HistoryBar filters={filters()} people={people} onChange={(change) => setHistoryFilters((current) => ({ ...current, ...change }))} />
-            <span class="ibx-note">Questions and proposals answered on tasks</span>
             <KeyHints keys={[["j k", "move"], ["enter", "open the task"]]} />
           </div>
-          <HistoryList data={history} filters={filters()} people={people} selectedId={selected()} onSelect={setSelected} onOpen={openDecision} />
+          <HistoryList
+            data={history}
+            filters={filters()}
+            people={people}
+            selectedId={selected()}
+            onSelect={setSelected}
+            onOpen={openDecision}
+            onEveryone={() => setHistoryFilters((current) => ({ ...current, scope: "all" }))}
+          />
         </Match>
 
         <Match when={props.tab === "snoozed" || props.tab === "cleared"}>
           <div class="ibx-bar">
-            <span class="ibx-note">{props.tab === "snoozed" ? "Back in your inbox when the snooze ends" : "Cleared requests and alerts, and tasks you archived"}</span>
+            <span class="ibx-note">{props.tab === "snoozed" ? "Snoozed for you" : "Archived for you"}</span>
+            <InfoTip label={props.tab === "snoozed" ? "About Snoozed" : "About Archived"}>
+              {props.tab === "snoozed"
+                ? "Requests and alerts you snoozed. Each comes back when its snooze ends, or sooner if it changes. Only you stop seeing it."
+                : "Requests and alerts you archived, and tasks you archived from Updates. An archived request comes back when it changes. Only you stop seeing it; it stays open for everyone else."}
+            </InfoTip>
             <KeyHints keys={[["j k", "move"], ["u", "restore"], ["enter", "open the task"]]} />
           </div>
           <FeedState
             inbox={inbox}
-            empty={terms().length ? "Nothing here matches the search." : props.tab === "snoozed" ? "Nothing snoozed." : "Nothing cleared."}
+            empty={terms().length ? "Nothing here matches the search." : props.tab === "snoozed" ? "Nothing snoozed." : "Nothing archived."}
             count={(props.tab === "snoozed" ? snoozed() : cleared()).length + (props.tab === "cleared" ? archived().length : 0)}
           >
             <Show when={(props.tab === "snoozed" ? snoozed() : cleared()).length > 0}>
-              <ul class="ibx-rows" aria-label={props.tab === "snoozed" ? "Snoozed" : "Cleared"}>
+              <ul class="ibx-rows" aria-label={props.tab === "snoozed" ? "Snoozed" : "Archived"}>
                 <For each={props.tab === "snoozed" ? snoozed() : cleared()}>
                   {(item) => (
                     <ShelfRow
@@ -761,6 +823,7 @@ function Inbox(props: { tab: InboxTab; base: string }) {
           </FeedState>
         </Match>
       </Switch>
+      <RouteDialogs inbox={inbox} people={people} />
     </div>
   );
 }

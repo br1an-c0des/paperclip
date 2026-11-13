@@ -121,7 +121,7 @@ describe("tabFromPath: History", () => {
  * shelf in use the two disagree, so the nav keeps counting from the feed (decision 24).
  */
 describe("the nav count against attention/summary", () => {
-  const base = { companyId: "c1", subject: { kind: "issue", id: "s", companyId: "c1", title: "t", identifier: null, status: null, href: null } };
+  const base = { companyId: "c1", audience: { kind: "user", userId: "u1", reason: "assignee" }, subject: { kind: "issue", id: "s", companyId: "c1", title: "t", identifier: null, status: null, href: null } };
   const make = (id: string, sourceKind: AttentionItem["sourceKind"], extra: Partial<AttentionItem> = {}) =>
     ({ ...base, id, sourceKind, dismissal: null, shelf: false, keep: false, rank: 0, severity: "medium", activityAt: "2026-11-01T00:00:00Z", createdAt: "2026-11-01T00:00:00Z", ...extra }) as AttentionItem;
   const items = [make("a", "approval"), make("b", "issue_thread_interaction", { shelf: true }), make("c", "review"), make("d", "failed_run")];
@@ -131,7 +131,7 @@ describe("the nav count against attention/summary", () => {
   const fromSummary = Object.entries(summaryCounts).reduce((sum, [kind, count]) => (alertKinds.has(kind) ? sum : sum + count), 0);
 
   it("differs by the shelf", () => {
-    expect(needsYouCount(items)).toBe(2);
+    expect(needsYouCount(items, "u1")).toBe(2);
     expect(fromSummary).toBe(3);
   });
 });

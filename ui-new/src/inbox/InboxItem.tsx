@@ -1,5 +1,5 @@
 import type { AttentionItem, AttentionSubject, IssueDisplayStatus } from "@paperclipai/shared";
-import { AlarmClock, Archive, CircleAlert, Clock, CornerDownRight, Ellipsis, RotateCcw, Sparkles, X } from "lucide-solid";
+import { AlarmClock, Archive, CircleAlert, Clock, CornerDownRight, Ellipsis, RotateCcw, Sparkles, Undo2, UserRoundPlus } from "lucide-solid";
 import { For, Match, Show, Switch, type JSX } from "solid-js";
 import { useCompany } from "@/lib/company";
 import { budgetIncidentHref, CollapseButton, RequestCard } from "@/requests/RequestCard";
@@ -12,6 +12,8 @@ import { StatusCapsule } from "@/ui/Status";
 import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { DEFAULT_SNOOZE, SNOOZE_PRESETS, snoozedUntil, snoozeLabel, type Pending } from "./inbox-model";
 import { CollapsedRow } from "./InboxRow";
+import { OwnerBlock } from "./InboxRouting";
+import { closeMenu } from "./routing-model";
 import type { RowModel } from "./row-model";
 import { itemTask, type Inbox } from "./use-inbox";
 
@@ -25,7 +27,10 @@ import { itemTask, type Inbox } from "./use-inbox";
  * interrupted (a failed run's, say) shows the state and Retry beside Open the task, as task rows do;
  * the state comes from Updates' read (`interruptionFor`).
  *
- * Snoozed and Cleared draw items as one-line rows with Restore; the aging shelf draws them as rows
+ * The "…" menu is the Close… menu (U133): Transfer, snooze and Archive for you, Withdraw for
+ * everyone, by the card's `closeModes`; the context column ends with who the card is for, and Claim.
+ *
+ * Snoozed and Archived draw items as one-line rows with Restore; the aging shelf draws them as rows
  * with Keep.
  */
 
@@ -89,35 +94,59 @@ export function TaskLink(props: { task: AttentionSubject; displayStatus?: IssueD
   );
 }
 
-/** Snooze presets and Clear, for the "…" menu in a card's top row. */
+/**
+ * The Close… menu in a card's top row (U133): Transfer to another person where the card can hold an
+ * owner, then what hides it for you (snooze presets, Archive), then Withdraw for everyone, each only
+ * where the card's `closeModes` offer it. Archive and snooze go through the inbox dismissals, as
+ * before, now with the card's fingerprint.
+ */
 function TriageItems(props: { item: AttentionItem; inbox: Inbox }) {
+  const menu = () => closeMenu(props.item);
+  // A feed from before #20959 lists no close modes; hiding for you still works there.
+  const legacy = () => !props.item.closeModes?.length;
   return (
     <>
-      <Menu.Group label="Snooze until">
-        <For each={SNOOZE_PRESETS}>
-          {(preset) => (
-            <Menu.Item hint={preset === DEFAULT_SNOOZE ? "S" : undefined} onSelect={() => props.inbox.snooze(props.item, preset.until(new Date()))}>
-              {preset.label}
-            </Menu.Item>
-          )}
-        </For>
-      </Menu.Group>
-      <Menu.Separator />
-      <Menu.Item icon={<X size={15} />} hint="Y" description="Out of your inbox; Cleared keeps it" onSelect={() => props.inbox.clear(props.item)}>
-        Clear
-      </Menu.Item>
+      <Show when={menu().transfer}>
+        <Menu.Item icon={<UserRoundPlus size={15} />} description="Route it to someone else; it moves to their For you" onSelect={() => props.inbox.askTransfer(props.item)}>
+          Transfer to…
+        </Menu.Item>
+        <Menu.Separator />
+      </Show>
+      <Show when={menu().snooze || legacy()}>
+        <Menu.Group label="Snooze for you until">
+          <For each={SNOOZE_PRESETS}>
+            {(preset) => (
+              <Menu.Item hint={preset === DEFAULT_SNOOZE ? "S" : undefined} onSelect={() => props.inbox.snooze(props.item, preset.until(new Date()))}>
+                {preset.label}
+              </Menu.Item>
+            )}
+          </For>
+        </Menu.Group>
+        <Menu.Separator />
+      </Show>
+      <Show when={menu().archive || legacy()}>
+        <Menu.Item icon={<Archive size={15} />} hint="Y" description="Hidden for you until it changes; teammates still see it" onSelect={() => props.inbox.clear(props.item)}>
+          Archive
+        </Menu.Item>
+      </Show>
+      <Show when={menu().withdraw}>
+        <Menu.Separator />
+        <Menu.Item icon={<Undo2 size={15} />} description="It's out of date: end it for everyone, without approving" onSelect={() => props.inbox.askWithdraw(props.item)}>
+          Withdraw for everyone…
+        </Menu.Item>
+      </Show>
     </>
   );
 }
 
-/** The triage menu on its own, for cards that aren't RequestCards. */
+/** The Close… menu on its own, for cards that aren't RequestCards. */
 function TriageMenu(props: { item: AttentionItem; inbox: Inbox }) {
   return (
     <Menu>
-      <Menu.Trigger class="rq-menu" aria-label="Snooze or clear">
+      <Menu.Trigger class="rq-menu" aria-label="Close…">
         <Ellipsis size={15} aria-hidden="true" />
       </Menu.Trigger>
-      <Menu.Content label="Snooze or clear" width={240}>
+      <Menu.Content label="Close…" width={260}>
         <TriageItems item={props.item} inbox={props.inbox} />
       </Menu.Content>
     </Menu>
@@ -136,6 +165,7 @@ function Context(props: { item: AttentionItem; inbox: Inbox; people: TaskPeople;
       <Show when={props.showWhy || !task()}>
         <p class="ibx-why">{props.item.whyNow}</p>
       </Show>
+      <OwnerBlock item={props.item} inbox={props.inbox} people={props.people} />
     </>
   );
 }
@@ -225,7 +255,8 @@ export function NeedsItem(props: {
                 taskId={task()?.id ?? ""}
                 people={props.people}
                 triage={() => <TriageItems item={props.item} inbox={props.inbox} />}
-                triageLabel="Snooze or clear"
+                triageLabel="Close…"
+                ownWithdraw={!closeMenu(props.item).withdraw}
                 fresh={props.fresh}
                 cardId={cardId()}
                 onCollapse={collapse()}
@@ -356,7 +387,7 @@ export function ShelfRow(props: {
   const snoozed = () => snoozedUntil(props.item, props.pending);
   const task = () => props.inbox.taskOf(props.item);
   const note = (): JSX.Element =>
-    props.pending?.action === "clear" || (!snoozed() && props.item.dismissal) ? "Cleared" : snoozeLabel(snoozed());
+    props.pending?.action === "clear" || (!snoozed() && props.item.dismissal) ? "Archived" : snoozeLabel(snoozed());
   return (
     <li
       class="ibx-row"

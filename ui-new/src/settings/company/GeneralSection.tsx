@@ -1,13 +1,13 @@
 import { A, useNavigate } from "@solidjs/router";
 import { useQueryClient } from "@tanstack/solid-query";
 import { Archive, Check, ImageUp, PauseCircle, PlayCircle, Trash2 } from "lucide-solid";
-import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
+import { createEffect, createSignal, For, on, Show } from "solid-js";
 import { companiesApi } from "@/api/companies";
-import { personName } from "@/api/access";
 import { queryKeys } from "@/api/queryKeys";
 import { ConfirmDialog } from "@/documents/ConfirmDialog";
 import { useCompany } from "@/lib/company";
-import { useAgentsQuery, usePeopleQuery } from "@/lib/company-data";
+import { useAgentsQuery } from "@/lib/company-data";
+import { OwnerMenu } from "@/settings/OwnerMenu";
 import { InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { FieldButton, SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
@@ -35,6 +35,8 @@ import { CardHead, CardNote, failure, SectionTitle, SwitchRow, useCompanySaver }
  * - Organization: name, description, logo (`POST /companies/:id/logo`, then `logoAssetId`), and the
  *   default owner (board 30), who gets tasks and requests that have no owner.
  * - Hiring: require approval for new agents, with the hires waiting for it.
+ * - Request routing (U134): the decision owner, who gets requests no one else owns, and the budget
+ *   owner, who gets budget hard stops (`defaultDecisionOwnerUserId`, `budgetOwnerUserId`).
  * - Agent requests: who may answer each kind (`interactionResolverGovernance`).
  * - Feedback: share rated outputs with Paperclip (`feedbackDataSharingEnabled`).
  * - Danger zone: pause every agent (the company's `paused` status) and archive the organization.
@@ -52,6 +54,7 @@ export function GeneralSection() {
       <SectionTitle title="General">Who the organization is, and its rules for hiring and for answering agents. Changes save as you make them.</SectionTitle>
       <OrganizationCard saver={saver} />
       <HiringCard saver={saver} />
+      <RoutingCard saver={saver} />
       <RequestsCard saver={saver} />
       <SettingsCard title="Feedback">
         <SwitchRow
@@ -71,16 +74,12 @@ type Saver = ReturnType<typeof useCompanySaver>;
 function OrganizationCard(props: { saver: Saver }) {
   const company = useCompany();
   const client = useQueryClient();
-  const people = usePeopleQuery();
   const [name, setName] = createSignal(company().name);
   const [description, setDescription] = createSignal(company().description ?? "");
   const [uploading, setUploading] = createSignal(false);
   let fileInput!: HTMLInputElement;
   createEffect(on(() => company().name, (value) => setName(value), { defer: true }));
   createEffect(on(() => company().description, (value) => setDescription(value ?? ""), { defer: true }));
-
-  const owners = createMemo(() => (people.data?.users ?? []).filter((user) => user.status === "active"));
-  const owner = () => owners().find((user) => user.principalId === company().defaultResponsibleUserId);
 
   const saveName = () => {
     const patch = nameEdit(company(), name());
@@ -165,32 +164,50 @@ function OrganizationCard(props: { saver: Saver }) {
         </div>
       </SettingsRow>
       <SettingsRow label="Default owner" help="The person who gets tasks and requests that have no owner.">
-        <Menu>
-          <Menu.Trigger as={FieldButton} class="ps-field-320" aria-label={`Default owner: ${owner() ? personName(owner()!) : "nobody"}`}>
-            {owner() ? personName(owner()!) : company().defaultResponsibleUserId ? "Someone who isn't a member now" : "Nobody"}
-          </Menu.Trigger>
-          <Menu.Content label="Default owner" width={300}>
-            <For each={owners()} fallback={<p class="nt-menu-note">No people to choose from.</p>}>
-              {(user) => (
-                <Menu.Item
-                  onSelect={() => user.principalId !== company().defaultResponsibleUserId && void props.saver.save({ defaultResponsibleUserId: user.principalId })}
-                  icon={<InitialsDisc name={personName(user)} seed={user.principalId} size={24} />}
-                  description={user.user?.email ?? undefined}
-                  hint={user.principalId === company().defaultResponsibleUserId ? <Check size={14} /> : undefined}
-                >
-                  {personName(user)}
-                </Menu.Item>
-              )}
-            </For>
-            <Menu.Separator />
-            <Menu.Item
-              onSelect={() => company().defaultResponsibleUserId && void props.saver.save({ defaultResponsibleUserId: null })}
-              hint={company().defaultResponsibleUserId ? undefined : <Check size={14} />}
-            >
-              Nobody
-            </Menu.Item>
-          </Menu.Content>
-        </Menu>
+        <OwnerMenu label="Default owner" value={company().defaultResponsibleUserId} onChange={(id) => void props.saver.save({ defaultResponsibleUserId: id })} />
+      </SettingsRow>
+    </SettingsCard>
+  );
+}
+
+/**
+ * Request routing's owners (U134, upstream #20959): who gets requests nobody else owns, and budget
+ * stops. Placement only: they show in that person's For you, and who may answer stays as the
+ * request says.
+ */
+function RoutingCard(props: { saver: Saver }) {
+  const company = useCompany();
+  return (
+    <SettingsCard
+      title="Request routing"
+      info="Where requests show in the Inbox. A request goes to the person it's sent to, the chat's person, the reviewer or assignee, or whoever started the work. If none of them applies, it goes to the project's decision owner, then to the decision owner here, and otherwise waits in Unassigned. Routing never changes who may answer."
+      description={
+        <CardNote state={props.saver.state()} error={props.saver.error()}>
+          {null}
+        </CardNote>
+      }
+    >
+      <SettingsRow
+        label="Decision owner"
+        info="Gets requests that have no owner, in their For you, unless the task's project has its own decision owner. With nobody, those requests wait in Unassigned, and after a week they move to Company."
+      >
+        <OwnerMenu
+          label="Decision owner"
+          value={company().defaultDecisionOwnerUserId}
+          noneLabel="Nobody: they wait in Unassigned"
+          onChange={(id) => void props.saver.save({ defaultDecisionOwnerUserId: id })}
+        />
+      </SettingsRow>
+      <SettingsRow
+        label="Budget owner"
+        info="Gets budget hard stops in their For you, to raise the limit or keep the work paused. The company's operators still see them under Company."
+      >
+        <OwnerMenu
+          label="Budget owner"
+          value={company().budgetOwnerUserId}
+          noneLabel="Nobody: Company only"
+          onChange={(id) => void props.saver.save({ budgetOwnerUserId: id })}
+        />
       </SettingsRow>
     </SettingsCard>
   );

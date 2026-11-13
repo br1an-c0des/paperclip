@@ -243,6 +243,8 @@ export const queryKeys = {
   inbox: {
     attention: (companyId: string) => ["attention", companyId] as const,
     feed: (companyId: string) => ["attention", companyId, "with-dismissed"] as const,
+    /** For you's receipts and the server's view counts (`view=mine`, one card), under the feed's prefix. */
+    receipts: (companyId: string) => ["attention", companyId, "receipts"] as const,
     history: (companyId: string, filters: Record<string, string>) => ["attention", companyId, "history", filters] as const,
     approval: (companyId: string, approvalId: string) => ["approvals", companyId, "detail", approvalId] as const,
     approvalIssues: (companyId: string, approvalId: string) => ["approvals", companyId, "detail", approvalId, "issues"] as const,

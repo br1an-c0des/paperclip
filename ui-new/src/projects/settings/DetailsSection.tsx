@@ -5,6 +5,7 @@ import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js"
 import { activeAgents } from "@/api/agents";
 import { useAgentsQuery } from "@/lib/company-data";
 import { ProjectTile } from "@/projects/NewProjectDialog";
+import { OwnerMenu } from "@/settings/OwnerMenu";
 import { TILE_COLORS, TILE_ICONS } from "@/projects/new-project";
 import { AgentAvatar } from "@/ui/Avatar";
 import { FieldButton, SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
@@ -16,8 +17,9 @@ import { nameEdit, PROJECT_STATUS_OPTIONS, projectDescriptionEdit, projectGoalId
 import { CardNote, useProjectSaver } from "./shared";
 
 /*
- * Details (board 10's first card): name, tile color and icon, description, status, lead and target
- * date. Changes save as you make them: text when the field loses focus (or on Enter for the name),
+ * Details (board 10's first card): name, tile color and icon, description, status, lead, decision
+ * owner (U134: who gets the project's ownerless requests, `decisionOwnerUserId`) and target date.
+ * Changes save as you make them: text when the field loses focus (or on Enter for the name),
  * picks at once. The goals have their own section; this card links to it.
  */
 
@@ -211,6 +213,19 @@ export function DetailsSection(props: { project: Project; base: string }) {
             </Menu.Item>
           </Menu.Content>
         </Menu>
+      </SettingsRow>
+
+      <SettingsRow
+        label="Decision owner"
+        info="Gets this project's requests that have no owner, in their For you, before the company's decision owner does. Routing never changes who may answer."
+      >
+        <OwnerMenu
+          label="Decision owner"
+          class="ps-field-360"
+          value={props.project.decisionOwnerUserId ?? null}
+          noneLabel="The company's decision owner"
+          onChange={(id) => void saver.save({ decisionOwnerUserId: id })}
+        />
       </SettingsRow>
 
       <SettingsRow label="Target date" for="ps-target">

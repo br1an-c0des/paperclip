@@ -23,6 +23,15 @@ export function isOpenApproval(approval: Pick<Approval, "status">) {
   return approval.status === "pending" || approval.status === "revision_requested";
 }
 
+/**
+ * Whether an approval can be withdrawn as out of date (`POST /approvals/:id/cancel`, upstream
+ * #20959): an open one that isn't a hire, which is rejected instead so its pending agent gets a
+ * decision.
+ */
+export function canWithdrawApproval(approval: Pick<Approval, "status" | "type">) {
+  return isOpenApproval(approval) && approval.type !== "hire_agent";
+}
+
 /** The agent a hire request created, which waits in `pending_approval` until it's decided. */
 export function hiredAgentId(approval: Pick<Approval, "payload">): string | null {
   const id = approval.payload?.agentId;

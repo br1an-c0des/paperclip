@@ -19,8 +19,10 @@ import { markMonitoring } from "./issues";
  * - The attention feed (`GET /companies/:id/attention`): every kind of request and alert as one
  *   ranked item shape. The Inbox reads it whole (`all`) with your cleared and snoozed items
  *   (`includeDismissed`), and sorts it into tabs itself.
- * - Clearing and snoozing are per person (`/companies/:id/inbox-dismissals`), keyed by the item's
- *   `dismissalKey`. Restoring deletes the entry.
+ * - Archiving (the old "clear") and snoozing are per person (`/companies/:id/inbox-dismissals`),
+ *   keyed by the item's `dismissalKey`, with its `changeFingerprint` since upstream #20959: a hidden
+ *   card comes back once its content changes. Restoring deletes the entry. A For you receipt is
+ *   dismissed the same way, by its own key.
  * - Keep (`/companies/:id/decision-retention/:sourceKind/:sourceId`): brings an item that went
  *   quiet past its retention days back from the aging shelf, and keeps it from being archived.
  * - One approval by id, for its request card, and the tasks it's linked to.
@@ -61,9 +63,11 @@ export const inboxApi = {
   feed: (companyId: string, signal?: AbortSignal) =>
     api.get<AttentionFeed>(`/companies/${companyId}/attention?includeDismissed=true&all=true`, { signal }),
 
-  clear: (companyId: string, itemKey: string) => api.post<InboxDismissal>(`/companies/${companyId}/inbox-dismissals`, { itemKey }),
-  snooze: (companyId: string, itemKey: string, snoozedUntil: string) =>
-    api.post<InboxDismissal>(`/companies/${companyId}/inbox-dismissals`, { itemKey, kind: "snooze", snoozedUntil }),
+  /** Archive for you: hidden until the card's content changes from `fingerprint` (its `changeFingerprint`). */
+  clear: (companyId: string, itemKey: string, fingerprint?: string | null) =>
+    api.post<InboxDismissal>(`/companies/${companyId}/inbox-dismissals`, { itemKey, ...(fingerprint ? { fingerprint } : {}) }),
+  snooze: (companyId: string, itemKey: string, snoozedUntil: string, fingerprint?: string | null) =>
+    api.post<InboxDismissal>(`/companies/${companyId}/inbox-dismissals`, { itemKey, kind: "snooze", snoozedUntil, ...(fingerprint ? { fingerprint } : {}) }),
   restore: (companyId: string, itemKey: string) =>
     api.delete<void>(`/companies/${companyId}/inbox-dismissals/${encodeURIComponent(itemKey)}`),
 

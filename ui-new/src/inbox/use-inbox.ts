@@ -1,7 +1,8 @@
-import type { AttentionFeed, AttentionItem, AttentionSubject, CompactIssue } from "@paperclipai/shared";
+import type { AttentionFeed, AttentionItem, AttentionReceipt, AttentionSubject, CompactIssue } from "@paperclipai/shared";
 import { createMutation, createQueries, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createMemo, createSignal } from "solid-js";
 import { accessApi } from "@/api/access";
+import { attentionApi } from "@/api/attention";
 import { ApiError } from "@/api/client";
 import { decisionsApi } from "@/api/decisions";
 import { inboxApi } from "@/api/inbox";
@@ -30,6 +31,7 @@ import {
   type Pending,
 } from "./inbox-model";
 import { useAttentionFeed } from "./needs-you";
+import { alreadyClosed, alreadyClosedText, liveReceipts, withOwner } from "./routing-model";
 
 /*
  * The Inbox's data and triage (board 14):
@@ -40,9 +42,14 @@ import { useAttentionFeed } from "./needs-you";
  *   each proposal by id with the open list's changed targets, and the pending join requests (the
  *   list Settings → Members reads).
  * - Keep brings a request back from the aging shelf, at once in the cached feed.
- * - Clear, snooze and restore, shown at once and undone from the toast. A step stays shown until a
- *   feed fetched after it lands. It also patches the feed's cache, which the nav's Inbox count reads
- *   (`needs-you.ts`), so the count moves with it; a failed step puts the item back.
+ * - Archive (the "clear" step), snooze and restore, shown at once and undone from the toast. Archive
+ *   and snooze send the card's `changeFingerprint`, so it comes back when it changes. A step stays
+ *   shown until a feed fetched after it lands. It also patches the feed's cache, which the nav's
+ *   Inbox count reads (`needs-you.ts`), so the count moves with it; a failed step puts the item back.
+ * - Routing (U133, `routing-model.ts`): claim and transfer patch the card's owner in the cache at
+ *   once; withdraw ends the request for everyone and drops it once the server agrees. When someone
+ *   else was first, the toast says who and the feed is read again.
+ * - For you's receipts, read only while For you is open, each with its own dismiss.
  * - Your tasks for Updates in one read (`inbox/mine`), with read state and the inbox archive. The
  *   read is checked against who you are before it's kept, as the old Inbox checks it. Its context
  *   rows give a task behind a failed run its interruption, for Retry on Updates rows and on failed
@@ -64,7 +71,11 @@ export function itemTask(item: AttentionItem) {
   return item.subject.kind === "issue" ? item.subject : null;
 }
 
-export function useInbox(options: { people: TaskPeople; clearedOpen: () => boolean }) {
+function itemTitleOf(item: AttentionItem) {
+  return item.subject.title ?? itemTask(item)?.title ?? undefined;
+}
+
+export function useInbox(options: { people: TaskPeople; clearedOpen: () => boolean; receiptsOpen?: () => boolean }) {
   const company = useCompany();
   const client = useQueryClient();
   const companyId = () => company().id;
@@ -112,8 +123,9 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
   const triage = createMutation(() => ({
     mutationFn: (input: { item: AttentionItem; step: Pending }): Promise<unknown> => {
       const key = input.item.dismissalKey;
-      if (input.step.action === "clear") return inboxApi.clear(companyId(), key);
-      if (input.step.action === "snooze") return inboxApi.snooze(companyId(), key, input.step.until);
+      const fingerprint = input.item.changeFingerprint || null;
+      if (input.step.action === "clear") return inboxApi.clear(companyId(), key, fingerprint);
+      if (input.step.action === "snooze") return inboxApi.snooze(companyId(), key, input.step.until, fingerprint);
       return inboxApi.restore(companyId(), key);
     },
     onMutate: async (input) => {
@@ -134,13 +146,13 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
     },
   }));
 
-  const title = (item: AttentionItem) => item.subject.title ?? itemTask(item)?.title ?? undefined;
+  const title = (item: AttentionItem) => itemTitleOf(item);
 
   const clear = (item: AttentionItem) => {
     triage.mutate({ item, step: { action: "clear" } });
     pushToast({
       dedupeKey: `inbox-clear-${item.id}`,
-      title: "Cleared",
+      title: "Archived for you",
       body: title(item),
       tone: "info",
       ttlMs: 8000,
@@ -174,6 +186,88 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
     },
   }));
   const keep = (item: AttentionItem) => keepStep.mutate(item);
+
+  // Routing: claim, transfer and withdraw (U133).
+  const names = (id: string) => options.people.personName(id);
+  const routeFailed = (title: string, error: Error) => {
+    const closed = alreadyClosed(error);
+    if (closed) {
+      pushToast({ tone: "warn", title: alreadyClosedText(closed, options.people.youId(), names), body: "The inbox has been read again." });
+      refreshFeed();
+      return;
+    }
+    pushToast({ tone: "error", title, body: error.message });
+  };
+  const route = createMutation(() => ({
+    mutationFn: (input: { item: AttentionItem; to: string | null }) =>
+      input.to === null
+        ? attentionApi.claim(companyId(), input.item.sourceKind, input.item.subject.id)
+        : attentionApi.transfer(companyId(), input.item.sourceKind, input.item.subject.id, { userId: input.to }),
+    onMutate: async (input: { item: AttentionItem; to: string | null }) => {
+      await client.cancelQueries({ queryKey: queryKeys.inbox.feed(companyId()) });
+      const you = options.people.youId();
+      if (!you) return { before: undefined };
+      const before = patchItem(input.item.id, (item) => (input.to === null ? withOwner(item, you, null) : withOwner(item, input.to, you)));
+      return { before };
+    },
+    onSuccess: (_result: unknown, input: { item: AttentionItem; to: string | null }) => {
+      refreshFeed();
+      const title = itemTitleOf(input.item);
+      if (input.to === null) pushToast({ tone: "success", title: "Claimed. It's in For you now.", body: title });
+      else pushToast({ tone: "success", title: `Transferred to ${names(input.to)}`, body: title });
+    },
+    onError: (error: Error, input: { item: AttentionItem; to: string | null }, context: { before: AttentionItem | undefined } | undefined) => {
+      if (context?.before) patchItem(input.item.id, () => context.before!);
+      routeFailed(input.to === null ? "Couldn't claim it" : "Couldn't transfer it", error);
+    },
+  }));
+  const claim = (item: AttentionItem) => route.mutate({ item, to: null });
+  const transfer = (item: AttentionItem, userId: string) => route.mutate({ item, to: userId });
+
+  const withdrawStep = createMutation(() => ({
+    mutationFn: (input: { item: AttentionItem; reason: string }) =>
+      attentionApi.close(companyId(), input.item.sourceKind, input.item.subject.id, { mode: "withdraw", reason: input.reason.trim() || null }),
+    onSuccess: (_result: unknown, input: { item: AttentionItem; reason: string }) => {
+      client.setQueryData<AttentionFeed>(queryKeys.inbox.feed(companyId()), (current) =>
+        current ? { ...current, items: current.items.filter((item) => item.id !== input.item.id) } : current,
+      );
+      refreshFeed();
+      void client.invalidateQueries({ queryKey: ["approvals", companyId()] });
+      const task = itemTask(input.item);
+      if (task) void client.invalidateQueries({ queryKey: queryKeys.issues.detail(task.id) });
+      pushToast({ tone: "success", title: "Withdrawn for everyone", body: itemTitleOf(input.item) });
+    },
+    onError: (error: Error) => routeFailed("Couldn't withdraw it", error),
+  }));
+  /** Resolves true once withdrawn; false when it failed (the toast says why). */
+  const withdraw = (item: AttentionItem, reason = "") =>
+    withdrawStep.mutateAsync({ item, reason }).then(
+      () => true,
+      () => false,
+    );
+
+  /** The Close… menu's dialogs, drawn once by the page (`RouteDialogs` in InboxRouting.tsx). */
+  const [dialog, setDialog] = createSignal<{ kind: "transfer" | "withdraw"; item: AttentionItem } | null>(null);
+
+  // For you's receipts: what someone else did with a request that was yours.
+  const receiptsQuery = createQuery(() => ({
+    queryKey: queryKeys.inbox.receipts(companyId()),
+    queryFn: ({ signal }) => attentionApi.receipts(companyId(), signal),
+    enabled: options.receiptsOpen?.() ?? false,
+    refetchOnWindowFocus: true,
+  }));
+  const [dismissedReceipts, setDismissedReceipts] = createSignal<ReadonlySet<string>>(new Set());
+  const receipts = createMemo(() => liveReceipts(receiptsQuery.data?.receipts, dismissedReceipts()));
+  const dismissReceipt = (receipt: AttentionReceipt) => {
+    setDismissedReceipts((current) => new Set([...current, receipt.dismissalKey]));
+    inboxApi.clear(companyId(), receipt.dismissalKey).then(
+      () => void client.invalidateQueries({ queryKey: queryKeys.inbox.receipts(companyId()) }),
+      (error: Error) => {
+        setDismissedReceipts((current) => new Set([...current].filter((key) => key !== receipt.dismissalKey)));
+        pushToast({ tone: "error", title: "Couldn't dismiss it", body: error.message });
+      },
+    );
+  };
 
   // The cards' sources. Interactions are read per task, as the task's thread reads them.
   const interactionTaskIds = createMemo(() => [
@@ -424,6 +518,17 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
     snooze,
     restore,
     keep,
+    claim,
+    transfer,
+    withdraw,
+    routing: () => route.isPending || withdrawStep.isPending,
+    dialog,
+    askTransfer: (item: AttentionItem) => setDialog({ kind: "transfer", item }),
+    askWithdraw: (item: AttentionItem) => setDialog({ kind: "withdraw", item }),
+    closeDialog: () => setDialog(null),
+    receipts,
+    receiptsQuery,
+    dismissReceipt,
     refreshFeed,
     tasks,
     rows,

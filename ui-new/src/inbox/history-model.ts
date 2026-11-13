@@ -2,45 +2,64 @@ import type { DecisionHistoryItem, DecisionHistoryQuery } from "@paperclipai/sha
 import type { Tone } from "@/ui/Status";
 
 /*
- * The Inbox's History tab (`GET /companies/:id/attention/history`): what was decided on tasks, a
- * page at a time, as the old UI's Coordinator "Decision history" panel lists it. Each row is a
- * receipt that opens its task; it isn't a second answer form. History covers questions and
- * proposals answered on a task (interactions and Decisions); approvals aren't in it.
+ * The Inbox's History tab (`GET /companies/:id/attention/history`): what was decided, a page at a
+ * time, as the old UI's "Decision history" panel lists it. Each row is a receipt that opens its
+ * task; it isn't a second answer form. History covers questions and proposals answered on a task
+ * (interactions and Decisions) and, since upstream #20959, approvals, which may have no task.
  *
- * - Filters, as the old panel offers them: outcome, the agent that asked, the project, newest or
- *   oldest first. The Inbox's search box is the history's `search` (titles and task IDs, on the
- *   server).
+ * - Filters, as the old panel offers them: whose (`scope`: by or for you, the default, or
+ *   everyone's), outcome (with "Handled for me", `handledForMe`), the agent that asked, the
+ *   project, newest or oldest first. The Inbox's search box is the history's `search` (titles and
+ *   task IDs, on the server).
+ * - A row says what the person did in the receipt's words ("Approved by Sam"), and for whom when
+ *   someone else handled it ("for Riley").
  * - Newest first is grouped by when it was decided, as Updates groups by activity; oldest first
  *   is one list.
  */
 
 export const HISTORY_PAGE_SIZE = 40;
 
-export type HistoryOutcome = "" | "accepted" | "answered" | "rejected" | "decided" | "cancelled" | "expired";
+export type HistoryOutcome = "" | "accepted" | "answered" | "rejected" | "decided" | "withdrawn" | "expired" | "issue_closed" | "cancelled" | "handled_for_me";
 
-/** The old panel's outcome choices; `outcome` is what the server filters on. */
+/**
+ * The outcome choices (the server's `DECISION_HISTORY_OUTCOME_FILTERS`, upstream #20959), and
+ * "Handled for me", which isn't an outcome but who the card was for: it's sent as `handledForMe`.
+ */
 export const HISTORY_OUTCOMES: readonly { value: HistoryOutcome; label: string }[] = [
   { value: "", label: "All outcomes" },
+  { value: "handled_for_me", label: "Handled for me" },
   { value: "accepted", label: "Approved" },
   { value: "answered", label: "Answered" },
   { value: "rejected", label: "Changes requested" },
   { value: "decided", label: "Decided" },
-  { value: "cancelled", label: "Cancelled" },
+  { value: "withdrawn", label: "Withdrawn" },
   { value: "expired", label: "Expired" },
+  { value: "issue_closed", label: "Closed with its task" },
+  { value: "cancelled", label: "Cancelled" },
 ];
 
 export type HistorySort = "newest" | "oldest";
 
-export type HistoryFilters = { search: string; outcome: HistoryOutcome; agentId: string; projectId: string; sort: HistorySort };
+/** Whose history (#20959): handled by you or for you (the default, as upstream's), or everyone's. */
+export type HistoryScope = "mine" | "all";
 
-export const NO_HISTORY_FILTERS: HistoryFilters = { search: "", outcome: "", agentId: "", projectId: "", sort: "newest" };
+export const HISTORY_SCOPES: readonly { value: HistoryScope; label: string }[] = [
+  { value: "mine", label: "By or for me" },
+  { value: "all", label: "Everyone's" },
+];
 
-/** The request's query for one page. Empty filters are left out; newest is the server's default. */
+export type HistoryFilters = { search: string; outcome: HistoryOutcome; agentId: string; projectId: string; sort: HistorySort; scope: HistoryScope };
+
+export const NO_HISTORY_FILTERS: HistoryFilters = { search: "", outcome: "", agentId: "", projectId: "", sort: "newest", scope: "mine" };
+
+/** The request's query for one page. Empty filters are left out; newest and everyone's are the server's defaults. */
 export function historyQuery(filters: HistoryFilters, cursor?: string): DecisionHistoryQuery {
   const query: DecisionHistoryQuery = { limit: HISTORY_PAGE_SIZE };
+  if (filters.scope === "mine") query.scope = "mine";
   const search = filters.search.trim();
   if (search) query.search = search.slice(0, 200);
-  if (filters.outcome) query.outcome = filters.outcome;
+  if (filters.outcome === "handled_for_me") query.handledForMe = true;
+  else if (filters.outcome) query.outcome = filters.outcome;
   if (filters.agentId) query.agentId = filters.agentId;
   if (filters.projectId) query.projectId = filters.projectId;
   if (filters.sort === "oldest") query.sort = "oldest";
@@ -65,6 +84,7 @@ export function filtersActive(filters: HistoryFilters) {
  */
 export function outcomeTone(item: Pick<DecisionHistoryItem, "outcome" | "label">): Tone | null {
   switch (item.outcome) {
+    case "approved":
     case "accepted":
       return "green";
     case "rejected":
@@ -89,6 +109,25 @@ export function historyItems(pages: readonly { items: readonly DecisionHistoryIt
     }
   }
   return items;
+}
+
+/**
+ * A row's "who did what" line (#20959): "Approved by Sam for Riley", "Withdrawn by you",
+ * "Decided by an agent". Rows without a recorded action fall back to who resolved it. Null when
+ * nobody acted (it expired, closed with its task).
+ */
+export function actionLine(
+  item: Pick<DecisionHistoryItem, "action" | "resolvedByUserId" | "resolvedByAgentId" | "handledForUserId">,
+  names: { youId: string | null; person: (id: string) => string; agent: (id: string) => string | undefined },
+  verb: (outcome: NonNullable<DecisionHistoryItem["action"]>["outcome"]) => string,
+): string | null {
+  const by = decidedBy(item, names);
+  if (!by) return null;
+  const who = by === "You" ? "you" : by;
+  const head = item.action ? `${verb(item.action.outcome)} by ${who}` : `Decided by ${who}`;
+  const forId = item.handledForUserId;
+  if (!forId || forId === item.resolvedByUserId) return head;
+  return `${head} for ${forId === names.youId ? "you" : names.person(forId)}`;
 }
 
 /** "Jane Doe" or "an agent": who decided, from the people the board knows. */
