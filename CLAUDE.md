@@ -44,6 +44,15 @@ or package code.
 - For upstream conventions (repo map, dev setup, API rules), see `AGENTS.md`. Its PR-template and
   Paperclip-issue workflow rules apply only to pull requests sent upstream, not to work on `new-ui`.
 
+## UI text
+
+- **Help text goes behind an "i" icon, not in the page body.** When you write a short description
+  or hint for a UI element (what a section, card or field is for, or general guidance), put it in a
+  hover tooltip under a small "i" info icon: `ui-new/src/ui/InfoTip.tsx`, or the `info` prop on
+  `SettingsCard` and `SettingsRow`. Keep visible only what describes the current state: empty
+  states, why a control is missing or disabled, save status and errors. The tip also opens on tap,
+  for phones. See [decision 52](ui-new/docs/decisions.md#52-help-text-goes-behind-an-info-icon).
+
 ## Documentation
 
 | Doc | What it covers |

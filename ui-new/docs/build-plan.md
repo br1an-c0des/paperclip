@@ -451,6 +451,13 @@ Progress:
   the Instructions page lists each active connection's instructions).
 - **Upstream changes to integrate:** the [table below](#upstream-changes-to-integrate), from the
   Nov 3 audit of every sync report since Oct 15 and the Nov 3 sync.
+- **Open (Nov 12): help text behind info icons** ([decision 52](decisions.md#52-help-text-goes-behind-an-info-icon)).
+  An app-wide sweep: every card description, row `help`, form `Field` help and similar hint
+  paragraph that says what something is for moves into an `info` tip, and is rewritten where it
+  misleads. State, empty-state, disabled-reason, save-status and error text stays visible. First
+  done: `ui/InfoTip.tsx` and project settings → Code and workspaces. Left: everything else (about
+  210 `SettingsCard`s, 170 `SettingsRow`s and 140 note lines, Nov 12 count); split by area, one
+  agent per area, and check phones (tap to open).
 
 ##### Upstream changes to integrate
 

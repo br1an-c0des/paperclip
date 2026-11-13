@@ -76,6 +76,9 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 47 | [Upstream sync 2026-10-29](#47-upstream-sync-2026-10-29) | Skills, `shell/coordinator-workspace`, `agents/configuration-yaml` | Decided | Nov 1, 2026 |
 | 48 | [Upstream sync 2026-11-01](#48-upstream-sync-2026-11-01) | Skills, chat, plugins, settings | Decided | Nov 1, 2026 |
 | 49 | [The left nav: company row, settings sidebars and an icon rail](#49-the-left-nav-company-row-settings-sidebars-and-an-icon-rail) | `shell/navigation`, `shell/contextual-sidebars`, `shell/company` | Decided | Nov 9, 2026 |
+| 50 | [Gaps found in integration round 7](#50-gaps-found-in-integration-round-7) | Chat, queue, link previews, projects | Decided | Nov 11, 2026 |
+| 51 | [Apps is called Connections](#51-apps-is-called-connections) | Apps and tools, `shell/navigation`, company settings | Decided | Nov 12, 2026 |
+| 52 | [Help text goes behind an info icon](#52-help-text-goes-behind-an-info-icon) | All screens | Decided | Nov 12, 2026 |
 
 ## Entries
 
@@ -1798,3 +1801,21 @@ Both are handled in `ui-new` for now.
     connections says "Connections".
   - Notes written before Nov 12, here and in the build plan and checklist, still say Apps.
 
+### 52. Help text goes behind an info icon
+
+- **Status:** Decided 2026-11-12
+- **Area:** every screen; first applied to project settings → Code and workspaces.
+- **Found in:** using the deployed instance. The Code and workspaces cards' descriptions were long,
+  misleading about how Repositories, Project workspaces and Task checkouts relate, and crowded the
+  page.
+
+- **Decision:**
+  - Text that says what a section, card or field *is for*, or gives general guidance, goes in a
+    hover tooltip under a small "i" icon (`ui/InfoTip.tsx`), not in the page body.
+    `SettingsCard` and `SettingsRow` take it as `info`.
+  - Text about the current state stays visible: empty states, why a control is missing or
+    disabled, save status and errors. Keep it short.
+  - The icon is a real button. It opens on hover and keyboard focus, and on tap on touch screens
+    (decision H: hover-only text may only repeat what's visible).
+  - New UI follows this from now on (CLAUDE.md, "UI text"). Existing help text moves over in an
+    app-wide sweep (build plan, M7 progress, "Open: help text behind info icons").
