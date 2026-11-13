@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeMention, decorateMentions, insertMention, matchesQuery, parseMentions, splitCode, taskRefFromHref } from "./mentions";
+import { activeMention, decorateMentions, insertMention, matchesQuery, parseMentions, splitCode, taskLinkPath, taskRefFromHref } from "./mentions";
 
 describe("activeMention", () => {
   it("finds the @query just before the caret", () => {
@@ -69,6 +69,20 @@ describe("helpers", () => {
     expect(taskRefFromHref("/issues/tra-41")).toBe("TRA-41");
     expect(taskRefFromHref("https://board.example/TRA/issues/TRA-41#c1")).toBe("TRA-41");
     expect(taskRefFromHref("https://example.com")).toBeNull();
+  });
+
+  it("keeps another company's prefix on task links (U146)", () => {
+    const known = ["TES", "BIR"];
+    expect(taskLinkPath("/issues/TES-4", "TES", known)).toBe("/TES/issues/TES-4");
+    expect(taskLinkPath("/BIR/issues/BIR-1", "TES", known)).toBe("/BIR/issues/BIR-1");
+    expect(taskLinkPath("/bir/issues/bir-1#document-plan", "TES", known)).toBe("/BIR/issues/BIR-1#document-plan");
+    expect(taskLinkPath("https://board.example/BIR/issues/BIR-1", "TES", known)).toBe("/BIR/issues/BIR-1");
+    // A bare link goes to the company its identifier names, when it's one you can open.
+    expect(taskLinkPath("/issues/BIR-1", "TES", known)).toBe("/BIR/issues/BIR-1");
+    expect(taskLinkPath("/issues/ZED-9", "TES", known)).toBe("/TES/issues/ZED-9");
+    // A company you can't open keeps its prefix rather than turning into one of yours.
+    expect(taskLinkPath("/ZED/issues/ZED-9", "TES", known)).toBe("/ZED/issues/ZED-9");
+    expect(taskLinkPath("https://example.com", "TES", known)).toBeNull();
   });
 
   it("matches any word of a name", () => {

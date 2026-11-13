@@ -85,6 +85,23 @@ export function taskRefFromHref(href: string | null | undefined): string | null 
 }
 
 /**
+ * Where a task link opens in this board (U146, upstream #21026): `/<PREFIX>/issues/<ID>`, keeping
+ * a fragment such as `#document-plan`. A link that names a company (`/BIR/issues/BIR-1`, or a full
+ * URL with one) keeps that company; a bare `/issues/BIR-1` goes to the company whose prefix the
+ * identifier carries when it's one this person can open, and otherwise to the current company. Null
+ * when the href isn't a task link.
+ */
+export function taskLinkPath(href: string | null | undefined, currentPrefix: string, knownPrefixes: readonly string[] = []): string | null {
+  const ref = taskRefFromHref(href);
+  if (!ref || !href) return null;
+  const hash = href.includes("#") ? href.slice(href.indexOf("#")) : "";
+  const known = (prefix: string | undefined) => (prefix ? knownPrefixes.find((each) => each.toLowerCase() === prefix.toLowerCase()) : undefined);
+  const named = /(?:^|\/)([A-Za-z][A-Za-z0-9]*)\/issues\/[A-Za-z][A-Za-z0-9]*-\d+(?:[/?#]|$)/.exec(href)?.[1];
+  const prefix = named && named.toLowerCase() !== "issues" ? (known(named) ?? named) : (known(ref.slice(0, ref.lastIndexOf("-"))) ?? currentPrefix);
+  return `/${prefix}/issues/${ref}${hash}`;
+}
+
+/**
  * The message, ready for the Markdown renderer: mention links become `<span class="mention">`
  * chips, and bare identifiers with the company's prefix become task links. Code spans and fenced
  * blocks pass through untouched.
