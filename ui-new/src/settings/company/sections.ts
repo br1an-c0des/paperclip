@@ -19,7 +19,7 @@ export type SectionDef = { key: SectionKey; label: string; path: string };
 export const SECTIONS: readonly SectionDef[] = [
   { key: "general", label: "General", path: "" },
   { key: "members", label: "Members", path: "/members" },
-  { key: "connections", label: "Connections", path: "/connections" },
+  { key: "connections", label: "Paperclip Models", path: "/paperclip-models" },
   { key: "secrets", label: "Secrets", path: "/secrets" },
   { key: "budgets", label: "Budgets", path: "/budgets" },
   { key: "environments", label: "Environments", path: "/environments" },
@@ -55,6 +55,8 @@ const LEGACY: Record<string, { key: SectionKey; anchor?: string }> = {
   access: { key: "members" },
   invites: { key: "members", anchor: "invites" },
   "join-requests": { key: "members", anchor: "join-requests" },
+  // Paperclip Models was called Connections, at the old UI's address; Connections is Apps now.
+  connections: { key: "connections" },
   "cloud-upstream": { key: "transfer" },
   export: { key: "transfer", anchor: "export" },
   import: { key: "transfer", anchor: "import" },

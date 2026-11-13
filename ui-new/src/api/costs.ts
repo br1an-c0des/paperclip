@@ -25,7 +25,7 @@ import { api } from "./client";
  * everything (`period=all`); with one it counts ledger events from `from` up to `to`.
  *
  * Also the decision model's and fast responses' call history (ui/src/api/decision-models.ts and
- * fast-responses.ts), which the Costs tab lists; their settings are company settings → Connections
+ * fast-responses.ts), which the Costs tab lists; their settings are company settings → Paperclip Models
  * (ai-connections.ts).
  */
 

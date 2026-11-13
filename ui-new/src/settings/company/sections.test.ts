@@ -9,9 +9,11 @@ describe("parseSettingsPath", () => {
   });
 
   it("knows each section's address", () => {
-    for (const key of ["members", "connections", "secrets", "budgets", "environments", "transfer"] as const) {
+    for (const key of ["members", "secrets", "budgets", "environments", "transfer"] as const) {
       expect(parseSettingsPath(key)).toEqual({ kind: "section", key });
     }
+    expect(parseSettingsPath("paperclip-models")).toEqual({ kind: "section", key: "connections" });
+    expect(sectionHref("/TES/company/settings", "connections")).toBe("/TES/company/settings/paperclip-models");
   });
 
   it("sends a deeper address to its section", () => {
@@ -24,6 +26,8 @@ describe("parseSettingsPath", () => {
     expect(parseSettingsPath("members", "?tab=invites")).toEqual({ kind: "redirect", key: "members", anchor: "invites" });
     expect(parseSettingsPath("members", "?tab=members")).toEqual({ kind: "section", key: "members" });
     expect(parseSettingsPath("cloud-upstream")).toEqual({ kind: "redirect", key: "transfer" });
+    // Paperclip Models was Connections, at the old UI's address.
+    expect(parseSettingsPath("connections")).toEqual({ kind: "redirect", key: "connections" });
     expect(parseSettingsPath("instance/environments")).toEqual({ kind: "redirect", key: "environments" });
     expect(parseSettingsPath("instance/environments/new")).toEqual({ kind: "redirect", key: "environments" });
     expect(parseSettingsPath("instance/environments/env-1/edit")).toEqual({ kind: "redirect", key: "environments" });
@@ -58,7 +62,7 @@ describe("companySettingsEntries", () => {
       "# Organization",
       "General /TES/company/settings end",
       "Members /TES/company/settings/members",
-      "Connections /TES/company/settings/connections",
+      "Paperclip Models /TES/company/settings/paperclip-models",
       "Secrets /TES/company/settings/secrets",
       "Budgets /TES/company/settings/budgets",
       "Environments /TES/company/settings/environments",
