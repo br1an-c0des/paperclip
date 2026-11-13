@@ -1,5 +1,5 @@
 {
-  "upstreamCommit": "c8ae02e5ce42c254e1d56dd4d1b34bd73e1a415b",
+  "upstreamCommit": "2659ff1d22ae05d1f77b83b1a6235b6975f88c3c",
   "routes": [
     {
       "path": "/oauth-handoff",
@@ -5074,7 +5074,6 @@
         ],
         "via": [
           "components/AgentConfigForm.tsx",
-          "components/AgentLoginTarget.tsx",
           "components/CommandPalette.tsx",
           "components/MarkdownBody.tsx",
           "components/NewIssueDialog.tsx",
@@ -5200,7 +5199,6 @@
         ],
         "via": [
           "components/AgentConfigForm.tsx",
-          "components/AgentLoginTarget.tsx",
           "components/ai-connections/AiConnectionCredentialStep.tsx",
           "plugins/useAgentEnvironmentSlots.ts"
         ]
@@ -5769,6 +5767,18 @@
         ]
       },
       {
+        "key": "api/tools.ts::toolsApi.listProviderToolIcons",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/companies/:companyId/tool-icons"
+          }
+        ],
+        "via": [
+          "components/ProviderToolIcon.tsx"
+        ]
+      },
+      {
         "key": "api/routines.ts::routinesApi.get",
         "requests": [
           {
@@ -5778,19 +5788,6 @@
         ],
         "via": [
           "components/RoutineContextualSidebar.tsx"
-        ]
-      },
-      {
-        "key": "api/attention.ts::attentionApi.list",
-        "requests": [
-          {
-            "method": "GET",
-            "path": "/api/companies/:companyId/attention"
-          }
-        ],
-        "via": [
-          "components/Sidebar.tsx",
-          "hooks/useCoordinatorAttentionCount.ts"
         ]
       },
       {
@@ -6507,6 +6504,120 @@
         ]
       },
       {
+        "key": "api/access.ts::accessApi.getCurrentBoardAccess",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/cli-auth/me"
+          }
+        ],
+        "via": [
+          "hooks/useAttentionViews.ts",
+          "hooks/useCompanyInviteAccess.ts"
+        ]
+      },
+      {
+        "key": "api/attention.ts::attentionApi.claim",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/companies/:companyId/attention/:sourceKind/:sourceId/claim"
+          }
+        ],
+        "via": [
+          "hooks/useAttentionViews.ts"
+        ]
+      },
+      {
+        "key": "api/attention.ts::attentionApi.close",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/companies/:companyId/attention/:sourceKind/:sourceId/close"
+          }
+        ],
+        "via": [
+          "hooks/useAttentionViews.ts"
+        ]
+      },
+      {
+        "key": "api/attention.ts::attentionApi.list",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/companies/:companyId/attention"
+          }
+        ],
+        "via": [
+          "hooks/useAttentionViews.ts",
+          "hooks/useCoordinatorAttentionCount.ts"
+        ]
+      },
+      {
+        "key": "api/attention.ts::attentionApi.transfer",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/companies/:companyId/attention/:sourceKind/:sourceId/transfer"
+          }
+        ],
+        "via": [
+          "hooks/useAttentionViews.ts"
+        ]
+      },
+      {
+        "key": "api/inboxDismissals.ts::inboxDismissalsApi.dismiss",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/companies/:companyId/inbox-dismissals"
+          }
+        ],
+        "via": [
+          "hooks/useAttentionViews.ts",
+          "hooks/useInboxBadge.ts"
+        ]
+      },
+      {
+        "key": "api/inboxDismissals.ts::inboxDismissalsApi.restore",
+        "requests": [
+          {
+            "method": "DELETE",
+            "path": "/api/companies/:companyId/inbox-dismissals/:itemKey"
+          }
+        ],
+        "via": [
+          "hooks/useAttentionViews.ts",
+          "hooks/useInboxBadge.ts"
+        ]
+      },
+      {
+        "key": "api/workspacePreferences.ts::workspacePreferencesApi.get",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/workspace-preferences/me"
+          }
+        ],
+        "via": [
+          "hooks/useBrowserTimeZoneSync.ts",
+          "hooks/useCoordinatorWorkspaceEnabled.ts"
+        ]
+      },
+      {
+        "key": "api/workspacePreferences.ts::workspacePreferencesApi.update",
+        "requests": [
+          {
+            "method": "PUT",
+            "path": "/api/companies/:companyId/workspace-preferences/me"
+          }
+        ],
+        "via": [
+          "hooks/useBrowserTimeZoneSync.ts",
+          "hooks/useCoordinatorWorkspaceEnabled.ts"
+        ]
+      },
+      {
         "key": "api/cloud.ts::cloudApi.listStacks",
         "requests": [
           {
@@ -6516,18 +6627,6 @@
         ],
         "via": [
           "hooks/useCloudInviteUrl.ts"
-        ]
-      },
-      {
-        "key": "api/access.ts::accessApi.getCurrentBoardAccess",
-        "requests": [
-          {
-            "method": "GET",
-            "path": "/api/cli-auth/me"
-          }
-        ],
-        "via": [
-          "hooks/useCompanyInviteAccess.ts"
         ]
       },
       {
@@ -6579,59 +6678,11 @@
         ]
       },
       {
-        "key": "api/workspacePreferences.ts::workspacePreferencesApi.get",
-        "requests": [
-          {
-            "method": "GET",
-            "path": "/api/workspace-preferences/me"
-          }
-        ],
-        "via": [
-          "hooks/useCoordinatorWorkspaceEnabled.ts"
-        ]
-      },
-      {
-        "key": "api/workspacePreferences.ts::workspacePreferencesApi.update",
-        "requests": [
-          {
-            "method": "PUT",
-            "path": "/api/companies/:companyId/workspace-preferences/me"
-          }
-        ],
-        "via": [
-          "hooks/useCoordinatorWorkspaceEnabled.ts"
-        ]
-      },
-      {
-        "key": "api/inboxDismissals.ts::inboxDismissalsApi.dismiss",
-        "requests": [
-          {
-            "method": "POST",
-            "path": "/api/companies/:companyId/inbox-dismissals"
-          }
-        ],
-        "via": [
-          "hooks/useInboxBadge.ts"
-        ]
-      },
-      {
         "key": "api/inboxDismissals.ts::inboxDismissalsApi.list",
         "requests": [
           {
             "method": "GET",
             "path": "/api/companies/:companyId/inbox-dismissals"
-          }
-        ],
-        "via": [
-          "hooks/useInboxBadge.ts"
-        ]
-      },
-      {
-        "key": "api/inboxDismissals.ts::inboxDismissalsApi.restore",
-        "requests": [
-          {
-            "method": "DELETE",
-            "path": "/api/companies/:companyId/inbox-dismissals/:itemKey"
           }
         ],
         "via": [
@@ -7808,6 +7859,66 @@
           ],
           "via": [
             "components/coordinator/CoordinatorTaskCommitment.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/mcp-app-views"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppIssueContext.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.callTool",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/tool-calls"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.detail",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.messageSent",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/messages"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.updateModelContext",
+          "requests": [
+            {
+              "method": "PUT",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/model-context"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
           ]
         },
         {
@@ -10329,6 +10440,18 @@
           ]
         },
         {
+          "key": "api/agents.ts::agentsApi.renameInstructionsFile",
+          "requests": [
+            {
+              "method": "PUT",
+              "path": "/api/agents/:id/instructions-bundle/file"
+            }
+          ],
+          "via": [
+            "pages/AgentDetail.tsx"
+          ]
+        },
+        {
           "key": "api/agents.ts::agentsApi.resolveInstructionCandidate",
           "requests": [
             {
@@ -10778,7 +10901,8 @@
             }
           ],
           "via": [
-            "pages/Agents.tsx"
+            "pages/Agents.tsx",
+            "pages/OrgChart.tsx"
           ]
         },
         {
@@ -10791,6 +10915,18 @@
           ],
           "via": [
             "pages/Agents.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.summaries",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/issues/summaries"
+            }
+          ],
+          "via": [
+            "pages/OrgChart.tsx"
           ]
         }
       ]
@@ -17807,19 +17943,6 @@
           ]
         },
         {
-          "key": "api/issues.ts::issuesApi.cancelInteraction",
-          "requests": [
-            {
-              "method": "POST",
-              "path": "/api/issues/:id/interactions/:interactionId/cancel"
-            }
-          ],
-          "via": [
-            "components/AttentionInteractionResolver.tsx",
-            "pages/IssueDetail.tsx"
-          ]
-        },
-        {
           "key": "api/issues.ts::issuesApi.listInteractions",
           "requests": [
             {
@@ -17886,18 +18009,6 @@
             {
               "method": "POST",
               "path": "/api/decisions/:id/decide"
-            }
-          ],
-          "via": [
-            "components/DecisionResolver.tsx"
-          ]
-        },
-        {
-          "key": "api/decisions.ts::decisionsApi.dismiss",
-          "requests": [
-            {
-              "method": "POST",
-              "path": "/api/decisions/:id/dismiss"
             }
           ],
           "via": [
@@ -18863,6 +18974,66 @@
           ]
         },
         {
+          "key": "api/mcpApps.ts::mcpAppsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/mcp-app-views"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppIssueContext.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.callTool",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/tool-calls"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.detail",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.messageSent",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/messages"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.updateModelContext",
+          "requests": [
+            {
+              "method": "PUT",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/model-context"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
           "key": "api/issues.ts::issuesApi.actOnRunnerGoal",
           "requests": [
             {
@@ -19549,6 +19720,18 @@
             {
               "method": "DELETE",
               "path": "/api/issues/:id/comments/:commentId"
+            }
+          ],
+          "via": [
+            "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.cancelInteraction",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/interactions/:interactionId/cancel"
             }
           ],
           "via": [
@@ -21071,6 +21254,18 @@
           ]
         },
         {
+          "key": "api/access.ts::accessApi.listMembers",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/members"
+            }
+          ],
+          "via": [
+            "pages/CompanySettings.tsx"
+          ]
+        },
+        {
           "key": "api/assets.ts::assetsApi.uploadCompanyLogo",
           "requests": [
             {
@@ -21646,39 +21841,11 @@
           ]
         },
         {
-          "key": "api/agents.ts::agentsApi.get",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/agents/:id"
-            },
-            {
-              "method": "GET",
-              "path": "/api/companies/:companyId/agents"
-            }
-          ],
-          "via": [
-            "pages/Secrets.tsx"
-          ]
-        },
-        {
           "key": "api/agents.ts::agentsApi.list",
           "requests": [
             {
               "method": "GET",
               "path": "/api/companies/:companyId/agents"
-            }
-          ],
-          "via": [
-            "pages/Secrets.tsx"
-          ]
-        },
-        {
-          "key": "api/agents.ts::agentsApi.update",
-          "requests": [
-            {
-              "method": "PATCH",
-              "path": "/api/agents/:id"
             }
           ],
           "via": [
@@ -22046,6 +22213,34 @@
           "via": [
             "pages/secrets/MyUserSecretsTab.tsx"
           ]
+        },
+        {
+          "key": "api/agents.ts::agentsApi.get",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/agents/:id"
+            },
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/agents"
+            }
+          ],
+          "via": [
+            "pages/secrets/agent-secret-access.ts"
+          ]
+        },
+        {
+          "key": "api/agents.ts::agentsApi.update",
+          "requests": [
+            {
+              "method": "PATCH",
+              "path": "/api/agents/:id"
+            }
+          ],
+          "via": [
+            "pages/secrets/agent-secret-access.ts"
+          ]
         }
       ]
     },
@@ -22161,6 +22356,66 @@
           ],
           "via": [
             "components/coordinator/CoordinatorTaskCommitment.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/mcp-app-views"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppIssueContext.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.callTool",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/tool-calls"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.detail",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.messageSent",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/messages"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.updateModelContext",
+          "requests": [
+            {
+              "method": "PUT",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/model-context"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
           ]
         },
         {
@@ -22572,6 +22827,66 @@
           ]
         },
         {
+          "key": "api/mcpApps.ts::mcpAppsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/mcp-app-views"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppIssueContext.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.callTool",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/tool-calls"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.detail",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.messageSent",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/messages"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.updateModelContext",
+          "requests": [
+            {
+              "method": "PUT",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/model-context"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
           "key": "api/heartbeats.ts::heartbeatsApi.log",
           "requests": [
             {
@@ -22834,6 +23149,56 @@
       ],
       "calls": [
         {
+          "key": "api/agents.ts::agentsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/agents"
+            }
+          ],
+          "via": [
+            "components/ApprovalCardPanel.tsx",
+            "pages/DecisionQueuePage.tsx"
+          ]
+        },
+        {
+          "key": "api/approvals.ts::approvalsApi.get",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/approvals/:id"
+            }
+          ],
+          "via": [
+            "components/ApprovalCardPanel.tsx"
+          ]
+        },
+        {
+          "key": "api/budgets.ts::budgetsApi.resolveIncident",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/budget-incidents/:incidentId/resolve"
+            }
+          ],
+          "via": [
+            "components/AttentionInlineVerbs.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.retryTask",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/retry"
+            }
+          ],
+          "via": [
+            "components/AttentionInlineVerbs.tsx",
+            "hooks/useTaskRetry.ts"
+          ]
+        },
+        {
           "key": "api/issues.ts::issuesApi.acceptInteraction",
           "requests": [
             {
@@ -22848,18 +23213,6 @@
           "via": [
             "components/AttentionInteractionResolver.tsx",
             "components/AttentionQueueRow.tsx"
-          ]
-        },
-        {
-          "key": "api/issues.ts::issuesApi.cancelInteraction",
-          "requests": [
-            {
-              "method": "POST",
-              "path": "/api/issues/:id/interactions/:interactionId/cancel"
-            }
-          ],
-          "via": [
-            "components/AttentionInteractionResolver.tsx"
           ]
         },
         {
@@ -22999,18 +23352,6 @@
             {
               "method": "POST",
               "path": "/api/decisions/:id/decide"
-            }
-          ],
-          "via": [
-            "components/DecisionResolver.tsx"
-          ]
-        },
-        {
-          "key": "api/decisions.ts::decisionsApi.dismiss",
-          "requests": [
-            {
-              "method": "POST",
-              "path": "/api/decisions/:id/dismiss"
             }
           ],
           "via": [
@@ -23311,18 +23652,6 @@
           ]
         },
         {
-          "key": "api/agents.ts::agentsApi.list",
-          "requests": [
-            {
-              "method": "GET",
-              "path": "/api/companies/:companyId/agents"
-            }
-          ],
-          "via": [
-            "pages/DecisionQueuePage.tsx"
-          ]
-        },
-        {
           "key": "api/attention.ts::attentionApi.list",
           "requests": [
             {
@@ -23377,6 +23706,58 @@
       ],
       "calls": [
         {
+          "key": "api/agents.ts::agentsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/agents"
+            }
+          ],
+          "via": [
+            "components/ApprovalCardPanel.tsx",
+            "components/coordinator/CoordinatorNeedsYou.tsx",
+            "pages/WhatNeedsMe.tsx"
+          ]
+        },
+        {
+          "key": "api/approvals.ts::approvalsApi.get",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/approvals/:id"
+            }
+          ],
+          "via": [
+            "components/ApprovalCardPanel.tsx",
+            "components/coordinator/CoordinatorReviewPanel.tsx"
+          ]
+        },
+        {
+          "key": "api/budgets.ts::budgetsApi.resolveIncident",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/budget-incidents/:incidentId/resolve"
+            }
+          ],
+          "via": [
+            "components/AttentionInlineVerbs.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.retryTask",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/retry"
+            }
+          ],
+          "via": [
+            "components/AttentionInlineVerbs.tsx",
+            "hooks/useTaskRetry.ts"
+          ]
+        },
+        {
           "key": "api/issues.ts::issuesApi.acceptInteraction",
           "requests": [
             {
@@ -23394,18 +23775,6 @@
           ]
         },
         {
-          "key": "api/issues.ts::issuesApi.cancelInteraction",
-          "requests": [
-            {
-              "method": "POST",
-              "path": "/api/issues/:id/interactions/:interactionId/cancel"
-            }
-          ],
-          "via": [
-            "components/AttentionInteractionResolver.tsx"
-          ]
-        },
-        {
           "key": "api/issues.ts::issuesApi.listInteractions",
           "requests": [
             {
@@ -23414,7 +23783,8 @@
             }
           ],
           "via": [
-            "components/AttentionInteractionResolver.tsx"
+            "components/AttentionInteractionResolver.tsx",
+            "components/coordinator/CoordinatorReviewPanel.tsx"
           ]
         },
         {
@@ -23523,6 +23893,31 @@
           ]
         },
         {
+          "key": "api/attention.ts::attentionApi.history",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/attention/history"
+            }
+          ],
+          "via": [
+            "components/DecisionHistoryPanel.tsx",
+            "components/coordinator/CoordinatorNeedsYou.tsx"
+          ]
+        },
+        {
+          "key": "api/projects.ts::projectsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/projects"
+            }
+          ],
+          "via": [
+            "components/DecisionHistoryPanel.tsx"
+          ]
+        },
+        {
           "key": "api/decisionQueues.ts::decisionQueuesApi.list",
           "requests": [
             {
@@ -23541,18 +23936,6 @@
             {
               "method": "POST",
               "path": "/api/decisions/:id/decide"
-            }
-          ],
-          "via": [
-            "components/DecisionResolver.tsx"
-          ]
-        },
-        {
-          "key": "api/decisions.ts::decisionsApi.dismiss",
-          "requests": [
-            {
-              "method": "POST",
-              "path": "/api/decisions/:id/dismiss"
             }
           ],
           "via": [
@@ -23681,11 +24064,11 @@
           ]
         },
         {
-          "key": "api/agents.ts::agentsApi.list",
+          "key": "api/access.ts::accessApi.listUserDirectory",
           "requests": [
             {
               "method": "GET",
-              "path": "/api/companies/:companyId/agents"
+              "path": "/api/companies/:companyId/user-directory"
             }
           ],
           "via": [
@@ -23694,28 +24077,27 @@
           ]
         },
         {
-          "key": "api/attention.ts::attentionApi.history",
+          "key": "api/issues.ts::issuesApi.getDocument",
           "requests": [
             {
               "method": "GET",
-              "path": "/api/companies/:companyId/attention/history"
+              "path": "/api/issues/:id/documents/:key"
             }
           ],
           "via": [
-            "components/coordinator/CoordinatorNeedsYou.tsx"
+            "components/coordinator/CoordinatorReviewPanel.tsx"
           ]
         },
         {
-          "key": "api/attention.ts::attentionApi.list",
+          "key": "api/issues.ts::issuesApi.getDocumentRevision",
           "requests": [
             {
               "method": "GET",
-              "path": "/api/companies/:companyId/attention"
+              "path": "/api/issues/:id/documents/:key/revisions/:revisionId"
             }
           ],
           "via": [
-            "components/coordinator/CoordinatorNeedsYou.tsx",
-            "pages/WhatNeedsMe.tsx"
+            "components/coordinator/CoordinatorReviewPanel.tsx"
           ]
         },
         {
@@ -23891,11 +24273,11 @@
           ]
         },
         {
-          "key": "api/auth.ts::authApi.getSession",
+          "key": "api/attention.ts::attentionApi.list",
           "requests": [
             {
               "method": "GET",
-              "path": "/api/auth/get-session"
+              "path": "/api/companies/:companyId/attention"
             }
           ],
           "via": [
@@ -24065,6 +24447,66 @@
           ],
           "via": [
             "components/coordinator/CoordinatorTaskCommitment.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/mcp-app-views"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppIssueContext.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.callTool",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/tool-calls"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.detail",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.messageSent",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/messages"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.updateModelContext",
+          "requests": [
+            {
+              "method": "PUT",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/model-context"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
           ]
         },
         {
@@ -24552,18 +24994,6 @@
           ]
         },
         {
-          "key": "api/issues.ts::issuesApi.cancelInteraction",
-          "requests": [
-            {
-              "method": "POST",
-              "path": "/api/issues/:id/interactions/:interactionId/cancel"
-            }
-          ],
-          "via": [
-            "components/AttentionInteractionResolver.tsx"
-          ]
-        },
-        {
           "key": "api/issues.ts::issuesApi.listInteractions",
           "requests": [
             {
@@ -24665,6 +25095,66 @@
           ],
           "via": [
             "components/coordinator/CoordinatorTaskCommitment.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/mcp-app-views"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppIssueContext.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.callTool",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/tool-calls"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.detail",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.messageSent",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/messages"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.updateModelContext",
+          "requests": [
+            {
+              "method": "PUT",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/model-context"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
           ]
         },
         {
@@ -25829,19 +26319,6 @@
           ]
         },
         {
-          "key": "api/issues.ts::issuesApi.cancelInteraction",
-          "requests": [
-            {
-              "method": "POST",
-              "path": "/api/issues/:id/interactions/:interactionId/cancel"
-            }
-          ],
-          "via": [
-            "components/AttentionInteractionResolver.tsx",
-            "pages/IssueDetail.tsx"
-          ]
-        },
-        {
           "key": "api/issues.ts::issuesApi.listInteractions",
           "requests": [
             {
@@ -25908,18 +26385,6 @@
             {
               "method": "POST",
               "path": "/api/decisions/:id/decide"
-            }
-          ],
-          "via": [
-            "components/DecisionResolver.tsx"
-          ]
-        },
-        {
-          "key": "api/decisions.ts::decisionsApi.dismiss",
-          "requests": [
-            {
-              "method": "POST",
-              "path": "/api/decisions/:id/dismiss"
             }
           ],
           "via": [
@@ -26883,6 +27348,66 @@
           ]
         },
         {
+          "key": "api/mcpApps.ts::mcpAppsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/mcp-app-views"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppIssueContext.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.callTool",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/tool-calls"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.detail",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.messageSent",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/messages"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.updateModelContext",
+          "requests": [
+            {
+              "method": "PUT",
+              "path": "/api/issues/:issueId/mcp-app-views/:viewId/model-context"
+            }
+          ],
+          "via": [
+            "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
           "key": "api/issues.ts::issuesApi.actOnRunnerGoal",
           "requests": [
             {
@@ -27544,6 +28069,18 @@
             {
               "method": "DELETE",
               "path": "/api/issues/:id/comments/:commentId"
+            }
+          ],
+          "via": [
+            "pages/IssueDetail.tsx"
+          ]
+        },
+        {
+          "key": "api/issues.ts::issuesApi.cancelInteraction",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/issues/:id/interactions/:interactionId/cancel"
             }
           ],
           "via": [
@@ -28500,6 +29037,18 @@
             {
               "method": "GET",
               "path": "/api/cli-auth/me"
+            }
+          ],
+          "via": [
+            "components/ProjectProperties.tsx"
+          ]
+        },
+        {
+          "key": "api/access.ts::accessApi.listMembers",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/members"
             }
           ],
           "via": [
@@ -29772,6 +30321,54 @@
       ],
       "calls": [
         {
+          "key": "api/mcpSkills.ts::mcpSkillsApi.approve",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/mcp-skills/:skillId/approve"
+            }
+          ],
+          "via": [
+            "components/skills/ConnectedAppSkills.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpSkills.ts::mcpSkillsApi.content",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/mcp-skills/:skillId/content"
+            }
+          ],
+          "via": [
+            "components/skills/ConnectedAppSkills.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpSkills.ts::mcpSkillsApi.decline",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/mcp-skills/:skillId/decline"
+            }
+          ],
+          "via": [
+            "components/skills/ConnectedAppSkills.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpSkills.ts::mcpSkillsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/mcp-skills"
+            }
+          ],
+          "via": [
+            "components/skills/ConnectedAppSkills.tsx"
+          ]
+        },
+        {
           "key": "api/agents.ts::agentsApi.list",
           "requests": [
             {
@@ -30433,6 +31030,54 @@
             "components/skill-studio/SkillProvenance.tsx",
             "pages/CompanySkills.tsx",
             "pages/SkillStudio.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpSkills.ts::mcpSkillsApi.approve",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/mcp-skills/:skillId/approve"
+            }
+          ],
+          "via": [
+            "components/skills/ConnectedAppSkills.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpSkills.ts::mcpSkillsApi.content",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/mcp-skills/:skillId/content"
+            }
+          ],
+          "via": [
+            "components/skills/ConnectedAppSkills.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpSkills.ts::mcpSkillsApi.decline",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/mcp-skills/:skillId/decline"
+            }
+          ],
+          "via": [
+            "components/skills/ConnectedAppSkills.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpSkills.ts::mcpSkillsApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/mcp-skills"
+            }
+          ],
+          "via": [
+            "components/skills/ConnectedAppSkills.tsx"
           ]
         },
         {
@@ -31814,6 +32459,8 @@
       ],
       "usedBy": [
         "pages/CompanyAccess.tsx",
+        "pages/CompanySettings.tsx",
+        "pages/ProjectDetail.tsx",
         "pages/apps/chat/ChatEndpointDetail.tsx"
       ],
       "referenced": true
@@ -31838,6 +32485,7 @@
         "pages/RoutineDetail.tsx",
         "pages/Routines.tsx",
         "pages/Secrets.tsx",
+        "pages/WhatNeedsMe.tsx",
         "pages/apps/AppDetail.tsx",
         "pages/apps/AppNotConnected.tsx",
         "pages/apps/AppsConnect.tsx",
@@ -32861,6 +33509,18 @@
       ],
       "referenced": true
     },
+    "api/agents.ts::agentsApi.renameInstructionsFile": {
+      "requests": [
+        {
+          "method": "PUT",
+          "path": "/api/agents/:id/instructions-bundle/file"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentDetailPage.tsx"
+      ],
+      "referenced": true
+    },
     "api/agents.ts::agentsApi.resetSession": {
       "requests": [
         {
@@ -33503,6 +34163,16 @@
       ],
       "referenced": true
     },
+    "api/approvals.ts::approvalsApi.cancel": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/approvals/:id/cancel"
+        }
+      ],
+      "usedBy": [],
+      "referenced": false
+    },
     "api/approvals.ts::approvalsApi.create": {
       "requests": [
         {
@@ -33521,7 +34191,9 @@
         }
       ],
       "usedBy": [
-        "pages/ApprovalDetail.tsx"
+        "pages/ApprovalDetail.tsx",
+        "pages/DecisionQueuePage.tsx",
+        "pages/WhatNeedsMe.tsx"
       ],
       "referenced": true
     },
@@ -33650,6 +34322,30 @@
       ],
       "referenced": true
     },
+    "api/attention.ts::attentionApi.claim": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/attention/:sourceKind/:sourceId/claim"
+        }
+      ],
+      "usedBy": [
+        "App shell"
+      ],
+      "referenced": true
+    },
+    "api/attention.ts::attentionApi.close": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/attention/:sourceKind/:sourceId/close"
+        }
+      ],
+      "usedBy": [
+        "App shell"
+      ],
+      "referenced": true
+    },
     "api/attention.ts::attentionApi.history": {
       "requests": [
         {
@@ -33698,6 +34394,18 @@
       "usedBy": [
         "App shell",
         "pages/Issues.tsx"
+      ],
+      "referenced": true
+    },
+    "api/attention.ts::attentionApi.transfer": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/attention/:sourceKind/:sourceId/transfer"
+        }
+      ],
+      "usedBy": [
+        "App shell"
       ],
       "referenced": true
     },
@@ -33765,7 +34473,6 @@
         "pages/RoutineDetail.tsx",
         "pages/Search.tsx",
         "pages/UserProfile.tsx",
-        "pages/WhatNeedsMe.tsx",
         "pages/apps/chat/ChatEndpointSetup.tsx",
         "pages/apps/chat/ChatIdentityConfirm.tsx"
       ],
@@ -33980,6 +34687,8 @@
       ],
       "usedBy": [
         "pages/AgentDetailPage.tsx",
+        "pages/DecisionQueuePage.tsx",
+        "pages/WhatNeedsMe.tsx",
         "pages/audit/AuditHub.tsx",
         "pages/audit/CompanyActivity.tsx"
       ],
@@ -36151,13 +36860,8 @@
           "path": "/api/decisions/:id/dismiss"
         }
       ],
-      "usedBy": [
-        "pages/AgentChat.tsx",
-        "pages/DecisionQueuePage.tsx",
-        "pages/IssueDetail.tsx",
-        "pages/WhatNeedsMe.tsx"
-      ],
-      "referenced": true
+      "usedBy": [],
+      "referenced": false
     },
     "api/decisions.ts::decisionsApi.get": {
       "requests": [
@@ -38381,10 +39085,7 @@
       ],
       "usedBy": [
         "pages/AgentChat.tsx",
-        "pages/DecisionQueuePage.tsx",
-        "pages/IssueDetail.tsx",
-        "pages/TaskChatLab.tsx",
-        "pages/WhatNeedsMe.tsx"
+        "pages/IssueDetail.tsx"
       ],
       "referenced": true
     },
@@ -38786,7 +39487,8 @@
       "usedBy": [
         "pages/AgentChat.tsx",
         "pages/CaseDetail.tsx",
-        "pages/IssueDetail.tsx"
+        "pages/IssueDetail.tsx",
+        "pages/WhatNeedsMe.tsx"
       ],
       "referenced": true
     },
@@ -38799,7 +39501,8 @@
       ],
       "usedBy": [
         "pages/AgentChat.tsx",
-        "pages/IssueDetail.tsx"
+        "pages/IssueDetail.tsx",
+        "pages/WhatNeedsMe.tsx"
       ],
       "referenced": true
     },
@@ -39447,11 +40150,13 @@
         "pages/AgentChat.tsx",
         "pages/Dashboard.tsx",
         "pages/DashboardLive.tsx",
+        "pages/DecisionQueuePage.tsx",
         "pages/DesignGuide.tsx",
         "pages/Inbox.tsx",
         "pages/IssueChatLongThreadPerf.tsx",
         "pages/IssueDetail.tsx",
-        "pages/Issues.tsx"
+        "pages/Issues.tsx",
+        "pages/WhatNeedsMe.tsx"
       ],
       "referenced": true
     },
@@ -39554,6 +40259,7 @@
         "App shell",
         "App.tsx#AppsConnectEntryRoute",
         "pages/AgentChat.tsx",
+        "pages/Agents.tsx",
         "pages/Dashboard.tsx",
         "pages/DashboardLive.tsx",
         "pages/DecisionQueuePage.tsx",
@@ -39689,6 +40395,148 @@
       "usedBy": [
         "pages/AgentChat.tsx",
         "pages/IssueDetail.tsx"
+      ],
+      "referenced": true
+    },
+    "api/mcpApps.ts::mcpAppsApi.callTool": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/issues/:issueId/mcp-app-views/:viewId/tool-calls"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/Dashboard.tsx",
+        "pages/DashboardLive.tsx",
+        "pages/DesignGuide.tsx",
+        "pages/IssueChatLongThreadPerf.tsx",
+        "pages/IssueDetail.tsx",
+        "pages/TaskChatLab.tsx"
+      ],
+      "referenced": true
+    },
+    "api/mcpApps.ts::mcpAppsApi.detail": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/issues/:issueId/mcp-app-views/:viewId"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/Dashboard.tsx",
+        "pages/DashboardLive.tsx",
+        "pages/DesignGuide.tsx",
+        "pages/IssueChatLongThreadPerf.tsx",
+        "pages/IssueDetail.tsx",
+        "pages/TaskChatLab.tsx"
+      ],
+      "referenced": true
+    },
+    "api/mcpApps.ts::mcpAppsApi.list": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/issues/:issueId/mcp-app-views"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/Dashboard.tsx",
+        "pages/DashboardLive.tsx",
+        "pages/DesignGuide.tsx",
+        "pages/IssueChatLongThreadPerf.tsx",
+        "pages/IssueDetail.tsx",
+        "pages/TaskChatLab.tsx"
+      ],
+      "referenced": true
+    },
+    "api/mcpApps.ts::mcpAppsApi.messageSent": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/issues/:issueId/mcp-app-views/:viewId/messages"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/Dashboard.tsx",
+        "pages/DashboardLive.tsx",
+        "pages/DesignGuide.tsx",
+        "pages/IssueChatLongThreadPerf.tsx",
+        "pages/IssueDetail.tsx",
+        "pages/TaskChatLab.tsx"
+      ],
+      "referenced": true
+    },
+    "api/mcpApps.ts::mcpAppsApi.updateModelContext": {
+      "requests": [
+        {
+          "method": "PUT",
+          "path": "/api/issues/:issueId/mcp-app-views/:viewId/model-context"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/Dashboard.tsx",
+        "pages/DashboardLive.tsx",
+        "pages/DesignGuide.tsx",
+        "pages/IssueChatLongThreadPerf.tsx",
+        "pages/IssueDetail.tsx",
+        "pages/TaskChatLab.tsx"
+      ],
+      "referenced": true
+    },
+    "api/mcpSkills.ts::mcpSkillsApi.approve": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/mcp-skills/:skillId/approve"
+        }
+      ],
+      "usedBy": [
+        "pages/CompanySkills.tsx",
+        "pages/SkillStudio.tsx"
+      ],
+      "referenced": true
+    },
+    "api/mcpSkills.ts::mcpSkillsApi.content": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/companies/:companyId/mcp-skills/:skillId/content"
+        }
+      ],
+      "usedBy": [
+        "pages/CompanySkills.tsx",
+        "pages/SkillStudio.tsx"
+      ],
+      "referenced": true
+    },
+    "api/mcpSkills.ts::mcpSkillsApi.decline": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/mcp-skills/:skillId/decline"
+        }
+      ],
+      "usedBy": [
+        "pages/CompanySkills.tsx",
+        "pages/SkillStudio.tsx"
+      ],
+      "referenced": true
+    },
+    "api/mcpSkills.ts::mcpSkillsApi.list": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/companies/:companyId/mcp-skills"
+        }
+      ],
+      "usedBy": [
+        "pages/CompanySkills.tsx",
+        "pages/SkillStudio.tsx"
       ],
       "referenced": true
     },
@@ -40173,7 +41021,8 @@
       "usedBy": [
         "App shell",
         "pages/Inbox.tsx",
-        "pages/Issues.tsx"
+        "pages/Issues.tsx",
+        "pages/WhatNeedsMe.tsx"
       ],
       "referenced": true
     },
@@ -42472,6 +43321,18 @@
         "pages/tools/AdvancedToolsRoute.tsx",
         "pages/tools/profiles/ProfileDetailRoute.tsx",
         "pages/tools/profiles/ProfileWizardRoute.tsx"
+      ],
+      "referenced": true
+    },
+    "api/tools.ts::toolsApi.listProviderToolIcons": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/companies/:companyId/tool-icons"
+        }
+      ],
+      "usedBy": [
+        "App shell"
       ],
       "referenced": true
     },
