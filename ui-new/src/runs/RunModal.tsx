@@ -36,6 +36,7 @@ import { ProviderFailureNotice } from "@/ui/ProviderFailureNotice";
 import { buildTranscript, showsPlainLines } from "./parsers";
 import { RunInput } from "./RunInput";
 import { logAsText } from "./run-log";
+import { modelStillUnavailableToast } from "./model-retry";
 import { createRunLog } from "./run-log-source";
 import {
   agoLabel,
@@ -306,7 +307,9 @@ function RunView(props: { runId: string }) {
         pushToast({ tone: "success", title: "Retry queued", body: "The same request will retry when the task is ready." });
       }
     },
-    onError: (error: Error) => pushToast({ tone: "error", title: "Couldn't retry the run", body: error.message }),
+    // A model the provider rejected and that's still selected links to the agent's model settings (#21244).
+    onError: (error: Error) =>
+      pushToast(modelStillUnavailableToast(error, agent(), company().issuePrefix) ?? { tone: "error", title: "Couldn't retry the run", body: error.message }),
   }));
   const resume = createMutation(() => ({
     mutationFn: async () => {

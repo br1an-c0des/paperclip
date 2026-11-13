@@ -1,14 +1,17 @@
 import type { Issue, IssueBlockerStalledWakeContext } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createQueries, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { ArrowRight, EyeOff, Hourglass, LifeBuoy, Lock, PauseCircle, PlugZap, RotateCcw, ShieldCheck, ShieldX, TriangleAlert, Wrench } from "lucide-solid";
+import { ArrowRight, EyeOff, FastForward, Hourglass, LifeBuoy, Lock, PauseCircle, PlugZap, RotateCcw, ShieldCheck, ShieldX, TriangleAlert, Wrench } from "lucide-solid";
 import { createMemo, createSignal, For, Match, Show, Switch, type JSX } from "solid-js";
 import { issuePath, issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
+import { runsApi } from "@/api/runs";
 import { taskActionsApi } from "@/api/task-actions";
 import { useNow } from "@/lib/clock";
 import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
+import { modelStillUnavailableToast } from "@/runs/model-retry";
+import { retryOutcome } from "@/runs/run-model";
 import { Button } from "@/ui/Button";
 import { pushToast } from "@/ui/Toast";
 import { useTaskPeople } from "./people";
@@ -27,12 +30,13 @@ import {
   taskNotices,
   timeOfDay,
   waitingText,
+  type ModelRetry,
   type RetryBlocker,
   type SetupFailure,
   type StalledDependencyRow,
   type TaskNotice,
 } from "./recovery";
-import { useTaskRetry, type TaskRetry } from "./retry";
+import { MOVE_FORWARD_LABEL, MOVE_FORWARD_TEXT, MOVE_FORWARD_TITLE, useTaskRetry, type TaskRetry } from "./retry";
 import { TreeControlDialog, useTreeControlState } from "./TaskActions";
 import { ProviderFailureNotice } from "@/ui/ProviderFailureNotice";
 import { ConfirmServerStopped, TaskRecovery } from "./TaskRecovery";
@@ -57,6 +61,11 @@ import { TaskIntegrations } from "./integrations/TaskIntegrations";
  * a disclosure and a link to the project's workspace settings (#20478); a rejected model is named
  * (#20488); a budget hold links to Costs (#20338); and an agent parked while its setup is checked
  * points to the task's connection card instead of Resume agent (#20361).
+ *
+ * Since the 2026-11-13 sync: a continuation that has waited 15 minutes to start reads "Waiting for
+ * the agent to finish other work" with Move it forward now (#21373, #21385), the same Retry request
+ * with `retryAction`; and a rejected model offers Try again on the failed run (#21244), whose
+ * refusal while the model is still selected links to the agent's model settings (runs/model-retry.ts).
  */
 
 export function TaskNotices(props: { taskId: string }) {
@@ -68,6 +77,7 @@ export function TaskNotices(props: { taskId: string }) {
   const tree = useTreeControlState(() => props.taskId);
   const [resumeOpen, setResumeOpen] = createSignal(false);
   const [resumingAgent, setResumingAgent] = createSignal(false);
+  const [modelRetrying, setModelRetrying] = createSignal(false);
   // Whether the recovery card offers its own way on, which Retry then gives way to (#19840).
   const [recoveryOwnsRetry, setRecoveryOwnsRetry] = createSignal(true);
 
@@ -122,6 +132,34 @@ export function TaskNotices(props: { taskId: string }) {
     }
   };
 
+  // Try again on a run the provider failed for its model (#21244): the failed run's own Retry
+  // (`POST /agents/:id/wakeup` with `failedRunId`), which the server refuses while the model is
+  // still selected.
+  const retryModelRun = async (target: ModelRetry) => {
+    setModelRetrying(true);
+    try {
+      const outcome = retryOutcome(await runsApi.retry({ id: target.runId, agentId: target.agentId, companyId: company().id }));
+      if ("error" in outcome) throw new Error(outcome.error);
+      pushToast(
+        outcome.runId
+          ? { tone: "success", title: "Trying again" }
+          : { tone: "success", title: "Retry queued", body: "The same request will retry when the task is ready." },
+      );
+    } catch (error) {
+      pushToast(
+        modelStillUnavailableToast(error, people.agent(target.agentId), company().issuePrefix) ?? {
+          tone: "error",
+          title: "Couldn't try again",
+          body: error instanceof Error ? error.message : String(error),
+        },
+      );
+    } finally {
+      setModelRetrying(false);
+      void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
+      void client.invalidateQueries({ queryKey: queryKeys.issues.detail(props.taskId) });
+    }
+  };
+
   return (
     <>
     <Show when={notices().length > 0 && task()}>
@@ -139,6 +177,8 @@ export function TaskNotices(props: { taskId: string }) {
                 onRetry={() => void retry.retry(current())}
                 resumingAgent={resumingAgent()}
                 onResumeAgent={(agentId) => void resumeAgent(agentId)}
+                modelRetrying={modelRetrying()}
+                onModelRetry={(target) => void retryModelRun(target)}
                 onResumeTree={() => setResumeOpen(true)}
               />
             )}
@@ -180,6 +220,9 @@ function Notice(props: {
   onRetry: () => void;
   resumingAgent: boolean;
   onResumeAgent: (agentId: string) => void;
+  /** Try again on a run failed for its model (#21244). */
+  modelRetrying: boolean;
+  onModelRetry: (target: ModelRetry) => void;
   onResumeTree: () => void;
 }) {
   const company = useCompany();
@@ -194,6 +237,11 @@ function Notice(props: {
   const retryButton = (label = "Retry") => (
     <Button size="compact" icon={<RotateCcw size={14} aria-hidden="true" />} disabled={props.retrying} onClick={() => props.onRetry()}>
       {props.retrying ? "Retrying…" : label}
+    </Button>
+  );
+  const tryAgainButton = (target: ModelRetry) => (
+    <Button size="compact" icon={<RotateCcw size={14} aria-hidden="true" />} disabled={props.modelRetrying} onClick={() => props.onModelRetry(target)}>
+      {props.modelRetrying ? "Trying again…" : "Try again"}
     </Button>
   );
   return (
@@ -243,6 +291,25 @@ function Notice(props: {
           );
         }}
       </Match>
+      <Match when={props.notice.kind === "move-forward" && props.notice}>
+        {(notice) => (
+          <Row
+            tone="neutral"
+            icon={<Hourglass size={16} />}
+            title={MOVE_FORWARD_TITLE}
+            label="Task status"
+            action={
+              (notice() as Extract<TaskNotice, { kind: "move-forward" }>).canRetry ? (
+                <Button size="compact" icon={<FastForward size={14} aria-hidden="true" />} disabled={props.retrying} onClick={() => props.onRetry()}>
+                  {props.retrying ? "Moving it forward…" : MOVE_FORWARD_LABEL}
+                </Button>
+              ) : undefined
+            }
+          >
+            {MOVE_FORWARD_TEXT}
+          </Row>
+        )}
+      </Match>
       <Match when={props.notice.kind === "recovering" && props.notice}>
         {(notice) => (
           <Row tone="neutral" icon={<LifeBuoy size={16} />} title="Recovering saved work">
@@ -279,7 +346,13 @@ function Notice(props: {
               failure={found.failure}
               tone={found.state === "retry_scheduled" ? "amber" : "red"}
               action={
-                found.canRetry ? retryButton(found.state === "retry_scheduled" ? "Retry now" : "Retry") : found.budgetWait ? costsLink() : undefined
+                found.canRetry
+                  ? retryButton(found.state === "retry_scheduled" ? "Retry now" : "Retry")
+                  : found.budgetWait
+                    ? costsLink()
+                    : found.modelRetry
+                      ? tryAgainButton(found.modelRetry)
+                      : undefined
               }
             >
               {found.state === "retry_scheduled"
@@ -308,7 +381,7 @@ function Notice(props: {
               tone={budget && found.attempted ? "red" : "amber"}
               icon={<PauseCircle size={16} />}
               title={budget ? "Waiting for the budget" : found.action === "choose_model" && found.rejectedModel ? "Model rejected" : "Waiting on someone"}
-              action={budget ? costsLink() : undefined}
+              action={budget ? costsLink() : found.modelRetry ? tryAgainButton(found.modelRetry) : undefined}
             >
               {waitingText(found)}
             </Row>
@@ -609,7 +682,7 @@ function StalledDependency(props: {
             onClick={() => void props.retry.retry(found())}
           >
             <RotateCcw size={12} stroke-width={2.2} aria-hidden="true" />
-            {busy() ? "Retrying…" : "Retry"}
+            {busy() ? "Retrying…" : found().interruption?.retryAction === "move_forward" ? MOVE_FORWARD_LABEL : "Retry"}
           </button>
         )}
       </Show>

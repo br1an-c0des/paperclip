@@ -29,6 +29,12 @@ import "./retry.css";
  * retry (`scheduledRetry`): the toast says "Trying TES-4 again" only when work started, and
  * otherwise gives the server's reason, wherever this hook is used (the task's notices, list rows,
  * and each stalled dependency's Retry).
+ *
+ * Since the 2026-11-13 sync (#21373, #21385): while a recorded continuation has waited 15 minutes to
+ * start, the task reads as working and offers Move it forward now (`retryAction: "move_forward"`).
+ * The same request carries `retryAction`, so it moves that continuation to the front of the agent's
+ * queue and never starts a second run; the answer says `alreadyMovedOn` when the task had already
+ * moved on. Rows don't offer it (as the old UI's Inbox rows don't): it's on the task's notices.
  */
 
 export type RetryOffer = {
@@ -95,19 +101,53 @@ type Retryable = Pick<CompactIssue, "id" | "identifier" | "title" | "interruptio
 /** Upstream's words for a Retry on an attempt that was replaced meanwhile (#20283). */
 export const STALE_RETRY_MESSAGE = "This attempt was already replaced, so Retry did not start new work. The task now shows its current state.";
 
+/** Upstream's words for a Move it forward now that found the task already moved on (#21373). */
+export const ALREADY_MOVED_ON_MESSAGE = "The task already moved on, so nothing new was started. It now shows its current state.";
+
+/** The waiting continuation's line and button, in the old UI's words (ExecutionBlockerNotice, #21373). */
+export const MOVE_FORWARD_TITLE = "Waiting for the agent to finish other work";
+export const MOVE_FORWARD_TEXT = "Paperclip continues this task by itself.";
+export const MOVE_FORWARD_LABEL = "Move it forward now";
+
+/**
+ * Whether the interruption offers Move it forward now (#21373, #21385): a continuation Paperclip
+ * recorded that has waited 15 minutes to start. The task is working, not failed, and the click
+ * joins that continuation instead of starting a second run.
+ */
+export function offersMoveForward(interruption: Pick<TaskInterruptionPresentation, "state" | "canRetry" | "retryAction"> | null | undefined) {
+  return interruption?.state === "working" && interruption.retryAction === "move_forward" && interruption.canRetry;
+}
+
 /**
  * What a Retry receipt came to (#20283, the old UI's `taskRetryNotStartedReason`): it started work,
  * or it didn't and the reason says why. A receipt that wasn't accepted means the attempt was
  * replaced; an accepted one whose scheduled retry wasn't promoted (held by a gate, still waiting,
  * or none left to promote) carries the server's message.
  */
-export function retryReceiptOutcome(receipt: Pick<TaskRetryReceipt, "accepted" | "stale" | "scheduledRetry">): { started: true } | { started: false; stale: boolean; reason: string } {
+export function retryReceiptOutcome(
+  receipt: Pick<TaskRetryReceipt, "accepted" | "stale" | "scheduledRetry" | "alreadyMovedOn">,
+): { started: true } | { started: false; stale: boolean; reason: string } {
+  // A Move it forward now whose continuation already started or was given up (#21373).
+  if (!receipt.accepted && receipt.alreadyMovedOn) return { started: false, stale: true, reason: ALREADY_MOVED_ON_MESSAGE };
   if (!receipt.accepted || receipt.stale) return { started: false, stale: true, reason: STALE_RETRY_MESSAGE };
   const scheduled = receipt.scheduledRetry;
   if (scheduled && scheduled.outcome !== "promoted" && scheduled.outcome !== "already_promoted") {
     return { started: false, stale: false, reason: scheduled.message || "Retry didn't start new work." };
   }
   return { started: true };
+}
+
+/**
+ * What `POST /issues/:id/retry` sends for a task: the key, the run the viewer saw, and for a
+ * waiting continuation `retryAction: "move_forward"` (#21373), as the old UI's useTaskRetry does.
+ */
+export function retryRequest(task: Pick<CompactIssue, "interruption">, idempotencyKey: string) {
+  const interruption = task.interruption;
+  return {
+    idempotencyKey,
+    observedRunId: interruption?.observedRunId ?? null,
+    ...(interruption?.retryAction === "move_forward" ? { retryAction: "move_forward" as const } : {}),
+  };
 }
 
 /** When the task is read again after an accepted Retry: once the admission has run, and after its grace. */
@@ -153,18 +193,20 @@ export function useTaskRetry() {
   const retry = async (task: Retryable) => {
     if (busy().has(task.id)) return;
     const observedRunId = task.interruption?.observedRunId ?? null;
-    const slot = `${task.id}:${observedRunId ?? ""}`;
+    // Moving a waiting continuation forward says so, so the server joins it rather than retrying (#21373).
+    const moveForward = task.interruption?.retryAction === "move_forward";
+    const slot = `${task.id}:${observedRunId ?? ""}${moveForward ? ":move_forward" : ""}`;
     const idempotencyKey = keys.get(slot) ?? crypto.randomUUID();
     keys.set(slot, idempotencyKey);
     mark(task.id, true);
     const ref = task.identifier ?? task.title;
     try {
-      const receipt = await issuesApi.retry(task.id, { idempotencyKey, observedRunId });
+      const receipt = await issuesApi.retry(task.id, retryRequest(task, idempotencyKey));
       keys.delete(slot);
       setInterruption(task.id, receipt.presentation);
       // Say what actually happened (#20283): a Retry that didn't start work says why.
       const outcome = retryReceiptOutcome(receipt);
-      if (outcome.started) pushToast({ tone: "success", title: `Trying ${ref} again` });
+      if (outcome.started) pushToast({ tone: "success", title: moveForward ? `Moving ${ref} forward` : `Trying ${ref} again` });
       else if (outcome.stale) pushToast({ tone: "info", title: `${ref} has moved on`, body: outcome.reason });
       else pushToast({ tone: "info", title: `${ref} hasn't started`, body: outcome.reason });
       // The run is admitted after the receipt, so its wait (`retryWait`) shows up a moment later:
@@ -173,7 +215,7 @@ export function useTaskRetry() {
     } catch (error) {
       // A refusal won't change on a resend; anything else might still land, so keep the key.
       if (error instanceof ApiError && error.status >= 400 && error.status < 500) keys.delete(slot);
-      pushToast({ tone: "error", title: `Couldn't retry ${ref}`, body: error instanceof Error ? error.message : String(error) });
+      pushToast({ tone: "error", title: moveForward ? `Couldn't move ${ref} forward` : `Couldn't retry ${ref}`, body: error instanceof Error ? error.message : String(error) });
     } finally {
       mark(task.id, false);
       refresh(task.id);
