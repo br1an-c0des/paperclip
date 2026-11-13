@@ -573,7 +573,7 @@ settings (U135, U137, U140–U144, U147, U148, U150).
 
 Outcomes: **build** (an agent builds it), **decide** (a question for the user first), **check**
 (verify, then build or close), **design** (needs boards first), **left out** (with the reason),
-**done**. When a line is built or settled, mark it done or left out here and in its row.
+**deferred** (decided not now, with what would bring it back), **done**. When a line is built or settled, mark it done or left out here and in its row.
 
 The audit (Nov 3) found the Oct 15–26 syncs mostly built. The gaps start with the Oct 22 sync. Many
 were noted on `done` rows as "Upstream sync …" without being built or recorded as a to-do. The
