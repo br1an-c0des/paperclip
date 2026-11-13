@@ -7,7 +7,7 @@ import type {
   ToolPolicy,
   ToolProfileWithDetails,
 } from "@paperclipai/shared";
-import { GOOGLE_WORKSPACE_CONNECTOR_PROFILES } from "@paperclipai/shared";
+import { credentialConfigPath as sharedCredentialConfigPath, getConnectableAppDefinition, GOOGLE_WORKSPACE_CONNECTOR_PROFILES } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import {
   accessFrom,
@@ -27,6 +27,8 @@ import {
   connectionState,
   connectPayload,
   connectProblem,
+  credentialConfigPath,
+  credentialValuesFor,
   defaultServerName,
   displayName,
   enabledIds,
@@ -266,10 +268,35 @@ describe("connecting", () => {
       connectionMethodKey: "rest-api-key",
       name: "Vercel",
       credentialSource: "paperclip_vault",
-      credentialValues: { authorization: "tok" },
+      credentialValues: { "credentials.authorization": "tok" },
       configValues: { teamId: "team_abc" },
       resumeConnectionId: "c9",
     });
+  });
+
+  it("keys credentials by the path the server reads, as the shared package does", () => {
+    const field = { key: "token", label: "Token", type: "password" as const, required: true };
+    const remote = method({ auth: "api_key", keyPlacement: { location: "header", name: "Authorization", prefix: "Bearer " } });
+    const command = method({ transport: "local_stdio", auth: "api_key", keyPlacement: { location: "env", name: "TOKEN" } });
+    const commandArg = method({ transport: "local_stdio", auth: "api_key", keyPlacement: { location: "query", name: "token" } });
+    for (const candidate of [remote, command, commandArg, null]) {
+      expect(credentialConfigPath(field, candidate)).toBe(sharedCredentialConfigPath(field, candidate));
+    }
+    expect(credentialConfigPath(field, remote)).toBe("credentials.token");
+    expect(credentialConfigPath(field, command)).toBe("env.token");
+    expect(credentialConfigPath(field, commandArg)).toBe("credentials.token");
+    const withFields = { ...command, credentialFields: [field, { ...field, key: "extra", required: false }] };
+    expect(credentialValuesFor(withFields, { token: " t ", extra: " ", stray: "x" })).toEqual({ "env.token": "t" });
+  });
+
+  it("sends GitHub's personal access token as credentials.authorization (regression)", () => {
+    const github = getConnectableAppDefinition("github")!;
+    const pat = github.methods.find((candidate) => candidate.key === "mcp-key")!;
+    expect(toolMethods(github).map((candidate) => candidate.key)).toContain("mcp-key");
+    const draft = newConnectDraft(github, pat);
+    draft.credentials.authorization = "github_pat_dummy";
+    expect(connectProblem(pat, draft)).toBeNull();
+    expect(connectPayload(github, pat, draft).credentialValues).toEqual({ "credentials.authorization": "github_pat_dummy" });
   });
 
   it("connects through Vercel with only the connector and settings", () => {
