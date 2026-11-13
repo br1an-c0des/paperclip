@@ -573,6 +573,7 @@ Server-enforced flags, all following the setting:
 | `enableGoogleWorkspaceConnector` | Added upstream Nov 5, 2026 (#19247), off by default. The server hides and blocks Paperclip's own Google Workspace connector while it's off, and the Composio and Arcade Google apps show instead; Apps already gates catalog entries by `experimentalFeatureKey`. A switch in Features (confirmed Nov 5, 2026; U53). |
 | `enableOpenAiDot`, `enableGrokBot`, `enableMuse`, `enableBuiltInAgents`, `enableBetaSkills` | New-agent choices and agent settings (M5). |
 | `enableExternalObjects`, `enableSummaries`, `enableStatusCards` | Their panels on tasks, projects and workspaces, when the setting is on. |
+| `enableMcpTasks` | Added upstream Nov 13, 2026 (#21263), managed tier, off by default. "Durable app actions (MCP Tasks)": long tool calls of connected apps become tasks the server tracks across timeouts, restarts and deploys. The server enforces it and the old Experimental page has a toggle, so it gets a switch in Features under Connections (confirmed Nov 13, 2026). |
 
 The 14 flags the old UI doesn't read stay switches on the ported settings page, and `ui-new`
 doesn't branch on them: `enableAiConnectionRouters`, `enableIsolatedWorkspacesByDefault`,
