@@ -1,4 +1,5 @@
 import type { Project, ProjectRepository, ProjectWorkspace, WorkspaceRuntimeService } from "@paperclipai/shared";
+import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Book, Check, ChevronDown, FolderOpen, Lock, Plus, Search, X } from "lucide-solid";
 import { batch, createEffect, createMemo, createSignal, createUniqueId, For, Match, on, Show, Switch } from "solid-js";
@@ -9,6 +10,7 @@ import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { readNote } from "@/lib/offline/read-state";
 import { WorkspacePlugins } from "@/plugins/WorkspacePlugins";
+import { APP_SETTINGS_PATH } from "@/settings/app/app-settings-model";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
@@ -35,16 +37,21 @@ import {
   type CheckoutDraft,
   type WorkspaceDraft,
 } from "./settings-model";
-import { CardNote, failure, FootError, refreshProject, useProjectSaver, useSaveRunner } from "./shared";
+import { failure, FootError, refreshProject, SaveStatus, useProjectSaver, useSaveRunner, type SaveState } from "./shared";
 import { COMMANDS_EXAMPLE, commandEntries, commandsRequest, commandsText, parseCommands } from "./workspace-commands";
 
 /*
  * Code and workspaces (board 11): the project's repositories and local folder, its workspaces with
- * their runtime services, and how tasks get their own checkout.
+ * their runtime services, and how tasks get their own checkout. Each card says what it's for behind
+ * its "i" button (InfoTip.tsx); the body keeps state, empty states and errors.
  *
- * - Repositories are the company's connected GitHub repositories (`PUT /projects/:id/repositories`,
- *   the first is the primary). Ones added by URL before the connection existed are listed and edited
- *   as workspaces. The local folder is the primary workspace's folder, as in the old UI.
+ * - Repositories are the company's connected GitHub repositories (`PUT /projects/:id/repositories`).
+ *   The server keeps one project workspace per repository: adding one creates it, removing one
+ *   removes it, or only detaches the repository when the workspace has a folder of its own
+ *   (`replaceRepositories` in server/src/services/projects.ts). The list's order isn't stored, so
+ *   "primary" is the repository whose workspace is the primary one, and Make primary sets that
+ *   workspace as the primary. Ones added by URL before the connection existed are listed and
+ *   edited as workspaces. The local folder is the primary workspace's folder, as in the old UI.
  * - Workspaces (`/projects/:id/workspaces`): add, edit, remove, make one the default (primary), and
  *   start, stop or restart their services. A workspace's commands JSON (its services and jobs,
  *   `runtimeConfig.workspaceRuntime`) is edited in the workspace's form, checked before saving
@@ -87,6 +94,15 @@ function RepositoriesCard(props: { project: Project; hideHostPaths: boolean }) {
   const byId = createMemo(() => new Map((options.data?.repositories ?? []).map((repo) => [repo.id, repo] as const)));
   const nameOf = (id: string) => saved().find((repo) => repo.id === id)?.fullName ?? byId().get(id)?.fullName ?? `Repository ${id}`;
   const legacy = createMemo(() => legacyRepositories(props.project));
+  const savedById = createMemo(() => new Map(saved().map((repo) => [repo.id, repo] as const)));
+  const makePrimary = createMutation(() => ({
+    mutationFn: (workspaceId: string) => projectsApi.updateWorkspace(props.project.id, workspaceId, { isPrimary: true }),
+    onSuccess: async () => {
+      setProblem(null);
+      await refreshProject(client, company().id);
+    },
+    onError: (caught) => setProblem(failure(caught, "Couldn't make it the primary repository.")),
+  }));
 
   const save = createMutation(() => ({
     mutationFn: (repositoryIds: string[]) => projectsApi.setRepositories(props.project.id, repositoryIds),
@@ -108,7 +124,7 @@ function RepositoriesCard(props: { project: Project; hideHostPaths: boolean }) {
   return (
     <SettingsCard
       title="Repositories"
-      description="Where the project's code comes from. Skills in a repository are imported too."
+      info="Which GitHub repositories, from the company's GitHub connections, the project's code comes from. Adding one adds a project workspace for it and imports the skills it contains."
       footer={
         <>
           <RepositoryPicker selected={ids()} options={options} onToggle={(id) => change(ids().includes(id) ? ids().filter((entry) => entry !== id) : [...ids(), id])} />
@@ -129,24 +145,29 @@ function RepositoriesCard(props: { project: Project; hideHostPaths: boolean }) {
         </>
       }
     >
-      <Show when={ids().length > 0 || legacy().length > 0} fallback={<p class="ps-list-note">No repositories. Agents work in the project's folder.</p>}>
+      <Show
+        when={ids().length > 0 || legacy().length > 0}
+        fallback={<p class="ps-list-note">{(props.project.workspaces ?? []).length > 0 ? "No repositories. Agents work in the project workspaces below." : "No repositories."}</p>}
+      >
         <ul class="ps-repos" aria-label="Repositories for this project">
           <For each={ids()}>
-            {(id, index) => (
+            {(id) => (
               <li class="ps-repo">
                 <Book size={15} aria-hidden="true" />
                 <span class="mono ps-repo-name">{nameOf(id)}</span>
-                <Show when={index() === 0}>
+                <Show when={savedById().get(id)?.isPrimary}>
                   <span class="np-primary">primary</span>
                 </Show>
                 <Show when={byId().get(id)?.private}>
                   <Lock size={12} aria-label="Private repository" />
                 </Show>
                 <span class="ps-repo-actions">
-                  <Show when={index() > 0}>
-                    <Button size="compact" variant="quiet" onClick={() => change([id, ...ids().filter((entry) => entry !== id)])}>
-                      Make primary
-                    </Button>
+                  <Show when={savedById().get(id)?.isPrimary === false ? savedById().get(id) : undefined}>
+                    {(repo) => (
+                      <Button size="compact" variant="quiet" disabled={makePrimary.isPending} onClick={() => makePrimary.mutate(repo().workspaceId)}>
+                        Make primary
+                      </Button>
+                    )}
                   </Show>
                   <button type="button" class="nt-icon nt-icon--small" aria-label={`Remove ${nameOf(id)}`} onClick={() => change(ids().filter((entry) => entry !== id))}>
                     <X size={13} aria-hidden="true" />
@@ -163,7 +184,7 @@ function RepositoriesCard(props: { project: Project; hideHostPaths: boolean }) {
                   {workspace.repoUrl}
                 </a>
                 <span class="ps-chip">added by URL</span>
-                <span class="ps-repo-actions ps-muted-line">Edit it under Workspaces</span>
+                <span class="ps-repo-actions ps-muted-line">Edit it under Project workspaces</span>
               </li>
             )}
           </For>
@@ -268,10 +289,18 @@ function LocalFolder(props: { project: Project; hideHostPaths: boolean }) {
 
   return (
     <div class="ps-subrow">
-      <SettingsRow label="Local folder" help={props.hideHostPaths ? "Agents check the code out in the platform's managed environment." : "Where agents write code on the server."}>
+      <SettingsRow
+        label="Local folder"
+        info="The primary workspace's folder on the server, where agents work on the code. Without one, agents work in a copy of the workspace's repository that Paperclip keeps."
+        help={props.hideHostPaths ? "Agents check the code out in the platform's managed environment." : undefined}
+      >
         <Show
           when={!props.hideHostPaths}
-          fallback={<span class="ps-muted-line">{codebase()?.origin === "managed_checkout" ? "A folder Paperclip manages." : "Set by the project's workspace."}</span>}
+          fallback={
+            <span class="ps-muted-line">
+              {!codebase()?.workspaceId ? "None" : codebase()?.origin === "managed_checkout" ? "A folder Paperclip manages." : "Set by the project's workspace."}
+            </span>
+          }
         >
           <Show
             when={editing()}
@@ -279,8 +308,9 @@ function LocalFolder(props: { project: Project; hideHostPaths: boolean }) {
               <div class="ps-inline ps-inline--spread">
                 <span class="ps-folder">
                   <FolderOpen size={15} aria-hidden="true" />
-                  <span class="mono">{codebase()?.effectiveLocalFolder ?? "None"}</span>
-                  <Show when={codebase()?.origin === "managed_checkout"}>
+                  {/* With no workspace there's no managed copy either: tasks start in folders of their own. */}
+                  <span class="mono">{codebase()?.workspaceId ? (codebase()?.effectiveLocalFolder ?? "None") : "None"}</span>
+                  <Show when={codebase()?.workspaceId && codebase()?.origin === "managed_checkout"}>
                     <span class="ps-chip">managed by Paperclip</span>
                   </Show>
                 </span>
@@ -364,11 +394,8 @@ function WorkspacesCard(props: { project: Project; hideHostPaths: boolean }) {
     <>
       <SettingsCard
         title="Project workspaces"
-        description={
-          <CardNote state={saver.state()} error={saver.error()}>
-            The checkouts agents work in, and the services they can run. The primary one is the default.
-          </CardNote>
-        }
+        info="Where agents work on the project's code: a folder on the server, or a repository Paperclip copies for them, with its commands and services. Tasks use the primary one unless they pick another."
+        description={saveNote(saver.state(), saver.error())}
         footer={
           <Button size="compact" icon={<Plus size={14} aria-hidden="true" />} disabled={editing() === "new"} onClick={() => setEditing("new")}>
             Add workspace
@@ -415,7 +442,7 @@ function WorkspacesCard(props: { project: Project; hideHostPaths: boolean }) {
             />
           </Show>
           <Show when={workspaces().length === 0 && editing() !== "new"}>
-            <p class="ps-list-note">No workspaces. Agents work in the folder Paperclip manages for the project.</p>
+            <p class="ps-list-note">No workspaces. Each task starts in an empty folder, or in its agent's own folder.</p>
           </Show>
         </div>
       </SettingsCard>
@@ -661,7 +688,13 @@ function WorkspaceForm(props: {
 
 // ---------------------------------------------------------------------------------------------
 
+/** A card's save status as its description, or nothing while idle (what the card is for is in its `info`). */
+function saveNote(state: SaveState, error: string | null) {
+  return state === "idle" ? undefined : <SaveStatus state={state} error={error} />;
+}
+
 function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
+  const company = useCompany();
   const saver = useProjectSaver(() => props.project);
   const [draft, setDraft] = createStore<CheckoutDraft>(checkoutDraft(props.project));
   // Follows the saved policy when it changes and nothing is being edited.
@@ -673,8 +706,8 @@ function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
     ),
   );
   const dirty = () => checkoutDirty(props.project, draft);
-  const text = (key: "baseRef" | "branchTemplate" | "worktreeParentDir" | "provisionCommand" | "runtimeProvisionCommand" | "teardownCommand", label: string, placeholder: string, help?: string) => (
-    <SettingsRow label={label} help={help} for={`ps-co-${key}`}>
+  const text = (key: "baseRef" | "branchTemplate" | "worktreeParentDir" | "provisionCommand" | "runtimeProvisionCommand" | "teardownCommand", label: string, placeholder: string, info: string) => (
+    <SettingsRow label={label} info={info} for={`ps-co-${key}`}>
       <TextInput id={`ps-co-${key}`} class="mono" placeholder={placeholder} spellcheck={false} value={draft[key]} onInput={(event) => setDraft(key, event.currentTarget.value)} />
     </SettingsRow>
   );
@@ -682,11 +715,8 @@ function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
   return (
     <SettingsCard
       title="Task checkouts"
-      description={
-        <CardNote state={saver.state()} error={saver.error()}>
-          How each task gets a copy of the code to work in.
-        </CardNote>
-      }
+      info="Whether each task gets its own git worktree, branched from the project workspace, instead of sharing the workspace with other tasks. Agents working at once then don't collide."
+      description={saveNote(saver.state(), saver.error())}
       footer={
         dirty() ? (
           <span class="ps-foot-end">
@@ -704,27 +734,33 @@ function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
         when={props.isolatedEnabled}
         fallback={
           <p class="ps-list-note">
-            Every task works in the project's shared checkout. Separate checkouts per task are off on this instance; an instance admin can turn on isolated workspaces in
-            the instance settings.
+            Tasks share the project workspace. To give each its own worktree, an instance admin turns on Isolated workspaces in{" "}
+            <A class="ps-link" href={`/${company().issuePrefix}${APP_SETTINGS_PATH}/general`}>
+              App settings → General → Features
+            </A>
+            .
           </p>
         }
       >
-        <SettingsRow label="Separate checkout per task" help="Each task can get its own git worktree, so agents working at once don't collide.">
+        <SettingsRow label="Separate checkout per task" info="Lets this project's tasks work in their own git worktree instead of the shared project workspace.">
           <Toggle checked={draft.enabled} onChange={(value) => setDraft("enabled", value)} label="Separate checkout per task" labelHidden />
         </SettingsRow>
         <Show when={draft.enabled}>
-          <SettingsRow label="New tasks get their own" help="Off: new tasks use the shared checkout unless someone picks their own.">
+          <SettingsRow label="New tasks get their own" info="On: each new task gets its own worktree. Off: new tasks share the project workspace unless someone picks a worktree for them.">
             <Toggle checked={draft.isolatedByDefault} onChange={(value) => setDraft("isolatedByDefault", value)} label="New tasks get their own checkout" labelHidden />
           </SettingsRow>
-          <SettingsRow label="Runs in the shared checkout" help={CONCURRENCY_OPTIONS.find((option) => option.value === draft.concurrency)?.help}>
-            <Segmented label="Runs in the shared checkout" options={CONCURRENCY_OPTIONS} value={draft.concurrency} onChange={(value) => setDraft("concurrency", value)} />
+          <SettingsRow
+            label="Runs in the shared workspace"
+            info={`Whether runs that share the project workspace wait for each other. ${CONCURRENCY_OPTIONS.find((option) => option.value === draft.concurrency)?.help ?? ""}`}
+          >
+            <Segmented label="Runs in the shared workspace" options={CONCURRENCY_OPTIONS} value={draft.concurrency} onChange={(value) => setDraft("concurrency", value)} />
           </SettingsRow>
-          {text("baseRef", "Base branch", "origin/main")}
+          {text("baseRef", "Base branch", "origin/main", "The branch each task's worktree starts from.")}
           {text("branchTemplate", "Branch name", "{{issue.identifier}}-{{slug}}", "The name each task's branch gets.")}
-          {text("worktreeParentDir", "Worktree folder", ".paperclip/worktrees")}
-          {text("provisionCommand", "Setup command", "bash ./scripts/provision-worktree.sh", "Runs when a checkout is created.")}
+          {text("worktreeParentDir", "Worktree folder", ".paperclip/worktrees", "Where task worktrees are created, relative to the repository.")}
+          {text("provisionCommand", "Setup command", "bash ./scripts/provision-worktree.sh", "Runs in a task's worktree when it's created.")}
           {text("runtimeProvisionCommand", "Runtime setup command", "bash ./scripts/provision-runtime.sh", "Runs once before the first service starts, for heavy setup such as seeding a database.")}
-          {text("teardownCommand", "Teardown command", "bash ./scripts/teardown-worktree.sh", "Runs when a checkout is closed.")}
+          {text("teardownCommand", "Teardown command", "bash ./scripts/teardown-worktree.sh", "Runs when a task's worktree is cleaned up.")}
         </Show>
       </Show>
       <StorageAvailabilityRow project={props.project} />

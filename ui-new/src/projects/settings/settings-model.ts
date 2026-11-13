@@ -352,9 +352,9 @@ export function workspacePatch(workspace: ProjectWorkspace, draft: WorkspaceDraf
 // Task checkouts (the execution workspace policy)
 
 export const CONCURRENCY_OPTIONS: { value: SharedWorkspaceConcurrency; label: string; help: string }[] = [
-  { value: "auto", label: "Auto", help: "Runs share the checkout on local and SSH runners, and take turns in cloud environments." },
-  { value: "serialize", label: "Take turns", help: "Sandbox runs take turns in the shared checkout. Local and SSH folders still allow runs at once." },
-  { value: "allow", label: "At once", help: "Runs never wait for the checkout, so edits can collide." },
+  { value: "auto", label: "Auto", help: "Runs work at once on local and SSH runners, and take turns in cloud environments." },
+  { value: "serialize", label: "Take turns", help: "Sandbox runs take turns. Local and SSH folders still allow runs at once." },
+  { value: "allow", label: "At once", help: "Runs never wait for each other, so edits can collide." },
 ];
 
 export type CheckoutDraft = {
