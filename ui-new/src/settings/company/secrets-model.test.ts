@@ -9,14 +9,11 @@ import {
   folderCrumbs,
   folderListing,
   folderNameProblem,
-  hasFolders,
   nameInFolder,
   normalizeFolderPath,
   referencePlaceholder,
   rotateKinds,
   rotateLabel,
-  storeChoices,
-  supportsReferences,
   importableVaults,
   importDraft,
   importDraftProblem,
@@ -24,11 +21,9 @@ import {
   importResultLine,
   keyFromName,
   keyProblem,
-  listedProviders,
   organizationSecrets,
   proposalMeta,
   proposalTitle,
-  secretCounts,
   storedIn,
   usesLabel,
   vaultBlockReason,
@@ -78,27 +73,14 @@ describe("organization secrets", () => {
   });
 
   it("says where a value is stored", () => {
-    expect(storedIn(secret({}), [])).toBe("Paperclip vault");
-    expect(storedIn(secret({ provider: "aws_secrets_manager", providerConfigId: "p" }), [{ id: "p", displayName: "AWS prod" } as never])).toBe("AWS prod");
+    expect(storedIn(secret({}), [])).toBe("Paperclip");
+    expect(storedIn(secret({ provider: "aws_secrets_manager", providerConfigId: "p" }), [{ id: "p", displayName: "AWS prod" } as never])).toBe("AWS prod · AWS Secrets Manager");
   });
 
   it("counts uses", () => {
     expect(usesLabel(0)).toBe("Not used");
     expect(usesLabel(1)).toBe("1 use");
     expect(usesLabel(6)).toBe("6 uses");
-  });
-
-  it("lists configured providers and any holding secrets", () => {
-    const counts = secretCounts([secret({ provider: "vault" })]);
-    const listed = listedProviders(
-      [
-        { id: "local_encrypted", label: "", requiresExternalRef: false, configured: true },
-        { id: "aws_secrets_manager", label: "", requiresExternalRef: false, configured: false },
-        { id: "vault", label: "", requiresExternalRef: true, configured: false },
-      ],
-      counts,
-    );
-    expect(listed.map((entry) => entry.id)).toEqual(["local_encrypted", "vault"]);
   });
 });
 
@@ -220,12 +202,12 @@ describe("folders", () => {
   it("lists a folder's own secrets and the folders in it", () => {
     const top = folderListing(names, "");
     expect(top.folders).toEqual([
-      { name: "aws", path: "aws", secretCount: 1 },
-      { name: "github", path: "github", secretCount: 3 },
+      { name: "aws", path: "aws", secretCount: 1, folderCount: 1 },
+      { name: "github", path: "github", secretCount: 3, folderCount: 1 },
     ]);
     expect(top.secrets.map((entry) => entry.name)).toEqual(["OPENAI_KEY"]);
     const github = folderListing(names, "/github/");
-    expect(github.folders).toEqual([{ name: "actions", path: "github/actions", secretCount: 1 }]);
+    expect(github.folders).toEqual([{ name: "actions", path: "github/actions", secretCount: 1, folderCount: 0 }]);
     expect(github.secrets.map((entry) => entry.name)).toEqual(["github/ci", "github/deploy"]);
     expect(folderListing(names, "nothing")).toEqual({ folders: [], secrets: [] });
   });
@@ -238,8 +220,6 @@ describe("folders", () => {
     expect(nameInFolder("aws/prod/db", "aws/prod")).toBe("db");
     expect(nameInFolder("OPENAI_KEY", "")).toBe("OPENAI_KEY");
     expect(normalizeFolderPath("/a//b/")).toBe("a/b");
-    expect(hasFolders(names)).toBe(true);
-    expect(hasFolders([secret({ name: "A" })])).toBe(false);
     expect(folderNameProblem(" ")).toMatch(/Name/);
     expect(folderNameProblem("a/b")).toMatch(/slash/);
     expect(folderNameProblem("ok")).toBeNull();
@@ -252,29 +232,17 @@ describe("where a secret goes", () => {
     { id: "aws_secrets_manager", label: "AWS Secrets Manager", requiresExternalRef: false, supportsManagedValues: true, supportsExternalReferences: true, supportsExternalValueWrites: true, configured: false },
     { id: "vault", label: "HashiCorp Vault", requiresExternalRef: true, supportsManagedValues: false, supportsExternalReferences: true, configured: true },
   ] as never;
-  const aws = { id: "v1", provider: "aws_secrets_manager", displayName: "Prod AWS", status: "ready", isDefault: false, healthStatus: null, healthMessage: null } as unknown as CompanySecretProviderConfig;
-  const off = { ...aws, id: "v2", displayName: "Old", status: "disabled" } as CompanySecretProviderConfig;
 
-  it("offers the default and value vaults for a stored value", () => {
-    expect(storeChoices("managed", descriptors, [aws, off]).map((entry) => entry.value)).toEqual(["", "v1"]);
-  });
-
-  it("offers vaults and configured deployments for a reference", () => {
-    const choices = storeChoices("external", descriptors, [aws, off]);
-    expect(choices.map((entry) => [entry.value, entry.provider, entry.providerConfigId])).toEqual([
-      ["v1", "aws_secrets_manager", "v1"],
-      ["provider:vault", "vault", null],
-    ]);
-    expect(supportsReferences(descriptors, [])).toBe(true);
-    expect(supportsReferences([descriptors[0], descriptors[1]] as never, [])).toBe(false);
+  it("shows what a reference looks like for the provider", () => {
     expect(referencePlaceholder("aws_secrets_manager")).toMatch(/^arn:aws/);
   });
 
   it("updates a reference by pointing it elsewhere, or writing when the provider can", () => {
     expect(rotateKinds(secret({}), descriptors)).toEqual(["value"]);
-    expect(rotateKinds(secret({ managedMode: "external_reference", provider: "aws_secrets_manager", externalRef: "arn:x" }), descriptors)).toEqual(["reference", "value"]);
+    expect(rotateKinds(secret({ managedMode: "external_reference", provider: "aws_secrets_manager", externalRef: "arn:x" }), descriptors)).toEqual(["value", "reference"]);
     expect(rotateKinds(secret({ managedMode: "external_reference", provider: "vault", externalRef: "secret/x" }), descriptors)).toEqual(["reference"]);
-    expect(rotateLabel(secret({ managedMode: "external_reference" })).title).toBe("Update");
-    expect(rotateLabel(secret({})).title).toBe("Rotate");
+    expect(rotateLabel(secret({ managedMode: "external_reference", provider: "vault", externalRef: "secret/x" }), descriptors)).toBe("Change reference");
+    expect(rotateLabel(secret({ managedMode: "external_reference", provider: "aws_secrets_manager", externalRef: "arn:x" }), descriptors)).toBe("Replace value");
+    expect(rotateLabel(secret({}), descriptors)).toBe("Replace value");
   });
 });
