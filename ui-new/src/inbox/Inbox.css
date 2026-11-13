@@ -612,8 +612,11 @@
   gap: 7px;
 }
 
+/* The "i" sits in the switch; undo the segment button's padding and height. */
 .ibx-views .infotip {
+  height: 20px;
   margin: 0 6px 0 2px;
+  padding: 0;
 }
 
 .ibx-unassigned {
