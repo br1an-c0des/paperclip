@@ -57,6 +57,15 @@ Reference:
   questions stay in the feed after dismissal and can be reopened (upstream `dismiss-and-reopen`).
 - **Since the 2026-11-01 sync:** `GET /api/companies/:companyId/attention/summary`
   (`attentionApi.summary`) returns the feed's counts without the cards, for navigation badges.
+- **Since the 2026-11-13 sync (#20959, #20961):** personal routing. `GET …/attention` takes
+  `view=mine|unassigned|company|archived|all` (default `all`) and returns `viewCounts`, each card's
+  `audience`, `closeModes` and `changeFingerprint`, and, for `view=mine`, `receipts`.
+  `POST /api/companies/:companyId/attention/:sourceKind/:sourceId/claim` takes an Unassigned card,
+  `…/transfer { userId, reason }` routes it to another person, and `…/close { mode, reason, until,
+  fingerprint }` withdraws it for everyone or archives or snoozes it for yourself. Inbox dismissals
+  take `fingerprint`. `POST /api/approvals/:id/cancel { reason }` withdraws an out-of-date approval.
+  History takes `scope` and `handledForMe` and lists approvals (`issueId` can be null). The old UI's
+  Inbox and Decisions pages are built on these (U133).
 
 ### `decisions/queues`: Decision queues and triage
 

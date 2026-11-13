@@ -30,6 +30,9 @@ Resources: `PATCH /api/companies/:companyId`, `/logo`, `/archive`, `/decision-mo
 Notes: since the 2026-10-22 upstream sync, decision model setup is always on Connections (before, it
 was on General unless fast responses were on), and General shows agent observability in its place.
 Decision charges appear under Activity → Costs.
+Since the 2026-11-13 sync, `PATCH /api/companies/:companyId` takes `defaultDecisionOwnerUserId` and
+`budgetOwnerUserId` (#20959; U134), and `GET …/secret-proposals` takes `order=created|resolved` and
+`limit`, used by the redesigned Secrets page (#21225; U135).
 
 ## Instance settings
 
@@ -101,6 +104,10 @@ source's connection; `POST …/discover` with `Accept: application/x-ndjson` str
 Since the 2026-11-09 sync, `GET /api/companies/:companyId/skills/:skillId/update-diff` returns
 `SkillSourceUpdateDiff`, a per-file unified diff between the installed and the latest tracked GitHub
 revision (#20155). The old UI doesn't call it. Skill routes also accept a slug as `skillId` (#19808).
+
+Since the 2026-11-13 sync, skills that connected apps publish over MCP wait for review in a
+"Connected app skills" section: `GET /api/companies/:companyId/mcp-skills`, `GET …/:skillId/content`,
+`POST …/:skillId/approve` (bound to `manifestDigest`) and `POST …/:skillId/decline` (#21219; U137).
 
 ## Apps and tools ("Connectors")
 

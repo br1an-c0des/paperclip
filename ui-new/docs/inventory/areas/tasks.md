@@ -158,6 +158,10 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   preloaded on hover and from Recents; the individual reads above remain (`lib/issue-chat-history-queries.ts`).
   A deferred request whose wait reason changes logs `issue.execution_waiting` (#20338), which refreshes
   open pages.
+- **Since the 2026-11-13 sync** (#21119, #21266): a connected app's tool call can carry an MCP Apps
+  view, shown as a sandboxed frame under the tool card: `GET /api/issues/:issueId/mcp-app-views`,
+  `GET …/:viewId`, `POST …/:viewId/tool-calls`, `PUT …/:viewId/model-context`, `POST …/:viewId/messages`
+  (`mcpAppsApi`), and provider tool icons from `GET /api/companies/:companyId/tool-icons` (U136).
 
 ### `tasks/discussion`: Comment and reassign
 

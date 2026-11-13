@@ -140,6 +140,8 @@ Runs, activity, costs and budget for an agent link out to the Activity hub filte
   Since the 2026-11-03 sync, bundle settings have their own panel
   (`pages/agent-detail/InstructionsBundleSettings.tsx`), and `PATCH .../instructions-bundle` accepts
   `requireExistingEntry` so a changed entry file must already exist.
+  Since the 2026-11-13 sync, `PUT .../instructions-bundle/file` with `renameTo` and `baseHash`
+  renames a file (`agentsApi.renameInstructionsFile`, #20973; U141).
 
 ### `agents/skills`: Skills
 
