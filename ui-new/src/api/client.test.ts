@@ -48,4 +48,13 @@ describe("errorMessage", () => {
     expect(errorMessage({ message: "Message" }, 400)).toBe("Message");
     expect(errorMessage(null, 500)).toBe("Request failed: 500");
   });
+
+  it("reads an OAuth error's description rather than its code (U150)", () => {
+    expect(errorMessage({ error: "invalid_grant", error_description: "This code is expired, already decided, or invalid." }, 400)).toBe(
+      "This code is expired, already decided, or invalid.",
+    );
+    expect(errorMessage({ error: "invalid_grant", error_description: " " }, 400)).toBe("invalid_grant");
+    // A sentence in `error` is already readable.
+    expect(errorMessage({ error: "Agent not found", error_description: "Other" }, 404)).toBe("Agent not found");
+  });
 });
