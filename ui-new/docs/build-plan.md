@@ -457,7 +457,13 @@ Progress:
   misleads. State, empty-state, disabled-reason, save-status and error text stays visible. First
   done: `ui/InfoTip.tsx` and project settings → Code and workspaces. Left: everything else (about
   210 `SettingsCard`s, 170 `SettingsRow`s and 140 note lines, Nov 12 count); split by area, one
-  agent per area, and check phones (tap to open).
+  agent per area, and check phones (tap to open). Tip text is plain (no links or controls); a link
+  goes in the visible note. Found on Nov 12, for the sweep: `NewProjectDialog.tsx` and
+  `ProjectDashboard.tsx` still say that without code "Agents work in a folder Paperclip manages for
+  the project" (wrong: with no workspace, runs use the agent's folder or a per-task one); the
+  workspace form's commands help still says "task checkouts"; and a project created with a
+  workspace storage plugin applies its task-checkout policy even with Isolated workspaces off,
+  while the Task checkouts card hides those controls then.
 
 ##### Upstream changes to integrate
 
