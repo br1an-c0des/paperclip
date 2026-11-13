@@ -15,6 +15,7 @@ import { Markdown } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
 import { TonePill, type Tone } from "@/ui/Status";
 import { useSkillDetail, useSkillFile, useSkillFolders, useSkillList, useSkillVersions } from "./queries";
+import { ConnectedAppSkills } from "./ConnectedAppSkills";
 import { AuditBlock, CompareVersionsDialog, ForkDialog, SkillSettingsDialog, StarButton, UpdateBlock } from "./SkillActions";
 import { FolderMenu, MoveToFolder } from "./SkillFolders";
 import { ImportDialog, ScanProjectsDialog } from "./SkillImport";
@@ -50,6 +51,9 @@ import { readNote } from "@/lib/offline/read-state";
  * the search kept in the address. The core Paperclip skills come first when sorted by name.
  * "Add skills" opens the catalog, an import from a path or URL, a project scan (SkillImport.tsx),
  * Sources, or a new skill in the Studio.
+ *
+ * Above the list, while any connected app publishes skills over MCP: Connected app skills, to review
+ * and approve or decline (ConnectedAppSkills.tsx, U137).
  *
  * Opening a skill (`/skills/:skillId`) shows its detail beside the list: what it's for, the agents
  * using it (`GET /skills/:id`, `usedByAgents`), the lead agents without a core skill, its source,
@@ -154,6 +158,7 @@ export function SkillLibrary(props: { skillId: string | null }) {
           </Menu>
         </div>
       </div>
+      <ConnectedAppSkills />
       <ImportDialog open={adding() === "import"} onOpenChange={(open) => setAdding(open ? "import" : null)} />
       <ScanProjectsDialog open={adding() === "scan"} onOpenChange={(open) => setAdding(open ? "scan" : null)} />
 
