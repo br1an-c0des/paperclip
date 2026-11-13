@@ -5,6 +5,7 @@ import {
   containmentBody,
   containmentFormKey,
   controllerContainment,
+  followUpLine,
   isContainmentHold,
   OWNER_GONE_RESOURCE,
   ownerGoneHeadline,
@@ -221,5 +222,23 @@ describe("original-host containment (#19813)", () => {
 
   it("starts a fresh form for a new authority snapshot", () => {
     expect(containmentFormKey("ra1", { runId: RUN, digest: DIGEST })).not.toBe(containmentFormKey("ra1", { runId: RUN, digest: "b".repeat(64) }));
+  });
+});
+
+describe("what follows a recovery, in plainer words (#21348)", () => {
+  it("says it from the wake policy, as the old card's Follow-up row does", () => {
+    expect(followUpLine({ wakePolicy: { type: "bounded_recovery_owner" } })).toBe("An agent is choosing the next step");
+    expect(followUpLine({ wakePolicy: { type: "board_escalation" } })).toBe("Waiting for you");
+    expect(followUpLine({ wakePolicy: { type: "manual_repair_required" } })).toBe("Needs a fix before Retry");
+    expect(followUpLine({ wakePolicy: { type: "wake_owner" } })).toBe("An agent will be asked to choose the next step");
+    expect(followUpLine({ wakePolicy: { type: "monitor", intervalLabel: "every 5m" } })).toBe("Check scheduled · every 5m");
+    expect(followUpLine({ wakePolicy: { type: "some_new_policy" } })).toBe("Some new policy");
+    expect(followUpLine({ wakePolicy: null })).toBeNull();
+    expect(followUpLine(null)).toBeNull();
+  });
+
+  it("puts it on the card", () => {
+    const card = recoveryCard(unprovable({}, { wakePolicy: { type: "board_escalation" } }), { board: true });
+    expect(card?.followUp).toBe("Waiting for you");
   });
 });

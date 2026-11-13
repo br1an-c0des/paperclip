@@ -130,6 +130,7 @@ export function TaskRecovery(props: { task: Issue; onOwnsRetry?: (owns: boolean)
             <Show when={found().nextAction}>{(next) => <span class="tn-recovery-next">Next: {next()}</span>}</Show>
             <span class="tn-recovery-meta">
               <Show when={owner()}>{(who) => <>With {who()}</>}</Show>
+              <Show when={found().followUp}>{(followUp) => <>{owner() ? " · " : ""}{followUp()}</>}</Show>
               <Show when={found().attempts}>{(attempts) => <> · {attempts()}</>}</Show>
             </span>
             <Show when={stop()}>

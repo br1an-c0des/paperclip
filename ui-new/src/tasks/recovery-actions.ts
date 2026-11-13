@@ -40,6 +40,10 @@ import type { BoardAccess } from "./task-edits";
  *   "controller_process_space_unverified"`). The server refuses any other way out of it, so the
  *   card offers none; an owner or admin records that the controller and provider stopped, with the
  *   reviewed action outcome and evidence, bound to the server's authority digest. It doesn't retry.
+ *
+ * Since the 2026-11-13 sync (#21348): the card says what follows, from the action's wake policy, in
+ * upstream's plainer words ("An agent is choosing the next step", "Waiting for you", "Needs a fix
+ * before Retry"), as the old card's Follow-up row does.
  */
 
 export type RecoveryState = "needed" | "in_progress" | "observing";
@@ -67,6 +71,36 @@ const KIND_HEADLINES: Record<IssueRecoveryActionKind, string> = {
   active_run_watchdog: "The run has gone quiet. Paperclip is watching it without interrupting.",
   issue_graph_liveness: "Paperclip couldn't find a clear next step for this open task. Continue the work, send it for review, mark it done, or record what blocks it.",
 };
+
+/**
+ * What follows the recovery, from its wake policy (`wakePolicy.type`), in the old UI's words since
+ * #21348 (IssueRecoveryActionCard's `readWakePolicySummary`). Null without a policy.
+ */
+export function followUpLine(action: Pick<IssueRecoveryAction, "wakePolicy"> | null | undefined): string | null {
+  const policy = action?.wakePolicy;
+  const type = typeof policy?.type === "string" ? policy.type.trim() : "";
+  if (!type) return null;
+  switch (type) {
+    case "wake_owner":
+      return "An agent will be asked to choose the next step";
+    case "bounded_owner_disposition_repair":
+      return "Paperclip is retrying the original owner";
+    case "bounded_recovery_owner":
+      return "An agent is choosing the next step";
+    case "board_escalation":
+      return "Waiting for you";
+    case "manual":
+      return "Manual follow-up needed";
+    case "manual_repair_required":
+      return "Needs a fix before Retry";
+    case "monitor": {
+      const interval = typeof policy?.intervalLabel === "string" && policy.intervalLabel.trim() ? policy.intervalLabel.trim() : null;
+      return interval ? `Check scheduled · ${interval}` : "Check scheduled";
+    }
+    default:
+      return type.replace(/_/g, " ").replace(/^./, (first) => first.toUpperCase());
+  }
+}
 
 export const OUTCOMES: { outcome: RecoveryOutcome; label: string; description: string; boardOnly?: boolean }[] = [
   { outcome: "todo", label: "Try again", description: "Close the recovery and put the task back in Todo." },
@@ -186,6 +220,8 @@ export type RecoveryCard = {
   /** The server's own next step, when it gives one. */
   nextAction: string | null;
   attempts: string | null;
+  /** What follows, from the wake policy (`followUpLine`, #21348). */
+  followUp: string | null;
   outcomes: typeof OUTCOMES;
 };
 
@@ -232,6 +268,7 @@ export function recoveryCard(action: IssueRecoveryAction | null | undefined, opt
     // An unprovable record's next step repeats the headline and the confirmation under it.
     nextAction: ownerGone ? null : action.nextAction?.trim() || null,
     attempts: action.attemptCount > 1 ? `Attempt ${action.attemptCount}${action.maxAttempts ? ` of ${action.maxAttempts}` : ""}` : null,
+    followUp: followUpLine(action),
     outcomes,
   };
 }
