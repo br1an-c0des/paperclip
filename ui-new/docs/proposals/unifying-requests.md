@@ -2,6 +2,11 @@
 
 Oct 16, 2026 · revised Oct 19, 2026 · @Brian Abbott
 
+> **Nov 13, 2026:** upstream now routes each request to a person (For you, Unassigned, Company),
+> with claim, transfer, withdraw, archive and snooze. [Decision 53](../decisions.md#53-requests-are-routed-to-a-person)
+> records what that changes here: placement isn't authority, Needs you is personal, Withdraw
+> applies to every kind, and Clear became Archive.
+
 ## Summary
 
 Treat agent questions, Decisions and approvals as one concept in the interface, a **request**: something waiting on someone's response, where the response decides what happens next. Today they are three separate systems, added months apart, with different tables, audiences, lifecycles and agent guidance, and their boundaries don't follow the lines they imply.

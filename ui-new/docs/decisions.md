@@ -79,6 +79,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 50 | [Gaps found in integration round 7](#50-gaps-found-in-integration-round-7) | Chat, queue, link previews, projects | Decided | Nov 11, 2026 |
 | 51 | [Apps is called Connections](#51-apps-is-called-connections) | Apps and tools, `shell/navigation`, company settings | Decided | Nov 12, 2026 |
 | 52 | [Help text goes behind an info icon](#52-help-text-goes-behind-an-info-icon) | All screens | Decided | Nov 12, 2026 |
+| 53 | [Requests are routed to a person](#53-requests-are-routed-to-a-person) | `inbox-search/triage`, `decisions/feed`, `approvals/governance`, `shell/navigation` | Decided | Nov 13, 2026 |
 
 ## Entries
 
@@ -1820,3 +1821,44 @@ Both are handled in `ui-new` for now.
     (decision H: hover-only text may only repeat what's visible).
   - New UI follows this from now on (CLAUDE.md, "UI text"). Existing help text moves over in an
     app-wide sweep (build plan, M7 progress, "Open: help text behind info icons").
+
+### 53. Requests are routed to a person
+
+- **Status:** Decided 2026-11-13
+- **Area:** `inbox-search/triage`, `decisions/feed`, `approvals/governance`, `shell/navigation`,
+  company and project settings
+- **Found in:** the Nov 13 sync, upstream #20959 and #20961 (build plan U133, U134).
+
+- **What we found:** upstream gave every request card an audience (a person, the Unassigned pool
+  or the company), views over the feed, and claim, transfer and close actions. The old Inbox opens
+  on the requests routed to you.
+- **Decision (built in round 8):**
+  - Needs you opens on **For you**, beside Unassigned, Company and Everyone (`?view=`). The views
+    are split on the client from the one feed by the server's audience rule, so one cache drives
+    every view and the nav count. Everyone is shown to all members, viewers included.
+  - Each card's "…" menu is a **Close…** menu with what the card's `closeModes` allow: Transfer
+    to…, Snooze and Archive (for you), and Withdraw for everyone. An owner line ("Assigned to you",
+    "No owner yet") carries **Claim** (key `c`). Archive and snooze send the card's
+    `changeFingerprint`, so a hidden card returns when it changes.
+  - The **Cleared** tab is now **Archived** (`/inbox/cleared` redirects); with Snoozed it is
+    upstream's Archived view.
+  - For you shows receipts for requests someone else handled for you. History gets "By or for me"
+    (default) or "Everyone's", and a Handled for me filter.
+  - Out-of-date approvals (pending or changes requested, not hires) can be withdrawn
+    (`/approvals/:id/cancel`).
+  - Company settings → General → Request routing sets the decision owner and budget owner;
+    project settings → Details sets the project's decision owner.
+- **Changes to the [requests proposal](proposals/unifying-requests.md):**
+  1. A card's placement (who it's for) is separate from who may answer it; placement isn't
+     authority.
+  2. Needs you is personal by default; everyone's requests are in Unassigned, Company and Everyone.
+  3. Withdraw is a normal action for Decisions and approvals too, not only a question you asked.
+  4. Item 14: Clear is now Archive (hidden until the card changes).
+- **Nav count (amends decision 24):** still computed from the feed, so triage moves it at once:
+  For you within Needs you. It can be lower than the server's `deskBadgeCount`, which also counts
+  the aging shelf and alerts routed to you (a budget stop for its budget owner).
+- **Not built yet:** folding an obligation's evidence cards under its lead card; a Stale group and
+  "Withdraw all stale"; a reason on the approval card's own Withdraw; a "This is for X. Continue?"
+  check before acting on someone else's card; an Open button on approval-only receipts. The
+  question card's "Set aside" and the Inbox's "Archive" read alike and may need clearer labels. Not
+  yet checked against a real server with several people.
