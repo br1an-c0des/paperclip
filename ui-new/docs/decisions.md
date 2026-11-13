@@ -1774,3 +1774,27 @@ Both are handled in `ui-new` for now.
   Settings, Cases) and mix pages and agents in one dragged order, and an agent pin opens its chat.
   **Decided Nov 11:** left out; Starred stays projects and agents.
 
+### 51. Apps is called Connections
+
+- **Status:** Decided 2026-11-12
+- **Area:** Apps and tools ("Connectors"), `shell/navigation`, company settings (board 23)
+- **Found in:** using the deployed instance.
+
+- **What we found:** "Apps" read as something other than what the page is: the agents' connections
+  to outside tools, accounts and AI providers. Company settings already had a section called
+  Connections, for the models Paperclip itself uses.
+- **Decision:**
+  - The page is **Connections** everywhere in `ui-new` (nav, org header tab, palette, titles,
+    toasts, help text); typing "apps" in the palette still finds it. Things in its gallery can
+    still be called apps ("Connect an app", "Search apps"). Code names (`src/apps/`, `AppsPage`)
+    stay.
+  - Its addresses move to `/:prefix/connections/…`. Every `/:prefix/apps/…` and unprefixed
+    `/apps/…` address redirects there, keeping path, query and fragment, so the server's OAuth
+    returns, AI sign-in resumes, chat setup links and agents' links (all still `/apps/…`) keep
+    working. If `ui-new` ever adds Cloud connector enrollment, the server only accepts
+    `/apps/connect` and `/apps/chat/connect` as its `returnTo`.
+  - Company settings' Connections section is **Paperclip Models**, at
+    `/company/settings/paperclip-models` (the old address redirects); its link to the agents'
+    connections says "Connections".
+  - Notes written before Nov 12, here and in the build plan and checklist, still say Apps.
+

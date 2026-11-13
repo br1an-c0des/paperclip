@@ -73,7 +73,7 @@ anyone else can reach it. (`public` deployments use `paperclipai auth bootstrap-
 | `PAPERCLIP_PUBLIC_URL` | The exact URL people open, including `https://` |
 | `PAPERCLIP_DEPLOYMENT_EXPOSURE` | `private` (Tailscale/VPN/LAN) or `public` (internet, behind Caddy) |
 | `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, `PAPERCLIP_TOOL_ACTION_SIGNING_SECRET` | Generate each with `openssl rand -hex 32`. Keep them stable: changing `BETTER_AUTH_SECRET` signs everyone out. |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | API keys for agents. Leave `ANTHROPIC_API_KEY` empty to use a Claude subscription instead: sign in from Apps → AI connections after setup. A set key takes precedence over the subscription. |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | API keys for agents. Leave `ANTHROPIC_API_KEY` empty to use a Claude subscription instead: sign in from Connections → AI connections after setup. A set key takes precedence over the subscription. |
 | `PAPERCLIP_PORT` | Host port, default 3100. Use another one (e.g. 3200) when a dev server already runs on 3100 on the same machine. |
 | `GITHUB_TOKEN` | Optional fallback for cloning private repos. A company secret named `GITHUB_TOKEN` (set in the UI) takes precedence and is scoped to one company. |
 
