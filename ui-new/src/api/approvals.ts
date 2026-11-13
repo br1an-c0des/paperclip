@@ -5,7 +5,8 @@ import { api } from "./client";
  * Approvals, as ui/src/api/approvals.ts and ui/src/api/issues.ts call them: the ones linked to a
  * task, deciding one, and its own discussion thread; for the approval page (src/approvals/), one by
  * id with its linked tasks, the company's list, resubmitting after Request changes, and removing a
- * rejected hire's agent (`DELETE /agents/:id`, which the old approval page offers).
+ * rejected hire's agent (`DELETE /agents/:id`, which the old approval page offers), and withdrawing
+ * one that's out of date (`POST /approvals/:id/cancel`).
  */
 
 export const approvalsApi = {
@@ -21,6 +22,11 @@ export const approvalsApi = {
   resubmit: (id: string, payload?: Record<string, unknown>) => api.post<Approval>(`/approvals/${id}/resubmit`, { payload }),
   comments: (id: string, signal?: AbortSignal) => api.get<ApprovalComment[]>(`/approvals/${id}/comments`, { signal }),
   addComment: (id: string, body: string) => api.post<ApprovalComment>(`/approvals/${id}/comments`, { body }),
+  /**
+   * Withdraws an out-of-date approval (upstream #20959): it's cancelled, never approved, and the
+   * requester is told. Not for hires (reject those) or an approval already decided.
+   */
+  cancel: (id: string, reason?: string) => api.post<Approval>(`/approvals/${id}/cancel`, reason ? { reason } : {}),
   /** Deletes the agent a rejected hire created (it waits in `pending_approval` until then). */
   removeAgent: (agentId: string) => api.delete<{ ok: true }>(`/agents/${encodeURIComponent(agentId)}`),
 };

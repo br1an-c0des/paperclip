@@ -29,8 +29,8 @@ function item(id: string, extra: Partial<DecisionHistoryItem> = {}): DecisionHis
 
 describe("historyQuery", () => {
   it("sends only what's set, a page of 40, newest by default", () => {
-    expect(historyQuery(NO_HISTORY_FILTERS)).toEqual({ limit: 40 });
-    expect(historyQuery({ search: "  tes-4 ", outcome: "rejected", agentId: "a1", projectId: "p1", sort: "oldest" }, "next")).toEqual({
+    expect(historyQuery(NO_HISTORY_FILTERS)).toEqual({ limit: 40, scope: "mine" });
+    expect(historyQuery({ search: "  tes-4 ", outcome: "rejected", agentId: "a1", projectId: "p1", sort: "oldest", scope: "all" }, "next")).toEqual({
       limit: 40,
       search: "tes-4",
       outcome: "rejected",
@@ -42,12 +42,18 @@ describe("historyQuery", () => {
   });
 
   it("keys equal filters alike, without the page size", () => {
-    expect(historyKey(NO_HISTORY_FILTERS)).toEqual({});
-    expect(historyKey({ ...NO_HISTORY_FILTERS, search: " x " })).toEqual({ search: "x" });
+    expect(historyKey(NO_HISTORY_FILTERS)).toEqual({ scope: "mine" });
+    expect(historyKey({ ...NO_HISTORY_FILTERS, search: " x " })).toEqual({ scope: "mine", search: "x" });
+    expect(historyKey({ ...NO_HISTORY_FILTERS, scope: "all" })).toEqual({});
   });
 
   it("builds the request's query string", () => {
-    expect(historyParams(historyQuery({ ...NO_HISTORY_FILTERS, outcome: "answered" }, "c 1"))).toBe("limit=40&outcome=answered&cursor=c+1");
+    expect(historyParams(historyQuery({ ...NO_HISTORY_FILTERS, outcome: "answered" }, "c 1"))).toBe("limit=40&scope=mine&outcome=answered&cursor=c+1");
+  });
+
+  it("sends Handled for me as its own flag, not an outcome (U133)", () => {
+    expect(historyQuery({ ...NO_HISTORY_FILTERS, outcome: "handled_for_me" })).toEqual({ limit: 40, scope: "mine", handledForMe: true });
+    expect(historyQuery({ ...NO_HISTORY_FILTERS, outcome: "withdrawn", scope: "all" })).toEqual({ limit: 40, outcome: "withdrawn" });
   });
 });
 

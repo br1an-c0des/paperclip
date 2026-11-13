@@ -44,6 +44,9 @@ export type CompanyPatch = Partial<
     | "feedbackDataSharingEnabled"
     | "logoAssetId"
     | "defaultResponsibleUserId"
+    // Request routing's owners (upstream #20959, U134): placement only, never authority.
+    | "defaultDecisionOwnerUserId"
+    | "budgetOwnerUserId"
   > & { interactionResolverGovernance: InteractionResolverGovernance }
 >;
 

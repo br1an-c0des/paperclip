@@ -5,16 +5,18 @@ import type { Request, RequestKind } from "@/requests/request-model";
  * The Inbox's view model (board 14), from the attention feed (`GET /companies/:id/attention`):
  *
  * - Tabs. Needs you holds the requests (questions, proposals, approvals, sign-offs, plus join
- *   requests and recovery actions); Alerts holds what broke (failed runs, budget alerts, agent
- *   errors, stuck blockers), as the requests proposal keeps them apart. Snoozed and Cleared hold what
- *   you set aside, from your per-person dismissals. Updates is your tasks, from one read
- *   (`inbox/mine`, below). History is what was decided (`history-model.ts`).
+ *   requests and recovery actions), in views by who they're for (`routing-model.ts`: For you by
+ *   default); Alerts holds what broke (failed runs, budget alerts, agent errors, stuck blockers), as
+ *   the requests proposal keeps them apart. Snoozed and Archived (the tab's id is still `cleared`)
+ *   hold what you hid for yourself, from your per-person dismissals, whoever it's for: the server's
+ *   Archived view. Updates is your tasks, from one read (`inbox/mine`, below). History is what was
+ *   decided (`history-model.ts`).
  * - Triage shows at once: a cleared, snoozed or restored item moves tabs before the server answers
  *   (`Pending`), and the next feed puts it where the server says.
  * - Kinds. An item's request kind comes from its card once that has loaded, and from the feed until
  *   then, so the filter counts don't wait on every card.
- * - Keys, after the old Decisions page and Inbox: j/k move, Enter opens the task, y (or x) clears,
- *   s snoozes, a answers, r and Shift+U mark read and unread, u restores; in Needs you → and ←
+ * - Keys, after the old Decisions page and Inbox: j/k move, Enter opens the task, y (or x) archives,
+ *   s snoozes, a answers, c claims, r and Shift+U mark read and unread, u restores; in Needs you → and ←
  *   open and close a card or unfold and fold a group, and Shift with them opens or closes all
  *   (board 14b).
  * - The aging shelf (decision 39, D5): a request idle past its retention days (30 unless a queue
@@ -34,7 +36,7 @@ export const INBOX_TABS: readonly { tab: InboxTab; label: string; path: string }
   { tab: "updates", label: "Updates", path: "updates" },
   { tab: "alerts", label: "Alerts", path: "alerts" },
   { tab: "snoozed", label: "Snoozed", path: "snoozed" },
-  { tab: "cleared", label: "Cleared", path: "cleared" },
+  { tab: "cleared", label: "Archived", path: "archived" },
   { tab: "history", label: "History", path: "history" },
 ];
 
@@ -48,6 +50,8 @@ const OLD_PATHS: Record<string, InboxTab> = {
   blocked: "alerts",
   requests: "needs",
   decided: "history",
+  // Archived was called Cleared before U133.
+  cleared: "cleared",
 };
 
 /** The tab a path under `/inbox/` names: `updates`, `alerts`…, or an old Inbox path. */
@@ -184,6 +188,7 @@ export type InboxKey =
   | "clear"
   | "snooze"
   | "answer"
+  | "claim"
   | "read"
   | "unread"
   | "restore"
@@ -217,6 +222,8 @@ export function inboxKeyAction(key: string, shift = false): InboxKey | null {
       return "snooze";
     case "a":
       return "answer";
+    case "c":
+      return "claim";
     case "r":
       return "read";
     case "U":

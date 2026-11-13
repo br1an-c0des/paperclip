@@ -11,10 +11,13 @@ import type { TaskPeople } from "@/tasks/people";
 import { Button } from "@/ui/Button";
 import { Menu } from "@/ui/Menu";
 import { Capsule, TonePill } from "@/ui/Status";
+import { outcomeText } from "./routing-model";
 import {
-  decidedBy,
+  actionLine,
   filtersActive,
   HISTORY_OUTCOMES,
+  HISTORY_SCOPES,
+  type HistoryScope,
   historyItems,
   historyKey,
   historyQuery,
@@ -26,10 +29,10 @@ import {
 import { activityGroups } from "./inbox-model";
 
 /*
- * The Inbox's History tab: what was decided on tasks, newest first, a page of 40 at a time with
- * Load more (`history-model.ts`). Each row names the outcome, the request, its task (which opens in
- * the task modal), who asked and who decided, and when. The filters sit in the bar; the Inbox's
- * search box searches the history on the server.
+ * The Inbox's History tab: what was decided, newest first, a page of 40 at a time with Load more
+ * (`history-model.ts`). Each row names the outcome, the request, its task (which opens in the task
+ * modal), who asked, who did what and for whom, the reason given for a withdrawal, and when. The
+ * filters sit in the bar, starting with whose; the Inbox's search box searches it on the server.
  */
 
 export function useDecisionHistory(filters: Accessor<HistoryFilters>, enabled: Accessor<boolean>) {
@@ -84,6 +87,7 @@ export function HistoryBar(props: { filters: HistoryFilters; people: TaskPeople;
   ]);
   return (
     <>
+      <Pick label="Whose" value={props.filters.scope} options={HISTORY_SCOPES} onChange={(scope: HistoryScope) => props.onChange({ scope })} />
       <Pick label="Outcome" value={props.filters.outcome} options={HISTORY_OUTCOMES} onChange={(outcome: HistoryOutcome) => props.onChange({ outcome })} />
       <Pick label="Asked by" value={props.filters.agentId} options={agents()} onChange={(agentId) => props.onChange({ agentId })} />
       <Pick label="Project" value={props.filters.projectId} options={projectOptions()} onChange={(projectId) => props.onChange({ projectId })} />
@@ -104,6 +108,8 @@ export function HistoryList(props: {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onOpen: (item: DecisionHistoryItem) => void;
+  /** Widens an empty "by or for me" history to everyone's. */
+  onEveryone?: () => void;
 }) {
   const groups = createMemo(() =>
     props.filters.sort === "newest"
@@ -128,7 +134,17 @@ export function HistoryList(props: {
           when={props.data.items().length > 0}
           fallback={
             <p class="ibx-empty card">
-              {filtersActive(props.filters) ? "No decisions match these filters." : "Nothing decided yet. Questions and proposals answered on tasks show up here."}
+              {filtersActive(props.filters)
+                ? "No decisions match these filters."
+                : props.filters.scope === "mine"
+                  ? "Nothing handled by you or for you yet."
+                  : "Nothing decided yet."}
+              <Show when={props.filters.scope === "mine" && props.onEveryone}>
+                {" "}
+                <Button size="compact" variant="quiet" onClick={() => props.onEveryone?.()}>
+                  Show everyone's
+                </Button>
+              </Show>
             </p>
           }
         >
@@ -170,8 +186,11 @@ export function HistoryList(props: {
 function HistoryRow(props: { item: DecisionHistoryItem; people: TaskPeople; selected: boolean; onSelect: () => void; onOpen: () => void }) {
   const tone = () => outcomeTone(props.item);
   const by = () =>
-    decidedBy(props.item, { youId: props.people.youId(), person: props.people.personName, agent: (id) => props.people.agent(id)?.name });
-  const meta = () => [props.item.agentName ? `Asked by ${props.item.agentName}` : null, by() ? `decided by ${by()}` : null].filter(Boolean).join(", ");
+    actionLine(props.item, { youId: props.people.youId(), person: props.people.personName, agent: (id) => props.people.agent(id)?.name }, outcomeText);
+  const meta = () =>
+    [props.item.agentName ? `Asked by ${props.item.agentName}` : null, by() ? (props.item.agentName ? by()!.charAt(0).toLowerCase() + by()!.slice(1) : by()) : null]
+      .filter(Boolean)
+      .join(", ");
   return (
     <li
       class="ibx-row ibx-hist"
@@ -200,6 +219,7 @@ function HistoryRow(props: { item: DecisionHistoryItem; people: TaskPeople; sele
       <Show when={meta()}>
         <span class="ibx-task-meta">{meta()}</span>
       </Show>
+      <Show when={props.item.reason}>{(reason) => <span class="ibx-receipt-reason">“{reason()}”</span>}</Show>
       <time class="ibx-row-when" datetime={props.item.resolvedAt} title={new Date(props.item.resolvedAt).toLocaleString()}>
         {updatedLabel(props.item.resolvedAt)}
       </time>

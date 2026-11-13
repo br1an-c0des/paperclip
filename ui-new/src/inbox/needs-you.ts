@@ -3,25 +3,26 @@ import { createQuery } from "@tanstack/solid-query";
 import { inboxApi } from "@/api/inbox";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
+import { useSession } from "@/lib/session";
 import { groupFeed } from "./inbox-model";
+import { filterByView } from "./routing-model";
 
 /*
- * The nav's Inbox count (decision 24): what's waiting on you, exactly as the Inbox's Needs you tab
- * holds it — active items you haven't cleared or snoozed, alerts left out. It reads the Inbox's own
- * feed query, so the Nav, the phone dock and the Inbox share one cache: triage in the Inbox patches
- * that cache at once (`use-inbox.ts`), and the live events and answered cards refresh it.
+ * The nav's Inbox count (decision 24, U133): what's waiting on you, exactly as Needs you's For you
+ * view holds it — requests routed to you (`audience` is you), active, not archived or snoozed, not
+ * on the aging shelf, alerts left out. It reads the Inbox's own feed query, so the Nav, the phone
+ * dock and the Inbox share one cache: triage, claims and transfers in the Inbox patch that cache at
+ * once (`use-inbox.ts`), and the live events and answered cards refresh it.
  *
- * The feed's `deskBadgeCount` isn't this count. Since upstream #20959 it counts the current cards
- * routed to the signed-in person ("For you", the same as `viewCounts.mine`), and the old UI's nav
- * shows it from the `view=mine` feed. The Inbox reads the whole feed (the default `all` view), so in
- * a company with several people the two differ; personal routing is U133 in the build plan. Nor is
- * it `GET …/attention/summary`'s: its counts by kind leave cleared and snoozed items out, but keep
- * requests on the aging shelf, which Needs you folds away (decision 39), and it doesn't say how
- * many those are.
+ * Since upstream #20959 the feed's `deskBadgeCount` also counts For you (`viewCounts.mine`), and
+ * this follows it, with two differences kept on purpose: it leaves out the aging shelf, which Needs
+ * you folds away (decision 39), and alerts routed to you (a budget stop for its budget owner),
+ * which sit in Alerts. Requests with obligation evidence count once there and per card here. Nor is
+ * it `GET …/attention/summary`'s: that keeps the aging shelf too.
  */
 
-export function needsYouCount(items: readonly AttentionItem[]) {
-  return groupFeed(items).needs.length;
+export function needsYouCount(items: readonly AttentionItem[], youId: string | null) {
+  return filterByView(groupFeed(items).needs, "mine", youId).length;
 }
 
 /** The feed query the Inbox, the project dashboard and the nav share. */
@@ -34,8 +35,9 @@ export function useAttentionFeed() {
   }));
 }
 
-/** How many items wait on you; undefined until the feed loads. */
+/** How many requests wait on you; undefined until the feed loads. */
 export function useNeedsYouCount() {
   const feed = useAttentionFeed();
-  return () => (feed.data ? needsYouCount(feed.data.items) : undefined);
+  const session = useSession();
+  return () => (feed.data ? needsYouCount(feed.data.items, session.youId()) : undefined);
 }

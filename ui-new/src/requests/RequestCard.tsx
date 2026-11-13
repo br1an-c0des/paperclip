@@ -52,6 +52,9 @@ import { DeclineButton, Footer } from "./card-parts";
 import { ConnectionControls } from "./ConnectionControls";
 import { DecisionControls, DecisionResults } from "./DecisionControls";
 import { JoinControls } from "./JoinControls";
+import { WithdrawDialog } from "./WithdrawDialog";
+import { canWithdrawApproval } from "@/approvals/approval-model";
+import { alreadyClosed, alreadyClosedText } from "@/inbox/routing-model";
 import { answerRefusal, documentLabel, documentReviewTarget, KIND_LABEL, planLabel, planReviewTarget, suggestedOwner, type Request, type RequestKind } from "./request-model";
 import "./RequestCard.css";
 
@@ -68,7 +71,9 @@ import "./RequestCard.css";
  *   (`PATCH /issues/:id`), stalled ones through `/issues/:id/stalled-review-decision`; proposals
  *   through `/decisions/:id/*` (DecisionControls.tsx); join requests through
  *   `/companies/:id/join-requests/:id/*` (JoinControls.tsx).
- * - A question you asked can be withdrawn from the "…" menu (`…/cancel`).
+ * - A question you asked can be withdrawn from the "…" menu (`…/cancel`), and so can an open
+ *   approval that's out of date, other than a hire (`POST /approvals/:id/cancel`, upstream #20959;
+ *   reject a hire instead). Both ask first (WithdrawDialog.tsx).
  * - Since the 2026-11-10 sync (U99, #20340): an approved app call whose app needs signing in again
  *   settles as "You approved · Sign-in needed" with Reconnect <app> (its permissions page), and an
  *   approval refused because the reviewed call changed says so and reads the card again.
@@ -108,6 +113,11 @@ export type RequestCardProps = {
   onCollapse?: () => void;
   /** The card's element id, for the row that opens it (`aria-controls`). */
   cardId?: string;
+  /**
+   * False where the page's `triage` already offers Withdraw (the Inbox's Close… menu), so the card
+   * leaves out its own: withdrawing a question you asked, or an approval that's out of date.
+   */
+  ownWithdraw?: boolean;
 };
 
 /** The prompt's element id, so a control group can be labelled by the rendered Markdown. */
@@ -414,12 +424,34 @@ function OpenCard(props: RequestCardProps) {
   /** A question you asked, still open: you can withdraw it (the server cancels only question forms). */
   const yours = () => {
     const found = interaction();
-    return !!found && found.kind === "ask_user_questions" && !!found.createdByUserId && found.createdByUserId === props.people.youId();
+    return props.ownWithdraw !== false && !!found && found.kind === "ask_user_questions" && !!found.createdByUserId && found.createdByUserId === props.people.youId();
+  };
+
+  // An approval that's out of date can be withdrawn for everyone (U133).
+  const approval = () => (props.request.source.type === "approval" ? props.request.source.approval : null);
+  const approvalWithdrawable = () => props.ownWithdraw !== false && !!approval() && canWithdrawApproval(approval()!);
+  const [withdrawing, setWithdrawing] = createSignal(false);
+  const withdrawApproval = async (reason: string) => {
+    try {
+      await approvalsApi.cancel(approval()!.id, reason.trim() || undefined);
+      pushToast({ tone: "success", title: "Withdrawn for everyone", body: props.request.title });
+      refresh();
+      return true;
+    } catch (error) {
+      const closed = alreadyClosed(error);
+      if (closed) {
+        pushToast({ tone: "warn", title: alreadyClosedText(closed, props.people.youId(), props.people.personName) });
+        refresh();
+        return true;
+      }
+      pushToast({ tone: "error", title: "Couldn't withdraw it", body: (error as Error).message });
+      return false;
+    }
   };
 
   const ownItems = () => (
     <>
-      <Show when={props.request.respond.allowed}>
+      <Show when={interaction() && props.request.respond.allowed}>
         <Show when={props.request.state === "open"}>
           <Menu.Item description="Keep it in the history to answer later" onSelect={() => aside.mutate("dismiss")}>
             Set aside
@@ -436,10 +468,16 @@ function OpenCard(props: RequestCardProps) {
           Withdraw the question
         </Menu.Item>
       </Show>
+      <Show when={approvalWithdrawable()}>
+        <Menu.Item description="It's out of date: end it for everyone, without approving" onSelect={() => setWithdrawing(true)}>
+          Withdraw…
+        </Menu.Item>
+      </Show>
     </>
   );
-  const hasOwn = () => !!interaction() && (props.request.respond.allowed || yours());
-  const menuLabel = () => (hasOwn() ? (props.triage || yours() ? "Request actions" : "Set aside or skip") : (props.triageLabel ?? "Request actions"));
+  const hasOwn = () => (!!interaction() && (props.request.respond.allowed || yours())) || approvalWithdrawable();
+  const menuLabel = () =>
+    hasOwn() ? (props.triage || yours() || approvalWithdrawable() ? "Request actions" : "Set aside or skip") : (props.triageLabel ?? "Request actions");
 
   return (
     <article id={props.cardId} class="rq" classList={{ "rq--compact": props.inThread }} data-kind={props.request.kind} aria-label={`${KIND_LABEL[props.request.kind]} from ${props.request.asker.name}`}>
@@ -494,6 +532,15 @@ function OpenCard(props: RequestCardProps) {
           </Match>
         </Switch>
       </Split>
+      <Show when={approval()}>
+        <WithdrawDialog
+          open={withdrawing()}
+          onOpenChange={setWithdrawing}
+          what="this approval"
+          body="It's cancelled for everyone and the agent that asked is told. It isn't approved."
+          onConfirm={withdrawApproval}
+        />
+      </Show>
     </article>
   );
 }
