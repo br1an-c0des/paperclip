@@ -7,6 +7,7 @@ import type {
   RemoteSecretImportPreviewResult,
   RemoteSecretImportResult,
   SecretAccessEvent,
+  SecretProposalStatus,
   SecretProposalView,
   SecretProvider,
   SecretProviderConfigDiscoveryPreviewResult,
@@ -35,6 +36,9 @@ import { api } from "./client";
 
 /** One "My secrets" row: a company definition paired with your own value, if you set one. */
 export type MyUserSecretEntry = { definition: UserSecretDefinition; secret: CompanySecret | null };
+
+/** A definition's editable fields (`updateUserSecretDefinitionSchema`). */
+export type UpdateUserDefinitionInput = { name?: string; description?: string | null; usageGuidance?: string | null; status?: SecretStatus };
 
 export type UpdateSecretInput = { name?: string; key?: string; status?: SecretStatus; description?: string | null; externalRef?: string | null };
 
@@ -138,8 +142,11 @@ export const secretsApi = {
 
   userDefinitions: (companyId: string, signal?: AbortSignal) =>
     api.get<UserSecretDefinition[]>(`${company(companyId)}/user-secret-definitions`, { signal }),
-  createUserDefinition: (companyId: string, data: { key: string; name: string; description?: string | null }) =>
+  createUserDefinition: (companyId: string, data: { key: string; name: string; description?: string | null; usageGuidance?: string | null; status?: "active" }) =>
     api.post<UserSecretDefinition>(`${company(companyId)}/user-secret-definitions`, data),
+  /** Renames, describes or turns a definition off, on or into the archive. The key never changes. */
+  updateUserDefinition: (companyId: string, definitionId: string, data: UpdateUserDefinitionInput) =>
+    api.patch<UserSecretDefinition>(`${company(companyId)}/user-secret-definitions/${encodeURIComponent(definitionId)}`, data),
   removeUserDefinition: (companyId: string, definitionId: string) =>
     api.delete<{ ok: true }>(`${company(companyId)}/user-secret-definitions/${encodeURIComponent(definitionId)}`),
   userDefinitionCoverage: (companyId: string, definitionId: string, signal?: AbortSignal) =>
@@ -153,8 +160,16 @@ export const secretsApi = {
   removeMySecret: (companyId: string, secretId: string) =>
     api.delete<{ ok: true }>(`${company(companyId)}/me/user-secrets/${encodeURIComponent(secretId)}`),
 
-  proposals: (companyId: string, signal?: AbortSignal) =>
-    api.get<SecretProposalView[]>(`${company(companyId)}/secret-proposals?status=pending`, { signal }),
+  /**
+   * The requests agents made: pending by default. `order: "resolved"` puts the latest decisions
+   * first (#21225), and `limit` caps the page, for the recently decided list.
+   */
+  proposals: (companyId: string, signal?: AbortSignal, query: { status?: SecretProposalStatus; order?: "created" | "resolved"; limit?: number } = {}) => {
+    const params = new URLSearchParams({ status: query.status ?? "pending" });
+    if (query.order) params.set("order", query.order);
+    if (query.limit) params.set("limit", String(query.limit));
+    return api.get<SecretProposalView[]>(`${company(companyId)}/secret-proposals?${params}`, { signal });
+  },
   approveProposal: (companyId: string, proposalId: string, data: ApproveSecretProposalInput = {}) =>
     api.post<SecretProposalView>(`${company(companyId)}/secret-proposals/${encodeURIComponent(proposalId)}/approve`, data),
   rejectProposal: (companyId: string, proposalId: string, data: RejectSecretProposalInput) =>

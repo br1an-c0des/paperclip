@@ -408,9 +408,13 @@ export const queryKeys = {
     secretUsage: (secretId: string) => ["secrets", "usage", secretId] as const,
     secretProviders: (companyId: string) => ["secret-providers", companyId] as const,
     secretProviderConfigs: (companyId: string) => ["secret-provider-configs", companyId] as const,
+    /** The deployment's own provider settings and their health (`…/secret-providers/health`). */
+    secretProviderHealth: (companyId: string) => ["secret-provider-health", companyId] as const,
     userSecretCoverage: (companyId: string, definitionId: string) => ["user-secret-definitions", companyId, definitionId, "coverage"] as const,
     mySecrets: (companyId: string) => ["my-user-secrets", companyId] as const,
     secretProposals: (companyId: string) => ["secret-proposals", companyId, "pending"] as const,
+    /** One decided status's latest requests, for the Requests tab's "Recently decided". */
+    secretProposalsDecided: (companyId: string, status: string) => ["secret-proposals", companyId, status, "recent"] as const,
     exportFidelity: (companyId: string) => ["companies", companyId, "export-fidelity"] as const,
     secretAccessEvents: (secretId: string) => ["secrets", "access-events", secretId] as const,
     environmentCapabilities: (companyId: string) => ["environment-capabilities", companyId] as const,

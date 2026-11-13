@@ -5,10 +5,11 @@ import type {
   RemoteSecretImportResult,
   SecretProvider,
   SecretProviderConfigDiscoveryPreviewResult,
+  SecretProviderDescriptor,
 } from "@paperclipai/shared";
-import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Check, CloudDownload, Ellipsis, Plus, Search, ShieldCheck } from "lucide-solid";
-import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
+import { useQueryClient } from "@tanstack/solid-query";
+import { AlertTriangle, Check, CheckCircle2, ChevronRight, Cloud, Database, Ellipsis, KeyRound, Plus, Search, ShieldCheck } from "lucide-solid";
+import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch as Choose } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { queryKeys } from "@/api/queryKeys";
 import { secretsApi } from "@/api/secrets";
@@ -16,75 +17,76 @@ import { ConfirmDialog } from "@/documents/ConfirmDialog";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { Field, FieldButton, TextInput } from "@/ui/Field";
+import { Field, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Menu } from "@/ui/Menu";
-import { TonePill, type Tone } from "@/ui/Status";
 import { Switch } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
 import {
   applyCandidate,
+  builtInStores,
   discoveryQuery,
   emptyVaultForm,
-  importableVaults,
   importDraft,
   importDraftProblem,
   importResultLine,
-  listedProviders,
-  providerName,
-  secretCounts,
+  orderedVaults,
+  providerKind,
   secretsLabel,
   VAULT_FIELDS,
   VAULT_PROVIDERS,
   vaultBlockReason,
   vaultComingSoon,
   vaultConfig,
+  vaultDefaultBadge,
   vaultForm,
   vaultProblem,
+  vaultSecretCounts,
   vaultStatus,
+  whenLabel,
   type ImportDraft,
   type VaultForm,
 } from "./secrets-model";
-import { CardHead, CardNoteLine, failure, shortDate } from "./shared";
+import { CardHead, CardNoteLine, failure } from "./shared";
 
 /*
- * Secrets → Providers (the old Secrets page's Provider vaults tab). A provider is where values are
- * stored; a vault is this organization's settings for one (AWS region and naming, say), and one
- * vault can be the default new secrets go to. Each vault can be checked, edited, made the default,
- * turned off or removed. GCP and HashiCorp Vault vaults save settings only, as in the old UI.
+ * Secrets → Vaults (upstream's redesigned Vaults tab, #21225): where secret values are kept, as one
+ * flat list with each place's health and how many secrets it holds. Paperclip's own storage is
+ * always first (the default until the organization has a usable Paperclip-encrypted vault), then a
+ * provider set up for the whole deployment, then the organization's vaults: each can be edited,
+ * checked, made the default, turned off or on, removed, and an AWS one imported from. A new vault is
+ * checked as soon as it's saved. GCP and HashiCorp Vault can't store values yet: existing drafts
+ * still show and can be edited, but Add vault no longer makes new ones.
  *
  * AWS vaults add two flows that read AWS metadata, never values:
  * - Discovery, in the vault dialog, suggests routing settings from existing secrets
  *   (`POST …/secret-provider-configs/discovery/preview`).
- * - Import secrets lists a vault's existing secrets and imports the chosen ones as references
+ * - Import lists a vault's existing secrets and imports the chosen ones as references
  *   (`POST …/secrets/remote-import/preview`, then `…/remote-import`).
  */
 
 type VaultEdit = { mode: "new"; provider: SecretProvider } | { mode: "edit"; config: CompanySecretProviderConfig };
 
-const healthTone = (status: string | null): Tone | null => (status === "ready" ? "green" : status === "warning" ? "amber" : status === "error" ? "red" : null);
-const providerMark = (provider: SecretProvider) =>
-  provider === "aws_secrets_manager" ? "AW" : provider === "gcp_secret_manager" ? "GC" : provider === "vault" ? "HV" : "PV";
+const providerIcon = (provider: SecretProvider) => (provider === "local_encrypted" ? Database : provider === "aws_secrets_manager" ? Cloud : provider === "gcp_secret_manager" ? ShieldCheck : KeyRound);
 
-export function ProvidersCard(props: { secrets: CompanySecret[] }) {
+export function VaultsTab(props: {
+  secrets: CompanySecret[] | undefined;
+  descriptors: SecretProviderDescriptor[] | undefined;
+  configs: CompanySecretProviderConfig[] | undefined;
+  configsLoading: boolean;
+  configsError: string | null;
+  onImport: (config: CompanySecretProviderConfig) => void;
+}) {
   const company = useCompany();
   const client = useQueryClient();
-  const descriptors = createQuery(() => ({
-    queryKey: queryKeys.companySettings.secretProviders(company().id),
-    queryFn: ({ signal }) => secretsApi.providers(company().id, signal),
-  }));
-  const configs = createQuery(() => ({
-    queryKey: queryKeys.companySettings.secretProviderConfigs(company().id),
-    queryFn: ({ signal }) => secretsApi.providerConfigs(company().id, signal),
-    retry: false,
-  }));
-  const counts = createMemo(() => secretCounts(props.secrets));
-  const listed = createMemo(() => listedProviders(descriptors.data, counts()));
+  const counts = createMemo(() => vaultSecretCounts((props.secrets ?? []).filter((secret) => secret.status !== "deleted")));
+  const builtIns = createMemo(() => builtInStores(props.descriptors, props.configs, counts()));
+  const vaults = createMemo(() => orderedVaults(props.configs));
   const [busy, setBusy] = createSignal<string | null>(null);
   const [edit, setEdit] = createSignal<VaultEdit | null>(null);
   const [removing, setRemoving] = createSignal<CompanySecretProviderConfig | null>(null);
-  const [importing, setImporting] = createSignal<CompanySecretProviderConfig | null>(null);
   const refresh = () => client.invalidateQueries({ queryKey: queryKeys.companySettings.secretProviderConfigs(company().id) });
-  const label = (provider: SecretProvider) => descriptors.data?.find((entry) => entry.id === provider)?.label ?? providerName(provider);
+  const kind = (provider: SecretProvider) => providerKind(provider, props.descriptors);
 
   const act = async (config: CompanySecretProviderConfig, work: () => Promise<unknown>, done: string, fallback: string) => {
     setBusy(config.id);
@@ -103,7 +105,11 @@ export function ProvidersCard(props: { secrets: CompanySecret[] }) {
     try {
       const result = await secretsApi.checkProviderConfig(config.id);
       await refresh();
-      pushToast({ tone: result.status === "ready" ? "success" : "warn", title: result.message });
+      pushToast({
+        tone: result.status === "error" ? "error" : result.status === "ready" ? "success" : "warn",
+        title: result.status === "error" ? `${config.displayName} can't be reached` : `${config.displayName} is working`,
+        body: result.message,
+      });
     } catch (caught) {
       pushToast({ tone: "error", title: "Couldn't check the vault", body: failure(caught, "") || undefined });
     } finally {
@@ -112,21 +118,27 @@ export function ProvidersCard(props: { secrets: CompanySecret[] }) {
   };
 
   return (
-    <section class="card settings-card" aria-labelledby="cs-providers">
+    <section class="card settings-card" aria-labelledby="sec-vaults">
       <CardHead
-        id="cs-providers"
-        title="Providers"
-        note="Where secret values are stored. A vault is this organization's settings for a provider."
+        id="sec-vaults"
+        title={
+          <span class="info-line">
+            Vaults
+            <InfoTip label="About vaults">
+              Where secret values are kept. Paperclip encrypts them itself unless you connect a vault of your own. Only settings are saved here: credentials stay with Paperclip's server.
+            </InfoTip>
+          </span>
+        }
         actions={
           <Menu placement="bottom-end">
             <Menu.Trigger as={Button} size="compact" icon={<Plus size={14} aria-hidden="true" />}>
               Add vault
             </Menu.Trigger>
-            <Menu.Content label="Providers" width={280}>
+            <Menu.Content label="Add a vault" width={280}>
               <For each={VAULT_PROVIDERS}>
                 {(provider) => (
-                  <Menu.Item onSelect={() => setEdit({ mode: "new", provider })} description={vaultComingSoon(provider) ? "Settings only for now" : undefined}>
-                    {label(provider)}
+                  <Menu.Item disabled={vaultComingSoon(provider)} hint={vaultComingSoon(provider) ? "Coming soon" : undefined} onSelect={() => setEdit({ mode: "new", provider })}>
+                    {provider === "local_encrypted" ? "Paperclip-encrypted vault" : kind(provider)}
                   </Menu.Item>
                 )}
               </For>
@@ -134,132 +146,145 @@ export function ProvidersCard(props: { secrets: CompanySecret[] }) {
           </Menu>
         }
       />
-      <Show when={descriptors.isError}>
-        <CardNoteLine alert>Couldn't load the providers. {failure(descriptors.error, "")}</CardNoteLine>
+      <Show when={props.configsError}>
+        <CardNoteLine alert>Couldn't load the vaults. {props.configsError}</CardNoteLine>
       </Show>
-      <For each={listed()}>
-        {(descriptor) => (
-          <div class="cs-lrow">
-            <div class="cs-person cs-grow">
-              <span class="cs-conn-mark" aria-hidden="true">
-                <ShieldCheck size={15} />
-              </span>
-              <span class="cs-person-text">
-                <span class="cs-strong">{providerName(descriptor.id)}</span>
-                <span class="cs-muted">
-                  {[descriptor.id === "local_encrypted" ? "Built in · encrypted on this server" : "The deployment's own settings", secretsLabel(counts().get(descriptor.id))]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-              </span>
-            </div>
-            <Show when={descriptor.configured} fallback={<span class="cs-pill">Not set up</span>}>
-              <TonePill tone="green" compact>
-                Ready
-              </TonePill>
-            </Show>
-          </div>
-        )}
-      </For>
-      <For each={configs.data ?? []}>
-        {(config) => {
-          const blocked = () => vaultBlockReason(config);
+      <For each={builtIns()}>
+        {(store) => {
+          const Icon = providerIcon(store.provider);
           return (
-            <div class="cs-lrow cs-lrow--wrap" classList={{ "cs-lrow--quiet": config.status === "disabled" || config.status === "coming_soon" }}>
-              <div class="cs-person cs-grow">
-                <span class="cs-conn-mark" aria-hidden="true">
-                  {providerMark(config.provider)}
-                </span>
-                <span class="cs-person-text">
-                  <span class="cs-strong">
-                    {config.displayName}
-                    <Show when={config.isDefault}>
-                      <span class="cs-pill">Default</span>
-                    </Show>
-                  </span>
-                  <span class="cs-muted">
-                    {[
-                      providerName(config.provider),
-                      config.status === "coming_soon" ? "settings only" : config.status === "disabled" ? "turned off" : null,
-                      config.healthMessage,
-                      config.healthCheckedAt ? `checked ${shortDate(config.healthCheckedAt)}` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                  <Show when={config.healthDetails?.guidance?.length}>
-                    <ul class="cs-bullets fhelp">
-                      <For each={config.healthDetails!.guidance}>{(item) => <li>{item}</li>}</For>
-                    </ul>
+            <div class="cs-lrow sec-vault" data-testid={`vault-built-in-${store.provider}`}>
+              <Icon size={16} aria-hidden="true" />
+              <div class="sec-vault-text">
+                <span class="sec-vault-title">
+                  {store.label}
+                  <Show when={store.isDefault}>
+                    <span class="cs-pill">Default</span>
                   </Show>
                 </span>
+                <span class="sec-health">
+                  {store.provider === "local_encrypted" ? "Encrypted and stored by Paperclip. Always available." : store.configured ? "This deployment's own settings." : "Not set up on this server any more."}
+                </span>
               </div>
-              <Show when={healthTone(config.healthStatus)} fallback={<span class="cs-pill">{config.status === "disabled" ? "Off" : "Not checked"}</span>}>
-                {(tone) => (
-                  <TonePill tone={tone()} compact>
-                    {config.healthStatus === "ready" ? "Healthy" : config.healthStatus === "warning" ? "Warning" : "Error"}
-                  </TonePill>
-                )}
-              </Show>
-              <div class="cs-inline">
-                <Button size="compact" disabled={busy() === config.id} onClick={() => void check(config)}>
-                  {busy() === config.id ? "Checking…" : "Check"}
-                </Button>
-                <Menu placement="bottom-end">
-                  <Menu.Trigger as={Button} variant="icon" ghost size="compact" aria-label={`More actions for ${config.displayName}`}>
-                    <Ellipsis size={16} aria-hidden="true" />
-                  </Menu.Trigger>
-                  <Menu.Content label="Vault actions" width={260}>
-                    <Menu.Item onSelect={() => setEdit({ mode: "edit", config })}>Edit…</Menu.Item>
-                    <Show when={config.provider === "aws_secrets_manager"}>
-                      <Menu.Item
-                        icon={<CloudDownload size={14} />}
-                        disabled={!!blocked()}
-                        description={blocked() ?? "Bring in its existing secrets as references"}
-                        onSelect={() => setImporting(config)}
-                      >
-                        Import secrets…
-                      </Menu.Item>
+              <span class="sec-vault-count">{secretsLabel(store.count)}</span>
+              <span class="sec-vault-spacer" aria-hidden="true" />
+            </div>
+          );
+        }}
+      </For>
+      <Show when={props.configsLoading}>
+        <CardNoteLine>Loading vaults…</CardNoteLine>
+      </Show>
+      <For each={vaults()}>
+        {(config) => {
+          const Icon = providerIcon(config.provider);
+          const blocked = () => vaultBlockReason(config);
+          const unavailable = () => config.status === "disabled" || config.status === "coming_soon";
+          const badge = () => vaultDefaultBadge(config, props.configs, kind(config.provider));
+          return (
+            <div class="cs-lrow sec-vault" data-testid={`vault-${config.id}`}>
+              <Icon size={16} aria-hidden="true" />
+              <div class="sec-vault-text">
+                <span class="sec-vault-title">
+                  {config.displayName}
+                  <span class="sec-vault-kind">{kind(config.provider)}</span>
+                  <Show when={badge()}>
+                    <span class="cs-pill">{badge()}</span>
+                  </Show>
+                  <Show when={config.status === "disabled"}>
+                    <span class="cs-pill">Turned off</span>
+                  </Show>
+                  <Show when={config.status === "coming_soon"}>
+                    <span class="cs-pill">Not available yet</span>
+                  </Show>
+                </span>
+                <Choose>
+                  <Match when={unavailable()}>
+                    <span class="sec-health">{config.status === "disabled" ? "Secrets can't be stored in or read from it while it's off." : "Paperclip can't store or read secrets here yet."}</span>
+                  </Match>
+                  <Match when={blocked()}>
+                    <span class="sec-health sec-health--bad" role="alert">
+                      <AlertTriangle size={13} aria-hidden="true" />
+                      {blocked()}
+                      <Button size="compact" disabled={busy() === config.id} onClick={() => void check(config)}>
+                        {busy() === config.id ? "Checking…" : "Check again"}
+                      </Button>
+                    </span>
+                    <Show when={config.healthDetails?.guidance?.length}>
+                      <ul class="cs-bullets fhelp">
+                        <For each={config.healthDetails!.guidance}>{(item) => <li>{item}</li>}</For>
+                      </ul>
                     </Show>
-                    <Show when={!config.isDefault}>
-                      <Menu.Item
-                        disabled={!!blocked()}
-                        description={blocked() ?? "New secrets are stored here"}
-                        onSelect={() => void act(config, () => secretsApi.setDefaultProviderConfig(config.id), `New secrets go to ${config.displayName} now`, "Couldn't change the default")}
-                      >
-                        Make default
-                      </Menu.Item>
+                  </Match>
+                  <Match when={config.healthStatus}>
+                    <span class="sec-health">
+                      {config.healthStatus === "warning" ? <AlertTriangle size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
+                      {config.healthStatus === "warning" ? (config.healthMessage ?? "Working, with a warning") : "Working"} · checked {whenLabel(config.healthCheckedAt)}
+                    </span>
+                    <Show when={config.healthStatus === "warning" && config.healthDetails?.guidance?.length}>
+                      <ul class="cs-bullets fhelp">
+                        <For each={config.healthDetails!.guidance}>{(item) => <li>{item}</li>}</For>
+                      </ul>
                     </Show>
-                    <Menu.Separator />
-                    <Show when={config.status !== "disabled"}>
+                  </Match>
+                  <Match when={true}>
+                    <span class="sec-health">Not checked yet</span>
+                  </Match>
+                </Choose>
+              </div>
+              <span class="sec-vault-count">{secretsLabel(counts().get(config.id))}</span>
+              <Menu placement="bottom-end">
+                <Menu.Trigger as={Button} variant="icon" ghost size="compact" aria-label={`Actions for ${config.displayName}`} disabled={busy() === config.id}>
+                  <Ellipsis size={16} aria-hidden="true" />
+                </Menu.Trigger>
+                <Menu.Content label="Vault actions" width={270}>
+                  <Menu.Item onSelect={() => setEdit({ mode: "edit", config })}>Edit connection</Menu.Item>
+                  <Menu.Item onSelect={() => void check(config)}>Check connection</Menu.Item>
+                  <Show when={config.provider === "aws_secrets_manager"}>
+                    <Menu.Item icon={<Cloud size={14} />} disabled={!!blocked()} description={blocked() ?? "Bring in its existing secrets as references"} onSelect={() => props.onImport(config)}>
+                      Import secrets from it
+                    </Menu.Item>
+                  </Show>
+                  <Show when={!config.isDefault && !blocked()}>
+                    <Menu.Item
+                      description="New secrets are stored here"
+                      onSelect={() => void act(config, () => secretsApi.setDefaultProviderConfig(config.id), `New secrets go to ${config.displayName} now`, "Couldn't change the default")}
+                    >
+                      Make default
+                    </Menu.Item>
+                  </Show>
+                  <Menu.Separator />
+                  <Show
+                    when={config.status === "disabled"}
+                    fallback={
                       <Menu.Item
                         description="Secrets stored there stop resolving"
                         onSelect={() => void act(config, () => secretsApi.updateProviderConfig(config.id, { status: "disabled" }), `Turned ${config.displayName} off`, "Couldn't turn the vault off")}
                       >
                         Turn off
                       </Menu.Item>
-                    </Show>
-                    <Menu.Item danger onSelect={() => setRemoving(config)}>
-                      Remove…
+                    }
+                  >
+                    <Menu.Item onSelect={() => void act(config, () => secretsApi.updateProviderConfig(config.id, { status: vaultStatus(config.provider) }), `Turned ${config.displayName} on`, "Couldn't turn the vault on")}>
+                      Turn on
                     </Menu.Item>
-                  </Menu.Content>
-                </Menu>
-              </div>
+                  </Show>
+                  <Menu.Item danger onSelect={() => setRemoving(config)}>
+                    Remove vault…
+                  </Menu.Item>
+                </Menu.Content>
+              </Menu>
             </div>
           );
         }}
       </For>
-      <Show when={configs.data && configs.data.length === 0 && !configs.isError}>
-        <CardNoteLine>No vaults of this organization's own; secrets use the deployment's provider settings.</CardNoteLine>
-      </Show>
-      <VaultDialog edit={edit()} label={label} onClose={() => setEdit(null)} onSaved={refresh} />
-      <ImportSecretsDialog vault={importing()} secrets={props.secrets} onClose={() => setImporting(null)} />
+      <VaultDialog edit={edit()} kind={kind} onClose={() => setEdit(null)} onSaved={refresh} />
       <ConfirmDialog
         open={!!removing()}
         onOpenChange={(open) => !open && setRemoving(null)}
         title={`Remove ${removing()?.displayName ?? ""}?`}
-        body="Its settings are removed. Secrets stored there keep their values in the provider but stop resolving here."
-        confirmLabel="Remove"
+        body={`This removes the vault from Paperclip only. ${removing()?.provider === "aws_secrets_manager" ? "Nothing is deleted in AWS." : "Nothing is deleted in the vault itself."} Secrets stored in it stop working until you move them to another vault.`}
+        confirmLabel="Remove vault"
         danger
         onConfirm={async () => {
           const config = removing();
@@ -267,7 +292,7 @@ export function ProvidersCard(props: { secrets: CompanySecret[] }) {
           try {
             await secretsApi.removeProviderConfig(config.id);
             await refresh();
-            pushToast({ tone: "success", title: `Removed ${config.displayName}` });
+            pushToast({ tone: "success", title: `Removed ${config.displayName}`, body: "From Paperclip only." });
           } catch (caught) {
             pushToast({ tone: "error", title: "Couldn't remove the vault", body: failure(caught, "") || undefined });
             throw caught;
@@ -278,22 +303,34 @@ export function ProvidersCard(props: { secrets: CompanySecret[] }) {
   );
 }
 
-function VaultDialog(props: { edit: VaultEdit | null; label: (provider: SecretProvider) => string; onClose: () => void; onSaved: () => Promise<unknown> }) {
+/*
+ * Connect or edit a vault. AWS asks for a name and a region; its naming and tags sit behind a
+ * disclosure, with discovery to fill them from existing secrets. A new vault is checked as soon as
+ * it's saved, so the list shows a real result instead of "Not checked yet".
+ */
+function VaultDialog(props: { edit: VaultEdit | null; kind: (provider: SecretProvider) => string; onClose: () => void; onSaved: () => Promise<unknown> }) {
   const company = useCompany();
   const [form, setForm] = createStore<VaultForm>(emptyVaultForm("local_encrypted"));
   const [busy, setBusy] = createSignal(false);
+  const [attempted, setAttempted] = createSignal(false);
   const [problem, setProblem] = createSignal<string | null>(null);
+  const [advanced, setAdvanced] = createSignal(false);
   const [discovery, setDiscovery] = createSignal<SecretProviderConfigDiscoveryPreviewResult | null>(null);
   const [discovering, setDiscovering] = createSignal(false);
   const [discoveryProblem, setDiscoveryProblem] = createSignal<string | null>(null);
   const editing = () => (props.edit?.mode === "edit" ? props.edit.config : null);
+  const aws = () => form.provider === "aws_secrets_manager";
+  const fields = () => VAULT_FIELDS[form.provider].filter((field) => !(aws() && field.key === "region"));
+  const found = () => (attempted() ? vaultProblem(form) : null);
 
   createEffect(
     on(
       () => props.edit,
       (edit) => {
         setForm(reconcile(edit?.mode === "edit" ? vaultForm(edit.config) : emptyVaultForm(edit?.provider ?? "local_encrypted")));
+        setAttempted(false);
         setProblem(null);
+        setAdvanced(false);
         setDiscovery(null);
         setDiscoveryProblem(null);
       },
@@ -314,17 +351,32 @@ function VaultDialog(props: { edit: VaultEdit | null; label: (provider: SecretPr
   };
 
   const save = async () => {
-    const found = vaultProblem(form);
-    if (found) return setProblem(found);
+    setAttempted(true);
+    if (vaultProblem(form)) return;
     setProblem(null);
     setBusy(true);
     try {
       const config = editing();
       const body = { displayName: form.displayName.trim(), isDefault: form.isDefault, config: vaultConfig(form) };
-      if (config) await secretsApi.updateProviderConfig(config.id, body);
-      else await secretsApi.createProviderConfig(company().id, { ...body, provider: form.provider, status: vaultStatus(form.provider) });
+      if (config) {
+        await secretsApi.updateProviderConfig(config.id, body);
+        pushToast({ tone: "success", title: `Saved ${body.displayName}` });
+      } else {
+        const saved = await secretsApi.createProviderConfig(company().id, { ...body, provider: form.provider, status: vaultStatus(form.provider) });
+        pushToast({ tone: "success", title: `Connected ${body.displayName}` });
+        if (saved.status !== "coming_soon") {
+          void secretsApi
+            .checkProviderConfig(saved.id)
+            .then((health) => {
+              if (health.status === "error") pushToast({ tone: "error", title: `${saved.displayName} can't be reached`, body: health.message });
+            })
+            .catch((caught) =>
+              pushToast({ tone: "error", title: `Couldn't check ${saved.displayName}`, body: `${failure(caught, "")} The vault is saved; use Check connection in its menu to try again.` }),
+            )
+            .finally(() => void props.onSaved());
+        }
+      }
       await props.onSaved();
-      pushToast({ tone: "success", title: config ? `Saved ${body.displayName}` : `Added ${body.displayName}` });
       props.onClose();
     } catch (caught) {
       setProblem(failure(caught, "Couldn't save the vault."));
@@ -333,12 +385,31 @@ function VaultDialog(props: { edit: VaultEdit | null; label: (provider: SecretPr
     }
   };
 
+  const fieldInputs = () => (
+    <div class="cs-env-grid">
+      <For each={fields()}>
+        {(field) => (
+          <Field label={field.required ? field.label : `${field.label} (optional)`} for={`sec-vault-${field.key}`}>
+            <TextInput
+              id={`sec-vault-${field.key}`}
+              class="mono"
+              spellcheck={false}
+              autocomplete="off"
+              placeholder={field.placeholder}
+              value={form.fields[field.key] ?? ""}
+              onInput={(event) => setForm("fields", field.key, event.currentTarget.value)}
+            />
+          </Field>
+        )}
+      </For>
+    </div>
+  );
+
   return (
     <Dialog
       open={!!props.edit}
       onOpenChange={(open) => !open && props.onClose()}
-      title={editing() ? `Edit ${editing()!.displayName}` : `New ${props.label(form.provider)} vault`}
-      description={vaultComingSoon(form.provider) ? "Paperclip can save these settings, but can't store or read values there yet." : undefined}
+      title={editing() ? `Edit ${editing()!.displayName}` : aws() ? "Connect AWS Secrets Manager" : form.provider === "local_encrypted" ? "Add a Paperclip-encrypted vault" : `Add a ${props.kind(form.provider)} vault`}
       width={600}
       footer={
         <>
@@ -351,57 +422,88 @@ function VaultDialog(props: { edit: VaultEdit | null; label: (provider: SecretPr
             Cancel
           </Button>
           <Button variant="primary" disabled={busy()} onClick={() => void save()}>
-            {busy() ? "Saving…" : editing() ? "Save" : "Add vault"}
+            {busy() ? "Saving…" : editing() ? "Save changes" : aws() ? "Connect vault" : "Add vault"}
           </Button>
         </>
       }
     >
-      <div class="cs-dialog-body">
-        <Field label="Name" for="cs-vault-name" help="How secrets and people refer to it.">
-          <TextInput id="cs-vault-name" value={form.displayName} autocomplete="off" onInput={(event) => setForm("displayName", event.currentTarget.value)} />
-        </Field>
-        <Show when={VAULT_FIELDS[form.provider].length}>
-          <div class="cs-env-grid">
-            <For each={VAULT_FIELDS[form.provider]}>
-              {(field) => (
-                <Field label={field.required ? field.label : `${field.label} (optional)`} for={`cs-vault-${field.key}`}>
-                  <TextInput
-                    id={`cs-vault-${field.key}`}
-                    class="mono"
-                    spellcheck={false}
-                    autocomplete="off"
-                    placeholder={field.placeholder}
-                    value={form.fields[field.key] ?? ""}
-                    onInput={(event) => setForm("fields", field.key, event.currentTarget.value)}
-                  />
-                </Field>
-              )}
-            </For>
-          </div>
-        </Show>
+      <form
+        class="cs-dialog-body"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          void save();
+        }}
+      >
+        <div class="cs-env-grid">
+          <Field
+            label={
+              <span class="info-line">
+                Name
+                <InfoTip label="About connecting a vault">
+                  {aws() ? "Paperclip connects with the AWS role its server runs as. No access keys are stored." : "Only settings are saved here. Credentials stay with Paperclip's server."}
+                </InfoTip>
+              </span>
+            }
+            for="sec-vault-name"
+            error={found() === "Give the vault a name." ? "Give the vault a name your team will recognize." : undefined}
+          >
+            <TextInput id="sec-vault-name" value={form.displayName} autocomplete="off" autofocus placeholder={aws() ? "prod-us-east" : "Production vault"} onInput={(event) => setForm("displayName", event.currentTarget.value)} />
+          </Field>
+          <Show when={aws()}>
+            <Field label="AWS region" for="sec-vault-region" error={found() === "Enter the AWS region." ? "Enter the AWS region, such as us-east-1." : undefined}>
+              <TextInput id="sec-vault-region" class="mono" spellcheck={false} autocomplete="off" placeholder="us-east-1" value={form.fields.region ?? ""} onInput={(event) => setForm("fields", "region", event.currentTarget.value)} />
+            </Field>
+          </Show>
+        </div>
+        <Choose>
+          <Match when={vaultComingSoon(form.provider)}>
+            <p class="cs-muted">{props.kind(form.provider)} vaults can be saved, but Paperclip can't store or read secrets in them yet.</p>
+          </Match>
+          <Match when={editing()?.status === "disabled"}>
+            <p class="cs-muted">This vault is turned off. Turn it on from its menu to use it for secrets.</p>
+          </Match>
+          <Match when={true}>
+            <Switch
+              label={form.provider === "local_encrypted" ? "Use for new secrets by default" : `Use for new ${props.kind(form.provider)} secrets by default`}
+              description="Existing secrets stay where they are."
+              checked={form.isDefault}
+              onChange={(value) => setForm("isDefault", value)}
+            />
+          </Match>
+        </Choose>
         <Show when={form.provider === "local_encrypted"}>
           <Switch
             label="I know how to back it up"
-            description="Restoring these secrets needs both the database and this server's encryption key file."
+            description="Restoring these secrets needs both the database and Paperclip's encryption key file."
             checked={form.backupReminderAcknowledged}
             onChange={(value) => setForm("backupReminderAcknowledged", value)}
           />
+          <Show when={found() === "Confirm you know how to back it up."}>
+            <span class="field-error" role="alert">
+              Confirm you know how to back it up.
+            </span>
+          </Show>
         </Show>
-        <Show when={!vaultComingSoon(form.provider) && editing()?.status !== "disabled"}>
-          <Switch label="Make it the default" description="New secrets are stored here." checked={form.isDefault} onChange={(value) => setForm("isDefault", value)} />
-        </Show>
-
-        <Show when={form.provider === "aws_secrets_manager"}>
+        <Show when={aws()} fallback={<Show when={fields().length}>{fieldInputs()}</Show>}>
+          <button type="button" class="sec-more" aria-expanded={advanced()} onClick={() => setAdvanced(!advanced())}>
+            <ChevronRight size={15} aria-hidden="true" />
+            Naming and tags
+          </button>
+          <Show when={advanced()}>{fieldInputs()}</Show>
           <div class="cs-discovery">
             <div class="cs-inline">
-              <span class="cs-person-text cs-grow">
+              <span class="info-line cs-grow">
                 <span class="cs-strong">Find existing AWS settings</span>
-                <span class="fhelp">Reads AWS Secrets Manager metadata with the region and fields above to suggest settings. Values aren't read.</span>
+                <InfoTip label="About finding AWS settings">Reads AWS Secrets Manager metadata with the region and fields above to suggest settings. Values aren't read.</InfoTip>
               </span>
               <Button size="compact" icon={<Search size={14} aria-hidden="true" />} disabled={!(form.fields.region ?? "").trim() || discovering()} onClick={() => void discover()}>
                 {discovering() ? "Searching…" : "Search AWS"}
               </Button>
             </div>
+            <Show when={!(form.fields.region ?? "").trim()}>
+              <p class="fhelp">Enter the region to search.</p>
+            </Show>
             <Show when={discoveryProblem()}>
               <p class="cs-bad" role="alert">
                 {discoveryProblem()}
@@ -409,22 +511,27 @@ function VaultDialog(props: { edit: VaultEdit | null; label: (provider: SecretPr
             </Show>
             <For each={discovery()?.warnings ?? []}>{(warning) => <p class="fhelp cs-warn">{warning}</p>}</For>
             <Show when={discovery()}>
-              {(found) => (
-                <Show when={found().candidates.length} fallback={<p class="fhelp">Nothing found; enter the settings by hand.</p>}>
+              {(result) => (
+                <Show when={result().candidates.length} fallback={<p class="fhelp">Nothing found; enter the settings by hand.</p>}>
                   <p class="fhelp">
-                    {found().candidates.length} {found().candidates.length === 1 ? "suggestion" : "suggestions"} from {found().sampledSecretCount} secrets
+                    {result().candidates.length} {result().candidates.length === 1 ? "suggestion" : "suggestions"} from {result().sampledSecretCount} secrets
                   </p>
-                  <For each={found().candidates}>
+                  <For each={result().candidates}>
                     {(candidate) => (
                       <div class="cs-lrow cs-lrow--flush">
                         <span class="cs-person-text cs-grow">
                           <span class="cs-strong">{candidate.displayName}</span>
                           <span class="cs-muted mono cs-ellipsis">
-                            {[candidate.signals.namespace, candidate.signals.secretNamePrefix, candidate.signals.environmentTag].filter(Boolean).join(" · ") ||
-                              `${candidate.sampleCount} secrets`}
+                            {[candidate.signals.namespace, candidate.signals.secretNamePrefix, candidate.signals.environmentTag].filter(Boolean).join(" · ") || `${candidate.sampleCount} secrets`}
                           </span>
                         </span>
-                        <Button size="compact" onClick={() => setForm(reconcile(applyCandidate({ ...form, fields: { ...form.fields } }, candidate)))}>
+                        <Button
+                          size="compact"
+                          onClick={() => {
+                            setForm(reconcile(applyCandidate({ ...form, fields: { ...form.fields } }, candidate)));
+                            setAdvanced(true);
+                          }}
+                        >
                           Use
                         </Button>
                       </div>
@@ -435,7 +542,7 @@ function VaultDialog(props: { edit: VaultEdit | null; label: (provider: SecretPr
             </Show>
           </div>
         </Show>
-      </div>
+      </form>
     </Dialog>
   );
 }
@@ -443,7 +550,7 @@ function VaultDialog(props: { edit: VaultEdit | null; label: (provider: SecretPr
 const PAGE_SIZE = 50;
 
 /** Import a vault's existing secrets as references: pick, name, import, then the result. */
-function ImportSecretsDialog(props: { vault: CompanySecretProviderConfig | null; secrets: CompanySecret[]; onClose: () => void }) {
+export function ImportSecretsDialog(props: { vault: CompanySecretProviderConfig | null; secrets: CompanySecret[]; onClose: () => void }) {
   const company = useCompany();
   const client = useQueryClient();
   const [query, setQuery] = createSignal("");
@@ -645,36 +752,3 @@ function ImportSecretsDialog(props: { vault: CompanySecretProviderConfig | null;
   );
 }
 
-/** Opens the import from the organization's secrets card, with a vault picker when there are several. */
-export function ImportFromVaultButton(props: { secrets: CompanySecret[] }) {
-  const company = useCompany();
-  const configs = createQuery(() => ({
-    queryKey: queryKeys.companySettings.secretProviderConfigs(company().id),
-    queryFn: ({ signal }) => secretsApi.providerConfigs(company().id, signal),
-    retry: false,
-  }));
-  const vaults = createMemo(() => importableVaults(configs.data).filter((config) => !vaultBlockReason(config)));
-  const [vault, setVault] = createSignal<CompanySecretProviderConfig | null>(null);
-  return (
-    <Show when={vaults().length}>
-      <Show
-        when={vaults().length > 1}
-        fallback={
-          <Button size="compact" icon={<CloudDownload size={14} aria-hidden="true" />} onClick={() => setVault(vaults()[0]!)}>
-            Import from AWS
-          </Button>
-        }
-      >
-        <Menu placement="bottom-end">
-          <Menu.Trigger as={FieldButton} icon={<CloudDownload size={14} aria-hidden="true" />}>
-            Import from AWS
-          </Menu.Trigger>
-          <Menu.Content label="Vaults" width={260}>
-            <For each={vaults()}>{(config) => <Menu.Item onSelect={() => setVault(config)}>{config.displayName}</Menu.Item>}</For>
-          </Menu.Content>
-        </Menu>
-      </Show>
-      <ImportSecretsDialog vault={vault()} secrets={props.secrets} onClose={() => setVault(null)} />
-    </Show>
-  );
-}

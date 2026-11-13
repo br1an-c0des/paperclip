@@ -303,11 +303,6 @@
   grid-template-columns: minmax(0, 1fr) 180px 36px;
 }
 
-.cs-table--secrets .cs-thead,
-.cs-table--secrets .cs-trow {
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 110px 80px 36px;
-}
-
 .cs-table--budgets .cs-thead,
 .cs-table--budgets .cs-trow {
   grid-template-columns: minmax(0, 1fr) 130px 170px 190px;
@@ -565,32 +560,6 @@
   text-decoration: none;
 }
 
-.cs-folder-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.cs-folder-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.cs-folder-link:hover .cs-strong {
-  text-decoration: underline;
-}
-
 /* Import: files by folder, harnesses, values. */
 .cs-import-files {
   display: flex;
@@ -626,14 +595,6 @@
   }
 }
 
-.cs-access-log {
-  gap: 12px;
-}
-
-.cs-access-when {
-  margin-left: auto;
-}
-
 @media (max-width: 640px) {
   .cs-import-names {
     grid-template-columns: minmax(0, 1fr);
@@ -666,10 +627,6 @@
 
   .cs-table--requests .cs-trow > :nth-child(2) {
     grid-column: 1 / -1;
-  }
-
-  .cs-table--secrets .cs-trow > :nth-child(4) {
-    display: none;
   }
 
   .cs-lrow {
