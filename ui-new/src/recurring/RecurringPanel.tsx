@@ -7,6 +7,7 @@ import { routinesApi } from "@/api/routines";
 import { Panel } from "@/layout/Panel";
 import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
+import { toastConfigurationWarnings } from "@/lib/configuration-warnings";
 import { copyText } from "@/tasks/TaskActions";
 import { setTaskOpenMode } from "@/tasks/task-open-mode";
 import { TASK_SECTION_SCROLLERS } from "@/tasks/TaskSections";
@@ -143,8 +144,8 @@ function PanelActions(props: { routine: RoutineDetail; modal: boolean; onClose: 
 
   const update = async (patch: Record<string, unknown>, failed: string, done?: string) => {
     try {
-      await routinesApi.update(props.routine.id, patch);
-      if (done) pushToast({ tone: "success", title: done, body: props.routine.title });
+      const warned = toastConfigurationWarnings(await routinesApi.update(props.routine.id, patch), "Routine saved");
+      if (done && !warned) pushToast({ tone: "success", title: done, body: props.routine.title });
     } catch (error) {
       pushToast({ tone: "error", title: failed, body: error instanceof Error ? error.message : undefined });
     } finally {

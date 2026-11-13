@@ -5,6 +5,7 @@ import { createSignal, Match, onCleanup, Show, Switch, type JSX } from "solid-js
 import { projectsApi } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
+import { toastConfigurationWarnings } from "@/lib/configuration-warnings";
 import type { Patch } from "./settings-model";
 
 /*
@@ -65,11 +66,23 @@ export function useSaveRunner() {
   return { run, state, error };
 }
 
-/** A save runner for `PATCH /projects/:id`; a null patch is nothing to save. */
+/**
+ * A save runner for `PATCH /projects/:id`; a null patch is nothing to save. Configuration warnings
+ * in the answer (U140) show as a "Project saved" warning toast, and `warned()` says the last save
+ * had them, so a card can leave out its own "Saved" toast.
+ */
 export function useProjectSaver(project: () => Project) {
   const runner = useSaveRunner();
-  const save = (patch: Patch | null) => (patch ? runner.run(() => projectsApi.update(project().id, patch)) : Promise.resolve(true));
-  return { ...runner, save };
+  let warned = false;
+  const save = (patch: Patch | null) => {
+    warned = false;
+    return patch
+      ? runner.run(async () => {
+          warned = toastConfigurationWarnings(await projectsApi.update(project().id, patch), "Project saved");
+        })
+      : Promise.resolve(true);
+  };
+  return { ...runner, save, warned: () => warned };
 }
 
 /** "Saving…", "Saved", or the error, beside a card's description. */

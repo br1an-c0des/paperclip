@@ -65,7 +65,7 @@ export function EnvironmentSection(props: { project: Project; base: string }) {
     setProblem(null);
     if (await saver.save({ env: envFromRows(rows) })) {
       setRows(reconcile(envRows(envFromRows(rows))));
-      pushToast({ tone: "success", title: "Saved the environment variables" });
+      if (!saver.warned()) pushToast({ tone: "success", title: "Saved the environment variables" });
     }
   };
   const secretName = (id: string) => (secrets.data ?? []).find((secret) => secret.id === id)?.name ?? (id ? "A secret you can't see" : "Pick a secret");

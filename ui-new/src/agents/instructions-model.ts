@@ -3,8 +3,8 @@ import type { InstructionsBundleUpdate } from "@/api/agents";
 
 /*
  * The Instructions section's pure parts (board 27): the file list as a tree with the entry file
- * first, a line diff for a change a run suggested, the checks for a new file's path, and the bundle
- * settings' draft.
+ * first, a line diff for a change a run suggested, the checks for a new or renamed file's path, and
+ * the bundle settings' draft.
  */
 
 export type DiffLine = { kind: "same" | "add" | "remove"; text: string };
@@ -122,6 +122,19 @@ export function newFileProblem(path: string, existing: readonly { path: string }
   if (!/\.(md|markdown|txt|json|ya?ml)$/i.test(value)) return "Use a text file: .md, .txt, .json or .yaml.";
   if (existing.some((file) => file.path === value)) return `${value} already exists.`;
   return null;
+}
+
+/**
+ * Why a file can't be renamed to `path`, or null. The same rules as a new file's path; the server
+ * also compares names without case, so it refuses one another file has in any case, and a change
+ * of case alone.
+ */
+export function renameProblem(path: string, current: string, existing: readonly { path: string }[]): string | null {
+  const value = path.trim();
+  if (value.toLowerCase() === current.toLowerCase()) return "Choose a different name.";
+  const taken = existing.find((file) => file.path.toLowerCase() === value.toLowerCase());
+  if (taken) return `${taken.path} already exists.`;
+  return newFileProblem(value, existing.filter((file) => file.path !== current));
 }
 
 export type BundleDraft = { mode: "managed" | "external"; rootPath: string; entryFile: string };

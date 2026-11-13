@@ -11,6 +11,10 @@ export const queryKeys = {
   auth: {
     session: ["auth", "session"] as const,
   },
+  /** Your own workspace preferences (U143), per account as the old UI keys them. */
+  workspacePreferences: {
+    mine: (userId: string | null) => ["workspace-preferences", "me", userId ?? "anonymous"] as const,
+  },
   access: {
     currentBoardAccess: ["access", "current-board-access"] as const,
     userDirectory: (companyId: string) => ["access", "company-user-directory", companyId] as const,
@@ -360,6 +364,9 @@ export const queryKeys = {
     updateDiff: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId, "update-diff"] as const,
     forkPrecheck: (companyId: string, skillId: string) => ["company-skills", companyId, "skill", skillId, "fork-precheck"] as const,
     folders: (companyId: string) => ["company-skills", companyId, "folders"] as const,
+    /** Skills connected apps publish over MCP, for review (U137); the content per manifest digest. */
+    mcp: (companyId: string) => ["mcp-skills", companyId] as const,
+    mcpContent: (companyId: string, skillId: string, manifestDigest: string) => ["mcp-skills", companyId, skillId, "content", manifestDigest] as const,
     sources: (companyId: string) => ["skill-sources", companyId] as const,
     sourceBranches: (companyId: string, sourceId: string) => ["skill-sources", companyId, sourceId, "branches"] as const,
     repositories: (companyId: string) => ["skill-sources", companyId, "repositories"] as const,

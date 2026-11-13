@@ -875,6 +875,120 @@ button.sk-chip {
   margin-bottom: 10px;
 }
 
+/* Connected app skills (U137): above the library while an app publishes any. */
+.sk-mcp {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.sk-mcp-error {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.sk-mcp-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sk-mcp-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-top: 1px solid var(--row-line);
+  min-width: 0;
+}
+
+.sk-mcp-row:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+
+.sk-mcp-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.sk-mcp-name {
+  overflow-wrap: anywhere;
+}
+
+.sk-mcp-size,
+.sk-mcp-small {
+  font-size: 12px;
+}
+
+.sk-mcp-desc,
+.sk-mcp-small,
+.sk-mcp-note {
+  margin: 0;
+}
+
+.sk-mcp-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sk-mcp-note {
+  padding: 8px 12px;
+  border-radius: var(--r-inner);
+  background: var(--amber-bg);
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sk-mcp-note--error {
+  background: var(--red-bg);
+  color: var(--red-fg);
+}
+
+.sk-mcp-tools {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--body);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.sk-mcp-tools input {
+  margin-top: 2px;
+}
+
+.sk-mcp-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sk-mcp-pre {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-field);
+  background: var(--code);
+  color: var(--body);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @container main (max-width: 1000px) {
   .sk-library--open {
     grid-template-columns: minmax(0, 1fr);

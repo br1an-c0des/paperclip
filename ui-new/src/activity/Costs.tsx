@@ -25,6 +25,7 @@ import {
   pricingNote,
   projectCostRows,
   RANGE_PRESETS,
+  unpricedMark,
   type AgentCostRow,
   type RangePreset,
 } from "./costs-model";
@@ -248,7 +249,7 @@ export function Costs() {
                           )}
                         </Show>
                         <span class="act-cost-nums">
-                          <b>{formatCents(row.costCents)}</b> <span class="org-muted">· {formatTokens(row.tokens)}</span>
+                          <Spend row={row} strong /> <span class="org-muted">· {formatTokens(row.tokens)}</span>
                         </span>
                       </div>
                       <span class="org-meter" aria-hidden="true">
@@ -356,7 +357,7 @@ function AgentCost(props: { row: AgentCostRow; max: number; maxTokens: number; b
           )}
         </Show>
         <span class="act-cost-nums">
-          <b>{formatCents(props.row.costCents)}</b> <span class="org-muted">· {formatTokens(props.row.tokens)}</span>
+          <Spend row={props.row} strong /> <span class="org-muted">· {formatTokens(props.row.tokens)}</span>
         </span>
       </div>
       <span class="org-meter" aria-hidden="true">
@@ -372,7 +373,7 @@ function AgentCost(props: { row: AgentCostRow; max: number; maxTokens: number; b
                   {model.provider} · {model.billing}
                 </span>
                 <span class="act-cost-nums">
-                  {formatCents(model.costCents)} <span class="org-muted">· {formatTokens(model.tokens)}</span>
+                  <Spend row={model} /> <span class="org-muted">· {formatTokens(model.tokens)}</span>
                 </span>
               </li>
             )}
@@ -380,5 +381,19 @@ function AgentCost(props: { row: AgentCostRow; max: number; maxTokens: number; b
         </ul>
       </Show>
     </li>
+  );
+}
+
+/** A row's spend, a dash when none of its usage had a price, and how many reports had none (U147). */
+function Spend(props: { row: { costCents: number; events: number; unpriced: number }; strong?: boolean }) {
+  const mark = () => unpricedMark(props.row);
+  const amount = () => (mark()?.dash ? "—" : formatCents(props.row.costCents));
+  return (
+    <>
+      <Show when={props.strong} fallback={amount()}>
+        <b>{amount()}</b>
+      </Show>
+      <Show when={mark()}>{(found) => <span class="act-estimate"> {found().note}</span>}</Show>
+    </>
   );
 }

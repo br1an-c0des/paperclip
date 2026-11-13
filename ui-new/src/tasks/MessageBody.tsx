@@ -2,7 +2,7 @@ import { useNavigate } from "@solidjs/router";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { useCompany } from "@/lib/company";
 import { APP_LINK_ATTRIBUTE, followAppLink, renderMarkdown, useKnownPrefixes } from "@/ui/Markdown";
-import { decorateMentions, taskRefFromHref } from "./composer/mentions";
+import { decorateMentions, taskLinkPath } from "./composer/mentions";
 import { decoratePreviewLink, PreviewMarks, previewTargetFor, type PreviewLink } from "./LinkPreview";
 import { parseGitHubLink, patchLines, type GitHubLink } from "./message-format";
 import "./MessageBody.css";
@@ -152,17 +152,17 @@ export function MessageBody(props: { source: string; class?: string }) {
 
   // Task links point at this board's task page and stay in the tab. A fragment such as
   // `#document-plan` is kept, so the page (or the chat it redirects to) can open the document.
-  // A `//PAP/issues/PAP-1` link (U86) already names its company's path and keeps it.
+  // A `//PAP/issues/PAP-1` link (U86) already names its company's path and keeps it, and so does a
+  // link to another company's task, `/BIR/issues/BIR-1` (U146, taskLinkPath).
   createEffect(() => {
     html();
     if (!root) return;
     const found: PreviewLink[] = [];
     for (const link of root.querySelectorAll<HTMLAnchorElement>("a[href]")) {
       const href = link.getAttribute("href");
-      const ref = parseGitHubLink(href) ? null : taskRefFromHref(href);
-      if (ref) {
-        const hash = href!.includes("#") ? href!.slice(href!.indexOf("#")) : "";
-        if (!link.hasAttribute(APP_LINK_ATTRIBUTE)) link.setAttribute("href", `/${company().issuePrefix}/issues/${ref}${hash}`);
+      const path = parseGitHubLink(href) ? null : taskLinkPath(href, company().issuePrefix, prefixes());
+      if (path) {
+        if (!link.hasAttribute(APP_LINK_ATTRIBUTE)) link.setAttribute("href", path);
         link.removeAttribute("target");
         link.classList.add("task-link");
         continue;

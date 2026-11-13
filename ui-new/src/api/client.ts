@@ -57,10 +57,18 @@ export async function readApiJson<T = unknown>(response: Response): Promise<T> {
   }
 }
 
+/**
+ * The server's reason for a failed request. OAuth endpoints (RFC 6749) answer `{ error: code,
+ * error_description: sentence }`; the sentence is what a person can read (U150, upstream #21012),
+ * and the code stays on `body.error` for the checks that need it.
+ */
 export function errorMessage(body: unknown, status: number): string {
   if (body && typeof body === "object") {
-    const record = body as { error?: unknown; message?: unknown };
-    if (typeof record.error === "string" && record.error) return record.error;
+    const record = body as { error?: unknown; error_description?: unknown; message?: unknown };
+    if (typeof record.error === "string" && record.error) {
+      const description = typeof record.error_description === "string" ? record.error_description.trim() : "";
+      return description && !/\s/.test(record.error) ? description : record.error;
+    }
     if (record.error && typeof record.error === "object") {
       const nested = record.error as { message?: unknown };
       if (typeof nested.message === "string" && nested.message) return nested.message;

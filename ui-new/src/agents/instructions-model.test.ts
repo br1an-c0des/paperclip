@@ -1,6 +1,6 @@
 import type { AgentInstructionCandidate, AgentInstructionsFileSummary } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { actionableCandidates, bundleDraft, bundleSize, bundleUpdate, diffHunks, diffSummary, fileDate, fileRows, lineDiff, newFileProblem } from "./instructions-model";
+import { actionableCandidates, bundleDraft, bundleSize, bundleUpdate, diffHunks, diffSummary, fileDate, fileRows, lineDiff, newFileProblem, renameProblem } from "./instructions-model";
 
 describe("fileDate", () => {
   it("prefers the last change, then creation, and invents neither", () => {
@@ -78,6 +78,17 @@ describe("files", () => {
     expect(newFileProblem("script.sh", existing)).toMatch(/text file/);
     expect(newFileProblem("AGENTS.md", existing)).toBe("AGENTS.md already exists.");
     expect(newFileProblem("research/sources.md", existing)).toBeNull();
+  });
+
+  it("checks a renamed file's path", () => {
+    const existing = [file("AGENTS.md"), file("TOOLS.md"), file("notes/today.md")];
+    expect(renameProblem("TOOLS.md", "TOOLS.md", existing)).toBe("Choose a different name.");
+    expect(renameProblem("agents.md", "TOOLS.md", existing)).toBe("AGENTS.md already exists.");
+    expect(renameProblem("../TOOLS.md", "TOOLS.md", existing)).toMatch(/relative path/);
+    expect(renameProblem("tools.sh", "TOOLS.md", existing)).toMatch(/text file/);
+    expect(renameProblem(" reference/TOOLS.md ", "TOOLS.md", existing)).toBeNull();
+    // The server compares names without case, so a change of case alone is refused.
+    expect(renameProblem("tools.md", "TOOLS.md", existing)).toBe("Choose a different name.");
   });
 });
 

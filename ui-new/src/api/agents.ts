@@ -293,6 +293,13 @@ export const agentsApi = {
     data: { path: string; content: string; baseRevisionId?: string | null; baseHash?: string | null },
     companyId?: string,
   ) => api.put<AgentInstructionsFileDetail>(agentPath(id, companyId, "/instructions-bundle/file"), data),
+  /**
+   * Renames an instruction file (U141, #20973): `PUT …/file` with `renameTo`, the text to keep (the
+   * draft, or the file as read) and the content hash it was read at, which the server checks. Renaming
+   * the entry file makes the new name the entry file. Answers the file under its new name.
+   */
+  renameInstructionsFile: (id: string, data: { path: string; renameTo: string; content: string; baseHash: string | null }, companyId?: string) =>
+    api.put<AgentInstructionsFileDetail>(agentPath(id, companyId, "/instructions-bundle/file"), data),
   deleteInstructionsFile: (id: string, path: string, companyId?: string, baseHash?: string) =>
     api.delete<AgentInstructionsBundle>(
       agentPath(id, companyId, `/instructions-bundle/file?path=${encodeURIComponent(path)}${baseHash ? `&baseHash=${encodeURIComponent(baseHash)}` : ""}`),
