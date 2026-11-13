@@ -178,7 +178,7 @@ export const queryKeys = {
     loginSetup: (companyId: string, sessionId: string) => ["ai-connections", companyId, "login-setup", sessionId] as const,
   },
   /**
-   * Apps and tools (src/apps/). Everything sits under `["tools", companyId]`, one connection's
+   * Connections (src/apps/). Everything sits under `["tools", companyId]`, one connection's
    * parts under its `connection(companyId, id)` key, so the live events refresh the whole area
    * with one prefix on any tool activity.
    */
@@ -223,7 +223,7 @@ export const queryKeys = {
     part: (companyId: string, endpointId: string, part: string, ...rest: string[]) =>
       ["chat-endpoints", companyId, "endpoint", endpointId, part, ...rest] as const,
   },
-  /** Paperclip's MCP endpoint for outside assistants (src/auth/McpConnect.tsx, Apps → Assistants). */
+  /** Paperclip's MCP endpoint for outside assistants (src/auth/McpConnect.tsx, Connections → Assistants). */
   mcp: {
     setup: ["mcp-setup"] as const,
     connections: ["mcp-connections"] as const,

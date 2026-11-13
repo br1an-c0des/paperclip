@@ -46,7 +46,7 @@ import "./chat/ChatExtras.css";
 
 export function TestCallDialog(props: { connection: ToolConnection; entry: ToolCatalogEntry | null; onClose: () => void }) {
   const company = useCompany();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const agents = createQuery(() => ({
     queryKey: queryKeys.tools.connectionPart(company().id, props.connection.id, "test-agents"),
     queryFn: ({ signal }) => toolsApi.testAgents(props.connection.id, signal),

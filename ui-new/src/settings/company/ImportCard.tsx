@@ -350,7 +350,7 @@ export function ImportCard() {
           <SettingsRow
             label="GitHub address"
             for="cs-import-github"
-            help="A repository, a folder in it (…/tree/main/company) or its COMPANY.md (…/blob/main/COMPANY.md). Private repositories need a GitHub connection under Apps."
+            help="A repository, a folder in it (…/tree/main/company) or its COMPANY.md (…/blob/main/COMPANY.md). Private repositories need a GitHub connection in Connections."
           >
             <TextInput
               id="cs-import-github"

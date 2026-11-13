@@ -14,7 +14,7 @@ import type { ConnectionState } from "../apps-model";
 /*
  * View model for chat endpoints (src/apps/chat/): an agent people reach from Slack, GitHub, Teams,
  * Discord, Telegram, a Speko voice persona or an AgentMail inbox. The routes under
- * `/:prefix/apps/chat`, which providers the instance shows, the setup steps, the endpoint's tabs,
+ * `/:prefix/connections/chat`, which providers the instance shows, the setup steps, the endpoint's tabs,
  * and the activity rules (replay, resolve). The rules follow the old UI's
  * ui/src/pages/apps/chat/ChatEndpointSetup.tsx and ChatEndpointDetail.tsx.
  */
@@ -66,17 +66,17 @@ export function tabsFor(provider: ChatProvider): { key: ChatTab; label: string }
 export type ChatRoute =
   | { kind: "connect" }
   | { kind: "detail"; endpointId: string; tab: ChatTab }
-  /** Relative to `/:prefix/apps`. */
+  /** Relative to `/:prefix/connections`. */
   | { kind: "redirect"; to: string };
 
-/** `/:prefix/apps/<rest>` when it's a chat page (the old UI's `/apps/chat/*`), else null. */
+/** `/:prefix/connections/<rest>` when it's a chat page (the old UI's `/apps/chat/*`), else null. */
 export function chatRoute(rest: string): ChatRoute | null {
   const parts = rest.split("/").filter(Boolean).map(decodeURIComponent);
   if (parts[0] !== "chat") return null;
   const [, id, tab, extra] = parts;
   if (!id) return { kind: "redirect", to: "" };
   if (id === "connect") return { kind: "connect" };
-  // `/apps/chat/:id/reviews/:reviewId`: the review list, where each review links out.
+  // `/connections/chat/:id/reviews/:reviewId`: the review list, where each review links out.
   if (tab === "reviews" && extra) return { kind: "detail", endpointId: id, tab: "reviews" };
   if (tab && CHAT_TABS.some((entry) => entry.key === tab) && !extra) return { kind: "detail", endpointId: id, tab: tab as ChatTab };
   return { kind: "redirect", to: `chat/${encodeURIComponent(id)}/settings` };

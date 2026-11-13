@@ -29,7 +29,7 @@ import { api } from "./client";
  * Also the signed-in account behind a saved credential (`GET :id/identity?grantId=`, upstream
  * #18653), which asks the provider and so is given 20 seconds, and a saved sign-in setup to resume
  * (`GET login/:sessionId/setup`, #17737): an agent that starts a sign-in hands its person a link to
- * `/apps/connect?aiLogin=<sessionId>`.
+ * `/apps/connect?aiLogin=<sessionId>`, which redirects to `/connections/connect`.
  */
 
 export type AiConnectionResult = { connectionId: string; grantId: string };

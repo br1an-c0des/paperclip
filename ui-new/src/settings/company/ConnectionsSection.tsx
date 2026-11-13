@@ -30,7 +30,7 @@ import { TelemetryCard } from "./TelemetryCard";
 import { readNote } from "@/lib/offline/read-state";
 
 /*
- * Connections (board 23): the models Paperclip itself uses on top of your agents, and where run
+ * Paperclip Models (board 23, once Connections): the models Paperclip itself uses on top of your agents, and where run
  * telemetry goes. Each card is a draft with Save and Discard, as in the old UI, because these
  * settings change what every agent gets; a test runs on the saved settings and is charged to the
  * connection.
@@ -43,7 +43,7 @@ export function ConnectionsSection() {
   const company = useCompany();
   return (
     <>
-      <SectionTitle title="Connections">
+      <SectionTitle title="Paperclip Models">
         The models Paperclip itself uses on top of your agents, and where run telemetry goes. Calls are charged to the connection you pick.
       </SectionTitle>
       <DecisionCard />
@@ -52,8 +52,8 @@ export function ConnectionsSection() {
       <TelemetryCard />
       <p class="cs-muted cs-after">
         Agents' own model connections live in{" "}
-        <A class="ps-link" href={`/${company().issuePrefix}/apps/ai`}>
-          Connections for agents
+        <A class="ps-link" href={`/${company().issuePrefix}/connections/ai`}>
+          Connections
         </A>
         .
       </p>

@@ -16,7 +16,7 @@ import { failureText, useRefreshTools } from "../shared";
 import { credentialKey, credentialValues, draftSummary, draftUrl, humanizeKey, missingKeys, pasteProblem, SAMPLE_CONFIG } from "./paste-model";
 
 /*
- * Advanced → Paste a config (`/apps/advanced/paste-config`, the old UI's PasteConfigTab): paste the
+ * Advanced → Paste a config (`/connections/advanced/paste-config`, the old UI's PasteConfigTab): paste the
  * MCP config a tool's README gives, see what Paperclip found in it, then check a remote server's
  * actions and turn it on for every agent. A server that signs in with OAuth leaves for its sign-in
  * and comes back to its connection's page. Commands that run in a workspace stay drafts until an
@@ -106,7 +106,7 @@ export function PasteConfig() {
           </h3>
           <p>
             For tools that aren't in the gallery: paste the MCP config snippet from the tool's README and Paperclip shows what it found before anything is saved.
-            Just an address? <A href={`/${company().issuePrefix}/apps/byo`}>Connect your own server</A> instead.
+            Just an address? <A href={`/${company().issuePrefix}/connections/byo`}>Connect your own server</A> instead.
           </p>
         </header>
         <form
@@ -326,7 +326,7 @@ function Review(props: {
           }
         >
           {(found) => (
-            <A class="tl-rowlink" href={`/${company().issuePrefix}/apps/${found().id}/permissions`}>
+            <A class="tl-rowlink" href={`/${company().issuePrefix}/connections/${found().id}/permissions`}>
               Open {found().name}
             </A>
           )}

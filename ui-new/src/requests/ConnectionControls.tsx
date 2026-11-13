@@ -5,6 +5,7 @@ import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } 
 import { connectionIntentsApi } from "@/api/connection-intents";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
+import { connectionsAddress } from "@/routes/legacy-model";
 import { Button, buttonClass } from "@/ui/Button";
 import { Footer } from "./card-parts";
 import type { Request } from "./request-model";
@@ -15,14 +16,14 @@ import type { Request } from "./request-model";
  * it waits on.
  *
  * - Access to an existing connection: the tools it would get, then Grant access or Not now.
- * - A new connection: reuse one you already have (`…/complete`), or set one up in Apps, which opens
+ * - A new connection: reuse one you already have (`…/complete`), or set one up in Connections, which opens
  *   in a new tab while the card is marked "authorizing" (`…/phase`) and checks every few seconds for
- *   the new connection. The provider's sign-in page opens from Apps, not from here. A new tool
+ *   the new connection. The provider's sign-in page opens from Connections, not from here. A new tool
  *   connection defaults to all agents there, as in the old UI's task setup (#19352); reusing one
- *   adds access for the requesting agent only. Apps doesn't run the setup for this request, so the
+ *   adds access for the requesting agent only. Connections doesn't run the setup for this request, so the
  *   card has no draft audience (`setupAccess`) to save.
  * - An AI connection: use one of yours for the agent (`/agents/:id/connection-intents/:id/adopt`)
- *   when its sign-in needs adopting, continue with a repaired one, or set one up in Apps → AI
+ *   when its sign-in needs adopting, continue with a repaired one, or set one up in Connections → AI
  *   connections.
  * - Not now declines (`…/decline`); the agent continues without it.
  */
@@ -31,10 +32,11 @@ type Payload = ConnectionIntentInteraction["payload"];
 
 /** Where to set the app up: the server's setup path for its method, or the app's gallery page. */
 export function setupHref(prefix: string, payload: Pick<Payload, "serviceSlug" | "purpose">, setupPath?: string | null) {
-  if (payload.purpose === "ai") return `/${prefix}/apps/ai`;
-  if (setupPath?.startsWith("/")) return setupPath.startsWith(`/${prefix}/`) ? setupPath : `/${prefix}${setupPath}`;
-  if (payload.serviceSlug.startsWith("connection:")) return `/${prefix}/apps`;
-  return `/${prefix}/apps/connect?source=${encodeURIComponent(payload.serviceSlug)}`;
+  if (payload.purpose === "ai") return `/${prefix}/connections/ai`;
+  // The server still builds `/:prefix/apps/…` setup paths; they open under Connections.
+  if (setupPath?.startsWith("/")) return connectionsAddress(setupPath.startsWith(`/${prefix}/`) ? setupPath : `/${prefix}${setupPath}`);
+  if (payload.serviceSlug.startsWith("connection:")) return `/${prefix}/connections`;
+  return `/${prefix}/connections/connect?source=${encodeURIComponent(payload.serviceSlug)}`;
 }
 
 function Logo(props: { payload: Payload }) {
@@ -178,7 +180,7 @@ export function ConnectionControls(props: { request: Request; interaction: Conne
           <Match when={ai() && repair() && !adopting()}>
             <p class="rq-note">
               {repair()!.canReconnect
-                ? `Reconnect ${repair()!.connection.name} in Apps → AI connections, then continue here.`
+                ? `Reconnect ${repair()!.connection.name} in Connections → AI connections, then continue here.`
                 : `${repair()!.connection.ownerName ?? "The account's owner"} must reconnect ${repair()!.connection.name}. You can continue here once it's back.`}
             </p>
           </Match>
@@ -217,10 +219,10 @@ export function ConnectionControls(props: { request: Request; interaction: Conne
           <Match when={true}>
             <p class="rq-note">
               {ai()
-                ? `${payload().requestingAgentName} needs a working AI connection. Set one up in Apps, then pick it here.`
+                ? `${payload().requestingAgentName} needs a working AI connection. Set one up in Connections, then pick it here.`
                 : authorizing()
                   ? "Finish connecting in the tab that opened. The new connection shows up here."
-                  : "You don't have a connection to reuse yet. Set one up in Apps; it shows up here once it's connected. New connections are for all agents unless you pick fewer."}
+                  : "You don't have a connection to reuse yet. Set one up in Connections; it shows up here once it's connected. New connections are for all agents unless you pick fewer."}
             </p>
           </Match>
         </Switch>

@@ -43,9 +43,9 @@ import "./Pools.css";
  * those near their usage limit. Agents pick a pool like any AI connection.
  *
  * - AI connections lists the pools and offers each pool plugin (PoolsCard).
- * - New pool (`/apps/connect?source=<pool slug>`): choose connections, then their order. It's
+ * - New pool (`/connections/connect?source=<pool slug>`): choose connections, then their order. It's
  *   created paused.
- * - A pool's page (`/apps/:connectionId/…`): its connections in order, on or off, usage-aware
+ * - A pool's page (`/connections/:connectionId/…`): its connections in order, on or off, usage-aware
  *   skipping, each member's model and effort, who uses it, rename and remove.
  *
  * Only a connection manager can see or change pools (`canManageConnections` from the AI connection
@@ -87,7 +87,7 @@ export function PoolsCard() {
   const company = useCompany();
   const gallery = useGallery();
   const connections = useConnections();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const plugins = createMemo(() => poolApps(gallery.data?.apps ?? []));
   const pools = createMemo(() =>
     (connections.data?.connections ?? []).filter((connection) => connection.status !== "archived" && poolPluginKey(connection)),
@@ -151,7 +151,7 @@ export function NewPool(props: { app: AppDefinition }) {
   const accounts = useAccounts();
   const [step, setStep] = createSignal<0 | 1>(0);
   const [draft, setDraft] = createSignal<AiConnectionPoolConfig>(emptyConfig(props.app.name));
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const pluginKey = () => props.app.aiConnectionRouter!.pluginKey;
   const unavailable = () => props.app.availability?.available === false;
   const canManage = () => accounts.data?.canManageConnections === true;
@@ -253,7 +253,7 @@ export function PoolPage(props: { connection: ToolConnection }) {
   const canManage = () => accounts.data?.canManageConnections === true;
   const pools = usePools(canManage);
   const agents = useAgentsQuery();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const pluginKey = () => poolPluginKey(props.connection)!;
   const app = createMemo(() => poolApp(gallery.data?.apps ?? [], pluginKey()));
   const pool = createMemo(() => poolFor(pools.data, props.connection.id, pluginKey()));
@@ -265,7 +265,7 @@ export function PoolPage(props: { connection: ToolConnection }) {
         mark={<AppLogo app={app()} name={props.connection.name} size={40} />}
         crumbs={
           <>
-            <A href={base()}>Apps</A>
+            <A href={base()}>Connections</A>
             <span aria-hidden="true">/</span>
             <A href={`${base()}/ai`}>AI connections</A>
           </>
@@ -627,7 +627,7 @@ function MemberPicker(props: {
         </ul>
       </Show>
       <div class="pl-picker-foot">
-        <A href={`/${company().issuePrefix}/apps/ai`} target="_blank" rel="noopener noreferrer">
+        <A href={`/${company().issuePrefix}/connections/ai`} target="_blank" rel="noopener noreferrer">
           Connect a new account
         </A>
         <Show when={props.onRefresh}>

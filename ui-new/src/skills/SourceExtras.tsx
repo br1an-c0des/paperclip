@@ -239,7 +239,7 @@ export function SourceSettingsDialog(props: { source: SkillSource | null; onClos
       <div class="sk-form">
         <Toggle checked={automatic()} onChange={setAutomatic} label="Update automatically" description="Install new commits on the branch as they land. Off, use Sync now." />
         <Toggle checked={importNew()} onChange={setImportNew} label="Import new skills" description="Skills added to the repository later are imported too, not just offered." />
-        <Show when={connections().length > 0} fallback={<Show when={repositories.isSuccess}><p class="org-muted">No GitHub connection can read it. Connect GitHub under Apps; public repositories work without one.</p></Show>}>
+        <Show when={connections().length > 0} fallback={<Show when={repositories.isSuccess}><p class="org-muted">No GitHub connection can read it. Connect GitHub in Connections; public repositories work without one.</p></Show>}>
           <ConnectionField
             id="sk-source-connection"
             choices={connections()}
@@ -586,7 +586,7 @@ export function ConnectionField(props: {
   disabled?: boolean;
 }) {
   return (
-    <Field label="GitHub connection" for={props.id} help={props.help ?? "Whose access reads the repository. Manage connections under Apps."}>
+    <Field label="GitHub connection" for={props.id} help={props.help ?? "Whose access reads the repository. Manage them in Connections."}>
       <select id={props.id} class="input" value={props.value ?? ""} disabled={props.disabled} onChange={(event) => props.onChange(event.currentTarget.value || null)}>
         <Show when={props.automatic || !props.value}>
           <option value="">{props.automatic ? "Let Paperclip choose" : "None chosen"}</option>

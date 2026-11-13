@@ -150,7 +150,7 @@ export function CommandPalette() {
         { id: "agents", label: "Agents", keywords: "roster org team", run: go(`${base()}/agents`) },
         { id: "workload", label: "Workload", keywords: "agents capacity heatmap", run: go(`${base()}/workload`) },
         { id: "workspaces", label: "Workspaces", keywords: "worktrees branches services", run: go(`${base()}/workspaces`) },
-        { id: "apps", label: "Apps", keywords: "integrations connections tools mcp", run: go(`${base()}/apps`) },
+        { id: "apps", label: "Connections", keywords: "apps integrations tools mcp", run: go(`${base()}/connections`) },
         { id: "skills", label: "Skills", keywords: "library studio sources", run: go(`${base()}/skills`) },
         { id: "activity", label: "Activity", keywords: "log audit runs costs timeline", run: go(`${base()}/activity`) },
         { id: "approvals", label: "Approvals", keywords: "history decided", run: go(`${base()}/approvals/all`) },

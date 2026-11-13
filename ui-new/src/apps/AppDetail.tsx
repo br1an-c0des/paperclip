@@ -54,7 +54,7 @@ import { poolPluginKey } from "./pools/pool-model";
 import { AgentAccessPicker, AppLogo, failureText, StateTag, useApplications, useGallery, useRefreshTools } from "./shared";
 
 /*
- * One connection (`/apps/:connectionId/:tab`, the old UI's AppDetail):
+ * One connection (`/connections/:connectionId/:tab`, the old UI's AppDetail):
  *
  * - Permissions: which agents may use it, and each action Off, Ask first or Allowed. Every save
  *   restates the whole set (`POST tools/apps/:id/finish`), as the old UI does: the server replaces
@@ -85,7 +85,7 @@ export function AppDetail(props: { connectionId: string; tab: DetailTab; success
   const company = useCompany();
   const navigate = useNavigate();
   const refresh = useRefreshTools();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const id = () => props.connectionId;
 
   const connectionQuery = createQuery(() => ({
@@ -142,7 +142,7 @@ export function AppDetail(props: { connectionId: string; tab: DetailTab; success
         <section class="card ap-later">
           <h2 class="disp">Connection not found</h2>
           <p>
-            It may have been disconnected. <A href={base()}>Back to Apps</A>
+            It may have been disconnected. <A href={base()}>Back to Connections</A>
           </p>
         </section>
       </Match>
@@ -157,7 +157,7 @@ export function AppDetail(props: { connectionId: string; tab: DetailTab; success
                 mark={<AppLogo app={current().app} name={current().name} size={40} />}
                 crumbs={
                   <>
-                    <A href={base()}>Apps</A>
+                    <A href={base()}>Connections</A>
                     <span aria-hidden="true">/</span>
                     <span>{current().app?.name ?? "Custom app"}</span>
                   </>
@@ -448,7 +448,7 @@ function ActionsCard(props: { connection: ToolConnection; state: AccessState; ca
         </Show>
       </header>
       <Show when={quarantined() > 0}>
-        <A class="ap-banner ap-banner--inline" href={`/${company().issuePrefix}/apps/${props.connection.id}/review`}>
+        <A class="ap-banner ap-banner--inline" href={`/${company().issuePrefix}/connections/${props.connection.id}/review`}>
           {quarantined()} new {quarantined() === 1 ? "action is" : "actions are"} off until someone reviews {quarantined() === 1 ? "it" : "them"}.
         </A>
       </Show>
@@ -654,7 +654,7 @@ function ReconnectCard(props: { connection: ToolConnection; methods: ConnectionM
           <Match when={isDraft() && slug()}>
             <A
               class={buttonClass({ variant: "primary", size: "compact" })}
-              href={connectHref(`/${company().issuePrefix}/apps`, slug()!, { resume: props.connection.id }, props.connection.credentialSource)}
+              href={connectHref(`/${company().issuePrefix}/connections`, slug()!, { resume: props.connection.id }, props.connection.credentialSource)}
             >
               Finish setup
             </A>
@@ -757,7 +757,7 @@ function ConnectionSettings(props: { connection: ToolConnection; name: string; c
     mutationFn: () => toolsApi.archiveConnection(props.connection.id),
     onSuccess: () => {
       pushToast({ title: `Disconnected ${props.name}`, body: "Its credentials were revoked.", tone: "success" });
-      navigate(`/${company().issuePrefix}/apps`);
+      navigate(`/${company().issuePrefix}/connections`);
     },
     onError: (error) => pushToast({ title: "Couldn't disconnect", body: failureText(error, "Please try again."), tone: "error" }),
     onSettled: () => refresh(),
@@ -829,7 +829,7 @@ function ConnectionSettings(props: { connection: ToolConnection; name: string; c
         when={!isAi()}
         fallback={
           <p class="card cx-note ap-flash">
-            To remove an AI account, use <A href={`/${company().issuePrefix}/apps/ai`}>AI connections</A>.
+            To remove an AI account, use <A href={`/${company().issuePrefix}/connections/ai`}>AI connections</A>.
           </p>
         }
       >

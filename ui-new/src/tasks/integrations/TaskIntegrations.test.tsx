@@ -126,7 +126,7 @@ describe("TaskIntegrations", () => {
 
     expect(await screen.findByText("Connected to Slack")).toBeTruthy();
     expect(screen.getByRole("link", { name: /Open in Slack/ }).getAttribute("href")).toBe("https://slack.test/archives/C1");
-    expect(screen.getByRole("link", { name: "Activity" }).getAttribute("href")).toBe("/TES/apps/chat/e1/activity");
+    expect(screen.getByRole("link", { name: "Activity" }).getAttribute("href")).toBe("/TES/connections/chat/e1/activity");
 
     fireEvent.click(screen.getByRole("button", { name: "Send to Slack" }));
     fireEvent.input(screen.getByLabelText("Message to Slack"), { target: { value: "Shipping today" } });

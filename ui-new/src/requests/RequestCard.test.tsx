@@ -123,7 +123,7 @@ describe("RequestCard", () => {
     expect(screen.getByText("You approved · Sign-in needed")).toBeTruthy();
     expect(screen.getByText(/Your approval is saved\. Reconnect the app to continue\./)).toBeTruthy();
     expect(screen.queryByText("Running the call…")).toBeNull();
-    expect(screen.getByRole("link", { name: "Reconnect Gmail" }).getAttribute("href")).toBe("/TRA/apps/conn-1/permissions");
+    expect(screen.getByRole("link", { name: "Reconnect Gmail" }).getAttribute("href")).toBe("/TRA/connections/conn-1/permissions");
   });
 
   it("links a plan review to the Plan revision it asks about, open or settled (U41)", () => {

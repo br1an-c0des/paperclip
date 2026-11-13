@@ -13,7 +13,7 @@ import type { AccessDraft, ConnectionState } from "./apps-model";
 import { readNote } from "@/lib/offline/read-state";
 
 /*
- * What the Apps pages share: their queries, the app logo, a connection's state, and the "which
+ * What the Connections pages share: their queries, the app logo, a connection's state, and the "which
  * agents can use it" picker that connecting and the Permissions tab both use.
  */
 
@@ -52,7 +52,7 @@ export function usePendingRequests() {
   }));
 }
 
-/** Refreshes everything Apps shows for the company. */
+/** Refreshes everything Connections shows for the company. */
 export function useRefreshTools() {
   const company = useCompany();
   const client = useQueryClient();

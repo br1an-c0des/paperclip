@@ -1,7 +1,7 @@
 import type { McpJsonImportDraft } from "@paperclipai/shared";
 
 /*
- * Pasting an MCP config (`/apps/advanced/paste-config`, the old UI's PasteConfigTab): the snippet a
+ * Pasting an MCP config (`/connections/advanced/paste-config`, the old UI's PasteConfigTab): the snippet a
  * README says to copy is read by the server into drafts. A remote server with a web address can be
  * checked and turned on here; a command that runs in a workspace stays a draft until an admin maps it
  * to an approved template.

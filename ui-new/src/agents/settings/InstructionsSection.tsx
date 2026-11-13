@@ -147,7 +147,7 @@ export function InstructionsSection(props: { agent: AgentDetail }) {
 /**
  * "From connections" (the old UI's AgentConnectionInstructions): the instructions the agent's
  * active connections add to its prompt (`GET tools/profiles/effective/agents/:id`, the same read
- * as Apps and tools). They're edited on the connection's page; this lists them read-only. Hidden
+ * as Connections). They're edited on the connection's page; this lists them read-only. Hidden
  * when no connection brings any.
  */
 function FromConnections(props: { agent: AgentDetail }) {
@@ -185,7 +185,7 @@ function FromConnections(props: { agent: AgentDetail }) {
         >
           <For each={sources()}>
             {(connection) => (
-              <SettingsRow label={<A class="ps-link" href={`/${company().issuePrefix}/apps/${connection.id}/permissions`}>{connection.name}</A>}>
+              <SettingsRow label={<A class="ps-link" href={`/${company().issuePrefix}/connections/${connection.id}/permissions`}>{connection.name}</A>}>
                 <div class="ps-stack">
                   <Show when={!connection.agentInstructions!.enabled}>
                     <span class="fhelp ag-warn">These instructions are turned off for this connection.</span>

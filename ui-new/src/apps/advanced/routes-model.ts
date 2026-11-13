@@ -1,11 +1,11 @@
 /*
- * The Apps pages M6 round 3 adds under `/:prefix/apps`, keeping the old UI's addresses
+ * The Connections pages M6 round 3 adds under `/:prefix/connections`, keeping the old UI's addresses
  * (ui/src/App.tsx):
  *
- * - `/apps/assistant-connection`: connect an outside assistant to Paperclip's MCP endpoint.
- * - `/apps/gateways`, `/apps/gateways/:gatewayId/:tab`: named MCP gateways.
- * - `/apps/advanced`, `/apps/advanced/:tab`: pasting an MCP config, and access profiles.
- * - `/apps/advanced/profiles/new`, `…/profiles/:id`, `…/profiles/:id/edit`: a profile and its wizard.
+ * - `/connections/assistant-connection`: connect an outside assistant to Paperclip's MCP endpoint.
+ * - `/connections/gateways`, `/connections/gateways/:gatewayId/:tab`: named MCP gateways.
+ * - `/connections/advanced`, `/connections/advanced/:tab`: pasting an MCP config, and access profiles.
+ * - `/connections/advanced/profiles/new`, `…/profiles/:id`, `…/profiles/:id/edit`: a profile and its wizard.
  *
  * The old UI's retired Advanced tabs redirect as it does; the smoke lab (maintainer tooling,
  * decision 12) goes to the profiles.
@@ -34,15 +34,15 @@ export type MoreAppsView =
   | { section: "profile-new" }
   | { section: "profile-edit"; profileId: string }
   | { section: "profile"; profileId: string }
-  /** `to` is relative to `/:prefix/apps`. */
+  /** `to` is relative to `/:prefix/connections`. */
   | { section: "redirect"; to: string };
 
-/** Which of the Apps tabs a page sits under. */
+/** Which of the Connections tabs a page sits under. */
 export type MoreAppsTab = "assistant" | "gateways" | "advanced";
 
 const RETIRED_TO_APPS = new Set(["applications", "connections", "overview", "examples", "audit", "runtime", "run-your-own"]);
 
-/** Where `/:prefix/apps/<rest>` goes, when it's one of these pages; null for the rest of Apps. */
+/** Where `/:prefix/connections/<rest>` goes, when it's one of these pages; null for the rest of Connections. */
 export function moreAppsView(rest: string): MoreAppsView | null {
   const parts = rest.split("/").filter(Boolean).map(decodeURIComponent);
   const [first, second, third, fourth] = parts;

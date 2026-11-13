@@ -262,7 +262,7 @@ export function retainQuota(previous: readonly ProviderQuotaResult[] | undefined
 /** Why an account's quota isn't shown. Never the adapter's own error text. */
 export function quotaProblem(account: Pick<ProviderQuotaResult, "ok" | "errorFamily" | "windows">) {
   if (account.ok) return null;
-  if (account.errorFamily === "credentials_unavailable") return "Connect or reconnect the subscription under Apps → AI connections to see its quota.";
+  if (account.errorFamily === "credentials_unavailable") return "Connect or reconnect the subscription in Connections → AI connections to see its quota.";
   return account.windows.length > 0 ? "Showing the last quota Paperclip saw. It updates on its own." : "The provider isn't reporting quota right now. Check usage with the provider.";
 }
 

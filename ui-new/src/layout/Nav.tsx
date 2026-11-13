@@ -60,7 +60,7 @@ import "./Nav.css";
  * The left nav (board 1, on every board): the company row, the tools row (search and new task),
  * Inbox with its badge (what's waiting on you, as the Inbox's Needs you tab counts it); what you
  * starred; projects with their task counts; agents with their live state; the tasks you opened
- * lately; Apps and you at the bottom. The item owning the current page is raised with the --sel
+ * lately; Connections and you at the bottom. The item owning the current page is raised with the --sel
  * pill: the router marks it `.active` for every page under it, and `aria-current` on the exact page.
  *
  * The company row ("layout B") is the company's disc and name, a link to its dashboard that took
@@ -89,7 +89,7 @@ import "./Nav.css";
  * folds, the labels fade first (Nav.css, `[data-fold]`), then the column narrows (Shell.tsx). Plugins
  * live only here: the rail has no plugin sections, project plugin items or toolbar buttons.
  *
- * Three zones: the company row, the tools row, Inbox and Status stay pinned at the top; Apps and
+ * Three zones: the company row, the tools row, Inbox and Status stay pinned at the top; Connections and
  * you stay pinned at the bottom; between them Starred, Projects, Agents, Recent tasks
  * and plugins' sections each scroll on their own, without the browser's scrollbar: a slim
  * gradient capsule shows where you are, or on a touch screen the edge with more beyond it glows
@@ -453,10 +453,10 @@ export function Nav() {
 
       <div class="nav-zone nav-zone--bottom">
         <div class="nav-group">
-          {/* Was the temporary Connectors page; Apps and tools (the org's Apps tab) took its place. */}
-          <A class="navi" href={`${base()}/apps`}>
+          {/* Was the temporary Connectors page; Connections (once Apps and tools) took its place. */}
+          <A class="navi" href={`${base()}/connections`}>
             <Plug size={16} aria-hidden="true" />
-            <span class="navi-text">Apps</span>
+            <span class="navi-text">Connections</span>
           </A>
         </div>
 

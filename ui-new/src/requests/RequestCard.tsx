@@ -382,7 +382,7 @@ function Reconnect(props: { app: NonNullable<Request["reconnect"]> }) {
     <Show when={props.app.connectionId}>
       {(id) => (
         <div class="rq-reconnect">
-          <a class={buttonClass({ variant: "primary", size: "compact" })} href={`/${company().issuePrefix}/apps/${encodeURIComponent(id())}/permissions`}>
+          <a class={buttonClass({ variant: "primary", size: "compact" })} href={`/${company().issuePrefix}/connections/${encodeURIComponent(id())}/permissions`}>
             Reconnect {props.app.appName}
           </a>
         </div>

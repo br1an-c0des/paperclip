@@ -49,17 +49,17 @@ import { NewPool } from "./pools/Pools";
 /*
  * Connecting an app (the old UI's AppsConnect and ConnectionSetupFlow, on a page):
  *
- * - A gallery app (`/apps/connect?source=<slug>`): pick a way to connect when it has several, fill
+ * - A gallery app (`/connections/connect?source=<slug>`): pick a way to connect when it has several, fill
  *   in its key and settings, and choose which agents may use it. Keys and keyless servers connect
  *   and turn on at once (`POST tools/apps/connect`, then `…/finish` with every discovered action on
  *   and the risky ones set to ask first). OAuth saves the choices, then leaves for the provider's
  *   sign-in; the server sends you back to the connection's page.
- * - Your own MCP server (`/apps/byo`): paste its address; Paperclip probes it, or you say how it
+ * - Your own MCP server (`/connections/byo`): paste its address; Paperclip probes it, or you say how it
  *   signs in (a key, headers, or your own OAuth app).
- * - Vercel Connect (`/apps/vercel-connect?source=<slug>`): the apps Vercel has reviewed, connected
+ * - Vercel Connect (`/connections/vercel-connect?source=<slug>`): the apps Vercel has reviewed, connected
  *   with a connector made in Vercel. Paperclip keeps only the connector's reference; the form asks
  *   for its UID instead of a key, address or OAuth app.
- * - `/apps/app/:applicationId`: an app the company has, with its accounts and a way to add one.
+ * - `/connections/app/:applicationId`: an app the company has, with its accounts and a way to add one.
  *
  * Composio and Arcade have their own form (src/apps/setups/AggregatorConnect.tsx); chat apps
  * (AgentMail, Telegram…) go to their chat setup (src/apps/chat/); Google Workspace's services and
@@ -111,7 +111,7 @@ function useConnectFlow(onFailure: (message: string) => void) {
       void refresh();
       if (outcome.kind === "done") {
         pushToast({ title: "Connected", body: "Review its actions and who can use it.", tone: "success" });
-        navigate(`/${company().issuePrefix}/apps/${outcome.connectionId}/permissions`);
+        navigate(`/${company().issuePrefix}/connections/${outcome.connectionId}/permissions`);
       }
     },
     onError: (error) => {
@@ -133,7 +133,7 @@ export function GalleryConnect(props: { source: string | null; resume: string | 
   return (
     <Switch>
       <Match when={!props.source}>
-        <Navigate href={`/${company().issuePrefix}/apps`} />
+        <Navigate href={`/${company().issuePrefix}/connections`} />
       </Match>
       <Match when={gallery.isPending}>
         <p class="ap-empty card" role="status">
@@ -152,10 +152,10 @@ export function GalleryConnect(props: { source: string | null; resume: string | 
         {(entry) => <NewPool app={entry} />}
       </Match>
       <Match when={isAi()}>
-        <Navigate href={`/${company().issuePrefix}/apps/ai`} />
+        <Navigate href={`/${company().issuePrefix}/connections/ai`} />
       </Match>
       <Match when={app() && methods().length === 0 && channelMethod(app()!)}>
-        {(method) => <Navigate href={chatConnectHref(`/${company().issuePrefix}/apps`, method().provider)} />}
+        {(method) => <Navigate href={chatConnectHref(`/${company().issuePrefix}/connections`, method().provider)} />}
       </Match>
       <Match when={app() && isAggregator(app()!.slug) && app()}>
         {(entry) => <AggregatorConnect app={entry()} id={entry().slug as "composio" | "arcade"} resume={props.resume} />}
@@ -167,7 +167,7 @@ export function GalleryConnect(props: { source: string | null; resume: string | 
             {app()
               ? "Its setup needs steps this board doesn't have yet. You can still connect it as your own MCP server if it has one."
               : `There's no app called "${props.source}" in this Paperclip's gallery.`}{" "}
-            <A href={`/${company().issuePrefix}/apps`}>Back to Apps</A>
+            <A href={`/${company().issuePrefix}/connections`}>Back to Connections</A>
           </p>
         </section>
       </Match>
@@ -186,7 +186,7 @@ export function GalleryConnect(props: { source: string | null; resume: string | 
 /** Vercel Connect: the reviewed apps, then one app's form with a Vercel connector for credentials. */
 export function VercelConnect(props: { source: string | null; resume: string | null; applicationId: string | null }) {
   const company = useCompany();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const gallery = useGallery();
   const availability = () => gallery.data?.credentialSources?.vercelConnect ?? null;
   const reviewed = createMemo(() => (gallery.data?.apps ?? []).filter((entry) => vercelMethods(entry).length > 0));
@@ -554,7 +554,7 @@ function GalleryForm(props: {
         )}
       </Show>
       <div class="cx-actions">
-        <A class={buttonClass({ variant: "quiet" })} href={`/${company().issuePrefix}/apps`}>
+        <A class={buttonClass({ variant: "quiet" })} href={`/${company().issuePrefix}/connections`}>
           Cancel
         </A>
         <span class="ap-actions-end">
@@ -774,7 +774,7 @@ export function ByoConnect() {
         )}
       </Show>
       <div class="cx-actions">
-        <A class={buttonClass({ variant: "quiet" })} href={`/${company().issuePrefix}/apps`}>
+        <A class={buttonClass({ variant: "quiet" })} href={`/${company().issuePrefix}/connections`}>
           Cancel
         </A>
         <span class="ap-actions-end">
@@ -792,10 +792,10 @@ export function ByoConnect() {
 
 // ---------------------------------------------------------------------------------------------
 
-/** An app the company has (`/apps/app/:applicationId`): its accounts, and a way to add one. */
+/** An app the company has (`/connections/app/:applicationId`): its accounts, and a way to add one. */
 export function ApplicationPage(props: { applicationId: string }) {
   const company = useCompany();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const applications = useApplications();
   const connections = useConnections();
   const gallery = useGallery();
@@ -822,7 +822,7 @@ export function ApplicationPage(props: { applicationId: string }) {
         <section class="card ap-later">
           <h2 class="disp">App not found</h2>
           <p>
-            It may have been removed. <A href={base()}>Back to Apps</A>
+            It may have been removed. <A href={base()}>Back to Connections</A>
           </p>
         </section>
       </Match>

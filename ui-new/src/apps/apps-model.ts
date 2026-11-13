@@ -20,7 +20,7 @@ import type { Tone } from "@/ui/Status";
 import { isSheetsRobotMethod } from "./setups/extras-model";
 
 /*
- * View model for Apps and tools (src/apps/): the routes under `/:prefix/apps`, the gallery and your
+ * View model for Connections (src/apps/, once Apps and tools): the routes under `/:prefix/connections`, the gallery and your
  * connections, a connection's state, the connect forms' requests, and who may use a connection and
  * how each of its actions is allowed. The rules follow the old UI (ui/src/pages/apps/,
  * ui/src/features/connections/) and the shared package's app-definition helpers, copied here because
@@ -44,14 +44,14 @@ export type AppsView =
   | { section: "ai" }
   | { section: "review" }
   | { section: "connect" }
-  /** Connecting a gallery app with a connector set up in Vercel (`/apps/vercel-connect?source=…`). */
+  /** Connecting a gallery app with a connector set up in Vercel (`/connections/vercel-connect?source=…`). */
   | { section: "vercel" }
   | { section: "byo" }
   | { section: "application"; applicationId: string }
   | { section: "detail"; connectionId: string; tab: DetailTab }
   /** Pages the old UI has that ui-new leaves for later. */
   | { section: "later"; name: string }
-  /** `to` is relative to `/:prefix/apps`, or absolute from the company when it starts with `/`. */
+  /** `to` is relative to `/:prefix/connections`, or absolute from the company when it starts with `/`. */
   | { section: "redirect"; to: string };
 
 const LATER: Record<string, string> = {
@@ -61,7 +61,7 @@ const LATER: Record<string, string> = {
   chat: "Chat endpoints",
 };
 
-/** Where `/:prefix/apps/<rest>` goes. Keeps the old UI's addresses (ui/src/App.tsx). */
+/** Where `/:prefix/connections/<rest>` goes. Keeps the old UI's addresses (ui/src/App.tsx). */
 export function appsView(rest: string): AppsView {
   const parts = rest.split("/").filter(Boolean).map(decodeURIComponent);
   const [first, second, third] = parts;
@@ -72,7 +72,7 @@ export function appsView(rest: string): AppsView {
   if (first === "byo") return { section: "byo" };
   if (first === "vercel-connect") return { section: "vercel" };
   if (first === "connect") {
-    // The old `/apps/connect/:appKey(/:stage)` addresses: open that app's setup.
+    // The old `/connections/connect/:appKey(/:stage)` addresses: open that app's setup.
     if (second) return { section: "redirect", to: `connect?source=${encodeURIComponent(second)}` };
     return { section: "connect" };
   }

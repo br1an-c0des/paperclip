@@ -124,8 +124,8 @@ describe("NavRail", () => {
     // Dee runs; Ann has two unread replies.
     expect(icon("Agents, 1 running, 2 unread messages").classList.contains("rail-i--ringed")).toBe(true);
     expect(icon("Board Owner: account and appearance")).toBeTruthy();
-    // No plugin sections, Recent tasks or Apps.
-    expect(screen.queryByText("Apps")).toBeNull();
+    // No plugin sections, Recent tasks or Connections.
+    expect(screen.queryByText("Connections")).toBeNull();
     cleanup();
 
     renderRail(seededClient({ statusCards: true }));

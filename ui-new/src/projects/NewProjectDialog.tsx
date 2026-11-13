@@ -625,7 +625,7 @@ function Repositories(props: { selected: string[]; onChange: (ids: string[]) => 
         <Switch>
           <Match when={disconnected()}>
             <p class="np-code-note">
-              No GitHub account is connected to this company yet. Connect one under Apps, then pick its repositories here, or choose Local folder.
+              No GitHub account is connected to this company yet. Connect one in Connections, then pick its repositories here, or choose Local folder.
             </p>
           </Match>
           <Match when={true}>
@@ -682,7 +682,7 @@ function Repositories(props: { selected: string[]; onChange: (ids: string[]) => 
                   </Switch>
                 </div>
                 <Show when={options.data?.failedConnectionCount}>
-                  <p class="nt-menu-note">Some GitHub connections couldn't load. Reconnect them under Apps.</p>
+                  <p class="nt-menu-note">Some GitHub connections couldn't load. Reconnect them in Connections.</p>
                 </Show>
               </Popover.Content>
             </Popover>

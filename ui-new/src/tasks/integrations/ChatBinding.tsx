@@ -258,7 +258,7 @@ function BindingRow(props: { taskId: string; binding: ExternalChannelBindingSumm
               Send to {name()}
             </Button>
           </Show>
-          <A class={buttonClass({ size: "compact", variant: "quiet" })} href={`/${company().issuePrefix}/apps/chat/${props.binding.endpointId}/activity`}>
+          <A class={buttonClass({ size: "compact", variant: "quiet" })} href={`/${company().issuePrefix}/connections/chat/${props.binding.endpointId}/activity`}>
             Activity
           </A>
         </span>

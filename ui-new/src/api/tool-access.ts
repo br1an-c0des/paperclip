@@ -24,7 +24,7 @@ import type {
 import { api } from "./client";
 
 /*
- * The rest of Apps and tools, as ui/src/api/tools.ts has it for the pages ui-new adds in M6 round 3:
+ * The rest of Connections, as ui/src/api/tools.ts has it for the pages ui-new adds in M6 round 3:
  *
  * - Gateways (`/companies/:id/tools/gateways`, `/tool-gateway/gateways/*`, `/tool-gateway/gateway-tokens/*`):
  *   named MCP endpoints, their tokens.

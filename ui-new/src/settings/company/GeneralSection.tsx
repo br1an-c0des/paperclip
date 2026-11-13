@@ -39,7 +39,7 @@ import { CardHead, CardNote, failure, SectionTitle, SwitchRow, useCompanySaver }
  * - Feedback: share rated outputs with Paperclip (`feedbackDataSharingEnabled`).
  * - Danger zone: pause every agent (the company's `paused` status) and archive the organization.
  *
- * Agent observability, which the old General page carried, is Run telemetry under Connections
+ * Agent observability, which the old General page carried, is Run telemetry under Paperclip Models
  * (board 23). The instance's own general settings are app settings.
  */
 

@@ -427,7 +427,7 @@
 
 /*
  * Folding to the rail and back (Shell.tsx): first everything the rail doesn't keep fades over 90ms
- * (`data-fold="out"`): the labels, counts, badges, the lists, New task and Apps, leaving the icons,
+ * (`data-fold="out"`): the labels, counts, badges, the lists, New task and Connections, leaving the icons,
  * discs and avatars where the rail puts them. Unfolding, once the column is wide again, they fade
  * back in (`"in"`).
  */

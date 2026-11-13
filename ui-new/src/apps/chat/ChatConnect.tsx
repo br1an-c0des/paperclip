@@ -33,7 +33,7 @@ import { defaultSlackMethod, isProvisioned, type SlackMethod } from "./slack-mod
 import { AutomaticSlackSetup, ManagedSlackSetup } from "./SlackSetup";
 
 /*
- * Setting up a chat endpoint (`/apps/chat/connect?provider=…`, the old UI's ChatEndpointSetup):
+ * Setting up a chat endpoint (`/connections/chat/connect?provider=…`, the old UI's ChatEndpointSetup):
  *
  * 1. Agent: who people will talk to. The agent is fixed for the endpoint; Slack also takes the
  *    app's name, bot name and slash command here. Continuing creates the endpoint as a draft.
@@ -55,7 +55,7 @@ import { AutomaticSlackSetup, ManagedSlackSetup } from "./SlackSetup";
 
 export function ChatConnect(props: { provider: ChatProvider; app: AppDefinition | null }) {
   const company = useCompany();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const [params, setParams] = useSearchParams<{ resume?: string; reconnect?: string; agentId?: string; purpose?: string }>();
   const [chosePurpose, setChosePurpose] = createSignal(params.purpose === "chat");
   const offerTools = () => Boolean(props.app && hasToolMethod(props.app) && !params.resume && !chosePurpose());
@@ -98,7 +98,7 @@ function PurposeChoice(props: { app: AppDefinition; provider: ChatProvider; onCh
           </button>
         </li>
         <li>
-          <A class="ch-choice" href={`/${company().issuePrefix}/apps/connect?source=${encodeURIComponent(props.app.slug)}`}>
+          <A class="ch-choice" href={`/${company().issuePrefix}/connections/connect?source=${encodeURIComponent(props.app.slug)}`}>
             <Hammer size={22} aria-hidden="true" />
             <span>
               <b>Use it as an agent tool</b>
@@ -174,7 +174,7 @@ function SetupFlow(props: {
         </Match>
         <Match when={props.resume && endpointQuery.isError}>
           <p class="cx-note cx-note--error" role="alert">
-            This setup couldn't be loaded. It may have been removed. <A href={props.base}>Back to Apps</A>
+            This setup couldn't be loaded. It may have been removed. <A href={props.base}>Back to Connections</A>
           </p>
         </Match>
         <Match when={step() === "agent"}>

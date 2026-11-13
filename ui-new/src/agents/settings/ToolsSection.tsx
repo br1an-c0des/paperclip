@@ -53,7 +53,7 @@ export function ToolsSection(props: { agent: AgentDetail }) {
   const [checking, setChecking] = createSignal(false);
   const [showAll, setShowAll] = createSignal(false);
   const [pick, setPick] = createSignal("");
-  const appsHref = () => `/${company().issuePrefix}/apps`;
+  const appsHref = () => `/${company().issuePrefix}/connections`;
   const effective = createQuery(() => ({
     queryKey: queryKeys.tools.effective(company().id, props.agent.id),
     queryFn: ({ signal }) => toolAccessApi.effectiveForAgent(company().id, props.agent.id, signal),
@@ -375,7 +375,7 @@ function GitHubIdentity(props: { agent: AgentDetail; connections: ToolConnection
   );
   const loading = () => props.loading || grants.some((query) => query.isPending);
   const failed = () => grants.some((query) => query.isError);
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   return (
     <SettingsCard
       title="GitHub identity"

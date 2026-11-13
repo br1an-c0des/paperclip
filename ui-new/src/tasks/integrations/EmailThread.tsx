@@ -98,7 +98,7 @@ export function ThreadBody(props: { taskId: string; thread: EmailThreadSummary }
               </Button>
             )}
           </Show>
-          <A class={buttonClass({ size: "compact", variant: "quiet" })} href={`/${company().issuePrefix}/apps/chat/${props.thread.endpoint.id}/settings`}>
+          <A class={buttonClass({ size: "compact", variant: "quiet" })} href={`/${company().issuePrefix}/connections/chat/${props.thread.endpoint.id}/settings`}>
             Inbox settings
           </A>
         </span>

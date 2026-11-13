@@ -42,7 +42,7 @@ import { TaskDefaults } from "./TaskDefaults";
 import { readNote } from "@/lib/offline/read-state";
 
 /*
- * One chat endpoint (`/apps/chat/:endpointId/:tab`, the old UI's ChatEndpointDetail):
+ * One chat endpoint (`/connections/chat/:endpointId/:tab`, the old UI's ChatEndpointDetail):
  *
  * - Settings: the channels and groups it answers in, direct messages, Slack's @mention rule and how
  *   the agent writes there; a voice persona's phone line and the incoming calls waiting for a code;
@@ -67,7 +67,7 @@ import { readNote } from "@/lib/offline/read-state";
 export function ChatEndpointPage(props: { endpointId: string; tab: ChatTab }) {
   const company = useCompany();
   const agents = useAgentsQuery();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   // Activity and conversations follow provider callbacks, which don't always log activity.
   const query = useChatEndpoint(
     () => props.endpointId,
@@ -85,7 +85,7 @@ export function ChatEndpointPage(props: { endpointId: string; tab: ChatTab }) {
         <section class="card ap-later">
           <h2 class="disp">Chat connection not found</h2>
           <p>
-            It may have been removed. <A href={base()}>Back to Apps</A>
+            It may have been removed. <A href={base()}>Back to Connections</A>
           </p>
         </section>
       </Match>
@@ -106,7 +106,7 @@ export function ChatEndpointPage(props: { endpointId: string; tab: ChatTab }) {
                 mark={<AgentAvatar agent={agent() ?? { id: endpoint().assignedAgentId, name: endpoint().assignedAgentName }} size={40} />}
                 crumbs={
                   <>
-                    <A href={base()}>Apps</A>
+                    <A href={base()}>Connections</A>
                     <span aria-hidden="true">/</span>
                     <span>{name()}</span>
                   </>
@@ -201,7 +201,7 @@ function SettingsTab(props: { endpoint: ChatEndpoint }) {
           <IncomingCalls endpoint={props.endpoint} />
         </Match>
         <Match when={props.endpoint.provider === "github"}>
-          <GitHubSettings endpoint={props.endpoint} base={`/${company().issuePrefix}/apps`} />
+          <GitHubSettings endpoint={props.endpoint} base={`/${company().issuePrefix}/connections`} />
         </Match>
         <Match when={true}>
           <Show when={props.endpoint.provider === "slack"}>
@@ -516,7 +516,7 @@ function InboxSettings(props: { endpoint: ChatEndpoint }) {
       <Show when={props.endpoint.connectionId}>
         {(connectionId) => (
           <p class="cx-note">
-            The AgentMail account and which agents may use it are on its <A href={`/${company().issuePrefix}/apps/${connectionId()}/permissions`}>connection page</A>.
+            The AgentMail account and which agents may use it are on its <A href={`/${company().issuePrefix}/connections/${connectionId()}/permissions`}>connection page</A>.
           </p>
         )}
       </Show>
@@ -701,7 +701,7 @@ function AccessTab(props: { endpoint: ChatEndpoint }) {
               {(connectionId) => (
                 <>
                   {" "}
-                  <A href={`/${company().issuePrefix}/apps/${connectionId()}/permissions`}>Open the connection</A>
+                  <A href={`/${company().issuePrefix}/connections/${connectionId()}/permissions`}>Open the connection</A>
                 </>
               )}
             </Show>
@@ -947,7 +947,7 @@ function ActivityTab(props: { endpoint: ChatEndpoint }) {
   const company = useCompany();
   const client = useQueryClient();
   const navigate = useNavigate();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const [cursors, setCursors] = createSignal<(string | null)[]>([null]);
   const cursor = () => cursors()[cursors().length - 1] ?? null;
   const activityKey = () => queryKeys.chatEndpoints.part(company().id, props.endpoint.id, "activity");

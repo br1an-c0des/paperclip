@@ -13,7 +13,7 @@ import { projectGoalIds } from "@/projects/settings/settings-model";
 import { PageHeader } from "@/ui/PageHeader";
 import { PlannedNote } from "./Planned";
 import { Splash } from "./Splash";
-import { caseLinkTarget, companyLegacyTarget, identifierPrefix, isUuid, withSearchAndHash } from "./legacy-model";
+import { caseLinkTarget, companyLegacyTarget, connectionsAddress, identifierPrefix, isUuid, withSearchAndHash } from "./legacy-model";
 
 /*
  * The old UI's addresses that have no page of their own here (legacy-model.ts has the mapping):
@@ -39,6 +39,12 @@ export function CompanyLegacyRedirect() {
     return withSearchAndHash(to.startsWith("/") ? to : `/${company().issuePrefix}/${to}`, location.search, location.hash);
   };
   return <Navigate href={target()} />;
+}
+
+/** `/:prefix/apps/…`: Apps became Connections; the same page under `/:prefix/connections/…`. */
+export function AppsRedirect() {
+  const location = useLocation();
+  return <Navigate href={connectionsAddress(`${location.pathname}${location.search}${location.hash}`)} />;
 }
 
 /** `/:prefix/goals/:goalId`: the project the goal belongs to, in its settings' Goals section. */

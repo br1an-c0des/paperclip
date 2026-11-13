@@ -607,7 +607,7 @@ export function CallHistory(props: { kind: "decisions" | "fast-responses"; scope
       fast() ? costsApi.fastResponseHistory(company().id, props.scope.from, props.scope.to, signal) : costsApi.decisionHistory(company().id, props.scope.from, props.scope.to, signal),
     refetchInterval: (query) => (historyBusy(query.state.data) ? (fast() ? 3_000 : 5_000) : false),
   }));
-  const settingsHref = () => `/${company().issuePrefix}/company/settings/connections`;
+  const settingsHref = () => `/${company().issuePrefix}/company/settings/paperclip-models`;
 
   return (
     <section class="card act-card" aria-label={fast() ? "Fast responses" : "Decision-model calls"}>
@@ -624,7 +624,7 @@ export function CallHistory(props: { kind: "decisions" | "fast-responses"; scope
             <A class="org-link" href={settingsHref()}>
               {fast() ? "Set up fast responses" : "Set up a decision model"}
             </A>{" "}
-            in company settings → Connections, and run its test.
+            in company settings → Paperclip Models, and run its test.
           </p>
         </Match>
       </Switch>

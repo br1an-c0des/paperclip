@@ -43,6 +43,7 @@ describe("which announcements show", () => {
 
   it("puts route actions in the current company", () => {
     expect(actionHref({ kind: "route", label: "x", path: "/projects" }, "TES")).toBe("/TES/projects");
+    expect(actionHref({ kind: "route", label: "x", path: "/apps" }, "TES")).toBe("/TES/connections");
     expect(actionHref({ kind: "external", label: "x", url: "https://paperclip.ing" }, "TES")).toBe("https://paperclip.ing");
   });
 });

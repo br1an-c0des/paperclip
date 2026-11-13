@@ -131,7 +131,7 @@ function SubscriptionsDialog(props: { open: boolean; onOpenChange: (open: boolea
         fallback={
           <div class="act-subs">
             <Show when={props.report.accounts.length === 0}>
-              <p class="org-muted">No subscriptions you can see yet. Connect an AI account under Apps, or run an agent on a connected subscription.</p>
+              <p class="org-muted">No subscriptions you can see yet. Connect an AI account in Connections, or run an agent on a connected subscription.</p>
             </Show>
             <For each={props.report.accounts}>
               {(account) => (

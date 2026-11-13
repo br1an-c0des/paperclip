@@ -170,7 +170,7 @@ function RepositoriesCard(props: { project: Project; hideHostPaths: boolean }) {
         </ul>
       </Show>
       <Show when={options.data?.failedConnectionCount}>
-        <p class="ps-list-note">Some GitHub connections couldn't load. Reconnect them under Apps.</p>
+        <p class="ps-list-note">Some GitHub connections couldn't load. Reconnect them in Connections.</p>
       </Show>
       <LocalFolder project={props.project} hideHostPaths={props.hideHostPaths} />
     </SettingsCard>
@@ -191,7 +191,7 @@ function RepositoryPicker(props: {
   return (
     <Show
       when={props.options.data?.connectionCount !== 0}
-      fallback={<span class="ps-muted-line">No GitHub account is connected to this company. Connect one under Apps to add repositories.</span>}
+      fallback={<span class="ps-muted-line">No GitHub account is connected to this company. Connect one in Connections to add repositories.</span>}
     >
       <Popover open={open()} onOpenChange={setOpen} placement="top-start">
         <Popover.Trigger class="btn btn--secondary btn--compact">

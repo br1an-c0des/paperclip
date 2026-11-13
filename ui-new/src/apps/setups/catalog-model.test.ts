@@ -130,7 +130,7 @@ describe("gateways", () => {
     expect(connectStart(linear!.routes, none)).toEqual({ kind: "setup", route: linear!.routes[0] });
     expect(connectStart(asana!.routes, none)).toEqual({ kind: "dialog" });
     expect(connectStart(linear!.routes, { composio: [connection({})], arcade: [] })).toEqual({ kind: "dialog" });
-    expect(gatewaySetupHref("/TES/apps", linear!.routes[0]!)).toBe("/TES/apps/connect?source=composio&targetToolkit=linear");
-    expect(gatewaySetupHref("/TES/apps", linear!.routes[0]!, connection({ id: "d1", status: "draft" }))).toBe("/TES/apps/connect?source=composio&targetToolkit=linear&resume=d1");
+    expect(gatewaySetupHref("/TES/connections", linear!.routes[0]!)).toBe("/TES/connections/connect?source=composio&targetToolkit=linear");
+    expect(gatewaySetupHref("/TES/connections", linear!.routes[0]!, connection({ id: "d1", status: "draft" }))).toBe("/TES/connections/connect?source=composio&targetToolkit=linear&resume=d1");
   });
 });

@@ -12,7 +12,7 @@ import { buttonClass } from "@/ui/Button";
 import { pushToast } from "@/ui/Toast";
 
 /*
- * `/:prefix/apps/connect?aiLogin=<sessionId>`: a saved AI sign-in to finish (upstream #17737). An
+ * `/:prefix/connections/connect?aiLogin=<sessionId>`: a saved AI sign-in to finish (upstream #17737). An
  * agent allowed to set up connections starts the sign-in and hands its person this link; the setup
  * (`GET ai-connections/login/:sessionId/setup`) says what it's for, and the Claude sign-in dialog
  * picks it up with those details. Only Claude subscriptions sign in from ui-new; another provider's
@@ -22,7 +22,7 @@ import { pushToast } from "@/ui/Toast";
 export function ResumeAiLogin(props: { sessionId: string }) {
   const company = useCompany();
   const navigate = useNavigate();
-  const aiPage = () => `/${company().issuePrefix}/apps/ai`;
+  const aiPage = () => `/${company().issuePrefix}/connections/ai`;
   const setup = createQuery(() => ({
     queryKey: queryKeys.aiConnections.loginSetup(company().id, props.sessionId),
     queryFn: ({ signal }) => aiConnectionsApi.loginSetup(company().id, props.sessionId, signal),

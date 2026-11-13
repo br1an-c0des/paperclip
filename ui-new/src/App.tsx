@@ -44,6 +44,7 @@ import { ProfilePage } from "./profile/ProfilePage";
 import { ProjectsPage } from "./routes/Projects";
 import { StatusPage } from "./status-cards/StatusPage";
 import {
+  AppsRedirect,
   CaseRedirect,
   CompanyLegacyRedirect,
   ExecutionWorkspaceRedirect,
@@ -108,8 +109,8 @@ export function App() {
           <Route path="/agents/new" component={UnprefixedNewAgent} />
           {/* The old UI's unprefixed skills, activity and costs links open in the last company. */}
           <Route path={["/skills/*", "/activity/*", "/audit/*", "/costs", "/budgets"]} component={UnprefixedCompanyRedirect} />
-          {/* The old UI's unprefixed apps links (and OAuth returns) open in the last company too. */}
-          <Route path="/apps/*" component={UnprefixedCompanyRedirect} />
+          {/* The old UI's unprefixed apps links (and OAuth returns) open Connections in the last company. */}
+          <Route path={["/apps/*", "/connections/*"]} component={UnprefixedCompanyRedirect} />
           <Route path="/workspaces" component={UnprefixedCompanyRedirect} />
           {/* The old UI's other unprefixed addresses: a task or case in the company its identifier
               names, a workspace, approval or case by id in the company it's in, the rest in the last company. */}
@@ -197,8 +198,10 @@ export function App() {
             <Route path="/company/settings/*rest" component={CompanySettingsPage} />
             <Route path="/company/export/*" component={() => <CompanyTransferRedirect kind="export" />} />
             <Route path="/company/import" component={() => <CompanyTransferRedirect kind="import" />} />
-            {/* Apps and tools; the temporary Connectors page became Apps → AI connections. */}
-            <Route path="/apps/*rest" component={AppsPage} />
+            {/* Connections (once Apps and tools); the temporary Connectors page became Connections → AI
+                connections. Apps' old addresses (`/apps/*`) open the same page under `/connections/*`. */}
+            <Route path="/connections/*rest" component={AppsPage} />
+            <Route path="/apps/*" component={AppsRedirect} />
             <Route path="/connectors" component={ConnectorsRedirect} />
             <Route path="/search" component={SearchPage} />
             <Route path="/workload" component={CompanyWorkload} />

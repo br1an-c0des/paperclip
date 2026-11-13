@@ -14,7 +14,7 @@ import { canAlwaysAllow, displayName, requestTitle } from "./apps-model";
 import { failureText, usePendingRequests, useRefreshTools } from "./shared";
 
 /*
- * Review (`/apps/review`, and a connection's Review tab): app calls an agent wants to make that
+ * Review (`/connections/review`, and a connection's Review tab): app calls an agent wants to make that
  * need your OK first (`GET tools/action-requests?status=pending`). Allow once approves this call;
  * Always allow also makes a trust rule, so the agent isn't asked again for that action on that
  * connection; Decline stops it. The old UI's ReviewQueueCard; a request tied to a task's thread

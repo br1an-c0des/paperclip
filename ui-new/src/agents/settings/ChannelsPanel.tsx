@@ -20,7 +20,7 @@ import { failure } from "../shared";
 /*
  * The agent's channels (`agents/channels`): the chat endpoints people reach it through (Slack,
  * GitHub, Teams, Discord, Telegram, a voice persona) and its email inboxes, each opening its page in
- * Apps, with Connect a channel and Disconnect. Chat endpoints show only while the instance has
+ * Connections, with Connect a channel and Disconnect. Chat endpoints show only while the instance has
  * `enableChatConnectors` on (GitHub review bots: `enableGitHubReviewBots`); email inboxes always.
  */
 
@@ -38,7 +38,7 @@ export function ChannelsPanel(props: { agent: AgentDetail }) {
   const company = useCompany();
   const client = useQueryClient();
   const navigate = useNavigate();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const flags = useExperimentalSettingsQuery();
   const gallery = useGallery();
   const chatOn = () => flags.data?.enableChatConnectors === true || flags.data?.enableGitHubReviewBots === true;

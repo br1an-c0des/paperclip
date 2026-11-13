@@ -203,10 +203,10 @@ export function runStatusToast(lookup: ToastLookup, payload: Record<string, unkn
   if (status === "failed" && errorCode === "low_trust_isolation_unavailable" && readString(payload.contextSource)?.startsWith("chat:")) {
     return {
       title: `${name} couldn't start this chat`,
-      body: "This external chat identity isn't linked, and isolated guest workspaces are off. Link the identity in Apps or turn on isolated workspaces, then start a new task.",
+      body: "This external chat identity isn't linked, and isolated guest workspaces are off. Link the identity in Connections or turn on isolated workspaces, then start a new task.",
       tone: "warn",
       ttlMs: 10_000,
-      action: { label: "Open apps", href: `/${lookup.prefix}/apps` },
+      action: { label: "Open Connections", href: `/${lookup.prefix}/connections` },
       dedupeKey: `run-status:${runId}:${status}`,
     };
   }

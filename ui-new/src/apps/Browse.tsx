@@ -40,7 +40,7 @@ import {
 import { CatalogManageDialog, CatalogSection, useAggregatorCatalog, useGatewayAccounts } from "./setups/CatalogRows";
 
 /*
- * Browse (`/apps`): the company's connections, then the gallery. Connections are grouped as the old
+ * Browse (`/connections`): the company's connections, then the gallery. Connections are grouped as the old
  * UI's landing page groups them: tools and MCP servers, AI accounts (managed in AI connections),
  * chat endpoints when the instance has `enableChatConnectors` on, and email inboxes. Each opens its
  * own page. The gallery lists the apps ui-new can connect, searchable and by category, and the
@@ -50,7 +50,7 @@ import { CatalogManageDialog, CatalogSection, useAggregatorCatalog, useGatewayAc
 
 export function Browse() {
   const company = useCompany();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const gallery = useGallery();
   const connections = useConnections();
   const applications = useApplications();
@@ -199,7 +199,7 @@ function ConnectionGroup(props: { title: string; rows: ConnectionRow[]; base: st
 
 function Gallery(props: { counts: Map<string, number> }) {
   const company = useCompany();
-  const base = () => `/${company().issuePrefix}/apps`;
+  const base = () => `/${company().issuePrefix}/connections`;
   const gallery = useGallery();
   const flags = useExperimentalSettingsQuery();
   const [query, setQuery] = createSignal("");

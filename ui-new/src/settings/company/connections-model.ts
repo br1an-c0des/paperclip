@@ -14,7 +14,7 @@ import type {
 import type { Tone } from "@/ui/Status";
 
 /*
- * Connections (board 23): the models Paperclip itself runs on a shared AI connection (the decision
+ * Paperclip Models (board 23, once Connections): the models Paperclip itself runs on a shared AI connection (the decision
  * model, fast responses and the prompt injection check), and run telemetry (agent observability).
  * Each card edits a draft and saves it as a set, as the old UI's sections do, since these settings
  * change what every agent gets.
