@@ -451,6 +451,12 @@ Progress:
   the Instructions page lists each active connection's instructions).
 - **Upstream changes to integrate:** the [table below](#upstream-changes-to-integrate), from the
   Nov 3 audit of every sync report since Oct 15 and the Nov 3 sync.
+- **Round 8 (Nov 13), complete:** the Nov 13 sync's lines. A: personal request routing and
+  decision owners (U133, U134; [decision 53](decisions.md#53-requests-are-routed-to-a-person)). B:
+  the Secrets redesign (U135). C: Move it forward now, Try again on a rejected model, recovery
+  wording, drag-ordered starred agents (U138, U139, U144, U145, U149). D: connected app skills,
+  save warnings, instruction file rename, time zone and five checks (U137, U140–U143, U146–U148,
+  U150). U136 (app views in chat) deferred. Browser checks ran against mocked data (no :3100).
 - **Open (Nov 12): help text behind info icons** ([decision 52](decisions.md#52-help-text-goes-behind-an-info-icon)).
   An app-wide sweep: every card description, row `help`, form `Field` help and similar hint
   paragraph that says what something is for moves into an `info` tip, and is rewritten where it
