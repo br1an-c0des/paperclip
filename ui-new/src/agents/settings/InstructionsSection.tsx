@@ -1,7 +1,7 @@
 import type { AgentDetail, AgentInstructionCandidate, AgentInstructionsBundle, AgentInstructionsFileDetail, AgentInstructionsFileSummary, ToolConnection } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { ChevronRight, Copy, Download, File, Folder, History, Plus, Trash2 } from "lucide-solid";
+import { ChevronRight, Copy, Download, File, Folder, History, PenLine, Plus, Trash2 } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
 import { agentsApi } from "@/api/agents";
 import { toolAccessApi } from "@/api/tool-access";
@@ -20,13 +20,17 @@ import { copyText } from "@/tasks/TaskActions";
 import { connectionSlug } from "@/apps/apps-model";
 import { useGallery } from "@/apps/shared";
 import { instructionsConfigured } from "@/apps/setups/extras-model";
-import { actionableCandidates, bundleDraft, bundleProblem, bundleSize, bundleUpdate, diffHunks, diffSummary, fileDate, fileRows, lineDiff, newFileProblem } from "../instructions-model";
+import { actionableCandidates, bundleDraft, bundleProblem, bundleSize, bundleUpdate, diffHunks, diffSummary, fileDate, fileRows, lineDiff, newFileProblem, renameProblem } from "../instructions-model";
 import { dateTime, failure, SectionTitle, shortDate, useAdapters } from "../shared";
 
 /*
  * Instructions (board 27): the agent's instruction files, with AGENTS.md as the entry file, and
  * changes a run suggested, shown as a diff to accept or reject. A file is edited in the Markdown
  * editor and saved on its own; the entry file keeps revisions, which History lists and can restore.
+ *
+ * A file can be renamed (U141, #20973) while Paperclip keeps the files: the new name, the text (with
+ * an unsaved edit) and the content hash it was read at go in one `PUT …/file` with `renameTo`.
+ * Renaming the entry file makes the new name the entry file.
  *
  * Saving sends the base the edit started from (the entry file's revision, other files' content
  * hash), so an edit made elsewhere in the meantime comes back as a conflict instead of being
@@ -133,7 +137,17 @@ export function InstructionsSection(props: { agent: AgentDetail }) {
                 </div>
                 <div class="ag-files-foot">{bundleSize(files())}</div>
               </div>
-              <FileEditor agent={props.agent} path={current()} summary={files().find((file) => file.path === current())} editable={found().editable} entry={current() === found().entryFile} onDeleted={() => setSelected(null)} />
+              <FileEditor
+                agent={props.agent}
+                path={current()}
+                summary={files().find((file) => file.path === current())}
+                files={files()}
+                editable={found().editable}
+                renamable={found().editable && found().mode !== "external"}
+                entry={current() === found().entryFile}
+                onDeleted={() => setSelected(null)}
+                onRenamed={setSelected}
+              />
             </section>
           )}
         </Show>
@@ -206,8 +220,19 @@ function FromConnections(props: { agent: AgentDetail }) {
   );
 }
 
-/** One file: Edit or Preview, History (entry file), download, delete, and Save. */
-function FileEditor(props: { agent: AgentDetail; path: string; summary?: AgentInstructionsFileSummary; editable: boolean; entry: boolean; onDeleted: () => void }) {
+/** One file: Edit or Preview, History (entry file), rename, download, delete, and Save. */
+function FileEditor(props: {
+  agent: AgentDetail;
+  path: string;
+  summary?: AgentInstructionsFileSummary;
+  files: readonly AgentInstructionsFileSummary[];
+  editable: boolean;
+  /** Paperclip keeps the files, so they can be renamed (not in an external folder). */
+  renamable: boolean;
+  entry: boolean;
+  onDeleted: () => void;
+  onRenamed: (path: string) => void;
+}) {
   const company = useCompany();
   const client = useQueryClient();
   const [mode, setMode] = createSignal<"edit" | "preview">("edit");
@@ -259,6 +284,19 @@ function FileEditor(props: { agent: AgentDetail; path: string; summary?: AgentIn
       setSaving(false);
     }
   };
+  const rename = async (to: string) => {
+    const detail = file.data;
+    if (!detail?.contentHash) throw new Error("Reload the file before renaming it.");
+    const renamed = await agentsApi.renameInstructionsFile(props.agent.id, { path: props.path, renameTo: to, content: content(), baseHash: detail.contentHash }, company().id);
+    client.setQueryData(queryKeys.agents.instructionsFile(props.agent.id, to), renamed);
+    setDraft(null);
+    await Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.agents.instructionsBundle(props.agent.id) }),
+      client.invalidateQueries({ queryKey: queryKeys.agents.detail(props.agent.id), exact: true }),
+    ]);
+    pushToast({ tone: "success", title: `Renamed to ${to}` });
+    props.onRenamed(to);
+  };
   const remove = async () => {
     setDeleteOpen(false);
     try {
@@ -301,6 +339,9 @@ function FileEditor(props: { agent: AgentDetail; path: string; summary?: AgentIn
           />
           <Show when={props.entry && file.data?.revision}>
             <FileHistory agent={props.agent} path={props.path} current={file.data!} onRestored={() => setDraft(null)} />
+          </Show>
+          <Show when={props.renamable && !readOnly() && file.data}>
+            <RenameFile path={props.path} existing={props.files} dirty={dirty()} disabled={saving()} onRename={rename} />
           </Show>
           <a class="btn btn--icon btn--compact btn--ghost" href={agentsApi.instructionsFileDownloadUrl(props.agent.id, props.path, company().id)} aria-label={`Download ${props.path}`} title="Download">
             <Download size={14} aria-hidden="true" />
@@ -420,6 +461,72 @@ function FileHistory(props: { agent: AgentDetail; path: string; current: AgentIn
             )}
           </For>
         </ul>
+      </Popover.Content>
+    </Popover>
+  );
+}
+
+/** Rename: the file's new path, checked as a new file's is; an unsaved edit goes with it. */
+function RenameFile(props: { path: string; existing: readonly { path: string }[]; dirty: boolean; disabled: boolean; onRename: (path: string) => Promise<void> }) {
+  const [open, setOpen] = createSignal(false);
+  const [path, setPath] = createSignal(props.path);
+  const [busy, setBusy] = createSignal(false);
+  const [problem, setProblem] = createSignal<string | null>(null);
+  const toggle = (next: boolean) => {
+    if (next) {
+      setPath(props.path);
+      setProblem(null);
+    }
+    setOpen(next);
+  };
+  const submit = async (event: Event) => {
+    event.preventDefault();
+    const found = renameProblem(path(), props.path, props.existing);
+    if (found) return setProblem(found);
+    setBusy(true);
+    try {
+      await props.onRename(path().trim());
+      setOpen(false);
+    } catch (caught) {
+      setProblem(failure(caught, "Couldn't rename the file. If it changed elsewhere, reload it and try again."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Popover open={open()} onOpenChange={toggle} placement="bottom-end">
+      <Popover.Trigger class="btn btn--icon btn--compact btn--ghost" aria-label={`Rename ${props.path}`} title="Rename" disabled={props.disabled}>
+        <PenLine size={14} aria-hidden="true" />
+      </Popover.Trigger>
+      <Popover.Content title={`Rename ${props.path}`} width={320}>
+        <form class="ps-popover-form" onSubmit={(event) => void submit(event)}>
+          <TextInput
+            class="mono"
+            value={path()}
+            aria-label="New path"
+            autocomplete="off"
+            spellcheck={false}
+            invalid={Boolean(problem())}
+            onInput={(event) => {
+              setProblem(null);
+              setPath(event.currentTarget.value);
+            }}
+            autofocus
+          />
+          <Show when={props.dirty}>
+            <p class="fhelp">Your unsaved edit is saved under the new name.</p>
+          </Show>
+          <div class="ps-form-foot">
+            <Show when={problem()}>
+              <span class="nt-error" role="alert">
+                {problem()}
+              </span>
+            </Show>
+            <Button size="compact" variant="primary" type="submit" disabled={busy()}>
+              {busy() ? "Renaming…" : "Rename"}
+            </Button>
+          </div>
+        </form>
       </Popover.Content>
     </Popover>
   );
