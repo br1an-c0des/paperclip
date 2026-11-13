@@ -2,6 +2,7 @@ import type { IssueBlockerStalledWakeContext, TaskInterruptionPresentation } fro
 import { describe, expect, it } from "vitest";
 import {
   budgetWaitText,
+  modelRetryOf,
   pauseDetail,
   rejectedModelText,
   setupFailureText,
@@ -70,9 +71,33 @@ describe("taskNotices", () => {
     expect(taskNotices(input({ task: { interruption: ready } }))[0]).toMatchObject({ kind: "project-access", ready: true, canRetry: true });
   });
 
+  it("shows a waiting continuation with Move it forward now, ahead of a Retry wait, and no failure (#21373)", () => {
+    const waiting = interruption({ state: "working", retryAction: "move_forward", canRetry: true });
+    expect(taskNotices(input({ task: { interruption: waiting } }))).toEqual([{ kind: "move-forward", canRetry: true }]);
+    const held = interruption({ state: "working", retryAction: "move_forward", canRetry: true, retryWait: { reason: "budget.blocked", message: "Waiting for the budget." } });
+    expect(kinds(input({ task: { interruption: held } }))).toEqual(["move-forward"]);
+    // Once a person asked (or before 15 minutes), the server drops the offer: nothing to show.
+    expect(kinds(input({ task: { interruption: interruption({ state: "working", retryAction: "move_forward", canRetry: false }) } }))).toEqual([]);
+    // A saved-work step still reads first.
+    const recovering = interruption({ state: "working", retryAction: "move_forward", canRetry: true, recoveryStep: "saving_previous_files" });
+    expect(kinds(input({ task: { interruption: recovering } }))).toEqual(["recovering"]);
+  });
+
+  it("offers Try again on the failed run of a rejected model, by the task's assignee (#21244)", () => {
+    const rejected = interruption({ responsibility: "user", state: "waiting_for_user", userAction: "choose_model", canRetry: false, rejectedModel: "bad/model" });
+    expect(taskNotices(input({ task: { interruption: rejected, assigneeAgentId: "agent-1" } }))).toEqual([
+      { kind: "waiting", action: "choose_model", rejectedModel: "bad/model", attempted: true, modelRetry: { runId: "run-1", agentId: "agent-1" } },
+    ]);
+    expect(modelRetryOf(rejected, null)).toBeNull();
+    expect(modelRetryOf({ ...rejected, observedRunId: null }, "agent-1")).toBeNull();
+    // The task's own Retry, when the server offers one, is the way on instead.
+    expect(modelRetryOf({ ...rejected, canRetry: true }, "agent-1")).toBeNull();
+    expect(modelRetryOf({ ...rejected, userAction: "reconnect" }, "agent-1")).toBeNull();
+  });
+
   it("says what a wait needs", () => {
     const waiting = interruption({ responsibility: "user", state: "waiting_for_user", userAction: "choose_model", canRetry: false });
-    expect(taskNotices(input({ task: { interruption: waiting } }))).toEqual([{ kind: "waiting", action: "choose_model", rejectedModel: null, attempted: true }]);
+    expect(taskNotices(input({ task: { interruption: waiting } }))).toEqual([{ kind: "waiting", action: "choose_model", rejectedModel: null, attempted: true, modelRetry: null }]);
   });
 
   it("offers Resume where a tree pause was made", () => {
@@ -168,6 +193,7 @@ describe("provider and workspace failures", () => {
         resuming: false,
         rejectedModel: null,
         budgetWait: false,
+        modelRetry: null,
       },
     ]);
     const waiting = interruption({ providerFailure, responsibility: "user", state: "waiting_for_user", userAction: "reconnect", canRetry: false });
@@ -270,7 +296,7 @@ describe("a pending native resume (#19503)", () => {
   it("asks an owner or admin to confirm the previous server stopped", () => {
     const waiting = interruption({ responsibility: "user", state: "waiting_for_user", userAction: "confirm_owner_stop", canRetry: false });
     expect(taskNotices(input({ task: { interruption: waiting } }))).toEqual([
-      { kind: "waiting", action: "confirm_owner_stop", rejectedModel: null, attempted: true },
+      { kind: "waiting", action: "confirm_owner_stop", rejectedModel: null, attempted: true, modelRetry: null },
     ]);
   });
 });
@@ -326,7 +352,7 @@ describe("since the 2026-11-10 sync", () => {
       "Couldn't finish this attempt. Your message is saved. It's waiting for the budget to allow new work. Raise the budget in Costs.",
     );
     const fresh = user({ userAction: "budget", observedRunId: null, sourceRunIds: [] });
-    expect(taskNotices(input({ task: { interruption: fresh } }))).toEqual([{ kind: "waiting", action: "budget", rejectedModel: null, attempted: false }]);
+    expect(taskNotices(input({ task: { interruption: fresh } }))).toEqual([{ kind: "waiting", action: "budget", rejectedModel: null, attempted: false, modelRetry: null }]);
     expect(budgetWaitText(false)).toBe("This task hasn't started. It's waiting for the budget to allow new work. Raise the budget in Costs.");
     const providerFailure = {
       schema: "paperclip.provider-failure.v1",

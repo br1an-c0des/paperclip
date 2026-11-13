@@ -412,3 +412,20 @@ describe("dependent tasks refresh when a blocker changes (U130, #20836)", () => 
     client.clear();
   });
 });
+
+describe("an open chat when its conversation settles (U145, upstream #21054)", () => {
+  it("refetches the chat's comments on issue.updated, since they sit under the task's key", async () => {
+    // The old UI refetched a chat's comments only on a new comment; upstream added `issue.updated`
+    // for the visible conversation. Here the task's detail key is invalidated as a prefix, which
+    // covers its comments (`issues.section(id, "comments", "chat")`, chat/use-chat.ts) already.
+    const client = new QueryClient();
+    const comments = queryKeys.issues.section("chat-1", "comments", "chat");
+    client.setQueryData(comments, { pages: [], pageParams: [] });
+    client.setQueryData(queryKeys.issues.section("other", "comments", "chat"), { pages: [], pageParams: [] });
+    const keys = keysForEvent("c1", event("activity.logged", { entityType: "issue", entityId: "chat-1", action: "issue.updated" }));
+    await Promise.all(keys.map((queryKey) => client.invalidateQueries({ queryKey }, { cancelRefetch: false })));
+    expect(client.getQueryState(comments)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(queryKeys.issues.section("other", "comments", "chat"))?.isInvalidated).toBe(false);
+    client.clear();
+  });
+});

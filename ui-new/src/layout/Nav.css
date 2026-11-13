@@ -405,10 +405,80 @@
   visibility: hidden;
 }
 
+/*
+ * A starred agent's grip, left of its "…" (U144): drag to reorder. `touch-action: none` lets a
+ * finger drag the row instead of scrolling the list. The rows it passes slide out of its way.
+ */
+.nav-row--sortable {
+  transition: transform 0.15s ease;
+}
+
+.nav-row--moving {
+  z-index: 2;
+  transition: none;
+  border-radius: var(--r-pill);
+  background: var(--card);
+  box-shadow: var(--shadow-lg);
+}
+
+.nav-row-grip {
+  position: absolute;
+  top: 5px;
+  right: 35px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 28px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  cursor: grab;
+  touch-action: none;
+  opacity: 0;
+}
+
+.nav-row-grip:hover {
+  background: var(--well);
+  color: var(--text);
+}
+
+.nav-row-grip:active,
+.nav-row--moving .nav-row-grip {
+  cursor: grabbing;
+}
+
+.nav-row:hover .nav-row-grip,
+.nav-row:focus-within .nav-row-grip,
+.nav-row--moving .nav-row-grip,
+.nav-row-grip[aria-pressed="true"] {
+  opacity: 1;
+}
+
+.nav-row-grip[aria-pressed="true"] {
+  background: var(--well);
+  color: var(--text);
+}
+
+/* The grip takes the room of the trailing state, so the name gives way to it. */
+.nav-row--sortable:hover .navi-label,
+.nav-row--sortable:focus-within .navi-label {
+  margin-right: 32px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-row--sortable {
+    transition: none;
+  }
+}
+
 /* Touch screens have no hover: keep the menu showing. */
 @media (hover: none) {
-  .nav-row-menu {
+  .nav-row-menu,
+  .nav-row-grip {
     opacity: 1;
+  }
+
+  .nav-row--sortable .navi-label {
+    margin-right: 32px;
   }
 
   .nav-row .navi > :last-child:not(.navi-label) {

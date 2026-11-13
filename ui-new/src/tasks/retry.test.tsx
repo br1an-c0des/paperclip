@@ -1,7 +1,62 @@
 import type { TaskInterruptionPresentation } from "@paperclipai/shared";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import { interruptionReason, RetryMark, retryOffer, retryReceiptOutcome, STALE_RETRY_MESSAGE, type TaskRetry } from "./retry";
+import {
+  ALREADY_MOVED_ON_MESSAGE,
+  interruptionReason,
+  offersMoveForward,
+  RetryMark,
+  retryOffer,
+  retryReceiptOutcome,
+  retryRequest,
+  STALE_RETRY_MESSAGE,
+  type TaskRetry,
+} from "./retry";
+
+describe("Move it forward now (#21373, #21385)", () => {
+  const waiting = (extra: Partial<TaskInterruptionPresentation> = {}): TaskInterruptionPresentation => ({
+    intentId: null,
+    responsibility: "system",
+    state: "working",
+    nextRetryAt: null,
+    canRetry: true,
+    retryAction: "move_forward",
+    userAction: null,
+    sourceRunIds: ["continuation"],
+    observedRunId: "continuation",
+    ...extra,
+  });
+
+  it("is offered only on a working task whose continuation the server lets you move forward", () => {
+    expect(offersMoveForward(waiting())).toBe(true);
+    expect(offersMoveForward(waiting({ canRetry: false }))).toBe(false);
+    expect(offersMoveForward(waiting({ retryAction: undefined }))).toBe(false);
+    expect(offersMoveForward(waiting({ state: "failed" }))).toBe(false);
+    expect(offersMoveForward(null)).toBe(false);
+  });
+
+  it("sends the move-forward intent with the observed run, and nothing extra for an ordinary Retry", () => {
+    expect(retryRequest({ interruption: waiting() }, "key-1")).toEqual({ idempotencyKey: "key-1", observedRunId: "continuation", retryAction: "move_forward" });
+    expect(retryRequest({ interruption: waiting({ state: "failed", retryAction: undefined }) }, "key-2")).toEqual({
+      idempotencyKey: "key-2",
+      observedRunId: "continuation",
+    });
+    expect(retryRequest({ interruption: null }, "key-3")).toEqual({ idempotencyKey: "key-3", observedRunId: null });
+  });
+
+  it("says plainly when the task already moved on, so nothing new was started", () => {
+    expect(retryReceiptOutcome({ accepted: false, stale: false, alreadyMovedOn: true })).toEqual({
+      started: false,
+      stale: true,
+      reason: ALREADY_MOVED_ON_MESSAGE,
+    });
+    expect(ALREADY_MOVED_ON_MESSAGE).toContain("already moved on, so nothing new was started");
+  });
+
+  it("isn't a row's Retry: the list rows leave a working task alone", () => {
+    expect(retryOffer({ interruption: waiting() })).toBeNull();
+  });
+});
 
 describe("retryReceiptOutcome (#20283)", () => {
   const receipt = (extra: Partial<Parameters<typeof retryReceiptOutcome>[0]>) => ({ accepted: true, stale: false, ...extra });

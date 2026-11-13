@@ -62,3 +62,34 @@ export function starredAgents<T extends { id: string; status: string }>(membersh
     return agent && agent.status !== "terminated" ? [agent] : [];
   });
 }
+
+/*
+ * Your own order for starred agents (since the 2026-11-13 sync, upstream #20830): starred agents are
+ * ui-new's chat pins (U66), and they lead the nav's agents in an order you can drag. As in the old
+ * UI, the order is kept per person in this browser; the server's stars have no order of their own
+ * beyond newest first. Agents starred since you last arranged them lead, newest first; the rest
+ * follow in your order.
+ */
+
+/** Starred ids in your order: ones you haven't arranged first (in star order), then your order. */
+export function inPinOrder(starredIds: readonly string[], saved: readonly string[]): string[] {
+  const starred = new Set(starredIds);
+  const arranged = new Set(saved.filter((id) => starred.has(id)));
+  return [...starredIds.filter((id) => !arranged.has(id)), ...arranged];
+}
+
+/** A saved order read back from storage: unique strings, anything else dropped. */
+export function parsePinOrder(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const value: unknown = JSON.parse(raw);
+    return Array.isArray(value) ? [...new Set(value.filter((entry): entry is string => typeof entry === "string"))] : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Where your order is kept: per person and company, in this browser. */
+export function pinOrderKey(userId: string, companyId: string) {
+  return `paperclip.ui-new.agent-pin-order.v1:${encodeURIComponent(userId)}:${companyId}`;
+}

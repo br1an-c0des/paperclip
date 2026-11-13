@@ -170,9 +170,10 @@ export const issuesApi = {
   /**
    * Asks for another attempt at an interrupted task (`POST /issues/:id/retry`). The idempotency key
    * makes a resent request land once; `observedRunId` is the run the viewer saw fail, and the server
-   * answers `stale` when the task has moved on since.
+   * answers `stale` when the task has moved on since. `retryAction: "move_forward"` (since the
+   * 2026-11-13 sync, #21373) moves a waiting continuation forward instead of starting a new attempt.
    */
-  retry: (id: string, body: { idempotencyKey: string; observedRunId: string | null }) =>
+  retry: (id: string, body: { idempotencyKey: string; observedRunId: string | null; retryAction?: "move_forward" }) =>
     api.post<TaskRetryReceipt>(`/issues/${id}/retry`, body),
   /**
    * Task search for pickers and the command palette (`?q=`). Chats are hidden tasks the search still
@@ -348,6 +349,11 @@ export type TaskRetryReceipt = {
    * `already_promoted` mean it started; the others mean it didn't, and `message` says why.
    */
   scheduledRetry?: { outcome: "promoted" | "already_promoted" | "gate_suppressed" | "waiting" | "no_scheduled_retry"; message: string };
+  /**
+   * A Move it forward now that found the continuation already started or given up (since the
+   * 2026-11-13 sync, #21373): nothing new was started.
+   */
+  alreadyMovedOn?: boolean;
   presentation: TaskInterruptionPresentation | null;
 };
 

@@ -65,6 +65,14 @@ import { providerFailureOf, type ProviderFailure } from "@/ui/provider-failure";
  * - An agent parked while its setup is checked again (no `pauseReason`, lifecycle `preparing`,
  *   `verifying` or `resuming`, #20361) isn't called paused and gets no Resume agent, which can't
  *   finish verification: the notice points to the task's connection card instead.
+ *
+ * Since the 2026-11-13 sync:
+ * - A continuation Paperclip recorded that has waited 15 minutes to start (#21373, #21385) reads as
+ *   waiting for the agent's other work, with Move it forward now (`move-forward`; retry.tsx sends
+ *   `retryAction: "move_forward"`). The task is working, not failed.
+ * - A rejected model (`choose_model`) offers Try again on the failed run (#21244), which the server
+ *   allows once the model is fixed and refuses while it's still selected
+ *   (`native_provider_model_still_unavailable`; runs/model-retry.ts words that refusal).
  */
 
 export type TaskNotice =
@@ -101,7 +109,11 @@ export type TaskNotice =
       rejectedModel: string | null;
       /** A budget hold keeps the refusal on screen (#20338): the line that says so, with Costs. */
       budgetWait: boolean;
+      /** The failed run Try again retries, on a rejected model (#21244); null for none. */
+      modelRetry: ModelRetry | null;
     }
+  /** A recorded continuation waiting behind the agent's other work, with Move it forward now (#21373). */
+  | { kind: "move-forward"; canRetry: boolean }
   /** Paperclip is recovering the previous attempt's saved work before the task goes on. */
   | { kind: "recovering"; step: string }
   /**
@@ -117,6 +129,8 @@ export type TaskNotice =
       rejectedModel: string | null;
       /** Whether an attempt ran before the wait, which a budget hold words differently (#20338). */
       attempted: boolean;
+      /** The failed run Try again retries, on a rejected model (#21244); null for none. */
+      modelRetry: ModelRetry | null;
     }
   /**
    * A Retry parked because the previous run never recorded its process (#20310): an owner or admin
@@ -243,8 +257,24 @@ export function retryWaitTitle(notice: { reason: string; blockers: readonly Retr
 
 const words = (value: string) => value.replace(/_/g, " ").replace(/^./, (first) => first.toUpperCase());
 
+/** A failed run to try again, and the agent that ran it (`POST /agents/:id/wakeup` with `failedRunId`). */
+export type ModelRetry = { runId: string; agentId: string };
+
+/**
+ * The run Try again retries on a rejected model (#21244; the old UI's "Model unavailable" marker):
+ * the run the interruption observed, by the task's assignee, which the server requires. Null when
+ * the task's own Retry is offered, or without a run or an assignee.
+ */
+export function modelRetryOf(
+  interruption: Pick<TaskInterruptionPresentation, "userAction" | "observedRunId" | "canRetry"> | null | undefined,
+  assigneeAgentId: string | null | undefined,
+): ModelRetry | null {
+  if (interruption?.userAction !== "choose_model" || interruption.canRetry) return null;
+  return interruption.observedRunId && assigneeAgentId ? { runId: interruption.observedRunId, agentId: assigneeAgentId } : null;
+}
+
 export type NoticeInput = {
-  task: Pick<Issue, "status" | "hiddenAt" | "interruption"> & Partial<Pick<Issue, "executionBlocker" | "blockedBy">>;
+  task: Pick<Issue, "status" | "hiddenAt" | "interruption"> & Partial<Pick<Issue, "executionBlocker" | "blockedBy" | "assigneeAgentId">>;
   assignee?: Pick<Agent, "id" | "name" | "status" | "pauseReason"> & Partial<Pick<Agent, "lifecycleState" | "lifecycleError">> | null;
   project?: Pick<Project, "name" | "pausedAt"> | null;
   tree?: TreeControlState | null;
@@ -317,9 +347,13 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
       resuming,
       rejectedModel: rejectedModelOf(interruption),
       budgetWait: interruption.state === "waiting_for_user" && interruption.userAction === "budget",
+      modelRetry: interruption.state === "waiting_for_user" ? modelRetryOf(interruption, task.assigneeAgentId) : null,
     });
   } else if (step && interruption?.state === "working") {
     notices.push({ kind: "recovering", step });
+  } else if (interruption?.state === "working" && interruption.retryAction === "move_forward" && interruption.canRetry) {
+    // Ahead of a Retry wait, as in the old UI's ExecutionBlockerNotice (#21373).
+    notices.push({ kind: "move-forward", canRetry });
   } else if (retryWait && interruption?.state === "working") {
     const reason = interruption.retryWait!.reason;
     notices.push({ kind: "retry-waiting", reason, message: retryWait, blockers: retryWaitBlockers(interruption.retryWait, task.blockedBy) });
@@ -355,6 +389,7 @@ export function taskNotices(input: NoticeInput): TaskNotice[] {
       action: interruption.userAction,
       rejectedModel: rejectedModelOf(interruption),
       attempted: !!interruption.observedRunId || interruption.sourceRunIds.length > 0,
+      modelRetry: modelRetryOf(interruption, task.assigneeAgentId),
     });
   }
 

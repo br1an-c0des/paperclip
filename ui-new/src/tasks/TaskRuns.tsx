@@ -7,6 +7,7 @@ import { runsApi } from "@/api/runs";
 import { useNow } from "@/lib/clock";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
+import { modelStillUnavailableToast } from "@/runs/model-retry";
 import { canResumeRun, canRetryRun, resumePayload, retryOutcome, runErrorCodeLabel } from "@/runs/run-model";
 import { RunWatchdog } from "@/runs/RunWatchdog";
 import { AgentAvatar } from "@/ui/Avatar";
@@ -159,7 +160,11 @@ export function TaskRuns(props: { taskId: string }) {
       }
       afterRerun();
     } catch (error) {
-      pushToast({ tone: "error", title: how === "resume" ? "Couldn't resume the run" : "Couldn't retry the run", body: error instanceof Error ? error.message : String(error) });
+      // A model the provider rejected and that's still selected links to the agent's model settings (#21244).
+      const modelToast = how === "retry" ? modelStillUnavailableToast(error, people.agent(run.agentId), company().issuePrefix) : null;
+      pushToast(
+        modelToast ?? { tone: "error", title: how === "resume" ? "Couldn't resume the run" : "Couldn't retry the run", body: error instanceof Error ? error.message : String(error) },
+      );
     } finally {
       setRerunning(null);
     }
