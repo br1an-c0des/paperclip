@@ -1,0 +1,35 @@
+/* The "i" button beside a title or label (InfoTip.tsx). The tip itself is `.tip` (Tooltip.css). */
+.infotip {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--muted);
+  vertical-align: middle;
+}
+
+.infotip:hover,
+.infotip[data-expanded] {
+  color: var(--text);
+  background: var(--hover);
+}
+
+/* A finger-sized target on touch screens, without moving the layout. */
+@media (pointer: coarse) {
+  .infotip::before {
+    content: "";
+    position: absolute;
+    inset: -10px;
+  }
+}
+
+/* A title or label with its InfoTip after it (SettingsCard, SettingsRow). */
+.info-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}

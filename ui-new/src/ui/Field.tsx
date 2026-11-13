@@ -1,4 +1,5 @@
 import { Show, splitProps, type JSX, type ParentProps } from "solid-js";
+import { InfoTip } from "./InfoTip";
 import "./Field.css";
 
 /*
@@ -9,7 +10,15 @@ import "./Field.css";
  * - <FieldButton>: a field-shaped button that opens a menu or listbox ("Shared workspace ⌄").
  * - <SettingsCard> with <SettingsRow>: the card header, label column with help text, and footer
  *   actions used across settings (boards 10, 11, 21–29). Rows stack when their card is narrow.
+ *   Both take `info`: what the card or field is for, behind an "i" button beside the title or label
+ *   (InfoTip.tsx has the rule). `description` and `help` stay for text that must be visible: state,
+ *   why something is unavailable, save status, errors.
  */
+
+/** The info button's name: "About Repositories", or a generic one for a label that isn't text. */
+function aboutLabel(label: JSX.Element) {
+  return typeof label === "string" ? `About ${label}` : "About this setting";
+}
 
 type InputProps = JSX.InputHTMLAttributes<HTMLInputElement> & { variant?: "title"; invalid?: boolean };
 
@@ -78,13 +87,25 @@ export function Field(
 }
 
 export function SettingsCard(
-  props: ParentProps<{ title?: JSX.Element; description?: JSX.Element; footer?: JSX.Element; "aria-label"?: string }>,
+  props: ParentProps<{
+    title?: JSX.Element;
+    /** What the card is for, behind an "i" button beside the title (InfoTip.tsx). */
+    info?: JSX.Element;
+    description?: JSX.Element;
+    footer?: JSX.Element;
+    "aria-label"?: string;
+  }>,
 ) {
   return (
     <section class="card settings-card" aria-label={props["aria-label"]}>
       <Show when={props.title}>
         <header class="chead">
-          <h3 class="disp">{props.title}</h3>
+          <Show when={props.info} fallback={<h3 class="disp">{props.title}</h3>}>
+            <div class="info-line">
+              <h3 class="disp">{props.title}</h3>
+              <InfoTip label={aboutLabel(props.title)}>{props.info}</InfoTip>
+            </div>
+          </Show>
           <Show when={props.description}>
             <p>{props.description}</p>
           </Show>
@@ -98,15 +119,42 @@ export function SettingsCard(
   );
 }
 
-export function SettingsRow(props: ParentProps<{ label: JSX.Element; help?: JSX.Element; for?: string }>) {
+export function SettingsRow(
+  props: ParentProps<{
+    label: JSX.Element;
+    /** What the field is for, behind an "i" button beside the label (InfoTip.tsx). */
+    info?: JSX.Element;
+    /** Text that stays visible under the label: state, or why the control is unavailable. */
+    help?: JSX.Element;
+    for?: string;
+  }>,
+) {
+  const help = () => (
+    <Show when={props.help}>
+      <span class="fhelp">{props.help}</span>
+    </Show>
+  );
   return (
     <div class="frow">
-      <label class="flabel" for={props.for}>
-        {props.label}
-        <Show when={props.help}>
-          <span class="fhelp">{props.help}</span>
-        </Show>
-      </label>
+      <Show
+        when={props.info}
+        fallback={
+          <label class="flabel" for={props.for}>
+            {props.label}
+            {help()}
+          </label>
+        }
+      >
+        {/* The button sits outside the <label>, so it isn't part of the control's name and a
+            press on it can't reach the control. */}
+        <div class="flabel">
+          <span class="info-line">
+            <label for={props.for}>{props.label}</label>
+            <InfoTip label={aboutLabel(props.label)}>{props.info}</InfoTip>
+          </span>
+          {help()}
+        </div>
+      </Show>
       <div class="fcontrol">{props.children}</div>
     </div>
   );
