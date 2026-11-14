@@ -18,9 +18,25 @@ import { Segmented } from "@/ui/Segmented";
 import { TonePill } from "@/ui/Status";
 import { Switch } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
-import { emptyEnvironmentForm, environmentForm, environmentFormProblem, environmentPayload, editScope, sandboxProviders, type EnvironmentForm } from "./environments-model";
+import { useTailscaleConnections } from "@/apps/tailscale/queries";
+import { connectedNetworks, pairingPort, showsNetworkChoice } from "@/apps/tailscale/tailscale-model";
+import { InfoTip } from "@/ui/InfoTip";
+import {
+  draftTestBlock,
+  emptyEnvironmentForm,
+  environmentForm,
+  environmentFormProblem,
+  environmentPayload,
+  editScope,
+  machinePatch,
+  networkPatch,
+  sandboxProviders,
+  type EnvironmentForm,
+  type SshNetwork,
+} from "./environments-model";
 import { EnvVarsEditor } from "./EnvVarsEditor";
 import { failure } from "./shared";
+import { TailscaleMachine } from "./TailscaleMachine";
 
 /*
  * New environment and Edit (the old page's form at `/company/settings/instance/environments/new` and
@@ -28,12 +44,19 @@ import { failure } from "./shared";
  * private key pasted or picked from the company's secrets, known hosts) or a sandbox provider with
  * the settings its plugin declares, and the variables runs there get.
  *
+ * An SSH host is reached directly or through a Tailscale network (U156): Network, then the tailnet's
+ * machine and pairing (TailscaleMachine.tsx). Under Advanced, "Use authentication configured on
+ * the remote machine" (U157, `useHostAuth`): off for new environments, so agents there run on their
+ * own AI account; on for ones saved without the field, which keep the remote user's sign-in.
+ *
  * Test probes the draft before it's saved (`POST …/environments/probe-config`): an SSH draft is
- * checked by connecting to the host. A Paperclip-managed environment only takes its variables.
+ * checked by connecting to the host; a Tailscale one waits until it's saved, and is tested from the
+ * list. A Paperclip-managed environment only takes its variables.
  * Saved changes apply to later runs; Paperclip may start fresh sessions or sandboxes after a change.
  */
 
-export type EnvironmentEdit = { mode: "new" } | { mode: "edit"; environment: Environment };
+/** A new one may start on a tailnet (Connections → Tailscale → New SSH environment). */
+export type EnvironmentEdit = { mode: "new"; tailscaleConnectionId?: string } | { mode: "edit"; environment: Environment };
 
 export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose: () => void; onSaved: () => Promise<unknown> }) {
   const company = useCompany();
@@ -83,6 +106,16 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
     const schema = provider()?.configSchema;
     return form.driver === "sandbox" && schema ? validateValues(schema, form.sandboxConfig) : {};
   });
+  // Tailscale (U156): the Network choice shows once a tailnet is connected, or on a Tailscale environment.
+  const tailscale = useTailscaleConnections(() => open() && form.driver === "ssh");
+  const networkChoice = () => showsNetworkChoice(form.sshNetwork, tailscale.canManage(), connectedNetworks(tailscale.connections.data).length);
+  const onTailscale = () => form.driver === "ssh" && form.sshNetwork === "tailscale";
+  const testBlock = () => (managed() ? null : draftTestBlock(form));
+  const pickNetwork = (network: SshNetwork) => {
+    if (network === form.sshNetwork) return;
+    setForm(networkPatch(network));
+    setProbe(null);
+  };
   const drivers = createMemo(() => [
     ...(providers().length > 0 || form.driver === "sandbox" ? [{ value: "sandbox" as const, label: "Sandbox" }] : []),
     { value: "ssh" as const, label: "SSH host" },
@@ -94,7 +127,9 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
     on(
       () => props.edit,
       (edit) => {
-        setForm(reconcile(edit?.mode === "edit" ? environmentForm(edit.environment) : emptyEnvironmentForm()));
+        setForm(
+          reconcile(edit?.mode === "edit" ? environmentForm(edit.environment) : emptyEnvironmentForm({ tailscaleConnectionId: edit?.tailscaleConnectionId })),
+        );
         setRows(reconcile(envRows(edit?.mode === "edit" ? edit.environment.envVars : {})));
         setProblem(null);
         setProbe(null);
@@ -176,7 +211,14 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
       width={680}
       footer={
         <>
-          <Show when={problem()}>
+          <Show
+            when={problem()}
+            fallback={
+              <Show when={testBlock()}>
+                <span class="fhelp ps-foot-error">{testBlock()}</span>
+              </Show>
+            }
+          >
             <span class="nt-error ps-foot-error" role="alert">
               {problem()}
             </span>
@@ -185,7 +227,7 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
             Cancel
           </Button>
           <Show when={!managed() && form.driver !== "local"}>
-            <Button disabled={!!busy()} onClick={() => void test()}>
+            <Button disabled={!!busy() || !!testBlock()} onClick={() => void test()}>
               {busy() === "test" ? "Testing…" : "Test"}
             </Button>
           </Show>
@@ -214,9 +256,59 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
           </Show>
 
           <Show when={form.driver === "ssh"}>
+            <Show when={networkChoice()}>
+              <div class="field-stack">
+                <span class="field-label info-line">
+                  Network
+                  <InfoTip label="About the network">
+                    How Paperclip reaches the machine: directly at its address, or through a Tailscale network you connected in Connections.
+                  </InfoTip>
+                </span>
+                <Segmented
+                  label="Network"
+                  options={[
+                    { value: "direct" as const, label: "Direct" },
+                    { value: "tailscale" as const, label: "Tailscale" },
+                  ]}
+                  value={form.sshNetwork}
+                  onChange={pickNetwork}
+                />
+              </div>
+            </Show>
+            <Show when={onTailscale()}>
+              <TailscaleMachine
+                connectionId={form.tailscaleConnectionId}
+                deviceId={form.tailscaleDeviceId}
+                port={pairingPort(form.sshPort)}
+                onChange={(selection) => {
+                  setForm(machinePatch(selection));
+                  setProbe(null);
+                }}
+                onPaired={(secretId) => setForm({ sshPrivateKeySecretId: secretId, sshPrivateKey: "" })}
+              />
+              <Show when={showErrors() && (!form.tailscaleConnectionId || !form.tailscaleDeviceId)}>
+                <span class="field-error" role="alert">
+                  {!form.tailscaleConnectionId ? "Pick a tailnet." : "Pick a machine."}
+                </span>
+              </Show>
+            </Show>
             <div class="cs-env-grid">
-              <Field label="Host" for="cs-env-host" help="DNS name or IP address." error={fieldError(!form.sshHost.trim(), "Enter the host.")}>
-                <TextInput id="cs-env-host" class="mono" autocomplete="off" spellcheck={false} value={form.sshHost} onInput={(event) => setForm("sshHost", event.currentTarget.value)} />
+              <Field
+                label="Host"
+                for="cs-env-host"
+                help={onTailscale() ? "Set by the machine you pick." : "DNS name or IP address."}
+                error={fieldError(!onTailscale() && !form.sshHost.trim(), "Enter the host.")}
+              >
+                <TextInput
+                  id="cs-env-host"
+                  class="mono"
+                  autocomplete="off"
+                  spellcheck={false}
+                  readOnly={onTailscale()}
+                  placeholder={onTailscale() ? "Pick a machine" : undefined}
+                  value={form.sshHost}
+                  onInput={(event) => setForm("sshHost", event.currentTarget.value)}
+                />
               </Field>
               <Field label="Port" for="cs-env-port" help="Usually 22.">
                 <TextInput id="cs-env-port" type="number" min={1} max={65535} value={form.sshPort} onInput={(event) => setForm("sshPort", event.currentTarget.value)} />
@@ -288,6 +380,26 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
               checked={form.sshStrictHostKeyChecking}
               onChange={(value) => setForm("sshStrictHostKeyChecking", value)}
             />
+            <details class="cs-env-advanced">
+              <summary>
+                Advanced
+                <Show when={form.sshUseHostAuth}>
+                  <span class="cs-env-advanced-state"> · uses the remote machine's sign-in</span>
+                </Show>
+              </summary>
+              <div class="info-line cs-env-advanced-row">
+                <Switch
+                  label="Use authentication configured on the remote machine"
+                  description={form.sshUseHostAuth ? "Runs use the remote user's own provider sign-in." : "Agents here run on the AI account picked for each agent."}
+                  checked={form.sshUseHostAuth}
+                  onChange={(value) => setForm("sshUseHostAuth", value)}
+                />
+                <InfoTip label="About remote machine authentication">
+                  Off, each agent needs an AI account in Paperclip, and runs use its subscription or API key. On, runs use whatever provider sign-in the SSH user has
+                  on that machine.
+                </InfoTip>
+              </div>
+            </details>
           </Show>
 
           <Show when={form.driver === "sandbox"}>

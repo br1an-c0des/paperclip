@@ -432,6 +432,24 @@
   gap: 8px;
 }
 
+/* SSH's Advanced: authentication configured on the remote machine (U157). */
+.cs-env-advanced summary {
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cs-env-advanced-state {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.cs-env-advanced-row {
+  align-items: flex-start;
+  margin-top: 10px;
+}
+
 .cs-env .ps-env-head,
 .cs-env .ps-env-row {
   padding-inline: 0;

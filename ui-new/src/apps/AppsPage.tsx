@@ -15,6 +15,7 @@ import { ReviewPage } from "./Review";
 import { ChatRoutes } from "./chat/ChatRoutes";
 import { chatRoute } from "./chat/chat-model";
 import { usePendingRequests } from "./shared";
+import { TailscalePage } from "./tailscale/TailscalePage";
 import "@/activity/Activity.css";
 import "@/connectors/Connectors.css";
 import "./Apps.css";
@@ -30,6 +31,8 @@ import "./Apps.css";
  *   a gallery app, one through a Vercel connector, your own MCP server, or one more account for an
  *   app you have. `/connections/connect?aiLogin=<sessionId>` finishes an AI sign-in started for you
  *   (ResumeAiLogin.tsx).
+ * - Tailscale (`/connections/tailscale`, U156): the tailnets SSH environments pick machines from
+ *   (src/apps/tailscale/); instance admins only.
  * - A connection (`/connections/:connectionId/:tab`): its tools and who may use them, its review queue, and
  *   its settings.
  *
@@ -125,6 +128,9 @@ export function AppsPage() {
           </Match>
           <Match when={view().section === "byo"}>
             <ByoConnect />
+          </Match>
+          <Match when={view().section === "tailscale"}>
+            <TailscalePage />
           </Match>
           <Match when={application()} keyed>
             {(current) => <ApplicationPage applicationId={current.applicationId} />}

@@ -11,6 +11,9 @@ import {
   reassignTargets,
   unlistedAgentCount,
   driverLabel,
+  draftTestBlock,
+  machinePatch,
+  networkPatch,
   editScope,
   isManagedPluginEnvironment,
   effectiveDefaultId,
@@ -273,6 +276,65 @@ describe("the environment form", () => {
     expect(environmentFormProblem({ ...emptyEnvironmentForm(), name: "Box", sshHost: "h", sshUsername: "u", sshRemoteWorkspacePath: "/w", sshPort: "70000" })).toMatch(/1 to 65535/);
     expect(environmentFormProblem({ ...emptyEnvironmentForm(), name: "Box", driver: "sandbox", sandboxProvider: "fake" })).toBe("Pick a sandbox provider.");
     expect(environmentFormProblem({ ...environmentForm(ssh) })).toBeNull();
+  });
+
+  it("starts new SSH environments on the agent's AI account, and reads saved ones without the field as host auth (U157)", () => {
+    const fresh = { ...emptyEnvironmentForm(), name: "Box", sshHost: "h", sshUsername: "u", sshRemoteWorkspacePath: "/w" };
+    expect(fresh.sshUseHostAuth).toBe(false);
+    expect(environmentPayload(fresh, {}).config).toMatchObject({ useHostAuth: false, network: "direct" });
+    expect(environmentForm(ssh).sshUseHostAuth).toBe(true);
+    expect(environmentPayload(environmentForm(ssh), {}).config).toMatchObject({ useHostAuth: true });
+    expect(environmentForm(env({ driver: "ssh", config: { ...ssh.config, useHostAuth: false } })).sshUseHostAuth).toBe(false);
+    expect(environmentForm(env({ driver: "ssh", config: { ...ssh.config, useHostAuth: true } })).sshUseHostAuth).toBe(true);
+  });
+
+  it("saves a Tailscale machine by its tailnet and stable id (U156)", () => {
+    const saved = env({
+      driver: "ssh",
+      config: { ...ssh.config, network: "tailscale", tailscaleConnectionId: "n1", tailscaleDeviceId: "d1", host: "100.64.0.9", useHostAuth: false },
+    });
+    const form = environmentForm(saved);
+    expect(form).toMatchObject({ sshNetwork: "tailscale", tailscaleConnectionId: "n1", tailscaleDeviceId: "d1", sshHost: "100.64.0.9" });
+    expect(environmentPayload(form, {}).config).toMatchObject({ network: "tailscale", tailscaleConnectionId: "n1", tailscaleDeviceId: "d1", host: "100.64.0.9" });
+    expect(environmentSummary(saved)).toBe("pc@100.64.0.9 via Tailscale");
+    const direct = environmentPayload({ ...form, ...networkPatch("direct"), sshHost: "box.lan" }, {}).config!;
+    expect(direct).toMatchObject({ network: "direct", host: "box.lan" });
+    expect(direct).not.toHaveProperty("tailscaleConnectionId");
+    expect(direct).not.toHaveProperty("tailscaleDeviceId");
+  });
+
+  it("starts a new environment on a tailnet from Connections", () => {
+    expect(emptyEnvironmentForm({ tailscaleConnectionId: "n1" })).toMatchObject({ sshNetwork: "tailscale", tailscaleConnectionId: "n1", tailscaleDeviceId: "" });
+    expect(emptyEnvironmentForm()).toMatchObject({ sshNetwork: "direct", tailscaleConnectionId: "" });
+  });
+
+  it("clears the route when the network or machine changes", () => {
+    expect(networkPatch("tailscale")).toEqual({
+      sshNetwork: "tailscale",
+      tailscaleConnectionId: "",
+      tailscaleDeviceId: "",
+      sshHost: "",
+      sshPrivateKey: "",
+      sshPrivateKeySecretId: "",
+      sshKnownHosts: "",
+    });
+    expect(machinePatch({ connectionId: "n1", deviceId: "d2", host: "100.64.0.2" })).toMatchObject({
+      tailscaleConnectionId: "n1",
+      tailscaleDeviceId: "d2",
+      sshHost: "100.64.0.2",
+      sshPrivateKeySecretId: "",
+      sshKnownHosts: "",
+    });
+  });
+
+  it("needs a tailnet and machine, and tests a Tailscale draft only once it's saved", () => {
+    const base = { ...emptyEnvironmentForm({ tailscaleConnectionId: "n1" }), name: "Box", sshUsername: "u", sshRemoteWorkspacePath: "/w" };
+    expect(environmentFormProblem({ ...base, tailscaleConnectionId: "" })).toBe("Pick a Tailscale network.");
+    expect(environmentFormProblem(base)).toBe("Pick a Tailscale machine.");
+    expect(environmentFormProblem({ ...base, tailscaleDeviceId: "d1", sshHost: "100.64.0.1" })).toBeNull();
+    expect(draftTestBlock(base)).toMatch(/Save it first/);
+    expect(draftTestBlock(emptyEnvironmentForm())).toBeNull();
+    expect(draftTestBlock({ ...base, driver: "sandbox" })).toBeNull();
   });
 
   it("offers run-capable sandbox providers, keeping a saved one whose plugin is gone", () => {

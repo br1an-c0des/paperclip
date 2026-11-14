@@ -47,6 +47,7 @@ import { extrasChanges, extrasConfig, extrasDraft, fieldVisible, harnessFields, 
 import { EnvironmentMenu, HarnessDisc, instanceDefaultEnvironment, ModelMenu, TestChecks } from "./fields";
 import { HarnessChangeDialog } from "./HarnessChange";
 import { RunnerStateCard } from "./RunnerStateCard";
+import { testFailureText } from "../ssh-ai-account";
 import { UsageLimitDetail, useUsageLimit } from "@/tasks/UsageLimit";
 
 /*
@@ -661,7 +662,7 @@ function TestEnvironment(props: { agent: AgentDetail; environmentId: string | nu
         }),
       );
     } catch (caught) {
-      setError(failure(caught, "The test couldn't run."));
+      setError(testFailureText(caught, (error) => failure(error, "The test couldn't run.")));
     } finally {
       setBusy(false);
     }

@@ -501,4 +501,10 @@ export const queryKeys = {
    * and company as the old UI keys it. Outside every company prefix, so no live event refetches it.
    */
   linkPreview: (companyId: string, userId: string | null, url: string) => ["link-preview", companyId, userId, url] as const,
+  /** The company's Tailscale networks (U156, api/tailscale.ts), in the old UI's shapes. */
+  tailscale: {
+    connections: (companyId: string) => ["tailscale-connections", companyId] as const,
+    devices: (companyId: string, connectionId: string) => ["tailscale-devices", companyId, connectionId] as const,
+    deviceLogin: (companyId: string, connectionId: string) => ["tailscale-device-login", companyId, connectionId] as const,
+  },
 };
