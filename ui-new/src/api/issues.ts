@@ -354,6 +354,12 @@ export type TaskRetryReceipt = {
    * 2026-11-13 sync, #21373): nothing new was started.
    */
   alreadyMovedOn?: boolean;
+  /**
+   * Admission refused the Retry for a reason another click can't change (since the 2026-11-14 sync,
+   * #21497): `200` with `accepted: false`. `message` is what to show. The request stays saved and
+   * starts by itself if the reason clears.
+   */
+  refused?: { reason: string; message: string };
   presentation: TaskInterruptionPresentation | null;
 };
 

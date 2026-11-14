@@ -77,6 +77,15 @@ describe("retryReceiptOutcome (#20283)", () => {
     }
   });
 
+  it("gives a refused Retry's own reason, not a replaced attempt (#21497)", () => {
+    const message = "Retry can't continue because Paperclip can't confirm that the previous attempt stopped before it started work.";
+    expect(retryReceiptOutcome(receipt({ accepted: false, refused: { reason: "previous_execution_unverified", message } }))).toEqual({
+      started: false,
+      stale: false,
+      reason: message,
+    });
+  });
+
   it("calls a replaced attempt stale, in upstream's words", () => {
     expect(retryReceiptOutcome(receipt({ stale: true }))).toEqual({ started: false, stale: true, reason: STALE_RETRY_MESSAGE });
     expect(retryReceiptOutcome(receipt({ accepted: false }))).toEqual({ started: false, stale: true, reason: STALE_RETRY_MESSAGE });
