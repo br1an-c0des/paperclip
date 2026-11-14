@@ -14,7 +14,7 @@ import {
   unverifiedSourceText,
 } from "./recover-files";
 import { canConfirmServerStop, previousServerStop, recoveryCard, stopConfirmationBody } from "./recovery-actions";
-import { newRequestId } from "./request-id";
+import { randomId as newRequestId } from "@/lib/random-id";
 
 function action(evidence: Record<string, unknown> = {}, patch: Partial<IssueRecoveryAction> = {}): IssueRecoveryAction {
   return {

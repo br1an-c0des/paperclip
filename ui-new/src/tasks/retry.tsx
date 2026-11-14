@@ -6,6 +6,7 @@ import { ApiError } from "@/api/client";
 import { issuesApi, type TaskRetryReceipt } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
+import { randomId } from "@/lib/random-id";
 import { Capsule, TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { providerFailureOf, providerFailureTitle } from "@/ui/provider-failure";
@@ -196,7 +197,7 @@ export function useTaskRetry() {
     // Moving a waiting continuation forward says so, so the server joins it rather than retrying (#21373).
     const moveForward = task.interruption?.retryAction === "move_forward";
     const slot = `${task.id}:${observedRunId ?? ""}${moveForward ? ":move_forward" : ""}`;
-    const idempotencyKey = keys.get(slot) ?? crypto.randomUUID();
+    const idempotencyKey = keys.get(slot) ?? randomId();
     keys.set(slot, idempotencyKey);
     mark(task.id, true);
     const ref = task.identifier ?? task.title;

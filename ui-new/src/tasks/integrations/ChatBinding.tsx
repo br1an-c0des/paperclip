@@ -9,6 +9,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { chatProviderVisible, providerName, PUBLICATION_FEEDBACK, publicationDone } from "@/apps/chat/chat-model";
 import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
+import { randomId } from "@/lib/random-id";
 import { Button, buttonClass } from "@/ui/Button";
 import { TextArea } from "@/ui/Field";
 import { pushToast } from "@/ui/Toast";
@@ -189,7 +190,7 @@ function BindingRow(props: { taskId: string; binding: ExternalChannelBindingSumm
       body: text,
       attachmentIds: picked(),
       attachmentNames: files().filter((file) => picked().includes(file.id)),
-      idempotencyKey: crypto.randomUUID(),
+      idempotencyKey: randomId(),
       publication: null,
     };
     // Kept before it's posted: a send that can't be kept isn't sent, or a reload could send it twice.

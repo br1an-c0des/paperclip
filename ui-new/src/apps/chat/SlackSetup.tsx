@@ -5,6 +5,7 @@ import { createEffect, createSignal, For, Match, on, onCleanup, Show, Switch } f
 import { chatEndpointsApi, slackToolsApi, type ChatEndpoint } from "@/api/chat-endpoints";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
+import { randomId } from "@/lib/random-id";
 import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Field, TextInput } from "@/ui/Field";
@@ -45,7 +46,7 @@ export function ManagedSlackSetup(props: { endpoint: ChatEndpoint; reconnect: bo
   }));
   const [picked, setPicked] = createSignal<string | null>(null);
   const [confirmed, setConfirmed] = createSignal(false);
-  let requestId = crypto.randomUUID();
+  let requestId = randomId();
   const registration = () => props.endpoint.setup?.slackRegistration ?? null;
   const workspaces = () => options.data?.workspaces ?? [];
   const target = () => managedWorkspace(props.endpoint, options.data, picked());
@@ -58,7 +59,7 @@ export function ManagedSlackSetup(props: { endpoint: ChatEndpoint; reconnect: bo
       const { grantId, authorize: needsAuthorization } = target();
       if (mode === "authorize" || needsAuthorization || !grantId) return authorize();
       // A new request ID only when no app could have been made with the last one.
-      if (confirmed() || registration()?.status === "failed") requestId = crypto.randomUUID();
+      if (confirmed() || registration()?.status === "failed") requestId = randomId();
       const result = await chatEndpointsApi.provisionManagedSlack(props.endpoint.id, {
         requestId,
         grantId,
@@ -168,7 +169,7 @@ export function ManagedSlackSetup(props: { endpoint: ChatEndpoint; reconnect: bo
 export function AutomaticSlackSetup(props: { endpoint: ChatEndpoint; onSaved: (next: ChatEndpoint) => void; onExit: () => void; onManual: (existing: boolean) => void }) {
   const [token, setToken] = createSignal("");
   const [checkedNoApp, setCheckedNoApp] = createSignal(false);
-  let requestId = crypto.randomUUID();
+  let requestId = randomId();
   const registration = () => props.endpoint.setup?.slackRegistration ?? null;
   const stage = () => automaticStage(props.endpoint);
 
@@ -176,7 +177,7 @@ export function AutomaticSlackSetup(props: { endpoint: ChatEndpoint; onSaved: (n
     mutationFn: async () => {
       const configurationToken = token().trim();
       setToken("");
-      if (registration()?.status === "failed" || checkedNoApp()) requestId = crypto.randomUUID();
+      if (registration()?.status === "failed" || checkedNoApp()) requestId = randomId();
       const confirmedNoAppCreated = checkedNoApp();
       setCheckedNoApp(false);
       try {
@@ -313,7 +314,7 @@ type SlackAccounts = Extract<SlackTestMessageResult, { status: "connection_requi
 export function SlackTestMessage(props: { endpoint: ChatEndpoint }) {
   const company = useCompany();
   const client = useQueryClient();
-  const [requestId, setRequestId] = createSignal(crypto.randomUUID());
+  const [requestId, setRequestId] = createSignal(randomId());
   const [accounts, setAccounts] = createSignal<SlackAccounts | null>(null);
   const [cursor, setCursor] = createSignal<string | null>(null);
   const [selected, setSelected] = createSignal("");
@@ -363,7 +364,7 @@ export function SlackTestMessage(props: { endpoint: ChatEndpoint }) {
   );
   const start = () => {
     if (expired()) {
-      const next = crypto.randomUUID();
+      const next = randomId();
       setRequestId(next);
       send.mutate({ requestId: next, slackUserId: selected() });
     } else send.mutate({});

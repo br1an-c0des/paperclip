@@ -2,6 +2,7 @@ import { useQueryClient, type QueryClient } from "@tanstack/solid-query";
 import { createContext, createEffect, onCleanup, useContext, type Accessor, type ParentProps } from "solid-js";
 import { api } from "@/api/client";
 import { casesApi } from "@/api/cases";
+import { randomId } from "@/lib/random-id";
 import { pushToast } from "@/ui/Toast";
 import { connectivity } from "./connectivity";
 import { describeError } from "./errors";
@@ -122,15 +123,8 @@ export function useWritesFor(target: Accessor<string | null>) {
   };
 }
 
-/** A fresh local id for a write. */
-export function writeId() {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
-}
-
 /** The fields every new write starts with. */
 export function newWrite(fields: Omit<QueuedWrite, "id" | "status" | "uncertain" | "attempts" | "error" | "createdAt" | "updatedAt">): QueuedWrite {
   const at = Date.now();
-  return { ...fields, id: writeId(), status: "queued", uncertain: false, attempts: 0, error: null, createdAt: at, updatedAt: at };
+  return { ...fields, id: randomId(), status: "queued", uncertain: false, attempts: 0, error: null, createdAt: at, updatedAt: at };
 }
