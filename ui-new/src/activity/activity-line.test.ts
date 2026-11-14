@@ -96,3 +96,18 @@ describe("activityLine", () => {
     });
   });
 });
+
+describe("actor names (U161, #21406)", () => {
+  it("prefers the server's name for the actor, and still says You", () => {
+    expect(activityLine(event({ actorId: "local-board", actorName: "Board" }), names)?.who).toBe("Board");
+    expect(activityLine(event({ actorType: "agent", actorId: "gone", actorName: "Old Agent" }), names)?.who).toBe("Old Agent");
+    expect(activityLine(event({ actorName: "Brian" }), names)?.who).toBe("You");
+    expect(activityLine(event({ actorId: "u3" }), names)?.who).toBe("Someone");
+  });
+
+  it("reads a Stop while the run waited in plain words (#21407)", () => {
+    const details = { identifier: "TES-9", status: "todo", reason: "stopped_while_waiting" };
+    const line = activityLine(event({ action: "issue.updated", actorName: "Board", actorId: "local-board", details }), names);
+    expect(line).toMatchObject({ who: "Board", verb: "stopped the run waiting on", target: "TES-9" });
+  });
+});

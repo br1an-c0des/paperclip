@@ -964,3 +964,38 @@
 .rq-pending {
   margin: 8px 0;
 }
+
+/* A question set's question (U155): its prompt, help, field and what's wrong with the answer */
+.rq-qs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rq-q-header {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* An app's default choice */
+.rq-rec {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  vertical-align: 1px;
+}
+
+.rq-chip .rq-rec {
+  margin-left: 2px;
+}
+
+.rq-field-error {
+  margin-top: -2px;
+  font-size: 12px;
+}

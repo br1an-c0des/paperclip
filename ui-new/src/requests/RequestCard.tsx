@@ -52,6 +52,8 @@ import { DeclineButton, Footer } from "./card-parts";
 import { ConnectionControls } from "./ConnectionControls";
 import { DecisionControls, DecisionResults } from "./DecisionControls";
 import { JoinControls } from "./JoinControls";
+import { appQuestion } from "./question-set";
+import { QuestionSetForm } from "./QuestionSetForm";
 import { WithdrawDialog } from "./WithdrawDialog";
 import { canWithdrawApproval } from "@/approvals/approval-model";
 import { alreadyClosed, alreadyClosedText } from "@/inbox/routing-model";
@@ -599,6 +601,20 @@ function InteractionControls(props: { request: Request; interaction: IssueThread
       )}
     </Show>
     <Switch>
+      {/* A question with its exact presentation, such as an app's form question (U155), has its own form. */}
+      <Match when={props.interaction.kind === "ask_user_questions" && (props.interaction as AskUserQuestionsInteraction).payload.questionSet}>
+        {(questionSet) => (
+          <QuestionSetForm
+            request={props.request}
+            questionSet={questionSet()}
+            submitLabel={(props.interaction as AskUserQuestionsInteraction).payload.submitLabel}
+            busy={busy()}
+            error={error()}
+            onSubmit={respond}
+            onSkip={appQuestion(props.interaction) ? () => run(() => interactionsApi.skip(props.taskId, props.interaction.id)) : undefined}
+          />
+        )}
+      </Match>
       <Match when={props.interaction.kind === "ask_user_questions"}>
         <QuestionForm
           request={props.request}

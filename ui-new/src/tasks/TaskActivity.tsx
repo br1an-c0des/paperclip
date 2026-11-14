@@ -57,6 +57,7 @@ import { useQueueWait } from "@/chat/admission-hold";
 import { WaitLine } from "@/runs/QueueWait";
 import type { QueueWait } from "@/runs/queue-wait";
 import type { LiveRun } from "@/api/heartbeats";
+import { RunToolProgress } from "./ToolCallProgress";
 import { CommentPluginActions, CommentPluginAnnotations } from "@/plugins/CommentPlugins";
 import "./TaskActivity.css";
 
@@ -573,6 +574,8 @@ export function TaskActivity(props: {
                   </Button>
                   {/* What it's doing: a tool, its latest words or a status such as a storage wait (U107). */}
                   <LiveRunStatusLine class="lrs--row" runId={run.id} run={run} active />
+                  {/* A connected-app tool call's live progress (U154). */}
+                  <RunToolProgress taskId={props.taskId} run={run} />
                 </article>
                 );
               }}
