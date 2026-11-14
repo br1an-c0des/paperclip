@@ -1,7 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { pluginsApi, type PluginConfig } from "@/api/plugins";
+import type { PluginConfig } from "@paperclipai/shared";
+import { pluginsApi } from "@/api/plugins";
 import { secretsApi } from "@/api/secrets";
 import { PluginConfigForm } from "./PluginConfigForm";
 import type { JsonSchemaNode } from "./schema-form";
