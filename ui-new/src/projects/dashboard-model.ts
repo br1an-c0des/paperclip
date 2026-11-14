@@ -222,15 +222,15 @@ export function crew(input: {
   return members.sort((a, b) => CREW_ORDER[a.state] - CREW_ORDER[b.state] || name(a.agentId).localeCompare(name(b.agentId)));
 }
 
-/** "2 running · 1 blocked · 1 idle". Queued counts as running. */
+/**
+ * "2 running · 1 waiting · 1 blocked · 1 idle". Since the 2026-11-14 sync (U151) a queued run isn't
+ * counted as running: it waits for its turn.
+ */
 export function crewSummary(members: readonly CrewMember[]) {
   const counts = new Map<string, number>();
-  for (const member of members) {
-    const key = member.state === "queued" ? "running" : member.state;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  const order = ["running", "blocked", "error", "paused", "idle"] as const;
-  const words: Record<(typeof order)[number], string> = { running: "running", blocked: "blocked", error: "in error", paused: "paused", idle: "idle" };
+  for (const member of members) counts.set(member.state, (counts.get(member.state) ?? 0) + 1);
+  const order = ["running", "queued", "blocked", "error", "paused", "idle"] as const;
+  const words: Record<(typeof order)[number], string> = { running: "running", queued: "waiting", blocked: "blocked", error: "in error", paused: "paused", idle: "idle" };
   return order.flatMap((key) => (counts.get(key) ? [`${counts.get(key)} ${words[key]}`] : [])).join(" · ");
 }
 

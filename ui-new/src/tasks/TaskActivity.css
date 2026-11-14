@@ -259,6 +259,19 @@
   font-weight: 700;
 }
 
+/* A run waiting for the agent's slot or to start (U151): quiet, not working yet. */
+.ta-live--waiting {
+  background: var(--well);
+}
+
+.ta-live--waiting .ta-live-who {
+  color: var(--body);
+}
+
+.ta-live-wait {
+  font-size: 14px;
+}
+
 .ta-live-view {
   margin-left: auto;
 }

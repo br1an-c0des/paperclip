@@ -172,10 +172,10 @@ describe("crew", () => {
     expect(crewSummary(members)).toBe("1 running · 1 blocked · 1 paused");
   });
 
-  it("counts a queued run, and an agent with a run but no assigned task", () => {
+  it("counts a queued run as waiting, and an agent with a run but no assigned task", () => {
     const members = crew({ tasks: [task("t1", { status: "todo" })], liveRuns: [run("r1", "a2", "t1", "queued")], agents });
     expect(members).toEqual([{ agentId: "a2", state: "queued", task: expect.objectContaining({ id: "t1" }), runId: "r1", openCount: 0 }]);
-    expect(crewSummary(members)).toBe("1 running");
+    expect(crewSummary(members)).toBe("1 waiting");
   });
 });
 

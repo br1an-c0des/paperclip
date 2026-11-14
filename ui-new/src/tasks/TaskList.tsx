@@ -31,6 +31,7 @@ import {
 import { Assignee, assigneeName, type TaskPeople } from "./people";
 import { NewLabelDialog } from "./NewLabelDialog";
 import { AssigneeItems, LabelDot, LabelItems, PriorityItems, StatusItems } from "./pickers";
+import { WaitingPill } from "@/runs/QueueWait";
 import { RetryMark, type TaskRetry } from "./retry";
 import type { TaskUpdates } from "./task-updates";
 import { assigneeKey } from "./view-state";
@@ -611,7 +612,9 @@ function Row(props: {
           </button>
         </Show>
         <Show when={props.row.live}>
-          <RunningPill compact />
+          <Show when={props.row.waiting} fallback={<RunningPill compact />}>
+            {(waiting) => <WaitingPill waiting={waiting()} />}
+          </Show>
         </Show>
         <Show when={props.row.note}>{(note) => <NotePill note={note()} />}</Show>
         <RetryMark task={task()} retry={props.retry} />

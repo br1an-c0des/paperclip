@@ -42,6 +42,21 @@ describe("buildTaskGroups", () => {
     expect(groups.flatMap((group) => group.rows.map((row) => row.task.id))).toEqual(["parent", "orphan"]);
   });
 
+  it("marks a live row waiting when none of its runs has started (U151)", () => {
+    const waiting = new Map([
+      ["a", { queue: null, label: "Waiting to start" }],
+      ["gone", { queue: null, label: "Waiting to start" }],
+    ]);
+    const rows = buildTaskGroups([task("a", "in_progress"), task("b", "in_progress"), task("c", "todo")], new Set(["a", "b"]), { waiting }).flatMap(
+      (group) => group.rows,
+    );
+    expect(rows.map((row) => [row.task.id, row.live, row.waiting?.label ?? null])).toEqual([
+      ["a", true, "Waiting to start"],
+      ["b", true, null],
+      ["c", false, null],
+    ]);
+  });
+
   it("hangs subtasks under their parent, all the way down, and unfolds the ones asked for", () => {
     const [group] = buildTaskGroups(
       [

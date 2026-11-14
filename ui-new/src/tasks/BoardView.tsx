@@ -15,6 +15,7 @@ import { NewLabelDialog } from "./NewLabelDialog";
 import { assigneeName, type TaskPeople } from "./people";
 import { AssigneeItems, LabelItems, PriorityItems } from "./pickers";
 import { RetryMark, type TaskRetry } from "./retry";
+import { WaitingPill } from "@/runs/QueueWait";
 import type { TaskUpdates } from "./task-updates";
 import { GroupMarkView, hasOpenLayer, latest, NotePill, openMoreOptions, plainClick, QuickAdd } from "./TaskList";
 import { assigneeKey } from "./view-state";
@@ -484,7 +485,9 @@ function Card(props: {
         </Show>
         <Show when={props.row.live}>
           <span class="bv-live">
-            <RunningPill compact />
+            <Show when={props.row.waiting} fallback={<RunningPill compact />}>
+              {(waiting) => <WaitingPill waiting={waiting()} />}
+            </Show>
           </span>
         </Show>
       </div>

@@ -20,7 +20,7 @@ import { AgentAvatar } from "@/ui/Avatar";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { followAppLink, renderMarkdown, useKnownPrefixes, useOptionalNavigate } from "@/ui/Markdown";
-import { admissionHold, type AdmissionRun } from "./admission";
+import { createQueueWait, WaitLine } from "@/runs/QueueWait";
 import type { ReplyTurn } from "./chat-model";
 import { morphChildren } from "./live-morph";
 import { EMPTY_REPLY, mergeEvents, pickReply, prpEventsFromOutput, recentSteps, replyFromEvents, replyFromTranscript, type ReplyEvent } from "./reply-model";
@@ -46,6 +46,11 @@ import { EMPTY_REPLY, mergeEvents, pickReply, prpEventsFromOutput, recentSteps, 
  * Since the 2026-11-10 sync (U120, #20559): while the server admits the reply it already reads
  * "Bob is replying" and "Thinking…", not "about to reply"; only a hold the server names (agent
  * setup, maintenance, a restart) shows in its place (admission.ts).
+ *
+ * Since the 2026-11-14 sync (U151, #21405, #21447, #21564): a reply waiting for one of the agent's
+ * slots reads "Waiting for Bob · 1 slot max · 2 of 3 in line · Configure" in the head, a reply still
+ * queued after 30 seconds with no named hold "Bob · Waiting to start", and the body adds no second
+ * line for the wait (runs/queue-wait.ts).
  */
 
 /** A burst of event signals costs one read. */
@@ -153,8 +158,10 @@ export function LiveReply(props: {
     queryFn: ({ signal }) => runsApi.get(props.turn.runId, signal),
   }));
   const active = () => isActiveRun(props.turn.status) && (!run.data || isActiveRun(run.data.status));
-  // Ordinary admission reads as the reply already under way; only a hold the server names says so (U120).
-  const hold = () => (active() ? admissionHold({ status: run.data?.status ?? props.turn.status, execution: (run.data as { execution?: AdmissionRun["execution"] } | undefined)?.execution }) : null);
+  // Ordinary admission reads as the reply already under way; only a hold the server names says so
+  // (U120), or since U151 the agent's line or "Waiting to start" after 30 s, named once in the head.
+  const waitFor = createQueueWait(() => (active() ? { status: run.data?.status ?? props.turn.status, startedAt: run.data?.startedAt, createdAt: run.data?.createdAt, execution: run.data?.execution } : null));
+  const wait = () => (active() ? waitFor() : null);
   const now = useNow(active);
 
   // The reply streams the run's output and event signals, so the socket asks for its transcript.
@@ -221,10 +228,10 @@ export function LiveReply(props: {
       </span>
       <div class="ch-live" classList={{ "ch-live--done": !active() }}>
         <div class="ch-live-head">
-          <Capsule gradient="ion" size="tiny" live={active()} />
-          <span class="ch-live-who">
-            {active() ? `${props.agent.name} is replying` : `${props.agent.name} replied`}
-          </span>
+          <Capsule gradient="ion" size="tiny" live={active() && !wait()} />
+          <Show when={wait()} fallback={<span class="ch-live-who">{active() ? `${props.agent.name} is replying` : `${props.agent.name} replied`}</span>}>
+            {(found) => (found().kind === "agent" ? <WaitLine wait={found()} /> : <span class="ch-live-who">{`${props.agent.name} · ${found().label}`}</span>)}
+          </Show>
           <span class="ch-muted">{[elapsed(), cost()].filter(Boolean).join(" · ")}</span>
           <div class="ch-live-actions">
             <button type="button" class="ch-pill-btn" onClick={() => commands.openRunModal(props.turn.runId)}>
@@ -289,8 +296,8 @@ export function LiveReply(props: {
             <Show
               when={active() && reply().headline}
               fallback={
-                <Show when={steps().shown.length === 0}>
-                  <p class="ch-muted">{hold() ? `${hold()}…` : active() ? "Thinking…" : "Finishing up…"}</p>
+                <Show when={steps().shown.length === 0 && !wait()}>
+                  <p class="ch-muted">{active() ? "Thinking…" : "Finishing up…"}</p>
                 </Show>
               }
             >

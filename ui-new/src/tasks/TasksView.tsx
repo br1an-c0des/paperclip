@@ -357,7 +357,7 @@ export function TasksView(props: {
     return hideClosed() ? shown.filter((task) => !CLOSED_STATUSES.has(task.status)) : shown;
   });
   const groups = createMemo(() =>
-    buildTaskGroups(sortTasks(visible(), view().sort), people.liveIssueIds(), { groupBy: groupBy(), names }),
+    buildTaskGroups(sortTasks(visible(), view().sort), people.liveIssueIds(), { groupBy: groupBy(), names, waiting: people.waitingTasks() }),
   );
   const columns = createMemo(() => boardColumns(groups(), groupBy(), view().filters, !hideClosed()));
   // The board folds its columns apart from the list's groups, with its own defaults.

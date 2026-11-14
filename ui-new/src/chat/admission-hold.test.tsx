@@ -91,9 +91,34 @@ describe("the chat's Activity column", () => {
 
   it("keeps Starting through ordinary admission", async () => {
     details.get.mockResolvedValue({ id: "w1", status: "queued", execution: ordinary });
-    mount(() => <ChatActivity agent={agent} base="/TES/chat/bob" chatId={null} replyRuns={[]} otherRuns={[live("w1")]} people={people} />);
+    mount(() => <ChatActivity agent={agent} base="/TES/chat/bob" chatId={null} replyRuns={[]} otherRuns={[live("w1", { createdAt: new Date().toISOString() })]} people={people} />);
     await waitFor(() => expect(details.get).toHaveBeenCalled());
     expect(screen.getByText("Starting")).toBeTruthy();
+    expect(screen.getByText("Working now")).toBeTruthy();
+  });
+
+  it("says Waiting to start once ordinary admission has taken 30 seconds (U151, #21447)", async () => {
+    mount(() => <ChatActivity agent={agent} base="/TES/chat/bob" chatId={null} replyRuns={[]} otherRuns={[live("w1", { execution: ordinary })]} people={people} />);
+    expect(screen.getByText("Waiting to start")).toBeTruthy();
+    expect(screen.getByText("Waiting")).toBeTruthy();
+    expect(screen.queryByText("Starting")).toBeNull();
+    // The live row carries its execution, so the run detail isn't read.
+    expect(details.get).not.toHaveBeenCalled();
+  });
+
+  it("shows the agent's line with Configure while its slots are full (U151, #21405)", async () => {
+    const execution = {
+      phase: "queued",
+      label: "Waiting for Bob",
+      cause: "agent_at_capacity",
+      agentQueue: { agentId: "a1", agentName: "Bob", maxConcurrentRuns: 1, runningCount: 1, position: 2, queuedCount: 3 },
+    };
+    mount(() => <ChatActivity agent={agent} base="/TES/chat/bob" chatId={null} replyRuns={[]} otherRuns={[live("w1", { issueId: "t1", execution })]} people={people} />);
+    expect(screen.getByText("Waiting for Bob")).toBeTruthy();
+    expect(screen.getByText("1 slot max")).toBeTruthy();
+    expect(screen.getByText("2 of 3 in line")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Configure Bob's runs at once" }).getAttribute("href")).toBe("/TES/agents/a1/settings/runtime");
+    expect(details.get).not.toHaveBeenCalled();
   });
 
   it("names a queued reply's hold instead of From your message", async () => {
@@ -121,5 +146,25 @@ describe("a task's live run line", () => {
     mount(() => <LiveRunWho run={{ id: "r2", status: "running", agentName: "Bob" }} />);
     expect(screen.getByText("Bob is working")).toBeTruthy();
     expect(details.get).not.toHaveBeenCalled();
+  });
+
+  it("names a routine's hold from the live row itself (U151, #21447)", () => {
+    const execution = { phase: "queued", label: "Waiting for TES-12 to finish", cause: "routine_execution_in_progress" } as never;
+    mount(() => <LiveRunWho run={{ id: "r1", status: "queued", agentName: "Bob", startedAt: null, createdAt: new Date().toISOString(), execution }} />);
+    expect(screen.getByText("Bob · Waiting for TES-12 to finish")).toBeTruthy();
+    expect(details.get).not.toHaveBeenCalled();
+  });
+
+  it("turns Bob is working into Waiting to start when the 30 seconds pass", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-11-14T10:00:10Z"));
+      mount(() => <LiveRunWho run={{ id: "r1", status: "queued", agentName: "Bob", startedAt: null, createdAt: "2026-11-14T10:00:00Z", execution: ordinary as never }} />);
+      expect(screen.getByText("Bob is working")).toBeTruthy();
+      vi.advanceTimersByTime(21_000);
+      expect(screen.getByText("Bob · Waiting to start")).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
