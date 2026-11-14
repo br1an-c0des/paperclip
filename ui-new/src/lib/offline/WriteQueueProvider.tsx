@@ -1,11 +1,10 @@
 import { useQueryClient, type QueryClient } from "@tanstack/solid-query";
 import { createContext, createEffect, onCleanup, useContext, type Accessor, type ParentProps } from "solid-js";
 import { api } from "@/api/client";
-import { casesApi } from "@/api/cases";
+import { useNavigate } from "@solidjs/router";
 import { randomId } from "@/lib/random-id";
-import { pushToast } from "@/ui/Toast";
+import { landNewTask, newTaskFailed } from "@/tasks/new-task-saves";
 import { connectivity } from "./connectivity";
-import { describeError } from "./errors";
 import { createWriteQueue, type WriteQueue } from "./write-runner";
 import { rebaseDocumentSaves, type QueuedWrite, type WriteRequest } from "./write-queue";
 
@@ -14,11 +13,9 @@ import { rebaseDocumentSaves, type QueuedWrite, type WriteRequest } from "./writ
  * sends as the user the session gate has checked with the server since the page loaded.
  *
  * When a queued write lands, what shows it is refreshed before its pending copy goes, so a comment
- * doesn't blink out of the thread between the two. A new task says so in a toast with a link.
+ * doesn't blink out of the thread between the two. A new task says so in a toast with a link, and
+ * one that fails for good goes back to the new-task dialog (tasks/new-task-saves.ts, U153).
  */
-
-const ISSUE_PATH = (prefix: string | undefined, identifier: string | null | undefined, id: string) =>
-  prefix && identifier ? `/${prefix}/issues/${identifier}` : `/issues/${identifier ?? id}`;
 
 function browserStorage(): Storage | null {
   try {
@@ -45,27 +42,21 @@ async function refreshAfter(client: QueryClient, write: QueuedWrite, result: unk
   await Promise.race([Promise.allSettled(refreshes), new Promise((resolve) => setTimeout(resolve, 4_000))]);
 }
 
-function onLanded(client: QueryClient, write: QueuedWrite, result: unknown, storage: Storage | null) {
+async function onLanded(client: QueryClient, write: QueuedWrite, result: unknown, storage: Storage | null, navigate?: (href: string) => void) {
   const row = (result ?? {}) as Record<string, unknown>;
   if (write.kind === "document" && storage) rebaseDocumentSaves(storage, write, typeof row.latestRevisionId === "string" ? row.latestRevisionId : null);
-  if (write.kind === "task" && typeof row.id === "string") {
-    const ref = typeof row.identifier === "string" ? row.identifier : "the task";
-    const prefix = write.after?.issuePrefix;
-    pushToast({
-      tone: "success",
-      title: `Created ${ref}`,
-      body: typeof row.title === "string" ? `Saved while offline: ${row.title}` : undefined,
-      action: { label: `Open ${ref}`, href: ISSUE_PATH(prefix, row.identifier as string | null, row.id) },
-    });
-    const link = write.after?.caseLink;
-    if (link) {
-      void casesApi
-        .link(link.caseId, row.id, link.role as Parameters<typeof casesApi.link>[2])
-        .then(() => client.invalidateQueries({ queryKey: ["cases", write.companyId] }))
-        .catch((error: unknown) => pushToast({ tone: "warn", title: `Created ${ref}, but couldn't add it to the case`, body: describeError(error) }));
-    }
-  }
+  // A new task's files, case, toast and Create and open (tasks/new-task-saves.ts, U153).
+  if (write.kind === "task") await landNewTask(client, write, result, navigate);
   return refreshAfter(client, write, result);
+}
+
+/** The router's navigate, or none outside a router (a component rendered on its own in a test). */
+function optionalNavigate() {
+  try {
+    return useNavigate();
+  } catch {
+    return undefined;
+  }
 }
 
 const QueueContext = createContext<WriteQueue>();
@@ -73,15 +64,17 @@ const QueueContext = createContext<WriteQueue>();
 export function WriteQueueProvider(props: ParentProps<{ userId: Accessor<string | null>; verified: Accessor<boolean> }>) {
   const client = useQueryClient();
   const storage = browserStorage();
+  const navigate = optionalNavigate();
   const queue = createWriteQueue({
     storage,
     transport,
     connectivity,
-    onLanded: (write, result) => onLanded(client, write, result, storage),
+    onLanded: (write, result) => onLanded(client, write, result, storage, navigate),
     // A write that failed for good: what showed it as done (a document's offline edit) goes back
     // to what the server has.
     onFailed: (write) => {
       for (const queryKey of [...write.refresh, ...(write.store ? [write.store] : [])]) void client.invalidateQueries({ queryKey });
+      if (write.kind === "task") newTaskFailed(write);
     },
   });
   createEffect(() => queue.setUser(props.userId(), props.verified()));

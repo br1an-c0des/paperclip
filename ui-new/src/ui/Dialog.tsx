@@ -84,6 +84,10 @@ export function Dialog(props: DialogProps) {
             data-mode={layerMode()}
             class={props.class ? `dialog ${props.class}` : "dialog"}
             onCloseAutoFocus={restoreFocus}
+            // A toast's action (Retry on a task that failed to save, U153) isn't a click away.
+            onInteractOutside={(event: Event) => {
+              if (event.target instanceof Element && event.target.closest(".toast")) event.preventDefault();
+            }}
             onOpenAutoFocus={(event: Event) => {
               const target = props.initialFocus?.();
               if (!target) return;

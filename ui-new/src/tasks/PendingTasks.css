@@ -1,0 +1,55 @@
+/* New tasks still being saved, above the task list (PendingTasks.tsx, U153). */
+
+.pt {
+  padding: 6px 8px;
+  margin-bottom: 12px;
+}
+
+.pt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pt-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  min-height: 40px;
+  padding: 4px 8px;
+}
+
+.pt-row + .pt-row {
+  border-top: 1px solid var(--line);
+}
+
+.pt-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.pt-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pt-row .ow-status {
+  flex: 0 1 auto;
+}
+
+.pt-row .ow-text {
+  flex: 0 1 auto;
+}
+
+.pt-row--failed .pt-title {
+  color: var(--text);
+}
