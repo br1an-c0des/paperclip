@@ -1,6 +1,7 @@
 import type { Approval, IssueExecutionStagePrincipal, IssueExecutionState, IssueStatus, IssueThreadInteraction } from "@paperclipai/shared";
 import type { CompanyJoinRequest } from "@/api/access";
 import type { DecisionOutcome } from "@/api/decisions";
+import { appQuestion } from "./question-set";
 
 /*
  * The request view model (proposals/unifying-requests.md, "Proposed model: requests"): anything
@@ -214,7 +215,7 @@ function classify(interaction: IssueThreadInteraction): Classified {
         shape: "form",
         outcome: "return",
         acts: false,
-        askVerb: questions.length > 1 ? `asks you ${questions.length} questions` : "asks you",
+        askVerb: appQuestion(interaction) ? `passes on a question from ${appQuestion(interaction)!.app}` : questions.length > 1 ? `asks you ${questions.length} questions` : "asks you",
         title: interaction.payload.title?.trim() || titled(single?.prompt ?? `Answer ${questions.length} questions`),
         body: interaction.summary ?? null,
       };
@@ -319,9 +320,13 @@ function nextLine(c: Classified, interaction: IssueThreadInteraction, asker: str
       if (payload?.purpose === "ai") return `Once ${asker} has a working AI connection, the task resumes on its own.`;
       return `Connecting lets ${asker} use the app, then it continues. Access is added for this agent only.`;
     }
-    default:
+    default: {
       if (c.acts) return `Approving applies it now, then tells ${asker}.`;
+      // An app's question (U155): the answer, or a skip, reaches the app on the agent's next call.
+      const app = appQuestion(interaction)?.app;
+      if (app) return `Your answer goes to ${app} when ${asker} tries again. Skip tells ${app} no.`;
       return `Your answer goes to ${asker}${continues}.`;
+    }
   }
 }
 
@@ -476,7 +481,12 @@ export function settledLines(interaction: IssueThreadInteraction, ctx: RequestCo
     if (interaction.status === "failed") {
       return { verdict: { text: "Failed", tone: "bad", at }, result: typeof result?.reason === "string" ? { text: result.reason, tone: "bad" } : null };
     }
-    return { verdict: { text: endedText ?? (interaction.status === "expired" ? "Expired without an answer" : "Cancelled"), tone: "muted", at }, result: null };
+    const verdict = { text: endedText ?? (interaction.status === "expired" ? "Expired without an answer" : "Cancelled"), tone: "muted", at } as const;
+    // An app's question (U155): a skip reaches the app as a decline; the server says why it ended otherwise.
+    const app = appQuestion(interaction)?.app;
+    if (app && result?.outcome === "skipped") return { verdict: { ...verdict, text: `${by} skipped it` }, result: { text: `${app} is told you declined`, tone: "muted" } };
+    if (app && typeof result?.reason === "string" && result.reason.trim()) return { verdict: { ...verdict, text: "Ended without an answer" }, result: { text: result.reason.trim(), tone: "muted" } };
+    return { verdict, result: null };
   }
 
   if (interaction.kind === "request_confirmation" && interaction.result?.toolAction) {
@@ -501,14 +511,21 @@ export function settledLines(interaction: IssueThreadInteraction, ctx: RequestCo
   }
 
   if (interaction.kind === "ask_user_questions" && interaction.status === "answered") {
-    const options = new Map(interaction.payload.questions.flatMap((question) => question.options.map((option) => [option.id, option.label] as const)));
+    // A written answer's placeholder option ("Type an answer") isn't part of the answer; a question
+    // set's own labels win (U155).
+    const options = new Map([
+      ...(interaction.payload.questions ?? []).flatMap((question) => question.options.filter((option) => !option.freeText).map((option) => [option.id, option.label] as const)),
+      ...(interaction.payload.questionSet?.questions ?? []).flatMap((question) => (question.options ?? []).map((option) => [`${question.id}\u0000${option.id}`, option.label] as const)),
+    ]);
+    const freeText = new Set((interaction.payload.questions ?? []).flatMap((question) => question.options.filter((option) => option.freeText).map((option) => option.id)));
+    const app = appQuestion(interaction)?.app;
     const picked = (interaction.result?.answers ?? []).flatMap((answer) => [
-      ...answer.optionIds.map((id) => options.get(id) ?? id),
+      ...answer.optionIds.filter((id) => !freeText.has(id)).map((id) => options.get(`${answer.questionId}\u0000${id}`) ?? options.get(id) ?? id),
       ...(answer.otherText?.trim() ? [answer.otherText.trim()] : []),
     ]);
     return {
       verdict: { text: picked.length > 0 ? `${by} answered ${picked.join(", ")}` : `${by} answered`, tone: "ok", at },
-      result: { text: `Sent to ${asker}`, tone: "muted" },
+      result: { text: `Sent to ${app ?? asker}`, tone: "muted" },
     };
   }
 
