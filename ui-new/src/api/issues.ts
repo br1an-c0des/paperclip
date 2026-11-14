@@ -20,6 +20,7 @@ import type {
   IssueWorkProduct,
   ExecutionProjection,
   TaskInterruptionPresentation,
+  ToolCallProgressSnapshot,
   WorkspaceSourceInspection,
 } from "@paperclipai/shared";
 import { api } from "./client";
@@ -329,7 +330,11 @@ export const issuesApi = {
       );
     }
     return Object.assign({}, ...(await Promise.all(batches)).map((batch) => batch.summaries)) as Record<string, ExternalObjectSummary>;
-  },
+  },  /**
+   * The latest progress of the task's running connected-app tool calls, and those that finished in
+   * the last hour marked `done` (U154, upstream #21449), for a page opened mid-call. Board only.
+   */
+  toolCallProgress: (issueId: string, signal?: AbortSignal) => api.get<ToolCallProgressSnapshot[]>(`/issues/${issueId}/tool-call-progress`, { signal }),
 };
 
 /** What `POST /issues/:id/retry` answers, as ui/src/api/issues.ts types it. */

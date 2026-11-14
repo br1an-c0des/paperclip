@@ -53,6 +53,7 @@ import { compactionDetail, compactionRunIds, runsToRead, useRunCompactions } fro
 import { contextUsageQuery } from "./TaskContext";
 import { CopyMessage } from "./CopyMessage";
 import { LiveRunStatusLine } from "./LiveRunStatus";
+import { RunToolProgress } from "./ToolCallProgress";
 import { useQueuedHold } from "@/chat/admission-hold";
 import { CommentPluginActions, CommentPluginAnnotations } from "@/plugins/CommentPlugins";
 import "./TaskActivity.css";
@@ -564,6 +565,8 @@ export function TaskActivity(props: {
                   </Button>
                   {/* What it's doing: a tool, its latest words or a status such as a storage wait (U107). */}
                   <LiveRunStatusLine class="lrs--row" runId={run.id} run={run} active />
+                  {/* A connected-app tool call's live progress (U154). */}
+                  <RunToolProgress taskId={props.taskId} run={run} />
                 </article>
               )}
             </For>

@@ -14,6 +14,8 @@ import { costLabel, elapsedLabel, isActiveRun, runUsage } from "@/runs/run-model
 import { buildItems } from "@/runs/transcript-model";
 import type { Plan } from "@/runs/activity-model";
 import { LiveRunStatusLine } from "@/tasks/LiveRunStatus";
+import { ToolProgressLine, useToolCallProgress } from "@/tasks/ToolCallProgress";
+import { pickProgress } from "@/tasks/tool-call-progress";
 import { decoratePreviewLinks, PreviewMarks, type PreviewLink } from "@/tasks/LinkPreview";
 import { stopLabel, stopRun } from "@/tasks/run-stop";
 import { AgentAvatar } from "@/ui/Avatar";
@@ -23,7 +25,7 @@ import { followAppLink, renderMarkdown, useKnownPrefixes, useOptionalNavigate } 
 import { admissionHold, type AdmissionRun } from "./admission";
 import type { ReplyTurn } from "./chat-model";
 import { morphChildren } from "./live-morph";
-import { EMPTY_REPLY, mergeEvents, pickReply, prpEventsFromOutput, recentSteps, replyFromEvents, replyFromTranscript, type ReplyEvent } from "./reply-model";
+import { EMPTY_REPLY, mergeEvents, pickReply, prpEventsFromOutput, recentSteps, replyFromEvents, replyFromTranscript, type ReplyEvent, type ReplyStep } from "./reply-model";
 
 /*
  * The agent's reply while it's being written (board 13): a blue card with "Bob is replying", the
@@ -46,6 +48,9 @@ import { EMPTY_REPLY, mergeEvents, pickReply, prpEventsFromOutput, recentSteps, 
  * Since the 2026-11-10 sync (U120, #20559): while the server admits the reply it already reads
  * "Bob is replying" and "Thinking…", not "about to reply"; only a hold the server names (agent
  * setup, maintenance, a restart) shows in its place (admission.ts).
+ *
+ * Since the 2026-11-14 sync (U154, #21449): a long connected-app tool call shows its live progress
+ * under its running step (tasks/ToolCallProgress.tsx).
  */
 
 /** A burst of event signals costs one read. */
@@ -171,6 +176,13 @@ export function LiveReply(props: {
   });
   const reply = createMemo(() => pickReply(fromOutputEvents(), fromStoredEvents(), fromTranscript()));
   const steps = createMemo(() => recentSteps(reply().steps));
+  // A connected-app tool call's live progress, under its running step (U154).
+  const toolProgress = useToolCallProgress({
+    runId: () => props.turn.runId,
+    issueId: () => (typeof run.data?.contextSnapshot?.issueId === "string" ? run.data.contextSnapshot.issueId : null),
+    wanted: () => active() && steps().shown.some((step) => step.state === "running" && !!step.tool),
+  });
+  const stepProgress = (step: ReplyStep) => (step.state === "running" && step.tool ? pickProgress(toolProgress(), step.tool, props.turn.runId) : null);
   // `//PAP/...` links to a known company open in the board (U86), as in a finished message.
   const prefixes = useKnownPrefixes(company);
   const html = createMemo(() => (reply().text ? renderMarkdown(reply().text, { knownPrefixes: prefixes() }) : ""));
@@ -260,17 +272,26 @@ export function LiveReply(props: {
             </Show>
             <For each={steps().shown}>
               {(step) => (
-                <li class="ch-step" data-state={step.state}>
-                  <span class="ch-step-mark" aria-hidden="true">
-                    {step.state === "done" ? "✓" : step.state === "error" ? "✕" : "›"}
-                  </span>
-                  <span class="ch-step-label">{step.label}</span>
-                  <span class="ch-step-detail">{step.detail}</span>
-                  <Show when={step.meta}>
-                    <span class="ch-step-meta">{step.meta}</span>
+                <>
+                  <li class="ch-step" data-state={step.state}>
+                    <span class="ch-step-mark" aria-hidden="true">
+                      {step.state === "done" ? "✓" : step.state === "error" ? "✕" : "›"}
+                    </span>
+                    <span class="ch-step-label">{step.label}</span>
+                    <span class="ch-step-detail">{step.detail}</span>
+                    <Show when={step.meta}>
+                      <span class="ch-step-meta">{step.meta}</span>
+                    </Show>
+                    <span class="sr-only">{step.state === "running" ? "(going)" : step.state === "error" ? "(failed)" : "(done)"}</span>
+                  </li>
+                  <Show when={stepProgress(step)}>
+                    {(progress) => (
+                      <li class="ch-step-progress">
+                        <ToolProgressLine progress={progress()} class="tcp--step" />
+                      </li>
+                    )}
                   </Show>
-                  <span class="sr-only">{step.state === "running" ? "(going)" : step.state === "error" ? "(failed)" : "(done)"}</span>
-                </li>
+                </>
               )}
             </For>
           </ul>

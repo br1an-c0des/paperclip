@@ -160,6 +160,8 @@ export const queryKeys = {
       ["org", companyId, "bulk-catalog", agentIds.join(","), binding ?? "current"] as const,
   }),
   liveRuns: (companyId: string) => ["live-runs", companyId] as const,
+  /** A task's running connected-app tool calls' saved progress (U154); live events don't refresh it. */
+  toolCallProgress: (issueId: string) => ["tool-call-progress", issueId] as const,
   /**
    * One run, for the run modal. The live-events socket refreshes `["heartbeat-run", runId]` on
    * `heartbeat.run.status`, so the run's events and trace refresh with it.

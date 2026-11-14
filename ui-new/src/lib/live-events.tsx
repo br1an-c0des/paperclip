@@ -256,7 +256,8 @@ export function keysForEvent(companyId: string, event: LiveEvent, viewer?: LiveV
     // Run logs and events stream to subscribers only (the run modal and chat read them).
     // `heartbeat.run.activity` is the server's throttled "a run produced output" hint, sent instead
     // of transcripts for runs no view asked for (`useRunInterest`). `heartbeat.run.tool_progress`
-    // (#21449) is a connected-app tool call's live progress; nothing reads it yet (U154).
+    // (#21449) is a connected-app tool call's live progress, sent like transcripts only for runs a
+    // view holds; tasks/ToolCallProgress.tsx reads it (U154).
     case "heartbeat.run.log":
     case "heartbeat.run.event":
     case "heartbeat.run.activity":

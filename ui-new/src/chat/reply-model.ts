@@ -3,6 +3,7 @@ import { toolDuration } from "@/runs/activity-model";
 import { latestReasoningHeadline } from "@/runs/reasoning-summary";
 import { createRunnerTranscriptParser } from "@/runs/runner-entries";
 import { buildItems, latestPlan, runHealth, type TranscriptItem } from "@/runs/transcript-model";
+import { wrappedAppToolName, type ToolRow } from "@/tasks/tool-call-progress";
 
 /*
  * The live reply (board 13): while the agent's run is going, the chat shows the steps it has taken
@@ -38,6 +39,8 @@ export type ReplyStep = {
   state: "running" | "done" | "error";
   /** How it went, after the detail: "exit 1 · 2.3s", "blocked", "2 steps". */
   meta?: string;
+  /** A tool call's names and gateway id, to find its live progress (U154, tasks/tool-call-progress.ts). */
+  tool?: ToolRow;
 };
 
 export type LiveReply = {
@@ -169,6 +172,7 @@ function toolStep(tool: Extract<TranscriptItem, { kind: "tool" }>): ReplyStep {
     detail: short(tool.step === "command" && tool.title ? `$ ${tool.title}` : tool.title),
     state: tool.blocked ? "error" : tool.status,
     ...(meta ? { meta } : {}),
+    tool: { names: [tool.name, wrappedAppToolName(tool.name, tool.input)], invocationId: tool.refs?.invocationId ?? null },
   };
 }
 
