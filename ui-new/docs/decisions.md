@@ -1767,6 +1767,10 @@ Both are handled in `ui-new` for now.
   ("Bob · Waiting for agent setup") read `GET /heartbeat-runs/:id` under the shared run-detail key
   while a row is queued, with a 15-second fallback; nothing is read for running rows, so a provider
   wait on a running run still shows only in the chat's reply card.
+  **Corrected Nov 14 (round 9, U151):** the premise was wrong. `GET /companies/:id/live-runs` has
+  carried each run's `execution` since about Oct 1 (`efc2e6810e`). `chat/admission-hold.ts` now
+  reads the row's own execution and reads the run detail only for rows without it, so deep queues
+  no longer cost one request per queued run.
 - **Pull request previews (U113).** Previews aren't kept across a reload: the old UI keeps them in
   its persisted query cache (#20654), and `ui-new`'s `lib/offline/persisted-cache.ts` allowlist
   doesn't include `link-preview` yet, so a reload shows the plain mark until the next hover. A
