@@ -51,6 +51,8 @@ import { PoolPage } from "./pools/Pools";
 import { BrowserUsePanel, RailwayPanel, TestCallDialog } from "./TestCall";
 import { appPanel } from "./test-call-model";
 import { poolPluginKey } from "./pools/pool-model";
+import { MachineSignInCard } from "./MachineSignIn";
+import { usesMachineSignIn } from "./machine-sign-in-model";
 import { AgentAccessPicker, AppLogo, failureText, StateTag, useApplications, useGallery, useRefreshTools } from "./shared";
 
 /*
@@ -62,7 +64,8 @@ import { AgentAccessPicker, AppLogo, failureText, StateTag, useApplications, use
  *   on every run (installs) stay allowed. An AI account's agents are its installs.
  * - Review: its Ask-first calls waiting for your OK, and new actions the server held back until
  *   someone reviews them.
- * - Settings: its name, pausing it, a health check, its details, and disconnecting it (which revokes
+ * - Settings: its name, pausing it, a health check, machine sign-in (status, Test, rotation:
+ *   src/apps/MachineSignIn.tsx) when it uses it, its details, and disconnecting it (which revokes
  *   its credentials).
  *
  * A connection that needs attention offers to sign in again or replace its key. The OAuth return
@@ -651,6 +654,12 @@ function ReconnectCard(props: { connection: ToolConnection; methods: ConnectionM
           <Match when={!props.canConfigure}>
             <p class="cx-note">Only a connection manager can restore it.</p>
           </Match>
+          {/* Machine sign-in has no browser sign-in to repeat: its test, on Settings, restores it. */}
+          <Match when={usesMachineSignIn(props.connection)}>
+            <A class={buttonClass({ variant: "primary", size: "compact" })} href={`/${company().issuePrefix}/connections/${props.connection.id}/settings`}>
+              {isDraft() ? "Finish machine sign-in" : "Test machine sign-in"}
+            </A>
+          </Match>
           <Match when={isDraft() && slug()}>
             <A
               class={buttonClass({ variant: "primary", size: "compact" })}
@@ -716,7 +725,12 @@ function ReconnectCard(props: { connection: ToolConnection; methods: ConnectionM
 }
 
 function connectionStateMessage(connection: ToolConnection) {
-  if (connection.status === "draft") return "Setup stopped before it finished. Agents can't use it yet.";
+  if (connection.status === "draft") {
+    return usesMachineSignIn(connection)
+      ? "Machine sign-in isn't tested yet. Agents can't use it until a test passes."
+      : "Setup stopped before it finished. Agents can't use it yet.";
+  }
+  if (usesMachineSignIn(connection)) return connection.healthMessage ?? connection.lastError ?? "Test its machine sign-in to restore access.";
   return connection.healthMessage ?? connection.lastError ?? (connection.authKind === "oauth" ? "Sign in again to restore access." : "Replace the key to restore access.");
 }
 
@@ -800,6 +814,10 @@ function ConnectionSettings(props: { connection: ToolConnection; name: string; c
           </div>
         </SettingsRow>
       </SettingsCard>
+
+      <Show when={usesMachineSignIn(props.connection)}>
+        <MachineSignInCard connection={props.connection} canConfigure={props.canConfigure} />
+      </Show>
 
       <SettingsCard title="Details">
         <SettingsRow label="Kind">
@@ -890,6 +908,9 @@ function kindLabel(connection: ToolConnection) {
             : connection.transport === "chat_sdk"
               ? "Chat endpoint"
               : "Voice";
-  const auth = connection.authKind === "oauth" ? "signed in with OAuth" : connection.authKind === "api_key" ? "with a key" : "no sign-in";
+  const auth = usesMachineSignIn(connection)
+    ? "machine sign-in"
+    : connection.authKind === "oauth"
+      ? "signed in with OAuth" : connection.authKind === "api_key" ? "with a key" : "no sign-in";
   return `${transport}, ${auth}`;
 }

@@ -548,6 +548,161 @@ a.ap-row-name:hover {
   width: 100%;
 }
 
+/* Your own MCP server: the sign-in line, its choices and machine sign-in (Connect.tsx, MachineSignIn.tsx) */
+.ap-signin {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-inner);
+  background: var(--well);
+}
+
+.ap-signin-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.ap-signin-summary {
+  color: var(--body);
+  font-size: 14px;
+}
+
+.ap-signin-change,
+.ap-signin-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.ap-signin-link {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.ap-signin-change:disabled {
+  color: var(--muted);
+  cursor: default;
+  text-decoration: none;
+}
+
+.ap-signin-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ap-signin-options .cx-option {
+  background: var(--ground);
+}
+
+.ap-signin-options .cx-option--on {
+  background: var(--run-bg);
+}
+
+/* A radio card with its "i" outside the label (shared.tsx ChoiceCard) */
+.ap-choice {
+  padding: 0 12px 0 0;
+  cursor: default;
+}
+
+.ap-choice-label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 42px;
+  padding: 6px 0 6px 12px;
+  cursor: pointer;
+}
+
+.ap-choice-label input {
+  accent-color: var(--run-fg);
+}
+
+.ap-choice-label .cx-option-name {
+  white-space: normal;
+}
+
+.ap-signin-fields {
+  padding: 12px 4px 6px;
+}
+
+.ap-signin-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ap-machine {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ap-machine-methods {
+  max-height: none;
+}
+
+.ap-machine-register {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ap-machine-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ap-machine-keys .tl-copy pre {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.ap-machine-details summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ap-machine-details[open] summary {
+  margin-bottom: 10px;
+}
+
+.ap-machine-rotate {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ap-machine-service {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .ap-signin-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Review */
 .ap-request {
   display: flex;

@@ -1,27 +1,33 @@
-import type { AppDefinition, ConnectToolApp, ConnectionMethodDef, FieldDef } from "@paperclipai/shared";
+import type { AppDefinition, ConnectToolApp, ConnectToolAppResult, ConnectionMethodDef, FieldDef, MachineSignInSetupResult } from "@paperclipai/shared";
 import { A, Navigate, useNavigate } from "@solidjs/router";
 import { createMutation } from "@tanstack/solid-query";
 import { ExternalLink, Plus, Trash2 } from "lucide-solid";
-import { createEffect, createMemo, createSignal, For, Index, Match, on, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Index, Match, on, Show, Switch, type JSX } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { toolsApi, type VercelConnectAvailability } from "@/api/tools";
 import { useCompany } from "@/lib/company";
 import { Button, buttonClass } from "@/ui/Button";
 import { Field, TextArea, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Markdown } from "@/ui/Markdown";
-import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
 import {
   acceptsOwnOAuthClient,
   accessInstalls,
+  BYO_SIGN_IN_OPTIONS,
+  byoAuthChange,
+  byoFailureFocus,
   byoPayload,
   byoProblem,
+  byoSignInProblem,
+  byoSignInSummary,
   canSetUp,
   configFields,
   connectFailure,
   connectionRows,
   connectPayload,
   connectProblem,
+  defaultServerName,
   errorCode,
   finishDefaults,
   methodTitle,
@@ -38,13 +44,15 @@ import {
   type ByoDraft,
   type ConnectDraft,
 } from "./apps-model";
-import { AgentAccessPicker, AppLogo, StateTag, useApplications, useConnections, useGallery, useRefreshTools } from "./shared";
+import { AgentAccessPicker, AppLogo, ChoiceCard, StateTag, useApplications, useConnections, useGallery, useRefreshTools } from "./shared";
 import { channelMethod, chatConnectHref } from "./chat/chat-model";
 import { AggregatorConnect } from "./setups/AggregatorConnect";
 import { setupExtras, type GalleryExtras } from "./setups/SetupExtras";
 import { isAggregator } from "./setups/setups-model";
 import { isSheetsRobotMethod } from "./setups/extras-model";
 import { NewPool } from "./pools/Pools";
+import { CopyBlock } from "./advanced/parts";
+import { MachineSignInSetup } from "./MachineSignIn";
 
 /*
  * Connecting an app (the old UI's AppsConnect and ConnectionSetupFlow, on a page):
@@ -55,7 +63,8 @@ import { NewPool } from "./pools/Pools";
  *   and the risky ones set to ask first). OAuth saves the choices, then leaves for the provider's
  *   sign-in; the server sends you back to the connection's page.
  * - Your own MCP server (`/connections/byo`): paste its address; Paperclip probes it, or you say how it
- *   signs in (a key, headers, or your own OAuth app).
+ *   signs in (a key, headers, browser sign-in with your own client ID, none, or machine sign-in for
+ *   automation the organization owns: src/apps/MachineSignIn.tsx).
  * - Vercel Connect (`/connections/vercel-connect?source=<slug>`): the apps Vercel has reviewed, connected
  *   with a connector made in Vercel. Paperclip keeps only the connector's reference; the form asks
  *   for its UID instead of a key, address or OAuth app.
@@ -72,8 +81,20 @@ import { NewPool } from "./pools/Pools";
 
 type ConnectOutcome = { kind: "done"; connectionId: string } | { kind: "redirect" };
 
+/** Turns a connected app on (every action, the risky ones asking first) and saves who may use it. */
+async function finishConnected(companyId: string, result: ConnectToolAppResult, access: AccessDraft, agentInstructions?: ConnectToolApp["agentInstructions"]) {
+  const defaults = finishDefaults(result);
+  await toolsApi.finishApp(companyId, result.connectionId, {
+    enabledCatalogEntryIds: defaults.enabled,
+    askFirstCatalogEntryIds: defaults.askFirst,
+    ...(agentInstructions ? { agentInstructions } : {}),
+    access: access.mode === "all" ? "all_agents" : { agentIds: [...access.agentIds] },
+  });
+  await toolsApi.putInstalls(result.connectionId, accessInstalls(companyId, access));
+}
+
 /** Connect, then finish or leave for sign-in. Shared by the gallery and your-own-server forms. */
-function useConnectFlow(onFailure: (message: string) => void) {
+function useConnectFlow(onFailure: (message: string, code: string | null) => void) {
   const company = useCompany();
   const navigate = useNavigate();
   const refresh = useRefreshTools();
@@ -97,14 +118,7 @@ function useConnectFlow(onFailure: (message: string) => void) {
         window.location.assign(start.authorizationUrl);
         return { kind: "redirect" };
       }
-      const defaults = finishDefaults(result);
-      await toolsApi.finishApp(company().id, result.connectionId, {
-        enabledCatalogEntryIds: defaults.enabled,
-        askFirstCatalogEntryIds: defaults.askFirst,
-        ...(input.payload.agentInstructions ? { agentInstructions: input.payload.agentInstructions } : {}),
-        access: input.access.mode === "all" ? "all_agents" : { agentIds: [...input.access.agentIds] },
-      });
-      await toolsApi.putInstalls(result.connectionId, installs);
+      await finishConnected(company().id, result, input.access, input.payload.agentInstructions);
       return { kind: "done", connectionId: result.connectionId };
     },
     onSuccess: (outcome) => {
@@ -116,7 +130,8 @@ function useConnectFlow(onFailure: (message: string) => void) {
     },
     onError: (error) => {
       void refresh();
-      onFailure(connectFailure(errorCode(error), error instanceof Error ? error.message : null));
+      const code = errorCode(error);
+      onFailure(connectFailure(code, error instanceof Error ? error.message : null), code);
     },
   }));
 }
@@ -638,69 +653,89 @@ function FieldInput(props: { field: FieldDef; value: string | boolean; onChange:
 
 // ---------------------------------------------------------------------------------------------
 
-const AUTH_OPTIONS: { value: ByoAuth; label: string }[] = [
-  { value: "auto", label: "Detect" },
-  { value: "none", label: "None" },
-  { value: "bearer", label: "Key" },
-  { value: "custom_headers", label: "Headers" },
-  { value: "oauth", label: "OAuth app" },
-];
-
-const AUTH_HELP: Record<ByoAuth, string> = {
-  auto: "Paperclip checks the server and signs in if it offers a sign-in Paperclip can complete.",
-  none: "The server is public and needs no sign-in.",
-  bearer: "Sent as a bearer token in the Authorization header.",
-  custom_headers: "Headers the server's docs list, such as X-API-Key. Values are kept as secrets.",
-  oauth: "An OAuth app you registered with the provider, for servers that don't let Paperclip register itself.",
+/** Extra guidance for an option's fields, behind the option's "i" with its description. */
+const SIGN_IN_TIPS: Partial<Record<ByoAuth, string>> = {
+  bearer: "Grant the key access to what your agents need. Paperclip can't increase its permissions.",
+  custom_headers: "Values are stored as secrets and can't be read back.",
 };
 
+const MACHINE_TIP =
+  "Your organization's automation signs in as its own registered client, so no person signs in. For connections shared with the organization, which this one is.";
+
+/*
+ * Your own MCP server (`/connections/byo`), after upstream #21469's sign-in step: the address alone
+ * is the default path. How the server signs in is a stated default with Change; the choices are
+ * radio cards with each one's fields right below it, and the choice stays open while the picked
+ * option still needs something typed, so a disabled Connect always has its reason on screen.
+ * Machine sign-in (MachineSignIn.tsx) is a sixth choice with its own footer: it creates a draft,
+ * then tests it, instead of connecting at once.
+ */
 export function ByoConnect() {
   const company = useCompany();
+  const navigate = useNavigate();
+  const refresh = useRefreshTools();
   const gallery = useGallery();
   const [draft, setDraft] = createStore<ByoDraft>(newByoDraft());
   const [failure, setFailure] = createSignal<string | null>(null);
-  const flow = useConnectFlow(setFailure);
+  const [choosing, setChoosing] = createSignal(false);
+  const [clientFields, setClientFields] = createSignal(false);
+  const [machine, setMachine] = createSignal(false);
+  const [machineSetup, setMachineSetup] = createSignal<MachineSignInSetupResult | null>(null);
+  const flow = useConnectFlow((message, code) => {
+    setFailure(message);
+    // The server's answer says where to look: the key, or a client you register yourself.
+    const focus = byoFailureFocus(code);
+    if (focus === "key") {
+      if (draft.auth === "auto") setDraft("needsKey", true);
+      setChoosing(true);
+    } else if (focus === "client") {
+      setDraft(byoAuthChange(draft, "oauth"));
+      setClientFields(true);
+      setChoosing(true);
+    }
+  });
   const problem = () => byoProblem(draft);
+  const needsInput = () => !machine() && (draft.auth === "bearer" || draft.auth === "custom_headers") && Boolean(byoSignInProblem(draft));
+  const expanded = () => choosing() || needsInput() || machine();
+  const showClientFields = () => clientFields() || Boolean(draft.oauthClientId.trim() || draft.oauthClientSecret.trim());
+  const base = () => `/${company().issuePrefix}/connections`;
+
+  const pick = (auth: ByoAuth) => {
+    setMachine(false);
+    setFailure(null);
+    setDraft(byoAuthChange(draft, auth));
+  };
   const submit = (event: Event) => {
     event.preventDefault();
-    if (problem()) return;
+    if (machine() || problem()) return;
     setFailure(null);
     flow.mutate({ payload: byoPayload(draft), access: draft.access });
   };
+  const machineConnected = async (result: ConnectToolAppResult) => {
+    await finishConnected(company().id, result, draft.access);
+    void refresh();
+    pushToast({ title: "Connected", body: "Machine sign-in works. Review its actions and who can use it.", tone: "success" });
+    navigate(`${base()}/${result.connectionId}/permissions`);
+  };
 
-  return (
-    <form class="card ap-connect" onSubmit={submit}>
-      <header class="ap-connect-head">
-        <div class="ap-connect-title">
-          <h2 class="disp">Connect your own MCP server</h2>
-          <p>Any remote MCP server reachable from this Paperclip. You choose which of its tools agents may use once it's connected.</p>
-        </div>
-      </header>
+  const keyInput = (id: string, label: string) => (
+    <TextInput id={id} aria-label={label} type="password" autocomplete="new-password" placeholder="Paste the key or token" value={draft.key} onInput={(event) => setDraft("key", event.currentTarget.value)} />
+  );
+  const accessField = () => (
+    <Field label="Which agents can use it">
+      <AgentAccessPicker
+        value={draft.access}
+        onChange={(next) => setDraft("access", next)}
+        disabled={flow.isPending}
+        allDescription="Current and future agents can use it, and carry its tools on every run."
+      />
+    </Field>
+  );
 
-      <Field label="Server address" for="ap-byo-link" help="For example https://mcp.example.com/mcp.">
-        <TextInput
-          id="ap-byo-link"
-          type="url"
-          placeholder="https://"
-          autocomplete="off"
-          value={draft.link}
-          onInput={(event) => setDraft("link", event.currentTarget.value)}
-        />
-      </Field>
-      <Field label="Name (optional)" for="ap-byo-name" help="Defaults to the server's address.">
-        <TextInput id="ap-byo-name" maxLength={160} value={draft.name} onInput={(event) => setDraft("name", event.currentTarget.value)} />
-      </Field>
-
-      <Field label="Sign-in" help={AUTH_HELP[draft.auth]}>
-        <Segmented label="Sign-in" options={AUTH_OPTIONS} value={draft.auth} onChange={(value) => setDraft("auth", value)} />
-      </Field>
-
-      <Show when={draft.auth === "bearer"}>
-        <Field label="Key" for="ap-byo-key">
-          <TextInput id="ap-byo-key" type="password" autocomplete="new-password" value={draft.key} onInput={(event) => setDraft("key", event.currentTarget.value)} />
-        </Field>
-      </Show>
-      <Show when={draft.auth === "custom_headers"}>
+  const optionFields = (auth: ByoAuth): JSX.Element => (
+    <Switch>
+      <Match when={auth === "bearer"}>{keyInput("ap-byo-key", "Key or token")}</Match>
+      <Match when={auth === "custom_headers"}>
         <div class="ap-headers" role="group" aria-label="Headers">
           <Index each={draft.headers}>
             {(row, index) => (
@@ -708,6 +743,8 @@ export function ByoConnect() {
                 <TextInput
                   aria-label={`Header ${index + 1} name`}
                   placeholder="X-API-Key"
+                  autocomplete="off"
+                  spellcheck={false}
                   value={row().name}
                   onInput={(event) => setDraft("headers", index, "name", event.currentTarget.value)}
                 />
@@ -731,61 +768,183 @@ export function ByoConnect() {
               </div>
             )}
           </Index>
-          <Button size="compact" variant="quiet" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setDraft("headers", (rows) => [...rows, { name: "", value: "" }])}>
-            Add a header
-          </Button>
+          <div>
+            <Button size="compact" variant="quiet" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setDraft("headers", (rows) => [...rows, { name: "", value: "" }])}>
+              Add a header
+            </Button>
+          </div>
         </div>
-      </Show>
-      <Show when={draft.auth === "oauth"}>
+      </Match>
+      <Match when={auth === "oauth" && !showClientFields()}>
+        <button type="button" class="ap-signin-link" onClick={() => setClientFields(true)}>
+          Use your own client ID
+        </button>
+      </Match>
+      <Match when={auth === "oauth"}>
         <div class="ap-oauth-client">
-          <p class="cx-note">Register Paperclip with the provider, using this callback address:</p>
+          <span class="info-line">
+            <b>Your own client ID</b>
+            <InfoTip label="About your own client ID">
+              Paperclip sets sign-in up by itself whenever the server allows it. Fill these in only when the server's docs tell you to register Paperclip yourself first, using
+              this callback address.
+            </InfoTip>
+          </span>
           <Show when={gallery.data?.oauthCallbackUrl} fallback={<p class="cx-note cx-note--error">This Paperclip has no public address for sign-in callbacks.</p>}>
-            {(url) => <code class="ap-code mono">{url()}</code>}
+            {(url) => <CopyBlock value={url()} label="Callback address" inline />}
           </Show>
-          <Field label="Client ID (optional)" for="ap-byo-client" help="Leave it empty to let Paperclip register itself where the server allows it.">
-            <TextInput id="ap-byo-client" autocomplete="off" value={draft.oauthClientId} onInput={(event) => setDraft("oauthClientId", event.currentTarget.value)} />
-          </Field>
-          <Field label="Client secret (if it has one)" for="ap-byo-secret">
-            <TextInput
-              id="ap-byo-secret"
-              type="password"
-              autocomplete="new-password"
-              value={draft.oauthClientSecret}
-              onInput={(event) => setDraft("oauthClientSecret", event.currentTarget.value)}
-            />
-          </Field>
+          <div class="ap-signin-pair">
+            <Field label="Client ID" for="ap-byo-client">
+              <TextInput id="ap-byo-client" autocomplete="off" spellcheck={false} placeholder="Optional" value={draft.oauthClientId} onInput={(event) => setDraft("oauthClientId", event.currentTarget.value)} />
+            </Field>
+            <Field label="Client secret" for="ap-byo-secret">
+              <TextInput
+                id="ap-byo-secret"
+                type="password"
+                autocomplete="new-password"
+                placeholder="Optional"
+                value={draft.oauthClientSecret}
+                onInput={(event) => setDraft("oauthClientSecret", event.currentTarget.value)}
+              />
+            </Field>
+          </div>
         </div>
-      </Show>
+      </Match>
+    </Switch>
+  );
 
-      <Field label="Which agents can use it">
-        <AgentAccessPicker
-          value={draft.access}
-          onChange={(next) => setDraft("access", next)}
-          disabled={flow.isPending}
-          allDescription="Current and future agents can use it, and carry its tools on every run."
+  return (
+    <form class="card ap-connect" onSubmit={submit}>
+      <header class="ap-connect-head">
+        <div class="ap-connect-title">
+          <span class="info-line">
+            <h2 class="disp">Connect your own MCP server</h2>
+            <InfoTip label="About connecting your own MCP server">
+              Any remote MCP server reachable from this Paperclip. You choose which of its tools agents may use once it's connected.
+            </InfoTip>
+          </span>
+        </div>
+      </header>
+
+      <Field label="Server address" for="ap-byo-link" help={machineSetup() ? "Its machine sign-in draft is tied to this address. Start over to change it." : undefined}>
+        <TextInput
+          id="ap-byo-link"
+          type="url"
+          placeholder="https://mcp.example.com/mcp"
+          autocomplete="off"
+          disabled={Boolean(machineSetup())}
+          value={draft.link}
+          onInput={(event) => setDraft("link", event.currentTarget.value)}
+        />
+      </Field>
+      <Field label="Name (optional)" for="ap-byo-name">
+        <TextInput
+          id="ap-byo-name"
+          maxLength={160}
+          placeholder={defaultServerName(draft.link.trim()) ?? ""}
+          disabled={Boolean(machineSetup())}
+          value={draft.name}
+          onInput={(event) => setDraft("name", event.currentTarget.value)}
         />
       </Field>
 
-      <Show when={failure()}>
-        {(text) => (
-          <p class="cx-note cx-note--error" role="alert">
-            {text()}
-          </p>
-        )}
+      {/* The server's own check asked for a key: it shows now, rather than as a guess beforehand. */}
+      <Show when={!machine() && draft.auth === "auto" && draft.needsKey}>
+        <Field label="App key" for="ap-byo-app-key">
+          {keyInput("ap-byo-app-key", "App key")}
+        </Field>
       </Show>
-      <div class="cx-actions">
-        <A class={buttonClass({ variant: "quiet" })} href={`/${company().issuePrefix}/connections`}>
-          Cancel
-        </A>
-        <span class="ap-actions-end">
-          <Show when={problem() && draft.link.trim()}>
-            <span class="cx-note">{problem()}</span>
-          </Show>
-          <Button type="submit" variant="primary" disabled={Boolean(problem()) || flow.isPending}>
-            {flow.isPending ? "Checking the server…" : "Connect"}
-          </Button>
-        </span>
-      </div>
+
+      <section class="ap-signin" aria-label="Sign-in">
+        <div class="ap-signin-line">
+          <span class="ap-signin-summary">{expanded() ? "How does this server sign in?" : byoSignInSummary(draft)}</span>
+          <button
+            type="button"
+            class="ap-signin-change"
+            data-testid="byo-sign-in-toggle"
+            aria-expanded={expanded()}
+            disabled={flow.isPending || needsInput() || machine()}
+            onClick={() => setChoosing(!expanded())}
+          >
+            {expanded() ? "Done" : "Change"}
+          </button>
+        </div>
+        <Show when={expanded()}>
+          <ul class="ap-signin-options" role="radiogroup" aria-label="How this server signs in">
+            <For each={BYO_SIGN_IN_OPTIONS}>
+              {(option) => {
+                const on = () => !machine() && draft.auth === option.value;
+                return (
+                  <li>
+                    <ChoiceCard
+                      name="ap-byo-auth"
+                      title={option.title}
+                      info={`${option.description}${SIGN_IN_TIPS[option.value] ? ` ${SIGN_IN_TIPS[option.value]}` : ""}`}
+                      checked={on()}
+                      disabled={flow.isPending}
+                      onSelect={() => pick(option.value)}
+                    />
+                    <Show when={on() && option.value !== "auto" && option.value !== "none"}>
+                      <div class="ap-signin-fields">{optionFields(option.value)}</div>
+                    </Show>
+                  </li>
+                );
+              }}
+            </For>
+            <li>
+              <ChoiceCard
+                name="ap-byo-auth"
+                title="Machine sign-in"
+                info={MACHINE_TIP}
+                checked={machine()}
+                disabled={flow.isPending}
+                onSelect={() => {
+                  setMachine(true);
+                  setFailure(null);
+                }}
+              />
+            </li>
+          </ul>
+        </Show>
+      </section>
+
+      <Show
+        when={machine()}
+        fallback={
+          <>
+            {accessField()}
+            <Show when={failure()}>
+              {(text) => (
+                <p class="cx-note cx-note--error" role="alert">
+                  {text()}
+                </p>
+              )}
+            </Show>
+            <div class="cx-actions">
+              <A class={buttonClass({ variant: "quiet" })} href={base()}>
+                Cancel
+              </A>
+              <span class="ap-actions-end">
+                <Show when={problem() && draft.link.trim()}>
+                  <span class="cx-note">{problem()}</span>
+                </Show>
+                <Button type="submit" variant="primary" disabled={Boolean(problem()) || flow.isPending}>
+                  {flow.isPending ? "Checking the server…" : "Connect"}
+                </Button>
+              </span>
+            </div>
+          </>
+        }
+      >
+        <MachineSignInSetup
+          link={draft.link}
+          name={draft.name}
+          setup={machineSetup()}
+          onSetup={setMachineSetup}
+          onConnected={machineConnected}
+          access={accessField()}
+          cancelHref={base()}
+        />
+      </Show>
     </form>
   );
 }

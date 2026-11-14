@@ -67,15 +67,30 @@ export function FieldButton(props: FieldButtonProps) {
   );
 }
 
-/** A labelled field outside settings rows: label above, help or error below. */
+/**
+ * A labelled field outside settings rows: label above, help or error below. `info` is what the
+ * field is for, behind an "i" beside the label and outside it, as SettingsRow has it.
+ */
 export function Field(
-  props: ParentProps<{ label: JSX.Element; for?: string; help?: JSX.Element; error?: JSX.Element }>,
+  props: ParentProps<{ label: JSX.Element; for?: string; info?: JSX.Element; help?: JSX.Element; error?: JSX.Element }>,
 ) {
   return (
     <div class="field-stack">
-      <label class="field-label" for={props.for}>
-        {props.label}
-      </label>
+      <Show
+        when={props.info}
+        fallback={
+          <label class="field-label" for={props.for}>
+            {props.label}
+          </label>
+        }
+      >
+        <span class="info-line">
+          <label class="field-label" for={props.for}>
+            {props.label}
+          </label>
+          <InfoTip label={aboutLabel(props.label)}>{props.info}</InfoTip>
+        </span>
+      </Show>
       {props.children}
       <Show when={props.error} fallback={<Show when={props.help}><span class="fhelp">{props.help}</span></Show>}>
         <span class="field-error" role="alert">
