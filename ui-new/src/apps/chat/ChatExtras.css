@@ -3,6 +3,11 @@
  * picker and task defaults (M7), next to Chat.css.
  */
 
+/* A sponsor or responsible-member picker (GitHubBot.tsx) */
+.ch-sponsor {
+  max-width: 360px;
+}
+
 .ch-check {
   display: inline-flex;
   align-items: center;

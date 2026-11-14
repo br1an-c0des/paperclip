@@ -16,8 +16,13 @@ import {
   actionPermission,
   appsView,
   askFirstIds,
+  BYO_SIGN_IN_OPTIONS,
+  byoAuthChange,
+  byoFailureFocus,
   byoPayload,
   byoProblem,
+  byoSignInProblem,
+  byoSignInSummary,
   canAlwaysAllow,
   categoriesIn,
   claimingApps,
@@ -366,6 +371,34 @@ describe("connecting", () => {
     });
     draft.auth = "auto";
     expect(byoPayload(draft)).not.toHaveProperty("authMode");
+  });
+
+  it("states your own server's sign-in, and switches it cleanly (#21469)", () => {
+    expect(BYO_SIGN_IN_OPTIONS.map((option) => option.title)).toEqual(["Let Paperclip check", "Key or token", "Browser sign-in", "Custom headers", "No sign-in needed"]);
+    const draft = { ...newByoDraft(), link: "https://mcp.example.com/mcp" };
+    expect(byoSignInSummary(draft)).toBe("Paperclip asks the server how to sign in.");
+    expect(byoSignInSummary({ ...draft, auth: "custom_headers", headers: [{ name: "A", value: "1" }, { name: "B", value: "2" }] })).toBe("Signs in with 2 custom headers.");
+    expect(byoSignInSummary({ ...draft, auth: "oauth", oauthClientId: " id " })).toBe("You'll sign in at the provider, using your own client ID.");
+    expect(byoSignInSummary({ ...draft, auth: "none" })).toContain("No sign-in");
+
+    // The server asked for a key while Paperclip was checking: the key is required and sent.
+    const needsKey = { ...draft, needsKey: true };
+    expect(byoSignInProblem(needsKey)).toBe("Add the key.");
+    expect(byoPayload({ ...needsKey, key: " k " })).toEqual({ link: draft.link, name: "mcp.example.com/mcp", credentialValues: { "credentials.authorization": "k" } });
+    // Picking another option drops that answer, and a key isn't carried into an option that doesn't send one.
+    expect(byoAuthChange({ needsKey: true, key: "k" }, "custom_headers")).toEqual({ auth: "custom_headers", needsKey: false, key: "" });
+    expect(byoAuthChange({ needsKey: true, key: "k" }, "bearer")).toEqual({ auth: "bearer", needsKey: false, key: "k" });
+    expect(byoAuthChange({ needsKey: true, key: "k" }, "auto")).toEqual({ auth: "auto", needsKey: true, key: "k" });
+    // Browser sign-in sends your own client only when it has an ID.
+    expect(byoPayload({ ...draft, auth: "oauth", oauthClientSecret: "s" })).not.toHaveProperty("oauthClient");
+    expect(byoPayload({ ...draft, auth: "oauth", oauthClientId: "c", oauthClientSecret: "s" })).toMatchObject({ authMode: "oauth", oauthClient: { clientId: "c", clientSecret: "s" } });
+  });
+
+  it("points a failed connect at the key or your own client", () => {
+    expect(byoFailureFocus("oauth_challenge")).toBe("key");
+    expect(byoFailureFocus("oauth_manual_client_required")).toBe("client");
+    expect(byoFailureFocus("remote_http_dns_failed")).toBeNull();
+    expect(connectFailure("oauth_manual_client_required", null)).toContain("under Browser sign-in");
   });
 
   it("explains failures by code", () => {

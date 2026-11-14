@@ -1,15 +1,18 @@
 import type { GitHubChatConfiguration, GitHubReviewEvent, GitHubReviewPolicy } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createInfiniteQuery, createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { ExternalLink, Plus, RefreshCw } from "lucide-solid";
+import { Check, ChevronDown, ExternalLink, Plus, RefreshCw } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch, type JSX } from "solid-js";
+import { accessApi, personName, type CompanyUserDirectoryEntry } from "@/api/access";
 import { chatEndpointsApi, githubChatApi, type ChatEndpoint, type GitHubConfigurationRecord } from "@/api/chat-endpoints";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { usePeopleQuery } from "@/lib/company-data";
+import { PersonAvatar } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Field, TextArea, TextInput } from "@/ui/Field";
+import { Menu } from "@/ui/Menu";
 import { Switch as Toggle } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
 import { failureText } from "../shared";
@@ -23,10 +26,13 @@ import {
   peopleRows,
   repositoryNote,
   REVIEW_EVENTS,
+  sponsorChoices,
+  sponsorProblem,
   toggleEvent,
   withoutPerson,
   withPerson,
   type PersonRow,
+  type SponsorViewer,
 } from "./github-model";
 import { Card } from "./parts";
 import { TaskDefaults } from "./TaskDefaults";
@@ -42,7 +48,9 @@ import "./ChatExtras.css";
  *   it runs, its automatic filters, what it posts and its passing score.
  * - Access tab: who may mention it or start work automatically: linked company members (all or
  *   picked), outside contributors a member sponsors, the member responsible for automatic tasks,
- *   and turning the bot's GitHub tools on.
+ *   and turning the bot's GitHub tools on. Sponsors and the responsible member are picked with
+ *   avatars, and are only yourself unless you're a company owner or admin, or an instance admin
+ *   (upstream #21218, which the server enforces on every save); a new guest's sponsor is you.
  *
  * The review configuration is one document saved whole with the revision it was read at
  * (`PUT …/github/configuration`); repository switches save at once.
@@ -73,6 +81,62 @@ function useConfiguration(endpoint: () => ChatEndpoint) {
 }
 
 type ConfigurationState = ReturnType<typeof useConfiguration>;
+
+/**
+ * You, and whether you may name someone else as a sponsor (upstream #21218): the company's people
+ * with their roles, and your board access.
+ */
+function useSponsors() {
+  const members = usePeopleQuery();
+  const access = createQuery(() => ({ queryKey: queryKeys.access.currentBoardAccess, queryFn: accessApi.currentBoardAccess }));
+  const viewer = (): SponsorViewer | null => (access.data ? { userId: access.data.userId, isInstanceAdmin: access.data.isInstanceAdmin } : null);
+  const sponsors = createMemo(() => sponsorChoices(members.data?.users ?? [], members.data ? viewer() : null));
+  /** Why a changed configuration can't be saved by you, or null. */
+  const problem = (configuration: GitHubChatConfiguration | null) => (configuration ? sponsorProblem(configuration, members.data ? viewer() : null, sponsors().canChooseOthers) : null);
+  return { members, viewer, sponsors, problem };
+}
+
+/** A member picker with avatars, for a sponsor or the responsible member. */
+function SponsorPicker(props: {
+  label: string;
+  value: string;
+  choices: readonly CompanyUserDirectoryEntry[];
+  members: readonly CompanyUserDirectoryEntry[];
+  youId: string | null;
+  onChange: (userId: string) => void;
+  id?: string;
+}) {
+  const current = () => props.members.find((member) => member.principalId === props.value) ?? null;
+  const nameOf = (entry: CompanyUserDirectoryEntry) => (entry.principalId === props.youId ? `You (${personName(entry)})` : personName(entry));
+  return (
+    <Menu>
+      <Menu.Trigger id={props.id} class="field ch-sponsor" aria-label={`${props.label}: ${current() ? personName(current()!) : "none"}`} disabled={props.choices.length === 0}>
+        <Show when={current()} fallback={<span class="field-value">{props.value ? "A former member" : "Choose a member"}</span>}>
+          {(entry) => (
+            <>
+              <PersonAvatar name={personName(entry())} seed={entry().principalId} image={entry().user?.image ?? null} size={20} you={entry().principalId === props.youId} />
+              <span class="field-value">{nameOf(entry())}</span>
+            </>
+          )}
+        </Show>
+        <ChevronDown size={14} class="field-caret" aria-hidden="true" />
+      </Menu.Trigger>
+      <Menu.Content label={props.label} width={300}>
+        <For each={props.choices}>
+          {(entry) => (
+            <Menu.Item
+              icon={<PersonAvatar name={personName(entry)} seed={entry.principalId} image={entry.user?.image ?? null} size={20} you={entry.principalId === props.youId} />}
+              hint={entry.principalId === props.value ? <Check size={14} aria-hidden="true" /> : undefined}
+              onSelect={() => props.onChange(entry.principalId)}
+            >
+              {nameOf(entry)}
+            </Menu.Item>
+          )}
+        </For>
+      </Menu.Content>
+    </Menu>
+  );
+}
 
 function SaveBar(props: { state: ConfigurationState; invalid?: string | null; onDiscard?: () => void }) {
   return (
@@ -127,11 +191,14 @@ function ConfigurationGate(props: { state: ConfigurationState; children: (config
 
 export function GitHubSettings(props: { endpoint: ChatEndpoint; base: string }) {
   const state = useConfiguration(() => props.endpoint);
+  const sponsors = useSponsors();
   const [scoreText, setScoreText] = createSignal<string | null>(null);
   const invalid = () => {
     const configuration = state.current();
-    if (!configuration || scoreText() === null) return null;
-    return parseScore(scoreText()!, configuration.defaults.ratingThreshold === null).ok ? null : "The passing score is a whole number from 1 to 5.";
+    if (!configuration) return null;
+    if (scoreText() !== null && !parseScore(scoreText()!, configuration.defaults.ratingThreshold === null).ok) return "The passing score is a whole number from 1 to 5.";
+    // The whole document is saved, so its sponsors are checked even when only the policy changed.
+    return state.dirty() ? sponsors.problem(configuration) : null;
   };
   return (
     <>
@@ -475,8 +542,11 @@ export function GitHubAccess(props: { endpoint: ChatEndpoint; base: string }) {
   const company = useCompany();
   const client = useQueryClient();
   const state = useConfiguration(() => props.endpoint);
-  // The company's active people with their roles (#15183), which any member can read.
-  const members = usePeopleQuery();
+  // The company's active people with their roles (#15183), which any member can read, and who may
+  // be named a sponsor by you.
+  const sponsors = useSponsors();
+  const members = sponsors.members;
+  const youId = () => sponsors.viewer()?.userId ?? null;
   const linksKey = () => queryKeys.chatEndpoints.part(company().id, props.endpoint.id, "principals");
   const links = createQuery(() => ({
     queryKey: linksKey(),
@@ -585,17 +655,19 @@ export function GitHubAccess(props: { endpoint: ChatEndpoint; base: string }) {
               </Card>
 
               <Card title="Responsible member" description="Accountable for tasks the bot creates automatically. GitHub authors are recorded separately; this gives no access to the member's credentials.">
-                <select
-                  class="input"
-                  aria-label="Responsible member"
-                  value={configuration.responsibleUserId}
-                  onChange={(event) => state.edit({ ...configuration, responsibleUserId: event.currentTarget.value })}
-                >
-                  <Show when={!active().some((member) => member.principalId === configuration.responsibleUserId)}>
-                    <option value={configuration.responsibleUserId}>{configuration.responsibleUserId || "Choose a member"}</option>
-                  </Show>
-                  <For each={active()}>{(member) => <option value={member.principalId}>{member.user?.name ?? member.user?.email ?? member.principalId}</option>}</For>
-                </select>
+                <div>
+                  <SponsorPicker
+                    label="Responsible member"
+                    value={configuration.responsibleUserId}
+                    choices={sponsors.sponsors().choices}
+                    members={active()}
+                    youId={youId()}
+                    onChange={(userId) => state.edit({ ...configuration, responsibleUserId: userId })}
+                  />
+                </div>
+                <Show when={sponsors.viewer() && members.data && !sponsors.sponsors().canChooseOthers}>
+                  <span class="cx-static">Only company owners and admins can choose someone other than themselves.</span>
+                </Show>
               </Card>
 
               <Show when={!configuration.toolsEnabled}>
@@ -620,6 +692,9 @@ export function GitHubAccess(props: { endpoint: ChatEndpoint; base: string }) {
                 configuration={configuration}
                 links={links.data ?? []}
                 members={active()}
+                choices={sponsors.sponsors().choices}
+                canChooseOthers={sponsors.sponsors().canChooseOthers}
+                youId={youId()}
                 onAdd={(person) => {
                   state.edit(withPerson(configuration, person));
                   setDialog(null);
@@ -643,7 +718,7 @@ export function GitHubAccess(props: { endpoint: ChatEndpoint; base: string }) {
           <p class="mono ch-scopes">{`${window.location.origin}${linkHref()}`}</p>
         </div>
       </Dialog>
-      <SaveBar state={state} />
+      <SaveBar state={state} invalid={state.dirty() ? sponsors.problem(state.current()) : null} />
     </>
   );
 }
@@ -654,18 +729,31 @@ function GuestDialog(props: {
   endpoint: ChatEndpoint;
   configuration: GitHubChatConfiguration;
   links: { githubUserId?: string | null }[];
-  members: { principalId: string; user: { name?: string | null; email?: string | null } | null }[];
+  members: CompanyUserDirectoryEntry[];
+  /** Who you may name: yourself, or anyone when you're an owner or admin. */
+  choices: CompanyUserDirectoryEntry[];
+  canChooseOthers: boolean;
+  youId: string | null;
   onAdd: (person: { kind: "guest"; githubUserId: string; login: string; sponsorUserId: string; permissionProfile: "restricted" }) => void;
 }) {
   const [login, setLogin] = createSignal("");
-  const [sponsor, setSponsor] = createSignal(props.configuration.responsibleUserId);
+  // A new guest's sponsor is you (#21218), each time the dialog opens.
+  const [sponsor, setSponsor] = createSignal(props.youId ?? "");
+  createEffect(
+    on(
+      () => [props.open, props.youId] as const,
+      ([open, you]) => {
+        if (open) setSponsor(you ?? "");
+      },
+    ),
+  );
   const lookup = createMutation(() => ({
     mutationFn: () => githubChatApi.lookup(props.endpoint.id, login().trim()),
   }));
   const found = () => lookup.data ?? null;
   const listed = () =>
     Boolean(found() && (props.configuration.people.some((person) => person.githubUserId === found()!.githubUserId) || props.links.some((link) => link.githubUserId === found()!.githubUserId)));
-  const sponsorOk = () => props.members.some((member) => member.principalId === sponsor());
+  const sponsorOk = () => props.choices.some((member) => member.principalId === sponsor());
   return (
     <Dialog
       open={props.open}
@@ -709,13 +797,12 @@ function GuestDialog(props: {
             </Button>
           </div>
         </Field>
-        <Field label="Sponsor" for="gh-guest-sponsor">
-          <select id="gh-guest-sponsor" class="input" value={sponsor()} onChange={(event) => setSponsor(event.currentTarget.value)}>
-            <Show when={!sponsorOk()}>
-              <option value={sponsor()}>Choose a member</option>
-            </Show>
-            <For each={props.members}>{(member) => <option value={member.principalId}>{member.user?.name ?? member.user?.email ?? member.principalId}</option>}</For>
-          </select>
+        <Field
+          label="Sponsor"
+          for="gh-guest-sponsor"
+          help={props.youId && !props.canChooseOthers ? "You sponsor them. Only company owners and admins can choose someone else." : undefined}
+        >
+          <SponsorPicker id="gh-guest-sponsor" label="Sponsor" value={sponsor()} choices={props.choices} members={props.members} youId={props.youId} onChange={setSponsor} />
         </Field>
         <Show when={found()}>
           <p role="status">{listed() ? `@${found()!.login} is already listed.` : `Found @${found()!.login}. They can mention the bot once you save.`}</p>

@@ -123,6 +123,44 @@ export function mentionsAllowed(configuration: GitHubChatConfiguration, person: 
 }
 
 // ---------------------------------------------------------------------------------------------
+// Configuration: sponsors (upstream #21218)
+
+export type SponsorViewer = { userId: string; isInstanceAdmin: boolean };
+
+/**
+ * Who you may name as an outside contributor's sponsor or the responsible member: only yourself,
+ * unless you're a company owner or admin, or an instance admin. Viewers are never offered. The
+ * server checks the same on every save (`403` otherwise), as the old UI's GitHubSponsorSelect
+ * limits its choices.
+ */
+export function sponsorChoices<T extends { principalId: string; membershipRole: string | null }>(
+  members: readonly T[],
+  viewer: SponsorViewer | null | undefined,
+): { canChooseOthers: boolean; choices: T[] } {
+  if (!viewer) return { canChooseOthers: false, choices: [] };
+  const eligible = members.filter((member) => member.membershipRole !== "viewer");
+  const role = members.find((member) => member.principalId === viewer.userId)?.membershipRole;
+  const canChooseOthers = viewer.isInstanceAdmin || role === "owner" || role === "admin";
+  return { canChooseOthers, choices: canChooseOthers ? eligible : eligible.filter((member) => member.principalId === viewer.userId) };
+}
+
+/** Every sponsor a configuration names: the responsible member and each outside contributor's. */
+export function configuredSponsors(configuration: GitHubChatConfiguration): string[] {
+  const ids = [configuration.responsibleUserId, ...configuration.people.flatMap((person) => (person.kind === "guest" ? [person.sponsorUserId] : []))];
+  return [...new Set(ids.filter(Boolean))];
+}
+
+/**
+ * Why you can't save this configuration, or null. The server refuses a save that names anyone
+ * else as a sponsor unless you may choose others, even when that sponsor was already saved.
+ */
+export function sponsorProblem(configuration: GitHubChatConfiguration, viewer: SponsorViewer | null | undefined, canChooseOthers: boolean): string | null {
+  if (!viewer || canChooseOthers) return null;
+  if (configuredSponsors(configuration).every((id) => id === viewer.userId)) return null;
+  return "Only company owners and admins can save settings that name someone else as a sponsor or the responsible member. Name yourself in Access, or ask an admin to save.";
+}
+
+// ---------------------------------------------------------------------------------------------
 // Configuration: review policy
 
 export const REVIEW_EVENTS: { key: GitHubReviewEvent; label: string }[] = [

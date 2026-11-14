@@ -669,6 +669,11 @@ export type ByoDraft = {
   link: string;
   name: string;
   auth: ByoAuth;
+  /**
+   * Set when the server's own check (a failed connect) asked for a credential while sign-in was
+   * still "Let Paperclip check": the key field then shows by itself, never as a guess beforehand.
+   */
+  needsKey: boolean;
   key: string;
   headers: HeaderRow[];
   oauthClientId: string;
@@ -681,12 +686,68 @@ export function newByoDraft(): ByoDraft {
     link: "",
     name: "",
     auth: "auto",
+    needsKey: false,
     key: "",
     headers: [{ name: "", value: "" }],
     oauthClientId: "",
     oauthClientSecret: "",
     access: { mode: "all", agentIds: new Set() },
   };
+}
+
+/**
+ * How a pasted server signs in, in its own terms (upstream #21469's five options, in its order).
+ * Paperclip decides which protocol satisfies the choice; none of that shows here.
+ */
+export const BYO_SIGN_IN_OPTIONS: { value: ByoAuth; title: string; description: string }[] = [
+  { value: "auto", title: "Let Paperclip check", description: "Paperclip asks the server what it needs and walks you through it." },
+  { value: "bearer", title: "Key or token", description: "Paperclip sends your key as an Authorization header." },
+  { value: "oauth", title: "Browser sign-in", description: "You'll sign in at the provider." },
+  { value: "custom_headers", title: "Custom headers", description: "For servers that name their own headers." },
+  { value: "none", title: "No sign-in needed", description: "The server is open to anyone with the address." },
+];
+
+/** The sign-in choice, stated in one line beside its Change control. */
+export function byoSignInSummary(draft: Pick<ByoDraft, "auth" | "headers" | "oauthClientId">): string {
+  switch (draft.auth) {
+    case "none":
+      return "No sign-in. The server is open to anyone with the address.";
+    case "bearer":
+      return "Signs in with a key or token.";
+    case "custom_headers": {
+      const count = draft.headers.filter((row) => row.name.trim() && row.value.trim()).length;
+      return count === 0 ? "Signs in with custom headers." : `Signs in with ${count} custom ${count === 1 ? "header" : "headers"}.`;
+    }
+    case "oauth":
+      return draft.oauthClientId.trim() ? "You'll sign in at the provider, using your own client ID." : "You'll sign in at the provider.";
+    default:
+      return "Paperclip asks the server how to sign in.";
+  }
+}
+
+/**
+ * The fields that change when another way to sign in is picked. Leaving "Let Paperclip check"
+ * drops the server's "it needs a key" answer, so the two can't disagree, and a key typed for one
+ * option isn't sent by another.
+ */
+export function byoAuthChange(draft: Pick<ByoDraft, "needsKey" | "key">, auth: ByoAuth): Pick<ByoDraft, "auth" | "needsKey" | "key"> {
+  return {
+    auth,
+    needsKey: auth === "auto" ? draft.needsKey : false,
+    key: auth === "bearer" || auth === "auto" ? draft.key : "",
+  };
+}
+
+/**
+ * What a failed connect of a pasted address changes on the form, by the server's error code (the
+ * old UI's genericConnectGuidance focus): a credential challenge shows the key field and opens the
+ * sign-in choice; a server that needs a client you register yourself switches to Browser sign-in
+ * with the client fields open.
+ */
+export function byoFailureFocus(code: string | null | undefined): "key" | "client" | null {
+  if (code === "oauth_challenge" || code === "mcp_header_rejected") return "key";
+  if (code === "oauth_manual_client_required" || code === "oauth_manual_client_rebinding_required") return "client";
+  return null;
 }
 
 /** "mcp.example.com/mcp": host and path, never the query (it can carry a token). */
@@ -702,16 +763,26 @@ export function defaultServerName(link: string) {
 
 const HEADER_NAME = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
 
-export function byoProblem(draft: ByoDraft): string | null {
-  const link = draft.link.trim();
-  if (!link) return "Paste the server address.";
+/** Why the server address can't be used yet, or null. */
+export function byoLinkProblem(link: string): string | null {
+  const trimmed = link.trim();
+  if (!trimmed) return "Paste the server address.";
   try {
-    const url = new URL(link);
+    const url = new URL(trimmed);
     if (url.protocol !== "https:" && url.protocol !== "http:") return "The address should start with https://.";
   } catch {
     return "That doesn't look like a server address. Paste the full address, starting with https://.";
   }
-  if (draft.auth === "bearer" && !draft.key.trim()) return "Add the key.";
+  return null;
+}
+
+export function byoProblem(draft: ByoDraft): string | null {
+  return byoLinkProblem(draft.link) ?? byoSignInProblem(draft);
+}
+
+/** Why the chosen sign-in can't be used yet, or null. */
+export function byoSignInProblem(draft: ByoDraft): string | null {
+  if ((draft.auth === "bearer" || (draft.auth === "auto" && draft.needsKey)) && !draft.key.trim()) return "Add the key.";
   if (draft.auth === "custom_headers") {
     const rows = draft.headers.filter((row) => row.name.trim() || row.value.trim());
     if (rows.length === 0) return "Add at least one header.";
@@ -730,7 +801,8 @@ export function byoProblem(draft: ByoDraft): string | null {
 /** `POST tools/apps/connect` for a pasted address. Header values go in as credentials, never config. */
 export function byoPayload(draft: ByoDraft): ConnectToolApp {
   const credentials: Record<string, string> = {};
-  if (draft.auth === "bearer" && draft.key.trim()) credentials["credentials.authorization"] = draft.key.trim();
+  const sendsKey = draft.auth === "bearer" || (draft.auth === "auto" && draft.needsKey);
+  if (sendsKey && draft.key.trim()) credentials["credentials.authorization"] = draft.key.trim();
   if (draft.auth === "custom_headers") {
     for (const row of draft.headers) if (row.name.trim() && row.value.trim()) credentials[`headers.${row.name.trim()}`] = row.value;
   }
@@ -757,10 +829,10 @@ export function connectFailure(code: string | null | undefined, message: string 
     case "remote_http_dns_failed":
       return "We couldn't find that host. Check the spelling, or confirm the server is published on the internet.";
     case "oauth_challenge":
-      return "The server wants a credential it can't get by itself. Add its key or headers.";
+      return "The server asked for a credential but offered no sign-in Paperclip can complete. Add the key or headers its docs list.";
     case "oauth_manual_client_required":
     case "oauth_manual_client_rebinding_required":
-      return "This server needs an OAuth client you register yourself. Choose \"Sign in with your OAuth app\" and add its client ID and secret.";
+      return "This server needs sign-in details you create yourself. Register Paperclip in the provider's settings, then add the client ID and secret it gives you under Browser sign-in.";
     case "oauth_redirect_origin_unsupported":
     case "oauth_redirect_uri_invalid":
       return "Sign-in needs this Paperclip to have a public HTTPS address. Ask your Paperclip admin to set it up.";

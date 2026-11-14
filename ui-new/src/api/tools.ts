@@ -3,6 +3,11 @@ import type {
   ConnectToolApp,
   ConnectToolAppResult,
   ConnectionAgentInstructions,
+  CreateMachineSignIn,
+  MachineSignInSetupResult,
+  MachineSignInStatus,
+  RotateMachineSignIn,
+  TestMachineSignIn,
   ConnectionGrantsResponse,
   EmailEndpointSummary,
   FinishToolAppResult,
@@ -156,4 +161,23 @@ export const toolsApi = {
 
   emailInboxes: (companyId: string, signal?: AbortSignal) =>
     api.get<EmailEndpointSummary[]>(company(companyId, "email/inboxes"), { signal }),
+
+  /*
+   * Machine sign-in (OAuth client credentials) for an organization connection to a remote MCP
+   * server, as ui/src/api/tools.ts has it. No response ever carries a secret or private key.
+   */
+  /** Creates the draft: finds and pins the sign-in service, creates the key or stores the secret. */
+  createMachineSignIn: (companyId: string, input: CreateMachineSignIn) =>
+    api.post<MachineSignInSetupResult>(company(companyId, "tools/machine-sign-in"), input),
+  machineSignIn: (connectionId: string, signal?: AbortSignal) =>
+    api.get<MachineSignInStatus>(connection(connectionId, "/machine-sign-in"), { signal }),
+  /** Asks the sign-in service for a token and lists the server's tools with it; success turns it on. */
+  testMachineSignIn: (connectionId: string, input: TestMachineSignIn) =>
+    api.post<ConnectToolAppResult>(connection(connectionId, "/machine-sign-in/test"), input),
+  /** A new secret is tested, then replaces the old one (`completed`); a new key is staged until completed. */
+  rotateMachineSignIn: (connectionId: string, input: RotateMachineSignIn) =>
+    api.post<MachineSignInSetupResult & { completed: boolean }>(connection(connectionId, "/machine-sign-in/rotate"), input),
+  /** Tests the staged key, then switches to it and deletes the old key or secret. */
+  completeMachineSignInRotation: (connectionId: string) =>
+    api.post<MachineSignInSetupResult>(connection(connectionId, "/machine-sign-in/rotate/complete"), {}),
 };

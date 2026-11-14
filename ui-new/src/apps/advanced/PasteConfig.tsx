@@ -59,7 +59,7 @@ export function PasteConfig() {
         if (found.auth.manualClientRequired) {
           pushToast({
             title: "This server needs your own OAuth app",
-            body: "Finish it from Connect your own server, with its client ID and secret.",
+            body: "Connect it as your own server instead: choose Browser sign-in and add the client ID and secret the provider gives you.",
             tone: "warn",
           });
           return;

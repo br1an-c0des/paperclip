@@ -8,6 +8,7 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
 import { theme } from "@/lib/theme";
 import { AgentAvatar, discGradient } from "@/ui/Avatar";
+import { InfoTip } from "@/ui/InfoTip";
 import { Switch as Toggle } from "@/ui/Switch";
 import type { AccessDraft, ConnectionState } from "./apps-model";
 import { readNote } from "@/lib/offline/read-state";
@@ -57,6 +58,24 @@ export function useRefreshTools() {
   const company = useCompany();
   const client = useQueryClient();
   return () => client.invalidateQueries({ queryKey: queryKeys.tools.all(company().id) });
+}
+
+/**
+ * A radio card (a sign-in option, a machine sign-in method). Its help sits behind an "i" outside
+ * the <label>, so it isn't read as part of the radio's name and a press on it can't pick the card.
+ */
+export function ChoiceCard(props: { name: string; title: string; info?: JSX.Element; checked: boolean; disabled?: boolean; onSelect: () => void }) {
+  return (
+    <div class="cx-option ap-choice" classList={{ "cx-option--on": props.checked }}>
+      <label class="ap-choice-label">
+        <input type="radio" name={props.name} checked={props.checked} disabled={props.disabled} onChange={() => props.onSelect()} />
+        <span class="cx-option-name">{props.title}</span>
+      </label>
+      <Show when={props.info}>
+        <InfoTip label={`About ${props.title}`}>{props.info}</InfoTip>
+      </Show>
+    </div>
+  );
 }
 
 export function failureText(error: unknown, fallback: string) {

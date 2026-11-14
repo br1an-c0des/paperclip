@@ -12,6 +12,9 @@ import {
   mentionsAllowed,
   parseScore,
   peopleRows,
+  configuredSponsors,
+  sponsorChoices,
+  sponsorProblem,
   toggleEvent,
   wizardPollMs,
   withoutPerson,
@@ -132,5 +135,34 @@ describe("review policy", () => {
     const policy = { events: ["mention"] } as unknown as GitHubReviewPolicy;
     expect(toggleEvent(policy, "opened", true).events).toEqual(["opened", "mention"]);
     expect(toggleEvent(policy, "mention", false).events).toEqual([]);
+  });
+});
+
+describe("sponsors (#21218)", () => {
+  const members = [
+    { principalId: "u1", membershipRole: "owner" },
+    { principalId: "u2", membershipRole: "member" },
+    { principalId: "u3", membershipRole: "viewer" },
+    { principalId: "u4", membershipRole: "admin" },
+  ];
+
+  it("offers only yourself unless you're an owner, admin or instance admin", () => {
+    expect(sponsorChoices(members, { userId: "u2", isInstanceAdmin: false })).toEqual({ canChooseOthers: false, choices: [members[1]] });
+    expect(sponsorChoices(members, { userId: "u1", isInstanceAdmin: false }).choices.map((m) => m.principalId)).toEqual(["u1", "u2", "u4"]);
+    expect(sponsorChoices(members, { userId: "u4", isInstanceAdmin: false }).canChooseOthers).toBe(true);
+    expect(sponsorChoices(members, { userId: "u2", isInstanceAdmin: true }).canChooseOthers).toBe(true);
+    // A viewer is never offered, even to themselves; with no access yet nothing is.
+    expect(sponsorChoices(members, { userId: "u3", isInstanceAdmin: false }).choices).toEqual([]);
+    expect(sponsorChoices(members, null)).toEqual({ canChooseOthers: false, choices: [] });
+  });
+
+  it("refuses a save that names someone else, unless you may choose others", () => {
+    const guest = { kind: "guest" as const, githubUserId: "g9", login: "outsider", sponsorUserId: "u4", permissionProfile: "restricted" as const };
+    const config = configuration({ responsibleUserId: "u2", people: [guest] });
+    expect(configuredSponsors(config)).toEqual(["u2", "u4"]);
+    expect(sponsorProblem(config, { userId: "u2", isInstanceAdmin: false }, false)).toContain("Only company owners and admins");
+    expect(sponsorProblem(configuration({ responsibleUserId: "u2" }), { userId: "u2", isInstanceAdmin: false }, false)).toBeNull();
+    expect(sponsorProblem(config, { userId: "u1", isInstanceAdmin: false }, true)).toBeNull();
+    expect(sponsorProblem(config, null, false)).toBeNull();
   });
 });
