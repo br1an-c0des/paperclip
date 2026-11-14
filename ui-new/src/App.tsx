@@ -2,6 +2,7 @@ import { Navigate, Route, Router, type RouteSectionProps } from "@solidjs/router
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { lazy } from "solid-js";
 import { watchViewport } from "@/layout/breakpoints";
+import { watchKeyboard } from "@/layout/keyboard";
 import { queryClient } from "@/lib/query";
 import { SessionGate } from "@/lib/session";
 import { GrainFilter } from "@/ui/Grain";
@@ -74,6 +75,8 @@ const OLD_TASK_VIEWS = ["active", "all", "backlog", "done", "recent"];
 
 function Root(props: RouteSectionProps) {
   watchViewport();
+  // Composers stay above the on-screen keyboard (U166).
+  watchKeyboard();
   useThemeColor();
   useServiceWorker();
   return (

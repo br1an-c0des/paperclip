@@ -1,0 +1,55 @@
+/*
+ * While the on-screen keyboard is open (keyboard.ts): the boxes that hold a composer take the
+ * visible area's height instead of the window's, so the composer sits just above the keyboard.
+ * Each rule mirrors a `100dvh` rule in the file named beside it.
+ */
+
+/* A docked panel's shell (Shell.css): the page is exactly the visible area. */
+:root[data-keyboard="open"] .shell--split {
+  grid-template-rows: var(--vv-height);
+  height: var(--vv-height);
+}
+
+:root[data-keyboard="open"] .shell-nav,
+:root[data-keyboard="open"] .shell-seam {
+  height: var(--vv-height);
+}
+
+/* The docked task panel (TaskSections.css, Panel.css) */
+:root[data-keyboard="open"] .panel {
+  max-height: calc(var(--vv-height) - 2 * var(--main-pad-top, 14px));
+}
+
+:root[data-keyboard="open"] .panel:has(> .panel-body > .tsec) {
+  height: calc(var(--vv-height) - 2 * var(--main-pad-top, 14px));
+}
+
+:root[data-keyboard="open"] .tsec-main {
+  min-height: 0;
+}
+
+/* The task page's sections (routes/Tasks.css): the card fits what you see, composer at its foot. */
+:root[data-keyboard="open"] .task-page:has(.tsec:not([data-section="details"])) {
+  height: calc(var(--vv-height) - 2 * var(--main-pad-top, 14px));
+  min-height: 0;
+}
+
+/* Dialogs (ui/layer.css) cover the visible area, wherever the browser panned it to. */
+:root[data-keyboard="open"] .layer-dialog-frame {
+  inset: var(--vv-top) 0 auto 0;
+  height: var(--vv-height);
+}
+
+/* The task modal (TaskModal.css) */
+:root[data-keyboard="open"] .dialog.tmodal {
+  height: calc(var(--vv-height) - 2 * clamp(24px, 6vh, 72px));
+}
+
+:root[data-keyboard="open"] .dialog.tmodal[data-mode="sheet"] {
+  height: var(--vv-height);
+}
+
+/* The agent chat's sticky composer (chat/Chat.css) sticks to the keyboard's top edge. */
+:root[data-keyboard="open"] .ch-foot {
+  bottom: var(--keyboard-inset);
+}
