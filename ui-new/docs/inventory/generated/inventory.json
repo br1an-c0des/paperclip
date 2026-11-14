@@ -1,5 +1,5 @@
 {
-  "upstreamCommit": "2659ff1d22ae05d1f77b83b1a6235b6975f88c3c",
+  "upstreamCommit": "68d5c9c1205f1f1629d76a1ec703bcb1c38fc48d",
   "routes": [
     {
       "path": "/oauth-handoff",
@@ -1716,6 +1716,25 @@
           "kind": "page",
           "component": "Browse",
           "file": "pages/apps/Browse.tsx",
+          "redirectTo": null,
+          "flags": [],
+          "gates": []
+        }
+      ]
+    },
+    {
+      "path": "/:companyPrefix/apps/tailscale",
+      "flags": [],
+      "gates": [
+        "CloudAccessGate",
+        "ShellConfigurationGate(loaded={streamlinedUiLoaded}, allowPendingTaskDetail={classicStreamlinedUiLoaded && !coordinatorWorkspaceLoaded})"
+      ],
+      "note": null,
+      "variants": [
+        {
+          "kind": "page",
+          "component": "TailscaleConnector",
+          "file": "pages/apps/TailscaleConnector.tsx",
           "redirectTo": null,
           "flags": [],
           "gates": []
@@ -6432,6 +6451,42 @@
         ]
       },
       {
+        "key": "api/tools.ts::toolsApi.createMachineSignIn",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/companies/:companyId/tools/machine-sign-in"
+          }
+        ],
+        "via": [
+          "features/connections/MachineSignInSetup.tsx"
+        ]
+      },
+      {
+        "key": "api/tools.ts::toolsApi.getMachineSignIn",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/tool-connections/:connectionId/machine-sign-in"
+          }
+        ],
+        "via": [
+          "features/connections/MachineSignInSetup.tsx"
+        ]
+      },
+      {
+        "key": "api/tools.ts::toolsApi.testMachineSignIn",
+        "requests": [
+          {
+            "method": "POST",
+            "path": "/api/tool-connections/:connectionId/machine-sign-in/test"
+          }
+        ],
+        "via": [
+          "features/connections/MachineSignInSetup.tsx"
+        ]
+      },
+      {
         "key": "api/tools.ts::toolsApi.getConnectionInstalls",
         "requests": [
           {
@@ -7919,6 +7974,18 @@
           ],
           "via": [
             "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.toolCallProgress",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/tool-call-progress"
+            }
+          ],
+          "via": [
+            "components/task-chat/tool-call-progress.tsx"
           ]
         },
         {
@@ -14948,6 +15015,30 @@
           ]
         },
         {
+          "key": "api/access.ts::accessApi.getCurrentBoardAccess",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/cli-auth/me"
+            }
+          ],
+          "via": [
+            "hooks/useTailscaleConnections.ts"
+          ]
+        },
+        {
+          "key": "api/tailscale.ts::tailscaleApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/tailscale-connections"
+            }
+          ],
+          "via": [
+            "hooks/useTailscaleConnections.ts"
+          ]
+        },
+        {
           "key": "api/tools.ts::toolsApi.listAggregatorApps",
           "requests": [
             {
@@ -15199,6 +15290,42 @@
           ],
           "via": [
             "pages/apps/ExecutorManagementSetup.tsx"
+          ]
+        },
+        {
+          "key": "api/tailscale.ts::tailscaleApi.connect",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/tailscale-connections"
+            }
+          ],
+          "via": [
+            "pages/apps/TailscaleConnector.tsx"
+          ]
+        },
+        {
+          "key": "api/tailscale.ts::tailscaleApi.disconnect",
+          "requests": [
+            {
+              "method": "DELETE",
+              "path": "/api/companies/:companyId/tailscale-connections/:id"
+            }
+          ],
+          "via": [
+            "pages/apps/TailscaleConnector.tsx"
+          ]
+        },
+        {
+          "key": "api/tailscale.ts::tailscaleApi.deviceLogin",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/tailscale-connections/:connectionId/device-login"
+            }
+          ],
+          "via": [
+            "pages/apps/TailscaleDeviceSignIn.tsx"
           ]
         }
       ]
@@ -15745,6 +15872,18 @@
           ],
           "via": [
             "pages/apps/chat/EmailEndpointSetup.tsx"
+          ]
+        },
+        {
+          "key": "api/access.ts::accessApi.getCurrentBoardAccess",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/cli-auth/me"
+            }
+          ],
+          "via": [
+            "pages/apps/chat/GitHubBotConfiguration.tsx"
           ]
         },
         {
@@ -16809,6 +16948,84 @@
       ]
     },
     {
+      "key": "pages/apps/TailscaleConnector.tsx",
+      "components": [
+        "TailscaleConnector"
+      ],
+      "routes": [
+        {
+          "path": "/:companyPrefix/apps/tailscale",
+          "flags": [],
+          "gates": [
+            "CloudAccessGate",
+            "ShellConfigurationGate(loaded={streamlinedUiLoaded}, allowPendingTaskDetail={classicStreamlinedUiLoaded && !coordinatorWorkspaceLoaded})"
+          ]
+        }
+      ],
+      "calls": [
+        {
+          "key": "api/access.ts::accessApi.getCurrentBoardAccess",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/cli-auth/me"
+            }
+          ],
+          "via": [
+            "hooks/useTailscaleConnections.ts"
+          ]
+        },
+        {
+          "key": "api/tailscale.ts::tailscaleApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/tailscale-connections"
+            }
+          ],
+          "via": [
+            "hooks/useTailscaleConnections.ts"
+          ]
+        },
+        {
+          "key": "api/tailscale.ts::tailscaleApi.connect",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/tailscale-connections"
+            }
+          ],
+          "via": [
+            "pages/apps/TailscaleConnector.tsx"
+          ]
+        },
+        {
+          "key": "api/tailscale.ts::tailscaleApi.disconnect",
+          "requests": [
+            {
+              "method": "DELETE",
+              "path": "/api/companies/:companyId/tailscale-connections/:id"
+            }
+          ],
+          "via": [
+            "pages/apps/TailscaleConnector.tsx"
+          ]
+        },
+        {
+          "key": "api/tailscale.ts::tailscaleApi.deviceLogin",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/tailscale-connections/:connectionId/device-login"
+            }
+          ],
+          "via": [
+            "pages/apps/TailscaleDeviceSignIn.tsx"
+          ]
+        }
+      ]
+    },
+    {
       "key": "pages/tools/AdvancedToolsRoute.tsx",
       "components": [
         "AdvancedToolsRoute"
@@ -17665,7 +17882,7 @@
           ]
         },
         {
-          "key": "api/issues.ts::issuesApi.list",
+          "key": "api/issues.ts::issuesApi.listCompact",
           "requests": [
             {
               "method": "GET",
@@ -19055,6 +19272,18 @@
           ],
           "via": [
             "components/task-chat/RunnerGoalWidget.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.toolCallProgress",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/tool-call-progress"
+            }
+          ],
+          "via": [
+            "components/task-chat/tool-call-progress.tsx"
           ]
         },
         {
@@ -20584,6 +20813,54 @@
         }
       ],
       "calls": [
+        {
+          "key": "api/tailscale.ts::tailscaleApi.devices",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/tailscale-connections/:id/devices"
+            }
+          ],
+          "via": [
+            "components/TailscaleSshMachine.tsx"
+          ]
+        },
+        {
+          "key": "api/tailscale.ts::tailscaleApi.pairing",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/tailscale-connections/:id/pairing"
+            }
+          ],
+          "via": [
+            "components/TailscaleSshMachine.tsx"
+          ]
+        },
+        {
+          "key": "api/access.ts::accessApi.getCurrentBoardAccess",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/cli-auth/me"
+            }
+          ],
+          "via": [
+            "hooks/useTailscaleConnections.ts"
+          ]
+        },
+        {
+          "key": "api/tailscale.ts::tailscaleApi.list",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/companies/:companyId/tailscale-connections"
+            }
+          ],
+          "via": [
+            "hooks/useTailscaleConnections.ts"
+          ]
+        },
         {
           "key": "api/agents.ts::agentsApi.list",
           "requests": [
@@ -22355,7 +22632,8 @@
             }
           ],
           "via": [
-            "components/coordinator/CoordinatorTaskCommitment.tsx"
+            "components/coordinator/CoordinatorTaskCommitment.tsx",
+            "pages/Dashboard.tsx"
           ]
         },
         {
@@ -22416,6 +22694,18 @@
           ],
           "via": [
             "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.toolCallProgress",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/tool-call-progress"
+            }
+          ],
+          "via": [
+            "components/task-chat/tool-call-progress.tsx"
           ]
         },
         {
@@ -22723,7 +23013,7 @@
           ]
         },
         {
-          "key": "api/issues.ts::issuesApi.list",
+          "key": "api/issues.ts::issuesApi.listCompact",
           "requests": [
             {
               "method": "GET",
@@ -22884,6 +23174,18 @@
           ],
           "via": [
             "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.toolCallProgress",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/tool-call-progress"
+            }
+          ],
+          "via": [
+            "components/task-chat/tool-call-progress.tsx"
           ]
         },
         {
@@ -24510,6 +24812,18 @@
           ]
         },
         {
+          "key": "api/mcpApps.ts::mcpAppsApi.toolCallProgress",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/tool-call-progress"
+            }
+          ],
+          "via": [
+            "components/task-chat/tool-call-progress.tsx"
+          ]
+        },
+        {
           "key": "direct::GET /api/attachments/:attachmentId/content",
           "requests": [
             {
@@ -25155,6 +25469,18 @@
           ],
           "via": [
             "components/mcp-app/McpAppView.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.toolCallProgress",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/tool-call-progress"
+            }
+          ],
+          "via": [
+            "components/task-chat/tool-call-progress.tsx"
           ]
         },
         {
@@ -27429,6 +27755,18 @@
           ],
           "via": [
             "components/task-chat/RunnerGoalWidget.tsx"
+          ]
+        },
+        {
+          "key": "api/mcpApps.ts::mcpAppsApi.toolCallProgress",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/issues/:issueId/tool-call-progress"
+            }
+          ],
+          "via": [
+            "components/task-chat/tool-call-progress.tsx"
           ]
         },
         {
@@ -32378,9 +32716,13 @@
         "App shell",
         "pages/AgentChat.tsx",
         "pages/AgentDetailPage.tsx",
+        "pages/CompanyEnvironments.tsx",
         "pages/DesignGuide.tsx",
         "pages/IssueDetail.tsx",
         "pages/ProjectDetail.tsx",
+        "pages/apps/Browse.tsx",
+        "pages/apps/TailscaleConnector.tsx",
+        "pages/apps/chat/ChatEndpointDetail.tsx",
         "pages/tools/AdvancedToolsRoute.tsx",
         "pages/tools/profiles/ProfileDetailRoute.tsx",
         "pages/tools/profiles/ProfileWizardRoute.tsx"
@@ -39628,9 +39970,7 @@
         "App.tsx#AppsConnectEntryRoute",
         "pages/AgentChat.tsx",
         "pages/AgentDetailPage.tsx",
-        "pages/BoardChat.tsx",
         "pages/CompanyAccess.tsx",
-        "pages/Dashboard.tsx",
         "pages/DesignGuide.tsx",
         "pages/ExecutionWorkspaceDetail.tsx",
         "pages/Inbox.tsx",
@@ -39743,6 +40083,8 @@
       ],
       "usedBy": [
         "App shell",
+        "pages/BoardChat.tsx",
+        "pages/Dashboard.tsx",
         "pages/Inbox.tsx",
         "pages/Issues.tsx"
       ],
@@ -40457,6 +40799,24 @@
         {
           "method": "POST",
           "path": "/api/issues/:issueId/mcp-app-views/:viewId/messages"
+        }
+      ],
+      "usedBy": [
+        "pages/AgentChat.tsx",
+        "pages/Dashboard.tsx",
+        "pages/DashboardLive.tsx",
+        "pages/DesignGuide.tsx",
+        "pages/IssueChatLongThreadPerf.tsx",
+        "pages/IssueDetail.tsx",
+        "pages/TaskChatLab.tsx"
+      ],
+      "referenced": true
+    },
+    "api/mcpApps.ts::mcpAppsApi.toolCallProgress": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/issues/:issueId/tool-call-progress"
         }
       ],
       "usedBy": [
@@ -42501,6 +42861,83 @@
       ],
       "referenced": true
     },
+    "api/tailscale.ts::tailscaleApi.connect": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/tailscale-connections"
+        }
+      ],
+      "usedBy": [
+        "pages/apps/Browse.tsx",
+        "pages/apps/TailscaleConnector.tsx"
+      ],
+      "referenced": true
+    },
+    "api/tailscale.ts::tailscaleApi.deviceLogin": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/tailscale-connections/:connectionId/device-login"
+        }
+      ],
+      "usedBy": [
+        "pages/apps/Browse.tsx",
+        "pages/apps/TailscaleConnector.tsx"
+      ],
+      "referenced": true
+    },
+    "api/tailscale.ts::tailscaleApi.devices": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/companies/:companyId/tailscale-connections/:id/devices"
+        }
+      ],
+      "usedBy": [
+        "pages/CompanyEnvironments.tsx"
+      ],
+      "referenced": true
+    },
+    "api/tailscale.ts::tailscaleApi.disconnect": {
+      "requests": [
+        {
+          "method": "DELETE",
+          "path": "/api/companies/:companyId/tailscale-connections/:id"
+        }
+      ],
+      "usedBy": [
+        "pages/apps/Browse.tsx",
+        "pages/apps/TailscaleConnector.tsx"
+      ],
+      "referenced": true
+    },
+    "api/tailscale.ts::tailscaleApi.list": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/companies/:companyId/tailscale-connections"
+        }
+      ],
+      "usedBy": [
+        "pages/CompanyEnvironments.tsx",
+        "pages/apps/Browse.tsx",
+        "pages/apps/TailscaleConnector.tsx"
+      ],
+      "referenced": true
+    },
+    "api/tailscale.ts::tailscaleApi.pairing": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/tailscale-connections/:id/pairing"
+        }
+      ],
+      "usedBy": [
+        "pages/CompanyEnvironments.tsx"
+      ],
+      "referenced": true
+    },
     "api/teamCatalog.ts::teamCatalogApi.catalogDetail": {
       "requests": [
         {
@@ -42644,6 +43081,16 @@
       ],
       "referenced": true
     },
+    "api/tools.ts::toolsApi.completeMachineSignInRotation": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/tool-connections/:connectionId/machine-sign-in/rotate/complete"
+        }
+      ],
+      "usedBy": [],
+      "referenced": false
+    },
     "api/tools.ts::toolsApi.configureArcadeDiscovery": {
       "requests": [
         {
@@ -42738,6 +43185,18 @@
       "usedBy": [
         "pages/apps/gateways/GatewayDetail.tsx",
         "pages/tools/AdvancedToolsRoute.tsx"
+      ],
+      "referenced": true
+    },
+    "api/tools.ts::toolsApi.createMachineSignIn": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/companies/:companyId/tools/machine-sign-in"
+        }
+      ],
+      "usedBy": [
+        "App shell"
       ],
       "referenced": true
     },
@@ -42987,6 +43446,18 @@
         "App shell",
         "pages/AgentDetailPage.tsx",
         "pages/tools/AdvancedToolsRoute.tsx"
+      ],
+      "referenced": true
+    },
+    "api/tools.ts::toolsApi.getMachineSignIn": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/tool-connections/:connectionId/machine-sign-in"
+        }
+      ],
+      "usedBy": [
+        "App shell"
       ],
       "referenced": true
     },
@@ -43577,6 +44048,16 @@
       "usedBy": [],
       "referenced": false
     },
+    "api/tools.ts::toolsApi.rotateMachineSignIn": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/tool-connections/:connectionId/machine-sign-in/rotate"
+        }
+      ],
+      "usedBy": [],
+      "referenced": false
+    },
     "api/tools.ts::toolsApi.runTestCall": {
       "requests": [
         {
@@ -43682,6 +44163,18 @@
       ],
       "usedBy": [],
       "referenced": false
+    },
+    "api/tools.ts::toolsApi.testMachineSignIn": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/tool-connections/:connectionId/machine-sign-in/test"
+        }
+      ],
+      "usedBy": [
+        "App shell"
+      ],
+      "referenced": true
     },
     "api/tools.ts::toolsApi.testPolicy": {
       "requests": [
