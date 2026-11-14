@@ -13,6 +13,7 @@ import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { createAutoSteer } from "./auto-steer";
 import {
   canCancel,
+  discardLabel,
   deferredMessage,
   entryLabel,
   firstTurnIds,
@@ -320,7 +321,7 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
                                 </Menu.Item>
                               </Show>
                               <Menu.Item icon={<Trash2 size={14} />} danger disabled={!canCancel(entry)} onSelect={() => void discard(entry)}>
-                                Cancel message
+                                {discardLabel(entry)}
                               </Menu.Item>
                             </Menu.Content>
                           </Menu>

@@ -8,6 +8,7 @@ import {
   autoSteerKey,
   canCancel,
   deferredMessage,
+  discardLabel,
   entryLabel,
   firstTurnIds,
   fullOrder,
@@ -114,6 +115,13 @@ describe("canCancel (U117, #20553)", () => {
     expect(canCancel(entry("c1", 0))).toBe(true);
     expect(canCancel(entry("c1", 0, { canDiscard: false }))).toBe(false);
     expect(canCancel(entry("optimistic-1", 0))).toBe(false);
+  });
+});
+
+describe("discardLabel (U162, #21458)", () => {
+  it("cancels your own message and discards an agent's", () => {
+    expect(discardLabel(entry("c1", 0))).toBe("Cancel message");
+    expect(discardLabel(entry("c1", 0, { comment: { id: "c1", body: "x", authorAgentId: "agent-1" } as IssueQueuedCommentEntry["comment"] }))).toBe("Discard message");
   });
 });
 

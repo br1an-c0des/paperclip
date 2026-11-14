@@ -28,6 +28,15 @@ export function canCancel(entry: IssueQueuedCommentEntry) {
 }
 
 /**
+ * The row menu's remove item. Since the 2026-11-14 sync (U162, #21458) a board user can discard an
+ * agent's queued message too (`canDiscard`); editing stays the author's. Your own message is
+ * cancelled, an agent's is discarded, as the old UI's "Discard queued message" says.
+ */
+export function discardLabel(entry: Pick<IssueQueuedCommentEntry, "comment">) {
+  return entry.comment.authorAgentId ? "Discard message" : "Cancel message";
+}
+
+/**
  * What a row offers: Steer into the run that's going, Interrupt it to start the next one with the
  * queue, or Send a queue that waits for a run that hasn't started (the same request as Interrupt,
  * with no run to stop).
