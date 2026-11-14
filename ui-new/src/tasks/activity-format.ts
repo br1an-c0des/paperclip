@@ -200,8 +200,17 @@ function updateText(details: Details, names: ActivityNames) {
   return parts.join(", ");
 }
 
-/** Who did it, in words. */
-export function actorName(event: Pick<ActivityEvent, "actorType" | "actorId" | "agentId">, names: ActivityNames) {
+type ActorFields = Pick<ActivityEvent, "actorType" | "actorId" | "agentId"> & { actorName?: string | null };
+
+/**
+ * Who did it, in words. Since the 2026-11-14 sync (U161, upstream #21406) the server names the
+ * actor on task and company activity (`actorName`: the agent's or member's name, "Board" for the
+ * local board, "Paperclip" for the system), which wins over a lookup here; you still read "You".
+ */
+export function actorName(event: ActorFields, names: ActivityNames) {
+  if (event.actorType === "user" && event.actorId && event.actorId === names.youId()) return "You";
+  const named = event.actorName?.trim();
+  if (named) return named;
   if (event.actorType === "agent") return names.agent(event.agentId ?? event.actorId) ?? "An agent";
   if (event.actorType === "user") return userName(event.actorId, names);
   if (event.actorType === "plugin") return "A plugin";
@@ -209,7 +218,7 @@ export function actorName(event: Pick<ActivityEvent, "actorType" | "actorId" | "
 }
 
 /** The line for an event, or null when the thread leaves it out. */
-export function activityLine(event: Pick<ActivityEvent, "action" | "details" | "actorType" | "actorId" | "agentId">, names: ActivityNames): ActivityLine | null {
+export function activityLine(event: Pick<ActivityEvent, "action" | "details"> & ActorFields, names: ActivityNames): ActivityLine | null {
   if (HIDDEN.has(event.action)) return null;
   const actor = actorName(event, names);
   const details = event.details ?? {};
@@ -219,7 +228,9 @@ export function activityLine(event: Pick<ActivityEvent, "action" | "details" | "
       if (details.status !== undefined) {
         const previous = record(details._previous) ?? {};
         const from = typeof previous.status === "string" ? (previous.status as IssueStatus) : null;
-        return { actor, text: rest, status: { from, to: details.status as IssueStatus } };
+        // A Stop while the run still waited to start (upstream #21407): nothing works on the task any more.
+        const why = details.reason === "stopped_while_waiting" ? "stopped the run before it started, so nobody is working on it now" : "";
+        return { actor, text: [rest, why].filter(Boolean).join(", "), status: { from, to: details.status as IssueStatus } };
       }
       // An update that changed nothing the thread shows (an internal field) is left out.
       return rest ? { actor, text: rest } : null;

@@ -164,6 +164,8 @@ export type ActivityNames = {
 export type ActivityInput = Pick<ActivityEvent, "id" | "action" | "entityType" | "entityId" | "details"> & {
   actorType: ActivityEvent["actorType"] | null;
   actorId: string | null;
+  /** The actor's name, from company and task activity reads (U161, #21406); the audit feed has none. */
+  actorName?: string | null;
   agentId?: string | null;
   runId?: string | null;
   responsibleUserId?: string | null;
@@ -176,6 +178,8 @@ function str(value: unknown) {
 }
 
 function statusVerb(details: Record<string, unknown> | null) {
+  // A Stop while the run still waited to start puts the task back to To do (upstream #21407, #21406).
+  if (details?.reason === "stopped_while_waiting") return "stopped the run waiting on";
   const change = (details?.changes as Record<string, { to?: unknown }> | undefined)?.status;
   const to = str(change?.to);
   if (!to) return null;
@@ -186,7 +190,11 @@ function personName(id: string, names: ActivityNames) {
   return id === names.youId ? "You" : names.person(id);
 }
 
+/** Who did it. The server's name for the actor wins (U161, #21406); you still read "You". */
 function actorName(event: ActivityInput, names: ActivityNames) {
+  if (event.actorType === "user" && event.actorId && event.actorId === names.youId) return "You";
+  const named = event.actorName?.trim();
+  if (named) return named;
   if (event.actorType === "agent") return (event.actorId ? names.agent(event.actorId)?.name : undefined) ?? "An agent";
   if (event.actorType === "user" && event.actorId) return personName(event.actorId, names);
   if (event.actorType === "plugin") return "A plugin";

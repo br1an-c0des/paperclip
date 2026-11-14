@@ -31,3 +31,30 @@ describe("issue.execution_waiting (#20338)", () => {
     expect(executionWaitText(undefined)).toBe("held the Retry until it can start");
   });
 });
+
+describe("actor names (U161, #21406)", () => {
+  const updated = (extra: Record<string, unknown>) =>
+    ({ action: "issue.updated", details: { priority: "high" }, actorType: "user", actorId: "local-board", agentId: null, ...extra }) as unknown as ActivityEvent;
+
+  it("prefers the server's name for the actor, and still says You", () => {
+    expect(activityLine(updated({ actorName: "Board" }), names)?.actor).toBe("Board");
+    expect(activityLine(updated({ actorId: "u7", actorName: "Maya R." }), names)?.actor).toBe("Maya R.");
+    expect(activityLine(updated({ actorType: "agent", actorId: "a9", agentId: "a9", actorName: "Codex" }), names)?.actor).toBe("Codex");
+    expect(activityLine(updated({ actorType: "plugin", actorId: "p1", actorName: "Linear sync" }), names)?.actor).toBe("Linear sync");
+    expect(activityLine(updated({ actorId: "u1", actorName: "Brian" }), names)?.actor).toBe("You");
+  });
+
+  it("falls back to its own lookup on a server without names", () => {
+    expect(activityLine(updated({ actorId: "u7" }), names)?.actor).toBe("User u7");
+    expect(activityLine(updated({ actorType: "plugin", actorId: "p1", actorName: "  " }), names)?.actor).toBe("A plugin");
+  });
+
+  it("says plainly that a Stop while the run waited put the task back (#21407)", () => {
+    const details = { status: "todo", previousStatus: "in_progress", reason: "stopped_while_waiting", _previous: { status: "in_progress" } };
+    expect(activityLine(updated({ actorName: "Board", details }), names)).toEqual({
+      actor: "Board",
+      text: "stopped the run before it started, so nobody is working on it now",
+      status: { from: "in_progress", to: "todo" },
+    });
+  });
+});
