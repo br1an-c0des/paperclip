@@ -255,10 +255,12 @@ export function keysForEvent(companyId: string, event: LiveEvent, viewer?: LiveV
       return [["plugins"]];
     // Run logs and events stream to subscribers only (the run modal and chat read them).
     // `heartbeat.run.activity` is the server's throttled "a run produced output" hint, sent instead
-    // of transcripts for runs no view asked for (`useRunInterest`).
+    // of transcripts for runs no view asked for (`useRunInterest`). `heartbeat.run.tool_progress`
+    // (#21449) is a connected-app tool call's live progress; nothing reads it yet (U154).
     case "heartbeat.run.log":
     case "heartbeat.run.event":
     case "heartbeat.run.activity":
+    case "heartbeat.run.tool_progress":
     case "external_object.updated":
       return [];
   }
