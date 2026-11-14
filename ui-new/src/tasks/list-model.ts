@@ -1,5 +1,6 @@
 import type { CompactIssue, IssueDisplayStatus, IssuePriority, IssueStatus } from "@paperclipai/shared";
 import { PRIORITY_META, shownStatus, STATUS_META, STATUS_ORDER, statusLook, statusNote, type Gradient } from "@/ui/status-meta";
+import type { TaskWaiting } from "@/runs/queue-wait";
 import type { GroupBy } from "./view-state";
 import type { WorkspaceLookup } from "./workspaces";
 
@@ -31,6 +32,8 @@ export type TaskRow = {
   /** The subtasks in the list, as rows of their own, with theirs under them. */
   children: TaskRow[];
   live: boolean;
+  /** Set when the task is live but none of its runs has started (U151): the row says "Waiting". */
+  waiting: TaskWaiting | null;
   note: RowNote | null;
 };
 
@@ -269,7 +272,7 @@ function compareRank(a: Slot, b: Slot) {
 export function buildTaskGroups(
   tasks: readonly CompactIssue[],
   liveIssueIds: ReadonlySet<string>,
-  options: { groupBy?: GroupBy; names?: GroupNames } = {},
+  options: { groupBy?: GroupBy; names?: GroupNames; waiting?: ReadonlyMap<string, TaskWaiting> } = {},
 ): TaskGroup[] {
   const groupBy = options.groupBy ?? "status";
   // Grouped by case, a subtask can be in a case its parent isn't, so every task gets its own row.
@@ -301,6 +304,7 @@ export function buildTaskGroups(
       subtasksDone: kids.filter((kid) => kid.status === "done").length,
       children: kids.map(rowFor),
       live: liveIssueIds.has(task.id),
+      waiting: liveIssueIds.has(task.id) ? (options.waiting?.get(task.id) ?? null) : null,
       note: rowNote(task),
     };
   };

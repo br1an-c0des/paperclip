@@ -36,6 +36,8 @@ import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery, useLiveRunsQuery } from "@/lib/company-data";
 import { Capsule, RunningPill } from "@/ui/Status";
+import { WaitingPill } from "@/runs/QueueWait";
+import { shownTaskRun, waitingTasks } from "@/runs/queue-wait";
 import { STATUS_META, statusLook, type StatusSource } from "@/ui/status-meta";
 import { Assignee, useTaskPeople } from "./people";
 import { stageKeys } from "./review-stages";
@@ -158,8 +160,11 @@ export function TaskDetails(props: {
 
   const task = () => query.data;
   const change = useTaskChange(task);
-  const run = createMemo(() => (liveRuns.data ?? []).find((candidate) => candidate.issueId === props.taskId));
-  const now = useNow(() => !!run());
+  // A run that has started over one still waiting in line; a task whose runs all wait says "Waiting"
+  // with no running time (U151).
+  const run = createMemo(() => shownTaskRun(liveRuns.data, props.taskId));
+  const waiting = createMemo(() => waitingTasks(run() ? [run()!] : []).get(props.taskId) ?? null);
+  const now = useNow(() => !!run() && !waiting());
   const kids = () => subtasks.data ?? [];
   const kidsDone = () => kids().filter((kid) => kid.status === "done").length;
   // A subtask another subtask's agent asked for lands here, beside its requester (agents' trees stop
@@ -324,7 +329,9 @@ export function TaskDetails(props: {
                 <Show when={run()}>
                   {(live) => (
                     <button type="button" class="td-run" onClick={() => commands.openRunModal(live().id)}>
-                      <RunningPill compact label={`Running · ${elapsed(live().startedAt ?? live().createdAt, now())}`} />
+                      <Show when={waiting()} fallback={<RunningPill compact label={`Running · ${elapsed(live().startedAt ?? live().createdAt, now())}`} />}>
+                        {(found) => <WaitingPill waiting={found()} />}
+                      </Show>
                     </button>
                   )}
                 </Show>

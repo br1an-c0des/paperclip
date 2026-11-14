@@ -29,6 +29,7 @@ import { OPEN_STATUSES } from "./Tasks";
 import { projectLegacyTab, withSearchAndHash } from "./legacy-model";
 import { classifyError, describeError } from "@/lib/offline/errors";
 import { loadingText } from "@/lib/offline/read-state";
+import { startedRuns } from "@/runs/queue-wait";
 
 /*
  * A project's pages under its header card (boards 1 and 8). The project's address is its dashboard
@@ -145,9 +146,10 @@ export function ProjectPage() {
   const list = () => (project() ? (tasks.data ?? []) : []);
   const open = () => list().filter((task) => OPEN_STATUSES.has(task.status as IssueStatus)).length;
   const blocked = () => list().filter((task) => shownStatus(task) === "blocked").length;
+  // Agents with a started run here; a run waiting in line isn't running yet (U151).
   const running = createMemo(() => {
     const ids = new Set(list().map((task) => task.id));
-    return new Set((liveRuns.data ?? []).filter((run) => run.issueId && ids.has(run.issueId)).map((run) => run.agentId)).size;
+    return new Set(startedRuns(liveRuns.data).filter((run) => run.issueId && ids.has(run.issueId)).map((run) => run.agentId)).size;
   });
   const updated = () => {
     let latest: number | null = null;

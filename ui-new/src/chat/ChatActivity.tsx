@@ -19,7 +19,9 @@ import { stopLabel, stopRun } from "@/tasks/run-stop";
 import { ChatContextSection } from "@/tasks/TaskContext";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
-import { useQueuedHold } from "./admission-hold";
+import { WaitLine } from "@/runs/QueueWait";
+import type { QueueWait } from "@/runs/queue-wait";
+import { useQueueWait } from "./admission-hold";
 import { messageTime } from "./chat-model";
 import { readNote } from "@/lib/offline/read-state";
 
@@ -39,6 +41,11 @@ import { readNote } from "@/lib/offline/read-state";
  */
 
 const TIMELINE_LIMIT = 40;
+
+/** What a run that hasn't started waits for (U151); a started run reads its running time instead. */
+function startWait(run: { startedAt: string | null }, wait: QueueWait | null) {
+  return run.startedAt ? null : wait;
+}
 
 /** Bookkeeping the column leaves out: workspace leases and cost reports. */
 const SKIPPED = /^(environment|cost|budget)\./;
@@ -70,9 +77,10 @@ export function ChatActivity(props: {
   const now = useNow(() => props.replyRuns.length > 0 || props.otherRuns.length > 0);
 
   const work = () => props.otherRuns.find((run) => run.status === "running") ?? props.otherRuns[0];
-  // A queued run's named hold (maintenance, agent setup…), from its run detail (decision 50, U120).
-  const replyHold = useQueuedHold(() => props.replyRuns[0]);
-  const workHold = useQueuedHold(work);
+  // A queued run's named hold (maintenance, agent setup…) (decision 50, U120), its place in the
+  // agent's line, or "Waiting to start" after 30 seconds (U151, runs/queue-wait.ts).
+  const replyWait = useQueueWait(() => props.replyRuns[0]);
+  const workWait = useQueueWait(work);
   const workTask = createQuery(() => ({
     queryKey: queryKeys.issues.section(work()?.issueId ?? "", "core"),
     queryFn: ({ signal }) => issuesApi.getCore(work()!.issueId!, signal),
@@ -183,8 +191,8 @@ export function ChatActivity(props: {
             {(run) => (
               <section class="ch-now ch-now--live" aria-label="Right now">
                 <span class="ch-now-kicker">
-                  <Capsule gradient="ion" size="tiny" live />
-                  Working now
+                  <Capsule gradient="ion" size="tiny" live={!startWait(run(), workWait())} queued={!!startWait(run(), workWait())} />
+                  {startWait(run(), workWait()) ? "Waiting" : "Working now"}
                 </span>
                 <Show when={workTask.data} fallback={<span class="ch-now-title">On a task</span>}>
                   {(task) => (
@@ -194,8 +202,10 @@ export function ChatActivity(props: {
                   )}
                 </Show>
                 <span class="ch-muted">
-                  {/* No "Queued" while the run is admitted, and no time until it has started; only a named hold says so (U120). */}
-                  {run().startedAt ? `Started ${since(run()) ?? "just now"} ago` : (workHold() ?? "Starting")}
+                  {/* No "Queued" while the run is admitted, and no time until it has started; only a named hold or the agent's line says so (U120, U151). */}
+                  <Show when={startWait(run(), workWait())} fallback={run().startedAt ? `Started ${since(run()) ?? "just now"} ago` : "Starting"}>
+                    {(wait) => <WaitLine wait={wait()} />}
+                  </Show>
                 </span>
                 <div class="ch-now-actions">
                   <button type="button" class="ch-pill-btn" onClick={() => commands.openRunModal(run().id)}>
@@ -214,11 +224,15 @@ export function ChatActivity(props: {
         {(run) => (
           <section class="ch-now ch-now--live" aria-label="Right now">
             <span class="ch-now-kicker">
-              <Capsule gradient="ion" size="tiny" live />
-              Working now
+              <Capsule gradient="ion" size="tiny" live={!startWait(run(), replyWait())} queued={!!startWait(run(), replyWait())} />
+              {startWait(run(), replyWait()) ? "Waiting" : "Working now"}
             </span>
             <span class="ch-now-title">Replying to you in this chat</span>
-            <span class="ch-muted">{run().startedAt ? `Started ${since(run()) ?? "just now"} ago by your message` : (replyHold() ?? "From your message")}</span>
+            <span class="ch-muted">
+              <Show when={startWait(run(), replyWait())} fallback={run().startedAt ? `Started ${since(run()) ?? "just now"} ago by your message` : "From your message"}>
+                {(wait) => <WaitLine wait={wait()} />}
+              </Show>
+            </span>
             <div class="ch-now-actions">
               <button type="button" class="ch-pill-btn ch-pill-btn--stop" disabled={stopping().has(run().id)} onClick={() => void stop(run())}>
                 <Square size={11} aria-hidden="true" />

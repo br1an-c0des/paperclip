@@ -132,6 +132,27 @@ describe("QueuedMessages round 7 (U117, U118, U127)", () => {
     expect(screen.getByRole("menuitem", { name: /Cancel message/ }).getAttribute("aria-disabled")).not.toBe("true");
   });
 
+  // An agent's queued message, which a board user may discard but not edit (U162, #21458).
+  const agentEntry = (id: string, position: number) =>
+    ({ ...entry(id, position), comment: { id, body: `Message ${id}`, authorAgentId: "agent-1" }, canEdit: false, canDiscard: true }) as IssueQueuedCommentEntry;
+
+  it("discards an agent's queued message with the queue's revision, and offers no Edit (U162, #21458)", async () => {
+    discard.mockResolvedValue({ ...queue(), entries: [], revision: "rev2" });
+    mount(queue({ entries: [agentEntry("c1", 0)] }));
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    await pick("More for queued message 1", /Discard message/);
+    await waitFor(() => expect(discard).toHaveBeenCalledWith("t1", "c1", { queueId: "q1", revision: "rev1" }));
+    await waitFor(() => expect(screen.queryByText("Message c1")).toBeNull());
+  });
+
+  it("keeps an agent's message and says the queue changed when its discard gets a 409", async () => {
+    discard.mockRejectedValue(new ApiError("x", 409, { error: "x", details: { code: "queued_comment_revision_conflict" } }));
+    mount(queue({ entries: [agentEntry("c1", 0)] }));
+    await pick("More for queued message 1", /Discard message/);
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "The queue changed in another tab. It's been refreshed; try again.");
+    expect(screen.getByText("Message c1")).toBeTruthy();
+  });
+
   it("shows why an edit wasn't saved under the editor, and keeps it open (U118, #20583)", async () => {
     edit.mockRejectedValue(new ApiError("x", 409, { error: "x", details: { code: "queued_comment_revision_conflict" } }));
     mount(queue({ entries: [entry("c1", 0)] }));

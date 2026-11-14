@@ -9,6 +9,7 @@ import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { modelStillUnavailableToast } from "@/runs/model-retry";
 import { canResumeRun, canRetryRun, resumePayload, retryOutcome, runErrorCodeLabel } from "@/runs/run-model";
+import { AgentQueueLine } from "@/runs/QueueWait";
 import { RunWatchdog } from "@/runs/RunWatchdog";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
@@ -273,12 +274,20 @@ export function TaskRuns(props: { taskId: string }) {
                         <Show when={wait()?.until ?? run.scheduledRetryAt}>
                           {(at) => <p class="tsec-muted">{wait()?.held ? "Its retry starts" : wait() ? "Starts" : "Retries"} {stampLabel(at())}</p>}
                         </Show>
-                        <Show when={runNextAction(run)}>
-                          {(next) => (
-                            <p class="tr-next">
-                              <b>Next action:</b> {next()}
-                            </p>
-                          )}
+                        {/* The agent's line, with Configure, in place of the next action (U151). */}
+                        <Show
+                          when={wait()?.queue}
+                          fallback={
+                            <Show when={runNextAction(run)}>
+                              {(next) => (
+                                <p class="tr-next">
+                                  <b>Next action:</b> {next()}
+                                </p>
+                              )}
+                            </Show>
+                          }
+                        >
+                          {(queue) => <AgentQueueLine queue={queue()} class="tr-queue" />}
                         </Show>
                         <Show when={run.status === "running"}>
                           <QuietRun runId={run.runId} taskId={props.taskId} />

@@ -113,6 +113,15 @@ describe("runWait", () => {
     expect(runWait({ ...base, status: "scheduled_retry", execution })).toEqual({ label: USAGE_LIMIT_WAIT, until: "2026-11-05T15:41:00.000Z", held: false });
   });
 
+  it("names a queued run's hold, with the agent's line while its slots are full (U151)", () => {
+    const agentQueue = { agentId: "a1", agentName: "Codie", maxConcurrentRuns: 20, runningCount: 20, position: 41, queuedCount: 295 };
+    const atCapacity = { phase: "queued", label: "Waiting for Codie", cause: "agent_at_capacity", agentQueue } as never;
+    expect(runWait({ ...base, status: "queued", startedAt: null, execution: atCapacity })).toEqual({ label: "Waiting for Codie", until: null, held: false, queue: agentQueue });
+    const routine = { phase: "queued", label: "Waiting for TES-12 to finish", cause: "routine_execution_in_progress" } as never;
+    expect(runWait({ ...base, status: "queued", startedAt: null, execution: routine })).toEqual({ label: "Waiting for TES-12 to finish", until: null, held: false, queue: null });
+    expect(runWait({ ...base, status: "queued", startedAt: null, execution: { phase: "queued", label: "Queued", cause: null } as never })).toBeNull();
+  });
+
   it("leaves other runs alone", () => {
     expect(runWait({ ...base, status: "failed" })).toBeNull();
     expect(runWait({ ...base, status: "running", execution: { phase: "working", label: "Working" } as never })).toBeNull();

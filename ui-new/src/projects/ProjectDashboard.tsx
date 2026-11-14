@@ -504,7 +504,7 @@ function Crew(props: {
                       {(task) => (
                         <div class="pd-crew-now" data-state={member.state}>
                           <div class="pd-crew-now-head">
-                            <span>{member.state === "running" ? "Working now" : member.state === "queued" ? "Queued" : member.state === "blocked" ? "Blocked" : "Next up"}</span>
+                            <span>{member.state === "running" ? "Working now" : member.state === "queued" ? "Waiting" : member.state === "blocked" ? "Blocked" : "Next up"}</span>
                             <Show when={member.runId}>
                               {(runId) => (
                                 <button type="button" class={`${buttonClass({ size: "compact" })} pd-push`} onClick={() => commands.openRunModal(runId())}>
@@ -537,8 +537,8 @@ function CrewPill(props: { state: CrewMember["state"] }) {
         <RunningPill compact />
       </Match>
       <Match when={props.state === "queued"}>
-        <TonePill tone="run" compact icon={<Capsule gradient="ion" size="tiny" />}>
-          Queued
+        <TonePill tone="run" compact icon={<Capsule gradient="ion" size="tiny" queued />}>
+          Waiting
         </TonePill>
       </Match>
       <Match when={props.state === "blocked"}>

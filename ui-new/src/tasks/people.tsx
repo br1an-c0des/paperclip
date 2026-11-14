@@ -3,12 +3,16 @@ import { createMemo, Match, Switch } from "solid-js";
 import { personName } from "@/api/access";
 import { useAgentsQuery, useLiveRunsQuery, usePeopleQuery } from "@/lib/company-data";
 import { useSession } from "@/lib/session";
+import { waitingTasks, type TaskWaiting } from "@/runs/queue-wait";
 import { AgentAvatar, PersonAvatar } from "@/ui/Avatar";
 import "./people.css";
 
 /*
  * Who a task belongs to, for the task list and panel: agents by id, people by id from the company's
- * user directory, and you; who a task can be assigned to. Also which tasks have a run going right now.
+ * user directory, and you; who a task can be assigned to. Also which tasks have a run going right now,
+ * and which of those are only waiting: every live run still queued and never started (U151,
+ * runs/queue-wait.ts). A waiting task is still live (the Live filter keeps it), but its row says
+ * "Waiting" instead of the running pill.
  */
 
 export type TaskPeople = ReturnType<typeof useTaskPeople>;
@@ -29,6 +33,7 @@ export function useTaskPeople() {
   const liveIssueIds = createMemo(
     () => new Set((liveRuns.data ?? []).flatMap((run) => (run.issueId ? [run.issueId] : []))),
   );
+  const waiting = createMemo(() => waitingTasks(liveRuns.data));
 
   const assignableAgents = createMemo(() =>
     (agents.data ?? []).filter((agent) => agent.status !== "terminated").sort((a, b) => a.name.localeCompare(b.name)),
@@ -51,6 +56,9 @@ export function useTaskPeople() {
     personImage: (id: string): string | null => imagesById().get(id) ?? null,
     youId: () => session.youId(),
     liveIssueIds,
+    /** Live tasks whose runs haven't started, with what they wait for. */
+    waitingTasks: waiting,
+    taskWaiting: (id: string): TaskWaiting | null => waiting().get(id) ?? null,
   };
 }
 

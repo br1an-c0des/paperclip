@@ -1,0 +1,35 @@
+/* A waiting run's line (QueueWait.tsx): quiet, wrapping on a narrow screen. */
+.qw-line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.qw-icon {
+  flex: none;
+  color: var(--muted);
+}
+
+.qw-lead {
+  color: var(--body);
+  font-weight: 500;
+}
+
+.qw-configure {
+  color: var(--run-fg);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.qw-configure:hover {
+  text-decoration: underline;
+}
+
+.qw-pill {
+  display: inline-flex;
+  flex: none;
+}

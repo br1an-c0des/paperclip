@@ -1,5 +1,5 @@
 import type { PaperclipQuestionResponse } from "@paperclipai/adapter-utils";
-import type { AgentAppearance, WorkspaceOperation } from "@paperclipai/shared";
+import type { AgentAppearance, ExecutionProjection, WorkspaceOperation } from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
@@ -27,6 +27,11 @@ export type LiveRun = {
   issueId?: string | null;
   startedAt: string | null;
   createdAt: string;
+  /**
+   * The run's execution projection: a queued run's named hold, and since the 2026-11-14 sync its
+   * place in the agent's line while the agent's slots are full (U151, runs/queue-wait.ts).
+   */
+  execution?: ExecutionProjection | null;
 } & LiveRunStatus;
 
 /**

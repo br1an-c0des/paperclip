@@ -80,7 +80,8 @@ export function SearchRow(props: {
   const issue = () => props.result.issue;
   const agent = () => (props.kind === "agent" ? props.people.agent(props.result.id) : undefined);
   const snippet = () => rowSnippet(props.result, props.kind);
-  const live = () => !!issue() && props.people.liveIssueIds().has(issue()!.id);
+  // A task whose runs are all still waiting to start isn't working yet (U151): no breathing capsule.
+  const live = () => !!issue() && props.people.liveIssueIds().has(issue()!.id) && !props.people.taskWaiting(issue()!.id);
 
   const identifier = () => issue()?.identifier ?? null;
   const title = (): Segment[] => {

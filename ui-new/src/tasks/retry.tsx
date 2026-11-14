@@ -35,6 +35,10 @@ import "./retry.css";
  * The same request carries `retryAction`, so it moves that continuation to the front of the agent's
  * queue and never starts a second run; the answer says `alreadyMovedOn` when the task had already
  * moved on. Rows don't offer it (as the old UI's Inbox rows don't): it's on the task's notices.
+ *
+ * Since the 2026-11-14 sync (#21497): the server waits up to 5 s for admission before it answers. A
+ * refusal another click can't change answers `accepted: false` with `refused: { reason, message }`,
+ * and the toast says "TES-4 hasn't started" with that message instead of calling it replaced.
  */
 
 export type RetryOffer = {
@@ -125,8 +129,11 @@ export function offersMoveForward(interruption: Pick<TaskInterruptionPresentatio
  * or none left to promote) carries the server's message.
  */
 export function retryReceiptOutcome(
-  receipt: Pick<TaskRetryReceipt, "accepted" | "stale" | "scheduledRetry" | "alreadyMovedOn">,
+  receipt: Pick<TaskRetryReceipt, "accepted" | "stale" | "scheduledRetry" | "alreadyMovedOn" | "refused">,
 ): { started: true } | { started: false; stale: boolean; reason: string } {
+  // Admission refused it for a reason another click can't change (#21497): the request stays saved
+  // and starts by itself if the reason clears; the server's message says why.
+  if (!receipt.accepted && receipt.refused?.message) return { started: false, stale: false, reason: receipt.refused.message };
   // A Move it forward now whose continuation already started or was given up (#21373).
   if (!receipt.accepted && receipt.alreadyMovedOn) return { started: false, stale: true, reason: ALREADY_MOVED_ON_MESSAGE };
   if (!receipt.accepted || receipt.stale) return { started: false, stale: true, reason: STALE_RETRY_MESSAGE };

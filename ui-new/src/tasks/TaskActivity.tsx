@@ -53,7 +53,10 @@ import { compactionDetail, compactionRunIds, runsToRead, useRunCompactions } fro
 import { contextUsageQuery } from "./TaskContext";
 import { CopyMessage } from "./CopyMessage";
 import { LiveRunStatusLine } from "./LiveRunStatus";
-import { useQueuedHold } from "@/chat/admission-hold";
+import { useQueueWait } from "@/chat/admission-hold";
+import { WaitLine } from "@/runs/QueueWait";
+import type { QueueWait } from "@/runs/queue-wait";
+import type { LiveRun } from "@/api/heartbeats";
 import { CommentPluginActions, CommentPluginAnnotations } from "@/plugins/CommentPlugins";
 import "./TaskActivity.css";
 
@@ -384,6 +387,9 @@ export function TaskActivity(props: {
       // A settling Stop stays marked; the run leaves the live list when it ends.
       if (!settling) setStopping((current) => new Set([...current].filter((id) => id !== run.id)));
       void client.invalidateQueries({ queryKey: queryKeys.liveRuns(company().id) });
+      // Stop on a run still waiting in line puts an in-progress task back to To do (#21407), so the
+      // task is read again too, even without the live event that says so.
+      void client.invalidateQueries({ queryKey: queryKeys.issues.detail(props.taskId) });
     }
   };
 
@@ -547,10 +553,13 @@ export function TaskActivity(props: {
               )}
             </For>
             <For each={live()}>
-              {(run) => (
-                <article class="ta-live" aria-label="Live run">
-                  <Capsule gradient="ion" size="tiny" live />
-                  <LiveRunWho run={run} />
+              {(run) => {
+                // A run waiting for the agent's slot, a named hold, or just to start (U151): no breathing capsule.
+                const wait = useQueueWait(() => run);
+                return (
+                <article class="ta-live" classList={{ "ta-live--waiting": !!wait() }} aria-label="Live run">
+                  <Capsule gradient="ion" size="tiny" live={!wait()} queued={!!wait()} />
+                  <LiveRunWho run={run} wait={wait} />
                   <span class="ta-muted">
                     Run {run.id.slice(0, 8)}
                     <Show when={run.startedAt}>{(start) => <> · {duration(start(), new Date(now()))}</>}</Show>
@@ -565,7 +574,8 @@ export function TaskActivity(props: {
                   {/* What it's doing: a tool, its latest words or a status such as a storage wait (U107). */}
                   <LiveRunStatusLine class="lrs--row" runId={run.id} run={run} active />
                 </article>
-              )}
+                );
+              }}
             </For>
             <Show when={queue.data}>{(found) => <QueuedMessages taskId={props.taskId} queue={found()} />}</Show>
           </Match>
@@ -593,12 +603,24 @@ export function TaskActivity(props: {
 
 /**
  * Who the live run line is about. Working from the moment it's admitted, as the chat's live reply
- * reads (U120, #20559); only a queued run's named hold, read from its run detail, says otherwise
- * (decision 50, chat/admission-hold.ts).
+ * reads (U120, #20559); only a queued run's named hold says otherwise (decision 50,
+ * chat/admission-hold.ts). Since the 2026-11-14 sync (U151): a run waiting for the agent's slot
+ * shows its place in line with Configure, and one still queued after 30 seconds with no named hold
+ * says "Waiting to start" (runs/queue-wait.ts).
  */
-export function LiveRunWho(props: { run: { id: string; status: string; agentName: string } }) {
-  const hold = useQueuedHold(() => props.run);
-  return <span class="ta-live-who">{hold() ? `${props.run.agentName} · ${hold()}` : `${props.run.agentName} is working`}</span>;
+export function LiveRunWho(props: {
+  run: { id: string; status: string; agentName: string; startedAt?: string | null; createdAt?: string | null; execution?: LiveRun["execution"] };
+  /** The run's wait, when the caller already reads it. */
+  wait?: () => QueueWait | null;
+}) {
+  const wait = props.wait ?? useQueueWait(() => props.run);
+  return (
+    <Show when={wait()} fallback={<span class="ta-live-who">{`${props.run.agentName} is working`}</span>}>
+      {(found) =>
+        found().kind === "agent" ? <WaitLine wait={found()} class="ta-live-wait" /> : <span class="ta-live-who">{`${props.run.agentName} · ${found().label}`}</span>
+      }
+    </Show>
+  );
 }
 
 function Comment(props: {
