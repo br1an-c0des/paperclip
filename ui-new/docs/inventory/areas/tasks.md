@@ -162,6 +162,10 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   view, shown as a sandboxed frame under the tool card: `GET /api/issues/:issueId/mcp-app-views`,
   `GET …/:viewId`, `POST …/:viewId/tool-calls`, `PUT …/:viewId/model-context`, `POST …/:viewId/messages`
   (`mcpAppsApi`), and provider tool icons from `GET /api/companies/:companyId/tool-icons` (U136).
+- **Since the 2026-11-14 sync** (#21449): a long connected-app tool call shows live progress under
+  its tool card. The old UI reads the running calls' latest progress on load with
+  `GET /api/issues/:issueId/tool-call-progress` (`mcpAppsApi.toolCallProgress`) and follows the live
+  event `heartbeat.run.tool_progress` (U154).
 
 ### `tasks/discussion`: Comment and reassign
 

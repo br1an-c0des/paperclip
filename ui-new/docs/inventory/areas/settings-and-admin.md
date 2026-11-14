@@ -72,6 +72,14 @@ retain-on-failure sandboxes, the only copy of a failed run's files, and the old 
 (`pages/CompanyEnvironments.tsx`; #20085, #20099). `DELETE /secrets/:id` now works on a secret that a
 pending binding proposal references, and rejects those proposals (#20193).
 
+Since the 2026-11-14 sync, an SSH environment can reach its machine over a connected Tailscale
+network (#20617, #21526): the form's Network choice lists the tailnet's machines from
+`GET /api/companies/:companyId/tailscale-connections` and `…/:id/devices`, and
+`POST …/:id/pairing` (`deviceId`, `port`) makes the private-key secret and the command that installs
+its public key (`tailscaleApi`, `components/TailscaleSshMachine.tsx`). New SSH environments also save
+`useHostAuth: false`, so agents use their Paperclip AI account unless Advanced's "Use authentication
+configured on the remote machine" is on (#21248). U156, U157.
+
 ## Skills
 
 | Page | Route (under `/:co`) | What it does |
@@ -138,6 +146,16 @@ gives a connection's saved profiles without access summaries (App detail uses it
 Since the second 2026-11-10 sync: a gateway client token an agent created for its responsible person
 has `pendingReveal`; the person reveals its value once on the gateway's Tokens tab with
 `POST /api/tool-gateway/gateway-tokens/:tokenId/reveal` (`toolsApi.revealGatewayToken`).
+Since the 2026-11-14 sync:
+- **Tailscale** (#20617, #21526): Browse shows a Tailscale card to people who can manage connections,
+  opening `/apps/tailscale` (`TailscaleConnector`): `GET|POST /api/companies/:companyId/tailscale-connections`
+  (connect or reconnect, answered with a device sign-in link), `POST …/:connectionId/device-login`,
+  `DELETE …/:id`, and the OAuth return `/api/tools/oauth/tailscale/callback` (U156).
+- **Machine sign-in** (#21473, #21566): the pasted-MCP sign-in step can set up OAuth client
+  credentials, with a key Paperclip holds or a client secret: `POST /api/companies/:companyId/tools/machine-sign-in`,
+  `GET /api/tool-connections/:connectionId/machine-sign-in`, `POST …/machine-sign-in/test`,
+  `POST …/rotate` and `POST …/rotate/complete` (`toolsApi.*MachineSignIn*`; rotate and complete are
+  unused in the old UI so far). The step itself is redesigned (#21469). U158, U159.
 Upstream recipes: `maps/feature-map/connection-setup.md`, `gateways-profiles.md`, `chat-channels.md`,
 `app-permissions.md`.
 
