@@ -47,6 +47,8 @@ export type AppsView =
   /** Connecting a gallery app with a connector set up in Vercel (`/connections/vercel-connect?source=…`). */
   | { section: "vercel" }
   | { section: "byo" }
+  /** Tailscale networks for SSH environments (U156; the old UI's `/apps/tailscale`). */
+  | { section: "tailscale" }
   | { section: "application"; applicationId: string }
   | { section: "detail"; connectionId: string; tab: DetailTab }
   /** Pages the old UI has that ui-new leaves for later. */
@@ -71,6 +73,7 @@ export function appsView(rest: string): AppsView {
   if (first === "review") return { section: "review" };
   if (first === "byo") return { section: "byo" };
   if (first === "vercel-connect") return { section: "vercel" };
+  if (first === "tailscale") return { section: "tailscale" };
   if (first === "connect") {
     // The old `/connections/connect/:appKey(/:stage)` addresses: open that app's setup.
     if (second) return { section: "redirect", to: `connect?source=${encodeURIComponent(second)}` };

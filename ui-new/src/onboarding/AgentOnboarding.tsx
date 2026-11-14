@@ -51,6 +51,7 @@ import {
 } from "@/agents/new/new-agent-model";
 import { EnvironmentMenu, harnessMark, instanceDefaultEnvironment, ModelMenu, PaletteGrid, paletteAppearance, TestChecks } from "@/agents/settings/fields";
 import { failure, refreshAgent } from "@/agents/shared";
+import { environmentsHref, SSH_AI_ACCOUNT_TEXT, sshAiAccountProblem, testFailureText } from "@/agents/ssh-ai-account";
 import { ConnectionSetup } from "@/connectors/ConnectionSetup";
 import { localLoginSupported } from "@/connectors/connection-model";
 import { useCompany } from "@/lib/company";
@@ -58,7 +59,7 @@ import { useAgentsQuery } from "@/lib/company-data";
 import { providerForHarness } from "@/org/bulk-model";
 import { Splash } from "@/routes/Splash";
 import { AgentAvatar } from "@/ui/Avatar";
-import { Button } from "@/ui/Button";
+import { Button, buttonClass } from "@/ui/Button";
 import { FieldButton, SettingsRow, TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
@@ -361,7 +362,7 @@ export function AgentOnboarding() {
       setTest({ signature, result });
       return result;
     } catch (caught) {
-      setTestError(failure(caught, "The test couldn't run."));
+      setTestError(testFailureText(caught, (error) => failure(error, "The test couldn't run.")));
       return null;
     } finally {
       setTesting(false);
@@ -679,6 +680,13 @@ export function AgentOnboarding() {
                         </Show>
                       </div>
                       <span class="fhelp">{selectedSignIn(signIns(), setup.binding)?.description}</span>
+                      <Show when={sshAiAccountProblem(environment(), setup.binding)}>
+                        {(hint) => (
+                          <span class="fhelp ag-warn" role="status">
+                            {hint()}
+                          </span>
+                        )}
+                      </Show>
                     </SettingsRow>
 
                     <SettingsRow
@@ -746,6 +754,25 @@ export function AgentOnboarding() {
                             {testError() ?? (currentTest() ? testSummary(currentTest()!) : "Not tested yet. Hire tests it first.")}
                           </span>
                         </div>
+                        <Show when={testError() === SSH_AI_ACCOUNT_TEXT}>
+                          <div class="ps-inline">
+                            <Show
+                              when={provider() === "anthropic" && connections.data}
+                              fallback={
+                                <A class={buttonClass({ size: "compact" })} href={`${base()}/connections/ai`}>
+                                  Connect an AI account
+                                </A>
+                              }
+                            >
+                              <Button size="compact" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setConnectOpen(true)}>
+                                Connect Claude
+                              </Button>
+                            </Show>
+                            <A class="ps-link" href={environmentsHref(company().issuePrefix)}>
+                              Environment settings
+                            </A>
+                          </div>
+                        </Show>
                         <TestChecks result={currentTest()} />
                       </div>
                     </SettingsRow>

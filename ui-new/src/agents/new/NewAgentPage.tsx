@@ -36,6 +36,7 @@ import {
   TestChecks,
 } from "../settings/fields";
 import { failure } from "../shared";
+import { environmentsHref, SSH_AI_ACCOUNT_TEXT, sshAiAccountProblem, testFailureText } from "../ssh-ai-account";
 import { OutsideAgentInvite } from "./OutsideAgentInvite";
 import {
   antigravityCandidate,
@@ -381,7 +382,7 @@ export function NewAgentPage() {
       setTest({ signature, result });
       return result;
     } catch (caught) {
-      setTestError(failure(caught, "The test couldn't run."));
+      setTestError(testFailureText(caught, (error) => failure(error, "The test couldn't run.")));
       return null;
     } finally {
       setTesting(false);
@@ -695,6 +696,13 @@ export function NewAgentPage() {
                             </Show>
                           </div>
                           <span class="fhelp">{selectedSignIn(signIns(), setup.binding)?.description}</span>
+                          <Show when={sshAiAccountProblem(environment(), setup.binding)}>
+                            {(hint) => (
+                              <span class="fhelp ag-warn" role="status">
+                                {hint()}
+                              </span>
+                            )}
+                          </Show>
                         </SettingsRow>
                       </Show>
 
@@ -772,6 +780,25 @@ export function NewAgentPage() {
                               {testError() ?? (currentTest() ? testSummary(currentTest()!) : "Not tested yet. Hire tests it first.")}
                             </span>
                           </div>
+                          <Show when={testError() === SSH_AI_ACCOUNT_TEXT}>
+                            <div class="ps-inline">
+                              <Show
+                                when={provider() === "anthropic" && connections.data}
+                                fallback={
+                                  <A class={buttonClass({ size: "compact" })} href={`${base()}/connections/ai`}>
+                                    Connect an AI account
+                                  </A>
+                                }
+                              >
+                                <Button size="compact" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setConnectOpen(true)}>
+                                  Connect Claude
+                                </Button>
+                              </Show>
+                              <A class="ps-link" href={environmentsHref(company().issuePrefix)}>
+                                Environment settings
+                              </A>
+                            </div>
+                          </Show>
                           <TestChecks result={currentTest()} />
                         </div>
                       </SettingsRow>

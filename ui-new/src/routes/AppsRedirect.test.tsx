@@ -50,6 +50,13 @@ describe("Apps' old addresses", () => {
     await waitFor(() => expect(history.get()).toBe("/TES/connections/c1/permissions?oauth=failed&code=github_installation_required"));
   });
 
+  it("open Tailscale from the old connector page and its sign-in return (U156)", async () => {
+    const history = open("/TES/apps/tailscale?tailscale_connection=n1&tailscale_error=cancelled");
+    await waitFor(() => expect(history.get()).toBe("/TES/connections/tailscale?tailscale_connection=n1&tailscale_error=cancelled"));
+    const bare = open("/apps/tailscale");
+    await waitFor(() => expect(bare.get()).toBe("/TES/connections/tailscale"));
+  });
+
   it("open in the last company when they have no prefix", async () => {
     const history = open("/apps/chat/connect?provider=slack&resume=e1#top");
     await waitFor(() => expect(history.get()).toBe("/TES/connections/chat/connect?provider=slack&resume=e1#top"));

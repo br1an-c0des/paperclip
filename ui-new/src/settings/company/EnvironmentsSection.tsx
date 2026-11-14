@@ -1,4 +1,5 @@
 import type { Environment, EnvironmentDeleteBlastRadius, EnvironmentProbeResult } from "@paperclipai/shared";
+import { useSearchParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Ellipsis, Plus, Server } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
@@ -59,6 +60,18 @@ export function EnvironmentsSection() {
   const [probes, setProbes] = createStore<Record<string, EnvironmentProbeResult | "running" | { error: string }>>({});
   const [deleting, setDeleting] = createSignal<Environment | null>(null);
   const [editing, setEditing] = createSignal<EnvironmentEdit | null>(null);
+  // Connections → Tailscale → New SSH environment opens the form on that tailnet (U156).
+  const [search, setSearch] = useSearchParams<{ tailscale_connection?: string }>();
+  createEffect(
+    on(
+      () => search.tailscale_connection,
+      (connectionId) => {
+        if (!connectionId) return;
+        setEditing({ mode: "new", tailscaleConnectionId: connectionId });
+        setSearch({ tailscale_connection: undefined }, { replace: true });
+      },
+    ),
+  );
   const capabilities = createQuery(() => ({
     queryKey: queryKeys.companySettings.environmentCapabilities(company().id),
     queryFn: ({ signal }) => environmentsApi.capabilities(company().id, signal),

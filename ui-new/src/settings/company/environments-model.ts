@@ -204,15 +204,35 @@ export type EnvironmentForm = {
   sshPrivateKeySecretId: string;
   sshKnownHosts: string;
   sshStrictHostKeyChecking: boolean;
+  /**
+   * How Paperclip reaches the host (U156): directly, or through one of the company's Tailscale
+   * networks, which saves the tailnet and the machine's stable id. The host is the machine's
+   * current address, looked up again for each run.
+   */
+  sshNetwork: SshNetwork;
+  tailscaleConnectionId: string;
+  tailscaleDeviceId: string;
+  /**
+   * Run on the remote user's own provider sign-in instead of the agent's AI account (U157,
+   * `useHostAuth`). New environments start off; saved ones without the field are on.
+   */
+  sshUseHostAuth: boolean;
   sandboxProvider: string;
   sandboxConfig: Record<string, unknown>;
 };
 
-export function emptyEnvironmentForm(): EnvironmentForm {
+export type SshNetwork = "direct" | "tailscale";
+
+/** A new environment; `tailscaleConnectionId` starts it on that tailnet (from Connections → Tailscale). */
+export function emptyEnvironmentForm(options: { tailscaleConnectionId?: string } = {}): EnvironmentForm {
   return {
     name: "",
     description: "",
     driver: "ssh",
+    sshNetwork: options.tailscaleConnectionId ? "tailscale" : "direct",
+    tailscaleConnectionId: options.tailscaleConnectionId ?? "",
+    tailscaleDeviceId: "",
+    sshUseHostAuth: false,
     sshHost: "",
     sshPort: "22",
     sshUsername: "",
@@ -244,6 +264,11 @@ export function environmentForm(environment: Environment): EnvironmentForm {
       sshPrivateKeySecretId: ref && typeof ref === "object" && typeof ref.secretId === "string" ? ref.secretId : "",
       sshKnownHosts: text(config.knownHosts),
       sshStrictHostKeyChecking: typeof config.strictHostKeyChecking === "boolean" ? config.strictHostKeyChecking : true,
+      sshNetwork: config.network === "tailscale" ? "tailscale" : "direct",
+      tailscaleConnectionId: text(config.tailscaleConnectionId),
+      tailscaleDeviceId: text(config.tailscaleDeviceId),
+      // Saved before #21248: no field means the remote machine's own sign-in.
+      sshUseHostAuth: config.useHostAuth !== false,
     };
   }
   if (environment.driver === "sandbox") {
@@ -259,6 +284,10 @@ export function environmentPayload(form: EnvironmentForm, envVars: AgentEnvConfi
   const config =
     form.driver === "ssh"
       ? {
+          useHostAuth: form.sshUseHostAuth,
+          ...(form.sshNetwork === "tailscale"
+            ? { network: "tailscale", tailscaleConnectionId: form.tailscaleConnectionId, tailscaleDeviceId: form.tailscaleDeviceId }
+            : { network: "direct" }),
           host: form.sshHost.trim(),
           port: Number.parseInt(form.sshPort || "22", 10) || 22,
           username: form.sshUsername.trim(),
@@ -279,6 +308,8 @@ export function environmentPayload(form: EnvironmentForm, envVars: AgentEnvConfi
 export function environmentFormProblem(form: EnvironmentForm): string | null {
   if (!form.name.trim()) return "Give the environment a name.";
   if (form.driver === "ssh") {
+    if (form.sshNetwork === "tailscale" && !form.tailscaleConnectionId) return "Pick a Tailscale network.";
+    if (form.sshNetwork === "tailscale" && !form.tailscaleDeviceId) return "Pick a Tailscale machine.";
     if (!form.sshHost.trim()) return "Enter the SSH host.";
     if (!form.sshUsername.trim()) return "Enter the SSH username.";
     if (!form.sshRemoteWorkspacePath.trim()) return "Enter the remote workspace path.";
@@ -289,7 +320,36 @@ export function environmentFormProblem(form: EnvironmentForm): string | null {
   return null;
 }
 
-export type SandboxProviderOption = { provider: string; displayName: string; description?: string; configSchema: JsonSchemaNode | null };
+/**
+ * Switching the network starts the connection over, as the old form does: the tailnet, machine,
+ * host, key and known hosts belong to the old route. Switching to Direct also drops the saved
+ * Tailscale machine on save.
+ */
+export function networkPatch(network: SshNetwork): Partial<EnvironmentForm> {
+  return { sshNetwork: network, tailscaleConnectionId: "", tailscaleDeviceId: "", sshHost: "", sshPrivateKey: "", sshPrivateKeySecretId: "", sshKnownHosts: "" };
+}
+
+/** A new tailnet or machine: its address, and a key and known hosts that must be paired again. */
+export function machinePatch(selection: { connectionId: string; deviceId: string; host: string }): Partial<EnvironmentForm> {
+  return {
+    tailscaleConnectionId: selection.connectionId,
+    tailscaleDeviceId: selection.deviceId,
+    sshHost: selection.host,
+    sshPrivateKey: "",
+    sshPrivateKeySecretId: "",
+    sshKnownHosts: "",
+  };
+}
+
+/**
+ * Why Test waits, or null. The server resolves a Tailscale machine through the saved connection, so
+ * a Tailscale draft is tested from the list once it's saved.
+ */
+export function draftTestBlock(form: Pick<EnvironmentForm, "driver" | "sshNetwork">): string | null {
+  return form.driver === "ssh" && form.sshNetwork === "tailscale" ? "Save it first, then test it from the list." : null;
+}
+
+export type SandboxProviderOption ={ provider: string; displayName: string; description?: string; configSchema: JsonSchemaNode | null };
 
 /**
  * The sandbox providers a new environment can use: installed providers that can run agents, without
@@ -321,7 +381,8 @@ export function environmentSummary(environment: Environment, providerName?: stri
   if (environment.driver === "ssh") {
     const host = text(config.host);
     const user = text(config.username);
-    return host ? `${user ? `${user}@` : ""}${host}` : null;
+    const where = host ? `${user ? `${user}@` : ""}${host}` : null;
+    return config.network === "tailscale" ? [where, "via Tailscale"].filter(Boolean).join(" ") : where;
   }
   if (environment.driver === "sandbox") {
     const detail = ["template", "image", "region", "workspacePath"].map((key) => text(config[key]).trim()).find(Boolean);

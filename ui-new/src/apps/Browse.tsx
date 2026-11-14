@@ -38,12 +38,13 @@ import {
   type CatalogSource,
 } from "./setups/catalog-model";
 import { CatalogManageDialog, CatalogSection, useAggregatorCatalog, useGatewayAccounts } from "./setups/CatalogRows";
+import { TailscaleEntry } from "./tailscale/TailscalePage";
 
 /*
  * Browse (`/connections`): the company's connections, then the gallery. Connections are grouped as the old
  * UI's landing page groups them: tools and MCP servers, AI accounts (managed in AI connections),
  * chat endpoints when the instance has `enableChatConnectors` on, and email inboxes. Each opens its
- * own page. The gallery lists the apps ui-new can connect, searchable and by category, and the
+ * own page. Instance admins also get Networks: Tailscale, for SSH environments (U156). The gallery lists the apps ui-new can connect, searchable and by category, and the
  * apps Composio and Arcade connect through a gateway (src/apps/setups/CatalogRows.tsx): under their
  * own source, or under Paperclip's when a search finds them.
  */
@@ -151,6 +152,8 @@ export function Browse() {
           </Match>
         </Switch>
       </section>
+
+      <TailscaleEntry />
 
       <Gallery counts={counts()} />
     </>
