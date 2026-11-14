@@ -1,4 +1,5 @@
 import { DEFAULT_SORT, parseFilters, parseGroupBy, parseSort, type GroupBy, type TaskFilters, type TaskSort } from "./view-state";
+import { randomId } from "@/lib/random-id";
 
 /*
  * Saved views: a named grouping, set of filters, sort and search for a task list, to switch back to
@@ -78,7 +79,7 @@ export const localSavedViews: SavedViewStore = {
 };
 
 function newId() {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `view-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return randomId();
 }
 
 /** Adds a view, after the others. A name already taken gets a number, so every view can be told apart. */

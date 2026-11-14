@@ -2,7 +2,7 @@ import type { ExecutionProjection } from "@paperclipai/shared";
 import { accessApi } from "@/api/access";
 import { ApiError } from "@/api/client";
 import { heartbeatsApi } from "@/api/heartbeats";
-import { newRequestId } from "./request-id";
+import { randomId as newRequestId } from "@/lib/random-id";
 
 /*
  * Stop in task run control (`tasks/run-control`), since the 2026-11-05 sync:

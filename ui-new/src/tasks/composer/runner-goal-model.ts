@@ -1,4 +1,5 @@
 import type { RunnerGoalCapability, RunnerGoalPendingAction, RunnerGoalProjection, RunnerGoalSnapshot, RunnerGoalStatus } from "@paperclipai/shared";
+import { randomId } from "@/lib/random-id";
 
 /*
  * The runner goal's model (`tasks/runner-goal`): "Goal: keep pursuing" in the composer sets an
@@ -140,5 +141,5 @@ export function liveGoalUpdate(
 }
 
 export function newRequestId() {
-  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `goal_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  return randomId();
 }

@@ -20,7 +20,7 @@ import {
   UserCheck,
   X,
 } from "lucide-solid";
-import { batch, createEffect, createMemo, createSignal, For, on, Show, untrack, type JSX } from "solid-js";
+import { batch, createEffect, createMemo, createSignal, For, on, onCleanup, Show, untrack, type JSX } from "solid-js";
 import { createStore, unwrap } from "solid-js/store";
 import { personName } from "@/api/access";
 import { activeAgents, agentsApi } from "@/api/agents";
@@ -42,9 +42,12 @@ import {
   useProjectsQuery,
 } from "@/lib/company-data";
 import { useSession } from "@/lib/session";
-import { classifySendFailure } from "@/lib/offline/errors";
-import { sendOrQueue, useOptionalWriteQueue, useWritesFor } from "@/lib/offline/WriteQueueProvider";
+import { connectivity } from "@/lib/offline/connectivity";
+import { useOptionalWriteQueue, useWritesFor } from "@/lib/offline/WriteQueueProvider";
 import { WriteStatus } from "@/lib/offline/WriteStatus";
+import { randomId } from "@/lib/random-id";
+import { draftFingerprint, holdSubmitted, loadSubmission, onNewTaskFailed, saveSubmission, takeRestoring, type Submission } from "./new-task-saves";
+import { useReopenNewTask } from "./PendingTasks";
 import { taskWrite } from "./task-write";
 import { inLineage, outsideLineage, useTaskLineage } from "./workspace-lineage";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
@@ -78,7 +81,6 @@ import {
   effortOptions,
   emptyDraft,
   loadDraft,
-  newId,
   saveDraft,
   supportsOverrides,
   workspaceChoiceAvailable,
@@ -113,9 +115,12 @@ import "./NewTaskDialog.css";
  * The draft is kept per company in local storage, so closing the dialog by accident loses nothing;
  * Cancel discards it. The payload rules live in new-task.ts.
  *
- * A task that can't reach the server waits in the write queue under its idempotency key and is
- * created when Paperclip is back (task-write.ts, U13); the dialog lists such tasks at its top until
- * then. One with attached files stays open with its draft instead, since files can't wait offline.
+ * Create closes the dialog at once and saves in the background (U153, new-task-saves.ts): the task
+ * goes into the write queue under its creation key (task-write.ts, U13), with its files held in
+ * this tab until it exists, and shows as pending on the task list. A failed save reopens its draft
+ * here when the dialog is free, or is offered as a retry beside the draft that's open; the dialog
+ * lists tasks still being saved at its top. Without a write queue (outside the session gate) it
+ * waits for the server as before.
  *
  * Repeat (boards N4–N7) turns it into "New recurring task": the Repeat pill's menu sets a schedule,
  * a webhook or both, and what happens if the last one is still open. Only what a recurring task
@@ -176,6 +181,21 @@ export function NewTaskDialog() {
   // After a recurring task with a webhook is created, the dialog shows "Connect your app" (N7).
   const [connect, setConnect] = createSignal<{ target: ConnectTarget; crumb: string } | null>(null);
   createEffect(on(open, (isOpen) => !isOpen && setConnect(null), { defer: true }));
+  // A task saved in the background that failed (U153): its draft comes back here when the dialog
+  // is free; otherwise the open draft stays and a toast offers Retry.
+  const reopen = useReopenNewTask();
+  const queue = useOptionalWriteQueue();
+  onCleanup(
+    onNewTaskFailed((write) => {
+      if (reopen(write)) return;
+      pushToast({
+        tone: "error",
+        title: `Couldn't create ${write.preview?.title ? `“${write.preview.title}”` : "a task"}`,
+        body: write.error ?? undefined,
+        action: queue ? { label: "Retry", onClick: () => queue.retry(write.id) } : undefined,
+      });
+    }),
+  );
   return (
     <Dialog
       open={open()}
@@ -234,8 +254,16 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
     if (start.assignee?.kind === "user") start.assignee = null;
   }
   const [draft, setDraft] = createStore<NewTaskDraft>(start);
-  const [files, setFiles] = createSignal<File[]>([]);
-  const [error, setError] = createSignal<string | null>(null);
+  // A failed background save reopened here brings its error and files (new-task-saves.ts).
+  const restored = takeRestoring(company().id);
+  const [files, setFiles] = createSignal<File[]>(restored?.files ?? []);
+  const [error, setError] = createSignal<string | null>(
+    restored
+      ? [restored.error ?? "Couldn't create the task.", restored.missingFiles.length > 0 ? `Attach its files again: ${restored.missingFiles.join(", ")}.` : ""]
+          .filter(Boolean)
+          .join(" ")
+      : null,
+  );
   const [whoOpen, setWhoOpen] = createSignal(false);
   const [repeatOpen, setRepeatOpen] = createSignal(false);
   const [creatingRecurring, setCreatingRecurring] = createSignal(false);
@@ -244,9 +272,10 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
   // A schedule fills each {{placeholder}} with a default, since no one's there to type it.
   const placeholders = createMemo(() => templatePlaceholders(draft.title, draft.description));
   const pending = () => create.isPending || creatingRecurring();
-  // A retry of the same submission reuses its key, so the server makes one task.
-  let submission: { fingerprint: string; key: string } | null = null;
-  // Tasks made while Paperclip was out of reach, waiting to be created (U13).
+  // A retry of the same submission reuses its key, so the server makes one task. It's kept beside
+  // the draft, so a reopened or reloaded draft sent again unchanged keeps it too.
+  let submission: Submission | null = loadSubmission(company().id);
+  // Tasks still being saved, or failed with Retry and Discard (U13, U153).
   const writes = useOptionalWriteQueue();
   const waitingTasks = useWritesFor(() => "new-task");
   const waitingHere = () => waitingTasks().filter((write) => write.companyId === company().id);
@@ -424,8 +453,9 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
     if (problem) return setError(problem);
     setError(null);
     const base = unwrap(draft);
-    const fingerprint = JSON.stringify(base);
-    if (submission?.fingerprint !== fingerprint) submission = { fingerprint, key: newId() };
+    const fingerprint = draftFingerprint(base);
+    if (submission?.fingerprint !== fingerprint) submission = { fingerprint, key: randomId() };
+    saveSubmission(company().id, submission);
     const payload = buildCreatePayload(base, {
       adapterType: assigneeAgent()?.adapterType ?? null,
       project: project(),
@@ -434,27 +464,40 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
       startCase: startingCase(),
     });
     const caseLink = caseLinkFor(base, casesOn() && !isCompact());
-    try {
-      // Out of reach, the task waits in the write queue under its key and is created when the server
-      // is back (U13). Files can't wait in browser storage, so a task with files stays in the dialog.
-      const outcome =
-        files().length > 0
-          ? { queued: false as const, result: await create.mutateAsync({ payload, caseLink }) }
-          : await sendOrQueue(
-              writes,
-              (userId) =>
-                taskWrite({ userId, companyId: company().id, issuePrefix: company().issuePrefix, payload, idempotencyKey: submission!.key, caseLink }),
-              () => create.mutateAsync({ payload, caseLink }),
-            );
-      if (outcome.queued) {
-        clearDraft(company().id);
-        submission = null;
-        pushToast({ tone: "info", title: "Saved offline", body: `${outcome.write.preview?.title ?? "The task"} is created when Paperclip is back.` });
-        commands.closeNewTask();
-        return;
+    // Saved in the background (U153): the task goes into the write queue with its key, draft and
+    // files, and the dialog closes at once. The queue sends it, or keeps it while Paperclip is out
+    // of reach; it lands or comes back through new-task-saves.ts.
+    const userId = writes?.userId();
+    if (writes && userId) {
+      const held = files();
+      const write = taskWrite({
+        userId,
+        companyId: company().id,
+        issuePrefix: company().issuePrefix,
+        payload,
+        idempotencyKey: submission.key,
+        caseLink,
+        draft: base,
+        fingerprint,
+        fileNames: held.map((file) => file.name),
+        openAfter,
+      });
+      holdSubmitted(write.id, held);
+      writes.add(write);
+      if (connectivity.status() === "offline") {
+        pushToast({
+          tone: "info",
+          title: "Saved offline",
+          body: `${write.preview?.title ?? "The task"} is created when Paperclip is back.${held.length > 0 ? " Keep this tab open: its files wait here." : ""}`,
+        });
       }
-      const { issue, failed } = outcome.result;
+      finish();
+      return;
+    }
+    try {
+      const { issue, failed } = await create.mutateAsync({ payload, caseLink });
       clearDraft(company().id);
+      saveSubmission(company().id, null);
       void client.invalidateQueries({ queryKey: queryKeys.issues.list(company().id) });
       if (caseLink) void client.invalidateQueries({ queryKey: queryKeys.cases.all(company().id) });
       void client.invalidateQueries({ queryKey: queryKeys.projects.all(company().id) });
@@ -469,20 +512,18 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
       commands.closeNewTask();
       if (openAfter) navigate(href);
     } catch (caught) {
-      setError(
-        files().length > 0 && classifySendFailure(caught) === "pending"
-          ? "Can't reach Paperclip, and attached files can't wait offline. Your draft is kept: create it again when Paperclip is back."
-          : caught instanceof Error
-            ? caught.message
-            : "Couldn't create the task.",
-      );
+      setError(caught instanceof Error ? caught.message : "Couldn't create the task.");
     }
   };
 
-  const cancel = () => {
+  // The draft and its key are done with: created, queued, or cancelled.
+  const finish = () => {
     clearDraft(company().id);
+    saveSubmission(company().id, null);
+    submission = null;
     commands.closeNewTask();
   };
+  const cancel = finish;
 
   // Opening Repeat turns it on (weekdays at 09:00) and drops a person as assignee: only an agent
   // can work a recurring task.

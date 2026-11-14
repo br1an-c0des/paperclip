@@ -71,6 +71,9 @@ describe("money and estimates", () => {
     expect(money("2000", "EUR")).toMatch(/EUR\s?20\.00/);
     expect(companyName("openrouter")).toBe("OpenRouter");
     expect(companyName("acme")).toBe("acme");
+    expect(companyName("ollama")).toBe("Ollama");
+    expect(companyName("ollama-cloud")).toBe("Ollama Cloud");
+    expect(companyName("unknown")).toBe("Unknown");
   });
 
   it("labels estimates and fully unpriced groups", () => {

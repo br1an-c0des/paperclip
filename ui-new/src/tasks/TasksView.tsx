@@ -66,6 +66,7 @@ import { useCaseIndex, useCasesOn } from "@/cases/queries";
 import { pushToast } from "@/ui/Toast";
 import { RecurringView } from "@/recurring/RecurringView";
 import { ShowSwitch, showsRecurring } from "@/recurring/ShowSwitch";
+import { PendingTasks } from "./PendingTasks";
 import "./TasksView.css";
 
 /*
@@ -676,6 +677,7 @@ export function TasksView(props: {
       <Show when={checkedTasks().length > 0}>
         <SelectionBar tasks={checkedTasks()} people={people} updates={updates} onClear={() => setChecked(new Set<string>())} />
       </Show>
+      <PendingTasks projectId={props.projectId} />
       <Switch>
         <Match when={props.tasks.isError && !props.tasks.data}>
           <section class="card tv-note">

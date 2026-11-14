@@ -2,6 +2,7 @@ import type { IssuePriority, IssueReviewPolicy, IssueStatus, IssueWorkMode, Proj
 import { templatePlaceholders } from "@/recurring/recurring-model";
 import { isRepeating, repeatProblem, scheduleCron, type RepeatDraft } from "@/recurring/schedule";
 import { withStartCaseRequest } from "@/cases/case-model";
+import { randomId } from "@/lib/random-id";
 import { buildAdapterOverrides } from "./run-overrides";
 
 /*
@@ -128,15 +129,8 @@ export function draftHasContent(draft: NewTaskDraft) {
 export { agentRunDefaults, buildAdapterOverrides, effortKeyFor, effortOptions, OVERRIDE_ADAPTERS, supportsOverrides } from "./run-overrides";
 export type { EffortOption } from "./run-overrides";
 
-/** A v4 UUID. `randomUUID` only exists in secure contexts, and the board may be served over plain HTTP. */
-export function newId() {
-  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
-  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
-  const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
+/** A v4 UUID, also on plain HTTP: lib/random-id.ts under the name the task, chat and project dialogs use. */
+export const newId = randomId;
 
 function participant(principal: Principal) {
   return {

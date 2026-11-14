@@ -12,7 +12,7 @@ import type {
   SubscriptionAccountReport,
   SubscriptionUsage,
 } from "@paperclipai/shared";
-import { billingLabel, totalTokens } from "./costs-model";
+import { billingLabel, PROVIDER_NAMES, totalTokens } from "./costs-model";
 
 /*
  * The Costs tab's other reports, apart from the components so they can be tested: spend by
@@ -52,22 +52,10 @@ export function weekRange(now: Date) {
 // ---------------------------------------------------------------------------------------------
 // Names
 
-const PROVIDERS: Record<string, string> = {
-  anthropic: "Anthropic",
-  aws_bedrock: "AWS Bedrock",
-  openai: "OpenAI",
-  openrouter: "OpenRouter",
-  chatgpt: "ChatGPT",
-  google: "Google",
-  cursor: "Cursor",
-  jetbrains: "JetBrains AI",
-  xai: "xAI",
-  unknown: "Unknown",
-};
-
-/** "Anthropic", "OpenRouter"…, or the id as given. Used for providers and billers alike. */
+/** "Anthropic", "OpenRouter", "Ollama Cloud"…, or the id as given. Used for providers and billers alike. */
 export function companyName(id: string) {
-  return PROVIDERS[id.toLowerCase()] ?? id;
+  if (id.toLowerCase() === "unknown") return "Unknown";
+  return PROVIDER_NAMES[id.toLowerCase()] ?? id;
 }
 
 const QUOTA_SOURCES: Record<string, string> = {

@@ -13,6 +13,7 @@ import { ConnectionSetup } from "@/connectors/ConnectionSetup";
 import { localLoginSupported } from "@/connectors/connection-model";
 import { useCompaniesQuery, findCompanyByPrefix, lastCompanyPrefix, useCompany } from "@/lib/company";
 import { useAgentsQuery, useExperimentalSettingsQuery } from "@/lib/company-data";
+import { randomId } from "@/lib/random-id";
 import { secretsApi } from "@/api/secrets";
 import { providerForHarness } from "@/org/bulk-model";
 import { AgentAvatar } from "@/ui/Avatar";
@@ -310,7 +311,7 @@ export function NewAgentPage() {
       if (!agent) {
         const provisional = provisionalAdapter(adapters.data);
         if (!provisional) throw new Error("No harness is available on this instance.");
-        const created = await agentsApi.create(company().id, draftCreateRequest({ ...profile }, crypto.randomUUID(), provisional));
+        const created = await agentsApi.create(company().id, draftCreateRequest({ ...profile }, randomId(), provisional));
         restored = created.id;
         batch(() => {
           setDraftId(created.id);

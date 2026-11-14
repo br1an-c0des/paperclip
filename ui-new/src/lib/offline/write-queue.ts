@@ -3,7 +3,8 @@ import type { AskUserQuestionsAnswer } from "@paperclipai/shared";
 /*
  * The write queue's records and their storage (U13, after #17960's ui/src/lib/pending-send.ts and
  * useDurableSubmit.ts). Comments, document saves, new tasks, request answers and decisions that
- * can't reach the server wait here and are sent again, in order, when it's back.
+ * can't reach the server wait here and are sent again, in order, when it's back. New tasks always
+ * go through it, so the dialog can close at once (U153, after #20831).
  *
  * - A record is written to local storage before the first attempt, so a reload, a crash or a
  *   closed tab mid-request loses nothing. Records are kept per user and company
@@ -63,8 +64,13 @@ export type QueuedWrite = {
   store?: unknown[];
   /** What the views show: a comment's text, a task's or document's title. */
   preview?: { text?: string; title?: string };
-  /** Follow-ups after it lands: the case a new task goes into, and the prefix its link uses. */
-  after?: { caseLink?: { caseId: string; role: string }; issuePrefix?: string };
+  /**
+   * Follow-ups after it lands: the case a new task goes into, the prefix its link uses, the files to
+   * attach (held in the tab's memory, tasks/new-task-saves.ts) and whether to open it.
+   */
+  after?: { caseLink?: { caseId: string; role: string }; issuePrefix?: string; fileNames?: string[]; openAfter?: boolean };
+  /** What a failed write's screen restores to edit it again: a new task's draft and its fingerprint. */
+  restore?: { draft: Record<string, unknown>; fingerprint: string };
   status: WriteStatus;
   /** The last attempt may have reached the server: settle that before sending again. */
   uncertain: boolean;

@@ -118,10 +118,25 @@ export function billingLabel(type: string) {
   return BILLING[type] ?? type.replace(/_/g, " ");
 }
 
-/** "Anthropic", "OpenAI", or the provider's id as given. */
+/** Providers and billers by name, after `providerDisplayName` in ui/src/lib/utils.ts (Ollama from #20420). */
+export const PROVIDER_NAMES: Record<string, string> = {
+  anthropic: "Anthropic",
+  aws_bedrock: "AWS Bedrock",
+  openai: "OpenAI",
+  openrouter: "OpenRouter",
+  ollama: "Ollama",
+  "ollama-cloud": "Ollama Cloud",
+  chatgpt: "ChatGPT",
+  google: "Google",
+  cursor: "Cursor",
+  jetbrains: "JetBrains AI",
+  xai: "xAI",
+};
+
+/** "Anthropic", "Ollama Cloud"…, or the provider's id as given. */
 export function providerLabel(provider: string) {
-  const known: Record<string, string> = { anthropic: "Anthropic", openai: "OpenAI", google: "Google", xai: "xAI", unknown: "Unknown provider" };
-  return known[provider] ?? provider;
+  if (provider.toLowerCase() === "unknown") return "Unknown provider";
+  return PROVIDER_NAMES[provider.toLowerCase()] ?? provider;
 }
 
 /** Spend per agent, most first (then most tokens), with each agent's models under it. */

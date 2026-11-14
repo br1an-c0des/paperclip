@@ -4,6 +4,7 @@ import { Button } from "@/ui/Button";
 import { connectivity } from "./connectivity";
 import { WriteStatus } from "./WriteStatus";
 import { useWriteQueue } from "./WriteQueueProvider";
+import type { QueuedWrite } from "./write-queue";
 import "./offline.css";
 
 /*
@@ -19,8 +20,12 @@ export function SyncBanner(props: { reconnecting: boolean }) {
   const queue = useWriteQueue();
   const [open, setOpen] = createSignal(false);
   const offline = () => props.reconnecting || connectivity.status() === "offline";
-  const failed = () => queue.writes().filter((write) => write.status === "failed");
-  const count = () => queue.writes().length;
+  // Online, a new task on its first try is shown where it was made (its pending row on the task
+  // list), so every Create doesn't flash the notice; it joins the notice once a try fails (U153).
+  const firstTry = (write: QueuedWrite) => write.kind === "task" && write.status !== "failed" && write.attempts === 0 && !write.uncertain;
+  const shown = () => (offline() ? queue.writes() : queue.writes().filter((write) => !firstTry(write)));
+  const failed = () => shown().filter((write) => write.status === "failed");
+  const count = () => shown().length;
   const tone = () => (offline() ? "offline" : failed().length > 0 ? "failed" : "syncing");
   const message = () => {
     const changes = count();
@@ -62,7 +67,7 @@ export function SyncBanner(props: { reconnecting: boolean }) {
         </div>
         <Show when={open() && count() > 0}>
           <ul class="ow-list">
-            <For each={queue.writes()}>
+            <For each={shown()}>
               {(write) => (
                 <li class="ow-item">
                   <span class="ow-item-label">{write.label}</span>

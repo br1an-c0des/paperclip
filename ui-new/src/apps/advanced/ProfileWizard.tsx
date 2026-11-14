@@ -7,6 +7,7 @@ import { createStore, reconcile } from "solid-js/store";
 import { activeAgents } from "@/api/agents";
 import { toolAccessApi, type ProfileTarget } from "@/api/tool-access";
 import { useCompany } from "@/lib/company";
+import { randomId } from "@/lib/random-id";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Field, TextArea, TextInput } from "@/ui/Field";
@@ -552,7 +553,7 @@ function Rules(props: { rules: AdvancedRule[]; onChange: (next: AdvancedRule[]) 
   const add = () => {
     const text = value().trim();
     if (kind() !== "risk_level" && !text) return;
-    const id = globalThis.crypto?.randomUUID?.() ?? `rule-${Date.now().toString(36)}`;
+    const id = randomId();
     props.onChange([
       ...props.rules,
       kind() === "risk_level" ? { id, kind: "risk_level", value: risk(), riskLevel: risk(), effect: effect() } : { id, kind: kind(), value: text, effect: effect() },

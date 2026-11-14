@@ -18,6 +18,7 @@ import { AppLogo, failureText } from "../shared";
 import { SetupSteps } from "./parts";
 import { addressProblem, inboxDomains, suggestUsername } from "./email-model";
 import { readNote } from "@/lib/offline/read-state";
+import { randomId } from "@/lib/random-id";
 
 /*
  * Giving an agent an email address (`/connections/chat/connect?provider=agentmail`, the old UI's
@@ -49,7 +50,7 @@ export function EmailSetup(props: { app: AppDefinition | null; agentId: string |
   const [step, setStep] = createSignal<Step>("account");
   const [agentId, setAgentId] = createSignal(props.agentId ?? "");
   const agent = () => choices().find((candidate) => candidate.id === agentId()) ?? null;
-  const [requestId] = createSignal(props.resume ?? crypto.randomUUID());
+  const [requestId] = createSignal(props.resume ?? randomId());
   const [savedId, setSavedId] = createSignal<string>("");
   const [apiKey, setApiKey] = createSignal("");
   const [connectionId, setConnectionId] = createSignal("");

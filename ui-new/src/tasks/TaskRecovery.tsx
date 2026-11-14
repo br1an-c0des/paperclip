@@ -41,7 +41,7 @@ import {
   type PreviousServerStop,
   type RecoveryOutcome,
 } from "./recovery-actions";
-import { newRequestId } from "./request-id";
+import { randomId as newRequestId } from "@/lib/random-id";
 import { useBoardAccess } from "./TaskActions";
 
 /*

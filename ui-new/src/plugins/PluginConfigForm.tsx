@@ -56,6 +56,9 @@ export function PluginConfigForm(props: {
   );
 
   const dirty = () => config.isSuccess && valuesDiffer(values(), saved());
+  // Nothing saved yet (`null`): the first save is allowed even when the form matches the schema's
+  // defaults, so a plugin whose defaults are valid can be configured as it is (#19847).
+  const firstSave = () => config.isSuccess && config.data === null;
 
   const check = () => {
     const problems = validateValues(props.schema, values());
@@ -66,11 +69,13 @@ export function PluginConfigForm(props: {
   const save = async () => {
     setResult(null);
     if (!check()) return;
+    // A save stays with the plugin and company it was made for, even if the page moves on meanwhile.
+    const { pluginId, companyId, schema } = props;
     setSaving(true);
     try {
-      const next = await pluginsApi.saveConfig(props.pluginId, props.companyId, values());
-      client.setQueryData(queryKeys.plugins.config(props.pluginId, props.companyId), next);
-      setValues(initialValues(props.schema, next.configJson));
+      const next = await pluginsApi.saveConfig(pluginId, companyId, values());
+      client.setQueryData(queryKeys.plugins.config(pluginId, companyId), next);
+      if (props.pluginId === pluginId && props.companyId === companyId) setValues(initialValues(schema, next.configJson));
       pushToast({ tone: "success", title: "Configuration saved" });
     } catch (caught) {
       setResult({ tone: "bad", text: caught instanceof Error && caught.message ? caught.message : "Couldn't save the configuration." });
@@ -96,7 +101,7 @@ export function PluginConfigForm(props: {
   return (
     <SettingsCard
       title="Configuration"
-      description="Generated from the plugin's settings schema. It applies to this organization."
+      info="Generated from the plugin's settings schema. It applies to this organization."
       footer={
         <>
           <Show when={result()}>
@@ -116,7 +121,7 @@ export function PluginConfigForm(props: {
               {testing() ? "Testing…" : "Test"}
             </Button>
           </Show>
-          <Button variant="primary" size="compact" disabled={!dirty() || saving()} onClick={() => void save()}>
+          <Button variant="primary" size="compact" disabled={(!dirty() && !firstSave()) || saving()} onClick={() => void save()}>
             {saving() ? "Saving…" : "Save"}
           </Button>
         </>

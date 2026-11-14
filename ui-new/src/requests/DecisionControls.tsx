@@ -8,6 +8,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { sendOrQueue, useOptionalWriteQueue, useWritesFor } from "@/lib/offline/WriteQueueProvider";
 import { WriteStatus } from "@/lib/offline/WriteStatus";
+import { randomId } from "@/lib/random-id";
 import { decisionWrite } from "./answer-write";
 import type { TaskPeople } from "@/tasks/people";
 import { Button } from "@/ui/Button";
@@ -153,7 +154,7 @@ export function DecisionControls(props: { request: Request; source: Source; peop
     mutationFn: async (choice: DecisionOption) => {
       const values = Object.fromEntries(Object.entries(inputs()).filter(([, value]) => value.trim()));
       const fingerprint = JSON.stringify([decision().id, choice.id, values]);
-      if (attempt?.fingerprint !== fingerprint) attempt = { fingerprint, key: crypto.randomUUID() };
+      if (attempt?.fingerprint !== fingerprint) attempt = { fingerprint, key: randomId() };
       const body = { optionId: choice.id, inputValues: values, idempotencyKey: attempt.key };
       const outcome = await sendOrQueue(
         writes,

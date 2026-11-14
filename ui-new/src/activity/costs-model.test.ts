@@ -1,6 +1,18 @@
 import type { BudgetPolicySummary, CostByAgent, CostByAgentModel } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { agentCostRows, barPercent, budgetRows, costRange, formatTokens, pricingNote, projectCostRows, unpricedMark } from "./costs-model";
+import { agentCostRows, barPercent, budgetRows, costRange, formatTokens, pricingNote, projectCostRows, providerLabel, unpricedMark } from "./costs-model";
+
+// U165 (#20420): Ollama billers by their product names.
+describe("provider names", () => {
+  it("names Ollama and Ollama Cloud, in any case, and keeps other ids as given", () => {
+    expect(providerLabel("ollama")).toBe("Ollama");
+    expect(providerLabel("ollama-cloud")).toBe("Ollama Cloud");
+    expect(providerLabel("Ollama-Cloud")).toBe("Ollama Cloud");
+    expect(providerLabel("openrouter")).toBe("OpenRouter");
+    expect(providerLabel("unknown")).toBe("Unknown provider");
+    expect(providerLabel("acme")).toBe("acme");
+  });
+});
 
 describe("cost ranges", () => {
   const now = new Date(2026, 9, 27, 15, 30);

@@ -6,6 +6,7 @@ import { browserUseApi } from "@/api/browser-use";
 import { queryKeys } from "@/api/queryKeys";
 import { ConfirmDialog } from "@/documents/ConfirmDialog";
 import { useNow } from "@/lib/clock";
+import { randomId } from "@/lib/random-id";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Segmented } from "@/ui/Segmented";
@@ -95,7 +96,7 @@ function BrowserRow(props: { taskId: string; browser: TaskBrowser }) {
 }
 
 export function BrowserView(props: { taskId: string; browser: TaskBrowser; now: number }) {
-  const viewerId = crypto.randomUUID();
+  const viewerId = randomId();
   const control = useBrowserControl(props.taskId, () => props.browser);
   const [size, setSize] = createSignal<BrowserUseViewportState>({ preset: "fit" });
   const [loaded, setLoaded] = createSignal(false);
