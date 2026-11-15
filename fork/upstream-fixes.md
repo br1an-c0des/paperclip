@@ -480,9 +480,11 @@ was closed by an automated pipeline as already fixed, which it isn't.
   `createAcpxPackageJsonResolver("/app/server", "/app/server/package.json")("@agentclientprotocol/claude-agent-acp")`
   throws this error, and with root `/app` it resolves. A commenter on #18557 confirms it on `master`
   at `358977454b` (2026-11-10).
-- **Fork workaround:** none in code. On the deployment, put Claude agents on the legacy runner
-  (with `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` as a company secret if the AI connection
-  isn't enough) until a fixed upstream image is synced and deployed; then move them back.
+- **Fork workaround:** since 2026-11-15 the deployment image carries the fix:
+  [`deploy-runner-provider-authority`](../FORK-PATCHES.md#deploy-runner-provider-authority) patches
+  the compiled function at image build. Before that, Claude agents on the deployment ran on the
+  legacy runner (with `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` as a company secret if the
+  AI connection wasn't enough).
 - **Built 2026-11-10:** commit `96f6f4fd4` off `master` at `69c69e4c2`. The rule from #15912 moves
   into `sourceWorkspaceProviderRoot` in `installed-provider-authority.ts`;
   `resolveInstalledProviderAuthority` uses it, and runnerd's `acpxProviderPackageAuthority` calls
@@ -494,7 +496,8 @@ was closed by an automated pipeline as already fixed, which it isn't.
   with the new root and fails with the old one. No fixed image was built. The PR draft is
   `PR_DESCRIPTION.md` in `~/coding/paperclip-fixes/runner-docker-provider-authority`.
 - **Submitted 2026-11-10** as [#20710](https://github.com/paperclipai/paperclip/pull/20710). Once
-  merged and in a published image: sync, redeploy, and move Claude agents back to the Paperclip Runner.
+  merged and in a published image: sync, redeploy, check the build log says the patch found
+  upstream's fix, then remove the patch (see its FORK-PATCHES entry).
 
 ### 29. Don't report the agent JWT secret missing when `BETTER_AUTH_SECRET` covers it
 

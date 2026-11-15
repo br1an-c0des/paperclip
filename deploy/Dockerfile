@@ -2,7 +2,8 @@
 #
 # Fork image: upstream's published Paperclip image with the ui-new SolidJS UI
 # in place of the React UI. Nothing upstream builds is rebuilt here, so the
-# Rust runner, agent CLIs and server stay exactly as upstream shipped them.
+# Rust runner, agent CLIs and server stay as upstream shipped them, apart from
+# the temporary patches in deploy/patches/ (see the end of this file).
 #
 # UPSTREAM_SHA is the upstream commit whose server image this fork builds on;
 # deploy/deploy.sh resolves it from the last upstream commit merged into this
@@ -41,3 +42,11 @@ FROM ghcr.io/paperclipai/paperclip:sha-${UPSTREAM_SHA}
 # index.html (server/src/app.ts), so clear both and install ui-new as ui/dist.
 RUN rm -rf /app/server/ui-dist /app/ui/dist
 COPY --from=ui --chown=node:node /app/ui-new/dist /app/ui/dist
+
+# FORK: deploy-runner-provider-authority. Temporary fix to upstream's built
+# server until a published image has upstream PR #20710: lets Claude and Codex
+# agents on the Paperclip Runner pass verification in this image. The script
+# skips copies that already have upstream's fix and fails the build if the
+# code it patches has changed. See FORK-PATCHES.md.
+COPY deploy/patches/runner-provider-authority.mjs /tmp/fork-patches/
+RUN node /tmp/fork-patches/runner-provider-authority.mjs && rm -rf /tmp/fork-patches

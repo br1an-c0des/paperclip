@@ -77,6 +77,40 @@ upstream could use as upstream pull requests instead (see
 - **If upstream changes this:** never resolve by hand. Take master's version and regenerate:
   `git checkout --theirs pnpm-lock.yaml && corepack pnpm install && git add pnpm-lock.yaml`.
 
+## Image patches
+
+Changes the deployment makes to upstream's built image (`deploy/Dockerfile`), not to source. They
+live in fork-only files, but they change upstream's shipped server, so each one has an entry.
+
+### deploy-runner-provider-authority
+
+- **Files:** none in the source tree. At image build, `deploy/patches/runner-provider-authority.mjs`
+  edits two compiled files in upstream's image: `server/dist/vendor/paperclip-runner/drivers/acpx/installed-provider-authority.js`
+  and the `server/dist-runtime/chunk-*.mjs` bundle that inlines it (what the server runs). [Fork-only:
+  `deploy/patches/runner-provider-authority.mjs`, the step at the end of `deploy/Dockerfile`.]
+- **What:** `resolveInstalledProviderAuthority` returns the pnpm workspace root (`/app`) instead of
+  the server package (`/app/server`) when the server sits in a workspace, so the server-side ACPX
+  verifier accepts the Claude and Codex bridges. A build-time copy of upstream PR
+  [#20710](https://github.com/paperclipai/paperclip/pull/20710) (issue #18557), with the same rule
+  as `sourceWorkspaceProviderRoot` there.
+- **Why:** temporary. Without it, Claude and Codex agents on the Paperclip Runner fail their
+  environment test in the Docker image and never run
+  ([upstream-fixes 28](fork/upstream-fixes.md#28-let-claude-runner-agents-pass-verification-in-the-docker-image)).
+  Added 2026-11-15 at the user's request. Local `pnpm dev` doesn't need it: the failing check only
+  applies to the vendored build.
+- **Depends on:** a `function resolveInstalledProviderAuthority(` that ends with
+  `return { root, manifest };`, in the vendored file and in exactly one `server/dist-runtime/*.mjs`
+  file; the image layout (`/app/server` in a workspace with `node_modules/.pnpm`,
+  `pnpm-workspace.yaml`, root package `paperclip`); Node with `process.getBuiltinModule` (22.3+).
+- **If upstream changes this:** the script skips a copy that already calls
+  `sourceWorkspaceProviderRoot`, and fails the image build if the function no longer ends as
+  expected. If #20710 (or another fix for #18557) is in the base image: the build log says
+  "already has upstream's fix" for both copies; delete the script, the Dockerfile step and this
+  entry, and move Claude agents back to the Paperclip Runner. If the build fails on a rewrite
+  without the fix, update the script to the new code and keep the same rule. To check a new base
+  image during a sync, before deploying (patches only the throwaway container and prints what it did):
+  `docker run --rm --network none --entrypoint node -v "$PWD/deploy/patches:/p:ro" ghcr.io/paperclipai/paperclip:sha-<sha> /p/runner-provider-authority.mjs`
+
 ## Database objects
 
 Tables, columns, indexes and other database objects the fork adds. Fork migrations must not use

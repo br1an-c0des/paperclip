@@ -11,6 +11,7 @@ why things are set up this way, see [FORK.md](../FORK.md).
 | `docker-compose.yml` | Postgres + Paperclip, with bind mounts for all data |
 | `.env.example` | Settings template; copy it to `deploy/.env` (gitignored) |
 | `deploy.sh` | Picks the matching upstream image, then builds and (re)starts the stack |
+| `patches/` | Temporary build-time fixes to upstream's built server, each in FORK-PATCHES.md |
 
 ### How the image is built
 
@@ -23,6 +24,11 @@ The server serves whatever is in `ui/dist`. `Dockerfile` therefore:
 2. Starts `FROM ghcr.io/paperclipai/paperclip:sha-<UPSTREAM_SHA>`, the image upstream publishes
    for each `master` commit.
 3. Replaces `/app/ui/dist` with the `ui-new` build.
+4. Applies the temporary patches in `patches/` to upstream's built server. Today there's one,
+   `runner-provider-authority.mjs`: it lets Claude and Codex agents on the Paperclip Runner pass
+   verification until upstream ships its fix (PR #20710). It skips a copy that already has upstream's
+   fix and fails the build if the code it patches has changed. Each patch has an entry in
+   [FORK-PATCHES.md](../FORK-PATCHES.md#image-patches).
 
 The service worker (`/sw.js`) replaces the old UI's in every browser that had it, since it's served
 at the same address with new contents. Each deploy changes its build id, so open tabs and the
