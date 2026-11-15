@@ -23,6 +23,7 @@ import {
 } from "lucide-solid";
 import { createSignal, For, Match, Show, Switch, type JSX } from "solid-js";
 import { useNow } from "@/lib/clock";
+import { InfoTip } from "@/ui/InfoTip";
 import { Markdown } from "@/ui/Markdown";
 import {
   planHeadline,
@@ -307,10 +308,10 @@ export function ProposalCard(props: { markdown: string; streaming: boolean }) {
           <span class="ra-proposal-title">
             Proposed a plan · <b>{proposalTitle(props.markdown)}</b>
           </span>
+          <InfoTip label="About Proposed a plan">On a standard or planning task, the task's Plan document takes this plan, with a request to approve it.</InfoTip>
         </summary>
         <div class="rt-tbody">
           <Markdown source={props.markdown} class="rt-md ra-proposal-md" />
-          <p class="cap">On a standard or planning task, the task's Plan document takes this plan, with a request to approve it.</p>
         </div>
       </details>
     </Show>

@@ -13,7 +13,8 @@ import { parseDollars } from "@/projects/settings/settings-model";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { TextInput } from "@/ui/Field";
+import { InfoHeading, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Menu } from "@/ui/Menu";
 import { Capsule } from "@/ui/Status";
 import { gradientVar } from "@/ui/status-meta";
@@ -250,6 +251,9 @@ export function OrgAgents() {
               Org chart
             </A>
           </Show>
+          <InfoTip label="About the agent list" placement="bottom">
+            A hire waits here until someone approves it in the Inbox. The crown marks your primary agent, the default for new tasks and chat.
+          </InfoTip>
         </div>
       </div>
 
@@ -346,11 +350,12 @@ export function OrgAgents() {
         <For each={team()}>{(row) => <AgentRow row={row} data={data} checked={selected().has(row.agent.id)} onToggle={() => toggle(row.agent.id)} actions={actions} />}</For>
         <Show when={builtIns().length > 0 || (data.builtInsAvailable().length > 0 && (filter() === "all" || filter() === "builtin") && !query().trim() && rosterActive() === 0)}>
           <div class="org-group-head">
-            <h3 class="disp">Built-in agents</h3>
-            <span class="org-muted">
-              Run Paperclip's routines for the whole organization.
-              <Show when={data.builtInsAvailable().length > 0}> {data.builtInsAvailable().length} more can be added.</Show>
-            </span>
+            <InfoHeading level={3} class="disp" info="They run Paperclip's routines for the whole organization.">
+              Built-in agents
+            </InfoHeading>
+            <Show when={data.builtInsAvailable().length > 0}>
+              <span class="org-muted">{data.builtInsAvailable().length} more can be added.</span>
+            </Show>
           </div>
           <For each={builtIns()}>{(row) => <AgentRow row={row} data={data} checked={selected().has(row.agent.id)} onToggle={() => toggle(row.agent.id)} actions={actions} />}</For>
           <Show when={(filter() === "all" || filter() === "builtin") && !query().trim() && rosterActive() === 0}>
@@ -359,9 +364,6 @@ export function OrgAgents() {
         </Show>
       </section>
 
-      <p class="org-foot">
-        A hire waits here until someone approves it in the Inbox. The crown marks your primary agent, the default for new tasks and chat.
-      </p>
 
       <Show when={editing()}>
         {(group) => (
@@ -597,7 +599,6 @@ function BudgetDialog(props: { open: boolean; onOpenChange: (open: boolean) => v
       onOpenChange={props.onOpenChange}
       width={440}
       title="Set monthly budget"
-      description={`What each of the ${count()} may spend per calendar month (UTC). At the limit Paperclip pauses the agent. Enter 0 to turn the limit off.`}
       footer={
         <div class="org-dialog-foot">
           <Button variant="quiet" onClick={() => props.onOpenChange(false)} disabled={saving()}>
@@ -609,10 +610,26 @@ function BudgetDialog(props: { open: boolean; onOpenChange: (open: boolean) => v
         </div>
       }
     >
-      <label class="org-budget-field">
-        <span class="org-strong">Monthly limit, in dollars</span>
-        <TextInput inputmode="decimal" placeholder="40.00" value={value()} onInput={(event) => setValue(event.currentTarget.value)} invalid={value() !== "" && cents() === null} />
-      </label>
+      {/* The bulk upsert sends no hardStopEnabled: a new policy is a hard stop, an existing one keeps its own (server budgets.ts upsertPolicy). */}
+      <div class="org-budget-field">
+        <span class="info-line">
+          <label class="org-strong" for="org-budget-amount">
+            Monthly limit, in dollars
+          </label>
+          <InfoTip label="About Monthly limit">
+            What each may spend per calendar month (UTC). At the limit Paperclip pauses the agent and stops its running and queued work, unless its budget is set to only warn; enter 0
+            to turn the limit off.
+          </InfoTip>
+        </span>
+        <TextInput
+          id="org-budget-amount"
+          inputmode="decimal"
+          placeholder="40.00"
+          value={value()}
+          onInput={(event) => setValue(event.currentTarget.value)}
+          invalid={value() !== "" && cents() === null}
+        />
+      </div>
     </Dialog>
   );
 }

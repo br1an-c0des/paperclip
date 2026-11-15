@@ -1,6 +1,7 @@
-import { ChevronRight, Copy, Info } from "lucide-solid";
+import { ChevronRight, Copy } from "lucide-solid";
 import { For, Show } from "solid-js";
 import type { RunDetail } from "@/api/runs";
+import { InfoTip } from "@/ui/InfoTip";
 import { pushToast } from "@/ui/Toast";
 import type { RunInvocation } from "./invocation";
 import { capitalize, isActiveRun, shortId } from "./run-model";
@@ -33,16 +34,18 @@ export function RunInput(props: {
   return (
     <div class="ri">
       <p class="rm-note">
-        <Info size={15} aria-hidden="true" />
+        <InfoTip label="About Input" placement="bottom">
+          What Paperclip sent {props.harness} to start this run. Before calling the model, {props.harness} adds its own system prompt, tool definitions and session history, so this
+          isn't the model's full input.
+        </InfoTip>
         <span>
-          What Paperclip sent {props.harness} to start this run. Before it calls the model, {props.harness} adds its own system prompt,
-          tool definitions and session history, so this isn't the model's full input. Only a{" "}
+          Only a{" "}
           <Show when={props.isAdmin} fallback={<>provider trace</>}>
             <button type="button" class="ri-link" onClick={() => props.onShowTrace()}>
               provider trace
             </button>
           </Show>{" "}
-          records those exact requests, when it's turned on
+          records the exact requests, when it's turned on
           {props.isAdmin ? "." : ", and only instance admins can see one."}
         </span>
       </p>
@@ -135,7 +138,7 @@ export function RunInput(props: {
                   <summary>
                     <ChevronRight size={13} class="rt-chev" aria-hidden="true" />
                     Wake context
-                    <span class="cap">JSON · what Paperclip knew about this wake</span>
+                    <InfoTip label="About Wake context">What Paperclip knew about this wake, as JSON.</InfoTip>
                   </summary>
                   <pre class="rm-pre">{context()}</pre>
                 </details>

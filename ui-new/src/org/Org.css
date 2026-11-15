@@ -40,11 +40,6 @@
   font-weight: 700;
 }
 
-.org-small {
-  font-size: 12px;
-  line-height: 1.5;
-}
-
 .org-pad {
   padding: 10px 0;
 }
@@ -1705,6 +1700,11 @@ a.org-act-target:hover {
   flex-direction: column;
   gap: 6px;
   padding-left: 26px;
+}
+
+.org-bulk-custom > .input {
+  flex: 1;
+  min-width: 0;
 }
 
 .org-option {
