@@ -8,6 +8,8 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
 import { agoLabel } from "@/runs/run-model";
 import { Button } from "@/ui/Button";
+import { InfoHeading } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Markdown } from "@/ui/Markdown";
 import { pushToast } from "@/ui/Toast";
 import { canAlwaysAllow, displayName, requestTitle } from "./apps-model";
@@ -25,10 +27,9 @@ export function ReviewPage() {
   return (
     <section class="card ap-card" aria-labelledby="ap-review">
       <header class="chead">
-        <h3 id="ap-review" class="disp">
+        <InfoHeading level={3} id="ap-review" class="disp" info="Actions your agents want to run that ask you first.">
           Waiting for your OK
-        </h3>
-        <p>Actions your agents want to run that ask you first. Allow once, always allow, or decline.</p>
+        </InfoHeading>
       </header>
       <ReviewQueue />
     </section>
@@ -110,19 +111,19 @@ function ReviewRow(props: { item: ToolActionRequestListItem }) {
           <Markdown source={preview()} />
         </div>
       </Show>
-      <Show when={canAlwaysAllow(props.item)}>
-        <p class="ap-row-meta">
-          Always allow lets this agent use this action with other arguments on this connection, within the current project when there is one.
-        </p>
-      </Show>
       <div class="ap-request-actions">
         <Button size="compact" variant="primary" disabled={busy()} icon={<Check size={14} aria-hidden="true" />} onClick={() => resolve.mutate("once")}>
           {busy() && resolve.variables === "once" ? "Allowing…" : "Allow once"}
         </Button>
         <Show when={canAlwaysAllow(props.item)}>
-          <Button size="compact" disabled={busy()} onClick={() => resolve.mutate("always")}>
-            {busy() && resolve.variables === "always" ? "Saving…" : "Always allow"}
-          </Button>
+          <span class="info-line">
+            <Button size="compact" disabled={busy()} onClick={() => resolve.mutate("always")}>
+              {busy() && resolve.variables === "always" ? "Saving…" : "Always allow"}
+            </Button>
+            <InfoTip label="About Always allow">
+              Always allow lets this agent use this action with other arguments on this connection, within the current project when there is one.
+            </InfoTip>
+          </span>
         </Show>
         <Button size="compact" variant="quiet" disabled={busy()} icon={<X size={14} aria-hidden="true" />} onClick={() => resolve.mutate("decline")}>
           Decline

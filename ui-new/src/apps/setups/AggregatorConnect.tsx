@@ -7,7 +7,7 @@ import { createStore } from "solid-js/store";
 import { toolsApi } from "@/api/tools";
 import { useCompany } from "@/lib/company";
 import { Button, buttonClass } from "@/ui/Button";
-import { Field, TextInput } from "@/ui/Field";
+import { Field, InfoHeading, TextInput } from "@/ui/Field";
 import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
 import { accessInstalls, connectFailure, errorCode, finishDefaults, type AccessDraft } from "../apps-model";
@@ -95,7 +95,7 @@ export function AggregatorConnect(props: { app: AppDefinition; id: AggregatorId;
   }));
 
   const addressField = () => (
-    <Field label="MCP address" for="ap-gw-url" help={info().urlHelp}>
+    <Field label="MCP address" for="ap-gw-url" info={info().urlHelp}>
       <TextInput
         id="ap-gw-url"
         type="url"
@@ -121,8 +121,15 @@ export function AggregatorConnect(props: { app: AppDefinition; id: AggregatorId;
       <header class="ap-connect-head">
         <AppLogo app={props.app} name={info().name} size={48} />
         <div class="ap-connect-title">
-          <h2 class="disp">{props.resume ? `Finish connecting ${info().name}` : `Connect ${info().name}`}</h2>
-          <p>{props.app.description} Paperclip decides which of its tools agents get; app sign-in happens in {info().name}.</p>
+          <InfoHeading
+            level={2}
+            class="disp"
+            infoLabel={`About ${info().name}`}
+            info={`Paperclip decides which of its tools agents get; app sign-in happens in ${info().name}.`}
+          >
+            {props.resume ? `Finish connecting ${info().name}` : `Connect ${info().name}`}
+          </InfoHeading>
+          <p>{props.app.description}</p>
         </div>
         <a class={buttonClass({ size: "compact", variant: "quiet" })} href={info().setupUrl} target="_blank" rel="noopener noreferrer">
           Guide
@@ -145,11 +152,11 @@ export function AggregatorConnect(props: { app: AppDefinition; id: AggregatorId;
         {addressField()}
       </Show>
 
-      <Field label="Sign-in" help={info().authHelp}>
+      <Field label="Sign-in" info={info().authHelp}>
         <Segmented label="Sign-in" options={AUTH_OPTIONS} value={draft.auth} onChange={(value) => setDraft("auth", value)} />
       </Field>
       <Show when={draft.auth === "bearer"}>
-        <Field label="Token" for="ap-gw-token" help="Just the token, without the word Bearer.">
+        <Field label="Token" for="ap-gw-token" info="Just the token, without the word Bearer.">
           <TextInput id="ap-gw-token" type="password" autocomplete="new-password" value={draft.token} onInput={(event) => setDraft("token", event.currentTarget.value)} />
         </Field>
       </Show>
@@ -193,7 +200,7 @@ export function AggregatorConnect(props: { app: AppDefinition; id: AggregatorId;
       <IdentityPicker kinds={[...kinds()]} value={identity()} onChange={setIdentity} disabled={connect.isPending} />
 
       <Field label="Which agents can use it">
-        <AgentAccessPicker value={access()} onChange={setAccess} disabled={connect.isPending} allDescription="Current and future agents can use it, and carry its tools on every run." />
+        <AgentAccessPicker value={access()} onChange={setAccess} disabled={connect.isPending} allInfo="Current and future agents can use it, and carry its tools on every run." />
       </Field>
 
       <Show when={failure()}>

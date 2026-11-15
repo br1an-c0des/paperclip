@@ -11,7 +11,7 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { Field } from "@/ui/Field";
+import { Field, InfoHeading } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { pushToast } from "@/ui/Toast";
 import { failureText, useRefreshTools } from "../shared";
@@ -114,10 +114,14 @@ export function ProfilesIndex(props: { checkOpen?: boolean }) {
       <section class="card ap-card" aria-labelledby="pr-list">
         <header class="chead ap-chead">
           <div>
-            <h3 id="pr-list" class="disp">
+            <InfoHeading
+              level={3}
+              id="pr-list"
+              class="disp"
+              info="Which tools your agents can use. Build a profile once, then assign it to the agents, projects or recurring tasks that need it."
+            >
               Access profiles
-            </h3>
-            <p>Which tools your agents can use. Build a profile once, then assign it to the agents, projects or recurring tasks that need it.</p>
+            </InfoHeading>
           </div>
           <span class="ap-actions-end">
             <Button size="compact" icon={<ShieldCheck size={14} aria-hidden="true" />} onClick={() => setChecking(true)}>
@@ -171,9 +175,9 @@ export function ProfilesIndex(props: { checkOpen?: boolean }) {
         </Switch>
         <Show when={profiles.isSuccess && apps().length > 0}>
           <div class="ap-group">
-            <h4 class="ap-group-title">
-              Made by an app's setup<span>Change these from the app's page</span>
-            </h4>
+            <InfoHeading level={4} class="ap-group-title" info="Change these from the app's page.">
+              Made by an app's setup
+            </InfoHeading>
             <ul class="ap-rows">
               <For each={apps()}>
                 {(profile) => (
@@ -278,7 +282,7 @@ export function CheckAccessDialog(props: { open: boolean; onOpenChange: (open: b
   }));
   const names = () => effective.data?.allowedToolNames ?? [];
   return (
-    <Dialog open={props.open} onOpenChange={props.onOpenChange} title="Check an agent's access" description="What one agent can use right now, and which profiles allow it." width={620}>
+    <Dialog open={props.open} onOpenChange={props.onOpenChange} title="Check an agent's access" info="What one agent can use right now, and which profiles allow it." width={620}>
       <div class="tl-stack">
         <Field label="Agent" for="pr-check-agent">
           <select id="pr-check-agent" class="tl-select" value={agentId()} onChange={(event) => setPicked(event.currentTarget.value)}>

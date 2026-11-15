@@ -10,6 +10,7 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
+import { InfoTip } from "@/ui/InfoTip";
 import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
 import { Card } from "../chat/parts";
@@ -93,7 +94,7 @@ export function ConnectionIdentities(props: { connection: ToolConnection }) {
   }));
 
   return (
-    <Card title="Whose account it is" description={`${connectionTypeLabel(policy())}. ${connectionTypeText(policy())}`}>
+    <Card title="Whose account it is" info={connectionTypeText(policy())} description={`${connectionTypeLabel(policy())}.`}>
       <Switch>
         <Match when={grants.isPending}>
           <p class="cx-static">Loading…</p>
@@ -333,7 +334,10 @@ function Audience(props: { connectionId: string; grant: ConnectionGrant; members
   };
   return (
     <div class="ch-copy">
-      <span class="ch-copy-label">Whose work can use the organization's account</span>
+      <span class="info-line">
+        <span class="ch-copy-label">Whose work can use the organization's account</span>
+        <InfoTip label="About whose work can use it">This is about whose work may use it; which agents have the connection is set below.</InfoTip>
+      </span>
       <Segmented
         label="Whose work can use it"
         options={[
@@ -360,7 +364,6 @@ function Audience(props: { connectionId: string; grant: ConnectionGrant; members
           </For>
         </ul>
       </Show>
-      <span class="cx-note">This is about whose work may use it; which agents have the connection is set below.</span>
       <div class="cx-actions">
         <span />
         <Button size="compact" disabled={!change() || save.isPending} onClick={() => change() && save.mutate(change()!)}>

@@ -49,7 +49,7 @@ export function AggregatorAccounts(props: { connection: ToolConnection; id: Aggr
   return (
     <Card
       title={`Apps through ${name()}`}
-      description={`What ${name()} has connected for this account. Which of its tools agents may use is set below.`}
+      info={`What ${name()} has connected for this account. Which of its tools agents may use is set below.`}
       footer={
         <>
           <Button
@@ -147,11 +147,14 @@ function ArcadeSync(props: { connection: ToolConnection; onSaved: (result: Await
           if (apiKey().trim() && userId().trim()) save.mutate();
         }}
       >
-        <p class="cx-note">The gateway works without this. A project key and user id let Paperclip list the accounts behind it; the key is stored and used only for that.</p>
-        <Field label="Project API key" for="ap-arcade-key" help="From Arcade, for the same project as this gateway.">
+        <Field
+          label="Project API key"
+          for="ap-arcade-key"
+          info="From Arcade, for the same project as this gateway. The gateway works without it: with a project key and user id Paperclip lists the accounts behind it, and uses the key only for that."
+        >
           <TextInput id="ap-arcade-key" type="password" autocomplete="new-password" value={apiKey()} onInput={(event) => setApiKey(event.currentTarget.value)} />
         </Field>
-        <Field label="Arcade user id" for="ap-arcade-user" help="The end-user id this gateway signs in as. It may not be your email.">
+        <Field label="Arcade user id" for="ap-arcade-user" info="The end-user id this gateway signs in as. It may not be your email.">
           <TextInput id="ap-arcade-user" autocomplete="off" value={userId()} onInput={(event) => setUserId(event.currentTarget.value)} />
         </Field>
         <Show when={save.isError}>
@@ -196,7 +199,7 @@ function ComposioConnectApp(props: { connection: ToolConnection; onDone: () => v
           if (slug()) setup.mutate(result() ? "complete" : "start");
         }}
       >
-        <Field label="App" for="ap-composio-app" help="Composio's name for it, such as gmail, notion or googlesheets.">
+        <Field label="App" for="ap-composio-app" info="Composio's name for it, such as gmail, notion or googlesheets.">
           <TextInput
             id="ap-composio-app"
             autocomplete="off"

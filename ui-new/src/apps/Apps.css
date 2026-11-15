@@ -247,6 +247,19 @@
   border-top: 0;
 }
 
+/* A group title with an "i" after it (InfoHeading class="ap-group-title"): the line holds the padding. */
+.info-line:has(> .ap-group-title) {
+  padding: 14px 20px 4px;
+}
+
+.info-line > .ap-group-title {
+  padding: 0;
+}
+
+.info-line:has(> .ap-group-title) + .ap-rows > .ap-row:first-child {
+  border-top: 0;
+}
+
 .ap-row--link:hover {
   background: var(--row-hover);
 }
@@ -437,16 +450,6 @@ a.ap-row-name:hover {
 
 .ap-page .cx-options {
   padding: 0;
-}
-
-.ap-method {
-  align-items: flex-start;
-  padding-top: 10px;
-  padding-bottom: 10px;
-}
-
-.ap-method input {
-  margin-top: 3px;
 }
 
 .ap-method-text {

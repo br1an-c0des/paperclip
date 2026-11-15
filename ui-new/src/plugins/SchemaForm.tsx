@@ -3,6 +3,7 @@ import { ChevronRight, Eye, EyeOff, Plus, Trash2 } from "lucide-solid";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Index, Match, Show, Switch, type JSX } from "solid-js";
 import { Button } from "@/ui/Button";
 import { TextArea, TextInput } from "@/ui/Field";
+import { aboutLabel, InfoTip } from "@/ui/InfoTip";
 import { Switch as Toggle } from "@/ui/Switch";
 import {
   boundSecretId,
@@ -122,7 +123,7 @@ export function SchemaField(props: FieldProps) {
             checked={props.value === true}
             onChange={(checked) => props.onChange(checked)}
             label={props.label || "On"}
-            description={props.schema.description}
+            info={props.schema.description}
             disabled={disabled()}
           />
           <FieldError message={error()} />
@@ -135,12 +136,18 @@ export function SchemaField(props: FieldProps) {
         <ObjectField {...props} />
       </Match>
       <Match when={kind() === "secret-ref"}>
-        <Labelled id={id()} label={props.label} required={props.required} description={props.schema.description ?? "Pick one of the organization's secrets, or paste a value (Paperclip stores it as a secret when you save)."} error={error()}>
+        <Labelled
+          id={id()}
+          label={props.label}
+          required={props.required}
+          info={props.schema.description ?? "Pick one of the organization's secrets, or paste a value (Paperclip stores it as a secret when you save)."}
+          error={error()}
+        >
           <SecretField {...props} id={id()} disabled={disabled()} />
         </Labelled>
       </Match>
       <Match when={true}>
-        <Labelled id={id()} label={props.label} required={props.required} description={props.schema.description} error={error()}>
+        <Labelled id={id()} label={props.label} required={props.required} info={props.schema.description} error={error()}>
           <Switch>
             <Match when={kind() === "enum"}>
               <select
@@ -207,24 +214,33 @@ export function SchemaField(props: FieldProps) {
   );
 }
 
-function Labelled(props: { id: string; label: string; required?: boolean; description?: string; error?: string; children: JSX.Element }) {
+/**
+ * A field with its label above. `info` is the schema's description (written by the plugin), behind
+ * an "i" beside the label and outside it, as the rest of settings has it.
+ */
+function Labelled(props: { id: string; label: string; required?: boolean; info?: string; error?: string; children: JSX.Element }) {
+  const label = () => (
+    <label class="sf-label" for={props.id}>
+      {props.label}
+      <Show when={props.required}>
+        <span class="sf-required" aria-hidden="true">
+          {" "}
+          *
+        </span>
+      </Show>
+    </label>
+  );
   return (
     <div class="sf-field">
       <Show when={props.label}>
-        <label class="sf-label" for={props.id}>
-          {props.label}
-          <Show when={props.required}>
-            <span class="sf-required" aria-hidden="true">
-              {" "}
-              *
-            </span>
-          </Show>
-        </label>
+        <Show when={props.info} fallback={label()}>
+          <span class="info-line">
+            {label()}
+            <InfoTip label={aboutLabel(props.label)}>{props.info}</InfoTip>
+          </span>
+        </Show>
       </Show>
       {props.children}
-      <Show when={props.description && !props.error}>
-        <span class="fhelp">{props.description}</span>
-      </Show>
       <FieldError message={props.error} />
     </div>
   );
@@ -248,11 +264,14 @@ function ArrayField(props: FieldProps) {
   const atMinimum = () => props.schema.minItems !== undefined && items().length <= props.schema.minItems;
   const set = (index: number, value: unknown) => props.onChange(items().map((entry, at) => (at === index ? value : entry)));
   return (
-    <fieldset class="sf-field sf-box" aria-invalid={Boolean(props.errors[props.path]) || undefined}>
-      <legend class="sf-label">{props.label}</legend>
-      <Show when={props.schema.description}>
-        <span class="fhelp">{props.schema.description}</span>
-      </Show>
+    <fieldset class="sf-field sf-box" aria-label={props.label} aria-invalid={Boolean(props.errors[props.path]) || undefined}>
+      {/* The fieldset is named by aria-label, so the "i" in the legend isn't part of its name. */}
+      <legend class="sf-label info-line">
+        <span>{props.label}</span>
+        <Show when={props.schema.description}>
+          <InfoTip label={aboutLabel(props.label)}>{props.schema.description}</InfoTip>
+        </Show>
+      </legend>
       <Index each={items()} fallback={<p class="sf-muted sf-empty">Nothing added yet.</p>}>
         {(entry, index) => (
           <div class="sf-item">

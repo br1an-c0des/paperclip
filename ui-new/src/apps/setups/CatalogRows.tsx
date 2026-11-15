@@ -8,7 +8,8 @@ import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { Field } from "@/ui/Field";
+import { Field, InfoHeading } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { pushToast } from "@/ui/Toast";
 import { AppLogo, failureText, useConnections } from "../shared";
 import {
@@ -86,14 +87,15 @@ export function CatalogSection(props: { rows: CatalogRow[]; source: CatalogSourc
   return (
     <Show when={props.loading || props.rows.length > 0}>
       <div class="ap-group ap-catalog">
-        <h4 class="ap-group-title">
+        <InfoHeading
+          level={4}
+          class="ap-group-title"
+          infoLabel={`About ${title()}`}
+          info="Each goes through a gateway you connect. Sign-in to each app happens in the provider."
+        >
           {title()}
-          <span>
-            {props.loading
-              ? "Loading their apps…"
-              : `${props.rows.length.toLocaleString()} ${props.rows.length === 1 ? "app" : "apps"} through a gateway you connect. Sign-in to each app happens in the provider.`}
-          </span>
-        </h4>
+          <span>{props.loading ? "Loading their apps…" : `${props.rows.length.toLocaleString()} ${props.rows.length === 1 ? "app" : "apps"}`}</span>
+        </InfoHeading>
         <ul class="ap-grid" aria-label={title()}>
           <For each={page()}>
             {(row) => (
@@ -163,7 +165,10 @@ export function CatalogConnectDialog(props: { row: CatalogRow; routes: CatalogRo
     <Dialog open onOpenChange={(open) => !open && props.onClose()} title={title()} width={520}>
       <Switch>
         <Match when={!route()}>
-          <p class="cx-note">Which service should handle the connection? It signs in to {props.row.name} and makes the calls.</p>
+          <p class="cx-note info-line">
+            Which service should handle the connection?
+            <InfoTip label="About the provider">It signs in to {props.row.name} and makes the calls.</InfoTip>
+          </p>
           <ul class="cx-options ap-providers" aria-label="Providers">
             <For each={props.routes}>
               {(candidate) => (
@@ -295,7 +300,12 @@ function ArcadeContinue(props: { row: CatalogRow; route: CatalogRoute; gateways:
   const url = () => managementUrl("arcade", typeof gateway()?.config?.managementUrl === "string" ? (gateway()!.config!.managementUrl as string) : null);
   return (
     <div class="ap-dialog-body">
-      <p class="cx-note">Your Arcade gateway is saved. {props.row.name}'s sign-in is managed inside Arcade; an agent may also be asked to authorize it the first time it uses a tool.</p>
+      <p class="cx-note info-line">
+        Your Arcade gateway is saved.
+        <InfoTip label="About signing in through Arcade">
+          {props.row.name}'s sign-in is managed inside Arcade; an agent may also be asked to authorize it the first time it uses a tool.
+        </InfoTip>
+      </p>
       <GatewayPicker id="ap-catalog-arcade" provider="arcade" gateways={props.gateways} value={gateway()?.id ?? ""} onChange={setSelected} />
       <A class="cx-link" href={gatewaySetupHref(`/${company().issuePrefix}/connections`, props.route)} onClick={props.onClose}>
         Set up another Arcade gateway
@@ -346,7 +356,7 @@ export function CatalogManageDialog(props: { row: CatalogRow; gateways: Record<A
       open
       onOpenChange={(open) => !open && props.onClose()}
       title={`Manage ${props.row.name}`}
-      description="Accounts and sign-in are managed in the provider. Which of its tools agents may use is set on the gateway's page."
+      info="Accounts and sign-in are managed in the provider. Which of its tools agents may use is set on the gateway's page."
       width={560}
       footer={
         <>

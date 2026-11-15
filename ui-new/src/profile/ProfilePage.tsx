@@ -12,6 +12,7 @@ import { useSession } from "@/lib/session";
 import { updatedLabel } from "@/tasks/list-model";
 import { InitialsDisc } from "@/ui/Avatar";
 import { buttonClass } from "@/ui/Button";
+import { InfoHeading } from "@/ui/Field";
 import { PageHeader } from "@/ui/PageHeader";
 import { Segmented } from "@/ui/Segmented";
 import { TaskStatusCapsule } from "@/ui/Status";
@@ -120,7 +121,7 @@ function Profile(props: { data: UserProfileResponse }) {
       <div class="prof-grid">
         <Usage
           title="Agent attribution"
-          note="What agents spent working on this person's tasks."
+          info="What agents spent working on this person's tasks."
           empty="No task-linked token use yet."
           rows={props.data.topAgents.map((row) => ({
             key: row.agentId ?? "services",
@@ -131,7 +132,7 @@ function Profile(props: { data: UserProfileResponse }) {
         />
         <Usage
           title="Provider mix"
-          note="The models behind that spend."
+          info="The models behind that spend."
           empty="No provider use attributed yet."
           rows={props.data.topProviders.map((row) => ({
             key: `${row.provider}:${row.biller}:${row.model}`,
@@ -322,15 +323,15 @@ function RecentActivity(props: { data: UserProfileResponse }) {
 
 type UsageRow = { key: string; label: string; sub: string; costCents: number; inputTokens: number; cachedInputTokens: number; outputTokens: number };
 
-function Usage(props: { title: string; note: string; empty: string; rows: UsageRow[] }) {
+/** A usage card; `info` says what it counts, behind an "i" beside the title. */
+function Usage(props: { title: string; info: string; empty: string; rows: UsageRow[] }) {
   const max = () => Math.max(1, ...props.rows.map((row) => totalTokens(row)));
   return (
     <section class="card prof-card" aria-label={props.title}>
       <div class="prof-card-head">
-        <div>
-          <h2 class="prof-h">{props.title}</h2>
-          <p class="cap">{props.note}</p>
-        </div>
+        <InfoHeading level={2} class="prof-h" info={props.info}>
+          {props.title}
+        </InfoHeading>
         <span class="muted">{props.rows.length}</span>
       </div>
       <Show when={props.rows.length > 0} fallback={<p class="muted prof-empty">{props.empty}</p>}>

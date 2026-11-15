@@ -437,6 +437,22 @@
   cursor: pointer;
 }
 
+/* A checkbox option with its "i" after it, outside the label. */
+.tl-radio-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.tl-radio-line > .tl-radio {
+  flex: 1;
+  min-width: 0;
+}
+
+.tl-radio-line > .infotip {
+  margin-top: 10px;
+}
+
 .tl-radio:hover {
   background: var(--hover);
 }

@@ -7,7 +7,7 @@ import { toolsApi } from "@/api/tools";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useExperimentalSettingsQuery } from "@/lib/company-data";
 import { Button, buttonClass } from "@/ui/Button";
-import { TextInput } from "@/ui/Field";
+import { InfoHeading, TextInput } from "@/ui/Field";
 import {
   CATEGORY_LABELS,
   categoriesIn,
@@ -87,10 +87,9 @@ export function Browse() {
       <section class="card ap-card" aria-labelledby="ap-yours">
         <header class="chead ap-chead">
           <div>
-            <h3 id="ap-yours" class="disp">
+            <InfoHeading level={3} id="ap-yours" class="disp" info="Apps, MCP servers and accounts your agents can use.">
               Your connections
-            </h3>
-            <p>Apps, MCP servers and accounts your agents can use.</p>
+            </InfoHeading>
           </div>
           <A class={buttonClass({ size: "compact" })} href={`${base()}/byo`}>
             Connect your own server
@@ -164,12 +163,9 @@ function ConnectionGroup(props: { title: string; rows: ConnectionRow[]; base: st
   return (
     <Show when={props.rows.length > 0}>
       <div class="ap-group">
-        <h4 class="ap-group-title">
+        <InfoHeading level={4} class="ap-group-title" info={props.note}>
           {props.title}
-          <Show when={props.note}>
-            <span>{props.note}</span>
-          </Show>
-        </h4>
+        </InfoHeading>
         <ul class="ap-rows">
           <For each={props.rows}>
             {(row) => {
@@ -236,10 +232,14 @@ function Gallery(props: { counts: Map<string, number> }) {
     <section class="card ap-card" aria-labelledby="ap-gallery">
       <header class="chead ap-chead">
         <div>
-          <h3 id="ap-gallery" class="disp">
+          <InfoHeading
+            level={3}
+            id="ap-gallery"
+            class="disp"
+            info="Give agents tools from the apps you use. You choose which agents may use each one, and which actions ask you first."
+          >
             Connect an app
-          </h3>
-          <p>Give agents tools from the apps you use. You choose which agents may use each one, and which actions ask you first.</p>
+          </InfoHeading>
         </div>
       </header>
       <div class="ap-filters">

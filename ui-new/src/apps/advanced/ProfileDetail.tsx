@@ -11,7 +11,7 @@ import { ConfirmDialog } from "@/documents/ConfirmDialog";
 import { useCompany } from "@/lib/company";
 import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { Field, TextArea, TextInput } from "@/ui/Field";
+import { Field, InfoHeading, TextArea, TextInput } from "@/ui/Field";
 import { PageHeader } from "@/ui/PageHeader";
 import { pushToast } from "@/ui/Toast";
 import { failureText, useRefreshTools } from "../shared";
@@ -25,6 +25,7 @@ import {
   newToolsAppLabel,
   profileKeyFrom,
   STATUS_LABEL,
+  PROFILE_PRECEDENCE,
 } from "./profile-model";
 import { CheckAccessDialog, ProfileActionDialog, profilesBase, useProfileActions, type PendingAction } from "./Profiles";
 import { useCompanyCatalog, useProfiles, useTargetNames } from "./queries";
@@ -207,10 +208,9 @@ export function ProfileDetail(props: { profileId: string; created: boolean; revi
               <section class="card ap-card" aria-labelledby="pd-who">
                 <header class="chead ap-chead">
                   <div>
-                    <h3 id="pd-who" class="disp">
+                    <InfoHeading level={3} id="pd-who" class="disp" info={PROFILE_PRECEDENCE}>
                       Who has it
-                    </h3>
-                    <p>An agent with several profiles can use anything any of them allows.</p>
+                    </InfoHeading>
                   </div>
                   <Show when={!archived()}>
                     <A class={buttonClass({ size: "compact" })} href={`${base()}/${current().id}/edit?step=3`}>
@@ -291,10 +291,9 @@ function NewToolsSetting(props: { value: ToolProfileDefaultAction; disabled: boo
   return (
     <section class="card ap-card" aria-labelledby="pd-new-tools">
       <header class="chead">
-        <h3 id="pd-new-tools" class="disp">
+        <InfoHeading level={3} id="pd-new-tools" class="disp" info="When a connected app gains a tool, whether this profile allows it.">
           Tools an app adds later
-        </h3>
-        <p>When a connected app gains a tool, whether this profile allows it.</p>
+        </InfoHeading>
       </header>
       <div class="ap-card-body" role="radiogroup" aria-labelledby="pd-new-tools">
         <NewToolsChoice name="pd-new-tools" value={props.value} disabled={props.disabled} onChange={props.onChange} />
@@ -304,9 +303,9 @@ function NewToolsSetting(props: { value: ToolProfileDefaultAction; disabled: boo
 }
 
 export function NewToolsChoice(props: { name: string; value: ToolProfileDefaultAction; disabled?: boolean; onChange: (value: ToolProfileDefaultAction) => void }) {
-  const options: { value: ToolProfileDefaultAction; title: string; body: string }[] = [
-    { value: "deny", title: "Stay blocked until someone allows them (recommended)", body: "New tools aren't usable until you review them." },
-    { value: "allow", title: "Allowed automatically", body: "New tools become usable right away." },
+  const options: { value: ToolProfileDefaultAction; title: string }[] = [
+    { value: "deny", title: "Stay blocked until someone allows them (recommended)" },
+    { value: "allow", title: "Allowed automatically" },
   ];
   return (
     <For each={options}>
@@ -315,7 +314,6 @@ export function NewToolsChoice(props: { name: string; value: ToolProfileDefaultA
           <input type="radio" name={props.name} checked={props.value === option.value} disabled={props.disabled} onChange={() => props.onChange(option.value)} />
           <span>
             <b>{option.title}</b>
-            {option.body}
           </span>
         </label>
       )}
@@ -371,7 +369,7 @@ function ReviewDialog(props: { open: boolean; onOpenChange: (open: boolean) => v
       open={props.open}
       onOpenChange={props.onOpenChange}
       title="Review new tools"
-      description="Allow the ones this profile should use; the rest stay blocked."
+      info="Allow the ones this profile should use; the rest stay blocked."
       width={680}
       footer={
         <>
@@ -486,7 +484,7 @@ function EditDialog(props: {
         <details class="ap-more">
           <summary>Identifier</summary>
           <div class="ap-more-body">
-            <Field label="Identifier" for="pd-key" help="Used in exports and the API.">
+            <Field label="Identifier" for="pd-key" info="Used in exports and the API.">
               <TextInput id="pd-key" class="mono" value={key()} onInput={(event) => setKey(event.currentTarget.value)} />
             </Field>
           </div>

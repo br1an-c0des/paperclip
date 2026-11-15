@@ -11,7 +11,7 @@ import { ConfirmDialog } from "@/documents/ConfirmDialog";
 import { useCompany } from "@/lib/company";
 import { usePeopleQuery } from "@/lib/company-data";
 import { Button, buttonClass } from "@/ui/Button";
-import { SettingsCard, SettingsRow, TextInput } from "@/ui/Field";
+import { InfoHeading, SettingsCard, SettingsRow, TextInput } from "@/ui/Field";
 import { PageHeader, Tabs } from "@/ui/PageHeader";
 import { Segmented } from "@/ui/Segmented";
 import { Switch as Toggle } from "@/ui/Switch";
@@ -226,10 +226,9 @@ export function AppDetail(props: { connectionId: string; tab: DetailTab; success
                 <Match when={props.tab === "review"}>
                   <section class="card ap-card" aria-labelledby="ap-detail-review">
                     <header class="chead">
-                      <h3 id="ap-detail-review" class="disp">
+                      <InfoHeading level={3} id="ap-detail-review" class="disp" info={`Calls to ${current().name} that ask you first.`}>
                         Waiting for your OK
-                      </h3>
-                      <p>Calls to {current().name} that ask you first.</p>
+                      </InfoHeading>
                     </header>
                     <ReviewQueue connectionId={id()} />
                   </section>
@@ -363,14 +362,19 @@ function AccessCard(props: { state: AccessState; canConfigure: boolean; editable
   return (
     <SettingsCard
       title="Which agents can use it"
-      description={
+      info={
         props.state.isAi()
           ? "The agents that run on this account."
+          : "Allowed agents can use its tools when they ask for them. Agents marked Installed carry them on every run."
+      }
+      description={
+        props.state.isAi()
+          ? undefined
           : installed().onAll
             ? "Every agent carries its tools on every run, so every agent may use it."
             : installed().agentIds.size > 0
               ? "Agents marked Installed carry its tools on every run, so they stay allowed."
-              : "Allowed agents can use its tools when they ask for them."
+              : undefined
       }
       footer={
         !props.canConfigure ? (
@@ -439,10 +443,9 @@ function ActionsCard(props: { connection: ToolConnection; state: AccessState; ca
     <section class="card ap-card" aria-labelledby="ap-actions">
       <header class="chead ap-chead">
         <div>
-          <h3 id="ap-actions" class="disp">
+          <InfoHeading level={3} id="ap-actions" class="disp" info="What agents may do with it. Ask first sends each call to Review before it runs.">
             Actions
-          </h3>
-          <p>What agents may do with it. Ask first sends each call to Review before it runs.</p>
+          </InfoHeading>
         </div>
         <Show when={props.canConfigure}>
           <Button size="compact" disabled={refreshCatalog.isPending} icon={<RefreshCw size={14} aria-hidden="true" />} onClick={() => refreshCatalog.mutate()}>
@@ -557,10 +560,9 @@ function NewActions(props: { connection: ToolConnection; canConfigure: boolean }
     <Show when={!state.loading() && entries().length > 0}>
       <section class="card ap-card" aria-labelledby="ap-new-actions">
         <header class="chead">
-          <h3 id="ap-new-actions" class="disp">
+          <InfoHeading level={3} id="ap-new-actions" class="disp" info="The app added these since it was set up. They stay off until you review them.">
             New actions
-          </h3>
-          <p>The app added these since it was set up. They stay off until you review them.</p>
+          </InfoHeading>
         </header>
         <ul class="ap-rows">
           <For each={entries()}>
@@ -782,7 +784,7 @@ function ConnectionSettings(props: { connection: ToolConnection; name: string; c
   return (
     <>
       <SettingsCard title="Connection">
-        <SettingsRow label="Name" help="How it shows in Paperclip." for="ap-set-name">
+        <SettingsRow label="Name" info="How it shows in Paperclip." for="ap-set-name">
           <div class="ap-inline">
             <TextInput id="ap-set-name" value={name()} maxLength={160} disabled={!props.canConfigure} onInput={(event) => setName(event.currentTarget.value)} />
             <Show when={nameDirty()}>
@@ -793,7 +795,7 @@ function ConnectionSettings(props: { connection: ToolConnection; name: string; c
           </div>
         </SettingsRow>
         <Show when={!isAi() && props.connection.status !== "draft"}>
-          <SettingsRow label="Paused" help="A paused connection keeps its settings, but agents can't use it.">
+          <SettingsRow label="Paused" info="A paused connection keeps its settings, but agents can't use it.">
             <Toggle
               checked={paused()}
               disabled={!props.canConfigure || update.isPending}
@@ -854,10 +856,9 @@ function ConnectionSettings(props: { connection: ToolConnection; name: string; c
         <section class="card ap-card ap-danger" aria-labelledby="ap-danger">
           <header class="chead ap-chead">
             <div>
-              <h3 id="ap-danger" class="disp">
+              <InfoHeading level={3} id="ap-danger" class="disp" info="Removes the connection and revokes its credentials. Agents lose its tools at once.">
                 Disconnect
-              </h3>
-              <p>Removes the connection and revokes its credentials. Agents lose its tools at once.</p>
+              </InfoHeading>
             </div>
             <Button size="compact" variant="danger" disabled={!props.canConfigure || archive.isPending} onClick={() => setConfirming(true)}>
               Disconnect

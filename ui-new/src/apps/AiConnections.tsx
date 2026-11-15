@@ -7,6 +7,8 @@ import { healthApi } from "@/api/health";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
+import { InfoHeading } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import {
@@ -76,17 +78,15 @@ export function AiConnections() {
       <section class="card cx-card" aria-labelledby="cx-ai-title">
         <header class="chead ap-chead">
           <div>
-            <h3 id="cx-ai-title" class="disp">
+            <InfoHeading level={3} id="cx-ai-title" class="disp" info="The accounts agents run on.">
               AI connections
-            </h3>
-            <p>
-              The accounts agents run on.
-              <Show when={list.data && connections().length > 0}>
-                {" "}
+            </InfoHeading>
+            <Show when={list.data && connections().length > 0}>
+              <p>
                 {connectedCount()} connected
                 <Show when={attentionCount() > 0}>, {attentionCount()} need attention</Show>.
-              </Show>
-            </p>
+              </p>
+            </Show>
           </div>
           <Button variant="primary" size="compact" disabled={!list.data} onClick={() => openSetup()}>
             Connect Claude
@@ -321,7 +321,15 @@ function UsagePanel(props: { connection: Connection }) {
   return (
     <section class="cx-usage" aria-label={`Usage for ${props.connection.name}`}>
       <div class="cx-usage-head">
-        <Show when={usage()?.status === "ok"} fallback={<span class="cap">Usage limits as the provider reports them.</span>}>
+        <Show
+          when={usage()?.status === "ok"}
+          fallback={
+            <span class="info-line">
+              <span class="cap">Usage limits</span>
+              <InfoTip label="About usage limits">Usage limits as the provider reports them. Each check asks the provider.</InfoTip>
+            </span>
+          }
+        >
           <span class="cap">
             Checked {new Date(usage()!.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             {usage()!.planType ? ` · ${usage()!.planType}` : ""}

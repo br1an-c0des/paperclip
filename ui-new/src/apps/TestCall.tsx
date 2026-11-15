@@ -11,7 +11,7 @@ import { SchemaForm } from "@/plugins/SchemaForm";
 import { validateValues, type JsonSchemaNode } from "@/plugins/schema-form";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
+import { Field, SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { displayName } from "./apps-model";
@@ -254,10 +254,13 @@ export function RailwayPanel(props: { connection: ToolConnection; grants: Connec
   const apiMessage = () => (typeof props.connection.config?.railwayApiMessage === "string" ? props.connection.config.railwayApiMessage : null);
 
   return (
-    <SettingsCard title="Railway operations" description={apiMessage() ?? "Check for new actions after connecting to see service, log and deployment access."}>
+    <SettingsCard
+      title="Railway operations"
+      info="Check for new actions after connecting to see service, log and deployment access. Optionally, give Paperclip direct SSH access to Railway containers with a key pair it makes."
+      description={apiMessage() ?? undefined}
+    >
       <div class="ap-card-body ap-panel">
         <p>
-          Optionally, give Paperclip direct SSH access to Railway containers with a key pair it makes.{" "}
           <a href="https://docs.railway.com/cli/ssh" target="_blank" rel="noopener noreferrer">
             Railway SSH docs
           </a>
@@ -281,21 +284,28 @@ export function RailwayPanel(props: { connection: ToolConnection; grants: Connec
           <Show when={setup()}>
             {(current) => (
               <>
-                <label class="field-stack" for="ap-railway-public">
-                  <span class="field-label">Public key</span>
+                <Field
+                  label="Public key"
+                  for="ap-railway-public"
+                  info="The private key stays in Paperclip's vault."
+                  help={
+                    <>
+                      Add it to the Railway account this authorization uses.{" "}
+                      <a href="https://docs.railway.com/cli/ssh#manage-ssh-keys" target="_blank" rel="noopener noreferrer">
+                        Railway key setup
+                      </a>
+                    </>
+                  }
+                >
                   <TextArea id="ap-railway-public" class="mono" rows={3} readOnly value={current().publicKey} />
-                  <span class="fhelp">
-                    Add it to the Railway account this authorization uses. The private key stays in Paperclip's vault.{" "}
-                    <a href="https://docs.railway.com/cli/ssh#manage-ssh-keys" target="_blank" rel="noopener noreferrer">
-                      Railway key setup
-                    </a>
-                  </span>
-                </label>
-                <label class="field-stack" for="ap-railway-hosts">
-                  <span class="field-label">Verified Railway host key</span>
+                </Field>
+                <Field
+                  label="Verified Railway host key"
+                  for="ap-railway-hosts"
+                  info="Paste the ssh.railway.com line from a known_hosts entry you checked yourself. Paperclip refuses untrusted or changed host keys."
+                >
                   <TextArea id="ap-railway-hosts" class="mono" rows={3} placeholder="ssh.railway.com ssh-ed25519 …" value={knownHosts()} onInput={(event) => setKnownHosts(event.currentTarget.value)} />
-                  <span class="fhelp">Paste the ssh.railway.com line from a known_hosts entry you checked yourself. Paperclip refuses untrusted or changed host keys.</span>
-                </label>
+                </Field>
                 <div class="cx-actions">
                   <Button size="compact" variant="danger" disabled={act.isPending} onClick={() => act.mutate({ action: "remove", grantId: current().grantId })}>
                     Remove the container key
@@ -322,7 +332,10 @@ export function BrowserUsePanel(props: { connection: ToolConnection; grants: Con
   const [picked, setPicked] = createSignal("");
   const grantId = () => picked() || eligible()[0]?.id;
   return (
-    <SettingsCard title="Browser settings" description="Which saved Browser Use profiles agents may use, and the most one browser run may cost.">
+    <SettingsCard
+      title="Browser settings"
+      info="Which saved Browser Use profiles agents may use, and the most one browser run may cost. Fresh browsers are the default; a saved profile lets agents use its website logins."
+    >
       <div class="ap-card-body ap-panel">
         <Show when={eligible().length > 1}>
           <label class="field-stack" for="ap-bu-grant">
@@ -375,13 +388,17 @@ function BrowserUseCredential(props: { companyId: string; grantId: string }) {
   }));
   return (
     <>
-      <SettingsRow label="Most a browser run may cost" help="In US dollars. Empty uses what's left of the Paperclip budget; agents may set less." for="ap-bu-limit">
+      <SettingsRow
+        label="Most a browser run may cost"
+        info="In US dollars. Empty means no cap of its own: a run is still held to what's left of any Paperclip budget that applies, and is uncapped if none does. Agents may ask for less."
+        for="ap-bu-limit"
+      >
         <TextInput id="ap-bu-limit" type="number" min="0" step="0.01" placeholder="No cap of its own" value={limit()} onInput={(event) => setLimit(event.currentTarget.value)} />
       </SettingsRow>
       <fieldset class="ap-panel-set">
         <legend class="field-label">Saved profiles agents may use</legend>
         <p class="cx-static">
-          Fresh browsers are the default. A saved profile lets agents use its website logins. Manage profiles in{" "}
+          Manage profiles in{" "}
           <a href="https://cloud.browser-use.com" target="_blank" rel="noopener noreferrer">
             Browser Use Cloud
           </a>

@@ -27,8 +27,12 @@ export const ASSISTANTS = Object.keys(ASSISTANT_NAMES) as AssistantClient[];
 /** `PUBLIC_MCP_SCOPES` (packages/shared/src/public-mcp.ts). */
 const PUBLIC_MCP_SCOPES = ["paperclip:read", "paperclip:write", "paperclip:configure", "offline_access"] as const;
 
+/**
+ * For the person setting an assistant up by hand: the gist of the server's instructions to the
+ * assistant (`mcpAuthorizationHandoffInstructions`, packages/shared/src/mcp-setup.ts).
+ */
 export const AUTHORIZATION_HANDOFF =
-  "Authorization commands wait for human approval. When using an assistant shell tool, keep the command running in a persistent terminal or background process, capture its output privately, and share the approval URL immediately while it is still running. Client callback deadlines still apply. If the command timed out or stopped, start a fresh authorization request before sharing a link. If the host cannot keep the command alive across turns, ask the user to run it in their own terminal.";
+  "The authorization command waits for you to approve it in Paperclip. Keep it running until you've opened its approval link; if it timed out or stopped, run it again.";
 
 export function setupUrl(serverUrl: string, companyId?: string) {
   const url = new URL("/mcp/setup", serverUrl);

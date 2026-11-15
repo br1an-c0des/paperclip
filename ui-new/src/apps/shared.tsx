@@ -122,6 +122,9 @@ export function AgentAccessPicker(props: {
   /** Agents the viewer may change; others show but can't be toggled. */
   editable?: readonly string[];
   allLabel?: JSX.Element;
+  /** What "Every agent" means, behind an "i" beside it. */
+  allInfo?: JSX.Element;
+  /** Visible under "Every agent": state, or why it can't be turned on. */
   allDescription?: JSX.Element;
 }) {
   const agents = useAgentsQuery();
@@ -140,7 +143,8 @@ export function AgentAccessPicker(props: {
         disabled={props.disabled}
         onChange={(on) => props.onChange({ mode: on ? "all" : "specific", agentIds: new Set(on ? [] : props.value.agentIds) })}
         label={props.allLabel ?? "Every agent"}
-        description={props.allDescription ?? "Current and future agents can use it."}
+        info={props.allInfo ?? "Current and future agents can use it."}
+        description={props.allDescription}
       />
       <Show when={props.value.mode === "specific"}>
         <Show when={list().length > 0} fallback={<p class="cx-static">{readNote(agents, "No agents yet.", { loading: "Loading agents…" })}</p>}>

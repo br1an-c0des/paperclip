@@ -272,6 +272,17 @@ export function countAllowed(groups: readonly AppGroup[], selections: Selections
 }
 
 // ---------------------------------------------------------------------------------------------
+// Assignment
+
+/**
+ * How several profiles combine (server/src/services/tool-profile-binding-precedence.ts): only the
+ * narrowest matching scope counts (gateway, task, recurring task, agent, project, organization),
+ * and app-setup profiles are added on top. Shown behind the "i" on Who has it and Assign.
+ */
+export const PROFILE_PRECEDENCE =
+  "Profiles at the same level add up. A narrower assignment replaces broader ones: a recurring task's over the agent's, the agent's over a project's, any of them over the organization default. Profiles an app's setup made always add.";
+
+// ---------------------------------------------------------------------------------------------
 // Templates (the wizard's first step and the empty state)
 
 export type TemplateKey = "read_only" | "everyday" | "full_access" | "scratch" | "copy";

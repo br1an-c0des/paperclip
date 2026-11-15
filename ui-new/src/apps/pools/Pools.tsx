@@ -13,7 +13,7 @@ import { useAgentsQuery } from "@/lib/company-data";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { SettingsCard, SettingsRow, TextInput } from "@/ui/Field";
+import { InfoHeading, SettingsCard, SettingsRow, TextInput } from "@/ui/Field";
 import { PageHeader } from "@/ui/PageHeader";
 import { Switch as Toggle } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
@@ -97,10 +97,14 @@ export function PoolsCard() {
       <section class="card cx-card" aria-labelledby="pl-card-title">
         <header class="chead ap-chead">
           <div>
-            <h3 id="pl-card-title" class="disp">
+            <InfoHeading
+              level={3}
+              id="pl-card-title"
+              class="disp"
+              info="Hand each new task to the next of several AI connections, so one account's limits don't stop the work."
+            >
               Connection pools
-            </h3>
-            <p>Hand each new task to the next of several AI connections, so one account's limits don't stop the work.</p>
+            </InfoHeading>
           </div>
           <div class="pl-adds">
             <For each={plugins()}>
@@ -385,7 +389,7 @@ function PoolEditor(props: {
       </Show>
       <SettingsCard
         title="Connections"
-        description="New tasks go to the next connection in this order. Changes apply to new tasks."
+        info="New tasks go to the next connection in this order. Changes apply to new tasks."
         footer={
           <>
             <Toggle
@@ -393,7 +397,7 @@ function PoolEditor(props: {
               disabled={unavailable() || save.isPending}
               onChange={(enabled) => setDraft({ ...draft(), enabled })}
               label="Pool on"
-              description="Agents set to this pool run on its connections."
+              info="Agents set to this pool run on its connections."
             />
             <span class="ap-actions-end">
               <Button variant="quiet" disabled={!dirty() || save.isPending} onClick={() => setDraft(configOf(saved()))}>
@@ -437,17 +441,17 @@ function PoolEditor(props: {
         />
       </SettingsCard>
 
-      <SettingsCard title="Advanced" description="Skip connections near their usage limit, and pick each connection's model.">
+      <SettingsCard title="Advanced">
         <div class="pl-advanced">
           <Toggle
             checked={draft().mode === "usage_aware"}
             disabled={unavailable() || save.isPending}
             onChange={(on) => setDraft({ ...draft(), mode: on ? "usage_aware" : "round_robin" })}
             label="Skip connections near their usage limit"
-            description="Uses each provider's reported usage, where it reports one."
+            info="Uses each provider's reported usage, where it reports one."
           />
           <Show when={draft().mode === "usage_aware"}>
-            <SettingsRow label="Skip at" help="Percent of a usage limit." for="pl-threshold">
+            <SettingsRow label="Skip at" info="Percent of a usage limit." for="pl-threshold">
               <TextInput
                 id="pl-threshold"
                 type="number"
@@ -489,10 +493,9 @@ function PoolEditor(props: {
 
       <section class="card ap-card" aria-labelledby="pl-used-by">
         <header class="chead">
-          <h3 id="pl-used-by" class="disp">
+          <InfoHeading level={3} id="pl-used-by" class="disp" info="Agents whose AI connection is this pool.">
             Used by
-          </h3>
-          <p>Agents whose AI connection is this pool.</p>
+          </InfoHeading>
         </header>
         <div class="ap-card-body">
           <Show when={!props.agentsLoading} fallback={<p class="cx-static">Loading agents…</p>}>
