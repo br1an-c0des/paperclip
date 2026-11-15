@@ -25,7 +25,7 @@ export function PluginLocalFolders(props: { pluginId: string; companyId: string;
   }));
   const statusFor = (key: string) => folders.data?.folders.find((folder) => folder.folderKey === key);
   return (
-    <SettingsCard title="Folders" description="Folders on the server this plugin works in, for this organization.">
+    <SettingsCard title="Folders" info="Folders on the server this plugin works in, for this organization.">
       <div class="plf">
         <Show when={folders.isError}>
           <p class="field-error" role="alert">

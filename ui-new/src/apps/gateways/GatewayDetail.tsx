@@ -10,7 +10,7 @@ import { useSession } from "@/lib/session";
 import { useAgentsQuery, useProjectsQuery } from "@/lib/company-data";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { Field, SettingsCard, TextInput } from "@/ui/Field";
+import { Field, InfoHeading, SettingsCard, TextInput } from "@/ui/Field";
 import { PageHeader, Tabs } from "@/ui/PageHeader";
 import { Switch as Toggle } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
@@ -154,10 +154,15 @@ export function GatewayDetail(props: { gatewayId: string; tab: GatewayTab }) {
                 <Match when={props.tab === "activity"}>
                   <section class="card ap-card" aria-labelledby="gw-activity">
                     <header class="chead">
-                      <h3 id="gw-activity" class="disp">
+                      <InfoHeading
+                        level={3}
+                        id="gw-activity"
+                        class="disp"
+                        info="Open a call to see its tool, decision, and redacted arguments and result."
+                      >
                         Calls through this gateway
-                      </h3>
-                      <p>The last 30 days. Open a call to see its tool, decision, and redacted arguments and result.</p>
+                      </InfoHeading>
+                      <p>The last 30 days.</p>
                     </header>
                     <ToolActivity filter={{ gateway: current().id, window: "30d" }} empty="No calls have gone through this gateway yet." />
                   </section>
@@ -214,7 +219,7 @@ function Overview(props: {
           <b>{attention() === 0 ? "All good" : `${attention()} ${attention() === 1 ? "app needs" : "apps need"} attention`}</b>
         </div>
       </div>
-      <SettingsCard title="Who can use it" description="Anyone holding an active token, limited to the tools its access profile allows.">
+      <SettingsCard title="Who can use it" info="Anyone holding an active token, limited to the tools its access profile allows.">
         <div class="ap-card-body tl-chips">
           <span class="tl-chip">Scope · {props.scope}</span>
           <span class="tl-chip">Profile · {props.profile?.name ?? "Unavailable"}</span>
@@ -224,7 +229,7 @@ function Overview(props: {
         </div>
       </SettingsCard>
       <AppsCard apps={props.apps} profile={props.profile} />
-      <SettingsCard title="How clients connect" description="Add this to a client's MCP settings, with a token from the Tokens tab, or use Client snippets.">
+      <SettingsCard title="How clients connect" info="Add this to a client's MCP settings, with a token from the Tokens tab, or use Client snippets.">
         <div class="ap-card-body">
           <CopyBlock value={overviewSnippet(props.gateway, props.endpoint)} label="client config" />
         </div>
@@ -240,12 +245,12 @@ function AppsCard(props: { apps: GatewayApp[]; profile: ToolProfileWithDetails |
     <section class="card ap-card" aria-labelledby="gw-apps">
       <header class="chead ap-chead">
         <div>
-          <h3 id="gw-apps" class="disp">
+          <InfoHeading level={3} id="gw-apps" class="disp" info={props.intro ? "The access profile decides which tools go through." : undefined}>
             Apps in this gateway
-          </h3>
+          </InfoHeading>
           <Show when={props.intro}>
             <p>
-              The access profile{props.profile ? ` ${props.profile.name}` : ""} decides which tools go through: {allowedToolsLabel(props.profile).toLowerCase()}.
+              {props.profile ? `${props.profile.name}: ${allowedToolsLabel(props.profile).toLowerCase()}` : allowedToolsLabel(props.profile)}
             </p>
           </Show>
         </div>
@@ -354,13 +359,14 @@ function Tokens(props: { gateway: ToolMcpGatewayWithTokens; onIssued: (token: To
       <section class="card ap-card" aria-labelledby="gw-tokens">
         <header class="chead ap-chead">
           <div>
-            <h3 id="gw-tokens" class="disp">
+            <InfoHeading
+              level={3}
+              id="gw-tokens"
+              class="disp"
+              info="A reusable token for an outside client; its name is also the client's label. Agent runs get their own one-hour token, revoked when the run ends, so revoked rows from runs are history, not tokens you made."
+            >
               Tokens
-            </h3>
-            <p>
-              A reusable token for an outside client; its name is also the client's label. Agent runs get their own one-hour token, revoked when the run ends, so
-              revoked rows from runs are history, not tokens you made.
-            </p>
+            </InfoHeading>
           </div>
           <Show when={!issuing()}>
             <Button size="compact" variant="primary" icon={<Plus size={14} aria-hidden="true" />} onClick={startIssuing}>
@@ -376,7 +382,7 @@ function Tokens(props: { gateway: ToolMcpGatewayWithTokens; onIssued: (token: To
               if (name().trim()) issue.mutate();
             }}
           >
-            <Field label="Token name" for="gw-token-name" help="Also used as the client label.">
+            <Field label="Token name" for="gw-token-name" info="Also used as the client label.">
               <TextInput id="gw-token-name" maxLength={160} value={name()} onInput={(event) => setName(event.currentTarget.value)} />
             </Field>
             <Field label="Expires" for="gw-token-expires">
@@ -584,7 +590,7 @@ function SnippetsDialog(props: {
       open={props.open}
       onOpenChange={props.onOpenChange}
       title="Client snippets"
-      description="Pick a client and copy a complete configuration. It reaches only the tools this gateway exposes, not the rest of Paperclip."
+      info="Pick a client and copy a complete configuration. It reaches only the tools this gateway exposes, not the rest of Paperclip."
       width={720}
     >
       <div class="tl-stack">

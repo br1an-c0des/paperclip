@@ -8,7 +8,7 @@ import { toolAccessApi } from "@/api/tool-access";
 import { toolsApi } from "@/api/tools";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
-import { Field, TextArea, TextInput } from "@/ui/Field";
+import { Field, InfoHeading, TextArea, TextInput } from "@/ui/Field";
 import { Switch as Toggle } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
 import { connectFailure, errorCode, finishDefaults } from "../apps-model";
@@ -101,11 +101,15 @@ export function PasteConfig() {
     <>
       <section class="card ap-card" aria-labelledby="pc-paste">
         <header class="chead">
-          <h3 id="pc-paste" class="disp">
+          <InfoHeading
+            level={3}
+            id="pc-paste"
+            class="disp"
+            info="For tools that aren't in the gallery: paste the MCP config snippet from the tool's README. Paperclip shows what it found before anything is saved."
+          >
             Paste a config
-          </h3>
+          </InfoHeading>
           <p>
-            For tools that aren't in the gallery: paste the MCP config snippet from the tool's README and Paperclip shows what it found before anything is saved.
             Just an address? <A href={`/${company().issuePrefix}/connections/byo`}>Connect your own server</A> instead.
           </p>
         </header>
@@ -116,7 +120,7 @@ export function PasteConfig() {
             if (text().trim() && !problem()) read.mutate();
           }}
         >
-          <Field label="MCP config" for="pc-config" error={problem() ?? undefined} help={'The JSON with "mcpServers" in it.'}>
+          <Field label="MCP config" for="pc-config" error={problem() ?? undefined} info={'The JSON with "mcpServers" in it.'}>
             <TextArea
               id="pc-config"
               class="tl-textarea"
@@ -149,16 +153,25 @@ export function PasteConfig() {
         {(found) => (
           <section class="card ap-card" aria-labelledby="pc-found">
             <header class="chead">
-              <h3 id="pc-found" class="disp">
-                {found().drafts.length === 0 ? "No apps found" : `Found ${found().drafts.length} ${found().drafts.length === 1 ? "app" : "apps"}`}
-              </h3>
-              <p>
-                {found().drafts.length === 0
-                  ? "Check you pasted the whole snippet."
-                  : found().drafts.some((draft) => draftUrl(draft))
+              <InfoHeading
+                level={3}
+                id="pc-found"
+                class="disp"
+                info={
+                  found().drafts.length > 0 && found().drafts.some((draft) => draftUrl(draft))
                     ? "Checking a server makes a draft connection, keeps any keys as Paperclip secrets, and lists its actions before you turn it on."
+                    : undefined
+                }
+              >
+                {found().drafts.length === 0 ? "No apps found" : `Found ${found().drafts.length} ${found().drafts.length === 1 ? "app" : "apps"}`}
+              </InfoHeading>
+              <Show when={found().drafts.length === 0 || !found().drafts.some((draft) => draftUrl(draft))}>
+                <p>
+                  {found().drafts.length === 0
+                    ? "Check you pasted the whole snippet."
                     : "These run in a workspace, so they stay drafts until an admin maps them to an approved template."}
-              </p>
+                </p>
+              </Show>
             </header>
             <ul class="ap-rows">
               <For each={found().drafts}>
@@ -312,10 +325,16 @@ function Review(props: {
     <section class="card ap-card" aria-labelledby="pc-review">
       <header class="chead ap-chead">
         <div>
-          <h3 id="pc-review" class="disp">
+          <InfoHeading
+            level={3}
+            id="pc-review"
+            class="disp"
+            infoLabel="About these actions"
+            info="Pick the ones agents may use. You can narrow who uses it on its page afterwards."
+          >
             Actions in {props.result.application.name}
-          </h3>
-          <p>It answered and listed its actions. Pick the ones agents may use; you can narrow who uses it on its page afterwards.</p>
+          </InfoHeading>
+          <p>It answered and listed its actions.</p>
         </div>
         <Show
           when={props.done}

@@ -3,6 +3,7 @@ import { createEffect, createSignal, For, Show, type JSX } from "solid-js";
 import { activeAgents } from "@/api/agents";
 import { useAgentsQuery } from "@/lib/company-data";
 import { AgentAvatar } from "@/ui/Avatar";
+import { ChoiceCard } from "@/ui/ChoiceCard";
 import { Field } from "@/ui/Field";
 import { Switch as Toggle } from "@/ui/Switch";
 import { useConnections, useGallery } from "../shared";
@@ -109,24 +110,23 @@ export function setupExtras(
 export function IdentityPicker(props: { kinds: ConnectionGrantKind[]; value: IdentityChoice; onChange: (next: IdentityChoice) => void; disabled?: boolean }) {
   const agents = useAgentsQuery();
   return (
-    <Field label="Whose account is it?" help="This decides who the connection acts as. It can't be changed later; connect another account instead.">
+    <Field
+      label="Whose account is it?"
+      info="This decides who the connection acts as."
+      help="It can't be changed later; connect another account instead."
+    >
       <ul class="cx-options" role="radiogroup" aria-label="Whose account is it?">
         <For each={props.kinds}>
           {(kind) => (
             <li>
-              <label class="cx-option ap-method" classList={{ "cx-option--on": props.value.kind === kind }}>
-                <input
-                  type="radio"
-                  name="ap-identity"
-                  checked={props.value.kind === kind}
-                  disabled={props.disabled}
-                  onChange={() => props.onChange({ kind, agentId: kind === "agent" ? props.value.agentId : null })}
-                />
-                <span class="ap-method-text">
-                  <span class="cx-option-name">{IDENTITY_LABELS[kind].title}</span>
-                  <span class="cx-option-note">{IDENTITY_LABELS[kind].text}</span>
-                </span>
-              </label>
+              <ChoiceCard
+                name="ap-identity"
+                title={IDENTITY_LABELS[kind].title}
+                info={IDENTITY_LABELS[kind].text}
+                checked={props.value.kind === kind}
+                disabled={props.disabled}
+                onSelect={() => props.onChange({ kind, agentId: kind === "agent" ? props.value.agentId : null })}
+              />
             </li>
           )}
         </For>
@@ -153,7 +153,7 @@ export function IdentityPicker(props: { kinds: ConnectionGrantKind[]; value: Ide
 /** Google Workspace's services, each on or off, read only or read and write. */
 export function WorkspaceServices(props: { value: WorkspaceSelection; onChange: (next: WorkspaceSelection) => void }) {
   return (
-    <Field label="Google services" help="Agents get only these. Google's consent screen asks for exactly this access.">
+    <Field label="Google services" info="Agents get only these. Google's consent screen asks for exactly this access.">
       <ul class="ch-list">
         <For each={WORKSPACE_SERVICES}>
           {(service) => (

@@ -12,6 +12,7 @@ import { AgentAvatar } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Field, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Segmented } from "@/ui/Segmented";
 import { Switch as Toggle } from "@/ui/Switch";
 import {
@@ -54,13 +55,8 @@ export function ConnectionSetup(props: {
       open={props.open}
       onOpenChange={props.onOpenChange}
       title={props.reconnect ? `Reconnect ${props.reconnect.name}` : props.resume ? `Finish connecting ${props.resume.name}` : "Connect Claude"}
-      description={
-        props.reconnect
-          ? "Sign in again to restore this connection. Its name and who can use it stay the same."
-          : props.resume
-            ? "Pick up the Claude sign-in that was started for you."
-            : "Add a Claude account so agents can run on it."
-      }
+      info={props.reconnect ? "Sign in again to restore this connection. Its name and who can use it stay the same." : undefined}
+      description={!props.reconnect && props.resume ? "Pick up the Claude sign-in that was started for you." : undefined}
       width={620}
     >
       <SetupBody
@@ -166,7 +162,10 @@ function SetupBody(props: {
       <Show when={step() === "details"}>
         <form class="cx-setup-form" onSubmit={(event) => (draft.method === "api_key" ? submitKey(event) : (event.preventDefault(), continueToSignIn()))}>
           <Show when={!props.reconnect}>
-            <Field label="How to connect" help={draft.method === "subscription" ? "Use your Claude Pro or Max plan. Recommended." : "Pay per use with a key from the Anthropic Console."}>
+            <Field
+              label="How to connect"
+              info="Claude subscription uses your Claude Pro or Max plan (recommended). API key pays per use with a key from the Anthropic Console."
+            >
               <Segmented
                 label="How to connect"
                 options={[
@@ -201,13 +200,8 @@ function SetupBody(props: {
           <Show when={!props.reconnect}>
             <Field
               label="Who can use it"
-              help={
-                canManage()
-                  ? draft.ownership === "shared"
-                    ? "Everyone in the company can run agents on it."
-                    : "Only runs you're responsible for use it. It becomes your personal Claude default if you don't have one."
-                  : "Only a connection manager can share a connection with everyone."
-              }
+              info="Everyone in the company: anyone can run agents on it. Just me: only runs you're responsible for use it, and it becomes your personal Claude default if you don't have one."
+              help={canManage() ? undefined : "Only a connection manager can share a connection with everyone."}
             >
               <Show when={canManage()} fallback={<p class="cx-static">Just me</p>}>
                 <Segmented
@@ -223,15 +217,21 @@ function SetupBody(props: {
             </Field>
 
             <div class="cx-agents" role="group" aria-labelledby="cx-agents-label">
-              <span id="cx-agents-label" class="field-label">
-                Agents
+              <span class="info-line">
+                <span id="cx-agents-label" class="field-label">
+                  Agents
+                </span>
+                <Show when={draft.ownership === "personal" && !draft.allAgents}>
+                  <InfoTip label="About Agents">Leave every agent unticked to keep it as your personal default only.</InfoTip>
+                </Show>
               </span>
               <Toggle
                 checked={draft.allAgents}
                 onChange={(on) => setDraft("allAgents", on)}
                 disabled={!canManage()}
                 label="Every agent"
-                description={canManage() ? "Current and future agents can use it." : "Only a connection manager can give every agent access."}
+                info="Current and future agents can use it."
+                description={canManage() ? undefined : "Only a connection manager can give every agent access."}
               />
               <Show when={!draft.allAgents}>
                 <Show
@@ -262,9 +262,6 @@ function SetupBody(props: {
                     </For>
                   </ul>
                 </Show>
-                <Show when={draft.ownership === "personal" && draft.agentIds.length === 0}>
-                  <p class="fhelp">Leave every agent unticked to keep it as your personal default only.</p>
-                </Show>
               </Show>
               <Show when={agents.isError}>
                 <p class="cx-note cx-note--error" role="alert">
@@ -275,7 +272,7 @@ function SetupBody(props: {
           </Show>
 
           <Show when={draft.method === "api_key"}>
-            <Field label="Anthropic API key" for="cx-key" help="Paperclip checks the key with Anthropic before saving it.">
+            <Field label="Anthropic API key" for="cx-key" info="Paperclip checks the key with Anthropic before saving it.">
               <TextInput
                 id="cx-key"
                 type="password"
@@ -425,7 +422,8 @@ function SetupBody(props: {
                 <time class="mono" dateTime={expiresAt()}>
                   {new Date(expiresAt()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </time>
-                . You can close this dialog and come back to it.
+                .{" "}
+                <InfoTip label="About this sign-in">You can close this dialog and come back to it.</InfoTip>
               </p>
             )}
           </Show>

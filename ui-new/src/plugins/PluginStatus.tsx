@@ -42,7 +42,7 @@ export function PluginStatus(props: { plugin: PluginRecord }) {
 
   return (
     <>
-      <SettingsCard title="Health" description={ready() ? "The plugin's own checks, every 30 seconds." : "Health checks run once the plugin is on and ready."}>
+      <SettingsCard title="Health" info="The plugin's own checks, every 30 seconds." description={ready() ? undefined : "Health checks run once the plugin is on and ready."}>
         <div class="ps-status">
           <Show
             when={health.data}
@@ -86,7 +86,7 @@ export function PluginStatus(props: { plugin: PluginRecord }) {
         </div>
       </SettingsCard>
 
-      <SettingsCard title="Runtime" description="Its worker process, scheduled jobs and webhook deliveries.">
+      <SettingsCard title="Runtime" info="Its worker process, scheduled jobs and webhook deliveries.">
         <div class="ps-status">
           <Show when={dashboard.data} fallback={<p class="sf-muted">{dashboard.isError ? "Runtime details are unavailable right now." : "Loading…"}</p>}>
             {(data) => <Runtime data={data()} />}
@@ -112,7 +112,7 @@ export function PluginStatus(props: { plugin: PluginRecord }) {
         </SettingsCard>
       </Show>
 
-      <SettingsCard title="Permissions" description="What it asked to be allowed to do.">
+      <SettingsCard title="Permissions" info="What it asked to be allowed to do.">
         <div class="ps-status">
           <Show when={capabilities().length > 0} fallback={<p class="sf-muted">No special permissions.</p>}>
             <ul class="ps-caps">

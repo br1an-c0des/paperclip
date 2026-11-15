@@ -347,7 +347,11 @@ export function AssistantConnectionsPage() {
   const problem = () => (connections.error ? mcpProblem(connections.error) : null);
 
   return (
-    <Standalone wide title="Assistant connections" lede="Revoking a connection stops its future tool calls. Work it already handed off carries on under your organization's usual controls.">
+    <Standalone
+      wide
+      title="Assistant connections"
+      info="Revoking a connection stops its future tool calls. Work it already handed off carries on under your organization's usual controls."
+    >
       <Show when={setup.data?.enabled === false}>
         <Note tone="amber">
           Assistant connections are turned off on this Paperclip, so these can't make calls. An instance admin can turn on the experimental setting for public MCP

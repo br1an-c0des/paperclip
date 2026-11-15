@@ -59,7 +59,7 @@ export function InstructionsEditor(props: {
         disabled={props.disabled}
         onChange={(enabled) => props.onChange({ ...props.value, enabled })}
         label={`Tell agents how to use ${props.provider}`}
-        description="Added to the prompt of every agent that can use this connection."
+        info="Added to the prompt of every agent that can use this connection."
       />
       <Show when={!props.value.enabled}>
         <p class="cx-note cx-note--warn">Agents can still use its tools, but won't get these instructions.</p>
@@ -135,7 +135,7 @@ export function InstructionsCard(props: { connection: ToolConnection; app: AppDe
       {(current) => (
         <Card
           title="Agent instructions"
-          description={`What agents that can use ${props.connection.name} are told about it.`}
+          info={`What agents that can use ${props.connection.name} are told about it.`}
           footer={
             !props.canConfigure ? (
               <span class="cx-note">Only a connection manager can change these.</span>
@@ -188,7 +188,7 @@ export function HonchoCard(props: { connection: ToolConnection; canConfigure: bo
   return (
     <Card
       title="Honcho workspace"
-      description="The workspace agents remember into and recall from."
+      info="The workspace agents remember into and recall from."
       footer={
         dirty() ? (
           <span class="ap-actions-end">
@@ -237,11 +237,8 @@ export function SheetsRobotFields(props: { robotEmail: string | null | undefined
       <Field
         label="Links to the sheets you shared"
         for="ap-sheets-links"
-        help={
-          parsed().ids.length > 0
-            ? `${parsed().ids.length} ${parsed().ids.length === 1 ? "sheet" : "sheets"} ready to connect.`
-            : "One link per line. Both …/edit and …/edit#gid=… links work."
-        }
+        info="One link per line. Both …/edit and …/edit#gid=… links work."
+        help={parsed().ids.length > 0 ? `${parsed().ids.length} ${parsed().ids.length === 1 ? "sheet" : "sheets"} ready to connect.` : undefined}
       >
         <TextArea
           id="ap-sheets-links"
@@ -278,7 +275,7 @@ export function SheetsCard(props: { connection: ToolConnection; canConfigure: bo
     save.mutate([...new Set([...ids(), ...parsed.ids])]);
   };
   return (
-    <Card title="Sheets agents can open" description="Agents can open only the sheets listed here, and only once each is shared with the robot account.">
+    <Card title="Sheets agents can open" info="Agents can open only the sheets listed here, and only once each is shared with the robot account.">
       <Show when={robotEmail()}>{(email) => <CopyValue label="Robot account" value={email()} />}</Show>
       <Show when={ids().length > 0} fallback={<p class="cx-static">No sheets yet.</p>}>
         <ul class="ch-list" aria-label="Sheets agents can open">

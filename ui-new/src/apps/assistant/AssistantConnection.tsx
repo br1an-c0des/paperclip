@@ -9,6 +9,8 @@ import { connectionTitle, mcpProblem } from "@/auth/auth-model";
 import { ConfirmDialog } from "@/documents/ConfirmDialog";
 import { useCompany } from "@/lib/company";
 import { Button, buttonClass } from "@/ui/Button";
+import { InfoHeading } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { pushToast } from "@/ui/Toast";
 import { CopyBlock } from "../advanced/parts";
 import { failureText } from "../shared";
@@ -71,13 +73,14 @@ export function AssistantConnection() {
     <>
       <section class="card ap-card" aria-labelledby="as-connect">
         <header class="chead">
-          <h3 id="as-connect" class="disp">
+          <InfoHeading
+            level={3}
+            id="as-connect"
+            class="disp"
+            info={`Use ${company().name} from Codex, Claude Code, OpenCode or another assistant: review work, create tasks and follow up, with your account's access to this organization.`}
+          >
             Connect an assistant
-          </h3>
-          <p>
-            Use {company().name} from Codex, Claude Code, OpenCode or another assistant: review work, create tasks and follow up, with your account's access to this
-            organization.
-          </p>
+          </InfoHeading>
         </header>
         <div class="tl-form">
           <Switch>
@@ -114,19 +117,27 @@ export function AssistantConnection() {
               </div>
             </Match>
             <Match when={enabled()}>
-              <p class="cx-note">Paste this invitation into your assistant. It sets up the connection and asks you to approve its access in Paperclip.</p>
+              <p class="cx-note info-line">
+                Paste this invitation into your assistant.
+                <InfoTip label="About the invitation">It sets up the connection and asks you to approve its access in Paperclip.</InfoTip>
+              </p>
               <CopyBlock value={invite()} label="invitation" />
               <details class="ap-more">
                 <summary>Set it up by hand</summary>
                 <div class="ap-more-body tl-stack">
-                  <div class="ap-chips" role="group" aria-label="Assistant">
-                    <For each={ASSISTANTS}>
-                      {(entry) => (
-                        <button type="button" class="ap-chip" aria-pressed={assistant() === entry} onClick={() => setAssistant(entry)}>
-                          {ASSISTANT_NAMES[entry]}
-                        </button>
-                      )}
-                    </For>
+                  <div class="info-line">
+                    <div class="ap-chips" role="group" aria-label="Assistant">
+                      <For each={ASSISTANTS}>
+                        {(entry) => (
+                          <button type="button" class="ap-chip" aria-pressed={assistant() === entry} onClick={() => setAssistant(entry)}>
+                            {ASSISTANT_NAMES[entry]}
+                          </button>
+                        )}
+                      </For>
+                    </div>
+                    <Show when={assistant() !== "browser"}>
+                      <InfoTip label="About authorizing">{AUTHORIZATION_HANDOFF}</InfoTip>
+                    </Show>
                   </div>
                   <ol class="cx-steps">
                     <For each={setupSteps(serverUrl(), assistant())}>
@@ -138,9 +149,6 @@ export function AssistantConnection() {
                       )}
                     </For>
                   </ol>
-                  <Show when={assistant() !== "browser"}>
-                    <p class="cx-note">{AUTHORIZATION_HANDOFF}</p>
-                  </Show>
                   <p class="cx-note">
                     When Paperclip asks, choose <b>{company().name}</b>, review the access, then click <b>Connect organization</b>. Creating tasks and adding comments
                     may start agent work on the organization's budget.
@@ -162,10 +170,14 @@ export function AssistantConnection() {
 
       <section class="card ap-card" aria-labelledby="as-yours">
         <header class="chead">
-          <h3 id="as-yours" class="disp">
+          <InfoHeading
+            level={3}
+            id="as-yours"
+            class="disp"
+            info={`Assistants connected as you to ${company().name}. Revoking one stops its future calls; work it already handed off carries on.`}
+          >
             Your connected assistants
-          </h3>
-          <p>Assistants connected as you to {company().name}. Revoking one stops its future calls; work it already handed off carries on.</p>
+          </InfoHeading>
         </header>
         <Switch>
           <Match when={connections.isPending}>

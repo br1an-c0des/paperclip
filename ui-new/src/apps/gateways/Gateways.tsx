@@ -10,7 +10,7 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useProjectsQuery } from "@/lib/company-data";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { Field, TextArea, TextInput } from "@/ui/Field";
+import { Field, InfoHeading, TextArea, TextInput } from "@/ui/Field";
 import { Switch as Toggle } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
 import { CardState, CopyBlock } from "../advanced/parts";
@@ -88,10 +88,14 @@ export function GatewaysList() {
       <section class="card ap-card" aria-labelledby="gw-list">
         <header class="chead ap-chead">
           <div>
-            <h3 id="gw-list" class="disp">
+            <InfoHeading
+              level={3}
+              id="gw-list"
+              class="disp"
+              info="One MCP endpoint for a client like Cursor or Claude Desktop, exposing only the tools its access profile allows. Turn it off and every client using it goes quiet."
+            >
               Gateways
-            </h3>
-            <p>One MCP endpoint that exposes only the apps you assign, for a client like Cursor or Claude Desktop. Revoke its token and the whole gateway goes quiet.</p>
+            </InfoHeading>
           </div>
           <Button size="compact" variant="primary" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setCreating(true)}>
             New gateway
@@ -102,7 +106,7 @@ export function GatewaysList() {
             <CardState loading={gateways.isPending} error={gateways.error} what="gateways" onRetry={() => void gateways.refetch()} />
           </Match>
           <Match when={list().length === 0}>
-            <p class="ap-empty">No gateways yet. Group connected apps into one endpoint you can hand to a client, then revoke it in one move.</p>
+            <p class="ap-empty">No gateways yet.</p>
           </Match>
           <Match when={true}>
             <Show when={list().length > 5}>
@@ -193,11 +197,7 @@ export function GatewayDialog(props: { open: boolean; onOpenChange: (open: boole
       open={props.open}
       onOpenChange={props.onOpenChange}
       title={props.gateway ? "Edit gateway" : "New gateway"}
-      description={
-        props.gateway
-          ? "Change its name, or the access profile that decides which tools it exposes."
-          : "One MCP endpoint that exposes only the tools in its access profile. Hand it to a client like Cursor or Claude Desktop."
-      }
+      info={props.gateway ? undefined : "One MCP endpoint that exposes only the tools in its access profile. Hand it to a client like Cursor or Claude Desktop."}
       width={520}
       footer={
         <>
@@ -223,14 +223,13 @@ export function GatewayDialog(props: { open: boolean; onOpenChange: (open: boole
         <Field
           label="Access profile"
           for="gw-profile"
+          info="Decides which tools this gateway allows. You can change it later."
           help={
             options().length === 0 && profiles.isSuccess ? (
               <>
                 No access profiles yet. <A href={`/${company().issuePrefix}/connections/advanced/profiles/new`}>Create one</A> first.
               </>
-            ) : (
-              "Decides which tools this gateway allows. You can change it later."
-            )
+            ) : undefined
           }
         >
           <select id="gw-profile" class="tl-select" value={profileId()} onChange={(event) => setProfileId(event.currentTarget.value)} disabled={options().length === 0}>

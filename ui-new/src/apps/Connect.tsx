@@ -7,7 +7,7 @@ import { createStore, produce } from "solid-js/store";
 import { toolsApi, type VercelConnectAvailability } from "@/api/tools";
 import { useCompany } from "@/lib/company";
 import { Button, buttonClass } from "@/ui/Button";
-import { Field, TextArea, TextInput } from "@/ui/Field";
+import { Field, InfoHeading, TextArea, TextInput } from "@/ui/Field";
 import { InfoTip } from "@/ui/InfoTip";
 import { Markdown } from "@/ui/Markdown";
 import { pushToast } from "@/ui/Toast";
@@ -250,8 +250,13 @@ export function VercelConnect(props: { source: string | null; resume: string | n
         <section class="card ap-connect">
           <header class="ap-connect-head">
             <div class="ap-connect-title">
-              <h2 class="disp">Connect through Vercel</h2>
-              <p>Create and manage the provider connector in Vercel. Paperclip stores its reference and applies agent access, policy, approval and audit controls here.</p>
+              <InfoHeading
+                level={2}
+                class="disp"
+                info="Create and manage the provider connector in Vercel. Paperclip stores its reference and applies agent access, policy, approval and audit controls here."
+              >
+                Connect through Vercel
+              </InfoHeading>
             </div>
             <Show when={availability()?.manageUrl}>
               {(url) => (
@@ -398,13 +403,13 @@ function GalleryForm(props: {
             <For each={props.methods}>
               {(candidate) => (
                 <li>
-                  <label class="cx-option ap-method" classList={{ "cx-option--on": candidate.key === methodKey() }}>
-                    <input type="radio" name="ap-method" checked={candidate.key === methodKey()} onChange={() => setMethodKey(candidate.key)} />
-                    <span class="ap-method-text">
-                      <span class="cx-option-name">{methodTitle(props.app, candidate)}</span>
-                      <span class="cx-option-note">{candidate.whenToUse}</span>
-                    </span>
-                  </label>
+                  <ChoiceCard
+                    name="ap-method"
+                    title={methodTitle(props.app, candidate)}
+                    info={candidate.whenToUse || undefined}
+                    checked={candidate.key === methodKey()}
+                    onSelect={() => setMethodKey(candidate.key)}
+                  />
                 </li>
               )}
             </For>
@@ -424,26 +429,26 @@ function GalleryForm(props: {
               </ul>
             </Show>
 
-            <Field label="Name" for="ap-name" help="How this connection shows in Paperclip.">
+            <Field label="Name" for="ap-name" info="How this connection shows in Paperclip.">
               <TextInput id="ap-name" value={draft.name} maxLength={160} onInput={(event) => setDraft("name", event.currentTarget.value)} />
             </Field>
 
             <Show when={viaVercel}>
               <div class="ap-oauth-client">
-                <p class="cx-note">
-                  Paperclip doesn't copy Vercel's setup forms. Create or attach the connector in Vercel, then paste its UID here.
-                  <Show when={props.vercel?.manageUrl}>
-                    {(url) => (
-                      <>
-                        {" "}
-                        <a href={url()} target="_blank" rel="noopener noreferrer">
-                          Open Vercel Connect
-                        </a>
-                      </>
-                    )}
-                  </Show>
-                </p>
-                <Field label="Connector UID or ID" for="ap-vercel-connector" help="Paperclip checks the connector and keeps only its reference and redacted verification details.">
+                <Show when={props.vercel?.manageUrl}>
+                  {(url) => (
+                    <p class="cx-note">
+                      <a href={url()} target="_blank" rel="noopener noreferrer">
+                        Open Vercel Connect
+                      </a>
+                    </p>
+                  )}
+                </Show>
+                <Field
+                  label="Connector UID or ID"
+                  for="ap-vercel-connector"
+                  info="Paperclip doesn't copy Vercel's setup forms: create or attach the connector in Vercel, then paste its UID here. Paperclip checks it and keeps only its reference and redacted verification details."
+                >
                   <TextInput
                     id="ap-vercel-connector"
                     class="mono"
@@ -457,7 +462,11 @@ function GalleryForm(props: {
             </Show>
 
             <Show when={!viaVercel && needsLink(current())}>
-              <Field label="Server address" for="ap-link" help="The full MCP address the provider gave you. Paperclip keeps it as a secret.">
+              <Field
+                label="Server address"
+                for="ap-link"
+                info="The full MCP address the provider gave you. If it carries a key, Paperclip stores the full address as a secret and keeps only the rest in the connection."
+              >
                 <TextInput
                   id="ap-link"
                   type="url"
@@ -551,11 +560,8 @@ function GalleryForm(props: {
                 value={draft.access}
                 onChange={(next) => setDraft("access", next)}
                 disabled={flow.isPending}
-                allDescription={
-                  canAll()
-                    ? "Current and future agents can use it, and carry its tools on every run."
-                    : (gallery.data?.capabilities.companyInstallReason ?? "Only a connection manager can give every agent access.")
-                }
+                allInfo="Current and future agents can use it, and carry its tools on every run."
+                allDescription={canAll() ? undefined : (gallery.data?.capabilities.companyInstallReason ?? "Only a connection manager can give every agent access.")}
               />
             </Field>
           </>
@@ -728,7 +734,7 @@ export function ByoConnect() {
         value={draft.access}
         onChange={(next) => setDraft("access", next)}
         disabled={flow.isPending}
-        allDescription="Current and future agents can use it, and carry its tools on every run."
+        allInfo="Current and future agents can use it, and carry its tools on every run."
       />
     </Field>
   );

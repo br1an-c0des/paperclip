@@ -32,7 +32,7 @@ afterEach(cleanup);
 describe("SchemaForm", () => {
   it("renders each kind and reports changes", () => {
     const values = setup();
-    fireEvent.input(screen.getByLabelText(/Server URL/), { target: { value: "https://b.example" } });
+    fireEvent.input(screen.getByRole("textbox", { name: /Server URL/ }), { target: { value: "https://b.example" } });
     fireEvent.change(screen.getByLabelText("Mode"), { target: { value: "safe" } });
     fireEvent.input(screen.getByLabelText("Retries"), { target: { value: "3" } });
     fireEvent.click(screen.getByRole("switch", { name: "Enabled" }));
@@ -46,6 +46,16 @@ describe("SchemaForm", () => {
       commands: [undefined],
       token: { type: "secret_ref", secretId: "s1", version: "latest" },
     });
+  });
+
+  it("puts a field's schema description behind an info button", () => {
+    setup();
+    const tip = screen.getByRole("button", { name: "About Server URL" });
+    expect(tip.getAttribute("aria-describedby")).toBeTruthy();
+    expect(document.getElementById(tip.getAttribute("aria-describedby")!)?.textContent).toBe("Where it calls.");
+    expect(document.querySelector(".fhelp")).toBeNull();
+    // A secret field without a description gets the standard one.
+    expect(screen.getByRole("button", { name: "About Token" })).toBeTruthy();
   });
 
   it("hides advanced fields until opened, and opens for their errors", () => {

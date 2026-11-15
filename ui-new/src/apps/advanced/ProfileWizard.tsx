@@ -10,7 +10,8 @@ import { useCompany } from "@/lib/company";
 import { randomId } from "@/lib/random-id";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
-import { Field, TextArea, TextInput } from "@/ui/Field";
+import { Field, InfoHeading, TextArea, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { PageHeader } from "@/ui/PageHeader";
 import { pushToast } from "@/ui/Toast";
 import { failureText, useRefreshTools } from "../shared";
@@ -45,6 +46,7 @@ import {
   type TemplateKey,
   type ToolCapability,
   type WizardStep,
+  PROFILE_PRECEDENCE,
 } from "./profile-model";
 import { profilesBase } from "./Profiles";
 import { useCompanyCatalog, useProfiles, useTargetNames } from "./queries";
@@ -202,7 +204,6 @@ export function ProfileWizard(props: { profileId?: string; template: TemplateKey
             </>
           }
           title={props.profileId ? (existing()?.status === "draft" ? "Finish your profile" : `Edit ${existing()?.name ?? "profile"}`) : "New access profile"}
-          numbers={<span>Choose which tools it allows, then who gets it.</span>}
         >
           <ol class="tl-steps" aria-label="Steps">
             <For each={STEPS}>
@@ -220,10 +221,9 @@ export function ProfileWizard(props: { profileId?: string; template: TemplateKey
           <Match when={step() === 1}>
             <section class="card ap-card" aria-labelledby="pw-name">
               <header class="chead">
-                <h3 id="pw-name" class="disp">
+                <InfoHeading level={3} id="pw-name" class="disp" info="A starting point for its tools. You choose the exact tools next.">
                   Start from
-                </h3>
-                <p>A starting point for its tools. You choose the exact tools next.</p>
+                </InfoHeading>
               </header>
               <div class="tl-form">
                 <ul class="tl-choices">
@@ -261,7 +261,7 @@ export function ProfileWizard(props: { profileId?: string; template: TemplateKey
                 <details class="ap-more">
                   <summary>Identifier</summary>
                   <div class="ap-more-body">
-                    <Field label="Identifier" for="pw-profile-key" help="Used in exports and the API. Filled in from the name.">
+                    <Field label="Identifier" for="pw-profile-key" info="Used in exports and the API. Filled in from the name.">
                       <TextInput
                         id="pw-profile-key"
                         class="mono"
@@ -410,10 +410,14 @@ function ToolsStep(props: {
     <>
       <section class="card ap-card" aria-labelledby="pw-tools">
         <header class="chead">
-          <h3 id="pw-tools" class="disp">
+          <InfoHeading
+            level={3}
+            id="pw-tools"
+            class="disp"
+            info="Tick an app for all its tools, including ones it adds later; open it to leave some out, or to pick a few."
+          >
             Choose tools
-          </h3>
-          <p>Tick an app for all its tools, including ones it adds later; open it to leave some out, or to pick a few.</p>
+          </InfoHeading>
         </header>
         <Switch>
           <Match when={props.loading}>
@@ -563,10 +567,15 @@ function Rules(props: { rules: AdvancedRule[]; onChange: (next: AdvancedRule[]) 
   return (
     <section class="card ap-card" aria-labelledby="pw-rules">
       <header class="chead">
-        <h3 id="pw-rules" class="disp">
+        <InfoHeading
+          level={3}
+          id="pw-rules"
+          class="disp"
+          infoLabel="About rules"
+          info="Match tools by a name pattern (with * wildcards), a risk level, or a tool's ID. They apply on top of the choices above."
+        >
           Rules (optional)
-        </h3>
-        <p>Match tools by a name pattern (with * wildcards), a risk level, or a tool's ID. They apply on top of the choices above.</p>
+        </InfoHeading>
       </header>
       <div class="tl-form">
         <Show when={props.rules.length > 0}>
@@ -663,19 +672,23 @@ function AssignStep(props: {
   return (
     <section class="card ap-card" aria-labelledby="pw-assign">
       <header class="chead">
-        <h3 id="pw-assign" class="disp">
+        <InfoHeading level={3} id="pw-assign" class="disp" info={PROFILE_PRECEDENCE}>
           Assign
-        </h3>
-        <p>An agent with several profiles can use anything any of them allows.</p>
+        </InfoHeading>
       </header>
       <div class="tl-form">
-        <label class="tl-radio">
-          <input type="checkbox" checked={props.draft.companyDefault} onChange={(event) => props.onChange({ ...props.draft, companyDefault: event.currentTarget.checked })} />
-          <span>
-            <b>Make this the organization default</b>
-            Every agent without a profile of its own uses it.{defaultName() ? ` Replaces “${defaultName()}”.` : ""}
-          </span>
-        </label>
+        <div class="tl-radio-line">
+          <label class="tl-radio">
+            <input type="checkbox" checked={props.draft.companyDefault} onChange={(event) => props.onChange({ ...props.draft, companyDefault: event.currentTarget.checked })} />
+            <span>
+              <b>Make this the organization default</b>
+              <Show when={defaultName()}>{(current) => `Replaces “${current()}”.`}</Show>
+            </span>
+          </label>
+          <InfoTip label="About the organization default">
+            Agents use it when nothing narrower applies: no profile of their own, their project's or their recurring task's.
+          </InfoTip>
+        </div>
         <Field label="Agents">
           <Show when={props.agents.length > 0} fallback={<p class="cx-static">No agents yet.</p>}>
             <ul class="cx-options">
@@ -706,12 +719,15 @@ function AssignStep(props: {
           <details class="ap-more" open={props.draft.projectIds.size > 0 || props.draft.routineIds.size > 0}>
             <summary>Projects and recurring tasks</summary>
             <div class="ap-more-body tl-stack">
-              <p class="cx-note">Give a whole project or a recurring task this profile, instead of (or as well as) single agents.</p>
               <Show when={props.projects.length > 0}>
-                <Field label="Projects">{checklist("projectIds", props.projects)}</Field>
+                <Field label="Projects" info="Runs on the project's tasks get this profile, unless their agent has profiles of its own.">
+                  {checklist("projectIds", props.projects)}
+                </Field>
               </Show>
               <Show when={props.routines.length > 0}>
-                <Field label="Recurring tasks">{checklist("routineIds", props.routines)}</Field>
+                <Field label="Recurring tasks" info="The recurring task's runs get this profile in place of their agent's own.">
+                  {checklist("routineIds", props.routines)}
+                </Field>
               </Show>
             </div>
           </details>
