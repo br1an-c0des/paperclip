@@ -8,7 +8,8 @@ import { useCompany } from "@/lib/company";
 import { randomId } from "@/lib/random-id";
 import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { Field, TextInput } from "@/ui/Field";
+import { Field, InfoHeading, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { failureText } from "../shared";
 import { Card } from "./parts";
 import { automaticStage, managedMessage, managedWorkspace, slackSetupMessage } from "./slack-model";
@@ -255,9 +256,11 @@ export function AutomaticSlackSetup(props: { endpoint: ChatEndpoint; onSaved: (n
         </p>
       </Show>
       <Show when={registration()?.appId && stage() !== "retry-config"}>
-        <p>
-          <b>{props.endpoint.setup?.slackApp?.appName ?? "Your Slack app"}</b> is created. Install it with your Slack account; Paperclip links that account
-          to you and sends you a welcome message.
+        <p class="info-line">
+          <span>
+            <b>{props.endpoint.setup?.slackApp?.appName ?? "Your Slack app"}</b> is created. Install it with your Slack account.
+          </span>
+          <InfoTip label="About installing">Paperclip links that Slack account to you and sends you a welcome message.</InfoTip>
         </p>
       </Show>
       <Show when={stage() === "resume"}>
@@ -400,7 +403,8 @@ export function SlackTestMessage(props: { endpoint: ChatEndpoint }) {
           if (!open && !send.isPending) setAccounts(null);
         }}
         title="Connect your Slack account"
-        description="Choose your account. Messages to this agent will use your Paperclip permissions."
+        info="Messages to this agent will use your Paperclip permissions."
+        description="Choose your account."
         width={520}
         footer={
           <>
@@ -479,7 +483,7 @@ export function SlackTools(props: { endpoint: ChatEndpoint }) {
   }));
 
   return (
-    <Card title="Slack tools" description="Read, search and act in Slack. Some actions ask first.">
+    <Card title="Slack tools" info="Read, search and act in Slack. Some actions ask first.">
       <Switch>
         <Match when={capabilities.isPending}>
           <p class="cx-static">Checking Slack permissions…</p>
@@ -506,11 +510,13 @@ export function SlackTools(props: { endpoint: ChatEndpoint }) {
         </Match>
       </Switch>
 
-      <h4 class="ch-subhead">Your Slack search access</h4>
-      <p class="cx-static">
-        Optional. Your own authorization lets agents search private conversations you can see, on runtimes that support it. It can't read channels the bot
-        hasn't joined or write as you.
-      </p>
+      <InfoHeading
+        level={4}
+        class="ch-subhead"
+        info="Optional. Your own authorization lets agents search private conversations you can see, on runtimes that support it. It can't read channels the bot hasn't joined or write as you."
+      >
+        Your Slack search access
+      </InfoHeading>
       <Switch>
         <Match when={search.isPending}>
           <p class="cx-static">Loading search access…</p>

@@ -187,7 +187,7 @@ function CompanyMenu() {
           </For>
         </Menu.Group>
         <Menu.Separator />
-        <Menu.Item onSelect={() => navigate("/companies")} icon={<Building2 size={16} />} description="Change their order there">
+        <Menu.Item onSelect={() => navigate("/companies")} icon={<Building2 size={16} />}>
           All companies
         </Menu.Item>
         <Show when={choices.canCreate()}>
@@ -571,7 +571,7 @@ function NavAgent(props: { agent: Agent; base: string; running: ReadonlySet<stri
         )}
       </Show>
       <RowMenu label={`${props.agent.name}: actions`}>
-        <Menu.Item icon={<Zap size={16} />} disabled={!can("wake") || actions.busy() !== null} description="Starts a heartbeat now" onSelect={() => void actions.wake([props.agent])}>
+        <Menu.Item icon={<Zap size={16} />} disabled={!can("wake") || actions.busy() !== null} onSelect={() => void actions.wake([props.agent])}>
           Run now
         </Menu.Item>
         <Show

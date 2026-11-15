@@ -8,6 +8,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { queuedCommentsApi } from "@/api/queued-comments";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
+import { InfoTip } from "@/ui/InfoTip";
 import { Menu } from "@/ui/Menu";
 import { pushToast } from "@/ui/Toast";
 import { attachmentIds, clearComposerDraft, loadComposerDraft, messageBody, saveComposerDraft, type ComposerAttachment } from "@/tasks/composer/composer-model";
@@ -400,7 +401,10 @@ export function ChatComposer(props: {
             </For>
           </Menu.Content>
         </Menu>
-        <span class="ch-cmp-hint">{live() ? "Sends when this reply finishes · /new starts a fresh session" : "/new starts a fresh session"}</span>
+        <InfoTip label="About commands">Type /new to start a fresh session; the history stays here.</InfoTip>
+        <Show when={live()}>
+          <span class="ch-cmp-hint">Sends when this reply finishes</span>
+        </Show>
 
         <div class="cmp-send">
           <Button type="submit" variant="primary" size="compact" class="cmp-send-main" disabled={sending() || !!props.disabledReason} title="Send (Enter)">

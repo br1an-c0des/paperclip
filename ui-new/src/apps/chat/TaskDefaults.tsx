@@ -6,6 +6,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
 import { Button } from "@/ui/Button";
+import { InfoTip } from "@/ui/InfoTip";
 import { failureText } from "../shared";
 import { defaultsPayload, projectKey, withProject, withWorkspace, workspaceChoices, workspaceKey } from "./task-defaults-model";
 import "./ChatExtras.css";
@@ -87,8 +88,16 @@ export function TaskDefaults(props: {
             <For each={projects.data ?? []}>{(project) => <option value={project.id}>{project.name}</option>}</For>
           </select>
         </label>
-        <label class="field-stack" for={`${id}-workspace`}>
-          <span class="field-label">Workspace</span>
+        <div class="field-stack">
+          <span class="info-line">
+            <label class="field-label" for={`${id}-workspace`}>
+              Workspace
+            </label>
+            <InfoTip label="About Workspace">
+              Paperclip checks access to the project and workspace each time it makes a task. A low-trust agent gets its own isolated checkout even when a shared
+              folder is picked.
+            </InfoTip>
+          </span>
           <select
             id={`${id}-workspace`}
             class="input"
@@ -124,9 +133,8 @@ export function TaskDefaults(props: {
               </optgroup>
             </Show>
           </select>
-        </label>
+        </div>
       </div>
-      <p class="cx-static">Access to the project and workspace is checked for each task. A shared folder must also be allowed by the agent's settings.</p>
       <Show when={error()}>
         <p class="cx-note cx-note--error" role="alert">
           {error()}

@@ -78,7 +78,6 @@ export function NewCardDialog(props: { open: boolean; onOpenChange: (open: boole
       open={props.open}
       onOpenChange={(open) => (open ? props.onOpenChange(true) : close())}
       title="New card"
-      description="Say what to keep an eye on and what each update should tell you. The agent builds the query from it and writes every update to it."
       width={640}
       initialFocus={() => promptField}
       footer={
@@ -93,7 +92,11 @@ export function NewCardDialog(props: { open: boolean; onOpenChange: (open: boole
       }
     >
       <form class="sc-new" onSubmit={(event) => void create(event)}>
-        <Field label="What do you want to keep an eye on?" for="sc-new-prompt">
+        <Field
+          label="What do you want to keep an eye on?"
+          for="sc-new-prompt"
+          info="Say what to keep an eye on and what each update should tell you. The agent builds the query from it and writes every update to it."
+        >
           <TextArea
             ref={promptField}
             id="sc-new-prompt"
@@ -116,7 +119,7 @@ export function NewCardDialog(props: { open: boolean; onOpenChange: (open: boole
             )}
           </For>
         </div>
-        <Field label="Agent" for="sc-new-agent" help="Runs the card's setup and updates. Each run is a real agent run and costs tokens.">
+        <Field label="Agent" for="sc-new-agent" info="Runs the card's setup and updates." help="Each run is a real agent run and costs tokens.">
           <AgentPicker id="sc-new-agent" value={agentId()} onChange={setAgentId} />
         </Field>
         <AgentNotice agentId={agentId()} check={agentCheck()} />

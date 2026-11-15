@@ -257,7 +257,7 @@ export function TasksSheet(props: {
               </span>
               <span class="tsheet-row-main">
                 <span>Settings and admin</span>
-                <span class="tsheet-meta tsheet-ellipsis">Company, secrets, plugins, routines, activity</span>
+                <span class="tsheet-meta tsheet-ellipsis">Members, models, secrets, budgets, environments</span>
               </span>
               <small class="tsheet-count">On desktop</small>
             </a>

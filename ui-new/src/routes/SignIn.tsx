@@ -59,7 +59,7 @@ export function SignIn() {
       fallback={
         <Standalone
           title={mode() === "sign_in" ? "Sign in" : "Create your account"}
-          lede={mode() === "sign_in" ? "Use your email and password for this Paperclip." : "An account on this Paperclip. No email confirmation is needed."}
+          info={mode() === "sign_in" ? undefined : "No email confirmation is needed."}
         >
           <AuthForm mode={mode()} onModeChange={setMode} onSignedIn={onSignedIn} idPrefix="signin" />
         </Standalone>

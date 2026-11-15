@@ -14,6 +14,7 @@ import { useTaskPeople } from "@/tasks/people";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Switch } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
 import { activityLine, type ActivityLine } from "./activity-line";
@@ -193,7 +194,13 @@ export function ActivityLog() {
           </Button>
         </Show>
         <div class="act-toolbar-end">
-          <Switch label="Reads and housekeeping" checked={showAll()} onChange={(on) => set({ all: on ? "1" : undefined })} />
+          <InfoTip label="About the activity log">Recorded by Paperclip. Entries can't be edited, and secret values are never stored.</InfoTip>
+          <Switch
+            label="Reads and housekeeping"
+            info="Shows reads and routine housekeeping entries, hidden by default."
+            checked={showAll()}
+            onChange={(on) => set({ all: on ? "1" : undefined })}
+          />
           <Show when={full()}>
             <Button size="compact" icon={<Download size={14} aria-hidden="true" />} disabled={exporting() || records().length === 0} onClick={() => void exportCsv()}>
               {exporting() ? "Exporting…" : "Export CSV"}
@@ -267,7 +274,6 @@ export function ActivityLog() {
           </div>
         </Show>
       </section>
-      <p class="org-foot">Recorded by Paperclip; entries can't be edited, and secret values are never stored.</p>
     </section>
   );
 }

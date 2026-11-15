@@ -504,41 +504,8 @@
   gap: 6px;
 }
 
-.sc-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 6px 12px;
-  border: 1px solid var(--edge);
-  border-radius: var(--r-inner);
-  cursor: pointer;
-}
-
-.sc-option:hover {
-  background: var(--row-hover);
-}
-
-.sc-option--on {
-  border-color: var(--run-fg);
-  background: var(--run-bg);
-}
-
-.sc-option input,
 .sc-check input {
   accent-color: var(--run-fg);
-}
-
-.sc-option-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.sc-option-name {
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 700;
 }
 
 .sc-row {
@@ -640,9 +607,6 @@
   color: var(--text);
   font-size: 14px;
   font-weight: 700;
-  text-decoration: underline dotted var(--muted);
-  text-underline-offset: 4px;
-  cursor: default;
 }
 
 .sc-settings-foot {

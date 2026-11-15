@@ -24,7 +24,7 @@ export function NotBuiltYet() {
       <h1 class="disp" style={{ "font-size": "22px", "font-weight": 800 }}>
         Not built yet
       </h1>
-      <p style={{ color: "var(--body)" }}>This page is planned for a later milestone. The classic UI still has it.</p>
+      <p style={{ color: "var(--body)" }}>This page isn't in this app. The classic UI may still have it.</p>
     </section>
   );
 }

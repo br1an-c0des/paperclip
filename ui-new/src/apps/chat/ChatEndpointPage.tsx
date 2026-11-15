@@ -14,6 +14,7 @@ import { AgentAvatar } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { TextArea, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { PageHeader, Tabs } from "@/ui/PageHeader";
 import { Switch as Toggle } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
@@ -205,7 +206,7 @@ function SettingsTab(props: { endpoint: ChatEndpoint }) {
         </Match>
         <Match when={true}>
           <Show when={props.endpoint.provider === "slack"}>
-            <Card title="Check it works" description={`${props.endpoint.assignedAgentName} sends you a direct message in Slack.`}>
+            <Card title="Check it works" info={`${props.endpoint.assignedAgentName} sends you a direct message in Slack.`}>
               <SlackTestMessage endpoint={props.endpoint} />
             </Card>
           </Show>
@@ -226,7 +227,7 @@ function EndpointTaskDefaults(props: { endpoint: ChatEndpoint }) {
   const company = useCompany();
   const client = useQueryClient();
   return (
-    <Card title="Task defaults" description="The project and workspace new conversations' tasks get. Existing tasks keep theirs.">
+    <Card title="Task defaults" info="The project and workspace new conversations' tasks get. Existing tasks keep theirs.">
       <TaskDefaults
         value={props.endpoint.executionDefaults}
         onSave={async (executionDefaults) => {
@@ -269,7 +270,7 @@ function CallMyPhone(props: { endpoint: ChatEndpoint }) {
     onError: (error) => pushToast({ tone: "error", title: "Couldn't save the callback number", body: failureText(error, "Try again.") }),
   }));
   return (
-    <Card title="Call my phone" description={`Your own number ${props.endpoint.assignedAgentName} may call about your tasks.`}>
+    <Card title="Call my phone" info={`Your own number ${props.endpoint.assignedAgentName} may call about your tasks.`}>
       <form
         class="ch-step-body"
         onSubmit={(event) => {
@@ -341,12 +342,11 @@ function Destinations(props: { endpoint: ChatEndpoint }) {
   return (
     <Card
       title={isSlack() ? "Channels" : "Where it answers"}
+      info={isSlack() ? `Invite ${props.endpoint.assignedAgentName} to a channel in Slack to add it here.` : undefined}
       description={
         props.endpoint.provider === "imessage-photon" && props.endpoint.photonAllocation === "shared"
           ? "A shared Photon line takes direct messages only; enroll senders in Photon and link them in Access."
-          : isSlack()
-            ? `Invite ${props.endpoint.assignedAgentName} to a channel in Slack to add it here.`
-            : "Turn each channel or group on or off."
+          : undefined
       }
     >
       <Switch>
@@ -426,7 +426,7 @@ function Behaviour(props: { endpoint: ChatEndpoint }) {
           disabled={update.isPending}
           onChange={(allowDirectMessages) => update.mutate({ allowDirectMessages })}
           label="Allow direct messages"
-          description={props.endpoint.provider === "discord" ? "People must also allow direct messages in the server's privacy settings." : undefined}
+          info={props.endpoint.provider === "discord" ? "People must also allow direct messages in the server's privacy settings." : undefined}
         />
         <Show when={props.endpoint.provider === "slack"}>
           <Toggle
@@ -434,7 +434,7 @@ function Behaviour(props: { endpoint: ChatEndpoint }) {
             disabled={update.isPending}
             onChange={(requireAtMention) => update.mutate({ requireAtMention })}
             label="Require at-mention in channels"
-            description="A channel message needs an @mention of this bot to start a conversation. Replies in existing threads and direct messages don't."
+            info="A channel message needs an @mention of this bot to start a conversation. Replies in existing threads and direct messages don't."
           />
         </Show>
         <Show when={props.endpoint.provider === "microsoft-teams"}>
@@ -443,14 +443,16 @@ function Behaviour(props: { endpoint: ChatEndpoint }) {
             disabled={update.isPending}
             onChange={(allowGroupChats) => update.mutate({ allowGroupChats })}
             label="Allow group chats"
-            description="The bot may take part in group chats it's installed in."
+            info="Only group chats the bot is installed in."
           />
         </Show>
         <Show when={props.endpoint.provider === "telegram"}>
           <div class="ch-copy">
-            <span class="ch-copy-label">Group command</span>
+            <span class="ch-copy-label info-line">
+              Group command
+              <InfoTip label="About the group command">Telegram doesn't pass ordinary mentions to bots in groups: use this command, or reply to the bot.</InfoTip>
+            </span>
             <code class="ap-code mono">{command()} &lt;request&gt;</code>
-            <span class="cx-note">Telegram doesn't pass ordinary mentions to bots in groups: use this command, or reply to the bot.</span>
           </div>
         </Show>
         <Show when={props.endpoint.provider === "slack"}>
@@ -492,7 +494,7 @@ function InboxSettings(props: { endpoint: ChatEndpoint }) {
   }));
   const inbox = () => inboxes.data?.find((entry) => entry.id === props.endpoint.id) ?? null;
   return (
-    <Card title="Inbox" description={`Email to this address becomes tasks for ${props.endpoint.assignedAgentName}; replies stay in the same task.`}>
+    <Card title="Inbox" info={`Email to this address becomes tasks for ${props.endpoint.assignedAgentName}; replies stay in the same task.`}>
       <Show when={inbox()} fallback={<p class="cx-static">{readNote(inboxes, "The inbox details aren't available.")}</p>}>
         {(current) => (
           <dl class="ch-facts">
@@ -543,7 +545,7 @@ function PhoneLine(props: { endpoint: ChatEndpoint }) {
   }));
   const current = () => phone.data?.number ?? null;
   return (
-    <Card title="Phone line" description="A Speko phone number people can call to reach the agent.">
+    <Card title="Phone line" info="A Speko phone number people can call to reach the agent.">
       <Switch>
         <Match when={props.endpoint.status !== "active"}>
           <p class="cx-static">Finish setting up the voice persona first.</p>
@@ -585,7 +587,7 @@ function PhoneLine(props: { endpoint: ChatEndpoint }) {
             disabled={!current() || save.isPending}
             onChange={(guestIntake) => save.mutate({ numberId: numberId(), enabled: current()?.enabled ?? false, guestIntake })}
             label="Let unknown callers start a new task"
-            description="Under a task-scoped low-trust policy. Private calls still need their code approved here."
+            info="New tasks run under a task-scoped low-trust policy. Private calls still need their code approved here."
           />
         </Match>
       </Switch>
@@ -614,7 +616,7 @@ function IncomingCalls(props: { endpoint: ChatEndpoint }) {
   }));
   return (
     <Show when={props.endpoint.status === "active"}>
-      <Card title="Calls waiting for you" description="A private incoming call goes ahead once you enter the code the caller hears.">
+      <Card title="Calls waiting for you" info="A private incoming call goes ahead once you enter the code the caller hears.">
         <Show when={waiting().length > 0} fallback={<p class="cx-static">No calls are waiting.</p>}>
           <ul class="ch-list">
             <For each={waiting()}>
@@ -692,36 +694,46 @@ function AccessTab(props: { endpoint: ChatEndpoint }) {
         </Card>
       </Match>
       <Match when={props.endpoint.provider === "agentmail" || props.endpoint.provider === "github"}>
-        <Card title="Access">
-          <p class="cx-note">
-            {props.endpoint.provider === "github"
+        <Card
+          title="Access"
+          info={
+            props.endpoint.provider === "github"
               ? "Who can ask the bot for reviews follows the repositories the GitHub App is installed on."
-              : "Anyone who emails the address starts or continues a task. Which agents may use the AgentMail account is on its connection page."}
-            <Show when={props.endpoint.connectionId}>
-              {(connectionId) => (
-                <>
-                  {" "}
-                  <A href={`/${company().issuePrefix}/connections/${connectionId()}/permissions`}>Open the connection</A>
-                </>
-              )}
-            </Show>
-          </p>
+              : "Anyone who emails the address starts or continues a task."
+          }
+        >
+          <Show
+            when={props.endpoint.connectionId}
+            fallback={
+              <Show when={props.endpoint.provider === "agentmail"}>
+                <p class="cx-note">Which agents may use the AgentMail account is on its connection page.</p>
+              </Show>
+            }
+          >
+            {(connectionId) => (
+              <p class="cx-note">
+                {props.endpoint.provider === "agentmail" ? "Which agents may use the AgentMail account: " : ""}
+                <A href={`/${company().issuePrefix}/connections/${connectionId()}/permissions`}>Open the connection</A>
+              </p>
+            )}
+          </Show>
         </Card>
       </Match>
       <Match when={true}>
         <Card
           title="People"
-          description={
-            <>
-              People with linked accounts work with their own Paperclip permissions. <A href={`/${company().issuePrefix}/company/settings/members`}>Members</A>
-            </>
-          }
+          info="People with linked accounts work with their own Paperclip permissions."
+          description={<A href={`/${company().issuePrefix}/company/settings/members`}>Members</A>}
         >
           <Show when={props.endpoint.provider === "slack"}>
             <details class="ap-more">
-              <summary>Invite people</summary>
+              <summary>
+                Invite people
+                <InfoTip label="About inviting people">
+                  They send the command in Slack, open the bot's private link, and sign in to confirm their Slack account. The link expires after 15 minutes.
+                </InfoTip>
+              </summary>
               <div class="ap-more-body">
-                <p class="cx-note">They send the command in Slack, open the bot's private link, and sign in to confirm their Slack account. The link expires after 15 minutes.</p>
                 <CopyValue label="Command" value={joinCommand()} />
                 <CopyValue label="Invitation" value={invitation()} block />
               </div>
@@ -819,7 +831,7 @@ function ReviewsTab(props: { endpoint: ChatEndpoint }) {
     retry: false,
   }));
   return (
-    <Card title="Pull request reviews" description="Reviews the bot made, newest first. Each has a task with its run.">
+    <Card title="Pull request reviews" info="Reviews the bot made, newest first. Each has a task with its run.">
       <Switch>
         <Match when={reviews.isPending}>
           <p class="cx-static">Loading…</p>
@@ -888,7 +900,7 @@ function ConversationsTab(props: { endpoint: ChatEndpoint }) {
     retry: false,
   }));
   return (
-    <Card title="Conversations" description="Each conversation is a task the agent works in.">
+    <Card title="Conversations" info="Each conversation is a task the agent works in.">
       <Switch>
         <Match when={conversations.isPending}>
           <p class="cx-static">Loading…</p>
@@ -1089,14 +1101,14 @@ function ActivityTab(props: { endpoint: ChatEndpoint }) {
                 <RefreshCw size={14} aria-hidden="true" />
                 {status() === "draft" || status() === "verifying" ? "Finish setup" : "Reconnect"}
               </A>
+              <Show when={status() !== "draft" && status() !== "verifying"}>
+                <InfoTip label="About reconnecting">{guidance().reconnect}</InfoTip>
+              </Show>
             </Show>
             <Button size="compact" variant="danger" ghost icon={<Trash2 size={14} aria-hidden="true" />} disabled={lifecycle.isPending} onClick={() => setRemoving(true)}>
               Remove
             </Button>
           </div>
-          <Show when={status() !== "draft" && status() !== "verifying"}>
-            <p class="cx-note">{guidance().reconnect}</p>
-          </Show>
         </Show>
       </Card>
 

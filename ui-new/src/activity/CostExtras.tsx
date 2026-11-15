@@ -13,6 +13,7 @@ import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Field, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { formatTokens } from "./costs-model";
@@ -80,7 +81,12 @@ export function SubscriptionsKpi(props: { report: SubscriptionCostReport | undef
   const estimated = () => props.report?.monthlyTotals.reduce((sum, total) => sum + total.estimatedCount, 0) ?? 0;
   return (
     <div class="card org-kpi">
-      <span class="org-kpi-label">Subscriptions</span>
+      <span class="org-kpi-label info-line">
+        Subscriptions
+        <InfoTip label="About Subscriptions">
+          A fee covers the whole account, including use outside Paperclip. Fees aren't charges and don't count against budgets, and currencies are added up separately.
+        </InfoTip>
+      </span>
       <span class="org-kpi-value disp">
         <Show when={totals()} fallback="—">
           {(lines) => <For each={lines()}>{(line) => <span class="act-kpi-line">{line}</span>}</For>}
@@ -103,9 +109,12 @@ export function SubscriptionsKpi(props: { report: SubscriptionCostReport | undef
         </button>
       </Show>
       <Show when={props.checkFailed}>
-        <button type="button" class="act-linkish act-kpi-link" onClick={props.onRetryCheck} title="Paperclip couldn't ask the connected accounts which plan they're on.">
-          Check plans again
-        </button>
+        <span class="org-muted act-kpi-link">
+          Couldn't check the plans ·{" "}
+          <button type="button" class="act-linkish" onClick={props.onRetryCheck}>
+            Check again
+          </button>
+        </span>
       </Show>
       <Show when={props.report}>{(report) => <SubscriptionsDialog open={open()} onOpenChange={setOpen} report={report()} />}</Show>
     </div>
@@ -123,7 +132,7 @@ function SubscriptionsDialog(props: { open: boolean; onOpenChange: (open: boolea
       }}
       width={680}
       title={editing() ? `${editing()!.name}: price` : "Subscriptions"}
-      description="Monthly fees of the accounts you can see. Token counts cover this organization's work in the range."
+      info={editing() ? undefined : "Monthly fees of the AI subscription accounts you can see. Token counts cover this organization's work in the range."}
     >
       <Show
         when={editing()}
@@ -131,7 +140,10 @@ function SubscriptionsDialog(props: { open: boolean; onOpenChange: (open: boolea
         fallback={
           <div class="act-subs">
             <Show when={props.report.accounts.length === 0}>
-              <p class="org-muted">No subscriptions you can see yet. Connect an AI account in Connections, or run an agent on a connected subscription.</p>
+              <p class="org-muted info-line">
+                No subscriptions you can see yet.
+                <InfoTip label="About adding subscriptions">Connect an AI account in Connections, or run an agent on a connected subscription.</InfoTip>
+              </p>
             </Show>
             <For each={props.report.accounts}>
               {(account) => (
@@ -156,7 +168,10 @@ function SubscriptionsDialog(props: { open: boolean; onOpenChange: (open: boolea
                     <span class="org-muted act-report-line">Used by {account.agents.map((agent) => agent.name).join(", ")}</span>
                   </Show>
                   <Show when={!account.identityVerified}>
-                    <span class="org-muted act-report-line">Paperclip can't confirm which account this is. If two connections are the same subscription, link them.</span>
+                    <span class="org-muted act-report-line info-line">
+                      Paperclip can't confirm which account this is.
+                      <InfoTip label="About unconfirmed accounts">If two connections are the same subscription, link them under Edit price.</InfoTip>
+                    </span>
                   </Show>
                   <Show when={account.observedAt || account.refreshStatus === "unavailable"}>
                     <span class="org-muted act-report-line">
@@ -183,7 +198,6 @@ function SubscriptionsDialog(props: { open: boolean; onOpenChange: (open: boolea
                 {Number(props.report.unknown.costCents) > 0 ? ` and ${formatCents(Number(props.report.unknown.costCents))} in charges` : ""}, counted with the runs' costs.
               </p>
             </Show>
-            <p class="org-foot">A fee covers the whole account, including use outside Paperclip. Fees aren't charges and don't count against budgets. Currencies are added up separately.</p>
           </div>
         }
       >
@@ -255,7 +269,12 @@ function SubscriptionEditor(props: { account: SubscriptionAccountReport; account
         <TextInput id="act-sub-plan" value={plan()} maxLength={100} onInput={(event) => setPlan(event.currentTarget.value)} />
       </Field>
       <div class="act-sub-grid">
-        <Field label="Price per billing period" for="act-sub-price" error={cents() === undefined ? "Use a number like 20 or 19.99." : undefined}>
+        <Field
+          label="Price per billing period"
+          for="act-sub-price"
+          info="The full price of one account or seat. A yearly price is divided by 12. Changes count from now."
+          error={cents() === undefined ? "Use a number like 20 or 19.99." : undefined}
+        >
           <TextInput id="act-sub-price" inputMode="decimal" value={amount()} placeholder="Unknown" onInput={(event) => setAmount(event.currentTarget.value)} />
         </Field>
         <Field label="Currency" for="act-sub-currency">
@@ -277,7 +296,9 @@ function SubscriptionEditor(props: { account: SubscriptionAccountReport; account
           </select>
         </Field>
       </div>
-      <p class="org-muted">The full price of one account or seat. A yearly price is divided by 12. Changes count from now; ending it here doesn't cancel anything with the provider.</p>
+      <Show when={status() === "ended"}>
+        <p class="org-muted">Ending it here doesn't cancel the subscription with the provider.</p>
+      </Show>
       <div class="org-dialog-foot">
         <Button variant="quiet" onClick={props.onDone} disabled={busy()}>
           Back
@@ -288,7 +309,8 @@ function SubscriptionEditor(props: { account: SubscriptionAccountReport; account
       </div>
       <Show when={targets().length > 0}>
         <div class="act-sub-link">
-          <Field label="The same subscription as another account?" for="act-sub-link" help="Linking counts them once, puts their usage together and keeps the chosen account's price. Only link the same subscription or seat.">
+          <Field label="The same subscription as another account?" for="act-sub-link" info="Linking counts them once, puts their usage together and keeps the chosen account's price."
+            help="Only link the same subscription or seat: linking can't be undone.">
             <select id="act-sub-link" class="input" value={target()} onChange={(event) => setTarget(event.currentTarget.value)}>
               <option value="">Choose an account</option>
               <For each={targets()}>
@@ -395,6 +417,7 @@ export function QualityNotice(props: { scope: CostScope; summary: { unpricedEven
                             <TonePill tone={item.reason === "retryable" ? "cyan" : "amber"} compact>
                               {QUALITY_REASONS[item.reason].label}
                             </TonePill>
+                            <InfoTip label={`About ${QUALITY_REASONS[item.reason].label}`}>{QUALITY_REASONS[item.reason].description}</InfoTip>
                             <span class="org-muted">{agoLabel(item.occurredAt)}</span>
                             <Show when={item.model}>
                               <span class="mono org-muted org-ellipsis">{item.model}</span>
@@ -405,7 +428,6 @@ export function QualityNotice(props: { scope: CostScope; summary: { unpricedEven
                               </button>
                             </Show>
                           </div>
-                          <p class="org-muted act-report-line">{QUALITY_REASONS[item.reason].description}</p>
                         </li>
                       )}
                     </For>

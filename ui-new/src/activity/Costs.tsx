@@ -11,10 +11,11 @@ import { useMinute } from "@/org/queries";
 import { useTaskPeople } from "@/tasks/people";
 import { AgentAvatar } from "@/ui/Avatar";
 import { TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Segmented } from "@/ui/Segmented";
 import { TonePill } from "@/ui/Status";
 import { QualityNotice, SubscriptionsKpi, useSubscriptions } from "./CostExtras";
-import { BillersView, ByPersonCard, CallHistory, FinanceView, ProvidersView, type CostScope } from "./CostReports";
+import { BillersView, ByPersonCard, CallHistory, COSTS_VIEW_INFO, FinanceView, ProvidersView, type CostScope } from "./CostReports";
 import {
   agentCostRows,
   barPercent,
@@ -127,14 +128,19 @@ export function Costs() {
           </label>
         </Show>
       </div>
-      <div class="org-filters act-cost-tabs" role="group" aria-label="Costs view">
-        <For each={COSTS_TABS}>
-          {(entry) => (
-            <button type="button" class="org-ftab" aria-pressed={tab() === entry.value} onClick={() => setSearch({ tab: entry.value === "overview" ? undefined : entry.value }, { replace: true })}>
-              {entry.label}
-            </button>
-          )}
-        </For>
+      <div class="info-line">
+        <div class="org-filters act-cost-tabs" role="group" aria-label="Costs view">
+          <For each={COSTS_TABS}>
+            {(entry) => (
+              <button type="button" class="org-ftab" aria-pressed={tab() === entry.value} onClick={() => setSearch({ tab: entry.value === "overview" ? undefined : entry.value }, { replace: true })}>
+                {entry.label}
+              </button>
+            )}
+          </For>
+        </div>
+        <Show when={COSTS_VIEW_INFO[tab()]}>
+          {(text) => <InfoTip label={`About ${COSTS_TABS.find((entry) => entry.value === tab())?.label ?? "this view"}`}>{text()}</InfoTip>}
+        </Show>
       </div>
 
       <Show when={ready()} fallback={<section class="card act-card"><p class="org-empty">Pick the first and last day to see that range.</p></section>}>

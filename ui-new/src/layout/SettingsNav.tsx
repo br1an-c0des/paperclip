@@ -128,14 +128,6 @@ function AppSettingsNav() {
       />
       <Show when={!sections.access.isLoading} fallback={<p class="snav-empty">Loading…</p>}>
         <SettingsRows entries={sections.entries()} />
-        <Show when={sections.isAdmin()}>
-          <div class="snav-zone snav-zone--bottom">
-            <p class="snav-note">
-              <span class="snav-note-title">No Experimental page</span>
-              The switches still worth changing are under General → Features.
-            </p>
-          </div>
-        </Show>
       </Show>
     </>
   );
