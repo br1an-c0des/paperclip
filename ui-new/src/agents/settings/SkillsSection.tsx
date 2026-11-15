@@ -109,7 +109,7 @@ export function SkillsSection(props: { agent: AgentDetail }) {
 
   return (
     <>
-      <SectionTitle title="Skills">What {props.agent.name} knows how to do, from the company's skill library.</SectionTitle>
+      <SectionTitle title="Skills" info={`What ${props.agent.name} knows how to do, from the company's skill library.`} />
       <Show when={skills.isError}>
         <p class="ps-list-note" role="alert">
           Couldn't load the skills. {failure(skills.error, "")}
@@ -127,9 +127,10 @@ export function SkillsSection(props: { agent: AgentDetail }) {
           >
             <SettingsCard
               title={`${assigned()} of ${choosable().length} assigned`}
+              info="Changes save at once."
               description={
                 <CardNote state={busy() ? "saving" : error() ? "error" : "idle"} error={error()}>
-                  {snapshot().mode === "ephemeral" ? "Given to each run as it starts." : "Installed in the harness."} Changes save at once.
+                  {snapshot().mode === "ephemeral" ? "Given to each run as it starts." : "Installed in the harness."}
                 </CardNote>
               }
             >

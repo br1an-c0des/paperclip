@@ -6,6 +6,7 @@ import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js"
 import { queryKeys } from "@/api/queryKeys";
 import { runsApi, type RunDetail } from "@/api/runs";
 import { useCompany } from "@/lib/company";
+import { InfoHeading } from "@/ui/Field";
 import { pushToast } from "@/ui/Toast";
 import { clockTime, dayLabel, isActiveRun } from "./run-model";
 import { decodeFrame, traceReadable, traceRows } from "./trace-model";
@@ -107,15 +108,22 @@ export function RunTrace(props: {
       fallback={
         <div class="rm-empty">
           <Waypoints size={22} aria-hidden="true" />
-          <h3 class="disp">{props.checking ? "Checking for a trace…" : props.trace ? "This run's trace is gone" : "No provider trace for this run"}</h3>
+          <InfoHeading
+            level={3}
+            class="disp"
+            infoLabel="About provider traces"
+            info={
+              props.checking
+                ? undefined
+                : `A provider trace records every raw request and response between ${props.harness} and the model provider, including the full system prompt, tool definitions and message history. Only instance admins can see traces; each is deleted after 24 hours.`
+            }
+          >
+            {props.checking ? "Checking for a trace…" : props.trace ? "This run's trace is gone" : "No provider trace for this run"}
+          </InfoHeading>
           <Show when={!props.checking}>
-            <p>
-              {props.trace
-                ? `It was ${props.trace.status === "deleted" ? "deleted" : "removed after 24 hours"}. `
-                : ""}
-              A provider trace records every raw request and response between {props.harness} and the model provider, including the full
-              system prompt, tool definitions and message history. Only instance admins can see traces, and each is deleted after 24 hours.
-            </p>
+            <Show when={props.trace}>
+              {(trace) => <p>It was {trace().status === "deleted" ? "deleted" : "removed after 24 hours"}.</p>}
+            </Show>
             <div class="rt-actions">
               <button type="button" class="rm-b" disabled={!props.canRerun || props.rerunning} onClick={() => props.onRerun()}>
                 <RotateCcw size={13} aria-hidden="true" />

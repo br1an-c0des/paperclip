@@ -88,7 +88,7 @@ export function ChannelsPanel(props: { agent: AgentDetail }) {
   return (
     <SettingsCard
       title="Channels"
-      description={`Where people reach ${props.agent.name} outside Paperclip. Each conversation becomes a task.`}
+      info={`Where people reach ${props.agent.name} outside Paperclip. Each conversation becomes a task.`}
       footer={
         <Show when={providers().length > 0}>
           <Menu>

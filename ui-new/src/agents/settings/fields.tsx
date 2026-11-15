@@ -1,7 +1,11 @@
 import type { AdapterEnvironmentTestResult, Agent, AgentRole, Environment } from "@paperclipai/shared";
 import { Check, Server } from "lucide-solid";
+import { createQuery } from "@tanstack/solid-query";
 import { For, Show } from "solid-js";
 import type { AdapterModel } from "@/api/agents";
+import { instanceSettingsApi } from "@/api/instance-settings";
+import { queryKeys } from "@/api/queryKeys";
+import { effectiveDefaultId } from "@/settings/company/environments-model";
 import { AgentAvatar } from "@/ui/Avatar";
 import { FieldButton } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
@@ -147,12 +151,27 @@ export function ModelMenu(props: {
   );
 }
 
-/** The instance's default environment: the one marked `defaultForInstance`. */
-export function instanceDefaultEnvironment(environments: readonly Environment[] | undefined) {
-  return environments?.find((entry) => (entry.metadata as Record<string, unknown> | null)?.defaultForInstance === true);
+/**
+ * The instance's default environment id (`GET /instance/settings`), the fallback for an agent with
+ * no environment of its own. Undefined until it loads, or when it can't be read.
+ */
+export function useInstanceDefaultId() {
+  const instance = createQuery(() => ({ queryKey: queryKeys.companySettings.instanceSettings, queryFn: instanceSettingsApi.settings, retry: false }));
+  return () => instance.data?.defaultEnvironmentId;
 }
 
-/** Where the agent runs: the organization default (an empty value) or one active environment. */
+/**
+ * The environment an agent with no environment of its own runs in: the instance settings'
+ * `defaultEnvironmentId`, else the local environment, as the server resolves it
+ * (`agent-runner-selection.ts`, `effectiveDefaultId`). Not the `defaultForInstance` metadata, which
+ * only marks the local environment when it was first made and doesn't follow a new default.
+ */
+export function instanceDefaultEnvironment(environments: readonly Environment[] | undefined, instanceDefaultId: string | null | undefined) {
+  const id = effectiveDefaultId(instanceDefaultId, environments);
+  return id ? environments?.find((entry) => entry.id === id) : undefined;
+}
+
+/** Where the agent runs: the instance default (an empty value) or one active environment. */
 export function EnvironmentMenu(props: {
   environments: readonly Environment[] | undefined;
   value: string;
@@ -161,7 +180,8 @@ export function EnvironmentMenu(props: {
   class?: string;
 }) {
   const chosen = () => props.environments?.find((entry) => entry.id === props.value);
-  const fallback = () => instanceDefaultEnvironment(props.environments);
+  const instanceDefaultId = useInstanceDefaultId();
+  const fallback = () => instanceDefaultEnvironment(props.environments, instanceDefaultId());
   return (
     <Menu>
       <Menu.Trigger
@@ -171,11 +191,11 @@ export function EnvironmentMenu(props: {
         aria-label="Environment"
         disabled={props.disabled}
       >
-        {props.value ? (chosen()?.name ?? "An environment you can't see") : `Organization default${fallback() ? ` · ${fallback()!.name}` : ""}`}
+        {props.value ? (chosen()?.name ?? "An environment you can't see") : `Instance default${fallback() ? ` · ${fallback()!.name}` : ""}`}
       </Menu.Trigger>
       <Menu.Content label="Environment" width={340}>
-        <Menu.Item onSelect={() => props.onChange("")} hint={props.value ? undefined : <Check size={14} />} description="The instance's default environment">
-          Organization default
+        <Menu.Item onSelect={() => props.onChange("")} hint={props.value ? undefined : <Check size={14} />} description="The instance's default environment, or the server's own machine when none is set">
+          Instance default
         </Menu.Item>
         <Menu.Separator />
         <For each={(props.environments ?? []).filter((entry) => entry.status === "active")}>

@@ -191,7 +191,6 @@ export function AgentHeader(props: { agent: AgentDetail; base: string; view: "ch
                 </Show>
                 <Show when={!retired() && props.agent.status !== "paused"}>
                   <Menu.Item
-                    description="Starts a run now"
                     onSelect={() => void act(() => agentsApi.invoke(props.agent.id, company().id), `Started a run for ${props.agent.name}`, "Couldn't start a run")}
                   >
                     Run now

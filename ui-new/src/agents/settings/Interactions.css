@@ -31,10 +31,7 @@
 .ix-foot {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: 4px;
   width: 100%;
-}
-
-.ix-foot > .btn {
-  margin-left: auto;
 }

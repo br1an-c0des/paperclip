@@ -9,7 +9,8 @@ import { useCompany } from "@/lib/company";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { FieldButton, TextInput } from "@/ui/Field";
+import { FieldButton, InfoHeading, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Menu } from "@/ui/Menu";
 import {
   agentConnection,
@@ -199,7 +200,7 @@ export function BulkEditDialog(props: {
       onOpenChange={(open) => !open && close()}
       width={560}
       title={`Update ${count(props.agents.length)} on ${label()}`}
-      description={others() > 0 ? `${count(others())} also selected won't change: they run on another harness.` : "Change their connection, default model, or both."}
+      description={others() > 0 ? `${count(others())} also selected won't change: they run on another harness.` : undefined}
       hideClose={saving()}
       footer={
         <div class="org-dialog-foot">
@@ -310,20 +311,21 @@ export function BulkEditDialog(props: {
                     </For>
                   </Menu.Content>
                 </Menu>
-                <Show when={available().allowCustom}>
-                  <TextInput
-                    class="mono"
-                    placeholder="Or type a model ID"
-                    aria-label="Model ID"
-                    value={custom()}
-                    onInput={(event) => setCustom(event.currentTarget.value)}
-                  />
+                <Show
+                  when={available().allowCustom}
+                  fallback={<p class="org-muted">Only models every agent's {changeConnection() ? "new" : "current"} connection offers.</p>}
+                >
+                  <div class="info-line org-bulk-custom">
+                    <TextInput
+                      class="mono"
+                      placeholder="Or type a model ID"
+                      aria-label="Model ID"
+                      value={custom()}
+                      onInput={(event) => setCustom(event.currentTarget.value)}
+                    />
+                    <InfoTip label="About Default model">Pick a suggested model or type one your harness supports.</InfoTip>
+                  </div>
                 </Show>
-                <p class="org-muted">
-                  {available().allowCustom
-                    ? "Pick a suggested model or type one your harness supports."
-                    : `Only models every agent's ${changeConnection() ? "new" : "current"} connection offers.`}
-                </p>
               </div>
             </Show>
           </section>
@@ -364,7 +366,13 @@ export function BulkEditDialog(props: {
         <Show when={!missing()}>
           <Show when={changed().length > 0} fallback={<p class="org-muted">All of these agents already have these settings.</p>}>
             <section class="org-bulk-preview" aria-label="Changes to apply">
-              <h3 class="org-cap">Changes to apply</h3>
+              <InfoHeading
+                level={3}
+                class="org-cap"
+                info="Applies to future runs; running work keeps its settings, and task-specific model overrides stay. A model change may start a fresh session, and existing sessions may keep their connection until they're reset."
+              >
+                Changes to apply
+              </InfoHeading>
               <For each={changed()}>
                 {(agent) => (
                   <div class="org-bulk-change">
@@ -393,10 +401,6 @@ export function BulkEditDialog(props: {
           </Show>
         </Show>
 
-        <p class="org-muted org-small">
-          Applies to future runs; running work keeps its settings, and task-specific model overrides stay. A model change may start a fresh session, and existing
-          sessions may keep their connection until they're reset.
-        </p>
       </div>
     </Dialog>
   );

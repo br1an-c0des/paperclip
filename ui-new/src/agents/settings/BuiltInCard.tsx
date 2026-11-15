@@ -9,6 +9,7 @@ import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { SettingsCard, SettingsRow } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { TonePill } from "@/ui/Status";
 import { Switch } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
@@ -134,10 +135,11 @@ function BuiltInCardBody(props: { agent: AgentDetail; state: BuiltInAgentState }
         {(found) => (
           <div class="frow ag-frow-switch">
             <div class="flabel">
-              {found().title}
-              <span class="fhelp">
-                {found().scheduleLabel ?? `${found().triggerCount} ${found().triggerCount === 1 ? "trigger" : "triggers"}`}. Turning the schedule off stops it starting work in the background.
+              <span class="info-line">
+                {found().title}
+                <InfoTip label={`About ${found().title}`}>Turning the schedule off stops it starting work in the background.</InfoTip>
               </span>
+              <span class="fhelp">{found().scheduleLabel ?? `${found().triggerCount} ${found().triggerCount === 1 ? "trigger" : "triggers"}`}.</span>
               <div class="ag-frow-extra">
                 <Button
                   size="compact"

@@ -7,6 +7,7 @@ import { useNeedsYouCount } from "@/inbox/needs-you";
 import { formatCents, monthWindow } from "@/projects/dashboard-model";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
+import { InfoTip } from "@/ui/InfoTip";
 import { Capsule } from "@/ui/Status";
 import { Menu } from "@/ui/Menu";
 import { gradientVar } from "@/ui/status-meta";
@@ -181,7 +182,9 @@ export function OrgChartCard(props: { data: OrgData; actions: AgentActions }) {
               <Capsule gradient="ember" size="tiny" />
               Paused
             </span>
-            <span class="org-push">Select an agent to see what it's doing.</span>
+            <span class="org-push">
+              <InfoTip label="About the org chart">Select an agent to see what it's doing.</InfoTip>
+            </span>
           </div>
           <Show when={builtIns().length > 0 || props.data.builtInsAvailable().length > 0}>
             <div class="org-builtins">

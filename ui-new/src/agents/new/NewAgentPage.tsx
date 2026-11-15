@@ -1,7 +1,7 @@
 import type { AdapterEnvironmentTestResult, Agent, AgentDetail, AgentRunner } from "@paperclipai/shared";
 import { A, Navigate, useNavigate, useSearchParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { ArrowLeft, Check, Info, Plus, RotateCw } from "lucide-solid";
+import { ArrowLeft, Check, Plus, RotateCw } from "lucide-solid";
 import { batch, createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch, untrack } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { adapterModelKeyOptions, agentsApi, type AdapterModelOptions } from "@/api/agents";
@@ -22,7 +22,7 @@ import { FieldButton, SettingsRow, TextArea, TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { TonePill } from "@/ui/Status";
-import { Tooltip } from "@/ui/Tooltip";
+import { InfoTip } from "@/ui/InfoTip";
 import { pushToast } from "@/ui/Toast";
 import { managerCandidates, modelLabel, roleLabel, runnerLabel, runnerOptions } from "../agent-model";
 import {
@@ -35,6 +35,7 @@ import {
   paletteAppearance,
   RoleMenu,
   TestChecks,
+  useInstanceDefaultId,
 } from "../settings/fields";
 import { failure } from "../shared";
 import { environmentsHref, SSH_AI_ACCOUNT_TEXT, sshAiAccountProblem, testFailureText } from "../ssh-ai-account";
@@ -162,12 +163,13 @@ export function NewAgentPage() {
   );
 
   // ---- Shared data --------------------------------------------------------------------------
+  const instanceDefaultId = useInstanceDefaultId();
   const environments = createQuery(() => ({
     queryKey: queryKeys.projectSettings.environments(company().id),
     queryFn: ({ signal }) => environmentsApi.list(company().id, signal),
   }));
   const environment = createMemo(() =>
-    setup.environmentId ? environments.data?.find((entry) => entry.id === setup.environmentId) : instanceDefaultEnvironment(environments.data),
+    setup.environmentId ? environments.data?.find((entry) => entry.id === setup.environmentId) : instanceDefaultEnvironment(environments.data, instanceDefaultId()),
   );
   const adapters = createQuery(() => ({
     queryKey: queryKeys.agents.adapters(company().id, setup.environmentId || null),
@@ -464,7 +466,7 @@ export function NewAgentPage() {
       rows.push(
         ["Harness", runner().label],
         ["Model", `${modelLabel(setup.model, models.data) ?? (isRunnerOnly(setup.harness) ? "Not chosen yet" : "Harness default")}${efforts().length ? ` · ${effortLabel()}` : ""}`],
-        ["Runs on", environment()?.name ?? "Organization default"],
+        ["Runs on", environment()?.name ?? "Instance default"],
       );
     }
     return rows;
@@ -567,7 +569,7 @@ export function NewAgentPage() {
                     />
                   </Match>
                   <Match when={step() === "model"}>
-                    <SettingsRow label="Harness" help="The program the agent works in.">
+                    <SettingsRow label="Harness" info="The program the agent works in.">
                       <Show when={harnesses().length > 0} fallback={<span class="ag-static-text">{adapters.isError ? "Couldn't load the harnesses." : "Loading harnesses…"}</span>}>
                         <div class="na-harnesses" role="radiogroup" aria-label="Harness">
                           <For each={harnesses()}>
@@ -624,7 +626,7 @@ export function NewAgentPage() {
                       </Show>
 
                       <Show when={setup.harness === "kimi_runtime"}>
-                        <SettingsRow label="Kimi key" help={`The organization secret Kimi Code reads as ${KIMI_KEY}.`}>
+                        <SettingsRow label="Kimi key" info={`The organization secret Kimi Code reads as ${KIMI_KEY}.`}>
                           <div class="ps-inline">
                             <Menu>
                               <Menu.Trigger
@@ -659,7 +661,7 @@ export function NewAgentPage() {
                       </Show>
 
                       <Show when={setup.harness !== "kimi_runtime"}>
-                        <SettingsRow label="Sign-in" help="How the harness reaches its model.">
+                        <SettingsRow label="Sign-in" info="How the harness reaches its model.">
                           <div class="ps-inline">
                             <Menu>
                               <Menu.Trigger as={FieldButton} class="ps-field-320" aria-label={`Sign-in: ${selectedSignIn(signIns(), setup.binding)?.name ?? "an AI connection"}`}>
@@ -750,13 +752,17 @@ export function NewAgentPage() {
                       </SettingsRow>
 
                       <Show when={efforts().length > 0}>
-                        <SettingsRow label="Thinking effort" help="More effort is slower and costs more.">
+                        <SettingsRow label="Thinking effort" info="More effort is slower and costs more.">
                           <Segmented label="Thinking effort" options={[{ value: "", label: "Auto" }, ...efforts()]} value={setup.effort} onChange={(value) => setSetup("effort", value)} />
                         </SettingsRow>
                       </Show>
 
                       <Show when={runner().applies}>
-                        <SettingsRow label="Runner" help={runnerHelp(setup.harness, runner(), { qualifies: qualifies() })}>
+                        <SettingsRow
+                          label="Runner"
+                          info={runnerHelp(setup.harness, runner(), { qualifies: qualifies() }).info}
+                          help={runnerHelp(setup.harness, runner(), { qualifies: qualifies() }).help}
+                        >
                           <Show
                             when={runner().alternative}
                             fallback={
@@ -770,7 +776,7 @@ export function NewAgentPage() {
                         </SettingsRow>
                       </Show>
 
-                      <SettingsRow label="Test" help="Checks the harness is installed, signed in and can reach the model.">
+                      <SettingsRow label="Test" info="Checks the harness is installed, signed in and can reach the model.">
                         <div class="ps-stack">
                           <div class="ps-inline">
                             <Button size="compact" disabled={working() || saving()} icon={<Check size={14} aria-hidden="true" />} onClick={() => void runTest()}>
@@ -828,15 +834,6 @@ export function NewAgentPage() {
                     {problem()}
                   </span>
                 </Show>
-                <Show when={step() === "model" && needsApproval()}>
-                  <Tooltip title="Approval first" content="This organization approves new agents first. The request goes to the Inbox, and the agent starts work once it's approved.">
-                    {(triggerProps) => (
-                      <button type="button" {...triggerProps} class="na-info" aria-label="Why it asks for approval">
-                        <Info size={15} aria-hidden="true" />
-                      </button>
-                    )}
-                  </Tooltip>
-                </Show>
                 <Show
                   when={step() === "model"}
                   fallback={
@@ -865,14 +862,15 @@ export function NewAgentPage() {
               <div class="na-preview-line">{previewLine(profile, manager()?.name)}</div>
             </div>
             <Show when={draftId()}>
-              <Tooltip content="Saved as a paused draft when you continued, so you can finish it later from here or the Agents page.">
-                {(triggerProps) => (
-                  <span {...triggerProps} class="na-draft-pill" tabindex="0">
-                    <span class="na-draft-glyph" aria-hidden="true" />
-                    Draft, paused
-                  </span>
-                )}
-              </Tooltip>
+              <span class="info-line na-draft-line">
+                <span class="na-draft-pill">
+                  <span class="na-draft-glyph" aria-hidden="true" />
+                  Draft, paused
+                </span>
+                <InfoTip label="About Draft, paused">
+                  Saved as a paused draft when you continued, so you can finish it later from here or the Agents page.
+                </InfoTip>
+              </span>
             </Show>
             <dl class="na-preview-rows">
               <For each={previewRows()}>
@@ -921,7 +919,7 @@ function ProfileFields(props: {
 }) {
   return (
     <>
-      <SettingsRow label="Avatar" help="One of the ClipLab palettes.">
+      <SettingsRow label="Avatar" info="One of the ClipLab palettes.">
         <PaletteGrid
           class="na-palettes"
           agent={{ id: props.seed, name: props.profile.name || "New agent" }}
@@ -944,10 +942,10 @@ function ProfileFields(props: {
       <SettingsRow label="Role">
         <RoleMenu value={props.profile.role} onChange={(role) => props.onChange("role", role)} />
       </SettingsRow>
-      <SettingsRow label="Reports to" help="Its manager in the org chart.">
+      <SettingsRow label="Reports to" info="Its manager in the org chart.">
         <ManagerMenu candidates={props.candidates} manager={props.manager} value={props.profile.reportsTo} onChange={(id) => props.onChange("reportsTo", id)} />
       </SettingsRow>
-      <SettingsRow label="Title" help="Shown in place of the role." for="na-title">
+      <SettingsRow label="Title" info="Shown in place of the role." for="na-title">
         <TextInput
           id="na-title"
           value={props.profile.title}
@@ -956,7 +954,7 @@ function ProfileFields(props: {
           onInput={(event) => props.onChange("title", event.currentTarget.value)}
         />
       </SettingsRow>
-      <SettingsRow label="What they do" help="Other agents read this when they decide what to hand over." for="na-caps">
+      <SettingsRow label="What they do" info="Other agents read this when they decide what to hand over." for="na-caps">
         <TextArea
           id="na-caps"
           rows={4}

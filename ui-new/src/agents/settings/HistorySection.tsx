@@ -60,10 +60,10 @@ export function HistorySection(props: { agent: AgentDetail; base: string }) {
 
   return (
     <>
-      <SectionTitle title="History">Every change to {props.agent.name}'s configuration, and everything it did.</SectionTitle>
+      <SectionTitle title="History" info={`Every change to ${props.agent.name}'s configuration, and everything it did.`} />
       <SettingsCard
         title="Revisions"
-        description="Each save of the agent's settings is a revision. Rolling back to one restores the settings it saved, as a new revision."
+        info="Each save of the agent's settings is a revision. Rolling back to one restores the settings it saved, as a new revision."
         footer={
           <Show when={sorted().length > 1}>
             <Button size="compact" icon={<GitCompare size={14} aria-hidden="true" />} onClick={() => setComparing(true)}>
@@ -222,7 +222,7 @@ function ActionsCard(props: { agent: AgentDetail }) {
   return (
     <SettingsCard
       title="Actions"
-      description="What the agent did, from the audit log."
+      info="What the agent did, from the audit log."
       footer={
         <>
           <a class="btn btn--secondary btn--compact" href={agentsApi.actionsCsvUrl(company().id, props.agent.id)} download="">

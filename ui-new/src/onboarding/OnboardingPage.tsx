@@ -122,8 +122,12 @@ function OrganizationStep() {
           }
         >
           <form class="ob-form" onSubmit={create}>
-            <p class="ob-lede">An organization holds your agents, projects and tasks. You set up its first agent next.</p>
-            <Field label="What's the organization called?" for="ob-org-name" error={problem() ?? undefined}>
+            <Field
+              label="What's the organization called?"
+              for="ob-org-name"
+              info="An organization holds your agents, projects and tasks. You set up its first agent next."
+              error={problem() ?? undefined}
+            >
               <TextInput
                 id="ob-org-name"
                 variant="title"

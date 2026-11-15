@@ -48,10 +48,10 @@ const editableYaml = (snapshot: AgentConfigurationSnapshot) => serializeAgentCon
 export function AdvancedSection(props: { agent: AgentDetail }) {
   return (
     <>
-      <SectionTitle title="Configuration as YAML">
-        {props.agent.name}'s whole setup as one YAML document: profile, runtime, instructions, skills, tools, channels, permissions, secrets and
-        keys. Anything you leave out stays as it is.
-      </SectionTitle>
+      <SectionTitle
+        title="Configuration as YAML"
+        info={`${props.agent.name}'s whole setup as one YAML document: profile, runtime, instructions, skills, tools, channels, permissions, secrets and keys. Anything you leave out stays as it is.`}
+      />
       <Show when={props.agent.id} keyed>
         {(agentId) => <ConfigurationLoader agent={props.agent} agentId={agentId} />}
       </Show>
@@ -338,7 +338,7 @@ function ConfigurationEditor(props: { agent: AgentDetail; initial: Draft }) {
         {(steps) => (
           <SettingsCard
             title={steps().length === 1 ? "1 change to save" : `${steps().length} changes to save`}
-            description="A save runs these in this order, each through its own settings. If one fails, the ones before it stay saved."
+            info="A save runs these in this order, each through its own settings. If one fails, the ones before it stay saved."
           >
             <ol class="adv-steps">
               <For each={steps()}>

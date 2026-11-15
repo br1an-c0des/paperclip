@@ -63,7 +63,7 @@ describe("InteractionsCard", () => {
     expect(screen.getByRole("switch", { name: "Take comments from agents" }).getAttribute("aria-checked")).toBe("false");
     expect(screen.getByRole("switch", { name: "Mention agents" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getAllByRole("button", { name: /^Reset “/ })).toHaveLength(1);
-    expect(screen.getByText("1 of 11 turned off. Changes save at once.")).toBeTruthy();
+    expect(screen.getByText("1 of 11 turned off.")).toBeTruthy();
   });
 
   it("saves a switch through the interaction route only", async () => {

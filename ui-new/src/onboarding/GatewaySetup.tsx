@@ -35,7 +35,7 @@ export function GatewaySetup(props: {
       open={props.open}
       onOpenChange={props.onOpenChange}
       title="Use a custom gateway"
-      description={`Send ${harnessLabel(props.harness)} through your own endpoint. Save it, then choose a model and test it.`}
+      info={`Send ${harnessLabel(props.harness)} through your own endpoint. Save it, then choose a model and test it.`}
       width={620}
     >
       <GatewayForm {...props} onCancel={() => props.onOpenChange(false)} />
@@ -82,7 +82,7 @@ function GatewayForm(props: {
   return (
     <div class="cx-setup">
       <form class="cx-setup-form" onSubmit={(event) => void submit(event)}>
-        <Field label="Gateway address" for="ob-gw-url" help={`Speaks ${protocolLabel()}, as ${harnessLabel(props.harness)} needs. HTTPS, or HTTP on localhost.`}>
+        <Field label="Gateway address" for="ob-gw-url" info={`Speaks ${protocolLabel()}, as ${harnessLabel(props.harness)} needs. HTTPS, or HTTP on localhost.`}>
           <TextInput
             id="ob-gw-url"
             class="mono"
@@ -96,12 +96,12 @@ function GatewayForm(props: {
           />
         </Field>
 
-        <Field label="Sign-in" help="How Paperclip authenticates with the gateway.">
+        <Field label="Sign-in" info="How Paperclip authenticates with the gateway.">
           <Segmented<GatewayAuth> label="Sign-in" options={gatewayAuthOptions(props.harness)} value={draft.auth} onChange={(value) => setDraft("auth", value)} />
         </Field>
 
         <Show when={draft.auth !== "none"}>
-          <Field label="Key" for="ob-gw-key" help="Stored encrypted. It isn't shown again.">
+          <Field label="Key" for="ob-gw-key" info="Stored encrypted. It isn't shown again.">
             <TextInput
               id="ob-gw-key"
               type="password"
@@ -112,7 +112,7 @@ function GatewayForm(props: {
           </Field>
         </Show>
 
-        <Field label="Model ids" for="ob-gw-models" help="Comma separated: the provider's ids or your gateway's aliases. Leave empty to type one on the agent.">
+        <Field label="Model ids" for="ob-gw-models" info="Comma separated: the provider's ids or your gateway's aliases. Leave empty to type one on the agent.">
           <TextInput
             id="ob-gw-models"
             class="mono"

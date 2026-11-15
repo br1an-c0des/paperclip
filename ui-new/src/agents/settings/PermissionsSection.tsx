@@ -11,11 +11,12 @@ import { useProjectsQuery } from "@/lib/company-data";
 import { taskName, TaskPicker } from "@/tasks/TaskPicker";
 import { Button, buttonClass } from "@/ui/Button";
 import { FieldButton, SettingsCard, SettingsRow } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Menu } from "@/ui/Menu";
 import { Popover } from "@/ui/Popover";
 import { pushToast } from "@/ui/Toast";
 import { taskAssignHelp } from "../agent-model";
-import { CardNote, failure, refreshAgent, SectionTitle, SwitchRow, useAgentSaver } from "../shared";
+import { failure, refreshAgent, saveNote, SectionTitle, SwitchRow, useAgentSaver } from "../shared";
 import { InteractionsCard } from "./InteractionsCard";
 import {
   BOUNDARY_TYPES,
@@ -78,21 +79,31 @@ export function PermissionsSection(props: { agent: AgentDetail }) {
 
   return (
     <>
-      <SectionTitle title="Permissions and trust">What {props.agent.name} may do without asking, which projects it can reach, and how it deals with other agents.</SectionTitle>
+      <SectionTitle
+        title="Permissions and trust"
+        info={`What ${props.agent.name} may do without asking, which projects it can reach, and how it deals with other agents.`}
+      />
       <ProjectAccessCard agent={props.agent} />
       <SettingsCard
         title="Trust"
-        description={
-          <CardNote state={saver.state()} error={saver.error()}>
-            Changes save at once.
-          </CardNote>
-        }
+        info="Changes save at once."
+        description={saveNote(saver.state(), saver.error())}
       >
         <TrustRows agent={props.agent} disabled={saver.state() === "saving"} onChange={saveTrust} />
-        <SwitchRow label="Hire agents" help="Create or hire agents. This also lets it assign tasks." checked={current().canCreateAgents} disabled={saver.state() === "saving"} onChange={(value) => change({ canCreateAgents: value })} />
-        <SwitchRow label="Create skills" help="Install, import, create and scan the company's skills." checked={current().canCreateSkills} disabled={saver.state() === "saving"} onChange={(value) => change({ canCreateSkills: value })} />
+        <SwitchRow label="Hire agents" info="Create or hire agents. This also lets it assign tasks." checked={current().canCreateAgents} disabled={saver.state() === "saving"} onChange={(value) => change({ canCreateAgents: value })} />
+        {/* `permissions.canCreateSkills` is saved and logged, but no route reads it: the company
+            skill policy and `skills:create` grants decide (server routes/company-skills.ts). */}
+        <SwitchRow
+          label="Create skills"
+          info="Meant to let it install, import, create and scan the company's skills. Today the company's skill policy decides that."
+          help="Not used by the server yet."
+          checked={current().canCreateSkills}
+          disabled={saver.state() === "saving"}
+          onChange={(value) => change({ canCreateSkills: value })}
+        />
         <SwitchRow
           label="Assign tasks"
+          info="Give tasks to other agents and people."
           help={taskAssignHelp(props.agent.access?.taskAssignSource ?? "none")}
           checked={current().canAssignTasks}
           disabled={saver.state() === "saving" || assignLocked()}
@@ -148,7 +159,8 @@ function ProjectAccessCard(props: { agent: AgentDetail }) {
     <section id="project-access" class="ag-anchor">
       <SettingsCard
         title="Project access"
-        description={lowTrust() ? `Projects whose tasks and repositories ${props.agent.name} may reach.` : `${props.agent.name} has standard trust, so no project list limits it.`}
+        info={lowTrust() ? `Projects whose tasks and repositories ${props.agent.name} may reach.` : undefined}
+        description={lowTrust() ? undefined : `${props.agent.name} has standard trust, so no project list limits it.`}
         footer={
           fromTask() || pending().length > 0 ? (
             <>
@@ -184,7 +196,7 @@ function ProjectAccessCard(props: { agent: AgentDetail }) {
             Couldn't load project access. {failure(access.error, "")}
           </p>
         </Show>
-        <Show when={lowTrust()} fallback={<p class="ps-list-note">Project access lists only apply to agents with low trust, under Trust below.</p>}>
+        <Show when={lowTrust()}>
           <ul class="ps-list">
             <For each={[...allowed(), ...pending()]} fallback={<li class="ps-list-note">No projects allowed yet.</li>}>
               {(id) => (
@@ -276,7 +288,10 @@ function TrustRows(props: { agent: AgentDetail; disabled: boolean; onChange: (ne
 
   return (
     <>
-      <SettingsRow label="Trust preset" help="How broadly it may read and act on the organization's work.">
+      <SettingsRow
+        label="Trust preset"
+        info="How broadly it may read and act on the organization's work. Standard works across the organization within its permissions; low trust is contained for untrusted input such as pull request review, with output quarantined until someone trusted promotes it."
+      >
         <div class="ps-stack">
           <Menu>
             <Menu.Trigger as={FieldButton} class="ps-field-240" disabled={props.disabled} aria-label={`Trust preset: ${TRUST_PRESETS.find((entry) => entry.value === preset())!.label}`}>
@@ -296,24 +311,25 @@ function TrustRows(props: { agent: AgentDetail; disabled: boolean; onChange: (ne
               </For>
             </Menu.Content>
           </Menu>
-          <span class="fhelp">
-            {TRUST_PRESETS.find((entry) => entry.value === preset())!.description}
-            <Show when={!lowTrust() && props.agent.permissions?.canCreateAgents}> Choosing low trust also takes away hiring.</Show>
-          </span>
+          <Show when={!lowTrust() && props.agent.permissions?.canCreateAgents}>
+            <span class="fhelp">Choosing low trust also takes away hiring.</span>
+          </Show>
         </div>
       </SettingsRow>
       <Show when={lowTrust()}>
-        <SettingsRow label="Boundary" help="What it may read and change. Without one, every request is denied.">
+        <SettingsRow label="Boundary" info="What it may read and change. Without one, every request is denied.">
           <div class="ps-stack ag-trust">
             <div class="ag-trust-state" data-tone={boundaryHasScope(boundary()) ? "amber" : "red"} role={boundaryHasScope(boundary()) ? "status" : "alert"}>
               <Show when={boundaryHasScope(boundary())} fallback={<Lock size={14} aria-hidden="true" />}>
                 <ShieldAlert size={14} aria-hidden="true" />
               </Show>
               <span>
-                <b>{boundaryHasScope(boundary()) ? "Contained" : "No boundary yet"}</b>
-                {boundaryHasScope(boundary())
-                  ? " It reads and changes only the work inside its boundary. Its raw output stays quarantined from agents with more trust until a trusted reviewer promotes it."
-                  : " Pick a project or a task below before it can run without being denied."}
+                <Show when={boundaryHasScope(boundary())} fallback={<><b>No boundary yet</b> Pick a project or a task below before it can run without being denied.</>}>
+                  <b>Contained</b>
+                  <InfoTip label="About Contained">
+                    It reads and changes only the work inside its boundary. Its raw output stays quarantined from agents with more trust until a trusted reviewer promotes it.
+                  </InfoTip>
+                </Show>
               </span>
             </div>
             <Show

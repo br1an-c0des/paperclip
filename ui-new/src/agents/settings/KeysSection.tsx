@@ -59,10 +59,11 @@ export function KeysSection(props: { agent: AgentDetail }) {
 
   return (
     <>
-      <SectionTitle title="API keys">Keys that let outside tools act as {props.agent.name}.</SectionTitle>
+      <SectionTitle title="API keys" info={`Keys that let outside tools act as ${props.agent.name}.`} />
       <SettingsCard
         title={active().length === 1 ? "1 active key" : `${active().length} active keys`}
-        description="Anyone with a key can act as this agent. Revoke keys you no longer use."
+        info="Revoke keys you no longer use."
+        description="Anyone with a key can act as this agent."
         footer={
           <form class="ag-key-form" onSubmit={(event) => void create(event)}>
             <TextInput value={name()} placeholder="Key name, such as ci-bot" aria-label="Key name" autocomplete="off" onInput={(event) => setName(event.currentTarget.value)} />

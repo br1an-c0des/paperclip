@@ -28,6 +28,7 @@ import { runWait } from "@/tasks/run-waits";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
+import { InfoTip } from "@/ui/InfoTip";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { findInvokeEvent, promptSize, readInvocation } from "./invocation";
@@ -591,12 +592,16 @@ function RunView(props: { runId: string }) {
                       variant="danger"
                       size="compact"
                       disabled={stop.isPending || settling()}
-                      title={current().status === "failed" ? "Stop the retry this run would start by itself." : undefined}
                       onClick={() => stop.mutate()}
                     >
                       <Square size={12} aria-hidden="true" />
                       {stop.isPending || settling() ? stopLabel(current().status, true) : `${stopLabel(current().status, false)} run`}
                     </Button>
+                    <Show when={current().status === "failed"}>
+                      <InfoTip label="About stopping a failed run" placement="bottom">
+                        Stops the retry this run would start by itself.
+                      </InfoTip>
+                    </Show>
                   </Show>
                   <Show when={reruns().resume || reruns().retry || reruns().trace}>
                     <Menu placement="bottom-end">
@@ -750,8 +755,9 @@ function RunView(props: { runId: string }) {
                       before={
                         <Show when={(operations.data ?? []).length > 0}>
                           <section class="rm-ops" aria-label="Workspace operations">
-                            <span class="rm-ops-head">
-                              Workspace <span class="cap">· what Paperclip did before and after the run</span>
+                            <span class="rm-ops-head info-line">
+                              Workspace
+                              <InfoTip label="About Workspace">What Paperclip did before and after the run.</InfoTip>
                             </span>
                             <WorkspaceOperations operations={operations.data!} censorUsername={censorUsername()} />
                           </section>
