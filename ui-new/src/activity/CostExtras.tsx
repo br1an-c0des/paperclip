@@ -83,7 +83,7 @@ export function SubscriptionsKpi(props: { report: SubscriptionCostReport | undef
     <div class="card org-kpi">
       <span class="org-kpi-label info-line">
         Subscriptions
-        <InfoTip label="About subscriptions">
+        <InfoTip label="About Subscriptions">
           A fee covers the whole account, including use outside Paperclip. Fees aren't charges and don't count against budgets, and currencies are added up separately.
         </InfoTip>
       </span>
