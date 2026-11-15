@@ -205,14 +205,14 @@ describe("runner choice", () => {
     expect(runnerChoiceSupported("kimi_runtime", "legacy", ADAPTERS)).toBe(true);
   });
 
-  it("says what each runner is when there's a choice, and why there isn't one otherwise", () => {
-    expect(runnerHelp("claude_local", resolveRunner("claude_local", "auto", ADAPTERS))).toBe(
-      "Paperclip Runner supervises each run of Claude Code; the legacy runner runs the program directly. You can switch later in the agent's settings.",
-    );
-    expect(runnerHelp("claude_local", resolveRunner("claude_local", "auto", undefined))).toBe("Paperclip picks a runner once it knows what this machine supports.");
+  it("says what each runner is behind the tip when there's a choice, and visibly why there isn't one otherwise", () => {
+    expect(runnerHelp("claude_local", resolveRunner("claude_local", "auto", ADAPTERS))).toEqual({
+      info: "Paperclip Runner supervises each run of Claude Code; the legacy runner runs the program directly. You can switch later in the agent's settings.",
+    });
+    expect(runnerHelp("claude_local", resolveRunner("claude_local", "auto", undefined))).toEqual({ help: "Paperclip picks a runner once it knows what this machine supports." });
     const legacyOnly = [adapter("claude_local"), adapter("paperclip_runner")];
-    expect(runnerHelp("claude_local", resolveRunner("claude_local", "auto", legacyOnly))).toBe("The only runner that carries Claude Code here.");
-    expect(runnerHelp("claude_local", resolveRunner("claude_local", "auto", legacyOnly), { qualifies: true })).toContain("Test checks whether Paperclip Runner qualifies");
+    expect(runnerHelp("claude_local", resolveRunner("claude_local", "auto", legacyOnly))).toEqual({ help: "The only runner that carries Claude Code here." });
+    expect(runnerHelp("claude_local", resolveRunner("claude_local", "auto", legacyOnly), { qualifies: true }).help).toContain("Test checks whether Paperclip Runner qualifies");
   });
 });
 

@@ -49,7 +49,7 @@ import {
   type ProfileDraft,
   type SetupDraft,
 } from "@/agents/new/new-agent-model";
-import { EnvironmentMenu, harnessMark, instanceDefaultEnvironment, ModelMenu, PaletteGrid, paletteAppearance, TestChecks } from "@/agents/settings/fields";
+import { EnvironmentMenu, harnessMark, instanceDefaultEnvironment, ModelMenu, PaletteGrid, paletteAppearance, TestChecks, useInstanceDefaultId } from "@/agents/settings/fields";
 import { failure, refreshAgent } from "@/agents/shared";
 import { environmentsHref, SSH_AI_ACCOUNT_TEXT, sshAiAccountProblem, testFailureText } from "@/agents/ssh-ai-account";
 import { ConnectionSetup } from "@/connectors/ConnectionSetup";
@@ -169,12 +169,13 @@ export function AgentOnboarding() {
 
   // ---- Shared data --------------------------------------------------------------------------
   const onModel = () => step() === "model";
+  const instanceDefaultId = useInstanceDefaultId();
   const environments = createQuery(() => ({
     queryKey: queryKeys.projectSettings.environments(company().id),
     queryFn: ({ signal }) => environmentsApi.list(company().id, signal),
   }));
   const environment = createMemo(() =>
-    setup.environmentId ? environments.data?.find((entry) => entry.id === setup.environmentId) : instanceDefaultEnvironment(environments.data),
+    setup.environmentId ? environments.data?.find((entry) => entry.id === setup.environmentId) : instanceDefaultEnvironment(environments.data, instanceDefaultId()),
   );
   const adapters = createQuery(() => ({
     queryKey: queryKeys.agents.adapters(company().id, setup.environmentId || null),
@@ -487,7 +488,7 @@ export function AgentOnboarding() {
       rows.push(
         ["Harness", runner().label],
         ["Model", `${modelLabel(setup.model, models.data) ?? "Harness default"}${efforts().length ? ` · ${effortLabel()}` : ""}`],
-        ["Runs on", environment()?.name ?? "Organization default"],
+        ["Runs on", environment()?.name ?? "Instance default"],
       );
     }
     return rows;
@@ -564,7 +565,7 @@ export function AgentOnboarding() {
             <div class="settings-rows">
               <Switch>
                 <Match when={step() === "agent"}>
-                  <SettingsRow label="Name" for="ob-agent-name" help="Your first agent runs the organization with you. Its instructions are written for that.">
+                  <SettingsRow label="Name" for="ob-agent-name" info="Your first agent runs the organization with you. Its instructions are written for that.">
                     <TextInput
                       id="ob-agent-name"
                       variant="title"
@@ -576,7 +577,7 @@ export function AgentOnboarding() {
                       onKeyDown={(event) => event.key === "Enter" && void toModel()}
                     />
                   </SettingsRow>
-                  <SettingsRow label="Avatar" help="One of the ClipLab palettes.">
+                  <SettingsRow label="Avatar">
                     <PaletteGrid
                       class="na-palettes"
                       agent={{ id: draftId() ?? "new-agent", name: profile.name || "New agent" }}
@@ -587,7 +588,7 @@ export function AgentOnboarding() {
                 </Match>
 
                 <Match when={step() === "model"}>
-                  <SettingsRow label="Harness" help="The program the agent works in. Other harnesses are in New agent once you're set up.">
+                  <SettingsRow label="Harness" info="The program the agent works in. Other harnesses are in New agent once you're set up.">
                     <Show
                       when={harnesses().length > 0}
                       fallback={
@@ -645,7 +646,7 @@ export function AgentOnboarding() {
                       </div>
                     </Show>
 
-                    <SettingsRow label="Sign-in" help="How the harness reaches its model: your subscription or an API key.">
+                    <SettingsRow label="Sign-in" info="How the harness reaches its model: your subscription or an API key.">
                       <div class="ps-inline">
                         <Menu>
                           <Menu.Trigger as={FieldButton} class="ps-field-320" aria-label={`Sign-in: ${selectedSignIn(signIns(), setup.binding)?.name ?? "an AI connection"}`}>
@@ -693,7 +694,7 @@ export function AgentOnboarding() {
                     <SettingsRow
                       label="Model"
                       for={models.data?.length || gatewayModels().length ? undefined : "ob-model"}
-                      help={gatewayModels().length ? "The models your gateway lists." : undefined}
+                      info={gatewayModels().length ? "The models your gateway lists." : undefined}
                     >
                       <Show when={gatewayModels().length === 0} fallback={<ModelMenu models={gatewayModels()} loading={false} value={setup.model} onChange={(model) => setSetup("model", model)} />}>
                       <Show
@@ -720,13 +721,17 @@ export function AgentOnboarding() {
                     </SettingsRow>
 
                     <Show when={efforts().length > 0}>
-                      <SettingsRow label="Thinking effort" help="More effort is slower and costs more.">
+                      <SettingsRow label="Thinking effort" info="More effort is slower and costs more.">
                         <Segmented label="Thinking effort" options={[{ value: "", label: "Auto" }, ...efforts()]} value={setup.effort} onChange={(value) => setSetup("effort", value)} />
                       </SettingsRow>
                     </Show>
 
                     <Show when={runner().applies}>
-                      <SettingsRow label="Runner" help={runnerHelp(setup.harness, runner(), { qualifies: qualifies() })}>
+                      <SettingsRow
+                        label="Runner"
+                        info={runnerHelp(setup.harness, runner(), { qualifies: qualifies() }).info}
+                        help={runnerHelp(setup.harness, runner(), { qualifies: qualifies() }).help}
+                      >
                         <Show
                           when={runner().alternative}
                           fallback={
@@ -740,7 +745,7 @@ export function AgentOnboarding() {
                       </SettingsRow>
                     </Show>
 
-                    <SettingsRow label="Test" help="Checks the harness is installed, signed in and can reach the model.">
+                    <SettingsRow label="Test" info="Checks the harness is installed, signed in and can reach the model.">
                       <div class="ps-stack">
                         <div class="ps-inline">
                           <Button size="compact" disabled={working() || saving()} icon={<Check size={14} aria-hidden="true" />} onClick={() => void runTest()}>
@@ -781,7 +786,7 @@ export function AgentOnboarding() {
                 </Match>
 
                 <Match when={step() === "task"}>
-                  <SettingsRow label="Task" for="ob-task-title" help="Paperclip writes the brief. It's where you and your agent plan what comes next.">
+                  <SettingsRow label="Task" for="ob-task-title" info="Paperclip writes the brief. It's where you and your agent plan what comes next.">
                     <TextInput
                       id="ob-task-title"
                       variant="title"

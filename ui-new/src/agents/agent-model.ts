@@ -738,8 +738,8 @@ export function isMemoryFile(path: string) {
 // ---------------------------------------------------------------------------------------------
 // Permissions
 
-/** Why the agent may assign tasks, after the old UI's permissions tab. */
-export function taskAssignHelp(source: string) {
+/** Why the agent may assign tasks (or why the switch is locked), after the old UI's permissions tab; nothing for a plain on or off. */
+export function taskAssignHelp(source: string): string | undefined {
   switch (source) {
     case "ceo_role":
       return "On for every CEO agent.";
@@ -750,7 +750,7 @@ export function taskAssignHelp(source: string) {
     case "simple_default":
       return "On for every agent, by the company's defaults.";
     default:
-      return "Give tasks to other agents and people.";
+      return undefined;
   }
 }
 

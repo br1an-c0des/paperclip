@@ -1,7 +1,7 @@
 import type { AgentDetail } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
-import { Brain, File } from "lucide-solid";
+import { File } from "lucide-solid";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
@@ -68,12 +68,13 @@ export function MemorySection(props: { agent: AgentDetail; base: string }) {
 
   return (
     <>
-      <SectionTitle title="Memory">
-        What {props.agent.name} remembers between runs, and where. It depends on the harness: {identity().label}.
-      </SectionTitle>
+      <SectionTitle title="Memory" info={`What ${props.agent.name} remembers between runs, and where. It depends on the harness: ${identity().label}.`} />
 
-      <SettingsCard title="What applies to this agent">
-        <SettingsRow label="Its own folder" help="Notes the agent keeps in its folder, which Paperclip saves after each run.">
+      <SettingsCard title="What applies to this agent" info="These three don't share notes yet: a lesson saved in one isn't seen by the others.">
+        <SettingsRow
+          label="Its own folder"
+          info="Notes the agent keeps in its own folder (AGENT_HOME). Paperclip restores it before a run and saves the changes; the para-memory-files skill writes MEMORY.md, memory/ and life/ there."
+        >
           <Switch>
             <Match when={memory().kind === "agent-files"}>
               <div class="ps-stack">
@@ -81,8 +82,7 @@ export function MemorySection(props: { agent: AgentDetail; base: string }) {
                   Kept between runs
                 </TonePill>
                 <span class="fhelp">
-                  The para-memory-files skill writes MEMORY.md, memory/ and life/ here.{" "}
-                  {paraSkill()?.desired ? "It's assigned to this agent." : "It isn't assigned to this agent, so nothing tells it to keep notes there."}
+                  {paraSkill()?.desired ? "The para-memory-files skill is assigned." : "The para-memory-files skill isn't assigned, so nothing tells it to keep notes here."}
                 </span>
               </div>
             </Match>
@@ -100,7 +100,7 @@ export function MemorySection(props: { agent: AgentDetail; base: string }) {
           </Switch>
         </SettingsRow>
         <Show when={memory().claudeAutoMemory}>
-          <SettingsRow label="Claude Code auto memory" help="Claude Code's built-in memory. Paperclip can't read it.">
+          <SettingsRow label="Claude Code auto memory" info="Claude Code's built-in memory. Paperclip can't read it.">
             <div class="ps-stack">
               <Show
                 when={!autoMemoryOff()}
@@ -129,7 +129,7 @@ export function MemorySection(props: { agent: AgentDetail; base: string }) {
             </div>
           </SettingsRow>
         </Show>
-        <SettingsRow label="Memory connectors" help="Mem0, Zep, Supermemory, Cognee or Honcho, assigned like any tool connection.">
+        <SettingsRow label="Memory connectors" info="Mem0, Zep, Supermemory, Cognee or Honcho, assigned like any tool connection.">
           <Show
             when={connectors().length > 0}
             fallback={
@@ -152,7 +152,7 @@ export function MemorySection(props: { agent: AgentDetail; base: string }) {
       </SettingsCard>
 
       <Show when={memory().kind === "agent-files"}>
-        <SettingsCard title="Memory files" description="What the agent has written to MEMORY.md, memory/ and life/. Edit them under Instructions.">
+        <SettingsCard title="Memory files" info="What the agent has written to MEMORY.md, memory/ and life/. Edit them under Instructions.">
           <Show when={bundle.isError}>
             <p class="ps-list-note" role="alert">
               Couldn't load the agent's files. {failure(bundle.error, "")}
@@ -178,16 +178,6 @@ export function MemorySection(props: { agent: AgentDetail; base: string }) {
           </Show>
         </SettingsCard>
       </Show>
-
-      <div class="ag-note ag-note--quiet" role="note">
-        <span class="ag-note-icon" aria-hidden="true">
-          <Brain size={18} />
-        </span>
-        <div class="ag-note-text">
-          <b>One memory for every harness is still to come</b>
-          <span>These three don't know about each other yet, so a lesson saved in one isn't seen by the others.</span>
-        </div>
-      </div>
     </>
   );
 }

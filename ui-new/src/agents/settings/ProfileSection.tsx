@@ -17,7 +17,7 @@ import { checkingSetup } from "@/tasks/recovery";
 import { creatorLabel, directReportsOf, managerCandidates, roleLabel, textEdit } from "../agent-model";
 import { BuiltInCard } from "./BuiltInCard";
 import { ManagerMenu, PaletteGrid, paletteAppearance, RoleMenu } from "./fields";
-import { CardNote, dateTime, failure, refreshAgent, SectionTitle, shortDate, SwitchRow, useAgentSaver } from "../shared";
+import { dateTime, failure, refreshAgent, saveNote, SectionTitle, shortDate, SwitchRow, useAgentSaver } from "../shared";
 
 /*
  * Profile (board 30's outline): who the agent is, where it sits in the org, what's personal to you,
@@ -54,15 +54,12 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
 
   return (
     <>
-      <SectionTitle title="Profile">Who {props.agent.name} is, where it sits in the organization, and its lifecycle.</SectionTitle>
+      <SectionTitle title="Profile" info={`Who ${props.agent.name} is, where it sits in the organization, and its lifecycle.`} />
       <BuiltInCard agent={props.agent} />
       <SettingsCard
         title="Identity"
-        description={
-          <CardNote state={saver.state()} error={saver.error()}>
-            Changes save as you make them.
-          </CardNote>
-        }
+        info="Changes save as you make them."
+        description={saveNote(saver.state(), saver.error())}
         footer={
           <span class="ps-meta">
             Created {shortDate(props.agent.createdAt)}
@@ -70,7 +67,7 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
           </span>
         }
       >
-        <SettingsRow label="Avatar" help="One of the ClipLab palettes.">
+        <SettingsRow label="Avatar" info="One of the ClipLab palettes.">
           <Popover open={avatarOpen()} onOpenChange={setAvatarOpen}>
             <Popover.Trigger class="ag-avatar-button" aria-label="Change the avatar">
               <AgentAvatar agent={props.agent} size={48} ring={false} />
@@ -102,7 +99,7 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
         <SettingsRow label="Role">
           <RoleMenu value={props.agent.role} onChange={(role) => void saver.save({ role })} />
         </SettingsRow>
-        <SettingsRow label="Title" help="Shown in place of the role, such as “Quant Researcher”." for="ag-title">
+        <SettingsRow label="Title" info="Shown in place of the role, such as “Quant Researcher”." for="ag-title">
           <TextInput
             id="ag-title"
             value={title()}
@@ -113,7 +110,7 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
             onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
           />
         </SettingsRow>
-        <SettingsRow label="What they do" help="Other agents read this when they decide what to hand over." for="ag-about">
+        <SettingsRow label="What they do" info="Other agents read this when they decide what to hand over." for="ag-about">
           <TextArea
             id="ag-about"
             rows={4}
@@ -123,7 +120,7 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
             onBlur={() => void saver.save(textEdit("capabilities", props.agent.capabilities, about()))}
           />
         </SettingsRow>
-        <SettingsRow label="Reports to" help="Its manager in the org chart. Its own reports aren't offered, since that would make a loop.">
+        <SettingsRow label="Reports to" info="Its manager in the org chart. Its own reports aren't offered, since that would make a loop.">
           <div class="ag-manager">
             <ManagerMenu
               candidates={candidates()}
@@ -147,7 +144,7 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
           </Show>
         </SettingsRow>
         <Show when={reports().length > 0}>
-          <SettingsRow label="Direct reports" help="Agents that report to it. Change one's manager from its own profile.">
+          <SettingsRow label="Direct reports" info="Agents that report to it. Change one's manager from its own profile.">
             <ul class="ag-agent-chips" aria-label="Direct reports">
               <For each={reports()}>
                 {(report) => (
@@ -201,8 +198,8 @@ function ForYouCard(props: { agent: AgentDetail }) {
   };
 
   return (
-    <SettingsCard title="For you" description="Only you see these.">
-      <SettingsRow label="Primary agent" help="The default for your new tasks and chat.">
+    <SettingsCard title="For you" info="Only you see these.">
+      <SettingsRow label="Primary agent" info="The default for your new tasks and chat.">
         <Show
           when={!isPrimary()}
           fallback={
@@ -222,7 +219,7 @@ function ForYouCard(props: { agent: AgentDetail }) {
       </SettingsRow>
       <SwitchRow
         label="Show in my sidebar"
-        help="Turning it off only hides it from your sidebar; nobody else is affected."
+        info="Turning it off only hides it from your sidebar; nobody else is affected."
         checked={joined()}
         disabled={busy() || !memberships.isSuccess}
         onChange={(checked) =>
@@ -280,7 +277,7 @@ function LifecycleCard(props: { agent: AgentDetail }) {
   const paused = () => props.agent.status === "paused" && !checking();
 
   return (
-    <SettingsCard title="Lifecycle" description="Pause or resume it, clear an error, or reset its sessions. Retire it from the header's menu.">
+    <SettingsCard title="Lifecycle" info="Pause or resume it, clear an error, or reset its sessions. Retire it from the header's menu.">
       <SettingsRow label="State">
         <div class="ps-stack">
           <span>{lifecycleStateText(props.agent)}</span>

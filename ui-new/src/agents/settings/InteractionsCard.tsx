@@ -5,6 +5,7 @@ import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { Button } from "@/ui/Button";
 import { SettingsCard } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { CardNote, failure, SwitchRow, useAgentSaver } from "../shared";
 import { deniedCount, interactionAllowed, interactionGroups, interactionOverridden, resetAllPatch, resetPatch, switchPatch } from "./interactions-model";
 import "./Interactions.css";
@@ -39,19 +40,16 @@ export function InteractionsCard(props: { agent: AgentDetail }) {
     <section id="interactions" class="ag-anchor">
       <SettingsCard
         title="Interactions"
+        info="What it may do to other agents and their work, and what they may do to it. Each is allowed until you turn it off, and changes save at once."
         description={
           <CardNote state={saver.state()} error={saver.error()}>
-            {pendingHire()
-              ? "These can be set once the hire is approved."
-              : denied() > 0
-                ? `${denied()} of 11 turned off. Changes save at once.`
-                : "Everything is allowed until you turn it off. Changes save at once."}
+            {pendingHire() ? "These can be set once the hire is approved." : denied() > 0 ? `${denied()} of 11 turned off.` : "Nothing turned off."}
           </CardNote>
         }
         footer={
           resetAll() ? (
             <span class="ix-foot">
-              <span class="fhelp">Switches set for this agent override the default.</span>
+              <InfoTip label="About Reset all">Switches set for this agent override the default.</InfoTip>
               <Button size="compact" variant="quiet" disabled={disabled()} onClick={() => save(resetAll()!, "Couldn't reset the interaction switches.")}>
                 Reset all
               </Button>
@@ -79,7 +77,7 @@ export function InteractionsCard(props: { agent: AgentDetail }) {
                   {(row) => (
                     <SwitchRow
                       label={row.label}
-                      help={row.help}
+                      info={row.help}
                       checked={interactionAllowed(state.data, row.key)}
                       disabled={disabled()}
                       onChange={(value) => save(switchPatch(row.key, value), `Couldn't change “${row.label}”.`)}

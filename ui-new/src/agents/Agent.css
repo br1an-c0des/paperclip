@@ -122,19 +122,9 @@
   background: var(--run-bg);
 }
 
-.ag-note--quiet {
-  border-color: var(--card-edge);
-  background: var(--card);
-  box-shadow: var(--shadow);
-}
-
 .ag-note-icon {
   display: inline-flex;
   color: var(--run-fg);
-}
-
-.ag-note--quiet .ag-note-icon {
-  color: var(--muted);
 }
 
 .ag-note-text {
@@ -1028,4 +1018,10 @@
   .ag-rot {
     transition: none;
   }
+}
+
+/* A popover's path input with its "i" after it (Instructions, New file). */
+.ag-path-line > .input {
+  flex: 1;
+  min-width: 0;
 }

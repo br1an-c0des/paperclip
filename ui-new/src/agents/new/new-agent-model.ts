@@ -210,18 +210,23 @@ export function runnerChoiceSupported(harness: string, choice: RunnerChoice, ada
 }
 
 /**
- * The Runner row's help on New agent and onboarding. With a choice, what each runner is and that it
- * can change later; without one, why there's nothing to pick.
+ * The Runner row's text on New agent and onboarding, as SettingsRow props. With a choice, what each
+ * runner is and that it can change later, behind the row's "i" (`info`); without one, why there's
+ * nothing to pick, visible (`help`).
  */
-export function runnerHelp(harness: string, resolution: RunnerResolution, options: { qualifies?: boolean } = {}) {
+export function runnerHelp(
+  harness: string,
+  resolution: RunnerResolution,
+  options: { qualifies?: boolean } = {},
+): { info?: string; help?: string } {
   const name = harnessLabel(harness);
   if (resolution.alternative) {
     // The recommended runner is marked on the control itself (runnerOptions).
-    return `Paperclip Runner supervises each run of ${name}; the legacy runner runs the program directly. You can switch later in the agent's settings.`;
+    return { info: `Paperclip Runner supervises each run of ${name}; the legacy runner runs the program directly. You can switch later in the agent's settings.` };
   }
-  if (options.qualifies) return `Test checks whether Paperclip Runner qualifies on this sandbox, and uses it if it does. Otherwise ${name} runs on the legacy runner.`;
-  if (!resolution.recommended) return "Paperclip picks a runner once it knows what this machine supports.";
-  return `The only runner that carries ${name} here.`;
+  if (options.qualifies) return { help: `Test checks whether Paperclip Runner qualifies on this sandbox, and uses it if it does. Otherwise ${name} runs on the legacy runner.` };
+  if (!resolution.recommended) return { help: "Paperclip picks a runner once it knows what this machine supports." };
+  return { help: `The only runner that carries ${name} here.` };
 }
 
 /**

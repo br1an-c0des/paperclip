@@ -13,6 +13,7 @@ import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
 import { connectionChoices, providerForHarness } from "@/org/bulk-model";
 import { FieldButton, SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { TonePill } from "@/ui/Status";
@@ -44,7 +45,7 @@ import {
 import { failure, FootError, refreshAgent, SectionTitle, shortDate, SwitchRow } from "../shared";
 import { resolveRunner } from "../new/new-agent-model";
 import { extrasChanges, extrasConfig, extrasDraft, fieldVisible, harnessFields, isSecretField, type ExtrasDraft, type ExtraValue, type HarnessField } from "../harness-model";
-import { EnvironmentMenu, HarnessDisc, instanceDefaultEnvironment, ModelMenu, TestChecks } from "./fields";
+import { EnvironmentMenu, HarnessDisc, instanceDefaultEnvironment, ModelMenu, TestChecks, useInstanceDefaultId } from "./fields";
 import { HarnessChangeDialog } from "./HarnessChange";
 import { RunnerStateCard } from "./RunnerStateCard";
 import { testFailureText } from "../ssh-ai-account";
@@ -97,12 +98,14 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
   // The saved settings replace the draft when they change, unless you're editing.
   createEffect(on(() => JSON.stringify(base()), () => changes().length === 0 && setDraft(reconcile(base())), { defer: true }));
 
+  const instanceDefaultId = useInstanceDefaultId();
+
   const environments = createQuery(() => ({
     queryKey: queryKeys.projectSettings.environments(company().id),
     queryFn: ({ signal }) => environmentsApi.list(company().id, signal),
   }));
   const environment = createMemo(() =>
-    draft.environmentId ? environments.data?.find((entry) => entry.id === draft.environmentId) : instanceDefaultEnvironment(environments.data),
+    draft.environmentId ? environments.data?.find((entry) => entry.id === draft.environmentId) : instanceDefaultEnvironment(environments.data, instanceDefaultId()),
   );
   const adapters = createQuery(() => ({
     queryKey: queryKeys.agents.adapters(company().id, props.agent.defaultEnvironmentId ?? null),
@@ -171,12 +174,35 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
   /** The runner the Runner row shows: the staged switch, or the agent's own. */
   const shownRunner = () => stagedRunner() ?? identity().runner;
   const recommendedRunner = () => resolveRunner(identity().harness, "auto", adapters.data).recommended;
+  /** The Runner row's visible line: the current runner's setup, a staged switch, or why there's no switch. */
+  const runnerNote = () => {
+    if (shownRunner() === "paperclip") {
+      if (identity().runner === "paperclip") return runnerDetail(config());
+      return offer().kind === "qualify"
+        ? `Saving probes ${environment()?.name ?? "the environment"} first, and switches only if the Runner qualifies there. The model and instructions stay.`
+        : "The model and instructions stay.";
+    }
+    if (offer().kind === "none" && offer().reason === "not-supported-here") return "Paperclip Runner isn't available for this harness in this environment.";
+    return identity().runner === "paperclip" ? "The model and instructions stay." : undefined;
+  };
+  /**
+   * When a scheduled check-in is skipped: a Paperclip Runner agent takes none without a task
+   * (`supportsUnscopedTimerHeartbeat`), and one with `skipTimerWhenNoActionableWork` (set for agents
+   * made in this UI) none while it has no todo or in-progress task (`heartbeat/timer-policy.ts`).
+   */
+  const heartbeatNote = () => {
+    if (shownRunner() === "paperclip" && identity().runnerApplies) return "Paperclip Runner agents don't take scheduled check-ins without a task.";
+    const heartbeat = (props.agent.runtimeConfig as Record<string, unknown> | null)?.heartbeat as Record<string, unknown> | undefined;
+    const skips = heartbeat?.skipTimerWhenNoActionableWork ?? heartbeat?.requireActionableTimerWork ?? heartbeat?.issueOnlyTimer;
+    return skips === true ? "Skips check-ins while it has no open task." : undefined;
+  };
 
   return (
     <>
-      <SectionTitle title="Model and runtime">
-        How {props.agent.name} runs: its harness and model, where it runs, when it wakes, and its limits. Changes are saved together, as a new revision.
-      </SectionTitle>
+      <SectionTitle
+        title="Model and runtime"
+        info={`How ${props.agent.name} runs: harness and model, where it runs, when it wakes, its limits. Changes here are saved together as one new revision.`}
+      />
 
       <Show when={offer().kind === "upgrade" || offer().kind === "qualify"}>
         <div class="ag-note" role="note">
@@ -217,7 +243,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
           />
         }
       >
-        <SettingsRow label="Harness" help="The program the agent runs in.">
+        <SettingsRow label="Harness" info="The program the agent runs in.">
           <div class="ps-inline">
             <span class="ag-static">
               <HarnessDisc harness={identity().harness} />
@@ -235,7 +261,10 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
             </Button>
           </div>
         </SettingsRow>
-        <SettingsRow label="Runner" help="What starts and supervises the harness for each run.">
+        <SettingsRow
+          label="Runner"
+          info="What starts and supervises the harness for each run. Paperclip Runner supervises it; the legacy runner runs the harness program directly."
+        >
           <Show when={identity().runnerApplies} fallback={<span class="ag-static-text">Not applicable: {identity().harnessLabel} runs only on the legacy runner.</span>}>
             <div class="ps-stack">
               {/* Where the adapters allow a switch either way, the runner is a choice like the other settings, staged until you save. */}
@@ -257,24 +286,16 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
               <Show when={shownRunner() !== identity().runner}>
                 <span class="ag-changed">Changed from {runnerLabel(identity().runner)}. Switches when you save.</span>
               </Show>
-              <span class="fhelp">
-                {shownRunner() === "paperclip"
-                  ? identity().runner === "paperclip"
-                    ? runnerDetail(config())
-                    : offer().kind === "qualify"
-                      ? `Saving probes ${environment()?.name ?? "the environment"} first, and switches only if the Runner qualifies there. The model and instructions stay.`
-                      : "Paperclip Runner starts and supervises the harness for each run. The model and instructions stay."
-                  : offer().kind === "none" && offer().reason === "not-supported-here"
-                    ? "Paperclip Runner isn't available for this harness in this environment."
-                    : `Runs the ${identity().harnessLabel} program directly.${identity().runner === "paperclip" ? " The model and instructions stay." : ""}`}
-              </span>
+              <Show when={runnerNote()}>
+                <span class="fhelp">{runnerNote()}</span>
+              </Show>
             </div>
           </Show>
         </SettingsRow>
         <SignInRow agent={props.agent} value={draft.connection} saved={base().connection} onChange={(value) => setDraft("connection", value)} />
         <Show when={usage()}>
           {(limit) => (
-            <SettingsRow label="Usage limit" help={`What ${limit().provider} last reported for this sign-in's limits. Queued work waits while it's used up.`}>
+            <SettingsRow label="Usage limit" info={`What ${limit().provider} last reported for this sign-in's limits. Queued work waits while a limit is used up.`}>
               <UsageLimitDetail limit={limit()} />
             </SettingsRow>
           )}
@@ -289,7 +310,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
           </SettingsRow>
         </Show>
         <Show when={fields().effort && effortOptions().length > 0}>
-          <SettingsRow label="Thinking effort" help="More effort is slower and costs more.">
+          <SettingsRow label="Thinking effort" info="More effort is slower and costs more.">
             <div class="ps-stack">
               <Segmented
                 label="Thinking effort"
@@ -306,7 +327,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
       </SettingsCard>
 
       <Show when={extraFields().length > 0}>
-        <SettingsCard title="Harness settings" description={`Options of ${identity().harnessLabel} itself. Saved with your other changes.`}>
+        <SettingsCard title="Harness settings" info={`Options of ${identity().harnessLabel} itself. Saved with your other changes.`}>
           <For each={extraFields().filter((field) => fieldVisible(field, extras, props.agent.adapterConfig as Record<string, unknown>))}>
             {(field) => <ExtraFieldRow field={field} value={extras[field.key]} saved={(props.agent.adapterConfig as Record<string, unknown>)[field.key]} onChange={(value) => setExtras(field.key, value)} />}
           </For>
@@ -314,17 +335,32 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
       </Show>
 
       <SettingsCard title="Where it runs">
-        <SettingsRow label="Environment" help="Uses the organization default unless you pick another.">
+        <SettingsRow
+          label="Environment"
+          info="Where the agent's runs happen. Left on the default, it uses the instance's default environment, or the Paperclip server's own machine when none is set."
+        >
           <EnvironmentMenu environments={environments.data} value={draft.environmentId} onChange={(id) => setDraft("environmentId", id)} />
         </SettingsRow>
         <Show when={fields().browser}>
-          <SwitchRow label="Browser access" help="Lets the agent open and read web pages in a real browser (Chrome)." checked={draft.chrome} onChange={(value) => setDraft("chrome", value)} />
+          <SwitchRow label="Browser access" info="Lets the agent open and read web pages in a real browser (Chrome)." checked={draft.chrome} onChange={(value) => setDraft("chrome", value)} />
         </Show>
       </SettingsCard>
 
       <SettingsCard title="When it wakes">
-        <SwitchRow label="When there is work" help="It is assigned a task, mentioned, or sent a message." checked={draft.wakeOnDemand} onChange={(value) => setDraft("wakeOnDemand", value)} />
-        <SwitchRow label="On a heartbeat" help="Checks in on a schedule, even when nothing is new." checked={draft.heartbeatEnabled} onChange={(value) => setDraft("heartbeatEnabled", value)}>
+        <SwitchRow
+          label="When there is work"
+          info="Wakes it for anything but the heartbeat: a task assigned, a mention or message, a routine, or Run now. Off, all of these are skipped."
+          help={draft.wakeOnDemand ? undefined : "Off: assignments, messages, routines and Run now don't wake it."}
+          checked={draft.wakeOnDemand}
+          onChange={(value) => setDraft("wakeOnDemand", value)}
+        />
+        <SwitchRow
+          label="On a heartbeat"
+          info="Also wakes it on a schedule, to check in even when nothing is new."
+          help={draft.heartbeatEnabled ? heartbeatNote() : undefined}
+          checked={draft.heartbeatEnabled}
+          onChange={(value) => setDraft("heartbeatEnabled", value)}
+        >
           <Show when={draft.heartbeatEnabled}>
             <Menu>
               <Menu.Trigger as={FieldButton} class="ps-field-220" aria-label="Heartbeat interval">
@@ -342,17 +378,24 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
             </Menu>
           </Show>
         </SwitchRow>
-        <NumberRow label="Cooldown" help="The shortest gap between two runs." unit="seconds" value={draft.cooldownSec} onInput={(value) => setDraft("cooldownSec", value)} />
-        <NumberRow label="Runs at once" help="How many runs may overlap." unit={draft.maxConcurrentRuns === "1" ? "run" : "runs"} value={draft.maxConcurrentRuns} onInput={(value) => setDraft("maxConcurrentRuns", value)} />
+        <NumberRow
+          label="Cooldown"
+          info="The shortest gap between two runs."
+          help="Not used by the server yet."
+          unit="seconds"
+          value={draft.cooldownSec}
+          onInput={(value) => setDraft("cooldownSec", value)}
+        />
+        <NumberRow label="Runs at once" info="How many of its runs may happen at the same time (1 to 50)." unit={draft.maxConcurrentRuns === "1" ? "run" : "runs"} value={draft.maxConcurrentRuns} onInput={(value) => setDraft("maxConcurrentRuns", value)} />
       </SettingsCard>
 
       <Show when={fields().timeouts}>
         <SettingsCard title="Run limits">
-          <NumberRow label="Timeout" help="A run is stopped after this long. 0 means no limit." unit="minutes" value={draft.timeoutMin} onInput={(value) => setDraft("timeoutMin", value)} />
-          <NumberRow label="Grace period" help="Time a run gets to wrap up after it is stopped." unit="seconds" value={draft.graceSec} onInput={(value) => setDraft("graceSec", value)} />
+          <NumberRow label="Timeout" info="A run is stopped after this long. 0 means no limit." unit="minutes" value={draft.timeoutMin} onInput={(value) => setDraft("timeoutMin", value)} />
+          <NumberRow label="Grace period" info="Time a run gets to wrap up after it is stopped, before it's force-killed." unit="seconds" value={draft.graceSec} onInput={(value) => setDraft("graceSec", value)} />
           <SwitchRow
             label="Continue after a turn limit"
-            help="When the harness stops at its turn limit, start a follow-up run that picks up where it left off."
+            info="When the harness stops at its turn limit, start a follow-up run that picks up where it left off."
             checked={draft.continueEnabled}
             onChange={(value) => setDraft("continueEnabled", value)}
           >
@@ -373,7 +416,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
         <SettingsCard title="Debugging">
           <SwitchRow
             label="Capture raw provider traces"
-            help="Records the full model input and output of every run and keeps it for 24 hours. Only instance admins can read traces. Turn it on while you investigate a problem."
+            info="Records the full model input and output of every run and keeps it for 24 hours. Only instance admins can read traces. Turn it on while you investigate a problem."
             checked={draft.providerTrace}
             onChange={(value) => setDraft("providerTrace", value)}
           />
@@ -393,15 +436,15 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
           </summary>
           <div class="settings-rows">
             <Show when={fields().command}>
-              <SettingsRow label="Command" help="Leave empty to use the harness default." for="ag-command">
+              <SettingsRow label="Command" info="Leave empty to use the harness default." for="ag-command">
                 <TextInput id="ag-command" class="mono" spellcheck={false} autocomplete="off" placeholder={identity().harness.replace(/_local$/, "")} value={draft.command} onInput={(event) => setDraft("command", event.currentTarget.value)} />
               </SettingsRow>
-              <SettingsRow label={props.agent.adapterType === "process" ? "Arguments" : "Extra arguments"} help="Separated by commas." for="ag-args">
+              <SettingsRow label={props.agent.adapterType === "process" ? "Arguments" : "Extra arguments"} info="Separated by commas." for="ag-args">
                 <TextInput id="ag-args" class="mono" spellcheck={false} autocomplete="off" placeholder="--verbose" value={draft.extraArgs} onInput={(event) => setDraft("extraArgs", event.currentTarget.value)} />
               </SettingsRow>
             </Show>
             <Show when={fields().promptTemplate}>
-              <SettingsRow label="Prompt template" help="Sent at the start of every run." for="ag-prompt">
+              <SettingsRow label="Prompt template" info="Sent at the start of every run. Keep it small; long-lived guidance belongs in Instructions." for="ag-prompt">
                 <TextArea id="ag-prompt" class="mono" rows={4} spellcheck={false} value={draft.promptTemplate} placeholder="Not set" onInput={(event) => setDraft("promptTemplate", event.currentTarget.value)} />
               </SettingsRow>
               <SettingsRow label="Bootstrap prompt" help="Legacy. Move it into Instructions.">
@@ -491,7 +534,7 @@ function SignInRow(props: { agent: AgentDetail; value: string; saved: string; on
           ? "The responsible person's connection"
           : "An AI connection";
   return (
-    <SettingsRow label="Sign-in" help="How the harness reaches the model.">
+    <SettingsRow label="Sign-in" info="How the harness reaches the model.">
       <div class="ps-stack">
         <div class="ps-inline ps-inline--spread">
           <Show when={!router()} fallback={<TonePill tone="violet" compact>Routed through a connection pool</TonePill>}>
@@ -581,10 +624,10 @@ function ExtraFieldRow(props: { field: HarnessField; value: ExtraValue | undefin
   return (
     <Switch>
       <Match when={props.field.type === "toggle"}>
-        <SwitchRow label={props.field.label} help={help() ?? ""} checked={props.value === true} onChange={props.onChange} />
+        <SwitchRow label={props.field.label} info={help()} checked={props.value === true} onChange={props.onChange} />
       </Match>
       <Match when={props.field.type === "select"}>
-        <SettingsRow label={props.field.label} help={help()}>
+        <SettingsRow label={props.field.label} info={help()}>
           <Menu>
             <Menu.Trigger as={FieldButton} class="ps-field-240" aria-label={`${props.field.label}: ${props.field.options?.find((option) => option.value === props.value)?.label ?? String(props.value ?? "")}`}>
               {props.field.options?.find((option) => option.value === props.value)?.label ?? (String(props.value ?? "") || "Not set")}
@@ -602,12 +645,12 @@ function ExtraFieldRow(props: { field: HarnessField; value: ExtraValue | undefin
         </SettingsRow>
       </Match>
       <Match when={props.field.type === "textarea"}>
-        <SettingsRow label={props.field.label} help={help()} for={id}>
+        <SettingsRow label={props.field.label} info={help()} for={id}>
           <TextArea id={id} class="mono" rows={4} spellcheck={false} value={String(props.value ?? "")} onInput={(event) => props.onChange(event.currentTarget.value)} />
         </SettingsRow>
       </Match>
       <Match when={true}>
-        <SettingsRow label={props.field.label} help={help()} for={id}>
+        <SettingsRow label={props.field.label} info={help()} for={id}>
           <TextInput
             id={id}
             class={props.field.type === "number" ? "ag-num" : "mono"}
@@ -674,15 +717,19 @@ function TestEnvironment(props: { agent: AgentDetail; environmentId: string | nu
         <Button size="compact" disabled={busy()} icon={<Check size={14} aria-hidden="true" />} onClick={() => void test()}>
           {busy() ? (phase() === "qualifying" ? "Checking the computer…" : "Testing…") : "Test environment"}
         </Button>
+        <InfoTip label="About Test environment">
+          {props.qualifyEnvironmentId
+            ? "Checks the saved computer still qualifies for the Runner, then tests the saved settings."
+            : "Tests the saved settings: harness found, signed in, model available."}
+        </InfoTip>
         <Show
           when={result()}
           fallback={
-            <span class="ps-muted-line" role={error() ? "alert" : undefined}>
-              {error() ??
-                (props.qualifyEnvironmentId
-                  ? "Checks the saved computer still qualifies for the Runner, then tests the saved settings."
-                  : "Tests the saved settings: harness found, signed in, model available.")}
-            </span>
+            <Show when={error()}>
+              <span class="ps-muted-line" role="alert">
+                {error()}
+              </span>
+            </Show>
           }
         >
           {(found) => (
@@ -697,10 +744,10 @@ function TestEnvironment(props: { agent: AgentDetail; environmentId: string | nu
   );
 }
 
-function NumberRow(props: { label: string; help: string; unit: string; value: string; onInput: (value: string) => void }) {
+function NumberRow(props: { label: string; info: string; help?: string; unit: string; value: string; onInput: (value: string) => void }) {
   const id = `ag-num-${props.label.toLowerCase().replace(/\W+/g, "-")}`;
   return (
-    <SettingsRow label={props.label} help={props.help} for={id}>
+    <SettingsRow label={props.label} info={props.info} help={props.help} for={id}>
       <div class="ps-inline">
         <TextInput id={id} class="ag-num" inputmode="decimal" autocomplete="off" value={props.value} onInput={(event) => props.onInput(event.currentTarget.value)} />
         <span class="ps-muted-line">{props.unit}</span>

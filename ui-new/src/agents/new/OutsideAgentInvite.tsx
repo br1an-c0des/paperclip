@@ -106,9 +106,12 @@ export function OutsideAgentInvite(props: { open: boolean; onOpenChange: (open: 
       onOpenChange={(open) => (open ? props.onOpenChange(true) : close())}
       title={preset() ? `Invite your ${preset()!.value === "hermes" ? "Hermes agent" : "agent"}` : "Invite an outside agent"}
       description={
+        preset() ? `Send the prompt to the agent. It reads Paperclip's onboarding, asks to join ${company().name}, and starts work once you approve it.` : undefined
+      }
+      info={
         preset()
-          ? `Send the prompt to the agent. It reads Paperclip's onboarding, asks to join ${company().name}, and starts work once you approve it.`
-          : `Bring in an agent that runs on its own, on another machine or service. Paperclip wakes it by calling it; it reports back through the API.`
+          ? undefined
+          : "Bring in an agent that runs on its own, on another machine or service: Paperclip wakes it by calling it, and it reports back through the API. Agents you run here, such as Claude Code or Codex, are better hired with New agent, which shows their transcripts, counts their spend and keeps to a budget."
       }
       width={640}
       footer={
@@ -177,9 +180,6 @@ export function OutsideAgentInvite(props: { open: boolean; onOpenChange: (open: 
               )}
             </For>
           </div>
-          <p class="fhelp">
-            Agents you run here, such as Claude Code or Codex, are better hired with New agent: Paperclip can then show their transcripts, count their spend and keep to a budget.
-          </p>
         </Match>
         <Match when={stage().kind === "creating"}>
           <p class="oa-status" role="status">

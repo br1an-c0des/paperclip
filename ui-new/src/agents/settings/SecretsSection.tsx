@@ -66,12 +66,13 @@ export function SecretsSection(props: { agent: AgentDetail }) {
 
   return (
     <>
-      <SectionTitle title="Secrets and variables">Values {props.agent.name}'s runs receive as environment variables.</SectionTitle>
+      <SectionTitle title="Secrets and variables" info={`Values ${props.agent.name}'s runs receive as environment variables.`} />
       <SettingsCard
         title="Variables"
+        info="Set for every run of this agent. On a project's task, a project variable with the same name wins."
         description={
           <CardNote state={saver.state()} error={saver.error()}>
-            Set for every run of this agent, on top of the project's. Secret values are never shown here.
+            Secret values are never shown here.
           </CardNote>
         }
         footer={
@@ -177,7 +178,7 @@ export function SecretsSection(props: { agent: AgentDetail }) {
                           )}
                         </For>
                         <Menu.Separator />
-                        <Menu.CheckboxItem checked={row.required} onChange={(value) => update(row.id, (draft) => void (draft.required = value))} description="Runs wait until the person has set it">
+                        <Menu.CheckboxItem checked={row.required} onChange={(value) => update(row.id, (draft) => void (draft.required = value))} description="Runs fail until the person sets it">
                           Required
                         </Menu.CheckboxItem>
                       </Menu.Content>

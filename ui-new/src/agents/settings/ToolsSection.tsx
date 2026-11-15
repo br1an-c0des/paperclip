@@ -15,7 +15,7 @@ import { ToolActivity } from "@/apps/gateways/Activity";
 import { failureText, useConnections, useRefreshTools } from "@/apps/shared";
 import { useCompany } from "@/lib/company";
 import { Button, buttonClass } from "@/ui/Button";
-import { SettingsCard } from "@/ui/Field";
+import { InfoHeading, SettingsCard } from "@/ui/Field";
 import { Switch as Toggle } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
 import { SectionTitle } from "../shared";
@@ -98,13 +98,14 @@ export function ToolsSection(props: { agent: AgentDetail }) {
 
   return (
     <>
-      <SectionTitle title="Tools and channels">The apps, tools and chat channels {props.agent.name} can use.</SectionTitle>
+      <SectionTitle title="Tools and channels" info={`The apps, tools and chat channels ${props.agent.name} can use.`} />
 
       <SettingsCard
         title="What its runs get"
+        info="Its instructions can narrow this, never widen it."
         description={
           effective.data
-            ? `${allowed().length === 1 ? "1 tool" : `${allowed().length} tools`}, from ${applying().length === 1 ? "1 access profile" : `${applying().length} access profiles`}. Its instructions can narrow this, never widen it.`
+            ? `${allowed().length === 1 ? "1 tool" : `${allowed().length} tools`}, from ${applying().length === 1 ? "1 access profile" : `${applying().length} access profiles`}.`
             : undefined
         }
       >
@@ -164,7 +165,7 @@ export function ToolsSection(props: { agent: AgentDetail }) {
 
       <SettingsCard
         title="Apps it carries"
-        description="An installed app's tools are loaded into every run. Installing one also lets the agent use it; an app it may use but doesn't carry adds nothing to its runs."
+        info="An installed app's tools are loaded into every run. Installing one also lets the agent use it; an app it may use but doesn't carry adds nothing to its runs."
         footer={
           <A class={buttonClass({ size: "compact" })} href={appsHref()}>
             Connect an app
@@ -217,7 +218,7 @@ export function ToolsSection(props: { agent: AgentDetail }) {
 
       <SettingsCard
         title="Access profiles"
-        description="Profiles decide which tools a run gets. With several, it can use anything any of them allows."
+        info="Profiles decide which tools a run gets. With several, it can use anything any of them allows."
         footer={
           <>
             <Button size="compact" variant="quiet" onClick={() => setChecking(true)}>
@@ -299,7 +300,7 @@ export function ToolsSection(props: { agent: AgentDetail }) {
         </Show>
       </SettingsCard>
 
-      <SettingsCard title="Policies" description="Rules the gateway checks on every call it makes, in order. Set Ask first on an action from its app's page.">
+      <SettingsCard title="Policies" info="Rules the gateway checks on every call it makes, in order. Set Ask first on an action from its app's page.">
         <Switch>
           <Match when={!policies.isSuccess}>
             <CardState loading={policies.isPending} error={policies.error} what="policies" onRetry={() => void policies.refetch()} />
@@ -341,10 +342,9 @@ export function ToolsSection(props: { agent: AgentDetail }) {
 
       <section class="card settings-card" aria-labelledby="ag-tool-calls">
         <header class="chead">
-          <h3 id="ag-tool-calls" class="disp">
+          <InfoHeading level={3} id="ag-tool-calls" class="disp" info="Calls it made in the last 7 days: allowed, asked about, or blocked.">
             Recent tool calls
-          </h3>
-          <p>Calls it made in the last 7 days: allowed, asked about, or blocked.</p>
+          </InfoHeading>
         </header>
         <ToolActivity filter={{ agent: props.agent.id, window: "7d" }} pageSize={10} empty={`${props.agent.name} hasn't called any app tools in the last 7 days.`} />
       </section>

@@ -12,6 +12,7 @@ import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { SettingsCard, SettingsRow, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Markdown } from "@/ui/Markdown";
 import { Popover } from "@/ui/Popover";
 import { Segmented } from "@/ui/Segmented";
@@ -65,10 +66,10 @@ export function InstructionsSection(props: { agent: AgentDetail }) {
 
   return (
     <>
-      <SectionTitle title="Instructions">
-        The files that tell {props.agent.name} how to work. It reads {bundle.data?.entryFile ?? "AGENTS.md"} first, which can point to the others. Agents can suggest edits; you
-        decide.
-      </SectionTitle>
+      <SectionTitle
+        title="Instructions"
+        info={`The files that tell ${props.agent.name} how to work. It reads ${bundle.data?.entryFile ?? "AGENTS.md"} first, which can point to the others. Agents can suggest edits; you decide.`}
+      />
       <Show
         when={supported()}
         fallback={
@@ -195,7 +196,7 @@ function FromConnections(props: { agent: AgentDetail }) {
         <SettingsCard
           aria-label="From connections"
           title="From connections"
-          description="Its apps add these when the connection is available for the task. Access can also depend on the task's responsible person and on action permissions. Edit them on the app's page."
+          info="Its apps add these when the connection is available for the task. Access can also depend on the task's responsible person and on action permissions. Edit them on the app's page."
         >
           <For each={sources()}>
             {(connection) => (
@@ -559,21 +560,23 @@ function NewFile(props: { existing: readonly { path: string }[]; onCreate: (path
       </Popover.Trigger>
       <Popover.Content title="New file" width={320}>
         <form class="ps-popover-form" onSubmit={(event) => void create(event)}>
-          <TextInput
-            class="mono"
-            value={path()}
-            placeholder="TOOLS.md"
-            aria-label="File path"
-            autocomplete="off"
-            spellcheck={false}
-            invalid={Boolean(problem())}
-            onInput={(event) => {
-              setProblem(null);
-              setPath(event.currentTarget.value);
-            }}
-            autofocus
-          />
-          <p class="fhelp">A path inside the instructions folder, such as research/sources.md.</p>
+          <div class="info-line ag-path-line">
+            <TextInput
+              class="mono"
+              value={path()}
+              placeholder="TOOLS.md"
+              aria-label="File path"
+              autocomplete="off"
+              spellcheck={false}
+              invalid={Boolean(problem())}
+              onInput={(event) => {
+                setProblem(null);
+                setPath(event.currentTarget.value);
+              }}
+              autofocus
+            />
+            <InfoTip label="About File path">A path inside the instructions folder, such as research/sources.md.</InfoTip>
+          </div>
           <div class="ps-form-foot">
             <Show when={problem()}>
               <span class="nt-error" role="alert">
@@ -730,7 +733,7 @@ function BundleSettings(props: { agent: AgentDetail; bundle: AgentInstructionsBu
         <span>{saved().mode === "external" ? `A folder on disk · ${saved().entryFile}` : `Kept by Paperclip · ${saved().entryFile}`}</span>
       </summary>
       <div class="settings-rows">
-        <SettingsRow label="Where the files live" help="Managed: Paperclip keeps them, with revisions. External: a folder on the server's disk that you manage.">
+        <SettingsRow label="Where the files live" info="Managed: Paperclip keeps them, with revisions. External: a folder on the server's disk that you manage.">
           <Segmented
             label="Where the files live"
             options={[
@@ -741,7 +744,7 @@ function BundleSettings(props: { agent: AgentDetail; bundle: AgentInstructionsBu
             onChange={(value) => setMode(value as "managed" | "external")}
           />
         </SettingsRow>
-        <SettingsRow label="Folder" help={mode() === "external" ? "An absolute path on the machine Paperclip runs on. The folder and its entry file must already exist." : "Paperclip's own folder for this agent."} for="ag-bundle-root">
+        <SettingsRow label="Folder" info={mode() === "external" ? "An absolute path on the machine Paperclip runs on. The folder and its entry file must already exist." : "Paperclip's own folder for this agent."} for="ag-bundle-root">
           <Show
             when={mode() === "external"}
             fallback={
@@ -760,13 +763,13 @@ function BundleSettings(props: { agent: AgentDetail; bundle: AgentInstructionsBu
         </SettingsRow>
         <SettingsRow
           label="Entry file"
-          help={mode() === "external" ? "The file the agent reads first, inside the folder. Paperclip checks it's there before switching." : "The file the agent reads first. Usually AGENTS.md; a new name starts from the current one."}
+          info={mode() === "external" ? "The file the agent reads first, inside the folder. Paperclip checks it's there before switching." : "The file the agent reads first. Usually AGENTS.md; a new name starts from the current one."}
           for="ag-bundle-entry"
         >
           <TextInput id="ag-bundle-entry" class="mono ps-field-240" spellcheck={false} autocomplete="off" value={entryFile()} onInput={(event) => setEntryFile(event.currentTarget.value)} />
         </SettingsRow>
         <Show when={legacy()}>
-          <SettingsRow label="Prompt template" help="An older setting that still sends its own text at the start of every run, next to these files.">
+          <SettingsRow label="Prompt template" info="An older setting that still sends its own text at the start of every run, next to these files.">
             <div class="ps-stack">
               <span class="fhelp ag-warn">
                 {props.bundle.legacyPromptTemplateActive ? "A legacy prompt template is still in use." : "A legacy bootstrap prompt is still in use."} Move what it says into {saved().entryFile}, then turn it off.

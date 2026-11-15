@@ -340,20 +340,6 @@
   font-size: 13px;
 }
 
-.na-info {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  color: var(--muted);
-}
-
-.na-info:hover {
-  background: var(--hover);
-  color: var(--text);
-}
-
 .na-approval-note {
   padding: 0 22px 14px;
   background: var(--ground);
@@ -502,7 +488,7 @@
     font-size: 20px;
   }
 
-  .na-draft-pill {
+  .na-draft-line {
     justify-self: start;
   }
 

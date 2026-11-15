@@ -124,6 +124,7 @@ export function BuiltInSetupDialog(props: { state: BuiltInAgentState; onClose: (
       onOpenChange={(open) => !open && !busy() && props.onClose()}
       title={`Set up the ${props.state.definition.displayName}`}
       description={props.state.definition.shortPurpose}
+      info="It joins the roster marked Built-in. If your organization approves new agents, it waits in the Inbox first."
       width={560}
       footer={
         <>
@@ -141,7 +142,6 @@ export function BuiltInSetupDialog(props: { state: BuiltInAgentState; onClose: (
         </>
       }
     >
-      <p class="fhelp">It joins the roster marked Built-in. If your organization approves new agents, it waits in the Inbox first.</p>
       <div class="settings-rows">
         <SettingsRow label="Harness">
           <Menu>
@@ -168,7 +168,7 @@ export function BuiltInSetupDialog(props: { state: BuiltInAgentState; onClose: (
         <SettingsRow label="Model">
           <ModelMenu models={models.data} loading={models.isLoading} value={model()} onChange={setModel} allowDefault />
         </SettingsRow>
-        <SettingsRow label="Monthly budget" help="In dollars. Leave empty for no limit." for="bi-budget">
+        <SettingsRow label="Monthly budget" info="In dollars. Leave empty for no limit." for="bi-budget">
           <TextInput id="bi-budget" class="ag-num" inputmode="decimal" autocomplete="off" value={budget()} onInput={(event) => setBudget(event.currentTarget.value)} />
         </SettingsRow>
       </div>

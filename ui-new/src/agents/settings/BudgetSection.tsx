@@ -68,10 +68,10 @@ export function BudgetSection(props: { agent: AgentDetail }) {
 
   return (
     <>
-      <SectionTitle title="Budget">How much {props.agent.name} may spend, and what it has used.</SectionTitle>
+      <SectionTitle title="Budget" info={`How much ${props.agent.name} may spend, and what it has used.`} />
       <SettingsCard
         title={draft.windowKind === "lifetime" ? "Lifetime limit" : "Monthly limit"}
-        description="What this agent may spend across every project. Company-wide budgets are set in company settings."
+        info="What this agent may spend across every project. Company-wide budgets are set in company settings."
         footer={
           dirty() || problem() ? (
             <span class="ps-foot-end">
@@ -91,7 +91,7 @@ export function BudgetSection(props: { agent: AgentDetail }) {
         <Show when={props.agent.pausedAt && props.agent.pauseReason === "budget"}>
           <div class="ps-banner ps-banner--red" role="status">
             <PauseCircle size={16} aria-hidden="true" />
-            {props.agent.name} is paused: it reached its budget. Raise the limit, then resume it.
+            {props.agent.name} is paused: it reached its budget. Raising the limit resumes it.
           </div>
         </Show>
         <Show when={overview.isError}>
@@ -110,7 +110,7 @@ export function BudgetSection(props: { agent: AgentDetail }) {
             onChange={(value) => setDraft("windowKind", value)}
           />
         </SettingsRow>
-        <SettingsRow label="Limit" help="Leave it empty for no limit." for="ag-budget-amount">
+        <SettingsRow label="Limit" info="Leave it empty for no limit." for="ag-budget-amount">
           <div class="ps-money">
             <span aria-hidden="true">$</span>
             <TextInput
@@ -167,7 +167,7 @@ export function BudgetSection(props: { agent: AgentDetail }) {
                 {draft.hardStop ? `Pause ${props.agent.name}` : "Only warn me"}
               </Menu.Trigger>
               <Menu.Content label="When the limit is reached" width={300}>
-                <Menu.Item onSelect={() => setDraft("hardStop", true)} description="New runs wait until the limit is raised" hint={draft.hardStop ? <Check size={14} /> : undefined}>
+                <Menu.Item onSelect={() => setDraft("hardStop", true)} description="Pauses it and stops its running and queued work until the limit is raised" hint={draft.hardStop ? <Check size={14} /> : undefined}>
                   Pause {props.agent.name}
                 </Menu.Item>
                 <Menu.Item onSelect={() => setDraft("hardStop", false)} description="Runs carry on past the limit" hint={draft.hardStop ? undefined : <Check size={14} />}>
@@ -213,7 +213,7 @@ function UsageCard(props: { agent: AgentDetail }) {
   const shown = createMemo(() => filterRuns(runs.data, filter()).slice(0, all() ? 200 : 8));
 
   return (
-    <SettingsCard title="Usage this month" description="From the cost ledger, since the first of the month (UTC).">
+    <SettingsCard title="Usage this month" info="From the cost ledger, since the first of the month (UTC).">
       <Show when={byAgent.isError}>
         <p class="ps-list-note" role="alert">
           Couldn't load the costs. {failure(byAgent.error, "")}
@@ -238,7 +238,7 @@ function UsageCard(props: { agent: AgentDetail }) {
       </SettingsRow>
       <Show when={mine()}>
         {(row) => (
-          <SettingsRow label="Tokens" help="Subscription tokens are included in the plan.">
+          <SettingsRow label="Tokens" info="Subscription tokens are included in the plan.">
             <div class="ag-stats">
               <span>
                 <b>{formatTokens(row().inputTokens)}</b> input

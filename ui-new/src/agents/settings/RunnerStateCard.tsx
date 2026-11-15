@@ -77,7 +77,7 @@ export function RunnerStateCard(props: { agent: AgentDetail }) {
   return (
     <SettingsCard
       title="Runner state and sessions"
-      description={`What ${runtimeIdentity(props.agent).label} keeps between runs. Reset a session to give the next run fresh context.`}
+      info={`What ${runtimeIdentity(props.agent).label} keeps between runs. Reset a session to give the next run fresh context.`}
       footer={
         <Button size="compact" disabled={busy() !== null} icon={<RotateCcw size={14} aria-hidden="true" />} onClick={() => void reset(null)}>
           Reset all sessions
@@ -92,7 +92,7 @@ export function RunnerStateCard(props: { agent: AgentDetail }) {
       <Show when={state.data} fallback={<Show when={state.isSuccess}><p class="ps-list-note">{props.agent.name} hasn't run yet.</p></Show>}>
         {(current) => (
           <>
-            <SettingsRow label="Current session" help="The provider session the next run without a task resumes.">
+            <SettingsRow label="Current session" info="The provider session the next run without a task resumes.">
               <div class="ps-stack">
                 <span class="mono" title={current().sessionDisplayId ?? current().sessionId ?? undefined}>
                   {sessionLabel(current().sessionDisplayId ?? current().sessionId)}
@@ -114,7 +114,7 @@ export function RunnerStateCard(props: { agent: AgentDetail }) {
                 )}
               </Show>
             </SettingsRow>
-            <SettingsRow label="Totals" help="Across every run the runtime state has counted.">
+            <SettingsRow label="Totals" info="Across every run the runtime state has counted.">
               <div class="ag-stats">
                 <span>
                   <b>{formatTokens(current().totalInputTokens)}</b> input
@@ -138,7 +138,7 @@ export function RunnerStateCard(props: { agent: AgentDetail }) {
           </>
         )}
       </Show>
-      <SettingsRow label="Task sessions" help="One provider session per task, and one for your chat with it. The newest first.">
+      <SettingsRow label="Task sessions" info="One provider session per task, and one for your chat with it. Newest first.">
         <Show when={sortedSessions().length > 0} fallback={<span class="ag-static-text">{readNote(sessions, "No task sessions.")}</span>}>
           <ul class="ps-list ag-sessions">
             <For each={sortedSessions()}>
