@@ -4,6 +4,7 @@ import { createSignal, For, Show } from "solid-js";
 import { chatEndpointsApi, type ChatEndpoint } from "@/api/chat-endpoints";
 import { Button } from "@/ui/Button";
 import { Field, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { failureText } from "../shared";
 import { photonCredentials } from "./chat-model";
 import "./ChatExtras.css";
@@ -46,9 +47,11 @@ export function PhotonConnect(props: { endpoint: ChatEndpoint; repairing: boolea
 
   return (
     <div class="ch-step-body">
-      <p>
-        Connect {props.endpoint.assignedAgentName} to Photon Cloud. Photon Pro offers direct messages through a shared line; a dedicated number also takes
-        group chats, each turned on separately.
+      <p class="info-line">
+        <span>Connect {props.endpoint.assignedAgentName} to Photon Cloud.</span>
+        <InfoTip label="About Photon lines">
+          Photon Pro offers direct messages through a shared line; a dedicated number also takes group chats, each turned on separately.
+        </InfoTip>
       </p>
       <p class="ch-links">
         <a href="https://app.photon.codes/" target="_blank" rel="noopener noreferrer">
@@ -115,9 +118,11 @@ export function PhotonConnect(props: { endpoint: ChatEndpoint; repairing: boolea
               </p>
             </Show>
             <Show when={result().allocation === "shared" && result().eligible}>
-              <p class="cx-static">
-                Direct messages only. Enroll each sender on your Photon project's Users page, then use the number Photon gives that sender. People still link
-                their Paperclip accounts; group chats can't be turned on.
+              <p class="cx-static info-line">
+                <span>Direct messages only; group chats can't be turned on.</span>
+                <InfoTip label="About the shared line">
+                  Enroll each sender on your Photon project's Users page, then use the number Photon gives that sender. People still link their Paperclip accounts.
+                </InfoTip>
               </p>
             </Show>
             <ul class="cx-options">

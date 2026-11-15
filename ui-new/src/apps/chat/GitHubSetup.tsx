@@ -9,6 +9,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { Button, buttonClass } from "@/ui/Button";
 import { Field, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { pushToast } from "@/ui/Toast";
 import { failureText } from "../shared";
 import { defaultAppName, failingChecks, knownOrganizations, manifestAction, wizardPollMs } from "./github-model";
@@ -227,9 +228,12 @@ function CreateApp(props: {
 
   return (
     <>
-      <p>Paperclip creates a GitHub App for {props.endpoint.assignedAgentName} from a manifest. You confirm it on GitHub, then install it on the repositories it should review.</p>
       <div class="ch-grid">
-        <Field label="GitHub account" for="gh-owner">
+        <Field
+          label="GitHub account"
+          for="gh-owner"
+          info={`Paperclip creates a GitHub App for ${props.endpoint.assignedAgentName} from a manifest. You confirm it on GitHub, then install it on the repositories it should review.`}
+        >
           <select
             id="gh-owner"
             class="input"
@@ -253,7 +257,7 @@ function CreateApp(props: {
             <TextInput id="gh-org" value={ownerLogin()} disabled={locked()} placeholder="GitHub organization name" onInput={(event) => setOwnerLogin(event.currentTarget.value)} />
           </Field>
         </Show>
-        <Field label="App name" for="gh-name" help="Up to 34 characters. It becomes the bot's @mention.">
+        <Field label="App name" for="gh-name" info="It becomes the bot's @mention. Up to 34 characters.">
           <TextInput id="gh-name" value={name()} maxLength={34} disabled={locked()} onInput={(event) => setName(event.currentTarget.value)} />
         </Field>
       </div>
@@ -342,7 +346,10 @@ function IdentityStep(props: {
         when={props.state.identity}
         fallback={
           <>
-            <p>Link your GitHub account, so your mentions of the bot use your Paperclip permissions.</p>
+            <p class="info-line">
+              Link your GitHub account.
+              <InfoTip label="About linking your account">Your mentions of the bot then use your Paperclip permissions.</InfoTip>
+            </p>
             <Show when={usable().length > 0}>
               <Field label="A GitHub connection you have" for="gh-identity">
                 <select

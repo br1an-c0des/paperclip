@@ -11,7 +11,7 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
-import { Field, TextInput } from "@/ui/Field";
+import { Field, InfoHeading, TextInput } from "@/ui/Field";
 import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
 import { AppLogo, failureText } from "../shared";
@@ -164,8 +164,9 @@ export function EmailSetup(props: { app: AppDefinition | null; agentId: string |
       <header class="ap-connect-head">
         <AppLogo app={props.app} name="AgentMail" size={48} />
         <div class="ap-connect-title">
-          <h2 class="disp">Give an agent an email address</h2>
-          <p>Email to the address becomes a task for the agent. Replies stay in the same task.</p>
+          <InfoHeading level={2} class="disp" info="Email to the address becomes a task for the agent. Replies stay in the same task.">
+            Give an agent an email address
+          </InfoHeading>
         </div>
       </header>
       <SetupSteps steps={STEPS} current={step()} reached={connectionId() ? "address" : "account"} onPick={setStep} disabled={connect.isPending || create.isPending} />
@@ -318,7 +319,7 @@ export function EmailSetup(props: { app: AppDefinition | null; agentId: string |
               <div class="ap-more-body">
                 <Field
                   label="How mail arrives"
-                  help={receive() === "webhook" ? "AgentMail calls this Paperclip's public address." : "Paperclip keeps a live connection open; no public address needed."}
+                  info="Live connection: Paperclip keeps a connection to AgentMail open, so no public address is needed. Webhook: AgentMail calls this Paperclip's public address."
                 >
                   <Segmented
                     label="How mail arrives"

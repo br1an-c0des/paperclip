@@ -10,7 +10,9 @@ import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
+import { ChoiceCard } from "@/ui/ChoiceCard";
 import { Field, TextArea, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Markdown } from "@/ui/Markdown";
 import { pushToast } from "@/ui/Toast";
 import { AppLogo, failureText, useGallery } from "../shared";
@@ -152,16 +154,14 @@ function SetupFlow(props: {
         <AppLogo app={props.app} name={name()} size={48} />
         <div class="ap-connect-title">
           <h2 class="disp">{repairing() ? `Reconnect ${name()}` : props.resume ? `Finish connecting ${name()}` : `Chat with an agent in ${name()}`}</h2>
-          <p>
-            <Show when={endpoint()} fallback="Pick the agent people will talk to, then connect it.">
-              {(current) => (
-                <>
-                  {current().assignedAgentName} in {name()}
-                  {current().providerAccountLabel ? ` · ${current().providerAccountLabel}` : ""}
-                </>
-              )}
-            </Show>
-          </p>
+          <Show when={endpoint()}>
+            {(current) => (
+              <p>
+                {current().assignedAgentName} in {name()}
+                {current().providerAccountLabel ? ` · ${current().providerAccountLabel}` : ""}
+              </p>
+            )}
+          </Show>
         </div>
       </header>
       <SetupSteps steps={SETUP_STEPS} current={step()} reached={reached()} onPick={(next) => setViewed(next)} />
@@ -318,7 +318,7 @@ function AgentStep(props: {
         if (agentId() && !slackProblem()) create.mutate();
       }}
     >
-      <Field label="Which agent do people talk to?" help="It stays the same for this connection. Connect another one for a different agent.">
+      <Field label="Which agent do people talk to?" info="The agent can't be changed later. Connect another one for a different agent.">
         <Show when={props.agents.length > 0} fallback={<p class="cx-static">No active agents yet.</p>}>
           <ul class="cx-options" role="radiogroup" aria-label="Agent">
             <For each={props.agents}>
@@ -353,29 +353,32 @@ function AgentStep(props: {
           <ul class="cx-options" role="radiogroup" aria-label="Slack setup">
             <Show when={slackOptions.data?.managedAvailable}>
               <li>
-                <label class="cx-option" classList={{ "cx-option--on": method() === "managed" }}>
-                  <input type="radio" name="ch-slack-method" checked={method() === "managed"} onChange={() => setSlackMethod("managed")} />
-                  <span class="cx-option-name">
-                    For me <span class="cx-row-meta">Paperclip's Slack app creates and installs it in a workspace you authorize.</span>
-                  </span>
-                </label>
+                <ChoiceCard
+                  name="ch-slack-method"
+                  title="For me"
+                  info="Paperclip's Slack app creates and installs it in a workspace you authorize."
+                  checked={method() === "managed"}
+                  onSelect={() => setSlackMethod("managed")}
+                />
               </li>
             </Show>
             <li>
-              <label class="cx-option" classList={{ "cx-option--on": method() === "automatic" }}>
-                <input type="radio" name="ch-slack-method" checked={method() === "automatic"} onChange={() => setSlackMethod("automatic")} />
-                <span class="cx-option-name">
-                  With a configuration token <span class="cx-row-meta">Paste a Slack App configuration access token; Paperclip creates the app.</span>
-                </span>
-              </label>
+              <ChoiceCard
+                name="ch-slack-method"
+                title="With a configuration token"
+                info="Paste a Slack App configuration access token; Paperclip creates the app."
+                checked={method() === "automatic"}
+                onSelect={() => setSlackMethod("automatic")}
+              />
             </li>
             <li>
-              <label class="cx-option" classList={{ "cx-option--on": method() === "manual" }}>
-                <input type="radio" name="ch-slack-method" checked={method() === "manual"} onChange={() => setSlackMethod("manual")} />
-                <span class="cx-option-name">
-                  Myself <span class="cx-row-meta">Paste the app manifest in Slack and copy its credentials back.</span>
-                </span>
-              </label>
+              <ChoiceCard
+                name="ch-slack-method"
+                title="Myself"
+                info="Paste the app manifest in Slack and copy its credentials back."
+                checked={method() === "manual"}
+                onSelect={() => setSlackMethod("manual")}
+              />
             </li>
           </ul>
         </Field>
@@ -603,9 +606,11 @@ function VerifyStep(props: { endpoint: ChatEndpoint; onSaved: (next: ChatEndpoin
   }));
   return (
     <div class="ch-step-body">
-      <p class="cx-note">
-        Paperclip is waiting for {name()} to call its address. Save the address in {name()}'s settings (and, for Slack, save the manifest), then check
-        again. This page checks every few seconds.
+      <p class="cx-note info-line">
+        <span>
+          Waiting for {name()} to call Paperclip's address. Save it in {name()}'s settings (for Slack, save the manifest), then Verify.
+        </span>
+        <InfoTip label="About verifying">This page checks again every few seconds.</InfoTip>
       </p>
       <CopyValue label="Paperclip webhook address" value={props.endpoint.setup?.webhookUrl} />
       <Show when={props.endpoint.setup?.webhookVerifiedAt}>

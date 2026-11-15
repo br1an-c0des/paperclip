@@ -208,7 +208,7 @@ describe("StatusPage", () => {
     mount("/TES/status/c1?tab=settings");
     const name = await screen.findByLabelText("Name");
     fireEvent.input(name, { target: { value: "Glance" } });
-    fireEvent.click(screen.getByLabelText(/On a schedule/));
+    fireEvent.click(screen.getByRole("radio", { name: "On a schedule" }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
       expect(api.patch).toHaveBeenCalledWith("c1", expect.objectContaining({ title: "Glance", titlePinned: true, agentId: "a1", refreshPolicy: expect.objectContaining({ mode: "interval", intervalMinutes: 15 }) })),
