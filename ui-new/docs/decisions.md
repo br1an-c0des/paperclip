@@ -1825,6 +1825,14 @@ Both are handled in `ui-new` for now.
     (decision H: hover-only text may only repeat what's visible).
   - New UI follows this from now on (CLAUDE.md, "UI text"). Existing help text moves over in an
     app-wide sweep (build plan, M7 progress, "Open: help text behind info icons").
+  - **The sweep (approved Nov 14):** the audit
+    [audit/info-tip-sweep.md](audit/info-tip-sweep.md) lists 972 help texts (392 move, 396 stay,
+    104 split, 54 rewrites, 26 removals). Its judgement calls J1–J18 stand, with two changes from
+    the user: settings the server saves but ignores (an agent's heartbeat Cooldown, a workspace's
+    Setup command) keep their controls with visible text saying the server doesn't use them yet
+    (not hidden, as J9 proposed); and the six suspected errors in J18 are checked against the
+    server and corrected only when confirmed. Step 0 (shared `info` props) lands first, then five
+    area agents.
 
 ### 53. Requests are routed to a person
 
