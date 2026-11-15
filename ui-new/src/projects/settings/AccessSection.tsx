@@ -19,7 +19,7 @@ import { SettingsCard, SettingsRow } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { pushToast } from "@/ui/Toast";
 import { addableMembers, isOwnerMember, isStarred, membershipState, visibilityChange, type Candidate } from "./settings-model";
-import { CardNote, failure, useProjectSaver } from "./shared";
+import { failure, saveNote, useProjectSaver } from "./shared";
 
 /*
  * Visibility and members (board 10's second card). An open project is visible to everyone in the
@@ -64,13 +64,13 @@ export function AccessSection(props: { project: Project }) {
     <>
       <SettingsCard
         title="Visibility and members"
-        description={
-          <CardNote state={saver.state()} error={saver.error()}>
-            Who can see this project and its tasks.
-          </CardNote>
-        }
+        info="Who can see this project and its tasks."
+        description={saveNote(saver.state(), saver.error())}
       >
-        <SettingsRow label="Visibility">
+        <SettingsRow
+          label="Visibility"
+          info={`Open: everyone in ${company().name} can find it, and tasks made private keep their own access. Private: only its members can find it and read its tasks, and a task can still be shared directly.`}
+        >
           <div class="ps-choices" role="radiogroup" aria-label="Visibility">
             <button type="button" role="radio" class="ps-choice" aria-checked={!isPrivate()} disabled={!canManage()} onClick={() => pick("open")}>
               <span class="ps-radio" aria-hidden="true" />
@@ -78,7 +78,7 @@ export function AccessSection(props: { project: Project }) {
                 <b>
                   <Globe size={14} aria-hidden="true" /> Open
                 </b>
-                <span class="ps-choice-help">Everyone in {company().name} can find it. Tasks made private keep their own access.</span>
+
               </span>
             </button>
             <button type="button" role="radio" class="ps-choice" aria-checked={isPrivate()} disabled={!canManage()} onClick={() => pick("private")}>
@@ -87,7 +87,7 @@ export function AccessSection(props: { project: Project }) {
                 <b>
                   <Lock size={14} aria-hidden="true" /> Private
                 </b>
-                <span class="ps-choice-help">Only its members can find it and read its tasks. A task can still be shared directly.</span>
+
               </span>
             </button>
           </div>
@@ -96,7 +96,7 @@ export function AccessSection(props: { project: Project }) {
           </Show>
         </SettingsRow>
         <Show when={isPrivate()}>
-          <SettingsRow label="Members" help="People and agents who can see this private project.">
+          <SettingsRow label="Members" info="People and agents who can see this private project.">
             <Members project={props.project} canManage={canManage()} />
           </SettingsRow>
         </Show>
@@ -289,7 +289,7 @@ function YourMembership(props: { project: Project; youId: string | null }) {
   const membership = useMembership(() => props.project);
   return (
     <>
-      <SettingsRow label="In your sidebar" help="Joining is personal. It only decides whether the project shows in your sidebar.">
+      <SettingsRow label="In your sidebar" info="Joining is personal. It only decides whether the project shows in your sidebar.">
         <div class="ps-inline ps-inline--spread">
           <span class="ps-muted-line">{membership.state() === "left" ? "You've left this project." : "You've joined this project."}</span>
           <Button size="compact" disabled={!membership.loaded() || membership.pending()} onClick={() => membership.set({ state: membership.state() === "left" ? "joined" : "left" })}>
@@ -297,7 +297,7 @@ function YourMembership(props: { project: Project; youId: string | null }) {
           </Button>
         </div>
       </SettingsRow>
-      <SettingsRow label="Starred" help="Starred projects are pinned for you.">
+      <SettingsRow label="Starred" info="Starred projects are pinned for you.">
         <div class="ps-inline ps-inline--spread">
           <span class="ps-muted-line">{membership.starred() ? "You've starred this project." : "Not starred."}</span>
           <Button

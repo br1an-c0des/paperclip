@@ -681,12 +681,14 @@ function Inbox(props: { tab: InboxTab; base: string }) {
             </div>
             <Show when={aging().length > 0}>
               <section class="ibx-group ibx-aging" aria-label={agingLabel(aging())}>
-                <button type="button" class="ibx-fold" aria-expanded={agingOpen()} aria-controls="ibx-aging-rows" onClick={() => setAgingOpen((open) => !open)}>
-                  <ChevronRight size={15} aria-hidden="true" class="ibx-fold-icon" />
-                  <span class="ibx-sub">{agingLabel(aging())}</span>
-                  <span class="ibx-sub-count">{aging().length}</span>
-                  <span class="ibx-note">Gone quiet. Keep one to bring it back.</span>
-                </button>
+                <div class="info-line">
+                  <button type="button" class="ibx-fold" aria-expanded={agingOpen()} aria-controls="ibx-aging-rows" onClick={() => setAgingOpen((open) => !open)}>
+                    <ChevronRight size={15} aria-hidden="true" class="ibx-fold-icon" />
+                    <span class="ibx-sub">{agingLabel(aging())}</span>
+                    <span class="ibx-sub-count">{aging().length}</span>
+                  </button>
+                  <InfoTip label="About requests gone quiet">Requests with no activity for a while. Keep one to bring it back.</InfoTip>
+                </div>
                 <Show when={agingOpen()}>
                   <ul class="ibx-rows" id="ibx-aging-rows" aria-label={agingLabel(aging())}>
                     <For each={aging()}>
@@ -701,7 +703,8 @@ function Inbox(props: { tab: InboxTab; base: string }) {
 
         <Match when={props.tab === "alerts"}>
           <div class="ibx-bar">
-            <span class="ibx-note">Failed runs, budget alerts, agent errors and stuck blockers, most urgent first</span>
+            <span class="ibx-note">Most urgent first</span>
+            <InfoTip label="About Alerts">Failed runs, budget alerts, agent errors and stuck blockers.</InfoTip>
             {searchNote(alerts().length)}
             <KeyHints keys={[["j k", "move"], ["y", "clear"], ["s", "snooze"], ["enter", "open the task"]]} />
           </div>
@@ -732,6 +735,7 @@ function Inbox(props: { tab: InboxTab; base: string }) {
               {unreadIds().length ? `${unreadIds().length} unread` : "All caught up"}
               {seen.known ? ` · you last looked ${lastLookedLabel(seen.at())}` : ""}
             </span>
+            <InfoTip label="About Updates">Tasks you create, comment on or are assigned show up here.</InfoTip>
             {searchNote(tasks().length)}
             <Show when={unreadIds().length > 0}>
               <Button size="compact" onClick={() => inbox.markRead(unreadIds())}>
@@ -751,7 +755,7 @@ function Inbox(props: { tab: InboxTab; base: string }) {
               <Show
                 when={updateGroups().length > 0}
                 fallback={
-                  <p class="ibx-empty card">{terms().length ? "None of your tasks match the search." : "No tasks yet. Tasks you create, comment on or are assigned show up here."}</p>
+                  <p class="ibx-empty card">{terms().length ? "None of your tasks match the search." : "No tasks yet."}</p>
                 }
               >
                 <For each={updateGroups()}>

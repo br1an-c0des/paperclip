@@ -146,7 +146,7 @@ const WORK_MODES = [
 ] as const;
 
 const WORKSPACES: { value: Exclude<WorkspaceMode, "reuse_existing">; label: string; description: string }[] = [
-  { value: "shared_workspace", label: "Shared workspace", description: "The project's main checkout" },
+  { value: "shared_workspace", label: "Shared workspace", description: "The project's primary workspace, shared with other tasks" },
   { value: "isolated_workspace", label: "New worktree", description: "A fresh branch just for this task" },
 ];
 

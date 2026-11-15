@@ -12,6 +12,8 @@ import { approvalTitle, requestFromApproval } from "@/requests/request-model";
 import { useTaskPeople } from "@/tasks/people";
 import { stampLabel } from "@/tasks/thread-model";
 import { Button, buttonClass } from "@/ui/Button";
+import { InfoHeading } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { PageHeader } from "@/ui/PageHeader";
 import { Capsule, TaskStatusCapsule } from "@/ui/Status";
 import { STATUS_META } from "@/ui/status-meta";
@@ -190,8 +192,12 @@ function FollowUps(props: { approval: Approval }) {
         <Show when={follow().resubmit}>
           <div class="apv-follow-row">
             <div>
-              <b>Changes were requested</b>
-              <p>The agent resubmits once it has made them. If it already has, or you've sorted it out together, mark it resubmitted.</p>
+              <span class="info-line">
+                <b>Changes were requested</b>
+                <InfoTip label="About requested changes">
+                  The agent resubmits once it has made the changes. If it already has, or you've sorted it out together, mark it resubmitted.
+                </InfoTip>
+              </span>
             </div>
             <Button size="compact" icon={<Undo2 size={14} aria-hidden="true" />} disabled={resubmit.isPending} onClick={() => resubmit.mutate()}>
               Mark resubmitted
@@ -255,9 +261,9 @@ function LinkedTasks(props: { approval: Approval; tasks: { id: string; identifie
   const company = useCompany();
   return (
     <section class="card apv-tasks" aria-labelledby="apv-tasks-h">
-      <h2 id="apv-tasks-h" class="apv-h">
+      <InfoHeading level={2} id="apv-tasks-h" class="apv-h" info="Linked tasks stay open until the requesting agent follows up and closes them.">
         Linked tasks
-      </h2>
+      </InfoHeading>
       <Show when={!props.loading} fallback={<p class="muted">Loading…</p>}>
         <Show when={(props.tasks ?? []).length > 0} fallback={<p class="muted">No tasks are linked to this approval.</p>}>
           <ul class="apv-task-list">
@@ -275,7 +281,7 @@ function LinkedTasks(props: { approval: Approval; tasks: { id: string; identifie
               )}
             </For>
           </ul>
-          <p class="apv-hint">Linked tasks stay open until the requesting agent follows up and closes them.</p>
+
         </Show>
       </Show>
     </section>

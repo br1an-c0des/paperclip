@@ -13,6 +13,7 @@ import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { OrgHeader } from "@/org/OrgHeader";
 import { Button } from "@/ui/Button";
+import { InfoTip } from "@/ui/InfoTip";
 import { Segmented } from "@/ui/Segmented";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
@@ -125,14 +126,16 @@ export function WorkspacesPage() {
       </Show>
       <div class="ws-toolbar">
         <Segmented label="Show" options={VIEWS} value={view()} onChange={setView} />
+        <InfoTip label="About workspaces">
+          A task's first run sets up its workspace, following its project's workspace settings. A closed workspace reopens from its task: a new message or resuming
+          the task reopens it.
+        </InfoTip>
         <Show when={overview.data}>
           <span class="ws-muted">
             {total()} workspace{total() === 1 ? "" : "s"}
           </span>
         </Show>
-        <Show when={view() === "closed"}>
-          <span class="ws-muted ws-toolbar-note">A closed workspace reopens from its task: a new message or resuming the task reopens it.</span>
-        </Show>
+
       </div>
       <Show when={focusNote()}>
         {(note) => (
@@ -153,7 +156,7 @@ export function WorkspacesPage() {
         </Match>
         <Match when={groups().length === 0}>
           <div class="ws-empty card">
-            <p>{view() === "open" ? "No open workspaces. A task's first run sets one up, following its project's workspace settings." : "No closed workspaces."}</p>
+            <p>{view() === "open" ? "No open workspaces." : "No closed workspaces."}</p>
           </div>
         </Match>
         <Match when={true}>

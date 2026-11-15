@@ -20,6 +20,7 @@ import type { useTaskList } from "@/tasks/TasksView";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Menu } from "@/ui/Menu";
 import { Capsule, TaskStatusCapsule } from "@/ui/Status";
 import { Switch } from "@/ui/Switch";
@@ -245,7 +246,9 @@ export function RecurringView(props: { projectId?: string; tasks: TaskListQuery 
                     when={search()}
                     fallback={
                       <>
-                        <p>No recurring tasks yet. A task can repeat on a schedule, or each time a webhook arrives.</p>
+                        <p>
+                          No recurring tasks yet. <InfoTip label="About recurring tasks">A task can repeat on a schedule, or each time a webhook arrives.</InfoTip>
+                        </p>
                         <Button size="compact" onClick={newRecurring}>
                           New recurring task
                         </Button>

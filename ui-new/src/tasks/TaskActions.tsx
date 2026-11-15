@@ -219,11 +219,7 @@ export function TaskActions(props: {
         </Menu.Trigger>
         <Menu.Content label="Task actions" width={250}>
           <Show when={isPrivate()}>
-            <Menu.Item
-              icon={<Users size={15} />}
-              description={canManage() ? "Share it, or take access back" : undefined}
-              onSelect={() => setShareOpen(true)}
-            >
+            <Menu.Item icon={<Users size={15} />} onSelect={() => setShareOpen(true)}>
               Who can see it…
             </Menu.Item>
             <Menu.Separator />

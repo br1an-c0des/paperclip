@@ -123,7 +123,7 @@ export function GoalsSection(props: { project: Project }) {
   return (
     <SettingsCard
       title="Goals"
-      description="Why this project exists. A task in the project gets its first goal unless you pick another, and agents read the goal with the task."
+      info="Why this project exists. A task in the project gets its first goal unless you pick another, and agents read the goal with the task."
       footer={
         <>
           <Button size="compact" icon={<Plus size={14} aria-hidden="true" />} disabled={busy() || editing() === "new"} onClick={() => setEditing("new")}>
@@ -182,7 +182,7 @@ export function GoalsSection(props: { project: Project }) {
           <GoalForm goalId={null} project={props.project} initial={withParent(emptyGoalDraft(), null)} busy={busy()} submitLabel="Add goal" onCancel={() => setEditing(null)} onSubmit={(draft) => void create(draft)} />
         </Show>
         <Show when={!goals.isPending && list().open.length === 0 && editing() !== "new"}>
-          <p class="ps-list-note">No goals yet. Add one to say why the project exists, or link one the company already has.</p>
+          <p class="ps-list-note">No goals yet.</p>
         </Show>
         <Show when={list().archived.length > 0}>
           <button type="button" class="ps-disclosure" aria-expanded={showArchived()} onClick={() => setShowArchived(!showArchived())}>
@@ -371,7 +371,7 @@ function GoalForm(props: {
             {parent() ? `Under ${parent()!.title}` : "No parent goal"}
           </Menu.Trigger>
           <Menu.Content label="Parent goal" width={300}>
-            <Menu.Item onSelect={() => setDraft("parentId", null)} hint={draft.parentId ? undefined : <Check size={14} />} description="A top-level goal">
+            <Menu.Item onSelect={() => setDraft("parentId", null)} hint={draft.parentId ? undefined : <Check size={14} />}>
               No parent goal
             </Menu.Item>
             <Menu.Separator />

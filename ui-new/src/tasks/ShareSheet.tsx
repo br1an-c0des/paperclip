@@ -108,7 +108,7 @@ export function ShareSheet(props: { task: Issue; open: boolean; canManage: boole
         open={props.open}
         onOpenChange={close}
         title="Who can see this task"
-        description="Sharing gives access to this task and its subtasks: comments, documents and run history. Its parent and the tasks beside it need their own access."
+        info="Sharing gives access to this task and its subtasks, with their comments, documents and run history. Its parent and the tasks beside it need their own access."
         width={480}
         footer={
           <Show

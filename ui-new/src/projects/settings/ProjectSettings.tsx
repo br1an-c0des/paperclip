@@ -61,7 +61,7 @@ export function ProjectSettings(props: { project: Project; base: string; rest: s
             <GitAuthorizationSection project={props.project} />
           </Match>
           <Match when={section() === "environment"}>
-            <EnvironmentSection project={props.project} base={settingsBase()} />
+            <EnvironmentSection project={props.project} />
           </Match>
           <Match when={section() === "budget"}>
             <BudgetSection project={props.project} />

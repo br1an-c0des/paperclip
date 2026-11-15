@@ -9,6 +9,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
+import { InfoTip } from "@/ui/InfoTip";
 import { Segmented } from "@/ui/Segmented";
 import { TaskStatusCapsule } from "@/ui/Status";
 import { STATUS_META } from "@/ui/status-meta";
@@ -335,7 +336,7 @@ function CaseBody(props: { kase: CaseDetail; taskId: string; linkRole: IssueCase
               Fields
             </h4>
             <span class="tcase-muted">{fields().length}</span>
-            <span class="tcase-muted tcase-part-end">Kept up to date by the agents</span>
+            <InfoTip label="About Fields">Kept up to date by the agents.</InfoTip>
           </div>
           <dl class="tcase-kv">
             <For each={fields()}>
@@ -463,7 +464,9 @@ function CaseBody(props: { kase: CaseDetail; taskId: string; linkRole: IssueCase
             when={(children.data ?? []).length > 0}
             fallback={
               <Show when={children.isSuccess}>
-                <div class="tcase-row tcase-row--note">No child cases. Agents add one when part of the work can be checked on its own.</div>
+                <div class="tcase-row tcase-row--note">
+                  No child cases. <InfoTip label="About child cases">Agents add a child case when part of the work can be checked on its own.</InfoTip>
+                </div>
               </Show>
             }
           >

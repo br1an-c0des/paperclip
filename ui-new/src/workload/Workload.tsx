@@ -8,6 +8,8 @@ import { useTaskPeople } from "@/tasks/people";
 import { useTaskUpdates } from "@/tasks/task-updates";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
+import { InfoHeading } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Popover } from "@/ui/Popover";
 import { Segmented } from "@/ui/Segmented";
 import { Capsule, PriorityBars } from "@/ui/Status";
@@ -125,8 +127,8 @@ export function WorkloadView(props: { scope: WorkloadScope; tasks: () => readonl
   const states = createMemo(() => (range() === "today" ? null : agentStates(data.input(), roster())));
 
   const rangeSub = () => {
-    if (range() === "today") return props.scope.kind === "project" ? `Runs, schedules and blocked time for agents on ${props.scopeName}` : "Every agent in the company, coloured by project";
-    return range() === "week" ? "How busy each agent was, in 4-hour blocks from midnight" : "How busy each agent was, day by day";
+    if (range() === "today") return props.scope.kind === "project" ? `Runs, schedules and blocked time for agents on ${props.scopeName}.` : "Every agent in the company, coloured by project.";
+    return range() === "week" ? "How busy each agent was, in 4-hour blocks from midnight." : "How busy each agent was, day by day.";
   };
 
   return (
@@ -135,19 +137,22 @@ export function WorkloadView(props: { scope: WorkloadScope; tasks: () => readonl
       <div class="card wl-top">
         <section class="wl-top-col" aria-labelledby="wl-chains-h">
           <div class="wl-head">
-            <h2 id="wl-chains-h" class="disp">
+            <InfoHeading level={2} id="wl-chains-h" class="disp" info="Follow a chain to find what's holding work up.">
               Who's waiting on whom
-            </h2>
-            <span class="wl-sub">Follow a chain to find what's holding work up</span>
+            </InfoHeading>
           </div>
           <Chains chains={chains()} ready={data.ready()} agentById={agentById()} />
         </section>
         <section class="wl-top-col wl-top-col--load" aria-labelledby="wl-load-h">
           <div class="wl-head">
-            <h2 id="wl-load-h" class="disp">
+            <InfoHeading
+              level={2}
+              id="wl-load-h"
+              class="disp"
+              info={props.scope.kind === "project" ? "Open tasks assigned to each agent in this project." : "Open tasks assigned to each agent, by project."}
+            >
               Open work
-            </h2>
-            <span class="wl-sub">{props.scope.kind === "project" ? "Tasks assigned in this project" : "Tasks assigned, by project"}</span>
+            </InfoHeading>
             <Show when={tip()}>{(found) => <SuggestionPill suggestion={found()} agentById={agentById()} findTask={(id) => props.tasks()?.find((task) => task.id === id)} />}</Show>
           </div>
           <OpenWork rows={work().rows} legend={work().key} agentById={agentById()} ready={data.ready()} />
@@ -156,11 +161,10 @@ export function WorkloadView(props: { scope: WorkloadScope; tasks: () => readonl
 
       <section class="card wl-lanes" aria-labelledby="wl-lanes-h">
         <div class="wl-lanes-head">
-          <h2 id="wl-lanes-h" class="disp">
+          <InfoHeading level={2} id="wl-lanes-h" class="disp" info={rangeSub()} infoLabel={`About ${RANGE_TITLE[range()]}`}>
             {RANGE_TITLE[range()]}
-          </h2>
+          </InfoHeading>
           <Segmented label="Range" options={RANGES} value={range()} onChange={(value) => setParams({ range: value === "today" ? undefined : value }, { replace: true })} />
-          <span class="wl-sub">{rangeSub()}</span>
           <div class="wl-legend">
             <Show when={today()}>
               {(found) => (
@@ -408,6 +412,7 @@ function SuggestionPill(props: {
                 <Clock size={12} aria-hidden="true" />
                 Only a hint
               </span>
+              <InfoTip label="About this hint">Worked out from open tasks and recent runs.</InfoTip>
               <Popover.Close class="rq-menu" aria-label="Close">
                 <X size={14} aria-hidden="true" />
               </Popover.Close>
@@ -418,7 +423,6 @@ function SuggestionPill(props: {
               </span>
               <b>Paperclip</b>
               <span>suggests a change</span>
-              <span>· worked out from open tasks and recent runs</span>
             </div>
             <h3 class="disp">{props.suggestion.title}</h3>
             <p class="wl-tip-body">{props.suggestion.body}</p>

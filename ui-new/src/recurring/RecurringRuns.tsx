@@ -33,13 +33,13 @@ import { readNote } from "@/lib/offline/read-state";
  * open one, or failed with the reason. A run an agent's run started through the webhook says
  * which, and opens that run in the run modal. A filter for all runs, the ones that made a task,
  * and the ones that didn't. Run now takes the inputs and who to assign (`POST /routines/:id/run`), and, as
- * the old Run now dialog does, where the run works: the project's checkout, a new worktree or another
+ * the old Run now dialog does, where the run works: the project's primary workspace, a new worktree or another
  * task's (when the instance and the project have execution workspaces on), and the environment
  * (when the instance has environments on). Routines don't store these, so each run picks them.
  */
 
 const WORKSPACES: { value: Exclude<WorkspaceMode, "reuse_existing">; label: string; description: string }[] = [
-  { value: "shared_workspace", label: "Shared workspace", description: "The project's main checkout" },
+  { value: "shared_workspace", label: "Shared workspace", description: "The project's primary workspace, shared with other tasks" },
   { value: "isolated_workspace", label: "New worktree", description: "A fresh branch just for this run" },
 ];
 

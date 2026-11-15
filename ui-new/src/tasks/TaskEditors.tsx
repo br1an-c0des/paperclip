@@ -12,6 +12,7 @@ import { ConfirmDialog } from "@/documents/ConfirmDialog";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { TextArea, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Markdown } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
 import { Popover } from "@/ui/Popover";
@@ -45,6 +46,16 @@ import { useTaskUpdates } from "./task-updates";
 import { outsideLineage, useTaskLineage } from "./workspace-lineage";
 import { readNote } from "@/lib/offline/read-state";
 import "./TaskEditors.css";
+
+/** A small heading for a popover with no visible title, with its "i" (InfoTip.tsx) beside it. */
+export function PopHead(props: { title: string; info: string }) {
+  return (
+    <div class="te-pop-head">
+      <span>{props.title}</span>
+      <InfoTip label={`About ${props.title}`}>{props.info}</InfoTip>
+    </div>
+  );
+}
 
 /*
  * The editable parts of the Details section (board 2): the title, the description with an edit
@@ -409,7 +420,10 @@ function RunSettings(props: { task: Issue; agent: Agent; onChange: ChangeTask })
         <Popover.Content label="Model and effort for this task" width={440} hideClose>
           <div class="te-run">
             <div role="radiogroup" aria-label="Model" class="te-radios te-radios--models">
-              <div class="mh">Model</div>
+              <div class="mh info-line">
+                <span>Model</span>
+                <InfoTip label="About model and effort">For this task only. The agent keeps its own settings.</InfoTip>
+              </div>
               <button type="button" class="te-radio" role="radio" aria-checked={current().model === null} onClick={() => set({ model: null })}>
                 <span>Agent default</span>
                 <small>{defaults().model ? label(defaults().model!) : "Its own setting"}</small>
@@ -445,13 +459,13 @@ function RunSettings(props: { task: Issue; agent: Agent; onChange: ChangeTask })
               <Switch
                 checked={current().chrome}
                 label="Browser access"
-                description="Claude can use Chrome on this task (--chrome)."
+                info="Claude can use Chrome on this task (--chrome)."
                 onChange={(on) => set({ chrome: on })}
               />
             </div>
           </Show>
           <div class="te-pop-foot">
-            <span class="te-hint">For this task only. The agent keeps its own settings.</span>
+
             <Show when={overridden()}>
               <Button variant="quiet" size="compact" onClick={() => props.onChange({ assigneeAdapterOverrides: null })}>
                 Use the agent's settings
@@ -542,19 +556,19 @@ export function ReviewControl(props: { task: Issue; people: TaskPeople; onChange
             {caret()}
           </Popover.Trigger>
           <Popover.Content label="Review and approval" width={340} hideClose>
-            <div class="te-stage-tabs" role="group" aria-label="Stage">
-              <button type="button" aria-pressed={tab() === "review"} onClick={() => setTab("review")}>
-                Reviewers{reviewers().length > 0 ? ` · ${reviewers().length}` : ""}
-              </button>
-              <button type="button" aria-pressed={tab() === "approval"} onClick={() => setTab("approval")}>
-                Approvers{approvers().length > 0 ? ` · ${approvers().length}` : ""}
-              </button>
+            <div class="te-stage-row">
+              <div class="te-stage-tabs" role="group" aria-label="Stage">
+                <button type="button" aria-pressed={tab() === "review"} onClick={() => setTab("review")}>
+                  Reviewers{reviewers().length > 0 ? ` · ${reviewers().length}` : ""}
+                </button>
+                <button type="button" aria-pressed={tab() === "approval"} onClick={() => setTab("approval")}>
+                  Approvers{approvers().length > 0 ? ` · ${approvers().length}` : ""}
+                </button>
+              </div>
+              <InfoTip label={tab() === "review" ? "About Reviewers" : "About Approvers"}>
+                {tab() === "review" ? "When the task is done, one of these reviews it first." : "After any review, one of these approves it before it closes."}
+              </InfoTip>
             </div>
-            <p class="te-note">
-              {tab() === "review"
-                ? "When the task is done, one of these reviews it first."
-                : "After any review, one of these approves it before it closes."}
-            </p>
             <div class="te-list">
               <TextInput type="search" aria-label="Find a person or agent" placeholder="Find a person or agent" value={query()} onInput={(event) => setQuery(event.currentTarget.value)} />
               <button type="button" class="te-option" role="checkbox" aria-checked={keys().length === 0} onClick={clear}>
@@ -757,8 +771,8 @@ export function BillingControl(props: { task: Issue; onChange: ChangeTask }) {
             save();
           }}
         >
+          <PopHead title="Billing code" info="Costs of this task's runs are reported under this code." />
           <TextInput aria-label="Billing code" placeholder="Such as OPS-12" value={draft()} onInput={(event) => setDraft(event.currentTarget.value)} autofocus />
-          <p class="te-note">Costs of this task's runs are reported under this code.</p>
           <div class="te-pop-foot">
             <Button variant="quiet" size="compact" onClick={() => setOpen(false)}>
               Cancel

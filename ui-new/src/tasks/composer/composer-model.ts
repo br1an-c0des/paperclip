@@ -183,6 +183,6 @@ export const WORK_MODES: { value: IssueWorkMode; label: string; description: str
 export function placeholderFor(mode: IssueWorkMode, assigneeName: string | null) {
   const name = assigneeName ?? "the agent";
   if (mode === "planning") return `Plan with ${name}. Shapes the plan, no code changes`;
-  if (mode === "ask") return `Ask ${name} a question. Read-only, nothing runs`;
+  if (mode === "ask") return `Ask ${name} a question. It answers without changing anything`;
   return "Comment, or @mention an agent, person or task";
 }

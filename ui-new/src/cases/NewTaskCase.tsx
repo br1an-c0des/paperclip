@@ -74,7 +74,6 @@ export function NewTaskCase(props: { value: CaseChoice; onChange: (patch: Partia
           checked={props.value.startCase}
           onChange={(on) => props.onChange({ startCase: on })}
           label="Start a case"
-          description={props.value.startCase ? "The assignee sets up a case with this task as its main task." : undefined}
         />
         <InfoTip
           label="About Start a case"
@@ -88,7 +87,7 @@ export function NewTaskCase(props: { value: CaseChoice; onChange: (patch: Partia
               <ChevronDown size={13} aria-hidden="true" />
             </Menu.Trigger>
             <Menu.Content label="Add to case" width={320}>
-              <Menu.Item onSelect={() => props.onChange({ addToCase: null })} description="Just a task" hint={props.value.addToCase ? undefined : <Check size={14} />}>
+              <Menu.Item onSelect={() => props.onChange({ addToCase: null })} hint={props.value.addToCase ? undefined : <Check size={14} />}>
                 No case
               </Menu.Item>
               <Menu.Separator />

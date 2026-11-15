@@ -9,6 +9,7 @@ import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Field, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { failureText, useRefreshSkills } from "./queries";
@@ -53,7 +54,9 @@ export function SkillSources(props: { sourceId: string | null }) {
   return (
     <section class="act-section" aria-label="Skill sources">
       <div class="act-toolbar">
-        <span class="org-muted">Repositories the library imports skills from. Their skills stay in step with the branch you pick.</span>
+        <InfoTip label="About sources">
+          Repositories the library imports skills from. With automatic updates on, their skills follow the branch you pick; otherwise use Sync now.
+        </InfoTip>
         <div class="act-toolbar-end">
           <Button variant="primary" size="compact" icon={<Plus size={14} stroke-width={2.2} aria-hidden="true" />} onClick={() => setAdding(true)}>
             Add a source
@@ -305,7 +308,7 @@ function AddSourceDialog(props: { open: boolean; onOpenChange: (open: boolean) =
       onOpenChange={close}
       width={640}
       title="Add a source"
-      description="A GitHub repository with skills in it (folders with a SKILL.md). Paperclip reads it, then imports the skills you pick."
+      info="A GitHub repository with skills in it (folders with a SKILL.md). Paperclip reads it, then imports the skills you pick."
       footer={
         <div class="org-dialog-foot">
           <Button variant="quiet" onClick={() => close(false)} disabled={scanning() || importing()}>
@@ -331,7 +334,7 @@ function AddSourceDialog(props: { open: boolean; onOpenChange: (open: boolean) =
           when={found()}
           fallback={
             <>
-              <Field label="Repository" for="sk-source-url" error={problem() ?? undefined} help="github.com/owner/repo, or just owner/repo.">
+              <Field label="Repository" for="sk-source-url" error={problem() ?? undefined} info="github.com/owner/repo, or just owner/repo.">
                 <TextInput
                   id="sk-source-url"
                   value={url()}
@@ -341,7 +344,7 @@ function AddSourceDialog(props: { open: boolean; onOpenChange: (open: boolean) =
                   onKeyDown={(event) => event.key === "Enter" && void scan()}
                 />
               </Field>
-              <Field label="Branch" for="sk-source-branch" help="Leave empty for the repository's default branch.">
+              <Field label="Branch" for="sk-source-branch" info="Leave empty for the repository's default branch.">
                 <TextInput id="sk-source-branch" value={branch()} placeholder="main" onInput={(event) => setBranch(event.currentTarget.value)} />
               </Field>
               <Show when={connections().length > 1}>

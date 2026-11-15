@@ -70,7 +70,7 @@ export function ImportDialog(props: { open: boolean; onOpenChange: (open: boolea
       onOpenChange={close}
       width={560}
       title="Import from a path or URL"
-      description="A folder with a SKILL.md, or a repository with several. Paperclip copies the skills in; to keep a repository's skills up to date, add it under Sources."
+      info="A folder with a SKILL.md, or a repository with several. Paperclip copies the skills in; to keep a repository's skills up to date, add it under Sources."
       footer={
         <div class="org-dialog-foot">
           <Button variant="quiet" onClick={() => close(false)} disabled={busy()}>
@@ -87,7 +87,7 @@ export function ImportDialog(props: { open: boolean; onOpenChange: (open: boolea
           label="Path or address"
           for="sk-import-from"
           error={problem() ?? error() ?? undefined}
-          help="Examples: /home/me/skills/review, github.com/owner/repo/tree/main/skills/review, owner/repo, https://skills.sh/…"
+          info="Examples: /home/me/skills/review, github.com/owner/repo/tree/main/skills/review, owner/repo, https://skills.sh/…"
         >
           <TextInput
             id="sk-import-from"
@@ -249,7 +249,7 @@ export function ScanProjectsDialog(props: { open: boolean; onOpenChange: (open: 
       onOpenChange={close}
       width={680}
       title={project() && step() !== "pick" ? `Skills in ${project()!.name}` : "Scan a project for skills"}
-      description="Skill folders (with a SKILL.md) in a project's workspaces. Imported skills keep reading the workspace's files."
+      info="Skill folders (with a SKILL.md) in a project's workspaces. Imported skills keep reading the workspace's files."
       footer={footer()}
     >
       <div class="sk-form">

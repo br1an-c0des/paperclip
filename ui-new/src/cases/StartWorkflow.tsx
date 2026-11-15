@@ -95,7 +95,7 @@ export function StartWorkflowDialog(props: { kase: CaseSummary; open: boolean; o
           </select>
         </Field>
         <Show when={!draft().workflowId}>
-          <Field label="Workflow" for={id("text")} help="Markdown. A Mermaid stateDiagram-v2 whose states are the phase names draws the phase track.">
+          <Field label="Workflow" for={id("text")} info="Markdown. A Mermaid stateDiagram-v2 whose states are the phase names draws the phase track.">
             <TextArea id={id("text")} rows={5} value={draft().workflowText} onInput={(event) => change({ workflowText: event.currentTarget.value })} />
           </Field>
         </Show>

@@ -12,7 +12,8 @@ import { diffCounts, lineDiff } from "@/documents/document-model";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { Field, TextArea, TextInput } from "@/ui/Field";
+import { Field, InfoHeading, TextArea, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Segmented } from "@/ui/Segmented";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
@@ -255,7 +256,7 @@ export function ForkDialog(props: { open: boolean; onOpenChange: (open: boolean)
       onOpenChange={props.onOpenChange}
       width={520}
       title={`Fork ${props.skill.name}`}
-      description="An editable copy, authored here. The original keeps updating from its source; the copy doesn't."
+      info="An editable copy, authored here. The original keeps updating from its source; the copy doesn't."
       footer={
         <div class="org-dialog-foot">
           <Button variant="quiet" onClick={() => props.onOpenChange(false)} disabled={busy()}>
@@ -509,7 +510,7 @@ export function SkillSettingsDialog(props: { open: boolean; onOpenChange: (open:
       onOpenChange={props.onOpenChange}
       width={560}
       title={`${props.skill.name} settings`}
-      description="How the library shows it, and who sees it."
+
       footer={
         <div class="org-dialog-foot">
           <Show when={error()}>
@@ -540,13 +541,13 @@ export function SkillSettingsDialog(props: { open: boolean; onOpenChange: (open:
         >
           <TextInput id="sk-set-name" {...field("name")} disabled={busy() || !renamable()} />
         </Field>
-        <Field label="Description" for="sk-set-desc" help="What it's for. Agents read this to decide when to use it.">
+        <Field label="Description" for="sk-set-desc" info="What it's for. Agents read this to decide when to use it.">
           <TextArea id="sk-set-desc" rows={3} {...field("description")} />
         </Field>
-        <Field label="Tagline" for="sk-set-tagline" help={`A short line for the library. ${draft.tagline.trim().length}/120`}>
+        <Field label="Tagline" for="sk-set-tagline" info="A short line for the library." help={`${draft.tagline.trim().length}/120`}>
           <TextInput id="sk-set-tagline" {...field("tagline")} invalid={draft.tagline.trim().length > 120} />
         </Field>
-        <Field label="Categories" for="sk-set-categories" help="Separated by commas, such as engineering, review.">
+        <Field label="Categories" for="sk-set-categories" info="Separated by commas, such as engineering, review.">
           <TextInput id="sk-set-categories" {...field("categories")} />
         </Field>
         <div class="sk-form-pair">
@@ -556,10 +557,10 @@ export function SkillSettingsDialog(props: { open: boolean; onOpenChange: (open:
           <Field label="Homepage" for="sk-set-home">
             <TextInput id="sk-set-home" type="url" placeholder="https://" {...field("homepageUrl")} />
           </Field>
-          <Field label="Icon" for="sk-set-icon" help="An image address.">
+          <Field label="Icon" for="sk-set-icon">
             <TextInput id="sk-set-icon" type="url" placeholder="https://" {...field("iconUrl")} />
           </Field>
-          <Field label="Colour" for="sk-set-color" help="Any CSS colour, such as #6f5cf6.">
+          <Field label="Colour" for="sk-set-color" info="Any CSS colour, such as #6f5cf6.">
             <div class="org-row">
               <Show when={draft.color.trim()}>
                 <span class="sk-swatch" style={{ background: draft.color.trim() }} aria-hidden="true" />
@@ -570,9 +571,11 @@ export function SkillSettingsDialog(props: { open: boolean; onOpenChange: (open:
         </div>
         <Show when={!props.skill.accessSourceId} fallback={<p class="org-muted">It came with a project's repository, so only that project's agents see it.</p>}>
           <div class="field-stack">
-            <span class="field-label">Who sees it</span>
+            <span class="info-line">
+              <span class="field-label">Who sees it</span>
+              <InfoTip label="About Who sees it">{SHARING_OPTIONS.map((option) => `${option.label}: ${option.help}`).join(" ")}</InfoTip>
+            </span>
             <Segmented label="Who sees it" options={SHARING_OPTIONS} value={draft.sharingScope} onChange={(value) => setDraft("sharingScope", value)} />
-            <span class="fhelp">{SHARING_OPTIONS.find((option) => option.value === draft.sharingScope)?.help}</span>
           </div>
         </Show>
       </div>
@@ -613,16 +616,16 @@ export function AuditBlock(props: { skill: Pick<CompanySkillDetail, "id" | "name
   return (
     <section class="sk-block" aria-labelledby="sk-audit-h">
       <div class="sk-versions-head">
-        <h3 class="sk-block-head" id="sk-audit-h">
+        <InfoHeading level={3} class="sk-block-head" id="sk-audit-h" info="The check scans the skill's files for scripts, executables and links outside the skill.">
           Safety check
-        </h3>
+        </InfoHeading>
         <button type="button" class="act-linkish" disabled={busy()} onClick={() => void run()}>
           {busy() ? "Checking…" : "Check now"}
         </button>
       </div>
       <Show
         when={verdict()}
-        fallback={<p class="org-muted">{error() ?? (status.isPending ? "Loading…" : "Not checked yet. The check scans its files for scripts, executables and links outside the skill.")}</p>}
+        fallback={<p class="org-muted">{error() ?? (status.isPending ? "Loading…" : "Not checked yet.")}</p>}
       >
         {(current) => (
           <>

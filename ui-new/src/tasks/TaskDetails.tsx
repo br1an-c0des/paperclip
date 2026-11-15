@@ -35,6 +35,7 @@ import { useNow } from "@/lib/clock";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery, useLiveRunsQuery } from "@/lib/company-data";
+import { InfoTip } from "@/ui/InfoTip";
 import { Capsule, RunningPill } from "@/ui/Status";
 import { WaitingPill } from "@/runs/QueueWait";
 import { shownTaskRun, waitingTasks } from "@/runs/queue-wait";
@@ -283,9 +284,10 @@ export function TaskDetails(props: {
       empty: (current) => !(current.requestDepth > 0),
       value: () => (
         <Show when={t().requestDepth > 0} fallback={<span class="td-muted">The first request</span>}>
-          <span class="td-inline" title="How many delegations deep this task is: a request made by another agent's request, and so on.">
+          <span class="td-inline">
             <span class="mono">{t().requestDepth}</span>
             <span class="td-muted">delegation{t().requestDepth === 1 ? "" : "s"} from the first request</span>
+            <InfoTip label="About Depth">How many delegations deep this task is: a request made by another agent's request, and so on.</InfoTip>
           </span>
         </Show>
       ),

@@ -10,7 +10,8 @@ import { MarkdownEditor } from "@/documents/MarkdownEditor";
 import { useCompany } from "@/lib/company";
 import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { Field, TextArea, TextInput } from "@/ui/Field";
+import { Field, InfoHeading, TextArea, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { failureText, useRefreshSkills, useSkillDetail, useSkillList, useSkillVersions } from "./queries";
@@ -53,7 +54,7 @@ export function StudioHome() {
   return (
     <section class="act-section" aria-label="Studio">
       <div class="act-toolbar">
-        <span class="org-muted">Skills written here. Bundled and imported skills are read-only; their source keeps them up to date.</span>
+        <InfoTip label="About the Studio">Skills written here. Bundled and imported skills open read-only here; fork one for a copy you can edit.</InfoTip>
         <div class="act-toolbar-end">
           <A class={buttonClass({ variant: "primary", size: "compact" })} href={`${base()}/studio/new`}>
             <Plus size={14} stroke-width={2.2} aria-hidden="true" />
@@ -124,10 +125,14 @@ export function NewSkill() {
   return (
     <section class="card sk-new" aria-labelledby="sk-new-h">
       <header class="chead">
-        <h3 class="disp" id="sk-new-h">
+        <InfoHeading
+          level={3}
+          class="disp"
+          id="sk-new-h"
+          info="A skill is a folder of instructions (SKILL.md) and any files they refer to. Once it exists, turn it on for agents in their Skills settings."
+        >
           New skill
-        </h3>
-        <p>A skill is a folder of instructions (SKILL.md) and any files they refer to. Once it exists, turn it on for agents in their Skills settings.</p>
+        </InfoHeading>
       </header>
       <div class="sk-form">
         <Field label="Name" for="sk-name" error={tried() && problem() ? problem()! : undefined}>
@@ -139,7 +144,7 @@ export function NewSkill() {
             onInput={(event) => patch({ name: event.currentTarget.value, ...(slugEdited() ? {} : { slug: slugFor(event.currentTarget.value) }) })}
           />
         </Field>
-        <Field label="Slug" for="sk-slug" help="The skill's folder name, which agents see.">
+        <Field label="Slug" for="sk-slug" info="The skill's folder name, which agents see.">
           <TextInput
             id="sk-slug"
             class="mono"
@@ -151,10 +156,10 @@ export function NewSkill() {
             }}
           />
         </Field>
-        <Field label="Description" for="sk-desc" help="When agents should use it. Agents read this to decide.">
+        <Field label="Description" for="sk-desc" info="When agents should use it. Agents read this to decide.">
           <TextArea id="sk-desc" rows={3} value={draft().description} onInput={(event) => patch({ description: event.currentTarget.value })} />
         </Field>
-        <Field label="Categories" for="sk-cats" help="Optional, separated by commas.">
+        <Field label="Categories" for="sk-cats" info="Optional, separated by commas.">
           <TextInput id="sk-cats" value={draft().categories} placeholder="Writing, Docs" onInput={(event) => patch({ categories: event.currentTarget.value })} />
         </Field>
         <Show when={error()}>
@@ -575,7 +580,7 @@ function NewFileDialog(props: { open: boolean; onOpenChange: (open: boolean) => 
       onOpenChange={props.onOpenChange}
       width={460}
       title="New file"
-      description="It's saved with the skill when you first save it."
+      info="It's saved with the skill when you first save it."
       footer={
         <div class="org-dialog-foot">
           <Button variant="quiet" onClick={() => props.onOpenChange(false)}>
@@ -587,7 +592,7 @@ function NewFileDialog(props: { open: boolean; onOpenChange: (open: boolean) => 
         </div>
       }
     >
-      <Field label="Path" for="sk-file-path" help="Relative to the skill's folder, like references/style.md." error={tried() && problem() ? problem()! : undefined}>
+      <Field label="Path" for="sk-file-path" info="Relative to the skill's folder, like references/style.md." error={tried() && problem() ? problem()! : undefined}>
         <TextInput id="sk-file-path" class="mono" value={value()} placeholder="references/notes.md" onInput={(event) => setValue(event.currentTarget.value)} onKeyDown={(event) => event.key === "Enter" && submit()} />
       </Field>
     </Dialog>
@@ -621,7 +626,7 @@ function SaveVersionDialog(props: { open: boolean; onOpenChange: (open: boolean)
       onOpenChange={props.onOpenChange}
       width={460}
       title="Save version"
-      description="Names the skill's files as they are now, so agents can be pinned to it and you can come back to it."
+      info="Names the skill's files as they are now, so agents can be pinned to it and you can come back to it."
       footer={
         <div class="org-dialog-foot">
           <Button variant="quiet" onClick={() => props.onOpenChange(false)} disabled={busy()}>
@@ -636,7 +641,7 @@ function SaveVersionDialog(props: { open: boolean; onOpenChange: (open: boolean)
       <Show when={props.dirty}>
         <p class="sk-warning">The open file has unsaved changes; they aren't part of the version until you save the file.</p>
       </Show>
-      <Field label="Label" for="sk-version-label" help="Optional, like “Adds the style guide”.">
+      <Field label="Label" for="sk-version-label" info="Optional, like “Adds the style guide”.">
         <TextInput id="sk-version-label" value={label()} onInput={(event) => setLabel(event.currentTarget.value)} onKeyDown={(event) => event.key === "Enter" && void save()} />
       </Field>
     </Dialog>

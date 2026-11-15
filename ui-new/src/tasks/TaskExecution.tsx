@@ -12,7 +12,7 @@ import { Popover } from "@/ui/Popover";
 import { pushToast } from "@/ui/Toast";
 import type { TaskPeople } from "./people";
 import { boardMonitor, toDateTimeLocal, withMonitor } from "./review-stages";
-import type { ChangeTask } from "./TaskEditors";
+import { PopHead, type ChangeTask } from "./TaskEditors";
 
 /*
  * The execution properties of the Details section (board 2's "watchdog, monitor, scheduled retry"),
@@ -126,7 +126,7 @@ export function WatchdogControl(props: {
         </Popover.Trigger>
         <Popover.Content label="Watchdog" width={380} hideClose>
           <div class="te-form">
-            <p class="te-note">An agent that watches this task and steps in to keep it moving.</p>
+            <PopHead title="Watchdog" info="An agent that watches this task and steps in to keep it moving." />
             <div class="te-list te-list--short" role="radiogroup" aria-label="Watchdog agent">
               <For each={props.people.assignableAgents()}>
                 {(candidate) => (
@@ -244,7 +244,7 @@ export function MonitorControl(props: { task: Issue; onChange: ChangeTask }) {
             if (monitor) set(monitor);
           }}
         >
-          <p class="te-note">Have the agent re-check this task at a set time, such as when an outside service should be done.</p>
+          <PopHead title="Monitor" info="Has the agent re-check this task at a set time, such as when an outside service should be done." />
           <Show when={waitsForRun()}>
             <p class="te-note" role="status">
               {MONITOR_RUN_WAIT_HINT} Scheduled for {dateTime(nextCheckAt()!)}.

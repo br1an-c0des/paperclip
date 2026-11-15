@@ -99,7 +99,7 @@ function SaveViewDialog(props: { open: boolean; onOpenChange: (open: boolean) =>
         props.onOpenChange(open);
       }}
       title="Save view"
-      description="Keeps this list's grouping, filters, sort and search under a name, in this browser."
+      info="Keeps this list's grouping, filters, sort and search under a name, in this browser only."
       width={440}
       hideClose
       initialFocus={() => input}

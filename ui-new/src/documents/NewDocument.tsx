@@ -4,6 +4,7 @@ import { createSignal, Show } from "solid-js";
 import { documentsApi } from "@/api/documents";
 import { Button } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { classifySaveError, draftProblem, isDirty, isPlanKey, keyProblem, newDraft, slugifyKey, upsertPayload, type Draft } from "./document-model";
 import { documentKeys, type DocumentHost } from "./host";
@@ -58,7 +59,8 @@ export function NewDocument(props: {
       class="tf dv"
       aria-label="New document"
       onKeyDown={(event) => {
-        if (event.key === "Escape" && !event.defaultPrevented) {
+        // Escape on an "i" button closes its tip, not the new document.
+        if (event.key === "Escape" && !event.defaultPrevented && !(event.target as Element).closest(".infotip")) {
           event.preventDefault();
           back();
         }
@@ -87,9 +89,15 @@ export function NewDocument(props: {
                 }}
               />
             </label>
-            <label class="nd-field nd-field--key">
-              <span class="nd-label">Key</span>
+            <div class="nd-field nd-field--key">
+              <span class="info-line">
+                <label class="nd-label" for="nd-key">
+                  Key
+                </label>
+                <InfoTip label="About Key">Agents find documents by key.</InfoTip>
+              </span>
               <TextInput
+                id="nd-key"
                 class="mono"
                 value={draft().key}
                 placeholder="data-notes"
@@ -100,13 +108,13 @@ export function NewDocument(props: {
                   setDraft((value) => ({ ...value, key: event.currentTarget.value.toLowerCase() }));
                 }}
               />
-            </label>
+            </div>
           </div>
           <p id="nd-key-help" class="tsec-muted" classList={{ "nd-error": Boolean(keyIssue()) }}>
             {keyIssue() ??
               (isPlanKey(draft().key)
                 ? "The plan key makes this the task's plan."
-                : "Agents find documents by key. Lowercase letters, numbers, - and _.")}
+                : "Lowercase letters, numbers, - and _.")}
           </p>
           <MarkdownEditor
             mentions={{ excludeTaskId: props.host.owner.id }}

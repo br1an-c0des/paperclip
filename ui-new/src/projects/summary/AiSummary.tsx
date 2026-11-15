@@ -10,6 +10,7 @@ import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { useLiveEvent } from "@/lib/live-events";
 import { Button } from "@/ui/Button";
+import { InfoTip } from "@/ui/InfoTip";
 import { Markdown } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
 import { briefView, generatedAgo, isGenerating, summarizerState } from "./summary-model";
@@ -120,9 +121,8 @@ export function SummaryControls(props: { summary: AiSummary; label: string }) {
   const s = props.summary;
   return (
     <span class="ais-controls">
-      <span class="ais-chip" title="Written by the Summarizer agent">
-        AI
-      </span>
+      <span class="ais-chip">AI</span>
+      <InfoTip label="About AI summaries">Written by Paperclip's built-in Summarizer agent.</InfoTip>
       <Show when={s.canGenerate() && (s.view() || s.failed())}>
         <button
           type="button"

@@ -21,10 +21,6 @@
   flex-wrap: wrap;
 }
 
-.ws-toolbar-note {
-  flex-basis: 100%;
-}
-
 .ws-empty {
   padding: 24px;
   color: var(--body);

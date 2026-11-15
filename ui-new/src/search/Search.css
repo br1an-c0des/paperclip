@@ -186,21 +186,6 @@
   color: var(--text);
 }
 
-.sx-info {
-  display: inline-grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  color: var(--muted);
-  cursor: help;
-}
-
-.sx-info:hover,
-.sx-info:focus-visible {
-  background: var(--hover);
-  color: var(--text);
-}
 
 /* A card per kind */
 .sx-sections {
@@ -551,19 +536,6 @@
   margin-top: 14px;
 }
 
-.sx-tips {
-  margin: 0;
-  padding-left: 18px;
-  color: var(--body);
-  line-height: 1.7;
-}
-
-.sx-tips code {
-  padding: 1px 5px;
-  border-radius: 6px;
-  background: var(--code);
-  font-size: 12.5px;
-}
 
 /* Narrow: the Filter menu alone narrows tasks; the facet column goes */
 @container main (max-width: 860px) {

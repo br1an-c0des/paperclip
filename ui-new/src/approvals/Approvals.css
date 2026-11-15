@@ -211,11 +211,6 @@
   font-weight: 600;
 }
 
-.apv-hint {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
 
 .apv-history {
   padding: 10px 12px;
