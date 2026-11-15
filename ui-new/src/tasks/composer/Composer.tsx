@@ -12,6 +12,7 @@ import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { sendOrQueue, useOptionalWriteQueue } from "@/lib/offline/WriteQueueProvider";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
+import { InfoTip } from "@/ui/InfoTip";
 import { Menu } from "@/ui/Menu";
 import { Popover } from "@/ui/Popover";
 import { pushToast } from "@/ui/Toast";
@@ -726,7 +727,10 @@ function AssigneePicker(props: {
           <Show when={overridable()}>
             <div class="cmp-who-run">
               <div role="radiogroup" aria-label="Model" class="cmp-radios">
-                <div class="mh">Model</div>
+                <div class="mh info-line">
+                  <span>Model</span>
+                  <InfoTip label="About model and effort">Applies to this task's next runs.</InfoTip>
+                </div>
                 <button type="button" class="cmp-radio" role="radio" aria-checked={shown().model === null} onClick={() => props.onRunSettings({ ...shown(), model: null })}>
                   <span>Agent default</span>
                   <small>{defaults().model ?? "Its own setting"}</small>
@@ -755,7 +759,7 @@ function AssigneePicker(props: {
                   </For>
                 </div>
               </Show>
-              <p class="cmp-who-note">Applies to this task's next runs.</p>
+
             </div>
           </Show>
         </div>

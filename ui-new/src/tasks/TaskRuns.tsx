@@ -13,6 +13,7 @@ import { AgentQueueLine } from "@/runs/QueueWait";
 import { RunWatchdog } from "@/runs/RunWatchdog";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
+import { InfoHeading } from "@/ui/Field";
 import { pushToast } from "@/ui/Toast";
 import { useTaskPeople } from "./people";
 import { canStopRun, stopLabel, stopRun } from "./run-stop";
@@ -174,7 +175,9 @@ export function TaskRuns(props: { taskId: string }) {
   return (
     <section class="tr" aria-label="Runs">
       <div class="tsec-head">
-        <h2 class="disp">Runs</h2>
+        <InfoHeading level={2} class="disp" info="Assigning the task to an agent starts a run.">
+          Runs
+        </InfoHeading>
       </div>
       <div class="tsec-scroll">
         <Show when={cost.data}>
@@ -212,7 +215,7 @@ export function TaskRuns(props: { taskId: string }) {
             <p class="tsec-muted">This task's runs couldn't be loaded: {(runs.error as Error).message}</p>
           </Match>
           <Match when={ordered().length === 0}>
-            <p class="tsec-muted">No runs yet. Assigning the task to an agent starts one.</p>
+            <p class="tsec-muted">No runs yet.</p>
           </Match>
           <Match when={true}>
             <ol class="card tr-list">

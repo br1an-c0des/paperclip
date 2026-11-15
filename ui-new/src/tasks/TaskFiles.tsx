@@ -50,7 +50,7 @@ import { fileSize } from "@/files/preview";
 import { viewport } from "@/layout/breakpoints";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
-import { TextInput } from "@/ui/Field";
+import { InfoHeading, TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
@@ -418,7 +418,7 @@ export function TaskFiles(props: {
                     </FileGroup>
                   </Show>
                   <Show when={show("outputs")}>
-                    <FileGroup title="Outputs" count={made().length} empty="Nothing produced yet: pull requests, branches and previews from runs show here.">
+                    <FileGroup title="Outputs" info="Pull requests, branches and previews from runs." count={made().length} empty="Nothing produced yet.">
                       <div class="tf-outputs">
                         <For each={made()}>
                           {(output) => (
@@ -479,13 +479,13 @@ export function TaskFiles(props: {
   );
 }
 
-function FileGroup(props: { title: string; count: number; empty: string; tools?: JSX.Element; children: JSX.Element }) {
+function FileGroup(props: { title: string; info?: string; count: number; empty: string; tools?: JSX.Element; children: JSX.Element }) {
   return (
     <section class="tf-group" aria-label={props.title}>
       <div class="tf-group-head">
-        <h3 class="tf-group-title">
+        <InfoHeading level={3} class="tf-group-title" info={props.info} infoLabel={`About ${props.title}`}>
           {props.title} <span class="tsec-muted">{props.count}</span>
-        </h3>
+        </InfoHeading>
         <Show when={props.tools}>
           <div class="tf-group-tools">{props.tools}</div>
         </Show>

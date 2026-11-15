@@ -7,6 +7,7 @@ import { instanceSettingsApi } from "@/api/instance-settings";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
 import { Button } from "@/ui/Button";
+import { InfoHeading } from "@/ui/Field";
 import { pushToast } from "@/ui/Toast";
 import { WorkspacePlugins } from "@/plugins/WorkspacePlugins";
 import { isActiveService, runtimeControls, type RuntimeControl } from "@/workspaces/runtime-commands";
@@ -196,7 +197,9 @@ export function TaskWorkspace(props: { taskId: string }) {
   return (
     <section class="tw" aria-label="Workspace">
       <div class="tsec-head">
-        <h2 class="disp">Workspace</h2>
+        <InfoHeading level={2} class="disp" info="A task's first run sets up its workspace, following the project's workspace settings.">
+          Workspace
+        </InfoHeading>
       </div>
       <div class="tsec-scroll">
         <Switch>
@@ -204,7 +207,7 @@ export function TaskWorkspace(props: { taskId: string }) {
             <p class="tsec-muted">Loading…</p>
           </Match>
           <Match when={workspaceId() === null}>
-            <p class="tsec-muted">This task hasn't run in a workspace yet. Its first run sets one up, following the project's workspace settings.</p>
+            <p class="tsec-muted">This task hasn't run in a workspace yet.</p>
           </Match>
           <Match when={workspace.isError}>
             <p class="tsec-muted">The workspace couldn't be loaded: {(workspace.error as Error).message}</p>

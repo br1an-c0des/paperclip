@@ -894,7 +894,6 @@ function FilterMenu(props: {
           </Menu.CheckboxItem>
           <Menu.CheckboxItem
             icon={<Repeat size={14} aria-hidden="true" />}
-            description="Started by a recurring task"
             checked={props.filters.routineOnly}
             onChange={() => props.onChange({ routineOnly: !props.filters.routineOnly })}
           >

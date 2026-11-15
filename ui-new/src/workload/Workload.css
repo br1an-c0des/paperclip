@@ -47,14 +47,6 @@
   white-space: nowrap;
 }
 
-.wl-sub {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-  font-size: 13px;
-}
 
 .wl-push {
   margin-left: auto;

@@ -397,10 +397,6 @@
   gap: 8px;
 }
 
-.tcase-part-end {
-  margin-left: auto;
-  font-size: 12px;
-}
 
 /* Fields: key and value rows */
 .tcase-kv {

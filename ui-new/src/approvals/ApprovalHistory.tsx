@@ -7,6 +7,7 @@ import { useCompany } from "@/lib/company";
 import { approvalTitle } from "@/requests/request-model";
 import { useTaskPeople } from "@/tasks/people";
 import { stampLabel } from "@/tasks/thread-model";
+import { InfoTip } from "@/ui/InfoTip";
 import { HeaderNumber, PageHeader } from "@/ui/PageHeader";
 import { Capsule } from "@/ui/Status";
 import { approvalStatus, isOpenApproval, sortApprovals } from "./approval-model";
@@ -37,6 +38,7 @@ export function ApprovalHistory() {
       <PageHeader
         crumbs={<span>{company().name}</span>}
         title="Approvals"
+        titleAside={<InfoTip label="About Approvals">When an agent asks for an approval, it shows up in the Inbox to answer.</InfoTip>}
         numbers={
           <Show when={list.data}>
             <HeaderNumber value={open()} label="open" tone={open() > 0 ? "amber" : undefined} />
@@ -58,7 +60,7 @@ export function ApprovalHistory() {
             <p role="alert">Couldn't load approvals: {(list.error as Error).message}</p>
           </Match>
           <Match when={rows().length === 0}>
-            <p class="muted">No approvals yet. When an agent asks for one, it shows up in the Inbox.</p>
+            <p class="muted">No approvals yet.</p>
           </Match>
           <Match when={rows().length > 0}>
             <ul class="apv-rows">

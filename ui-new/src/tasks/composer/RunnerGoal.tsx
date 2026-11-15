@@ -278,7 +278,7 @@ function GoalDialogView(props: { control: RunnerGoalControl }) {
         if (!open && !c.pending()) c.setDialog(null);
       }}
       title={replacing() ? "Replace the goal?" : "Edit the goal"}
-      description={replacing() ? "This clears the unfinished goal and starts a new one with the objective below." : "Change the objective. The goal keeps its progress."}
+      description={replacing() ? "This clears the unfinished goal and starts a new one with the objective below." : "The goal keeps its progress."}
       width={560}
       hideClose
       footer={
@@ -299,7 +299,7 @@ function GoalDialogView(props: { control: RunnerGoalControl }) {
           void c.submitDialog();
         }}
       >
-        <Field label="Objective" for="rg-objective" help={`What the agent keeps working toward, up to ${MAX_OBJECTIVE.toLocaleString()} characters.`}>
+        <Field label="Objective" for="rg-objective" info="What the agent keeps working toward." help={`Up to ${MAX_OBJECTIVE.toLocaleString()} characters.`}>
           <TextArea
             id="rg-objective"
             rows={5}

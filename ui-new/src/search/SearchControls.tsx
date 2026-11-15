@@ -1,5 +1,5 @@
 import type { CompanySearchFilterOptionCounts, CompanySearchSort, IssueLabel, Project } from "@paperclipai/shared";
-import { Check, ChevronDown, Info, ListFilter, X } from "lucide-solid";
+import { Check, ChevronDown, ListFilter, X } from "lucide-solid";
 import { createMemo, For, Match, Show, Switch, type JSX } from "solid-js";
 import { LabelDot } from "@/tasks/pickers";
 import { PRIORITY_ORDER } from "@/tasks/list-model";
@@ -9,7 +9,7 @@ import { Button } from "@/ui/Button";
 import { Menu } from "@/ui/Menu";
 import { PriorityBars, StatusCapsule } from "@/ui/Status";
 import { STATUS_META, STATUS_ORDER } from "@/ui/status-meta";
-import { Tooltip } from "@/ui/Tooltip";
+import { InfoTip } from "@/ui/InfoTip";
 import {
   assigneeName,
   isFilterOn,
@@ -47,15 +47,7 @@ export function FilterChips(props: { chips: FilterChip[]; onRemove: (dimension: 
 }
 
 export function TypedFiltersTip() {
-  return (
-    <Tooltip content="Or type them in the search box, like status:blocked, assignee:me or updated:7d.">
-      {(trigger) => (
-        <button {...trigger} type="button" class="sx-info" aria-label="Filters can also be typed, like status:blocked, assignee:me or updated:7d">
-          <Info size={15} aria-hidden="true" />
-        </button>
-      )}
-    </Tooltip>
-  );
+  return <InfoTip label="About typed filters">Filters can also be typed in the search box, like status:blocked, assignee:me or updated:7d.</InfoTip>;
 }
 
 const count = (value: number | undefined) => (value ? String(value) : undefined);

@@ -14,6 +14,7 @@ import { hasOpenDialog, isTextInputTarget } from "@/lib/shortcuts";
 import { useChatIndex } from "@/chat/chat-index";
 import { useTaskPeople, type TaskPeople } from "@/tasks/people";
 import { Button } from "@/ui/Button";
+import { InfoTip } from "@/ui/InfoTip";
 import {
   EMPTY_FILTERS,
   filterChips,
@@ -361,10 +362,15 @@ export function SearchPage() {
             </For>
           </nav>
           <span class="sx-in">In {company().name}</span>
+          <InfoTip label="About search">
+            Searches task titles, descriptions, comments and documents, files, agents and projects. A task ID such as <code class="mono">{company().issuePrefix}-12</code>{" "}
+            and Enter opens that task. Filters can be typed, like <code class="mono">status:blocked</code>, <code class="mono">assignee:me</code>,{" "}
+            <code class="mono">is:open</code> or <code class="mono">updated:7d</code>, and quotes match a phrase exactly.
+          </InfoTip>
         </div>
       </header>
 
-      <Show when={searching()} fallback={<SearchIdle recent={recent()} onPick={(q) => go({ q })} prefix={company().issuePrefix} />}>
+      <Show when={searching()} fallback={<SearchIdle recent={recent()} onPick={(q) => go({ q })} />}>
         <div class="sx-grid" classList={{ "sx-grid--facets": filterable() }}>
           <div class="sx-col">
             <div class="sx-tools">
@@ -587,11 +593,14 @@ function NoResults(props: {
   );
 }
 
-/** Before anything is typed: recent searches and what's searched (phone board M14's "recent"). */
-function SearchIdle(props: { recent: string[]; onPick: (q: string) => void; prefix: string }) {
+/**
+ * Before anything is typed: recent searches (phone board M14's "recent"), or nothing. What's searched
+ * is in the "About search" tip beside the scopes.
+ */
+function SearchIdle(props: { recent: string[]; onPick: (q: string) => void }) {
   return (
-    <section class="card sx-idle" aria-label="Search tips">
-      <Show when={props.recent.length > 0}>
+    <Show when={props.recent.length > 0}>
+      <section class="card sx-idle" aria-label="Recent searches">
         <h2 class="lbl">Recent searches</h2>
         <div class="sx-recent">
           <For each={props.recent}>
@@ -603,19 +612,7 @@ function SearchIdle(props: { recent: string[]; onPick: (q: string) => void; pref
             )}
           </For>
         </div>
-      </Show>
-      <h2 class="lbl">What's searched</h2>
-      <ul class="sx-tips">
-        <li>Task titles, descriptions, comments and documents; files; agents; projects.</li>
-        <li>
-          A task ID such as <code class="mono">{props.prefix}-12</code> and Enter opens that task.
-        </li>
-        <li>
-          Filters can be typed: <code class="mono">status:blocked</code>, <code class="mono">assignee:me</code>,{" "}
-          <code class="mono">is:open</code>, <code class="mono">updated:7d</code>.
-        </li>
-        <li>Quotes match a phrase exactly.</li>
-      </ul>
-    </section>
+      </section>
+    </Show>
   );
 }

@@ -4,6 +4,7 @@ import { GitBranch } from "lucide-solid";
 import { For, Show } from "solid-js";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
+import { InfoTip } from "@/ui/InfoTip";
 import type { TaskPeople } from "./people";
 import { StatusChip } from "./TaskDetails";
 import { stampLabel } from "./thread-model";
@@ -65,9 +66,8 @@ function Decomposition(props: {
           Plan {revision()} · {made()} of {requested()} subtask{requested() === 1 ? "" : "s"} made
         </span>
         <Show when={done() && requested() > 0}>
-          <span class="td-muted" title="Splitting the same plan again reuses these subtasks instead of making new ones.">
-            · repeat-safe
-          </span>
+          <span class="td-muted">· repeat-safe</span>
+          <InfoTip label="About repeat-safe">Splitting the same plan again reuses these subtasks instead of making new ones.</InfoTip>
         </Show>
       </div>
       <span class="td-muted">

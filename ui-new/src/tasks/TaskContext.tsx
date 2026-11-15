@@ -8,6 +8,7 @@ import { useLiveRunsQuery } from "@/lib/company-data";
 import { describeError } from "@/lib/offline/errors";
 import { agoLabel } from "@/runs/run-model";
 import { Button } from "@/ui/Button";
+import { InfoTip } from "@/ui/InfoTip";
 import { Popover } from "@/ui/Popover";
 import { pushToast } from "@/ui/Toast";
 import {
@@ -223,9 +224,16 @@ export function ContextCard(props: { context: TaskContext }) {
                   >
                     {compact().status === "pending" ? "Compacting…" : "Compact now"}
                   </Button>
-                  <p class="ctx-muted" role={compact().status === "unavailable" ? "note" : undefined}>
-                    {compact().note}
-                  </p>
+                  <Show
+                    when={compact().status === "available"}
+                    fallback={
+                      <p class="ctx-muted" role={compact().status === "unavailable" ? "note" : undefined}>
+                        {compact().note}
+                      </p>
+                    }
+                  >
+                    <InfoTip label="About Compact now">{compact().note}</InfoTip>
+                  </Show>
                 </div>
               )}
             </Show>
