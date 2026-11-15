@@ -842,7 +842,7 @@ function Inputs(props: { routine: RoutineDetail; save: Save }) {
           text="Inputs fill the placeholders in the title and description, like {{exchanges}}. A run uses these defaults unless Run now, a webhook or an API call sends its own. Add one by writing a new placeholder in the text."
         />
       </div>
-      <Show when={props.routine.variables.length > 0 || builtIns().length > 0} fallback={<p class="rpn-muted">No inputs. Write a placeholder like {"{{date}}"} or {"{{region}}"} in the title or description to add one.</p>}>
+      <Show when={props.routine.variables.length > 0 || builtIns().length > 0} fallback={<p class="rpn-muted">No inputs.</p>}>
         <ul class="rpn-inputs" aria-label="Inputs">
           <For each={builtIns()}>
             {(name) => (
@@ -995,8 +995,11 @@ function Secrets(props: { routine: RoutineDetail; save: Save }) {
           <Popover.Trigger class="btn btn--icon btn--ghost btn--compact" aria-label="Add a secret">
             <Plus size={15} aria-hidden="true" />
           </Popover.Trigger>
-          <Popover.Content title="Add a secret" width={340}>
-            <p class="rpn-muted rpn-popover-note">Each run gets it as an environment variable, over the project's and the agent's.</p>
+          <Popover.Content label="Add a secret" width={340}>
+            <div class="info-line rpn-popover-head">
+              <h2 class="popover-title">Add a secret</h2>
+              <InfoTip label="About secrets" text="Each run gets it as an environment variable, over the project's and the agent's." />
+            </div>
             <TextInput aria-label="Variable name" placeholder="Variable name, like DERIBIT_API_KEY" class="mono" value={name()} onInput={(event) => setName(event.currentTarget.value)} />
             <div class="rpn-secret-list" role="listbox" aria-label="Company secrets">
               <Branch>
@@ -1066,7 +1069,7 @@ function RunPolicy(props: { routine: RoutineDetail; save: Save }) {
               <For each={Object.entries(CATCH_UP_LABEL)}>
                 {([value, label]) => (
                   <Menu.Item
-                    description={value === "skip_missed" ? "Runs the server missed while it was down are dropped" : "Missed runs catch up, a few at most"}
+                    description={value === "skip_missed" ? "Missed runs are dropped" : "Missed runs are made up, up to 25"}
                     hint={value === props.routine.catchUpPolicy ? <Check size={14} /> : undefined}
                     onSelect={() => void props.save({ catchUpPolicy: value }, "Couldn't change the policy")}
                   >

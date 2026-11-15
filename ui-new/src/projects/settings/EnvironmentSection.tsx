@@ -1,5 +1,5 @@
 import type { Project } from "@paperclipai/shared";
-import { A } from "@solidjs/router";
+
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Check, KeyRound, Plus, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
@@ -13,7 +13,7 @@ import { Menu } from "@/ui/Menu";
 import { Popover } from "@/ui/Popover";
 import { pushToast } from "@/ui/Toast";
 import { envDirty, envFromRows, envProblem, envRows, newEnvRow, type EnvRow, type EnvRowKind } from "./settings-model";
-import { CardNote, failure, FootError, useProjectSaver } from "./shared";
+import { failure, FootError, saveNote, useProjectSaver } from "./shared";
 
 /*
  * Environment (board 10, `section` = environment): the variables every run in the project gets
@@ -27,7 +27,7 @@ import { CardNote, failure, FootError, useProjectSaver } from "./shared";
 
 const KIND_LABEL: Record<EnvRowKind, string> = { text: "Text", secret: "Secret", user_secret: "Personal secret" };
 
-export function EnvironmentSection(props: { project: Project; base: string }) {
+export function EnvironmentSection(props: { project: Project }) {
   const company = useCompany();
   const client = useQueryClient();
   const saver = useProjectSaver(() => props.project);
@@ -75,11 +75,8 @@ export function EnvironmentSection(props: { project: Project; base: string }) {
     <>
       <SettingsCard
         title="Environment variables"
-        description={
-          <CardNote state={saver.state()} error={saver.error()}>
-            Set for every run in this project. Secret values are never shown here.
-          </CardNote>
-        }
+        info="Set for every run in this project, over an agent's own variable with the same name. Secret values are never shown here."
+        description={saveNote(saver.state(), saver.error())}
         footer={
           <>
             <Button size="compact" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setRows(rows.length, newEnvRow())}>
@@ -176,7 +173,7 @@ export function EnvironmentSection(props: { project: Project; base: string }) {
                           )}
                         </For>
                         <Menu.Separator />
-                        <Menu.CheckboxItem checked={row.required} onChange={(value) => update(row.id, (draft) => void (draft.required = value))} description="Runs wait until the person has set it">
+                        <Menu.CheckboxItem checked={row.required} onChange={(value) => update(row.id, (draft) => void (draft.required = value))} description="Runs fail until the person sets it">
                           Required
                         </Menu.CheckboxItem>
                       </Menu.Content>
@@ -203,14 +200,8 @@ export function EnvironmentSection(props: { project: Project; base: string }) {
         </div>
       </SettingsCard>
 
-      <SettingsCard title="Execution environment" description="Where agents run this project's work.">
-        <p class="ps-list-note">
-          Runs use the environment their agent is set to, or the instance's default. A project picks one only for separate task checkouts, under{" "}
-          <A class="ps-link" href={`${props.base}/code`}>
-            Code and workspaces
-          </A>
-          .
-        </p>
+      <SettingsCard title="Execution environment" info="Where this project's runs happen.">
+        <p class="ps-list-note">A project has no run environment of its own. Runs use their agent's environment, or the instance default.</p>
       </SettingsCard>
     </>
   );

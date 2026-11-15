@@ -69,7 +69,7 @@ export function BudgetSection(props: { project: Project }) {
   return (
     <SettingsCard
       title={draft.windowKind === "lifetime" ? "Lifetime budget" : "Monthly budget"}
-      description="What agents may spend on this project. Company-wide budgets are set in Costs."
+      info="What agents may spend on this project. Company-wide budgets are set in Costs."
       footer={
         dirty() || problem() ? (
           <span class="ps-foot-end">
@@ -89,7 +89,7 @@ export function BudgetSection(props: { project: Project }) {
       <Show when={props.project.pausedAt && props.project.pauseReason === "budget"}>
         <div class="ps-banner ps-banner--red" role="status">
           <PauseCircle size={16} aria-hidden="true" />
-          This project's agent runs are paused: it reached its budget. Raise the limit to let them run again.
+          This project is paused: it reached its budget. Raising the limit resumes it.
         </div>
       </Show>
       <Show when={overview.isError}>
@@ -108,7 +108,7 @@ export function BudgetSection(props: { project: Project }) {
           onChange={(value) => setDraft("windowKind", value)}
         />
       </SettingsRow>
-      <SettingsRow label={draft.windowKind === "lifetime" ? "Limit" : "Monthly limit"} help="Leave it empty for no limit." for="ps-budget-amount">
+      <SettingsRow label={draft.windowKind === "lifetime" ? "Limit" : "Monthly limit"} info="Leave it empty for no limit." for="ps-budget-amount">
         <div class="ps-money">
           <span aria-hidden="true">$</span>
           <TextInput
@@ -171,7 +171,7 @@ export function BudgetSection(props: { project: Project }) {
               {draft.hardStop ? "Pause this project's agent runs" : "Only warn me"}
             </Menu.Trigger>
             <Menu.Content label="When the limit is reached" width={300}>
-              <Menu.Item onSelect={() => setDraft("hardStop", true)} description="New runs wait until the limit is raised" hint={draft.hardStop ? <Check size={14} /> : undefined}>
+              <Menu.Item onSelect={() => setDraft("hardStop", true)} description="Pauses it and stops its running and queued work until the limit is raised" hint={draft.hardStop ? <Check size={14} /> : undefined}>
                 Pause this project's agent runs
               </Menu.Item>
               <Menu.Item onSelect={() => setDraft("hardStop", false)} description="Runs carry on past the limit" hint={draft.hardStop ? undefined : <Check size={14} />}>

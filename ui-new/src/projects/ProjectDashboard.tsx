@@ -22,6 +22,8 @@ import { AssigneeItems } from "@/tasks/pickers";
 import type { useTaskList } from "@/tasks/TasksView";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
+import { InfoHeading } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Markdown } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
@@ -45,6 +47,7 @@ import {
   type RequestFilter,
   type StuckItem,
 } from "./dashboard-model";
+import { NO_CODE_INFO } from "./new-project";
 import { SummaryBody, SummaryControls, useAiSummary } from "./summary/AiSummary";
 import "./ProjectDashboard.css";
 
@@ -261,10 +264,9 @@ export function ProjectDashboard(props: { project: Project; tasks: Tasks; base: 
 
       <section class="card pd-stuck" aria-labelledby="pd-stuck-h">
         <div class="pd-section-head">
-          <h2 id="pd-stuck-h" class="disp">
+          <InfoHeading level={2} id="pd-stuck-h" class="disp" info="Open tasks that aren't a request but are waiting on someone.">
             Stuck work
-          </h2>
-          <span class="cap">Not a request, but waiting on someone</span>
+          </InfoHeading>
         </div>
         <Show when={props.tasks.data} fallback={<p class="pd-note">Loading tasks…</p>}>
           <ul class="pd-stuck-list">
@@ -278,13 +280,13 @@ export function ProjectDashboard(props: { project: Project; tasks: Tasks; base: 
   );
 }
 
-function Well(props: { id: string; title: string; aside?: JSX.Element; children: JSX.Element }) {
+function Well(props: { id: string; title: string; info?: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
     <section class={`pd-well pd-well--${props.id.replace(/^pd-/, "")}`} aria-labelledby={props.id}>
       <div class="pd-well-head">
-        <h2 id={props.id} class="disp">
+        <InfoHeading level={2} id={props.id} class="disp" info={props.info}>
           {props.title}
-        </h2>
+        </InfoHeading>
         {props.aside}
       </div>
       {props.children}
@@ -299,7 +301,14 @@ function Well(props: { id: string; title: string; aside?: JSX.Element; children:
 function Brief(props: { project: Project }) {
   const summary = useAiSummary(() => ({ scopeKind: "project", scopeId: props.project.id }));
   const description = () => (
-    <Show when={props.project.description?.trim()} fallback={<p class="pd-note">No description yet. Agents read it before every task; add one in Settings.</p>}>
+    <Show
+      when={props.project.description?.trim()}
+      fallback={
+        <p class="pd-note">
+          No description yet. <InfoTip label="About the project's description">Agents read the project's description before every task. Edit it in Settings.</InfoTip>
+        </p>
+      }
+    >
       {(text) => <Markdown source={text()} class="pd-brief" />}
     </Show>
   );
@@ -344,7 +353,12 @@ function Budget(props: { project: Project }) {
   );
   const loading = () => (lifetime() ? allCosts.isPending : monthCosts.isPending);
   return (
-    <Well id="pd-budget" title="Budget" aside={<span class="pd-well-aside">{view().period}</span>}>
+    <Well
+      id="pd-budget"
+      title="Budget"
+      info="A budget set in Settings warns you, or pauses the project and stops its work, when it's reached."
+      aside={<span class="pd-well-aside">{view().period}</span>}
+    >
       <Switch>
         <Match when={(lifetime() ? allCosts : monthCosts).isError}>
           <p class="pd-note">Couldn't load the spend.</p>
@@ -368,9 +382,7 @@ function Budget(props: { project: Project }) {
             </div>
           </Show>
           <Show when={view().pace}>{(pace) => <p class="pd-note">{pace()}</p>}</Show>
-          <Show when={view().limitCents === null}>
-            <p class="pd-note">Set a monthly budget in Settings to stop work before it overspends.</p>
-          </Show>
+
         </Match>
       </Switch>
     </Well>
@@ -417,7 +429,9 @@ function CodeWell(props: { project: Project; settingsHref: string }) {
           )}
         </Show>
         <Show when={view().repos.length === 0 && !view().folder}>
-          <li class="pd-note">No repository. Agents work in a folder Paperclip manages for the project.</li>
+          <li class="pd-note">
+            No repository or folder. <InfoTip label="About projects without code">{NO_CODE_INFO}</InfoTip>
+          </li>
         </Show>
         <Show when={view().checkouts.count > 0}>
           <li>

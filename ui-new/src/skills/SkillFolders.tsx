@@ -177,7 +177,7 @@ function ManageFoldersDialog(props: { open: boolean; folders: readonly FolderLis
         onOpenChange={(open) => !open && props.onClose()}
         width={480}
         title="Folders"
-        description="Your folders. Bundled skills sit in Paperclip's own folders, which can't be changed."
+        info="Bundled skills sit in Paperclip's own folders, which can't be changed."
       >
         <Show when={editable().length > 0} fallback={<p class="org-muted">No folders of your own yet.</p>}>
           <ul class="sk-folders">

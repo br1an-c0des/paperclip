@@ -312,9 +312,15 @@
   font-size: 12px;
 }
 
-.rpn-popover-note {
-  margin: 0 0 8px;
-  font-size: 13px;
+
+/* The Add a secret popover's own title, with its "i" beside it (Popover's title can't hold one). */
+.rpn-popover-head {
+  margin-bottom: 8px;
+  padding-right: 32px;
+}
+
+.rpn-popover-head .popover-title {
+  padding-right: 0;
 }
 
 .rpn-secret-list {

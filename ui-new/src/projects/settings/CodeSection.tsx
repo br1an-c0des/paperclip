@@ -14,6 +14,7 @@ import { APP_SETTINGS_PATH } from "@/settings/app/app-settings-model";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Popover } from "@/ui/Popover";
 import { Segmented } from "@/ui/Segmented";
 import { Capsule } from "@/ui/Status";
@@ -37,7 +38,7 @@ import {
   type CheckoutDraft,
   type WorkspaceDraft,
 } from "./settings-model";
-import { failure, FootError, refreshProject, SaveStatus, useProjectSaver, useSaveRunner, type SaveState } from "./shared";
+import { failure, FootError, refreshProject, saveNote, useProjectSaver, useSaveRunner } from "./shared";
 import { COMMANDS_EXAMPLE, commandEntries, commandsRequest, commandsText, parseCommands } from "./workspace-commands";
 
 /*
@@ -56,8 +57,15 @@ import { COMMANDS_EXAMPLE, commandEntries, commandsRequest, commandsText, parseC
  *   start, stop or restart their services. A workspace's commands JSON (its services and jobs,
  *   `runtimeConfig.workspaceRuntime`) is edited in the workspace's form, checked before saving
  *   (workspace-commands.ts).
- * - Task checkouts follow the instance's `enableIsolatedWorkspaces` (decision 12), and the folder
- *   paths hide under `enableManagedSandboxOnly`, as the old UI does.
+ * - Task checkouts follow the instance's `enableIsolatedWorkspaces` (decision 12), except on a
+ *   project with a workspace storage plugin, whose checkout policy the server applies even with it
+ *   off (`gateProjectExecutionWorkspacePolicy` in server/src/services/heartbeat.ts and
+ *   execution-workspaces.ts). The folder paths hide under `enableManagedSandboxOnly`, as the old UI
+ *   does.
+ * - A workspace's Setup command is saved but the server never runs it (only the checkout policy's
+ *   setup command runs, in a task's worktree), so its field says so. Its Cleanup command and
+ *   commands JSON apply to every task working from the workspace, shared or in a worktree
+ *   (server/src/routes/execution-workspaces.ts).
  * - Workspace storage is fixed when the project is created and only shown, with the environments that
  *   can use it (#20835, build plan U126). A project has no run environment of its own: runs follow
  *   the agent's default, then the instance's.
@@ -71,7 +79,10 @@ export function CodeSection(props: { project: Project }) {
     <>
       <RepositoriesCard project={props.project} hideHostPaths={hideHostPaths()} />
       <WorkspacesCard project={props.project} hideHostPaths={hideHostPaths()} />
-      <CheckoutsCard project={props.project} isolatedEnabled={experimental.data?.enableIsolatedWorkspaces === true} />
+      <CheckoutsCard
+        project={props.project}
+        isolatedEnabled={experimental.data?.enableIsolatedWorkspaces === true || Boolean(props.project.executionWorkspacePolicy?.storageProviderPluginId)}
+      />
     </>
   );
 }
@@ -291,8 +302,11 @@ function LocalFolder(props: { project: Project; hideHostPaths: boolean }) {
     <div class="ps-subrow">
       <SettingsRow
         label="Local folder"
-        info="The primary workspace's folder on the server, where agents work on the code. Without one, agents work in a copy of the workspace's repository that Paperclip keeps."
-        help={props.hideHostPaths ? "Agents check the code out in the platform's managed environment." : undefined}
+        info={
+          props.hideHostPaths
+            ? "The primary workspace's folder, where agents work on the code. On this instance agents check the code out in the platform's managed environment."
+            : "The primary workspace's folder on the server, where agents work on the code. Without one, agents work in a copy of the workspace's repository that Paperclip keeps."
+        }
       >
         <Show
           when={!props.hideHostPaths}
@@ -601,11 +615,40 @@ function WorkspaceForm(props: {
   const [commandsProblem, setCommandsProblem] = createSignal<string | null>(null);
   const [problem, setProblem] = createSignal<string | null>(null);
   const commandsId = createUniqueId();
-  const field = (key: keyof WorkspaceDraft, label: string, placeholder: string, mono = true) => (
-    <label class="ps-form-field">
-      <span class="field-label">{label}</span>
-      <TextInput class={mono ? "mono" : ""} placeholder={placeholder} spellcheck={false} value={draft[key]} onInput={(event) => setDraft(key, event.currentTarget.value)} />
-    </label>
+  const fieldId = createUniqueId();
+  const field = (key: keyof WorkspaceDraft, label: string, placeholder: string, opts: { mono?: boolean; info?: string; note?: string } = {}) => (
+    <Show
+      when={opts.info}
+      fallback={
+        <label class="ps-form-field">
+          <span class="field-label">{label}</span>
+          <TextInput class={opts.mono === false ? "" : "mono"} placeholder={placeholder} spellcheck={false} value={draft[key]} onInput={(event) => setDraft(key, event.currentTarget.value)} />
+        </label>
+      }
+    >
+      <div class="ps-form-field">
+        <span class="info-line">
+          <label class="field-label" for={`${fieldId}-${key}`}>
+            {label}
+          </label>
+          <InfoTip label={`About ${label}`}>{opts.info}</InfoTip>
+        </span>
+        <TextInput
+          id={`${fieldId}-${key}`}
+          class={opts.mono === false ? "" : "mono"}
+          placeholder={placeholder}
+          spellcheck={false}
+          aria-describedby={opts.note ? `${fieldId}-${key}-note` : undefined}
+          value={draft[key]}
+          onInput={(event) => setDraft(key, event.currentTarget.value)}
+        />
+        <Show when={opts.note}>
+          <span id={`${fieldId}-${key}-note`} class="fhelp">
+            {opts.note}
+          </span>
+        </Show>
+      </div>
+    </Show>
   );
   const submit = (event: Event) => {
     event.preventDefault();
@@ -623,25 +666,33 @@ function WorkspaceForm(props: {
   return (
     <form class="ps-goal-form ps-workspace-form" onSubmit={submit} onKeyDown={(event) => event.key === "Escape" && props.onCancel()}>
       <div class="ps-form-grid">
-        {field("name", "Name", "Optional", false)}
+        {field("name", "Name", "Optional", { mono: false })}
         <Show when={!props.hideHostPaths}>{field("cwd", "Folder on the server", "/home/you/code/project")}</Show>
         {field("repoUrl", "Repository URL", "https://github.com/org/repo")}
         {field("repoRef", "Branch or ref", "main")}
         {field("defaultRef", "Default ref", "origin/main")}
-        {field("setupCommand", "Setup command", "Runs when the workspace is set up")}
-        {field("cleanupCommand", "Cleanup command", "Runs before a task checkout is torn down")}
+        {field("setupCommand", "Setup command", "bash ./scripts/setup.sh", {
+          info: "Saved with the workspace. The setup command that runs in a task's worktree is under Task checkouts.",
+          note: "Not used by the server yet.",
+        })}
+        {field("cleanupCommand", "Cleanup command", "bash ./scripts/cleanup.sh", {
+          info: "Runs when a workspace a task used from here is closed, whether it's the shared one or a task's own worktree.",
+        })}
       </div>
       <div class="ps-commands">
-        <button type="button" class="ps-commands-toggle" aria-expanded={commandsOpen()} aria-controls={commandsId} onClick={() => setCommandsOpen(!commandsOpen())}>
-          <ChevronDown size={14} aria-hidden="true" />
-          Workspace commands (JSON)
-        </button>
+        <div class="info-line">
+          <button type="button" class="ps-commands-toggle" aria-expanded={commandsOpen()} aria-controls={commandsId} onClick={() => setCommandsOpen(!commandsOpen())}>
+            <ChevronDown size={14} aria-hidden="true" />
+            Workspace commands (JSON)
+          </button>
+          <InfoTip label="About Workspace commands">
+            The services and jobs agents can run in this workspace. Every task working from it can run them too, in the shared folder or in its own worktree, unless
+            that task's workspace has its own. Use <code>commands</code> entries with a <code>kind</code> of <code>service</code> or <code>job</code>; older{" "}
+            <code>services</code> lists still work.
+          </InfoTip>
+        </div>
         <Show when={commandsOpen()}>
           <div id={commandsId} class="ps-form-field">
-            <span class="fhelp">
-              The services and jobs agents can run here: Paperclip lists them under the workspace and task checkouts inherit them. Use <code>commands</code> entries with a{" "}
-              <code>kind</code> of <code>service</code> or <code>job</code>; older <code>services</code> lists still work. Leave it empty for none.
-            </span>
             <TextArea
               class="mono ps-commands-json"
               aria-label="Workspace commands JSON"
@@ -688,10 +739,6 @@ function WorkspaceForm(props: {
 
 // ---------------------------------------------------------------------------------------------
 
-/** A card's save status as its description, or nothing while idle (what the card is for is in its `info`). */
-function saveNote(state: SaveState, error: string | null) {
-  return state === "idle" ? undefined : <SaveStatus state={state} error={error} />;
-}
 
 function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
   const company = useCompany();
@@ -784,15 +831,17 @@ function StorageAvailabilityRow(props: { project: Project }) {
     const found = availability();
     return found.kind === "list" ? storageEnvironmentNames(options.data, found.pluginId) : [];
   });
-  const help = () => {
+  const storageInfo = () => {
     const found = availability();
-    return found.kind === "list"
-      ? `${found.storageName} workspace storage was chosen when this project was created and doesn't change.`
-      : "The workspace storage plugin this project was created with isn't installed. Storage doesn't change after creation.";
+    return found.kind === "list" ? `${found.storageName} workspace storage was chosen when this project was created and doesn't change.` : undefined;
   };
   return (
     <Show when={availability().kind !== "hidden"}>
-      <SettingsRow label="Available in" help={help()}>
+      <SettingsRow
+        label="Available in"
+        info={storageInfo()}
+        help={availability().kind === "unavailable" ? "The workspace storage plugin this project was created with isn't installed. Storage doesn't change after creation." : undefined}
+      >
         <Switch>
           <Match when={availability().kind === "unavailable"}>
             <span class="field-error" role="alert">

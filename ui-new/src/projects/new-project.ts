@@ -15,11 +15,21 @@ import type { Project, ProjectIconName, ProjectStatus } from "@paperclipai/share
  * - storage, when the company has workspace storage plugins: Core or one of them, saved as
  *   `executionWorkspacePolicy.storageProviderPluginId`. Since #19036 a project keeps the storage it
  *   was created with: left out, the server applies the one installed default (and refuses the
- *   create when several claim it), and a plugin-backed project can't move off its plugin later.
+ *   create when several claim it), and the storage can't change later in either direction, Core to
+ *   a plugin or back (409 `project_storage_locked`, server/src/services/projects.ts).
  *
  * A private project's members are added once it exists (`POST /projects/:id/access-members`); the
  * person creating it is its owner and always has access.
  */
+
+/**
+ * Where a run works when its project has no workspace (`heartbeat/workspaces.ts` in the server): the
+ * task's previous session folder if it's still there, else the agent's working folder
+ * (`adapterConfig.cwd`), else a per-task folder (`isolated-task-directory.ts`). There's no folder
+ * per project.
+ */
+export const NO_CODE_INFO =
+  "Without a workspace, a run uses its task's earlier folder if it's still there, otherwise its agent's working folder if one is set, otherwise a folder Paperclip makes for that task. There's no shared folder for the project.";
 
 export type CodeSource = "github" | "local" | "none";
 export type Member = { kind: "agent" | "user"; id: string };

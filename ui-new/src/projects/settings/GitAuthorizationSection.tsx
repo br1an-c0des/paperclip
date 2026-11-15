@@ -58,7 +58,7 @@ export function GitAuthorizationSection(props: { project: Project }) {
   return (
     <SettingsCard
       title="Background GitHub authorization"
-      description="Lets this project's workspace provider use your GitHub Connector to set up and maintain its repositories, until you revoke it."
+      info="Lets this project's workspace provider use your GitHub Connector to set up and maintain its repositories, until you revoke it."
       footer={save.error ? <FootError message={failure(save.error, "Couldn't change the authorization.")} /> : undefined}
     >
       <Switch>
@@ -73,9 +73,9 @@ export function GitAuthorizationSection(props: { project: Project }) {
         <Match when={data()}>
           {(current) => (
             <>
-              <SettingsRow label="Authorized as">
+              <SettingsRow label="Authorized as" info="Private repositories wait for an authorization before their workspaces are set up; public ones don't need one.">
                 <div class="ps-inline ps-inline--spread">
-                  <Show when={authorizedAs()} fallback={<span class="ps-muted-line">Not authorized. Private repositories wait for an authorization before their workspaces are set up; public ones don't need one.</span>}>
+                  <Show when={authorizedAs()} fallback={<span class="ps-muted-line">Not authorized.</span>}>
                     {(who) => (
                       <span class="ps-inline">
                         <ShieldCheck size={15} aria-hidden="true" />
@@ -92,7 +92,7 @@ export function GitAuthorizationSection(props: { project: Project }) {
               </SettingsRow>
               <SettingsRow
                 label={current().grantId ? "Authorize another account" : "Your GitHub account"}
-                help="Only your own accounts, connected through the Paperclip GitHub App and installed for this company."
+                info="Only your own accounts, connected through the Paperclip GitHub App and installed for this company."
               >
                 <Show
                   when={current().options.length > 0}

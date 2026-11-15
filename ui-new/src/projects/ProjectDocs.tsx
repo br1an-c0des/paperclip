@@ -12,6 +12,7 @@ import { useTaskPeople } from "@/tasks/people";
 import type { useTaskList } from "@/tasks/TasksView";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Dialog } from "@/ui/Dialog";
+import { InfoHeading } from "@/ui/Field";
 import { StatusCapsule } from "@/ui/Status";
 import { shownStatus, STATUS_META } from "@/ui/status-meta";
 import { Switch as Toggle } from "@/ui/Switch";
@@ -131,10 +132,9 @@ export function ProjectDocs(props: { project: Project; tasks: Tasks }) {
 
       <section class="pdocs-section" aria-labelledby="pdocs-project-h">
         <div class="pdocs-head">
-          <h2 id="pdocs-project-h" class="disp">
+          <InfoHeading level={2} id="pdocs-project-h" class="disp" info="Docs and files for the whole project, not tied to one task.">
             Project docs and files
-          </h2>
-          <span class="cap">Shared across the whole project, not tied to one task</span>
+          </InfoHeading>
         </div>
         <p class="pdocs-waiting">
           Projects can't hold their own documents or files yet. Until they can, everything is listed under the task it came from,

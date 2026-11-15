@@ -9,7 +9,7 @@ import { CodeView } from "@/files/CodeView";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
-import { Field, TextInput } from "@/ui/Field";
+import { Field, InfoHeading, TextInput } from "@/ui/Field";
 import { Markdown } from "@/ui/Markdown";
 import { TonePill } from "@/ui/Status";
 import { Switch as Toggle } from "@/ui/Switch";
@@ -237,8 +237,8 @@ export function SourceSettingsDialog(props: { source: SkillSource | null; onClos
       }
     >
       <div class="sk-form">
-        <Toggle checked={automatic()} onChange={setAutomatic} label="Update automatically" description="Install new commits on the branch as they land. Off, use Sync now." />
-        <Toggle checked={importNew()} onChange={setImportNew} label="Import new skills" description="Skills added to the repository later are imported too, not just offered." />
+        <Toggle checked={automatic()} onChange={setAutomatic} label="Update automatically" info="Install new commits on the branch as they land. Off, use Sync now." />
+        <Toggle checked={importNew()} onChange={setImportNew} label="Import new skills" info="Skills added to the repository later are imported too, not just offered." />
         <Show when={connections().length > 0} fallback={<Show when={repositories.isSuccess}><p class="org-muted">No GitHub connection can read it. Connect GitHub in Connections; public repositories work without one.</p></Show>}>
           <ConnectionField
             id="sk-source-connection"
@@ -248,7 +248,12 @@ export function SourceSettingsDialog(props: { source: SkillSource | null; onClos
             help={props.source?.lastError && props.source.repairAction === "connection" ? "Its last sync failed reading the repository. Pick a connection that can read it." : undefined}
           />
         </Show>
-        <Field label="Branch" for="sk-source-branch-set" help={branches.data ? `Default: ${branches.data.defaultBranch}. Pinned agent versions stay as they are.` : "HEAD follows the repository's default branch."}>
+        <Field
+          label="Branch"
+          for="sk-source-branch-set"
+          info="Pinned agent versions stay as they are. HEAD follows the repository's default branch."
+          help={branches.data ? `Default: ${branches.data.defaultBranch}.` : undefined}
+        >
           <TextInput id="sk-source-branch-set" list="sk-source-branches" value={branch()} onInput={(event) => setBranch(event.currentTarget.value)} />
           <datalist id="sk-source-branches">
             <option value="HEAD">default branch</option>
@@ -414,10 +419,9 @@ export function ProjectRepositories() {
     <Show when={groups().length > 0}>
       <section class="card act-card" aria-labelledby="sk-project-repos-h">
         <div class="org-card-row sk-pad">
-          <h2 class="disp" id="sk-project-repos-h">
+          <InfoHeading level={2} class="disp" id="sk-project-repos-h" info="Skills imported from a project's repository are seen only by that project's agents.">
             From your projects
-          </h2>
-          <span class="org-muted org-push">Skills stay limited to the project</span>
+          </InfoHeading>
         </div>
         <ul class="act-list">
           <For each={groups()}>
@@ -586,7 +590,7 @@ export function ConnectionField(props: {
   disabled?: boolean;
 }) {
   return (
-    <Field label="GitHub connection" for={props.id} help={props.help ?? "Whose access reads the repository. Manage them in Connections."}>
+    <Field label="GitHub connection" for={props.id} info="Whose access reads the repository. Manage them in Connections." help={props.help}>
       <select id={props.id} class="input" value={props.value ?? ""} disabled={props.disabled} onChange={(event) => props.onChange(event.currentTarget.value || null)}>
         <Show when={props.automatic || !props.value}>
           <option value="">{props.automatic ? "Let Paperclip choose" : "None chosen"}</option>

@@ -13,6 +13,7 @@ import { AgentAvatar } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Field, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Markdown } from "@/ui/Markdown";
 import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
@@ -69,6 +70,10 @@ export function SkillCatalog(props: { catalogId: string | null }) {
             )}
           </For>
         </div>
+        <InfoTip label="About the catalog">
+          Recommended skills cover common work; optional ones add a tool or a practice. When Paperclip ships a newer version of an installed skill, its library page
+          offers the update.
+        </InfoTip>
         <div class="act-toolbar-end">
           <label class="org-search">
             <Search size={14} aria-hidden="true" />
@@ -131,7 +136,7 @@ export function SkillCatalog(props: { catalogId: string | null }) {
           </Show>
         </Show>
       </div>
-      <p class="org-foot">Recommended skills cover common work; optional ones add a tool or a practice. Installed skills update with Paperclip.</p>
+
     </section>
   );
 }
@@ -368,7 +373,7 @@ function InstallDialog(props: { open: boolean; onOpenChange: (open: boolean) => 
       onOpenChange={props.onOpenChange}
       width={540}
       title={`Install ${props.entry.name}`}
-      description={props.installed ? "It's already in the library. Installing again brings it back to the catalog's version." : "Copies it into the library."}
+      description={props.installed ? "It's already in the library. Installing again brings it back to the catalog's version." : undefined}
       footer={
         <div class="org-dialog-foot">
           <Button variant="quiet" onClick={() => props.onOpenChange(false)} disabled={busy()}>
@@ -381,7 +386,7 @@ function InstallDialog(props: { open: boolean; onOpenChange: (open: boolean) => 
       }
     >
       <div class="sk-form">
-        <Field label="Name in the library" for="sk-install-slug" error={slugError() ?? undefined} help={`Leave empty to use ${props.entry.slug}.`}>
+        <Field label="Name in the library" for="sk-install-slug" error={slugError() ?? undefined} info={`Leave empty to use ${props.entry.slug}.`}>
           <TextInput id="sk-install-slug" value={slug()} placeholder={props.entry.slug} onInput={(event) => setSlug(event.currentTarget.value)} onBlur={() => slug().trim() && setSlug(slugFor(slug()))} />
         </Field>
         <Show when={clash() || props.installed}>

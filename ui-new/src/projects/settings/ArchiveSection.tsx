@@ -3,6 +3,7 @@ import { createSignal, Show } from "solid-js";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { SettingsCard } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { pushToast } from "@/ui/Toast";
 import { useMembership } from "./AccessSection";
 import { archivePatch } from "./settings-model";
@@ -61,10 +62,12 @@ export function ArchiveSection(props: { project: Project }) {
           </div>
           <div class="ps-danger-row">
             <div>
-              <div class="ps-danger-title">{membership.state() === "left" ? "Join project" : "Leave project"}</div>
-              <p class="ps-muted-line">
-                {membership.state() === "left" ? "Puts it back in your sidebar." : "Removes it from your sidebar. Other members aren't affected."}
-              </p>
+              <div class="info-line">
+                <div class="ps-danger-title">{membership.state() === "left" ? "Join project" : "Leave project"}</div>
+                <InfoTip label={membership.state() === "left" ? "About Join project" : "About Leave project"}>
+                  {membership.state() === "left" ? "Puts it back in your sidebar." : "Removes it from your sidebar. Other members aren't affected."}
+                </InfoTip>
+              </div>
             </div>
             <Button size="compact" disabled={!membership.loaded() || membership.pending()} onClick={() => membership.set({ state: membership.state() === "left" ? "joined" : "left" })}>
               {membership.state() === "left" ? "Join" : "Leave"}

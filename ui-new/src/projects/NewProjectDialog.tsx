@@ -40,7 +40,8 @@ import { useSession } from "@/lib/session";
 import { newId } from "@/tasks/new-task";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Dialog } from "@/ui/Dialog";
-import { TextArea, TextInput } from "@/ui/Field";
+import { InfoHeading, TextArea, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Menu } from "@/ui/Menu";
 import { Popover } from "@/ui/Popover";
 import { Segmented } from "@/ui/Segmented";
@@ -52,6 +53,7 @@ import {
   initialStorage,
   membersToAdd,
   NEW_PROJECT_STATUSES,
+  NO_CODE_INFO,
   projectProblem,
   storageCatalog,
   TILE_COLORS,
@@ -442,10 +444,9 @@ function NewProjectForm() {
 
       <section class="np-code" aria-labelledby="np-code-h">
         <div class="np-code-head">
-          <h3 id="np-code-h" class="disp">
+          <InfoHeading level={3} id="np-code-h" class="disp" info="Where the project's code comes from: GitHub repositories, a folder on the server, or none.">
             Code
-          </h3>
-          <span class="cap">Where agents check out the project's code</span>
+          </InfoHeading>
           <Segmented<CodeSource>
             label="Where the code comes from"
             value={draft.source}
@@ -479,12 +480,15 @@ function NewProjectForm() {
             </div>
           </Match>
           <Match when={draft.source === "none"}>
-            <p class="np-code-note">No code. Agents work in a folder Paperclip manages for the project, and you can add a repository later in Settings.</p>
+            <p class="np-code-note">
+              No code. You can add a repository later in Settings. <InfoTip label="About projects without code">{NO_CODE_INFO}</InfoTip>
+            </p>
           </Match>
         </Switch>
         <Show when={catalog().length > 0}>
           <div class="np-storage">
             <span class="cap">Workspace storage</span>
+            <InfoTip label="About Workspace storage">Storage is fixed when the project is created: a project can't move between Core and a plugin later.</InfoTip>
             <Menu>
               <Menu.Trigger class="nt-pill" aria-label={`Workspace storage: ${storageName()}`}>
                 <b class="np-pill-value">{storageName()}</b>
@@ -507,7 +511,7 @@ function NewProjectForm() {
                 </For>
               </Menu.Content>
             </Menu>
-            <p class="np-storage-note">A project on a storage plugin stays on it; a project on Core can move to a plugin later.</p>
+
           </div>
         </Show>
       </section>

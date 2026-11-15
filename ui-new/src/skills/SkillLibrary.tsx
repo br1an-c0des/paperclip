@@ -11,6 +11,7 @@ import { agoLabel, dayLabel } from "@/runs/run-model";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
+import { InfoTip } from "@/ui/InfoTip";
 import { Markdown } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
 import { TonePill, type Tone } from "@/ui/Status";
@@ -127,6 +128,10 @@ export function SkillLibrary(props: { skillId: string | null }) {
           options={LIBRARY_SORTS.filter((entry) => entry.value !== "name")}
           onPick={(value) => setSearch({ sort: value }, { replace: true })}
         />
+        <InfoTip label="About the library">
+          Paperclip's bundled skills update with Paperclip, and skills from a source follow it while its automatic updates are on. Other skills show an update to
+          install. Turn a skill on for an agent in the agent's Skills settings.
+        </InfoTip>
         <div class="act-toolbar-end">
           <label class="org-search">
             <Search size={14} aria-hidden="true" />
@@ -183,7 +188,7 @@ export function SkillLibrary(props: { skillId: string | null }) {
           {(skillId) => <SkillDetail skillId={skillId} closeHref={`${base()}${keep()}`} folders={folderList()} />}
         </Show>
       </div>
-      <p class="org-foot">Bundled skills update with Paperclip and imported ones with their source. Turn a skill on for an agent in the agent's Skills settings.</p>
+
     </section>
   );
 }
@@ -285,9 +290,11 @@ function SkillDetail(props: { skillId: string; closeHref: string; folders: reado
                 <Show when={isCoreSkill(skill().key)}>
                   <div class="sk-note">
                     <p>
-                      <Star size={13} aria-hidden="true" /> <b>Recommended for lead agents.</b> It's one of Paperclip's core skills: how a lead agent works with tasks, the
-                      board, plans and hiring.
-                      <Show when={skill().key === PAPERCLIP_CORE_SKILL_KEY}> Paperclip Runner agents don't need it: the Runner provides it.</Show>
+                      <Star size={13} aria-hidden="true" /> <b>Recommended for lead agents.</b>{" "}
+                      <InfoTip label="About core skills">
+                        One of Paperclip's core skills: how a lead agent works with tasks, the board, plans and hiring.
+                        <Show when={skill().key === PAPERCLIP_CORE_SKILL_KEY}> Paperclip Runner agents don't need it: the Runner provides it.</Show>
+                      </InfoTip>
                     </p>
                     <Show when={missing().length > 0}>
                       <p class="org-muted">Lead agents without it:</p>

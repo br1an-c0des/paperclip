@@ -14,7 +14,7 @@ import { Popover } from "@/ui/Popover";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { nameEdit, PROJECT_STATUS_OPTIONS, projectDescriptionEdit, projectGoalIds, targetDateEdit, targetDateValue } from "./settings-model";
-import { CardNote, useProjectSaver } from "./shared";
+import { saveNote, useProjectSaver } from "./shared";
 
 /*
  * Details (board 10's first card): name, tile color and icon, description, status, lead, decision
@@ -60,11 +60,8 @@ export function DetailsSection(props: { project: Project; base: string }) {
   return (
     <SettingsCard
       title="Details"
-      description={
-        <CardNote state={saver.state()} error={saver.error()}>
-          Changes save as you make them.
-        </CardNote>
-      }
+      info="Changes save as you make them."
+      description={saveNote(saver.state(), saver.error())}
       footer={
         <span class="ps-meta">
           Created {dateLabel(props.project.createdAt)} · Updated {dateLabel(props.project.updatedAt)}
@@ -145,7 +142,7 @@ export function DetailsSection(props: { project: Project; base: string }) {
         </div>
       </SettingsRow>
 
-      <SettingsRow label="Description" help="Agents read this as context for every task in the project." for="ps-description">
+      <SettingsRow label="Description" info="Agents read this as context for every task in the project." for="ps-description">
         <TextArea
           id="ps-description"
           rows={5}
@@ -182,7 +179,7 @@ export function DetailsSection(props: { project: Project; base: string }) {
         </Menu>
       </SettingsRow>
 
-      <SettingsRow label="Lead" help="The agent who looks after the project.">
+      <SettingsRow label="Lead" info="The agent who looks after the project.">
         <Menu>
           <Menu.Trigger
             as={FieldButton}
@@ -251,7 +248,7 @@ export function DetailsSection(props: { project: Project; base: string }) {
         </div>
       </SettingsRow>
 
-      <SettingsRow label="Goals" help="Why this project exists.">
+      <SettingsRow label="Goals" info="Why this project exists.">
         <A class="ps-goals-link" href={`${props.base}/goals`}>
           {goalCount() === 0 ? "No goals yet" : goalCount() === 1 ? "1 goal" : `${goalCount()} goals`}
           <span class="ps-link">
