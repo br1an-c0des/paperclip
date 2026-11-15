@@ -121,7 +121,7 @@ export function TelemetryCard() {
   return (
     <Show when={!query.isError} fallback={<CardNoteLine alert>Couldn't load run telemetry. {failure(query.error, "")}</CardNoteLine>}>
       <section class="card settings-card" aria-labelledby="cs-otel">
-        <CardHead id="cs-otel" title="Run telemetry" note="Send OpenTelemetry logs and traces from managed Claude Code and Codex runs to your own collector." />
+        <CardHead id="cs-otel" title="Run telemetry" info="Send OpenTelemetry logs and traces from managed Claude Code and Codex runs to your own collector." />
         <Show when={query.data} fallback={<CardNoteLine>Loading…</CardNoteLine>}>
           <Show when={query.data!.canManage} fallback={<CardNoteLine>You need permission to manage connections to set up run telemetry.</CardNoteLine>}>
             <SettingsRow label="Status">
@@ -168,7 +168,7 @@ export function TelemetryCard() {
               when={draft.provider === "otlp"}
               fallback={
                 <>
-                  <SettingsRow label="Project ID" for="cs-otel-project" help="The Braintrust project's UUID.">
+                  <SettingsRow label="Project ID" for="cs-otel-project" info="The Braintrust project's UUID.">
                     <TextInput id="cs-otel-project" class="mono" autocomplete="off" value={draft.projectId} onInput={(event) => setDraft("projectId", event.currentTarget.value)} />
                   </SettingsRow>
                   <SettingsRow label="API key" for="cs-otel-key" help="Use a key limited to telemetry ingestion: the agent's harness receives it.">
@@ -189,7 +189,7 @@ export function TelemetryCard() {
                 </>
               }
             >
-              <SettingsRow label="Endpoint" for="cs-otel-endpoint" help="OTLP over HTTP. The base URL, without /v1/logs or /v1/traces; every environment agents run in must reach it.">
+              <SettingsRow label="Endpoint" for="cs-otel-endpoint" info="OTLP over HTTP. The base URL, without /v1/logs or /v1/traces; every environment agents run in must reach it.">
                 <TextInput
                   id="cs-otel-endpoint"
                   class="mono"
@@ -199,7 +199,7 @@ export function TelemetryCard() {
                   onInput={(event) => setDraft("endpoint", event.currentTarget.value)}
                 />
               </SettingsRow>
-              <SettingsRow label="Headers" help="For your collector's authentication. Values are never shown again; the agent's harness receives them.">
+              <SettingsRow label="Headers" info="For your collector's authentication." help="Values aren't shown again, and the agent's harness receives them.">
                 <div class="cs-headers">
                   <For each={draft.headers}>
                     {(row, index) => (
@@ -240,7 +240,7 @@ export function TelemetryCard() {
                 </div>
               </SettingsRow>
             </Show>
-            <SwitchRow label="Send telemetry" help="Applies to runs that start after you save." checked={draft.enabled} onChange={(value) => setDraft("enabled", value)} />
+            <SwitchRow label="Send telemetry" info="Applies to runs that start after you save." checked={draft.enabled} onChange={(value) => setDraft("enabled", value)} />
             <SettingsRow label="What to include" help="Exported records can contain task content.">
               <div class="cs-checks">
                 <For each={CAPTURE_LABELS}>

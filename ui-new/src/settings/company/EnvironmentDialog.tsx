@@ -201,9 +201,10 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
       open={open()}
       onOpenChange={(value) => !value && props.onClose()}
       title={editing() ? `Edit ${editing()!.name}` : "New environment"}
+      info={managed() ? undefined : "A machine agents run on. Saved changes apply to later runs."}
       description={
         !managed()
-          ? "A machine agents run on. Saved changes apply to later runs."
+          ? undefined
           : editing()!.metadata?.managedByPaperclip === true
             ? "Managed by Paperclip: its name and settings are kept for you; you can add variables."
             : "Its settings belong to its plugin; you can add variables."
@@ -242,7 +243,7 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
           <Field label="Name" for="cs-env-name" error={fieldError(!form.name.trim(), "Give it a name.")}>
             <TextInput id="cs-env-name" value={form.name} autocomplete="off" onInput={(event) => setForm("name", event.currentTarget.value)} />
           </Field>
-          <Field label="Description" for="cs-env-description" help="Optional: what this machine is for.">
+          <Field label="Description" for="cs-env-description" info="What this machine is for.">
             <TextInput id="cs-env-description" value={form.description} onInput={(event) => setForm("description", event.currentTarget.value)} />
           </Field>
           <Show when={drivers().length > 1}>
@@ -296,7 +297,8 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
               <Field
                 label="Host"
                 for="cs-env-host"
-                help={onTailscale() ? "Set by the machine you pick." : "DNS name or IP address."}
+                info={onTailscale() ? undefined : "DNS name or IP address."}
+                help={onTailscale() ? "Set by the machine you pick." : undefined}
                 error={fieldError(!onTailscale() && !form.sshHost.trim(), "Enter the host.")}
               >
                 <TextInput
@@ -310,7 +312,7 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
                   onInput={(event) => setForm("sshHost", event.currentTarget.value)}
                 />
               </Field>
-              <Field label="Port" for="cs-env-port" help="Usually 22.">
+              <Field label="Port" for="cs-env-port" info="Usually 22.">
                 <TextInput id="cs-env-port" type="number" min={1} max={65535} value={form.sshPort} onInput={(event) => setForm("sshPort", event.currentTarget.value)} />
               </Field>
               <Field label="Username" for="cs-env-user" error={fieldError(!form.sshUsername.trim(), "Enter the username.")}>
@@ -319,7 +321,7 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
               <Field
                 label="Remote workspace path"
                 for="cs-env-path"
-                help="An absolute path on the host; Test checks it."
+                info="An absolute path on the host; Test checks it."
                 error={fieldError(!form.sshRemoteWorkspacePath.trim(), "Enter the path.")}
               >
                 <TextInput
@@ -333,7 +335,12 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
               </Field>
             </div>
             <div class="field-stack">
-              <span class="field-label">Private key</span>
+              <span class="info-line">
+                <span class="field-label">Private key</span>
+                <InfoTip label="About Private key">
+                  Optional. A pasted key is stored as a secret when you save. Without one, the server's SSH agent or default keys are used.
+                </InfoTip>
+              </span>
               <Menu>
                 <Menu.Trigger as={FieldButton} class="cs-env-key" icon={<KeyRound size={13} aria-hidden="true" />} aria-label="Private key secret">
                   {form.sshPrivateKeySecretId
@@ -369,14 +376,13 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
                 value={form.sshPrivateKey}
                 onInput={(event) => setForm("sshPrivateKey", event.currentTarget.value)}
               />
-              <span class="fhelp">Optional. A pasted key is stored as a secret when you save. Without one, the server's SSH agent or default keys are used.</span>
             </div>
-            <Field label="Known hosts" for="cs-env-known" help="Optional known_hosts lines, used with strict host key checking.">
+            <Field label="Known hosts" for="cs-env-known" info="Optional known_hosts lines, used with strict host key checking.">
               <TextArea id="cs-env-known" class="mono cs-env-pem" rows={3} spellcheck={false} value={form.sshKnownHosts} onInput={(event) => setForm("sshKnownHosts", event.currentTarget.value)} />
             </Field>
             <Switch
               label="Strict host key checking"
-              description="Keep this on unless you mean to accept the host's key without checking it."
+              info="Keep this on unless you mean to accept the host's key without checking it."
               checked={form.sshStrictHostKeyChecking}
               onChange={(value) => setForm("sshStrictHostKeyChecking", value)}
             />
@@ -433,7 +439,7 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
             </Show>
             <Switch
               label="Stream run logs"
-              description="Show the agent's output live while a run works (recommended). Off: the output arrives when the run finishes."
+              info="Show the agent's output live while a run works (recommended). Off: the output arrives when the run finishes."
               checked={form.sandboxConfig.streamRunLogs !== false}
               onChange={(value) => setForm("sandboxConfig", "streamRunLogs", value)}
             />
@@ -441,8 +447,10 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
         </Show>
 
         <div class="field-stack">
-          <span class="field-label">Environment variables</span>
-          <span class="fhelp">Given to every run in this environment. Secret values are never shown here.</span>
+          <span class="info-line">
+            <span class="field-label">Environment variables</span>
+            <InfoTip label="About Environment variables">Given to every run in this environment. Secret values are never shown here.</InfoTip>
+          </span>
           <EnvVarsEditor
             rows={rows}
             setRows={setRows}

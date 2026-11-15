@@ -59,10 +59,10 @@ export function AdminsSection(props: { youId: string | null }) {
 
   return (
     <>
-      <SectionTitle title="Admins">Who can change this instance's settings, and which organizations each person belongs to.</SectionTitle>
+      <SectionTitle title="Admins" info="Who can change this instance's settings, and which organizations each person belongs to." />
       <SettingsCard
         title="People"
-        description="Instance admins can change these settings and open every organization's settings."
+        info="Instance admins can change these settings and open every organization's settings."
         aria-label="People on this instance"
       >
         <div class="as-search">
@@ -180,7 +180,7 @@ function AccessDialog(props: { user: AdminUser; onClose: () => void }) {
       open
       onOpenChange={(open) => !open && props.onClose()}
       title={`${personLabel(props.user)}'s organizations`}
-      description="Turn on the organizations this person belongs to. Roles are changed in each organization's Members settings."
+      info="Turn on the organizations this person belongs to. Roles are changed in each organization's Members settings."
       width={520}
       hideClose
       footer={

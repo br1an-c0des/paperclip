@@ -50,7 +50,11 @@ export function useSaver() {
   return { run, state, error, busy: () => state() === "saving" };
 }
 
-/** A card description with "Saving…", "Saved" or the error after it. */
+/**
+ * A card description for state, with "Saving…", "Saved" or the error after it. Children are state
+ * that must stay visible; what the card is for goes in the card's `info`. With no children, use
+ * `saveNote`, which leaves an idle card's header without an empty line.
+ */
 export function SaveNote(props: ParentProps<{ saver: { state: () => SaveState; error: () => string | null } }>) {
   return (
     <>
@@ -76,6 +80,11 @@ export function SaveNote(props: ParentProps<{ saver: { state: () => SaveState; e
       </SwitchFlow>
     </>
   );
+}
+
+/** A card's save status as its `description`, or nothing while idle (projects/settings/shared.tsx has the same). */
+export function saveNote(saver: { state: () => SaveState; error: () => string | null }) {
+  return saver.state() === "idle" ? undefined : <SaveNote saver={saver} />;
 }
 
 /** A section's title. `info` is its purpose, behind an "i" beside the title; children stay visible, for state. */

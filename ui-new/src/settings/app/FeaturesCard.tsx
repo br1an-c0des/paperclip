@@ -7,9 +7,10 @@ import { instanceSettingsApi } from "@/api/instance-settings";
 import { queryKeys } from "@/api/queryKeys";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { SettingsCard } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Switch } from "@/ui/Switch";
 import { featurePatch, featureRowState, linkedNote, visibleFeatureGroups, type FeatureContext, type FeatureFlag } from "./features-model";
-import { SaveNote, useSaver } from "./shared";
+import { SaveNote, saveNote, useSaver } from "./shared";
 import "./FeaturesCard.css";
 
 /*
@@ -59,11 +60,13 @@ export function FeaturesCard(props: { hidden: ReadonlySet<string> }) {
     <Show when={groups().length}>
       <SettingsCard
         title="Features"
+        info="Features the server turns on or off for every organization; they replace the old Experimental page. They're still experimental and may change."
         description={
-          <SaveNote saver={saver}>
-            Features the server turns on or off for every organization. They're still experimental and may change.
-            <Show when={access.data && !access.data.isInstanceAdmin}> Only instance admins can change them.</Show>
-          </SaveNote>
+          access.data && !access.data.isInstanceAdmin ? (
+            <SaveNote saver={saver}>Only instance admins can change them.</SaveNote>
+          ) : (
+            saveNote(saver)
+          )
         }
       >
         <Show
@@ -93,7 +96,10 @@ function FeatureRow(props: { flag: FeatureFlag; context: FeatureContext; onChang
     <div class="frow as-frow-switch ft-row">
       <div class="flabel">
         <span class="ft-name">
-          {props.flag.label}
+          <span class="info-line">
+            {props.flag.label}
+            <InfoTip label={`About ${props.flag.label}`}>{props.flag.help}</InfoTip>
+          </span>
           <Show when={state().managed}>
             <span class="as-chip ft-managed">
               <Lock size={11} aria-hidden="true" />
@@ -101,7 +107,6 @@ function FeatureRow(props: { flag: FeatureFlag; context: FeatureContext; onChang
             </span>
           </Show>
         </span>
-        <span class="fhelp">{props.flag.help}</span>
         <Show when={state().requirements.length}>
           <span class="ft-needs">
             Needs

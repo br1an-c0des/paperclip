@@ -100,11 +100,11 @@ export function PluginsSection() {
         </Show>
       }
     >
-      <SectionTitle title="Plugins">Extensions that add pages, settings, tools and environments to this instance.</SectionTitle>
+      <SectionTitle title="Plugins" info="Extensions that add pages, settings, tools and environments to this instance." />
 
       <SettingsCard
         title="Installed"
-        description="Turning a plugin off stops it and hides what it adds; its settings are kept."
+        info="Turning a plugin off stops it and hides what it adds; its settings are kept."
         footer={
           <form
             class="as-install"
@@ -225,7 +225,7 @@ export function PluginsSection() {
       </SettingsCard>
 
       <Show when={bundled.data?.length}>
-        <SettingsCard title="Bundled with Paperclip" description="Plugins that ship with this checkout. They install from their folder on the server.">
+        <SettingsCard title="Bundled with Paperclip" info="Plugins that ship with this checkout. They install from their folder on the server.">
           <For each={bundledRows(bundled.data ?? [], installed.data ?? [])}>
             {(row) => (
               <ListRow

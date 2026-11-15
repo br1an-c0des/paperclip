@@ -109,7 +109,7 @@ export function OrganizationsSection(props: { accessibleIds: readonly string[] }
 
   return (
     <>
-      <SectionTitle title="Organizations">Every organization on this instance. Each one's own settings are under that organization.</SectionTitle>
+      <SectionTitle title="Organizations" info="Every organization on this instance. Each one's own settings are under that organization." />
       <SettingsCard
         title="Organizations"
         description={directory.data ? `${directory.data.length} on this instance.` : undefined}
@@ -174,11 +174,9 @@ export function OrganizationsSection(props: { accessibleIds: readonly string[] }
         onOpenChange={(value) => !value && setDialog(null)}
         title={dialog()?.kind === "create" ? "New organization" : dialog()?.kind === "rename" ? "Rename organization" : `Delete ${(dialog() as { company?: Company })?.company?.name ?? ""}?`}
         description={
-          dialog()?.kind === "create"
-            ? "It starts empty: hire its first agent from its Agents page."
-            : dialog()?.kind === "delete"
-              ? "This deletes its agents, tasks, projects and history for good. It can't be undone."
-              : undefined
+          dialog()?.kind === "delete"
+            ? "This deletes its agents, tasks, projects and history for good. It can't be undone."
+            : undefined
         }
         width={480}
         hideClose
@@ -202,6 +200,7 @@ export function OrganizationsSection(props: { accessibleIds: readonly string[] }
           <Field
             label={dialog()?.kind === "delete" ? `Type “${(dialog() as { company?: Company })?.company?.name ?? ""}” to confirm` : "Name"}
             for="as-org-name"
+            info={dialog()?.kind === "create" ? "It starts empty: hire its first agent from its Agents page." : undefined}
             error={problem() ?? undefined}
           >
             <TextInput id="as-org-name" value={draft()} autocomplete="off" invalid={Boolean(problem())} onInput={(event) => setDraft(event.currentTarget.value)} />

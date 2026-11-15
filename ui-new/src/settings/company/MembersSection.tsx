@@ -89,8 +89,8 @@ export function MembersSection(props: { anchor?: string }) {
 
   return (
     <>
-      <SectionTitle title="Members">
-        The people in {company().name}, their roles, and how new people get in. Agents are members too; manage them in{" "}
+      <SectionTitle title="Members" info={`The people in ${company().name}, their roles, and how new people get in.`}>
+        Agents are managed in{" "}
         <A class="ps-link" href={`/${company().issuePrefix}/agents`}>
           Agents
         </A>
@@ -114,6 +114,7 @@ export function MembersSection(props: { anchor?: string }) {
         <CardHead
           id="cs-people"
           title="People"
+          info="Owners manage everything, including changing and removing members. Admins manage everything else, including invites and join requests. Operators work with tasks, projects and agents, and can invite people. Viewers can look but not change anything."
           note={peopleNote()}
           actions={
             <Show when={access()?.canInviteUsers}>
@@ -195,7 +196,7 @@ export function MembersSection(props: { anchor?: string }) {
                                   "Couldn't suspend them",
                                 )
                               }
-                              description="They keep their role but can't sign in here"
+                              description="They keep their role but lose access to this organization until reactivated"
                             >
                               Suspend
                             </Menu.Item>
@@ -251,9 +252,6 @@ export function MembersSection(props: { anchor?: string }) {
             )}
           </For>
         </div>
-        <footer class="cfoot cs-muted">
-          Owners and admins manage settings and members. Operators work with tasks, projects and agents. Viewers can look but not change anything.
-        </footer>
       </section>
 
       <Show when={access()?.canInviteUsers !== false}>
@@ -410,7 +408,7 @@ function JoinRequestsCard(props: { onChanged: () => Promise<unknown> }) {
 
   return (
     <section class="card settings-card" id="join-requests" aria-labelledby="cs-join">
-      <CardHead id="cs-join" title="Join requests" note="People who asked to join. Requests also arrive in your Inbox." />
+      <CardHead id="cs-join" title="Join requests" info="People who asked to join. Requests also arrive in your Inbox." />
       <Show when={requests.isError}>
         <CardNoteLine alert>Couldn't load the requests. {failure(requests.error, "")}</CardNoteLine>
       </Show>

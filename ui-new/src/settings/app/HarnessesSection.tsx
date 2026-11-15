@@ -121,9 +121,10 @@ export function HarnessesSection() {
 
   return (
     <>
-      <SectionTitle title="Harnesses">
-        The programs agents run in, such as Claude Code and Codex. Turning one off hides it when hiring; agents already using it are not changed.
-      </SectionTitle>
+      <SectionTitle
+        title="Harnesses"
+        info="The programs agents run in, such as Claude Code and Codex. Turning one off hides it when hiring; agents already using it are not changed."
+      />
       <Show when={adapters.error}>
         <section class="card as-empty" role="alert">
           <p>{failure(adapters.error, "Couldn't load the harnesses.")}</p>
@@ -144,7 +145,7 @@ export function HarnessesSection() {
       </Show>
 
       <Show when={groups().otherBuiltIn.length}>
-        <SettingsCard title="Other built-in harnesses" description="Not used by any agent yet. Only those turned on appear when hiring.">
+        <SettingsCard title="Other built-in harnesses" info="Not used by any agent yet. Only those turned on appear when hiring.">
           <div class="as-hgrid">
             <For each={groups().otherBuiltIn}>
               {(row) => (
@@ -162,8 +163,8 @@ export function HarnessesSection() {
       </Show>
 
       <SettingsCard
-        title="Installed from npm"
-        description="Harness packages added to this instance, from npm or a folder on the server."
+        title="Installed packages"
+        info="Harness packages added to this instance, from npm or a folder on the server."
         footer={
           <form
             class="as-install"
