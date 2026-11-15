@@ -29,6 +29,37 @@ UI wraps it in a help sentence. Text already behind an InfoTip or `info` isn't l
 it's wrong. Rows marked "suspect" in their evidence weren't traced end to end; check before
 changing them.
 
+
+## Step 0: done Nov 14 (`acbb99211`)
+
+Approved Nov 14 ([decision 52](../decisions.md#52-help-text-goes-behind-an-info-icon)) with two changes:
+settings the server ignores (heartbeat Cooldown, a workspace's Setup command) keep their controls
+with visible text saying the server doesn't use them yet (not hidden as J9 proposed), and the six
+J18 suspects are checked against the server and corrected only when confirmed.
+
+Components that take `info` (every "i" is a button named "About <label>", never inside a `<label>`
+or heading, opens on tap, renders nothing without `info`):
+
+- `ui/Field.tsx`: `SettingsCard`, `SettingsRow`, `Field`, and `InfoHeading level={1–6} info? infoLabel?`.
+- `ui/Dialog.tsx` `Dialog`: `info?`, `infoLabel?` beside the title; `description` stays for state and
+  consequences.
+- `ui/Switch.tsx` `Switch`: `info?`, `infoLabel?` beside the label (visible even with `labelHidden`).
+- `ui/ChoiceCard.tsx` (moved from `apps/shared.tsx`): `{ name, title, info?, infoLabel?, value?, checked,
+  disabled?, onSelect }`.
+- `agents/shared.tsx` `SwitchRow` (`help` optional, for state) and `SectionTitle` (`info?`; children stay
+  visible). Company settings re-export `SwitchRow`.
+- `settings/app/shared.tsx` `SectionTitle`, `SwitchRow`; `settings/company/shared.tsx` `CardHead`
+  (`note` stays visible); `apps/chat/parts.tsx` `Card`; `auth/Standalone.tsx` `Standalone` (`lede`
+  stays visible).
+- `projects/settings/shared.tsx` `saveNote(state, error)` (re-exported from agents and company shared):
+  a status-only description, nothing while idle. `CardNote`'s children are optional; keep them for
+  state only.
+- `recurring/RepeatMenu.tsx` `InfoTip { text, label? }` now wraps `ui/InfoTip` (opens on tap).
+
+Left to the area agents (they own these files): `NumberRow`, `ExtraFieldRow`, `ListField`, `Well`,
+`FileGroup`, `ConnectionField`, `FeatureRow`, `Usage`, `Labelled`, `AgentAccessPicker` `allInfo` (agent
+2), app settings' `SaveNote`, and `CodeSection.tsx`'s local `saveNote` (agent 5: use the shared one).
+
 ## 1. Summary
 
 ### Counts per verdict
