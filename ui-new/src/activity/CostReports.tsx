@@ -8,6 +8,8 @@ import { useCompany } from "@/lib/company";
 import { formatCents } from "@/projects/dashboard-model";
 import { agoLabel } from "@/runs/run-model";
 import { InitialsDisc } from "@/ui/Avatar";
+import { InfoHeading } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { TonePill } from "@/ui/Status";
 import { formatTokens, type RangePreset } from "./costs-model";
 import {
@@ -59,16 +61,30 @@ export type CostScope = { from?: string; to?: string; keyFrom?: string; keyTo?: 
 
 const REFRESH = 30_000;
 
-/** A cost and its estimate badge, or a dash when nothing in the group had a price. */
-function Amount(props: { costCents: number; eventCount?: number; estimatedEventCount?: number; unpricedEventCount?: number }) {
+const ESTIMATE_INFO = "Estimated amounts are worked out from token counts and published rates; the provider's bill may differ.";
+
+/** What the Providers and Billers views show, for the "i" beside the Costs view tabs. */
+export const COSTS_VIEW_INFO: Partial<Record<string, string>> = {
+  providers: "Subscription quota comes from each provider and is checked every few minutes. Budgets cap spend; quota is the provider's own limit.",
+  billers: "The biller is who sends the bill. It differs from the provider when a router such as OpenRouter resells a model.",
+};
+
+/**
+ * A cost and its estimate badge, or a dash when nothing in the group had a price. `tip` adds the
+ * estimate's "i" beside the badge, for a card's one total; a list explains it once in its header.
+ */
+function Amount(props: { costCents: number; eventCount?: number; estimatedEventCount?: number; unpricedEventCount?: number; tip?: boolean }) {
   return (
     <span class="act-amount">
       <b>{entirelyUnpriced(props) ? "—" : formatCents(props.costCents)}</b>
       <Show when={estimateLabel(props)}>
         {(label) => (
-          <span class="act-estimate" title="Worked out from token counts and published rates; the provider's bill may differ.">
-            {label()}
-          </span>
+          <>
+            <span class="act-estimate">{label()}</span>
+            <Show when={props.tip}>
+              <InfoTip label="About estimates">{ESTIMATE_INFO}</InfoTip>
+            </Show>
+          </>
         )}
       </Show>
     </span>
@@ -86,9 +102,14 @@ export function ByPersonCard(props: { scope: CostScope }) {
   return (
     <section class="card org-card act-cost-card" aria-labelledby="act-by-person">
       <div class="org-card-row">
-        <h2 class="disp" id="act-by-person">
+        <InfoHeading
+          level={2}
+          class="disp"
+          id="act-by-person"
+          info={`“No one” is spend with no responsible person recorded in this organization. ${ESTIMATE_INFO}`}
+        >
           By person
-        </h2>
+        </InfoHeading>
         <span class="org-muted org-push">Runs · tokens in / out · spend</span>
       </div>
       <Switch>
@@ -124,9 +145,6 @@ export function ByPersonCard(props: { scope: CostScope }) {
           )}
         </For>
       </ul>
-      <Show when={rows().some((row) => row.userId === null)}>
-        <p class="org-foot">“No one” is work with no responsible person here, such as routines and agents' own tasks.</p>
-      </Show>
     </section>
   );
 }
@@ -178,7 +196,6 @@ export function ProvidersView(props: { scope: CostScope }) {
       <div class="act-report-grid">
         <For each={cards()}>{(card) => <ProviderCardView card={card} scope={props.scope} quotaLoading={quota.isPending} quotaFailed={quota.isError} />}</For>
       </div>
-      <p class="org-foot">Subscription quota comes from each provider and is checked every few minutes. Budgets cap spend; quota is the provider's own limit.</p>
     </div>
   );
 }
@@ -198,7 +215,7 @@ function ProviderCardView(props: { card: ProviderCard; scope: CostScope; quotaLo
           </span>
         </div>
         <span class="act-report-total">
-          <Amount {...props.card} />
+          <Amount {...props.card} tip />
           <Show when={props.card.unpricedEventCount > 0}>
             <span class="act-estimate">{props.card.unpricedEventCount} without a price</span>
           </Show>
@@ -357,7 +374,6 @@ export function BillersView(props: { scope: CostScope }) {
       <div class="act-report-grid">
         <For each={cards()}>{(card) => <BillerCardView card={card} scope={props.scope} />}</For>
       </div>
-      <p class="org-foot">The biller is who sends the bill. It differs from the provider when a router such as OpenRouter resells a model.</p>
     </div>
   );
 }
@@ -375,7 +391,7 @@ function BillerCardView(props: { card: BillerCard; scope: CostScope }) {
           </span>
         </div>
         <span class="act-report-total">
-          <Amount {...props.card} />
+          <Amount {...props.card} tip />
         </span>
       </div>
       <Show when={share() !== null}>
@@ -525,14 +541,18 @@ export function FinanceView(props: { scope: CostScope }) {
       </div>
       <section class="card org-card" aria-labelledby="act-fin-events">
         <div class="org-card-row">
-          <h2 class="disp" id="act-fin-events">
+          <InfoHeading
+            level={2}
+            class="disp"
+            id="act-fin-events"
+            info="Charges, fees and credits, apart from run estimates. Entries arrive through the API, the CLI or a provider integration."
+          >
             Recent entries
-          </h2>
-          <span class="org-muted org-push">Charges, fees and credits, apart from run estimates</span>
+          </InfoHeading>
         </div>
         <Show
           when={(events.data ?? []).length > 0}
-          fallback={<p class="org-muted org-pad">{readNote(events, "Nothing recorded in this range. Entries arrive through the API, the CLI or a provider integration.")}</p>}
+          fallback={<p class="org-muted org-pad">{readNote(events, "Nothing recorded in this range.")}</p>}
         >
           <ul class="act-cost-list">
             <For each={events.data}>
@@ -587,9 +607,11 @@ export function FinanceSummaryKpis(props: { summary: { netCents: number; debitCe
         <span class="org-kpi-note">{props.summary ? `${formatCents(props.summary.estimatedDebitCents)} estimated` : ""}</span>
       </div>
       <div class="card org-kpi">
-        <span class="org-kpi-label">Credits</span>
+        <span class="org-kpi-label info-line">
+          Credits
+          <InfoTip label="About credits">Entries marked as credits: refunds, offsets and credit returns.</InfoTip>
+        </span>
         <span class="org-kpi-value disp">{props.summary ? formatCents(props.summary.creditCents) : "—"}</span>
-        <span class="org-kpi-note">Refunds and credit purchases</span>
       </div>
     </div>
   );
@@ -629,7 +651,10 @@ export function CallHistory(props: { kind: "decisions" | "fast-responses"; scope
         </Match>
       </Switch>
       <Show when={(history.data ?? []).length > 0}>
-        <p class="org-muted act-calls-note">The latest calls. Their inputs aren't kept.</p>
+        <p class="org-muted act-calls-note info-line">
+          The latest calls.
+          <InfoTip label="About call history">Paperclip keeps each call's details and cost, not its inputs.</InfoTip>
+        </p>
         <div class="act-calls-scroll">
           <table class="act-calls">
             <thead>

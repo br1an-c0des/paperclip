@@ -200,7 +200,7 @@ export function SessionGate(props: ParentProps) {
             actions={<Button variant="primary" size="compact" onClick={retry}>Try again</Button>}
           >
             {isTemporaryApiError(error())
-              ? "The server isn't answering. Start it with corepack pnpm dev at the repo root; this page retries on its own."
+              ? "The server isn't answering. This page retries on its own."
               : String((error() as Error).message ?? error())}
           </Splash>
         )}

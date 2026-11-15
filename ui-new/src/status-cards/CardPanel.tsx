@@ -12,6 +12,7 @@ import { stampLabel } from "@/tasks/thread-model";
 import { updatedLabel } from "@/tasks/list-model";
 import { Button } from "@/ui/Button";
 import { FieldButton } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Markdown } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
@@ -441,11 +442,13 @@ function WatchedTab(props: { card: StatusCard; onOpenTask: (task: { id: string; 
   return (
     <div class="sc-tab">
       <div class="sc-watched-top">
-        <p class="cap">A dry run of the card's query: the tasks it matches now. No agent runs.</p>
         <Show when={hasWatchSet(props.card)}>
-          <Button size="compact" variant="quiet" icon={<RefreshCw size={14} aria-hidden="true" />} disabled={dryRun.isFetching} onClick={() => void dryRun.refetch()}>
-            {dryRun.isFetching ? "Running…" : "Run again"}
-          </Button>
+          <span class="info-line">
+            <Button size="compact" variant="quiet" icon={<RefreshCw size={14} aria-hidden="true" />} disabled={dryRun.isFetching} onClick={() => void dryRun.refetch()}>
+              {dryRun.isFetching ? "Running…" : "Run again"}
+            </Button>
+            <InfoTip label="About the dry run">A dry run of the card's query: the tasks it matches now. No agent runs.</InfoTip>
+          </span>
         </Show>
       </div>
       <Switch>

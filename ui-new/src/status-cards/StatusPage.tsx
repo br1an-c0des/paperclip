@@ -8,6 +8,8 @@ import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { updatedLabel } from "@/tasks/list-model";
 import { Button } from "@/ui/Button";
+import { InfoHeading } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { HeaderNumber, PageHeader } from "@/ui/PageHeader";
 import { pushToast } from "@/ui/Toast";
 import { CARD_TABS, CardPanel, type CardTab } from "./CardPanel";
@@ -131,7 +133,7 @@ export function StatusPage() {
           <p class="card sc-page-note muted">Loading…</p>
         </Match>
         <Match when={enabled() === false}>
-          <p class="card sc-page-note">Status cards are off on this instance. An instance admin turns them on with the `enableStatusCards` experimental setting.</p>
+          <p class="card sc-page-note">Status cards are off on this instance. An instance admin can turn them on in the app settings' Features.</p>
         </Match>
         <Match when={on()}>
           <Dock>
@@ -144,8 +146,9 @@ export function StatusPage() {
               </Match>
               <Match when={(active.data ?? []).length === 0}>
                 <section class="card sc-empty">
-                  <h2 class="disp">No status cards yet</h2>
-                  <p class="muted">A card keeps a summary of the tasks you care about current: ask it a standing question, and an agent answers it as the tasks change.</p>
+                  <InfoHeading level={2} class="disp" info="A card keeps a summary of the tasks you care about current: ask it a standing question, and an agent answers it as the tasks change.">
+                    No status cards yet
+                  </InfoHeading>
                   <Button variant="primary" icon={<Plus size={16} aria-hidden="true" />} onClick={() => setCreating(true)}>
                     New card
                   </Button>
@@ -174,10 +177,13 @@ export function StatusPage() {
 
             <Show when={(archived.data ?? []).length > 0}>
               <section class="sc-archived">
-                <button type="button" class="sc-archived-toggle" aria-expanded={showArchived()} onClick={() => setShowArchived(!showArchived())}>
-                  <ChevronDown size={14} aria-hidden="true" class="sc-caret" />
-                  Archived <span class="cap">{archived.data!.length}</span>
-                </button>
+                <div class="info-line">
+                  <button type="button" class="sc-archived-toggle" aria-expanded={showArchived()} onClick={() => setShowArchived(!showArchived())}>
+                    <ChevronDown size={14} aria-hidden="true" class="sc-caret" />
+                    Archived <span class="cap">{archived.data!.length}</span>
+                  </button>
+                  <InfoTip label="About archived cards">Restoring a card runs an update at once.</InfoTip>
+                </div>
                 <Show when={showArchived()}>
                   <ul class="card sc-archived-list">
                     <For each={archived.data}>
@@ -243,7 +249,7 @@ function ArchivedRow(props: { card: StatusCard; selected: boolean; restoring: bo
           {lifetime() ? ` · ${formatTokens(lifetime()!.totalTokens)} · ${formatCents(lifetime()!.totalCostCents)} in all` : ""}
         </span>
       </div>
-      <Button size="compact" icon={<ArchiveRestore size={14} aria-hidden="true" />} disabled={props.restoring} title="Restoring runs an update at once" onClick={() => props.onRestore()}>
+      <Button size="compact" icon={<ArchiveRestore size={14} aria-hidden="true" />} disabled={props.restoring} onClick={() => props.onRestore()}>
         {props.restoring ? "Restoring…" : "Restore"}
       </Button>
     </li>

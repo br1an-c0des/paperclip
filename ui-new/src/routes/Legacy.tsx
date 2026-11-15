@@ -11,7 +11,6 @@ import { findCompanyByPrefix, lastCompanyPrefix, useCompaniesQuery, useCompany }
 import { useProjectsQuery } from "@/lib/company-data";
 import { projectGoalIds } from "@/projects/settings/settings-model";
 import { PageHeader } from "@/ui/PageHeader";
-import { PlannedNote } from "./Planned";
 import { Splash } from "./Splash";
 import { caseLinkTarget, companyLegacyTarget, connectionsAddress, identifierPrefix, isUuid, withSearchAndHash } from "./legacy-model";
 
@@ -107,20 +106,6 @@ export function CaseRedirect() {
         </section>
       </Match>
     </Switch>
-  );
-}
-
-/** `/:prefix/status`, `/status/:cardId`: status cards (D3) come next round. */
-export function StatusPlaceholder() {
-  const company = useCompany();
-  return (
-    <>
-      <PageHeader crumbs={<span>{company().name}</span>} title="Status" />
-      <PlannedNote milestone="the next M7 round">
-        Status cards (a board of tiles an agent keeps up to date, with history and dry runs) are being ported. Until then, the dashboard and Activity
-        show what's happening.
-      </PlannedNote>
-    </>
   );
 }
 

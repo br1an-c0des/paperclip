@@ -12,6 +12,7 @@ import { useTaskPeople } from "@/tasks/people";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
+import { InfoTip } from "@/ui/InfoTip";
 import { Markdown } from "@/ui/Markdown";
 import { Segmented } from "@/ui/Segmented";
 import { TonePill } from "@/ui/Status";
@@ -82,6 +83,7 @@ export function Commentary() {
           onPick={(value) => set({ agentId: value })}
         />
         <Segmented label="Kind" options={KINDS} value={(filters().kind ?? "all") as Kind} onChange={(value) => set({ kind: value === "all" ? undefined : value })} />
+        <InfoTip label="About commentary">Suggestions and complaints agents send in while they work.</InfoTip>
         <Show when={hasFilters()}>
           <Button size="compact" variant="quiet" onClick={() => { setDraft(""); set({ q: undefined, agentId: undefined, kind: undefined }); }}>
             Clear filters
@@ -108,7 +110,7 @@ export function Commentary() {
                 ? "No messages on this page."
                 : hasFilters()
                   ? "No messages match these filters."
-                  : "No commentary yet. Suggestions and complaints show up here when agents send them."}
+                  : "No commentary yet."}
             </p>
           </Match>
         </Switch>

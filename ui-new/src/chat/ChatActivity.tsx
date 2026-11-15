@@ -17,6 +17,7 @@ import { agoLabel, dayLabel, formatDuration } from "@/runs/run-model";
 import type { TaskPeople } from "@/tasks/people";
 import { stopLabel, stopRun } from "@/tasks/run-stop";
 import { ChatContextSection } from "@/tasks/TaskContext";
+import { InfoTip } from "@/ui/InfoTip";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import { WaitLine } from "@/runs/QueueWait";
@@ -174,10 +175,15 @@ export function ChatActivity(props: {
                   <Capsule gradient={props.agent.status === "paused" ? "ember" : "ash"} size="tiny" />
                   {props.agent.status === "paused" ? "Paused" : "Idle"}
                 </span>
-                <span class="ch-now-title">Nothing running</span>
-                <span class="ch-muted">
-                  {props.agent.status === "paused" ? "Resume it under Manage agent to chat." : "Runs on new messages and assignments."}
-                </span>
+                <Show when={props.agent.status === "paused"} fallback={
+                  <span class="info-line">
+                    <span class="ch-now-title">Nothing running</span>
+                    <InfoTip label="About when it runs">It runs when you message it or assign it work, and on its heartbeat timer if it has one.</InfoTip>
+                  </span>
+                }>
+                  <span class="ch-now-title">Nothing running</span>
+                  <span class="ch-muted">Resume it under Manage agent to chat.</span>
+                </Show>
                 <Show when={props.agent.status !== "paused" && props.agent.status !== "terminated"}>
                   <div class="ch-now-actions">
                     <button type="button" class="ch-pill-btn" onClick={() => void runNow()}>

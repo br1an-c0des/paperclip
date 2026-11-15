@@ -12,7 +12,7 @@
   flex-shrink: 0;
 }
 
-/* The sections take the height between the top and the note, and scroll there if the window is
+/* The sections take the height below the top, and scroll there if the window is
    too short for them, without the browser's scrollbar (as the nav's lists do). */
 .snav-zone--sections {
   flex: 1 1 auto;
@@ -119,16 +119,3 @@
   font-size: 13px;
 }
 
-.snav-note {
-  padding: 12px;
-  border: 1px dashed var(--edge);
-  border-radius: var(--r-card);
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.snav-note-title {
-  display: block;
-  font-weight: 600;
-}

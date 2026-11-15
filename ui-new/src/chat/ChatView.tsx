@@ -22,7 +22,7 @@ import { MessageBody } from "@/tasks/MessageBody";
 import { CopyMessage } from "@/tasks/CopyMessage";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
-import { TextInput } from "@/ui/Field";
+import { InfoHeading, TextInput } from "@/ui/Field";
 import { documentAnchor, parseTaskAnchor } from "@/tasks/task-anchor";
 import { Capsule, TaskStatusCapsule } from "@/ui/Status";
 import { shownStatus, STATUS_META } from "@/ui/status-meta";
@@ -395,11 +395,10 @@ function ChatThread(props: ChatViewProps) {
                   fallback={
                     <div class="ch-empty">
                       <AgentAvatar agent={props.agent} size={48} />
-                      <p class="disp">Your conversation with {props.agent.name}</p>
-                      <p class="ch-muted">
-                        Ask a question, think something through, or describe work. {props.agent.name} plans with you here and hands the work off as tasks,
-                        which show up as cards and report back when they're done.
-                      </p>
+                      <InfoHeading level={2} class="disp" info={`${props.agent.name} plans with you here and hands work off as tasks, which show up as cards and report back when they're done.`} infoLabel="About this conversation">
+                        Your conversation with {props.agent.name}
+                      </InfoHeading>
+                      <p class="ch-muted">Ask a question, think something through, or describe work.</p>
                     </div>
                   }
                 >

@@ -5,11 +5,12 @@ import { statusCardsApi } from "@/api/status-cards";
 import { ConfirmDialog } from "@/documents/ConfirmDialog";
 import { updatedLabel } from "@/tasks/list-model";
 import { Button } from "@/ui/Button";
+import { ChoiceCard } from "@/ui/ChoiceCard";
 import { Field, TextArea, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Segmented } from "@/ui/Segmented";
 import { Switch } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
-import { Tooltip } from "@/ui/Tooltip";
 import { AgentNotice, AgentPicker } from "./AgentPicker";
 import { useRefreshCards } from "./queries";
 import {
@@ -104,13 +105,18 @@ export function CardSettings(props: { card: StatusCard; onDeleted: () => void })
 
   return (
     <form class="sc-settings" onSubmit={(event) => void save(event)}>
-      <Field label="Name" for="sc-name" help="Leave it empty to let the agent name the card.">
+      <Field label="Name" for="sc-name" info="Leave it empty to let the agent name the card.">
         <TextInput id="sc-name" value={title()} placeholder={props.card.title ?? "Named from the prompt"} onInput={(event) => setTitle(event.currentTarget.value)} />
       </Field>
-      <Field label="What this card watches and reports" for="sc-prompt" help="The agent builds the query from this and follows it in every update. Changing it rebuilds the card.">
+      <Field
+        label="What this card watches and reports"
+        for="sc-prompt"
+        info="The agent builds the query from this and follows it in every update."
+        help="Changing it rebuilds the card."
+      >
         <TextArea id="sc-prompt" rows={4} value={prompt()} onInput={(event) => setPrompt(event.currentTarget.value)} />
       </Field>
-      <Field label="Agent" for="sc-agent" help="Runs the card's setup and updates.">
+      <Field label="Agent" for="sc-agent" info="Runs the card's setup and updates.">
         <AgentPicker id="sc-agent" value={agentId()} onChange={setAgentId} />
       </Field>
       <AgentNotice agentId={agentId()} />
@@ -120,13 +126,14 @@ export function CardSettings(props: { card: StatusCard; onDeleted: () => void })
         <div class="sc-options" role="radiogroup" aria-label="When the card updates">
           <For each={MODES}>
             {(mode) => (
-              <label class="sc-option" classList={{ "sc-option--on": policy().mode === mode.value }}>
-                <input type="radio" name="sc-mode" checked={policy().mode === mode.value} onChange={() => setPolicy(withMode(policy(), mode.value))} />
-                <span class="sc-option-text">
-                  <span class="sc-option-name">{mode.title}</span>
-                  <span class="cap">{mode.note}</span>
-                </span>
-              </label>
+              <ChoiceCard
+                name="sc-mode"
+                title={mode.title}
+                info={mode.note}
+                value={mode.value}
+                checked={policy().mode === mode.value}
+                onSelect={() => setPolicy(withMode(policy(), mode.value))}
+              />
             )}
           </For>
         </div>
@@ -193,7 +200,7 @@ export function CardSettings(props: { card: StatusCard; onDeleted: () => void })
                 })
               }
               label="Only during active hours"
-              description="Changes outside the window wait for one update when it opens."
+              info="Changes outside the window wait for one update when it opens."
             />
             <Show when={policy().activeHours}>
               {(hours) => (
@@ -219,7 +226,8 @@ export function CardSettings(props: { card: StatusCard; onDeleted: () => void })
                   patchPolicy({ dailyTokenCap: event.currentTarget.value === "" || value <= 0 ? undefined : Math.round(value) });
                 }}
               />
-              <span class="cap">tokens; empty uses the server's {formatTokens(SERVER_DEFAULT_DAILY_CAP)}</span>
+              <span class="cap">tokens</span>
+              <InfoTip label="About the daily token cap">Empty uses the server's default, {formatTokens(SERVER_DEFAULT_DAILY_CAP)} a day.</InfoTip>
             </Row>
           </div>
         </details>
@@ -227,23 +235,21 @@ export function CardSettings(props: { card: StatusCard; onDeleted: () => void })
 
       <p class="sc-cost">
         <span class="lbl">Estimated cost</span>
-        <Tooltip title={cost().detail} content={`${cost().note} A rough guide from typical update sizes; the History tab has what each update really cost.`}>
-          {(p) => (
-            <span {...p} class="sc-cost-value" tabindex="0">
-              {cost().cost}
-            </span>
-          )}
-        </Tooltip>
+        <span class="sc-cost-value">{cost().cost}</span>
+        <InfoTip label="About the estimated cost">
+          <b>{cost().detail}</b> {cost().note} A rough guide from typical update sizes; the History tab has what each update really cost.
+        </InfoTip>
       </p>
 
       <details class="sc-query">
         <summary>
           Query <span class="mono cap">v{props.card.queryVersion}</span>
+          <InfoTip label="About the query">The agent keeps the query; change the prompt to rebuild it.</InfoTip>
         </summary>
         <pre class="sc-code">{props.card.queries.length > 0 ? JSON.stringify(props.card.queries, null, 2) : "Not built yet."}</pre>
         <p class="cap">
           {props.card.queryCompiledAt
-            ? `Built ${midSentence(updatedLabel(props.card.queryCompiledAt))}, version ${props.card.queryVersion}. The agent keeps it; change the prompt to rebuild it.`
+            ? `Built ${midSentence(updatedLabel(props.card.queryCompiledAt))}, version ${props.card.queryVersion}.`
             : "The query is built when the card finishes setting up."}
         </p>
       </details>
