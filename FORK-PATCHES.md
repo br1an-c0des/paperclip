@@ -54,6 +54,9 @@ upstream could use as upstream pull requests instead (see
   and delete this entry. If upstream fixes it another way, take upstream's version and delete the
   entry once a sync shows `supportedRunners` including `paperclip` here. If upstream rewrites the
   probe without fixing it, keep the synchronous call and the comment.
+  Upstream's #21670 (2026-11-14) cut `doc/DEVELOPING.md` and moved the "Local Linux runner
+  qualification" section to `doc/runner-internals.md`: take upstream's `DEVELOPING.md` and carry
+  the wording change into `doc/runner-internals.md`, as the PR branch did in `3a08309e7`.
 
 
 ### workspace-ui-new

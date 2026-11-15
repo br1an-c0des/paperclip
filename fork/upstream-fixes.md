@@ -186,6 +186,11 @@ until one becomes a concrete fix.
 - **Built 2026-10-27:** `execFileSync` with the same timeout, kill signal and output limit, and no
   top-level await; a test that blocks the event loop for 1.2 s after a real probe; `doc/DEVELOPING.md`
   updated. Targeted tests pass (16, plus 221 in the probe's consumers) and the server typechecks.
+- **Updated 2026-11-14:** upstream's #21670 moved the doc section it edited from `doc/DEVELOPING.md`
+  to `doc/runner-internals.md`, which made the PR conflict. Merged upstream master into the branch
+  (`3a08309e7`, no force-push), took upstream's `DEVELOPING.md` and moved the wording change to
+  `doc/runner-internals.md`. The targeted test (16) and the server typecheck pass; the PR is
+  mergeable again. An outside user confirmed the bug on a Raspberry Pi 5 on 2026-11-07.
 
 ### 7. Accept `env: null` when updating a project
 
