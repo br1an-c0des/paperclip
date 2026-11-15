@@ -464,6 +464,14 @@ Progress:
   U165). D: Tailscale networks and SSH on the agent's AI account (U156, U157). E: the pasted-server
   sign-in step, machine sign-in, GitHub bot sponsors (U158, U159, U163). Browser checks used mocked
   data; U166 still needs a real tablet.
+- **Done (Nov 14): help text behind info icons.** Step 0 (shared `info` props) and five area
+  agents applied the [audit](audit/info-tip-sweep.md): about 600 changes across the app, including
+  the rewrites checked against the server. Leftovers: a few hover-only `title=` texts on buttons
+  (`ChatBinding.tsx`, `QueuedMessages.tsx`, `TaskModal.tsx`, `TaskNotices.tsx`) and
+  `AppExtras.tsx`'s remove-sheet reason; the not-found page's "Not built yet" heading; the New status
+  card dialog's example buttons overflow at 390px (older); `RunTrace.tsx`'s admin note kept visible.
+  Three settings the server ignores keep their controls with "Not used by the server yet."
+  ([upstream-fixes](../../fork/upstream-fixes.md) 30–32). Original item below.
 - **Open (Nov 12): help text behind info icons** ([decision 52](decisions.md#52-help-text-goes-behind-an-info-icon)).
   An app-wide sweep: every card description, row `help`, form `Field` help and similar hint
   paragraph that says what something is for moves into an `info` tip, and is rewritten where it

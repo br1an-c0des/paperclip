@@ -1833,6 +1833,17 @@ Both are handled in `ui-new` for now.
     (not hidden, as J9 proposed); and the six suspected errors in J18 are checked against the
     server and corrected only when confirmed. Step 0 (shared `info` props) lands first, then five
     area agents.
+  - **Done Nov 14.** All five areas applied. Confirmed and corrected along the way: no per-project
+    folder without code; workspace commands and cleanup apply to every task using the workspace;
+    the project's variables win over the agent's; required personal secrets make runs fail; a
+    budget hard stop also cancels running and queued work and raising the limit resumes; "When
+    there is work" off also blocks Run now and routine wakes; the instance default environment
+    (`instanceSettings.defaultEnvironmentId`, which `ui-new` had read wrongly from a metadata stamp:
+    fixed in `agents/settings/fields.tsx`); member roles; any member but a viewer approves hires;
+    Suspend removes access to this organization only; skills don't update by themselves. The Task
+    checkouts card now also shows its controls for projects on a storage plugin, where the server
+    applies the policy (J17). Settings the server ignores: Cooldown, a workspace's Setup command and
+    an agent's Create skills (upstream-fixes 30–32).
 
 ### 53. Requests are routed to a person
 

@@ -66,6 +66,9 @@ until one becomes a concrete fix.
 | 27 | [Kitchen Sink example: hide config-gated items until the config loads](#27-kitchen-sink-example-hide-config-gated-items-until-the-config-loads) | candidate | | | 2026-11-09 | | |
 | 28 | [Let Claude Runner agents pass verification in the Docker image](#28-let-claude-runner-agents-pass-verification-in-the-docker-image) | submitted | `fix/runner-docker-provider-authority` | [#20710](https://github.com/paperclipai/paperclip/pull/20710) | 2026-11-10 | 2026-11-10 | |
 | 29 | [Don't report the agent JWT secret missing when `BETTER_AUTH_SECRET` covers it](#29-dont-report-the-agent-jwt-secret-missing-when-better_auth_secret-covers-it) | candidate | | | 2026-11-12 | | |
+| 30 | [Run a project workspace's setup command, or drop the field](#30-run-a-project-workspaces-setup-command-or-drop-the-field) | candidate | | | 2026-11-14 | | |
+| 31 | [Enforce an agent's "Create skills" permission, or drop it](#31-enforce-an-agents-create-skills-permission-or-drop-it) | candidate | | | 2026-11-14 | | |
+| 32 | [Honour an agent's heartbeat cooldown, or drop it](#32-honour-an-agents-heartbeat-cooldown-or-drop-it) | candidate | | | 2026-11-14 | | |
 
 ## Details
 
@@ -511,3 +514,38 @@ Found redeploying the fork's Docker deployment (Nov 12).
   silently; this fix shouldn't weaken that warning. Search for duplicates again before building.
 - **Fork workaround:** none needed; the warning is cosmetic.
 
+### 30. Run a project workspace's setup command, or drop the field
+
+Found in the info-tip sweep (Nov 14, [audit](../ui-new/docs/audit/info-tip-sweep.md), J9).
+
+- **Problem:** a project workspace stores `setupCommand` (`projectWorkspaces.setupCommand`), and the
+  old UI offers it, but nothing reads it when a workspace is prepared. The only setup that runs is
+  the execution workspace policy's provision command (worktree setup). A person who fills it in
+  expects it to run.
+- **Likely fix:** ask upstream which is intended: run it when the shared workspace is first
+  prepared (beside the cleanup command, which does run), or remove the field and point to the
+  checkout policy's provision command. An issue first, not a PR.
+- **Fork workaround:** `ui-new` keeps the field with "Not used by the server yet."
+
+### 31. Enforce an agent's "Create skills" permission, or drop it
+
+Found in the info-tip sweep (Nov 14, J18).
+
+- **Problem:** `permissions.canCreateSkills` on an agent is stored and logged
+  (`server/src/lib/agent-permissions.ts:122`, `routes/agents.ts:5142`) but skill routes decide by the
+  company skill policy and `skills:create` grants (`routes/company-skills.ts:232-274`,
+  `company-skill-policy.ts:143-149`), so the switch changes nothing.
+- **Likely fix:** an issue asking whether the per-agent switch should gate skill creation or be
+  removed in favour of the skill policy.
+- **Fork workaround:** `ui-new` keeps the switch with "Not used by the server yet."
+
+### 32. Honour an agent's heartbeat cooldown, or drop it
+
+Found in the info-tip sweep (Nov 14, J9).
+
+- **Problem:** `runtimeConfig.heartbeat.cooldownSec` is offered in agent settings, but the server only
+  writes it as a default in `company-portability.ts` and never reads it when scheduling or admitting
+  runs.
+- **Likely fix:** an issue asking whether a minimum gap between runs is still planned; if not,
+  remove it from the shared config and the old UI.
+- **Fork workaround:** `ui-new` keeps the control with "Not used by the server yet."
