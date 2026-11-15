@@ -5,6 +5,8 @@ import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { failure, type SaveState } from "@/projects/settings/shared";
+import { InfoHeading } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Switch } from "@/ui/Switch";
 import { harnessType } from "./agent-model";
 
@@ -14,12 +16,17 @@ import { harnessType } from "./agent-model";
  * status line and errors are the project settings' (projects/settings/shared.tsx).
  */
 
-export { CardNote, FootError, failure, SaveStatus } from "@/projects/settings/shared";
+export { CardNote, FootError, failure, saveNote, SaveStatus } from "@/projects/settings/shared";
 
-/** A settings row whose control is one switch, at the row's end like the other rows' controls. */
+/**
+ * A settings row whose control is one switch, at the row's end like the other rows' controls.
+ * `info` is what the setting is for, behind an "i" beside the label; `help` stays visible, for state
+ * or why the switch is unavailable.
+ */
 export function SwitchRow(props: {
   label: string;
-  help: JSX.Element;
+  info?: JSX.Element;
+  help?: JSX.Element;
   checked: boolean;
   disabled?: boolean;
   onChange: (value: boolean) => void;
@@ -28,8 +35,15 @@ export function SwitchRow(props: {
   return (
     <div class="frow ag-frow-switch">
       <div class="flabel">
-        {props.label}
-        <span class="fhelp">{props.help}</span>
+        <Show when={props.info} fallback={props.label}>
+          <span class="info-line">
+            {props.label}
+            <InfoTip label={`About ${props.label}`}>{props.info}</InfoTip>
+          </span>
+        </Show>
+        <Show when={props.help}>
+          <span class="fhelp">{props.help}</span>
+        </Show>
         <Show when={props.children}>
           <div class="ag-frow-extra">{props.children}</div>
         </Show>
@@ -108,12 +122,17 @@ export function useAdapters(agent: () => AgentDetail) {
   return { query, harness };
 }
 
-/** A section's title and purpose, above its cards (board 26). */
-export function SectionTitle(props: { title: JSX.Element; children?: JSX.Element; aside?: JSX.Element }) {
+/**
+ * A section's title above its cards (board 26). `info` is the section's purpose, behind an "i"
+ * beside the title; children stay visible, for state.
+ */
+export function SectionTitle(props: { title: JSX.Element; info?: JSX.Element; children?: JSX.Element; aside?: JSX.Element }) {
   return (
     <div class="ag-sec-title">
       <div>
-        <h2 class="disp">{props.title}</h2>
+        <InfoHeading level={2} class="disp" info={props.info}>
+          {props.title}
+        </InfoHeading>
         <Show when={props.children}>
           <p>{props.children}</p>
         </Show>

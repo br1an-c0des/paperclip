@@ -1,11 +1,11 @@
 import type { RoutineConcurrencyPolicy } from "@paperclipai/shared";
-import { CalendarClock, Info, Webhook } from "lucide-solid";
+import { CalendarClock, Webhook } from "lucide-solid";
 import { createMemo, For, Show } from "solid-js";
 import { Button } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
+import { InfoTip as UiInfoTip } from "@/ui/InfoTip";
 import { Segmented } from "@/ui/Segmented";
 import { Switch } from "@/ui/Switch";
-import { Tooltip } from "@/ui/Tooltip";
 import {
   cronProblem,
   DAY_NAMES,
@@ -155,7 +155,7 @@ export function RepeatMenu(props: {
         <div class="rp-switch">
           <Webhook size={16} aria-hidden="true" class="rp-icon" />
           <Switch label="When a webhook arrives" checked={props.value.webhook} onChange={(webhook) => props.onChange({ webhook })} />
-          <InfoTip text={HOOK_TIP} />
+          <InfoTip text={HOOK_TIP} label="About When a webhook arrives" />
         </div>
         <Show when={props.value.webhook}>
           <div class="rp-row">
@@ -203,15 +203,10 @@ export function RepeatMenu(props: {
   );
 }
 
-/** A small (i) whose tooltip explains the control beside it. */
+/**
+ * A small (i) whose tip explains the control beside it: `ui/InfoTip` with the text as a prop, so it
+ * also opens on a tap. New code uses `ui/InfoTip` directly.
+ */
 export function InfoTip(props: { text: string; label?: string }) {
-  return (
-    <Tooltip content={props.text}>
-      {(trigger) => (
-        <button {...trigger} type="button" class="rp-info" aria-label={props.label ?? props.text}>
-          <Info size={14} aria-hidden="true" />
-        </button>
-      )}
-    </Tooltip>
-  );
+  return <UiInfoTip label={props.label ?? "About this setting"}>{props.text}</UiInfoTip>;
 }

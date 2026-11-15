@@ -1,5 +1,7 @@
 import { Check, LoaderCircle } from "lucide-solid";
 import { createSignal, Match, onCleanup, Show, Switch as SwitchFlow, type JSX, type ParentProps } from "solid-js";
+import { InfoHeading } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { Switch } from "@/ui/Switch";
 import { TonePill, type Tone } from "@/ui/Status";
 
@@ -76,10 +78,13 @@ export function SaveNote(props: ParentProps<{ saver: { state: () => SaveState; e
   );
 }
 
-export function SectionTitle(props: ParentProps<{ title: string }>) {
+/** A section's title. `info` is its purpose, behind an "i" beside the title; children stay visible, for state. */
+export function SectionTitle(props: ParentProps<{ title: string; info?: JSX.Element }>) {
   return (
     <div class="as-sec-title">
-      <h2 class="disp">{props.title}</h2>
+      <InfoHeading level={2} class="disp" info={props.info}>
+        {props.title}
+      </InfoHeading>
       <Show when={props.children}>
         <p>{props.children}</p>
       </Show>
@@ -87,12 +92,27 @@ export function SectionTitle(props: ParentProps<{ title: string }>) {
   );
 }
 
-/** A settings row whose control is a switch at the right. */
-export function SwitchRow(props: { label: string; help?: JSX.Element; checked: boolean; disabled?: boolean; onChange: (value: boolean) => void }) {
+/**
+ * A settings row whose control is a switch at the right. `info` is what the setting is for, behind
+ * an "i" beside the label; `help` stays visible, for state or why the switch is unavailable.
+ */
+export function SwitchRow(props: {
+  label: string;
+  info?: JSX.Element;
+  help?: JSX.Element;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (value: boolean) => void;
+}) {
   return (
     <div class="frow as-frow-switch">
       <div class="flabel">
-        {props.label}
+        <Show when={props.info} fallback={props.label}>
+          <span class="info-line">
+            {props.label}
+            <InfoTip label={`About ${props.label}`}>{props.info}</InfoTip>
+          </span>
+        </Show>
         <Show when={props.help}>
           <span class="fhelp">{props.help}</span>
         </Show>

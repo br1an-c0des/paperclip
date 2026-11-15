@@ -25,7 +25,25 @@ import "./InfoTip.css";
  * the control of a label it sits in.
  *
  *   <InfoTip label="About Repositories">Which GitHub repositories the project's code comes from.</InfoTip>
+ *
+ * Most help goes in a component's `info` prop rather than a hand-placed InfoTip. These take one,
+ * each rendering the "i" beside its title or label, outside any <label>, named "About <label>":
+ * - ui/Field.tsx: `Field`, `SettingsCard`, `SettingsRow`, and `InfoHeading` (a heading of any level
+ *   with its tip, for custom card and section headers).
+ * - ui/Dialog.tsx `Dialog` (beside the title), ui/Switch.tsx `Switch` (beside the label),
+ *   ui/ChoiceCard.tsx `ChoiceCard` (per radio option).
+ * - Local helpers: agents/shared.tsx `SectionTitle` and `SwitchRow` (also re-exported by
+ *   settings/company/shared.tsx), settings/app/shared.tsx `SectionTitle` and `SwitchRow`,
+ *   settings/company/shared.tsx `CardHead`, apps/chat/parts.tsx `Card`, auth/Standalone.tsx
+ *   `Standalone` (beside the page title).
+ * `CardNote` (projects/settings/shared.tsx) is for save status only: a card's purpose goes in the
+ * card's `info`. recurring/RepeatMenu.tsx's `InfoTip` is a wrapper over this one.
  */
+
+/** The info button's name: "About Repositories", or `fallback` for a label that isn't text. */
+export function aboutLabel(label: JSX.Element, fallback = "About this setting") {
+  return typeof label === "string" ? `About ${label}` : fallback;
+}
 
 export function InfoTip(props: {
   /** The button's accessible name, such as "About Repositories". */

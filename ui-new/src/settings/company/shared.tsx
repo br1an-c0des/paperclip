@@ -3,6 +3,7 @@ import { createSignal, onCleanup, Show, type JSX } from "solid-js";
 import { companiesApi, type CompanyPatch } from "@/api/companies";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
+import { InfoHeading } from "@/ui/Field";
 import { failure, type SaveState } from "@/projects/settings/shared";
 
 /*
@@ -11,7 +12,7 @@ import { failure, type SaveState } from "@/projects/settings/shared";
  * cards are the agent settings' (agents/shared.tsx), so the three settings pages read alike.
  */
 
-export { CardNote, FootError, failure, SaveStatus } from "@/projects/settings/shared";
+export { CardNote, FootError, failure, saveNote, SaveStatus } from "@/projects/settings/shared";
 export { OutlineCard, SectionTitle, SwitchRow, shortDate, dateTime } from "@/agents/shared";
 
 /**
@@ -60,14 +61,17 @@ export function useCompanySaver() {
   return { ...runner, save };
 }
 
-/** A card whose header has a title, a note and actions at its end (board 22's People and Invites). */
-export function CardHead(props: { id?: string; title: JSX.Element; note?: JSX.Element; actions?: JSX.Element }) {
+/**
+ * A card whose header has a title, a note and actions at its end (board 22's People and Invites).
+ * `info` is what the card is for, behind an "i" beside the title; `note` stays visible, for state.
+ */
+export function CardHead(props: { id?: string; title: JSX.Element; info?: JSX.Element; note?: JSX.Element; actions?: JSX.Element }) {
   return (
     <header class="chead cs-chead">
       <div class="cs-chead-text">
-        <h3 class="disp" id={props.id}>
+        <InfoHeading level={3} class="disp" id={props.id} info={props.info}>
           {props.title}
-        </h3>
+        </InfoHeading>
         <Show when={props.note}>
           <p>{props.note}</p>
         </Show>

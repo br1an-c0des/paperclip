@@ -605,37 +605,13 @@ a.ap-row-name:hover {
   list-style: none;
 }
 
-.ap-signin-options .cx-option {
+/* ui/ChoiceCard on the sign-in panel's tinted ground */
+.ap-signin-options .choice-card {
   background: var(--ground);
 }
 
-.ap-signin-options .cx-option--on {
+.ap-signin-options .choice-card--on {
   background: var(--run-bg);
-}
-
-/* A radio card with its "i" outside the label (shared.tsx ChoiceCard) */
-.ap-choice {
-  padding: 0 12px 0 0;
-  cursor: default;
-}
-
-.ap-choice-label {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  min-height: 42px;
-  padding: 6px 0 6px 12px;
-  cursor: pointer;
-}
-
-.ap-choice-label input {
-  accent-color: var(--run-fg);
-}
-
-.ap-choice-label .cx-option-name {
-  white-space: normal;
 }
 
 .ap-signin-fields {

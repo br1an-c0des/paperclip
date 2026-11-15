@@ -107,9 +107,9 @@ export function SetupSteps<T extends string>(props: {
 }
 
 /** A settings card whose body is free content (lists, notes, toggles) rather than label rows. */
-export function Card(props: ParentProps<{ title?: JSX.Element; description?: JSX.Element; footer?: JSX.Element }>) {
+export function Card(props: ParentProps<{ title?: JSX.Element; info?: JSX.Element; description?: JSX.Element; footer?: JSX.Element }>) {
   return (
-    <SettingsCard title={props.title} description={props.description} footer={props.footer}>
+    <SettingsCard title={props.title} info={props.info} description={props.description} footer={props.footer}>
       <div class="ch-body">{props.children}</div>
     </SettingsCard>
   );

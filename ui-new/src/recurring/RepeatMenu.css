@@ -166,19 +166,3 @@
   padding: 12px 16px;
   border-top: 1px solid var(--line);
 }
-
-.rp-info {
-  display: inline-grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  color: var(--muted);
-}
-
-.rp-info:hover,
-.rp-info:focus-visible {
-  color: var(--text);
-  background: var(--well);
-}
