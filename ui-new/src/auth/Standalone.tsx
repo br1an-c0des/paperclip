@@ -1,13 +1,23 @@
 import { For, Show, type JSX, type ParentProps } from "solid-js";
+import { InfoHeading } from "@/ui/Field";
 import "./Auth.css";
 
 /*
  * The frame for pages outside a company (sign-in, invites, claims, connections, onboarding): a
  * centred card with the Paperclip eyebrow and a display title, as the sign-in page and <Splash> set
- * the look. `wide` fits a form beside its details.
+ * the look. `wide` fits a form beside its details. `info` is what the page is for, behind an "i"
+ * beside the title; `lede` stays visible, for what the person must read before acting.
  */
 export function Standalone(
-  props: ParentProps<{ title: JSX.Element; eyebrow?: JSX.Element; lede?: JSX.Element; mark?: JSX.Element; wide?: boolean; label?: string }>,
+  props: ParentProps<{
+    title: JSX.Element;
+    eyebrow?: JSX.Element;
+    info?: JSX.Element;
+    lede?: JSX.Element;
+    mark?: JSX.Element;
+    wide?: boolean;
+    label?: string;
+  }>,
 ) {
   return (
     <main class="stand">
@@ -18,7 +28,9 @@ export function Standalone(
           </Show>
           <span class="stand-head-text">
             <span class="mono cap">{props.eyebrow ?? "Paperclip"}</span>
-            <h1 class="disp">{props.title}</h1>
+            <InfoHeading level={1} class="disp" info={props.info}>
+              {props.title}
+            </InfoHeading>
           </span>
         </header>
         <Show when={props.lede}>

@@ -110,8 +110,21 @@ export function SaveStatus(props: { state: SaveState; error: string | null }) {
   );
 }
 
-/** A card description with the save status after it. */
-export function CardNote(props: { children: JSX.Element; state?: SaveState; error?: string | null }) {
+/**
+ * A card's save status as its `description`, or nothing while idle, so an idle card's header has
+ * no empty line: `description={saveNote(saver.state(), saver.error())}`. What the card is for goes
+ * in the card's `info` (InfoTip.tsx).
+ */
+export function saveNote(state: SaveState, error: string | null) {
+  return state === "idle" ? undefined : <SaveStatus state={state} error={error} />;
+}
+
+/**
+ * State that must stay visible in a card's description, with the save status after it. Not for
+ * what the card is for: that goes in the card's `info`. (Some callers still pass help text as
+ * children; it moves to `info` in the info-tip sweep. With no children, use `saveNote`.)
+ */
+export function CardNote(props: { children?: JSX.Element; state?: SaveState; error?: string | null }) {
   return (
     <>
       {props.children}

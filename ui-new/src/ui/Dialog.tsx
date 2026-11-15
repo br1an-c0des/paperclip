@@ -1,6 +1,7 @@
 import { Dialog as KDialog } from "@kobalte/core/dialog";
 import { X } from "lucide-solid";
 import { createContext, createRenderEffect, on, Show, useContext, type JSX, type ParentProps } from "solid-js";
+import { aboutLabel, InfoTip } from "./InfoTip";
 import { layerMode, SheetOnly, useLayerMount } from "./layer";
 import "./Dialog.css";
 
@@ -27,12 +28,31 @@ export function useInDialog() {
   return useContext(InDialogContext);
 }
 
+const FOCUSABLE =
+  'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** The first element focus would land on in the dialog, other than an "i" button. */
+function firstFocusableAfterTip(root: HTMLElement | undefined) {
+  if (!root) return null;
+  for (const el of root.querySelectorAll<HTMLElement>(FOCUSABLE)) {
+    if (!el.closest(".infotip") && !el.closest("[hidden]")) return el;
+  }
+  return null;
+}
+
 export type DialogProps = ParentProps<{
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   /** Visible title. Pass `titleHidden` to keep it for screen readers only. */
   title: JSX.Element;
   titleHidden?: boolean;
+  /**
+   * What the dialog is for, behind an "i" button beside the title (InfoTip.tsx), named "About
+   * <title>" or `infoLabel`.
+   */
+  info?: JSX.Element;
+  infoLabel?: string;
+  /** Visible under the title, and the dialog's description: state and consequences, not purpose. */
   description?: JSX.Element;
   /** Maximum width in px: 760 for forms like the new-task dialog, 1300 for the task modal. */
   width?: number;
@@ -55,6 +75,7 @@ export type DialogProps = ParentProps<{
 
 export function Dialog(props: DialogProps) {
   const mount = useLayerMount();
+  let content: HTMLElement | undefined;
   // A controlled dialog has no Kobalte trigger to return focus to, so remember what had it.
   let returnFocus: HTMLElement | null = null;
   createRenderEffect(
@@ -88,8 +109,10 @@ export function Dialog(props: DialogProps) {
             onInteractOutside={(event: Event) => {
               if (event.target instanceof Element && event.target.closest(".toast")) event.preventDefault();
             }}
+            ref={content}
             onOpenAutoFocus={(event: Event) => {
-              const target = props.initialFocus?.();
+              // The title's "i" comes first, but focus on it would open its tip: start after it.
+              const target = props.initialFocus?.() ?? (props.info ? firstFocusableAfterTip(content) : null);
               if (!target) return;
               event.preventDefault();
               target.focus();
@@ -100,7 +123,12 @@ export function Dialog(props: DialogProps) {
               <span class="layer-handle" aria-hidden="true" />
             </SheetOnly>
             <header class="dialog-head" classList={{ "sr-only": props.titleHidden }}>
-              <KDialog.Title class="dialog-title disp">{props.title}</KDialog.Title>
+              <Show when={props.info} fallback={<KDialog.Title class="dialog-title disp">{props.title}</KDialog.Title>}>
+                <div class="info-line">
+                  <KDialog.Title class="dialog-title disp">{props.title}</KDialog.Title>
+                  <InfoTip label={props.infoLabel ?? aboutLabel(props.title, "About this dialog")}>{props.info}</InfoTip>
+                </div>
+              </Show>
               <Show when={props.description}>
                 <KDialog.Description class="dialog-desc">{props.description}</KDialog.Description>
               </Show>

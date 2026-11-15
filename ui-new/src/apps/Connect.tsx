@@ -44,7 +44,8 @@ import {
   type ByoDraft,
   type ConnectDraft,
 } from "./apps-model";
-import { AgentAccessPicker, AppLogo, ChoiceCard, StateTag, useApplications, useConnections, useGallery, useRefreshTools } from "./shared";
+import { ChoiceCard } from "@/ui/ChoiceCard";
+import { AgentAccessPicker, AppLogo, StateTag, useApplications, useConnections, useGallery, useRefreshTools } from "./shared";
 import { channelMethod, chatConnectHref } from "./chat/chat-model";
 import { AggregatorConnect } from "./setups/AggregatorConnect";
 import { setupExtras, type GalleryExtras } from "./setups/SetupExtras";

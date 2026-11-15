@@ -1,0 +1,41 @@
+/* A radio option drawn as a card, with its "i" outside the label (ChoiceCard.tsx). */
+.choice-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px 0 0;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-inner);
+}
+
+.choice-card:hover {
+  background: var(--row-hover);
+}
+
+.choice-card--on {
+  border-color: var(--run-fg);
+  background: var(--run-bg);
+}
+
+.choice-card-label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 42px;
+  padding: 6px 0 6px 12px;
+  cursor: pointer;
+}
+
+.choice-card-label input {
+  accent-color: var(--run-fg);
+}
+
+.choice-card-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}

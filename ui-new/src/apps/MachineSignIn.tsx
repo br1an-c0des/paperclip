@@ -26,7 +26,8 @@ import {
   scopesText,
   type MachineDraft,
 } from "./machine-sign-in-model";
-import { ChoiceCard, failureText, useRefreshTools } from "./shared";
+import { ChoiceCard } from "@/ui/ChoiceCard";
+import { failureText, useRefreshTools } from "./shared";
 
 /*
  * Machine sign-in (OAuth client credentials) for an organization connection, after the old UI's

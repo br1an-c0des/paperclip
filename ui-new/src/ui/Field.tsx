@@ -1,5 +1,6 @@
-import { Show, splitProps, type JSX, type ParentProps } from "solid-js";
-import { InfoTip } from "./InfoTip";
+import { children, Show, splitProps, type JSX, type ParentProps } from "solid-js";
+import { Dynamic } from "solid-js/web";
+import { aboutLabel, InfoTip } from "./InfoTip";
 import "./Field.css";
 
 /*
@@ -13,11 +14,42 @@ import "./Field.css";
  *   Both take `info`: what the card or field is for, behind an "i" button beside the title or label
  *   (InfoTip.tsx has the rule). `description` and `help` stay for text that must be visible: state,
  *   why something is unavailable, save status, errors.
+ * - <InfoHeading>: a heading of any level with that "i" after it, for headers that aren't a
+ *   SettingsCard's (`.chead` intros, section heads, page titles).
  */
 
-/** The info button's name: "About Repositories", or a generic one for a label that isn't text. */
-function aboutLabel(label: JSX.Element) {
-  return typeof label === "string" ? `About ${label}` : "About this setting";
+/**
+ * A heading with an "i" button after it. The button sits beside the heading, not inside it, so it
+ * isn't part of the heading's name. Without `info` it's the bare heading, so nothing moves.
+ *
+ *   <InfoHeading level={3} class="disp" info="Which repositories the code comes from.">Repositories</InfoHeading>
+ */
+export function InfoHeading(
+  props: ParentProps<{
+    /** The level the heading would have without a tip. */
+    level: 1 | 2 | 3 | 4 | 5 | 6;
+    /** What the section is for, behind the "i" (InfoTip.tsx). */
+    info?: JSX.Element;
+    /** The button's name, when the heading isn't plain text; by default "About <heading>". */
+    infoLabel?: string;
+    class?: string;
+    id?: string;
+  }>,
+) {
+  const title = children(() => props.children);
+  const heading = () => (
+    <Dynamic component={`h${props.level}`} class={props.class} id={props.id}>
+      {title()}
+    </Dynamic>
+  );
+  return (
+    <Show when={props.info} fallback={heading()}>
+      <div class="info-line">
+        {heading()}
+        <InfoTip label={props.infoLabel ?? aboutLabel(title() as JSX.Element, "About this section")}>{props.info}</InfoTip>
+      </div>
+    </Show>
+  );
 }
 
 type InputProps = JSX.InputHTMLAttributes<HTMLInputElement> & { variant?: "title"; invalid?: boolean };
@@ -115,12 +147,9 @@ export function SettingsCard(
     <section class="card settings-card" aria-label={props["aria-label"]}>
       <Show when={props.title}>
         <header class="chead">
-          <Show when={props.info} fallback={<h3 class="disp">{props.title}</h3>}>
-            <div class="info-line">
-              <h3 class="disp">{props.title}</h3>
-              <InfoTip label={aboutLabel(props.title)}>{props.info}</InfoTip>
-            </div>
-          </Show>
+          <InfoHeading level={3} class="disp" info={props.info} infoLabel={aboutLabel(props.title)}>
+            {props.title}
+          </InfoHeading>
           <Show when={props.description}>
             <p>{props.description}</p>
           </Show>
