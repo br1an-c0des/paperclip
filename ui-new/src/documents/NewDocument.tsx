@@ -59,7 +59,8 @@ export function NewDocument(props: {
       class="tf dv"
       aria-label="New document"
       onKeyDown={(event) => {
-        if (event.key === "Escape" && !event.defaultPrevented) {
+        // Escape on an "i" button closes its tip, not the new document.
+        if (event.key === "Escape" && !event.defaultPrevented && !(event.target as Element).closest(".infotip")) {
           event.preventDefault();
           back();
         }

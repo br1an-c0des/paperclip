@@ -664,7 +664,8 @@ function WorkspaceForm(props: {
     props.onSubmit({ ...draft }, commands());
   };
   return (
-    <form class="ps-goal-form ps-workspace-form" onSubmit={submit} onKeyDown={(event) => event.key === "Escape" && props.onCancel()}>
+    // Escape on an "i" button closes its tip, not the form.
+    <form class="ps-goal-form ps-workspace-form" onSubmit={submit} onKeyDown={(event) => event.key === "Escape" && !(event.target as Element).closest(".infotip") && props.onCancel()}>
       <div class="ps-form-grid">
         {field("name", "Name", "Optional", { mono: false })}
         <Show when={!props.hideHostPaths}>{field("cwd", "Folder on the server", "/home/you/code/project")}</Show>
