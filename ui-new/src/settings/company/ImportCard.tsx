@@ -295,11 +295,11 @@ export function ImportCard() {
 
   return (
     <section class="card settings-card" id="import" aria-labelledby="cs-import">
-      <CardHead id="cs-import" title="Import" note="Bring in a company package as a new organization or into this one. Preview it first: nothing changes until you import." />
+      <CardHead id="cs-import" title="Import" info="Bring in a company package as a new organization or into this one. Preview it first: nothing changes until you import." />
       <Show
         when={!resumed()}
         fallback={
-          <SettingsRow label="Running import" help="Started before this page was reloaded. It runs on the server; this page follows it.">
+          <SettingsRow label="Running import" info="It runs on the server; this page follows it." help="Started before this page was reloaded.">
             <div class="cs-person-text">
               <span class="cs-strong">{resumed()!.label}</span>
               <span class="cs-muted">{resumed()!.target === "existing" ? `Into ${company().name}` : "As a new organization"}</span>
@@ -325,7 +325,7 @@ export function ImportCard() {
         <Show
           when={source() === "github"}
           fallback={
-            <SettingsRow label="Package" help="A .zip exported from Paperclip, or any agentcompanies/v1 package. Large ones upload in resumable parts.">
+            <SettingsRow label="Package" info="A .zip exported from Paperclip, or any agentcompanies/v1 package. Large ones upload in resumable parts.">
               <div class="cs-inline">
                 <input
                   ref={input}
@@ -350,7 +350,7 @@ export function ImportCard() {
           <SettingsRow
             label="GitHub address"
             for="cs-import-github"
-            help="A repository, a folder in it (…/tree/main/company) or its COMPANY.md (…/blob/main/COMPANY.md). Private repositories need a GitHub connection in Connections."
+            info="A repository, a folder in it (…/tree/main/company) or its COMPANY.md (…/blob/main/COMPANY.md). Private repositories need a GitHub connection in Connections."
           >
             <TextInput
               id="cs-import-github"
@@ -388,7 +388,7 @@ export function ImportCard() {
         <Show
           when={into()}
           fallback={
-            <SettingsRow label="New organization's name" for="cs-import-name" help="Optional. The package's own name is used otherwise.">
+            <SettingsRow label="New organization's name" for="cs-import-name" info="Optional. The package's own name is used otherwise.">
               <TextInput
                 id="cs-import-name"
                 value={name()}
@@ -428,7 +428,7 @@ export function ImportCard() {
               <Show when={into() && found().plan.companyAction === "update" && companyFile()}>
                 <SwitchRow
                   label="Update the organization's details"
-                  help="Take the package's name, description and settings for this organization. Off: only its agents, projects, tasks and skills come in."
+                  info="Take the package's name, description and settings for this organization. Off: only its agents, projects, tasks and skills come in."
                   checked={updateDetails()}
                   onChange={setUpdateDetails}
                 />
@@ -523,7 +523,7 @@ function ImportFiles(props: { paths: readonly string[]; checked: ReadonlySet<str
     });
 
   return (
-    <SettingsRow label="Files" help="Leave out files you don't want: an agent, a project, a skill or tasks.">
+    <SettingsRow label="Files" info="Leave out files you don't want: an agent, a project, a skill or tasks.">
       <div class="cs-person-text">
         <span class="cs-strong">
           {count(props.paths) === props.paths.length ? `All ${props.paths.length} files` : `${count(props.paths)} of ${props.paths.length} files`}
@@ -607,7 +607,7 @@ function ImportHarnesses(props: {
   onModel: (slug: string, model: string) => void;
 }) {
   return (
-    <SettingsRow label="Harnesses" help="What each agent runs in. Moving one keeps its instructions, variables and timeouts; its harness settings start fresh.">
+    <SettingsRow label="Harnesses" info="What each agent runs in. Moving one keeps its instructions, variables and timeouts; its harness settings start fresh.">
       <div class="cs-import-list" role="list" aria-label="Agents' harnesses">
         <For each={props.agents}>
           {(agent) => {
@@ -674,7 +674,7 @@ function ImportValues(props: {
   onChange: (key: string, value: string) => void;
 }) {
   return (
-    <SettingsRow label="Values it needs" help={`Secret values are stored as new secrets in ${props.organization}; plain ones are written into the agent or project. Optional ones can be filled in later.`}>
+    <SettingsRow label="Values it needs" info={`Secret values are stored as new secrets in ${props.organization}; plain ones are written into the agent or project. Optional ones can be filled in later.`}>
       <div class="cs-import-list" role="list" aria-label="Environment values">
         <For each={props.inputs}>
           {(input) => {

@@ -368,10 +368,10 @@ export function executionPolicy(mode: "kubernetes" | "any" | undefined) {
 }
 
 export const RETENTION = {
-  dailyDays: { label: "Daily backups", help: "Every backup in this window is kept.", values: [3, 7, 14], unit: "day" },
-  weeklyWeeks: { label: "Weekly backups", help: "Then one a week.", values: [1, 2, 4], unit: "week" },
-  monthlyMonths: { label: "Monthly backups", help: "Then one a month.", values: [1, 3, 6], unit: "month" },
-} as const satisfies Record<keyof BackupRetentionPolicy, { label: string; help: string; values: readonly number[]; unit: string }>;
+  dailyDays: { label: "Daily backups", info: "Every backup in this window is kept.", values: [3, 7, 14], unit: "day" },
+  weeklyWeeks: { label: "Weekly backups", info: "Then one a week.", values: [1, 2, 4], unit: "week" },
+  monthlyMonths: { label: "Monthly backups", info: "Then one a month.", values: [1, 3, 6], unit: "month" },
+} as const satisfies Record<keyof BackupRetentionPolicy, { label: string; info: string; values: readonly number[]; unit: string }>;
 
 export function retentionLabel(count: number, unit: string) {
   return `${count} ${unit}${count === 1 ? "" : "s"}`;
@@ -391,7 +391,7 @@ export function backupStatus(backup: InstanceHealth["databaseBackup"], now = Dat
 }
 
 export const FEEDBACK_OPTIONS: { value: FeedbackDataSharingPreference; label: string }[] = [
-  { value: "prompt", label: "Ask each time" },
+  { value: "prompt", label: "Ask on the next vote" },
   { value: "allowed", label: "Always allow" },
   { value: "not_allowed", label: "Don't allow" },
 ];
@@ -448,10 +448,10 @@ export function displayNameProblem(name: string) {
 // ---------------------------------------------------------------------------------------------
 // "Let agents tidy my inbox" (the old Profile page's InboxAgentPolicyControl)
 
-export const INBOX_POLICY_OPTIONS: readonly { value: InboxAgentPolicyMode; label: string; help: string }[] = [
-  { value: "open", label: "Any of my agents", help: "Any agent you manage may archive tasks out of your inbox." },
-  { value: "allowlist", label: "Only chosen agents", help: "Only the agents you pick below may." },
-  { value: "disabled", label: "Off", help: "Agents never archive tasks from your inbox." },
+export const INBOX_POLICY_OPTIONS: readonly { value: InboxAgentPolicyMode; label: string }[] = [
+  { value: "open", label: "Any of my agents" },
+  { value: "allowlist", label: "Only chosen agents" },
+  { value: "disabled", label: "Off" },
 ];
 
 export type InboxPolicyDraft = { mode: InboxAgentPolicyMode; allowedAgentIds: string[] };

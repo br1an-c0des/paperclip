@@ -171,10 +171,18 @@ function KeyLine(props: { value: string }) {
   );
 }
 
-function Row(props: { label: string; children: JSX.Element }) {
+/** A detail row. `info` is what the row means, behind an "i" beside the label. */
+function Row(props: { label: string; info?: JSX.Element; children: JSX.Element }) {
   return (
     <div>
-      <dt>{props.label}</dt>
+      <dt>
+        <Show when={props.info} fallback={props.label}>
+          <span class="info-line">
+            {props.label}
+            <InfoTip label={`About ${props.label}`}>{props.info}</InfoTip>
+          </span>
+        </Show>
+      </dt>
       <dd>{props.children}</dd>
     </div>
   );
@@ -200,13 +208,11 @@ function CompanyDetails(props: { secret: CompanySecret; configs: CompanySecretPr
         </Show>
       </Row>
       <Show when={props.secret.externalRef}>
-        <Row label="Reference">
+        <Row
+          label="Reference"
+          info={linked() ? (writes() ? "A new value is written to the vault." : "Change the value in the vault; Paperclip reads it at run time.") : undefined}
+        >
           <span class="mono">{props.secret.externalRef}</span>
-          <Show when={linked()}>
-            <span class="sec-sub">
-              <span>{writes() ? "A new value is written to the vault." : "Change the value in the vault; Paperclip reads it at run time."}</span>
-            </span>
-          </Show>
         </Row>
       </Show>
       <Row label="Description">{props.secret.description || <span class="cs-muted">—</span>}</Row>
@@ -565,13 +571,17 @@ export function SecretEditDialog(props: { edit: SecretEdit | null; descriptors: 
     }
   };
 
-  const describe = () => {
+  /** What replacing does, behind the title's "i"; writing to an outside vault stays visible (`describe`). */
+  const about = () => {
     const current = secret();
     if (!current || !rotating()) return undefined;
     if (current.managedMode !== "external_reference") return "Agents get the new value from their next run. The old one is kept as an earlier version.";
-    return kind() === "value"
-      ? `Written to ${current.externalRef} in ${providerName(current.provider)}. Everything that reads that secret gets it, inside and outside Paperclip.`
-      : "Points Paperclip at a different secret in your vault. Nothing is written to the vault.";
+    return kind() === "value" ? undefined : "Points Paperclip at a different secret in your vault. Nothing is written to the vault.";
+  };
+  const describe = () => {
+    const current = secret();
+    if (!current || !rotating() || current.managedMode !== "external_reference" || kind() !== "value") return undefined;
+    return `Written to ${current.externalRef} in ${providerName(current.provider)}. Everything that reads that secret gets it, inside and outside Paperclip.`;
   };
 
   return (
@@ -579,6 +589,7 @@ export function SecretEditDialog(props: { edit: SecretEdit | null; descriptors: 
       open={!!props.edit}
       onOpenChange={(open) => !open && props.onClose()}
       title={rotating() ? (kind() === "reference" ? `Change reference · ${secret()?.name ?? ""}` : `Replace value · ${secret()?.name ?? ""}`) : `Edit ${secret()?.name ?? ""}`}
+      info={about()}
       description={describe()}
       width={520}
       footer={

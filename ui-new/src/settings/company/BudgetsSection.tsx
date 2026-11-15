@@ -59,8 +59,8 @@ export function BudgetsSection() {
 
   return (
     <>
-      <SectionTitle title="Budgets">
-        Monthly limits for the organization, its agents and its projects, all in one place. Spending charts stay in{" "}
+      <SectionTitle title="Budgets" info="Monthly limits for the organization, its agents and its projects.">
+        Spending charts are in{" "}
         <A class="ps-link" href={`/${company().issuePrefix}/activity/costs`}>
           Activity → Costs
         </A>
@@ -122,7 +122,7 @@ function OrganizationBudgetCard(props: { policy: BudgetPolicySummary | null; loa
         ) : undefined
       }
     >
-      <SettingsRow label="Monthly budget" for="cs-org-budget" help="Leave it empty for no limit.">
+      <SettingsRow label="Monthly budget" for="cs-org-budget" info="Leave it empty for no limit.">
         <div class="ps-money cs-field-160">
           <span aria-hidden="true">$</span>
           <TextInput
@@ -185,7 +185,7 @@ function LimitMenu(props: { scope: ScopeKind; hardStop: boolean; onChange: (hard
         {limitAction(props.scope, props.hardStop)}
       </Menu.Trigger>
       <Menu.Content label="When the limit is reached" width={280}>
-        <Menu.Item onSelect={() => props.onChange(true)} description="New runs wait until the limit is raised" hint={props.hardStop ? <Check size={14} /> : undefined}>
+        <Menu.Item onSelect={() => props.onChange(true)} description="Pauses it and stops its running and queued work until the limit is raised" hint={props.hardStop ? <Check size={14} /> : undefined}>
           {limitAction(props.scope, true)}
         </Menu.Item>
         <Menu.Item onSelect={() => props.onChange(false)} description="Runs carry on past the limit" hint={props.hardStop ? undefined : <Check size={14} />}>
@@ -333,7 +333,7 @@ function ScopesCard(props: { policies: BudgetPolicySummary[] | undefined; loaded
       <CardHead
         id="cs-budgets"
         title="Agents and projects"
-        note="A run stops when its agent or its project reaches its budget, whichever comes first. Clear an amount to remove that budget."
+        info="At its budget, an agent or project set to pause is paused and its running and queued work stops, whichever limit comes first; one set to Only warn carries on. Clear an amount to remove that budget."
         actions={
           <Menu placement="bottom-end">
             <Menu.Trigger as={Button} size="compact" disabled={!props.loaded}>

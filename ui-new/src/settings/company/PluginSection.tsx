@@ -18,9 +18,7 @@ export function PluginPageSection(props: { page: PluginSettingsPage }) {
   const slot = createMemo(() => plugins.slots().find((candidate) => candidate.pluginId === props.page.pluginId && candidate.id === props.page.slotId));
   return (
     <>
-      <SectionTitle title={props.page.label}>
-        A settings page the {props.page.pluginName} plugin adds ({props.page.version}).
-      </SectionTitle>
+      <SectionTitle title={props.page.label} info={`A settings page the ${props.page.pluginName} plugin adds (${props.page.version}).`} />
       <section aria-label={props.page.label} class="card settings-card">
         <Show when={slot()} fallback={<CardNoteLine>Loading…</CardNoteLine>}>
           {(found) => <PluginSlotMount slot={found()} context={{ companyId: company().id, companyPrefix: company().issuePrefix }} class="plugin-tab plugin-tab-card" missing="placeholder" />}
@@ -34,9 +32,9 @@ export function PluginsOverview(props: { pages: PluginSettingsPage[]; loading: b
   const company = useCompany();
   return (
     <>
-      <SectionTitle title="From plugins">Settings pages that installed plugins add to the organization. Each one gets an entry in this list.</SectionTitle>
+      <SectionTitle title="From plugins" info="Settings pages that installed plugins add to the organization." />
       <section class="card settings-card" aria-labelledby="cs-plugin-pages">
-        <CardHead id="cs-plugin-pages" title="Plugin settings pages" note="Each plugin draws its own page." />
+        <CardHead id="cs-plugin-pages" title="Plugin settings pages" />
         <Show when={!props.error} fallback={<CardNoteLine alert>Couldn't load the plugins.</CardNoteLine>}>
           <For each={props.pages} fallback={<CardNoteLine>{props.loading ? "Loading…" : "No installed plugin adds a settings page."}</CardNoteLine>}>
             {(page) => (

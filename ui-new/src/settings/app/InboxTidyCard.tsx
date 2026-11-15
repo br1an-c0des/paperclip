@@ -67,11 +67,8 @@ export function InboxTidyCard() {
   return (
     <SettingsCard
       title="Let agents tidy my inbox"
-      description={
-        <SaveNote saver={saver}>
-          In {company().name}: whether agents you manage may archive tasks out of your inbox. You can undo any archive, and the task says which agent did it.
-        </SaveNote>
-      }
+      info="Whether agents you manage may archive tasks out of your inbox. You can undo any archive, and the task says which agent did it."
+      description={<SaveNote saver={saver}>For {company().name} only.</SaveNote>}
       footer={
         <Show when={dirty()}>
           <span class="as-lrow-end">
@@ -86,7 +83,7 @@ export function InboxTidyCard() {
       }
     >
       <Show when={!policy.isError} fallback={<p class="as-empty-line">Couldn't load your inbox setting. {policy.error instanceof Error ? policy.error.message : ""}</p>}>
-        <SettingsRow label="Who may archive" help={INBOX_POLICY_OPTIONS.find((option) => option.value === draft.mode)?.help}>
+        <SettingsRow label="Who may archive">
           <Show when={policy.data} fallback={<span class="as-muted">Loading…</span>}>
             <Segmented label="Who may archive from your inbox" options={INBOX_POLICY_OPTIONS} value={draft.mode} onChange={(mode) => setDraft("mode", mode)} />
           </Show>

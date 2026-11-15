@@ -117,7 +117,7 @@ export function EnvVarsEditor(props: {
                       )}
                     </For>
                     <Menu.Separator />
-                    <Menu.CheckboxItem checked={row.required} onChange={(value) => update(row.id, (draft) => void (draft.required = value))} description="Runs wait until the person has set it">
+                    <Menu.CheckboxItem checked={row.required} onChange={(value) => update(row.id, (draft) => void (draft.required = value))} description="Runs fail until the person sets it">
                       Required
                     </Menu.CheckboxItem>
                   </Menu.Content>

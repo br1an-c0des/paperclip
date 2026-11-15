@@ -144,7 +144,6 @@ export function AddConnectionDialog(props: {
       open={props.open}
       onOpenChange={props.onOpenChange}
       title="Add a shared connection"
-      description={`An API key the whole organization can use ${props.purpose}. Calls are charged to it.`}
       width={520}
       footer={
         <>
@@ -174,7 +173,7 @@ export function AddConnectionDialog(props: {
         <Field label="Name" for="cs-conn-name" help="Optional.">
           <TextInput id="cs-conn-name" value={name()} placeholder={`${PROVIDER_LABEL[provider()]}, shared`} onInput={(event) => setName(event.currentTarget.value)} />
         </Field>
-        <Field label="API key" for="cs-conn-key">
+        <Field label="API key" for="cs-conn-key" info={`An API key the whole organization can use ${props.purpose}. Calls are charged to it.`}>
           <TextInput id="cs-conn-key" type="password" autocomplete="new-password" value={key()} onInput={(event) => setKey(event.currentTarget.value)} />
         </Field>
       </div>

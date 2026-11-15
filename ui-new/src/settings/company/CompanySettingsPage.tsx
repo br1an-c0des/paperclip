@@ -69,7 +69,7 @@ export function CompanySettingsPage() {
             }}
           </Match>
           <Match when={route().kind === "instance"}>
-            <SectionTitle title="App settings">This address belongs to app settings, which apply to every organization on this Paperclip instance.</SectionTitle>
+            <SectionTitle title="App settings" info="App settings apply to every organization on this Paperclip instance.">This address belongs to app settings.</SectionTitle>
             <CardNoteLine>
               <A class="cs-link-button" href={`${base()}/instance`}>
                 Open app settings

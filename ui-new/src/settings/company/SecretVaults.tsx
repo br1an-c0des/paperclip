@@ -466,7 +466,7 @@ function VaultDialog(props: { edit: VaultEdit | null; kind: (provider: SecretPro
           <Match when={true}>
             <Switch
               label={form.provider === "local_encrypted" ? "Use for new secrets by default" : `Use for new ${props.kind(form.provider)} secrets by default`}
-              description="Existing secrets stay where they are."
+              info="Existing secrets stay where they are."
               checked={form.isDefault}
               onChange={(value) => setForm("isDefault", value)}
             />
@@ -640,7 +640,7 @@ export function ImportSecretsDialog(props: { vault: CompanySecretProviderConfig 
       open={!!props.vault}
       onOpenChange={(open) => !open && props.onClose()}
       title={`Import from ${props.vault?.displayName ?? ""}`}
-      description="Existing secrets come in as references: Paperclip reads their values from the provider when a run needs them."
+      info="Existing secrets come in as references: Paperclip reads their values from the provider when a run needs them."
       width={720}
       footer={
         <>

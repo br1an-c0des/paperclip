@@ -6,9 +6,9 @@ import type { CompanyInviteRecord, CompanyJoinRequest, CompanyMember, CompanyUse
  */
 
 export const ROLE_OPTIONS: readonly { value: HumanCompanyRole; label: string; description: string }[] = [
-  { value: "owner", label: "Owner", description: "Everything, including billing and removing the organization" },
-  { value: "admin", label: "Admin", description: "Settings, members and every agent" },
-  { value: "operator", label: "Operator", description: "Tasks, projects and agents" },
+  { value: "owner", label: "Owner", description: "Everything, including changing and removing members" },
+  { value: "admin", label: "Admin", description: "Everything but changing and removing members" },
+  { value: "operator", label: "Operator", description: "Tasks, projects and agents, and inviting people" },
   { value: "viewer", label: "Viewer", description: "Can look, but not change anything" },
 ];
 

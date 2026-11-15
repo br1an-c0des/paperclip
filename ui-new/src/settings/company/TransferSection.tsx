@@ -33,7 +33,7 @@ import { createZipArchive, downloadBytes } from "./zip";
 export function TransferSection() {
   return (
     <>
-      <SectionTitle title="Import and export">Move an organization between Paperclip instances as a company package.</SectionTitle>
+      <SectionTitle title="Import and export" info="Move an organization between Paperclip instances as a company package." />
       <ExportCard />
       <ImportCard />
     </>
@@ -90,9 +90,9 @@ function ExportCard() {
 
   return (
     <section class="card settings-card" id="export" aria-labelledby="cs-export">
-      <CardHead id="cs-export" title="Export" note="Agents, projects, their instructions and settings, as markdown and YAML files in a zip. Secret values are never included." />
-      <SwitchRow label="Include tasks" help="Open and closed tasks with their descriptions." checked={issues()} onChange={(value) => change(setIssues, value)} />
-      <SwitchRow label="Include skills" help="The organization's skill library." checked={skills()} onChange={(value) => change(setSkills, value)} />
+      <CardHead id="cs-export" title="Export" info="Agents, projects, their instructions and settings, as markdown and YAML files in a zip. Secret values are never included." />
+      <SwitchRow label="Include tasks" info="Open and closed tasks with their descriptions, and the organization's recurring tasks." checked={issues()} onChange={(value) => change(setIssues, value)} />
+      <SwitchRow label="Include skills" info="The organization's skill library." checked={skills()} onChange={(value) => change(setSkills, value)} />
       <Show when={preview()}>
         {(found) => (
           <SettingsRow label="Package">
@@ -112,7 +112,7 @@ function ExportCard() {
         )}
       </Show>
       <Show when={fidelity.data?.warnings.length}>
-        <SettingsRow label="Not included" help="A package never carries these.">
+        <SettingsRow label="Not included" info="A package never carries these.">
           <div class="cs-person-text">
             <For each={fidelity.data!.warnings}>{(warning) => <span class="cs-muted">{warning.message}</span>}</For>
           </div>

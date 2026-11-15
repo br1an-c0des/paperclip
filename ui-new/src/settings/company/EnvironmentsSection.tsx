@@ -113,11 +113,12 @@ export function EnvironmentsSection() {
 
   return (
     <>
-      <SectionTitle title="Environments">Where this organization's agents run.</SectionTitle>
+      <SectionTitle title="Environments" info="Where this organization's agents run." />
       <section class="card settings-card" aria-labelledby="cs-envs">
         <CardHead
           id="cs-envs"
           title="Environments"
+          info="The default is instance-wide: agents in every organization on this instance that haven't picked an environment run there."
           note={environments.data ? `${list().filter((entry) => entry.status === "active").length} active` : "Loading…"}
           actions={
             <Button size="compact" variant="primary" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setEditing({ mode: "new" })}>
@@ -125,10 +126,6 @@ export function EnvironmentsSection() {
             </Button>
           }
         />
-        <CardNoteLine>
-          The default is instance-wide: agents in every organization on this instance that haven't picked an environment run
-          there.
-        </CardNoteLine>
         <Show when={environments.isError}>
           <CardNoteLine alert>Couldn't load the environments. {failure(environments.error, "")}</CardNoteLine>
         </Show>

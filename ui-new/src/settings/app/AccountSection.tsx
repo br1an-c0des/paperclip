@@ -13,7 +13,7 @@ import { SettingsCard, SettingsRow, TextInput } from "@/ui/Field";
 import { pushToast } from "@/ui/Toast";
 import { APP_SETTINGS_PATH, avatarNamespace, displayNameProblem } from "./app-settings-model";
 import { InboxTidyCard } from "./InboxTidyCard";
-import { failure, LaterNote, SaveNote, SectionTitle, useSaver } from "./shared";
+import { failure, LaterNote, saveNote, SectionTitle, useSaver } from "./shared";
 
 /*
  * Account (board 30's outline): your profile, whether agents may tidy your inbox (InboxTidyCard.tsx,
@@ -71,10 +71,10 @@ export function AccountSection(props: { isAdmin: boolean }) {
 
   return (
     <>
-      <SectionTitle title="Account">You, on this Paperclip instance.</SectionTitle>
+      <SectionTitle title="Account" info="You, on this Paperclip instance." />
 
-      <SettingsCard title="Profile" description={<SaveNote saver={saver}>How you appear in the sidebar, in comments and to agents.</SaveNote>}>
-        <SettingsRow label="Photo" help={`Stored in ${company().name}'s file storage.`}>
+      <SettingsCard title="Profile" info="How you appear in the sidebar, in comments and to agents." description={saveNote(saver)}>
+        <SettingsRow label="Photo" info={`Stored in ${company().name}'s file storage.`}>
           <div class="as-inline">
             <Show when={profile.data?.image} fallback={<InitialsDisc name={shownName()} you size={48} />}>
               {(src) => <img class="as-avatar" src={src()} alt="" width="48" height="48" />}
@@ -102,7 +102,7 @@ export function AccountSection(props: { isAdmin: boolean }) {
             </Show>
           </div>
         </SettingsRow>
-        <SettingsRow label="Display name" for="as-name" help="Changes save when you leave the field.">
+        <SettingsRow label="Display name" for="as-name" info="Changes save when you leave the field.">
           <div class="as-stack">
             <TextInput
               id="as-name"
@@ -137,7 +137,7 @@ export function AccountSection(props: { isAdmin: boolean }) {
 
       <InboxTidyCard />
 
-      <SettingsCard title="Your organizations" description="The organizations you belong to.">
+      <SettingsCard title="Your organizations">
         <For each={companies.data ?? []} fallback={<p class="as-empty-line">You don't belong to any organization yet.</p>}>
           {(entry) => (
             <div class="as-lrow">
@@ -179,7 +179,7 @@ export function AccountSection(props: { isAdmin: boolean }) {
               </div>
             }
           >
-            <SettingsRow label="Sign out" help="Ends this browser's session. You'll go to the sign-in page.">
+            <SettingsRow label="Sign out" info="Ends this browser's session. You'll go to the sign-in page.">
               <Button icon={<LogOut size={15} />} onClick={() => void signOut()}>
                 Sign out
               </Button>

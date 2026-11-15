@@ -18,7 +18,7 @@ import {
   type InstanceHealth,
 } from "./app-settings-model";
 import { FeaturesCard } from "./FeaturesCard";
-import { SaveNote, SectionTitle, StatePill, SwitchRow, useSaver } from "./shared";
+import { SaveNote, saveNote, SectionTitle, StatePill, SwitchRow, useSaver } from "./shared";
 
 /*
  * General (board 28): how this instance is deployed, its privacy defaults, its backups and its
@@ -54,10 +54,10 @@ export function GeneralSection() {
 
   return (
     <>
-      <SectionTitle title="General">How this instance is deployed, its privacy defaults, its backups and its features. They apply to every organization on this server.</SectionTitle>
+      <SectionTitle title="General" info="How this instance is deployed, its privacy defaults, its backups and its features. They apply to every organization on this server." />
 
       <Show when={!hidden().has("instance.general.deploymentStatus")}>
-        <SettingsCard title="Deployment and sign-in" description="Set in the server's configuration when it starts. Shown here so you can check it.">
+        <SettingsCard title="Deployment and sign-in" description="Set in the server's configuration.">
           <SettingsRow label="Mode">
             <div class="as-inline as-min-34">
               <StatePill label={mode().label} tone="green" />
@@ -100,11 +100,11 @@ export function GeneralSection() {
       </Show>
 
       <Show when={!hidden().has("instance.general.censorUsernameInLogs") || !hidden().has("instance.general.feedbackDataSharingPreference")}>
-        <SettingsCard title="Privacy" description={<SaveNote saver={privacy}>Changes save as you make them.</SaveNote>}>
+        <SettingsCard title="Privacy" info="Changes save as you make them." description={saveNote(privacy)}>
           <Show when={!hidden().has("instance.general.censorUsernameInLogs")}>
             <SwitchRow
               label="Hide usernames in logs"
-              help="Replaces your computer's username in home-folder paths in run logs and transcripts. Other mentions of it aren't hidden yet."
+              info="Replaces your computer's username in home-folder paths in run logs and transcripts. Other mentions of it aren't hidden yet."
               checked={general.data?.censorUsernameInLogs === true}
               disabled={!general.data || privacy.busy()}
               onChange={(value) => void save(privacy, { censorUsernameInLogs: value })}
@@ -113,7 +113,7 @@ export function GeneralSection() {
           <Show when={!hidden().has("instance.general.feedbackDataSharingPreference")}>
             <SettingsRow
               label="AI feedback sharing"
-              help="Whether a thumbs up or down on an agent's output also sends that output to Paperclip Labs. Votes are always kept here."
+              info="Whether a thumbs up or down on an agent's output also sends that output to Paperclip Labs. Votes are always kept here."
             >
               <div class="as-stack">
                 <Segmented<FeedbackDataSharingPreference>
@@ -138,16 +138,18 @@ export function GeneralSection() {
       <Show when={!hidden().has("instance.general.backupRetention")}>
         <SettingsCard
           title="Backups"
+          info="How long Paperclip keeps its automatic database backups."
           description={
-            <SaveNote saver={backups}>
-              How long Paperclip keeps its automatic database backups.
-              <Show when={backup()}>{(status) => <span classList={{ "as-bad": !status().ok }}> {status().text}</span>}</Show>
-            </SaveNote>
+            backup() || backups.state() !== "idle" ? (
+              <SaveNote saver={backups}>
+                <Show when={backup()}>{(status) => <span classList={{ "as-bad": !status().ok }}>{status().text}</span>}</Show>
+              </SaveNote>
+            ) : undefined
           }
         >
           <For each={Object.entries(RETENTION) as [keyof BackupRetentionPolicy, (typeof RETENTION)[keyof BackupRetentionPolicy]][]}>
             {([key, meta]) => (
-              <SettingsRow label={meta.label} help={meta.help}>
+              <SettingsRow label={meta.label} info={meta.info}>
                 <Segmented
                   label={meta.label}
                   options={meta.values.map((count) => ({ value: String(count), label: retentionLabel(count, meta.unit) }))}

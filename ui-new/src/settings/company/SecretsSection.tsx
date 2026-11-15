@@ -444,7 +444,7 @@ function SecretList(props: {
         </Match>
         <Match when={props.rows.length === 0 && !props.folder}>
           <div class="cs-lrow">
-            <span class="cs-muted cs-grow">No secrets yet. Add an API key or token once, then choose which agents can use it.</span>
+            <span class="cs-muted cs-grow">No secrets yet.</span>
             <Button size="compact" icon={<Plus size={14} aria-hidden="true" />} onClick={props.onCreate}>
               New secret
             </Button>

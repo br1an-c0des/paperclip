@@ -43,9 +43,10 @@ export function ConnectionsSection() {
   const company = useCompany();
   return (
     <>
-      <SectionTitle title="Paperclip Models">
-        The models Paperclip itself uses on top of your agents, and where run telemetry goes. Calls are charged to the connection you pick.
-      </SectionTitle>
+      <SectionTitle
+        title="Paperclip Models"
+        info="The models Paperclip itself uses on top of your agents, and where run telemetry goes. Calls are charged to the connection you pick."
+      />
       <DecisionCard />
       <FastResponseCard />
       <InjectionCard />
@@ -139,7 +140,7 @@ function DecisionCard() {
           <CardHead
             id="cs-decision"
             title="Decision model"
-            note="The shared connection Paperclip uses for its optional decision features."
+            info="The shared connection Paperclip uses for its optional decision features."
             actions={
               <A class="btn btn--secondary btn--compact" href={`/${company().issuePrefix}/activity/costs?tab=decisions`}>
                 View usage
@@ -162,10 +163,10 @@ function DecisionCard() {
               </Show>
             </SettingsRow>
             <Show when={draft.connectionId}>
-              <SwitchRow label="Use decisions" help="Paperclip's optional decision features run on this connection." checked={draft.enabled} onChange={(value) => setDraft("enabled", value)} />
+              <SwitchRow label="Use decisions" info="Paperclip's optional decision features run on this connection." checked={draft.enabled} onChange={(value) => setDraft("enabled", value)} />
               <SwitchRow
                 label="Allow background decisions"
-                help="Background features can charge this connection without a responsible person. They show as Paperclip services in Costs."
+                info="Background features can charge this connection without a responsible person. They show as Paperclip services in Costs."
                 checked={draft.allowBackground}
                 onChange={(value) => setDraft("allowBackground", value)}
               />
@@ -268,7 +269,7 @@ function FastResponseCard() {
           <div class="frow cs-frow-wide">
             <div class="flabel">
               Acknowledge messages right away
-              <span class="fhelp">Fast responses are turned off for this instance. An instance admin can turn them on in app settings.</span>
+              <span class="fhelp">Fast responses are turned off for this instance. An instance admin can turn them on in App settings → General → Features.</span>
             </div>
           </div>
         </SettingsCard>
@@ -289,7 +290,7 @@ function FastResponseCard() {
           />
           <SwitchRow
             label="Acknowledge messages right away"
-            help="When someone messages an agent, a small model replies at once, marked as automatic. The agent's full reply follows."
+            info="When someone messages an agent, a small model replies at once, marked as automatic. The agent's full reply follows."
             checked={draft.enabled}
             onChange={(value) => setDraft("enabled", value)}
           />
@@ -304,7 +305,7 @@ function FastResponseCard() {
             </SettingsRow>
             <SwitchRow
               label="Answer people without an account"
-              help="Covers accepted outside messages from people with no linked Paperclip account, charged to the organization."
+              info="Covers accepted outside messages from people with no linked Paperclip account, charged to the organization."
               checked={draft.allowSponsored}
               onChange={(value) => setDraft("allowSponsored", value)}
             />
@@ -415,11 +416,12 @@ function InjectionCard() {
           <CardHead id="cs-inject" title="Prompt injection check" />
           <SwitchRow
             label="Check tool results with a model"
-            help="Looks for instructions planted in web pages, files and app responses, and holds suspicious results back. The provider receives tool content."
+            info="Looks for instructions planted in web pages, files and app responses, and holds suspicious results back."
+            help="The provider receives tool content."
             checked={draft.enabled}
             onChange={(value) => setDraft("enabled", value)}
           />
-          <SettingsRow label="Connection" help="A shared OpenRouter connection.">
+          <SettingsRow label="Connection" info="A shared OpenRouter connection.">
             <ConnectionBox connection={selected()} missing={!!draft.grantId && !selected()}>
               <ConnectionMenu
                 choices={query.data!.choices}
@@ -433,9 +435,8 @@ function InjectionCard() {
           <SettingsRow label="Model" for="cs-inject-model">
             <ModelField id="cs-inject-model" value={draft.model} placeholder={DEFAULT_INJECTION_MODEL} suggestions={models.data} onInput={(value) => setDraft("model", value)} />
           </SettingsRow>
-          <SettingsRow label="If the model is down">
+          <SettingsRow label="If the model is down" info="Built-in pattern matching always runs when the model check can't.">
             <span class="cs-static">Fall back to pattern matching</span>
-            <span class="fhelp">Built-in pattern matching always runs when the model check can't.</span>
           </SettingsRow>
           <Show when={result()}>
             {(found) => (

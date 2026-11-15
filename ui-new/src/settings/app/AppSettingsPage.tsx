@@ -3,6 +3,7 @@ import { Settings2, ShieldCheck } from "lucide-solid";
 import { createMemo, Match, Show, Switch } from "solid-js";
 import { findCompanyByPrefix, lastCompanyPrefix, useCompaniesQuery, useCompany } from "@/lib/company";
 import { useSession } from "@/lib/session";
+import { InfoTip } from "@/ui/InfoTip";
 import { PageHeader } from "@/ui/PageHeader";
 import { Splash } from "@/routes/Splash";
 import { SettingsBody } from "../SettingsBody";
@@ -58,7 +59,7 @@ export function AppSettingsPage() {
           </span>
         }
         title="App settings"
-        numbers={<span>Your account and this Paperclip instance. Organization settings live under each organization.</span>}
+        titleAside={<InfoTip label="About App settings">Your account and this Paperclip instance. Organization settings live under each organization.</InfoTip>}
         aside={
           <Show when={isAdmin()}>
             <span class="as-admin-pill">

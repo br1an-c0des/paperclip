@@ -25,7 +25,7 @@ import {
   type Audience,
   type GovernanceKind,
 } from "./general-model";
-import { CardHead, CardNote, failure, SectionTitle, SwitchRow, useCompanySaver } from "./shared";
+import { CardHead, failure, saveNote, SectionTitle, SwitchRow, useCompanySaver } from "./shared";
 
 /*
  * General (board 21): who the organization is, and its rules for hiring and for answering agents.
@@ -33,7 +33,8 @@ import { CardHead, CardNote, failure, SectionTitle, SwitchRow, useCompanySaver }
  * picks at once.
  *
  * - Organization: name, description, logo (`POST /companies/:id/logo`, then `logoAssetId`), and the
- *   default owner (board 30), who gets tasks and requests that have no owner.
+ *   default owner (board 30): the person runs act for when nobody else is responsible for the work
+ *   (`defaultResponsibleUserId`, attribution only; it never routes requests).
  * - Hiring: require approval for new agents, with the hires waiting for it.
  * - Request routing (U134): the decision owner, who gets requests no one else owns, and the budget
  *   owner, who gets budget hard stops (`defaultDecisionOwnerUserId`, `budgetOwnerUserId`).
@@ -51,7 +52,7 @@ export function GeneralSection() {
 
   return (
     <>
-      <SectionTitle title="General">Who the organization is, and its rules for hiring and for answering agents. Changes save as you make them.</SectionTitle>
+      <SectionTitle title="General" info="Who the organization is, and its rules for hiring and for answering agents. Changes save as you make them." />
       <OrganizationCard saver={saver} />
       <HiringCard saver={saver} />
       <RoutingCard saver={saver} />
@@ -59,7 +60,7 @@ export function GeneralSection() {
       <SettingsCard title="Feedback">
         <SwitchRow
           label="Share rated outputs with Paperclip"
-          help="When someone rates an agent's output, send that output and the rating to Paperclip to improve it. Off by default."
+          info="When someone rates an agent's output, send that output and the rating to Paperclip to improve it. Off by default."
           checked={company().feedbackDataSharingEnabled}
           onChange={(value) => void saver.save({ feedbackDataSharingEnabled: value })}
         />
@@ -104,13 +105,9 @@ function OrganizationCard(props: { saver: Saver }) {
   return (
     <SettingsCard
       title="Organization"
-      description={
-        <CardNote state={props.saver.state()} error={props.saver.error()}>
-          {null}
-        </CardNote>
-      }
+      description={saveNote(props.saver.state(), props.saver.error())}
     >
-      <SettingsRow label="Name" for="cs-name" help="Shown in the sidebar, on invites and in agents' instructions.">
+      <SettingsRow label="Name" for="cs-name" info="Shown in the sidebar and on invites.">
         <TextInput
           id="cs-name"
           value={name()}
@@ -126,7 +123,7 @@ function OrganizationCard(props: { saver: Saver }) {
           }}
         />
       </SettingsRow>
-      <SettingsRow label="Description" for="cs-description" help="Optional. Shown on the organization's profile.">
+      <SettingsRow label="Description" for="cs-description" info="Shown on the organization's dashboard.">
         <TextArea
           id="cs-description"
           rows={3}
@@ -136,7 +133,7 @@ function OrganizationCard(props: { saver: Saver }) {
           onBlur={() => void props.saver.save(descriptionEdit(company(), description()))}
         />
       </SettingsRow>
-      <SettingsRow label="Logo" help="Square, at least 128 px. PNG, JPEG, WEBP, GIF or SVG.">
+      <SettingsRow label="Logo" info="Square, at least 128 px. PNG, JPEG, WEBP, GIF or SVG.">
         <div class="cs-logo-row">
           <Show when={company().logoUrl} fallback={<InitialsDisc name={company().name.slice(0, 1)} seed={company().id} size={44} />}>
             {(url) => <img class="cs-logo" src={url()} alt="" width={44} height={44} />}
@@ -163,7 +160,10 @@ function OrganizationCard(props: { saver: Saver }) {
           </Show>
         </div>
       </SettingsRow>
-      <SettingsRow label="Default owner" help="The person who gets tasks and requests that have no owner.">
+      <SettingsRow
+        label="Default owner"
+        info="The person runs act for when nobody else is responsible for the work, such as a routine with no owner of its own; their personal secrets are used. With nobody set, the organization's first owner is used."
+      >
         <OwnerMenu label="Default owner" value={company().defaultResponsibleUserId} onChange={(id) => void props.saver.save({ defaultResponsibleUserId: id })} />
       </SettingsRow>
     </SettingsCard>
@@ -181,11 +181,7 @@ function RoutingCard(props: { saver: Saver }) {
     <SettingsCard
       title="Request routing"
       info="Where requests show in the Inbox. A request goes to the person it's sent to, the chat's person, the reviewer or assignee, or whoever started the work. If none of them applies, it goes to the project's decision owner, then to the decision owner here, and otherwise waits in Unassigned. Routing never changes who may answer."
-      description={
-        <CardNote state={props.saver.state()} error={props.saver.error()}>
-          {null}
-        </CardNote>
-      }
+      description={saveNote(props.saver.state(), props.saver.error())}
     >
       <SettingsRow
         label="Decision owner"
@@ -221,7 +217,7 @@ function HiringCard(props: { saver: Saver }) {
     <SettingsCard title="Hiring">
       <SwitchRow
         label="Require approval for new hires"
-        help="When a person or an agent hires an agent, the new agent waits in the Inbox until an owner or admin approves it."
+        info="When a person or an agent hires an agent, the new agent waits in the Inbox until a member approves it. Viewers can't approve."
         checked={company().requireBoardApprovalForNewAgents}
         onChange={(value) => void props.saver.save({ requireBoardApprovalForNewAgents: value })}
       >
@@ -246,11 +242,8 @@ function RequestsCard(props: { saver: Saver }) {
       <CardHead
         id="cs-requests"
         title="Agent requests"
-        note={
-          <CardNote state={props.saver.state()} error={props.saver.error()}>
-            Agents ask for answers, confirmations and reviews. Choose who may respond to each kind. A task can tighten this, but not loosen it.
-          </CardNote>
-        }
+        info="Agents ask for answers, confirmations and reviews. Choose who may respond to each kind; a task can tighten this, but not loosen it. Tool approvals always wait for a person."
+        note={saveNote(props.saver.state(), props.saver.error())}
       />
       <div class="cs-table cs-table--requests" role="table" aria-label="Who can answer each kind of request">
         <div class="cs-thead" role="row">
@@ -312,7 +305,6 @@ function RequestsCard(props: { saver: Saver }) {
           }}
         </For>
       </div>
-      <footer class="cfoot cs-muted">Tool approvals always wait for a person.</footer>
     </section>
   );
 }
@@ -337,7 +329,7 @@ function DangerCard(props: { saver: Saver }) {
 
   return (
     <section class="card settings-card cs-danger" aria-labelledby="cs-danger">
-      <CardHead id="cs-danger" title="Danger zone" note={<CardNote state={props.saver.state()} error={props.saver.error()}>{null}</CardNote>} />
+      <CardHead id="cs-danger" title="Danger zone" note={saveNote(props.saver.state(), props.saver.error())} />
       <div class="cs-lrow">
         <div class="cs-grow">
           <div class="cs-strong">{paused() ? "Every agent is paused" : "Pause every agent"}</div>
@@ -363,7 +355,7 @@ function DangerCard(props: { saver: Saver }) {
       <div class="cs-lrow">
         <div class="cs-grow">
           <div class="cs-strong">Archive the organization</div>
-          <div class="cs-muted">Stops every agent and hides the organization from its members. Its data is kept, and it can be restored from the organization list.</div>
+          <div class="cs-muted">Stops every agent and hides the organization from its members. Its data is kept, and an instance admin can bring it back from App settings → Organizations.</div>
         </div>
         <Button size="compact" variant="danger" icon={<Archive size={14} aria-hidden="true" />} disabled={company().status === "archived"} onClick={() => setConfirm("archive")}>
           Archive…
