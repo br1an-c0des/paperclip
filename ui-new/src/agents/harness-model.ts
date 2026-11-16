@@ -156,9 +156,12 @@ export function fieldVisible(field: HarnessField, draft: ExtrasDraft, config: Re
   return true;
 }
 
-/** The keys whose values differ from the saved ones. */
+/**
+ * The keys whose values differ from the saved ones. Only the saved settings' keys count, so a draft
+ * left from another harness's fields (before the form resets it) shows no changes.
+ */
 export function extrasChanges(base: ExtrasDraft, draft: ExtrasDraft) {
-  return Object.keys(draft).filter((key) => draft[key] !== base[key]);
+  return Object.keys(draft).filter((key) => key in base && draft[key] !== base[key]);
 }
 
 /**

@@ -2,8 +2,7 @@ import type { AdapterEnvironmentTestResult, AgentDetail } from "@paperclipai/sha
 import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ArrowLeftRight, Check, ChevronRight, History, Wand2, Zap } from "lucide-solid";
-import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
-import { createStore, reconcile } from "solid-js/store";
+import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { accessApi } from "@/api/access";
 import { adaptersApi, agentsApi } from "@/api/agents";
 import { aiConnectionsApi } from "@/api/ai-connections";
@@ -20,7 +19,6 @@ import { TonePill } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
 import {
   bindingText,
-  buildRuntimePatch,
   harnessLabel,
   harnessType,
   HEARTBEAT_INTERVALS,
@@ -30,21 +28,20 @@ import {
   probeQualified,
   requalifyEnvironment,
   requalifyProblem,
+  runnerCapable,
   runnerLabel,
   runnerOffer,
   runnerOptions,
   runnerSwitchable,
-  runtimeChanges,
-  runtimeDraft,
   runtimeEffortOptions,
   runtimeFields,
   runtimeIdentity,
-  runtimeProblem,
-  type RuntimeDraft,
 } from "../agent-model";
 import { failure, FootError, refreshAgent, SectionTitle, shortDate, SwitchRow } from "../shared";
 import { resolveRunner } from "../new/new-agent-model";
-import { extrasChanges, extrasConfig, extrasDraft, fieldVisible, harnessFields, isSecretField, type ExtrasDraft, type ExtraValue, type HarnessField } from "../harness-model";
+import { isSecretField, type ExtraValue, type HarnessField } from "../harness-model";
+import { createRuntimeForm } from "../runtime-form";
+import type { DroppedSetting, RunnerPreview } from "../runner-switch-model";
 import { EnvironmentMenu, HarnessDisc, instanceDefaultEnvironment, ModelMenu, TestChecks, useInstanceDefaultId } from "./fields";
 import { HarnessChangeDialog } from "./HarnessChange";
 import { RunnerStateCard } from "./RunnerStateCard";
@@ -59,7 +56,9 @@ import { UsageLimitDetail, useUsageLimit } from "@/tasks/UsageLimit";
  * old UI showed "Claude Code" even after upgrading and kept the Runner under Advanced. Whether the
  * Runner can carry the harness comes from the adapters list for the agent's environment
  * (`supportedRunners`, `defaultRunner`); switching is part of the same save (`runner` in the
- * patch), after qualifying a sandbox environment when it needs that.
+ * patch), after qualifying a sandbox environment when it needs that. While the switch is staged the
+ * harness settings are the Runner's, as the switch will save them, and what it changes from the
+ * legacy setup is listed with it (runtime-form.ts, runner-switch-model.ts).
  *
  * The AI connection is part of the same save (`runtimeConfig.aiConnection`); a pool (router)
  * binding is shown but not edited here. Harness settings come from the harness's own schema and the
@@ -73,30 +72,29 @@ import { UsageLimitDetail, useUsageLimit } from "@/tasks/UsageLimit";
 export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
   const company = useCompany();
   const client = useQueryClient();
-  const identity = createMemo(() => runtimeIdentity(props.agent));
   // The provider usage limit the harness last reported (U40), the same read as RunnerStateCard's.
   const usage = useUsageLimit(() => props.agent.id);
-  const fields = createMemo(() => runtimeFields(props.agent));
-  const base = createMemo(() => runtimeDraft(props.agent));
-  const [draft, setDraft] = createStore<RuntimeDraft>(runtimeDraft(props.agent));
   // Harness settings: the schema's and hand-written fields, edited as text or switches.
-  const schema = createQuery(() => ({
-    queryKey: queryKeys.agents.configSchema(props.agent.adapterType),
-    queryFn: ({ signal }) => adaptersApi.configSchema(props.agent.adapterType, signal),
-    staleTime: 5 * 60_000,
-    retry: false,
-  }));
-  const extraFields = createMemo(() => harnessFields(props.agent.adapterType, schema.data));
-  const extrasBase = createMemo(() => extrasDraft(extraFields(), props.agent.adapterConfig as Record<string, unknown>));
-  const [extras, setExtras] = createStore<ExtrasDraft>(extrasBase());
-  const extraChanges = createMemo(() => extrasChanges(extrasBase(), extras));
-  const changes = createMemo(() => [...runtimeChanges(base(), draft), ...extraChanges()]);
-  createEffect(on(() => JSON.stringify(extrasBase()), () => extraChanges().length === 0 && setExtras(reconcile(extrasBase())), { defer: true }));
+  const schemaQuery = (type: () => string, enabled: () => boolean = () => true) =>
+    createQuery(() => ({
+      queryKey: queryKeys.agents.configSchema(type()),
+      queryFn: ({ signal }) => adaptersApi.configSchema(type(), signal),
+      enabled: enabled(),
+      staleTime: 5 * 60_000,
+      retry: false,
+    }));
+  const schema = schemaQuery(() => props.agent.adapterType);
+  // The Runner's settings, shown while a switch to it is staged: loaded ahead for a harness it can carry.
+  const runnerSchema = schemaQuery(
+    () => "paperclip_runner",
+    () => runnerCapable(runtimeIdentity(props.agent).harness),
+  );
+  const form = createRuntimeForm({ agent: () => props.agent, schema: () => schema.data, runnerSchema: () => runnerSchema.data });
+  const { identity, base, draft, setDraft, changes } = form;
+  const fields = createMemo(() => runtimeFields(form.shownAgent()));
   const [changingHarness, setChangingHarness] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [problem, setProblem] = createSignal<string | null>(null);
-  // The saved settings replace the draft when they change, unless you're editing.
-  createEffect(on(() => JSON.stringify(base()), () => changes().length === 0 && setDraft(reconcile(base())), { defer: true }));
 
   const instanceDefaultId = useInstanceDefaultId();
 
@@ -130,11 +128,9 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
   const latest = createMemo(() => latestRevision(revisions.data));
 
   const save = async () => {
-    const found = runtimeProblem(draft);
-    if (found) return setProblem(found);
-    const extra = extrasConfig(extraFields(), extrasBase(), { ...extras }, props.agent.adapterConfig as Record<string, unknown>);
-    if ("problem" in extra) return setProblem(extra.problem);
-    const patch = buildRuntimePatch(props.agent, { ...draft }, base(), extra.entries);
+    const built = form.patch();
+    if ("problem" in built) return setProblem(built.problem);
+    const patch = built.patch;
     if (!patch) return;
     setSaving(true);
     setProblem(null);
@@ -152,6 +148,8 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
         }
       }
       const saved = await agentsApi.update(props.agent.id, patch, company().id);
+      // Saved: nothing is pending, whatever the refetch below brings (a switched runner's fields are new ones).
+      form.reset();
       await Promise.all([
         refreshAgent(client, company().id, props.agent.id),
         client.invalidateQueries({ queryKey: queryKeys.agents.adapters(company().id, props.agent.defaultEnvironmentId ?? null) }),
@@ -216,6 +214,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
                 ? `Saving probes ${environment()?.name ?? "the environment"} first, and switches only if the Runner qualifies there. The model and instructions stay.`
                 : "Switching keeps the model and instructions. It is saved with your other changes, as one revision."}
             </span>
+            <Show when={form.preview()}>{(view) => <SwitchSummary preview={view()} fields={form.runnerFields()} />}</Show>
           </div>
           <Show
             when={stagedRunner() !== "paperclip"}
@@ -326,11 +325,27 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
         </Show>
       </SettingsCard>
 
-      <Show when={extraFields().length > 0}>
-        <SettingsCard title="Harness settings" info={`Options of ${identity().harnessLabel} itself. Saved with your other changes.`}>
-          <For each={extraFields().filter((field) => fieldVisible(field, extras, props.agent.adapterConfig as Record<string, unknown>))}>
-            {(field) => <ExtraFieldRow field={field} value={extras[field.key]} saved={(props.agent.adapterConfig as Record<string, unknown>)[field.key]} onChange={(value) => setExtras(field.key, value)} />}
-          </For>
+      <Show
+        when={form.switching()}
+        fallback={
+          <Show when={form.fields().length > 0}>
+            <SettingsCard title="Harness settings" info={`Options of ${identity().harnessLabel} itself. Saved with your other changes.`}>
+              <For each={form.visibleFields()}>
+                {(field) => <ExtraFieldRow field={field} value={form.extras()[field.key]} saved={config()[field.key]} onChange={(value) => form.setExtra(field.key, value)} />}
+              </For>
+            </SettingsCard>
+          </Show>
+        }
+      >
+        <SettingsCard
+          title="Paperclip Runner settings"
+          info={`How Paperclip Runner will run ${identity().harnessLabel}: the settings carried over from the legacy runner and the Runner's defaults. Saved with the switch.`}
+        >
+          <Show when={runnerSchema.data} fallback={<p class="ps-muted-line">{runnerSchema.isError ? "Couldn't load the Runner's settings. The switch saves with its defaults." : "Loading the Runner's settings…"}</p>}>
+            <For each={form.visibleFields()}>
+              {(field) => <ExtraFieldRow field={field} value={form.extras()[field.key]} saved={form.fieldsConfig()[field.key]} onChange={(value) => form.setExtra(field.key, value)} />}
+            </For>
+          </Show>
         </SettingsCard>
       </Show>
 
@@ -477,8 +492,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
               disabled={saving()}
               onClick={() => {
                 setProblem(null);
-                setDraft(reconcile(base()));
-                setExtras(reconcile(extrasBase()));
+                form.reset();
               }}
             >
               Discard
@@ -493,6 +507,49 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
         <HarnessChangeDialog agent={props.agent} adapters={adapters.data} onClose={() => setChangingHarness(false)} />
       </Show>
     </>
+  );
+}
+
+/**
+ * What the staged switch changes from the legacy setup: the settings it sets (the Runner's defaults,
+ * or values it carries over differently), the ones the switch leaves out because the Runner can't
+ * honor them (the server would refuse the save), and the ones the Runner has no use for.
+ */
+function SwitchSummary(props: { preview: RunnerPreview; fields: readonly HarnessField[] }) {
+  const shown = (key: string, value: unknown) => {
+    const option = props.fields.find((field) => field.key === key)?.options?.find((entry) => entry.value === value);
+    if (option) return option.label;
+    if (typeof value === "boolean") return value ? "on" : "off";
+    return typeof value === "string" ? value : JSON.stringify(value);
+  };
+  const labels = (why: DroppedSetting["why"]) => [...new Set(props.preview.dropped.filter((entry) => entry.why === why).map((entry) => entry.label))].join(", ");
+  return (
+    <ul class="ag-switch-summary" aria-label="What the switch changes">
+      <Show when={props.preview.problem}>
+        <li class="ag-switch-problem" role="alert">
+          {props.preview.problem}
+        </li>
+      </Show>
+      <Show when={props.preview.changed.length > 0}>
+        <li>
+          Set by the switch:{" "}
+          <For each={props.preview.changed}>
+            {(entry, index) => (
+              <>
+                {index() > 0 ? ", " : ""}
+                {entry.label} <b>{shown(entry.key, entry.value)}</b>
+              </>
+            )}
+          </For>
+        </li>
+      </Show>
+      <Show when={labels("unsupported")}>
+        <li>Left out, since the Runner can't honor them: {labels("unsupported")}</li>
+      </Show>
+      <Show when={labels("unused")}>
+        <li>Not used on the Runner: {labels("unused")}</li>
+      </Show>
+    </ul>
   );
 }
 
