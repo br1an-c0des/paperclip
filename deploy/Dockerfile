@@ -9,15 +9,21 @@
 # deploy/deploy.sh resolves it from the last upstream commit merged into this
 # branch. Build context is the repo root:
 #
-#   docker build -f deploy/Dockerfile --build-arg UPSTREAM_SHA=<sha> .
+#   docker build -f deploy/Dockerfile --build-arg UPSTREAM_SHA=<sha> \
+#     --build-arg PAPERCLIP_UI_COMMIT=$(git rev-parse HEAD) .
 
 # The placeholder makes a build without deploy.sh fail with a readable
 # "sha-missing-run-deploy-sh: not found" instead of an invalid-reference error.
 ARG UPSTREAM_SHA=missing-run-deploy-sh
 
 FROM node:24-trixie-slim AS ui
+# The fork commit being built, shown under You in the nav. The build context
+# has no .git (upstream's .dockerignore), so deploy/deploy.sh passes it; a
+# build without it shows "ui unknown".
+ARG PAPERCLIP_UI_COMMIT=""
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
-    PNPM_STORE_DIR=/pnpm/store
+    PNPM_STORE_DIR=/pnpm/store \
+    PAPERCLIP_UI_COMMIT=${PAPERCLIP_UI_COMMIT}
 RUN corepack enable
 WORKDIR /app
 COPY . .

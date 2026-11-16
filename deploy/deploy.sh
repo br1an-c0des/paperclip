@@ -57,5 +57,8 @@ if [ ! -f .env ]; then
 fi
 
 export UPSTREAM_SHA=$upstream_sha
+# The fork commit, baked into ui-new (the image's build context has no .git).
+UI_COMMIT=$(git rev-parse HEAD)
+export UI_COMMIT
 docker compose up -d --build
 docker compose ps

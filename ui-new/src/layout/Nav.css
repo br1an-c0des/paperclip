@@ -298,7 +298,20 @@
 
 .nav-you {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+}
+
+/* The build line (shell/BuildVersion.tsx), under the name: the disc's 34px plus the row's gap, less its own padding. */
+.nav-build {
+  align-self: flex-start;
+  max-width: calc(100% - 38px);
+  margin: -6px 0 0 38px;
+}
+
+/* The same line at the foot of the rail's You menu. */
+.nav-build-menu {
+  margin: 2px 4px 4px;
+  max-width: calc(100% - 8px);
 }
 
 .nav-you-trigger {
@@ -501,7 +514,7 @@
  * discs and avatars where the rail puts them. Unfolding, once the column is wide again, they fade
  * back in (`"in"`).
  */
-.shell-nav[data-fold="out"] :is(.company-name, .company-switch, .nav-search-label, .nav-search-kbd, .nav-new-task, .navi-text, .navi-badge, .nav-you-name, .nav-zone--lists, .nav-zone--bottom > .nav-group, .plugin-global-toolbar) {
+.shell-nav[data-fold="out"] :is(.company-name, .company-switch, .nav-search-label, .nav-search-kbd, .nav-new-task, .navi-text, .navi-badge, .nav-you-name, .nav-build, .nav-zone--lists, .nav-zone--bottom > .nav-group, .plugin-global-toolbar) {
   opacity: 0;
   transition: opacity 0.09s ease-out;
 }
@@ -512,7 +525,7 @@
   transition: border-color 0.09s ease-out, background-color 0.09s ease-out;
 }
 
-.shell-nav[data-fold="in"] :is(.company-name, .company-switch, .nav-search-label, .nav-search-kbd, .nav-new-task, .navi-text, .navi-badge, .nav-you-name, .nav-zone--lists, .nav-zone--bottom > .nav-group, .plugin-global-toolbar) {
+.shell-nav[data-fold="in"] :is(.company-name, .company-switch, .nav-search-label, .nav-search-kbd, .nav-new-task, .navi-text, .navi-badge, .nav-you-name, .nav-build, .nav-zone--lists, .nav-zone--bottom > .nav-group, .plugin-global-toolbar) {
   animation: nav-label-in 0.09s ease-out both;
 }
 

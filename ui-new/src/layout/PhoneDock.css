@@ -366,6 +366,13 @@
   color: var(--red-fg);
 }
 
+/* The build line (shell/BuildVersion.tsx) at the foot of the You view, in line with the rows' icons. */
+.tsheet-build {
+  margin: 6px 0 2px 8px;
+  max-width: calc(100% - 16px);
+  padding-block: 6px;
+}
+
 .tsheet-actions {
   display: flex;
   gap: 8px;

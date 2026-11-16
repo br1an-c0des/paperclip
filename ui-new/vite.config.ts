@@ -129,19 +129,31 @@ function serviceWorkerBuildId(): Plugin {
   };
 }
 
-// The build the reads saved for offline belong to (src/lib/offline/persisted-cache.ts): records from
-// another build are dropped. The source commit, as the old UI stamps it (ui/src/lib/vite-build-commit.ts),
-// or the time of the build where there's no git (a Docker build without .git). The dev server is "dev"
-// plus the commit.
-function buildStamp(command: "build" | "serve") {
-  let commit = process.env.PAPERCLIP_BUILD_COMMIT?.trim() ?? "";
-  if (!/^[0-9a-f]{40}$/i.test(commit)) {
-    try {
-      commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: import.meta.dirname, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 1000 }).trim();
-    } catch {
-      commit = "";
-    }
+// The UI's source commit: PAPERCLIP_UI_COMMIT (deploy/deploy.sh passes it to the Docker build, whose
+// context has no .git), else PAPERCLIP_BUILD_COMMIT (the old UI's variable, ui/src/lib/vite-build-commit.ts),
+// else `git rev-parse HEAD` (a build or dev server inside the repo), else null. Shown under You in the
+// nav (src/shell/BuildVersion.tsx) and part of the build id below.
+export function uiCommit(env: Record<string, string | undefined> = process.env, git: () => string = gitHead): string | null {
+  for (const value of [env.PAPERCLIP_UI_COMMIT, env.PAPERCLIP_BUILD_COMMIT]) {
+    const commit = value?.trim() ?? "";
+    if (/^[0-9a-f]{7,40}$/i.test(commit)) return commit.toLowerCase();
   }
+  try {
+    const commit = git().trim();
+    return /^[0-9a-f]{40}$/i.test(commit) ? commit.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+function gitHead() {
+  return execFileSync("git", ["rev-parse", "HEAD"], { cwd: import.meta.dirname, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 1000 });
+}
+
+// The build the reads saved for offline belong to (src/lib/offline/persisted-cache.ts): records from
+// another build are dropped. The source commit (`uiCommit`), or the time of the build where there's
+// none. The dev server is "dev" plus the commit.
+function buildStamp(command: "build" | "serve", commit: string | null) {
   if (command === "serve") return `dev-${commit || "local"}`;
   return commit ? `${commit}-${Date.now().toString(36)}` : `build-${Date.now().toString(36)}`;
 }
@@ -173,9 +185,14 @@ const apiProxy: Record<string, ProxyOptions> = {
   "/_plugins": { target: apiTarget },
 };
 
+const commit = uiCommit();
+const builtAt = new Date().toISOString();
+
 export default defineConfig(({ command }) => ({
   define: {
-    "import.meta.env.VITE_UI_NEW_BUILD_ID": JSON.stringify(process.env.VITEST ? "test" : buildStamp(command)),
+    "import.meta.env.VITE_UI_NEW_BUILD_ID": JSON.stringify(process.env.VITEST ? "test" : buildStamp(command, commit)),
+    __UI_COMMIT__: JSON.stringify(commit),
+    __UI_BUILT_AT__: JSON.stringify(builtAt),
   },
   // Hot reload has no place in tests, and its runtime module breaks Vitest's loader.
   plugins: [solid({ hot: !process.env.VITEST }), brands(), serviceWorkerBuildId(), pluginTailwind()],

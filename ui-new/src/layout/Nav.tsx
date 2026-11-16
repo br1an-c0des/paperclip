@@ -40,6 +40,7 @@ import { useAgentStars } from "@/agents/AgentStar";
 import { useCanCreateCompany } from "@/onboarding/can-create";
 import { actionTargets, useAgentActions } from "@/org/actions";
 import { profilePath } from "@/profile/profile-model";
+import { BuildVersion } from "@/shell/BuildVersion";
 import { ServerInfo } from "@/shell/ServerInfo";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { useSession, useSignOut, useYouName } from "@/lib/session";
@@ -207,7 +208,8 @@ function CompanyMenu() {
 /**
  * The You menu's content, for the full nav's You row and the rail's avatar: your profile, App
  * settings, the theme, the shortcuts, Collapse sidebar (`[`, Expand sidebar on the rail) and Hide
- * navigation (Shift+`[`), the style guide, the server's details, and Sign out.
+ * navigation (Shift+`[`), the style guide, the server's details, and Sign out. On the rail it ends
+ * with the build line, which the full nav shows under the You row.
  */
 export function YouMenuContent(props: { rail?: boolean }) {
   const session = useSession();
@@ -255,6 +257,11 @@ export function YouMenuContent(props: { rail?: boolean }) {
           Sign out
         </Menu.Item>
       </Show>
+      {/* The full nav shows the build under the You row; the rail has no room, so it's here. */}
+      <Show when={props.rail}>
+        <Menu.Separator />
+        <BuildVersion class="nav-build-menu" placement="right" />
+      </Show>
     </Menu.Content>
   );
 }
@@ -270,6 +277,7 @@ function YouRow() {
         </Menu.Trigger>
         <YouMenuContent />
       </Menu>
+      <BuildVersion class="nav-build" placement="right" />
     </div>
   );
 }

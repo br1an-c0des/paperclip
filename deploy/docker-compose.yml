@@ -36,6 +36,9 @@ services:
         # when unset, so logs/ps/restart work without it and a stray build
         # fails on the Dockerfile's placeholder base image.
         - UPSTREAM_SHA
+        # This checkout's commit, shown under You in the nav (deploy.sh sets
+        # it too). Without it the build still works and shows "ui unknown".
+        - PAPERCLIP_UI_COMMIT=${UI_COMMIT:-}
     image: paperclip-fork:local
     restart: unless-stopped
     # The image makes tini PID 1 itself; see upstream's compose file for why
