@@ -65,7 +65,10 @@ export function createRuntimeForm(input: {
   const [runner, setRunner] = createStore<ExtrasDraft>({});
   const runnerChanges = createMemo(() => (switching() ? extrasChanges(runnerBase(), runner) : []));
 
-  const changes = createMemo(() => [...runtimeChanges(base(), draft), ...ownChanges(), ...runnerChanges()]);
+  const draftChanges = createMemo(() => runtimeChanges(base(), draft));
+  const changes = createMemo(() => [...draftChanges(), ...ownChanges(), ...runnerChanges()]);
+  /** Whether any of these settings has an edit `changes` counts: what lights a row's dot. */
+  const changed = (...keys: (keyof RuntimeDraft)[]) => keys.some((key) => draftChanges().includes(key));
 
   /** Back to the saved settings, everything. */
   const reset = () =>
@@ -97,6 +100,10 @@ export function createRuntimeForm(input: {
   const fieldsConfig = () => preview()?.config ?? config();
   const visibleFields = createMemo(() => fields().filter((field) => fieldVisible(field, extras(), fieldsConfig())));
   const setExtra = (key: string, value: ExtraValue) => (switching() ? setRunner(key, value) : setOwn(key, value));
+  /** The shown harness settings as saved (or, while the switch is staged, as the switch would save them). */
+  const extrasBase = (): ExtrasDraft => (switching() ? runnerBase() : ownBase());
+  /** Whether a shown harness setting has an edit `changes` counts. */
+  const extraChanged = (key: string) => (switching() ? runnerChanges() : ownChanges()).includes(key);
 
   /** The agent as the form shows it: as a Runner agent while the switch is staged. */
   const shownAgent = createMemo<FormAgent>(() => {
@@ -135,10 +142,13 @@ export function createRuntimeForm(input: {
     fields: fields as () => HarnessField[],
     visibleFields,
     extras,
+    extrasBase,
+    extraChanged,
     setExtra,
     fieldsConfig,
     shownAgent,
     changes,
+    changed,
     reset,
     patch,
   };

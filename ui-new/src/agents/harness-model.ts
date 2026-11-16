@@ -1,6 +1,7 @@
 import type { AdapterConfigSchema, ConfigFieldSchema } from "@paperclipai/adapter-utils";
 import type { Agent } from "@paperclipai/shared";
 import type { AdapterInfo } from "@/api/agents";
+import { savedText, type Changed } from "@/ui/changed";
 import { harnessLabel, runnerCapable } from "./agent-model";
 
 /*
@@ -154,6 +155,20 @@ export function fieldVisible(field: HarnessField, draft: ExtrasDraft, config: Re
   if (Array.isArray(when.values)) return when.values.includes(actual);
   if (Array.isArray(when.notValues)) return !when.notValues.includes(actual);
   return true;
+}
+
+/**
+ * A changed harness setting's dot (ui/ChangedDot.tsx): what it was, as the field shows it, or no
+ * value for a secret.
+ */
+export function extraChangedFrom(field: HarnessField, saved: ExtraValue | undefined): Changed {
+  if (isSecretField(field)) return true;
+  if (field.type === "toggle") return { from: saved === true ? "on" : "off" };
+  if (field.type === "select") {
+    const option = field.options?.find((entry) => entry.value === saved);
+    return { from: option?.label ?? savedText(saved, "not set") };
+  }
+  return { from: savedText(saved, field.default !== undefined && field.default !== "" ? `the default (${String(field.default)})` : "empty") };
 }
 
 /**

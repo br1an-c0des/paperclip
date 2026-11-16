@@ -203,3 +203,46 @@ describe("createRuntimeForm", () => {
     expect(form.switching()).toBe(false);
   });
 });
+
+describe("the form's unsaved-change dots", () => {
+  it("lights a setting's dot only while its edit counts, and puts it out when the value goes back", () => {
+    const { form } = mount();
+    expect(form.changed("model", "effort", "heartbeatEnabled", "intervalSec")).toBe(false);
+    form.setDraft("model", "claude-opus-5-5");
+    expect(form.changed("model")).toBe(true);
+    expect(form.changed("effort")).toBe(false);
+    // A row covering several settings is lit by any of them.
+    form.setDraft("intervalSec", "900");
+    expect(form.changed("heartbeatEnabled", "intervalSec")).toBe(true);
+    expect(form.changes()).toEqual(["model", "intervalSec"]);
+    form.setDraft("model", "claude-sonnet-5");
+    expect(form.changed("model")).toBe(false);
+    expect(form.changes()).toEqual(["intervalSec"]);
+  });
+
+  it("lights a harness setting's dot from its own saved value, and the Runner's from what the switch saves", () => {
+    const { form } = mount();
+    form.setExtra("engine", "acp");
+    expect(form.extraChanged("engine")).toBe(true);
+    expect(form.extrasBase().engine).toBe("auto");
+    form.setExtra("engine", "auto");
+    expect(form.extraChanged("engine")).toBe(false);
+
+    form.setDraft("runner", "paperclip");
+    // The Runner's settings start as the switch would save them: nothing lit but the runner.
+    expect(form.visibleFields().some((field) => form.extraChanged(field.key))).toBe(false);
+    form.setExtra("lifecycleMode", "warm");
+    expect(form.extraChanged("lifecycleMode")).toBe(true);
+    expect(form.extrasBase().lifecycleMode).toBe("per_turn");
+  });
+
+  it("puts every dot out on reset (Discard, or after a save)", () => {
+    const { form } = mount();
+    form.setDraft("model", "claude-opus-5-5");
+    form.setDraft("chrome", true);
+    form.setExtra("engine", "acp");
+    form.reset();
+    expect(form.changed("model", "chrome")).toBe(false);
+    expect(form.extraChanged("engine")).toBe(false);
+  });
+});

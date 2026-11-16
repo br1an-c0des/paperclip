@@ -52,6 +52,28 @@ export function InfoTip(props: {
   placement?: "top" | "bottom" | "left" | "right";
   class?: string;
 }) {
+  return (
+    <TapTip label={props.label} class={`infotip ${props.class ?? ""}`} placement={props.placement} trigger={<Info size={14} aria-hidden="true" />}>
+      {props.children}
+    </TapTip>
+  );
+}
+
+/**
+ * The tooltip button InfoTip and ChangedDot.tsx are built on: it opens on hover and focus, and a
+ * tap or click pins it open until a press outside, Escape or another tap. The button is described
+ * by the text all the time (a hidden copy), and swallows its click, so it never submits a form or
+ * reaches the control of a label it sits in.
+ */
+export function TapTip(props: {
+  /** The button's accessible name. */
+  label: string;
+  /** What the button shows: an icon, a dot. */
+  trigger: JSX.Element;
+  children: JSX.Element;
+  placement?: "top" | "bottom" | "left" | "right";
+  class: string;
+}) {
   const mount = useLayerMount();
   const descriptionId = createUniqueId();
   const [open, setOpen] = createSignal(false);
@@ -76,7 +98,7 @@ export function InfoTip(props: {
       <KTooltip.Trigger
         ref={trigger}
         type="button"
-        class={`infotip ${props.class ?? ""}`}
+        class={props.class}
         aria-label={props.label}
         aria-describedby={descriptionId}
         onClick={(event: MouseEvent) => {
@@ -87,7 +109,7 @@ export function InfoTip(props: {
         }}
         onBlur={unpin}
       >
-        <Info size={14} aria-hidden="true" />
+        {props.trigger}
       </KTooltip.Trigger>
       <span id={descriptionId} hidden>
         {props.children}
