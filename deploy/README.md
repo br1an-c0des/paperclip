@@ -123,9 +123,27 @@ Set `PAPERCLIP_PUBLIC_URL=https://paperclip.example.com` and
 `PAPERCLIP_DEPLOYMENT_EXPOSURE=public`. Public mode enables stricter checks, including auth rate
 limiting.
 
+## This fork's deployment: server1
+
+Since Nov 16, 2026 the working instance runs on `server1`, an Ubuntu mini PC on the tailnet, as a
+fresh instance (nothing was copied from the earlier desktop deployment):
+
+- **Checkout:** `~/paperclip` on `new-ui`, used only for deploys; `deploy/.env` lives there (mode
+  600). Data is in `~/paperclip-data`.
+- **Access:** Paperclip on `127.0.0.1:3100`, fronted by `tailscale serve --bg 3100`, so it's
+  `https://server1.<tailnet>.ts.net`.
+- **Updating from the dev machine** (after pushing `new-ui`):
+
+  ```bash
+  ssh server1 'cd ~/paperclip && git pull --ff-only && deploy/deploy.sh'
+  ```
+
 ## On the dev machine (WSL with Docker Desktop)
 
-The deployment can run on the same Windows + WSL machine you develop on, beside the dev server:
+No longer in use: the deployment moved to server1, and the desktop stack was stopped on Nov 16,
+2026 (its data is kept in `~/paperclip-data`). The notes stay for running it on a dev machine
+again. The deployment can run on the same Windows + WSL machine you develop on, beside the dev
+server:
 
 - **Docker:** Docker Desktop on Windows with WSL integration on for the Ubuntu distro. Run every
   command from Ubuntu as usual. The containers run in Docker Desktop's own distro and bind-mount

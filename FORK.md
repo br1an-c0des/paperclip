@@ -323,7 +323,6 @@ bind-mounted from `<PAPERCLIP_DATA_ROOT>/home`. Everything is visible on the hos
 ## Open items
 
 - Once the sync skill has run by hand a few times, consider scheduling it.
-- Test the full image build and a first deploy on a real server.
 - Optionally, a GitHub Actions workflow in this fork that builds the image on pushes to `new-ui`
   and publishes it to `ghcr.io/br1an-c0des/paperclip`, so the server only pulls. Keep upstream's
   own workflows disabled in the fork (GitHub disables them on forks by default).
