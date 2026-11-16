@@ -40,7 +40,7 @@ upstream could use as upstream pull requests instead (see
 ### runner-libc-probe-sync
 
 - **Files:** `server/src/lib/agent-runner-platform.ts`, `server/src/__tests__/agent-runner-platform.test.ts`,
-  `doc/DEVELOPING.md`
+  `doc/runner-internals.md` (the "Local Linux runner qualification" section)
 - **What:** the startup glibc probe uses `execFileSync` instead of an asynchronous `execFile`
   behind a top-level await, so slow module loading can't use up its 1 s timeout and cache
   `libc: "unknown"`. A copy of upstream PR [#17905](https://github.com/paperclipai/paperclip/pull/17905)
@@ -56,8 +56,10 @@ upstream could use as upstream pull requests instead (see
   entry once a sync shows `supportedRunners` including `paperclip` here. If upstream rewrites the
   probe without fixing it, keep the synchronous call and the comment.
   Upstream's #21670 (2026-11-14) cut `doc/DEVELOPING.md` and moved the "Local Linux runner
-  qualification" section to `doc/runner-internals.md`: take upstream's `DEVELOPING.md` and carry
-  the wording change into `doc/runner-internals.md`, as the PR branch did in `3a08309e7`.
+  qualification" section to `doc/runner-internals.md`. The 2026-11-15 sync took upstream's
+  `DEVELOPING.md` and carried the wording change into `doc/runner-internals.md`, as the PR branch
+  did in `3a08309e7`; `DEVELOPING.md` is no longer patched. If upstream moves that section again,
+  carry the "synchronous subprocess" wording to its new home.
 
 
 ### workspace-ui-new
