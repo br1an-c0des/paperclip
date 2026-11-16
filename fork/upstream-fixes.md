@@ -69,6 +69,7 @@ until one becomes a concrete fix.
 | 30 | [Run a project workspace's setup command, or drop the field](#30-run-a-project-workspaces-setup-command-or-drop-the-field) | candidate | | | 2026-11-14 | | |
 | 31 | [Enforce an agent's "Create skills" permission, or drop it](#31-enforce-an-agents-create-skills-permission-or-drop-it) | candidate | | | 2026-11-14 | | |
 | 32 | [Honour an agent's heartbeat cooldown, or drop it](#32-honour-an-agents-heartbeat-cooldown-or-drop-it) | candidate | | | 2026-11-14 | | |
+| 33 | [Let a Claude planning task resume after the board replies](#33-let-a-claude-planning-task-resume-after-the-board-replies) | candidate | | | 2026-11-16 | | |
 
 ## Details
 
@@ -555,3 +556,31 @@ Found in the info-tip sweep (Nov 14, J9).
 - **Likely fix:** an issue asking whether a minimum gap between runs is still planned; if not,
   remove it from the shared config and the old UI.
 - **Fork workaround:** `ui-new` keeps the control with "Not used by the server yet."
+
+### 33. Let a Claude planning task resume after the board replies
+
+Found on the server1 deployment (BRA-2, 2026-11-16). Reproduced on the dev instance: TES-34 and
+TES-36 failed, and the standard-mode control TES-35 resumed.
+
+- **Problem:** a Claude agent on Paperclip Runner (ACPX) with an effort set runs a planning-mode task
+  and asks the board a question. When a board comment wakes it, every resume attempt fails with
+  `native_session_recovery_failed: ... ACPX sidecar command session.open was rejected
+  (retryable=false, classification=admission_runtime)`. The run then ends failed and the task goes
+  to `blocked`.
+- **Cause:** the sidecar's hidden message is "Failed to spawn agent command: …claude-agent-acp",
+  caused by "ACPX provider spawned after ownership admission was sealed". In
+  `packages/paperclip-runner/src/drivers/acpx/acpx-runtime-adapter.ts`, a restored session isn't
+  connected. The effort admission's `setConfigOption("effort")` opens a cold connection, and
+  `verifyLifetimeOwnership()` then seals the spawn set. The read-only Claude plan-mode call that
+  follows (`setConfigOption({ key: "mode", value: "plan" })`, added in #19291) opens another cold
+  connection without an ownership admission, so `SpawnedChildSet.add` refuses it. A fresh session
+  stays connected and never spawns, and standard tasks skip the call. The error is non-retryable
+  and not "state unavailable", so `governedWaitFollowUpMayStartFresh` never replaces the session.
+  This looks like #17676 but has a different cause.
+- **Likely fix:** wrap the plan-mode call in `children.beginLifetimeOwnershipAdmission()` /
+  `finishOwnershipAdmission()` the way `setModel` does, or apply plan mode inside the handshake
+  before the seal. Add a test that restores a session with an effort set and `readOnly`. A separate
+  small fix would carry the sidecar's redacted message, or at least its code, across
+  `acpx_sidecar_transport.rs` so this kind of failure isn't opaque (see #19918).
+- **Fork workaround:** none in code. Reset the task's session in the agent's Runtime settings before
+  replying on a planning task that's waiting on the board.
