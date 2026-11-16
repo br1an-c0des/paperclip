@@ -196,6 +196,10 @@ git diff --stat ui-new/docs/inventory/generated
 - If FORK-PATCHES.md has entries outside `pnpm-workspace.yaml` and `pnpm-lock.yaml`, also run
   `corepack pnpm typecheck` and the vitest files next to each patched file
   (`corepack pnpm exec vitest run <paths>`).
+- If fork plugins exist (`packages/plugins/fork-*`), build each one and run its tests
+  (`corepack pnpm --filter <plugin> build`, then its `test` script). A clean merge can still break a
+  plugin through plugin SDK changes or changes to the core tables it reads; record any break in the
+  report.
 - Commit the regenerated inventory separately: `Regenerate UI inventory after upstream sync`.
 - For new routes, requests or flags in the inventory diff, find the capability they belong to:
   - **An existing capability** (the new request serves a page or feature already in the

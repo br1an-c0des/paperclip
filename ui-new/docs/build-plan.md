@@ -4,7 +4,8 @@ Nov 10, 2026 · built against upstream `bf0220d34` ([sync 2026-11-10](../../fork
 
 How the redesign gets built, and in what order. It sorts every idea in
 [paperclip-redesign-ideas.md](paperclip-redesign-ideas.md) into three stages and lays out stage 1 as
-milestones.
+milestones. Stage 4 holds the features that would need changes to upstream's source, deferred until
+stage 3 is done.
 
 How it fits with the other redesign docs:
 
@@ -16,25 +17,29 @@ How it fits with the other redesign docs:
 | [proposals/unifying-requests.md](proposals/unifying-requests.md) | The requests model for questions, decisions and approvals. |
 | This plan | The order of the work, and which ideas need more than the UI. |
 
-## The three stages
+## The stages
 
 | Stage | What it covers | Where the work happens | Conflict with upstream |
 | --- | --- | --- | --- |
 | **1. New UI only** | The approved boards, built on the API as it is. Every existing capability ported or dropped on purpose. | `ui-new/` on `new-ui`, plus `deploy/` | None |
 | **2. Small upstream changes** | Fixes, docs and small features that any Paperclip user would benefit from. | `fix/*` and `docs/*` branches off `master`, sent to `paperclipai/paperclip` | None. They return through the normal sync. |
-| **3. Experimental features** | New data or new agent behaviour the API doesn't have. | A fork plugin (`packages/plugins/fork-*`), a fork skill, and fork patches only where unavoidable. Each feature on its own `exp/<name>` branch. | Low for plugins and skills. Higher for patches. |
+| **3. Experimental features** | New data or new agent behaviour the API doesn't have, small enough or self-contained enough for a plugin. | A fork plugin (`packages/plugins/fork-*`), a fork skill, and `ui-new`. No changes to upstream's source. Each feature on its own `exp/<name>` branch. | Low. The deployment stays on upstream's image. |
+| **4. Source-change features (later)** | Features a plugin can't hold: changes to core tables, core API paths, the run prompt or upstream logic. | Fork patches to upstream's source, after stage 3. The first one switches the deployment to building from source ([FORK.md](../../FORK.md#when-the-fork-starts-changing-source)). | Higher, and ongoing on every sync. |
 
 How an idea is sorted:
 
 - If the API already stores it, it's stage 1, even when the old UI never shows it that way.
 - If it's a small fix or feature upstream would plausibly accept, it's stage 2.
-- If it needs new storage, or changes what agents do, it's stage 3, built as a plugin first.
+- If it needs new storage, or changes what agents do, it's stage 3, built as a plugin.
+- If a plugin can't hold it and upstream won't take it, it's stage 4. A feature can split: the part a
+  plugin covers ships in stage 3.
 
 Several ideas split across stages: the part the API covers ships in stage 1, and the rest waits.
 
 Stage 1 is the priority. Stage 2 pull requests can go out whenever one is ready, because they don't touch
 the fork. Stage 3 starts once stage 1 works well, except the fork skill (3.10), which is cheap and can
-start earlier.
+start earlier. Stage 4 waits until stage 3 is done, and starts with a deliberate decision to change how
+the fork deploys and syncs.
 
 ## Your ideas, sorted
 
@@ -855,14 +860,38 @@ dropped.
   tells agents when to use the plugin's tools: read project docs, save memory, read announcements
   (and when to message the user with upstream's `send_chat_message`).
   Plugin plus skill covers most of stage 3 without touching upstream code.
-- **Patches only when unavoidable.** Ask first, then follow
-  [FORK.md](../../FORK.md#changing-server-database-and-packages): a hook in new files over edits to
-  upstream logic, with a `FORK:` marker and a FORK-PATCHES.md entry. Never a migration in upstream's
-  numbered sequence.
+- **No changes to upstream's source.** A feature, or the part of one, that a plugin can't hold moves to
+  [stage 4](#stage-4-source-change-features-later), or is proposed upstream (2b). Keeping stage 3
+  this way keeps the deployment on upstream's published image and the syncs as they are
+  ([FORK.md](../../FORK.md#plugins-and-the-deployment)).
 - **One branch per feature.** `exp/<name>` off `new-ui`, merged back once it's stable. Add the branch
   type to FORK.md's branch table when the first one starts.
 - **Known limits.** The plugin worker can't read the attention feed, Decisions, budgets or runs
   (FORK.md). Features that need those combine data in `ui-new` instead.
+
+### How each idea fits
+
+Sorted Nov 15, 2026, from the entries below. "Stage 3" means it fits a plugin, a skill or `ui-new`
+alone; anything else is deferred or waits on upstream.
+
+| Idea | Fits stage 3? | Deferred part |
+| --- | --- | --- |
+| [3.10](#310-core-skill-add-on) Core skill add-on | Yes, no plugin needed. Start first: the other features lean on it. | — |
+| [3.13](#313-briefings-and-reports) Briefings and reports | Yes: a recurring task and upstream's `send_chat_message`; a plugin only for milestone triggers | — |
+| [3.15](#315-an-in-app-guide-to-paperclip) In-app guide | Yes, `ui-new` only | — |
+| [3.1](#31-custom-statuses-and-status-rules) Custom statuses and rules | Yes, as display statuses over the seven | Fully custom workflows (out of scope) |
+| [3.2](#32-custom-fields) Custom fields | Yes | Server-side filtering and sorting on fields |
+| [3.7](#37-announcement-channels) Announcement channels | Yes, plugin plus skill | — |
+| [3.9](#39-meetings) Meetings | Yes, scheduled tasks plus a plugin calendar | — |
+| [3.8](#38-assigned-comments-and-review-assignments) Assigned comments | Yes, the assigned comments | Driving review stages from them |
+| [3.5](#35-memory-service) Memory service | Yes, after the 2a-6 fix; check upstream's memory direction and that plugin tools reach Claude Managed agents first | — |
+| [3.4](#34-project-knowledge-base) Project knowledge base | Yes, if upstream declines 2b-8 | Docs in the run prompt (a plugin tool and the skill stand in) |
+| [3.14](#314-company-instructions-companymd) Company instructions | Partly: a plugin keeping a shared section of each agent's instructions in sync | One `COMPANY.md` added to every run's prompt, unless upstream takes it (2b) |
+| [3.3](#33-lists-and-sprints-on-hold) Lists and sprints | On hold. A plugin first if it resumes | Server-side filters and agent visibility, if the plugin's limits matter |
+| [3.6](#36-voting) Voting | Tabled | — |
+| [3.11](#311-runner-visibility-beyond-the-api) Runner visibility | No: plugins can't read runs. Propose upstream (2b) | Stage 4 if upstream declines |
+| [3.12](#312-chat-outside-tasks-dropped-kept-as-a-long-term-idea) Chat outside tasks, prompt suggestions | No | Stage 4, or proposed upstream |
+| [3.16](#316-upstreams-coordinator-workspace) Coordinator workspace | Decided; the two Inbox ideas are stage 1 work (U36) | — |
 
 ### 3.1 Custom statuses and status rules
 
@@ -1176,6 +1205,19 @@ investigated and designed for `ui-new`. Compared on Nov 8; decided (below).
   comparison right after the Nov 7 sync, against the merged Coordinator. **Decided Nov 8**, after the user used the merged Coordinator on TES: `ui-new`'s overall direction stays, and the Coordinator workspace isn't ported. Two ideas come into the Inbox: a slimmer collapsed state for every request card (capsule, kind, title and a few crucial signs; a questions card collapses to its list of questions), with Collapse all, and grouping the cards by task, agent or project. They're designed as a review artboard first. Tracked as
   [U36](#upstream-changes-to-integrate); the area guide entry is
   [`shell/coordinator-workspace`](inventory/areas/app-shell.md#shellcoordinator-workspace-coordinator-workspace).
+
+## Stage 4: source-change features (later)
+
+Features, or the parts of them, that a plugin can't hold and upstream hasn't taken: changes to core
+tables or core API paths, additions to the run prompt, or changes to upstream logic. Nothing here
+starts until stage 3 is done. The current list is the "Deferred part" column in
+[How each idea fits](#how-each-idea-fits).
+
+Starting stage 4 is one decision with three consequences, set out in
+[FORK.md](../../FORK.md#when-the-fork-starts-changing-source): the deployment builds the image from
+source instead of reusing upstream's, the image patches in `deploy/patches/` become source patches,
+and each sync checks the fork's server code as well as merge conflicts. Before starting, check
+whether upstream has built or would take each feature (2b), since that avoids carrying it at all.
 
 ## Questions for you
 

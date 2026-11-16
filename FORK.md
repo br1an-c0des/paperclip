@@ -4,9 +4,12 @@ This is a fork of [paperclipai/paperclip](https://github.com/paperclipai/papercl
 [br1an-c0des/paperclip](https://github.com/br1an-c0des/paperclip). Its purpose is to build a new
 board UI in SolidJS (`ui-new/`) while continuing to take upstream's daily changes.
 
-**The fork is UI-only.** Apart from registering `ui-new` in the pnpm workspace, it doesn't change
-server, database or package code. Upstream lands many commits a day, and the server areas the
-redesign touches are still changing, so `ui-new` works with the API as it is. Small server or
+**The fork doesn't change upstream code.** Apart from registering `ui-new` in the pnpm workspace
+and one temporary carried fix (see [Fork-only files](#fork-only-files)), it doesn't change
+upstream's server, database or package code. Upstream lands many commits a day,
+and the server areas the redesign touches are still changing, so `ui-new` works with the API as it
+is. New features go in fork plugins first (see
+[Changing server, database and packages](#changing-server-database-and-packages)). Small server or
 documentation fixes found along the way go upstream as focused pull requests (see
 [Contributing fixes upstream](#contributing-fixes-upstream)), not into the fork.
 
@@ -31,7 +34,10 @@ can check what upstream changed against what the fork depends on.
 | `packages/plugins/fork-*/` | Plugins the fork adds (see below). Already in the pnpm workspace through `packages/plugins/*`. |
 
 The upstream files the fork edits are listed in [FORK-PATCHES.md](FORK-PATCHES.md). So far that is
-`pnpm-workspace.yaml` (one line, `- ui-new`), plus the `pnpm-lock.yaml` entries that line causes.
+`pnpm-workspace.yaml` (one line, `- ui-new`), plus the `pnpm-lock.yaml` entries that line causes,
+and one exception: upstream PR #17905, carried in source until upstream merges it so the local dev
+server offers the Paperclip Runner (`runner-libc-probe-sync`). The deployed image doesn't use the
+fork's server source, so it gets the same fix from an image patch.
 
 ## Remotes and branches
 
@@ -63,12 +69,21 @@ git config alias.sync-ui '!f() { set -e; git sync-master; git checkout new-ui; g
 
 ## Changing server, database and packages
 
-The fork plans no server, database or package changes. When a UI feature seems to need one, first
-look for a way to build it on the existing API, then consider proposing the change upstream. The
-options below are kept for a change that turns out to be unavoidable; agree on it before starting.
-If one is needed, pick the first option that works:
+The fork builds new features in phases (the stages in the
+[build plan](ui-new/docs/build-plan.md#the-stages)):
 
-1. **A plugin.** Paperclip's plugin system ([doc/plugins/PLUGIN_AUTHORING_GUIDE.md](doc/plugins/PLUGIN_AUTHORING_GUIDE.md))
+- **Now, and stage 3: no upstream code changes.** New features are built on the existing API, in a
+  fork plugin and a fork skill, or proposed upstream. The deployment stays on upstream's published
+  image and the syncs stay as they are (see [Plugins and the deployment](#plugins-and-the-deployment)).
+- **Stage 4, later: changes to upstream's source.** Features that need options 2 or 3 below wait
+  until stage 3 is done, and the first one is a deliberate switch (see
+  [When the fork starts changing source](#when-the-fork-starts-changing-source)). Agree on it before
+  starting.
+
+When a feature seems to need a server change, pick the first option that works:
+
+1. **A plugin.** The default for new features, and the only option before stage 4. Paperclip's
+   plugin system ([doc/plugins/PLUGIN_AUTHORING_GUIDE.md](doc/plugins/PLUGIN_AUTHORING_GUIDE.md))
    gives a plugin its own Postgres schema with its own migrations, JSON API routes under
    `/api/plugins/:pluginId/api/*`, event subscriptions, scheduled jobs, and read access to core
    tables on an allowed list. `ui-new` can call plugin routes like any other API. A plugin can't
@@ -83,6 +98,42 @@ If one is needed, pick the first option that works:
 `@paperclipai/shared` is upstream-owned too. Put fork-only types in fork files rather than adding
 them to `packages/shared`.
 
+### Plugins and the deployment
+
+A fork plugin doesn't change upstream's server, so the deployment keeps building on upstream's
+published image (see [Production deployment](#production-deployment)). The Dockerfile gains a step
+that builds the fork plugin and makes it available to install, either built into the image and
+installed by local path or published to a registry; this is settled with the first plugin. The
+image patches in [FORK-PATCHES.md](FORK-PATCHES.md#image-patches) stay as they are.
+
+Plugins never cause merge conflicts, but they depend on the plugin SDK and on the core tables they
+read, both of which upstream changes. Each sync builds the fork plugins and runs their tests (the
+`upstream-sync` skill does this).
+
+### When the fork starts changing source
+
+The first change to upstream's source (option 2 or 3 above, build plan stage 4) changes three
+things together. Plan them as one switch, not one feature at a time:
+
+- **The deployment builds from source.** Today's image swaps the UI into upstream's compiled
+  server, so source changes would never reach it. The image would be built from the fork's own
+  source, starting from upstream's `Dockerfile` with a fork layer on top. The build is slower (the
+  server, the Rust runner and the agent CLIs are all built), the server is no longer exactly what
+  upstream's CI tested, and `deploy.sh` no longer needs to find a published upstream image.
+- **Image patches become source patches.** The scripts in `deploy/patches/` edit upstream's
+  compiled bundles only because the source isn't rebuilt. They would be replaced by the same
+  changes in source, each with a `FORK:` marker and a FORK-PATCHES.md entry. #17905 is already
+  carried this way for the dev server (`runner-libc-probe-sync`), so only #20710 is new. That turns
+  the exception into a rule: an open upstream pull request may be carried as a recorded source
+  patch until upstream merges it, and is then dropped in favour of upstream's version. `fix/*`
+  branches still aren't merged into `new-ui`; the patch is a copy of the change.
+- **Syncs check more than conflicts.** New fork files compile against upstream's services, schema
+  and types, which can change without any merge conflict. Each sync would also run the server
+  typecheck, the fork features' tests, and a review of every FORK-PATCHES.md server entry against
+  upstream's changes. Hooks (option 2) cost little per sync; edits to upstream logic (option 3)
+  need attention whenever upstream works in that area. Fork tables outside a plugin also need the
+  separate migration track (below), which isn't built.
+
 ### Database changes
 
 Upstream numbers its migrations in one sequence (`packages/db/src/migrations/NNNN_*.sql`, tracked
@@ -92,8 +143,8 @@ that a database has already applied breaks that database.
 
 - Prefer a plugin's own schema and migrations (option 1 above).
 - If core code needs fork tables, keep them on a separate migration track: their own folder and
-  tracking table, applied after upstream's. The mechanism isn't built, and isn't planned while
-  the fork is UI-only. If it's ever needed, record it in [FORK-PATCHES.md](FORK-PATCHES.md).
+  tracking table, applied after upstream's. The mechanism isn't built, and isn't planned before
+  stage 4 ([When the fork starts changing source](#when-the-fork-starts-changing-source)). If it's ever needed, record it in [FORK-PATCHES.md](FORK-PATCHES.md).
 - Prefer side tables that reference upstream tables over altering upstream tables. A fork column
   on an upstream table conflicts with every upstream change to that table.
 - List every fork database object under **Database objects** in [FORK-PATCHES.md](FORK-PATCHES.md).
@@ -240,7 +291,9 @@ Summary (full steps in [deploy/README.md](deploy/README.md)):
 - **Image:** `deploy/Dockerfile` starts from upstream's published image for the upstream commit
   last merged into `new-ui` (`ghcr.io/paperclipai/paperclip:sha-<commit>`), and replaces its UI
   with a `ui-new` build. The server, Rust runner and agent CLIs are exactly upstream's, and nothing
-  heavy is rebuilt. `deploy/deploy.sh` picks the base commit automatically.
+  heavy is rebuilt. `deploy/deploy.sh` picks the base commit automatically. This holds while the
+  fork's server features are plugins; changing upstream's source would mean building from source
+  ([When the fork starts changing source](#when-the-fork-starts-changing-source)).
 - **No server changes needed:** the server serves whatever is in `ui/dist`.
 - **Stack:** `deploy/docker-compose.yml` runs Postgres + Paperclip with bind mounts under
   `PAPERCLIP_DATA_ROOT` (default `/srv/paperclip`). Paperclip listens on loopback; put

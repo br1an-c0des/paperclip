@@ -68,7 +68,7 @@ Agents start cold, so the brief carries everything. Include:
 
 1. **Base check first.** Worktrees in this repo are cut from `master`, not `new-ui`. First step:
    `git merge-base --is-ancestor new-ui HEAD || git reset --hard new-ui` while the tree is clean.
-2. **Rules:** read `CLAUDE.md`. UI-only: no server, database or package changes; never edit `ui/`;
+2. **Rules:** read `CLAUDE.md`. No changes to upstream's server, database or package code (fork plugins are fine); never edit `ui/`;
    types from `@paperclipai/shared` with `import type`. Load the `solidjs` skill before writing Solid
    code. Follow the design in `ui-new/docs/design/` (boards, `design-system.md`, `tokens.css`).
 3. **The work:** the goal, the boards and plan sections to read, the files it owns, and what to leave

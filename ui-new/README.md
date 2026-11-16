@@ -67,7 +67,7 @@ component in both themes.
 
 ## Staying merge-friendly with upstream
 
-This fork tracks `paperclipai/paperclip` and is UI-only: build on the existing API rather than changing server, database or package code. Any change to an upstream file is recorded in [FORK-PATCHES.md](../FORK-PATCHES.md), and server fixes go upstream as pull requests ([FORK.md](../FORK.md#contributing-fixes-upstream)). Syncing with upstream is described in [FORK.md](../FORK.md#staying-in-sync-with-upstream).
+This fork tracks `paperclipai/paperclip` and doesn't change upstream code: build on the existing API rather than changing server, database or package code, with new features in fork plugins. Any change to an upstream file is recorded in [FORK-PATCHES.md](../FORK-PATCHES.md), and server fixes go upstream as pull requests ([FORK.md](../FORK.md#contributing-fixes-upstream)). Syncing with upstream is described in [FORK.md](../FORK.md#staying-in-sync-with-upstream).
 
 If `pnpm-lock.yaml` conflicts during a merge, don't resolve it by hand. Take upstream's version and regenerate it:
 

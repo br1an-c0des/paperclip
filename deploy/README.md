@@ -34,6 +34,10 @@ The server serves whatever is in `ui/dist`. `Dockerfile` therefore:
    Each script skips code that already has upstream's fix and fails the build if the code it patches
    has changed. Each has an entry in [FORK-PATCHES.md](../FORK-PATCHES.md#image-patches).
 
+This works because the fork doesn't change upstream's source. Fork plugins keep it that way, and get
+a build step here once the first one exists. Changing upstream's source would mean building the
+image from source instead ([FORK.md](../FORK.md#when-the-fork-starts-changing-source)).
+
 The service worker (`/sw.js`) replaces the old UI's in every browser that had it, since it's served
 at the same address with new contents. Each deploy changes its build id, so open tabs and the
 home-screen app reload onto the new build the next time they're in the background.

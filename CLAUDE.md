@@ -3,8 +3,8 @@
 This is a personal fork of [paperclipai/paperclip](https://github.com/paperclipai/paperclip)
 (`br1an-c0des/paperclip`). Its purpose is to build a **new board UI in SolidJS** (`ui-new/`) that
 regroups the existing UI into a more coherent, single interface, while continuing to merge upstream's
-daily changes. The fork is UI-only: it builds on the existing API and doesn't change server, database
-or package code.
+daily changes. The fork doesn't change upstream's server, database or package code: the UI builds on
+the existing API, and new features are built as fork plugins.
 
 ## Intentions
 
@@ -16,16 +16,21 @@ or package code.
   The new UI should settle on one refined interface instead of toggles.
 - **Lose no functionality by accident.** Every capability of the old UI is catalogued; anything left out
   is dropped on purpose.
-- **Stay UI-only.** Upstream lands many commits a day, and the server areas the redesign touches are
-  still changing. `ui-new` works with the API as it is; small, self-contained server or documentation
-  fixes go upstream as focused pull requests instead of fork patches.
+- **Don't change upstream code.** Upstream lands many commits a day, and the server areas the
+  redesign touches are still changing. `ui-new` works with the API as it is; small, self-contained
+  server or documentation fixes go upstream as focused pull requests instead of fork patches.
+- **New features: plugins first, source changes later.** Once the UI is polished, the next phase is
+  build plan stage 3: new features that are small or fit in a fork plugin (`packages/plugins/fork-*`)
+  and a fork skill. Features that would need changes to upstream's source wait for stage 4, which
+  changes how the fork deploys and syncs ([FORK.md](FORK.md#changing-server-database-and-packages)).
 
 ## Ground rules
 
 - **Keep work in fork-only files** (listed in [FORK.md](FORK.md#fork-only-files)). Don't change
-  server, database or package code in the fork. If a UI feature can't be built on the existing API,
-  design around the gap or propose the change upstream. If a fork change ever seems unavoidable, ask
-  first, then follow [FORK.md](FORK.md#changing-server-database-and-packages).
+  upstream's server, database or package code in the fork. If a feature can't be built on the
+  existing API, design around the gap, build it as a fork plugin, or propose the change upstream. If
+  a change to upstream code ever seems unavoidable, ask first, then follow
+  [FORK.md](FORK.md#changing-server-database-and-packages).
 - **Fixes for upstream** go in their own `fix/*` or `docs/*` branch off `master`, as a pull request to
   `paperclipai/paperclip` that follows upstream's `CONTRIBUTING.md` and PR template. They are never
   merged into `new-ui`. Record each one in [fork/upstream-fixes.md](fork/upstream-fixes.md), from
@@ -57,7 +62,7 @@ or package code.
 
 | Doc | What it covers |
 | --- | --- |
-| [FORK.md](FORK.md) | Remotes, branches, the UI-only policy and its fallback rules, sending fixes upstream, the upstream sync routine, why `ui-new` is a standalone app rather than a plugin, deployment summary, open items. |
+| [FORK.md](FORK.md) | Remotes, branches, the no-upstream-code policy (plugins first, source changes in a later stage, and what that would change for deploys and syncs), sending fixes upstream, the upstream sync routine, why `ui-new` is a standalone app rather than a plugin, deployment summary, open items. |
 | [FORK-PATCHES.md](FORK-PATCHES.md) | Every change the fork makes to upstream files: what, why, what it depends on, how to resolve conflicts. |
 | [fork/upstream-fixes.md](fork/upstream-fixes.md) | Small fixes for upstream: candidates to build, and each one's branch, pull request and status until it's merged. |
 | [.claude/skills/upstream-sync/SKILL.md](.claude/skills/upstream-sync/SKILL.md) | The upstream sync procedure and conflict-resolution policy. Reports go to `fork/sync-reports/`. |
@@ -65,7 +70,7 @@ or package code.
 | [.claude/skills/pm/SKILL.md](.claude/skills/pm/SKILL.md) | Project-manager mode (`/pm`): plan and review, delegate building to 3–5 agents, propose each one first. |
 | [ui-new/README.md](ui-new/README.md) | Running and building the SolidJS app; layout; lockfile-conflict fix. |
 | [deploy/README.md](deploy/README.md) | Production deployment: Docker image on top of upstream's, Compose with bind mounts, Tailscale or Caddy. |
-| [ui-new/docs/build-plan.md](ui-new/docs/build-plan.md) | The build plan: every redesign idea sorted into UI-only, small upstream PRs and experimental features, stage 1 milestones, the upstream changes still to integrate, decisions to make, and open questions. |
+| [ui-new/docs/build-plan.md](ui-new/docs/build-plan.md) | The build plan: every redesign idea sorted into UI-only, small upstream PRs, plugin features and later source-change features, stage 1 milestones, the upstream changes still to integrate, decisions to make, and open questions. |
 | [ui-new/docs/inventory/README.md](ui-new/docs/inventory/README.md) | How the existing UI is documented, and the redesign tiers. |
 | [ui-new/docs/inventory/capabilities.md](ui-new/docs/inventory/capabilities.md) | The redesign checklist: every capability, its new home, and its status. |
 | [ui-new/docs/inventory/areas/](ui-new/docs/inventory/areas/) | What each existing page does, its key actions and the API requests behind them. |
