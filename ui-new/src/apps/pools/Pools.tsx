@@ -15,6 +15,7 @@ import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { InfoHeading, SettingsCard, SettingsRow, TextInput } from "@/ui/Field";
 import { PageHeader } from "@/ui/PageHeader";
+import { ChangedDot, savedText, type Changed } from "@/ui/ChangedDot";
 import { Switch as Toggle } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
 import { connectionState } from "../apps-model";
@@ -345,6 +346,16 @@ function PoolEditor(props: {
   const [removing, setRemoving] = createSignal(false);
   const unavailable = () => props.app.availability?.available === false;
   const dirty = () => JSON.stringify(draft()) !== JSON.stringify(configOf(saved()));
+  // Unsaved-change dots: a setting differs from the saved pool.
+  const was = <K extends keyof AiConnectionPoolConfig>(key: K, text: (value: AiConnectionPoolConfig[K]) => string): Changed =>
+    JSON.stringify(saved()[key]) !== JSON.stringify(draft()[key]) && { from: text(saved()[key]) };
+  const memberNames = (members: readonly AiConnectionPoolMember[]) => savedText(members.map((member) => memberAccount(member, props.accounts)?.name ?? "a connection").join(", "), "none", 80);
+  /** A connection's model and effort as saved, when the draft changed them. */
+  const profileWas = (member: AiConnectionPoolMember): Changed => {
+    const before = saved().members.find((entry) => entry.id === member.id);
+    if (!before || JSON.stringify(before.profile) === JSON.stringify(member.profile)) return false;
+    return { from: [before.profile.model || "no model", before.profile.effort ? `${before.profile.effort} effort` : ""].filter(Boolean).join(", ") };
+  };
 
   const inspection = createQuery(() => ({
     queryKey: [...queryKeys.tools.pools(company().id), saved().id, "inspection"],
@@ -398,6 +409,7 @@ function PoolEditor(props: {
               onChange={(enabled) => setDraft({ ...draft(), enabled })}
               label="Pool on"
               info="Agents set to this pool run on its connections."
+              changed={was("enabled", (value) => (value ? "on" : "off"))}
             />
             <span class="ap-actions-end">
               <Button variant="quiet" disabled={!dirty() || save.isPending} onClick={() => setDraft(configOf(saved()))}>
@@ -415,11 +427,14 @@ function PoolEditor(props: {
           </>
         }
       >
-        <SettingsRow label="Name" for="pl-name">
+        <SettingsRow label="Name" for="pl-name" changed={was("name", (value) => savedText(value))}>
           <TextInput id="pl-name" value={draft().name} disabled={unavailable()} onInput={(event) => setDraft({ ...draft(), name: event.currentTarget.value })} />
         </SettingsRow>
         <div class="pl-order-head">
-          <span class="cap">In order</span>
+          <span class="info-line">
+            <span class="cap">In order</span>
+            <ChangedDot label="The connections and their order" changed={JSON.stringify(saved().members.map((member) => member.id)) !== JSON.stringify(draft().members.map((member) => member.id)) && { from: memberNames(saved().members) }} />
+          </span>
           <Button
             size="compact"
             icon={<Plus size={14} aria-hidden="true" />}
@@ -449,9 +464,10 @@ function PoolEditor(props: {
             onChange={(on) => setDraft({ ...draft(), mode: on ? "usage_aware" : "round_robin" })}
             label="Skip connections near their usage limit"
             info="Uses each provider's reported usage, where it reports one."
+            changed={was("mode", (value) => (value === "usage_aware" ? "on" : "off"))}
           />
           <Show when={draft().mode === "usage_aware"}>
-            <SettingsRow label="Skip at" info="Percent of a usage limit." for="pl-threshold">
+            <SettingsRow label="Skip at" info="Percent of a usage limit." for="pl-threshold" changed={was("thresholdPercent", (value) => `${value}%`)}>
               <TextInput
                 id="pl-threshold"
                 type="number"
@@ -466,7 +482,10 @@ function PoolEditor(props: {
           <For each={draft().members}>
             {(member, index) => (
               <div class="pl-profile">
-                <span class="pl-profile-name">{memberAccount(member, props.accounts)?.name ?? "Connection unavailable"}</span>
+                <span class="pl-profile-name info-line">
+                  {memberAccount(member, props.accounts)?.name ?? "Connection unavailable"}
+                  <ChangedDot label={`${memberAccount(member, props.accounts)?.name ?? "this connection"}'s model and effort`} changed={profileWas(member)} />
+                </span>
                 <label class="field-stack">
                   <span class="field-label">Model</span>
                   <TextInput

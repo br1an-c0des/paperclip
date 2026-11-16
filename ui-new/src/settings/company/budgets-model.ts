@@ -49,10 +49,23 @@ export function rowDraft(policy: Pick<BudgetPolicySummary, "amount" | "warnPerce
   };
 }
 
-export function rowDirty(policy: Pick<BudgetPolicySummary, "amount" | "warnPercent" | "hardStopEnabled"> | null, draft: BudgetRowDraft) {
+/**
+ * A budget's fields with an unsaved edit, each with what it was ("$500", "80%", "pausing at the
+ * limit"), for the unsaved-change dots. With no amount typed, only the amount counts.
+ */
+export function rowChanges(policy: Pick<BudgetPolicySummary, "amount" | "warnPercent" | "hardStopEnabled"> | null, draft: BudgetRowDraft): Partial<Record<keyof BudgetRowDraft, string>> {
   const before = rowDraft(policy);
   const amount = parseDollars(draft.amount);
-  return parseDollars(before.amount) !== amount || (amount !== 0 && (before.warnPercent !== draft.warnPercent || before.hardStop !== draft.hardStop));
+  const changes: Partial<Record<keyof BudgetRowDraft, string>> = {};
+  if (parseDollars(before.amount) !== amount) changes.amount = before.amount ? `$${before.amount}` : "no budget";
+  if (amount === 0) return changes;
+  if (before.warnPercent !== draft.warnPercent) changes.warnPercent = `${before.warnPercent}%`;
+  if (before.hardStop !== draft.hardStop) changes.hardStop = before.hardStop ? "pausing at the limit" : "only warning";
+  return changes;
+}
+
+export function rowDirty(policy: Pick<BudgetPolicySummary, "amount" | "warnPercent" | "hardStopEnabled"> | null, draft: BudgetRowDraft) {
+  return Object.keys(rowChanges(policy, draft)).length > 0;
 }
 
 /** The upsert that saves a draft for one scope and window, or null when the amount isn't a number. */

@@ -9,6 +9,7 @@ import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { Button } from "@/ui/Button";
 import { SettingsCard, SettingsRow } from "@/ui/Field";
+import { savedText, type Changed } from "@/ui/changed";
 import { pushToast } from "@/ui/Toast";
 import { AddConnectionDialog, ConnectionBox, ConnectionMenu, ModelField } from "./ConnectionPicker";
 import {
@@ -62,6 +63,13 @@ export function ConnectionsSection() {
   );
 }
 
+/** The connection a card had saved, for a changed Connection row's dot. */
+function connectionFrom(choices: readonly AiManagedConnectionSummary[] | undefined, grantId: string | null | undefined): Changed {
+  return { from: chosen(choices ?? [], grantId)?.name ?? (grantId ? "a connection you can't see" : "none") };
+}
+
+const onOff = (value: boolean) => ({ from: value ? "on" : "off" });
+
 function SaveFoot(props: { dirty: boolean; busy: boolean; problem: string | null; onDiscard: () => void; onSave: () => void; saveLabel?: string; test?: () => unknown; testLabel?: string; testDisabled?: boolean }) {
   return (
     <footer class="cfoot">
@@ -97,6 +105,8 @@ function DecisionCard() {
   const [draft, setDraft] = createStore(decisionDraft({ companyId: "", enabled: false, allowBackground: true, connectionId: null, grantId: null, provider: null, model: null }));
   createEffect(on(() => JSON.stringify(settings()), () => settings() && setDraft(reconcile(decisionDraft(settings()!)))));
   const dirty = () => (settings() ? decisionDirty(settings()!, draft) : false);
+  /** The saved values, for the rows' unsaved-change dots; null before they load. */
+  const saved = () => (settings() ? decisionDraft(settings()!) : null);
   const selected = () => chosen(query.data?.choices ?? [], draft.grantId);
   const [busy, setBusy] = createSignal(false);
   const [problem, setProblem] = createSignal<string | null>(null);
@@ -148,7 +158,7 @@ function DecisionCard() {
             }
           />
           <Show when={settings()} fallback={<CardNoteLine>{readNote(query, "Not available.")}</CardNoteLine>}>
-            <SettingsRow label="Connection">
+            <SettingsRow label="Connection" changed={saved() && saved()!.grantId !== draft.grantId && connectionFrom(query.data?.choices, saved()!.grantId)}>
               <ConnectionBox connection={selected()} model={selected() ? (query.data!.choices.find((c) => c.grantId === draft.grantId)?.decisionModel ?? null) : null} missing={!!draft.grantId && !selected()}>
                 <ConnectionMenu
                   choices={query.data!.choices}
@@ -163,11 +173,12 @@ function DecisionCard() {
               </Show>
             </SettingsRow>
             <Show when={draft.connectionId}>
-              <SwitchRow label="Use decisions" info="Paperclip's optional decision features run on this connection." checked={draft.enabled} onChange={(value) => setDraft("enabled", value)} />
+              <SwitchRow label="Use decisions" info="Paperclip's optional decision features run on this connection." checked={draft.enabled} changed={saved() && saved()!.enabled !== draft.enabled && onOff(saved()!.enabled)} onChange={(value) => setDraft("enabled", value)} />
               <SwitchRow
                 label="Allow background decisions"
                 info="Background features can charge this connection without a responsible person. They show as Paperclip services in Costs."
                 checked={draft.allowBackground}
+                changed={saved() && saved()!.allowBackground !== draft.allowBackground && onOff(saved()!.allowBackground)}
                 onChange={(value) => setDraft("allowBackground", value)}
               />
             </Show>
@@ -219,6 +230,7 @@ function FastResponseCard() {
   const [draft, setDraft] = createStore(fastDraft({ companyId: "", enabled: false, connectionId: null, grantId: null, provider: null, model: null, allowSponsored: true }));
   createEffect(on(() => JSON.stringify(settings()), () => settings() && setDraft(reconcile(fastDraft(settings()!)))));
   const dirty = () => (settings() ? fastDirty(settings()!, draft) : false);
+  const saved = () => (settings() ? fastDraft(settings()!) : null);
   const selected = () => chosen(query.data?.choices ?? [], draft.grantId);
   const models = createQuery(() => ({
     queryKey: queryKeys.companySettings.fastResponseModels(company().id, draft.connectionId ?? ""),
@@ -292,21 +304,26 @@ function FastResponseCard() {
             label="Acknowledge messages right away"
             info="When someone messages an agent, a small model replies at once, marked as automatic. The agent's full reply follows."
             checked={draft.enabled}
+            changed={saved() && saved()!.enabled !== draft.enabled && onOff(saved()!.enabled)}
             onChange={(value) => setDraft("enabled", value)}
           />
-          <SettingsRow label="Connection">
+          <SettingsRow
+            label="Connection"
+            changed={saved() && (saved()!.grantId !== draft.grantId || saved()!.connectionId !== draft.connectionId) && connectionFrom(query.data?.choices, saved()!.grantId)}
+          >
             <ConnectionBox connection={selected()} missing={!!draft.grantId && !selected()}>
               <ConnectionMenu choices={query.data!.choices} grantId={draft.grantId} onPick={pick} onClear={() => setDraft({ connectionId: null, grantId: null, enabled: false })} onAdd={() => setAdding(true)} />
             </ConnectionBox>
           </SettingsRow>
           <Show when={draft.connectionId}>
-            <SettingsRow label="Model" for="cs-fast-model">
+            <SettingsRow label="Model" for="cs-fast-model" changed={saved() && saved()!.model !== draft.model && { from: savedText(saved()!.model, "not set") }}>
               <ModelField id="cs-fast-model" value={draft.model ?? ""} placeholder="Choose or enter a model ID" suggestions={models.data} onInput={(value) => setDraft("model", value || null)} />
             </SettingsRow>
             <SwitchRow
               label="Answer people without an account"
               info="Covers accepted outside messages from people with no linked Paperclip account, charged to the organization."
               checked={draft.allowSponsored}
+              changed={saved() && saved()!.allowSponsored !== draft.allowSponsored && onOff(saved()!.allowSponsored)}
               onChange={(value) => setDraft("allowSponsored", value)}
             />
           </Show>
@@ -366,6 +383,7 @@ function InjectionCard() {
   const [draft, setDraft] = createStore(injectionDraft({ companyId: "", enabled: false, connectionId: null, grantId: null, model: DEFAULT_INJECTION_MODEL }));
   createEffect(on(() => JSON.stringify(settings()), () => settings() && setDraft(reconcile(injectionDraft(settings()!)))));
   const dirty = () => (settings() ? injectionDirty(settings()!, draft) : false);
+  const saved = () => (settings() ? injectionDraft(settings()!) : null);
   const selected = () => chosen(query.data?.choices ?? [], draft.grantId);
   const models = createQuery(() => ({
     queryKey: queryKeys.companySettings.promptInjectionModels(company().id, draft.connectionId ?? ""),
@@ -419,9 +437,14 @@ function InjectionCard() {
             info="Looks for instructions planted in web pages, files and app responses, and holds suspicious results back."
             help="The provider receives tool content."
             checked={draft.enabled}
+            changed={saved() && saved()!.enabled !== draft.enabled && onOff(saved()!.enabled)}
             onChange={(value) => setDraft("enabled", value)}
           />
-          <SettingsRow label="Connection" info="A shared OpenRouter connection.">
+          <SettingsRow
+            label="Connection"
+            info="A shared OpenRouter connection."
+            changed={saved() && (saved()!.grantId !== draft.grantId || saved()!.connectionId !== draft.connectionId) && connectionFrom(query.data?.choices, saved()!.grantId)}
+          >
             <ConnectionBox connection={selected()} missing={!!draft.grantId && !selected()}>
               <ConnectionMenu
                 choices={query.data!.choices}
@@ -432,7 +455,7 @@ function InjectionCard() {
               />
             </ConnectionBox>
           </SettingsRow>
-          <SettingsRow label="Model" for="cs-inject-model">
+          <SettingsRow label="Model" for="cs-inject-model" changed={saved() && saved()!.model !== draft.model && { from: savedText(saved()!.model, "not set") }}>
             <ModelField id="cs-inject-model" value={draft.model} placeholder={DEFAULT_INJECTION_MODEL} suggestions={models.data} onInput={(value) => setDraft("model", value)} />
           </SettingsRow>
           <SettingsRow label="If the model is down" info="Built-in pattern matching always runs when the model check can't.">

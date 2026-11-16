@@ -183,17 +183,39 @@ export function headersChanged(settings: AgentObservabilitySettings | null, draf
     JSON.stringify(headerNames(draft.headers)) !== JSON.stringify(saved);
 }
 
-export function telemetryDirty(settings: AgentObservabilitySettings | null, draft: TelemetryDraft) {
+export type TelemetryField = "provider" | "endpoint" | "projectId" | "apiKey" | "headers" | "enabled" | "capture";
+
+/** The fields with an unsaved edit: what makes the card dirty, and lights each row's dot. */
+export function telemetryChanges(settings: AgentObservabilitySettings | null, draft: TelemetryDraft): TelemetryField[] {
   const before = telemetryDraft(settings);
-  if (!settings) return Boolean(draft.endpoint.trim() || draft.projectId.trim() || draft.apiKey || draft.headers.length);
-  return (
-    before.provider !== draft.provider ||
-    before.enabled !== draft.enabled ||
-    JSON.stringify(before.capture) !== JSON.stringify(draft.capture) ||
-    (draft.provider === "otlp" ? before.endpoint !== draft.endpoint.trim() : before.projectId !== draft.projectId.trim()) ||
-    Boolean(draft.apiKey) ||
-    headersChanged(settings, draft)
-  );
+  const changed: [TelemetryField, boolean][] = settings
+    ? [
+        ["provider", before.provider !== draft.provider],
+        ["endpoint", draft.provider === "otlp" && before.endpoint !== draft.endpoint.trim()],
+        ["projectId", draft.provider !== "otlp" && before.projectId !== draft.projectId.trim()],
+        ["apiKey", Boolean(draft.apiKey)],
+        ["headers", headersChanged(settings, draft)],
+        ["enabled", before.enabled !== draft.enabled],
+        ["capture", JSON.stringify(before.capture) !== JSON.stringify(draft.capture)],
+      ]
+    : // Nothing saved yet: only what you've typed counts.
+      [
+        ["endpoint", Boolean(draft.endpoint.trim())],
+        ["projectId", Boolean(draft.projectId.trim())],
+        ["apiKey", Boolean(draft.apiKey)],
+        ["headers", draft.headers.length > 0],
+      ];
+  return changed.filter(([, yes]) => yes).map(([field]) => field);
+}
+
+export function telemetryDirty(settings: AgentObservabilitySettings | null, draft: TelemetryDraft) {
+  return telemetryChanges(settings, draft).length > 0;
+}
+
+/** The capture choices a draft includes, for a changed "What to include" row: "Prompts, Agent replies", or "nothing". */
+export function captureText(capture: AgentObservabilityCapture) {
+  const included = CAPTURE_LABELS.filter((entry) => capture[entry.key]).map((entry) => entry.label);
+  return included.length ? included.join(", ") : "nothing";
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

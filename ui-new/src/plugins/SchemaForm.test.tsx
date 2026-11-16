@@ -75,4 +75,24 @@ describe("SchemaForm", () => {
     fireEvent.input(screen.getByLabelText("Token value"), { target: { value: "ghp_x" } });
     expect(values().token).toBe("ghp_x");
   });
+
+  it("lights a field's unsaved-change dot against the saved values, without showing a secret", () => {
+    const saved = { url: "https://a.example", enabled: false };
+    const [values, setValues] = createSignal<Record<string, unknown>>({ ...saved });
+    render(() => <SchemaForm schema={schema} values={values()} onChange={setValues} secrets={secrets} saved={saved} />);
+    const dot = (name: string) => screen.queryByRole("button", { name: `Unsaved change: ${name}` });
+    expect(dot("Server URL")).toBeNull();
+    fireEvent.input(screen.getByRole("textbox", { name: /Server URL/ }), { target: { value: "https://b.example" } });
+    fireEvent.click(screen.getByRole("switch", { name: "Enabled" }));
+    fireEvent.click(screen.getByRole("button", { name: "Or paste a value" }));
+    fireEvent.input(screen.getByLabelText("Token value"), { target: { value: "ghp_x" } });
+    const text = (name: string) => document.getElementById(dot(name)!.getAttribute("aria-describedby")!)?.textContent;
+    expect(text("Server URL")).toBe("Changed from https://a.example. Not saved yet.");
+    expect(text("Enabled")).toBe("Changed from off. Not saved yet.");
+    expect(text("Token")).toBe("Changed. Not saved yet.");
+    // Discard: the values go back, the dots go out.
+    setValues({ ...saved });
+    expect(dot("Server URL")).toBeNull();
+    expect(dot("Enabled")).toBeNull();
+  });
 });

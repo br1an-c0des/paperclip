@@ -14,6 +14,7 @@ import { Dialog } from "@/ui/Dialog";
 import { Field, TextArea, TextInput } from "@/ui/Field";
 import { InfoTip } from "@/ui/InfoTip";
 import { Menu } from "@/ui/Menu";
+import { ChangedDot, savedText, type Changed } from "@/ui/ChangedDot";
 import { Switch as Toggle } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
 import { failureText } from "../shared";
@@ -209,6 +210,7 @@ export function GitHubSettings(props: { endpoint: ChatEndpoint; base: string }) 
         {(configuration) => (
           <ReviewPolicy
             policy={configuration.defaults}
+            saved={state.query.data?.configuration?.defaults}
             accessHref={`${props.base}/chat/${props.endpoint.id}/access`}
             scoreText={scoreText() ?? String(configuration.defaults.ratingThreshold ?? 5)}
             onScoreText={(text) => {
@@ -357,11 +359,13 @@ function GitHubRepositories(props: { endpoint: ChatEndpoint }) {
   );
 }
 
-function ListField(props: { id: string; label: string; info: string; values: string[]; onChange: (values: string[]) => void }) {
+const lower = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+
+function ListField(props: { id: string; label: string; info: string; values: string[]; changed?: Changed; onChange: (values: string[]) => void }) {
   const [text, setText] = createSignal(props.values.join("\n"));
   createEffect(on(() => props.values.join("\n"), (value) => (lines(text()).join("\n") === value ? undefined : setText(value)), { defer: true }));
   return (
-    <Field label={props.label} for={props.id} info={props.info}>
+    <Field label={props.label} for={props.id} info={props.info} changed={props.changed}>
       <TextArea
         id={props.id}
         rows={3}
@@ -378,12 +382,19 @@ function ListField(props: { id: string; label: string; info: string; values: str
 
 function ReviewPolicy(props: {
   policy: GitHubReviewPolicy;
+  /** The saved policy, for the unsaved-change dots. */
+  saved: GitHubReviewPolicy | undefined;
   accessHref: string;
   scoreText: string;
   onScoreText: (text: string) => void;
   onChange: (policy: GitHubReviewPolicy) => void;
 }) {
   const set = <K extends keyof GitHubReviewPolicy>(key: K, value: GitHubReviewPolicy[K]) => props.onChange({ ...props.policy, [key]: value });
+  // Unsaved-change dots: a setting differs from the saved policy.
+  const differs = (...keys: (keyof GitHubReviewPolicy)[]) => Boolean(props.saved) && keys.some((key) => JSON.stringify(props.saved![key]) !== JSON.stringify(props.policy[key]));
+  const was = <K extends keyof GitHubReviewPolicy>(key: K, text: (value: GitHubReviewPolicy[K]) => string): Changed => differs(key) && { from: text(props.saved![key]) };
+  const onOff = (value: boolean | null | undefined) => (value ? "on" : "off");
+  const list = (values: readonly string[]) => savedText(values.join(", "), "none");
   const [lastAutomatic, setLastAutomatic] = createSignal<"linked_authors" | "allowed_authors">("linked_authors");
   createEffect(() => {
     if (props.policy.invocation !== "mentions_only") setLastAutomatic(props.policy.invocation);
@@ -394,13 +405,14 @@ function ReviewPolicy(props: {
   return (
     <>
       <Card title="Instructions" info="Included in every GitHub task.">
-        <Field label="What should the agent do on GitHub?" for="gh-instructions">
+        <Field label="What should the agent do on GitHub?" for="gh-instructions" changed={was("instructions", (value) => savedText(value))}>
           <TextArea id="gh-instructions" rows={5} value={props.policy.instructions} onInput={(event) => set("instructions", event.currentTarget.value)} />
         </Field>
         <details class="ch-details">
           <summary>
             Instructions for one event
             <InfoTip label="About instructions for one event">Added to the main instructions for this event.</InfoTip>
+            <ChangedDot label="Instructions for one event" changed={differs("prompts", "issueOpenedInstructions")} />
           </summary>
           <div class="ch-step-body">
             <select class="input" aria-label="Event" value={promptEvent()} onChange={(event) => setPromptEvent(event.currentTarget.value as GitHubReviewEvent | "issue_opened")}>
@@ -431,6 +443,13 @@ function ReviewPolicy(props: {
           onChange={(on) => set("invocation", on ? lastAutomatic() : "mentions_only")}
           label="Run automatically"
           info="Start work without a mention when an allowed person opens an issue or updates a pull request."
+          changed={
+            differs("invocation")
+              ? { from: lower(INVOCATION_LABELS[props.saved!.invocation]) }
+              : differs("events", "issueOpened") && {
+                  from: list([...REVIEW_EVENTS.slice(0, 4).filter((event) => props.saved!.events.includes(event.key)).map((event) => event.label), ...(props.saved!.issueOpened ? ["New issues"] : [])]),
+                }
+          }
         />
         <Show when={automatic()}>
           <fieldset class="ch-checks-grid" aria-label="Automatic events">
@@ -451,22 +470,27 @@ function ReviewPolicy(props: {
             <summary>
               Automatic review filters
               <InfoTip label="About automatic review filters">Reviews asked for by @mention skip these filters. Repository access and ignored files still apply.</InfoTip>
+              <ChangedDot
+                label="Automatic review filters"
+                changed={differs("reviewDrafts", "reviewBotAuthors", "includeAuthors", "excludeAuthors", "targetBranches", "excludedBranches", "requiredLabels", "excludedLabels")}
+              />
             </summary>
             <div class="ch-step-body">
-              <Toggle checked={props.policy.reviewDrafts} onChange={(value) => set("reviewDrafts", value)} label="Include draft pull requests" />
+              <Toggle checked={props.policy.reviewDrafts} onChange={(value) => set("reviewDrafts", value)} label="Include draft pull requests" changed={was("reviewDrafts", onOff)} />
               <Toggle
                 checked={props.policy.reviewBotAuthors}
                 onChange={(value) => set("reviewBotAuthors", value)}
                 label="Include bot authors"
+                changed={was("reviewBotAuthors", onOff)}
                 info="The bot account also needs a sponsor and automatic runs for outside contributors in Access."
               />
               <div class="ch-grid">
-                <ListField id="gh-include-authors" label="Included authors" info="Empty means every allowed author. One username or glob per line." values={props.policy.includeAuthors} onChange={(values) => set("includeAuthors", values)} />
-                <ListField id="gh-exclude-authors" label="Excluded authors" info="One username or glob per line." values={props.policy.excludeAuthors} onChange={(values) => set("excludeAuthors", values)} />
-                <ListField id="gh-target-branches" label="Target branches" info="Empty means every branch. Supports * and **." values={props.policy.targetBranches} onChange={(values) => set("targetBranches", values)} />
-                <ListField id="gh-excluded-branches" label="Excluded branches" info="Supports * and **." values={props.policy.excludedBranches} onChange={(values) => set("excludedBranches", values)} />
-                <ListField id="gh-required-labels" label="Required labels" info="Every listed label must be there." values={props.policy.requiredLabels} onChange={(values) => set("requiredLabels", values)} />
-                <ListField id="gh-excluded-labels" label="Excluded labels" info="Any listed label stops an automatic review." values={props.policy.excludedLabels} onChange={(values) => set("excludedLabels", values)} />
+                <ListField id="gh-include-authors" label="Included authors" info="Empty means every allowed author. One username or glob per line." values={props.policy.includeAuthors} changed={was("includeAuthors", list)} onChange={(values) => set("includeAuthors", values)} />
+                <ListField id="gh-exclude-authors" label="Excluded authors" info="One username or glob per line." values={props.policy.excludeAuthors} changed={was("excludeAuthors", list)} onChange={(values) => set("excludeAuthors", values)} />
+                <ListField id="gh-target-branches" label="Target branches" info="Empty means every branch. Supports * and **." values={props.policy.targetBranches} changed={was("targetBranches", list)} onChange={(values) => set("targetBranches", values)} />
+                <ListField id="gh-excluded-branches" label="Excluded branches" info="Supports * and **." values={props.policy.excludedBranches} changed={was("excludedBranches", list)} onChange={(values) => set("excludedBranches", values)} />
+                <ListField id="gh-required-labels" label="Required labels" info="Every listed label must be there." values={props.policy.requiredLabels} changed={was("requiredLabels", list)} onChange={(values) => set("requiredLabels", values)} />
+                <ListField id="gh-excluded-labels" label="Excluded labels" info="Any listed label stops an automatic review." values={props.policy.excludedLabels} changed={was("excludedLabels", list)} onChange={(values) => set("excludedLabels", values)} />
               </div>
             </div>
           </details>
@@ -474,10 +498,15 @@ function ReviewPolicy(props: {
       </Card>
 
       <Card title="Review results">
-        <Toggle checked={props.policy.publishSummary} onChange={(value) => set("publishSummary", value)} label="Post a review summary" />
-        <Toggle checked={props.policy.publishInline} onChange={(value) => set("publishInline", value)} label="Post inline findings" />
+        <Toggle checked={props.policy.publishSummary} onChange={(value) => set("publishSummary", value)} label="Post a review summary" changed={was("publishSummary", onOff)} />
+        <Toggle checked={props.policy.publishInline} onChange={(value) => set("publishInline", value)} label="Post inline findings" changed={was("publishInline", onOff)} />
         <div class="ch-grid">
-          <Field label="Passing score" for="gh-score" info="A review scoring below this fails its check (1 to 5).">
+          <Field
+            label="Passing score"
+            for="gh-score"
+            info="A review scoring below this fails its check (1 to 5)."
+            changed={was("ratingThreshold", (value) => (value === null ? "report only" : String(value)))}
+          >
             <TextInput
               id="gh-score"
               type="number"
@@ -495,11 +524,14 @@ function ReviewPolicy(props: {
           </label>
         </div>
         <details class="ch-details">
-          <summary>Ignored files, inline comments, approvals</summary>
+          <summary>
+            Ignored files, inline comments, approvals
+            <ChangedDot label="Ignored files, inline comments, approvals" changed={differs("ignoredPaths", "findingCategories", "minimumCommentSeverity", "allowApprove", "allowRequestChanges")} />
+          </summary>
           <div class="ch-step-body">
-            <ListField id="gh-ignored" label="Ignored file patterns" info="Left out of every review, @mentions included. One pattern per line; supports * and **." values={props.policy.ignoredPaths} onChange={(values) => set("ignoredPaths", values)} />
+            <ListField id="gh-ignored" label="Ignored file patterns" info="Left out of every review, @mentions included. One pattern per line; supports * and **." values={props.policy.ignoredPaths} changed={was("ignoredPaths", list)} onChange={(values) => set("ignoredPaths", values)} />
             <div class="ch-grid">
-              <Field label="Finding categories" for="gh-categories" info="Separated by commas.">
+              <Field label="Finding categories" for="gh-categories" info="Separated by commas." changed={was("findingCategories", list)}>
                 <TextInput
                   id="gh-categories"
                   value={props.policy.findingCategories.join(", ")}
@@ -514,7 +546,12 @@ function ReviewPolicy(props: {
                   }
                 />
               </Field>
-              <Field label="Lowest severity posted inline" for="gh-severity" info="Hidden findings still count in the assessment.">
+              <Field
+                label="Lowest severity posted inline"
+                for="gh-severity"
+                info="Hidden findings still count in the assessment."
+                changed={was("minimumCommentSeverity", (value) => value.charAt(0).toUpperCase() + value.slice(1))}
+              >
                 <select id="gh-severity" class="input" value={props.policy.minimumCommentSeverity} onChange={(event) => set("minimumCommentSeverity", event.currentTarget.value as GitHubReviewPolicy["minimumCommentSeverity"])}>
                   <option value="info">Info</option>
                   <option value="warning">Warning</option>
@@ -526,12 +563,14 @@ function ReviewPolicy(props: {
               checked={props.policy.allowApprove}
               onChange={(value) => set("allowApprove", value)}
               label="Allow approvals"
+              changed={was("allowApprove", onOff)}
               info="The agent may submit an Approve review after a complete assessment. A 5/5 score alone doesn't approve."
             />
             <Toggle
               checked={props.policy.allowRequestChanges}
               onChange={(value) => set("allowRequestChanges", value)}
               label="Allow change requests"
+              changed={was("allowRequestChanges", onOff)}
               info="The agent may submit a Request changes review, which can block merging under your repository rules."
             />
           </div>
@@ -548,6 +587,8 @@ export function GitHubAccess(props: { endpoint: ChatEndpoint; base: string }) {
   const company = useCompany();
   const client = useQueryClient();
   const state = useConfiguration(() => props.endpoint);
+  /** The saved configuration, for the unsaved-change dots. */
+  const saved = () => state.query.data?.configuration ?? null;
   // The company's active people with their roles (#15183), which any member can read, and who may
   // be named a sponsor by you.
   const sponsors = useSponsors();
@@ -595,6 +636,7 @@ export function GitHubAccess(props: { endpoint: ChatEndpoint; base: string }) {
                   disabled={!person.linked}
                   label={`Allow mentions from @${person.login}`}
                   labelHidden
+                  changed={saved() && mentionsAllowed(saved()!, person) !== mentionsAllowed(configuration, person) && { from: mentionsAllowed(saved()!, person) ? "allowed" : "not allowed" }}
                   onChange={(on) =>
                     state.edit(on ? withPerson(configuration, { kind: "member", userId: (person as { userId: string }).userId, githubUserId: person.githubUserId, login: person.login }) : withoutPerson(configuration, person.githubUserId))
                   }
@@ -621,6 +663,7 @@ export function GitHubAccess(props: { endpoint: ChatEndpoint; base: string }) {
                   checked={configuration.memberAccess === "all_linked"}
                   onChange={(on) => state.edit({ ...configuration, memberAccess: on ? "all_linked" : "selected" })}
                   label="Allow mentions from every linked member"
+                  changed={saved() && saved()!.memberAccess !== configuration.memberAccess && { from: saved()!.memberAccess === "all_linked" ? "on" : "off" }}
                   info="On: every linked member, including members who link later. Off: only the members turned on below."
                 />
                 <ul class="ch-list ch-people">
@@ -650,6 +693,7 @@ export function GitHubAccess(props: { endpoint: ChatEndpoint; base: string }) {
                     disabled={!automatic()}
                     onChange={(on) => state.edit({ ...configuration, defaults: { ...configuration.defaults, invocation: on ? "allowed_authors" : "linked_authors" } })}
                     label="Allow automatic runs for outside contributors"
+                    changed={saved() && (saved()!.defaults.invocation === "allowed_authors") !== (configuration.defaults.invocation === "allowed_authors") && { from: saved()!.defaults.invocation === "allowed_authors" ? "on" : "off" }}
                     info="They can start the events and filters set in Settings."
                     description={automatic() ? undefined : "Turn on automatic runs in Settings first."}
                   />

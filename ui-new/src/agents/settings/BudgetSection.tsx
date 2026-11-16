@@ -8,7 +8,7 @@ import { budgetsApi } from "@/api/budgets";
 import { costsApi } from "@/api/costs";
 import { queryKeys } from "@/api/queryKeys";
 import { runPath, runsApi, type RunSummary } from "@/api/runs";
-import { budgetDirty, budgetDraft, budgetProblem, currentPolicy, parseDollars, WARN_OPTIONS, windowLabel, type BudgetDraft } from "@/projects/settings/settings-model";
+import { budgetChanges, budgetDirty, budgetDraft, budgetProblem, currentPolicy, parseDollars, WARN_OPTIONS, windowLabel, type BudgetDraft } from "@/projects/settings/settings-model";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
 import { FieldButton, SettingsCard, SettingsRow, TextInput } from "@/ui/Field";
@@ -42,6 +42,9 @@ export function BudgetSection(props: { agent: AgentDetail }) {
   const [problem, setProblem] = createSignal<string | null>(null);
   createEffect(on(() => JSON.stringify(budgetDraft(policy())), () => setDraft(reconcile(budgetDraft(policy())))));
   const dirty = () => budgetDirty(policy(), draft);
+  /** A row's unsaved-change dot: what the field was, while its edit counts. */
+  const changes = createMemo(() => budgetChanges(policy(), draft));
+  const changed = (field: keyof BudgetDraft) => changes()[field] !== undefined && { from: changes()[field]! };
   const limitOn = () => (parseDollars(draft.amount) ?? 0) > 0;
 
   const save = async () => {
@@ -99,7 +102,7 @@ export function BudgetSection(props: { agent: AgentDetail }) {
             Couldn't load the budget. {failure(overview.error, "")}
           </p>
         </Show>
-        <SettingsRow label="Period">
+        <SettingsRow label="Period" changed={changed("windowKind")}>
           <Segmented
             label="Budget period"
             options={[
@@ -110,7 +113,7 @@ export function BudgetSection(props: { agent: AgentDetail }) {
             onChange={(value) => setDraft("windowKind", value)}
           />
         </SettingsRow>
-        <SettingsRow label="Limit" info="Leave it empty for no limit." for="ag-budget-amount">
+        <SettingsRow label="Limit" info="Leave it empty for no limit." changed={changed("amount")} for="ag-budget-amount">
           <div class="ps-money">
             <span aria-hidden="true">$</span>
             <TextInput
@@ -145,7 +148,7 @@ export function BudgetSection(props: { agent: AgentDetail }) {
           )}
         </Show>
         <Show when={limitOn()}>
-          <SettingsRow label="Warn me at">
+          <SettingsRow label="Warn me at" changed={changed("warnPercent")}>
             <Menu>
               <Menu.Trigger as={FieldButton} class="ps-field-240" aria-label={`Warn at ${draft.warnPercent}% of the limit`}>
                 {draft.warnPercent}% of the limit
@@ -161,7 +164,7 @@ export function BudgetSection(props: { agent: AgentDetail }) {
               </Menu.Content>
             </Menu>
           </SettingsRow>
-          <SettingsRow label="When the limit is reached">
+          <SettingsRow label="When the limit is reached" changed={changed("hardStop")}>
             <Menu>
               <Menu.Trigger as={FieldButton} class="ps-field-320" aria-label="When the limit is reached">
                 {draft.hardStop ? `Pause ${props.agent.name}` : "Only warn me"}

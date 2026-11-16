@@ -7,8 +7,10 @@ import {
   fastDraft,
   fastModelFor,
   fastProblem,
+  captureText,
   headerRow,
   injectionProblem,
+  telemetryChanges,
   telemetryDirty,
   telemetryDraft,
   telemetryRequest,
@@ -148,5 +150,19 @@ describe("run telemetry", () => {
     expect(telemetryStatus(otlpSettings({ enabled: false })).label).toBe("Off");
     expect(telemetryStatus(otlpSettings()).label).toBe("Sending");
     expect(telemetryStatus(otlpSettings({ lastTest: { status: "failed" } as never })).tone).toBe("red");
+  });
+
+  it("names each changed field for its row's dot, exactly when the card is dirty", () => {
+    const settings = otlpSettings();
+    const draft = telemetryDraft(settings);
+    expect(telemetryChanges(settings, draft)).toEqual([]);
+    expect(telemetryChanges(settings, { ...draft, endpoint: "https://otel.example.com:4318 " })).toEqual([]);
+    expect(telemetryChanges(settings, { ...draft, enabled: false, capture: { ...draft.capture, toolContent: false } })).toEqual(["enabled", "capture"]);
+    expect(telemetryChanges(settings, { ...draft, headers: [] })).toEqual(["headers"]);
+    // Nothing saved: only what's typed counts, not the destination picked.
+    expect(telemetryChanges(null, { ...telemetryDraft(null), provider: "braintrust" })).toEqual([]);
+    expect(telemetryChanges(null, { ...telemetryDraft(null), endpoint: "https://x" })).toEqual(["endpoint"]);
+    expect(captureText({ userPrompts: true, assistantResponses: false, toolDetails: false, toolContent: false })).toBe("Prompts");
+    expect(captureText({ userPrompts: false, assistantResponses: false, toolDetails: false, toolContent: false })).toBe("nothing");
   });
 });

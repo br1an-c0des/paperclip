@@ -33,6 +33,16 @@ export function InboxTidyCard() {
   const choices = createMemo(() => tidyingAgents(agents.data));
   const [draft, setDraft] = createStore<InboxPolicyDraft>({ mode: "open", allowedAgentIds: [] });
   const dirty = () => inboxPolicyDirty(draft, policy.data);
+  // The rows' unsaved-change dots, from what's sent (inboxPolicyBody) against what's saved.
+  const modeChanged = () => policy.data && draft.mode !== policy.data.mode && { from: INBOX_POLICY_OPTIONS.find((option) => option.value === policy.data!.mode)?.label ?? policy.data.mode };
+  const agentsChanged = () => {
+    const saved = policy.data;
+    if (!saved || draft.mode !== "allowlist") return false;
+    const before = inboxPolicyBody(saved).allowedAgentIds;
+    if (JSON.stringify(inboxPolicyBody(draft).allowedAgentIds) === JSON.stringify(before)) return false;
+    const names = before.map((id) => choices().find((agent) => agent.id === id)?.name ?? "an agent you can't see");
+    return { from: names.length ? names.join(", ") : "none" };
+  };
   let synced: string | null = null;
 
   // Take the saved policy on load, and on refetch only while there's nothing unsaved.
@@ -83,13 +93,13 @@ export function InboxTidyCard() {
       }
     >
       <Show when={!policy.isError} fallback={<p class="as-empty-line">Couldn't load your inbox setting. {policy.error instanceof Error ? policy.error.message : ""}</p>}>
-        <SettingsRow label="Who may archive">
+        <SettingsRow label="Who may archive" changed={modeChanged()}>
           <Show when={policy.data} fallback={<span class="as-muted">Loading…</span>}>
             <Segmented label="Who may archive from your inbox" options={INBOX_POLICY_OPTIONS} value={draft.mode} onChange={(mode) => setDraft("mode", mode)} />
           </Show>
         </SettingsRow>
         <Show when={draft.mode === "allowlist"}>
-          <SettingsRow label="Agents" help={draft.allowedAgentIds.length === 0 ? "None picked yet: no agent may archive until you pick one." : undefined}>
+          <SettingsRow label="Agents" changed={agentsChanged()} help={draft.allowedAgentIds.length === 0 ? "None picked yet: no agent may archive until you pick one." : undefined}>
             <Menu>
               <Menu.Trigger as={FieldButton} class="as-field-320" icon={<Bot size={14} aria-hidden="true" />} aria-label="Agents allowed to tidy your inbox">
                 {chosenLabel()}

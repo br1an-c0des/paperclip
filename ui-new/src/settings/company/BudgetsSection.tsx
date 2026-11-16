@@ -11,6 +11,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useProjectsQuery } from "@/lib/company-data";
 import { AgentAvatar, InitialsDisc } from "@/ui/Avatar";
+import { ChangedDot, type Changed } from "@/ui/ChangedDot";
 import { Button } from "@/ui/Button";
 import { FieldButton, SettingsCard, SettingsRow, TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
@@ -25,6 +26,7 @@ import {
   ORG_WARN_OPTIONS,
   parseDollars,
   resetsLabel,
+  rowChanges,
   rowDirty,
   rowDraft,
   rowRequest,
@@ -83,6 +85,9 @@ function OrganizationBudgetCard(props: { policy: BudgetPolicySummary | null; loa
   const [problem, setProblem] = createSignal<string | null>(null);
   createEffect(on(() => JSON.stringify(rowDraft(props.policy)), () => setDraft(reconcile(rowDraft(props.policy)))));
   const dirty = () => rowDirty(props.policy, draft);
+  /** A row's unsaved-change dot: what the field was, while its edit counts. */
+  const changes = createMemo(() => rowChanges(props.policy, draft));
+  const changedRow = (field: keyof BudgetRowDraft) => changes()[field] !== undefined && { from: changes()[field]! };
   const limitOn = () => (parseDollars(draft.amount) ?? 0) > 0;
   const percent = () => usedPercent(props.policy);
   const warnOptions = () => (ORG_WARN_OPTIONS.includes(draft.warnPercent) ? ORG_WARN_OPTIONS : [...ORG_WARN_OPTIONS, draft.warnPercent].sort((a, b) => a - b));
@@ -122,7 +127,7 @@ function OrganizationBudgetCard(props: { policy: BudgetPolicySummary | null; loa
         ) : undefined
       }
     >
-      <SettingsRow label="Monthly budget" for="cs-org-budget" info="Leave it empty for no limit.">
+      <SettingsRow label="Monthly budget" for="cs-org-budget" info="Leave it empty for no limit." changed={changedRow("amount")}>
         <div class="ps-money cs-field-160">
           <span aria-hidden="true">$</span>
           <TextInput
@@ -162,7 +167,7 @@ function OrganizationBudgetCard(props: { policy: BudgetPolicySummary | null; loa
         </div>
       </SettingsRow>
       <Show when={limitOn()}>
-        <SettingsRow label="Warn me at">
+        <SettingsRow label="Warn me at" changed={changedRow("warnPercent")}>
           <Segmented
             label="Warn at"
             options={warnOptions().map((value) => ({ value: String(value), label: `${value}%` }))}
@@ -170,7 +175,7 @@ function OrganizationBudgetCard(props: { policy: BudgetPolicySummary | null; loa
             onChange={(value) => setDraft("warnPercent", Number(value))}
           />
         </SettingsRow>
-        <SettingsRow label="When it is reached">
+        <SettingsRow label="When it is reached" changed={changedRow("hardStop")}>
           <LimitMenu scope="company" hardStop={draft.hardStop} onChange={(value) => setDraft("hardStop", value)} />
         </SettingsRow>
       </Show>
@@ -194,6 +199,12 @@ function LimitMenu(props: { scope: ScopeKind; hardStop: boolean; onChange: (hard
       </Menu.Content>
     </Menu>
   );
+}
+
+/** A table row's dot: what its changed fields were ("Changed from $500, 80%."). */
+function rowChangedFrom(policy: BudgetPolicySummary | null, draft: BudgetRowDraft): Changed {
+  const was = Object.values(rowChanges(policy, draft));
+  return was.length > 0 && { from: was.join(", ") };
 }
 
 type Row = { key: string; scopeType: "agent" | "project"; scopeId: string; scopeName: string; windowKind: BudgetWindowKind; policy: BudgetPolicySummary | null };
@@ -279,6 +290,7 @@ function ScopesCard(props: { policies: BudgetPolicySummary[] | undefined; loaded
             {(found) => <AgentAvatar agent={found()} size={24} ring={false} />}
           </Show>
           <span class="cs-strong cs-ellipsis">{row.scopeName}</span>
+          <ChangedDot label={`${row.scopeName}'s budget`} changed={rowChangedFrom(row.policy, draft())} />
           <Show when={row.policy?.paused}>
             <span class="cs-pill cs-pill--red">Paused</span>
           </Show>

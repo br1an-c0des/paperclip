@@ -154,6 +154,7 @@ export function PluginConfigForm(props: {
             errors={errors()}
             disabled={saving()}
             secrets={secrets.data}
+            saved={saved()}
           />
         </Show>
       </div>
