@@ -8,7 +8,7 @@ import { useNow } from "@/lib/clock";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { modelStillUnavailableToast } from "@/runs/model-retry";
-import { canResumeRun, canRetryRun, resumePayload, retryOutcome, runErrorCodeLabel } from "@/runs/run-model";
+import { canResumeRun, canRetryRun, resumePayload, retriedByLabel, retryOutcome, runErrorCodeLabel } from "@/runs/run-model";
 import { AgentQueueLine } from "@/runs/QueueWait";
 import { RunWatchdog } from "@/runs/RunWatchdog";
 import { AgentAvatar } from "@/ui/Avatar";
@@ -228,6 +228,7 @@ export function TaskRuns(props: { taskId: string }) {
                   const retryable = () => canRetryRun(rerunnable());
                   const stoppable = () => canStopRun(run);
                   const wait = () => runWait(run);
+                  const retried = () => retriedByLabel(run.retriedBy);
                   // A settling Stop clears once the run has moved on.
                   const isStopping = () => stopping().has(run.runId) && stoppable();
                   return (
@@ -252,7 +253,8 @@ export function TaskRuns(props: { taskId: string }) {
                               </span>
                             )}
                           </Show>
-                          <Show when={run.retryOfRunId}>
+                          {/* Who started it goes on the line below when the server knows (U169). */}
+                          <Show when={run.retryOfRunId && !retried()}>
                             <span class="tsec-muted">retry</span>
                           </Show>
                         </div>
@@ -260,6 +262,13 @@ export function TaskRuns(props: { taskId: string }) {
                           {SOURCES[run.invocationSource] ?? words(run.invocationSource)} · {stampLabel(run.startedAt ?? run.createdAt)}
                           <Show when={duration(run.startedAt, run.finishedAt ?? (active() ? new Date(now()) : null))}>
                             {(took) => <> · {took()}</>}
+                          </Show>
+                          <Show when={retried()}>
+                            {(found) => (
+                              <>
+                                {" "}· <span class="tr-retried" title={found().summary ?? undefined}>{found().label}</span>
+                              </>
+                            )}
                           </Show>
                           <Show when={!active() && run.livenessState && run.livenessState !== "completed"}>
                             {" "}· <span title={run.livenessReason ?? undefined}>{words(run.livenessState!)}</span>

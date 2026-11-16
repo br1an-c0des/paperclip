@@ -1,4 +1,5 @@
 import { normalizeRunFailureCause, readRunFailureCause } from "@paperclipai/shared";
+import type { RunRetriedBy } from "@/api/issues";
 import type { Gradient } from "@/ui/status-meta";
 
 /*
@@ -208,6 +209,23 @@ export function triggerLabel(run: { invocationSource: string; contextSnapshot: R
   const reason = run.contextSnapshot?.wakeReason;
   if (typeof reason === "string" && reason) return WAKE_REASONS[reason] ?? `Woken: ${words(reason).toLowerCase()}`;
   return SOURCES[run.invocationSource] ?? words(run.invocationSource);
+}
+
+/**
+ * Who started a retry run, for the task's runs and the run modal (since the 2026-11-15 sync,
+ * upstream #21486): "Retried by Ada" for a person who pressed Retry, "Retried automatically" for
+ * Paperclip's recovery. `summary` is the server's plain-words sentence, for a tooltip. Null when the
+ * run isn't a retry or the server didn't record who started it (it doesn't guess).
+ */
+export function retriedByLabel(retriedBy: RunRetriedBy | null | undefined): { label: string; summary: string | null } | null {
+  if (!retriedBy) return null;
+  const summary = retriedBy.summary?.trim() || null;
+  if (retriedBy.kind === "automatic") return { label: "Retried automatically", summary };
+  if (retriedBy.kind === "person") {
+    const name = retriedBy.personName?.trim();
+    return { label: name ? `Retried by ${name}` : "Retried by a board member", summary };
+  }
+  return null;
 }
 
 /** "7f3a…c21", the way the boards shorten session and run ids. */
