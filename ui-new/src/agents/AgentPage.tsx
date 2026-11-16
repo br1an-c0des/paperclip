@@ -49,7 +49,18 @@ export function AgentPage() {
   const company = useCompany();
   const agents = useAgentsQuery();
   const listed = createMemo(() => findAgent(agents.data, params.agentKey));
-  const key = () => listed()?.id ?? params.agentKey;
+  // The address uses the agent's name (`urlKey`), which a rename changes. Once the address has
+  // found an agent, its id stays in use for that address, so a rename keeps the page and the
+  // effect below moves the address to the new name.
+  let resolved: { key: string; id: string } | undefined;
+  const key = createMemo(() => {
+    const found = listed();
+    if (found) {
+      resolved = { key: params.agentKey, id: found.id };
+      return found.id;
+    }
+    return resolved?.key === params.agentKey ? resolved.id : params.agentKey;
+  });
   const detail = createQuery(() => ({
     queryKey: queryKeys.agents.detail(key()),
     queryFn: ({ signal }) => agentsApi.get(key(), company().id, signal),
@@ -68,6 +79,13 @@ export function AgentPage() {
   // keeping the query and fragment, so the rail marks where you are.
   const navigate = useNavigate();
   const location = useLocation();
+  // A renamed agent: the old name no longer finds it in the list, so the address moves to the new one.
+  createEffect(() => {
+    const found = agent();
+    if (!found || !agents.isSuccess || listed() || params.agentKey === found.id) return;
+    const rest = (params.rest ?? "").replace(/^\/+/, "");
+    navigate(`${base()}${rest ? `/${rest}` : ""}${location.search}${location.hash}`, { replace: true });
+  });
   createEffect(() => {
     const current = view();
     if (!agent() || pluginTab() || current?.view !== "settings") return;

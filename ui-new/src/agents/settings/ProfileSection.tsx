@@ -16,7 +16,7 @@ import { pushToast } from "@/ui/Toast";
 import { checkingSetup } from "@/tasks/recovery";
 import { creatorLabel, directReportsOf, managerCandidates, roleLabel, textEdit } from "../agent-model";
 import { BuiltInCard } from "./BuiltInCard";
-import { ManagerMenu, PaletteGrid, paletteAppearance, RoleMenu } from "./fields";
+import { ManagerMenu, PaletteGrid, paletteAppearance } from "./fields";
 import { dateTime, failure, refreshAgent, saveNote, SectionTitle, shortDate, SwitchRow, useAgentSaver } from "../shared";
 
 /*
@@ -96,8 +96,15 @@ export function ProfileSection(props: { agent: AgentDetail; base: string }) {
             }}
           />
         </SettingsRow>
-        <SettingsRow label="Role">
-          <RoleMenu value={props.agent.role} onChange={(role) => void saver.save({ role })} />
+        {/* Turned off on purpose (decision 55): only CEO changes anything on the server. */}
+        <SettingsRow
+          label="Role"
+          info="Only CEO changes anything: it gives the agent hiring and permission powers, and its starting instructions. Every other role is a label. Planned instead: permission roles the company defines."
+        >
+          <div class="ps-stack">
+            <span>{roleLabel(props.agent.role)}</span>
+            <span class="fhelp">Changing the role is turned off for now.</span>
+          </div>
         </SettingsRow>
         <SettingsRow label="Title" info="Shown in place of the role, such as “Quant Researcher”." for="ag-title">
           <TextInput

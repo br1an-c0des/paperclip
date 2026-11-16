@@ -119,6 +119,7 @@ it gets built. Stage numbers like 2a-6 and 3.4 refer to the lists further down.
 | A `COMPANY.md`: company-wide instructions every run in the company receives, like an agent's `AGENTS.md` | Idea, then 2b or 3 | Raised Oct 27, 2026 ([3.14](#314-company-instructions-companymd)). Not designed yet. |
 | Help people understand what Paperclip is and how to use each feature: a user guide with worked examples, and an interactive guide in the app | Idea, then 1 or 3 | Raised Oct 28, 2026 ([3.15](#315-an-in-app-guide-to-paperclip)). Notes collect in [guides/](guides/README.md). Not designed yet. |
 | Investigate and design upstream's Coordinator workspace (one conversation per agent, task proposals from chat, decision cards, a Needs You queue) against `ui-new`'s Inbox, requests and chat | 1 | Raised Oct 29, 2026, from the upstream sync ([3.16](#316-upstreams-coordinator-workspace)). Not investigated yet. |
+| Permission roles: the company defines its own permission profiles in a permission-role editor and assigns them to agents, replacing the fixed agent Role list | Idea, then 3 or 4 | Raised Nov 16, 2026, when the Role picker was turned off ([decision 55](decisions.md#55-the-agent-role-picker-is-turned-off-permission-roles-later)). A profile could be a named set of the access grants agents already have; the CEO-only checks are hard-coded on the role and would need an upstream change. Not designed yet. |
 
 ## Stage 1: the new UI
 
@@ -477,6 +478,12 @@ Progress:
   card dialog's example buttons overflow at 390px (older); `RunTrace.tsx`'s admin note kept visible.
   Three settings the server ignores keep their controls with "Not used by the server yet."
   ([upstream-fixes](../../fork/upstream-fixes.md) 30–32). Original item below.
+- **Open (Nov 16): pages that break when a rename changes their address.** Found on the agent
+  page: renaming an agent changed its `urlKey`, so the page lost the agent and showed "There's no
+  agent called …". Fixed in `agents/AgentPage.tsx` (the page keeps the agent's id for that address
+  and moves to the new name). To do: check every other page whose address uses a name-derived key
+  or slug (projects, goals, routines, skills, plugins, organizations' issue prefix, and any other
+  `findX(list, key)` lookup) for the same bug when it's renamed from its own page or elsewhere.
 - **Done (Nov 16): two user requests.** Unsaved-change dots on every staged settings form
   ([decision 54](decisions.md#54-unsaved-changes-show-as-lit-dots)), and a build line under You in
   the nav showing the UI and server commits (`shell/misc`).

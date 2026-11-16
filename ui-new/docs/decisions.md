@@ -81,6 +81,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 52 | [Help text goes behind an info icon](#52-help-text-goes-behind-an-info-icon) | All screens | Decided | Nov 12, 2026 |
 | 53 | [Requests are routed to a person](#53-requests-are-routed-to-a-person) | `inbox-search/triage`, `decisions/feed`, `approvals/governance`, `shell/navigation` | Decided | Nov 13, 2026 |
 | 54 | [Unsaved changes show as lit dots](#54-unsaved-changes-show-as-lit-dots) | settings forms (agents, company, apps, plugins, projects) | Decided | Nov 16, 2026 |
+| 55 | [The agent Role picker is turned off; permission roles later](#55-the-agent-role-picker-is-turned-off-permission-roles-later) | `agents/overview`, agent Profile settings | Decided | Nov 16, 2026 |
 
 ## Entries
 
@@ -1910,3 +1911,29 @@ Both are handled in `ui-new` for now.
   environment) and a repository's TaskDefaults are left for later; GitHub Access lacks dots for
   the responsible member, guests and tools; legacy harness edits made before staging the Runner
   switch count in the bar but have no visible row while the Runner settings show.
+
+### 55. The agent Role picker is turned off; permission roles later
+
+- **Status:** Decided 2026-11-16 (user request)
+- **Area:** agent settings → Profile → Role.
+- **Found in:** a question about what Role does.
+
+- **What we found:** `role` is one of 12 fixed values (`AGENT_ROLES` in `packages/shared`), but the
+  server only checks for `ceo`. A CEO can hire by default, always assign tasks, manage other agents'
+  permissions and some company settings, and generate OpenClaw invites
+  (`server/src/lib/agent-permissions.ts`, `routes/agents.ts`, `routes/companies.ts`,
+  `routes/access.ts`). A new CEO also starts with the `onboarding-assets/ceo/` instruction files and
+  the core Paperclip skills; other roles get `default/AGENTS.md`. Changing the role later doesn't
+  touch those instructions. The role doesn't go into the prompt; agents can read it from the API
+  and from the native runner's task context. The other 11 roles behave the same as `general`: they
+  show on the org chart and in exports and telemetry. Title is the free-text job name.
+- **Decision:** the Profile's Role row stays visible but read-only: the current role, a visible
+  "Changing the role is turned off for now." note, and an info tip saying why. New agent keeps its
+  role picker, since hiring a CEO is still the one meaningful pick (not raised; revisit with the
+  idea below).
+- **Later: permission roles.** Rework Role into permission roles the company defines: named
+  permission profiles built in a permission-role editor and assigned to agents, instead of a fixed
+  list. Most of an agent's powers are already grants (`tasks:assign`, `agents:create` and others
+  through the access API), so a role could be a named set of grants applied to an agent. The CEO-only
+  checks are hard-coded on `role === "ceo"`, so those can't move into a profile without an upstream
+  change. Recorded in the [build plan's new ideas](build-plan.md#new-ideas); not designed yet.
