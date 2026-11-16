@@ -477,6 +477,9 @@ Progress:
   card dialog's example buttons overflow at 390px (older); `RunTrace.tsx`'s admin note kept visible.
   Three settings the server ignores keep their controls with "Not used by the server yet."
   ([upstream-fixes](../../fork/upstream-fixes.md) 30–32). Original item below.
+- **Done (Nov 16): two user requests.** Unsaved-change dots on every staged settings form
+  ([decision 54](decisions.md#54-unsaved-changes-show-as-lit-dots)), and a build line under You in
+  the nav showing the UI and server commits (`shell/misc`).
 - **Done (Nov 15): Round 10.** Three agents. A: foldable subtasks under the nav's recent tasks
   (U167). B: retry attribution, a note on every plan Request changes, Interrupt hand-off counted as
   sent, agents' case and status links (U169–U171, U173). C: the legacy → Paperclip Runner switch,

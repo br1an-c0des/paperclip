@@ -80,6 +80,7 @@ decision changes, mark the old one superseded and link the new entry rather than
 | 51 | [Apps is called Connections](#51-apps-is-called-connections) | Apps and tools, `shell/navigation`, company settings | Decided | Nov 12, 2026 |
 | 52 | [Help text goes behind an info icon](#52-help-text-goes-behind-an-info-icon) | All screens | Decided | Nov 12, 2026 |
 | 53 | [Requests are routed to a person](#53-requests-are-routed-to-a-person) | `inbox-search/triage`, `decisions/feed`, `approvals/governance`, `shell/navigation` | Decided | Nov 13, 2026 |
+| 54 | [Unsaved changes show as lit dots](#54-unsaved-changes-show-as-lit-dots) | settings forms (agents, company, apps, plugins, projects) | Decided | Nov 16, 2026 |
 
 ## Entries
 
@@ -1885,3 +1886,27 @@ Both are handled in `ui-new` for now.
   check before acting on someone else's card; an Open button on approval-only receipts. The
   question card's "Set aside" and the Inbox's "Archive" read alike and may need clearer labels. Not
   yet checked against a real server with several people.
+
+### 54. Unsaved changes show as lit dots
+
+- **Status:** Decided 2026-11-16 (user request)
+- **Area:** every staged settings form with a save bar: agent Model and runtime, company Paperclip
+  Models, budgets, inbox tidy policy, GitHub bot, connection pools, project task checkouts, plugin
+  configuration.
+
+- **What we decided:** a setting with an edit the form's save bar counts shows a small lit amber dot
+  (the Ember tone) after its label and its "i". Hovering, focusing or tapping it says what the
+  setting was: "Changed from <saved value>. Not saved yet.", or "Changed. Not saved yet." for
+  secrets, lists and objects. It goes out on save, Discard, or when the value is put back. A folded
+  section (Advanced, plugin advanced options) carries a dot on its summary when something inside
+  changed. The dots replace the visible "Changed from …" lines, in line with
+  [decision 52](#52-help-text-goes-behind-an-info-icon).
+- **How:** forms pass `changed={{ from }}` (or `true`) to `SettingsRow`, `Field`, `Switch` or
+  `SwitchRow` (`ui/ChangedDot.tsx`, `ui/changed.ts`); the dirty checks and the dots come from the
+  same per-field change sets.
+- **Not covered:** editors that are a single setting keep only their save bar (skill files,
+  instructions, Configuration as YAML, app instructions, local plugin folders, documents, the
+  repositories list, an app's agent list). Environment-variable editors (agent secrets, project
+  environment) and a repository's TaskDefaults are left for later; GitHub Access lacks dots for
+  the responsible member, guests and tools; legacy harness edits made before staging the Runner
+  switch count in the bar but have no visible row while the Runner settings show.
