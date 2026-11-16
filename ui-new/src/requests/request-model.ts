@@ -370,6 +370,30 @@ export function planLabel(target: Pick<PlanReviewTarget, "revisionNumber">) {
   return target.revisionNumber == null ? "Plan" : `Plan v${target.revisionNumber}`;
 }
 
+/** How a confirmation's decline takes a note: whether it asks, whether the note is required, and its prompt. */
+export type DeclineNote = { asks: boolean; required: boolean; placeholder: string | null; label: string };
+
+/**
+ * The note a confirmation's decline ("Reject", "Request changes") takes, as the old UI's cards read
+ * it: it asks when the request requires a reason, allows one, or sets a placeholder. A plan review
+ * always asks (since the 2026-11-15 sync, U170, upstream #21721), so an agent's own plan
+ * confirmation without those fields can still be sent back with what should change; the note stays
+ * optional unless the request requires it.
+ */
+export function declineNote(
+  payload: { rejectRequiresReason?: boolean | null; allowDeclineReason?: boolean | null; declineReasonPlaceholder?: string | null; rejectReasonLabel?: string | null },
+  plan: boolean,
+): DeclineNote {
+  const required = payload.rejectRequiresReason === true;
+  const own = payload.declineReasonPlaceholder?.trim() || null;
+  const asks = plan || required || payload.allowDeclineReason === true || !!own;
+  if (plan) {
+    const placeholder = own ?? `Describe what should change ${required ? "(required)" : "(optional)"}`;
+    return { asks, required, placeholder, label: payload.rejectReasonLabel?.trim() || "What should change?" };
+  }
+  return { asks, required, placeholder: own ?? (payload.rejectReasonLabel?.trim() || null), label: "Reason" };
+}
+
 /** A saved document, other than the plan, that a request asks the person to review. */
 export type DocumentReviewTarget = PlanReviewTarget & { key: string; label: string };
 

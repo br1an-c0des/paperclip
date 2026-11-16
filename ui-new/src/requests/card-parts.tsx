@@ -37,7 +37,16 @@ export function Footer(props: { request: Request; children?: JSX.Element; extra?
 }
 
 /** A decline that may need a reason: the first press asks for one, the second sends it. */
-export function DeclineButton(props: { label: string; needsReason: boolean; allowReason: boolean; placeholder?: string | null; busy: boolean; onReject: (reason?: string) => void }) {
+export function DeclineButton(props: {
+  label: string;
+  needsReason: boolean;
+  allowReason: boolean;
+  placeholder?: string | null;
+  /** The note field's accessible name: "Reason" by default, "What should change?" for a plan. */
+  noteLabel?: string;
+  busy: boolean;
+  onReject: (reason?: string) => void;
+}) {
   const [asking, setAsking] = createSignal(false);
   const [reason, setReason] = createSignal("");
   return (
@@ -50,7 +59,7 @@ export function DeclineButton(props: { label: string; needsReason: boolean; allo
       }
     >
       <TextInput
-        aria-label="Reason"
+        aria-label={props.noteLabel ?? "Reason"}
         placeholder={props.placeholder ?? (props.needsReason ? "Why? (required)" : "Why? (optional)")}
         value={reason()}
         onInput={(event) => setReason(event.currentTarget.value)}

@@ -57,7 +57,7 @@ import { QuestionSetForm } from "./QuestionSetForm";
 import { WithdrawDialog } from "./WithdrawDialog";
 import { canWithdrawApproval } from "@/approvals/approval-model";
 import { alreadyClosed, alreadyClosedText } from "@/inbox/routing-model";
-import { answerRefusal, documentLabel, documentReviewTarget, KIND_LABEL, planLabel, planReviewTarget, suggestedOwner, type Request, type RequestKind } from "./request-model";
+import { answerRefusal, declineNote, documentLabel, documentReviewTarget, KIND_LABEL, planLabel, planReviewTarget, suggestedOwner, type Request, type RequestKind } from "./request-model";
 import "./RequestCard.css";
 
 /*
@@ -788,6 +788,8 @@ function Confirmation(props: {
 }) {
   const payload = () => props.interaction.payload;
   const tool = () => payload().toolAction;
+  // A plan review's Request changes always takes a revision note (U170, #21721).
+  const note = () => declineNote(payload(), !!planReviewTarget(props.interaction));
   const args = createMemo(() => {
     const raw = tool()?.argumentsSummaryJson;
     if (!raw) return "";
@@ -834,9 +836,10 @@ function Confirmation(props: {
         </Show>
         <DeclineButton
           label={tool() ? "Decline" : payload().rejectLabel?.trim() || "Reject"}
-          needsReason={payload().rejectRequiresReason === true}
-          allowReason={payload().allowDeclineReason === true}
-          placeholder={payload().declineReasonPlaceholder ?? payload().rejectReasonLabel}
+          needsReason={note().required}
+          allowReason={note().asks}
+          placeholder={note().placeholder}
+          noteLabel={note().label}
           busy={props.busy}
           onReject={props.onReject}
         />
@@ -854,6 +857,7 @@ function CheckboxConfirmation(props: {
   onReject: (reason?: string) => void;
 }) {
   const payload = () => props.interaction.payload;
+  const note = () => declineNote(payload(), false);
   const [picked, setPicked] = createSignal<string[]>(payload().defaultSelectedOptionIds ?? []);
   const min = () => payload().minSelected ?? 0;
   const max = () => payload().maxSelected ?? Infinity;
@@ -885,9 +889,9 @@ function CheckboxConfirmation(props: {
         </Button>
         <DeclineButton
           label={payload().rejectLabel?.trim() || "Reject"}
-          needsReason={payload().rejectRequiresReason === true}
-          allowReason={payload().allowDeclineReason === true}
-          placeholder={payload().declineReasonPlaceholder ?? payload().rejectReasonLabel}
+          needsReason={note().required}
+          allowReason={note().asks}
+          placeholder={note().placeholder}
           busy={props.busy}
           onReject={props.onReject}
         />
