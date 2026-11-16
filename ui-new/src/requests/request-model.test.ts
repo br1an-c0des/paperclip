@@ -229,13 +229,13 @@ describe("declineNote (U170, #21721)", () => {
     expect(declineNote({ rejectRequiresReason: false }, true)).toEqual({
       asks: true,
       required: false,
-      placeholder: "Describe what should change (optional)",
+      placeholder: "What should change? (optional)",
       label: "What should change?",
     });
     expect(declineNote({ rejectRequiresReason: true, rejectReasonLabel: "What's off?" }, true)).toMatchObject({
       asks: true,
       required: true,
-      placeholder: "Describe what should change (required)",
+      placeholder: "What should change? (required)",
       label: "What's off?",
     });
     expect(declineNote({ declineReasonPlaceholder: "Which step?" }, true).placeholder).toBe("Which step?");

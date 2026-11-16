@@ -165,7 +165,7 @@ describe("RequestCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Request changes" }));
     expect(reject).not.toHaveBeenCalled();
     const note = screen.getByRole("textbox", { name: "What should change?" }) as HTMLInputElement;
-    expect(note.placeholder).toBe("Describe what should change (optional)");
+    expect(note.placeholder).toBe("What should change? (optional)");
     // Optional: an empty note can still be sent.
     const send = screen.getByRole("button", { name: "Request changes" }) as HTMLButtonElement;
     expect(send.disabled).toBe(false);

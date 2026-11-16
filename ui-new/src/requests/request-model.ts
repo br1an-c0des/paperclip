@@ -388,7 +388,7 @@ export function declineNote(
   const own = payload.declineReasonPlaceholder?.trim() || null;
   const asks = plan || required || payload.allowDeclineReason === true || !!own;
   if (plan) {
-    const placeholder = own ?? `Describe what should change ${required ? "(required)" : "(optional)"}`;
+    const placeholder = own ?? `What should change? ${required ? "(required)" : "(optional)"}`;
     return { asks, required, placeholder, label: payload.rejectReasonLabel?.trim() || "What should change?" };
   }
   return { asks, required, placeholder: own ?? (payload.rejectReasonLabel?.trim() || null), label: "Reason" };
