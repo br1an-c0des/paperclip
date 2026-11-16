@@ -51,7 +51,8 @@ upstream could use as upstream pull requests instead (see
 - **Depends on:** `detectLocalRunnerTarget` and `localAgentRunnerTarget` in that file, and
   `supportsLinuxLibc` in `packages/shared/src/agent-runner.ts`.
 - **If upstream changes this:** if #17905 is merged, take upstream's version of all three files
-  and delete this entry. If upstream fixes it another way, take upstream's version and delete the
+  and delete this entry (and [deploy-runner-libc-probe](#deploy-runner-libc-probe) once the image
+  has it). If upstream fixes it another way, take upstream's version and delete the
   entry once a sync shows `supportedRunners` including `paperclip` here. If upstream rewrites the
   probe without fixing it, keep the synchronous call and the comment.
   Upstream's #21670 (2026-11-14) cut `doc/DEVELOPING.md` and moved the "Local Linux runner
@@ -110,6 +111,32 @@ live in fork-only files, but they change upstream's shipped server, so each one 
   without the fix, update the script to the new code and keep the same rule. To check a new base
   image during a sync, before deploying (patches only the throwaway container and prints what it did):
   `docker run --rm --network none --entrypoint node -v "$PWD/deploy/patches:/p:ro" ghcr.io/paperclipai/paperclip:sha-<sha> /p/runner-provider-authority.mjs`
+
+### deploy-runner-libc-probe
+
+- **Files:** none in the source tree. At image build, `deploy/patches/runner-libc-probe.mjs` edits
+  the `server/dist-runtime/chunk-*.mjs` bundle file that defines `detectLocalRunnerTarget`.
+  [Fork-only: `deploy/patches/runner-libc-probe.mjs`, the step at the end of `deploy/Dockerfile`.]
+- **What:** the startup glibc check runs synchronously (`execFileSync`) instead of an asynchronous
+  `execFile` behind a top-level await. The image-build counterpart of
+  [runner-libc-probe-sync](#runner-libc-probe-sync), which fixes the source tree but never reaches
+  the image; both copy upstream PR [#17905](https://github.com/paperclipai/paperclip/pull/17905).
+- **Why:** temporary. In the image, the asynchronous check's 1 s timeout sometimes runs out while
+  the bundle loads (1 of 3 cold starts in a test on 2026-11-15). The server then caches
+  `libc: "unknown"` and offers only the legacy runner for every harness until it restarts
+  ([upstream-fixes 6](fork/upstream-fixes.md#6-detect-glibc-reliably-at-server-startup-so-paperclip-runner-is-offered-on-linux)).
+  Found after the 2026-11-15 redeploy, when the agent page said "Paperclip Runner isn't available
+  for this harness in this environment"; added the same day at the user's request.
+- **Depends on:** exactly one `localTarget = await detectLocalRunnerTarget();` (names may carry a
+  bundler suffix) in a `server/dist-runtime/*.mjs` file; Node with `process.getBuiltinModule`
+  (22.3+).
+- **If upstream changes this:** the script skips a file that calls `detectLocalRunnerTarget()`
+  without `await`, and fails the image build if it finds neither form. Once #17905 (or another
+  fix) is in the base image, the build log says "already has upstream's fix": delete the script,
+  its Dockerfile line and this entry, together with `runner-libc-probe-sync`. If the build fails on
+  a rewrite without the fix, update the script and keep the check synchronous. Check a new base
+  image the same way as for [deploy-runner-provider-authority](#deploy-runner-provider-authority),
+  with `/p/runner-libc-probe.mjs`.
 
 ## Database objects
 

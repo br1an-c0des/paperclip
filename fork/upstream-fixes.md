@@ -185,7 +185,10 @@ until one becomes a concrete fix.
   for 1.2 s or more returns `''` with no error, and under 1 s returns `glibc 2.39`.
 - **Fork workaround to remove once merged:** carried as the temporary fork patch
   [`runner-libc-probe-sync`](../FORK-PATCHES.md#runner-libc-probe-sync) since 2026-10-27; with it the
-  server offers Paperclip Runner here (`supportedRunners: ["paperclip", "legacy"]`).
+  server offers Paperclip Runner here (`supportedRunners: ["paperclip", "legacy"]`). The Docker
+  deployment isn't built from source, so since 2026-11-15 its image carries the same fix as
+  [`deploy-runner-libc-probe`](../FORK-PATCHES.md#deploy-runner-libc-probe): without it, 1 of 3
+  cold starts of the image cached `libc: "unknown"`.
 - **Built 2026-10-27:** `execFileSync` with the same timeout, kill signal and output limit, and no
   top-level await; a test that blocks the event loop for 1.2 s after a real probe; `doc/DEVELOPING.md`
   updated. Targeted tests pass (16, plus 221 in the probe's consumers) and the server typechecks.

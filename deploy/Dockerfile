@@ -43,10 +43,14 @@ FROM ghcr.io/paperclipai/paperclip:sha-${UPSTREAM_SHA}
 RUN rm -rf /app/server/ui-dist /app/ui/dist
 COPY --from=ui --chown=node:node /app/ui-new/dist /app/ui/dist
 
-# FORK: deploy-runner-provider-authority. Temporary fix to upstream's built
-# server until a published image has upstream PR #20710: lets Claude and Codex
-# agents on the Paperclip Runner pass verification in this image. The script
-# skips copies that already have upstream's fix and fails the build if the
-# code it patches has changed. See FORK-PATCHES.md.
-COPY deploy/patches/runner-provider-authority.mjs /tmp/fork-patches/
-RUN node /tmp/fork-patches/runner-provider-authority.mjs && rm -rf /tmp/fork-patches
+# Temporary fixes to upstream's built server, each until a published image has
+# the upstream PR. Each script skips code that already has upstream's fix and
+# fails the build if the code it patches has changed. See FORK-PATCHES.md.
+# FORK: deploy-runner-provider-authority (PR #20710): lets Claude and Codex
+#   agents on the Paperclip Runner pass verification in this image.
+# FORK: deploy-runner-libc-probe (PR #17905): detects glibc reliably at startup,
+#   so the server offers the Paperclip Runner at all.
+COPY deploy/patches/ /tmp/fork-patches/
+RUN node /tmp/fork-patches/runner-provider-authority.mjs \
+  && node /tmp/fork-patches/runner-libc-probe.mjs \
+  && rm -rf /tmp/fork-patches
