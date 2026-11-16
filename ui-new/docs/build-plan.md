@@ -477,6 +477,17 @@ Progress:
   card dialog's example buttons overflow at 390px (older); `RunTrace.tsx`'s admin note kept visible.
   Three settings the server ignores keep their controls with "Not used by the server yet."
   ([upstream-fixes](../../fork/upstream-fixes.md) 30–32). Original item below.
+- **Done (Nov 15): Round 10.** Three agents. A: foldable subtasks under the nav's recent tasks
+  (U167). B: retry attribution, a note on every plan Request changes, Interrupt hand-off counted as
+  sent, agents' case and status links (U169–U171, U173). C: the legacy → Paperclip Runner switch,
+  found on the deployment. Switching now shows the Runner's settings before saving, valued as the
+  server will translate them and editable; the switch, those settings and other edits save in one
+  `PATCH` (one revision); settings the Runner can't honor are listed as left out. After the save, or
+  any harness or runner change, the form resets to the saved settings, so nothing stays pending
+  (before, the old harness's fields showed as 9 phantom changes). `agents/runner-switch-model.ts`
+  mirrors `server/src/services/agent-runner-selection.ts` (the per-harness translations,
+  `claudeRunnerUnsupportedSettings`, the Runner configuration warnings): check it at each upstream
+  sync when those change. Browser checks used mocked data.
 - **Open (Nov 12): help text behind info icons** ([decision 52](decisions.md#52-help-text-goes-behind-an-info-icon)).
   An app-wide sweep: every card description, row `help`, form `Field` help and similar hint
   paragraph that says what something is for moves into an `info` tip, and is rewritten where it

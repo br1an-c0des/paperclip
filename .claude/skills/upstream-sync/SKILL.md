@@ -126,6 +126,10 @@ Work over `$BASE..$TIP`. The outline already covers the summary by theme; add:
   diff for everything under **Depends on** (`git diff $BASE..$TIP -S'<name>'`, `git grep` on
   `$TIP`). Do this whether or not git reports a conflict: a clean merge can still break a patch.
   Do the same for each object under **Database objects**, against the new migrations.
+- **Server logic ui-new mirrors.** `ui-new/src/agents/runner-switch-model.ts` copies the server's
+  legacy → Paperclip Runner translation. If the range touches `server/src/services/agent-runner-selection.ts`,
+  `claudeRunnerUnsupportedSettings` (`server/src/services/native-runtime/provider-profile.ts`) or
+  `packages/shared/src/runner-configuration-warnings.ts`, compare and add a U line for any drift.
 
 ## 6. Merge on a sync branch
 
