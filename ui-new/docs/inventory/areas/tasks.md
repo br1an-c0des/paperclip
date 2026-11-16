@@ -166,6 +166,15 @@ presentation with a separate Activity tab. The chat-style thread (`TaskChatThrea
   its tool card. The old UI reads the running calls' latest progress on load with
   `GET /api/issues/:issueId/tool-call-progress` (`mcpAppsApi.toolCallProgress`) and follows the live
   event `heartbeat.run.tool_progress` (U154).
+- **Since the 2026-11-16 sync** (#21746): pull request link status is cached in the database
+  (migration 0489, `link_previews`), and the old UI shows it for every link on a page without a
+  hover. Once the page has loaded, it reads the saved status of the mounted links in one request,
+  `GET /api/companies/:companyId/link-previews/cached?url=…&url=…` (up to 50 links, board only,
+  never contacts GitHub; `lib/link-preview-page-loader.ts`, `context/LinkPreviewContext.tsx`), then
+  refreshes the links that have none on browser idle, three at a time and at most 200 per page,
+  through `GET …/link-preview`. That read is now rate-limited per company and viewer (600, then
+  429 with `Retry-After`), `maxAgeMs: 0` means stale, and a failed refresh keeps the last known
+  status (U175).
 
 ### `tasks/discussion`: Comment and reassign
 

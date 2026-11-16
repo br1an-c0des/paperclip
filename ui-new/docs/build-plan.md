@@ -635,6 +635,12 @@ connections, Runner turns; no migrations). The board-facing changes: foldable su
 tasks (U167, done), who started a retry run (U169), a revision note for every plan Request changes
 (U170), and the Interrupt hand-off wait (U171). U168 was checked in the sync: ui-new isn't affected.
 
+The Nov 16 sync (`49a2b7b24..537b0408b`, [report](../../fork/sync-reports/2026-11-16.md)) added
+U175 and U176. Almost all of the range is server-side again (recovery, wake queue, dispatch, saved
+sessions, the Runner; 2 migrations), including the fix for a Claude reply that quotes "Please run
+/login" failing its run (#21921). The board-facing change: pull request link status on page load
+from a database cache (U175, build). U176 is left out.
+
 Outcomes: **build** (an agent builds it), **decide** (a question for the user first), **check**
 (verify, then build or close), **design** (needs boards first), **left out** (with the reason),
 **deferred** (decided not now, with what would bring it back), **done**. When a line is built or settled, mark it done or left out here and in its row.
@@ -819,6 +825,8 @@ follow-ups that decisions 47 and 48 listed are moved here.
 | U172 | **Chat completion reports.** `ConversationTaskHandoff.completionReportCommentId` names the reply that reported a task's latest completion, once delivered. The old UI doesn't read it; the server uses it to report an outcome once. | 11-15 | #21489 | `agent-chat/history + /handoff` | left out: server-side delivery bookkeeping that the old UI doesn't show either |
 | U173 | **Cases and Status links keep the company prefix.** The old UI's `company-routes.ts` now counts `cases` and `status` as board routes. | 11-15 | #21794 | `cases/browse`, Status cards | checked Nov 15, fixed in part: board links to cases and status were already prefixed, and the unprefixed redirects wait for the companies list; an agent's `/cases/…` and `/status/…` links in messages now open under the company, in the same tab (`boardLinkPath`) |
 | U174 | **A returning task opens from the browser's saved read cache.** The old UI saves a recently opened task's first chat frame and shows it before any server response, and keeps it on a 404 from the plan, run or work-product read. | 11-15 | #21671, #21650, #21684 | `tasks/thread` | left out: an old-UI loading optimization; ui-new loads tasks its own way. Revisit if task opening feels slow |
+| U175 | **Pull request link status on page load.** Link status is now cached in the database (migration 0489, `link_previews`). Once a page has loaded, the old UI reads the saved status of every mounted pull request link in one request, `GET /companies/:companyId/link-previews/cached?url=…` (up to 50 per request, `LINK_PREVIEW_BATCH_LIMIT`; board only; never contacts GitHub), then refreshes links with no saved status on browser idle, three at a time and at most 200 per page, through `GET …/link-preview`. That read is now rate-limited per company and viewer (600, then 429 with `Retry-After`); `maxAgeMs: 0` means stale; a failed refresh keeps the last known preview instead of dropping it. ui-new reads a preview only while its card is open (`tasks/LinkPreview.tsx`, `api/link-previews.ts`), so a link shows no status mark until someone hovers it, and a failed read (now possibly a 429) answers `preview: null`. | 11-16 | #21746 | `tasks/thread`, `tasks/discussion` | build: read `link-previews/cached` for the links in view (a streaming reply included) after the page settles, then refresh the rest on idle with the same limits; keep the last known preview when a read fails |
+| U176 | **Recents opens tasks faster.** The old UI's Recents re-warms its tasks on navigation, and opening one no longer waits for the ten-task `chat-bootstrap` preload (#21939, #21904); its status icons are aligned and the fold controls moved right (#21859). The server's `/runs?view=recent` read is now indexed, which ui-new gets for free. | 11-16 | #21939, #21904, #21859 | `shell/navigation` | left out: old-UI loading and layout changes; ui-new doesn't use `chat-bootstrap` (U116) and has its own Recents layout |
 
 - Plugin hosting (decision G): built in M6 rounds 2 and 3; the `organizationSwitcher` slot and local
   folders in M7 round 2.
