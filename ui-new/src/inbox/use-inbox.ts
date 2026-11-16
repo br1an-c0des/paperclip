@@ -9,6 +9,7 @@ import { inboxApi } from "@/api/inbox";
 import { interactionsApi } from "@/api/interactions";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
+import { refreshRecentNavForTasks } from "@/layout/recent-subtasks";
 import { useSession } from "@/lib/session";
 import { requestFromDecision } from "@/requests/decision-model";
 import { requestFromJoin } from "@/requests/join-model";
@@ -485,7 +486,15 @@ export function useInbox(options: { people: TaskPeople; clearedOpen: () => boole
         void client.invalidateQueries({ queryKey: ["issues", companyId(), "inbox"] }).finally(() => dropRestoring(input.ids));
       }, LIST_CACHE_MS);
     },
-    onSettled: refreshTasks,
+    onSettled: (_result, _error, input) => {
+      refreshTasks();
+      // Your read marks change the nav's recent tasks' unread dots and counts (U167).
+      if (input.action === "read" || input.action === "unread") {
+        const rows = client.getQueryData<CompactIssue[]>(queryKeys.inbox.tasks(companyId())) ?? [];
+        const tasks = input.ids.map((id) => rows.find((row) => row.id === id) ?? { id, parentId: null });
+        refreshRecentNavForTasks(client, companyId(), tasks, session.youId());
+      }
+    },
     onError: (error: Error, input) => {
       if (input.action === "unarchive") dropRestoring(input.ids);
       pushToast({ tone: "error", title: "Couldn't update your tasks", body: error.message });

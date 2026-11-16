@@ -99,6 +99,22 @@ describe("recent tasks", () => {
     expect(refreshRecent(monitored, [{ id: "1", identifier: "T-1", title: "One", status: "in_progress" }])[0]!.displayStatus).toBeNull();
   });
 
+  it("takes subtask counts and your read state from the summaries, never from what was stored", () => {
+    const openTask = { ...task("1"), parentId: "p", isUnreadForMe: true, subtaskCount: 9, description: "the full task" } as RecentTask;
+    const [kept] = recordRecent([], openTask, 1);
+    expect(kept).toEqual(task("1", 1));
+    expect(refreshRecent([openTask], undefined)).toEqual([task("1")]);
+    const [fresh] = refreshRecent([kept!], [{ id: "1", identifier: "T-1", title: "1", status: "todo", parentId: null, isUnreadForMe: false, subtaskCount: 2, unreadSubtaskCount: 1 }]);
+    expect(fresh).toMatchObject({ parentId: null, isUnreadForMe: false, subtaskCount: 2, unreadSubtaskCount: 1 });
+  });
+
+  it("keeps a task an earlier batch doesn't name while the new batch loads", () => {
+    const list = [task("new"), task("1")];
+    const earlier = [{ id: "1", identifier: "T-1", title: "One", status: "done" as const }];
+    expect(refreshRecent(list, earlier, true).map((entry) => entry.title)).toEqual(["new", "One"]);
+    expect(refreshRecent(list, earlier).map((entry) => entry.id)).toEqual(["1"]);
+  });
+
   it("parses what was stored, ignoring junk", () => {
     expect(parseRecent(null)).toEqual([]);
     expect(parseRecent("{")).toEqual([]);

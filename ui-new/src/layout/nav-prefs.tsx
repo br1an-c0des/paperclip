@@ -31,6 +31,7 @@ import {
   type NavMode,
   type RecentTask,
 } from "./nav-model";
+import { parseUnfolded, toggleUnfolded } from "./recent-subtasks";
 import "@/agents/AgentStar.css";
 
 /*
@@ -45,7 +46,7 @@ import "@/agents/AgentStar.css";
  *   `NAV_AUTO_RAIL_BELOW` shows the rail by itself; `[` there switches it only until the window
  *   is wide again, and your saved choice is untouched (nav-model.ts `NavFold`).
  * - The tasks you opened lately, per browser and company, refreshed from
- *   `GET /companies/:id/issues/summaries`.
+ *   `GET /companies/:id/issues/summaries`, and which of them you unfolded to show their subtasks.
  */
 
 // ---------------------------------------------------------------------------------------------
@@ -345,7 +346,12 @@ export function useRecordRecentTasks(task: () => { id: string; identifier: strin
   );
 }
 
-/** Your recent tasks, with titles and statuses as the server has them now. */
+/**
+ * Your recent tasks, with titles and statuses as the server has them now, and their subtask counts
+ * and your unread state (`?navigation=true`, board only, upstream #21649; U167). While a new batch
+ * loads (you opened another task) the last answer stands in, so the list and its groups don't
+ * flicker; a task it doesn't name keeps what was stored.
+ */
 export function useRecentTasks() {
   const company = useCompany();
   const session = useSession();
@@ -357,10 +363,37 @@ export function useRecentTasks() {
   const summaries = createQuery(() => ({
     queryKey: queryKeys.recentTasks(company().id, ids()),
     queryFn: ({ signal }) =>
-      api.get<IssueSummary[]>(`/companies/${company().id}/issues/summaries?${new URLSearchParams({ ids: ids().join(",") })}`, { signal }),
+      api.get<IssueSummary[]>(`/companies/${company().id}/issues/summaries?${new URLSearchParams({ ids: ids().join(","), navigation: "true" })}`, { signal }),
     enabled: ids().length > 0,
     staleTime: 30_000,
     retry: false,
+    placeholderData: (previous: IssueSummary[] | undefined, query) => (query?.queryKey[1] === company().id ? previous : undefined),
   }));
-  return createMemo(() => refreshRecent(stored(), summaries.isError ? undefined : summaries.data));
+  // A failed refresh keeps the last answer (its data), rather than going back to what was stored.
+  return createMemo(() => refreshRecent(stored(), summaries.data, summaries.isPlaceholderData));
+}
+
+const unfoldedKey = (companyId: string, youId: string | null) => `paperclip.ui-new.recent-unfolded:${companyId}:${youId ?? "anonymous"}`;
+const [unfoldedVersion, bumpUnfolded] = createSignal(0);
+
+/**
+ * The recent tasks whose subtasks you unfolded (folded until you do), per browser, company and
+ * person, as the recent tasks themselves are kept. `recentIds` prunes parents no longer listed.
+ */
+export function useRecentUnfolded(recentIds: () => readonly string[]) {
+  const company = useCompany();
+  const session = useSession();
+  const key = () => unfoldedKey(company().id, session.youId());
+  const list = createMemo(() => {
+    unfoldedVersion();
+    return parseUnfolded(readJson<unknown>(key(), []));
+  });
+  const set = createMemo(() => new Set(list()));
+  return {
+    set,
+    toggle: (id: string) => {
+      writeJson(key(), toggleUnfolded(list(), id, recentIds()));
+      bumpUnfolded((value) => value + 1);
+    },
+  };
 }

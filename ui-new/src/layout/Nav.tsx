@@ -50,9 +50,9 @@ import { Grain } from "@/ui/Grain";
 import { Menu } from "@/ui/Menu";
 import { ScrollList } from "@/ui/ScrollList";
 import { createSortable, type Sortable } from "@/ui/sortable";
-import { TaskStatusCapsule } from "@/ui/Status";
 import { navSection, setNavHidden, setNavMode, useCompanyOrder, useProjectStars, useRecentTasks } from "./nav-prefs";
 import { useNavLists } from "./nav-lists";
+import { RecentTasks } from "./RecentTasks";
 import { isProjectPage, showStatusLink } from "./nav-model";
 import { ChatUnreadBadge } from "@/chat/chat-read";
 import "@/ui/nav.css";
@@ -103,6 +103,10 @@ import "./Nav.css";
  * An agent whose chat has agent messages you haven't read (a reply, or a briefing it sent from a
  * task; decision 48) has a badge beside its name saying how many (U65), except the chat open now,
  * which marks itself read (chat/chat-read.tsx).
+ *
+ * Recent tasks (RecentTasks.tsx, U167): a recent task with subtasks folds, with its subtask count
+ * and how many are unread for you; unfolded, its subtasks list under it. Only this full nav lists
+ * recent tasks: the rail's flyouts leave them out, and the phone's dock has none.
  *
  * Status (status cards, decision 39, D3) sits under Inbox while the instance has `enableStatusCards`
  * on, as in the old sidebar.
@@ -452,15 +456,7 @@ export function Nav() {
 
         <Show when={recent().length > 0}>
           <NavSection id="recent" title="Recent tasks">
-            <For each={recent()}>
-              {(task) => (
-                <A class="navi navi--task" href={`${base()}/issues/${encodeURIComponent(task.identifier ?? task.id)}`} title={task.title}>
-                  <TaskStatusCapsule task={task} size="row" />
-                  <span class="navi-label">{task.title}</span>
-                  <span class="navi-note mono">{task.identifier}</span>
-                </A>
-              )}
-            </For>
+            <RecentTasks tasks={recent()} base={base()} />
           </NavSection>
         </Show>
 
