@@ -487,7 +487,16 @@ export const queryKeys = {
     summaryRevisions: (id: string) => ["status-cards", "detail", id, "summary-revisions"] as const,
     dryRun: (id: string) => ["status-cards", "detail", id, "dry-run"] as const,
   },
-  recentTasks: (companyId: string, ids: readonly string[]) => ["issues", companyId, "summaries", ...ids] as const,
+  /*
+   * The nav's recent tasks (U167): their summaries with subtask counts (`?navigation=true`), and
+   * each unfolded parent's subtasks, per viewer (read state is personal). Outside the company's
+   * `["issues", companyId]` prefix on purpose: a task event elsewhere in the company mustn't refetch
+   * them. The live events refresh only the batches and groups an event names
+   * (layout/recent-subtasks.ts `recentNavTargets`).
+   */
+  recentTasks: (companyId: string, ids: readonly string[]) => ["recent-nav", companyId, "summaries", ...ids] as const,
+  recentSubtasks: (companyId: string, viewer: string, parentId: string) => ["recent-nav", companyId, "subtasks", viewer, parentId] as const,
+  recentNav: (companyId: string) => ["recent-nav", companyId] as const,
   sidebarPreferences: {
     companyOrder: (userId: string) => ["sidebar-preferences", "company-order", userId] as const,
     projectOrder: (companyId: string, userId: string) => ["sidebar-preferences", "project-order", companyId, userId] as const,

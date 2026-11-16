@@ -68,6 +68,10 @@ export const RECENT_TASKS_LIMIT = 5;
  * `displayStatus` is what the summaries say it shows (Monitoring), when they say, and
  * `blockerAttention` the blockers' state on a blocked one (since the 2026-11-05 sync, #19329), so a
  * recent task draws the same capsule as everywhere else.
+ *
+ * The navigation fields (U167, upstream #21649) come only from the summaries
+ * (`?navigation=true`) and are never stored: whose child it is, whether it's unread for you, and
+ * how many direct subtasks it has, and how many of those are unread for you.
  */
 export type RecentTask = {
   id: string;
@@ -76,37 +80,62 @@ export type RecentTask = {
   status: IssueStatus;
   displayStatus?: IssueDisplayStatus | null;
   blockerAttention?: IssueBlockerAttention;
+  parentId?: string | null;
+  isUnreadForMe?: boolean;
+  subtaskCount?: number;
+  unreadSubtaskCount?: number;
   at: number;
 };
 
+type StoredRecent = Omit<RecentTask, "parentId" | "isUnreadForMe" | "subtaskCount" | "unreadSubtaskCount" | "at">;
+
+/** What's kept of a task: the open task is the full record, and its read state is personal and goes stale. */
+function stored(task: StoredRecent): StoredRecent {
+  return {
+    id: task.id,
+    identifier: task.identifier,
+    title: task.title,
+    status: task.status,
+    ...(task.displayStatus !== undefined ? { displayStatus: task.displayStatus } : {}),
+    ...(task.blockerAttention ? { blockerAttention: task.blockerAttention } : {}),
+  };
+}
+
 /** Puts a task you opened at the top, once, keeping the five newest. */
 export function recordRecent(list: readonly RecentTask[], task: Omit<RecentTask, "at">, at: number): RecentTask[] {
-  return [{ ...task, at }, ...list.filter((entry) => entry.id !== task.id)].slice(0, RECENT_TASKS_LIMIT);
+  return [{ ...stored(task), at }, ...list.filter((entry) => entry.id !== task.id).map((entry) => ({ ...stored(entry), at: entry.at }))].slice(0, RECENT_TASKS_LIMIT);
 }
+
+type RecentSummary = Pick<IssueSummary, "id" | "identifier" | "title" | "status" | "blockerAttention" | "parentId" | "isUnreadForMe" | "subtaskCount" | "unreadSubtaskCount"> & {
+  displayStatus?: IssueDisplayStatus | null;
+};
 
 /**
  * The list with what the server says now (`GET /companies/:id/issues/summaries`): fresh titles and
  * statuses, and tasks it no longer returns (deleted, or out of your reach) dropped. Before an answer
- * the list stays as it is.
+ * the list stays as it is. `partial`: the summaries are an earlier answer for other ids (while the
+ * list's new batch loads), so a task they don't name stays as stored rather than being dropped.
  */
-export function refreshRecent(
-  list: readonly RecentTask[],
-  summaries: readonly (Pick<IssueSummary, "id" | "identifier" | "title" | "status" | "blockerAttention"> & { displayStatus?: IssueDisplayStatus | null })[] | undefined,
-): RecentTask[] {
-  if (!summaries) return [...list];
+export function refreshRecent(list: readonly RecentTask[], summaries: readonly RecentSummary[] | undefined, partial = false): RecentTask[] {
+  if (!summaries) return list.map((entry) => ({ ...stored(entry), at: entry.at }));
   const byId = new Map(summaries.map((summary) => [summary.id, summary] as const));
   return list.flatMap((entry) => {
     const summary = byId.get(entry.id);
-    if (!summary) return [];
-    const { blockerAttention: _before, ...rest } = entry;
+    if (!summary) return partial ? [{ ...stored(entry), at: entry.at }] : [];
+    const { blockerAttention: _before, ...rest } = stored(entry);
     return [
       {
         ...rest,
+        at: entry.at,
         identifier: summary.identifier,
         title: summary.title,
         status: summary.status,
         displayStatus: summary.displayStatus ?? null,
         ...(summary.blockerAttention ? { blockerAttention: summary.blockerAttention } : {}),
+        ...(summary.parentId !== undefined ? { parentId: summary.parentId } : {}),
+        ...(summary.isUnreadForMe !== undefined ? { isUnreadForMe: summary.isUnreadForMe } : {}),
+        ...(summary.subtaskCount !== undefined ? { subtaskCount: summary.subtaskCount } : {}),
+        ...(summary.unreadSubtaskCount !== undefined ? { unreadSubtaskCount: summary.unreadSubtaskCount } : {}),
       },
     ];
   });

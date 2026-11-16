@@ -160,6 +160,26 @@ export const issuesApi = {
   /** Every page of a list, for views that group the whole set. */
   listAll: async (companyId: string, filters: Omit<IssueListFilters, "limit" | "offset">, signal?: AbortSignal) =>
     withMonitoring(companyId, filters, await allPages(companyId, filters, signal), signal),
+  /**
+   * A page of a task's direct subtasks for the nav's recent tasks (U167), as the old UI's
+   * RecentTaskGroup reads them since upstream #21649: the light `rows` projection in id order, the
+   * next page after the last id (`afterId`), and your read state on each (`includeReadState`, board
+   * only) without leaving out read ones.
+   */
+  subtaskPage: async (companyId: string, parentId: string, input: { limit: number; afterId?: string }, signal?: AbortSignal) => {
+    const params = new URLSearchParams({
+      view: "rows",
+      parentId,
+      limit: String(input.limit),
+      sortField: "id",
+      sortDir: "asc",
+      includeRoutineExecutions: "true",
+      includeReadState: "true",
+    });
+    if (input.afterId) params.set("afterId", input.afterId);
+    const page = await api.get<CompactIssue[]>(`/companies/${companyId}/issues?${params}`, { signal });
+    return withMonitoring(companyId, { parentId, includeRoutineExecutions: true }, page, signal);
+  },
   /** One task by id or identifier (`TRA-41`), with its project, goal, relations and documents. */
   get: (ref: string, signal?: AbortSignal) => api.get<Issue>(`/issues/${encodeURIComponent(ref)}`, { signal }),
   /**

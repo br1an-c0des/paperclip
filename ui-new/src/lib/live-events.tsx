@@ -7,6 +7,7 @@ import { createContext, createEffect, createMemo, createSignal, onCleanup, useCo
 import { queryKeys } from "@/api/queryKeys";
 import { useSession } from "@/lib/session";
 import { connectivity } from "@/lib/offline/connectivity";
+import { refreshRecentNav } from "@/layout/recent-subtasks";
 
 /*
  * The live-events socket: one WebSocket per company (`/api/companies/:id/events/ws`), as in
@@ -24,6 +25,9 @@ import { connectivity } from "@/lib/offline/connectivity";
  *   (`changesTaskMentions`, U80).
  * - Task lists, tasks and the live runs are fetched once more after a burst of events settles
  *   (`createTrailingRefetch`): the refetch an event starts can come back with them as they were.
+ * - The nav's recent tasks and their unfolded subtasks refetch only when an event names them: the
+ *   task, or the parents the server lists in `recentSubtaskParentIds` (U167,
+ *   layout/recent-subtasks.ts `recentNavTargets`).
  * - Run transcripts (`heartbeat.run.log`, `heartbeat.run.event`) come only for the runs on screen
  *   (upstream #17456). On open the socket says `live.hello`; a server that answers
  *   `live.capabilities` with `run-interests` is sent the runs views asked for with `useRunInterest`
@@ -359,7 +363,10 @@ function invalidateForEvent(client: QueryClient, companyId: string, event: LiveE
     void client.invalidateQueries({ queryKey, ...mentionFilter(mentions) }, { cancelRefetch: false });
   }
   invalidateRelationEmbedders(client, relationSummaryRefs(event));
-  trailing.add(keys, { mentions });
+  // The nav's recent tasks and their subtasks sit outside the task lists' prefix: only the
+  // batches and groups the event names refetch (layout/recent-subtasks.ts, U167).
+  const recent = refreshRecentNav(client, companyId, event, viewer);
+  trailing.add([...keys, ...recent], { mentions });
 }
 
 export type TrailingRefetch = {
@@ -397,6 +404,9 @@ export function createTrailingRefetch(client: QueryClient, delayMs = LIST_CACHE_
     // Updates snapshot (`inbox/mine`, which run events refresh) isn't either.
     trailingGroup(client, delayMs, (key) => key[0] === "issues" && key[2] !== "inbox", (key) => key[1] === "detail"),
     trailingGroup(client, liveRunsDelayMs, (key) => key[0] === "live-runs", () => true),
+    // The recent tasks' batches and groups an event named, each on its own: their reads are task
+    // lists too, behind the same server cache.
+    trailingGroup(client, delayMs, (key) => key[0] === "recent-nav", () => true),
   ];
   return {
     add: (eventKeys, options) => groups.forEach((group) => group.add(eventKeys, options)),
