@@ -3,6 +3,7 @@ import { ChevronRight, Eye, EyeOff, Plus, Trash2 } from "lucide-solid";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Index, Match, Show, Switch, type JSX } from "solid-js";
 import { Button } from "@/ui/Button";
 import { TextArea, TextInput } from "@/ui/Field";
+import { ChangedDot, savedText, type Changed } from "@/ui/ChangedDot";
 import { aboutLabel, InfoTip } from "@/ui/InfoTip";
 import { Switch as Toggle } from "@/ui/Switch";
 import {
@@ -16,6 +17,7 @@ import {
   labelFromKey,
   numberFromInput,
   objectFromInput,
+  valuesDiffer,
   type FieldEntry,
   type JsonSchemaNode,
 } from "./schema-form";
@@ -41,6 +43,8 @@ export type SchemaFormProps = {
   /** The company's secrets, for secret fields. */
   secrets?: readonly CompanySecret[];
   advancedLabel?: string;
+  /** The saved values: given, each field whose value differs gets an unsaved-change dot (ui/ChangedDot.tsx). */
+  saved?: Record<string, unknown>;
 };
 
 type FieldProps = {
@@ -54,7 +58,19 @@ type FieldProps = {
   disabled?: boolean;
   secrets?: readonly CompanySecret[];
   idPrefix: string;
+  /** Whether the field's unsaved edits are shown, against `saved`. */
+  tracked?: boolean;
+  saved?: unknown;
 };
+
+/** A field's unsaved-change dot: what it was, for a plain value; only that it changed, for a secret, list or object. */
+function fieldChanged(props: FieldProps): Changed {
+  if (!props.tracked || !valuesDiffer(props.value, props.saved)) return false;
+  const kind = fieldKind(props.schema);
+  if (kind === "boolean") return { from: props.saved === true ? "on" : "off" };
+  if (kind === "secret-ref" || kind === "array" || kind === "object" || kind === "json-object") return true;
+  return { from: savedText(props.saved === undefined || props.saved === null ? "" : String(props.saved)) };
+}
 
 export function SchemaForm(props: SchemaFormProps) {
   const idPrefix = createUniqueId();
@@ -78,8 +94,13 @@ export function SchemaForm(props: SchemaFormProps) {
       disabled={props.disabled}
       secrets={props.secrets}
       idPrefix={idPrefix}
+      tracked={props.saved !== undefined}
+      saved={props.saved?.[entry.key]}
     />
   );
+  /** Folded, the advanced fields' dots are out of sight: the disclosure carries one too. */
+  const advancedChanged = () =>
+    props.saved !== undefined && groups().advanced.some((group) => group.fields.some((entry) => valuesDiffer(props.values[entry.key], props.saved![entry.key])));
 
   return (
     <div class="sf">
@@ -91,6 +112,7 @@ export function SchemaForm(props: SchemaFormProps) {
               <ChevronRight size={14} aria-hidden="true" class="sf-chevron" />
               {props.advancedLabel ?? "Advanced options"}
             </button>
+            <ChangedDot label={props.advancedLabel ?? "Advanced options"} changed={advancedChanged()} />
             <Show when={advancedOpen()}>
               <For each={groups().advanced}>
                 {(group) => (
@@ -125,6 +147,7 @@ export function SchemaField(props: FieldProps) {
             label={props.label || "On"}
             info={props.schema.description}
             disabled={disabled()}
+            changed={fieldChanged(props)}
           />
           <FieldError message={error()} />
         </div>
@@ -142,12 +165,13 @@ export function SchemaField(props: FieldProps) {
           required={props.required}
           info={props.schema.description ?? "Pick one of the organization's secrets, or paste a value (Paperclip stores it as a secret when you save)."}
           error={error()}
+          changed={fieldChanged(props)}
         >
           <SecretField {...props} id={id()} disabled={disabled()} />
         </Labelled>
       </Match>
       <Match when={true}>
-        <Labelled id={id()} label={props.label} required={props.required} info={props.schema.description} error={error()}>
+        <Labelled id={id()} label={props.label} required={props.required} info={props.schema.description} error={error()} changed={fieldChanged(props)}>
           <Switch>
             <Match when={kind() === "enum"}>
               <select
@@ -218,7 +242,7 @@ export function SchemaField(props: FieldProps) {
  * A field with its label above. `info` is the schema's description (written by the plugin), behind
  * an "i" beside the label and outside it, as the rest of settings has it.
  */
-function Labelled(props: { id: string; label: string; required?: boolean; info?: string; error?: string; children: JSX.Element }) {
+function Labelled(props: { id: string; label: string; required?: boolean; info?: string; error?: string; changed?: Changed; children: JSX.Element }) {
   const label = () => (
     <label class="sf-label" for={props.id}>
       {props.label}
@@ -233,10 +257,13 @@ function Labelled(props: { id: string; label: string; required?: boolean; info?:
   return (
     <div class="sf-field">
       <Show when={props.label}>
-        <Show when={props.info} fallback={label()}>
+        <Show when={props.info || props.changed} fallback={label()}>
           <span class="info-line">
             {label()}
-            <InfoTip label={aboutLabel(props.label)}>{props.info}</InfoTip>
+            <Show when={props.info}>
+              <InfoTip label={aboutLabel(props.label)}>{props.info}</InfoTip>
+            </Show>
+            <ChangedDot label={props.label} changed={props.changed} />
           </span>
         </Show>
       </Show>
@@ -271,6 +298,7 @@ function ArrayField(props: FieldProps) {
         <Show when={props.schema.description}>
           <InfoTip label={aboutLabel(props.label)}>{props.schema.description}</InfoTip>
         </Show>
+        <ChangedDot label={props.label} changed={fieldChanged(props)} />
       </legend>
       <Index each={items()} fallback={<p class="sf-muted sf-empty">Nothing added yet.</p>}>
         {(entry, index) => (
@@ -317,6 +345,7 @@ function ObjectField(props: FieldProps) {
       <summary class="sf-label">
         <ChevronRight size={14} aria-hidden="true" class="sf-chevron" />
         {props.label}
+        <ChangedDot label={props.label} changed={fieldChanged(props)} />
       </summary>
       <Show when={props.schema.description}>
         <span class="fhelp">{props.schema.description}</span>
@@ -328,6 +357,7 @@ function ObjectField(props: FieldProps) {
         errors={errorsUnder(props.errors, props.path)}
         disabled={props.disabled || props.schema.readOnly === true}
         secrets={props.secrets}
+        saved={props.tracked ? (props.saved && typeof props.saved === "object" && !Array.isArray(props.saved) ? (props.saved as Record<string, unknown>) : {}) : undefined}
       />
       <FieldError message={props.errors[props.path]} />
     </details>

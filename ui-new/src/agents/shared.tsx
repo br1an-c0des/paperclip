@@ -6,6 +6,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { failure, type SaveState } from "@/projects/settings/shared";
 import { InfoHeading } from "@/ui/Field";
+import { ChangedDot, type Changed } from "@/ui/ChangedDot";
 import { InfoTip } from "@/ui/InfoTip";
 import { Switch } from "@/ui/Switch";
 import { harnessType } from "./agent-model";
@@ -21,7 +22,8 @@ export { CardNote, FootError, failure, saveNote, SaveStatus } from "@/projects/s
 /**
  * A settings row whose control is one switch, at the row's end like the other rows' controls.
  * `info` is what the setting is for, behind an "i" beside the label; `help` stays visible, for state
- * or why the switch is unavailable.
+ * or why the switch is unavailable. `changed` is an unsaved edit, a lit dot after the label
+ * (ui/ChangedDot.tsx); it covers the row's extra controls (`children`) too.
  */
 export function SwitchRow(props: {
   label: string;
@@ -31,14 +33,18 @@ export function SwitchRow(props: {
   disabled?: boolean;
   onChange: (value: boolean) => void;
   children?: JSX.Element;
+  changed?: Changed;
 }) {
   return (
-    <div class="frow ag-frow-switch">
+    <div class="frow ag-frow-switch" data-changed={props.changed ? "" : undefined}>
       <div class="flabel">
-        <Show when={props.info} fallback={props.label}>
+        <Show when={props.info || props.changed} fallback={props.label}>
           <span class="info-line">
             {props.label}
-            <InfoTip label={`About ${props.label}`}>{props.info}</InfoTip>
+            <Show when={props.info}>
+              <InfoTip label={`About ${props.label}`}>{props.info}</InfoTip>
+            </Show>
+            <ChangedDot label={props.label} changed={props.changed} />
           </span>
         </Show>
         <Show when={props.help}>

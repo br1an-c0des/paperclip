@@ -1,0 +1,53 @@
+/*
+ * The unsaved-change LED after a setting's label (ChangedDot.tsx). Ember, the "waiting on you"
+ * tone the save bar's "N unsaved changes" uses (--amber-fg), with a soft glow so it reads as lit.
+ * The button is the InfoTip's size, so the label line doesn't move when it comes on.
+ */
+.changed-dot {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.changed-dot:hover,
+.changed-dot[data-expanded] {
+  background: var(--hover);
+}
+
+.changed-dot-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff3d6 0, var(--ember-a) 45%, var(--ember-b) 100%);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--ember-a) 22%, transparent),
+    0 0 8px 1px color-mix(in srgb, var(--ember-a) 65%, transparent);
+  animation: changed-dot-on 0.18s ease-out;
+}
+
+@keyframes changed-dot-on {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .changed-dot-led {
+    animation: none;
+  }
+}
+
+/* A finger-sized target on touch screens, without moving the layout. */
+@media (pointer: coarse) {
+  .changed-dot::before {
+    content: "";
+    position: absolute;
+    inset: -10px;
+  }
+}

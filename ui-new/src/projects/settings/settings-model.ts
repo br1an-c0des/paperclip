@@ -592,12 +592,23 @@ export function budgetProblem(draft: BudgetDraft): string | null {
   return parseDollars(draft.amount) === null ? "Enter the limit in dollars, such as 300 or 300.00." : null;
 }
 
-export function budgetDirty(policy: BudgetPolicySummary | null, draft: BudgetDraft) {
+/**
+ * The budget fields with an unsaved edit, each with what it was ("$300.00", "Monthly", "80%",
+ * "pause"), for the rows' dots. With no limit typed, only the limit counts.
+ */
+export function budgetChanges(policy: BudgetPolicySummary | null, draft: BudgetDraft): Partial<Record<keyof BudgetDraft, string>> {
   const before = budgetDraft(policy);
-  return (
-    parseDollars(before.amount) !== parseDollars(draft.amount) ||
-    (parseDollars(draft.amount) !== 0 && (before.windowKind !== draft.windowKind || before.warnPercent !== draft.warnPercent || before.hardStop !== draft.hardStop))
-  );
+  const changes: Partial<Record<keyof BudgetDraft, string>> = {};
+  if (parseDollars(before.amount) !== parseDollars(draft.amount)) changes.amount = before.amount ? `$${before.amount}` : "no limit";
+  if (parseDollars(draft.amount) === 0) return changes;
+  if (before.windowKind !== draft.windowKind) changes.windowKind = before.windowKind === "lifetime" ? "Lifetime" : "Monthly";
+  if (before.warnPercent !== draft.warnPercent) changes.warnPercent = `${before.warnPercent}% of the limit`;
+  if (before.hardStop !== draft.hardStop) changes.hardStop = before.hardStop ? "pausing at the limit" : "only warning";
+  return changes;
+}
+
+export function budgetDirty(policy: BudgetPolicySummary | null, draft: BudgetDraft) {
+  return Object.keys(budgetChanges(policy, draft)).length > 0;
 }
 
 /**

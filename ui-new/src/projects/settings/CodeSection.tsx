@@ -14,6 +14,7 @@ import { APP_SETTINGS_PATH } from "@/settings/app/app-settings-model";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
+import { savedText, type Changed } from "@/ui/changed";
 import { InfoTip } from "@/ui/InfoTip";
 import { Popover } from "@/ui/Popover";
 import { Segmented } from "@/ui/Segmented";
@@ -754,8 +755,12 @@ function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
     ),
   );
   const dirty = () => checkoutDirty(props.project, draft);
+  // Unsaved-change dots: a field differs from the saved policy.
+  const saved = createMemo(() => checkoutDraft(props.project));
+  const was = <K extends keyof CheckoutDraft>(key: K, text: (value: CheckoutDraft[K]) => string): Changed => saved()[key] !== draft[key] && { from: text(saved()[key]) };
+  const onOff = (value: boolean) => (value ? "on" : "off");
   const text = (key: "baseRef" | "branchTemplate" | "worktreeParentDir" | "provisionCommand" | "runtimeProvisionCommand" | "teardownCommand", label: string, placeholder: string, info: string) => (
-    <SettingsRow label={label} info={info} for={`ps-co-${key}`}>
+    <SettingsRow label={label} info={info} for={`ps-co-${key}`} changed={was(key, (value) => savedText(value, "the default"))}>
       <TextInput id={`ps-co-${key}`} class="mono" placeholder={placeholder} spellcheck={false} value={draft[key]} onInput={(event) => setDraft(key, event.currentTarget.value)} />
     </SettingsRow>
   );
@@ -790,16 +795,25 @@ function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
           </p>
         }
       >
-        <SettingsRow label="Separate checkout per task" info="Lets this project's tasks work in their own git worktree instead of the shared project workspace.">
+        <SettingsRow
+          label="Separate checkout per task"
+          info="Lets this project's tasks work in their own git worktree instead of the shared project workspace."
+          changed={was("enabled", onOff)}
+        >
           <Toggle checked={draft.enabled} onChange={(value) => setDraft("enabled", value)} label="Separate checkout per task" labelHidden />
         </SettingsRow>
         <Show when={draft.enabled}>
-          <SettingsRow label="New tasks get their own" info="On: each new task gets its own worktree. Off: new tasks share the project workspace unless someone picks a worktree for them.">
+          <SettingsRow
+            label="New tasks get their own"
+            info="On: each new task gets its own worktree. Off: new tasks share the project workspace unless someone picks a worktree for them."
+            changed={was("isolatedByDefault", onOff)}
+          >
             <Toggle checked={draft.isolatedByDefault} onChange={(value) => setDraft("isolatedByDefault", value)} label="New tasks get their own checkout" labelHidden />
           </SettingsRow>
           <SettingsRow
             label="Runs in the shared workspace"
             info={`Whether runs that share the project workspace wait for each other. ${CONCURRENCY_OPTIONS.find((option) => option.value === draft.concurrency)?.help ?? ""}`}
+            changed={was("concurrency", (value) => CONCURRENCY_OPTIONS.find((option) => option.value === value)?.label ?? String(value))}
           >
             <Segmented label="Runs in the shared workspace" options={CONCURRENCY_OPTIONS} value={draft.concurrency} onChange={(value) => setDraft("concurrency", value)} />
           </SettingsRow>

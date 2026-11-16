@@ -466,9 +466,14 @@
   font-weight: 600;
 }
 
-.ag-advanced summary span:last-child {
+.ag-advanced summary b + span {
   color: var(--muted);
   font-size: 13px;
+}
+
+/* Advanced folded with an unsaved edit inside (ui/ChangedDot.css draws the LED). */
+.ag-advanced-dot {
+  flex-shrink: 0;
 }
 
 .ag-rot {

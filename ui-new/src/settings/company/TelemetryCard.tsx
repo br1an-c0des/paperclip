@@ -1,7 +1,7 @@
 import type { AgentObservabilitySettingsResponse } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Plus, X } from "lucide-solid";
-import { createEffect, createSignal, For, on, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
 import { ApiError } from "@/api/client";
 import { companiesApi } from "@/api/companies";
@@ -13,16 +13,20 @@ import { SettingsRow, TextInput } from "@/ui/Field";
 import { Segmented } from "@/ui/Segmented";
 import { TonePill } from "@/ui/Status";
 import { Switch } from "@/ui/Switch";
+import { savedText, type Changed } from "@/ui/changed";
 import { pushToast } from "@/ui/Toast";
 import {
   CAPTURE_LABELS,
+  captureText,
   headerRow,
   needsFreshHeaders,
+  telemetryChanges,
   telemetryDirty,
   telemetryDraft,
   telemetryRequest,
   telemetryStatus,
   type TelemetryDraft,
+  type TelemetryField,
 } from "./connections-model";
 import { CardHead, CardNoteLine, dateTime, failure, FootError, SwitchRow } from "./shared";
 
@@ -48,6 +52,10 @@ export function TelemetryCard() {
   const [replaceKey, setReplaceKey] = createSignal(false);
   const [confirmRemove, setConfirmRemove] = createSignal(false);
   const dirty = () => telemetryDirty(settings(), draft);
+  /** Which rows have an unsaved edit, and what they were. */
+  const changes = createMemo(() => telemetryChanges(settings(), draft));
+  const saved = createMemo(() => telemetryDraft(settings()));
+  const changed = (field: TelemetryField, from?: string): Changed => changes().includes(field) && (from === undefined ? true : { from });
   const reset = () => {
     setDraft(reconcile(telemetryDraft(settings())));
     setReplaceKey(false);
@@ -149,7 +157,7 @@ export function TelemetryCard() {
                 </For>
               </Show>
             </SettingsRow>
-            <SettingsRow label="Destination">
+            <SettingsRow label="Destination" changed={changed("provider", saved().provider === "otlp" ? "OTLP collector" : "Braintrust")}>
               <Segmented
                 label="Destination"
                 options={[
@@ -168,10 +176,10 @@ export function TelemetryCard() {
               when={draft.provider === "otlp"}
               fallback={
                 <>
-                  <SettingsRow label="Project ID" for="cs-otel-project" info="The Braintrust project's UUID.">
+                  <SettingsRow label="Project ID" for="cs-otel-project" info="The Braintrust project's UUID." changed={changed("projectId", savedText(saved().projectId))}>
                     <TextInput id="cs-otel-project" class="mono" autocomplete="off" value={draft.projectId} onInput={(event) => setDraft("projectId", event.currentTarget.value)} />
                   </SettingsRow>
-                  <SettingsRow label="API key" for="cs-otel-key" help="Use a key limited to telemetry ingestion: the agent's harness receives it.">
+                  <SettingsRow label="API key" for="cs-otel-key" help="Use a key limited to telemetry ingestion: the agent's harness receives it." changed={changed("apiKey")}>
                     <Show
                       when={keySaved() && !replaceKey()}
                       fallback={
@@ -189,7 +197,12 @@ export function TelemetryCard() {
                 </>
               }
             >
-              <SettingsRow label="Endpoint" for="cs-otel-endpoint" info="OTLP over HTTP. The base URL, without /v1/logs or /v1/traces; every environment agents run in must reach it.">
+              <SettingsRow
+                label="Endpoint"
+                for="cs-otel-endpoint"
+                info="OTLP over HTTP. The base URL, without /v1/logs or /v1/traces; every environment agents run in must reach it."
+                changed={changed("endpoint", savedText(saved().endpoint))}
+              >
                 <TextInput
                   id="cs-otel-endpoint"
                   class="mono"
@@ -199,7 +212,7 @@ export function TelemetryCard() {
                   onInput={(event) => setDraft("endpoint", event.currentTarget.value)}
                 />
               </SettingsRow>
-              <SettingsRow label="Headers" info="For your collector's authentication." help="Values aren't shown again, and the agent's harness receives them.">
+              <SettingsRow label="Headers" info="For your collector's authentication." help="Values aren't shown again, and the agent's harness receives them." changed={changed("headers")}>
                 <div class="cs-headers">
                   <For each={draft.headers}>
                     {(row, index) => (
@@ -240,8 +253,8 @@ export function TelemetryCard() {
                 </div>
               </SettingsRow>
             </Show>
-            <SwitchRow label="Send telemetry" info="Applies to runs that start after you save." checked={draft.enabled} onChange={(value) => setDraft("enabled", value)} />
-            <SettingsRow label="What to include" help="Exported records can contain task content.">
+            <SwitchRow label="Send telemetry" info="Applies to runs that start after you save." checked={draft.enabled} changed={changed("enabled", saved().enabled ? "on" : "off")} onChange={(value) => setDraft("enabled", value)} />
+            <SettingsRow label="What to include" help="Exported records can contain task content." changed={changed("capture", captureText(saved().capture))}>
               <div class="cs-checks">
                 <For each={CAPTURE_LABELS}>
                   {(entry) => <Switch label={entry.label} checked={draft.capture[entry.key]} onChange={(value) => setDraft("capture", entry.key, value)} />}

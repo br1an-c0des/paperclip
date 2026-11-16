@@ -12,7 +12,7 @@ import { Button } from "@/ui/Button";
 import { Menu } from "@/ui/Menu";
 import { Segmented } from "@/ui/Segmented";
 import { pushToast } from "@/ui/Toast";
-import { budgetDirty, budgetDraft, budgetProblem, budgetRequests, currentPolicy, parseDollars, projectPolicies, WARN_OPTIONS, windowLabel, type BudgetDraft } from "./settings-model";
+import { budgetChanges, budgetDirty, budgetDraft, budgetProblem, budgetRequests, currentPolicy, parseDollars, projectPolicies, WARN_OPTIONS, windowLabel, type BudgetDraft } from "./settings-model";
 import { failure, FootError, refreshProject } from "./shared";
 
 /*
@@ -37,6 +37,9 @@ export function BudgetSection(props: { project: Project }) {
   const [problem, setProblem] = createSignal<string | null>(null);
   createEffect(on(() => JSON.stringify(budgetDraft(policy())), () => setDraft(reconcile(budgetDraft(policy())))));
   const dirty = () => budgetDirty(policy(), draft);
+  /** A row's unsaved-change dot: what the field was, while its edit counts. */
+  const changes = createMemo(() => budgetChanges(policy(), draft));
+  const changed = (field: keyof BudgetDraft) => changes()[field] !== undefined && { from: changes()[field]! };
   const limitOn = () => (parseDollars(draft.amount) ?? 0) > 0;
 
   const save = async () => {
@@ -97,7 +100,7 @@ export function BudgetSection(props: { project: Project }) {
           Couldn't load the budget. {failure(overview.error, "")}
         </p>
       </Show>
-      <SettingsRow label="Period">
+      <SettingsRow label="Period" changed={changed("windowKind")}>
         <Segmented
           label="Budget period"
           options={[
@@ -108,7 +111,7 @@ export function BudgetSection(props: { project: Project }) {
           onChange={(value) => setDraft("windowKind", value)}
         />
       </SettingsRow>
-      <SettingsRow label={draft.windowKind === "lifetime" ? "Limit" : "Monthly limit"} info="Leave it empty for no limit." for="ps-budget-amount">
+      <SettingsRow label={draft.windowKind === "lifetime" ? "Limit" : "Monthly limit"} info="Leave it empty for no limit." changed={changed("amount")} for="ps-budget-amount">
         <div class="ps-money">
           <span aria-hidden="true">$</span>
           <TextInput
@@ -149,7 +152,7 @@ export function BudgetSection(props: { project: Project }) {
         )}
       </Show>
       <Show when={limitOn()}>
-        <SettingsRow label="Warn me at">
+        <SettingsRow label="Warn me at" changed={changed("warnPercent")}>
           <Menu>
             <Menu.Trigger as={FieldButton} class="ps-field-240" aria-label={`Warn at ${draft.warnPercent}% of the limit`}>
               {draft.warnPercent}% of the limit
@@ -165,7 +168,7 @@ export function BudgetSection(props: { project: Project }) {
             </Menu.Content>
           </Menu>
         </SettingsRow>
-        <SettingsRow label="When the limit is reached">
+        <SettingsRow label="When the limit is reached" changed={changed("hardStop")}>
           <Menu>
             <Menu.Trigger as={FieldButton} class="ps-field-320" aria-label="When the limit is reached">
               {draft.hardStop ? "Pause this project's agent runs" : "Only warn me"}

@@ -1,6 +1,6 @@
 import type { BudgetIncident, BudgetOverview, BudgetPolicySummary } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { companyPolicy, incidentText, limitAction, resetsLabel, rowDirty, rowDraft, rowRequest, scopeRows, shortDollars, suggestedRaise, usedPercent } from "./budgets-model";
+import { companyPolicy, incidentText, limitAction, resetsLabel, rowChanges, rowDirty, rowDraft, rowRequest, scopeRows, shortDollars, suggestedRaise, usedPercent } from "./budgets-model";
 
 function policy(overrides: Partial<BudgetPolicySummary>): BudgetPolicySummary {
   return {
@@ -63,6 +63,10 @@ describe("budget rows", () => {
     expect(rowDirty(current, draft)).toBe(false);
     expect(rowDirty(current, { ...draft, amount: "100.00" })).toBe(false);
     expect(rowDirty(current, { ...draft, warnPercent: 90 })).toBe(true);
+    // What each changed field was, for the unsaved-change dots.
+    expect(rowChanges(current, { ...draft, warnPercent: 90, hardStop: false })).toEqual({ warnPercent: "80%", hardStop: "pausing at the limit" });
+    expect(rowChanges(null, { ...rowDraft(null), amount: "50" })).toEqual({ amount: "no budget" });
+    expect(rowChanges(current, { ...draft, amount: "", warnPercent: 90 })).toEqual({ amount: "$100" });
     expect(rowRequest({ scopeType: "agent", scopeId: "a", windowKind: "calendar_month_utc" }, { ...draft, amount: "120" })).toEqual({
       scopeType: "agent",
       scopeId: "a",

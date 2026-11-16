@@ -39,7 +39,9 @@ import {
 } from "../agent-model";
 import { failure, FootError, refreshAgent, SectionTitle, shortDate, SwitchRow } from "../shared";
 import { resolveRunner } from "../new/new-agent-model";
-import { isSecretField, type ExtraValue, type HarnessField } from "../harness-model";
+import { extraChangedFrom, isSecretField, type ExtraValue, type HarnessField } from "../harness-model";
+import { amountFrom, continueFrom, heartbeatFrom, onOff, textFrom } from "../runtime-dots";
+import type { Changed } from "@/ui/changed";
 import { createRuntimeForm } from "../runtime-form";
 import type { DroppedSetting, RunnerPreview } from "../runner-switch-model";
 import { EnvironmentMenu, HarnessDisc, instanceDefaultEnvironment, ModelMenu, TestChecks, useInstanceDefaultId } from "./fields";
@@ -194,6 +196,9 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
     const skips = heartbeat?.skipTimerWhenNoActionableWork ?? heartbeat?.requireActionableTimerWork ?? heartbeat?.issueOnlyTimer;
     return skips === true ? "Skips check-ins while it has no open task." : undefined;
   };
+  /** An environment as its dot names it: "Instance default", or its name. */
+  const environmentName = (id: string) => (id ? (environments.data?.find((entry) => entry.id === id)?.name ?? "an environment you can't see") : "Instance default");
+  const runs = (value: string) => (value === "1" ? "run" : "runs");
 
   return (
     <>
@@ -263,6 +268,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
         <SettingsRow
           label="Runner"
           info="What starts and supervises the harness for each run. Paperclip Runner supervises it; the legacy runner runs the harness program directly."
+          changed={form.changed("runner") && { from: runnerLabel(identity().runner) }}
         >
           <Show when={identity().runnerApplies} fallback={<span class="ag-static-text">Not applicable: {identity().harnessLabel} runs only on the legacy runner.</span>}>
             <div class="ps-stack">
@@ -282,9 +288,6 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
                   onChange={(value) => setDraft("runner", value === identity().runner ? null : value)}
                 />
               </Show>
-              <Show when={shownRunner() !== identity().runner}>
-                <span class="ag-changed">Changed from {runnerLabel(identity().runner)}. Switches when you save.</span>
-              </Show>
               <Show when={runnerNote()}>
                 <span class="fhelp">{runnerNote()}</span>
               </Show>
@@ -300,27 +303,23 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
           )}
         </Show>
         <Show when={fields().model}>
-          <SettingsRow label="Model">
+          <SettingsRow label="Model" changed={form.changed("model") && { from: modelLabel(base().model, models.data) ?? "the default" }}>
             <ModelMenu models={models.data} loading={models.isLoading} value={draft.model} onChange={(model) => setDraft("model", model)} />
-            <Show when={draft.model !== base().model}>
-              <span class="ag-changed">Changed from {modelLabel(base().model, models.data) ?? "the default"}</span>
-            </Show>
             <DetectedModel agent={props.agent} harness={identity().harness} value={draft.model} onUse={(model) => setDraft("model", model)} />
           </SettingsRow>
         </Show>
         <Show when={fields().effort && effortOptions().length > 0}>
-          <SettingsRow label="Thinking effort" info="More effort is slower and costs more.">
-            <div class="ps-stack">
-              <Segmented
-                label="Thinking effort"
-                options={[{ value: "", label: "Auto" }, ...effortOptions()]}
-                value={draft.effort}
-                onChange={(value) => setDraft("effort", value)}
-              />
-              <Show when={draft.effort !== base().effort}>
-                <span class="ag-changed">Changed from {effortOptions().find((option) => option.value === base().effort)?.label ?? "Auto"}</span>
-              </Show>
-            </div>
+          <SettingsRow
+            label="Thinking effort"
+            info="More effort is slower and costs more."
+            changed={form.changed("effort") && { from: effortOptions().find((option) => option.value === base().effort)?.label ?? (base().effort || "Auto") }}
+          >
+            <Segmented
+              label="Thinking effort"
+              options={[{ value: "", label: "Auto" }, ...effortOptions()]}
+              value={draft.effort}
+              onChange={(value) => setDraft("effort", value)}
+            />
           </SettingsRow>
         </Show>
       </SettingsCard>
@@ -331,7 +330,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
           <Show when={form.fields().length > 0}>
             <SettingsCard title="Harness settings" info={`Options of ${identity().harnessLabel} itself. Saved with your other changes.`}>
               <For each={form.visibleFields()}>
-                {(field) => <ExtraFieldRow field={field} value={form.extras()[field.key]} saved={config()[field.key]} onChange={(value) => form.setExtra(field.key, value)} />}
+                {(field) => <ExtraFieldRow field={field} value={form.extras()[field.key]} saved={config()[field.key]} changed={form.extraChanged(field.key) && extraChangedFrom(field, form.extrasBase()[field.key])} onChange={(value) => form.setExtra(field.key, value)} />}
               </For>
             </SettingsCard>
           </Show>
@@ -343,7 +342,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
         >
           <Show when={runnerSchema.data} fallback={<p class="ps-muted-line">{runnerSchema.isError ? "Couldn't load the Runner's settings. The switch saves with its defaults." : "Loading the Runner's settings…"}</p>}>
             <For each={form.visibleFields()}>
-              {(field) => <ExtraFieldRow field={field} value={form.extras()[field.key]} saved={form.fieldsConfig()[field.key]} onChange={(value) => form.setExtra(field.key, value)} />}
+              {(field) => <ExtraFieldRow field={field} value={form.extras()[field.key]} saved={form.fieldsConfig()[field.key]} changed={form.extraChanged(field.key) && extraChangedFrom(field, form.extrasBase()[field.key])} onChange={(value) => form.setExtra(field.key, value)} />}
             </For>
           </Show>
         </SettingsCard>
@@ -353,11 +352,12 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
         <SettingsRow
           label="Environment"
           info="Where the agent's runs happen. Left on the default, it uses the instance's default environment, or the Paperclip server's own machine when none is set."
+          changed={form.changed("environmentId") && { from: environmentName(base().environmentId) }}
         >
           <EnvironmentMenu environments={environments.data} value={draft.environmentId} onChange={(id) => setDraft("environmentId", id)} />
         </SettingsRow>
         <Show when={fields().browser}>
-          <SwitchRow label="Browser access" info="Lets the agent open and read web pages in a real browser (Chrome)." checked={draft.chrome} onChange={(value) => setDraft("chrome", value)} />
+          <SwitchRow label="Browser access" info="Lets the agent open and read web pages in a real browser (Chrome)." checked={draft.chrome} changed={form.changed("chrome") && { from: onOff(base().chrome) }} onChange={(value) => setDraft("chrome", value)} />
         </Show>
       </SettingsCard>
 
@@ -367,6 +367,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
           info="Wakes it for anything but the heartbeat: a task assigned, a mention or message, a routine, or Run now. Off, all of these are skipped."
           help={draft.wakeOnDemand ? undefined : "Off: assignments, messages, routines and Run now don't wake it."}
           checked={draft.wakeOnDemand}
+          changed={form.changed("wakeOnDemand") && { from: onOff(base().wakeOnDemand) }}
           onChange={(value) => setDraft("wakeOnDemand", value)}
         />
         <SwitchRow
@@ -374,6 +375,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
           info="Also wakes it on a schedule, to check in even when nothing is new."
           help={draft.heartbeatEnabled ? heartbeatNote() : undefined}
           checked={draft.heartbeatEnabled}
+          changed={form.changed("heartbeatEnabled", "intervalSec") && heartbeatFrom(base(), draft)}
           onChange={(value) => setDraft("heartbeatEnabled", value)}
         >
           <Show when={draft.heartbeatEnabled}>
@@ -398,20 +400,22 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
           info="The shortest gap between two runs."
           help="Not used by the server yet."
           unit="seconds"
+          changed={form.changed("cooldownSec") && amountFrom(base().cooldownSec, () => "seconds")}
           value={draft.cooldownSec}
           onInput={(value) => setDraft("cooldownSec", value)}
         />
-        <NumberRow label="Runs at once" info="How many of its runs may happen at the same time (1 to 50)." unit={draft.maxConcurrentRuns === "1" ? "run" : "runs"} value={draft.maxConcurrentRuns} onInput={(value) => setDraft("maxConcurrentRuns", value)} />
+        <NumberRow label="Runs at once" info="How many of its runs may happen at the same time (1 to 50)." unit={runs(draft.maxConcurrentRuns)} changed={form.changed("maxConcurrentRuns") && amountFrom(base().maxConcurrentRuns, runs)} value={draft.maxConcurrentRuns} onInput={(value) => setDraft("maxConcurrentRuns", value)} />
       </SettingsCard>
 
       <Show when={fields().timeouts}>
         <SettingsCard title="Run limits">
-          <NumberRow label="Timeout" info="A run is stopped after this long. 0 means no limit." unit="minutes" value={draft.timeoutMin} onInput={(value) => setDraft("timeoutMin", value)} />
-          <NumberRow label="Grace period" info="Time a run gets to wrap up after it is stopped, before it's force-killed." unit="seconds" value={draft.graceSec} onInput={(value) => setDraft("graceSec", value)} />
+          <NumberRow label="Timeout" info="A run is stopped after this long. 0 means no limit." unit="minutes" changed={form.changed("timeoutMin") && amountFrom(base().timeoutMin, () => "minutes")} value={draft.timeoutMin} onInput={(value) => setDraft("timeoutMin", value)} />
+          <NumberRow label="Grace period" info="Time a run gets to wrap up after it is stopped, before it's force-killed." unit="seconds" changed={form.changed("graceSec") && amountFrom(base().graceSec, () => "seconds")} value={draft.graceSec} onInput={(value) => setDraft("graceSec", value)} />
           <SwitchRow
             label="Continue after a turn limit"
             info="When the harness stops at its turn limit, start a follow-up run that picks up where it left off."
             checked={draft.continueEnabled}
+            changed={form.changed("continueEnabled", "continueAttempts", "continueDelaySec") && continueFrom(base())}
             onChange={(value) => setDraft("continueEnabled", value)}
           >
             <Show when={draft.continueEnabled}>
@@ -433,6 +437,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
             label="Capture raw provider traces"
             info="Records the full model input and output of every run and keeps it for 24 hours. Only instance admins can read traces. Turn it on while you investigate a problem."
             checked={draft.providerTrace}
+            changed={form.changed("providerTrace") && { from: onOff(base().providerTrace) }}
             onChange={(value) => setDraft("providerTrace", value)}
           />
         </SettingsCard>
@@ -448,18 +453,23 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
             </span>
             <b>Advanced</b>
             <span>Command, arguments and prompt templates</span>
+            {/* Folded, its rows' dots are out of sight: the summary carries one too. */}
+            <Show when={form.changed("command", "extraArgs", "promptTemplate")}>
+              <span class="changed-dot-led ag-advanced-dot" aria-hidden="true" />
+              <span class="sr-only">Unsaved changes</span>
+            </Show>
           </summary>
           <div class="settings-rows">
             <Show when={fields().command}>
-              <SettingsRow label="Command" info="Leave empty to use the harness default." for="ag-command">
+              <SettingsRow label="Command" info="Leave empty to use the harness default." for="ag-command" changed={form.changed("command") && textFrom(base().command, "the harness default")}>
                 <TextInput id="ag-command" class="mono" spellcheck={false} autocomplete="off" placeholder={identity().harness.replace(/_local$/, "")} value={draft.command} onInput={(event) => setDraft("command", event.currentTarget.value)} />
               </SettingsRow>
-              <SettingsRow label={props.agent.adapterType === "process" ? "Arguments" : "Extra arguments"} info="Separated by commas." for="ag-args">
+              <SettingsRow label={props.agent.adapterType === "process" ? "Arguments" : "Extra arguments"} info="Separated by commas." for="ag-args" changed={form.changed("extraArgs") && textFrom(base().extraArgs, "none")}>
                 <TextInput id="ag-args" class="mono" spellcheck={false} autocomplete="off" placeholder="--verbose" value={draft.extraArgs} onInput={(event) => setDraft("extraArgs", event.currentTarget.value)} />
               </SettingsRow>
             </Show>
             <Show when={fields().promptTemplate}>
-              <SettingsRow label="Prompt template" info="Sent at the start of every run. Keep it small; long-lived guidance belongs in Instructions." for="ag-prompt">
+              <SettingsRow label="Prompt template" info="Sent at the start of every run. Keep it small; long-lived guidance belongs in Instructions." for="ag-prompt" changed={form.changed("promptTemplate") && textFrom(base().promptTemplate, "not set")}>
                 <TextArea id="ag-prompt" class="mono" rows={4} spellcheck={false} value={draft.promptTemplate} placeholder="Not set" onInput={(event) => setDraft("promptTemplate", event.currentTarget.value)} />
               </SettingsRow>
               <SettingsRow label="Bootstrap prompt" help="Legacy. Move it into Instructions.">
@@ -567,7 +577,8 @@ function SignInRow(props: { agent: AgentDetail; value: string; saved: string; on
   const company = useCompany();
   const harness = () => harnessType(props.agent.adapterType, props.agent.adapterConfig as Record<string, unknown>);
   const provider = () => providerForHarness(harness());
-  const binding = () => (props.value ? (JSON.parse(props.value) as Record<string, unknown>) : undefined);
+  const parse = (value: string) => (value ? (JSON.parse(value) as Record<string, unknown>) : undefined);
+  const binding = () => parse(props.value);
   const connections = createQuery(() => ({
     queryKey: [...queryKeys.aiConnections.list(company().id), "agent", props.agent.id],
     queryFn: () => aiConnectionsApi.list(company().id, props.agent.id),
@@ -575,23 +586,28 @@ function SignInRow(props: { agent: AgentDetail; value: string; saved: string; on
     retry: false,
   }));
   const choices = createMemo(() => (provider() ? connectionChoices(connections.data, provider()!) : []));
-  const connection = createMemo(() => {
-    const current = binding();
-    if (!current) return undefined;
-    return connections.data?.connections.find((entry) => entry.id === current.connectionId || entry.grantId === current.grantId);
-  });
+  const connectionOf = (current: Record<string, unknown> | undefined) =>
+    current ? connections.data?.connections.find((entry) => entry.id === current.connectionId || entry.grantId === current.grantId) : undefined;
+  const connection = createMemo(() => connectionOf(binding()));
   const mode = () => String(binding()?.mode ?? "");
   const router = () => mode() === "router";
-  const label = () =>
-    !binding()
+  /** A binding as the row names it; `inline` for the middle of a sentence ("Changed from its own sign-in"). */
+  const labelOf = (value: string, inline = false) => {
+    const current = parse(value);
+    const found = connectionOf(current);
+    if (found) return `${found.method === "subscription" ? "Subscription" : "API key"} · ${found.name}`;
+    const text = !current
       ? "Its own sign-in"
-      : connection()
-        ? `${connection()!.method === "subscription" ? "Subscription" : "API key"} · ${connection()!.name}`
-        : mode() === "responsible_user"
+      : current.mode === "router"
+        ? "A connection pool"
+        : current.mode === "responsible_user"
           ? "The responsible person's connection"
           : "An AI connection";
+    return inline ? text.charAt(0).toLowerCase() + text.slice(1) : text;
+  };
+  const label = () => labelOf(props.value);
   return (
-    <SettingsRow label="Sign-in" info="How the harness reaches the model.">
+    <SettingsRow label="Sign-in" info="How the harness reaches the model." changed={props.value !== props.saved && { from: labelOf(props.saved, true) }}>
       <div class="ps-stack">
         <div class="ps-inline ps-inline--spread">
           <Show when={!router()} fallback={<TonePill tone="violet" compact>Routed through a connection pool</TonePill>}>
@@ -634,9 +650,6 @@ function SignInRow(props: { agent: AgentDetail; value: string; saved: string; on
             Manage connections
           </A>
         </div>
-        <Show when={props.value !== props.saved}>
-          <span class="ag-changed">Changes when you save</span>
-        </Show>
       </div>
     </SettingsRow>
   );
@@ -675,16 +688,16 @@ function DetectedModel(props: { agent: AgentDetail; harness: string; value: stri
 }
 
 /** One harness setting: a switch, a menu, or text. A secret shows masked and is sent only when retyped. */
-function ExtraFieldRow(props: { field: HarnessField; value: ExtraValue | undefined; saved: unknown; onChange: (value: ExtraValue) => void }) {
+function ExtraFieldRow(props: { field: HarnessField; value: ExtraValue | undefined; saved: unknown; changed: Changed; onChange: (value: ExtraValue) => void }) {
   const id = `ag-extra-${props.field.key}`;
   const help = () => (props.field.hint ? props.field.hint : undefined);
   return (
     <Switch>
       <Match when={props.field.type === "toggle"}>
-        <SwitchRow label={props.field.label} info={help()} checked={props.value === true} onChange={props.onChange} />
+        <SwitchRow label={props.field.label} info={help()} changed={props.changed} checked={props.value === true} onChange={props.onChange} />
       </Match>
       <Match when={props.field.type === "select"}>
-        <SettingsRow label={props.field.label} info={help()}>
+        <SettingsRow label={props.field.label} info={help()} changed={props.changed}>
           <Menu>
             <Menu.Trigger as={FieldButton} class="ps-field-240" aria-label={`${props.field.label}: ${props.field.options?.find((option) => option.value === props.value)?.label ?? String(props.value ?? "")}`}>
               {props.field.options?.find((option) => option.value === props.value)?.label ?? (String(props.value ?? "") || "Not set")}
@@ -702,12 +715,12 @@ function ExtraFieldRow(props: { field: HarnessField; value: ExtraValue | undefin
         </SettingsRow>
       </Match>
       <Match when={props.field.type === "textarea"}>
-        <SettingsRow label={props.field.label} info={help()} for={id}>
+        <SettingsRow label={props.field.label} info={help()} for={id} changed={props.changed}>
           <TextArea id={id} class="mono" rows={4} spellcheck={false} value={String(props.value ?? "")} onInput={(event) => props.onChange(event.currentTarget.value)} />
         </SettingsRow>
       </Match>
       <Match when={true}>
-        <SettingsRow label={props.field.label} info={help()} for={id}>
+        <SettingsRow label={props.field.label} info={help()} for={id} changed={props.changed}>
           <TextInput
             id={id}
             class={props.field.type === "number" ? "ag-num" : "mono"}
@@ -801,10 +814,10 @@ function TestEnvironment(props: { agent: AgentDetail; environmentId: string | nu
   );
 }
 
-function NumberRow(props: { label: string; info: string; help?: string; unit: string; value: string; onInput: (value: string) => void }) {
+function NumberRow(props: { label: string; info: string; help?: string; unit: string; changed?: Changed; value: string; onInput: (value: string) => void }) {
   const id = `ag-num-${props.label.toLowerCase().replace(/\W+/g, "-")}`;
   return (
-    <SettingsRow label={props.label} info={props.info} help={props.help} for={id}>
+    <SettingsRow label={props.label} info={props.info} help={props.help} for={id} changed={props.changed}>
       <div class="ps-inline">
         <TextInput id={id} class="ag-num" inputmode="decimal" autocomplete="off" value={props.value} onInput={(event) => props.onInput(event.currentTarget.value)} />
         <span class="ps-muted-line">{props.unit}</span>

@@ -1,5 +1,6 @@
 import { children, Show, splitProps, type JSX, type ParentProps } from "solid-js";
 import { Dynamic } from "solid-js/web";
+import { ChangedDot, settingName, type Changed } from "./ChangedDot";
 import { aboutLabel, InfoTip } from "./InfoTip";
 import "./Field.css";
 
@@ -13,7 +14,8 @@ import "./Field.css";
  *   actions used across settings (boards 10, 11, 21–29). Rows stack when their card is narrow.
  *   Both take `info`: what the card or field is for, behind an "i" button beside the title or label
  *   (InfoTip.tsx has the rule). `description` and `help` stay for text that must be visible: state,
- *   why something is unavailable, save status, errors.
+ *   why something is unavailable, save status, errors. SettingsRow and Field take `changed` too: an
+ *   unsaved edit, shown as a lit dot after the label and its "i" (ChangedDot.tsx).
  * - <InfoHeading>: a heading of any level with that "i" after it, for headers that aren't a
  *   SettingsCard's (`.chead` intros, section heads, page titles).
  */
@@ -104,12 +106,20 @@ export function FieldButton(props: FieldButtonProps) {
  * field is for, behind an "i" beside the label and outside it, as SettingsRow has it.
  */
 export function Field(
-  props: ParentProps<{ label: JSX.Element; for?: string; info?: JSX.Element; help?: JSX.Element; error?: JSX.Element }>,
+  props: ParentProps<{
+    label: JSX.Element;
+    for?: string;
+    info?: JSX.Element;
+    help?: JSX.Element;
+    error?: JSX.Element;
+    /** An unsaved edit, as a lit dot after the label (ChangedDot.tsx). */
+    changed?: Changed;
+  }>,
 ) {
   return (
-    <div class="field-stack">
+    <div class="field-stack" data-changed={props.changed ? "" : undefined}>
       <Show
-        when={props.info}
+        when={props.info || props.changed}
         fallback={
           <label class="field-label" for={props.for}>
             {props.label}
@@ -120,7 +130,10 @@ export function Field(
           <label class="field-label" for={props.for}>
             {props.label}
           </label>
-          <InfoTip label={aboutLabel(props.label)}>{props.info}</InfoTip>
+          <Show when={props.info}>
+            <InfoTip label={aboutLabel(props.label)}>{props.info}</InfoTip>
+          </Show>
+          <ChangedDot label={settingName(props.label)} changed={props.changed} />
         </span>
       </Show>
       {props.children}
@@ -171,6 +184,8 @@ export function SettingsRow(
     /** Text that stays visible under the label: state, or why the control is unavailable. */
     help?: JSX.Element;
     for?: string;
+    /** An unsaved edit, as a lit dot after the label and its "i" (ChangedDot.tsx). */
+    changed?: Changed;
   }>,
 ) {
   const help = () => (
@@ -179,9 +194,9 @@ export function SettingsRow(
     </Show>
   );
   return (
-    <div class="frow">
+    <div class="frow" data-changed={props.changed ? "" : undefined}>
       <Show
-        when={props.info}
+        when={props.info || props.changed}
         fallback={
           <label class="flabel" for={props.for}>
             {props.label}
@@ -194,7 +209,10 @@ export function SettingsRow(
         <div class="flabel">
           <span class="info-line">
             <label for={props.for}>{props.label}</label>
-            <InfoTip label={aboutLabel(props.label)}>{props.info}</InfoTip>
+            <Show when={props.info}>
+              <InfoTip label={aboutLabel(props.label)}>{props.info}</InfoTip>
+            </Show>
+            <ChangedDot label={settingName(props.label)} changed={props.changed} />
           </span>
           {help()}
         </div>

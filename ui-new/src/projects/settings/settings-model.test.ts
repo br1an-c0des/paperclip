@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   addableMembers,
   archivePatch,
+  budgetChanges,
   budgetDirty,
   budgetDraft,
   budgetRequests,
@@ -452,6 +453,18 @@ describe("budget", () => {
     expect(budgetDirty(policy(), { ...budgetDraft(policy()), amount: "300" })).toBe(false);
     expect(budgetDirty(null, { ...budgetDraft(null), windowKind: "lifetime" })).toBe(false);
     expect(budgetDirty(policy(), { ...budgetDraft(policy()), warnPercent: 90 })).toBe(true);
+  });
+
+  it("names each changed field with what it was, for the rows' dots", () => {
+    const saved = budgetDraft(policy());
+    expect(budgetChanges(policy(), saved)).toEqual({});
+    expect(budgetChanges(policy(), { ...saved, amount: "500", hardStop: !saved.hardStop })).toEqual({
+      amount: `$${saved.amount}`,
+      hardStop: saved.hardStop ? "pausing at the limit" : "only warning",
+    });
+    expect(budgetChanges(null, { ...budgetDraft(null), amount: "20" })).toEqual({ amount: "no limit" });
+    // With no limit typed, the other fields don't count.
+    expect(budgetChanges(null, { ...budgetDraft(null), windowKind: "lifetime" })).toEqual({});
   });
 
   it("sets a limit, and turns the other window off when switching", () => {
