@@ -1,5 +1,5 @@
 {
-  "upstreamCommit": "68d5c9c1205f1f1629d76a1ec703bcb1c38fc48d",
+  "upstreamCommit": "49a2b7b245fec7b78cb4467cb547c06be6d30ea1",
   "routes": [
     {
       "path": "/oauth-handoff",
@@ -5470,6 +5470,7 @@
           "components/GitHubStarPrompt.tsx",
           "components/IssuesList.tsx",
           "components/LegacyIssuesList.tsx",
+          "components/RecentTaskGroup.tsx",
           "hooks/useIssueHierarchyContext.ts",
           "hooks/useIssueRowDetails.ts"
         ]
