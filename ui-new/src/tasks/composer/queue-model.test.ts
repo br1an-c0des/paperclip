@@ -104,6 +104,24 @@ describe("visibleEntries and moveEntry", () => {
     expect(firstTurnIds(null).size).toBe(0);
   });
 
+  it("counts your messages as sent while an Interrupt hands off to them (U171, #21661)", () => {
+    const handoff = queue({
+      state: "deferred",
+      targetRunId: null,
+      executionWait: { reason: "interrupt_handoff", message: "Sending your messages." },
+      entries: [
+        entry("mine", 0),
+        entry("receipt", 1, { source: { kind: "interaction" } } as Partial<IssueQueuedCommentEntry>),
+        entry("agent", 2, { comment: { id: "agent", body: "From an agent", authorAgentId: "a1" } } as Partial<IssueQueuedCommentEntry>),
+      ],
+    });
+    expect([...firstTurnIds(handoff)]).toEqual(["mine"]);
+    expect(visibleEntries(handoff, new Set()).map((item) => item.comment.id)).toEqual(["receipt", "agent"]);
+    // A real wait keeps the messages queued.
+    expect(firstTurnIds({ ...handoff, executionWait: { reason: "remote_cleanup", message: "Waiting for the previous environment to stop." } }).size).toBe(0);
+    expect(firstTurnIds({ ...handoff, state: "queued" }).size).toBe(0);
+  });
+
   it("keeps messages the strip hides in their place in the whole order", () => {
     const all = [entry("a", 0), entry("x", 1), entry("b", 2), entry("c", 3)];
     expect(fullOrder(all, ["c", "a", "b"])).toEqual(["c", "x", "a", "b"]);

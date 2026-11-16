@@ -18,6 +18,7 @@ import {
   entryLabel,
   firstTurnIds,
   isFixed,
+  isInterruptHandoff,
   targetGone,
   moveEntry,
   queueErrorMessage,
@@ -57,6 +58,10 @@ import "./QueuedMessages.css";
  * acknowledged its queue (U117, #20553); a failed edit says why under its editor, and keeps the text
  * when the message was already sent (U118, #20583); and messages a starting run's first turn takes
  * leave the strip for the thread, keeping their place when the rest is reordered (U127, #20822).
+ *
+ * Since the 2026-11-15 sync (U171, #21661): while an Interrupt hands off to the queue
+ * (`executionWait.reason: "interrupt_handoff"`), your messages count as sent and leave the strip for
+ * the thread, as in the old UI, rather than coming back as a wait.
  */
 
 export function useQueuedComments(taskId: () => string, active: () => boolean) {
@@ -173,8 +178,9 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
     if (delivered.length) setDelivering((now) => new Set([...now, ...delivered]));
     try {
       const next = await call();
-      // A Send the server keeps queued, behind a run that hasn't started, leaves the messages showing.
-      if (next && action === "interrupt" && next.state === "deferred" && next.entries.length > 0) {
+      // A Send the server keeps queued, behind a run that hasn't started, leaves the messages showing;
+      // an Interrupt handing off to them (U171, #21661) has sent them.
+      if (next && action === "interrupt" && next.state === "deferred" && next.entries.length > 0 && !isInterruptHandoff(next)) {
         setDelivering((now) => new Set([...now].filter((value) => !delivered.includes(value))));
         setDeferredQueue(next.queueId);
       }

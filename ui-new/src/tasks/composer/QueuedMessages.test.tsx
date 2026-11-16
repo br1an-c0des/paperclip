@@ -87,6 +87,22 @@ describe("QueuedMessages", () => {
     expect(screen.queryByText(/Sending in/)).toBeNull();
   });
 
+  it("shows an Interrupt as sent while the stopped run hands off, with no wait or error (U171, #21661)", async () => {
+    const handoff = queue({ targetRunId: null, state: "deferred", executionWait: { reason: "interrupt_handoff", message: "Sending your messages." } });
+    interrupt.mockResolvedValue(handoff);
+    const view = mount(queue({ steeringDisposition: "temporarily_unavailable" }));
+    fireEvent.click(screen.getByRole("button", { name: "Interrupt" }));
+    await waitFor(() => expect(interrupt).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText("Message c1")).toBeNull());
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText(/still queued/)).toBeNull();
+    view.unmount();
+    // A fresh page load during the hand-off: no strip, and the thread shows the message.
+    mount(handoff);
+    expect(screen.queryByRole("region", { name: "Queued messages" })).toBeNull();
+    expect(queuedIds(handoff).size).toBe(0);
+  });
+
   it("offers Send before the previous run starts, and says when the server keeps the messages queued (#19370)", async () => {
     const waiting = queue({ targetRunId: null, state: "deferred" });
     interrupt.mockResolvedValue(waiting);
