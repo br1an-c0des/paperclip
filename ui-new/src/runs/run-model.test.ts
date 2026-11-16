@@ -4,6 +4,7 @@ import {
   elapsedLabel,
   formatBytes,
   formatDuration,
+  retriedByLabel,
   runDurationMs,
   runErrorCodeLabel,
   runFailureCause,
@@ -115,6 +116,20 @@ describe("why a run started and where it sits", () => {
     expect(triggerLabel({ invocationSource: "automation", contextSnapshot: { wakeReason: "issue_blocker_stalled" } })).toBe(
       "Woken because a dependency needs the board",
     );
+  });
+
+  it("says who started a retry run (#21486)", () => {
+    expect(retriedByLabel({ kind: "person", personName: "Ada", summary: "Ada pressed Retry on the failed run." })).toEqual({
+      label: "Retried by Ada",
+      summary: "Ada pressed Retry on the failed run.",
+    });
+    expect(retriedByLabel({ kind: "person", personName: "  ", summary: "" })).toEqual({ label: "Retried by a board member", summary: null });
+    expect(retriedByLabel({ kind: "automatic", summary: "Paperclip retried the failed run automatically." })).toEqual({
+      label: "Retried automatically",
+      summary: "Paperclip retried the failed run automatically.",
+    });
+    expect(retriedByLabel(null)).toBeNull();
+    expect(retriedByLabel(undefined)).toBeNull();
   });
 
   it("numbers a run among its task's runs, oldest first", () => {

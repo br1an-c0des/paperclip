@@ -2,7 +2,7 @@ import { useNavigate } from "@solidjs/router";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { useCompany } from "@/lib/company";
 import { APP_LINK_ATTRIBUTE, followAppLink, renderMarkdown, useKnownPrefixes } from "@/ui/Markdown";
-import { decorateMentions, taskLinkPath } from "./composer/mentions";
+import { boardLinkPath, decorateMentions, taskLinkPath } from "./composer/mentions";
 import { decoratePreviewLink, PreviewMarks, previewTargetFor, type PreviewLink } from "./LinkPreview";
 import { parseGitHubLink, patchLines, type GitHubLink } from "./message-format";
 import "./MessageBody.css";
@@ -154,6 +154,7 @@ export function MessageBody(props: { source: string; class?: string }) {
   // `#document-plan` is kept, so the page (or the chat it redirects to) can open the document.
   // A `//PAP/issues/PAP-1` link (U86) already names its company's path and keeps it, and so does a
   // link to another company's task, `/BIR/issues/BIR-1` (U146, taskLinkPath).
+  // An agent's `/cases/PAP-C7` or `/status` link opens the same way, under its company (U173, boardLinkPath).
   createEffect(() => {
     html();
     if (!root) return;
@@ -165,6 +166,14 @@ export function MessageBody(props: { source: string; class?: string }) {
         if (!link.hasAttribute(APP_LINK_ATTRIBUTE)) link.setAttribute("href", path);
         link.removeAttribute("target");
         link.classList.add("task-link");
+        continue;
+      }
+      const board = boardLinkPath(href, company().issuePrefix, prefixes());
+      if (board) {
+        link.setAttribute("href", board);
+        link.setAttribute(APP_LINK_ATTRIBUTE, "");
+        link.removeAttribute("target");
+        link.removeAttribute("rel");
         continue;
       }
       const github = link.dataset.githubLink || link.querySelector("img") ? null : parseGitHubLink(href);

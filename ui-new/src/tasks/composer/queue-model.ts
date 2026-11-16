@@ -157,8 +157,27 @@ export function isFixed(entry: IssueQueuedCommentEntry) {
  * reorder keeps them, and anything else the strip hides, in their place.
  */
 
-/** The messages the target run's first turn takes, which show as sent. */
-export function firstTurnIds(queue: Pick<IssueQueuedCommentQueue, "targetRunId" | "firstTurnCommentIds"> | null | undefined): ReadonlySet<string> {
+/**
+ * An Interrupt delivering a deferred queue while the run it stopped settles (since the 2026-11-15
+ * sync, U171, upstream #21661): the queue reads `executionWait.reason: "interrupt_handoff"`
+ * ("Sending your messages."). As in the old UI (`isQueuedInterruptHandoff`), its messages count as
+ * sent, on every page load and not only in the tab that pressed Interrupt, rather than as a wait.
+ */
+export function isInterruptHandoff(queue: Pick<IssueQueuedCommentQueue, "state" | "executionWait"> | null | undefined) {
+  return queue?.state === "deferred" && queue.executionWait?.reason === "interrupt_handoff";
+}
+
+/**
+ * The messages that show as sent: those the target run's first turn takes, or during an Interrupt
+ * hand-off the person's own plain messages (receipts and agents' messages keep their rows, as in
+ * the old UI's `startingQueuedCommentIds`).
+ */
+export function firstTurnIds(
+  queue: Pick<IssueQueuedCommentQueue, "queueId" | "state" | "executionWait" | "entries" | "targetRunId" | "firstTurnCommentIds"> | null | undefined,
+): ReadonlySet<string> {
+  if (queue?.queueId && isInterruptHandoff(queue)) {
+    return new Set(queue.entries.flatMap((entry) => (!entry.source && !entry.comment.authorAgentId && !entry.comment.deletedAt ? [entry.comment.id] : [])));
+  }
   return new Set(queue?.targetRunId ? (queue.firstTurnCommentIds ?? []) : []);
 }
 

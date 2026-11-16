@@ -1,6 +1,6 @@
 import type { Approval, IssueThreadInteraction } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { answerRefusal, documentLabel, documentReviewTarget, expiryLabel, plainLine, refusalCode, SIGN_IN_NEEDED, planLabel, planReviewTarget, referenceImages, requestFromApproval, requestFromInteraction, requestFromReview, signoffOf, suggestedOwner, taskRequests, type RequestContext } from "./request-model";
+import { answerRefusal, declineNote, documentLabel, documentReviewTarget, expiryLabel, plainLine, refusalCode, SIGN_IN_NEEDED, planLabel, planReviewTarget, referenceImages, requestFromApproval, requestFromInteraction, requestFromReview, signoffOf, suggestedOwner, taskRequests, type RequestContext } from "./request-model";
 
 const ctx: RequestContext = {
   youId: "me",
@@ -221,6 +221,32 @@ describe("interactions as requests", () => {
     });
     expect(requestFromInteraction({ ...question, effectiveResolverPolicy: "not_creator", createdByAgentId: null, createdByUserId: "me" } as IssueThreadInteraction, ctx).respond.allowed).toBe(false);
     expect(requestFromInteraction({ ...question, addresseeUserId: "me" } as IssueThreadInteraction, ctx).audience.label).toBe("You");
+  });
+});
+
+describe("declineNote (U170, #21721)", () => {
+  it("always asks on a plan, optional unless required", () => {
+    expect(declineNote({ rejectRequiresReason: false }, true)).toEqual({
+      asks: true,
+      required: false,
+      placeholder: "What should change? (optional)",
+      label: "What should change?",
+    });
+    expect(declineNote({ rejectRequiresReason: true, rejectReasonLabel: "What's off?" }, true)).toMatchObject({
+      asks: true,
+      required: true,
+      placeholder: "What should change? (required)",
+      label: "What's off?",
+    });
+    expect(declineNote({ declineReasonPlaceholder: "Which step?" }, true).placeholder).toBe("Which step?");
+  });
+
+  it("asks elsewhere only when the request requires, allows or prompts for a note", () => {
+    expect(declineNote({}, false).asks).toBe(false);
+    expect(declineNote({ allowDeclineReason: true }, false)).toMatchObject({ asks: true, required: false });
+    expect(declineNote({ rejectRequiresReason: true }, false)).toMatchObject({ asks: true, required: true });
+    expect(declineNote({ declineReasonPlaceholder: "Why not?" }, false)).toEqual({ asks: true, required: false, placeholder: "Why not?", label: "Reason" });
+    expect(declineNote({ declineReasonPlaceholder: "  " }, false).asks).toBe(false);
   });
 });
 

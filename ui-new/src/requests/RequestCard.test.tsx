@@ -11,9 +11,16 @@ afterEach(cleanup);
 const respond = vi.fn(async () => ({}));
 const dismiss = vi.fn(async () => ({}));
 const update = vi.fn(async () => ({}));
+const reject = vi.fn(async (..._args: unknown[]) => ({}));
 
 vi.mock("@/lib/company", () => ({ useCompany: () => () => ({ id: "co1", issuePrefix: "TRA" }) }));
-vi.mock("@/api/interactions", () => ({ interactionsApi: { respond: (...args: unknown[]) => respond(...(args as [])), dismiss: (...args: unknown[]) => dismiss(...(args as [])) } }));
+vi.mock("@/api/interactions", () => ({
+  interactionsApi: {
+    respond: (...args: unknown[]) => respond(...(args as [])),
+    dismiss: (...args: unknown[]) => dismiss(...(args as [])),
+    reject: (...args: unknown[]) => reject(...args),
+  },
+}));
 vi.mock("@/api/issues", () => ({ issuesApi: { update: (...args: unknown[]) => update(...(args as [])) } }));
 
 const { RequestCard } = await import("./RequestCard");
@@ -139,6 +146,44 @@ describe("RequestCard", () => {
     mount({ ...review, status: "rejected", resolvedByUserId: "me", result: { version: 1, outcome: "rejected", reason: "Split step 3" } } as unknown as IssueThreadInteraction);
     expect(screen.getByText("You requested changes to Plan v2: Split step 3")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Plan v2" })).toBeTruthy();
+  });
+
+  it("asks for a revision note on a plan's Request changes even when the request doesn't (U170, #21721)", async () => {
+    const review = {
+      ...question,
+      kind: "request_confirmation",
+      payload: {
+        version: 1,
+        prompt: "Please review the plan.",
+        acceptLabel: "Confirm",
+        rejectLabel: "Request changes",
+        rejectRequiresReason: false,
+        target: { type: "issue_document", issueId: "t1", key: "plan", revisionId: "rev-1", revisionNumber: 1 },
+      },
+    } as unknown as IssueThreadInteraction;
+    mount(review);
+    fireEvent.click(screen.getByRole("button", { name: "Request changes" }));
+    expect(reject).not.toHaveBeenCalled();
+    const note = screen.getByRole("textbox", { name: "What should change?" }) as HTMLInputElement;
+    expect(note.placeholder).toBe("What should change? (optional)");
+    // Optional: an empty note can still be sent.
+    const send = screen.getByRole("button", { name: "Request changes" }) as HTMLButtonElement;
+    expect(send.disabled).toBe(false);
+    fireEvent.input(note, { target: { value: "Split step 2" } });
+    fireEvent.click(send);
+    await waitFor(() => expect(reject).toHaveBeenCalledWith("t1", "i1", "Split step 2"));
+  });
+
+  it("declines another confirmation at once unless it asks for a note", () => {
+    const confirm = { ...question, kind: "request_confirmation", payload: { version: 1, prompt: "Ship it?", rejectLabel: "No" } } as unknown as IssueThreadInteraction;
+    const first = mount(confirm);
+    fireEvent.click(screen.getByRole("button", { name: "No" }));
+    expect(screen.queryByRole("textbox")).toBeNull();
+    first.unmount();
+    // A placeholder alone opens the note, as the old UI's card reads it.
+    mount({ ...confirm, id: "i2", payload: { version: 1, prompt: "Ship it?", rejectLabel: "No", declineReasonPlaceholder: "What's missing?" } } as unknown as IssueThreadInteraction);
+    fireEvent.click(screen.getByRole("button", { name: "No" }));
+    expect((screen.getByRole("textbox", { name: "Reason" }) as HTMLInputElement).placeholder).toBe("What's missing?");
   });
 
   it("links a review request's own document, so the person can open what it asks them to review (U119, #20590)", () => {

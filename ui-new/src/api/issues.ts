@@ -368,6 +368,9 @@ export type TaskRetryReceipt = {
   presentation: TaskInterruptionPresentation | null;
 };
 
+/** Who started a retry run (`RunForIssue.retriedBy`; server `describeRunRetry`, #21486). */
+export type RunRetriedBy = { kind: "person"; personName: string; summary: string } | { kind: "automatic"; summary: string };
+
 /**
  * One of a task's runs (`GET /issues/:id/runs`). The full type lives in the old UI
  * (ui/src/api/activity.ts, `RunForIssue`); these are the fields ui-new reads.
@@ -388,6 +391,12 @@ export type RunForIssue = {
   usageJson: Record<string, unknown> | null;
   resultJson: Record<string, unknown> | null;
   retryOfRunId?: string | null;
+  /**
+   * Who started a retry run: a named person who pressed Retry, or automatic recovery, with the
+   * server's plain-words `summary`. Null for a run that isn't a retry, or a retry whose starter
+   * wasn't recorded (since the 2026-11-15 sync, #21486).
+   */
+  retriedBy?: RunRetriedBy | null;
   scheduledRetryAt?: string | null;
   livenessState?: string | null;
   livenessReason?: string | null;

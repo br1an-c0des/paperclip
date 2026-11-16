@@ -53,6 +53,7 @@ import {
   isActiveRun,
   plural,
   resumePayload,
+  retriedByLabel,
   retryOutcome,
   runDurationMs,
   runErrorCodeLabel,
@@ -229,6 +230,8 @@ function RunView(props: { runId: string }) {
   };
 
   const position = createMemo(() => runPosition(props.runId, taskRuns.data));
+  // Who started a retry run: only the task's runs carry it, not the run read.
+  const retried = createMemo(() => retriedByLabel(taskRuns.data?.find((candidate) => candidate.runId === props.runId)?.retriedBy));
   const usage = createMemo(() => (run.data ? runUsage(run.data) : null));
   const trace = () => traceMeta.data?.[0] ?? null;
 
@@ -558,8 +561,9 @@ function RunView(props: { runId: string }) {
                       )}
                     </Show>
                     <span aria-hidden="true">·</span>
-                    <span>
-                      {triggerLabel(current())}
+                    {/* A retry says who started it when the task's runs say (U169). */}
+                    <span title={retried()?.summary ?? undefined}>
+                      {retried()?.label ?? triggerLabel(current())}
                       <Show when={current().startedAt ?? current().createdAt}>{(at) => <> at {clockTime(at()).replace(/:\d\d (am|pm)$/, " $1")}</>}</Show>
                     </span>
                   </p>

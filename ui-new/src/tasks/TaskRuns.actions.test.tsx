@@ -19,6 +19,28 @@ const runs = [
   { ...base, runId: "r-failed", status: "failed", errorCode: "adapter_failed", error: "Exit 1", startedAt: "2026-10-28T10:00:00Z", createdAt: "2026-10-28T10:00:00Z" },
   { ...base, runId: "r-lost", status: "failed", errorCode: "process_lost", error: "Lost", startedAt: "2026-10-28T09:00:00Z", createdAt: "2026-10-28T09:00:00Z" },
   { ...base, runId: "r-live", status: "running", finishedAt: null, startedAt: "2026-10-28T11:00:00Z", createdAt: "2026-10-28T11:00:00Z" },
+  // Retry runs, with and without a recorded starter (U169, #21486).
+  {
+    ...base,
+    runId: "r-retried-person",
+    status: "succeeded",
+    invocationSource: "on_demand",
+    retryOfRunId: "r-failed",
+    retriedBy: { kind: "person", personName: "Ada", summary: "Ada pressed Retry on the failed run. Paperclip did not retry it automatically." },
+    startedAt: "2026-10-28T08:00:00Z",
+    createdAt: "2026-10-28T08:00:00Z",
+  },
+  {
+    ...base,
+    runId: "r-retried-auto",
+    status: "succeeded",
+    invocationSource: "automation",
+    retryOfRunId: "r-failed",
+    retriedBy: { kind: "automatic", summary: "Paperclip retried the failed run automatically; no person pressed Retry." },
+    startedAt: "2026-10-28T07:00:00Z",
+    createdAt: "2026-10-28T07:00:00Z",
+  },
+  { ...base, runId: "r-retried-unknown", status: "succeeded", retryOfRunId: "r-failed", retriedBy: null, startedAt: "2026-10-28T06:00:00Z", createdAt: "2026-10-28T06:00:00Z" },
 ];
 
 vi.mock("@/lib/company", () => ({ useCompany: () => () => ({ id: "co1", issuePrefix: "TES", name: "Test" }) }));
@@ -78,6 +100,15 @@ describe("TaskRuns actions", () => {
     await waitFor(() =>
       expect(resume).toHaveBeenCalledWith({ id: "r-lost", agentId: "a1", companyId: "co1" }, { resumeFromRunId: "r-lost", issueId: "t1" }),
     );
+  });
+
+  it("says who started a retry run, with the server's sentence as its tooltip", async () => {
+    mount();
+    const person = await screen.findByText("Retried by Ada");
+    expect(person.getAttribute("title")).toBe("Ada pressed Retry on the failed run. Paperclip did not retry it automatically.");
+    expect(screen.getByText("Retried automatically").getAttribute("title")).toContain("automatically");
+    // A retry whose starter isn't recorded keeps the plain "retry" tag, and only that one does.
+    expect(screen.getAllByText("retry")).toHaveLength(1);
   });
 
   it("answers the watchdog on a running run that has gone quiet", async () => {
