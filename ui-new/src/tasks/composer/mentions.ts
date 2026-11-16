@@ -102,6 +102,28 @@ export function taskLinkPath(href: string | null | undefined, currentPrefix: str
 }
 
 /**
+ * Where an agent's link to a case or the status cards opens in this board (U173, upstream #21794,
+ * which made the old UI count `cases` and `status` as board routes): `/cases/PAP-C7` goes to the
+ * company whose prefix the case identifier carries when it's one this person can open, else the
+ * current one; `/cases` and `/status[/<card>]` go to the current company, keeping any query and
+ * fragment. A link that already names a known company keeps it. Null for any other href, which
+ * then stays as written.
+ */
+export function boardLinkPath(href: string | null | undefined, currentPrefix: string, knownPrefixes: readonly string[] = []): string | null {
+  if (!href) return null;
+  const match = /^\/(?:([A-Za-z][A-Za-z0-9]*)\/)?(cases|status)(\/[^?#]*)?([?#].*)?$/.exec(href.trim());
+  if (!match) return null;
+  const [, named, root, rest = "", tail = ""] = match;
+  const known = (prefix: string | undefined) => (prefix ? knownPrefixes.find((each) => each.toLowerCase() === prefix.toLowerCase()) : undefined);
+  if (named) {
+    const company = known(named);
+    return company ? `/${company}/${root}${rest}${tail}` : null;
+  }
+  const caseCompany = root === "cases" ? known(/^\/([A-Za-z][A-Za-z0-9]*)-C\d+(?:\/|$)/i.exec(rest)?.[1]) : undefined;
+  return `/${caseCompany ?? currentPrefix}/${root}${rest}${tail}`;
+}
+
+/**
  * The message, ready for the Markdown renderer: mention links become `<span class="mention">`
  * chips, and bare identifiers with the company's prefix become task links. Code spans and fenced
  * blocks pass through untouched.

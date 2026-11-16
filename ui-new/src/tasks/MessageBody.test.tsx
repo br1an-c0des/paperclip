@@ -176,3 +176,17 @@ describe("//PREFIX/... links (U86, #19986)", () => {
     expect(navigate).toHaveBeenCalledWith("/TES/agents/a1/runs/r1");
   });
 });
+
+describe("case and status links (U173, #21794)", () => {
+  it("opens an agent's /cases and /status links under the company, in the board", () => {
+    const { container } = render(() => <MessageBody source={"See [the case](/cases/TES-C3) and [the card](/status/card-1?tab=history), not [this](/statuses)."} />);
+    const [kase, card, other] = Array.from(container.querySelectorAll("a"));
+    expect(kase!.getAttribute("href")).toBe("/TES/cases/TES-C3");
+    expect(kase!.hasAttribute("target")).toBe(false);
+    expect(card!.getAttribute("href")).toBe("/TES/status/card-1?tab=history");
+    expect(other!.getAttribute("href")).toBe("/statuses");
+    expect(other!.getAttribute("target")).toBe("_blank");
+    fireEvent.click(card!);
+    expect(navigate).toHaveBeenCalledWith("/TES/status/card-1?tab=history");
+  });
+});

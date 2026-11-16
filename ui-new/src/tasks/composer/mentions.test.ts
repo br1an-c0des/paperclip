@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeMention, decorateMentions, insertMention, matchesQuery, parseMentions, splitCode, taskLinkPath, taskRefFromHref } from "./mentions";
+import { activeMention, boardLinkPath, decorateMentions, insertMention, matchesQuery, parseMentions, splitCode, taskLinkPath, taskRefFromHref } from "./mentions";
 
 describe("activeMention", () => {
   it("finds the @query just before the caret", () => {
@@ -83,6 +83,23 @@ describe("helpers", () => {
     // A company you can't open keeps its prefix rather than turning into one of yours.
     expect(taskLinkPath("/ZED/issues/ZED-9", "TES", known)).toBe("/ZED/issues/ZED-9");
     expect(taskLinkPath("https://example.com", "TES", known)).toBeNull();
+  });
+
+  it("keeps the company on an agent's case and status links (U173, #21794)", () => {
+    const known = ["TES", "BIR"];
+    expect(boardLinkPath("/cases/TES-C3", "TES", known)).toBe("/TES/cases/TES-C3");
+    expect(boardLinkPath("/cases/bir-c2#documents", "TES", known)).toBe("/BIR/cases/bir-c2#documents");
+    expect(boardLinkPath("/cases/ZED-C1", "TES", known)).toBe("/TES/cases/ZED-C1");
+    expect(boardLinkPath("/cases", "TES", known)).toBe("/TES/cases");
+    expect(boardLinkPath("/status", "TES", known)).toBe("/TES/status");
+    expect(boardLinkPath("/status/7f3a-card?tab=history", "TES", known)).toBe("/TES/status/7f3a-card?tab=history");
+    expect(boardLinkPath("/BIR/status/card", "TES", known)).toBe("/BIR/status/card");
+    // Anything else stays as written.
+    expect(boardLinkPath("/ZED/status", "TES", known)).toBeNull();
+    expect(boardLinkPath("/statuses", "TES", known)).toBeNull();
+    expect(boardLinkPath("https://example.com/status", "TES", known)).toBeNull();
+    expect(boardLinkPath("/issues/TES-1", "TES", known)).toBeNull();
+    expect(boardLinkPath(null, "TES", known)).toBeNull();
   });
 
   it("matches any word of a name", () => {
