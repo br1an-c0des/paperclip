@@ -18,6 +18,7 @@ import { Switch } from "@/ui/Switch";
 import { companySummary, toggleCompanies, type SheetView, type TasksScope } from "./dock-model";
 import { TasksIcon } from "./dock-icons";
 import { GlobalToolbarPlugins } from "@/plugins/ShellPlugins";
+import { BuildVersion } from "@/shell/BuildVersion";
 
 /*
  * The Tasks switcher (design/mobile.md, N1), opened by tapping Tasks while in Tasks. It rises from
@@ -28,7 +29,7 @@ import { GlobalToolbarPlugins } from "@/plugins/ShellPlugins";
  * - companies: the company name at the top is the company dropdown; it swaps the projects for every
  *   company you can enter. Adding a company happens on desktop;
  * - you: your avatar in the top-right corner: profile, theme (light, dark, system), push settings,
- *   a pointer to settings, and Sign out.
+ *   a pointer to settings, Sign out, and the build line (shell/BuildVersion.tsx).
  *
  * It isn't modal (the dock stays usable, and Tasks closes it), but it takes focus when it opens,
  * Escape and the scrim close it, and the page under it doesn't scroll.
@@ -278,6 +279,7 @@ export function TasksSheet(props: {
                 <span class="tsheet-row-main">Sign out</span>
               </button>
             </Show>
+            <BuildVersion class="tsheet-build" />
           </Match>
         </SwitchFlow>
       </section>

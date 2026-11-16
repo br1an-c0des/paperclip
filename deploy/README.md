@@ -50,6 +50,12 @@ don't inherit the server's environment; set it in their adapter's `env`.
 that has a published image. The server in the image then matches the API your UI was
 type-checked against. Run `deploy/deploy.sh --dry-run` to see which image it would use.
 
+It also sets `UI_COMMIT` to the checkout's `git rev-parse HEAD`, which Compose passes as the
+`PAPERCLIP_UI_COMMIT` build arg. The `ui` stage bakes it into `ui-new`, whose nav shows
+`ui <commit> · server <commit>` under your name (the server's commit comes from `/api/health`). The
+arg is needed because the build context has no `.git`; a build without it works and shows
+`ui unknown`.
+
 ## Server requirements
 
 - Linux with Docker Engine and the Compose plugin.
