@@ -3,7 +3,7 @@ import { A, Navigate, useLocation, useNavigate, useParams, useSearchParams } fro
 import { CalendarDays, Globe, Lock, Pencil } from "lucide-solid";
 import { createEffect, createMemo, Match, Show, Switch } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
-import { findProject, projectsApi } from "@/api/projects";
+import { projectsApi } from "@/api/projects";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { useLiveRunsQuery, useProjectsQuery } from "@/lib/company-data";
@@ -30,6 +30,7 @@ import { projectLegacyTab, withSearchAndHash } from "./legacy-model";
 import { classifyError, describeError } from "@/lib/offline/errors";
 import { loadingText } from "@/lib/offline/read-state";
 import { startedRuns } from "@/runs/queue-wait";
+import { addressWithSegment, followKey, rememberedId, type KeyMemory } from "@/lib/renamed-address";
 
 /*
  * A project's pages under its header card (boards 1 and 8). The project's address is its dashboard
@@ -85,6 +86,10 @@ function viewFor(tab: string): View {
   return "later";
 }
 
+/** Which project each address key found this session, so a renamed project keeps its pages. */
+const projectKeys: KeyMemory = new Map();
+const projectMatches = (project: Project, key: string) => project.urlKey === key || project.id === key;
+
 function targetLabel(value: string) {
   const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value);
   if (Number.isNaN(date.getTime())) return value;
@@ -96,14 +101,23 @@ export function ProjectPage() {
   const company = useCompany();
   const projects = useProjectsQuery();
   const liveRuns = useLiveRunsQuery();
-  const listed = createMemo(() => findProject(projects.data, params.projectKey));
+  // A project's URL key follows its name, so a rename (here in settings, in another tab, or from a
+  // live update) changes it. The key keeps finding the project it found before (lib/renamed-address),
+  // so the page stays put and the effect below moves the address to the new key.
+  const listed = createMemo(() => followKey(projects.data, params.projectKey, projectMatches, projectKeys, company().id));
   const single = createQuery(() => ({
     queryKey: [...queryKeys.projectSettings.detail(params.projectKey), company().id],
-    queryFn: ({ signal }) => projectsApi.get(params.projectKey, company().id, signal),
+    queryFn: ({ signal }) => projectsApi.get(rememberedId(projectKeys, params.projectKey, company().id) ?? params.projectKey, company().id, signal),
     enabled: projects.isSuccess && !listed(),
     retry: false,
+    // An archived project renamed: the new key's read starts from the project already shown.
+    placeholderData: (previous) => previous,
   }));
-  const project = createMemo(() => listed() ?? (single.data?.companyId === company().id ? single.data : undefined));
+  const fetched = createMemo(() => {
+    const found = single.data;
+    return found?.companyId === company().id ? followKey([found], params.projectKey, projectMatches, projectKeys, company().id) : undefined;
+  });
+  const project = createMemo(() => listed() ?? fetched());
   // A read that failed says why; only a project the server doesn't have (or hides) is "not found".
   const missingNote = () => {
     const failed = (!projects.data && projects.error) || (single.error && classifyError(single.error) !== "not_found" ? single.error : null);
@@ -111,28 +125,18 @@ export function ProjectPage() {
     if (projects.isPending || single.isFetching) return loadingText("Loading the project…");
     return "There's no project with this address, or you can't open it.";
   };
-  // A project's URL key follows its name, so a rename (here in settings, or elsewhere) moves the
-  // page to the new address instead of losing the project.
+  // A renamed project: the address moves to its new key, keeping the tab, query and fragment.
   const navigate = useNavigate();
-  let shown: { id: string; key: string } | undefined;
+  const location = useLocation();
   createEffect(() => {
-    const current = project();
-    if (current) {
-      shown = { id: current.id, key: params.projectKey };
-      return;
-    }
-    // Only when this address showed the project a moment ago; not after following a link elsewhere.
-    if (!shown || shown.key !== params.projectKey) return;
-    const moved = projects.data?.find((candidate) => candidate.id === shown!.id);
-    if (moved && moved.urlKey !== params.projectKey) {
-      navigate(`/${company().issuePrefix}/projects/${moved.urlKey}${params.tab ? `/${params.tab}` : ""}`, { replace: true });
-    }
+    const found = project();
+    if (!found || projectMatches(found, params.projectKey)) return;
+    navigate(addressWithSegment(location, 2, found.urlKey), { replace: true });
   });
   const tasks = useTaskList(() => (project() ? { projectId: project()!.id } : null));
   const base = () => `/${company().issuePrefix}/projects/${params.projectKey}`;
   const view = () => viewFor((params.tab ?? "").replace(/\/$/, ""));
   const [search] = useSearchParams<{ tab?: string }>();
-  const location = useLocation();
   const plugins = usePluginSlots(() => ({ slotTypes: ["detailTab"], entityType: "project" }));
   const pluginContext = (found: Project) => ({
     companyId: company().id,

@@ -1,7 +1,8 @@
 import { A, useLocation, useNavigate, useParams, useSearchParams, type RouteSectionProps } from "@solidjs/router";
 import { useQueryClient } from "@tanstack/solid-query";
 import { ChevronLeft, Monitor } from "lucide-solid";
-import { createEffect, createSignal, Match, Show, Switch, type ParentProps } from "solid-js";
+import type { Company } from "@paperclipai/shared";
+import { createEffect, createMemo, createSignal, Match, Show, Switch, type ParentProps } from "solid-js";
 import { inboxApi } from "@/api/inbox";
 import { queryKeys } from "@/api/queryKeys";
 import { isCompact } from "@/layout/breakpoints";
@@ -13,7 +14,8 @@ import { settingsArea } from "@/layout/settings-nav-model";
 import { PhoneDock } from "@/layout/PhoneDock";
 import { Shell } from "@/layout/Shell";
 import { CommandsProvider, useCommands } from "@/lib/commands";
-import { CompanyProvider, findCompanyByPrefix, rememberCompany, useCompaniesQuery, useCompany } from "@/lib/company";
+import { CompanyProvider, rememberCompany, useCompaniesQuery, useCompany } from "@/lib/company";
+import { addressWithPrefix, followKey, type KeyMemory } from "@/lib/renamed-address";
 import { LiveEventsProvider } from "@/lib/live-events";
 import { useLiveToasts } from "@/lib/live-toasts";
 import { useBrowserTimeZoneSync } from "@/lib/time-zone";
@@ -230,14 +232,26 @@ function CompanyShell(props: ParentProps) {
   );
 }
 
+/** Which company each prefix found this session (lower case), so a re-derived prefix keeps the page. */
+const companyPrefixes: KeyMemory = new Map();
+const prefixMatches = (company: Company, prefix: string) => company.issuePrefix.toLowerCase() === prefix;
+
 export function CompanyLayout(props: RouteSectionProps) {
   const params = useParams<{ companyPrefix: string }>();
   const companies = useCompaniesQuery();
-  const company = () => findCompanyByPrefix(companies.data, params.companyPrefix);
-
+  // Renaming the company can change its issue prefix (a managed instance re-derives it, and re-keys
+  // every task and case identifier). The old prefix keeps finding the company it found before, so
+  // the page stays and the address moves to the new prefix and identifiers (lib/renamed-address).
+  const company = createMemo(() => followKey(companies.data, (params.companyPrefix ?? "").toLowerCase(), prefixMatches, companyPrefixes));
+  const navigate = useNavigate();
+  const location = useLocation();
   createEffect(() => {
     const current = company();
-    if (current) rememberCompany(current.issuePrefix);
+    if (!current) return;
+    rememberCompany(current.issuePrefix);
+    if (!prefixMatches(current, (params.companyPrefix ?? "").toLowerCase())) {
+      navigate(addressWithPrefix(location, params.companyPrefix, current.issuePrefix), { replace: true });
+    }
   });
 
   return (
