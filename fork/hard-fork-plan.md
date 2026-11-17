@@ -313,7 +313,7 @@ Replace the five sources with one builder the fork owns:
 
 This also delivers COMPANY.md
 ([3.14](../ui-new/docs/build-plan.md#314-company-instructions-companymd)), project context in every
-run (2b-15) and project docs in the prompt
+run ([F6](../ui-new/docs/build-plan.md#317-smaller-feature-ideas)) and project docs in the prompt
 ([3.4](../ui-new/docs/build-plan.md#34-project-knowledge-base)).
 
 ### 6. First-class chat
@@ -343,8 +343,8 @@ in whatever order matters most (next section).
 | --- | --- |
 | Becomes a real core feature, not a workaround | Custom statuses ([3.1](../ui-new/docs/build-plan.md#31-custom-statuses-and-status-rules): real statuses instead of display names mapped onto the seven), custom fields with server filtering ([3.2](../ui-new/docs/build-plan.md#32-custom-fields)), project documents ([3.4](../ui-new/docs/build-plan.md#34-project-knowledge-base), 2b-8), ticket prefix per project (2b-9), relation types (2b-13) |
 | Unblocked | Lists and sprints ([3.3](../ui-new/docs/build-plan.md#33-lists-and-sprints-on-hold): on hold only for want of its own table), runner visibility ([3.11](../ui-new/docs/build-plan.md#311-runner-visibility-beyond-the-api)), chat outside tasks ([3.12](../ui-new/docs/build-plan.md#312-chat-outside-tasks-dropped-kept-as-a-long-term-idea), step 6) |
-| Becomes a prompt-builder setting | COMPANY.md ([3.14](../ui-new/docs/build-plan.md#314-company-instructions-companymd)), project context in runs (2b-15), the fork skill ([3.10](../ui-new/docs/build-plan.md#310-core-skill-add-on): edit the `paperclip` skill itself) |
-| Much simpler, Claude only | Memory ([3.5](../ui-new/docs/build-plan.md#35-memory-service): one Claude memory model instead of three that don't coordinate), fast mode for Claude (2b-11) |
+| Becomes a prompt-builder setting | COMPANY.md ([3.14](../ui-new/docs/build-plan.md#314-company-instructions-companymd)), project context in runs ([F6](../ui-new/docs/build-plan.md#317-smaller-feature-ideas)), the fork skill ([3.10](../ui-new/docs/build-plan.md#310-core-skill-add-on): edit the `paperclip` skill itself) |
+| Much simpler, Claude only | Memory ([3.5](../ui-new/docs/build-plan.md#35-memory-service): one Claude memory model instead of three that don't coordinate), fast mode for Claude ([F3](../ui-new/docs/build-plan.md#317-smaller-feature-ideas)) |
 | Becomes straightforward | Assigned comments that drive review stages ([3.8](../ui-new/docs/build-plan.md#38-assigned-comments-and-review-assignments)), routines triggered by events ([3.13](../ui-new/docs/build-plan.md#313-briefings-and-reports) step 3), permission roles (the hard-coded CEO checks can change) |
 | Unchanged | Briefings ([3.13](../ui-new/docs/build-plan.md#313-briefings-and-reports)), meetings ([3.9](../ui-new/docs/build-plan.md#39-meetings)), announcements ([3.7](../ui-new/docs/build-plan.md#37-announcement-channels)), the in-app guide ([3.15](../ui-new/docs/build-plan.md#315-an-in-app-guide-to-paperclip)) |
 

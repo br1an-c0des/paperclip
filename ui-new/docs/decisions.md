@@ -125,10 +125,12 @@ Options 1 and 3 can be combined: start with a project docs task and move its con
 adds project documents.
 
 **Decision.** Option 3, without the option 1 stopgap (Oct 24, 2026). `ui-new` builds the
-"From tasks" part, and project documents are proposed upstream
-([build plan 2b-8](build-plan.md#2b-small-features-ask-upstream-first)). The project section waits
-for them. If upstream declines, the fork plugin provides them instead
-([build plan 3.4](build-plan.md#34-project-knowledge-base)).
+"From tasks" part, and project documents were proposed upstream (build plan 2b-8), with the fork plugin
+([build plan 3.4](build-plan.md#34-project-knowledge-base)) if upstream declined.
+
+**Changed Nov 16, 2026.** Project documents no longer wait on upstream: they're a new feature
+([build plan 3.4](build-plan.md#34-project-knowledge-base)), and the Docs tab's project section comes
+with it. Stage 1's Artifact library is done with "From tasks".
 
 ### 2. Agent chat is off unless the instance turns it on
 
@@ -233,7 +235,7 @@ aren't instance admins never see the full input, and admins only see it within a
 Options 1 and 3 can be combined.
 
 **Decision.** Option 1, decided Oct 26, 2026, as screens 16 to 18 draw it. The request summary of
-option 3 stays proposed upstream as [2b-10](build-plan.md#2b-small-features-ask-upstream-first).
+option 3 is a feature idea, [F2](build-plan.md#317-smaller-feature-ideas).
 
 ### 5. Agents can have three memory systems that don't know about each other
 
@@ -634,7 +636,7 @@ comes from the server, and the efforts belong with it.
 
 **Decision.** Option 3 with option 2 as the fallback, decided Oct 26, 2026. The endpoint is a small
 feature, so it starts as a message in upstream's `#dev` channel
-([2b-16](build-plan.md#2b-small-features-ask-upstream-first)). Until it lands, `new-task.ts` holds one
+([F7](build-plan.md#317-smaller-feature-ideas), was 2b-16). Until it lands, `new-task.ts` holds one
 mirrored table that New task and the composer share, and the upstream sync checks the adapter
 packages for changes to it.
 
@@ -697,7 +699,7 @@ table, so they wait; boards L1 to L4 stay in the board set, marked on hold, as t
 ([3.3](build-plan.md#33-lists-and-sprints-on-hold)). Goals keep their old role in the meantime: a task
 property, and the project's goals in project settings, with no Goals page. Separately, returning the
 goal and project descriptions in `heartbeat-context` is a small upstream change
-([2b-15](build-plan.md#2b-small-features-ask-upstream-first)).
+(feature idea [F6](build-plan.md#317-smaller-feature-ideas), was 2b-15).
 
 ### 15. Run transcripts use the adapter packages' parsers at runtime
 
@@ -723,7 +725,7 @@ Two smaller gaps came up alongside:
   `adapter.invoke` event, or else the agent, which is wrong if the agent has changed adapters since.
 - The `adapter.invoke` payload doesn't record the instructions revision or the skills a run loaded,
   which board 17's "Loaded with it" shows. This could feed the request summary in
-  [2b-10](build-plan.md#2b-small-features-ask-upstream-first).
+  feature idea [F2](build-plan.md#317-smaller-feature-ideas).
 
 **Why it matters.** `ui-new` imports from `@paperclipai/shared` with `import type` only
 ([decision 9](#9-agent-avatars-need-a-runtime-import-from-the-shared-package) is the one exception so

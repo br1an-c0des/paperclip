@@ -65,13 +65,13 @@ the existing API, and new features are built as fork plugins.
 | [FORK.md](FORK.md) | Remotes, branches, the no-upstream-code policy (plugins first, source changes in a later stage, and what that would change for deploys and syncs), sending fixes upstream, the upstream sync routine, why `ui-new` is a standalone app rather than a plugin, deployment summary, open items. |
 | [FORK-PATCHES.md](FORK-PATCHES.md) | Every change the fork makes to upstream files: what, why, what it depends on, how to resolve conflicts. |
 | [fork/hard-fork-plan.md](fork/hard-fork-plan.md) | **Proposed, not adopted.** Stop syncing upstream, cut to Claude only, make runs Claude-native, one prompt builder, first-class chat, and the build plan in core. Until adopted, the rules above still apply. |
-| [fork/upstream-fixes.md](fork/upstream-fixes.md) | Small fixes for upstream: candidates to build, and each one's branch, pull request and status until it's merged. |
+| [fork/upstream-fixes.md](fork/upstream-fixes.md) | Bug fixes for upstream (feature asks go in the build plan): candidates to build, and each one's branch, pull request and status until it's merged. |
 | [.claude/skills/upstream-sync/SKILL.md](.claude/skills/upstream-sync/SKILL.md) | The upstream sync procedure and conflict-resolution policy. Reports go to `fork/sync-reports/`. |
 | [.claude/skills/upstream-fix/SKILL.md](.claude/skills/upstream-fix/SKILL.md) | Building one signed-off fix for upstream: duplicate search, upstream's rules, the testing budget, the PR description, and stopping before anything is pushed. |
 | [.claude/skills/pm/SKILL.md](.claude/skills/pm/SKILL.md) | Project-manager mode (`/pm`): plan and review, delegate building to 3–5 agents, propose each one first. |
 | [ui-new/README.md](ui-new/README.md) | Running and building the SolidJS app; layout; lockfile-conflict fix. |
 | [deploy/README.md](deploy/README.md) | Production deployment: Docker image on top of upstream's, Compose with bind mounts, Tailscale or Caddy. |
-| [ui-new/docs/build-plan.md](ui-new/docs/build-plan.md) | The build plan: every redesign idea sorted into UI-only, small upstream PRs, plugin features and later source-change features, stage 1 milestones, the upstream changes still to integrate, decisions to make, and open questions. |
+| [ui-new/docs/build-plan.md](ui-new/docs/build-plan.md) | The build plan: every redesign idea sorted into UI-only, upstream bug fixes, feature ideas (plugin first) and later source-change features, stage 1 milestones, the upstream changes still to integrate, decisions to make, and open questions. |
 | [ui-new/docs/inventory/README.md](ui-new/docs/inventory/README.md) | How the existing UI is documented, and the redesign tiers. |
 | [ui-new/docs/inventory/capabilities.md](ui-new/docs/inventory/capabilities.md) | The redesign checklist: every capability, its new home, and its status. |
 | [ui-new/docs/inventory/areas/](ui-new/docs/inventory/areas/) | What each existing page does, its key actions and the API requests behind them. |

@@ -1,9 +1,16 @@
 # Upstream fixes
 
-Small, self-contained fixes the fork sends to `paperclipai/paperclip` as pull requests instead of
-carrying them as fork patches: candidates found while building `ui-new`, and what has been built,
+Bug fixes and docs corrections the fork can send to `paperclipai/paperclip` as pull requests instead
+of carrying them as fork patches: candidates found while building `ui-new`, and what has been built,
 submitted and merged. How to build and send one is in
 [FORK.md](../FORK.md#contributing-fixes-upstream).
+
+**Only fixes belong here:** something upstream's code or docs get wrong, which a focused pull request
+can correct without asking upstream first. New behaviour, new API fields or filters, and other
+feature asks are feature ideas, kept in the build plan
+([3.17](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) and the other stage 3 entries)
+whether or not they might go upstream. Entries 8 and 10–13 were moved there on Nov 16, 2026; their
+numbers are kept so older links still resolve.
 
 ## How to use this list
 
@@ -20,18 +27,16 @@ submitted and merged. How to build and send one is in
   | `submitted` | Pull request open upstream |
   | `merged` | Merged upstream; it reaches the fork through the next sync |
   | `closed` | Closed without merging, or dropped; say why |
+  | `moved` | A feature ask, not a bug: moved to the build plan's feature ideas |
 
 - **Fill in the branch, the pull request and the date** of each step, and note in its section any
   fork workaround to remove once it's merged.
 - Before building one, search upstream for a duplicate pull request, as upstream's PR template asks.
 - Build a fix only once the user has signed off on it, with the `upstream-fix` skill
   ([.claude/skills/upstream-fix/SKILL.md](../.claude/skills/upstream-fix/SKILL.md)).
-
-Larger ideas and features that need agreement in upstream's `#dev` channel stay in the
-[build plan](../ui-new/docs/build-plan.md#stage-2-small-upstream-contributions) and the proposals
-that found them, such as
-[unifying requests](../ui-new/docs/proposals/unifying-requests.md#small-upstream-contributions),
-until one becomes a concrete fix.
+- **A feature ask isn't a fix.** If the change adds something rather than correcting it, record it
+  as a feature idea in the [build plan](../ui-new/docs/build-plan.md#317-smaller-feature-ideas)
+  instead.
 
 ## The list
 
@@ -44,12 +49,12 @@ until one becomes a concrete fix.
 | 5 | [Start `pnpm dev` on Windows when the native runner is enabled](#5-start-pnpm-dev-on-windows-when-the-native-runner-is-enabled) | closed | | | 2026-10-26 | | |
 | 6 | [Detect glibc reliably at server startup so Paperclip Runner is offered on Linux](#6-detect-glibc-reliably-at-server-startup-so-paperclip-runner-is-offered-on-linux) | submitted | `fix/runner-libc-probe-startup` | [#17905](https://github.com/paperclipai/paperclip/pull/17905) | 2026-10-26 | 2026-10-27 | |
 | 7 | [Accept `env: null` when updating a project](#7-accept-env-null-when-updating-a-project) | candidate | | | 2026-10-27 | | |
-| 8 | [Let company search take several assignees, projects or labels](#8-let-company-search-take-several-assignees-projects-or-labels) | candidate | | | 2026-10-28 | | |
+| 8 | [Let company search take several assignees, projects or labels](#8-let-company-search-take-several-assignees-projects-or-labels) | moved to [F8](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) | | | 2026-10-28 | | |
 | 9 | [Mark agent chats in company search results](#9-mark-agent-chats-in-company-search-results) | candidate | | | 2026-10-28 | | |
-| 10 | [Filter cost breakdowns by agent](#10-filter-cost-breakdowns-by-agent) | candidate | | | 2026-10-28 | | |
-| 11 | [Filter run summaries by date range and project](#11-filter-run-summaries-by-date-range-and-project) | candidate | | | 2026-10-28 | | |
-| 12 | [Say in `/api/health` whether sign-up is allowed](#12-say-in-apihealth-whether-sign-up-is-allowed) | candidate | | | 2026-10-28 | | |
-| 13 | [Include `executionBlocker` on compact issues](#13-include-executionblocker-on-compact-issues) | candidate | | | 2026-10-28 | | |
+| 10 | [Filter cost breakdowns by agent](#10-filter-cost-breakdowns-by-agent) | moved to [F9](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) | | | 2026-10-28 | | |
+| 11 | [Filter run summaries by date range and project](#11-filter-run-summaries-by-date-range-and-project) | moved to [F10](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) | | | 2026-10-28 | | |
+| 12 | [Say in `/api/health` whether sign-up is allowed](#12-say-in-apihealth-whether-sign-up-is-allowed) | moved to [F11](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) | | | 2026-10-28 | | |
+| 13 | [Include `executionBlocker` on compact issues](#13-include-executionblocker-on-compact-issues) | moved to [F12](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) | | | 2026-10-28 | | |
 | 14 | [Let Keep take an item off the attention feed's aging shelf](#14-let-keep-take-an-item-off-the-attention-feeds-aging-shelf) | candidate | | | 2026-10-28 | | |
 | 15 | [Don't return agent credentials in plain text from the join request list](#15-dont-return-agent-credentials-in-plain-text-from-the-join-request-list) | candidate | | | 2026-10-28 | | |
 | 16 | [Don't merge keyless cases of the same type](#16-dont-merge-keyless-cases-of-the-same-type) | candidate | | | 2026-10-29 | | |
@@ -70,6 +75,15 @@ until one becomes a concrete fix.
 | 31 | [Enforce an agent's "Create skills" permission, or drop it](#31-enforce-an-agents-create-skills-permission-or-drop-it) | candidate | | | 2026-11-14 | | |
 | 32 | [Honour an agent's heartbeat cooldown, or drop it](#32-honour-an-agents-heartbeat-cooldown-or-drop-it) | candidate | | | 2026-11-14 | | |
 | 33 | [Let a Claude planning task resume after the board replies](#33-let-a-claude-planning-task-resume-after-the-board-replies) | candidate | | | 2026-11-16 | | |
+| 34 | [Refuse approve and reject on budget-override approvals](#34-refuse-approve-and-reject-on-budget-override-approvals) | candidate | | | 2026-10-24 | | |
+| 35 | [Document how an agent reads a Decision's outcome](#35-document-how-an-agent-reads-a-decisions-outcome) | candidate | | | 2026-10-24 | | |
+| 36 | [Stop the skill promising an unenforced CEO-strategy gate](#36-stop-the-skill-promising-an-unenforced-ceo-strategy-gate) | candidate | | | 2026-10-24 | | |
+| 37 | [Log participant changes for every review stage (optional)](#37-log-participant-changes-for-every-review-stage-optional) | candidate | | | 2026-10-24 | | |
+| 38 | [Report the review-stage bypass, with failing tests](#38-report-the-review-stage-bypass-with-failing-tests) | candidate | | | 2026-10-24 | | |
+| 39 | [Turn off Claude Code's auto memory when an agent has `para-memory-files`](#39-turn-off-claude-codes-auto-memory-when-an-agent-has-para-memory-files) | candidate | | | 2026-10-24 | | |
+
+Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
+plugin SDK link on Windows, is entry 4.
 
 ## Details
 
@@ -217,15 +231,7 @@ until one becomes a concrete fix.
 
 ### 8. Let company search take several assignees, projects or labels
 
-Found by the [M7 parity audit](../ui-new/docs/audit/m7-parity.md#6-api-changes-needed) (2026-10-28).
-
-- **Problem:** `GET /api/companies/:companyId/search` (`server/src/routes/issues.ts`, around line
-  8231) takes one assignee, one project and one label, so a search page can't filter by several at
-  once.
-- **Likely fix:** accept repeated or comma-separated values for each filter, matching how the issue
-  list takes them, with a route test.
-- **Fork workaround to revisit once merged:** `ui-new`'s search filters take one value each
-  ([decision 17](../ui-new/docs/decisions.md#17-search-results-are-shaped-differently-from-board-s1)).
+Moved to the build plan as feature idea [F8](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) (Nov 16, 2026): it adds to the API rather than fixing it.
 
 ### 9. Mark agent chats in company search results
 
@@ -239,45 +245,19 @@ Found by the M7 parity audit (2026-10-28).
 
 ### 10. Filter cost breakdowns by agent
 
-Found by the M7 parity audit (2026-10-28).
-
-- **Problem:** `GET /api/companies/:companyId/costs/by-agent` and `/costs/by-agent-model`
-  (`server/src/routes/costs.ts`, around line 250) take no agent, so one agent's page fetches the whole
-  company's breakdown and filters it.
-- **Likely fix:** an optional `?agentId=` on both, with a route test.
-- **Fork workaround to revisit once merged:** the agent page filters the company breakdown
-  ([decision 29](../ui-new/docs/decisions.md#29-gaps-found-building-the-agent-page)).
+Moved to the build plan as feature idea [F9](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) (Nov 16, 2026): it adds to the API rather than fixing it.
 
 ### 11. Filter run summaries by date range and project
 
-Found by the M7 parity audit (2026-10-28).
-
-- **Problem:** `GET /api/companies/:companyId/heartbeat-runs?summary=true&limit=1000`
-  (`server/src/routes/agents.ts`, around line 6905) has no date range or project filter, so workload
-  views fetch up to 1,000 runs and may still miss days.
-- **Likely fix:** optional `from`, `to` and `projectId`, with a route test.
-- **Fork workaround to revisit once merged:** workload marks the days it couldn't load
-  ([decision 28](../ui-new/docs/decisions.md#28-gaps-found-building-agent-workload)).
+Moved to the build plan as feature idea [F10](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) (Nov 16, 2026): it adds to the API rather than fixing it.
 
 ### 12. Say in `/api/health` whether sign-up is allowed
 
-Found by the M7 parity audit (2026-10-28).
-
-- **Problem:** `PAPERCLIP_AUTH_DISABLE_SIGN_UP` (`server/src/config.ts`) isn't reported by
-  `/api/health`, so a sign-in page can't tell whether to offer sign-up.
-- **Likely fix:** add a boolean to the health response, next to the other auth fields, with a test.
-- **Fork workaround to revisit once merged:** `ui-new` always offers sign-up
-  ([decision 36](../ui-new/docs/decisions.md#36-gaps-found-building-onboarding-and-the-pages-outside-a-company)).
+Moved to the build plan as feature idea [F11](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) (Nov 16, 2026): it adds to the API rather than fixing it.
 
 ### 13. Include `executionBlocker` on compact issues
 
-Found by the M7 parity audit (2026-10-28).
-
-- **Problem:** `CompactIssue` (`packages/shared/src/types/issue.ts`, around line 961) leaves out
-  `executionBlocker`, so a list row can't tell why an interrupted task is blocked before offering
-  Retry.
-- **Likely fix:** add the field to the compact pick and the compact list query, with a test.
-- **Fork workaround to revisit once merged:** Retry on list rows reads the interruption's run.
+Moved to the build plan as feature idea [F12](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) (Nov 16, 2026): it adds to the API rather than fixing it.
 
 ### 14. Let Keep take an item off the attention feed's aging shelf
 
@@ -584,3 +564,70 @@ TES-36 failed, and the standard-mode control TES-35 resumed.
   `acpx_sidecar_transport.rs` so this kind of failure isn't opaque (see #19918).
 - **Fork workaround:** none in code. Reset the task's session in the agent's Runtime settings before
   replying on a planning task that's waiting on the board.
+
+### 34. Refuse approve and reject on budget-override approvals
+
+From the [requests proposal](../ui-new/docs/proposals/unifying-requests.md#small-upstream-contributions),
+item 1 (was build plan 2a-1).
+
+- **Problem:** `POST /api/approvals/:id/approve` and `/reject` on a `budget_override_required`
+  approval mark it approved or rejected, and leave the budget incident open and the scope paused.
+  Plugins reach the same code through the plugin host.
+- **Likely fix:** a check in the approvals service's `decide` that refuses these approvals with an
+  error pointing to the budget-incident resolve endpoint, plus a test. Refusing is simpler than
+  resolving, because an approval carries no new limit amount.
+- **Fork workaround:** `ui-new` shows budget resolution instead of approve and reject.
+
+### 35. Document how an agent reads a Decision's outcome
+
+From the requests proposal, item 2 (was build plan 2a-2). Docs.
+
+- **Problem:** the skill's Standalone Decisions section (`skills/paperclip/SKILL.md`) covers creating
+  a Decision but not what happens afterwards.
+- **Likely fix:** a few lines: with `wake_origin_agent` the proposer is woken with reason
+  `decision_<outcome>` and a payload naming the `decisionId`; `GET /api/decisions/:id` returns the
+  status, the chosen option and each effect's result; an effect with `staleness: "strict"` is
+  skipped if its target task changed; only people can decide a Decision.
+
+### 36. Stop the skill promising an unenforced CEO-strategy gate
+
+From the requests proposal, item 3 (was build plan 2a-3). Docs, or an issue.
+
+- **Problem:** `skills/paperclip/references/api-reference.md` says a CEO's first strategic plan must
+  be approved before the CEO can move tasks to `in_progress`; nothing on the server checks this.
+- **Likely fix:** reword the line so it doesn't promise enforcement, or open a short issue asking
+  which is intended. The issue is the safer start, since the answer is a product decision.
+- **Fork workaround:** `ui-new` shows `approve_ceo_strategy` as an ordinary formal approval.
+
+### 37. Log participant changes for every review stage (optional)
+
+From the requests proposal, item 4 (was build plan 2a-4).
+
+- **Problem:** `summarizeExecutionParticipants` in `server/src/routes/issues.ts` uses `stages.find`,
+  so `issue.reviewers_updated` and `issue.approvers_updated` miss changes to every stage after the
+  first of its type.
+- **Likely fix:** a few lines and a test. The file is upstream's busiest, and no interface creates a
+  second stage of one type yet, so send it only as an easy first contribution.
+
+### 38. Report the review-stage bypass, with failing tests
+
+From the requests proposal, item 5 (was build plan 2a-5). A bug report, not a pull request.
+
+- **Problem:** a Runner agent finishing a task with configured but unstarted review stages, or
+  someone accepting a Runner completion-review card on such a task, may skip the stages
+  ([review-stage bypass](../ui-new/docs/proposals/unifying-requests.md#review-stage-bypass)).
+- **Likely fix:** write tests for the two Runner paths. If they fail, file a bug with upstream's
+  template, attach the tests, link #13744 and #13001, and let upstream own the fix.
+
+### 39. Turn off Claude Code's auto memory when an agent has `para-memory-files`
+
+From [decision 5](../ui-new/docs/decisions.md#5-agents-can-have-three-memory-systems-that-dont-know-about-each-other),
+option 3 (was build plan 2a-6). Revives #2700.
+
+- **Problem:** an agent with the `para-memory-files` skill also gets Claude Code's own auto memory,
+  so two memory systems that don't know about each other write to different places.
+- **Likely fix:** `claude_local`, and the Runner's isolated Claude settings, set
+  `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` whenever `para-memory-files` is among the agent's skills. The
+  environment variable, unlike #2700's settings files, also works with `--setting-sources user`.
+- **Fork workaround:** `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in `deploy/docker-compose.yml`, and in the
+  adapter `env` of each Runner agent.

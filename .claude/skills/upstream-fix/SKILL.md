@@ -17,7 +17,8 @@ for the user.
   approval. If there's no sign-off in the conversation, stop and ask.
 - **Bugs, docs and small targeted fixes only.** A feature, or anything that changes behaviour other
   users rely on, needs agreement in upstream's Discord `#dev` channel first (CONTRIBUTING.md,
-  "Path 2"). Keep it in the build plan's stage 2b and stop.
+  "Path 2"). It isn't an upstream fix: record it as a feature idea in the build plan
+  (`ui-new/docs/build-plan.md`, 3.17) and stop.
 
 ## 1. Search for duplicates
 
