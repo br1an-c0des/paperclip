@@ -64,6 +64,7 @@ the existing API, and new features are built as fork plugins.
 | --- | --- |
 | [FORK.md](FORK.md) | Remotes, branches, the no-upstream-code policy (plugins first, source changes in a later stage, and what that would change for deploys and syncs), sending fixes upstream, the upstream sync routine, why `ui-new` is a standalone app rather than a plugin, deployment summary, open items. |
 | [FORK-PATCHES.md](FORK-PATCHES.md) | Every change the fork makes to upstream files: what, why, what it depends on, how to resolve conflicts. |
+| [fork/hard-fork-plan.md](fork/hard-fork-plan.md) | **Proposed, not adopted.** Stop syncing upstream, cut to Claude only, make runs Claude-native, one prompt builder, first-class chat, and the build plan in core. Until adopted, the rules above still apply. |
 | [fork/upstream-fixes.md](fork/upstream-fixes.md) | Small fixes for upstream: candidates to build, and each one's branch, pull request and status until it's merged. |
 | [.claude/skills/upstream-sync/SKILL.md](.claude/skills/upstream-sync/SKILL.md) | The upstream sync procedure and conflict-resolution policy. Reports go to `fork/sync-reports/`. |
 | [.claude/skills/upstream-fix/SKILL.md](.claude/skills/upstream-fix/SKILL.md) | Building one signed-off fix for upstream: duplicate search, upstream's rules, the testing budget, the PR description, and stopping before anything is pushed. |
