@@ -487,6 +487,14 @@ Progress:
   and moves to the new name). To do: check every other page whose address uses a name-derived key
   or slug (projects, goals, routines, skills, plugins, organizations' issue prefix, and any other
   `findX(list, key)` lookup) for the same bug when it's renamed from its own page or elsewhere.
+- **Next (Nov 16): a Playwright smoke suite.** The "Playwright smoke run from M2 on" (How it's
+  built) and M2's end-to-end test of the done condition were never built: `ui-new` has only Vitest,
+  and every browser check so far was a one-off script. Planned as `test/e2e-smoke`, once the
+  rename sweep, U175 and the polish round are merged: a saved suite in `ui-new/e2e/` with a
+  `test:e2e` script, mocked API responses by default (writes stubbed), one journey per milestone's
+  done condition (sign in and pick a company; a task from created to done, answering an agent's
+  question and opening its run; Inbox triage; the project dashboard; agent chat; a settings save),
+  each also at 390px, and an optional read-only live mode against :3100.
 - **Done (Nov 16): the last two partial rows.** The sign-in flows are marked done (the user's
   call; the flows the local_trusted test instance can't reach stay unit-tested). The Artifact
   library is done for stage 1: its project section no longer waits on upstream project documents,
