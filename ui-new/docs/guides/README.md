@@ -18,3 +18,4 @@ claims can be checked as upstream changes.
 | Guide | Feature |
 | --- | --- |
 | [outside-agents.md](outside-agents.md) | Inviting an agent that runs outside Paperclip (Hermes, OpenClaw, any HTTP agent) |
+| [repo-instructions-and-skills.md](repo-instructions-and-skills.md) | Which runners load a repo's `CLAUDE.md` and skills, and where project-wide instructions should go |
