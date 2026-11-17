@@ -25,10 +25,14 @@ export function SignIn() {
 
   const health = createQuery(() => ({ queryKey: queryKeys.health, queryFn: healthApi.get, retry: false }));
   const session = createQuery(() => ({ queryKey: queryKeys.auth.session, queryFn: authApi.getSession, retry: false }));
+  // Where a sign-in on this page goes, fixed when it succeeds. While it's set, `onSignedIn` makes
+  // the one navigation, after the reads it refreshes; the session read it starts mustn't navigate
+  // first, or `?next=` is gone by the time `onSignedIn` would read it.
+  const [signedInTo, setSignedInTo] = createSignal<string | null>(null);
   createEffect(() => {
     if (!session.data) return;
     clearCloudSignInAttempt();
-    navigate(next(), { replace: true });
+    if (signedInTo() === null) navigate(next(), { replace: true });
   });
 
   const cloud = () => cloudOf(health.data);
@@ -46,12 +50,14 @@ export function SignIn() {
   });
 
   const onSignedIn = async () => {
+    const destination = next();
+    setSignedInTo(destination);
     await client.invalidateQueries({ queryKey: queryKeys.auth.session });
     await client.invalidateQueries({ queryKey: queryKeys.access.currentBoardAccess });
     await client.invalidateQueries({ queryKey: queryKeys.health });
     // Reset, not invalidate: the companies list isn't account-scoped, and sign-in can change accounts.
     await client.resetQueries({ queryKey: queryKeys.companies.all });
-    navigate(next(), { replace: true });
+    navigate(destination, { replace: true });
   };
 
   return (
