@@ -17,5 +17,6 @@ claims can be checked as upstream changes.
 
 | Guide | Feature |
 | --- | --- |
+| [environment-variables.md](environment-variables.md) | What environment variables do in a run, the four layers (agent, environment, project, recurring task), examples, and what doesn't get through |
 | [outside-agents.md](outside-agents.md) | Inviting an agent that runs outside Paperclip (Hermes, OpenClaw, any HTTP agent) |
 | [repo-instructions-and-skills.md](repo-instructions-and-skills.md) | Which runners load a repo's `CLAUDE.md` and skills, and where project-wide instructions should go |
