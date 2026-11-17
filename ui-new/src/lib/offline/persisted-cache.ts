@@ -16,10 +16,10 @@ import { classifyError, isTransientError } from "./errors";
  *   what is saved (`EXCLUDED_FIELDS`).
  * - **Pull request previews** (since the 2026-11-10 sync, as the old UI keeps them after #20654):
  *   your own (the key names you), in the company's record, each kept only for the `maxAgeMs` its
- *   answer gave, so an expired one is never restored as current. A link GitHub couldn't describe,
- *   or a read that failed, is the 60-second "no preview" and isn't kept. A restored preview isn't
+ *   answer gave, so an expired one is never restored as current. A link GitHub couldn't describe
+ *   isn't kept; a failed read keeps the last preview, current for a minute (U175). A restored preview isn't
  *   refetched: it keeps its read time, so opening its card reads again only once `maxAgeMs` has
- *   passed (LinkPreview.tsx `staleTime`).
+ *   passed (tasks/link-preview-loader.ts `staleTime`).
  * - **Scope.** One record per user and company, plus one for the user (`…:<user>:root`). A reload
  *   restores only the last signed-in user's records, and only companies in their saved list.
  * - **Age.** Each read is kept 24 hours from when it was fetched. Records from another build are
