@@ -76,9 +76,11 @@ ourselves ([step 2](#2-take-the-fixes-already-written)).
 
 ### CLAUDE.md, repo skills and repo MCP servers aren't used
 
-The Claude adapter starts each run as `claude --print` with flags that shut out what a normal
-Claude Code session loads (`packages/adapters/claude-local/src/server/execute.ts`, around lines
-880–907):
+The `claude_local` adapter has two engines: the CLI (`claude --print`, `engine: "cli"`) and ACP
+(`claude-agent-acp`), which is the **default** when an agent's config doesn't set `engine`. The full
+trace of a run, on both engines, with corrections to this section, is
+[claude-local-run.md](claude-local-run.md) (2026-11-17). On the CLI engine, the flags shut out what a normal Claude Code
+session loads (`packages/adapters/claude-local/src/server/execute.ts`, around lines 880–907):
 
 - `--strict-mcp-config` loads only Paperclip's MCP servers, so the repo's `.mcp.json` and the user's
   own servers are ignored.
@@ -139,9 +141,10 @@ Paperclip has two ways to run an agent:
   and streams back normalized events. Upstream's docs call the original adapters "legacy". The
   Runner is where upstream's effort goes.
 
-With `enableNativeRunner` on (the default), an ordinary `claude_local` hire runs on the Runner, as
-found during the status-card work
-([decisions](../ui-new/docs/decisions.md)).
+A Claude hire runs on the Runner whenever the platform supports it: hiring with the runner on
+"auto" saves the agent as `paperclip_runner`, and runs go by that saved type. `enableNativeRunner`
+doesn't change this for Claude: hiring ignores it, and Claude runs on the Runner are exempt from it
+at run time ([claude-local-run.md](claude-local-run.md), "Where legacy vs Runner is decided").
 
 ### What it gives
 
@@ -228,10 +231,10 @@ Nothing here changes code, and all of it can be undone.
 
 1. In a few recent runs' details, check which path each agent uses: `claude_local` directly, the
    Paperclip Runner, or Claude Managed. The command and adapter are logged.
-2. Move server1's agents to the legacy runner (each agent's Runtime settings in `ui-new`), and turn
-   off Paperclip Runner in App settings → Features so new hires don't use it. The App settings
-   switch alone doesn't move agents already on the Runner. It's the real instance, so the user makes
-   the change. Then use it that way.
+2. Move server1's agents to the legacy runner (each agent's Runtime settings in `ui-new`), and
+   choose Legacy runner when hiring. The App settings → Features "Paperclip Runner" switch doesn't
+   do this for Claude agents (see [What it is](#what-it-is)). It's the real instance, so the user
+   makes the change. Then use it that way.
 3. Note anything that breaks or gets worse. It either becomes a fix in step 4 or a reason to keep
    part of the Runner.
 4. List the open upstream pull requests worth taking (step 2).
@@ -397,7 +400,7 @@ in whatever order matters most ([The build plan after the hard fork](#the-build-
 | --- | --- |
 | 0. Check before freezing | Freeze taken first, on 2026-11-17. The legacy-runner switch on server1 is the user's to make (step 0, item 2); the run-path check and the list of upstream pull requests to take are open. |
 | 1. Freeze and reset the rules | Done 2026-11-17: tag `upstream-freeze`, `main`, the rules in CLAUDE.md, FORK.md and FORK-PATCHES.md, the `upstream-watch` skill replacing `upstream-sync` and `upstream-fix`. |
-| Repo map and `claude_local` trace | Next: two read-only agents. A map of the whole repo (ours, shared core, dormant, and which tests cover what), and a trace of one `claude_local` run from wake to finish, as the map for steps 4 and 5. |
+| Repo map and `claude_local` trace | Done 2026-11-17: [repo-map.md](repo-map.md) (ours, shared core, dormant, the seams, tests) and [claude-local-run.md](claude-local-run.md) (one run from wake to finish, both engines, with the change points for steps 4 and 5). |
 | 2. Take the fixes already written | Not started. Until then the deployment keeps upstream's image with `ui-new` and the two image patches. |
 | 3. Leave unused code | Ongoing, as decided. |
 | 4–7 | Not started. |
@@ -519,6 +522,10 @@ Taken on adoption, 2026-11-17:
 
 Still open:
 
+0. **Which Claude engine steps 4 and 5 build on:** the CLI (`claude --print`, which the plan was
+   written around) or ACP (`claude-agent-acp`, the adapter's default and what agents use unless set
+   otherwise). They differ in how instructions, skills, MCP servers, settings and memory load
+   ([claude-local-run.md](claude-local-run.md)). Decide before step 4.
 1. **Where agent personas live:** Paperclip's per-agent `AGENTS.md`, or role files in the repo
    (step 4).
 2. **Which open upstream pull requests to take** (step 2), from step 0's list.

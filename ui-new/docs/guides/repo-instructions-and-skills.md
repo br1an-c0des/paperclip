@@ -3,6 +3,18 @@
 Written Nov 16, 2026, from a code trace of `claude_local` and the Paperclip Runner, and a test with
 the Claude CLI (2.1.325).
 
+**Corrected Nov 17, 2026** by a fuller trace, [fork/claude-local-run.md](../../../fork/claude-local-run.md):
+
+- The "legacy" rows describe the CLI engine (`engine: "cli"`) only. A `claude_local` agent's default
+  engine is ACP (`claude-agent-acp`): skills are copied to the run's state folder and listed in the
+  prompt, and the instructions go in the first message, not `--append-system-prompt-file`.
+- The ❌ for repo `CLAUDE.md` and skills with a managed connection holds for the CLI engine. ACP passes
+  no `--setting-sources user`, so project sources should load (not tested in a real run).
+- A task without a project workspace runs in the agent's configured `cwd` if set, else a private
+  `isolated-workspaces/<company>/<issue>` folder; the agent's home folder is only for runs without a
+  task.
+- The ACP engine rewrites `<cwd>/.claude/settings.local.json` in the repo on every run.
+
 ## What it is
 
 Many repos carry instructions for coding agents: a `CLAUDE.md` or `AGENTS.md` at the root and skills

@@ -43,7 +43,9 @@ at the same address with new contents. Each deploy changes its build id, so open
 home-screen app reload onto the new build the next time they're in the background.
 
 `docker-compose.yml` also sets `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` for the server, which reaches
-`claude_local` agent runs, so every run of an agent sees the same memory. Paperclip Runner agents
+`claude_local` runs on the CLI engine (`engine: "cli"`) only, so every run of such an agent sees the
+same memory. Runs on the default ACP engine inherit an allowlist of variables that leaves it out, so
+Claude's auto memory stays on for them ([fork/claude-local-run.md](../fork/claude-local-run.md)). Paperclip Runner agents
 don't inherit the server's environment; set it in their adapter's `env`.
 
 `deploy.sh` sets `UPSTREAM_SHA` to the newest upstream commit already merged into your branch

@@ -12,8 +12,9 @@ set up for one person running Claude agents.
   routines, requests, artifacts, cases) regrouped into fewer, clearer pages, the rest ported mostly
   as-is, one refined interface instead of experimental toggles, and no capability lost by accident
   (every one is catalogued). Stage 1 of the [build plan](ui-new/docs/build-plan.md) is complete.
-- **Make Claude runs first-class.** Agents run on the `claude_local` adapter (`claude --print`). The
-  plan: runs that behave like a Claude Code session in the project's repo (its CLAUDE.md, skills and
+- **Make Claude runs first-class.** Agents run on the `claude_local` adapter, whose default engine is
+  ACP (`claude-agent-acp`), with `claude --print` as the CLI engine
+  ([fork/claude-local-run.md](fork/claude-local-run.md)). The plan: runs that behave like a Claude Code session in the project's repo (its CLAUDE.md, skills and
   MCP servers), Paperclip reached through MCP instead of curl, one prompt builder we own, and chat
   as its own concept rather than a hidden task (hard-fork plan steps 4–7).
 - **Then the build plan's features, in core,** without the plugin limits the fork used to work under.
@@ -65,6 +66,8 @@ set up for one person running Claude agents.
 | --- | --- |
 | [FORK.md](FORK.md) | Where this came from: the freeze, remotes and branches, the upstream watch, the deployment, why `ui-new` is a standalone app, open items. |
 | [fork/hard-fork-plan.md](fork/hard-fork-plan.md) | **Adopted 2026-11-17.** The plan and its progress: leave unused code, make runs Claude-native, Paperclip over MCP, one prompt builder, first-class chat, the build plan in core. |
+| [fork/repo-map.md](fork/repo-map.md) | The whole repo, labelled ours / shared core / dormant: where features live, where dormant code is wired in, which tests cover what. |
+| [fork/claude-local-run.md](fork/claude-local-run.md) | One `claude_local` run from wake to finish (CLI and ACP engines), with file references and the change points for hard-fork steps 4 and 5. |
 | [FORK-PATCHES.md](FORK-PATCHES.md) | The two image patches the deployment applies to upstream's image, until it builds from source. |
 | [fork/upstream-fixes.md](fork/upstream-fixes.md) | The fork's bug list: what's wrong, where, and the likely fix. |
 | [.claude/skills/upstream-watch/SKILL.md](.claude/skills/upstream-watch/SKILL.md) | The weekly upstream review: list what's new, triage, cherry-pick what you choose. Ledger in [fork/upstream-watch.md](fork/upstream-watch.md); older sync reports in `fork/sync-reports/`. |
@@ -105,6 +108,8 @@ triages them, and cherry-picks only what you choose, on a branch, after approval
 - `git sync-master` checks out `master`, so don't run it in a checkout the dev servers run from. Instead:
   `git fetch upstream && git push origin upstream/master:master && git branch -f master upstream/master && git branch --set-upstream-to=origin/master master`.
 - server1 is the real instance with real data: never test against it, and never run M7 test data there.
+- `pnpm verify` and similar scripts compare against `origin/master`, which is upstream now: pass `--base main`
+  where they take one ([fork/repo-map.md](fork/repo-map.md#5-tests)).
 - Finished agent worktrees can be locked: `git worktree unlock <path>` before `git worktree remove`.
 - Stop a dev server by its port (`ss -ltnp | grep ':5181 '`), not `pkill -f <pattern>`, which also matches and kills the
   shell running it.
