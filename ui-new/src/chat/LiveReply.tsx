@@ -118,7 +118,7 @@ function useStoredEvents(runId: () => string) {
 /**
  * The reply's text so far; in-app links (`data-app-link`, U86) open through the router. A pull
  * request link has its status mark and card as in a finished message (U113, tasks/LinkPreview.tsx),
- * read only once the card opens. Each chunk updates the text in place (live-morph.ts), so a link
+ * its saved status read as soon as the link is written (U175, tasks/link-preview-loader.ts). Each chunk updates the text in place (live-morph.ts), so a link
  * already written keeps its mark, and an open card stays open, while the text after it grows.
  */
 export function LiveText(props: { html: string; caret: boolean }) {

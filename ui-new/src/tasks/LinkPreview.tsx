@@ -1,13 +1,12 @@
-import { recognizeLinkPreview, type LinkPreviewResult, type LinkPreviewState, type LinkPreviewTarget } from "@paperclipai/shared";
-import { createQuery, QueryClientContext } from "@tanstack/solid-query";
+import { recognizeLinkPreview, type LinkPreviewState, type LinkPreviewTarget } from "@paperclipai/shared";
+import { createQuery, QueryClientContext, useQueryClient } from "@tanstack/solid-query";
 import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, TriangleAlert, type LucideProps } from "lucide-solid";
 import { createEffect, createSignal, For, onCleanup, onMount, Show, useContext, type JSX } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
-import { linkPreviewsApi } from "@/api/link-previews";
-import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
-import { useSession } from "@/lib/session";
 import { Popover } from "@/ui/Popover";
+import { linkPreviewQueryOptions } from "./link-preview-loader";
+import { createLinkPreviewSource, useLinkPreviewPage, useViewerId } from "./LinkPreviewProvider";
 import { LINK_PREVIEW_STATE_LABEL, parseGitHubLink, previewLinkLabel, previewMarkLabel, previewMeta } from "./message-format";
 import "./LinkPreview.css";
 
@@ -21,11 +20,16 @@ import "./LinkPreview.css";
  * - The card shows the link, its state, title, author, last update and address. It opens after a
  *   moment's hover on the link or the mark, on keyboard focus of the link, and on a click or tap
  *   of the mark, so a touch screen reaches it too; on a phone it's a bottom sheet (Popover).
- * - The preview is read only then, once per link, viewer and company: every copy of the link reads
- *   the same cached answer (`queryKeys.linkPreview`) for as long as its `maxAgeMs`. A failed read
- *   counts as no preview for a minute rather than an error.
+ * - The status shows without a hover (U175, upstream #21746): each mark registers its link with the
+ *   page's loader (LinkPreviewProvider.tsx, link-preview-loader.ts), which reads the server's
+ *   saved status at once and refreshes the rest from GitHub on browser idle.
+ * - Opening the card reads the preview if it isn't current yet, once per link, viewer and company:
+ *   every copy of the link reads the same cached answer (`queryKeys.linkPreview`) for as long as
+ *   its `maxAgeMs`. A failed read keeps the last preview known (none, if there wasn't one) for a
+ *   minute, or for a 429's `Retry-After`, rather than showing an error.
  *
- * Without a query client (tests of other screens) the mark is the plain icon.
+ * Without a query client (tests of other screens) the mark is the plain icon; without the
+ * provider, the preview is read only when the card opens.
  *
  * Which links get a mark, and the slot it's drawn into, are here too (`decoratePreviewLinks`,
  * `PreviewMarks`), so a finished message (MessageBody.tsx) and a reply still streaming
@@ -34,7 +38,6 @@ import "./LinkPreview.css";
 
 const HOVER_OPEN_MS = 350;
 const HOVER_CLOSE_MS = 150;
-const ABSENT_MAX_AGE_MS = 60_000;
 
 const STATE_ICON: Record<LinkPreviewState, (props: LucideProps) => JSX.Element> = {
   unknown: GitPullRequest,
@@ -100,15 +103,6 @@ export function PreviewMarks(props: { links: PreviewLink[] }) {
   );
 }
 
-/** Whose preview this is: the signed-in user, or `local-board` without sign-in, as the saved reads name them (persisted-cache.ts). */
-function viewerId(): () => string | null {
-  try {
-    return useSession().youId;
-  } catch {
-    return () => null;
-  }
-}
-
 export function LinkPreviewMark(props: { anchor: HTMLAnchorElement; target: LinkPreviewTarget }) {
   return (
     <Show when={useContext(QueryClientContext)} fallback={<GitPullRequest size={13} class="gh-icon" aria-hidden="true" />}>
@@ -119,7 +113,9 @@ export function LinkPreviewMark(props: { anchor: HTMLAnchorElement; target: Link
 
 function ConnectedMark(props: { anchor: HTMLAnchorElement; target: LinkPreviewTarget }) {
   const company = useCompany();
-  const userId = viewerId();
+  const userId = useViewerId();
+  const client = useQueryClient();
+  const page = useLinkPreviewPage();
   const [open, setOpen] = createSignal(false);
   const [byHover, setByHover] = createSignal(false);
   let timer: number | undefined;
@@ -127,24 +123,17 @@ function ConnectedMark(props: { anchor: HTMLAnchorElement; target: LinkPreviewTa
   const clear = () => window.clearTimeout(timer);
   onCleanup(clear);
 
+  // The page's loader reads this link's status on load (U175); the card reads it on opening if it
+  // still isn't current. Both read through the page's source, so a 429's wait holds for both.
+  const source = () => page()?.source ?? createLinkPreviewSource(company().id, userId());
+  createEffect(() => {
+    const loader = page()?.loader;
+    if (loader) onCleanup(loader.register(props.target));
+  });
   const preview = createQuery(() => ({
-    queryKey: queryKeys.linkPreview(company().id, userId(), props.target.canonicalUrl),
-    queryFn: async ({ signal }): Promise<LinkPreviewResult> => {
-      try {
-        return await linkPreviewsApi.get(company().id, props.target.canonicalUrl, signal);
-      } catch {
-        // Optional detail: a failed read is a cached absence, not an error on the page.
-        return { preview: null, maxAgeMs: ABSENT_MAX_AGE_MS };
-      }
-    },
-    // Read only while someone's looking at the card; the mark shows what's cached either way.
+    ...linkPreviewQueryOptions(client, source(), props.target),
+    // The card's own read: only while it's open. The mark shows what's cached either way.
     enabled: open(),
-    staleTime: (query) => query.state.data?.maxAgeMs ?? ABSENT_MAX_AGE_MS,
-    gcTime: 5 * 60_000,
-    retry: false,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
   }));
   const found = () => preview.data?.preview ?? null;
   const state = (): LinkPreviewState => found()?.state ?? "unknown";

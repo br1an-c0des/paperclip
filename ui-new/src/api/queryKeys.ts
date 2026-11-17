@@ -510,6 +510,8 @@ export const queryKeys = {
   /**
    * A GitHub pull request's preview on a message's link (U113, api/link-previews.ts), per viewer
    * and company as the old UI keys it. Outside every company prefix, so no live event refetches it.
+   * Filled by the card's read, and on load by the page's saved-status read and idle refresh (U175,
+   * tasks/link-preview-loader.ts), which keep the saved-status batches out of the query cache.
    */
   linkPreview: (companyId: string, userId: string | null, url: string) => ["link-preview", companyId, userId, url] as const,
   /** The company's Tailscale networks (U156, api/tailscale.ts), in the old UI's shapes. */

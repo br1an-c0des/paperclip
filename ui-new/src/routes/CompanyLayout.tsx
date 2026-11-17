@@ -25,6 +25,7 @@ import { CommandPalette } from "@/shell/CommandPalette";
 import { DevBanners } from "@/shell/DevBanners";
 import { PhoneTopBar } from "@/shell/pwa";
 import { ShortcutsDialog } from "@/shell/ShortcutsDialog";
+import { LinkPreviewProvider } from "@/tasks/LinkPreviewProvider";
 import { NewTaskDialog } from "@/tasks/NewTaskDialog";
 import { GlobalTaskModal } from "@/tasks/TaskModal";
 import { buttonClass } from "@/ui/Button";
@@ -253,7 +254,10 @@ export function CompanyLayout(props: RouteSectionProps) {
           <CompanyProvider company={current()}>
             <LiveEventsProvider companyId={current().id}>
               <CommandsProvider>
-                <CompanyShell>{props.children}</CompanyShell>
+                {/* Pull request status marks read their saved status on load (U175). */}
+                <LinkPreviewProvider>
+                  <CompanyShell>{props.children}</CompanyShell>
+                </LinkPreviewProvider>
               </CommandsProvider>
             </LiveEventsProvider>
           </CompanyProvider>
