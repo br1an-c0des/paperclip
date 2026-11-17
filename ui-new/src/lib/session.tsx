@@ -101,6 +101,38 @@ export function safeNextPath(next: string | null | undefined) {
   return next;
 }
 
+/**
+ * When this page loaded. A read older than this came from the reads saved for offline
+ * (offline/persisted-cache.ts keeps each one's original read time), not from the server during
+ * this visit.
+ */
+const PAGE_LOADED_AT = Date.now();
+
+/** What the gate reads off each of its queries. */
+export type GateRead = { isPending: boolean; data: unknown; error: unknown; dataUpdatedAt: number };
+
+/**
+ * Whether the gate still waits on a read it needs before it can decide anything. A read with no
+ * answer yet (`isPending`, which also covers one enabled in this same update and not started, so
+ * not `isLoading`) is never taken for "signed out" or "no access"; only an answer is.
+ */
+export function gateLoading(input: { authenticated: boolean; bootstrapPending: boolean; health: GateRead; session: GateRead; access: GateRead }) {
+  const { authenticated, bootstrapPending, health, session, access } = input;
+  return health.isPending || (authenticated && session.isPending) || (authenticated && !bootstrapPending && !!session.data && access.isPending);
+}
+
+/**
+ * Whether writes may go out as this user: this page has heard from the server who's signed in. A
+ * session saved from the last visit shows the board, but doesn't speak for the user. The rule is
+ * "read since the page loaded", not "since the gate mounted": the gate can mount after the session
+ * was read (signing in reads it on /auth first), and then nothing would read it again.
+ */
+export function sessionChecked(input: { authenticated: boolean; health: GateRead; session: GateRead; since: number }) {
+  const { authenticated, health, session, since } = input;
+  const fresh = (read: GateRead) => read.data !== undefined && read.dataUpdatedAt >= since && !read.error;
+  return fresh(health) && (!authenticated || (!!session.data && fresh(session)));
+}
+
 export function SessionGate(props: ParentProps) {
   const location = useLocation();
   const client = useQueryClient();
@@ -151,9 +183,7 @@ export function SessionGate(props: ParentProps) {
   const blockingError = () =>
     active().find((query) => query.error && !(query.data !== undefined && isTemporaryApiError(query.error)))?.error;
   const loading = () =>
-    health.isLoading ||
-    (isAuthenticatedMode() && session.isLoading) ||
-    (isAuthenticatedMode() && !isBootstrapPending() && !!session.data && access.isLoading);
+    gateLoading({ authenticated: isAuthenticatedMode(), bootstrapPending: isBootstrapPending(), health, session, access });
   const hasBoardAccess = () =>
     !isAuthenticatedMode() || !!access.data?.isInstanceAdmin || (access.data?.companyIds.length ?? 0) > 0;
 
@@ -166,13 +196,7 @@ export function SessionGate(props: ParentProps) {
     if (canAccess && health.data?.status === "ok") setOpened(true);
   });
 
-  // Writes go out only once this page has heard from the server who's signed in: a session saved
-  // from the last visit shows the board, but doesn't speak for the user.
-  const mountedAt = Date.now();
-  const verified = () =>
-    health.dataUpdatedAt >= mountedAt &&
-    !health.error &&
-    (!isAuthenticatedMode() || (!!session.data && session.dataUpdatedAt >= mountedAt && !session.error));
+  const verified = () => sessionChecked({ authenticated: isAuthenticatedMode(), health, session, since: PAGE_LOADED_AT });
 
   const retry = () => {
     for (const query of active()) if (query.error) void query.refetch();

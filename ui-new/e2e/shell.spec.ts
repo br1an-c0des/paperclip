@@ -69,8 +69,6 @@ test("opens the command palette and finds a task", async ({ page }) => {
 });
 
 test("New task creates a task", async ({ page, api }) => {
-  // Time is under the test's control, to stand in for coming back to the tab later (below).
-  await page.clock.install();
   await page.goto("/MSE/issues");
   await expect(page.getByRole("link", { name: "M7 test Write the landing page" })).toBeVisible();
   await page.getByRole("button", { name: "New task" }).first().click();
@@ -80,28 +78,17 @@ test("New task creates a task", async ({ page, api }) => {
   await dialog.getByRole("button", { name: "Create task" }).click();
   await expect(dialog).toBeHidden();
 
-  // Create saves in the background: the task waits in the write queue, shown at the top of the list.
-  await expect(page.getByText("M7 test Smoke-created task")).toBeVisible();
-  // App bug found by this suite (see "a fresh load opens without a trip through sign-in" below):
-  // the session gate remounts after a bounce through /auth, so the write queue never counts the
-  // session as checked on this page load and the task stays "Waiting to send…" until the health or
-  // session read refreshes (a refocus once they're 30 s stale). Simulate that; once the bug is
-  // fixed the POST goes out at once and these two lines can go.
-  await page.clock.fastForward("00:31");
-  await page.evaluate(() => window.dispatchEvent(new Event("visibilitychange")));
-
+  // Create saves in the background through the write queue, which sends it at once: the session
+  // gate has checked the session with the server on this page load.
   const created = await api.waitForWrite("POST", `/companies/${COMPANY_ID}/issues`);
   expect(created.body).toMatchObject({ title: "M7 test Smoke-created task", status: "todo" });
   await expect(page.getByRole("link", { name: "M7 test Smoke-created task" })).toBeVisible();
 });
 
 test("a fresh load opens without a trip through sign-in", async ({ page }) => {
-  // App bug found by this suite: with no reads saved from a last visit, the session gate renders
-  // once with health loaded but the session read not yet started (enabled in that same update, so
-  // not `isLoading`), takes that for "signed out" and navigates to /auth?next=…; SignIn then finds
-  // the session and navigates back, and the gate mounts a second time (lib/session.tsx).
-  // Expected to fail until that's fixed; Playwright reports it when it starts passing.
-  test.fail();
+  // With no reads saved from a last visit, the session gate once rendered with health loaded but
+  // the session read not yet started (enabled in that same update, so not `isLoading`), took that
+  // for "signed out" and bounced through /auth?next=…, mounting twice (lib/session.tsx `gateLoading`).
   const visited: string[] = [];
   page.on("framenavigated", (frame) => {
     if (frame === page.mainFrame()) visited.push(new URL(frame.url()).pathname);
