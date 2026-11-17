@@ -481,12 +481,14 @@ Progress:
   card dialog's example buttons overflow at 390px (older); `RunTrace.tsx`'s admin note kept visible.
   Three settings the server ignores keep their controls with "Not used by the server yet."
   ([upstream-fixes](../../fork/upstream-fixes.md) 30–32). Original item below.
-- **Open (Nov 16): pages that break when a rename changes their address.** Found on the agent
-  page: renaming an agent changed its `urlKey`, so the page lost the agent and showed "There's no
-  agent called …". Fixed in `agents/AgentPage.tsx` (the page keeps the agent's id for that address
-  and moves to the new name). To do: check every other page whose address uses a name-derived key
-  or slug (projects, goals, routines, skills, plugins, organizations' issue prefix, and any other
-  `findX(list, key)` lookup) for the same bug when it's renamed from its own page or elsewhere.
+- **Done (Nov 16): pages that break when a rename changes their address** (`shell/rename-sweep`).
+  Found on the agent page (fixed in `agents/AgentPage.tsx`). The sweep found two more: projects (the
+  `urlKey` follows the name) and the company prefix (a managed instance re-derives it on a company
+  rename and re-keys every task and case identifier). Both now keep their page and move to the new
+  address with the tab, query and fragment, and an older history entry with the old key still
+  opens the record for the rest of the session (`lib/renamed-address.ts`). An agent renamed while a
+  run is open keeps the run. Goals, recurring tasks, skills, plugins, profiles and the rest use ids,
+  so they aren't affected. Gaps: [decision 56](decisions.md#56-old-addresses-break-after-a-rename).
 - **Next (Nov 16): a Playwright smoke suite.** The "Playwright smoke run from M2 on" (How it's
   built) and M2's end-to-end test of the done condition were never built: `ui-new` has only Vitest,
   and every browser check so far was a one-off script. Planned as `test/e2e-smoke`, once the

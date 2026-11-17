@@ -1939,3 +1939,26 @@ Both are handled in `ui-new` for now.
   through the access API), so a role could be a named set of grants applied to an agent. The CEO-only
   checks are hard-coded on `role === "ceo"`, so those can't move into a profile without an upstream
   change. Recorded in the [build plan's new ideas](build-plan.md#new-ideas); not designed yet.
+
+### 56. Old addresses break after a rename
+
+- **Status:** Recorded 2026-11-16
+- **Area:** `projects/*`, `agents/*`, the company prefix (every page).
+- **Found in:** the rename sweep (`shell/rename-sweep`, build plan M7).
+
+- **What we found:** a project's and agent's `urlKey` follow their names (`deriveProjectUrlKey` in
+  `server/src/services/projects.ts`), and on a managed instance renaming the company re-derives its
+  issue prefix (`resolveRenamedIssuePrefix`) and re-keys every identifier
+  (`rekeyCompanyIssueIdentifiers`: `OLD-12` becomes `NEW-12`). The server keeps no alias for the old
+  key, prefix or identifier: `GET /projects/:oldKey`, `GET /agents/:oldKey` and
+  `GET /issues/OLD-12` answer 404 after a rename. `PATCH /companies/:id` doesn't say the prefix
+  changed, except through the returned `issuePrefix` and a `company.updated` activity event with
+  `reason: "issue_prefix_rederived"`.
+- **What `ui-new` does:** the open page keeps its record by id and moves to the new address, and an
+  address opened earlier in the same session still finds its record (`lib/renamed-address.ts`).
+  Links from outside the session (Slack, email, agent comments) with an old key stay broken.
+- **Left:** after a prefix change, "Back to app" (`layout/settings-nav-model.ts`) still holds the old
+  prefix and falls back to the dashboard; a task page may show "not found" for a moment before the
+  redirect lands.
+- **Later:** server-side aliases for old keys and identifiers would fix outside links (a source
+  change, or a feature idea for upstream).
