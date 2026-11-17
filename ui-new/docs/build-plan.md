@@ -146,7 +146,8 @@ it gets built. Numbers like 3.4 and F3 refer to stage 3 further down; "fix 39" i
   exports deep paths (`./*`). So `ui-new` can import it at runtime, as an exception to the `import type`
   rule. Record it in [decisions.md](decisions.md) when it's adopted.
 - **Tests.** Vitest and `@solidjs/testing-library` for view models (the requests model, list grouping,
-  override payloads) and key components. A Playwright smoke run against a dev server from M2 on.
+  override payloads) and key components. A Playwright smoke run against a dev server from M2 on
+  (built late, Nov 16: `test:e2e`, see M7).
   `typecheck` stays part of every sync.
 - **Tracking.** As each screen lands, fill in **Status** in [capabilities.md](inventory/capabilities.md)
   (`partial`, `done`, or `dropped` with the reason). Record new API gaps in [decisions.md](decisions.md).
@@ -501,14 +502,28 @@ Progress:
   opens the record for the rest of the session (`lib/renamed-address.ts`). An agent renamed while a
   run is open keeps the run. Goals, recurring tasks, skills, plugins, profiles and the rest use ids,
   so they aren't affected. Gaps: [decision 56](decisions.md#56-old-addresses-break-after-a-rename).
-- **Next (Nov 16): a Playwright smoke suite.** The "Playwright smoke run from M2 on" (How it's
-  built) and M2's end-to-end test of the done condition were never built: `ui-new` has only Vitest,
-  and every browser check so far was a one-off script. Planned as `test/e2e-smoke`, once the
-  rename sweep, U175 and the polish round are merged: a saved suite in `ui-new/e2e/` with a
-  `test:e2e` script, mocked API responses by default (writes stubbed), one journey per milestone's
-  done condition (sign in and pick a company; a task from created to done, answering an agent's
-  question and opening its run; Inbox triage; the project dashboard; agent chat; a settings save),
-  each also at 390px, and an optional read-only live mode against :3100.
+- **Done (Nov 16): a Playwright smoke suite** (`test/e2e-smoke`). `corepack pnpm --filter
+  @paperclipai/ui-new test:e2e` runs `ui-new/e2e/` against a production build on :5184 (about 30 s;
+  `E2E_DEV=1` uses the dev server, several times slower) with a fake API (`e2e/fixtures/`): every
+  request answered from typed fixtures, every write recorded and asserted, and a request with no
+  fixture fails the test. 14 journeys at desktop (1366) and phone (390) width: sign in, the shell
+  and New task, tasks (list, panel, inline status, comment, answering a question, the run modal),
+  Inbox triage, the project dashboard and Docs, agent chat, and a settings save with its unsaved dot.
+  `E2E_LIVE=1` runs read-only journeys against TES on :3100 (writes still faked); not yet run
+  against real data. Not covered: a task from created to done in one test, live-event updates,
+  uploads, drag and drop, plugins. See `ui-new/README.md`. Two app bugs found, below.
+- **Open (Nov 16): two sign-in bugs the smoke suite found.**
+  1. A fresh load bounces through sign-in, and then New task doesn't send. With nothing saved from a
+     previous visit, opening `/MSE/issues` signed in goes to `/auth?next=…` and straight back: the
+     gate in `lib/session.tsx` sees health loaded before the session read has started, treats that
+     as signed out, then mounts again. The write queue only counts the session as checked if it was
+     read after the gate mounted, so new tasks sit on "Waiting to send…" until the session refetches
+     (a refocus after 30 s). Also right after signing in, in dev and production builds.
+     `e2e/` marks it as an expected failure, and the New task test works around it (two lines to
+     delete once it's fixed).
+  2. Sign-in drops `?next=`: `routes/SignIn.tsx`'s `onSignedIn` reads `next()` after its awaits,
+     when the session effect has already navigated, so it goes on to `/` (a deep link or
+     `/companies` ends on the dashboard).
 - **Done (Nov 16): the last two partial rows.** The sign-in flows are marked done (the user's
   call; the flows the local_trusted test instance can't reach stay unit-tested). The Artifact
   library is done for stage 1: its project section no longer waits on upstream project documents,

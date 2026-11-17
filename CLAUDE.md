@@ -89,6 +89,7 @@ corepack pnpm --filter @paperclipai/ui-new dev       # new UI on :5174
 corepack pnpm --filter @paperclipai/ui-new exec vite --port 5181 --strictPort  # a second new UI, e.g. for an agent (5181–5184)
 corepack pnpm --filter @paperclipai/ui-new typecheck
 corepack pnpm --filter @paperclipai/ui-new test
+corepack pnpm --filter @paperclipai/ui-new test:e2e   # Playwright smoke suite, mocked API (E2E_LIVE=1: read-only against :3100)
 corepack pnpm --filter @paperclipai/ui-new inventory # regenerate the existing-UI inventory
 corepack pnpm --filter @paperclipai/plugin-sdk build # after install, a sync, or in a fresh worktree; else the server dies with "does not provide an export named …"
 git sync-master                                      # fast-forward master from upstream and push it (checks out master: see Gotchas)
