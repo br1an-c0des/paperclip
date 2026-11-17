@@ -12,6 +12,7 @@ import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { OrgHeader } from "@/org/OrgHeader";
+import { SummaryCard } from "@/projects/summary/AiSummary";
 import { Button } from "@/ui/Button";
 import { InfoTip } from "@/ui/InfoTip";
 import { Segmented } from "@/ui/Segmented";
@@ -32,6 +33,9 @@ import "./Workspaces.css";
  * the main one's address, and the tasks using it. Start or stop its services; close it, with the
  * server's close check first (CloseWorkspaceDialog). "Closed" lists closed workspaces: one reopens
  * from its task, when the task gets a new message or is resumed.
+ *
+ * Above the list, the Summarizer's "Workspace summary" (scope `workspaces_overview`, as the old
+ * page's SummarySlotCard), only while the instance has summaries on (`enableSummaries`).
  *
  * The old page shows only when isolated workspaces are switched on; the overview itself isn't
  * gated by the server, so here the tab is always there (no switches).
@@ -147,6 +151,7 @@ export function WorkspacesPage() {
           </p>
         )}
       </Show>
+      <SummaryCard scopeKind="workspaces_overview" title="Workspace summary" description="No workspace summary yet." />
       <Switch>
         <Match when={overview.isPending}>
           <p class="ws-muted">Loading workspaces…</p>

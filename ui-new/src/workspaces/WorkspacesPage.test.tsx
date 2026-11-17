@@ -77,6 +77,15 @@ vi.mock("@/api/workspaces", () => ({
   },
 }));
 
+// The card itself (and its "only while summaries are on") is tested in AiSummary.test.tsx.
+const summaryCard = vi.fn();
+vi.mock("@/projects/summary/AiSummary", () => ({
+  SummaryCard: (props: { title: string }) => {
+    summaryCard(props);
+    return <section aria-label={props.title} />;
+  },
+}));
+
 const { WorkspacesPage } = await import("./WorkspacesPage");
 
 function mount() {
@@ -101,6 +110,12 @@ describe("WorkspacesPage", () => {
     expect(within(card).getByRole("link", { name: /localhost:5173/ }).getAttribute("href")).toBe("http://localhost:5173");
     fireEvent.click(within(card).getByRole("button", { name: /TES-7/ }));
     expect(openTaskModal).toHaveBeenCalledWith({ id: "t7", identifier: "TES-7", title: "Fix the header", projectId: "p1" });
+  });
+
+  it("mounts the workspace summary over the list (decision 45)", async () => {
+    mount();
+    expect(screen.getByRole("region", { name: "Workspace summary" })).toBeTruthy();
+    expect(summaryCard).toHaveBeenCalledWith(expect.objectContaining({ scopeKind: "workspaces_overview", title: "Workspace summary" }));
   });
 
   it("stops services and closes after the close check", async () => {
