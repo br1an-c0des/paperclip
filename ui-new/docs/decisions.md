@@ -1574,7 +1574,7 @@ Both are handled in `ui-new` for now.
 - **Built-in agent setup** is one generic dialog (harness, model, budget); the old Summarizer-specific
   dialog and its streamed draft preview aren't ported. All built-in controls were checked with mocks
   only (`enableBuiltInAgents` is off).
-- **The Workspaces summary card is built but not mounted:** `src/workspaces/` belonged to another
+- **The Workspaces summary card is built but not mounted** (mounted Nov 16, `polish/stage1-leftovers`): `src/workspaces/` belonged to another
   slice. The mount is one line in the Workspaces overview:
   `<SummaryCard scopeKind="workspaces_overview" …>` from `@/projects/summary/AiSummary`. Also left:
   the project header wrapping on phones (`src/routes/Project.tsx`).

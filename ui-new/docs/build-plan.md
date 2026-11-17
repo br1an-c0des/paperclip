@@ -452,7 +452,7 @@ Progress:
 - **Left after round 3:** `documents-artifacts/library` (waits for upstream project documents,
   decision D), the sign-in flows (need an instance that requires sign-in to check live), and
   `shell/coordinator-workspace` (to investigate and design, 3.16). Still open from earlier: the
-  Workspaces summary card, the phone toolbar width (`.tv-toolbar--phone` is 394px at 390; fixed
+  Workspaces summary card (mounted Nov 16), the phone toolbar width (`.tv-toolbar--phone` is 394px at 390; fixed
   Nov 8), the project header on phones (built Nov 11, `projects/phone-header`: the M1, M12 and M13
   header, with the name opening the dock's Tasks switcher, status and date in the crumb line, search
   and More, the description on Overview, key numbers and the agents on it, and Overview, List and
@@ -481,6 +481,18 @@ Progress:
   card dialog's example buttons overflow at 390px (older); `RunTrace.tsx`'s admin note kept visible.
   Three settings the server ignores keep their controls with "Not used by the server yet."
   ([upstream-fixes](../../fork/upstream-fixes.md) 30–32). Original item below.
+- **Done (Nov 16): stage 1 polish leftovers** (`polish/stage1-leftovers`). The info-tip sweep's
+  leftovers: the queue's Steer, Interrupt and Interrupt and send buttons and ChatBinding's Discard
+  explain themselves in tap-open tips instead of `title=` (the countdown's Cancel is now "Keep
+  queued", which is what it does); the task modal's Dock uses the app's tooltip; a private blocker
+  says "Private: you don't have access." in view; the Sheets remove rule is a visible state line;
+  the catch-all page is a plain "Page not found" inside the shell (was "Not built yet"); the New
+  status card dialog's examples wrap at 390px. The Workspace summary card is mounted on the
+  Workspaces tab (decision 45). The Nov 12 copy was already fixed in the Nov 14 sweep and checked
+  against the server (`heartbeat/workspaces.ts`). Task checkouts shows its controls, with a note, when
+  a storage plugin keeps the policy in force with Isolated workspaces off; that's only when the
+  project has a workspace with a folder or repository (`checkoutsInForce`, from `heartbeat.ts` and
+  `project-workspace-provider.ts`). Not checked live: the Sheets line and the private blocker row.
 - **Done (Nov 16): pages that break when a rename changes their address** (`shell/rename-sweep`).
   Found on the agent page (fixed in `agents/AgentPage.tsx`). The sweep found two more: projects (the
   `urlKey` follows the name) and the company prefix (a managed instance re-derives it on a company
