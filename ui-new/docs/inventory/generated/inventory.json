@@ -1,5 +1,5 @@
 {
-  "upstreamCommit": "537b0408b38e2fe9497efca9ca3d7910de0af834",
+  "upstreamCommit": "79c8cf8b6bf73cad8c11222282fd792fdcb02fae",
   "routes": [
     {
       "path": "/oauth-handoff",
@@ -11486,7 +11486,7 @@
           ],
           "via": [
             "components/EmailConnectionAccess.tsx",
-            "pages/apps/AppDetail.tsx"
+            "pages/apps/app-detail/useConnectionPermissionSave.ts"
           ]
         },
         {
@@ -11885,18 +11885,6 @@
             {
               "method": "DELETE",
               "path": "/api/tool-profiles/:profileId"
-            }
-          ],
-          "via": [
-            "pages/apps/AppDetail.tsx"
-          ]
-        },
-        {
-          "key": "api/tools.ts::toolsApi.finishApp",
-          "requests": [
-            {
-              "method": "POST",
-              "path": "/api/companies/:companyId/tools/apps/:connectionId/finish"
             }
           ],
           "via": [
@@ -12171,6 +12159,54 @@
           ]
         },
         {
+          "key": "api/tools.ts::toolsApi.deleteStoredContent",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/tool-connections/:connectionId/stored-content/deletion"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/StoredContentDeletion.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.getStoredContent",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/tool-connections/:connectionId/stored-content"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/StoredContentDeletion.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.getStoredContentDeletion",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/tool-connections/:connectionId/stored-content/deletion"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/StoredContentDeletion.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.finishApp",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/tools/apps/:connectionId/finish"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/useConnectionPermissionSave.ts"
+          ]
+        },
+        {
           "key": "api/agents.ts::agentsApi.updatePermissions",
           "requests": [
             {
@@ -12285,7 +12321,7 @@
           ],
           "via": [
             "components/EmailConnectionAccess.tsx",
-            "pages/apps/AppDetail.tsx"
+            "pages/apps/app-detail/useConnectionPermissionSave.ts"
           ]
         },
         {
@@ -12682,18 +12718,6 @@
             {
               "method": "DELETE",
               "path": "/api/tool-profiles/:profileId"
-            }
-          ],
-          "via": [
-            "pages/apps/AppDetail.tsx"
-          ]
-        },
-        {
-          "key": "api/tools.ts::toolsApi.finishApp",
-          "requests": [
-            {
-              "method": "POST",
-              "path": "/api/companies/:companyId/tools/apps/:connectionId/finish"
             }
           ],
           "via": [
@@ -12943,6 +12967,54 @@
           ]
         },
         {
+          "key": "api/tools.ts::toolsApi.deleteStoredContent",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/tool-connections/:connectionId/stored-content/deletion"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/StoredContentDeletion.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.getStoredContent",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/tool-connections/:connectionId/stored-content"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/StoredContentDeletion.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.getStoredContentDeletion",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/tool-connections/:connectionId/stored-content/deletion"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/StoredContentDeletion.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.finishApp",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/tools/apps/:connectionId/finish"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/useConnectionPermissionSave.ts"
+          ]
+        },
+        {
           "key": "api/agents.ts::agentsApi.updatePermissions",
           "requests": [
             {
@@ -13078,7 +13150,7 @@
           ],
           "via": [
             "components/EmailConnectionAccess.tsx",
-            "pages/apps/AppDetail.tsx"
+            "pages/apps/app-detail/useConnectionPermissionSave.ts"
           ]
         },
         {
@@ -13476,18 +13548,6 @@
             {
               "method": "DELETE",
               "path": "/api/tool-profiles/:profileId"
-            }
-          ],
-          "via": [
-            "pages/apps/AppDetail.tsx"
-          ]
-        },
-        {
-          "key": "api/tools.ts::toolsApi.finishApp",
-          "requests": [
-            {
-              "method": "POST",
-              "path": "/api/companies/:companyId/tools/apps/:connectionId/finish"
             }
           ],
           "via": [
@@ -13751,6 +13811,54 @@
           ]
         },
         {
+          "key": "api/tools.ts::toolsApi.deleteStoredContent",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/tool-connections/:connectionId/stored-content/deletion"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/StoredContentDeletion.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.getStoredContent",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/tool-connections/:connectionId/stored-content"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/StoredContentDeletion.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.getStoredContentDeletion",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/tool-connections/:connectionId/stored-content/deletion"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/StoredContentDeletion.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.finishApp",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/tools/apps/:connectionId/finish"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/useConnectionPermissionSave.ts"
+          ]
+        },
+        {
           "key": "api/agents.ts::agentsApi.updatePermissions",
           "requests": [
             {
@@ -13865,7 +13973,7 @@
           ],
           "via": [
             "components/EmailConnectionAccess.tsx",
-            "pages/apps/AppDetail.tsx"
+            "pages/apps/app-detail/useConnectionPermissionSave.ts"
           ]
         },
         {
@@ -14271,18 +14379,6 @@
           ]
         },
         {
-          "key": "api/tools.ts::toolsApi.finishApp",
-          "requests": [
-            {
-              "method": "POST",
-              "path": "/api/companies/:companyId/tools/apps/:connectionId/finish"
-            }
-          ],
-          "via": [
-            "pages/apps/AppDetail.tsx"
-          ]
-        },
-        {
           "key": "api/tools.ts::toolsApi.getConnection",
           "requests": [
             {
@@ -14547,6 +14643,54 @@
           ],
           "via": [
             "pages/apps/app-detail/RailwayAccessPanel.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.deleteStoredContent",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/tool-connections/:connectionId/stored-content/deletion"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/StoredContentDeletion.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.getStoredContent",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/tool-connections/:connectionId/stored-content"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/StoredContentDeletion.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.getStoredContentDeletion",
+          "requests": [
+            {
+              "method": "GET",
+              "path": "/api/tool-connections/:connectionId/stored-content/deletion"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/StoredContentDeletion.tsx"
+          ]
+        },
+        {
+          "key": "api/tools.ts::toolsApi.finishApp",
+          "requests": [
+            {
+              "method": "POST",
+              "path": "/api/companies/:companyId/tools/apps/:connectionId/finish"
+            }
+          ],
+          "via": [
+            "pages/apps/app-detail/useConnectionPermissionSave.ts"
           ]
         },
         {
@@ -43315,6 +43459,21 @@
       ],
       "referenced": true
     },
+    "api/tools.ts::toolsApi.deleteStoredContent": {
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/api/tool-connections/:connectionId/stored-content/deletion"
+        }
+      ],
+      "usedBy": [
+        "App.tsx#AppsConnectEntryRoute",
+        "pages/apps/AppDetail.tsx",
+        "pages/apps/AppNotConnected.tsx",
+        "pages/apps/AppsConnect.tsx"
+      ],
+      "referenced": true
+    },
     "api/tools.ts::toolsApi.disableStdioTemplate": {
       "requests": [
         {
@@ -43495,6 +43654,36 @@
       ],
       "usedBy": [],
       "referenced": false
+    },
+    "api/tools.ts::toolsApi.getStoredContent": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/tool-connections/:connectionId/stored-content"
+        }
+      ],
+      "usedBy": [
+        "App.tsx#AppsConnectEntryRoute",
+        "pages/apps/AppDetail.tsx",
+        "pages/apps/AppNotConnected.tsx",
+        "pages/apps/AppsConnect.tsx"
+      ],
+      "referenced": true
+    },
+    "api/tools.ts::toolsApi.getStoredContentDeletion": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/tool-connections/:connectionId/stored-content/deletion"
+        }
+      ],
+      "usedBy": [
+        "App.tsx#AppsConnectEntryRoute",
+        "pages/apps/AppDetail.tsx",
+        "pages/apps/AppNotConnected.tsx",
+        "pages/apps/AppsConnect.tsx"
+      ],
+      "referenced": true
     },
     "api/tools.ts::toolsApi.getTestAgentAccess": {
       "requests": [
