@@ -156,6 +156,17 @@ Since the 2026-11-14 sync:
   `GET /api/tool-connections/:connectionId/machine-sign-in`, `POST …/machine-sign-in/test`,
   `POST …/rotate` and `POST …/rotate/complete` (`toolsApi.*MachineSignIn*`; rotate and complete are
   unused in the old UI so far). The step itself is redesigned (#21469). U158, U159.
+Since the 2026-11-17 sync:
+- **Delete data read through a connection** (#22010): `GET /api/tool-connections/:connectionId/stored-content`
+  (`toolsApi.getStoredContent`: counts of saved tool calls, approvals, app views and runs, plus any
+  deletion), `POST …/stored-content/deletion` (`toolsApi.deleteStoredContent`, starts one) and
+  `GET …/stored-content/deletion` (`toolsApi.getStoredContentDeletion`, polled until `completed`).
+  `DELETE /api/tool-connections/:connectionId?deleteStoredContent=true` removes the connection and
+  starts the deletion. App detail shows a "Delete data read through this app" row to people who can
+  configure a tool connection; Browse's Remove dialog has the checkbox (U177).
+- **Google Workspace disclosure** (#21998): the service picker shows what agents can do with each
+  chosen service and how the data is used, before Google's consent screen; Reconnect opens the
+  picker and sends `workspaceServices` with `startOAuth` (U178).
 Upstream recipes: `maps/feature-map/connection-setup.md`, `gateways-profiles.md`, `chat-channels.md`,
 `app-permissions.md`.
 
