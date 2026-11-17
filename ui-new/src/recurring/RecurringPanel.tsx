@@ -21,6 +21,7 @@ import { RecurringDetails } from "./RecurringDetails";
 import { RecurringActivity } from "./RecurringActivity";
 import { RecurringHistory } from "./RecurringHistory";
 import { RecurringRuns, RunNowForm } from "./RecurringRuns";
+import "@/projects/settings/ProjectSettings.css";
 import "@/tasks/TaskDetails.css";
 import "@/tasks/TaskModal.css";
 import "@/tasks/TaskPanel.css";

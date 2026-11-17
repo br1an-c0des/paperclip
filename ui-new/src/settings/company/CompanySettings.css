@@ -428,10 +428,6 @@
   font-size: 13px;
 }
 
-.cs-env {
-  gap: 8px;
-}
-
 /* SSH's Advanced: authentication configured on the remote machine (U157). */
 .cs-env-advanced summary {
   color: var(--body);
@@ -450,27 +446,9 @@
   margin-top: 10px;
 }
 
-.cs-env .ps-env-head,
-.cs-env .ps-env-row {
-  padding-inline: 0;
-}
-
 @media (max-width: 640px) {
   .cs-env-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .cs-env .ps-env-head {
-    display: none;
-  }
-
-  .cs-env .ps-env-row {
-    grid-template-columns: minmax(0, 1fr) 30px;
-  }
-
-  .cs-env .ps-env-value {
-    grid-column: 1 / -1;
-    grid-row: 2;
   }
 }
 

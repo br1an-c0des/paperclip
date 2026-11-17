@@ -289,49 +289,6 @@
   color: var(--text);
 }
 
-/* Secrets */
-.rpn-secrets {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.rpn-secrets h2 {
-  margin-right: 6px;
-}
-
-.rpn-secret-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 4px 0 10px;
-  border: 1px solid var(--edge);
-  border-radius: var(--r-pill);
-  font-size: 12px;
-}
-
-
-/* The Add a secret popover's own title, with its "i" beside it (Popover's title can't hold one). */
-.rpn-popover-head {
-  margin-bottom: 8px;
-  padding-right: 32px;
-}
-
-.rpn-popover-head .popover-title {
-  padding-right: 0;
-}
-
-.rpn-secret-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 240px;
-  margin-top: 8px;
-  overflow-y: auto;
-}
-
 /* Run policy */
 .rpn-policy {
   grid-template-columns: 210px minmax(0, 1fr);

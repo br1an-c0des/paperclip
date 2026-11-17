@@ -75,7 +75,7 @@ export function EnvironmentSection(props: { project: Project }) {
     <>
       <SettingsCard
         title="Environment variables"
-        info="Set for every run in this project, over an agent's own variable with the same name. Secret values are never shown here."
+        info="Set for every run on this project's tasks. When a name is set in more than one place, the later one wins: agent, environment, project, recurring task. Secret values are never shown here."
         description={saveNote(saver.state(), saver.error())}
         footer={
           <>

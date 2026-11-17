@@ -230,7 +230,7 @@ export const AGENT_SECTIONS: ({ heading: string } | { key: AgentSectionKey; labe
   { heading: "How it runs" },
   { key: "runtime", label: "Model and runtime" },
   { key: "tools", label: "Tools and channels" },
-  { key: "secrets", label: "Secrets and variables" },
+  { key: "secrets", label: "Environment variables" },
   { key: "budget", label: "Budget" },
   { heading: "Governance" },
   { key: "permissions", label: "Permissions and trust" },

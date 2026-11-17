@@ -1,4 +1,4 @@
-import type { EnvBinding, RoutineDetail, RoutineTrigger, RoutineVariable } from "@paperclipai/shared";
+import type { RoutineDetail, RoutineTrigger, RoutineVariable } from "@paperclipai/shared";
 import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import {
@@ -10,7 +10,6 @@ import {
   Folder,
   FolderKanban,
   GitBranch,
-  KeyRound,
   Plus,
   Puzzle,
   Target,
@@ -19,7 +18,8 @@ import {
   Webhook,
   X,
 } from "lucide-solid";
-import { createMemo, createSignal, For, Match, Show, Switch as Branch, type JSX } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch as Branch, type JSX } from "solid-js";
+import { createStore, reconcile } from "solid-js/store";
 import { activeAgents } from "@/api/agents";
 import { ApiError } from "@/api/client";
 import { openProjects } from "@/api/projects";
@@ -27,6 +27,10 @@ import { queryKeys } from "@/api/queryKeys";
 import { routinesApi } from "@/api/routines";
 import { secretsApi } from "@/api/secrets";
 import { useCompany } from "@/lib/company";
+import { NewSecret } from "@/projects/settings/EnvironmentSection";
+import { envDirty, envFromRows, envProblem, envRows, newEnvRow, type EnvRow } from "@/projects/settings/settings-model";
+import { FootError } from "@/projects/settings/shared";
+import { EnvVarsEditor } from "@/settings/company/EnvVarsEditor";
 import { useAgentsQuery, useGoalsQuery, useProjectsQuery } from "@/lib/company-data";
 import { copyText } from "@/tasks/TaskActions";
 import { useTaskPeople } from "@/tasks/people";
@@ -136,7 +140,7 @@ export function RecurringDetails(props: { routine: RoutineDetail; onOpenTask: (t
       <Description routine={props.routine} save={save} />
       <Triggers routine={props.routine} />
       <Inputs routine={props.routine} save={save} />
-      <Secrets routine={props.routine} save={save} />
+      <EnvVars routine={props.routine} save={save} />
       <RunPolicy routine={props.routine} save={save} />
     </div>
   );
@@ -942,88 +946,86 @@ function Inputs(props: { routine: RoutineDetail; save: Save }) {
   );
 }
 
-function envName(name: string) {
-  const cleaned = name.toUpperCase().replace(/[^A-Z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
-  return /^[A-Z_]/.test(cleaned) ? cleaned : `SECRET_${cleaned}`;
-}
-
-function Secrets(props: { routine: RoutineDetail; save: Save }) {
+/*
+ * Environment variables (board R2): what every task this recurring task creates gets, over the
+ * project's and the agent's variables with the same name. The project settings' editor: plain text,
+ * one of the company's secrets, or a personal secret. Saving is explicit and replaces the set.
+ */
+function EnvVars(props: { routine: RoutineDetail; save: Save }) {
   const company = useCompany();
-  const [open, setOpen] = createSignal(false);
-  const [name, setName] = createSignal("");
+  const client = useQueryClient();
+  const env = () => props.routine.env ?? null;
+  const [rows, setRows] = createStore<EnvRow[]>(envRows(env()));
+  const [problem, setProblem] = createSignal<string | null>(null);
+  const [saving, setSaving] = createSignal(false);
   const secrets = createQuery(() => ({
     queryKey: queryKeys.projectSettings.secrets(company().id),
     queryFn: ({ signal }) => secretsApi.list(company().id, signal),
-    enabled: open() || Object.keys(props.routine.env ?? {}).length > 0,
   }));
-  const env = () => (props.routine.env ?? {}) as Record<string, EnvBinding>;
-  const describe = (binding: EnvBinding) => {
-    if (typeof binding === "string" || binding.type === "plain") return "A plain value";
-    if (binding.type === "secret_ref") return secrets.data?.find((secret) => secret.id === binding.secretId)?.name ?? "A company secret";
-    return `Each person's ${binding.key}`;
+  const definitions = createQuery(() => ({
+    queryKey: queryKeys.projectSettings.userSecretDefinitions(company().id),
+    queryFn: ({ signal }) => secretsApi.userDefinitions(company().id, signal),
+    retry: false,
+  }));
+  const dirty = () => envDirty(env(), rows);
+  const reset = () => {
+    setProblem(null);
+    setRows(reconcile(envRows(env())));
   };
-  const remove = (key: string) => {
-    const next = { ...env() };
-    delete next[key];
-    void props.save({ env: Object.keys(next).length > 0 ? next : null }, `Couldn't remove ${key}`);
-  };
-  const add = (secretId: string, fallbackName: string) => {
-    const key = envName(name().trim() || fallbackName);
-    if (env()[key]) return pushToast({ tone: "warn", title: `${key} is already set` });
-    setOpen(false);
-    setName("");
-    void props.save({ env: { ...env(), [key]: { type: "secret_ref", secretId } } }, `Couldn't add ${key}`);
+  // Another recurring task always resets the rows; the same one follows saved changes unless you're editing.
+  createEffect(on(() => props.routine.id, reset, { defer: true }));
+  createEffect(on(() => JSON.stringify(env()), () => !dirty() && reset(), { defer: true }));
+
+  const save = async () => {
+    const found = envProblem(rows);
+    if (found) return setProblem(found);
+    setProblem(null);
+    const next = envFromRows(rows);
+    setSaving(true);
+    const saved = await props.save({ env: Object.keys(next).length > 0 ? next : null }, "Couldn't save the variables");
+    setSaving(false);
+    if (saved) setRows(reconcile(envRows(next)));
   };
   return (
-    <section class="td-section rpn-section" aria-labelledby="rpn-secrets">
-      <div class="rpn-secrets">
-        <h2 class="td-section-title disp" id="rpn-secrets">
-          Secrets
+    <section class="td-section rpn-section" aria-labelledby="rpn-env">
+      <div class="info-line">
+        <h2 class="td-section-title disp" id="rpn-env">
+          Environment variables
         </h2>
-        <For each={Object.entries(env())}>
-          {([key, binding]) => (
-            <span class="rpn-secret-chip" title={describe(binding)}>
-              <KeyRound size={12} aria-hidden="true" />
-              <span class="mono">{key}</span>
-              <button type="button" class="nt-icon nt-icon--small" aria-label={`Remove ${key}`} onClick={() => remove(key)}>
-                <X size={12} aria-hidden="true" />
-              </button>
-            </span>
-          )}
-        </For>
-        <Popover open={open()} onOpenChange={setOpen}>
-          <Popover.Trigger class="btn btn--icon btn--ghost btn--compact" aria-label="Add a secret">
-            <Plus size={15} aria-hidden="true" />
-          </Popover.Trigger>
-          <Popover.Content label="Add a secret" width={340}>
-            <div class="info-line rpn-popover-head">
-              <h2 class="popover-title">Add a secret</h2>
-              <InfoTip label="About secrets" text="Each run gets it as an environment variable, over the project's and the agent's." />
-            </div>
-            <TextInput aria-label="Variable name" placeholder="Variable name, like DERIBIT_API_KEY" class="mono" value={name()} onInput={(event) => setName(event.currentTarget.value)} />
-            <div class="rpn-secret-list" role="listbox" aria-label="Company secrets">
-              <Branch>
-                <Match when={!secrets.data}>
-                  <p class="rpn-muted">{secrets.isError ? "The secrets couldn't be loaded." : "Loading secrets…"}</p>
-                </Match>
-                <Match when={secrets.data!.filter((secret) => secret.status === "active").length === 0}>
-                  <p class="rpn-muted">This company has no secrets yet. Add them in company settings.</p>
-                </Match>
-                <Match when={true}>
-                  <For each={secrets.data!.filter((secret) => secret.status === "active")}>
-                    {(secret) => (
-                      <button type="button" class="nt-option" role="option" onClick={() => add(secret.id, secret.name)}>
-                        <KeyRound size={14} aria-hidden="true" />
-                        <span class="nt-option-label">{secret.name}</span>
-                      </button>
-                    )}
-                  </For>
-                </Match>
-              </Branch>
-            </div>
-          </Popover.Content>
-        </Popover>
+        <InfoTip
+          label="About environment variables"
+          text="Set for every task this creates. When a name is set in more than one place, the later one wins: agent, environment, project, recurring task. Secret values are never shown here."
+        />
       </div>
+      <EnvVarsEditor
+        rows={rows}
+        setRows={setRows}
+        secrets={secrets.data ?? []}
+        definitions={definitions.data ?? []}
+        onEdit={() => setProblem(null)}
+        actions={
+          <>
+            <NewSecret
+              onCreated={(secret) => {
+                void client.invalidateQueries({ queryKey: queryKeys.projectSettings.secrets(company().id) });
+                const name = secret.name.toUpperCase().replace(/[^A-Z0-9_]/g, "_").replace(/^(\d)/, "_$1");
+                setRows(rows.length, { ...newEnvRow("secret"), name, secretId: secret.id });
+              }}
+            />
+            <Show when={dirty()}>
+              <span class="ps-foot-end">
+                <FootError message={problem()} />
+                <Button size="compact" variant="quiet" onClick={reset}>
+                  Discard
+                </Button>
+                <Button size="compact" variant="primary" disabled={saving()} onClick={() => void save()}>
+                  {saving() ? "Saving…" : "Save variables"}
+                </Button>
+              </span>
+            </Show>
+          </>
+        }
+      />
     </section>
   );
 }

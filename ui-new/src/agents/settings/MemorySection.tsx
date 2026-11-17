@@ -121,7 +121,7 @@ export function MemorySection(props: { agent: AgentDetail; base: string }) {
                 <Show when={!autoMemoryOff()}>
                   To rely on the agent's folder alone, set CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 under{" "}
                   <A class="ps-link" href={`${props.base}/secrets`}>
-                    Secrets and variables
+                    Environment variables
                   </A>
                   .
                 </Show>

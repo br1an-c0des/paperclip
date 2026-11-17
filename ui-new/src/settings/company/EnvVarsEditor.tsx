@@ -1,6 +1,6 @@
 import type { CompanySecret, UserSecretDefinition } from "@paperclipai/shared";
 import { Check, KeyRound, Plus, X } from "lucide-solid";
-import { For, Show } from "solid-js";
+import { For, Show, type JSX } from "solid-js";
 import { produce, type SetStoreFunction } from "solid-js/store";
 import { newEnvRow, type EnvRow, type EnvRowKind } from "@/projects/settings/settings-model";
 import { Button } from "@/ui/Button";
@@ -8,9 +8,10 @@ import { FieldButton, TextInput } from "@/ui/Field";
 import { Menu } from "@/ui/Menu";
 
 /*
- * Variables an environment injects into the runs it hosts, in the project settings' editor rows
- * (projects/settings/EnvironmentSection.tsx, whose row model this reuses): plain text, one of the
- * company's secrets, or a personal secret each person sets. The caller owns the rows and saves them.
+ * Environment variables for the runs an environment hosts or a recurring task creates, in the
+ * project settings' editor rows (projects/settings/EnvironmentSection.tsx, whose row model this
+ * reuses): plain text, one of the company's secrets, or a personal secret each person sets. The
+ * caller owns the rows and saves them. The editor has no card padding of its own (`ps-env--bare`).
  *
  * `secretNames` names secrets the company's list can't show: environments are instance-wide, so a
  * variable may point at another organization's secret (`GET /environments/:id/secret-refs`).
@@ -25,6 +26,8 @@ export function EnvVarsEditor(props: {
   definitions: readonly UserSecretDefinition[];
   secretNames?: Record<string, string>;
   onEdit?: () => void;
+  /** More buttons beside Add variable, such as New secret and Save. */
+  actions?: JSX.Element;
 }) {
   const active = () => props.secrets.filter((secret) => secret.status === "active" && secret.scope === "company");
   const update = (id: string, change: (row: EnvRow) => void) => {
@@ -36,7 +39,7 @@ export function EnvVarsEditor(props: {
   const definitionName = (key: string) => props.definitions.find((definition) => definition.key === key)?.name ?? (key || "Pick a personal secret");
 
   return (
-    <div class="ps-env cs-env">
+    <div class="ps-env ps-env--bare">
       <div class="ps-env-head" aria-hidden="true">
         <span>Name</span>
         <span>Value</span>
@@ -138,7 +141,7 @@ export function EnvVarsEditor(props: {
           </div>
         )}
       </For>
-      <div>
+      <div class="ps-env-actions">
         <Button
           size="compact"
           icon={<Plus size={14} aria-hidden="true" />}
@@ -149,6 +152,7 @@ export function EnvVarsEditor(props: {
         >
           Add variable
         </Button>
+        {props.actions}
       </div>
     </div>
   );

@@ -15,7 +15,7 @@ import { pushToast } from "@/ui/Toast";
 import { CardNote, FootError, SectionTitle, useAgentSaver } from "../shared";
 
 /*
- * Secrets and variables (board 30's outline): the environment variables the agent's runs get
+ * Environment variables (board 30's "Secrets and variables"): the variables the agent's runs get
  * (`adapterConfig.env`), in the same editor as a project's: plain text, one of the company's
  * secrets by reference, or a personal secret each person sets. Values of secrets are never shown,
  * and the server keeps any value it sent back redacted. Saving is explicit and replaces the
@@ -58,7 +58,7 @@ export function SecretsSection(props: { agent: AgentDetail }) {
     const next = envFromRows(rows);
     if (await saver.save({ adapterConfig: { env: next } })) {
       setRows(reconcile(envRows(next)));
-      pushToast({ tone: "success", title: "Saved the variables" });
+      pushToast({ tone: "success", title: "Saved the environment variables" });
     }
   };
   const secretName = (id: string) => (secrets.data ?? []).find((secret) => secret.id === id)?.name ?? (id ? "A secret you can't see" : "Pick a secret");
@@ -66,10 +66,10 @@ export function SecretsSection(props: { agent: AgentDetail }) {
 
   return (
     <>
-      <SectionTitle title="Secrets and variables" info={`Values ${props.agent.name}'s runs receive as environment variables.`} />
+      <SectionTitle title="Environment variables" info={`Values ${props.agent.name}'s runs receive as environment variables.`} />
       <SettingsCard
         title="Variables"
-        info="Set for every run of this agent. On a project's task, a project variable with the same name wins."
+        info="Set for every run of this agent. When a name is set in more than one place, the later one wins: agent, environment, project, recurring task."
         description={
           <CardNote state={saver.state()} error={saver.error()}>
             Secret values are never shown here.

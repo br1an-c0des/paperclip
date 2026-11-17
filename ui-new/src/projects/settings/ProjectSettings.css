@@ -632,6 +632,38 @@ a.ps-path:hover {
   padding: 10px 20px;
 }
 
+/* The shared editor outside a settings card: no card padding (EnvVarsEditor.tsx). */
+.ps-env--bare {
+  gap: 8px;
+}
+
+.ps-env--bare .ps-env-head,
+.ps-env--bare .ps-env-row {
+  padding-inline: 0;
+}
+
+.ps-env-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .ps-env--bare .ps-env-head {
+    display: none;
+  }
+
+  .ps-env--bare .ps-env-row {
+    grid-template-columns: minmax(0, 1fr) 30px;
+  }
+
+  .ps-env--bare .ps-env-value {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
 @container (max-width: 560px) {
   .ps-env-head {
     display: none;

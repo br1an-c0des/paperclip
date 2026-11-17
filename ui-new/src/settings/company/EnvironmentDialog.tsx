@@ -449,7 +449,7 @@ export function EnvironmentDialog(props: { edit: EnvironmentEdit | null; onClose
         <div class="field-stack">
           <span class="info-line">
             <span class="field-label">Environment variables</span>
-            <InfoTip label="About Environment variables">Given to every run in this environment. Secret values are never shown here.</InfoTip>
+            <InfoTip label="About environment variables">Given to every run in this environment. When a name is set in more than one place, the later one wins: agent, environment, project, recurring task. Secret values are never shown here.</InfoTip>
           </span>
           <EnvVarsEditor
             rows={rows}
