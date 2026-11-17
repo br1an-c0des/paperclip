@@ -10,6 +10,7 @@ import {
   checkoutDirty,
   checkoutDraft,
   checkoutPolicy,
+  checkoutsInForce,
   storageAvailability,
   storageEnvironmentNames,
   currentPolicy,
@@ -341,6 +342,18 @@ describe("task checkouts", () => {
     const policy = checkoutPolicy(plugged, { ...checkoutDraft(plugged), enabled: false });
     expect(policy.storageProviderPluginId).toBe("plug");
     expect("environmentId" in policy).toBe(false);
+  });
+
+  it("is in force with Isolated workspaces on, or on a plugin-storage project with a workspace (J17)", () => {
+    const core = project({ executionWorkspacePolicy: { enabled: true, storageProviderPluginId: null }, workspaces: [workspace()] });
+    expect(checkoutsInForce(core, true)).toBe("instance");
+    expect(checkoutsInForce(core, false)).toBeNull();
+    const plugged = project({ executionWorkspacePolicy: { enabled: true, storageProviderPluginId: "plug" }, workspaces: [workspace({ cwd: null, repoUrl: "https://github.com/org/repo" })] });
+    expect(checkoutsInForce(plugged, true)).toBe("instance");
+    expect(checkoutsInForce(plugged, false)).toBe("plugin");
+    // Without a workspace the server reads the policy without its plugin, so the switch decides.
+    expect(checkoutsInForce({ ...plugged, workspaces: [] }, false)).toBeNull();
+    expect(checkoutsInForce({ ...plugged, workspaces: [workspace({ cwd: "  ", repoUrl: null })] }, false)).toBeNull();
   });
 });
 

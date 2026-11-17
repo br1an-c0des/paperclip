@@ -3,8 +3,9 @@ import type { ProjectWorkspace } from "@paperclipai/shared";
 /*
  * A project workspace's commands JSON (`runtimeConfig.workspaceRuntime`), as the old workspace
  * page edits it (ui/src/pages/ProjectWorkspaceDetail.tsx, "Advanced runtime JSON"): Paperclip
- * derives the workspace's services and jobs from it, and task checkouts inherit it unless they
- * override it. The text must be a JSON object, or empty to clear it. The server merges
+ * derives the workspace's services and jobs from it, and every task working from the workspace,
+ * in the shared folder or its own worktree, inherits it unless that task's workspace has its own
+ * (`effectiveRuntimeConfig` in server/src/routes/execution-workspaces.ts, no mode check). The text must be a JSON object, or empty to clear it. The server merges
  * `runtimeConfig`, so sending only `workspaceRuntime` keeps the desired service states.
  */
 

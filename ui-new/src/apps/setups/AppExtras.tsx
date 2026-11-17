@@ -293,7 +293,6 @@ export function SheetsCard(props: { connection: ToolConnection; canConfigure: bo
                     size="compact"
                     variant="quiet"
                     disabled={save.isPending || ids().length <= 1}
-                    title={ids().length <= 1 ? "Add another sheet before removing this one." : undefined}
                     onClick={() => save.mutate(ids().filter((current) => current !== id))}
                   >
                     Remove
@@ -303,6 +302,10 @@ export function SheetsCard(props: { connection: ToolConnection; canConfigure: bo
             )}
           </For>
         </ul>
+        {/* Why Remove is off: state, so it stays visible (a disabled button's title never shows on a phone). */}
+        <Show when={props.canConfigure && ids().length === 1}>
+          <p class="cx-static">Add another sheet before removing this one.</p>
+        </Show>
       </Show>
       <Show when={props.canConfigure}>
         <form class="ap-inline" onSubmit={add}>

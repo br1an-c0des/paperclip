@@ -6,6 +6,7 @@ import { ApiError } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import { queuedCommentsApi } from "@/api/queued-comments";
 import { Button } from "@/ui/Button";
+import { InfoTip } from "@/ui/InfoTip";
 import { TextArea } from "@/ui/Field";
 import { followAppLink, renderMarkdown, useKnownPrefixes, useOptionalNavigate } from "@/ui/Markdown";
 import { Menu } from "@/ui/Menu";
@@ -44,8 +45,8 @@ import "./QueuedMessages.css";
  * says so (#19370).
  *
  * Since the 2026-11-09 sync (U84, #19970): your own plain follow-up is steered into the live run on
- * its own after five seconds. Its row reads "Sending in Xs" with Edit and Cancel in place of Steer
- * now; Cancel keeps it queued, with Steer now back. The rules are in queue-model.ts, the countdown in
+ * its own after five seconds. Its row reads "Sending in Xs" with Edit and Keep queued in place of
+ * Steer now; Keep queued stops the countdown, with Steer now back. The rules are in queue-model.ts, the countdown in
  * auto-steer.ts. A run still starting takes the queue into its first turn when Interrupt is pressed
  * (#20168), and the strip's head says so through the queue's `executionWait.message`.
  *
@@ -216,7 +217,7 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
   const [announcement, setAnnouncement] = createSignal("");
   createEffect(
     on(auto.counting, (counting) => {
-      if (counting) setAnnouncement("A queued message will be sent into the current run in a few seconds. Edit or Cancel to keep it.");
+      if (counting) setAnnouncement("A queued message will be sent into the current run in a few seconds. Edit it, or choose Keep queued to hold it.");
     }),
   );
   const interrupt = () =>
@@ -251,10 +252,11 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
               <Show when={props.queue.executionWait?.message}>{(message) => <span class="qm-wait"> · {message()}</span>}</Show>
             </span>
             <Show when={props.queue.targetRunId}>
-              <Button size="compact" variant="quiet" class="qm-interrupt" disabled={!!busy() || !props.queue.queueId} onClick={() => void interrupt()} title="Stop the current run and start the next one with these messages">
+              <Button size="compact" variant="quiet" class="qm-interrupt" disabled={!!busy() || !props.queue.queueId} onClick={() => void interrupt()}>
                 <Square size={12} aria-hidden="true" />
                 Interrupt and send
               </Button>
+              <InfoTip label="About Interrupt and send">Stops the current run and starts the next one with these messages.</InfoTip>
             </Show>
           </div>
         </Show>
@@ -278,26 +280,31 @@ export function QueuedMessages(props: { taskId: string; queue: IssueQueuedCommen
                         <div class="qm-acts">
                           <Show when={auto.secondsLeft(entry.comment.id) !== null}>
                             <span class="qm-countdown">Sending in {auto.secondsLeft(entry.comment.id)}s</span>
-                            <Button size="compact" variant="quiet" title="Edit it before it's sent" onClick={() => setEditing({ id: entry.comment.id, body: entry.comment.body })}>
+                            <Button size="compact" variant="quiet" onClick={() => setEditing({ id: entry.comment.id, body: entry.comment.body })}>
                               Edit
                             </Button>
-                            <Button size="compact" variant="quiet" title="Keep this message in the queue" onClick={() => auto.cancel(entry.comment.id)}>
-                              Cancel
+                            <Button size="compact" variant="quiet" onClick={() => auto.cancel(entry.comment.id)}>
+                              Keep queued
                             </Button>
                           </Show>
                           <Show when={auto.secondsLeft(entry.comment.id) === null && delivery()}>
-                            {(found) => (
-                              <Button
-                                size="compact"
-                                variant="quiet"
-                                class="qm-steer"
-                                disabled={!found().enabled || !!busy()}
-                                title={found().hint}
-                                onClick={() => void (found().action === "steer" ? steer(entry) : interrupt())}
-                              >
-                                {found().action === "steer" ? "Steer now" : found().action === "send" ? "Send" : "Interrupt"}
-                              </Button>
-                            )}
+                            {(found) => {
+                              const label = () => (found().action === "steer" ? "Steer now" : found().action === "send" ? "Send" : "Interrupt");
+                              return (
+                                <>
+                                  <Button
+                                    size="compact"
+                                    variant="quiet"
+                                    class="qm-steer"
+                                    disabled={!found().enabled || !!busy()}
+                                    onClick={() => void (found().action === "steer" ? steer(entry) : interrupt())}
+                                  >
+                                    {label()}
+                                  </Button>
+                                  <InfoTip label={`About ${label()}`}>{found().hint}</InfoTip>
+                                </>
+                              );
+                            }}
                           </Show>
                           <Show when={entry.canEdit && !fixed && auto.secondsLeft(entry.comment.id) === null}>
                             <Button size="compact" variant="quiet" disabled={!!busy() || !props.queue.queueId} onClick={() => setEditing({ id: entry.comment.id, body: entry.comment.body })}>

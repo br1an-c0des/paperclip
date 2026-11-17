@@ -25,6 +25,7 @@ import {
   checkoutDirty,
   checkoutDraft,
   checkoutPolicy,
+  checkoutsInForce,
   CONCURRENCY_OPTIONS,
   legacyRepositories,
   localFolderRequest,
@@ -59,9 +60,9 @@ import { COMMANDS_EXAMPLE, commandEntries, commandsRequest, commandsText, parseC
  *   `runtimeConfig.workspaceRuntime`) is edited in the workspace's form, checked before saving
  *   (workspace-commands.ts).
  * - Task checkouts follow the instance's `enableIsolatedWorkspaces` (decision 12), except on a
- *   project with a workspace storage plugin, whose checkout policy the server applies even with it
- *   off (`gateProjectExecutionWorkspacePolicy` in server/src/services/heartbeat.ts and
- *   execution-workspaces.ts). The folder paths hide under `enableManagedSandboxOnly`, as the old UI
+ *   project with a workspace storage plugin and a workspace, whose checkout policy the server
+ *   applies even with it off (`checkoutsInForce` in settings-model.ts; the card says so then).
+ *   The folder paths hide under `enableManagedSandboxOnly`, as the old UI
  *   does.
  * - A workspace's Setup command is saved but the server never runs it (only the checkout policy's
  *   setup command runs, in a task's worktree), so its field says so. Its Cleanup command and
@@ -80,10 +81,7 @@ export function CodeSection(props: { project: Project }) {
     <>
       <RepositoriesCard project={props.project} hideHostPaths={hideHostPaths()} />
       <WorkspacesCard project={props.project} hideHostPaths={hideHostPaths()} />
-      <CheckoutsCard
-        project={props.project}
-        isolatedEnabled={experimental.data?.enableIsolatedWorkspaces === true || Boolean(props.project.executionWorkspacePolicy?.storageProviderPluginId)}
-      />
+      <CheckoutsCard project={props.project} inForce={checkoutsInForce(props.project, experimental.data?.enableIsolatedWorkspaces === true)} />
     </>
   );
 }
@@ -742,8 +740,14 @@ function WorkspaceForm(props: {
 // ---------------------------------------------------------------------------------------------
 
 
-function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
+function CheckoutsCard(props: { project: Project; inForce: ReturnType<typeof checkoutsInForce> }) {
   const company = useCompany();
+  // Why the controls show with Isolated workspaces off: state, so it stays visible.
+  const pluginNote = () => {
+    const found = storageAvailability(props.project);
+    const storage = found.kind === "list" ? `${found.storageName} storage` : "workspace storage plugin";
+    return `Isolated workspaces is off on this instance, but this project's ${storage} still applies these settings.`;
+  };
   const saver = useProjectSaver(() => props.project);
   const [draft, setDraft] = createStore<CheckoutDraft>(checkoutDraft(props.project));
   // Follows the saved policy when it changes and nothing is being edited.
@@ -783,8 +787,11 @@ function CheckoutsCard(props: { project: Project; isolatedEnabled: boolean }) {
         ) : undefined
       }
     >
+      <Show when={props.inForce === "plugin"}>
+        <p class="ps-list-note">{pluginNote()}</p>
+      </Show>
       <Show
-        when={props.isolatedEnabled}
+        when={props.inForce !== null}
         fallback={
           <p class="ps-list-note">
             Tasks share the project workspace. To give each its own worktree, an instance admin turns on Isolated workspaces in{" "}
