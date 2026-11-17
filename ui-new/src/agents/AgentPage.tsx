@@ -6,6 +6,7 @@ import { agentsApi, findAgent } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery } from "@/lib/company-data";
+import { addressWithSegment, rememberedId, rememberKey, type KeyMemory } from "@/lib/renamed-address";
 import { ChatHeaderActions, ChatView, createChatControls } from "@/chat/ChatView";
 import { RailLayout, SectionRail } from "@/ui/PageHeader";
 import { useAgentEnvironmentSlots } from "@/plugins/agent-environment";
@@ -44,22 +45,25 @@ import "./Agent.css";
  * `agentEnvironmentDriver` shows only when the agent's environment uses that plugin driver.
  */
 
+/** Which agent each address key found this session, so a renamed agent keeps its pages. */
+const agentKeys: KeyMemory = new Map();
+
 export function AgentPage() {
   const params = useParams<{ agentKey: string; rest?: string }>();
   const company = useCompany();
   const agents = useAgentsQuery();
   const listed = createMemo(() => findAgent(agents.data, params.agentKey));
-  // The address uses the agent's name (`urlKey`), which a rename changes. Once the address has
-  // found an agent, its id stays in use for that address, so a rename keeps the page and the
-  // effect below moves the address to the new name.
-  let resolved: { key: string; id: string } | undefined;
+  // The address uses the agent's name (`urlKey`), which a rename changes. Once an address has
+  // found an agent, its id stays in use for that address for the session (lib/renamed-address), so
+  // a rename keeps the page, the effect below moves the address to the new name, and an older
+  // history entry with the old name still opens the agent.
   const key = createMemo(() => {
     const found = listed();
     if (found) {
-      resolved = { key: params.agentKey, id: found.id };
+      rememberKey(agentKeys, params.agentKey, found.id, company().id);
       return found.id;
     }
-    return resolved?.key === params.agentKey ? resolved.id : params.agentKey;
+    return rememberedId(agentKeys, params.agentKey, company().id) ?? params.agentKey;
   });
   const detail = createQuery(() => ({
     queryKey: queryKeys.agents.detail(key()),
@@ -83,8 +87,8 @@ export function AgentPage() {
   createEffect(() => {
     const found = agent();
     if (!found || !agents.isSuccess || listed() || params.agentKey === found.id) return;
-    const rest = (params.rest ?? "").replace(/^\/+/, "");
-    navigate(`${base()}${rest ? `/${rest}` : ""}${location.search}${location.hash}`, { replace: true });
+    // Only the name's segment changes, so a run's address (`/agents/:key/runs/:runId`) keeps its run.
+    navigate(addressWithSegment(location, 2, found.urlKey), { replace: true });
   });
   createEffect(() => {
     const current = view();
