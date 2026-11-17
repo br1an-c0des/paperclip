@@ -369,6 +369,24 @@ export type CheckoutDraft = {
   teardownCommand: string;
 };
 
+/**
+ * Whether the server applies the project's task-checkout policy, so the Task checkouts card shows
+ * its controls: with the instance's Isolated workspaces on (`enableIsolatedWorkspaces`), and on a
+ * project created with a workspace storage plugin even with it off. The heartbeat gates the policy
+ * on `isolatedWorkspacesEnabled || storageProviderPluginId` (server/src/services/heartbeat.ts,
+ * `gateProjectExecutionWorkspacePolicy`). The plugin is only in the policy it reads when the
+ * project has a workspace with a folder or repository: without one it reads
+ * `sourcelessProjectWorkspacePolicy`, which drops the plugin (project-workspace-provider.ts), so the
+ * Isolated workspaces switch decides again. `"plugin"` is the second case, for the card to say
+ * why the controls are there.
+ */
+export function checkoutsInForce(project: Pick<Project, "executionWorkspacePolicy" | "workspaces">, isolatedWorkspacesOn: boolean): "instance" | "plugin" | null {
+  if (isolatedWorkspacesOn) return "instance";
+  if (!project.executionWorkspacePolicy?.storageProviderPluginId) return null;
+  const hasSource = (project.workspaces ?? []).some((workspace) => Boolean(workspace.cwd?.trim() || workspace.repoUrl?.trim()));
+  return hasSource ? "plugin" : null;
+}
+
 /** The policy in effect: a workspace provider's effective policy, else the stored one. */
 export function effectivePolicy(project: Pick<Project, "executionWorkspacePolicy" | "workspaceProvider">) {
   return project.workspaceProvider?.effectivePolicy ?? project.executionWorkspacePolicy ?? null;
