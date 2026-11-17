@@ -512,18 +512,16 @@ Progress:
   `E2E_LIVE=1` runs read-only journeys against TES on :3100 (writes still faked); not yet run
   against real data. Not covered: a task from created to done in one test, live-event updates,
   uploads, drag and drop, plugins. See `ui-new/README.md`. Two app bugs found, below.
-- **Open (Nov 16): two sign-in bugs the smoke suite found.**
-  1. A fresh load bounces through sign-in, and then New task doesn't send. With nothing saved from a
-     previous visit, opening `/MSE/issues` signed in goes to `/auth?next=…` and straight back: the
-     gate in `lib/session.tsx` sees health loaded before the session read has started, treats that
-     as signed out, then mounts again. The write queue only counts the session as checked if it was
-     read after the gate mounted, so new tasks sit on "Waiting to send…" until the session refetches
-     (a refocus after 30 s). Also right after signing in, in dev and production builds.
-     `e2e/` marks it as an expected failure, and the New task test works around it (two lines to
-     delete once it's fixed).
-  2. Sign-in drops `?next=`: `routes/SignIn.tsx`'s `onSignedIn` reads `next()` after its awaits,
-     when the session effect has already navigated, so it goes on to `/` (a deep link or
-     `/companies` ends on the dashboard).
+- **Done (Nov 16): two sign-in bugs the smoke suite found** (`auth/session-gate-fixes`).
+  1. A fresh load bounced through sign-in, and then New task didn't send for up to 30 s. The gate
+     took a session read that hadn't started yet for "signed out" (it waited on `isLoading`, now
+     `isPending`: `gateLoading` in `lib/session.tsx`), and the write queue only trusted a session read
+     after the gate mounted, which never happened after signing in (now: read from the server since
+     the page loaded, `sessionChecked`; a session restored from the offline cache still can't send).
+  2. Sign-in dropped `?next=`: `routes/SignIn.tsx` now fixes the destination before its awaits and
+     navigates once.
+  The suite's expected failure and its 31 s workaround are gone; `e2e/auth.spec.ts` covers both
+  (32 journeys pass).
 - **Done (Nov 16): the last two partial rows.** The sign-in flows are marked done (the user's
   call; the flows the local_trusted test instance can't reach stay unit-tested). The Artifact
   library is done for stage 1: its project section no longer waits on upstream project documents,
