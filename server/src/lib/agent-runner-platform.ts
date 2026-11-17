@@ -28,7 +28,8 @@ function detectLocalRunnerTarget(): LocalRunnerTarget {
   return target;
 }
 
-// FORK: runner-libc-probe-sync (upstream PR #17905; drop once it reaches the fork)
+// Synchronous on purpose: an async probe behind a top-level await can time out while modules load
+// and cache `libc: "unknown"` (same change as upstream PR #17905).
 const localTarget = detectLocalRunnerTarget();
 
 export function localAgentRunnerTarget(): LocalRunnerTarget {

@@ -1,46 +1,39 @@
-# Upstream fixes
+# Bugs
 
-Bug fixes and docs corrections the fork can send to `paperclipai/paperclip` as pull requests instead
-of carrying them as fork patches: candidates found while building `ui-new`, and what has been built,
-submitted and merged. How to build and send one is in
-[FORK.md](../FORK.md#contributing-fixes-upstream).
+The fork's bug list: things the code or docs get wrong, found while building and using Paperclip.
+Since the hard fork (2026-11-17) they're fixed in our own tree, on a branch merged into `main`. The
+file kept its old name, `upstream-fixes.md`, so links still work. Until then it listed fixes to send
+to `paperclipai/paperclip`; entries from that time keep their history (branches, pull requests).
 
-**Only fixes belong here:** something upstream's code or docs get wrong, which a focused pull request
-can correct without asking upstream first. New behaviour, new API fields or filters, and other
-feature asks are feature ideas, kept in the build plan
-([3.17](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) and the other stage 3 entries)
-whether or not they might go upstream. Entries 8 and 10–13 were moved there on Nov 16, 2026; their
-numbers are kept so older links still resolve.
+**Only bugs belong here:** something that's wrong. New behaviour, new API fields or filters and
+other additions are feature ideas in the build plan
+([3.17](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) and the other stage 3 entries).
+Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 
 ## How to use this list
 
-- **Add a candidate when you find one:** the next number, a one-line title, status `candidate`,
-  and a section below saying what's wrong, where, the likely fix, and anything in the fork that
-  works around it.
-- **Move it along as it changes:**
+- **Add one when you find it:** the next number, a one-line title, status `candidate`, and a section
+  below saying what's wrong, where, the likely fix, and anything in `ui-new` that works around it.
+- **Statuses:**
 
   | Status | Meaning |
   | --- | --- |
-  | `candidate` | Found and described; nothing built yet |
-  | `building` | Being built on its `fix/*` or `docs/*` branch off `master` |
-  | `ready` | Built and tested; waiting for review before it goes upstream |
-  | `submitted` | Pull request open upstream |
-  | `merged` | Merged upstream; it reaches the fork through the next sync |
-  | `closed` | Closed without merging, or dropped; say why |
-  | `moved` | A feature ask, not a bug: moved to the build plan's feature ideas |
+  | `candidate` | Found and described; not fixed yet |
+  | `fixed` | Fixed in `main`; say the commit, and remove any workaround it names |
+  | `submitted` | From the soft fork: a pull request still open upstream. Its change comes into `main` in hard-fork step 2. |
+  | `closed` | Dropped, or closed without merging; say why |
+  | `moved` | A feature, not a bug: moved to the build plan's feature ideas |
 
-- **Fill in the branch, the pull request and the date** of each step, and note in its section any
-  fork workaround to remove once it's merged.
-- Before building one, search upstream for a duplicate pull request, as upstream's PR template asks.
-- Build a fix only once the user has signed off on it, with the `upstream-fix` skill
-  ([.claude/skills/upstream-fix/SKILL.md](../.claude/skills/upstream-fix/SKILL.md)).
-- **A feature ask isn't a fix.** If the change adds something rather than correcting it, record it
-  as a feature idea in the [build plan](../ui-new/docs/build-plan.md#317-smaller-feature-ideas)
-  instead.
+- **Fix one only once the user has signed off on it.** Many are in code this setup doesn't use (the
+  Paperclip Runner, other adapters, Windows): those stay `candidate` unless they get in the way
+  ([hard-fork plan step 3](hard-fork-plan.md#3-leave-unused-code-until-it-gets-in-the-way)).
+- **A server fix reaches server1** only once the deployment builds from source (hard-fork step 2).
+- **An upstream fix for one of these** may turn up in the upstream watch; take it by cherry-pick
+  and mark the entry `fixed`.
 
 ## The list
 
-| # | Fix | Status | Branch | Pull request | Found | Submitted | Merged |
+| # | Bug | Status | Branch | Pull request | Found | Submitted | Merged |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | [Clear the compact issue-list cache when an issue changes](#1-clear-the-compact-issue-list-cache-when-an-issue-changes) | submitted | `fix/issue-list-cache-invalidation` | [#17828](https://github.com/paperclipai/paperclip/pull/17828) | 2026-10-26 | 2026-10-26 | |
 | 2 | [Don't crash on Windows when an agent directory path is longer than 260 characters](#2-dont-crash-on-windows-when-an-agent-directory-path-is-longer-than-260-characters) | closed | `fix/agent-directory-probe-long-cwd` | [#17691](https://github.com/paperclipai/paperclip/pull/17691) | | 2026-10-26 | |

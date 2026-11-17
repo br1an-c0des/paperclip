@@ -1,13 +1,15 @@
 # Hard fork plan
 
-**Status: proposed, not adopted.** Written 2026-11-16, at upstream `537b0408b` (the last commit merged
-into `new-ui`, [sync 2026-11-16](sync-reports/2026-11-16.md)). Until it's adopted, the rules in
-[CLAUDE.md](../CLAUDE.md) and [FORK.md](../FORK.md) still apply.
+**Status: adopted 2026-11-17.** Frozen at upstream `79c8cf8b6` (tag `upstream-freeze`, the last
+commit merged, [sync 2026-11-17](sync-reports/2026-11-17.md)). `new-ui` was renamed `main`. Step 1
+is done; [Progress](#progress) tracks the rest. Written 2026-11-16 as a proposal; the decisions
+taken on adoption are under [Decisions](#decisions).
 
-The proposal: stop syncing with upstream `paperclipai/paperclip`, treat this repo as our own
-codebase, cut it down to what a single-person, Claude-only setup needs, and then change the server
-freely. Today the fork pays the cost of syncing and also lives under upstream's limits. A hard fork
-removes both.
+The plan: stop syncing with upstream `paperclipai/paperclip`, treat this repo as our own codebase,
+and change the server freely, starting with how Claude runs. Code this setup doesn't use (the other
+adapters, the Paperclip Runner, cloud execution) stays in the tree, dormant, until it gets in the
+way of a change we want ([step 3](#3-leave-unused-code-until-it-gets-in-the-way)). Before, the fork
+paid the cost of syncing and also lived under upstream's limits. The hard fork removes both.
 
 ## Contents
 
@@ -16,12 +18,13 @@ removes both.
 - [The frustrations this addresses](#the-frustrations-this-addresses)
 - [The Paperclip Runner](#the-paperclip-runner)
 - [The plan](#the-plan)
+- [Progress](#progress)
 - [Watching upstream](#watching-upstream)
 - [The build plan after the hard fork](#the-build-plan-after-the-hard-fork)
 - [Deployment](#deployment)
 - [Risks](#risks)
-- [Decisions to make](#decisions-to-make)
-- [Docs to change when this is adopted](#docs-to-change-when-this-is-adopted)
+- [Decisions](#decisions)
+- [Docs changed on adoption](#docs-changed-on-adoption)
 
 ## Why
 
@@ -54,8 +57,10 @@ Measured 2026-11-16, with raw line counts (non-test TypeScript unless noted):
 | License | MIT, so a personal hard fork is fine |
 
 Upstream's pace means a young codebase, not a finished one. Freezing means inheriting today's bugs
-and fixing them ourselves. That's why the plan [cuts first](#3-cut-to-claude-only): code we delete
-is code we never have to understand, debug or test.
+and fixing them ourselves. The proposal was to cut first, since code we delete is code we never have
+to debug. On adoption we chose the opposite ([step 3](#3-leave-unused-code-until-it-gets-in-the-way)):
+cutting tangled code and its tests is real work up front, while dormant code mostly costs nothing
+until a change runs into it.
 
 ## The frustrations this addresses
 
@@ -65,8 +70,8 @@ the parts upstream won't make Claude-specific.
 
 ### Known bugs wait on upstream review
 
-Many bugs we hit already have an upstream pull request waiting for review, and 33 more are listed
-in [upstream-fixes.md](upstream-fixes.md), most as candidates. After the freeze, we take the fixes
+Many bugs we hit already have an upstream pull request waiting for review, and more are listed in
+[upstream-fixes.md](upstream-fixes.md) (39 entries at adoption), most as candidates. After the freeze, we take the fixes
 ourselves ([step 2](#2-take-the-fixes-already-written)).
 
 ### CLAUDE.md, repo skills and repo MCP servers aren't used
@@ -199,8 +204,8 @@ mean resolving conflicts in upstream's busiest area every week, for code we don'
 **Instead:**
 
 1. **Remove it late.** After step 0 turns it off, leave the code frozen and unsynced. Take it out
-   only when it gets in the way of a server change we want ([step 3](#3-cut-to-claude-only), last
-   item).
+   only when it gets in the way of a server change we want
+   ([step 3](#3-leave-unused-code-until-it-gets-in-the-way)).
 2. **Tag before deleting it** (for example `runner-last`), so a working Runner stays in git history.
    Bringing it back later means adapting it to a server that has moved on, which gets harder over
    time, but it's never lost.
@@ -223,27 +228,31 @@ Nothing here changes code, and all of it can be undone.
 
 1. In a few recent runs' details, check which path each agent uses: `claude_local` directly, the
    Paperclip Runner, or Claude Managed. The command and adapter are logged.
-2. Turn `enableNativeRunner` off on server1, or set the agents to `runner: "legacy"`, and use it
-   that way for one to two weeks. It's a setting on the real instance, so the user makes the change.
+2. Move server1's agents to the legacy runner (each agent's Runtime settings in `ui-new`), and turn
+   off Paperclip Runner in App settings → Features so new hires don't use it. The App settings
+   switch alone doesn't move agents already on the Runner. It's the real instance, so the user makes
+   the change. Then use it that way.
 3. Note anything that breaks or gets worse. It either becomes a fix in step 4 or a reason to keep
    part of the Runner.
 4. List the open upstream pull requests worth taking (step 2).
 
 ### 1. Freeze and reset the rules
 
-- **Freeze point:** the last upstream commit merged into `new-ui` (`537b0408b` today, or a later
-  one if we sync again before adopting this). Tag it, for example `upstream-freeze`.
-- **Branches:** `new-ui` becomes the main branch (optionally renamed to `main` and made the default
-  on GitHub). `master` keeps mirroring upstream (fast-forward only, `git sync-master`) so the
-  [upstream watch](#watching-upstream) can compare against it, but it's never merged into the main
-  branch again. `sync/*`, `fix/*` and `docs/*` branches stop.
+- **Freeze point:** `79c8cf8b6`, the last upstream commit merged (sync 2026-11-17), tagged
+  `upstream-freeze`.
+- **Branches:** `new-ui` is renamed `main` and is GitHub's default branch. `origin/new-ui` stays as
+  a frozen pointer at the branch point. `master` keeps mirroring upstream (fast-forward only,
+  `git sync-master`) so the [upstream watch](#watching-upstream) can compare against it, but it's
+  never merged into `main` again. `sync/*` branches stop. The three upstream pull requests already
+  open (#17828, #17905, #20710) stay open on their `fix/*` branches; no new ones are planned.
 - **Remote:** keep `upstream` as fetch-only. Chosen upstream fixes come in by cherry-pick
   ([Watching upstream](#watching-upstream)). That gets harder the further the code moves, so
   over time more of them become ideas to port by hand.
-- **Rules:** retire, in one commit, everything that only exists to stay mergeable:
+- **Rules:** retire everything that only exists to stay mergeable:
   - CLAUDE.md's ground rules: no upstream code changes, `FORK:` markers, no migrations in the
     numbered sequence, never edit `ui/`;
-  - [FORK-PATCHES.md](../FORK-PATCHES.md): its entries become ordinary code;
+  - [FORK-PATCHES.md](../FORK-PATCHES.md): the code entries become ordinary code; only the two
+    image patches stay listed until step 2 replaces them;
   - the `upstream-fix` skill and `git sync-ui`; the `upstream-sync` skill is replaced by
     `upstream-watch`;
   - FORK.md's sync, plugin-only and contribution sections.
@@ -262,29 +271,31 @@ Nothing here changes code, and all of it can be undone.
 - Turn [upstream-fixes.md](upstream-fixes.md) into the fork's own bug list. Many entries become
   plain fixes, and the ones about the Runner, other harnesses or Windows go away with step 3.
 
-### 3. Cut to Claude only
+### 3. Leave unused code until it gets in the way
 
-Remove, one subsystem per branch, in roughly this order:
+Decided on adoption (2026-11-17), replacing the proposal's "cut to Claude only". Nothing is removed
+up front: the other 11 adapters, the Paperclip Runner and Claude Managed, remote and cloud execution,
+the experimental flags on the server, unused packages and plugins, and the old `ui/` all stay in the
+tree, dormant. The work goes into `claude_local`, the path this setup uses (steps 4 to 7).
 
-1. **The other 11 adapters**, with their UI parsers, adapter selection and model lists. Hard-code
-   the Claude path.
-2. **Experimental flags, on the server too.** `ui-new` already settled most of them. Keep the
-   chosen branch of each and delete the switch and the other branch.
-3. **Remote and cloud execution:** environments, sandbox providers, AI connection pools and managed
-   connections, and whatever else only serves them, as long as the Runner doesn't need it while it's
-   still in the tree.
-4. **Packages and plugins we don't run.** Check each before removing: `google-sheets-mcp-server`,
-   `kv-demo-mcp-server`, `paperclip-eval-kernel`, `tailscale-https-broker`, `skills-catalog`,
-   `teams-catalog`, and the example and sandbox plugins.
-5. **The old `ui/`**, once `ui-new` covers everything M7 lists. Git history keeps it as a reference.
-6. **Later, when it gets in the way: the Paperclip Runner and Claude Managed.** Turned off since
-   step 0 and left frozen ([Keeping the option open](#keeping-the-option-open)). Tag the tree
-   first (`runner-last`), then remove it once it blocks a server change we want. It reaches into
-   heartbeat, tool authority (`paperclip-runner-tool-authority.ts`) and recovery, so it's real work,
-   but it's the biggest cut available.
+- **Remove when it gets in the way.** When dormant code blocks or complicates a change we want,
+  decide then: work around it, or remove that subsystem on its own branch. Tag before removing
+  anything large (for example `runner-last` for the Runner).
+- **Tests in dormant areas.** A change to shared code can break tests for features we don't use.
+  Don't fix dormant features to keep them green: skip the test with a note saying why, or remove the
+  subsystem if that's simpler. Tests for code we use keep passing.
+- **Builds.** Once the server is built from source ([Deployment](#deployment)), the image builds the
+  Rust Runner and every agent CLI. If build time gets in the way, that's a candidate for removal too.
+- **A map of the repo** says which areas are ours, which are shared core to change carefully, and
+  which are dormant: [Progress](#progress), after step 1.
 
-Delete tests together with the features they cover, and keep the rest of upstream's test suite
-running. It's the safety net for every later step.
+The proposal's list of what could go, in rough order of payoff, kept for when something does get in
+the way: the other 11 adapters; experimental flags on the server; remote and cloud execution
+(environments, sandbox providers, AI connection pools, managed connections); packages and plugins we
+don't run (`google-sheets-mcp-server`, `kv-demo-mcp-server`, `paperclip-eval-kernel`,
+`tailscale-https-broker`, `skills-catalog`, `teams-catalog`, the example and sandbox plugins); the
+old `ui/`; and the Paperclip Runner with Claude Managed, which reach into heartbeat, tool authority
+and recovery.
 
 ### 4. Make runs Claude-native
 
@@ -380,6 +391,17 @@ Build chat next to the hidden-task chat, then move over and delete the old path:
 Work through the [build plan](../ui-new/docs/build-plan.md) without the stage 3 and stage 4 limits,
 in whatever order matters most ([The build plan after the hard fork](#the-build-plan-after-the-hard-fork)).
 
+## Progress
+
+| Step | Status |
+| --- | --- |
+| 0. Check before freezing | Freeze taken first, on 2026-11-17. The legacy-runner switch on server1 is the user's to make (step 0, item 2); the run-path check and the list of upstream pull requests to take are open. |
+| 1. Freeze and reset the rules | Done 2026-11-17: tag `upstream-freeze`, `main`, the rules in CLAUDE.md, FORK.md and FORK-PATCHES.md, the `upstream-watch` skill replacing `upstream-sync` and `upstream-fix`. |
+| Repo map and `claude_local` trace | Next: two read-only agents. A map of the whole repo (ours, shared core, dormant, and which tests cover what), and a trace of one `claude_local` run from wake to finish, as the map for steps 4 and 5. |
+| 2. Take the fixes already written | Not started. Until then the deployment keeps upstream's image with `ui-new` and the two image patches. |
+| 3. Leave unused code | Ongoing, as decided. |
+| 4–7 | Not started. |
+
 ## Watching upstream
 
 We stop merging upstream, but keep reviewing it: a weekly check picks out the upstream changes
@@ -409,7 +431,11 @@ easy.
    The output is a short report, each candidate with its pull request and why it matters.
 4. **The user chooses.** The skill then cherry-picks the chosen commits on a branch, resolves
    conflicts, runs the typecheck and the related tests, and stops for approval before merging, as
-   the sync skill does today. Ports become tasks.
+   the sync skill did. Ports become tasks. A server fix only reaches server1 once the deployment
+   builds from source ([Deployment](#deployment)).
+
+The skill is [.claude/skills/upstream-watch/SKILL.md](../.claude/skills/upstream-watch/SKILL.md),
+and its ledger is [upstream-watch.md](upstream-watch.md).
 
 Expect cherry-picks to apply cleanly for the first months and less often as the code moves. The
 triage is what keeps the watch useful as that happens: it says which changes are worth porting by
@@ -431,14 +457,14 @@ Weekly is enough. In order:
 
 | Change | Ideas |
 | --- | --- |
-| Becomes a real core feature, not a workaround | Custom statuses ([3.1](../ui-new/docs/build-plan.md#31-custom-statuses-and-status-rules): real statuses instead of display names mapped onto the seven), custom fields with server filtering ([3.2](../ui-new/docs/build-plan.md#32-custom-fields)), project documents ([3.4](../ui-new/docs/build-plan.md#34-project-knowledge-base), 2b-8), ticket prefix per project (2b-9), relation types (2b-13) |
+| Becomes a real core feature, not a workaround | Custom statuses ([3.1](../ui-new/docs/build-plan.md#31-custom-statuses-and-status-rules): real statuses instead of display names mapped onto the seven), custom fields with server filtering ([3.2](../ui-new/docs/build-plan.md#32-custom-fields)), project documents ([3.4](../ui-new/docs/build-plan.md#34-project-knowledge-base)), the smaller feature ideas ([F1–F12](../ui-new/docs/build-plan.md#317-smaller-feature-ideas): ticket prefix per project, relation types, API filters and fields) |
 | Unblocked | Lists and sprints ([3.3](../ui-new/docs/build-plan.md#33-lists-and-sprints-on-hold): on hold only for want of its own table), runner visibility ([3.11](../ui-new/docs/build-plan.md#311-runner-visibility-beyond-the-api)), chat outside tasks ([3.12](../ui-new/docs/build-plan.md#312-chat-outside-tasks-dropped-kept-as-a-long-term-idea), step 6) |
 | Becomes a prompt-builder setting | COMPANY.md ([3.14](../ui-new/docs/build-plan.md#314-company-instructions-companymd)), project context in runs ([F6](../ui-new/docs/build-plan.md#317-smaller-feature-ideas)), the fork skill ([3.10](../ui-new/docs/build-plan.md#310-core-skill-add-on): edit the `paperclip` skill itself) |
 | Much simpler, Claude only | Memory ([3.5](../ui-new/docs/build-plan.md#35-memory-service): one Claude memory model instead of three that don't coordinate), fast mode for Claude ([F3](../ui-new/docs/build-plan.md#317-smaller-feature-ideas)) |
 | Becomes straightforward | Assigned comments that drive review stages ([3.8](../ui-new/docs/build-plan.md#38-assigned-comments-and-review-assignments)), routines triggered by events ([3.13](../ui-new/docs/build-plan.md#313-briefings-and-reports) step 3), permission roles (the hard-coded CEO checks can change) |
 | Unchanged | Briefings ([3.13](../ui-new/docs/build-plan.md#313-briefings-and-reports)), meetings ([3.9](../ui-new/docs/build-plan.md#39-meetings)), announcements ([3.7](../ui-new/docs/build-plan.md#37-announcement-channels)), the in-app guide ([3.15](../ui-new/docs/build-plan.md#315-an-in-app-guide-to-paperclip)) |
 
-Stage 2 (small upstream contributions) ends. Stage 1 (`ui-new`) continues, and gains the freedom to
+Stage 2 (upstream bug fixes) ends: its list becomes the fork's own bug list. Stage 1 (`ui-new`) continues, and gains the freedom to
 ask the server for what it needs instead of designing around gaps. Many entries in
 [decisions.md](../ui-new/docs/decisions.md) are API gaps that become server changes.
 
@@ -447,9 +473,11 @@ ask the server for what it needs instead of designing around gaps. Many entries 
 Today `deploy/Dockerfile` starts from upstream's published image and swaps in `ui-new`, and
 `deploy/patches/` edits the compiled server. After the freeze:
 
-- **Build from source.** Start from upstream's `Dockerfile` with our layer on top. It's slower at
-  first because of the Rust runner and the agent CLIs. It gets faster as the other harnesses go
-  (step 3), and again when the Runner goes.
+- **Build from source,** from the first server change (step 2 at the latest). Start from upstream's
+  `Dockerfile` with our layer on top. It's slower because of the Rust runner and the agent CLIs,
+  which stay while the code is kept (step 3). Until then `deploy.sh` keeps using upstream's image
+  for `upstream-freeze` (the merge base of `main` and `master`), so server source changes and
+  cherry-picks don't reach server1 yet.
 - **Image patches become source changes** (step 2).
 - **Optionally, a GitHub Actions workflow** builds the image on pushes to the main branch and
   publishes it to `ghcr.io/br1an-c0des/paperclip`, so server1 only pulls.
@@ -464,43 +492,53 @@ Today `deploy/Dockerfile` starts from upstream's published image and swaps in `u
   [upstream watch](#watching-upstream) picks them. Cherry-picking gets harder as the code moves.
 - **Security fixes no longer arrive automatically.** The watch always flags them. server1 is only
   reachable over Tailscale, so the exposure is low.
-- **Removing the Runner could turn out to be a mistake.** It's removed late, tagged first, and
-  watched upstream ([Keeping the option open](#keeping-the-option-open)).
+- **Removing the Runner could turn out to be a mistake.** It's removed late, if at all, tagged first,
+  and watched upstream ([Keeping the option open](#keeping-the-option-open)).
+- **Dormant code still costs something:** tests in dormant areas that break on shared changes, a
+  slower source build, and a larger repo to find your way around. Step 3's rules and the repo map
+  keep that small.
 - **The `claude_local` path has had less attention** since upstream started calling it "legacy". It
   may have rough edges, which become ours to fix. Step 0 finds them early.
-- **Cutting tangled code is real work.** The Runner and conversation mode reach into heartbeat,
-  recovery and `issues.ts`. One subsystem per branch, with tests passing after each, keeps it
-  manageable.
+- **Changing tangled code is real work.** Conversation mode (step 6), and the Runner if it's ever
+  removed, reach into heartbeat, recovery and `issues.ts`. One subsystem per branch, with tests
+  passing after each, keeps it manageable.
 - **Scope creep.** A hard fork makes everything possible. The build plan stays the list, and
   anything not on it needs a reason to be added.
 
-## Decisions to make
+## Decisions
 
-1. **Adopt this plan?** And when: right away, or after step 0's trial period.
-2. **Which run paths stay:** `claude_local` only (recommended), or also the Runner or Claude
-   Managed for something they alone provide. Either way the Runner's code stays in the tree until
-   it gets in the way.
-3. **The freeze point:** `537b0408b`, or one more sync first.
-4. **Branch names:** keep `new-ui`, or rename it to `main`.
-5. **Where agent personas live:** Paperclip's per-agent `AGENTS.md`, or role files in the repo
+Taken on adoption, 2026-11-17:
+
+1. **Adopt:** yes, now. The freeze came first; step 0's checks continue after it.
+2. **Run paths:** `claude_local` is what we use and improve. Nothing is removed: the Runner, Claude
+   Managed and the other adapters stay in the tree until they get in the way (step 3).
+3. **Freeze point:** `79c8cf8b6` (tag `upstream-freeze`).
+4. **Branch:** `new-ui` renamed `main`, GitHub's default; `origin/new-ui` kept as a frozen pointer.
+5. **The upstream watch:** written in step 1, run by hand weekly to start.
+6. **Open upstream pull requests** (#17828, #17905, #20710): left open.
+
+Still open:
+
+1. **Where agent personas live:** Paperclip's per-agent `AGENTS.md`, or role files in the repo
    (step 4).
-6. **Which open upstream pull requests to take** (step 2).
-7. **The order of steps 4 to 7**, if something else matters more day to day.
-8. **Where the upstream watch runs** once it's past the by-hand stage: a scheduled Claude Code run,
+2. **Which open upstream pull requests to take** (step 2), from step 0's list.
+3. **The order of steps 4 to 7**, if something else matters more day to day.
+4. **Where the upstream watch runs** once it's past the by-hand stage: a scheduled Claude Code run,
    or a recurring task in our own Paperclip instance.
 
-## Docs to change when this is adopted
+## Docs changed on adoption
 
 | Doc | Change |
 | --- | --- |
-| [CLAUDE.md](../CLAUDE.md) | Rewrite the purpose, intentions and ground rules for a hard fork; drop the sync commands and gotchas |
-| [FORK.md](../FORK.md) | Becomes a short "where this came from" page: the freeze point, the `master` mirror and `upstream` remote, the upstream watch, deployment |
-| [FORK-PATCHES.md](../FORK-PATCHES.md) | Retired once its entries are ordinary code |
-| [upstream-fixes.md](upstream-fixes.md) | Becomes the fork's bug list |
-| `fork/upstream-watch.md` | New: the watch's ledger (last reviewed upstream commit, decision on each candidate) |
-| `.claude/skills/upstream-sync` | Replaced by `.claude/skills/upstream-watch` |
-| `.claude/skills/upstream-fix` | Retired |
-| `fork/sync-reports/` | Kept as history; new watch reports go next to the ledger |
-| [ui-new/docs/build-plan.md](../ui-new/docs/build-plan.md) | Replace the four stages: stage 1 continues, stage 2 ends, stages 3 and 4 become one list of features built in core |
-| [deploy/README.md](../deploy/README.md), `deploy/Dockerfile` | Build from source |
-| Memory notes | Upstream-sync and upstream-fix notes become obsolete |
+| [CLAUDE.md](../CLAUDE.md) | Purpose, intentions and ground rules for a hard fork; sync commands and gotchas dropped |
+| [FORK.md](../FORK.md) | A short "where this came from" page: the freeze point, the `master` mirror and `upstream` remote, the upstream watch, deployment |
+| [FORK-PATCHES.md](../FORK-PATCHES.md) | Code entries retired; the two image patches stay until step 2 |
+| [upstream-fixes.md](upstream-fixes.md) | The fork's bug list |
+| [upstream-watch.md](upstream-watch.md) | New: the watch's ledger |
+| `.claude/skills/upstream-sync`, `.claude/skills/upstream-fix` | Replaced by `.claude/skills/upstream-watch` |
+| `fork/sync-reports/` | Kept as history |
+| [ui-new/docs/build-plan.md](../ui-new/docs/build-plan.md) | Stage 1 continues, stage 2 ends, stages 3 and 4 become features built in core |
+| [deploy/README.md](../deploy/README.md), [fork/setup-clone.sh](setup-clone.sh), [ui-new/README.md](../ui-new/README.md), the `pm` skill | `main` instead of `new-ui` |
+| Memory notes | Upstream-sync and upstream-fix notes retired |
+
+Still to change, in step 2: `deploy/Dockerfile` and `deploy/README.md` to build from source.

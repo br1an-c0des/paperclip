@@ -121,16 +121,13 @@ component in both themes.
 
 ## Using the existing UI as reference
 
-`../ui/src` is the source of truth for how the server API is used: endpoints, payloads, and realtime and websocket handling. `../ui/src/api/` is the most useful place to start. Import types from `@paperclipai/shared` with `import type` rather than redefining them, so type changes upstream show up as type errors here after a merge.
+`../ui/src` is the source of truth for how the server API is used: endpoints, payloads, and realtime and websocket handling. `../ui/src/api/` is the most useful place to start. Import types from `@paperclipai/shared` with `import type` rather than redefining them, so server type changes show up as type errors here.
 
-## Staying merge-friendly with upstream
+## Changing the API
 
-This fork tracks `paperclipai/paperclip` and doesn't change upstream code: build on the existing API rather than changing server, database or package code, with new features in fork plugins. Any change to an upstream file is recorded in [FORK-PATCHES.md](../FORK-PATCHES.md), and server fixes go upstream as pull requests ([FORK.md](../FORK.md#contributing-fixes-upstream)). Syncing with upstream is described in [FORK.md](../FORK.md#staying-in-sync-with-upstream).
+Since the hard fork (2026-11-17, [FORK.md](../FORK.md)) the server is ours: when `ui-new` needs
+something the API doesn't have, change the server instead of designing around the gap. Server
+changes only reach server1 once the deployment builds from source (hard-fork plan step 2).
 
-If `pnpm-lock.yaml` conflicts during a merge, don't resolve it by hand. Take upstream's version and regenerate it:
-
-```bash
-git checkout --theirs pnpm-lock.yaml   # "theirs" = master when merging master into new-ui
-pnpm install
-git add pnpm-lock.yaml
-```
+If `pnpm-lock.yaml` conflicts when merging a branch, don't resolve it by hand: take one side and
+regenerate it with `corepack pnpm install`, then `git add pnpm-lock.yaml`.

@@ -1,244 +1,58 @@
 # About this fork
 
-This is a fork of [paperclipai/paperclip](https://github.com/paperclipai/paperclip) at
-[br1an-c0des/paperclip](https://github.com/br1an-c0des/paperclip). Its purpose is to build a new
-board UI in SolidJS (`ui-new/`) while continuing to take upstream's daily changes.
+This is a hard fork of [paperclipai/paperclip](https://github.com/paperclipai/paperclip) at
+[br1an-c0des/paperclip](https://github.com/br1an-c0des/paperclip). It began on 2026-10-14 as a
+soft fork that built a new board UI in SolidJS (`ui-new/`) while merging upstream's changes every
+few days, without changing upstream's server. On 2026-11-17 it stopped merging upstream and became
+its own codebase ([fork/hard-fork-plan.md](fork/hard-fork-plan.md)).
 
-**The fork doesn't change upstream code.** Apart from registering `ui-new` in the pnpm workspace
-and one temporary carried fix (see [Fork-only files](#fork-only-files)), it doesn't change
-upstream's server, database or package code. Upstream lands many commits a day,
-and the server areas the redesign touches are still changing, so `ui-new` works with the API as it
-is. New features go in fork plugins first (see
-[Changing server, database and packages](#changing-server-database-and-packages)). Small server or
-documentation fixes found along the way go upstream as focused pull requests (see
-[Contributing fixes upstream](#contributing-fixes-upstream)), not into the fork.
+## The freeze
 
-The rule behind every decision below: **keep changes in files upstream doesn't own wherever
-possible, and record every exception.** New files never conflict with upstream, so merges stay
-easy. Each change to an upstream file is recorded in [FORK-PATCHES.md](FORK-PATCHES.md), so a merge
-can check what upstream changed against what the fork depends on.
-
-### Fork-only files
-
-| Fork-only files | Purpose |
-| --- | --- |
-| `FORK.md` | This plan |
-| `FORK-PATCHES.md` | Every change the fork makes to upstream files, and why |
-| `CLAUDE.md` | Instructions for Claude Code in this fork |
-| `ui-new/` | The SolidJS UI ([ui-new/README.md](ui-new/README.md)) |
-| `deploy/` | Production deployment ([deploy/README.md](deploy/README.md)) |
-| `fork/` | Fork records, such as upstream sync reports and the upstream fixes list |
-| `.claude/skills/upstream-sync/` | The upstream sync skill |
-| `.claude/skills/upstream-fix/` | The skill for building a small fix to send upstream |
-| `.claude/skills/pm/` | The `/pm` skill: run a session as the redesign's project manager |
-| `packages/plugins/fork-*/` | Plugins the fork adds (see below). Already in the pnpm workspace through `packages/plugins/*`. |
-
-The upstream files the fork edits are listed in [FORK-PATCHES.md](FORK-PATCHES.md). So far that is
-`pnpm-workspace.yaml` (one line, `- ui-new`), plus the `pnpm-lock.yaml` entries that line causes,
-and one exception: upstream PR #17905, carried in source until upstream merges it so the local dev
-server offers the Paperclip Runner (`runner-libc-probe-sync`). The deployed image doesn't use the
-fork's server source, so it gets the same fix from an image patch.
+- **Freeze point:** upstream `79c8cf8b6` (tag `upstream-freeze`), merged in the
+  [2026-11-17 sync](fork/sync-reports/2026-11-17.md). Everything upstream did up to there is in
+  `main`; nothing after it is, unless the upstream watch brings it in.
+- **Before the freeze:** 489 upstream migrations plus `0490`, 20 sync reports in
+  [fork/sync-reports/](fork/sync-reports/), and the soft fork's rules (no upstream code changes,
+  `FORK:` markers, fixes sent upstream). Those rules are retired; the history stays for reference.
+- **Upstream pull requests still open from the soft fork:** #17828, #17905 and #20710, on their
+  `fix/*` branches (worktrees in `~/coding/paperclip-fixes/`). They're left open. Their code comes
+  into `main` in hard-fork step 2, and two of them are applied as image patches until then
+  ([FORK-PATCHES.md](FORK-PATCHES.md)).
 
 ## Remotes and branches
 
 | Remote | URL | Use |
 | --- | --- | --- |
-| `origin` | `br1an-c0des/paperclip` | Your fork; push here |
+| `origin` | `br1an-c0des/paperclip` | Ours; push here |
 | `upstream` | `paperclipai/paperclip` | Fetch only. Push is disabled, and only `master` is fetched |
 
 | Branch | Rule |
 | --- | --- |
-| `master` | An exact mirror of `upstream/master`. Never commit here; it only fast-forwards. |
-| `new-ui` | All fork work. Upstream changes come in by merging `master`. |
-| `sync/<date>` | Short-lived, local. The `upstream-sync` skill merges `master` here first; `new-ui` fast-forwards to it once you approve. |
-| `fix/*`, `docs/*` | Pull requests to upstream. Branched from `master`, never merged into `new-ui` (see [Contributing fixes upstream](#contributing-fixes-upstream)). |
+| `main` | Our codebase, GitHub's default branch. Feature branches merge into it with `--no-ff`. Don't rebase it. |
+| `master` | An exact mirror of `upstream/master`, so the upstream watch can compare. Only fast-forwards (`git sync-master`); never committed to, never merged into `main`. |
+| `new-ui` (on origin) | Frozen pointer at the branch point, from before the rename. Don't push to it. |
+| `upstream-watch/<date>` | Short-lived: cherry-picks chosen in a watch, merged into `main` after approval. |
+| `fix/*` | The three open upstream pull requests above. No new ones. |
 
-Setting this up in a fresh clone (the git aliases and rerere live in `.git/config`, so they are
-per-clone):
+Setting up a fresh clone (the alias and remotes live in `.git/config`, so they're per-clone):
+[fork/setup-clone.sh](fork/setup-clone.sh).
 
-```bash
-git clone https://github.com/br1an-c0des/paperclip.git && cd paperclip
-git remote add upstream https://github.com/paperclipai/paperclip
-git remote set-url --push upstream DISABLE
-git config remote.upstream.fetch '+refs/heads/master:refs/remotes/upstream/master'
-git config rerere.enabled true
-git config rerere.autoupdate true
-git config alias.sync-master '!f() { set -e; cur=$(git branch --show-current); git fetch upstream; git checkout -q master; git merge --ff-only upstream/master; git push origin master; git checkout -q "$cur"; echo "master now at $(git rev-parse --short master); you are on $cur"; }; f'
-git config alias.sync-ui '!f() { set -e; git sync-master; git checkout new-ui; git merge master --no-edit; echo "Merged master into new-ui. Run tests, then: git push"; }; f'
-```
+## The upstream watch
 
-## Changing server, database and packages
-
-The fork builds new features in phases (the stages in the
-[build plan](ui-new/docs/build-plan.md#the-stages)):
-
-- **Now, and stage 3: no upstream code changes.** New features are built on the existing API, in a
-  fork plugin and a fork skill, or proposed upstream. The deployment stays on upstream's published
-  image and the syncs stay as they are (see [Plugins and the deployment](#plugins-and-the-deployment)).
-- **Stage 4, later: changes to upstream's source.** Features that need options 2 or 3 below wait
-  until stage 3 is done, and the first one is a deliberate switch (see
-  [When the fork starts changing source](#when-the-fork-starts-changing-source)). Agree on it before
-  starting.
-
-When a feature seems to need a server change, pick the first option that works:
-
-1. **A plugin.** The default for new features, and the only option before stage 4. Paperclip's
-   plugin system ([doc/plugins/PLUGIN_AUTHORING_GUIDE.md](doc/plugins/PLUGIN_AUTHORING_GUIDE.md))
-   gives a plugin its own Postgres schema with its own migrations, JSON API routes under
-   `/api/plugins/:pluginId/api/*`, event subscriptions, scheduled jobs, and read access to core
-   tables on an allowed list. `ui-new` can call plugin routes like any other API. A plugin can't
-   alter core tables or claim core API paths. Plugins never conflict with upstream.
-2. **New files plus a small hook.** Put the logic in new files (new routes, services, schema
-   files) and keep the edit to upstream files to a line or two that wires them in, such as
-   registering a router. Mark each hook with a `FORK:` comment and add an entry to
-   [FORK-PATCHES.md](FORK-PATCHES.md).
-3. **Editing upstream logic directly.** Last resort, for when a hook can't do it. Same marking and
-   entry, and the entry says why a hook wasn't enough. Expect these to need attention on syncs.
-
-`@paperclipai/shared` is upstream-owned too. Put fork-only types in fork files rather than adding
-them to `packages/shared`.
-
-### Plugins and the deployment
-
-A fork plugin doesn't change upstream's server, so the deployment keeps building on upstream's
-published image (see [Production deployment](#production-deployment)). The Dockerfile gains a step
-that builds the fork plugin and makes it available to install, either built into the image and
-installed by local path or published to a registry; this is settled with the first plugin. The
-image patches in [FORK-PATCHES.md](FORK-PATCHES.md#image-patches) stay as they are.
-
-Plugins never cause merge conflicts, but they depend on the plugin SDK and on the core tables they
-read, both of which upstream changes. Each sync builds the fork plugins and runs their tests (the
-`upstream-sync` skill does this).
-
-### When the fork starts changing source
-
-The first change to upstream's source (option 2 or 3 above, build plan stage 4) changes three
-things together. Plan them as one switch, not one feature at a time:
-
-- **The deployment builds from source.** Today's image swaps the UI into upstream's compiled
-  server, so source changes would never reach it. The image would be built from the fork's own
-  source, starting from upstream's `Dockerfile` with a fork layer on top. The build is slower (the
-  server, the Rust runner and the agent CLIs are all built), the server is no longer exactly what
-  upstream's CI tested, and `deploy.sh` no longer needs to find a published upstream image.
-- **Image patches become source patches.** The scripts in `deploy/patches/` edit upstream's
-  compiled bundles only because the source isn't rebuilt. They would be replaced by the same
-  changes in source, each with a `FORK:` marker and a FORK-PATCHES.md entry. #17905 is already
-  carried this way for the dev server (`runner-libc-probe-sync`), so only #20710 is new. That turns
-  the exception into a rule: an open upstream pull request may be carried as a recorded source
-  patch until upstream merges it, and is then dropped in favour of upstream's version. `fix/*`
-  branches still aren't merged into `new-ui`; the patch is a copy of the change.
-- **Syncs check more than conflicts.** New fork files compile against upstream's services, schema
-  and types, which can change without any merge conflict. Each sync would also run the server
-  typecheck, the fork features' tests, and a review of every FORK-PATCHES.md server entry against
-  upstream's changes. Hooks (option 2) cost little per sync; edits to upstream logic (option 3)
-  need attention whenever upstream works in that area. Fork tables outside a plugin also need the
-  separate migration track (below), which isn't built.
-
-### Database changes
-
-Upstream numbers its migrations in one sequence (`packages/db/src/migrations/NNNN_*.sql`, tracked
-in `meta/_journal.json`) and adds new ones most days. **Don't add fork migrations to that
-sequence:** the next upstream migration would take the same number, and renumbering a migration
-that a database has already applied breaks that database.
-
-- Prefer a plugin's own schema and migrations (option 1 above).
-- If core code needs fork tables, keep them on a separate migration track: their own folder and
-  tracking table, applied after upstream's. The mechanism isn't built, and isn't planned before
-  stage 4 ([When the fork starts changing source](#when-the-fork-starts-changing-source)). If it's ever needed, record it in [FORK-PATCHES.md](FORK-PATCHES.md).
-- Prefer side tables that reference upstream tables over altering upstream tables. A fork column
-  on an upstream table conflicts with every upstream change to that table.
-- List every fork database object under **Database objects** in [FORK-PATCHES.md](FORK-PATCHES.md).
-
-## Contributing fixes upstream
-
-Small server or documentation fixes found while building the UI go to `paperclipai/paperclip` as
-pull requests instead of fork patches. Once upstream merges one, it reaches the fork through the
-normal sync.
-
-Build each one with the `upstream-fix` skill (`/upstream-fix`,
-[.claude/skills/upstream-fix/SKILL.md](.claude/skills/upstream-fix/SKILL.md)), once the user has
-signed off on that fix. The skill covers the duplicate search, upstream's rules, a testing budget
-(the targeted test with and without the fix, plus `tsc`; the full suite is left to CI), and the PR
-description, and it stops before anything is pushed. The commands below are the outline.
-
-```bash
-git sync-master                                  # start from an up-to-date master
-git checkout -b fix/<short-description> master
-# make the change, with tests
-git push -u origin fix/<short-description>
-gh pr create --repo paperclipai/paperclip --base master --head br1an-c0des:fix/<short-description>
-```
-
-- **Branch from `master`, never from `new-ui`,** so the pull request contains only the fix. Don't
-  merge these branches into `new-ui`.
-- **Follow upstream's rules for contributors:** [CONTRIBUTING.md](CONTRIBUTING.md) (one logical
-  change in as few files as possible, and a search for duplicate pull requests first) and the PR
-  template rules in [AGENTS.md](AGENTS.md). Feature changes need agreement in upstream's Discord
-  `#dev` channel before any code is written.
-- **Name branches after the change** (`fix/…`, `docs/…`), with no internal task IDs.
-- **Track each fix in [fork/upstream-fixes.md](fork/upstream-fixes.md)** from the moment it's
-  found until it's merged: add it as a candidate, then record its branch, pull request and dates.
-  Ideas that still need agreement upstream stay in the proposal that found them, for example
-  [ui-new/docs/proposals/unifying-requests.md](ui-new/docs/proposals/unifying-requests.md#small-upstream-contributions).
-
-## Staying in sync with upstream
-
-Upstream lands about 25 commits a day, and about a third of them touch `ui/`. Sync often (daily
-or every few days); small merges are much easier than large ones.
-
-### With the sync skill (normal route)
-
-In Claude Code, run `/upstream-sync`. The skill
-([.claude/skills/upstream-sync/SKILL.md](.claude/skills/upstream-sync/SKILL.md)):
-
-1. Fetches upstream and outlines the commits `new-ui` doesn't have yet: the larger new features,
-   the bug fixes by area, other changes, and what to expect from the merge. Then it stops and
-   waits; nothing is pushed or merged until you give the go-ahead.
-2. Updates `master` from upstream, pushes it to origin, and checks the new commits against
-   [FORK-PATCHES.md](FORK-PATCHES.md).
-3. Merges them into a new local `sync/<date>` branch, resolving the conflicts its policy lets
-   it decide alone.
-4. Asks you about anything else, giving its options and a recommendation.
-5. Runs the checks: install, typechecks, tests near fork patches, the migration check, and the
-   inventory.
-6. Writes a report to `fork/sync-reports/<date>.md`.
-
-`new-ui` isn't touched until you approve. Then the skill fast-forwards `new-ui` to the sync branch
-and pushes it.
-
-### By hand
-
-```bash
-git sync-ui            # updates master from upstream, then merges it into new-ui
-corepack pnpm install  # upstream changes dependencies often
-corepack pnpm --filter @paperclipai/ui-new typecheck   # catches API type changes from @paperclipai/shared
-corepack pnpm --filter @paperclipai/ui-new inventory   # regenerate the existing-UI inventory
-git diff ui-new/docs/inventory/generated      # new or changed routes, requests and flags upstream added
-git push
-```
-
-When the inventory diff shows new capabilities, add them to `ui-new/docs/inventory/capabilities.md`
-(see [ui-new/docs/inventory/README.md](ui-new/docs/inventory/README.md)). Once the fork patches
-server code, also check upstream's changes against [FORK-PATCHES.md](FORK-PATCHES.md) and run the
-tests around each patch.
-
-### Rules
-
-- **Merge, don't rebase.** `new-ui` is long-lived and pushed. Rebasing it would replay hundreds of
-  upstream commits and rewrite pushed history.
-- **rerere is on**, so git reapplies a conflict resolution you've done before.
-- **`pnpm-lock.yaml` conflicts:** don't hand-edit. Take master's version and regenerate it:
-  ```bash
-  git checkout --theirs pnpm-lock.yaml && pnpm install && git add pnpm-lock.yaml
-  ```
-- `pnpm` isn't installed globally on the dev Mac. Use `corepack pnpm`, or run `corepack enable`
-  once.
+Upstream keeps moving (about 90 commits a day at the freeze). We don't merge it, but we review it:
+the `upstream-watch` skill (`/upstream-watch`,
+[.claude/skills/upstream-watch/SKILL.md](.claude/skills/upstream-watch/SKILL.md)) lists the
+upstream commits since the last review, filters out what only touches code we don't use, triages
+the rest (bug fixes in code we run, security fixes, features worth having, ideas to port by hand),
+and, once you choose, cherry-picks them on a branch for approval. Its ledger,
+[fork/upstream-watch.md](fork/upstream-watch.md), records the last upstream commit reviewed and the
+decision on each candidate. Weekly, by hand, to start.
 
 ## The new UI
 
 `ui-new/` is a standalone SolidJS + Vite app beside the React UI in `ui/`. It talks to the server
 over the same `/api`, and imports API types from `@paperclipai/shared` with `import type`, so
-upstream type changes show up as type errors after a merge. Use `ui/src` (especially
+server type changes show up as type errors. Use `ui/src` (especially
 `ui/src/api/`) as the reference for how the API is used. Details:
 [ui-new/README.md](ui-new/README.md).
 
@@ -262,18 +76,15 @@ decided against it:
   or runs. Plugins work around that with per-issue scans or `SELECT`s on allowed core tables, which
   ties them to the database layout. Calling `/api` straight from plugin UI works today, but the spec
   says plugins must not (`doc/plugins/PLUGIN_SPEC.md`, §19.0.2).
-- **The fork already has most of what a plugin would win.** It changes one upstream line, and the
-  deploy reuses upstream's image with only the UI swapped. What's left is installing on a stock
-  Paperclip with no custom image, which would matter only if pieces of the redesign were meant for
-  other Paperclip users.
+- **The fork already had most of what a plugin would win.** It changed one upstream line, and the
+  deploy reuses upstream's image with only the UI swapped. Since the hard fork the question is
+  settled anyway: the server is ours to change.
 
 Where plugins do fit:
 
-- **A companion plugin** (`packages/plugins/fork-*`) for state that belongs to the fork, such as
-  saved views, per-user triage state or agent tools. `ui-new` calls its routes under
-  `/api/plugins/:pluginId/api/*`. This is option 1 in
-  [Changing server, database and packages](#changing-server-database-and-packages). Don't use it to
-  combine core data; `ui-new` does that from the API.
+- **A companion plugin** (`packages/plugins/fork-*`) was the plan for state that belonged to the
+  fork before the hard fork. Now such state can go in core tables instead; a plugin is still fine
+  for something self-contained.
 - **A demo of one idea on stock Paperclip**, such as the "Needs you" page from the
   [requests proposal](ui-new/docs/proposals/unifying-requests.md), written as a React plugin page to
   share in upstream's Discord. Optional.
@@ -286,18 +97,17 @@ Where plugins do fit:
 
 ## Production deployment
 
-Summary (full steps in [deploy/README.md](deploy/README.md)):
+The working instance runs on server1 (details and commands in [deploy/README.md](deploy/README.md)):
 
-- **Image:** `deploy/Dockerfile` starts from upstream's published image for the upstream commit
-  last merged into `new-ui` (`ghcr.io/paperclipai/paperclip:sha-<commit>`), and replaces its UI
-  with a `ui-new` build. The server, Rust runner and agent CLIs are exactly upstream's, and nothing
-  heavy is rebuilt. `deploy/deploy.sh` picks the base commit automatically. This holds while the
-  fork's server features are plugins; changing upstream's source would mean building from source
-  ([When the fork starts changing source](#when-the-fork-starts-changing-source)).
-- **No server changes needed:** the server serves whatever is in `ui/dist`.
+- **Image, for now:** `deploy/Dockerfile` starts from upstream's published image for the merge base
+  of `main` and `master` (`ghcr.io/paperclipai/paperclip:sha-<commit>`, which stays
+  `upstream-freeze`), replaces its UI with a `ui-new` build, and applies the two image patches. The
+  server is exactly upstream's at the freeze. **Server source changes don't reach server1 yet.**
+- **Next:** build the image from our source (hard-fork plan step 2), starting from upstream's
+  `Dockerfile` with our layer on top. From then on every server change deploys.
 - **Stack:** `deploy/docker-compose.yml` runs Postgres + Paperclip with bind mounts under
-  `PAPERCLIP_DATA_ROOT` (default `/srv/paperclip`). Paperclip listens on loopback; put
-  `tailscale serve` (private) or Caddy (public, with HTTPS) in front.
+  `PAPERCLIP_DATA_ROOT`. Paperclip listens on loopback, behind `tailscale serve`.
+- **Before a deploy that adds a migration,** back up the database: migrations don't run backwards.
 
 ### Where agents' repos live
 
@@ -322,10 +132,6 @@ bind-mounted from `<PAPERCLIP_DATA_ROOT>/home`. Everything is visible on the hos
 
 ## Open items
 
-- Once the sync skill has run by hand a few times, consider scheduling it.
-- Optionally, a GitHub Actions workflow in this fork that builds the image on pushes to `new-ui`
-  and publishes it to `ghcr.io/br1an-c0des/paperclip`, so the server only pulls. Keep upstream's
-  own workflows disabled in the fork (GitHub disables them on forks by default).
+- Build the image from source (hard-fork step 2), optionally with a GitHub Actions workflow that
+  publishes it to `ghcr.io/br1an-c0des/paperclip` so server1 only pulls.
 - Agent git push / PR authentication inside the container (see above).
-- Decide how `ui-new` hosts plugin UI before it replaces the old UI in production (see
-  [A standalone app, not a plugin](#a-standalone-app-not-a-plugin)).

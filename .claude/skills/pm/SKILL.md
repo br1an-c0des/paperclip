@@ -17,8 +17,8 @@ You do:
 
 - Read the plan, the code and agent branches to decide and review work.
 - Small edits to plan and note documents: `ui-new/docs/build-plan.md`, `decisions.md`,
-  `inventory/capabilities.md` statuses and notes, `fork/upstream-fixes.md`, sync reports, memory.
-- Merge reviewed agent branches into `new-ui`, resolving small conflicts (a comment, an import, a
+  `inventory/capabilities.md` statuses and notes, `fork/upstream-fixes.md`, the watch ledger, memory.
+- Merge reviewed agent branches into `main`, resolving small conflicts (a comment, an import, a
   line both sides touched).
 - Run checks: typecheck, tests, `git` state.
 
@@ -32,7 +32,7 @@ just fix this" in code bypasses exactly the review step they asked for.
 ## Start of session
 
 1. Get oriented, without reporting every detail:
-   - `git status`, `git branch -vv`, `git worktree list`: is `new-ui` clean and pushed, and are there
+   - `git status`, `git branch -vv`, `git worktree list`: is `main` clean and pushed, and are there
      agent branches or worktrees not merged yet?
    - The milestones in `ui-new/docs/build-plan.md` and the statuses in
      `ui-new/docs/inventory/capabilities.md`: what's done, partial and next.
@@ -51,7 +51,7 @@ but the user approves each one, and may change or drop any of them. For each, gi
 - **Goal:** what it builds, with the boards and capability rows it closes.
 - **Owns:** the files and folders it will write. No two running agents own the same file. Shared
   docs (`capabilities.md`, `decisions.md`, `build-plan.md`) belong to you, not to agents.
-- **Branch:** `<area>/<slice>` in its own worktree, based on `new-ui`.
+- **Branch:** `<area>/<slice>` in its own worktree, based on `main`.
 - **Done when:** what works, plus `typecheck` and the tests passing.
 - **Depends on:** other agents' work it needs merged first, if any.
 
@@ -59,16 +59,16 @@ but the user approves each one, and may change or drop any of them. For each, gi
 
 - At most 5 agents running at once, and 3 is usually better: every branch has to be reviewed and
   merged, and that's your bottleneck, not theirs.
-- Don't start an upstream sync (`/upstream-sync`) while agents are running from the current
-  `new-ui`; propose it as its own step between batches.
+- Don't start an upstream watch's cherry-picks (`/upstream-watch`) while agents are running from the
+  current `main`; propose it as its own step between batches.
 
 ## Writing the brief
 
 Agents start cold, so the brief carries everything. Include:
 
-1. **Base check first.** Worktrees in this repo are cut from `master`, not `new-ui`. First step:
-   `git merge-base --is-ancestor new-ui HEAD || git reset --hard new-ui` while the tree is clean.
-2. **Rules:** read `CLAUDE.md`. No changes to upstream's server, database or package code (fork plugins are fine); never edit `ui/`;
+1. **Base check first.** Worktrees in this repo may be cut from `master`, not `main`. First step:
+   `git merge-base --is-ancestor main HEAD || git reset --hard main` while the tree is clean.
+2. **Rules:** read `CLAUDE.md`. Server, database and package changes are allowed where the work needs them (hard fork); don't extend dormant areas; don't edit `ui/`;
    types from `@paperclipai/shared` with `import type`. Load the `solidjs` skill before writing Solid
    code. Follow the design in `ui-new/docs/design/` (boards, `design-system.md`, `tokens.css`).
 3. **The work:** the goal, the boards and plan sections to read, the files it owns, and what to leave
@@ -80,17 +80,17 @@ Agents start cold, so the brief carries everything. Include:
 
 ## When an agent finishes
 
-1. Check the branch is based on `new-ui` and stays inside its files.
+1. Check the branch is based on `main` and stays inside its files.
 2. Review the diff, and run `corepack pnpm --filter @paperclipai/ui-new typecheck` and `test`.
-3. Problems go back to the agent. When it's clean, merge into `new-ui` with `--no-ff` and a message
+3. Problems go back to the agent. When it's clean, merge into `main` with `--no-ff` and a message
    like `Merge the run modal (M2, boards 16-18)`.
 4. Record it: capability statuses and notes, new API gaps in `decisions.md`, milestone progress in
    the build plan. Commit those as one docs commit.
 5. Tell the user what landed and what's left, then propose the next agent if a slot is free.
-6. Push `new-ui` when the user asks, and remove merged worktrees.
+6. Push `main` when the user asks, and remove merged worktrees.
 
-## Upstream bugs found along the way
+## Bugs found along the way
 
-Record each as a `candidate` in `fork/upstream-fixes.md` right away. Don't assign an agent to build
-one until the user signs off on that specific fix; that agent then uses the `upstream-fix` skill on a
-`fix/*` branch off `master`, never `new-ui`.
+Record each as a `candidate` in `fork/upstream-fixes.md` (the fork's bug list) right away. Don't
+assign an agent to fix one until the user signs off on that specific bug; the fix goes on its own
+branch off `main`, like any other work.

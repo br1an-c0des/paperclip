@@ -69,7 +69,7 @@ arg is needed because the build context has no `.git`; a build without it works 
 ```bash
 git clone https://github.com/br1an-c0des/paperclip.git
 cd paperclip
-git checkout new-ui
+git checkout main
 
 cp deploy/.env.example deploy/.env
 $EDITOR deploy/.env                   # see "Settings" below
@@ -128,11 +128,11 @@ limiting.
 Since Nov 16, 2026 the working instance runs on `server1`, an Ubuntu mini PC on the tailnet, as a
 fresh instance (nothing was copied from the earlier desktop deployment):
 
-- **Checkout:** `~/paperclip` on `new-ui`, used only for deploys; `deploy/.env` lives there (mode
+- **Checkout:** `~/paperclip` on `main`, used only for deploys; `deploy/.env` lives there (mode
   600). Data is in `~/paperclip-data`.
 - **Access:** Paperclip on `127.0.0.1:3100`, fronted by `tailscale serve --bg 3100`, so it's
   `https://server1.<tailnet>.ts.net`.
-- **Updating from the dev machine** (after pushing `new-ui`):
+- **Updating from the dev machine** (after pushing `main`):
 
   ```bash
   ssh server1 'cd ~/paperclip && git pull --ff-only && deploy/deploy.sh'
@@ -150,11 +150,11 @@ server:
   the data folder from Ubuntu's disk. Keep `PAPERCLIP_DATA_ROOT` on Ubuntu's disk (e.g.
   `~/paperclip-data`), not under `/mnt/c`.
 - **A clean checkout:** the image is built from the working tree as it is, so build from a separate
-  worktree that holds only committed `new-ui`, never from the checkout you're editing:
+  worktree that holds only committed `main`, never from the checkout you're editing:
 
   ```bash
-  git worktree add --detach ~/coding/paperclip-deploy new-ui   # once; deploy/.env lives here
-  cd ~/coding/paperclip-deploy && git checkout --detach new-ui && deploy/deploy.sh   # each update
+  git worktree add --detach ~/coding/paperclip-deploy main   # once; deploy/.env lives here
+  cd ~/coding/paperclip-deploy && git checkout --detach main && deploy/deploy.sh   # each update
   ```
 
 - **Ports:** set `PAPERCLIP_PORT=3200` so it doesn't collide with the dev server on 3100.

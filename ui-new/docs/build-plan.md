@@ -1,11 +1,17 @@
 # ui-new build plan
 
-Nov 16, 2026 · built against upstream `537b0408b` ([sync 2026-11-16](../../fork/sync-reports/2026-11-16.md))
+Nov 17, 2026 · hard fork at upstream `79c8cf8b6` (tag `upstream-freeze`, [sync 2026-11-17](../../fork/sync-reports/2026-11-17.md))
 
 How the redesign gets built, and in what order. It sorts every idea in
-[paperclip-redesign-ideas.md](paperclip-redesign-ideas.md) into three stages and lays out stage 1 as
-milestones. Stage 4 holds the features that would need changes to upstream's source, deferred until
-stage 3 is done.
+[paperclip-redesign-ideas.md](paperclip-redesign-ideas.md) and lays out stage 1 as milestones.
+
+**Since the hard fork (2026-11-17, [hard-fork-plan.md](../../fork/hard-fork-plan.md)):** stage 1 is
+complete; stage 2 has ended, and its list is now the fork's [bug list](../../fork/upstream-fixes.md);
+stages 3 and 4 are one list of features built in core, without the plugin limits. The sections
+below were written before that and keep their numbering (3.1–3.17, F1–F12): where an entry says
+"plugin", "upstream" or "stage 4", read it as history, and choose the approach in core when the
+feature is picked up. The hard-fork plan's own steps (Claude-native runs, Paperclip over MCP, one
+prompt builder, first-class chat) come before most of them.
 
 How it fits with the other redesign docs:
 
@@ -21,27 +27,20 @@ How it fits with the other redesign docs:
 
 | Stage | What it covers | Where the work happens | Conflict with upstream |
 | --- | --- | --- | --- |
-| **1. New UI only** | The approved boards, built on the API as it is. Every existing capability ported or dropped on purpose. | `ui-new/` on `new-ui`, plus `deploy/` | None |
-| **2. Upstream bug fixes** | Fixes for bugs and docs upstream gets wrong. Feature asks are feature ideas (stage 3), even when they might go upstream. | `fix/*` and `docs/*` branches off `master`, sent to `paperclipai/paperclip` | None. They return through the normal sync. |
-| **3. Experimental features** | New data or new agent behaviour the API doesn't have, small enough or self-contained enough for a plugin. | A fork plugin (`packages/plugins/fork-*`), a fork skill, and `ui-new`. No changes to upstream's source. Each feature on its own `exp/<name>` branch. | Low. The deployment stays on upstream's image. |
-| **4. Source-change features (later)** | Features a plugin can't hold: changes to core tables, core API paths, the run prompt or upstream logic. | Fork patches to upstream's source, after stage 3. The first one switches the deployment to building from source ([FORK.md](../../FORK.md#when-the-fork-starts-changing-source)). | Higher, and ongoing on every sync. |
+| **1. New UI only** (complete) | The approved boards, built on the API as it is. Every existing capability ported or dropped on purpose. | `ui-new/` on `main`, plus `deploy/` | None |
+| **2. Upstream bug fixes** (ended at the hard fork) | Fixes for bugs and docs upstream got wrong, sent as pull requests. | `fix/*` branches off `master`. Three are still open upstream; the list is now the [bug list](../../fork/upstream-fixes.md). | — |
+| **3. Features** (in core since the hard fork) | New data or new agent behaviour. Was: plugins only. Now: in core, a plugin only where one fits better. | `main`, a branch per feature | — |
+| **4. Source-change features** (merged into 3) | Was: what a plugin can't hold, deferred. Since the hard fork every feature can change the source. | — | — |
 
-How an idea is sorted:
+How an idea is sorted, since the hard fork:
 
-- If the API already stores it, it's stage 1, even when the old UI never shows it that way.
-- If it fixes something upstream's code or docs get wrong, it's stage 2.
-- If it adds something (new storage, new API fields or filters, new agent behaviour), it's a feature
-  idea: stage 3, built as a plugin where one can hold it. Whether it might also go upstream is
-  decided per idea.
-- If a plugin can't hold it and upstream won't take it, it's stage 4. A feature can split: the part a
-  plugin covers ships in stage 3.
+- If the API already stores it, it's stage 1 (the UI), even when the old UI never shows it that way.
+- If something is wrong, it's a bug: [fork/upstream-fixes.md](../../fork/upstream-fixes.md).
+- If it adds something (new storage, API fields or filters, agent behaviour), it's a feature: stage
+  3, built in core.
 
-Several ideas split across stages: the part the API covers ships in stage 1, and the rest waits.
-
-Stage 1 is the priority. Stage 2 pull requests can go out whenever one is ready, because they don't touch
-the fork. Stage 3 starts once stage 1 works well, except the fork skill (3.10), which is cheap and can
-start earlier. Stage 4 waits until stage 3 is done, and starts with a deliberate decision to change how
-the fork deploys and syncs.
+Before the hard fork, ideas split across all four stages by what a plugin could hold; the tables
+below still show that sorting.
 
 ## Your ideas, sorted
 
@@ -556,10 +555,10 @@ Progress:
 
 ##### Upstream changes to integrate
 
-`ui-new` keeps adopting upstream's changes, not just staying compatible. Every sync change that
-affects the board gets a line here, with an outcome, before `new-ui` moves (the
-[upstream-sync skill](../../.claude/skills/upstream-sync/SKILL.md), step 9). Each capability row's
-"Upstream sync" note links its line here.
+`ui-new` kept adopting upstream's changes, not just staying compatible. Every sync change that
+affected the board got a line here, with an outcome, before `new-ui` (now `main`) moved. Each
+capability row's "Upstream sync" note links its line here. The last sync was 2026-11-17 (U177–U181);
+since the hard fork, lines come only from changes the upstream watch cherry-picks.
 
 Integration round 1 (Nov 5): four agents, `integrate/tasks` (U1, U2, U6, U15–U18),
 `integrate/inbox-shell` (U3, U4, U14, U32, U33), `integrate/agents-runs` (U7, U10, U11 links, U19,
@@ -893,17 +892,12 @@ follow-ups that decisions 47 and 48 listed are moved here.
 
 After M7, stage 3 work starts in earnest.
 
-## Stage 2: upstream bug fixes
+## Stage 2: upstream bug fixes (ended)
 
-Fixes for something upstream's code or docs get wrong. Each is one change on its own `fix/*` or
-`docs/*` branch off `master`, following upstream's `CONTRIBUTING.md` and PR template
-([FORK.md](../../FORK.md#contributing-fixes-upstream)). None is carried as a fork patch, and none is
-merged into `new-ui`. Bug fixes and docs don't need agreement upstream first. Search upstream for
-duplicates before starting each one.
-
-The list, with each fix's status, branch and pull request, is
-[fork/upstream-fixes.md](../../fork/upstream-fixes.md). Build one with the
-[upstream-fix skill](../../.claude/skills/upstream-fix/SKILL.md), once you've signed it off.
+Until the hard fork, fixes for something upstream's code or docs got wrong were sent upstream as
+pull requests on `fix/*` branches off `master`. Three are still open (#17828, #17905, #20710); their
+changes come into `main` in hard-fork step 2. Since 2026-11-17 the list,
+[fork/upstream-fixes.md](../../fork/upstream-fixes.md), is the fork's bug list, fixed in our tree.
 
 Reorganized Nov 16, 2026, ahead of a possible hard fork ([hard-fork-plan.md](../../fork/hard-fork-plan.md)).
 Stage 2 used to hold small features too (2b), and upstream-fixes.md held a few API additions. Those
@@ -919,9 +913,14 @@ are now feature ideas in stage 3, which may or may not go upstream. Where the ol
 | 2b-15, 2b-16 | [F6, F7](#317-smaller-feature-ideas) |
 | Upstream fixes 8, 10, 11, 12, 13 | [F8 to F12](#317-smaller-feature-ideas) |
 
-## Stage 3: experimental features
+## Stage 3: features
 
-### How they're built
+Since the hard fork these are built in core: new tables, routes, prompt changes and server logic as
+needed, on a branch per feature merged into `main`. A plugin is still fine for something
+self-contained. "How they're built" below is the soft fork's plugin-first approach, kept as
+history; the per-entry approaches that depend on it get revisited when each feature is picked up.
+
+### How they're built (before the hard fork)
 
 - **Plugin first.** One fork plugin, `packages/plugins/fork-paperclip`, can hold all of these. Plugins
   get their own Postgres schema and migrations, JSON routes under `/api/plugins/:pluginId/api/*` (which
@@ -935,7 +934,7 @@ are now feature ideas in stage 3, which may or may not go upstream. Where the ol
   [stage 4](#stage-4-source-change-features-later), or is offered upstream as a feature idea. Keeping stage 3
   this way keeps the deployment on upstream's published image and the syncs as they are
   ([FORK.md](../../FORK.md#plugins-and-the-deployment)).
-- **One branch per feature.** `exp/<name>` off `new-ui`, merged back once it's stable. Add the branch
+- **One branch per feature.** `exp/<name>` off `main`, merged back once it's stable. Add the branch
   type to FORK.md's branch table when the first one starts.
 - **Known limits.** The plugin worker can't read the attention feed, Decisions, budgets or runs
   (FORK.md). Features that need those combine data in `ui-new` instead.
@@ -1303,18 +1302,12 @@ hard fork. "Today" is what `ui-new` does without it.
 | F11 | `/api/health` says whether sign-up is allowed (`PAPERCLIP_AUTH_DISABLE_SIGN_UP`) | A sign-in page can't tell whether to offer sign-up | Always offers sign-up ([decision 36](decisions.md#36-gaps-found-building-onboarding-and-the-pages-outside-a-company)) | Upstream fix 12 |
 | F12 | `executionBlocker` on compact issues (`CompactIssue` and the compact list query) | A list row can't tell why an interrupted task is blocked before offering Retry | Retry on list rows reads the interruption's run | Upstream fix 13 |
 
-## Stage 4: source-change features (later)
+## Stage 4: source-change features (merged into stage 3)
 
-Features, or the parts of them, that a plugin can't hold and upstream hasn't taken: changes to core
-tables or core API paths, additions to the run prompt, or changes to upstream logic. Nothing here
-starts until stage 3 is done. The current list is the "Deferred part" column in
-[How each idea fits](#how-each-idea-fits).
-
-Starting stage 4 is one decision with three consequences, set out in
-[FORK.md](../../FORK.md#when-the-fork-starts-changing-source): the deployment builds the image from
-source instead of reusing upstream's, the image patches in `deploy/patches/` become source patches,
-and each sync checks the fork's server code as well as merge conflicts. Before starting, check
-whether upstream has built or would take each feature, since that avoids carrying it at all.
+Before the hard fork, this held what a plugin couldn't: changes to core tables or API paths, the run
+prompt, or upstream logic (the "Deferred part" column in [How each idea fits](#how-each-idea-fits)).
+Since 2026-11-17 those are ordinary stage 3 work. The switch it was waiting on, building the
+deployment from source, is hard-fork step 2.
 
 ## Questions for you
 
@@ -1344,11 +1337,8 @@ All answered Oct 24, 2026.
 
 - After each milestone, update its row statuses in [capabilities.md](inventory/capabilities.md) and
   mark the milestone done here.
-- After each upstream sync, give every change that affects the board a line in
-  [Upstream changes to integrate](#upstream-changes-to-integrate), with an outcome, and link it from
-  its capability row.
-- Upstream syncs can move items between stages. When upstream ships something the plan expected to
-  build (as Artifacts V1 and bulk agent edits did on 2026-10-24), update the matching milestone or
-  stage 3 entry.
+- There are no more upstream syncs. When the upstream watch cherry-picks a change that affects the
+  board, give it a line in [Upstream changes to integrate](#upstream-changes-to-integrate), with an
+  outcome, and link it from its capability row.
 - When a question above is answered, edit the entries it affects, and mark the question answered with
   a link to them. Keep the numbering, since other entries refer to questions by number.

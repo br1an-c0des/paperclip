@@ -1,53 +1,54 @@
 # CLAUDE.md
 
-This is a personal fork of [paperclipai/paperclip](https://github.com/paperclipai/paperclip)
-(`br1an-c0des/paperclip`). Its purpose is to build a **new board UI in SolidJS** (`ui-new/`) that
-regroups the existing UI into a more coherent, single interface, while continuing to merge upstream's
-daily changes. The fork doesn't change upstream's server, database or package code: the UI builds on
-the existing API, and new features are built as fork plugins.
+This is a personal hard fork of [paperclipai/paperclip](https://github.com/paperclipai/paperclip)
+(`br1an-c0des/paperclip`), frozen at upstream `79c8cf8b6` (tag `upstream-freeze`) on 2026-11-17.
+It's our codebase now: we change the server, database and packages freely, and take upstream's
+changes only by choice ([FORK.md](FORK.md), [fork/hard-fork-plan.md](fork/hard-fork-plan.md)). It's
+set up for one person running Claude agents.
 
 ## Intentions
 
-- **Redesign the core work areas.** Tasks, projects, agents, goals, routines, approvals/decisions,
-  artifacts and cases may be merged or reorganized into fewer, clearer pages.
-- **Port the rest mostly as-is.** Settings, secrets, plugins, skills, apps and activity keep their
-  current structure.
-- **Remove the switches.** The current UI hides and shows features behind about 40 experimental flags.
-  The new UI should settle on one refined interface instead of toggles.
-- **Lose no functionality by accident.** Every capability of the old UI is catalogued; anything left out
-  is dropped on purpose.
-- **Don't change upstream code.** Upstream lands many commits a day, and the server areas the
-  redesign touches are still changing. `ui-new` works with the API as it is; small, self-contained
-  server or documentation fixes go upstream as focused pull requests instead of fork patches.
-- **New features: plugins first, source changes later.** Once the UI is polished, the next phase is
-  build plan stage 3: new features that are small or fit in a fork plugin (`packages/plugins/fork-*`)
-  and a fork skill. Features that would need changes to upstream's source wait for stage 4, which
-  changes how the fork deploys and syncs ([FORK.md](FORK.md#changing-server-database-and-packages)).
+- **A new board UI in SolidJS** (`ui-new/`): the core work areas (tasks, projects, agents, goals,
+  routines, requests, artifacts, cases) regrouped into fewer, clearer pages, the rest ported mostly
+  as-is, one refined interface instead of experimental toggles, and no capability lost by accident
+  (every one is catalogued). Stage 1 of the [build plan](ui-new/docs/build-plan.md) is complete.
+- **Make Claude runs first-class.** Agents run on the `claude_local` adapter (`claude --print`). The
+  plan: runs that behave like a Claude Code session in the project's repo (its CLAUDE.md, skills and
+  MCP servers), Paperclip reached through MCP instead of curl, one prompt builder we own, and chat
+  as its own concept rather than a hidden task (hard-fork plan steps 4–7).
+- **Then the build plan's features, in core,** without the plugin limits the fork used to work under.
+- **Leave unused code alone until it gets in the way.** The other adapters, the Paperclip Runner,
+  Claude Managed and cloud execution stay in the tree, dormant. Remove a subsystem only when it
+  blocks a change we want (hard-fork plan step 3).
 
 ## Ground rules
 
-- **Keep work in fork-only files** (listed in [FORK.md](FORK.md#fork-only-files)). Don't change
-  upstream's server, database or package code in the fork. If a feature can't be built on the
-  existing API, design around the gap, build it as a fork plugin, or propose the change upstream. If
-  a change to upstream code ever seems unavoidable, ask first, then follow
-  [FORK.md](FORK.md#changing-server-database-and-packages).
-- **Fixes for upstream** go in their own `fix/*` or `docs/*` branch off `master`, as a pull request to
-  `paperclipai/paperclip` that follows upstream's `CONTRIBUTING.md` and PR template. They are never
-  merged into `new-ui`. Record each one in [fork/upstream-fixes.md](fork/upstream-fixes.md), from
-  candidate to merged. See [FORK.md](FORK.md#contributing-fixes-upstream).
-- **Record every upstream edit.** Mark it with a `FORK: <entry id>` comment and add or update its
-  entry in [FORK-PATCHES.md](FORK-PATCHES.md) in the same commit. Never edit `ui/`: the old UI is the
-  reference, and `ui-new` replaces it.
-- **No fork migrations in upstream's numbered sequence** (`packages/db/src/migrations`). Use a
-  plugin's schema or the fork's separate migration track. See
-  [FORK.md](FORK.md#database-changes).
-- **Branches:** work on `new-ui`. `master` mirrors upstream and is never committed to. Merge `master` into
-  `new-ui`; don't rebase.
-- **`ui-new` talks to the existing API** (`/api`, proxied to the server on :3100) and imports types from
-  `@paperclipai/shared` with `import type`. Use `ui/src` as the reference for how the API is used.
+- **Branches:** work on `main`; larger work on a feature branch merged into `main` with `--no-ff`.
+  `master` mirrors upstream for the upstream watch and is never merged into `main` and never
+  committed to. Don't rebase `main`. `origin/new-ui` is a frozen pointer at the branch point; don't
+  push to it.
+- **Upstream code is ours to change.** No `FORK:` markers and no patch records needed. Keep each
+  change focused and tested, and prefer fixing the cause over working around it in `ui-new`.
+- **Dormant areas:** don't extend or fix code this setup doesn't use (other adapters, the Runner,
+  cloud and sandbox execution). If a change to shared code breaks a test there, skip that test with
+  a note saying why, or remove the subsystem if that's simpler. Ask before removing anything large.
+- **Migrations** continue upstream's numbered sequence in `packages/db/src/migrations` (the first
+  of ours is `0491`). Back up server1's database before deploying one; migrations don't run
+  backwards.
+- **Upstream changes come in by choice**, through the `upstream-watch` skill (`/upstream-watch`):
+  review, pick, cherry-pick on a branch, approve. Never merge `master` into `main`.
+- **Bugs** go in [fork/upstream-fixes.md](fork/upstream-fixes.md), the fork's bug list (the name
+  is historical). Fix them in our tree.
+- **`ui-new` talks to the API** (`/api`, proxied to the server on :3100) and imports types from
+  `@paperclipai/shared` with `import type`. When the API lacks something, change the server rather
+  than designing around the gap. `ui/` (the old React UI) isn't deployed; it stays as a reference
+  for how the API is used, and doesn't need to keep up with server changes.
+- **Deploys** still use upstream's published image for `upstream-freeze` with `ui-new` swapped in,
+  so server source changes don't reach server1 until the deployment builds from source (hard-fork
+  plan step 2). Say so whenever a server change is meant for server1.
 - `pnpm` isn't installed globally on this machine; use `corepack pnpm`.
-- For upstream conventions (repo map, dev setup, API rules), see `AGENTS.md`. Its PR-template and
-  Paperclip-issue workflow rules apply only to pull requests sent upstream, not to work on `new-ui`.
+- For the repo's conventions (repo map, dev setup, API rules), see `AGENTS.md`. Its pull-request
+  template and Paperclip-issue workflow rules are upstream's and don't apply here.
 
 ## UI text
 
@@ -62,22 +63,21 @@ the existing API, and new features are built as fork plugins.
 
 | Doc | What it covers |
 | --- | --- |
-| [FORK.md](FORK.md) | Remotes, branches, the no-upstream-code policy (plugins first, source changes in a later stage, and what that would change for deploys and syncs), sending fixes upstream, the upstream sync routine, why `ui-new` is a standalone app rather than a plugin, deployment summary, open items. |
-| [FORK-PATCHES.md](FORK-PATCHES.md) | Every change the fork makes to upstream files: what, why, what it depends on, how to resolve conflicts. |
-| [fork/hard-fork-plan.md](fork/hard-fork-plan.md) | **Proposed, not adopted.** Stop syncing upstream, cut to Claude only, make runs Claude-native, one prompt builder, first-class chat, and the build plan in core. Until adopted, the rules above still apply. |
-| [fork/upstream-fixes.md](fork/upstream-fixes.md) | Bug fixes for upstream (feature asks go in the build plan): candidates to build, and each one's branch, pull request and status until it's merged. |
-| [.claude/skills/upstream-sync/SKILL.md](.claude/skills/upstream-sync/SKILL.md) | The upstream sync procedure and conflict-resolution policy. Reports go to `fork/sync-reports/`. |
-| [.claude/skills/upstream-fix/SKILL.md](.claude/skills/upstream-fix/SKILL.md) | Building one signed-off fix for upstream: duplicate search, upstream's rules, the testing budget, the PR description, and stopping before anything is pushed. |
+| [FORK.md](FORK.md) | Where this came from: the freeze, remotes and branches, the upstream watch, the deployment, why `ui-new` is a standalone app, open items. |
+| [fork/hard-fork-plan.md](fork/hard-fork-plan.md) | **Adopted 2026-11-17.** The plan and its progress: leave unused code, make runs Claude-native, Paperclip over MCP, one prompt builder, first-class chat, the build plan in core. |
+| [FORK-PATCHES.md](FORK-PATCHES.md) | The two image patches the deployment applies to upstream's image, until it builds from source. |
+| [fork/upstream-fixes.md](fork/upstream-fixes.md) | The fork's bug list: what's wrong, where, and the likely fix. |
+| [.claude/skills/upstream-watch/SKILL.md](.claude/skills/upstream-watch/SKILL.md) | The weekly upstream review: list what's new, triage, cherry-pick what you choose. Ledger in [fork/upstream-watch.md](fork/upstream-watch.md); older sync reports in `fork/sync-reports/`. |
 | [.claude/skills/pm/SKILL.md](.claude/skills/pm/SKILL.md) | Project-manager mode (`/pm`): plan and review, delegate building to 3–5 agents, propose each one first. |
 | [ui-new/README.md](ui-new/README.md) | Running and building the SolidJS app; layout; lockfile-conflict fix. |
-| [deploy/README.md](deploy/README.md) | Production deployment: Docker image on top of upstream's, Compose with bind mounts, Tailscale or Caddy. |
-| [ui-new/docs/build-plan.md](ui-new/docs/build-plan.md) | The build plan: every redesign idea sorted into UI-only, upstream bug fixes, feature ideas (plugin first) and later source-change features, stage 1 milestones, the upstream changes still to integrate, decisions to make, and open questions. |
+| [deploy/README.md](deploy/README.md) | Production deployment on server1: Docker image on top of upstream's, Compose with bind mounts, Tailscale or Caddy. |
+| [ui-new/docs/build-plan.md](ui-new/docs/build-plan.md) | The build plan: stage 1 (the new UI, complete) and its milestones, upstream changes still to integrate, and the feature ideas now built in core. |
 | [ui-new/docs/inventory/README.md](ui-new/docs/inventory/README.md) | How the existing UI is documented, and the redesign tiers. |
 | [ui-new/docs/inventory/capabilities.md](ui-new/docs/inventory/capabilities.md) | The redesign checklist: every capability, its new home, and its status. |
 | [ui-new/docs/inventory/areas/](ui-new/docs/inventory/areas/) | What each existing page does, its key actions and the API requests behind them. |
 | [ui-new/docs/inventory/generated/](ui-new/docs/inventory/generated/) | Generated routes, per-page requests, API methods and experimental flags. |
 | [ui-new/docs/proposals/](ui-new/docs/proposals/) | Design proposals for the redesign, such as unifying questions, decisions and approvals into requests. |
-| [ui-new/docs/decisions.md](ui-new/docs/decisions.md) | Discoveries and decisions: API gaps and constraints the redesign runs into, their options, and what was decided. |
+| [ui-new/docs/decisions.md](ui-new/docs/decisions.md) | Discoveries and decisions: API gaps and constraints the redesign ran into, their options, and what was decided. Many API gaps can now be server changes. |
 | [ui-new/docs/guides/](ui-new/docs/guides/README.md) | Notes toward a user-facing guide to Paperclip: what each feature is for, when it helps, example flows. Raw material for a written guide and an in-app one (build plan 3.15). |
 | [ui-new/docs/design/](ui-new/docs/design/README.md) | The approved redesign to build from: board index, phone layouts (`mobile.md`), Capsule Stack design system, `tokens.css`, a style guide page, and the board sources. |
 
@@ -91,21 +91,20 @@ corepack pnpm --filter @paperclipai/ui-new typecheck
 corepack pnpm --filter @paperclipai/ui-new test
 corepack pnpm --filter @paperclipai/ui-new test:e2e   # Playwright smoke suite, mocked API (E2E_LIVE=1: read-only against :3100)
 corepack pnpm --filter @paperclipai/ui-new inventory # regenerate the existing-UI inventory
-corepack pnpm --filter @paperclipai/plugin-sdk build # after install, a sync, or in a fresh worktree; else the server dies with "does not provide an export named …"
-git sync-master                                      # fast-forward master from upstream and push it (checks out master: see Gotchas)
+corepack pnpm --filter @paperclipai/plugin-sdk build # after install, a cherry-pick, or in a fresh worktree; else the server dies with "does not provide an export named …"
+ssh server1 'cd ~/paperclip && git pull --ff-only && deploy/deploy.sh'   # deploy main to server1 (the real instance)
 ```
 
-To sync with upstream, run the `upstream-sync` skill (`/upstream-sync`). It first outlines the
-unsynced upstream commits (features, bug fixes) and waits for your go-ahead. Then it merges on a
-`sync/<date>` branch, checks upstream's changes against FORK-PATCHES.md, regenerates the inventory,
-and moves `new-ui` only after approval. `git sync-ui` merges straight into `new-ui` and is the manual fallback.
+To review upstream, run `/upstream-watch`: it lists upstream's new commits since the last review,
+triages them, and cherry-picks only what you choose, on a branch, after approval.
 
 ## Gotchas
 
-- Git worktrees here, including agents' `isolation: "worktree"`, start from `master`. Before working:
-  `git merge-base --is-ancestor new-ui HEAD || git reset --hard new-ui`.
+- Git worktrees here, including agents' `isolation: "worktree"`, may start from `master` rather than
+  `main`. Before working: `git merge-base --is-ancestor main HEAD || git reset --hard main`.
 - `git sync-master` checks out `master`, so don't run it in a checkout the dev servers run from. Instead:
   `git fetch upstream && git push origin upstream/master:master && git branch -f master upstream/master && git branch --set-upstream-to=origin/master master`.
+- server1 is the real instance with real data: never test against it, and never run M7 test data there.
 - Finished agent worktrees can be locked: `git worktree unlock <path>` before `git worktree remove`.
 - Stop a dev server by its port (`ss -ltnp | grep ':5181 '`), not `pkill -f <pattern>`, which also matches and kills the
   shell running it.

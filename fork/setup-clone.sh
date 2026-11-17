@@ -18,7 +18,6 @@ git config rerere.enabled true
 git config rerere.autoupdate true
 
 git config alias.sync-master '!f() { set -e; cur=$(git branch --show-current); git fetch upstream; git checkout -q master; git merge --ff-only upstream/master; git push origin master; git checkout -q "$cur"; echo "master now at $(git rev-parse --short master); you are on $cur"; }; f'
-git config alias.sync-ui '!f() { set -e; git sync-master; git checkout new-ui; git merge master --no-edit; echo "Merged master into new-ui. Run tests, then: git push"; }; f'
 
 git fetch upstream
-echo "Configured upstream (fetch master only, push disabled), rerere, and the sync-master / sync-ui aliases."
+echo "Configured upstream (fetch master only, push disabled), rerere, and the sync-master alias (master mirrors upstream for /upstream-watch; never merge it into main)."
