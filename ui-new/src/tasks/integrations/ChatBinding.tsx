@@ -12,6 +12,7 @@ import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { randomId } from "@/lib/random-id";
 import { Button, buttonClass } from "@/ui/Button";
 import { TextArea } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
 import { pushToast } from "@/ui/Toast";
 import {
   boardSendKey,
@@ -358,9 +359,12 @@ function BindingRow(props: { taskId: string; binding: ExternalChannelBindingSumm
                   </Button>
                 }
               >
-                <Button size="compact" variant="quiet" title="Keeps nothing of this send; check Activity before writing a new one" onClick={reset}>
+                <Button size="compact" variant="quiet" onClick={reset}>
                   Discard
                 </Button>
+                <InfoTip label="About Discard">
+                  Discard forgets this send, so Send again can no longer finish it. It may already have gone out: check Activity before writing a new one.
+                </InfoTip>
               </Show>
               <Button
                 type="submit"

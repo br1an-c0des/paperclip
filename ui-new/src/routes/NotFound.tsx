@@ -1,4 +1,5 @@
 import { A } from "@solidjs/router";
+import { useCompany } from "@/lib/company";
 import { buttonClass } from "@/ui/Button";
 import { Splash } from "./Splash";
 
@@ -17,14 +18,22 @@ export function NotFound() {
   );
 }
 
-/** A company page this UI doesn't have yet. Old-UI links keep resolving to something sensible. */
-export function NotBuiltYet() {
+/**
+ * A company address no page or plugin claims (App.tsx's catch-all, through PluginPageRoute): a
+ * typo, an old link, or a plugin's page while that plugin is off. Drawn inside the shell, so the
+ * navigation stays in reach.
+ */
+export function CompanyNotFound() {
+  const company = useCompany();
   return (
-    <section class="card" style={{ padding: "18px 22px", display: "flex", "flex-direction": "column", gap: "6px" }}>
+    <section class="card" style={{ padding: "18px 22px", display: "flex", "flex-direction": "column", "align-items": "flex-start", gap: "8px" }}>
       <h1 class="disp" style={{ "font-size": "22px", "font-weight": 800 }}>
-        Not built yet
+        Page not found
       </h1>
-      <p style={{ color: "var(--body)" }}>This page isn't in this app. The classic UI may still have it.</p>
+      <p style={{ color: "var(--body)" }}>Nothing lives at this address in {company().name}.</p>
+      <A class={buttonClass({ variant: "primary", size: "compact" })} href={`/${company().issuePrefix}/dashboard`}>
+        Go to the dashboard
+      </A>
     </section>
   );
 }

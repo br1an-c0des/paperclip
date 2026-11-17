@@ -605,10 +605,13 @@ function WaitingBlocker(props: { blocker: RetryBlocker }) {
       <Show
         when={!props.blocker.locked}
         fallback={
-          <span class="tn-dep-locked mono" title="Private: you don't have access">
-            <Lock size={12} aria-hidden="true" />
-            {props.blocker.identifier ?? "Private"}
-          </span>
+          <>
+            <span class="tn-dep-locked mono">
+              <Lock size={12} aria-hidden="true" />
+              {props.blocker.identifier ?? "Private"}
+            </span>
+            <span class="tn-dep-title">Private: you don't have access.</span>
+          </>
         }
       >
         <A class="tn-dep-link mono" href={issuePath(company().issuePrefix, props.blocker)}>

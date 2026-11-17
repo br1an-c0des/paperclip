@@ -9,7 +9,7 @@ import { GrainFilter } from "@/ui/Grain";
 import { ToastViewport } from "@/ui/Toast";
 import { Companies, CompanyRootRedirect } from "./routes/Companies";
 import { CompanyLayout } from "./routes/CompanyLayout";
-import { NotBuiltYet, NotFound } from "./routes/NotFound";
+import { CompanyNotFound, NotFound } from "./routes/NotFound";
 import { InboxPage } from "./inbox/InboxPage";
 import { OrgDashboard, OrgRedirect } from "./org/OrgDashboard";
 import { AgentsTabRedirect, OrgAgents } from "./org/OrgAgents";
@@ -59,8 +59,8 @@ const StyleGuide = lazy(() => import("./routes/StyleGuide").then((m) => ({ defau
 
 /*
  * Routes keep the old UI's URL shapes (`/:companyPrefix/issues/:id`, `/:companyPrefix/agents/:id`,
- * …): agents, Slack messages and emails link to them. Pages that don't exist yet render
- * <NotBuiltYet> inside the shell rather than a 404. The old UI's retired addresses, with or without
+ * …): agents, Slack messages and emails link to them. A company address no page or plugin claims
+ * renders <CompanyNotFound> inside the shell rather than the bare 404. The old UI's retired addresses, with or without
  * a company prefix, redirect to the page that does their job now (routes/Legacy.tsx and
  * legacy-model.ts), keeping the query and the `#comment-…` or `#document-…` fragment.
  *
@@ -217,8 +217,8 @@ export function App() {
             <Route path="/company/settings/instance/*rest" component={AppSettingsPage} />
             <Route path="/instance/*rest" component={() => <CompanySettingsRedirect kind="instance" />} />
             <Route path="/settings/*rest" component={() => <CompanySettingsRedirect kind="settings" />} />
-            {/* A plugin's page when a plugin owns the address (`/<routePath>/*`, `/plugins/:id`), else Not built yet. */}
-            <Route path="/*rest" component={() => <PluginPageRoute notFound={NotBuiltYet} />} />
+            {/* A plugin's page when a plugin owns the address (`/<routePath>/*`, `/plugins/:id`), else Page not found. */}
+            <Route path="/*rest" component={() => <PluginPageRoute notFound={CompanyNotFound} />} />
           </Route>
         </Route>
         <Route path="*404" component={NotFound} />

@@ -68,6 +68,14 @@ describe("QueuedMessages", () => {
     expect(steer).not.toHaveBeenCalled();
   });
 
+  it("says what Steer now and Interrupt do in tap-open info tips, not hover titles", () => {
+    mount(queue({ steeringDisposition: "unsupported", entries: [{ ...entry("c1", 0), canEdit: false }] }));
+    const about = screen.getByRole("button", { name: "About Interrupt" });
+    expect(document.getElementById(about.getAttribute("aria-describedby")!)?.textContent).toMatch(/^This agent's runner can't take messages mid-run\./);
+    expect(screen.getByRole("button", { name: "About Interrupt and send" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Interrupt" }).hasAttribute("title")).toBe(false);
+  });
+
   it("keeps Steer when the runner can take it", () => {
     // Someone else's message: never sent on its own, so it keeps the button.
     mount(queue({ entries: [{ ...entry("c1", 0), canEdit: false }] }));
@@ -172,7 +180,7 @@ describe("QueuedMessages round 7 (U117, U118, U127)", () => {
   it("shows why an edit wasn't saved under the editor, and keeps it open (U118, #20583)", async () => {
     edit.mockRejectedValue(new ApiError("x", 409, { error: "x", details: { code: "queued_comment_revision_conflict" } }));
     mount(queue({ entries: [entry("c1", 0)] }));
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" })); // stop the countdown
+    fireEvent.click(screen.getByRole("button", { name: "Keep queued" })); // stop the countdown
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     const box = screen.getByRole("textbox", { name: "Edit queued message" }) as HTMLTextAreaElement;
     fireEvent.input(box, { target: { value: "Changed text" } });
@@ -186,7 +194,7 @@ describe("QueuedMessages round 7 (U117, U118, U127)", () => {
   it("keeps an edit's text when the message was already sent (U118, #20583)", async () => {
     edit.mockRejectedValue(new ApiError("x", 409, { error: "x", details: { code: "queued_comment_stale_target" } }));
     mount(queue({ entries: [entry("c1", 0)] }));
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep queued" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     fireEvent.input(screen.getByRole("textbox", { name: "Edit queued message" }), { target: { value: "My new words" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -234,12 +242,12 @@ describe("QueuedMessages automatic steering (U84, #19970)", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("shows Sending in Xs with Edit and Cancel in place of Steer now, then steers it in", async () => {
+  it("shows Sending in Xs with Edit and Keep queued in place of Steer now, then steers it in", async () => {
     steer.mockResolvedValue(queue({ entries: [] }));
     mount(queue({ entries: [mine()] }));
     expect(screen.getByText("Sending in 5s")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Keep queued" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Steer now" })).toBeNull();
     await advance(2_100);
     expect(screen.getByText("Sending in 3s")).toBeTruthy();
@@ -249,9 +257,9 @@ describe("QueuedMessages automatic steering (U84, #19970)", () => {
     expect(steer).toHaveBeenCalledWith("t1", "c1", { queueId: "q1", revision: "rev1", targetRunId: "r1" });
   });
 
-  it("Cancel keeps it queued and brings Steer now back", async () => {
+  it("Keep queued stops the countdown and brings Steer now back", async () => {
     mount(queue({ entries: [mine()] }));
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep queued" }));
     expect(screen.queryByText(/Sending in/)).toBeNull();
     expect(screen.getByRole("button", { name: "Steer now" })).toBeTruthy();
     await advance(10_000);

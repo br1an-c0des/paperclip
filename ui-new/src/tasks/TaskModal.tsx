@@ -12,6 +12,7 @@ import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
 import { InitialsDisc } from "@/ui/Avatar";
 import { Dialog } from "@/ui/Dialog";
+import { Tooltip } from "@/ui/Tooltip";
 import { TaskHeaderActions } from "./TaskActions";
 import { TaskParentCrumb } from "./TaskParentCrumb";
 import { setTaskOpenMode } from "./task-open-mode";
@@ -138,15 +139,14 @@ export function TaskModal(props: {
           <TaskHeaderActions taskId={props.task.id} onHidden={props.onClose} />
           <span class="ta-sep" aria-hidden="true" />
           <Show when={props.canDock}>
-            <button
-              type="button"
-              class="btn btn--icon btn--ghost btn--compact"
-              aria-label="Dock to side panel"
-              title="Dock to side panel: open tasks beside the list"
-              onClick={() => setTaskOpenMode("panel")}
-            >
-              <PanelRight size={15} aria-hidden="true" />
-            </button>
+            {/* Opens on hover and on keyboard focus; it only explains the button's name. */}
+            <Tooltip title="Dock to side panel" content="Open tasks beside the list." placement="bottom">
+              {(trigger) => (
+                <button {...trigger} type="button" class="btn btn--icon btn--ghost btn--compact" aria-label="Dock to side panel" onClick={() => setTaskOpenMode("panel")}>
+                  <PanelRight size={15} aria-hidden="true" />
+                </button>
+              )}
+            </Tooltip>
           </Show>
           <A
             class="btn btn--icon btn--ghost btn--compact"
