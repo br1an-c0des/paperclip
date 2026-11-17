@@ -27,6 +27,63 @@ To point at a different server: `PAPERCLIP_API_URL=http://host:port pnpm dev`.
 | `pnpm preview` | Serve the production build on :3102 |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm test` | Vitest, once (`pnpm test:watch` to keep it running) |
+| `pnpm test:e2e` | The Playwright smoke suite in `e2e/`, against a mocked API (below) |
+
+## Smoke suite (Playwright)
+
+`e2e/` holds one spec per area, each journey run at desktop size (1366×900) and phone size
+(390×844): sign-in and the company list (`auth`), moving around the shell, the command palette and
+New task (`shell`), the task list, panel, inline status, comments, an agent's question and the run
+modal (`tasks`), Inbox triage (`inbox`), a project's dashboard and Docs (`project`), an agent's chat
+(`agent`) and a settings save with its unsaved-change dot (`settings`).
+
+```bash
+corepack pnpm --filter @paperclipai/ui-new test:e2e                 # mocked, headless, ~30 s
+corepack pnpm --filter @paperclipai/ui-new test:e2e e2e/tasks.spec.ts --project=phone
+corepack pnpm --filter @paperclipai/ui-new test:e2e --ui            # Playwright's UI, to step through
+E2E_LIVE=1 corepack pnpm --filter @paperclipai/ui-new test:e2e      # live: read-only, against :3100
+```
+
+Playwright builds the app and serves it with `vite preview` on :5184 (`playwright.config.ts`); stop
+anything else on that port first. `E2E_DEV=1` uses the Vite dev server instead (no build, but about
+five times slower, since every page load compiles modules), and `E2E_REUSE_SERVER=1` uses whatever
+already listens on :5184. `@playwright/test` comes from the workspace root, and the browser is the
+Chromium headless shell in `~/.cache/ms-playwright`. A failure leaves a screenshot and a trace in
+`e2e/.results/` (`corepack pnpm exec playwright show-trace <trace.zip>`) and a report in `e2e/.report/`.
+
+**Mocked (the default).** No Paperclip server is needed: `e2e/fixtures/` answers every `/api`
+request, and the app's proxy points at a closed port, so nothing can reach a real server.
+
+- `fixtures/world.ts` is the data: a signed-in user, two companies (MSE and MOT), agents, projects,
+  tasks, comments, a run, two agent questions, a document, a budget. Builders (`issue()`, `agent()`,
+  `project()`…) are typed with `@paperclipai/shared`, so an upstream type change fails
+  `typecheck`, which also checks `e2e/`.
+- `fixtures/handlers.ts` answers each request from a fresh copy of that data per test (`db`), and
+  answers writes the way the server would (a PATCH changes the task, a comment is added), so the
+  page moves on after a save.
+- `fixtures/mock-api.ts` routes the requests: every write is recorded (`api.writes`,
+  `await api.waitForWrite("POST", "/issues/…/comments")` returns it with its parsed `body`), the
+  live-events socket is a quiet fake (`api.emit(event)` pushes one), and anything outside localhost
+  is refused.
+- `fixtures/test.ts` is the `test` the specs import. A test **fails** if the page asked for
+  something no handler answers (the failure names each request, answered `501` meanwhile) or threw
+  an uncaught error.
+
+To add a fixture: run the spec, read the `requests the fake API has no fixture for` list, find each
+request's response type in `src/api/*` (and `@paperclipai/shared`), and add a handler to
+`installDefaultHandlers` in its API area, with any new records in `world.ts`. A single test can
+override one instead: `api.get("/companies/:companyId/labels", () => [...])` (later registrations
+win; `reply(404, {...})` sets a status). Throwaway names start with "M7 test", as on the real
+instance. Assert on roles, accessible names and visible text rather than CSS classes, and wait on
+what the page shows, not on time.
+
+**Live (`E2E_LIVE=1`).** Runs only `e2e/live.spec.ts`: the read-only journeys (companies, Inbox,
+tasks and a task's panel, a project and its Docs, an agent, settings) in the test company TES,
+against the server on :3100 (or `PAPERCLIP_API_URL`). Reads go to the server; every write is still
+answered by the fake API and never sent. It skips when no server answers or TES can't be read. On an
+authenticated server, save a signed-in state first (`corepack pnpm exec playwright codegen
+--save-storage=/tmp/tes.json http://localhost:5174`, sign in, close) and pass
+`E2E_LIVE_STORAGE_STATE=/tmp/tes.json`.
 
 ## Layout
 
@@ -47,6 +104,7 @@ src/
   routes/          one component per page, each with its own CSS file
   styles/          tokens.css (copied verbatim from docs/design/tokens.css), fonts, base styles
   test/            test setup (jsdom stand-ins)
+e2e/               the Playwright smoke suite and its fake API (fixtures/)
 ```
 
 Tests sit next to the code as `*.test.ts(x)`: view models and logic as plain unit tests, key
