@@ -271,6 +271,29 @@ include patterns; `area-review.md` totals match the audit within about 5%.
 - Step 4a: run its regression set with the new runner, and merge `feat/step-4a` before round 2
   starts editing test files. Its branches change many route-test fixtures.
 
+### Round 1 progress
+
+- **D merged** 2026-11-18 (`5c99f4f7cd`): `classification.csv`, `area-review.md`.
+- **A merged** 2026-11-18 (`c99cc73640`): `scripts/test.mjs`, 8 workers by default, `serialServer`
+  empty (no file failed only in parallel, including upstream's 178 serialized suites). Bench set at 8
+  workers: 128.8 s mean against 695.0 s. `quick` picks tests by name and direct import instead of
+  the plan's directory fallback (Vitest's `--changed` picked ~1,370 files); kept pending the user's
+  OK. [results-runner.md](test-suite-audit/results-runner.md).
+- **C merged** 2026-11-18 (`cda8495e8e`): durability off, cluster data on `/dev/shm`, cleanup on
+  interrupt and a sweep of leftovers. The shared server isn't wired in (no gain in parallel).
+  [results-postgres.md](test-suite-audit/results-postgres.md).
+- **B:** running.
+
+Follow-ups reported by the agents, for round 2:
+
+- Update `doc/test-infrastructure.md` ("Embedded Postgres template cache") for C's changes: flags,
+  data root, cleanup on interrupt (C's report, in `results-postgres.md`).
+- `packages/db/src/prepared-queries-postgres.test.ts` › "retries a pooled statement unprepared…"
+  failed once in a 2-worker run and passed 6 times alone: probably timing-sensitive.
+- Some tests leave read-only (0555) folders in `TMPDIR`; the runner now copes with them.
+- A SIGKILLed worker can still orphan a running Postgres (the sweep removes its directory only once
+  the postmaster is dead).
+
 ## Round 2 (proposed after the review)
 
 - **Tiers:** fill `optIn` in `scripts/test-tiers.json` from `classification.csv` and the user's
