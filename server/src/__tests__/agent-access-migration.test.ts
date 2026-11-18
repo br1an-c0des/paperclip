@@ -101,6 +101,9 @@ describe.skipIf(!support.supported)("migration 0491: carrying over today's acces
       role: "ceo",
       permissions: { canCreateAgents: false, ceoHiringDeniedBy: { actorType: "user", actorId: "u", at: "2026-01-01T00:00:00.000Z" } },
     });
+    // A false saved on a CEO without a board-recorded denial kept hiring (stale saves, imports).
+    const unrecordedFalseCeo = await legacyAgent({ role: "ceo", permissions: { canCreateAgents: false } });
+    const unflagged = await legacyAgent({ permissions: {} });
     const lowTrustCeo = await legacyAgent({ role: "ceo", permissions: { trustPreset: "low_trust_review" } });
     const restricted = await legacyAgent({
       permissions: { interactions: { canEditOtherTasks: false, canAssignTasksToHumans: false, canConfigureOtherAgents: false, canMentionAgents: false } },
@@ -109,6 +112,8 @@ describe.skipIf(!support.supported)("migration 0491: carrying over today's acces
     expect((await accessOf(hirer.id))?.overrides).toEqual({ "agents:create": true });
     expect((await accessOf(ceo.id))?.overrides).toEqual({ "agents:create": true });
     expect((await accessOf(deniedCeo.id))?.overrides).toEqual({});
+    expect((await accessOf(unrecordedFalseCeo.id))?.overrides).toEqual({ "agents:create": true });
+    expect((await accessOf(unflagged.id))?.overrides).toEqual({});
     expect((await accessOf(lowTrustCeo.id))?.overrides).toEqual({});
     // canMentionAgents and canCommentOnOtherTasks have no matching action and stay as switches.
     expect((await accessOf(restricted.id))?.overrides).toEqual({

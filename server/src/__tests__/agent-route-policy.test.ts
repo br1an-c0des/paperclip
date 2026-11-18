@@ -134,7 +134,7 @@ describe.skipIf(!support.supported)("agentRoutePolicy", () => {
       request(app).get(`/api/issues/${issueId}`),
     ];
     for (const response of await Promise.all(calls)) {
-      expect(response.status, `${response.req.method} ${response.req.path}`).toBe(200);
+      expect(response.status, JSON.stringify(response.body)).toBe(200);
     }
     const project = await request(app).post(`/api/companies/${companyId}/projects`).send({ name: "Nope" });
     expect(project.status).toBe(403);

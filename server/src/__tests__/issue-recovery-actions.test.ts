@@ -239,7 +239,7 @@ describeEmbeddedPostgres("issue recovery actions", () => {
         adapterType: "codex_local",
         adapterConfig: {},
         runtimeConfig: {},
-        permissions: {},
+        permissions: { access: { level: "manager" } }, // an agent from before step 4a (migration 0491)
       },
       {
         id: coderId,
@@ -251,7 +251,7 @@ describeEmbeddedPostgres("issue recovery actions", () => {
         adapterType: "codex_local",
         adapterConfig: {},
         runtimeConfig: {},
-        permissions: {},
+        permissions: { access: { level: "manager" } },
       },
     ]);
     await db.insert(issues).values({
