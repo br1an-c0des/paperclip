@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { IncomingMessage } from "node:http";
 import express from "express";
+import { inject } from "light-my-request";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { agents, companies, createDb } from "@paperclipai/db";
@@ -171,6 +173,47 @@ describe.skipIf(!support.supported)("agentRoutePolicy", () => {
     const app = appFor(runActor(worker));
     expect((await request(app).post(`/api/companies/${companyId}/projects`).send({})).status).toBe(200);
     expect((await request(app).post(`/api/companies/${companyId}/projects`).send({})).status).toBe(403);
+  });
+
+  it("an in-process dispatch through the API router is checked too", async () => {
+    // The MCP tools re-enter REST the way createMcpApiDispatch does: a fresh app that mounts the
+    // `api` router itself, so a policy mounted outside that router would be skipped.
+    const api = express.Router();
+    api.use(agentRoutePolicy(db));
+    api.all("/{*rest}", (_req, res) => {
+      res.json({ reached: true });
+    });
+    async function dispatch(actor: AuthorizationActor, method: "POST" | "DELETE", path: string) {
+      const app = express();
+      // As createMcpApiDispatch does: light-my-request adapts the parent prototypes of
+      // app.request/response, so clone them to keep the other requests in this file intact.
+      for (const target of [app.request, app.response]) {
+        const parent = Object.getPrototypeOf(target);
+        Object.setPrototypeOf(target, Object.create(Object.getPrototypeOf(parent), Object.getOwnPropertyDescriptors(parent)));
+      }
+      app.use(express.json());
+      app.use((req, _res, next) => {
+        req.actor = actor as typeof req.actor;
+        next();
+      });
+      app.use("/api", api);
+      return inject(app, {
+        method, url: `/api${path}`, Request: IncomingMessage,
+        payload: JSON.stringify({}), headers: { "content-type": "application/json" },
+      });
+    }
+    const manager = await agentWith({ level: "manager" });
+    const untagged = await dispatch(runActor(manager), "POST", "/not-a-documented-route");
+    expect(untagged.statusCode).toBe(403);
+    expect(untagged.json()).toMatchObject({ code: "access_denied", missingAction: "api:raw", requestable: true });
+    const admin = await agentWith({ level: "admin" });
+    expect((await dispatch(runActor(admin), "POST", "/not-a-documented-route")).statusCode).toBe(200);
+    const deletion = await dispatch(runActor(admin), "DELETE", `/issues/${randomUUID()}`);
+    expect(deletion.json()).toMatchObject({ code: "access_denied", missingAction: "tasks:delete" });
+    // The MCP endpoints themselves are open to every level that can read.
+    const worker = await agentWith({ level: "worker" });
+    expect((await dispatch(runActor(worker), "POST", "/mcp/paperclip")).statusCode).toBe(200);
+    expect((await dispatch(runActor(worker), "POST", "/mcp/project-tools")).statusCode).toBe(200);
   });
 
   it("board callers are not affected", async () => {

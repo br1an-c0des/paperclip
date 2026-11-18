@@ -28,9 +28,9 @@ function tag(action: AgentRoutePolicyAction, routes: readonly string[]): AgentRo
 }
 
 export const AGENT_ROUTE_POLICY: ReadonlyArray<AgentRoutePolicyEntry> = [
-  // Not in the OpenAPI document: the Paperclip MCP endpoint, whose tools filter by access and
-  // re-enter these routes as the caller, so the policy still applies to every call they make.
-  ...tag("tasks:read", ["POST /mcp/paperclip"]),
+  // The Paperclip MCP endpoints: their tools filter by access themselves and re-enter these routes
+  // as the caller (through the API router, so this policy still applies to every call they make).
+  ...tag("route_checks", ["POST /mcp/paperclip", "POST /mcp/project-tools"]),
   // The task routes a run uses (update, comment, documents, checkout, release, interactions,
   // deliverables) and agent routes with their own checks: the route decides own-or-any per task.
   ...tag("route_checks", [
@@ -129,8 +129,7 @@ export const AGENT_ROUTE_POLICY: ReadonlyArray<AgentRoutePolicyEntry> = [
     "DELETE /work-products/:id",
     "PATCH /work-products/:id",
   ]),
-  // Personal markers, previews and credential reads a run makes; MCP endpoints whose calls
-  // re-enter the REST API as the caller.
+  // Personal markers, previews and credential reads a run makes; the tool gateway's run-time calls.
   ...tag("tasks:read", [
     "POST /agents/me/connections/:connectionId/start-authorization",
     "POST /agents/me/connections/:connectionId/token",
@@ -149,7 +148,6 @@ export const AGENT_ROUTE_POLICY: ReadonlyArray<AgentRoutePolicyEntry> = [
     "POST /issues/:id/read",
     "POST /issues/:id/tree-control/preview",
     "POST /issues/:issueId/file-resources/availability",
-    "POST /mcp/project-tools",
     "POST /tool-gateway/gateways/:gatewayId/mcp",
     "POST /tool-gateway/sessions",
     "POST /tool-gateway/sessions/:sessionId/revoke",
