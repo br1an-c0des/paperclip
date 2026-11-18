@@ -713,7 +713,7 @@ codex, cursor, gemini, grok, kimi, opencode, pi, openclaw-gateway and hermes), a
 `@paperclipai/adapter-utils` has the log and command redaction. The old UI imports them at runtime.
 Some transcripts have no package parser:
 
-- `paperclip_runner` and `cursor_cloud` parsers live in `ui/src`.
+- `paperclip_runner` and `cursor_cloud` parsers live in `ui/src` (removed 2026-11-17; read them with `git show upstream-freeze:ui/src/...`).
 - Native-runtime runs build their transcript from run events
   (`ui/src/components/transcript/native-run-events.ts`, about 1,000 lines).
 - External and plugin adapters' parsers are loaded from the server at run time.
@@ -1181,7 +1181,7 @@ Both are handled in `ui-new` for now.
 - **App logos are served from the old UI's files.** The gallery's `branding.logoUrl` points at
   `/brands/apps/*.svg` in `ui/public`. `ui-new`'s Vite config serves that folder in dev and preview
   and copies it into `dist/brands` at build, so the deploy image has them; `ui/public/brands` stays
-  the one copy.
+  the one copy. (Since 2026-11-17 `ui/` is removed: the logos live in `ui-new/public/brands`.)
 - **No request lists a connection's tools, profiles and policies together.** A connection's page
   loads the company's profiles and policies (`GET tools/profiles`, `GET tools/policies`) and filters
   them in the browser.
@@ -1394,7 +1394,7 @@ Both are handled in `ui-new` for now.
 - **Icons stay in `ui/public`:** the favicons and home-screen icons are served from there in dev and
   copied into `dist` at build, as `/brands` is. `ui-new/public` holds only `site.webmanifest` and
   `sw.js`. The Dockerfile now fails the build if the brands, icons, manifest or a stamped worker are
-  missing.
+  missing. (Since 2026-11-17 `ui/` is removed: the icons live in `ui-new/public`.)
 - **The worker's build id is the entry chunk's name,** stamped at build; unstamped (Vite's dev
   server) it handles nothing, and dev unregisters any worker. A parked tab reloads onto a new build
   only while it's hidden, so a visible tab is never reloaded under you.
@@ -1610,7 +1610,7 @@ Both are handled in `ui-new` for now.
   declared, and Tailwind's `:root` block is stripped (it overwrote `--font-mono`). Left out:
   `@tailwindcss/typography` (`prose`) and the old `@utility` blocks, which no first-party plugin
   uses. About 362 kB minified, 50 kB gzipped. Vite warns that the config imports the script without an
-  extension. The Docker build copies the whole repository, so `ui/src` is there to scan.
+  extension. The Docker build copies the whole repository, so `ui/src` is there to scan. (Since 2026-11-17 `ui/` is removed: the old theme and its class list are frozen in `ui-new/scripts/plugin-tailwind/`, and only `packages/plugins/**/src` is scanned; the output didn't change.)
 - **The `organizationSwitcher` slot** replaces the nav's switcher only when exactly one plugin offers
   one, and falls back to the built-in switcher while it loads or if it fails. The phone's switcher
   sheet keeps the built-in one. `renderIcon` gets no company id, so other companies' discs are coloured

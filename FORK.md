@@ -50,11 +50,12 @@ decision on each candidate. Weekly, by hand, to start.
 
 ## The new UI
 
-`ui-new/` is a standalone SolidJS + Vite app beside the React UI in `ui/`. It talks to the server
-over the same `/api`, and imports API types from `@paperclipai/shared` with `import type`, so
-server type changes show up as type errors. Use `ui/src` (especially
-`ui/src/api/`) as the reference for how the API is used. Details:
-[ui-new/README.md](ui-new/README.md).
+`ui-new/` is a standalone SolidJS + Vite app, and the only board UI: upstream's React UI (`ui/`) was
+removed on 2026-11-17. It talks to the server over `/api`, and imports API types from
+`@paperclipai/shared` with `import type`, so server type changes show up as type errors. The old
+UI's code is still readable at the freeze (`git show upstream-freeze:ui/src/api/...`), and the
+[inventory](ui-new/docs/inventory/README.md) catalogues what it did. Paths under `ui/src` below refer
+to that copy. Details: [ui-new/README.md](ui-new/README.md).
 
 ### A standalone app, not a plugin
 

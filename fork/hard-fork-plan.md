@@ -281,8 +281,9 @@ Nothing here changes code, and all of it can be undone.
 
 Decided on adoption (2026-11-17), replacing the proposal's "cut to Claude only". Nothing is removed
 up front: the other 11 adapters, the Paperclip Runner and Claude Managed, remote and cloud execution,
-the experimental flags on the server, unused packages and plugins, and the old `ui/` all stay in the
-tree, dormant. The work goes into `claude_local`, the path this setup uses (steps 4 to 7).
+the experimental flags on the server, unused packages and plugins all stay in the tree, dormant.
+The old `ui/` was the first to go (removed 2026-11-17 at the user's request; readable with
+`git show upstream-freeze:ui/...`). The work goes into `claude_local`, the path this setup uses (steps 4 to 7).
 
 - **Remove when it gets in the way.** When dormant code blocks or complicates a change we want,
   decide then: work around it, or remove that subsystem on its own branch. Tag before removing
@@ -300,7 +301,7 @@ the way: the other 11 adapters; experimental flags on the server; remote and clo
 (environments, sandbox providers, AI connection pools, managed connections); packages and plugins we
 don't run (`google-sheets-mcp-server`, `kv-demo-mcp-server`, `paperclip-eval-kernel`,
 `tailscale-https-broker`, `skills-catalog`, `teams-catalog`, the example and sandbox plugins); the
-old `ui/`; and the Paperclip Runner with Claude Managed, which reach into heartbeat, tool authority
+old `ui/` (done 2026-11-17); and the Paperclip Runner with Claude Managed, which reach into heartbeat, tool authority
 and recovery.
 
 ### 4. Make runs Claude-native

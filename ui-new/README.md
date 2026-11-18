@@ -126,8 +126,8 @@ The old React UI showed how the server API is used: endpoints, payloads, and rea
 ## Changing the API
 
 Since the hard fork (2026-11-17, [FORK.md](../FORK.md)) the server is ours: when `ui-new` needs
-something the API doesn't have, change the server instead of designing around the gap. Server
-changes only reach server1 once the deployment builds from source (hard-fork plan step 2).
+something the API doesn't have, change the server instead of designing around the gap. The
+deployment builds from source, so server changes reach server1 at its next deploy.
 
 If `pnpm-lock.yaml` conflicts when merging a branch, don't resolve it by hand: take one side and
 regenerate it with `corepack pnpm install`, then `git add pnpm-lock.yaml`.
