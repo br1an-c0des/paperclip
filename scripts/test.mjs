@@ -104,9 +104,9 @@ export function loadTiers(file = tiersFile) {
   return tiers;
 }
 
-function isServerFile(file, inventory) {
-  const entry = inventory?.find((item) => item.file === file);
-  return entry ? serverProjectPattern.test(entry.project) : file.startsWith("server/");
+function isServerFile(file, projectOf) {
+  const project = projectOf?.get(file);
+  return project ? serverProjectPattern.test(project) : file.startsWith("server/");
 }
 
 function isOptIn(file, tiers) {
@@ -130,6 +130,7 @@ export function buildPlan(tier, tiers, options) {
   const workers = options.workers ?? defaultWorkers;
   const restrictTo = options.files ?? null;
   const absolute = (file) => path.posix.join(root, file);
+  const projectOf = inventory && new Map(inventory.map((entry) => [entry.file, entry.project]));
   const serial = new Set(tiers.serialServer);
   // A shared external test database can't be isolated per file, as in upstream's runner.
   const parallelArgs = sharedDatabase ? ["--no-file-parallelism", "--maxWorkers=1"]
@@ -138,7 +139,7 @@ export function buildPlan(tier, tiers, options) {
 
   function phases(prefix, files, { excludeOptIn }) {
     const optInExcludes = excludeOptIn ? tiers.optIn.map(({ glob }) => absolute(glob)) : [];
-    const isServer = (file) => isServerFile(file, inventory);
+    const isServer = (file) => isServerFile(file, projectOf);
     const pick = (predicate) => files === null ? null : files.filter(predicate).map(absolute);
     const serialFiles = (files ?? tiers.serialServer)
       .filter((file) => serial.has(file) && isServer(file) && !(excludeOptIn && isOptIn(file, tiers)));
@@ -435,14 +436,14 @@ function pad(value, width, left = false) {
 
 function printSummary(tier, workers, results, wallMs) {
   console.log(`\n[test] summary: tier ${tier}, ${workers} workers, ${formatSeconds(wallMs)} in all`);
-  console.log(`${pad("phase", 22, true)}${pad("files", 7)}${pad("passed", 9)}${pad("failed", 8)}${pad("skipped", 9)}${pad("wall", 9)}${pad("exit", 6)}`);
+  console.log(`${pad("phase", 22, true)}${pad("files", 7)}${pad("passed", 9)}${pad("failed", 8)}${pad("skipped", 9)}${pad("wall", 9)}${pad("exit", 9)}`);
   const total = { files: 0, passed: 0, failed: 0, skippedTests: 0 };
   for (const result of results) {
     const count = (key) => result.skipped || result[key] === undefined ? "-" : result[key];
     for (const key of Object.keys(total)) total[key] += typeof result[key] === "number" ? result[key] : 0;
     console.log(`${pad(result.phase, 22, true)}${pad(count("files"), 7)}${pad(count("passed"), 9)}${pad(count("failed"), 8)}`
       + `${pad(count("skippedTests"), 9)}${pad(result.skipped ? "-" : formatSeconds(result.wallMs), 9)}`
-      + `${pad(result.skipped ? "not run" : result.exitCode, 6)}`);
+      + `${pad(result.skipped ? "not run" : result.exitCode, 9)}`);
   }
   console.log(`${pad("total", 22, true)}${pad(total.files, 7)}${pad(total.passed, 9)}${pad(total.failed, 8)}${pad(total.skippedTests, 9)}`);
   const failures = results.filter((result) => result.exitCode !== 0);
@@ -451,7 +452,8 @@ function printSummary(tier, workers, results, wallMs) {
       console.log(`[test] ${result.phase}: not run (interrupted)`);
       continue;
     }
-    const why = result.error ?? (result.failedFiles?.length ? `${result.failedFiles.length} failed files` : "exited non-zero with no failed test file; see its output above");
+    const why = result.error ?? (result.failedFiles?.length ? `${result.failedFiles.length} failed files`
+      : result.exitCode === 130 ? "interrupted" : "exited non-zero with no failed test file; see its output above");
     console.log(`[test] ${result.phase} failed (exit ${result.exitCode}): ${why}`);
     for (const file of result.failedFiles ?? []) console.log(`  ${file}`);
     if (result.plannedFiles !== undefined && result.files !== undefined && result.files !== result.plannedFiles) {
@@ -481,7 +483,7 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const tiers = loadTiers();
   const sharedDatabase = hasSharedTestDatabase();
-  const workers = sharedDatabase ? 1 : options.workers ?? defaultWorkers;
+  const workers = options.workers ?? defaultWorkers;
   if (sharedDatabase) log("a PAPERCLIP_*_TEST_DATABASE_URL is set: server files run one at a time");
   const runRoot = createRunRoot();
   const controller = new AbortController();
