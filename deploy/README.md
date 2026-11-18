@@ -59,9 +59,12 @@ Measured on the dev machine (16 cores, Docker Desktop on WSL):
   2026-11-17). The slow parts are compiling the Rust Runner daemon (about 2.5 minutes), installing
   the workspace's dependencies, the agent CLIs, and the TypeScript server build. Expect longer on a
   smaller machine like server1, and a few GB of downloads (Node and Rust toolchains, npm packages).
-- **Later builds** reuse Docker's layer cache: a commit that changes only TypeScript or `ui-new`
-  rebuilds the app layers (the dependency install, the server build and the `ui-new` build) but
-  not the Rust daemon or the agent CLIs.
+- **Later builds** reuse Docker's layer cache. A commit that changes no package manifest rebuilds
+  only the app layers (the React `ui/` build, the server build and the copy into the final image),
+  not the dependency install, the Rust daemon or the agent CLIs: about 2.5 minutes for the core
+  image (136 s), then under a minute for the `ui-new` image (53 s). A lockfile change also reruns
+  the dependency install (about 2 minutes more), and the first deploy of each ISO week reinstalls
+  the agent CLIs (about 1.5 minutes).
 - **Size:** about 9.6 GB for `paperclip-core:<commit>` (upstream's published image, which also
   carries the remote provider pack, was about 15.7 GB); `paperclip-fork:local` adds only `ui-new`.
   Consecutive core images share most of their layers (the dependency `node_modules` layer changes
