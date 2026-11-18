@@ -7,13 +7,18 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
+  assignShards,
   buildPlan,
-  defaultWorkers,
+  buildShards,
+  defaultWorkerCount,
   exitCodeFor,
+  maxDefaultWorkers,
   parseArgs,
+  parseExpectedSeconds,
   removeRunRoot,
   runPhases,
   selectChangedTests,
+  shardCoverageProblems,
 } from "../test.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -89,9 +94,137 @@ test("thorough without serial files has no serial phase", () => {
   assert.deepEqual(excludes(phases[0].args), ["**/dist/**"]);
 });
 
-test("the worker count defaults to defaultWorkers", () => {
+test("buildPlan falls back to maxDefaultWorkers when given no worker count", () => {
   const [server] = buildPlan("thorough", emptyTiers, { root, inventory });
-  assert.ok(server.args.includes(`--maxWorkers=${defaultWorkers}`));
+  assert.ok(server.args.includes(`--maxWorkers=${maxDefaultWorkers}`));
+});
+
+test("every phase passes --fsModuleCache, which package configs don't inherit from the root", () => {
+  for (const tier of ["thorough", "optin", "all"]) {
+    for (const phase of plan(tier)) assert.ok(phase.args.includes("--fsModuleCache"), `${tier} ${phase.name}`);
+  }
+});
+
+const GB = 1024 ** 3;
+
+test("defaultWorkerCount: the smallest of the cap, half the cores and free memory per worker", () => {
+  const perWorkerBytes = 1.5 * GB;
+  // This desktop: 16 cores, ~17 GB free: the cap.
+  const desktop = defaultWorkerCount({ cores: 16, availableBytes: 17 * GB, perWorkerBytes });
+  assert.equal(desktop.workers, 8);
+  assert.equal(desktop.limitedBy, "cap");
+  // server1: 20 cores, memory shared with the real instance: memory.
+  const server1 = defaultWorkerCount({ cores: 20, availableBytes: 6.5 * GB, perWorkerBytes });
+  assert.equal(server1.workers, 4);
+  assert.equal(server1.limitedBy, "memory");
+  // GitHub's standard runner: 4 cores, 16 GB: cores.
+  const github = defaultWorkerCount({ cores: 4, availableBytes: 14.5 * GB, perWorkerBytes });
+  assert.equal(github.workers, 2);
+  assert.equal(github.limitedBy, "cores");
+  // Never below one.
+  assert.equal(defaultWorkerCount({ cores: 1, availableBytes: 0.2 * GB, perWorkerBytes }).workers, 1);
+  // The reason names every term.
+  assert.match(server1.reason, /20 cores/);
+  assert.match(server1.reason, /6\.5 GB free/);
+  assert.match(server1.reason, /1\.5 GB per worker/);
+});
+
+test("parseExpectedSeconds: local_s, else ci_s, from the classification CSV with quoted fields", () => {
+  const csv = [
+    "file,project,area,label,proposed_tier,reason,postgres,lines,ci_s,local_s",
+    "a.test.ts,p,x,shared,thorough,plain,no,10,12.5,30.1",
+    'b.test.ts,p,x,shared,thorough,"has, commas and ""quotes""",yes,10,7,',
+    "c.test.ts,p,x,shared,thorough,none,no,10,,",
+  ].join("\n");
+  const seconds = parseExpectedSeconds(csv);
+  assert.equal(seconds.get("a.test.ts"), 30.1);
+  assert.equal(seconds.get("b.test.ts"), 7);
+  assert.equal(seconds.has("c.test.ts"), false);
+});
+
+function phase(name, files, args = ["--maxWorkers=4"]) {
+  return { name, args, files };
+}
+
+function shardFiles(shard) {
+  return shard.flatMap((item) => item.files);
+}
+
+test("assignShards: every file in exactly one shard, balanced by expected time", () => {
+  const weights = { a: 100, b: 60, c: 50, d: 40, e: 10, f: 10, g: 10, h: 5 };
+  const phases = [phase("server", ["a", "b", "c", "d", "e", "f"]), phase("packages", ["g", "h"])];
+  const shards = assignShards(phases, 3, (file) => weights[file]);
+  assert.equal(shards.length, 3);
+  const all = shards.flatMap(shardFiles).sort();
+  assert.deepEqual(all, ["a", "b", "c", "d", "e", "f", "g", "h"]);
+  // Longest first onto the least loaded shard: {a}, {b, e, f}, {c, d} in the server phase.
+  const load = (shard) => shardFiles(shard).reduce((sum, file) => sum + weights[file], 0);
+  const loads = shards.map(load);
+  assert.ok(Math.max(...loads) - Math.min(...loads) <= 20, `loads ${loads}`);
+  // Each shard keeps the phase's name and args; a shard with no files in a phase leaves it out.
+  for (const shard of shards) {
+    for (const item of shard) assert.deepEqual(item.args, ["--maxWorkers=4"]);
+    assert.ok(shard.every((item) => item.files.length > 0));
+  }
+});
+
+test("assignShards is deterministic and ignores the order files come in", () => {
+  const weights = new Map(Array.from({ length: 40 }, (_, i) => [`f${i}`, (i * 37) % 11 + 1]));
+  const files = [...weights.keys()];
+  const one = assignShards([phase("server", files)], 4, (file) => weights.get(file));
+  const two = assignShards([phase("server", [...files].reverse())], 4, (file) => weights.get(file));
+  assert.deepEqual(one, two);
+});
+
+test("assignShards: more shards than files leaves some shards empty", () => {
+  const shards = assignShards([phase("server", ["a", "b"])], 3, () => 1);
+  assert.deepEqual(shards.map((shard) => shardFiles(shard)), [["a"], ["b"], []]);
+});
+
+test("assignShards needs explicit file lists", () => {
+  assert.throws(() => assignShards([phase("server", null)], 2, () => 1), /explicit file list/);
+});
+
+test("--shard splits the thorough tier's files: each shard runs its slice of every phase", () => {
+  const options = { tiers: emptyTiers, expectedSeconds: () => 1 };
+  const shards = buildShards("thorough", emptyTiers, { root, workers: 6, inventory, shardCount: 2, ...options });
+  assert.equal(shards.length, 2);
+  const everyFile = shards.flatMap((shard) => shard.flatMap((item) => item.files)).sort();
+  assert.deepEqual(everyFile, inventory.map((entry) => abs(entry.file)).sort());
+  for (const shard of shards) {
+    for (const item of shard) assert.ok(Array.isArray(item.files) && item.files.length > 0);
+    assert.ok(shard.every((item) => item.args.includes("--maxWorkers=6")));
+  }
+  // buildPlan with a shard returns that shard's phases.
+  assert.deepEqual(plan("thorough", { ...options, shard: { index: 2, count: 2 } }), shards[1]);
+  // optIn files stay out of every shard of thorough.
+  const withOptIn = buildShards("thorough", tiers, { root, workers: 6, inventory, shardCount: 3, expectedSeconds: () => 1 });
+  const sharded = withOptIn.flatMap((shard) => shard.flatMap((item) => item.files));
+  assert.ok(!sharded.includes(abs("server/src/services/native-runtime/n.test.ts")));
+  assert.ok(!sharded.includes(abs("packages/adapters/codex-local/src/e.test.ts")));
+  assert.equal(sharded.length, inventory.length - 2);
+});
+
+test("--shard weighs files by expected seconds, with unknown files at the median", () => {
+  const known = { "server/src/__tests__/a.test.ts": 100, "server/src/services/c.test.ts": 1, "packages/db/src/d.test.ts": 3 };
+  const shards = buildShards("thorough", emptyTiers, {
+    root, workers: 2, inventory, shardCount: 2, expectedSeconds: (file) => known[file],
+  });
+  // The 100 s file is alone in its shard's server phase; the rest (1 s, and three at the median 3 s) go to the other.
+  const serverOf = (shard) => shard.find((item) => item.name === "server")?.files ?? [];
+  const heavy = shards.find((shard) => serverOf(shard).includes(abs("server/src/__tests__/a.test.ts")));
+  assert.deepEqual(serverOf(heavy), [abs("server/src/__tests__/a.test.ts")]);
+});
+
+test("shardCoverageProblems names files that are missing, unexpected or in more than one shard", () => {
+  const shards = [[phase("server", ["/repo/a", "/repo/b"])], [phase("server", ["/repo/b"]), phase("packages", ["/repo/x"])]];
+  const problems = shardCoverageProblems(shards, new Set(["/repo/a", "/repo/b", "/repo/c"]));
+  assert.deepEqual(problems.sort(), [
+    "in more than one shard: /repo/b (1, 2)",
+    "in no shard: /repo/c",
+    "not expected in this tier: /repo/x",
+  ]);
+  assert.deepEqual(shardCoverageProblems([[phase("server", ["/repo/a"])], []], new Set(["/repo/a"])), []);
 });
 
 test("the worker count comes from the options", () => {
@@ -197,8 +330,15 @@ test("runPhases starts no new phase once interrupted", async () => {
 
 test("parseArgs reads tiers, workers, files, changed and passthrough args", () => {
   assert.deepEqual(parseArgs([]), {
-    tier: "thorough", workers: null, changed: null, filesList: null, dryRun: false, skipPreflight: false, vitestArgs: [],
+    tier: "thorough", workers: null, changed: null, filesList: null, shard: null, reportDir: null, dryRun: false,
+    skipPreflight: false, vitestArgs: [],
   });
+  assert.deepEqual(parseArgs(["--shard", "2/8"]).shard, { index: 2, count: 8 });
+  assert.deepEqual(parseArgs(["--shard=1/1"]).shard, { index: 1, count: 1 });
+  for (const bad of ["0/8", "9/8", "2", "a/b", "2/0", "1.5/4"]) {
+    assert.throws(() => parseArgs(["--shard", bad]), /--shard must be i\/n/, bad);
+  }
+  assert.equal(parseArgs(["--report-dir", "out"]).reportDir, "out");
   const parsed = parseArgs(["--tier", "quick", "--workers=4", "--files", "list.txt", "--dry-run", "--", "-t", "name"]);
   assert.equal(parsed.tier, "quick");
   assert.equal(parsed.workers, 4);
@@ -262,6 +402,17 @@ test("--dry-run lists the thorough phases with file counts and checks coverage",
   assert.match(result.stdout, /server\s+\d+ files/);
   assert.match(result.stdout, /packages\s+\d+ files/);
   assert.match(result.stdout, /coverage: every one of \d+ test files is in exactly one phase/);
+});
+
+test("--dry-run --shard lists one shard's phases, every shard's size, and checks the shards cover the tier", () => {
+  const result = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "test.mjs"), "--dry-run", "--tier", "thorough",
+    "--shard", "2/3", "--workers", "2"], { cwd: repoRoot, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.match(result.stdout, /tier thorough, shard 2\/3, 2 workers/);
+  assert.match(result.stdout, /workers: 2 \(--workers\)/);
+  for (const index of [1, 2, 3]) assert.match(result.stdout, new RegExp(`shard ${index}/3\\s+\\d+ files`));
+  assert.match(result.stdout, /coverage: the 3 shards hold every one of \d+ test files exactly once/);
+  assert.match(result.stdout, /coverage: shard 2\/3's \d+ files are exactly what its phases list/);
 });
 
 test("removeRunRoot removes a run directory that holds read-only and unreadable directories", () => {

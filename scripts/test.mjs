@@ -3,20 +3,25 @@
 // invocations from the repo root:
 //
 //   node scripts/test.mjs [--tier quick|thorough|optin|all] [--workers N] [--changed <ref>]
-//                         [--files <listfile>] [--dry-run] [--skip-preflight] [-- <vitest args>]
+//                         [--files <listfile>] [--shard i/n] [--report-dir <dir>] [--dry-run]
+//                         [--skip-preflight] [-- <vitest args>]
 //
 // - thorough (the default, `pnpm test`): server files in parallel, then the `serialServer` files
 //   one at a time, then every non-server project in a single run. `optIn` files are left out.
 // - optin: only the files matching `optIn` globs. all: thorough, then optin.
 // - quick: thorough restricted to the tests a change touches (see selectChangedTests).
+// - --shard i/n: only the i-th of n slices of the tier (CI runs one shard per job). Each phase's
+//   files are split by expected time (assignShards), the same way on every machine.
+// - --workers: by default, from the machine's cores and free memory (defaultWorkerCount).
+// - --report-dir: copy each phase's Vitest JSON report there (CI uploads them).
 //
 // Tiers live in scripts/test-tiers.json. Every phase runs even when an earlier one fails, and the
 // summary lists every phase's counts and failed files. Before running, the runner lists each phase's
 // files with `vitest list --filesOnly` and checks that every test file lands in exactly one phase.
 //
-// Upstream's scripts/run-vitest-stable.mjs (pnpm test:run*) is kept for upstream's CI workflows.
+// Upstream's scripts/run-vitest-stable.mjs (pnpm test:run*) is no longer run by any workflow.
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -33,12 +38,19 @@ export const tierNames = ["quick", "thorough", "optin", "all"];
 // Server projects are selected by name, so the server config can be split into several projects.
 export const serverProjectFilter = "@paperclipai/server*";
 const serverProjectPattern = /^@paperclipai\/server/;
-// The fastest of 2, 4, 6 and 8 workers on the 60-file benchmark set, with no file failing only in
-// parallel, and half of this machine's 16 cores (fork/test-suite-audit/results-runner.md).
-export const defaultWorkers = 8;
+// The default worker count is the smallest of this cap (the fastest of 2, 4, 6 and 8 workers on the
+// 60-file benchmark set, with no file failing only in parallel: results-runner.md), half the
+// cores, and the free memory divided by what one worker takes (measured in results-ci.md).
+export const maxDefaultWorkers = 8;
+export const bytesPerWorker = 1.5 * 1024 ** 3;
+// Expected seconds per test file, for balancing shards: local_s (this machine's profile), else ci_s
+// (upstream's recorded durations). Files with neither count as the median of those that have one.
+export const expectedSecondsFile = path.join(repoRoot, "fork", "test-suite-audit", "classification.csv");
 // quick: a directory with more test files than this contributes no directory files.
 export const quickMaxDirectoryFiles = 50;
 const sourceOnlyArgs = ["--exclude", "**/dist/**"];
+// A package project with its own config doesn't inherit the root's fsModuleCache (results-overhead.md).
+const cacheArgs = ["--fsModuleCache"];
 
 function usageError(message) {
   const error = new Error(message);
@@ -54,10 +66,20 @@ function positiveInteger(value, name) {
   return parsed;
 }
 
+function parseShard(value) {
+  const match = /^(\d+)\/(\d+)$/.exec(value);
+  const index = match ? Number(match[1]) : NaN;
+  const count = match ? Number(match[2]) : NaN;
+  if (!match || count < 1 || index < 1 || index > count) {
+    throw usageError(`--shard must be i/n with 1 <= i <= n, such as 2/8. Received "${value}".`);
+  }
+  return { index, count };
+}
+
 export function parseArgs(argv) {
   const options = {
-    tier: "thorough", workers: null, changed: null, filesList: null, dryRun: false, skipPreflight: false,
-    vitestArgs: [],
+    tier: "thorough", workers: null, changed: null, filesList: null, shard: null, reportDir: null, dryRun: false,
+    skipPreflight: false, vitestArgs: [],
   };
   const valueOf = (index, name) => {
     const value = argv[index + 1];
@@ -81,6 +103,8 @@ export function parseArgs(argv) {
     else if (name === "--workers") options.workers = positiveInteger(take(), "--workers");
     else if (name === "--changed") options.changed = take();
     else if (name === "--files") options.filesList = take();
+    else if (name === "--shard") options.shard = parseShard(take());
+    else if (name === "--report-dir") options.reportDir = take();
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--skip-preflight") options.skipPreflight = true;
     else throw usageError(`Unknown argument "${arg}".`);
@@ -124,19 +148,167 @@ function excludeArgs(patterns) {
  * left out. Pure: everything it needs comes in through `tiers` and `options`.
  *
  * options: { root, workers, inventory?: { file, project }[], files?: string[] | null,
- *            sharedDatabase?: boolean }. Paths in `tiers`, `inventory` and `files` are repo-relative.
+ *            sharedDatabase?: boolean, shard?: { index, count }, expectedSeconds?: (file) => number }.
+ * Paths in `tiers`, `inventory` and `files` are repo-relative. With `shard`, it returns that shard's
+ * phases (see buildShards).
  */
 export function buildPlan(tier, tiers, options) {
+  if (options.shard) return buildShards(tier, tiers, { ...options, shardCount: options.shard.count })[options.shard.index - 1];
+  return buildUnsharded(tier, tiers, options);
+}
+
+/**
+ * The phases of every shard of a tier: an array of `shardCount` plans, each a list of phases with
+ * explicit files. Each phase's files are split by assignShards, weighted by `expectedSeconds(file)`
+ * (repo-relative; undefined for an unknown file, which then counts as the median of the known
+ * ones). Needs `inventory` or `files`, so the split is the same for the same file list.
+ */
+export function buildShards(tier, tiers, options) {
+  const { root, shardCount, expectedSeconds = () => undefined } = options;
+  const files = options.files ?? options.inventory?.map((entry) => entry.file);
+  if (!files) throw new Error("Sharding needs the inventory or a file list.");
+  const phases = buildUnsharded(tier, tiers, { ...options, files });
+  return assignShards(phases, shardCount, shardWeights(phases.flatMap((phase) => phase.files), root, expectedSeconds));
+}
+
+/**
+ * The weight function buildShards uses for these (absolute) files: `expectedSeconds` of the
+ * repo-relative path, or the median of the files that have one (1 when none has).
+ */
+export function shardWeights(files, root, expectedSeconds) {
+  const prefix = `${root}/`;
+  const secondsOf = (file) => {
+    const seconds = expectedSeconds(file.startsWith(prefix) ? file.slice(prefix.length) : file);
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
+  };
+  const known = files.map(secondsOf).filter((seconds) => seconds !== undefined).sort((a, b) => a - b);
+  const median = known.length === 0 ? 1 : known.length % 2 === 1 ? known[(known.length - 1) / 2]
+    : (known[known.length / 2 - 1] + known[known.length / 2]) / 2;
+  return (file) => secondsOf(file) ?? median;
+}
+
+/**
+ * Splits each phase's files into `count` shards: longest expected time first, each onto the shard
+ * with the least expected time so far in that phase, so every shard's slice of every phase takes
+ * about as long. Ties go to the shard with the least time in the earlier phases, then the lower
+ * shard number. Phases are balanced on their own because they run one after another, and a serial
+ * phase's time isn't divided by the workers. Files of equal weight are taken in path order, so the
+ * result depends only on the files and their weights, not their order or the machine. Returns
+ * `count` plans; a shard with no files in a phase leaves that phase out.
+ */
+export function assignShards(phases, count, weightOf) {
+  const shards = Array.from({ length: count }, () => []);
+  const totals = new Array(count).fill(0);
+  for (const phase of phases) {
+    if (!Array.isArray(phase.files)) throw new Error(`Phase ${phase.name}: sharding needs an explicit file list.`);
+    const ordered = [...phase.files].map((file) => ({ file, weight: weightOf(file) }))
+      .sort((a, b) => b.weight - a.weight || (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+    const loads = new Array(count).fill(0);
+    const buckets = Array.from({ length: count }, () => []);
+    for (const { file, weight } of ordered) {
+      let target = 0;
+      for (let index = 1; index < count; index += 1) {
+        if (loads[index] < loads[target] || (loads[index] === loads[target] && totals[index] < totals[target])) target = index;
+      }
+      buckets[target].push(file);
+      loads[target] += weight;
+    }
+    loads.forEach((load, index) => { totals[index] += load; });
+    buckets.forEach((files, index) => {
+      if (files.length > 0) shards[index].push({ ...phase, files: files.sort() });
+    });
+  }
+  return shards;
+}
+
+/** What's wrong with a set of shards: files in no shard, in more than one, or not expected. */
+export function shardCoverageProblems(shards, expected) {
+  const seen = new Map();
+  shards.forEach((shard, index) => {
+    for (const phase of shard) for (const file of phase.files) seen.set(file, [...(seen.get(file) ?? []), index + 1]);
+  });
+  return [
+    ...[...expected].filter((file) => !seen.has(file)).map((file) => `in no shard: ${file}`),
+    ...[...seen.keys()].filter((file) => !expected.has(file)).map((file) => `not expected in this tier: ${file}`),
+    ...[...seen].filter(([, indexes]) => indexes.length > 1)
+      .map(([file, indexes]) => `in more than one shard: ${file} (${indexes.join(", ")})`),
+  ];
+}
+
+/** Expected seconds per file from classification.csv's text: local_s, else ci_s. */
+export function parseExpectedSeconds(csvText) {
+  const rows = parseCsv(csvText);
+  const [header, ...body] = rows;
+  const column = (name) => header.indexOf(name);
+  const [fileColumn, localColumn, ciColumn] = [column("file"), column("local_s"), column("ci_s")];
+  if (fileColumn < 0 || (localColumn < 0 && ciColumn < 0)) throw new Error("expected columns file, local_s and ci_s");
+  const seconds = new Map();
+  for (const row of body) {
+    const value = [row[localColumn], row[ciColumn]].find((cell) => cell !== undefined && cell.trim() !== "");
+    if (row[fileColumn] && value !== undefined && Number.isFinite(Number(value))) seconds.set(row[fileColumn], Number(value));
+  }
+  return seconds;
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (quoted) {
+      if (char === '"' && text[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else if (char === '"') quoted = false;
+      else cell += char;
+    } else if (char === '"') quoted = true;
+    else if (char === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (char === "\n" || char === "\r") {
+      if (char === "\r" && text[index + 1] === "\n") index += 1;
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else cell += char;
+  }
+  if (cell !== "" || row.length > 0) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows.filter((items) => items.some((item) => item !== ""));
+}
+
+/**
+ * The default worker count: the smallest of maxDefaultWorkers, half the cores and the free memory
+ * divided by `perWorkerBytes`, and at least one. `limitedBy` names the term that set it.
+ */
+export function defaultWorkerCount({ cores, availableBytes, perWorkerBytes = bytesPerWorker, cap = maxDefaultWorkers }) {
+  const byCores = Math.floor(cores / 2);
+  const byMemory = Math.floor(availableBytes / perWorkerBytes);
+  const terms = [["cap", cap], ["cores", byCores], ["memory", byMemory]];
+  const [limitedBy, smallest] = terms.reduce((best, term) => term[1] < best[1] ? term : best);
+  const workers = Math.max(1, smallest);
+  const gb = (bytes) => `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  const reason = `min(cap ${cap}, ${cores} cores / 2 = ${byCores}, ${gb(availableBytes)} free / ${gb(perWorkerBytes)} per worker = ${byMemory})`
+    + (smallest < 1 ? ", at least 1" : "");
+  return { workers, limitedBy, reason };
+}
+
+function buildUnsharded(tier, tiers, options) {
   const { root, inventory = null, sharedDatabase = false } = options;
-  const workers = options.workers ?? defaultWorkers;
+  const workers = options.workers ?? maxDefaultWorkers;
   const restrictTo = options.files ?? null;
   const absolute = (file) => path.posix.join(root, file);
   const projectOf = inventory && new Map(inventory.map((entry) => [entry.file, entry.project]));
   const serial = new Set(tiers.serialServer);
   // A shared external test database can't be isolated per file, as in upstream's runner.
-  const parallelArgs = sharedDatabase ? ["--no-file-parallelism", "--maxWorkers=1"]
-    : ["--fileParallelism", `--maxWorkers=${workers}`];
-  const serialArgs = ["--no-file-parallelism", "--maxWorkers=1"];
+  const parallelArgs = [...(sharedDatabase ? ["--no-file-parallelism", "--maxWorkers=1"]
+    : ["--fileParallelism", `--maxWorkers=${workers}`]), ...cacheArgs];
+  const serialArgs = ["--no-file-parallelism", "--maxWorkers=1", ...cacheArgs];
 
   function phases(prefix, files, { excludeOptIn }) {
     const optInExcludes = excludeOptIn ? tiers.optIn.map(({ glob }) => absolute(glob)) : [];
@@ -158,7 +330,7 @@ export function buildPlan(tier, tiers, options) {
       },
       {
         name: `${prefix}packages`,
-        args: ["--project", `!${serverProjectFilter}`, `--maxWorkers=${workers}`,
+        args: ["--project", `!${serverProjectFilter}`, `--maxWorkers=${workers}`, ...cacheArgs,
           ...excludeArgs([...sourceOnlyArgs.slice(1), ...optInExcludes])],
         files: pick((file) => !isServer(file)),
       },
@@ -340,12 +512,14 @@ function phaseEnv(runRoot) {
 }
 
 // A --reporter on the command line replaces the config's reporters, so this repeats the root
-// vitest.config.ts list and adds the JSON report the summary reads.
+// vitest.config.ts list and adds the JSON report the summary reads. Upstream's test-timing reporter
+// is left out: it records only a project named exactly "@paperclipai/server", which no longer exists,
+// and the JSON reports (--report-dir) hold the same durations.
 function reporterArgs(jsonFile, vitestArgs, env) {
   const userReporter = vitestArgs.some((arg) => arg === "--reporter" || arg.startsWith("--reporter="));
   const reporters = [
     ...(userReporter ? [] : ["default"]),
-    ...(env.GITHUB_ACTIONS === "true" ? ["./scripts/ci/test-timing-reporter.mjs", "./scripts/ci/oversized-test-files.mjs"] : []),
+    ...(env.GITHUB_ACTIONS === "true" ? ["./scripts/ci/oversized-test-files.mjs"] : []),
     ...(env.PAPERCLIP_CI_PROFILE === "true" ? ["./scripts/ci-profile/vitest-reporter.mjs"] : []),
     ...(retryReporterEnabled(env) ? ["./scripts/ci/retry-reporter.mjs"] : []),
     ...(stalledFileReporterEnabled(env) ? ["./scripts/ci/stalled-file-reporter.mjs"] : []),
@@ -395,6 +569,15 @@ async function preflight() {
     const code = await spawnAndWait(command, [...prefix, ...args], { env: process.env });
     if (code !== 0) throw new Error(`preflight "pnpm ${args.join(" ")}" failed (${code})`);
   }
+}
+
+// Expected seconds per repo-relative test file; empty (every file at weight 1) without the CSV.
+function loadExpectedSeconds(file = expectedSecondsFile) {
+  if (!existsSync(file)) {
+    log(`warning: ${path.relative(repoRoot, file)} not found: shards are balanced by file count`);
+    return new Map();
+  }
+  return parseExpectedSeconds(readFileSync(file, "utf8"));
 }
 
 function readFilesList(file) {
@@ -458,8 +641,8 @@ function pad(value, width, left = false) {
   return left ? text.padEnd(width) : text.padStart(width);
 }
 
-function printSummary(tier, workers, results, wallMs) {
-  console.log(`\n[test] summary: tier ${tier}, ${workers} workers, ${formatSeconds(wallMs)} in all`);
+function printSummary(label, workers, results, wallMs) {
+  console.log(`\n[test] summary: ${label}, ${workers} workers, ${formatSeconds(wallMs)} in all`);
   console.log(`${pad("phase", 22, true)}${pad("files", 7)}${pad("passed", 9)}${pad("failed", 8)}${pad("skipped", 9)}${pad("wall", 9)}${pad("exit", 9)}`);
   const total = { files: 0, passed: 0, failed: 0, skippedTests: 0 };
   for (const result of results) {
@@ -507,7 +690,14 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const tiers = loadTiers();
   const sharedDatabase = hasSharedTestDatabase();
-  const workers = options.workers ?? defaultWorkers;
+  let workers = options.workers;
+  if (workers === null) {
+    const choice = defaultWorkerCount({ cores: os.availableParallelism(), availableBytes: process.availableMemory() });
+    workers = choice.workers;
+    log(`workers: ${workers}, ${choice.reason}; --workers overrides`);
+  } else {
+    log(`workers: ${workers} (--workers)`);
+  }
   if (sharedDatabase) log("a PAPERCLIP_*_TEST_DATABASE_URL is set: server files run one at a time");
   const runRoot = createRunRoot();
   const controller = new AbortController();
@@ -536,14 +726,41 @@ async function main() {
       for (const file of files.filter((item) => !known.has(item))) log(`warning: not a test file in any project: ${file}`);
     }
 
-    const phases = buildPlan(options.tier, tiers, { root: repoRoot, workers, inventory, files, sharedDatabase });
+    const planOptions = { root: repoRoot, workers, inventory, files, sharedDatabase };
+    let phases;
+    let expected = expectedFiles(options.tier, tiers, inventory, files);
+    const { shard } = options;
+    if (shard) {
+      const seconds = loadExpectedSeconds();
+      const shards = buildShards(options.tier, tiers, { ...planOptions, shardCount: shard.count, expectedSeconds: (file) => seconds.get(file) });
+      const problems = shardCoverageProblems(shards, new Set([...expected].map((file) => path.posix.join(repoRoot, file))));
+      if (problems.length > 0) {
+        console.error(`[test] the shards don't cover the tier's files exactly:\n  ${problems.join("\n  ")}`);
+        return 1;
+      }
+      log(`coverage: the ${shard.count} shards hold every one of ${expected.size} test files exactly once`);
+      const weightOf = shardWeights(shards.flat().flatMap((phase) => phase.files), repoRoot, (file) => seconds.get(file));
+      log(`shards, balanced by expected seconds (${path.relative(repoRoot, expectedSecondsFile)}, unknown files at the median):`);
+      shards.forEach((plan, index) => {
+        const planFiles = plan.flatMap((phase) => phase.files);
+        const known = planFiles.filter((file) => seconds.has(toRepoPath(file))).length;
+        const minutes = planFiles.reduce((sum, file) => sum + weightOf(file), 0) / 60;
+        console.log(`  ${pad(`shard ${index + 1}/${shard.count}`, 12, true)}${pad(planFiles.length, 6)} files  `
+          + `${pad(minutes.toFixed(1), 6)} expected worker-minutes (${known} files recorded)  `
+          + plan.map((phase) => `${phase.name} ${phase.files.length}`).join(", "));
+      });
+      phases = shards[shard.index - 1];
+      expected = new Set(phases.flatMap((phase) => phase.files).map(toRepoPath));
+    } else {
+      phases = buildPlan(options.tier, tiers, planOptions);
+    }
     if (phases.length === 0) {
-      log(`tier ${options.tier}: no test files to run`);
+      log(`tier ${options.tier}${shard ? `, shard ${shard.index}/${shard.count}` : ""}: no test files to run`);
       return 0;
     }
-    const expected = expectedFiles(options.tier, tiers, inventory, files);
     const listing = listPhases(phases, expected, phaseEnv(runRoot), runRoot);
-    log(`tier ${options.tier}, ${workers} workers:`);
+    const label = `tier ${options.tier}${shard ? `, shard ${shard.index}/${shard.count}` : ""}`;
+    log(`${label}, ${workers} workers:`);
     for (const { phase, files: phaseFiles } of listing.listed) {
       const flags = phase.args.filter((arg) => /^--(?:no-)?file|^--maxWorkers/.test(arg)).join(" ");
       console.log(`  ${pad(phase.name, 22, true)}${pad(phaseFiles.length, 6)} files  ${flags}`);
@@ -557,7 +774,8 @@ async function main() {
       console.error(`[test] the phases don't cover the tier's files exactly:\n  ${problems.join("\n  ")}`);
       return 1;
     }
-    log(`coverage: every one of ${expected.size} test files is in exactly one phase`);
+    log(shard ? `coverage: shard ${shard.index}/${shard.count}'s ${expected.size} files are exactly what its phases list`
+      : `coverage: every one of ${expected.size} test files is in exactly one phase`);
     if (options.dryRun) return 0;
 
     if (!options.skipPreflight) await preflight();
@@ -570,9 +788,14 @@ async function main() {
       const exitCode = await spawnAndWait(process.execPath, [vitestBin, "run", ...phase.args,
         ...reporterArgs(jsonFile, options.vitestArgs, env), ...vitestRetryArgs(env), ...options.vitestArgs,
         ...(phase.files ?? [])], { env });
+      if (options.reportDir && existsSync(jsonFile)) {
+        const dir = path.resolve(options.reportDir);
+        mkdirSync(dir, { recursive: true });
+        copyFileSync(jsonFile, path.join(dir, `${shard ? `shard-${shard.index}-of-${shard.count}-` : ""}${phase.name}.json`));
+      }
       return { exitCode, plannedFiles: planned.get(phase.name), ...readReport(jsonFile) };
     }, { signal: controller.signal });
-    printSummary(options.tier, workers, results, performance.now() - started);
+    printSummary(label, workers, results, performance.now() - started);
     return controller.signal.aborted ? 130 : exitCodeFor(results);
   } finally {
     removeRunRoot(runRoot);
