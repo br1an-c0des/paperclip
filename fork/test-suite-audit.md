@@ -4,14 +4,20 @@
 What `pnpm test` costs today, where the time goes, and the fixes to try, each with how to measure it.
 Nothing here has been changed yet.
 
+> **Correction (2026-11-18, from agent B's results).** Vitest records a file's start *after* its
+> imports are collected, so the "4.2 s gap between files" already contains the next file's 3.6 s
+> import. Real per-file overhead is about 4.3 s, not 8 s, and the estimate for the files not measured
+> counted each import twice. Corrected: the full serial run is **about 6 hours**, of which per-file
+> overhead is about 2.2 hours. The figures below are corrected where marked.
+
 ## Summary
 
-- **A full `pnpm test` takes about 7.6 hours** on this machine (16 cores, WSL). That's 34 minutes
+- **A full `pnpm test` takes about 6 hours** (corrected; first estimated at 7.6) on this machine (16 cores, WSL). That's 34 minutes
   measured for the chat suite, 143 minutes measured for the first 304 general server files, and the
   rest estimated from those measurements and upstream's recorded CI times.
-- **More than half of it is per-file overhead, not testing.** Each server file costs about 8 seconds
-  before and after its tests: 3.6 s to import the server's modules and 4.2 s of Vitest setup between
-  files. Across ~2,000 server files that's about 4.4 hours.
+- **A third of it is per-file overhead, not testing** (corrected). Each server file costs about 4.3
+  seconds outside its tests, almost all of it importing the server's modules (3.6 s median). Across
+  ~2,000 server files that's about 2.2 hours.
 - **It uses one core.** Server files run one at a time (`--maxWorkers=1`), because upstream gets its
   parallelism from many CI machines.
 - **About a quarter is dormant code**, plus the 34-minute chat-channel suite.
@@ -63,12 +69,15 @@ Inside the 304 measured files (143 minutes of wall time):
 
 | Part | Time | Share |
 | --- | --- | --- |
-| Tests and their hooks | ~104 min | 73% |
-| Gaps between files (Vitest process setup and teardown) | 22 min | 15% |
+| Tests and their hooks | ~121 min | 85% |
 | Importing modules (collect) | 17 min | 12% |
+| Vitest process setup and teardown between files | ~5 min | 3% |
+
+(Corrected: the first version counted the 22-minute gap as setup on top of the import, but the gap
+contains the import.)
 
 For the remaining, smaller files the overhead dominates. Their tests average about a second per
-file against roughly 8 seconds of overhead.
+file against roughly 4 seconds of overhead.
 
 ## Findings
 
