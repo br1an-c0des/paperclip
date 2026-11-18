@@ -76,6 +76,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 39 | [Turn off Claude Code's auto memory when an agent has `para-memory-files`](#39-turn-off-claude-codes-auto-memory-when-an-agent-has-para-memory-files) | candidate | | | 2026-10-24 | | |
 | 40 | [Find why 11 server tests fail on `main` (one file is core)](#40-find-why-11-server-tests-fail-on-main-one-file-is-core) | candidate | | | 2026-11-18 | | |
 | 41 | [Give `para-memory-files` a recall tool that exists](#41-give-para-memory-files-a-recall-tool-that-exists) | candidate | | | 2026-11-18 | | |
+| 42 | [Fix or move the 8 test files that fail in a full run on `main`](#42-fix-or-move-the-8-test-files-that-fail-in-a-full-run-on-main) | candidate | | | 2026-11-18 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -649,6 +650,10 @@ printed its failure summary, so the reasons weren't captured.
   - The three native-runtime files fail on Runner transport (`runner_remote_provider_archive_transport_unavailable`,
     `current_directory_fallback_forbidden`), a missing `authority-epochs` directory and native
     finalization: environment and dormant code.
+- **Intermittent, not deterministic (later on 2026-11-18):** after step 3a round 1 the core file
+  passed in a full parallel run, and alone it failed 1 time in 3. That fits a timing-sensitive
+  start-time comparison. The dormant `heartbeat-native-restart-suspension` also passed in the full
+  run.
 - **Next:** the core file gets a fix once the user signs off. The dormant ones are skipped with a note
   (hard-fork step 3), unless step 3a moves their suites out of the default run anyway.
 
@@ -669,3 +674,26 @@ Found 2026-11-18 while comparing the memory systems
   first is simpler; the memory files are small. If memory moves to a memory service
   ([build plan 3.5](../ui-new/docs/build-plan.md#35-memory-service)), this section goes anyway.
 - **Fork workaround:** none.
+
+### 42. Fix or move the 8 test files that fail in a full run on `main`
+
+Found in step 3a's full runs after round 1 (2026-11-18,
+[step-3a-plan.md](step-3a-plan.md#round-1-progress)). With every server file isolated, the whole
+suite (all 2,735 files but the chat suite) has 14 failing tests in these 8 files. None is caused by
+round 1: each fails the same way when re-run on its own, except `github-launcher`.
+
+| File | Failure | Likely cause | Area |
+| --- | --- | --- | --- |
+| `packages/skills-catalog/src/shipped-catalog.test.ts` | `ENOENT … scandir '.agents'` | `ea326e0202` removed `.agents/` (upstream's maintainer skills); the test still lists it. Drop that path from the test | ours (easy fix) |
+| `server/scripts/reporting-lock-policy.test.mjs` | "Reporting lock changed; review the dependency correction before install" | A lockfile proof for upstream's Runner end-to-end CI reporting (`tests/runner-e2e/prepare-report-lock.mjs`), stale since our lockfile changed | dormant (upstream CI) |
+| `packages/adapter-utils/src/github-launcher.test.ts` | 5 s test timeout | Passed when re-run; times out under full-run load. A longer timeout or less work | shared (flaky) |
+| `server/src/__tests__/cursor-local-execute.test.ts` | exit code 127 | The Cursor CLI isn't installed | dormant (other adapter) |
+| `server/src/__tests__/cursor-local-adapter-environment.test.ts` | `'fail'` instead of `'pass'` | Same | dormant (other adapter) |
+| `server/src/services/native-runtime/native-runner-restart-preparation.integration.test.ts` | a preparation record doesn't match | Native runtime | dormant |
+| `server/src/services/native-runtime/native-session-resume.test.ts` | missing `authority-epochs` directory | Native runtime (entry 40) | dormant |
+| `server/src/services/native-runtime/retained-provider-pack-source.test.ts` | Runner transport unavailable | Native runtime (entry 40) | dormant |
+
+- **Likely fix:** the dormant ones leave the default run when step 3a round 2 fills the opt-in tier
+  (hard-fork step 3: they're not fixed). `shipped-catalog` gets the one-line fix; `github-launcher`
+  gets a test-sized timeout or less work.
+
