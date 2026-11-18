@@ -282,7 +282,10 @@ include patterns; `area-review.md` totals match the audit within about 5%.
 - **C merged** 2026-11-18 (`cda8495e8e`): durability off, cluster data on `/dev/shm`, cleanup on
   interrupt and a sweep of leftovers. The shared server isn't wired in (no gain in parallel).
   [results-postgres.md](test-suite-audit/results-postgres.md).
-- **B:** running.
+- **B merged** 2026-11-18 (`4df9b0a59e`): `fsModuleCache` on; the server project split into
+  `@paperclipai/server (shared)` (`isolate: false`, 1,723 files) and `@paperclipai/server (isolated)`
+  (497 files that replace modules with `vi.mock` and the like). Bench set: 538.8 s at 1 worker,
+  116–120 s at 6 workers. [results-overhead.md](test-suite-audit/results-overhead.md).
 
 Follow-ups reported by the agents, for round 2:
 
@@ -291,6 +294,16 @@ Follow-ups reported by the agents, for round 2:
 - `packages/db/src/prepared-queries-postgres.test.ts` › "retries a pooled statement unprepared…"
   failed once in a 2-worker run and passed 6 times alone: probably timing-sensitive.
 - Some tests leave read-only (0555) folders in `TMPDIR`; the runner now copes with them.
+- Upstream's runner (`test:run`, used only by upstream's workflows) now stops at its chat phase:
+  `scripts/test-line-shard.mjs` expects the project name `@paperclipai/server`. Retire it with
+  upstream's CI, or accept names starting with `@paperclipai/server (`.
+- `fsModuleCache` in the root config doesn't reach package projects with their own config; the
+  runner can pass `--fsModuleCache` to every phase.
+- Test homes are never removed: `setup-supertest.ts`'s `exit` cleanup doesn't fire in fork workers.
+  About 2,500 `paperclip-vitest-home-*` directories (1.9 GB) are in `/tmp`, plus
+  `paperclip-vitest-codex-home-*` and 545 `/tmp/pv-*` folders from upstream's runner.
+- The setup file's `beforeEach` costs ~0.4 s in isolated files that don't otherwise load drizzle
+  (`services/instance-settings-cache.ts`).
 - A SIGKILLed worker can still orphan a running Postgres (the sweep removes its directory only once
   the postmaster is dead).
 
