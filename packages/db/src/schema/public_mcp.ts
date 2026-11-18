@@ -33,6 +33,11 @@ export const mcpOauthGrants = pgTable("mcp_oauth_grants", {
   agentId: uuid("agent_id").references(() => agents.id, { onDelete: "cascade" }),
   scopes: jsonb("scopes").$type<string[]>().notNull(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  /** The agent this connection acts as; null acts as the person (step 4a, section 1). */
+  actAsAgentId: uuid("act_as_agent_id").references(() => agents.id, { onDelete: "set null" }),
+  /** The connection's access level, a cap on what the person or agent may do through it. */
+  accessLevel: text("access_level").$type<"read_only" | "worker" | "manager" | "admin">(),
+  accessOverrides: jsonb("access_overrides").$type<Record<string, boolean | { scope: Record<string, unknown> }>>(),
 
 
   revocationRevision: integer("revocation_revision").notNull().default(0),
