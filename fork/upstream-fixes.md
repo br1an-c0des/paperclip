@@ -75,6 +75,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 38 | [Report the review-stage bypass, with failing tests](#38-report-the-review-stage-bypass-with-failing-tests) | candidate | | | 2026-10-24 | | |
 | 39 | [Turn off Claude Code's auto memory when an agent has `para-memory-files`](#39-turn-off-claude-codes-auto-memory-when-an-agent-has-para-memory-files) | candidate | | | 2026-10-24 | | |
 | 40 | [Find why 11 server tests fail on `main` (one file is core)](#40-find-why-11-server-tests-fail-on-main-one-file-is-core) | candidate | | | 2026-11-18 | | |
+| 41 | [Give `para-memory-files` a recall tool that exists](#41-give-para-memory-files-a-recall-tool-that-exists) | candidate | | | 2026-11-18 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -651,3 +652,20 @@ printed its failure summary, so the reasons weren't captured.
 - **Next:** the core file gets a fix once the user signs off. The dormant ones are skipped with a note
   (hard-fork step 3), unless step 3a moves their suites out of the default run anyway.
 
+### 41. Give `para-memory-files` a recall tool that exists
+
+Found 2026-11-18 while comparing the memory systems
+([decision 5](../ui-new/docs/decisions.md#5-agents-can-have-three-memory-systems-that-dont-know-about-each-other)).
+
+- **Problem:** the skill's "Memory Recall -- Use qmd" section
+  ([skills/para-memory-files/SKILL.md](../skills/para-memory-files/SKILL.md)) tells agents to search
+  their memory with `qmd query`, `qmd search` and `qmd vsearch` "rather than grepping files", and to
+  index with `qmd index $AGENT_HOME`. Nothing installs `qmd`: it isn't in the root `Dockerfile`,
+  `deploy/`, the adapters or the dev machine. An agent that follows the skill gets "command not
+  found", then has to work out a fallback, costing a turn or two, and may conclude it has no memory.
+- **Likely fix:** either rewrite the section around what's there (`rg`/`grep` over `$AGENT_HOME`,
+  reading `summary.md` files first, which the layout is designed for), or install `qmd` in the
+  image and say in the skill that it's optional and to fall back to `rg` when it's missing. The
+  first is simpler; the memory files are small. If memory moves to a memory service
+  ([build plan 3.5](../ui-new/docs/build-plan.md#35-memory-service)), this section goes anyway.
+- **Fork workaround:** none.
