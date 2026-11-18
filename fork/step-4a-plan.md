@@ -533,6 +533,44 @@ tests.
 - **Project manager:** flip `PAPERCLIP_UNIFIED_RUN_MCP` on by default, retire
   `/api/mcp/project-tools`, the local-instance run check, docs.
 
+### Wave 1 status (2026-11-17)
+
+All four branches are merged into `feat/step-4a`. Each agent's new tests passed. **The regression
+runs were stopped at the user's request** (they're working on the test suite separately), so these
+are still to do before `feat/step-4a` goes to `main`:
+
+- Run the existing server tests on `feat/step-4a`: agent 1's grep list (149 files:
+  `ls server/src/__tests__ | grep -iE "authoriz|access|permission|issue"`) plus the 69 hiring and
+  assignment files, and agent 3's 226 heartbeat, recovery and completion files. **Expect fixture
+  failures:** tests that insert agents without `permissions.access` now get `worker`; the fix is
+  `access: { level: "manager" }` in the fixture.
+- Re-run alone: `heartbeat-native-restart-suspension.test.ts` (2 of 115 failed) and
+  `heartbeat/runtime-selection.test.ts` (6 of 82 failed), both dormant native paths that failed in an
+  overloaded run. Skip with a note if they're real and dormant.
+- Swap agent 2's route-policy stub (`server/src/mcp/catalog/route-policy.ts`) for the real
+  `AGENT_ROUTE_POLICY` import.
+
+Found in wave 1, to settle:
+
+- **New agents that should hire:** agents created after 0491 start at `worker`, so a new CEO can't
+  hire even though `canCreateAgents` defaults to true on create. Needs a rule (open question to the
+  user).
+- **The skill and the switch ship together:** the rewritten `paperclip` skill assumes the
+  `paperclip` MCP server, which is off by default (`PAPERCLIP_UNIFIED_RUN_MCP`). Flip the default
+  before `feat/step-4a` reaches `main`.
+- **Continuing runs wake again:** agent 3 added a wake after a run ends with
+  `report_progress` + `continue: true` (once per run, at most 10 in a row, then normal repair).
+- **No checkout tool:** the skill relies on the harness checking out the run's task.
+- `CONNECTION_INTENT_AGENT_GUIDANCE` (`packages/shared`) still tells every agent to use
+  `search_api`/`call_api`, which are admin-only now.
+- **One source of truth is narrower than the spec:** agents still use `principal_permission_grants`
+  for keys with no access action (`tools:*`, `inbox:manage`, `skills:*`,
+  `tasks:manage_active_checkouts`, `agents:read`, `agents:suggest-changes`).
+- `mcp_oauth_grants` already has `agent_id` and purpose `"agent"`; wave 2 settles how they relate to
+  the new `act_as_agent_id`.
+- Agent-side interaction checks in `agent-interaction-policy.ts` are redundant after 0491; remove in
+  a cleanup.
+
 Carried over from wave 1, to fold into the spec when wave 2 is planned:
 
 - `paperclip_search_api` needs `api:raw` (not `tasks:read`): it only lists what `call_api` can
