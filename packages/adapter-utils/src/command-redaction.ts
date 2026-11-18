@@ -17,9 +17,9 @@ const SECRET_NAME_START = String.raw`(?<![A-Za-z0-9_-])`;
 const SECRET_OPTION_NAME_PATTERN = String.raw`(?:[A-Za-z0-9_]|-(?!-))*${SECRET_NAME_WORDS}`;
 
 const COMMAND_CLI_SECRET_OPTION_RE = new RegExp(
-  String.raw`(\B-{1,2}${SECRET_OPTION_NAME_PATTERN}(?:\s+|=)(["']?))[^\s"'` +
+  String.raw`(\B-{1,2}${SECRET_OPTION_NAME_PATTERN}(?:\s+|=))(?:"(?:[^"\\\r\n]|\\.)*"|'[^'\r\n]*'|[^\s"'` +
     "`" +
-    String.raw`]+(\2)`,
+    String.raw`]+)`,
   "gi",
 );
 const COMMAND_ENV_SECRET_ASSIGNMENT_RE = new RegExp(
@@ -90,7 +90,12 @@ export function redactCommandText(
   if (!maybeContainsSecretText(command)) return command;
   return command
     .replace(COMMAND_AUTHORIZATION_BEARER_RE, `$1${redactedValue}`)
-    .replace(COMMAND_CLI_SECRET_OPTION_RE, `$1${redactedValue}$3`)
+    .replace(COMMAND_CLI_SECRET_OPTION_RE, (match: string, prefix: string) => {
+      const quote = match[prefix.length];
+      return quote === '"' || quote === "'"
+        ? `${prefix}${quote}${redactedValue}${quote}`
+        : `${prefix}${redactedValue}`;
+    })
     .replace(
       COMMAND_ENV_SECRET_ASSIGNMENT_RE,
       (
@@ -125,7 +130,7 @@ const JSON_SECRET_FIELD_RE = new RegExp(
 // consumes the doubled escape sequences. An escaped quote inside the value does
 // not end the match early. The value ends at the next unescaped `\"`.
 const JSON_ESCAPED_SECRET_FIELD_RE = new RegExp(
-  String.raw`(\\"(?:${SECRET_NAME_PATTERN})\\"\s*:\s*\\")(?:\\\\\\\\|\\\\\\"|\\\\[\s\S]|[^\\"])*(\\")`,
+  String.raw`(\\"(?:${SECRET_NAME_PATTERN})\\"\s*:\s*\\")(?=((?:\\\\\\\\|\\\\\\"|\\\\[\s\S]|[^\\"])*))\2(\\")`,
   "gi",
 );
 
@@ -144,7 +149,7 @@ export function redactDiagnosticText(
   redactedValue = REDACTED_COMMAND_TEXT_VALUE,
 ): string {
   return redactCommandText(text, redactedValue)
-    .replace(JSON_ESCAPED_SECRET_FIELD_RE, `$1${redactedValue}$2`)
+    .replace(JSON_ESCAPED_SECRET_FIELD_RE, `$1${redactedValue}$3`)
     .replace(JSON_SECRET_FIELD_RE, `$1${redactedValue}$2`);
 }
 

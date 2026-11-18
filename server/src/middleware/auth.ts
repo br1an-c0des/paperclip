@@ -59,6 +59,13 @@ function normalizeOptionalString(value: string | null | undefined) {
   return value?.trim() || null;
 }
 
+function normalizeRunIdHeader(value: string | undefined): string | undefined {
+  const raw = value?.trim();
+  if (!raw) return undefined;
+  const first = raw.includes(",") ? raw.split(",")[0].trim() : raw;
+  return isUuidLike(first) ? first : undefined;
+}
+
 function invalidAgentTokenMessage(token: string) {
   try {
     const payload = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8")) as {
@@ -298,7 +305,7 @@ export function actorMiddleware(db: Db, opts: ActorMiddlewareOptions): RequestHa
       return;
     }
 
-    const runIdHeader = req.header("x-paperclip-run-id");
+    const runIdHeader = normalizeRunIdHeader(req.header("x-paperclip-run-id"));
 
     const authHeader = req.header("authorization");
     const hasBearerCredentials = /^bearer(?:\s|$)/i.test(authHeader ?? "");
@@ -378,28 +385,30 @@ export function actorMiddleware(db: Db, opts: ActorMiddlewareOptions): RequestHa
     }
 
     const verifiedClaims = verifyLocalAgentJwt(token);
-    const boardKey = verifiedClaims ? null : await boardAuth.findBoardApiKeyByToken(token);
-    if (boardKey) {
-      const access = await boardAuth.resolveBoardAccess(boardKey.userId);
-      if (access.user) {
-        await boardAuth.touchBoardApiKey(boardKey.id);
-        req.actor = {
-          type: "board",
-          userId: boardKey.userId,
-          userName: access.user?.name ?? null,
-          userEmail: access.user?.email ?? null,
-          companyIds: access.companyIds,
-          memberships: access.memberships,
-          isInstanceAdmin: access.isInstanceAdmin,
-          keyId: boardKey.id,
-          runId: runIdHeader || undefined,
-          source: "board_key",
-        };
-        if (isCloudManagedInstance() && (access.isInstanceAdmin || access.companyIds.length)) {
-          _res.once("finish", () => { if (_res.statusCode >= 200 && _res.statusCode < 400) idleApiActivity.record(); });
+    if (!runIdHeader) {
+      const boardKey = verifiedClaims ? null : await boardAuth.findBoardApiKeyByToken(token);
+      if (boardKey) {
+        const access = await boardAuth.resolveBoardAccess(boardKey.userId);
+        if (access.user) {
+          await boardAuth.touchBoardApiKey(boardKey.id);
+          req.actor = {
+            type: "board",
+            userId: boardKey.userId,
+            userName: access.user?.name ?? null,
+            userEmail: access.user?.email ?? null,
+            companyIds: access.companyIds,
+            memberships: access.memberships,
+            isInstanceAdmin: access.isInstanceAdmin,
+            keyId: boardKey.id,
+            runId: runIdHeader || undefined,
+            source: "board_key",
+          };
+          if (isCloudManagedInstance() && (access.isInstanceAdmin || access.companyIds.length)) {
+            _res.once("finish", () => { if (_res.statusCode >= 200 && _res.statusCode < 400) idleApiActivity.record(); });
+          }
+          next();
+          return;
         }
-        next();
-        return;
       }
     }
 

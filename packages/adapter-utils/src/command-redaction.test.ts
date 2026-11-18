@@ -85,6 +85,13 @@ describe("redactDiagnosticText", () => {
     );
   });
 
+  it("does not hang on an unterminated escaped-JSON value full of backslashes", () => {
+    const input = String.raw`{\"token\": \"` + String.raw`\\\\`.repeat(26) + "x";
+    const started = performance.now();
+    expect(redactDiagnosticText(input)).toBe(input);
+    expect(performance.now() - started).toBeLessThan(5_000);
+  });
+
   it("still redacts a shell KEY=value secret", () => {
     const input = "ANTHROPIC_API_KEY=super-secret-value claude --print";
     const output = redactDiagnosticText(input);
@@ -250,5 +257,21 @@ describe("diagnostic environment secret selection", () => {
     const url = "postgres://user:private%20password@db.test/database";
     expect(new Set(collectDiagnosticEnvironmentSecrets({ DATABASE_URL: url, PASSWORD: "private password" })))
       .toEqual(new Set([url, "private%20password", "private password"]));
+  });
+});
+
+describe("quoted CLI secret option values containing whitespace", () => {
+  it("redacts a space-separated quoted value as it does the = form", () => {
+    expect(redactCommandText('tool --token "my secret value" --verbose'))
+      .toBe(`tool --token "${REDACTED_COMMAND_TEXT_VALUE}" --verbose`);
+    expect(redactCommandText("tool --password 'p@ss word here'"))
+      .toBe(`tool --password '${REDACTED_COMMAND_TEXT_VALUE}'`);
+    expect(redactCommandText('tool --password="hun ter2"'))
+      .toBe(`tool --password="${REDACTED_COMMAND_TEXT_VALUE}"`);
+  });
+
+  it("redacts a double-quoted value that contains escaped double quotes", () => {
+    expect(redactCommandText('tool --token "my secret \\"TAIL\\" end" --verbose'))
+      .toBe(`tool --token "${REDACTED_COMMAND_TEXT_VALUE}" --verbose`);
   });
 });

@@ -99,7 +99,7 @@ import {
   type PaperclipSkillEntry,
 } from "@paperclipai/adapter-utils/server-utils";
 import { shellQuote } from "@paperclipai/adapter-utils/ssh";
-import { createEphemeralSessionEnvironmentStore } from "./ephemeral-session-environment.js";
+import { createEphemeralSessionEnvironmentStore, hideRecordUntilSaved } from "./ephemeral-session-environment.js";
 import {
   createAcpRuntime,
   createAgentRegistry,
@@ -581,7 +581,9 @@ export function buildSessionFingerprint(identity: SessionFingerprintIdentity): s
  * form is `paperclip:companyId:agentId:taskKey:fingerprint`.
  */
 export function buildSessionKey(identity: SessionKeyIdentity, fingerprint: string): string {
-  return `paperclip:${identity.companyId}:${identity.agentId}:${identity.taskKey}:${fingerprint}`;
+  const base = `paperclip:${identity.companyId}:${identity.agentId}:${identity.taskKey}`;
+  const generation = identity.conversationGeneration ?? 0;
+  return generation > 0 ? `${base}:g${generation}:${fingerprint}` : `${base}:${fingerprint}`;
 }
 
 // ACPX runs inside the long-lived Paperclip server process. A local child needs
@@ -2361,6 +2363,7 @@ async function buildRuntime(input: {
     companyId: agent.companyId,
     agentId: agent.id,
     taskKey,
+    conversationGeneration: asNumber(input.ctx.context.conversationSessionGeneration, 0),
   };
   const sessionKey = buildSessionKey(keyIdentity, fingerprint);
 
@@ -3229,8 +3232,8 @@ async function buildPrompt(ctx: AdapterExecutionContext, resumedSession: boolean
       ? ""
       : renderTemplate(promptTemplate, templateData);
   const sessionHandoffNote = asString(context.paperclipSessionHandoffMarkdown, "").trim();
-  const paperclipEnvNote = externalChatTurn ? "" : renderPaperclipEnvNote(env);
-  const apiAccessNote = externalChatTurn ? "" : renderApiAccessNote(env);
+  const paperclipEnvNote = externalChatTurn || resumedSession ? "" : renderPaperclipEnvNote(env);
+  const apiAccessNote = externalChatTurn || resumedSession ? "" : renderApiAccessNote(env);
   const prompt = joinPromptSections([
     promptInstructionsPrefix,
     renderedBootstrapPrompt,
@@ -4582,7 +4585,9 @@ export function createAcpxEngineExecutor(deps: AcpxEngineExecutorOptions = {}) {
           : undefined;
         flushChildStderr(childStderrState);
         childStderrState.logPath = prepared.childStderrLogPath;
-        const persistedRuntimeStore = createRuntimeStore({ stateDir: prepared.stateDir });
+        const diskRuntimeStore = createRuntimeStore({ stateDir: prepared.stateDir });
+        const persistedRuntimeStore = !resumeSessionId && !cached
+          ? hideRecordUntilSaved(diskRuntimeStore, prepared.sessionKey) : diskRuntimeStore;
         // Resume with this run's launch environment; keep it out of the saved
         // conversation record without mutating the live runtime's options.
         const runtimeStore = createEphemeralSessionEnvironmentStore(persistedRuntimeStore, prepared.env);
@@ -5099,7 +5104,7 @@ export function createAcpxEngineExecutor(deps: AcpxEngineExecutorOptions = {}) {
         // `prepare_turn`.
         preparePhaseStart = now();
         const { prompt, promptMetrics, commandNotes } = await buildPrompt(ctx, resumedSession, prepared.env);
-        runPrompt = joinPromptSections([prepared.skillPromptInstructions, prompt]);
+        runPrompt = joinPromptSections([resumedSession ? "" : prepared.skillPromptInstructions, prompt]);
         await emitAcpxLog(ctx, {
           type: "acpx.session",
           agent: prepared.acpxAgent,
@@ -5333,6 +5338,11 @@ export function createAcpxEngineExecutor(deps: AcpxEngineExecutorOptions = {}) {
               }
             }
             if (event.type === "text_delta" && event.stream !== "thought") {
+              if (prepared.acpxAgent === "claude" && event.tag === "agent_message_chunk" && !event.messageId &&
+                /^\*\*Notice:\*\* [^\r\n]+['’]s safeguards stopped the response above · continuing once with that noted$/.test(event.text.trim())) {
+                await emitAcpxLog(ctx, { type: "acpx.status", tag: "claude_safeguard_retry", text: event.text });
+                continue;
+              }
               currentOutputChunk.push(event.text);
             } else if (event.type === "tool_call" && event.tag !== "tool_call_update") {
               // ACP makes tool-call status optional. The normalized event tag is

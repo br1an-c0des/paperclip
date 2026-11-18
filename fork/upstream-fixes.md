@@ -41,7 +41,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 4 | [Link the plugin SDK on Windows without symlink rights](#4-link-the-plugin-sdk-on-windows-without-symlink-rights) | closed | | | 2026-10-24 | | |
 | 5 | [Start `pnpm dev` on Windows when the native runner is enabled](#5-start-pnpm-dev-on-windows-when-the-native-runner-is-enabled) | closed | | | 2026-10-26 | | |
 | 6 | [Detect glibc reliably at server startup so Paperclip Runner is offered on Linux](#6-detect-glibc-reliably-at-server-startup-so-paperclip-runner-is-offered-on-linux) | fixed | `fix/runner-libc-probe-startup` | [#17905](https://github.com/paperclipai/paperclip/pull/17905) | 2026-10-26 | 2026-10-27 | in `main` before the freeze |
-| 7 | [Accept `env: null` when updating a project](#7-accept-env-null-when-updating-a-project) | candidate | | | 2026-10-27 | | |
+| 7 | [Accept `env: null` when updating a project](#7-accept-env-null-when-updating-a-project) | fixed | | [#9883](https://github.com/paperclipai/paperclip/pull/9883) (upstream's) | 2026-10-27 | | `ecce070df` (2026-11-17) |
 | 8 | [Let company search take several assignees, projects or labels](#8-let-company-search-take-several-assignees-projects-or-labels) | moved to [F8](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) | | | 2026-10-28 | | |
 | 9 | [Mark agent chats in company search results](#9-mark-agent-chats-in-company-search-results) | candidate | | | 2026-10-28 | | |
 | 10 | [Filter cost breakdowns by agent](#10-filter-cost-breakdowns-by-agent) | moved to [F9](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) | | | 2026-10-28 | | |
@@ -218,6 +218,10 @@ plugin SDK link on Windows, is entry 4.
   handles null, to match.
 - **Files:** `server/src/routes/projects.ts` and its test.
 - **Fork workaround to revisit once merged:** `ui-new`'s project settings send `{}` to clear.
+- **Fixed** 2026-11-17 by taking upstream's open pull request #9883 (`ecce070df`, upstream watch
+  of open pull requests): create and update skip normalization for `env: null`. The `ui-new`
+  workaround (`ui-new/src/projects/settings/settings-model.ts`) stays until server1 runs a build
+  from source (hard-fork step 2).
 
 ### 8. Let company search take several assignees, projects or labels
 

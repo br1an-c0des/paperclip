@@ -1823,7 +1823,7 @@ export function routineService(
       await assertAgentInteraction(tx, { companyId: input.routine.companyId, actorAgentId: interactionActorAgentId,
         actorCompanyId: interactionActorCompanyId,
         operation: "assign", targetAgentId: assigneeAgentId, parentIssueId: input.routine.parentIssueId,
-        texts: [title, description ?? ""], lock: true });
+        texts: [title, description ?? ""], lock: false });
 
       if (input.trigger && (input.source === "webhook" || input.source === "schedule")) {
         const currentTrigger = await txDb.select().from(routineTriggers).where(eq(routineTriggers.id, input.trigger.id)).then((rows) => rows[0]);
@@ -2529,6 +2529,24 @@ export function routineService(
         return routine;
       });
       return updatedRoutine ? { ...updatedRoutine, previousResponsibleUserId } : null;
+    },
+
+    releaseDeletedAgentRoutines: async (executor: Db, companyId: string, agentId: string) => {
+      await notifyDeliveryWork(executor, DELIVERY_QUEUES.routineSchedules);
+      const released = await executor
+        .update(routines)
+        .set({
+          assigneeAgentId: null,
+          status: sql`case when ${routines.status} = 'active' then 'paused' else ${routines.status} end`,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(routines.companyId, companyId), eq(routines.assigneeAgentId, agentId)))
+        .returning();
+      for (const routine of released) {
+        await appendRoutineRevision(executor, routine, { agentId: null, userId: null, runId: null }, {
+          changeSummary: "Default agent deleted",
+        });
+      }
     },
 
     createTrigger: async (

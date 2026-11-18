@@ -1,5 +1,6 @@
 import { recordMcpAttachmentCleanup, type McpAttachmentCleanup } from "./public-mcp/upload-cleanup.js";
 import { assertAgentInteraction } from "./agent-interaction-policy.js";
+import { retryTransientLockContention } from "./transient-lock-contention.js";
 import { instancePublicOrigin, mayContainInventedHostLink, relativizeInventedHostLinks } from "./agent-invented-host-links.js";
 import { currentPluginInteractionOrigin } from "./plugin-interaction-context.js";
 import type { IssueDisplayStatus } from "@paperclipai/shared";
@@ -2051,6 +2052,39 @@ async function assertExecutionTaskParent(db: Db, companyId: string, parentId?: s
   const [parent] = await db.select({ conversationAgentId: issues.conversationAgentId })
     .from(issues).where(and(eq(issues.id, parentId), eq(issues.companyId, companyId)));
   if (parent?.conversationAgentId) throw unprocessable("Conversations cannot have new subtasks; create a task in a project instead");
+}
+
+/**
+ * Reject a parent reassignment that would form a cycle. A cyclic parentId makes
+ * every recursive issue-tree walk (cost rollups, the workspace reaper) loop or
+ * exhaust temp disk, so the edge must be checked before it is written.
+ */
+async function assertNoParentCycle(
+  db: DbReader,
+  companyId: string,
+  issueId: string,
+  parentId: string,
+) {
+  if (parentId === issueId) {
+    throw unprocessable("Issue cannot be its own parent");
+  }
+  const visited = new Set<string>();
+  let currentId: string | null = parentId;
+  while (currentId) {
+    if (currentId === issueId) {
+      throw unprocessable("Issue cannot be moved under one of its own descendants");
+    }
+    if (visited.has(currentId)) {
+      throw unprocessable("Issue parent chain already contains a cycle; fix the tree before reparenting");
+    }
+    visited.add(currentId);
+    const [row] = await db
+      .select({ parentId: issues.parentId })
+      .from(issues)
+      .where(and(eq(issues.id, currentId), eq(issues.companyId, companyId)));
+    if (!row) return;
+    currentId = row.parentId ?? null;
+  }
 }
 
 type DbTransaction = Parameters<Parameters<Db["transaction"]>[0]>[0];
@@ -11712,6 +11746,9 @@ export function issueService(db: Db) {
       }
       if (data.parentId !== undefined && data.parentId !== existing.parentId) {
         await assertExecutionTaskParent(dbOrTx, existing.companyId, data.parentId);
+        if (data.parentId) {
+          await assertNoParentCycle(dbOrTx, existing.companyId, existing.id, data.parentId);
+        }
       }
       if (existing.conversationAgentId) {
         if ((data.assigneeAgentId !== undefined && data.assigneeAgentId !== existing.conversationAgentId)
@@ -11998,6 +12035,14 @@ export function issueService(db: Db) {
               code: "issue_parent_placement_changed",
             });
           }
+        }
+        if (issueData.parentId && issueData.parentId !== existing.parentId) {
+          // Concurrent reparents are serialized by the issue-privacy-tree
+          // advisory lock above (it fires on every parentId change), so the
+          // pre-write cycle check cannot race a concurrent move into a
+          // committed cycle: re-check the parent chain here, under the same
+          // lock, before the edge is written.
+          await assertNoParentCycle(tx, existing.companyId, existing.id, issueData.parentId);
         }
         // The receipt baseline must be read under the same row lock as the
         // write. Otherwise a concurrent update can be mistaken for a change
@@ -12865,7 +12910,9 @@ export function issueService(db: Db) {
             eq(issues.executionRunId, checkoutRunId),
           )
         : isNull(issues.executionRunId);
-      const updated = await db.transaction(async tx => {
+      // The checkout locks the issue before the agent rows. A deadlock victim
+      // rolled back whole, so retry it instead of failing the run's setup.
+      const updated = await retryTransientLockContention(() => db.transaction(async tx => {
         await assertAgentInteraction(tx as unknown as Db, {
           companyId: issueCompany.companyId, actorAgentId: agentId, operation: "assign",
           issueId: id, targetAgentId: agentId, lock: true,
@@ -12908,7 +12955,7 @@ export function issueService(db: Db) {
           )
           .returning()
           .then((rows) => rows[0] ?? null);
-      });
+      }));
 
       if (updated) {
         const [enriched] = await withIssueLabels(db, [updated]);
