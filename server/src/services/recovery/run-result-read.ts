@@ -5,6 +5,8 @@ const recoveryResultKeys = [
   "errorFamily", "workspaceValidation", "configurationIncomplete",
   "cancelledByActorType", "retryNotBefore", "transientRetryNotBefore",
   "providerQuotaRetryNotBefore", "finalizationReasonCode",
+  // How the run ended its work (finish, block, continue, or the task's state): see run-disposition.ts.
+  "paperclipDisposition",
 ] as const;
 
 export const recoveryRunResultColumn = sql<Record<string, unknown> | null>`
