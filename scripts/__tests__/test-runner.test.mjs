@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
   buildPlan,
+  defaultWorkers,
   exitCodeFor,
   parseArgs,
+  removeRunRoot,
   runPhases,
   selectChangedTests,
 } from "../test.mjs";
@@ -83,6 +87,11 @@ test("thorough without serial files has no serial phase", () => {
   const phases = plan("thorough", { tiers: emptyTiers });
   assert.deepEqual(phases.map((phase) => phase.name), ["server", "packages"]);
   assert.deepEqual(excludes(phases[0].args), ["**/dist/**"]);
+});
+
+test("the worker count defaults to defaultWorkers", () => {
+  const [server] = buildPlan("thorough", emptyTiers, { root, inventory });
+  assert.ok(server.args.includes(`--maxWorkers=${defaultWorkers}`));
 });
 
 test("the worker count comes from the options", () => {
@@ -253,4 +262,16 @@ test("--dry-run lists the thorough phases with file counts and checks coverage",
   assert.match(result.stdout, /server\s+\d+ files/);
   assert.match(result.stdout, /packages\s+\d+ files/);
   assert.match(result.stdout, /coverage: every one of \d+ test files is in exactly one phase/);
+});
+
+test("removeRunRoot removes a run directory that holds read-only and unreadable directories", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "test-runner-"));
+  mkdirSync(path.join(dir, "t", "bundle", "inner"), { recursive: true });
+  writeFileSync(path.join(dir, "t", "bundle", "inner", "AGENTS.md"), "x");
+  mkdirSync(path.join(dir, "t", "locked"));
+  chmodSync(path.join(dir, "t", "bundle", "inner"), 0o555);
+  chmodSync(path.join(dir, "t", "bundle"), 0o555);
+  chmodSync(path.join(dir, "t", "locked"), 0o000);
+  removeRunRoot(dir);
+  assert.equal(existsSync(dir), false);
 });

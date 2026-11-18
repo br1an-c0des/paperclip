@@ -16,7 +16,7 @@
 //
 // Upstream's scripts/run-vitest-stable.mjs (pnpm test:run*) is kept for upstream's CI workflows.
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -33,8 +33,9 @@ export const tierNames = ["quick", "thorough", "optin", "all"];
 // Server projects are selected by name, so the server config can be split into several projects.
 export const serverProjectFilter = "@paperclipai/server*";
 const serverProjectPattern = /^@paperclipai\/server/;
-// Measured on the 60-file benchmark set (fork/test-suite-audit/results-runner.md).
-export const defaultWorkers = 6;
+// The fastest of 2, 4, 6 and 8 workers on the 60-file benchmark set, with no file failing only in
+// parallel, and half of this machine's 16 cores (fork/test-suite-audit/results-runner.md).
+export const defaultWorkers = 8;
 // quick: a directory with more test files than this contributes no directory files.
 export const quickMaxDirectoryFiles = 50;
 const sourceOnlyArgs = ["--exclude", "**/dist/**"];
@@ -295,6 +296,29 @@ function createRunRoot() {
   return runRoot;
 }
 
+// Some tests leave read-only directories behind (runtime-context asset bundles are 0555), which
+// rmSync can't empty, so make every directory writable and try again. Cleanup never fails a run.
+export function removeRunRoot(runRoot) {
+  try {
+    rmSync(runRoot, { recursive: true, force: true });
+    return;
+  } catch {
+    // Fall through to the chmod pass.
+  }
+  const makeWritable = (dir) => {
+    chmodSync(dir, 0o700);
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) makeWritable(path.join(dir, entry.name));
+    }
+  };
+  try {
+    makeWritable(runRoot);
+    rmSync(runRoot, { recursive: true, force: true });
+  } catch (error) {
+    log(`warning: could not remove ${runRoot}: ${error.message}`);
+  }
+}
+
 let invocation = 0;
 function phaseEnv(runRoot) {
   invocation += 1;
@@ -551,7 +575,7 @@ async function main() {
     printSummary(options.tier, workers, results, performance.now() - started);
     return controller.signal.aborted ? 130 : exitCodeFor(results);
   } finally {
-    rmSync(runRoot, { recursive: true, force: true });
+    removeRunRoot(runRoot);
   }
 }
 
