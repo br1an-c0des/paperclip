@@ -40,7 +40,7 @@ A "?" after a label means a borderline call; the note says why.
 | --- | --- | --- | --- | --- |
 | [server/](../server/) | Express API + orchestration (heartbeat, runs, issues, everything) | 2,233 / ~717k (`server/src`) | ~2,330 | **Shared core** (see [§2](#2-the-server-in-depth)) |
 | [ui-new/](../ui-new/README.md) | The new SolidJS board | 692 / ~160k | 296 (vitest + Playwright) | **Ours** |
-| [ui/](../ui/) | Old React board, not deployed; reference for API use | 2,266 / ~496k | 998 | **Dormant** (reference) |
+| ~~`ui/`~~ | Old React board: removed 2026-11-17. In git at `upstream-freeze`; catalogued in [ui-new/docs/inventory/](../ui-new/docs/inventory/README.md) | 0 | 0 | **Removed** |
 | [cli/](../cli/) | `paperclipai` CLI: onboard, run, doctor, worktree, db-backup, routines, mcp, managed-agent | 106 / ~30k | 68 | **Dormant?** The deploy runs `server/dist-runtime/index.mjs`, not the CLI; dev uses `pnpm dev` |
 | [packages/db/](../packages/db/) | Drizzle schema (192 files in `schema/`), 490 migrations, clients, backup, embedded-Postgres test helper | 234 / ~23k | 88 | **Shared core**: schema holds dormant tables too; migrations are ours from `0491` |
 | [packages/shared/](../packages/shared/) | Types, validators, constants, API paths, feature catalog, experimental-flag schema | 280 / ~53k | 109 | **Shared core**: `ui-new` imports its types |
@@ -59,7 +59,7 @@ A "?" after a label means a borderline call; the note says why.
 | Path | What it is | Label |
 | --- | --- | --- |
 | [skills/](../skills/) | Bundled runtime skills. `paperclip` (809-line SKILL.md + references), `paperclip-board`, `paperclip-create-agent`, `paperclip-converting-plans-to-tasks`, `para-memory-files` are copied into every company's skill library; `agentmail`, `slack`, `complain`, `suggestion-box` are not core | **Ours** (the five core skills); rest **Dormant** |
-| [tests/](../tests/) | Cross-package suites: Playwright `e2e/` (old UI), `runner-e2e/`, `runner-acceptance/`, `restart-chaos/`, `release-smoke/`, `perf/`, `storybook-visual/`… (~2,200 files) | Mostly **Dormant** ([§5](#5-tests)) |
+| [tests/](../tests/) | Cross-package suites: `runner-e2e/`, `runner-acceptance/`, `restart-chaos/`, `release-smoke/`, `canary-onboarding/`… (~2,000 files) | Mostly **Dormant** ([§5](#5-tests)) |
 | [scripts/](../scripts/) | Repo tooling: `run-vitest-stable.mjs`, `local-verify.mjs` (`pnpm verify`), `agent-preflight.mjs`, migration/release/check scripts (284 files, ~52k lines) | **Shared core** (dev tooling); release scripts dormant |
 | [deploy/](../deploy/README.md) | Our server1 deployment: `deploy.sh` builds the root Dockerfile from source, then `deploy/Dockerfile` adds `ui-new`; Compose | **Ours** |
 | [fork/](.) | Hard-fork docs: [plan](hard-fork-plan.md), [bug list](upstream-fixes.md), [upstream watch ledger](upstream-watch.md), sync reports, this map | **Ours** |
@@ -220,9 +220,8 @@ the `vendor/paperclip-runner` shim, `runner-prp`, or `tool-gateway`). The main s
 | Packages | shared 109, adapter-utils 93, db 86, plugins 89 (sandbox-providers 54), adapters 118 (claude-local 24) | ~500 | adapters other than claude-local and sandbox-providers **Dormant** |
 | Runner package | `packages/paperclip-runner/test/` + colocated | ~460 | **Dormant** (not a root vitest project) |
 | ui-new | `ui-new/src/**/*.test.ts(x)` (vitest, jsdom), `ui-new/e2e/` (Playwright, mocked API) | ~281 + 8 specs | **Ours** |
-| Old UI | `ui/` | 998 | **Dormant** |
 | CLI | `cli/src/**` | 66 | **Dormant?** |
-| Cross-package | `tests/e2e/` (65 Playwright specs, old UI), `tests/runner-e2e/` (~720 tests), `runner-acceptance/`, `runner-recovery/`, `restart-chaos/`, `release-smoke/`, `canary-onboarding/`, `storybook-visual/`, `perf/`, `speko-*` | ~1,000 | **Dormant** (old UI, Runner, release); `restart-chaos/` mixed |
+| Cross-package | `tests/runner-e2e/` (~720 tests), `runner-acceptance/`, `runner-recovery/`, `restart-chaos/`, `release-smoke/`, `canary-onboarding/`, `speko-voice-proof/`, `lifecycle-baseline/` (the old UI's Playwright suites went with `ui/`) | ~900 | **Dormant** (Runner, release); `restart-chaos/` mixed |
 | Scripts | `scripts/__tests__/`, `scripts/*.test.mjs`, `server/scripts/*.test.mjs` | ~105 | Shared |
 
 ### Server tests by area (`server/src/__tests__`, by file-name keyword; groups overlap)
@@ -269,7 +268,7 @@ About 220–260 files in `__tests__` belong to dormant areas by name, plus the 2
 # server (uses server/vitest.config.ts: node, forks, one worker, 15s per test)
 corepack pnpm --filter @paperclipai/server exec vitest run src/__tests__/routines-service.test.ts
 corepack pnpm --filter @paperclipai/server exec vitest run src/services/heartbeat/
-# or from the root (root vitest.config.ts has projects for server, ui, cli, shared, db, adapters…)
+# or from the root (root vitest.config.ts has projects for server, cli, shared, db, adapters…)
 corepack pnpm exec vitest run server/src/__tests__/issues-service.test.ts
 # a package
 corepack pnpm --filter @paperclipai/adapter-claude-local exec vitest run

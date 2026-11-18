@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { listenOnFetchAllowedPort } from "../e2e/fetch-allowed-port.js";
+import { listenOnFetchAllowedPort } from "./fetch-allowed-port.js";
 
 export async function startReviewProvider(
   successText = "Pages: Roadmap, Meeting notes",

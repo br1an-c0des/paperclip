@@ -1,8 +1,8 @@
 # ui-new
 
-An experimental SolidJS board UI for Paperclip, built alongside the existing React UI in `../ui`.
+Paperclip's board UI, in SolidJS. It replaced upstream's React UI (`ui/`, removed on 2026-11-17).
 
-It is a standalone Vite app. It talks to the Paperclip server over the same `/api` the React UI uses and imports API types from `@paperclipai/shared`.
+It is a standalone Vite app. It talks to the Paperclip server over `/api` and imports API types from `@paperclipai/shared`. The server serves its production build (`dist/`) at `/`.
 
 ## Running it
 
@@ -14,7 +14,7 @@ pnpm dev
 pnpm --filter @paperclipai/ui-new dev    # or: cd ui-new && pnpm dev
 ```
 
-Open http://localhost:5174. The existing React UI keeps running at its usual address, so you can compare the two side by side.
+Open http://localhost:5174. The server on :3100 serves only the API in development, plus this app's last production build if `dist/` has one.
 
 To point at a different server: `PAPERCLIP_API_URL=http://host:port pnpm dev`.
 
@@ -119,9 +119,9 @@ component in both themes.
 
 `@/` is an alias for `src/`.
 
-## Using the existing UI as reference
+## The old UI as reference
 
-`../ui/src` is the source of truth for how the server API is used: endpoints, payloads, and realtime and websocket handling. `../ui/src/api/` is the most useful place to start. Import types from `@paperclipai/shared` with `import type` rather than redefining them, so server type changes show up as type errors here.
+The old React UI showed how the server API is used: endpoints, payloads, and realtime and websocket handling. It's in git at `upstream-freeze`: `git show upstream-freeze:ui/src/api/<file>` is the most useful place to start, and [docs/inventory/](docs/inventory/README.md) catalogues its pages and requests. Import types from `@paperclipai/shared` with `import type` rather than redefining them, so server type changes show up as type errors here.
 
 ## Changing the API
 

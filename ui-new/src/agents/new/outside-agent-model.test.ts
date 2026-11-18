@@ -1,24 +1,10 @@
 import { EXTERNAL_AGENT_TOOL_GUIDANCE as SHARED_GUIDANCE } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { buildAgentOnboardingPrompt as oldPrompt } from "../../../../ui/src/lib/agent-onboarding-prompt";
 import { buildAgentOnboardingPrompt, EXTERNAL_AGENT_TOOL_GUIDANCE, hasCeo, onboardingTextUrl, requestsForInvite } from "./outside-agent-model";
 
 describe("the onboarding prompt", () => {
   it("mirrors the shared tool guidance", () => {
     expect(EXTERNAL_AGENT_TOOL_GUIDANCE).toBe(SHARED_GUIDANCE);
-  });
-
-  it("matches the old UI's prompt for the same invite", () => {
-    const inputs = [
-      { onboardingTextUrl: "http://localhost:3100/api/invites/pcp_abc/onboarding.txt" },
-      {
-        onboardingTextUrl: "http://localhost:3100/api/invites/pcp_abc/onboarding.txt",
-        connectionCandidates: ["http://box.tailnet:3100", " ", "not a url"],
-        testResolutionUrl: "http://box.tailnet:3100/api/invites/pcp_abc/test-resolution",
-      },
-      { onboardingTextUrl: "/api/invites/pcp_abc/onboarding.txt", connectionCandidates: [] },
-    ];
-    for (const input of inputs) expect(buildAgentOnboardingPrompt(input)).toBe(oldPrompt(input));
   });
 
   it("lists every reachable address with the onboarding path", () => {

@@ -16,7 +16,7 @@ const makeFixture = () => {
     "packages/shared/src/app-definitions",
     "packages/shared/src/self-serve-mcp-research.json",
     "doc/connections/tool-method-permission-reviews.json",
-    "ui/public/brands/apps/manifest.json",
+    "ui-new/public/brands/apps/manifest.json",
   ]) {
     const source = path.join(repoRoot, relative);
     const target = path.join(root, relative);

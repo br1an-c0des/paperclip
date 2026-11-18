@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# prepare-server-ui-dist.sh — Build the UI and copy it into server/ui-dist.
+# prepare-server-ui-dist.sh — Build the board UI (ui-new) and copy it into server/ui-dist.
 # This keeps @paperclipai/server publish artifacts self-contained for static UI serving.
-# When PAPERCLIP_RELEASE_REUSE_UI_DIST=1 and ui/dist already exists, reuse that
+# When PAPERCLIP_RELEASE_REUSE_UI_DIST=1 and ui-new/dist already exists, reuse that
 # output instead of rebuilding it again inside the release packaging flow.
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-UI_DIST="$REPO_ROOT/ui/dist"
+UI_DIST="$REPO_ROOT/ui-new/dist"
 SERVER_UI_DIST="$REPO_ROOT/server/ui-dist"
 
 should_reuse_existing_ui_dist=false
@@ -18,10 +18,10 @@ case "${PAPERCLIP_RELEASE_REUSE_UI_DIST:-}" in
 esac
 
 if [ "$should_reuse_existing_ui_dist" = true ] && [ -f "$UI_DIST/index.html" ]; then
-  echo "  -> Reusing existing @paperclipai/ui dist output"
+  echo "  -> Reusing existing @paperclipai/ui-new dist output"
 else
-  echo "  -> Building @paperclipai/ui..."
-  pnpm --dir "$REPO_ROOT" --filter @paperclipai/ui build
+  echo "  -> Building @paperclipai/ui-new..."
+  pnpm --dir "$REPO_ROOT" --filter @paperclipai/ui-new build
 fi
 
 if [ ! -f "$UI_DIST/index.html" ]; then
@@ -31,4 +31,4 @@ fi
 
 rm -rf "$SERVER_UI_DIST"
 cp -r "$UI_DIST" "$SERVER_UI_DIST"
-echo "  -> Copied ui/dist to server/ui-dist"
+echo "  -> Copied ui-new/dist to server/ui-dist"

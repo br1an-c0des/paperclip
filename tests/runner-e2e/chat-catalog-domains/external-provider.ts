@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { createHash, randomBytes } from "node:crypto";
-import { listenOnFetchAllowedPort } from "../../e2e/fetch-allowed-port.js";
+import { listenOnFetchAllowedPort } from "../../fixtures/fetch-allowed-port.js";
 import type { ChatCatalogContext } from "../chat-catalog-contract.js";
 import { root } from "./external-support.js";
 

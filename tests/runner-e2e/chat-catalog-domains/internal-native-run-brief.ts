@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { listenOnFetchAllowedPort } from "../../e2e/fetch-allowed-port.js";
+import { listenOnFetchAllowedPort } from "../../fixtures/fetch-allowed-port.js";
 
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 

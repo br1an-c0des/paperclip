@@ -55,7 +55,8 @@ describe("invented-host Paperclip links", () => {
     expect(rewrite(text)).toBe(text);
   });
 
-  it("knows every board route root the app serves", () => {
+  // ui/ removed 2026-11-17 (hard fork): this checked the links against the old UI's routes (ui/src).
+  it.skip("knows every board route root the app serves", () => {
     const source = readFileSync(new URL("../../../ui/src/lib/company-routes.ts", import.meta.url), "utf8");
     const block = /const BOARD_ROUTE_ROOTS = new Set\(\[([\s\S]*?)\]\)/.exec(source)?.[1] ?? "";
     const roots = [...block.matchAll(/"([^"]+)"/g)].map(match => match[1]!);

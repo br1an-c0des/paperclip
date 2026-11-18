@@ -106,7 +106,7 @@ function timeline(): ChatCatalogCase {
     await ctx.input.evidence("chat-catalog-real-launch-timeline.json", { ...state, verification: verifier.receipts, events }); return state;
   }, gradeWorkTimeline);
   return { ...base, oracleVersion: "paperclip.chat-catalog.work-timeline.v16", authentication: "human-session", expectedRunCount: 3, minimumRunCount: 3, attemptTimeoutMs: 720000,
-    sourceFiles: [...base.sourceFiles, "chat-catalog-domains/internal-work-timeline.ts", "chat-catalog-domains/api-read-receipts.ts", "chat-catalog-domains/internal-timeline-verifier.ts", "chat-catalog-domains/internal-privacy.ts", "chat-catalog-domains/identity-auth.ts", "chat-catalog-domains/internal-routine-audit.ts", "../e2e/fetch-allowed-port.ts", "../../server/src/services/native-runtime/status-decision-committer.ts", "../../server/src/services/work-timeline.ts","../../server/src/services/native-runtime/runner-api-catalog.ts"],
+    sourceFiles: [...base.sourceFiles, "chat-catalog-domains/internal-work-timeline.ts", "chat-catalog-domains/api-read-receipts.ts", "chat-catalog-domains/internal-timeline-verifier.ts", "chat-catalog-domains/internal-privacy.ts", "chat-catalog-domains/identity-auth.ts", "chat-catalog-domains/internal-routine-audit.ts", "../fixtures/fetch-allowed-port.ts", "../../server/src/services/native-runtime/status-decision-committer.ts", "../../server/src/services/work-timeline.ts","../../server/src/services/native-runtime/runner-api-catalog.ts"],
     async observe(ctx, state): Promise<Timeline> {
       const o = await observeInternal(ctx, state), taskId = entity(state, "task").id ?? "";
       let savedTimelineRead = false;

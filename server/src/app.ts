@@ -246,7 +246,6 @@ import { createPluginHostServiceCleanup } from "./services/plugin-host-service-c
 import { pluginRegistryService } from "./services/plugin-registry.js";
 import { createHostClientHandlers } from "@paperclipai/plugin-sdk";
 import type { BetterAuthSessionResult } from "./auth/better-auth.js";
-import { createCachedViteHtmlRenderer } from "./vite-html-renderer.js";
 import {
   DEFAULT_JSON_BODY_LIMIT,
   PORTABLE_JSON_BODY_LIMIT,
@@ -266,27 +265,8 @@ import { chatWebhookBodyParser } from "./middleware/chat-webhook-body.js";
 import { postHogRequestContextMiddlewareForEnv } from "./services/posthog-direct/request-context.js";
 import { createChatWebhookDiagnostics } from "./services/chat-webhook-diagnostics.js";
 
-type UiMode = "none" | "static" | "vite-dev";
+type UiMode = "none" | "static";
 const FEEDBACK_EXPORT_FLUSH_INTERVAL_MS = 5_000;
-const VITE_DEV_ASSET_PREFIXES = [
-  "/@fs/",
-  "/@id/",
-  "/@react-refresh",
-  "/@vite/",
-  "/assets/",
-  "/node_modules/",
-  "/src/",
-];
-const VITE_DEV_STATIC_PATHS = new Set([
-  "/apple-touch-icon.png",
-  "/favicon-16x16.png",
-  "/favicon-32x32.png",
-  "/favicon.ico",
-  "/favicon.svg",
-  "/site.webmanifest",
-  "/sw.js",
-]);
-
 export function isDatabaseConnectionUnavailableError(err: unknown): boolean {
   const error = err as { code?: unknown; message?: unknown; cause?: unknown };
   if (error?.code === "ECONNREFUSED") return true;
@@ -297,27 +277,6 @@ export function isDatabaseConnectionUnavailableError(err: unknown): boolean {
 
 export function resolveViteHmrPort(serverPort: number): number {
   return derivePaperclipViteHmrPort(serverPort);
-}
-
-export function resolveViteHmrHost(bindHost: string): string | undefined {
-  const normalized = bindHost.trim().toLowerCase();
-  if (
-    normalized === "0.0.0.0" ||
-    normalized === "::" ||
-    normalized === "127.0.0.1" ||
-    normalized === "::1" ||
-    normalized === "localhost"
-  )
-    return undefined;
-  return bindHost;
-}
-
-export function resolveViteHmrProtocol(
-  value: string | undefined,
-): "ws" | "wss" | undefined {
-  if (!value) return undefined;
-  if (value === "ws" || value === "wss") return value;
-  throw new Error("PAPERCLIP_VITE_HMR_PROTOCOL must be ws or wss");
 }
 
 export function listenViteHmrServer(
@@ -338,14 +297,6 @@ export function listenViteHmrServer(
     server.once("listening", onListening);
     server.listen(port, bindHost);
   });
-}
-
-export function shouldServeViteDevHtml(req: ExpressRequest): boolean {
-  const pathname = req.path;
-  if (VITE_DEV_STATIC_PATHS.has(pathname)) return false;
-  if (VITE_DEV_ASSET_PREFIXES.some((prefix) => pathname.startsWith(prefix)))
-    return false;
-  return req.accepts(["html"]) === "html";
 }
 
 export function shouldEnablePrivateHostnameGuard(opts: {
@@ -985,9 +936,6 @@ export async function createApp(
     lifecycle,
     hostServicesDisposers,
   );
-  let viteHtmlRenderer: ReturnType<typeof createCachedViteHtmlRenderer> | null =
-    null;
-  let viteDevServer: { close(): Promise<void> } | null = null;
   let viteHmrServer: HttpServer | null = null;
   const loader = pluginLoader(
     db,
@@ -1118,10 +1066,11 @@ export async function createApp(
 
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   if (opts.uiMode === "static") {
-    // Try published location first (server/ui-dist/), then monorepo dev location (../../ui/dist)
+    // Try the published location first (server/ui-dist/), then the board UI's
+    // build in the repo (ui-new/dist). The deploy image puts it at the second.
     const candidates = [
       path.resolve(__dirname, "../ui-dist"),
-      path.resolve(__dirname, "../../ui/dist"),
+      path.resolve(__dirname, "../../ui-new/dist"),
     ];
     const uiDist = candidates.find((p) =>
       fs.existsSync(path.join(p, "index.html")),
@@ -1188,9 +1137,9 @@ export async function createApp(
     }
     if (process.env.PAPERCLIP_MANAGED_RUNTIME_EXPOSURE === "tailscale_https") {
       // The managed-runtime supervisor waits for the app port AND its derived
-      // Vite HMR companion port to bind before publishing the service. Static
-      // mode has no Vite, so bind the same placeholder listener dev mode uses
-      // or the supervisor kills a healthy server at the readiness deadline
+      // Vite HMR companion port to bind before publishing the service. The
+      // server runs no Vite, so bind a placeholder listener there or the
+      // supervisor kills a healthy server at the readiness deadline
       // (PAP-18043).
       const hmrServer = createHttpServer((_req, res) => {
         res.writeHead(426, { "Content-Type": "text/plain" });
@@ -1203,82 +1152,6 @@ export async function createApp(
       );
       viteHmrServer = hmrServer;
     }
-  }
-
-  if (opts.uiMode === "vite-dev") {
-    const uiRoot = path.resolve(__dirname, "../../ui");
-    const publicUiRoot = path.resolve(uiRoot, "public");
-    const hmrPort = resolveViteHmrPort(opts.serverPort);
-    const hmrHost = resolveViteHmrHost(opts.bindHost);
-    const hmrProtocol = resolveViteHmrProtocol(
-      process.env.PAPERCLIP_VITE_HMR_PROTOCOL,
-    );
-    const hmrServer = createHttpServer((_req, res) => {
-      res.writeHead(426, { "Content-Type": "text/plain" });
-      res.end("Upgrade Required");
-    });
-    const { createServer: createViteServer } = await import("vite");
-    const configuredViteCacheDir = process.env.PAPERCLIP_VITE_CACHE_DIR?.trim();
-    const vite = await createViteServer({
-      root: uiRoot,
-      ...(configuredViteCacheDir
-        ? { cacheDir: path.resolve(configuredViteCacheDir) }
-        : {}),
-      appType: "custom",
-      // Vite otherwise discovers every HTML entry below the UI root. Generated
-      // Storybook output can reference dependencies that are intentionally not
-      // part of the application install, poisoning a clean embedded dev-server
-      // cache before the browser opens. The embedded UI has one real entry.
-      optimizeDeps: { entries: [path.resolve(uiRoot, "index.html")] },
-      server: {
-        // Listener binding and browser HMR hostname are deliberately separate:
-        // exposed branch runtimes stay loopback-only while the browser uses the
-        // current MagicDNS hostname through the broker's HTTPS listener.
-        host: opts.bindHost,
-        middlewareMode: true,
-        hmr: {
-          server: hmrServer,
-          ...(hmrHost ? { host: hmrHost } : {}),
-          ...(hmrProtocol ? { protocol: hmrProtocol } : {}),
-          port: hmrPort,
-          clientPort: hmrPort,
-        },
-        allowedHosts: privateHostnameGateEnabled
-          ? Array.from(privateHostnameAllowSet)
-          : undefined,
-      },
-    });
-    try {
-      await listenViteHmrServer(hmrServer, hmrPort, opts.bindHost);
-    } catch (error) {
-      await vite.close();
-      throw error;
-    }
-    viteDevServer = vite;
-    viteHmrServer = hmrServer;
-    viteHtmlRenderer = createCachedViteHtmlRenderer({
-      vite,
-      uiRoot,
-      brandHtml: applyUiBranding,
-    });
-    const renderViteHtml = viteHtmlRenderer;
-
-    if (fs.existsSync(publicUiRoot)) {
-      staticUi.use(staticUiFiles(publicUiRoot, { index: false }));
-    }
-    staticUi.get(/.*/, async (req, res, next) => {
-      if (!shouldServeViteDevHtml(req)) {
-        next();
-        return;
-      }
-      try {
-        const html = await renderViteHtml.render(req.originalUrl);
-        res.status(200).set({ "Content-Type": "text/html" }).end(html);
-      } catch (err) {
-        next(err);
-      }
-    });
-    staticUi.use(vite.middlewares);
   }
 
   app.use(staticUi);
@@ -1453,8 +1326,6 @@ export async function createApp(
         importSpoolCleanup.unsubscribe();
         await deliveryWork.stop();
         devWatcher?.close();
-        viteHtmlRenderer?.dispose();
-        void viteDevServer?.close().catch(() => undefined);
         viteHmrServer?.close();
         hostServiceCleanup.disposeAll();
         hostServiceCleanup.teardown();

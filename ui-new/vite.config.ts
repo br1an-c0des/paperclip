@@ -1,93 +1,14 @@
 /// <reference types="vitest/config" />
 import { execFileSync } from "child_process";
 import fs from "fs";
-import type { IncomingMessage, ServerResponse } from "http";
 import path from "path";
 import { defineConfig, type Plugin, type ProxyOptions } from "vite";
 import solid from "vite-plugin-solid";
 import { pluginTailwind } from "./scripts/plugin-tailwind";
 
-// App and adapter logos (`/brands/apps/linear.svg`…), which the API's app gallery points at, and the
-// favicons and home-screen icons (decision 39, D11). The old UI's `ui/public` stays the one copy of
-// these: served from there in dev and preview, and copied into `dist` at build, so the production
-// image (which builds from the whole repo) has them. ui-new's own `public/` holds what differs: the
-// web app manifest and the service worker.
-const oldPublicDir = path.resolve(import.meta.dirname, "../ui/public");
-const brandsDir = path.join(oldPublicDir, "brands");
-export const SHARED_ICONS = [
-  "favicon.ico",
-  "favicon.svg",
-  "favicon-16x16.png",
-  "favicon-32x32.png",
-  "apple-touch-icon.png",
-  "android-chrome-192x192.png",
-  "android-chrome-512x512.png",
-];
-const BRAND_TYPES: Record<string, string> = {
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
-  ".ico": "image/x-icon",
-  ".json": "application/json",
-  ".md": "text/markdown; charset=utf-8",
-};
-
-function sendFile(res: ServerResponse, file: string) {
-  fs.stat(file, (error, stat) => {
-    if (error || !stat.isFile()) {
-      res.statusCode = 404;
-      return res.end();
-    }
-    res.setHeader("Content-Type", BRAND_TYPES[path.extname(file).toLowerCase()] ?? "text/plain; charset=utf-8");
-    res.setHeader("Content-Length", stat.size);
-    res.setHeader("Cache-Control", "public, max-age=3600");
-    fs.createReadStream(file).pipe(res);
-  });
-}
-
-function serveBrand(req: IncomingMessage, res: ServerResponse, next: () => void) {
-  const url = req.url ?? "";
-  const icon = url.split(/[?#]/)[0]!.slice(1);
-  if (SHARED_ICONS.includes(icon)) return sendFile(res, path.join(oldPublicDir, icon));
-  if (!url.startsWith("/brands/")) return next();
-  let rel: string;
-  try {
-    rel = decodeURIComponent(url.slice("/brands/".length).split(/[?#]/)[0]!);
-  } catch {
-    res.statusCode = 400;
-    return res.end();
-  }
-  const file = path.resolve(brandsDir, rel);
-  // Never leave the folder (`..`, absolute paths, encoded separators).
-  if (!file.startsWith(brandsDir + path.sep)) {
-    res.statusCode = 404;
-    return res.end();
-  }
-  sendFile(res, file);
-}
-
-function brands(): Plugin {
-  let outDir = "dist";
-  return {
-    name: "paperclip-brands",
-    configResolved(config) {
-      outDir = path.resolve(config.root, config.build.outDir);
-    },
-    configureServer(server) {
-      server.middlewares.use(serveBrand);
-    },
-    configurePreviewServer(server) {
-      server.middlewares.use(serveBrand);
-    },
-    closeBundle() {
-      if (process.env.VITEST || !fs.existsSync(brandsDir)) return;
-      fs.cpSync(brandsDir, path.join(outDir, "brands"), { recursive: true });
-      for (const icon of SHARED_ICONS) fs.copyFileSync(path.join(oldPublicDir, icon), path.join(outDir, icon));
-    },
-  };
-}
+// public/ holds the app and adapter logos (`/brands/apps/linear.svg`…), which the API's app gallery
+// points at, the favicons and home-screen icons (decision 39, D11), the web app manifest and the
+// service worker. They moved here from the old UI's `ui/public` when `ui/` was removed.
 
 // The service worker (public/sw.js) carries a placeholder the production build replaces with an id
 // taken from the entry chunk's hash, as ui/src/lib/vite-sw-build-id.ts does for the old UI: each
@@ -195,14 +116,13 @@ export default defineConfig(({ command }) => ({
     __UI_BUILT_AT__: JSON.stringify(builtAt),
   },
   // Hot reload has no place in tests, and its runtime module breaks Vitest's loader.
-  plugins: [solid({ hot: !process.env.VITEST }), brands(), serviceWorkerBuildId(), pluginTailwind()],
+  plugins: [solid({ hot: !process.env.VITEST }), serviceWorkerBuildId(), pluginTailwind()],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   server: {
-    // 5173 is the existing React UI, so both can run side by side.
     port: 5174,
     strictPort: true,
     // Reaching the dev server from other devices through `tailscale serve`, which keeps the

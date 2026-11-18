@@ -7,7 +7,7 @@ why things are set up this way, see [FORK.md](../FORK.md).
 
 | File | Purpose |
 | --- | --- |
-| `Dockerfile` | The core image built from source, with `ui-new` built and swapped in for the React UI |
+| `Dockerfile` | The core image built from source, with `ui-new` built and added |
 | `docker-compose.yml` | Postgres + Paperclip, with bind mounts for all data |
 | `.env.example` | Settings template; copy it to `deploy/.env` (gitignored) |
 | `deploy.sh` | Builds the core image for the checked-out commit, then builds and (re)starts the stack |
@@ -18,9 +18,9 @@ Since 2026-11-17 (hard-fork step 2) the image is built from this repo's source, 
 `main` (server, packages, migrations, `ui-new`) reaches the server at its next deploy. There are no
 image patches and no upstream images involved. `deploy.sh` builds two images:
 
-1. **`paperclip-core:<commit>`**, from the repo's root `Dockerfile` (upstream's, unchanged) with
-   `--target production`: the server, the Paperclip Runner (Rust), the agent CLIs (Claude Code,
-   Codex, OpenCode, Gemini, Kimi) and the React UI. `<commit>` is the checkout's
+1. **`paperclip-core:<commit>`**, from the repo's root `Dockerfile` (upstream's, without the old
+   React UI's build) with `--target production`: the server, the Paperclip Runner (Rust) and the
+   agent CLIs (Claude Code, Codex, OpenCode, Gemini, Kimi). `<commit>` is the checkout's
    `git rev-parse HEAD`. If an image with that tag exists, `deploy.sh` reuses it; pass `--rebuild`
    to build it again. A checkout with uncommitted or untracked files always rebuilds it, since the
    build reads the working tree, not the commit. The root `Dockerfile` copies the whole build
@@ -28,13 +28,14 @@ image patches and no upstream images involved. `deploy.sh` builds two images:
    out (only the committed `*.example` templates go in); otherwise `deploy/.env` and its secrets
    would be readable by agents inside the container.
 2. **`paperclip-fork:local`**, from `deploy/Dockerfile` through `docker compose up -d --build`:
-   - builds `ui-new` in a small Node stage. The build copies the app logos (`ui/public/brands`)
-     and the favicons and home-screen icons from `ui/public`, adds `ui-new/public` (the web app
-     manifest and the service worker), and stamps the worker with a build id; the stage fails if
-     any of these is missing;
+   - builds `ui-new` in a small Node stage. The build copies `ui-new/public` (the app logos in
+     `brands/`, the favicons and home-screen icons, the web app manifest and the service worker)
+     and stamps the worker with a build id; the stage fails if any of these is missing;
    - starts `FROM` the core image (the `BASE_IMAGE` build arg; a build without `deploy.sh` fails on
      the placeholder `paperclip-core-missing-run-deploy-sh`);
-   - replaces `/app/ui/dist` with the `ui-new` build.
+   - puts the `ui-new` build in `/app/ui-new/dist`, where the server serves it from
+     (`server/src/app.ts` serves the first of `server/ui-dist` and `ui-new/dist` that has an
+     `index.html`; the stage clears both first).
 
 Two build arguments of the root `Dockerfile` matter here:
 
@@ -50,10 +51,6 @@ Two build arguments of the root `Dockerfile` matter here:
 Run `deploy/deploy.sh --dry-run` to see the commit, whether the core image would be built or
 reused, and the exact build command, without building anything.
 
-The root build also runs `vite build` for the React UI in `ui/` (its output is replaced, but the
-step has to pass), so `ui/` has to keep building even though it isn't deployed. It isn't
-type-checked there.
-
 ### Build time and disk use
 
 Measured on the dev machine (16 cores, Docker Desktop on WSL):
@@ -63,7 +60,7 @@ Measured on the dev machine (16 cores, Docker Desktop on WSL):
   the workspace's dependencies, the agent CLIs, and the TypeScript server build. Expect longer on a
   smaller machine like server1, and a few GB of downloads (Node and Rust toolchains, npm packages).
 - **Later builds** reuse Docker's layer cache. A commit that changes no package manifest rebuilds
-  only the app layers (the React `ui/` build, the server build and the copy into the final image),
+  only the app layers (the server build and the copy into the final image),
   not the dependency install, the Rust daemon or the agent CLIs: about 2.5 minutes for the core
   image (136 s), then under a minute for the `ui-new` image (53 s). A lockfile change also reruns
   the dependency install (about 2 minutes more), and the first deploy of each ISO week reinstalls
@@ -222,7 +219,7 @@ server:
   ```bash
   tailscale serve --bg --https=443 http://localhost:3200     # deployed Paperclip
   tailscale serve --bg --https=10000 http://localhost:5174   # dev ui-new
-  tailscale serve --bg --https=8443 http://localhost:3100    # dev server and old UI
+  tailscale serve --bg --https=8443 http://localhost:3100    # dev server
   ```
 
 - **Staying up:** the stack restarts whenever Docker Desktop starts (`restart: unless-stopped`), so
@@ -303,7 +300,7 @@ docker compose down               # stop (data is kept)
   startup script checks ownership of every file under `/paperclip`. With many worktrees this can
   take minutes. Later boots skip the full check.
 - **The core image build fails:** the output names the stage. Common causes: a change that
-  breaks the server's TypeScript build or the React `ui/` build (`vite build` still runs there);
+  breaks the server's TypeScript build;
   `pnpm-lock.yaml` behind a package manifest (the `runner-lockfile` stage says so and gives the
   command to run in the checkout); a new workspace package the server depends on, whose
   `package.json` the root `Dockerfile`'s `deps` stage doesn't copy yet (add a `COPY` line there);

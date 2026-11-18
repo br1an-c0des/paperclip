@@ -367,7 +367,6 @@ function buildTestConfig(overrides: Record<string, unknown> = {}) {
     databaseBackupRetentionDays: 30,
     databaseBackupDir: "/tmp/paperclip-test-backups",
     serveUi: false,
-    uiDevMiddleware: false,
     secretsProvider: "local_encrypted",
     secretsStrictMode: false,
     secretsMasterKeyFilePath: "/tmp/paperclip-master.key",

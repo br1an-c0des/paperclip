@@ -7,7 +7,7 @@ vi.mock("node:http", () => ({ createServer: (handler: unknown) => {
   port.handler = handler;
   return { closeAllConnections: vi.fn(), close: (done: () => void) => done() };
 } }));
-vi.mock("../../e2e/fetch-allowed-port.js", () => ({ listenOnFetchAllowedPort: async () => 43123 }));
+vi.mock("../../fixtures/fetch-allowed-port.js", () => ({ listenOnFetchAllowedPort: async () => 43123 }));
 // Execute only the owning verifier's unchanged bounded Node command on synthetic
 // HTML; no server, browser, application or native agent process is started.
 vi.mock("node:child_process", async original => {

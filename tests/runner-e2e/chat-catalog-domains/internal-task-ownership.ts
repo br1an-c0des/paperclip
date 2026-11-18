@@ -65,7 +65,7 @@ function assignmentConflict(): ChatCatalogCase {
   }, gradeTaskOwnership);
   return { ...base, expectedRunCount: 3, minimumRunCount: 3, expectedHumanMessageCount: 2, setupHumanMessageCount: 1, attemptTimeoutMs: 600_000,
     runPolicy: { kind: "source-settled-with-active-work", maximumActiveWorkerRuns: 1 },
-    sourceFiles: [...base.sourceFiles, "chat-catalog-domains/internal-task-ownership.ts", "chat-catalog-domains/internal-run-brief.ts", "chat-catalog-domains/identity-support.ts", "../e2e/fetch-allowed-port.ts"],
+    sourceFiles: [...base.sourceFiles, "chat-catalog-domains/internal-task-ownership.ts", "chat-catalog-domains/internal-run-brief.ts", "chat-catalog-domains/identity-support.ts", "../fixtures/fetch-allowed-port.ts"],
     async observe(ctx, state): Promise<OwnershipObservation> {
       const o = await observeInternal(ctx, state); const prior = observation(state.firstRead); const firstIds = new Set(prior?.runs.map(run => run.id) ?? []);
       const comments = ctx.issue() ? await ctx.input.api.get<Entity[]>(`/api/issues/${ctx.issue()!.id}/comments?order=asc`) : [];

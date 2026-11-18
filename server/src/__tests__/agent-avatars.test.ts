@@ -143,8 +143,9 @@ describe("on-demand agent avatars", () => {
     expect(data[(256 * info.width + 256) * info.channels + 3]).toBe(255);
   }, 20_000);
   it("serves Slack exports on the Paperclip dark-mode color in a separate cache", async () => {
-    const css = await readFile(new URL("../../../ui/src/index.css", import.meta.url), "utf8");
-    const lightness = Number(css.match(/\.dark\s*\{\s*--background:\s*oklch\(([\d.]+) 0 0\)/)?.[1]);
+    // The old UI's dark-mode background, `.dark { --background: oklch(0.205 0 0) }` in
+    // ui/src/index.css (ui/ removed 2026-11-17, hard fork; the file is in git at upstream-freeze).
+    const lightness = 0.205;
     // Neutral OKLCH converts to equal sRGB channels; PNG rounds to 8-bit color.
     const linear = lightness ** 3;
     const channel = Math.round((linear <= 0.0031308 ? 12.92 * linear : 1.055 * linear ** (1 / 2.4) - 0.055) * 255);

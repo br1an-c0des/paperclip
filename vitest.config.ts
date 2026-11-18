@@ -32,7 +32,6 @@ export default defineConfig({
       "packages/plugins/create-paperclip-plugin",
       "packages/plugins/sandbox-providers/daytona",
       "server",
-      "ui",
       "cli",
     ],
   },

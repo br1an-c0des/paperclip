@@ -178,7 +178,7 @@ export async function startMaintenanceServer(databaseUrl: string, options: Maint
         PAPERCLIP_TOOL_ACTION_SIGNING_SECRET: runtimeSecrets?.PAPERCLIP_TOOL_ACTION_SIGNING_SECRET ?? randomUUID(), BETTER_AUTH_SECRET: runtimeSecrets?.BETTER_AUTH_SECRET ?? randomUUID(),
         CODEX_HOME: path.join(directory, "codex"), PAPERCLIP_ANNOUNCEMENTS_ENABLED: String(configuration?.announcements ?? false),
         ...(configuration?.announcements ? { PAPERCLIP_MAINTENANCE_ANNOUNCEMENT_FIXTURE: '1' } : {}),
-        PAPERCLIP_DB_BACKUP_ENABLED: String(Boolean(configuration?.automaticBackups)), PAPERCLIP_UI_DEV_MIDDLEWARE: "false",
+        PAPERCLIP_DB_BACKUP_ENABLED: String(Boolean(configuration?.automaticBackups)),
         ...(configuration?.automaticBackups ? { PAPERCLIP_DB_BACKUP_IDLE_CHECKPOINT_ENABLED: configuration.automaticBackups.idleCheckpoint ? "1" : "0" } : {}),
         ...(configuration?.telemetryOrigin ? { PAPERCLIP_TELEMETRY_ENDPOINT: configuration.telemetryOrigin } : {}),
         ...(configuration?.otelOrigin ? { OTEL_EXPORTER_OTLP_ENDPOINT: configuration.otelOrigin, OTEL_EXPORTER_OTLP_PROTOCOL: "http/json" } : {}),

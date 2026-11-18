@@ -2,9 +2,12 @@
  * The plugin compatibility stylesheet (decision 39, D10). Plugins written for the old UI style
  * themselves with its Tailwind classes (`fixed inset-0 z-50 flex …`, `text-muted-foreground`);
  * ui-new has no Tailwind, so those plugins rendered unstyled. This generates, at build time, the
- * same utilities the old UI offers: the classes found in the old UI's sources and the first-party
- * plugins (the old UI doesn't scan third-party plugins either), compiled against the old UI's theme.
+ * same utilities the old UI offered: the classes found in the old UI's sources and the first-party
+ * plugins (the old UI didn't scan third-party plugins either), compiled against the old UI's theme.
  *
+ * - The old UI (`ui/`) is gone. Its theme and the classes its sources used are frozen in
+ *   `plugin-tailwind/` (old-ui-theme.css, old-ui-classes.txt), taken at upstream-freeze; the
+ *   first-party plugins are still scanned at build time.
  * - Every rule is scoped to `.plugin-area`, so nothing outside plugin areas changes. The scope also
  *   lifts each utility above ui-new's element rules (`button`, `a`…) in base.css.
  * - No preflight: ui-new's base.css already resets the page, and preflight would restyle ui-new.
@@ -26,12 +29,13 @@ export const PLUGIN_AREA_SELECTOR = ".plugin-area";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
 
-/** Where the old UI finds its classes, plus the first-party plugins. */
-export const PLUGIN_TAILWIND_SOURCES = [
-  { base: path.join(repoRoot, "ui/src"), pattern: "**/*" },
-  { base: path.join(repoRoot, "ui"), pattern: "index.html" },
-  { base: path.join(repoRoot, "packages/plugins"), pattern: "**/src/**/*" },
-];
+/** The first-party plugins, scanned for classes at build time. */
+export const PLUGIN_TAILWIND_SOURCES = [{ base: path.join(repoRoot, "packages/plugins"), pattern: "**/src/**/*" }];
+
+/** The old UI's `@custom-variant` lines and `@theme` blocks, frozen from ui/src/index.css. */
+export const OLD_UI_THEME = path.join(import.meta.dirname, "plugin-tailwind/old-ui-theme.css");
+/** The utility classes the old UI's sources (ui/src, ui/index.html) used, frozen, one per line. */
+export const OLD_UI_CLASSES = path.join(import.meta.dirname, "plugin-tailwind/old-ui-classes.txt");
 
 /** The bodies of every `@theme` block in a stylesheet, joined. */
 export function extractThemeBlocks(source: string): string {
@@ -91,18 +95,17 @@ export async function compilePluginTailwind(candidates: string[], options: { old
   return optimize(css, { minify: options.minify ?? true }).code;
 }
 
-/** Scans the old UI and the first-party plugins for class candidates. */
+/** The old UI's frozen classes plus the candidates found in the first-party plugins. */
 export async function scanPluginTailwindCandidates(): Promise<string[]> {
   const { Scanner } = await import("@tailwindcss/oxide");
   const sources = PLUGIN_TAILWIND_SOURCES.filter((source) => fs.existsSync(source.base)).map((source) => ({ ...source, negated: false }));
-  return new Scanner({ sources }).scan();
+  const oldUi = fs.readFileSync(OLD_UI_CLASSES, "utf8").split("\n").filter(Boolean);
+  return [...new Set([...oldUi, ...new Scanner({ sources }).scan()])];
 }
 
 export async function generatePluginTailwind(minify = true): Promise<string> {
-  const oldIndexCss = path.join(repoRoot, "ui/src/index.css");
-  if (!fs.existsSync(oldIndexCss)) return "";
   const candidates = await scanPluginTailwindCandidates();
-  return compilePluginTailwind(candidates, { oldIndexCss: fs.readFileSync(oldIndexCss, "utf8"), base: import.meta.dirname, minify });
+  return compilePluginTailwind(candidates, { oldIndexCss: fs.readFileSync(OLD_UI_THEME, "utf8"), base: import.meta.dirname, minify });
 }
 
 /** Serves the sheet as a virtual CSS module, generated once per dev server or build. */

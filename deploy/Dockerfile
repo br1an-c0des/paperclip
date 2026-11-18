@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.20
 #
 # Fork image: the core image built from this repo's root Dockerfile (target
-# `production`: server, Paperclip Runner, agent CLIs) with the ui-new SolidJS
-# UI in place of the React UI.
+# `production`: server, Paperclip Runner, agent CLIs) plus the board UI, the
+# ui-new SolidJS app, which the core image doesn't build.
 #
 # BASE_IMAGE is that core image, paperclip-core:<commit>, which
 # deploy/deploy.sh builds first. Build context is the repo root:
@@ -28,10 +28,11 @@ RUN corepack enable
 WORKDIR /app
 COPY . .
 # Install only ui-new and the workspace packages it depends on, then build it.
-# The build copies the app logos (brands/) and the favicons from ui/public and
-# stamps the service worker with a build id (ui-new/vite.config.ts); check that
-# each made it in, since a missing one only shows as broken images, missing
-# icons, or tabs that never pick up a deploy.
+# The build copies public/ (the app logos in brands/, the favicons, the
+# manifest and the service worker) and stamps the service worker with a build
+# id (ui-new/vite.config.ts); check that each made it in, since a missing one
+# only shows as broken images, missing icons, or tabs that never pick up a
+# deploy.
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --filter "@paperclipai/ui-new..." --ignore-scripts \
   && pnpm --filter @paperclipai/ui-new build \
@@ -50,7 +51,8 @@ FROM ${BASE_IMAGE}
 # the commit is set here; it's the same commit the core image was built from.
 ARG PAPERCLIP_UI_COMMIT=""
 ENV PAPERCLIP_BUILD_COMMIT=${PAPERCLIP_UI_COMMIT}
-# The server serves the first of server/ui-dist and ui/dist that has an
-# index.html (server/src/app.ts), so clear both and install ui-new as ui/dist.
-RUN rm -rf /app/server/ui-dist /app/ui/dist
-COPY --from=ui --chown=node:node /app/ui-new/dist /app/ui/dist
+# The server serves the first of server/ui-dist and ui-new/dist that has an
+# index.html (server/src/app.ts), so clear the first and install the build as
+# the second.
+RUN rm -rf /app/server/ui-dist /app/ui-new/dist
+COPY --from=ui --chown=node:node /app/ui-new/dist /app/ui-new/dist

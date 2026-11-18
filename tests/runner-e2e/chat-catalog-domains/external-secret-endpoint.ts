@@ -4,7 +4,7 @@ import { mkdir, realpath, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { resolveDefaultAgentWorkspaceDir } from "../../../server/src/home-paths.js";
 import { createLocalAgentJwt } from "../../../server/src/agent-auth-jwt.js";
-import { listenOnFetchAllowedPort } from "../../e2e/fetch-allowed-port.js";
+import { listenOnFetchAllowedPort } from "../../fixtures/fetch-allowed-port.js";
 import type { ChatCatalogContext } from "../chat-catalog-contract.js";
 import {
   bytesContainSecret,

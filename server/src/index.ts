@@ -945,7 +945,7 @@ async function startServerWithDatabaseTeardown(
     throw err;
   }
 
-  const uiMode = config.uiDevMiddleware ? "vite-dev" : config.serveUi ? "static" : "none";
+  const uiMode = config.serveUi ? "static" : "none";
   const storageService = createStorageServiceFromConfig(config);
   const feedback = feedbackService(db as any, {
     shareClient: createFeedbackTraceShareClientFromConfig(config),

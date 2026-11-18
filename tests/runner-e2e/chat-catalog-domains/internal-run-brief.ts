@@ -1,6 +1,6 @@
 import { createServer, type ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
-import { listenOnFetchAllowedPort } from "../../e2e/fetch-allowed-port.js";
+import { listenOnFetchAllowedPort } from "../../fixtures/fetch-allowed-port.js";
 import type { ChatCatalogContext } from "../chat-catalog-contract.js";
 const WEBSITE_BRIEF = "The website brief is now available: Acorn Notes needs a semantic heading and an accessible signup link. For this prerequisite, record a short implementation note and complete the task. No website file or delivery is requested yet.";
 /** A real read-only app holds its first tool response while the product retains the actual worker checkout. */

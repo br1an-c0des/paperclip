@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { randomBytes, createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { listenOnFetchAllowedPort } from "../../e2e/fetch-allowed-port.js";
+import { listenOnFetchAllowedPort } from "../../fixtures/fetch-allowed-port.js";
 import type { ChatCatalogContext } from "../chat-catalog-contract.js";
 import type { WorkspaceFileContent } from "../../../packages/shared/src/types/workspace-file-resource.js";
 export interface VerificationReceipt { taskId: string; runId: string; filename: string; sha256: string; exitCode: number; checkedAt: string; command: string }

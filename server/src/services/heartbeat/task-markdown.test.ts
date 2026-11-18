@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildPaperclipTaskMarkdown } from "./task-markdown.js";
 
@@ -116,11 +115,8 @@ describe("heartbeat task markdown rendering", () => {
     expect(enabled).toContain("Do not sleep or poll the card. Report the outcome the response gives");
     expect(enabled).toContain("enqueued false otherwise means no run started, so say why from card.state");
     expect(enabled).toContain("[Launch blockers](/RUN/status/<cardId>)");
-    // The named pages are the board's real routes.
-    const app = readFileSync(new URL("../../../../ui/src/App.tsx", import.meta.url), "utf8");
+    // ui/ removed 2026-11-17 (hard fork): the route checks against ui/src/App.tsx are gone.
     expect(enabled).toContain("Status page at /RUN/status (");
-    expect(app).toMatch(/path="status"\s+element=\{<StatusCardsExperimentalGate>/);
-    expect(app).toMatch(/path="status\/:cardId"\s+element=\{<StatusCardsExperimentalGate>/);
     expect(buildPaperclipTaskMarkdown({ issue: chat, nativeRunner: true })).not.toContain("Status Cards:");
     expect(buildPaperclipTaskMarkdown({ issue: { ...chat, conversationAgentId: null }, nativeRunner: true, statusCardsEnabled: true }))
       .not.toContain("Status Cards:");
@@ -131,9 +127,7 @@ describe("heartbeat task markdown rendering", () => {
     expect(enabled).toContain("Cases:");
     expect(enabled).toContain("/RUN/cases/<case identifier>");
     expect(enabled).toContain("[RUN-C1](/RUN/cases/RUN-C1)");
-    // The named page is the board's real route.
-    const app = readFileSync(new URL("../../../../ui/src/App.tsx", import.meta.url), "utf8");
-    expect(app).toMatch(/path="cases\/:caseIdentifier"/);
+    // ui/ removed 2026-11-17 (hard fork): the route check against ui/src/App.tsx is gone.
     expect(buildPaperclipTaskMarkdown({ issue: chat, nativeRunner: true })).not.toContain("Cases:");
     expect(buildPaperclipTaskMarkdown({ issue: { ...chat, conversationAgentId: null }, nativeRunner: true, casesEnabled: true }))
       .not.toContain("Cases:");

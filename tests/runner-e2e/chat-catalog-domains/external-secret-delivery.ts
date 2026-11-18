@@ -300,7 +300,7 @@ export const secretDeliveryExternalCases = [
         "chat-catalog-domains/external-support.ts",
         "chat-catalog-domains/internal-support.ts",
         "run-observations.ts",
-        "../e2e/fetch-allowed-port.ts",
+        "../fixtures/fetch-allowed-port.ts",
         "../../server/src/home-paths.ts",
         "../../server/src/routes/secrets.ts",
         "../../server/src/services/secrets.ts",

@@ -4,7 +4,7 @@ import type { BindMode, DeploymentExposure, DeploymentMode } from "@paperclipai/
 
 import { parse as parseEnvFileContents } from "dotenv";
 
-type UiMode = "none" | "static" | "vite-dev";
+type UiMode = "none" | "static";
 
 type ExternalPostgresInfo = {
   mode: "external-postgres";
@@ -111,11 +111,9 @@ export function printStartupBanner(opts: StartupBannerOptions): void {
       ? color("embedded-postgres", "green")
       : color("external-postgres", "yellow");
   const uiMode =
-    opts.uiMode === "vite-dev"
-      ? color("vite-dev-middleware", "cyan")
-      : opts.uiMode === "static"
-        ? color("static-ui", "magenta")
-        : color("headless-api", "yellow");
+    opts.uiMode === "static"
+      ? color("static-ui", "magenta")
+      : color("headless-api", "yellow");
 
   const portValue =
     opts.requestedPort === opts.listenPort

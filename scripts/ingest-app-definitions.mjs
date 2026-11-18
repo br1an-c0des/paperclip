@@ -13,7 +13,7 @@ const corpus =
 const out = path.join(root, "packages/shared/src/app-definitions");
 const brandingManifest = JSON.parse(
   fs.readFileSync(
-    path.join(root, "ui/public/brands/apps/manifest.json"),
+    path.join(root, "ui-new/public/brands/apps/manifest.json"),
     "utf8",
   ),
 );

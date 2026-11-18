@@ -37,7 +37,7 @@ function discoverWorkspacePackagePaths(rootDir: string): Map<string, string> {
 
   visit(path.join(rootDir, "packages"));
   visit(path.join(rootDir, "server"));
-  visit(path.join(rootDir, "ui"));
+  visit(path.join(rootDir, "ui-new"));
   visit(path.join(rootDir, "cli"));
 
   return packagePaths;

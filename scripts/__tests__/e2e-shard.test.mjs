@@ -100,7 +100,8 @@ function runAggregate(block, fullCi, overrides = {}) {
   } });
 }
 
-test("the e2e shards form a complete, non-overlapping partition", () => {
+// ui/ removed 2026-11-17 (hard fork), and with it the old UI's Playwright suite (tests/e2e).
+test.skip("the e2e shards form a complete, non-overlapping partition", () => {
   const specs = listE2eSpecs();
   assert.ok(specs.length > 0, "expected a non-empty e2e spec set");
 
@@ -116,7 +117,8 @@ test("the e2e shards form a complete, non-overlapping partition", () => {
   }
 });
 
-test("the ignored spec list matches playwright.config.ts testIgnore", () => {
+// ui/ removed 2026-11-17 (hard fork), and with it the old UI's Playwright suite (tests/e2e).
+test.skip("the ignored spec list matches playwright.config.ts testIgnore", () => {
   const config = readFileSync(playwrightConfig, "utf8");
   const match = config.match(/testIgnore:\s*\[([^\]]*)\]/);
   assert.ok(match, "expected a testIgnore array in playwright.config.ts");
@@ -124,7 +126,8 @@ test("the ignored spec list matches playwright.config.ts testIgnore", () => {
   assert.deepEqual([...configured].sort(), [...IGNORED_SPECS].sort());
 });
 
-test("the duration manifest only names specs that still exist", () => {
+// ui/ removed 2026-11-17 (hard fork), and with it the old UI's Playwright suite (tests/e2e).
+test.skip("the duration manifest only names specs that still exist", () => {
   const durations = loadShardDurations(durationsManifest);
   assert.ok(Object.keys(durations).length > 0, "expected a populated duration manifest");
   const specs = new Set(listE2eSpecs());
@@ -133,7 +136,8 @@ test("the duration manifest only names specs that still exist", () => {
   }
 });
 
-test("the weighted partition keeps the shards close to balanced", () => {
+// ui/ removed 2026-11-17 (hard fork), and with it the old UI's Playwright suite (tests/e2e).
+test.skip("the weighted partition keeps the shards close to balanced", () => {
   const durations = loadShardDurations(durationsManifest);
   const specs = listE2eSpecs();
   // New specs use the scheduler's median estimate until measured durations exist.
