@@ -96,7 +96,11 @@ export default defineConfig({
           name: "shared",
           include,
           exclude: [...configDefaults.exclude, ...isolatedTestFiles],
-          isolate: false,
+          // Isolated for now (2026-11-18): without isolation, about 39 files failed in a full run
+          // because state leaks from earlier files in the same worker (Cloud runtime config,
+          // PAPERCLIP_MANAGED_CONFIG, counters). Step 3a round 2 finds the leaking files; then
+          // this goes back to `false` (bench set: 116 s against 127 s at 6 workers).
+          isolate: true,
         },
       },
       {
