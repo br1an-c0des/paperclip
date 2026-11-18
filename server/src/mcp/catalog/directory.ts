@@ -4,7 +4,8 @@ import { object, pathId, pick, rows, tool } from "./util.js";
 
 const AGENT_FIELDS = ["id", "name", "role", "title", "status", "reportsTo"] as const;
 const PROJECT_FIELDS = ["id", "name", "description", "status", "leadAgentId", "goalIds", "targetDate"] as const;
-const projectFields = { name: true, description: true, status: true, leadAgentId: true, goalIds: true, targetDate: true, color: true, icon: true } as const;
+// Color and icon stay in the UI: the icon list alone would cost every run ~1k characters of context.
+const projectFields = { name: true, description: true, status: true, leadAgentId: true, goalIds: true, targetDate: true } as const;
 
 /** Agents, projects, and the project tools that replace `/api/mcp/project-tools`. */
 export const DIRECTORY_TOOLS = [
@@ -49,7 +50,7 @@ export const DIRECTORY_TOOLS = [
   }),
   tool({
     name: "paperclip_update_project",
-    description: "Change a project's name, description, status, lead, goals, target date, color or icon.",
+    description: "Change a project's name, description, status, lead, goals or target date.",
     action: "projects:manage",
     input: z.object({ projectId: z.uuid(), changes: updateProjectSchema.pick(projectFields).strict() }).strict()
       .refine(args => Object.keys(args.changes).length > 0, "Supply at least one change"),

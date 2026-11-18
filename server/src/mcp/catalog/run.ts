@@ -25,6 +25,15 @@ async function runTaskId(deps: CatalogDeps, caller: McpCaller): Promise<string> 
   return taskId;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The unblock owner: "me", "board", an agent id (UUID), or else a user id. */
+function blockOwner(owner: string, caller: McpCaller): "board" | { agentId: string } | { userId: string } {
+  if (owner === "me") return { agentId: caller.agentId! };
+  if (owner === "board") return "board";
+  return UUID.test(owner) ? { agentId: owner } : { userId: owner };
+}
+
 function disposition(input: Omit<RunDisposition, "at" | "via">): RunDisposition {
   return { ...input, at: new Date().toISOString(), via: "tool" };
 }
@@ -120,12 +129,12 @@ export function createRunTools(deps: CatalogDeps, catalog: () => readonly Paperc
       input: z.object({
         summary,
         unblockAction: z.string().trim().min(1).max(2000),
-        owner: z.union([z.enum(["me", "board"]), z.object({ agentId: z.uuid() }).strict(), z.object({ userId: z.string().min(1) }).strict()]).default("me"),
+        owner: z.string().trim().min(1).max(200).default("me").describe('Who must act: "me", "board", an agent id, or a user id'),
         blockedByTaskIds: z.array(z.uuid()).max(100).optional(),
       }).strict(),
       run: async (caller, args, api) => {
         const taskId = await runTaskId(deps, caller);
-        const owner = args.owner === "me" ? { agentId: caller.agentId! } : args.owner;
+        const owner = blockOwner(args.owner, caller);
         const blockedOwner = owner === "board" ? "board" : "agentId" in owner ? `agent:${owner.agentId}` : `user:${owner.userId}`;
         const task = await api("PATCH", `/issues/${pathId(taskId)}`, {
           status: "blocked",
