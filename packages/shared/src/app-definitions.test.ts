@@ -920,7 +920,7 @@ describe("AppDefinition catalog", () => {
   it("ships matching local artwork for every store-visible provider", () => {
     const uiPublic = path.resolve(
       path.dirname(fileURLToPath(import.meta.url)),
-      "../../../ui/public",
+      "../../../ui-new/public",
     );
     const manifest = JSON.parse(
       fs.readFileSync(path.join(uiPublic, "brands/apps/manifest.json"), "utf8"),

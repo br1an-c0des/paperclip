@@ -48,7 +48,7 @@ describe("generic connection instructions", () => {
     const generate = () => execFileSync(process.execPath, [join(root, "scripts/ingest-app-definitions.mjs"), "--definitions-only"], { cwd: fixture, stdio: "pipe" });
     try {
       for (const source of [
-        "ui/public/brands/apps/manifest.json",
+        "ui-new/public/brands/apps/manifest.json",
         "packages/shared/src/self-serve-mcp-research.json",
         "doc/connections/tool-method-permission-reviews.json",
         "packages/shared/src/app-definitions",

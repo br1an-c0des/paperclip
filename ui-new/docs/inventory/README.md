@@ -27,18 +27,14 @@ What a request list can't show, and the area guides must call out explicitly:
 - local preferences (browser storage)
 - live updates pushed over the company event socket (`/api/companies/:companyId/events/ws`)
 
-## Regenerating
+## The generated snapshot (frozen)
 
-```bash
-pnpm --filter @paperclipai/ui-new inventory
-```
+`generated/` holds `routes.md`, `pages.md`, `api.md`, `flags.md` and `inventory.json`. They were
+generated from `ui/` at `upstream-freeze` and are now a frozen snapshot: `ui/` was removed from the
+repo on 2026-11-17, and the generator (`ui-new/scripts/ui-inventory.mjs`) with it. The old source is
+still in git: `git show upstream-freeze:ui/<path>`.
 
-It writes `routes.md`, `pages.md`, `api.md`, `flags.md` and `inventory.json`. Run it after every
-`git sync-ui` and commit the result. `git diff ui-new/docs/inventory/generated` then
-shows exactly which routes, pages and requests upstream added, removed or changed. Triage those into the
-area guides and the checklist. The output is deterministic, so an unchanged UI produces no diff.
-
-How the generator works (`ui-new/scripts/ui-inventory.mjs`):
+How the generator worked:
 
 - **Routes** come from parsing `ui/src/App.tsx`, including nested routes, `.map()`-generated routes, flag
   conditions and gate wrappers. Only the streamlined shell (the default) is analyzed; production-shell-only
