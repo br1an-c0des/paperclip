@@ -3,6 +3,7 @@ import { DIRECTORY_TOOLS } from "./directory.js";
 import { DOCUMENT_TOOLS } from "./documents.js";
 import { LABEL_TOOLS } from "./labels.js";
 import { REQUEST_TOOLS } from "./requests.js";
+import { createRunTools } from "./run.js";
 import { TASK_TOOLS } from "./tasks.js";
 import type { PaperclipTool } from "./types.js";
 
@@ -14,6 +15,11 @@ export interface CatalogDeps {
 }
 
 /** Every tool the Paperclip MCP serves, before filtering for a caller. */
-export function createPaperclipCatalog(_deps: CatalogDeps): readonly PaperclipTool[] {
-  return [...TASK_TOOLS, ...DOCUMENT_TOOLS, ...LABEL_TOOLS, ...DIRECTORY_TOOLS, ...REQUEST_TOOLS];
+export function createPaperclipCatalog(deps: CatalogDeps): readonly PaperclipTool[] {
+  const catalog: PaperclipTool[] = [];
+  catalog.push(
+    ...createRunTools(deps, () => catalog),
+    ...TASK_TOOLS, ...DOCUMENT_TOOLS, ...LABEL_TOOLS, ...DIRECTORY_TOOLS, ...REQUEST_TOOLS,
+  );
+  return catalog;
 }
