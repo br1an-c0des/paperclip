@@ -15,9 +15,9 @@ its own codebase ([fork/hard-fork-plan.md](fork/hard-fork-plan.md)).
   [fork/sync-reports/](fork/sync-reports/), and the soft fork's rules (no upstream code changes,
   `FORK:` markers, fixes sent upstream). Those rules are retired; the history stays for reference.
 - **Upstream pull requests still open from the soft fork:** #17828, #17905 and #20710, on their
-  `fix/*` branches (worktrees in `~/coding/paperclip-fixes/`). They're left open. Their code comes
-  into `main` in hard-fork step 2, and two of them are applied as image patches until then
-  ([FORK-PATCHES.md](FORK-PATCHES.md)).
+  `fix/*` branches (worktrees in `~/coding/paperclip-fixes/`). They're left open. Their code came
+  into `main` in hard-fork step 2; the image patches that carried two of them before then are
+  retired ([FORK-PATCHES.md](FORK-PATCHES.md)).
 
 ## Remotes and branches
 
@@ -99,12 +99,12 @@ Where plugins do fit:
 
 The working instance runs on server1 (details and commands in [deploy/README.md](deploy/README.md)):
 
-- **Image, for now:** `deploy/Dockerfile` starts from upstream's published image for the merge base
-  of `main` and `master` (`ghcr.io/paperclipai/paperclip:sha-<commit>`, which stays
-  `upstream-freeze`), replaces its UI with a `ui-new` build, and applies the two image patches. The
-  server is exactly upstream's at the freeze. **Server source changes don't reach server1 yet.**
-- **Next:** build the image from our source (hard-fork plan step 2), starting from upstream's
-  `Dockerfile` with our layer on top. From then on every server change deploys.
+- **Image, built from source** (since hard-fork step 2): `deploy/deploy.sh` builds the repo's root
+  `Dockerfile` (upstream's, target `production`) into `paperclip-core:<commit>`, and
+  `deploy/Dockerfile` builds on that, replacing its UI with a `ui-new` build. Every change on `main`
+  reaches server1 at its next deploy. No upstream image and no image patches are involved.
+- **Optionally, later:** a GitHub Actions workflow that builds the image and publishes it to
+  `ghcr.io/br1an-c0des/paperclip`, so server1 only pulls.
 - **Stack:** `deploy/docker-compose.yml` runs Postgres + Paperclip with bind mounts under
   `PAPERCLIP_DATA_ROOT`. Paperclip listens on loopback, behind `tailscale serve`.
 - **Before a deploy that adds a migration,** back up the database: migrations don't run backwards.
@@ -132,6 +132,6 @@ bind-mounted from `<PAPERCLIP_DATA_ROOT>/home`. Everything is visible on the hos
 
 ## Open items
 
-- Build the image from source (hard-fork step 2), optionally with a GitHub Actions workflow that
-  publishes it to `ghcr.io/br1an-c0des/paperclip` so server1 only pulls.
+- Optionally, a GitHub Actions workflow that builds the image and publishes it to
+  `ghcr.io/br1an-c0des/paperclip`, so server1 only pulls instead of building.
 - Agent git push / PR authentication inside the container (see above).

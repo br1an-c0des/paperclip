@@ -1,25 +1,25 @@
 # syntax=docker/dockerfile:1.20
 #
-# Fork image: upstream's published Paperclip image with the ui-new SolidJS UI
-# in place of the React UI. Nothing upstream builds is rebuilt here, so the
-# Rust runner, agent CLIs and server stay as upstream shipped them, apart from
-# the temporary patches in deploy/patches/ (see the end of this file).
+# Fork image: the core image built from this repo's root Dockerfile (target
+# `production`: server, Paperclip Runner, agent CLIs) with the ui-new SolidJS
+# UI in place of the React UI.
 #
-# UPSTREAM_SHA is the upstream commit whose server image this fork builds on;
-# deploy/deploy.sh resolves it from the last upstream commit merged into this
-# branch. Build context is the repo root:
+# BASE_IMAGE is that core image, paperclip-core:<commit>, which
+# deploy/deploy.sh builds first. Build context is the repo root:
 #
-#   docker build -f deploy/Dockerfile --build-arg UPSTREAM_SHA=<sha> \
-#     --build-arg PAPERCLIP_UI_COMMIT=$(git rev-parse HEAD) .
+#   docker build --target production -t paperclip-core:<commit> .
+#   docker build -f deploy/Dockerfile --build-arg BASE_IMAGE=paperclip-core:<commit> \
+#     --build-arg PAPERCLIP_UI_COMMIT=<commit> .
 
 # The placeholder makes a build without deploy.sh fail with a readable
-# "sha-missing-run-deploy-sh: not found" instead of an invalid-reference error.
-ARG UPSTREAM_SHA=missing-run-deploy-sh
+# "paperclip-core-missing-run-deploy-sh: not found" instead of an
+# invalid-reference error.
+ARG BASE_IMAGE=paperclip-core-missing-run-deploy-sh
 
 FROM node:24-trixie-slim AS ui
 # The fork commit being built, shown under You in the nav. The build context
-# has no .git (upstream's .dockerignore), so deploy/deploy.sh passes it; a
-# build without it shows "ui unknown".
+# has no .git (the root .dockerignore), so deploy/deploy.sh passes it; a build
+# without it shows "ui unknown".
 ARG PAPERCLIP_UI_COMMIT=""
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
     PNPM_STORE_DIR=/pnpm/store \
@@ -43,20 +43,14 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
   && test -f ui-new/dist/sw.js \
   && ! grep -q "__PAPERCLIP_BUILD_ID__" ui-new/dist/sw.js
 
-FROM ghcr.io/paperclipai/paperclip:sha-${UPSTREAM_SHA}
+FROM ${BASE_IMAGE}
+# The server reports this as its commit in /api/health (server/src/build-commit.ts
+# reads the variable first). deploy.sh builds the core image without
+# PAPERCLIP_BUILD_COMMIT, which would also build the remote provider pack, so
+# the commit is set here; it's the same commit the core image was built from.
+ARG PAPERCLIP_UI_COMMIT=""
+ENV PAPERCLIP_BUILD_COMMIT=${PAPERCLIP_UI_COMMIT}
 # The server serves the first of server/ui-dist and ui/dist that has an
 # index.html (server/src/app.ts), so clear both and install ui-new as ui/dist.
 RUN rm -rf /app/server/ui-dist /app/ui/dist
 COPY --from=ui --chown=node:node /app/ui-new/dist /app/ui/dist
-
-# Temporary fixes to upstream's built server, each until a published image has
-# the upstream PR. Each script skips code that already has upstream's fix and
-# fails the build if the code it patches has changed. See FORK-PATCHES.md.
-# FORK: deploy-runner-provider-authority (PR #20710): lets Claude and Codex
-#   agents on the Paperclip Runner pass verification in this image.
-# FORK: deploy-runner-libc-probe (PR #17905): detects glibc reliably at startup,
-#   so the server offers the Paperclip Runner at all.
-COPY deploy/patches/ /tmp/fork-patches/
-RUN node /tmp/fork-patches/runner-provider-authority.mjs \
-  && node /tmp/fork-patches/runner-libc-probe.mjs \
-  && rm -rf /tmp/fork-patches
