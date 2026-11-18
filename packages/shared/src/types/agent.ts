@@ -18,6 +18,7 @@ import type {
 import type { AgentOrgChainHealth } from "../agent-eligibility.js";
 import type { AgentApiKeyScope } from "../validators/agent.js";
 import type { AgentInteractionPermissions } from "../agent-interaction-permissions.js";
+import type { AgentAccess } from "../agent-access.js";
 
 export interface AgentPermissions extends Record<string, unknown> {
   canCreateAgents: boolean;
@@ -25,6 +26,7 @@ export interface AgentPermissions extends Record<string, unknown> {
   trustPreset?: TrustPreset;
   authorizationPolicy?: TrustAuthorizationPolicy;
   interactions?: AgentInteractionPermissions;
+  access?: AgentAccess;
 }
 
 export interface AgentProjectAccess {

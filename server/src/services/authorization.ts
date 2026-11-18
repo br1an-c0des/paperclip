@@ -27,6 +27,7 @@ import {
   userInboxAgentPolicies,
 } from "@paperclipai/db";
 import type {
+  AgentAccessAction,
   AgentApiKeyScope,
   InboxAgentPolicyMode,
   PermissionKey,
@@ -36,6 +37,7 @@ import type {
 } from "@paperclipai/shared";
 import {
   LOW_TRUST_REVIEW_PRESET,
+  PERMISSION_KEYS,
   extractAgentMentionIds,
   trustPresetSchema,
   lowTrustBoundarySchema,
@@ -95,6 +97,7 @@ export type AuthorizationActor =
 export type AuthorizationAction =
   | PermissionKey
   | ConnectionManagementAction
+  | AgentAccessAction
   | "agent_config:read"
   | "agent_config:update"
   | "agent_instructions:update"
@@ -194,6 +197,18 @@ function companyIdForResource(resource: AuthorizationResource) {
 function plainAuthorizationActionPhrase(action: AuthorizationAction): string {
   switch (action) {
     case "tasks:assign": return "assign this task";
+    case "tasks:read": return "view tasks";
+    case "tasks:comment": return "comment on this task";
+    case "tasks:update_own": return "change its own tasks";
+    case "tasks:create": return "create tasks";
+    case "requests:create": return "send requests to the board";
+    case "tasks:update_any": return "change tasks it doesn't own";
+    case "labels:manage": return "manage labels";
+    case "projects:manage": return "create or change projects";
+    case "agents:configure": return "configure agents";
+    case "agents:create": return "hire agents";
+    case "api:raw": return "call the REST API directly";
+    case "tasks:delete": return "delete this task";
     case "issue:mutate": return "change this task";
     case "issue:comment": return "comment on this task";
     case "issue:read": return "view this task";
@@ -262,7 +277,11 @@ function permissionForAction(action: AuthorizationAction): PermissionKey | null 
     return null;
   }
   if (action === "issue:comment" || action === "issue:mutate") return null;
-  return action;
+  return isPermissionKey(action) ? action : null;
+}
+
+function isPermissionKey(action: AuthorizationAction): action is PermissionKey {
+  return (PERMISSION_KEYS as readonly string[]).includes(action);
 }
 
 function canCreateAgentsLegacy(agent: { role: string; permissions: unknown }) {
