@@ -67,7 +67,7 @@ pnpm via `corepack pnpm`, bash + `flock` for the benchmark.
 - [x] Commit this plan, `fork/test-suite-audit/bench.sh`, `bench-set.txt` and bug-list entry 40.
 - [x] Run the baseline: `fork/test-suite-audit/bench.sh baseline` (current config, one file at a
   time), written to `fork/test-suite-audit/results-baseline.md`.
-- [ ] Re-run the 4 failing files from entry 40 one at a time. Record whether each fails alone.
+- [x] Re-run the 4 failing files from entry 40 one at a time. Record whether each fails alone.
 - [ ] Spawn the agents the user approved.
 
 ---

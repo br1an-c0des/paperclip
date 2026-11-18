@@ -635,7 +635,19 @@ printed its failure summary, so the reasons weren't captured.
 - **Dormant (native runtime):** `retained-provider-pack-source.test.ts` (6),
   `heartbeat-native-restart-suspension.test.ts` (2; also failed in step 4a's overloaded run),
   `native-session-resume.test.ts` (1).
-- **Next:** re-run each file alone to see whether it fails on its own or only after other files in
-  the same run. A real failure in the core file gets a fix; the dormant ones are skipped with a note
-  (hard-fork step 3) unless step 3a moves their suites out of the default run anyway.
+- **Re-run alone (2026-11-18):** all four fail the same way on their own, so it isn't interference
+  from other files.
+  - `legacy-controller-lease.test.ts`: in "keeps the run and lease of a live earlier-boot
+    controller", the controller is the test process itself (its PID, its process-space hash and
+    `currentProcessStartedAtMs()`), so it really is alive. Recovery still marks the run
+    `failed` / `process_lost`. The expired-lease case fails the same way. **Likely cause:** the
+    liveness check's process-start-time comparison disagrees on this host (WSL), so a live
+    controller looks dead. If the same thing can happen in production, recovery fails live
+    `claude_local` runs. Check how `currentProcessStartedAtMs` is computed and compared before
+    deciding.
+  - The three native-runtime files fail on Runner transport (`runner_remote_provider_archive_transport_unavailable`,
+    `current_directory_fallback_forbidden`), a missing `authority-epochs` directory and native
+    finalization: environment and dormant code.
+- **Next:** the core file gets a fix once the user signs off. The dormant ones are skipped with a note
+  (hard-fork step 3), unless step 3a moves their suites out of the default run anyway.
 
