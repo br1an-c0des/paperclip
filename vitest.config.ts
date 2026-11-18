@@ -4,6 +4,11 @@ import { stalledFileReporterEnabled } from "./scripts/ci/stalled-file-reporter.m
 
 export default defineConfig({
   test: {
+    // Persist transformed modules across runs (node_modules/.vitest-cache); keys hash each
+    // module's source and the config. Projects with their own config file don't inherit this:
+    // server/vitest.config.ts sets it itself, and `--fsModuleCache` on the command line turns it
+    // on for every project.
+    fsModuleCache: true,
     reporters: [...configDefaults.reporters,
       ...(process.env.GITHUB_ACTIONS === "true"
         ? ["./scripts/ci/test-timing-reporter.mjs", "./scripts/ci/oversized-test-files.mjs"] : []),

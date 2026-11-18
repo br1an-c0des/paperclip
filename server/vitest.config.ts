@@ -1,6 +1,40 @@
+import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
+
+const serverRoot = path.dirname(fileURLToPath(import.meta.url));
+const include = ["src/**/*.test.ts", "scripts/**/*.test.mjs"];
+
+// The server's test files run in two projects (see fork/test-suite-audit/results-overhead.md):
+//
+// - `shared` (`isolate: false`): one worker process runs many files one after another, so the
+//   server's module graph (~4 s to evaluate) loads once per worker instead of once per file.
+// - `isolated` (`isolate: true`): a fresh process per file, as before.
+//
+// A file goes to `isolated` when it replaces modules. A module mocked in one file stays mocked,
+// through every module that imported it, for the files that run after it in the same worker, and
+// a file's own mock doesn't reach modules an earlier file already loaded. These calls mark it:
+const MODULE_REPLACEMENT =
+  /\bvi\s*\.\s*(?:mock|doMock|unmock|doUnmock|resetModules|importActual|importMock|hoisted)\s*\(/;
+
+// Files without those calls that still fail when they share a worker with other files. Paths are
+// relative to server/.
+const ISOLATED_BY_NAME = new Set<string>([]);
+
+function serverTestFiles() {
+  return fs
+    .globSync(include, { cwd: serverRoot, exclude: (name) => path.basename(name) === "node_modules" })
+    .map((file) => file.split(path.sep).join("/"))
+    .sort();
+}
+
+export const isolatedTestFiles = serverTestFiles().filter(
+  (file) =>
+    ISOLATED_BY_NAME.has(file) ||
+    MODULE_REPLACEMENT.test(fs.readFileSync(path.join(serverRoot, file), "utf8")),
+);
 
 export default defineConfig({
   resolve: {
@@ -21,7 +55,6 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts", "scripts/**/*.test.mjs"],
     // Each server suite boots + tears down its own embedded Postgres in
     // beforeAll/afterAll. Under the loaded serial shard (maxWorkers=1) the
     // graceful shutdown can occasionally cross vitest's default 10s hookTimeout,
@@ -40,7 +73,9 @@ export default defineConfig({
     // headroom; 15s is far above the observed module-load cost yet still
     // catches a genuinely hung test well inside the 20 minute job limit.
     testTimeout: 15000,
-    isolate: true,
+    // Persist transformed modules across runs (node_modules/.vitest-cache at the workspace root).
+    // Keys hash each module's source and the config, so an edited file is re-transformed.
+    fsModuleCache: true,
     maxConcurrency: 1,
     maxWorkers: 1,
     pool: "forks",
@@ -52,5 +87,26 @@ export default defineConfig({
       hooks: "list",
     },
     setupFiles: ["./src/__tests__/setup-supertest.ts"],
+    // Run from the repo root these are `@paperclipai/server (shared)` and
+    // `@paperclipai/server (isolated)`; `--project @paperclipai/server` selects both.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "shared",
+          include,
+          exclude: [...configDefaults.exclude, ...isolatedTestFiles],
+          isolate: false,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "isolated",
+          include: isolatedTestFiles,
+          isolate: true,
+        },
+      },
+    ],
   },
 });
