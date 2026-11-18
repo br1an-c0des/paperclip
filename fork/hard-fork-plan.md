@@ -269,8 +269,11 @@ Nothing here changes code, and all of it can be undone.
 
 - Fetch and merge the upstream pull requests from step 0
   (`git fetch upstream pull/<n>/head:upstream-pr-<n>`), including our own submitted ones (#17828,
-  #17905 and the one for upstream-fixes entry 28).
-- Replace the image patches in `deploy/patches/` with the same changes in source.
+  #17905 and the one for upstream-fixes entry 28). **Ours: done 2026-11-17** (#17905 was already in
+  `main`; #17828 and #20710 cherry-picked). Upstream's others: surveyed in
+  [upstream-open-prs.md](upstream-open-prs.md), to take through the `upstream-watch` take stage.
+- Replace the image patches in `deploy/patches/` with the same changes in source, and build the image
+  from source (see [Deployment](#deployment)).
 - Turn [upstream-fixes.md](upstream-fixes.md) into the fork's own bug list. Many entries become
   plain fixes, and the ones about the Runner, other harnesses or Windows go away with step 3.
 
@@ -401,7 +404,7 @@ in whatever order matters most ([The build plan after the hard fork](#the-build-
 | 0. Check before freezing | Freeze taken first, on 2026-11-17. The legacy-runner switch on server1 is the user's to make (step 0, item 2); the run-path check and the list of upstream pull requests to take are open. |
 | 1. Freeze and reset the rules | Done 2026-11-17: tag `upstream-freeze`, `main`, the rules in CLAUDE.md, FORK.md and FORK-PATCHES.md, the `upstream-watch` skill replacing `upstream-sync` and `upstream-fix`. |
 | Repo map and `claude_local` trace | Done 2026-11-17: [repo-map.md](repo-map.md) (ours, shared core, dormant, the seams, tests) and [claude-local-run.md](claude-local-run.md) (one run from wake to finish, both engines, with the change points for steps 4 and 5). |
-| 2. Take the fixes already written | Not started. Until then the deployment keeps upstream's image with `ui-new` and the two image patches. |
+| 2. Take the fixes already written | In progress. Our three pull requests are in `main`; the image builds from source (no patches) on `deploy/build-from-source`, not yet deployed; upstream's open pull requests surveyed in [upstream-open-prs.md](upstream-open-prs.md), picks pending. |
 | 3. Leave unused code | Ongoing, as decided. |
 | 4–7 | Not started. |
 
@@ -473,15 +476,15 @@ ask the server for what it needs instead of designing around gaps. Many entries 
 
 ## Deployment
 
-Today `deploy/Dockerfile` starts from upstream's published image and swaps in `ui-new`, and
-`deploy/patches/` edits the compiled server. After the freeze:
+Until step 2, `deploy/Dockerfile` started from upstream's published image and swapped in `ui-new`,
+and `deploy/patches/` edited the compiled server. Since step 2:
 
-- **Build from source,** from the first server change (step 2 at the latest). Start from upstream's
-  `Dockerfile` with our layer on top. It's slower because of the Rust runner and the agent CLIs,
-  which stay while the code is kept (step 3). Until then `deploy.sh` keeps using upstream's image
-  for `upstream-freeze` (the merge base of `main` and `master`), so server source changes and
-  cherry-picks don't reach server1 yet.
-- **Image patches become source changes** (step 2).
+- **Built from source:** `deploy/deploy.sh` builds the root `Dockerfile` (`--target production`) as
+  `paperclip-core:<commit>`, then `deploy/Dockerfile` swaps in `ui-new`. A cold build takes about
+  9 minutes on the desktop (Rust runner, agent CLIs), a warm one about 2. The remote provider pack
+  isn't built, so the image is about 6 GB smaller than upstream's. See
+  [deploy/README.md](../deploy/README.md).
+- **Image patches became source changes** (step 2); `FORK-PATCHES.md` is retired.
 - **Optionally, a GitHub Actions workflow** builds the image on pushes to the main branch and
   publishes it to `ghcr.io/br1an-c0des/paperclip`, so server1 only pulls.
 - **Back up the database before every deploy that adds a migration.** Migrations don't run
@@ -528,7 +531,9 @@ Still open:
    ([claude-local-run.md](claude-local-run.md)). Decide before step 4.
 1. **Where agent personas live:** Paperclip's per-agent `AGENTS.md`, or role files in the repo
    (step 4).
-2. **Which open upstream pull requests to take** (step 2), from step 0's list.
+2. **Which open upstream pull requests to take** (step 2): surveyed 2026-11-17 in
+   [upstream-open-prs.md](upstream-open-prs.md) (25 to take now, 7 to port by hand); the picks are
+   the user's.
 3. **The order of steps 4 to 7**, if something else matters more day to day.
 4. **Where the upstream watch runs** once it's past the by-hand stage: a scheduled Claude Code run,
    or a recurring task in our own Paperclip instance.
@@ -539,7 +544,7 @@ Still open:
 | --- | --- |
 | [CLAUDE.md](../CLAUDE.md) | Purpose, intentions and ground rules for a hard fork; sync commands and gotchas dropped |
 | [FORK.md](../FORK.md) | A short "where this came from" page: the freeze point, the `master` mirror and `upstream` remote, the upstream watch, deployment |
-| [FORK-PATCHES.md](../FORK-PATCHES.md) | Code entries retired; the two image patches stay until step 2 |
+| [FORK-PATCHES.md](../FORK-PATCHES.md) | Code entries retired; the two image patches stayed until step 2, then it was retired |
 | [upstream-fixes.md](upstream-fixes.md) | The fork's bug list |
 | [upstream-watch.md](upstream-watch.md) | New: the watch's ledger |
 | `.claude/skills/upstream-sync`, `.claude/skills/upstream-fix` | Replaced by `.claude/skills/upstream-watch` |

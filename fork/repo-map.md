@@ -61,7 +61,7 @@ A "?" after a label means a borderline call; the note says why.
 | [skills/](../skills/) | Bundled runtime skills. `paperclip` (809-line SKILL.md + references), `paperclip-board`, `paperclip-create-agent`, `paperclip-converting-plans-to-tasks`, `para-memory-files` are copied into every company's skill library; `agentmail`, `slack`, `complain`, `suggestion-box` are not core | **Ours** (the five core skills); rest **Dormant** |
 | [tests/](../tests/) | Cross-package suites: Playwright `e2e/` (old UI), `runner-e2e/`, `runner-acceptance/`, `restart-chaos/`, `release-smoke/`, `perf/`, `storybook-visual/`… (~2,200 files) | Mostly **Dormant** ([§5](#5-tests)) |
 | [scripts/](../scripts/) | Repo tooling: `run-vitest-stable.mjs`, `local-verify.mjs` (`pnpm verify`), `agent-preflight.mjs`, migration/release/check scripts (284 files, ~52k lines) | **Shared core** (dev tooling); release scripts dormant |
-| [deploy/](../deploy/README.md) | Our server1 deployment: Dockerfile on upstream's image + `ui-new`, Compose, `deploy.sh`, image patches | **Ours** |
+| [deploy/](../deploy/README.md) | Our server1 deployment: `deploy.sh` builds the root Dockerfile from source, then `deploy/Dockerfile` adds `ui-new`; Compose | **Ours** |
 | [fork/](.) | Hard-fork docs: [plan](hard-fork-plan.md), [bug list](upstream-fixes.md), [upstream watch ledger](upstream-watch.md), sync reports, this map | **Ours** |
 | [Dockerfile](../Dockerfile) | Upstream's full image build (builds the Rust Runner and agent CLIs) | **Shared core?** Step 2 starts from it |
 | [docker/](../docker/) | Upstream's other images and smoke stacks (runner image, daytona, openclaw, hermes, quadlet, ECS) | **Dormant** |

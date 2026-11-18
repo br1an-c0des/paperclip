@@ -191,12 +191,9 @@ plugin SDK link on Windows, is entry 4.
 - **Evidence:** reproduced on this machine (WSL2 Ubuntu, x64, glibc 2.39) by importing
   `server/src/app.ts` (two of two runs `unknown`) and by a minimal script: a `getconf` call blocked
   for 1.2 s or more returns `''` with no error, and under 1 s returns `glibc 2.39`.
-- **Fork workaround to remove once merged:** carried as the temporary fork patch
-  [`runner-libc-probe-sync`](../FORK-PATCHES.md#runner-libc-probe-sync) since 2026-10-27; with it the
-  server offers Paperclip Runner here (`supportedRunners: ["paperclip", "legacy"]`). The Docker
-  deployment isn't built from source, so since 2026-11-15 its image carries the same fix as
-  [`deploy-runner-libc-probe`](../FORK-PATCHES.md#deploy-runner-libc-probe): without it, 1 of 3
-  cold starts of the image cached `libc: "unknown"`.
+- **Fixed in `main`:** carried as a fork patch from 2026-10-27 (in source) and 2026-11-15 (in the
+  deployment image, where 1 of 3 cold starts cached `libc: "unknown"` without it). Since hard-fork
+  step 2 the change is plain source and the image is built from it.
 - **Built 2026-10-27:** `execFileSync` with the same timeout, kill signal and output limit, and no
   top-level await; a test that blocks the event loop for 1.2 s after a real probe; `doc/DEVELOPING.md`
   updated. Targeted tests pass (16, plus 221 in the probe's consumers) and the server typechecks.
@@ -457,11 +454,8 @@ was closed by an automated pipeline as already fixed, which it isn't.
   `createAcpxPackageJsonResolver("/app/server", "/app/server/package.json")("@agentclientprotocol/claude-agent-acp")`
   throws this error, and with root `/app` it resolves. A commenter on #18557 confirms it on `master`
   at `358977454b` (2026-11-10).
-- **Fork workaround:** since 2026-11-15 the deployment image carries the fix:
-  [`deploy-runner-provider-authority`](../FORK-PATCHES.md#deploy-runner-provider-authority) patches
-  the compiled function at image build. Before that, Claude agents on the deployment ran on the
-  legacy runner (with `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` as a company secret if the
-  AI connection wasn't enough).
+- **Fixed in `main`** (`6b25a4fe5`, 2026-11-17). From 2026-11-15 until hard-fork step 2 the
+  deployment image carried it as a patch to the compiled function.
 - **Built 2026-11-10:** commit `96f6f4fd4` off `master` at `69c69e4c2`. The rule from #15912 moves
   into `sourceWorkspaceProviderRoot` in `installed-provider-authority.ts`;
   `resolveInstalledProviderAuthority` uses it, and runnerd's `acpxProviderPackageAuthority` calls
@@ -472,9 +466,7 @@ was closed by an automated pipeline as already fixed, which it isn't.
   `sha-d0057ee` container, the full `verifyQualifiedAcpxInstallation` passes for Claude and Codex
   with the new root and fails with the old one. No fixed image was built. The PR draft is
   `PR_DESCRIPTION.md` in `~/coding/paperclip-fixes/runner-docker-provider-authority`.
-- **Submitted 2026-11-10** as [#20710](https://github.com/paperclipai/paperclip/pull/20710). Once
-  merged and in a published image: sync, redeploy, check the build log says the patch found
-  upstream's fix, then remove the patch (see its FORK-PATCHES entry).
+- **Submitted 2026-11-10** as [#20710](https://github.com/paperclipai/paperclip/pull/20710), left open after the hard fork.
 
 ### 29. Don't report the agent JWT secret missing when `BETTER_AUTH_SECRET` covers it
 
