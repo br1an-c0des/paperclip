@@ -518,10 +518,25 @@ tests.
 
 - **Agent 4, requests and outside connections:** `permission_request` creation on a requestable
   denial and replay through a one-use temporary grant (spec section 7); the public MCP resolving
-  OAuth grants to `oauth_person` / `oauth_agent` callers and serving `PAPERCLIP_CATALOG`; carrying
+  OAuth grants to `oauth_person` / `oauth_agent` callers and serving the catalog
+  (`createPaperclipCatalog(catalogDeps(db))`; there's no `PAPERCLIP_CATALOG` constant); carrying
   over every public tool (spec section 4); "act as" and level on grants and the consent screen;
-  retiring `capabilities.ts`/`expanded-capabilities.ts` lists.
+  retiring `capabilities.ts`/`expanded-capabilities.ts` lists. Also: refuse direct creation of
+  `permission_request` approvals through `POST` approvals (today `createApprovalSchema` accepts the
+  type from anyone who can create approvals); and make sure the public MCP's in-process dispatch
+  passes through the agent route policy, as the catalog's does.
 - **Agent 5, `ui-new`:** the Permissions section (level and overrides), outside-connection settings,
-  the Inbox permission request card (spec section 8).
+  the Inbox permission request card (spec section 8), a label for `permission_request` in the
+  approval label maps (`ui-new/src/inbox/row-model.ts:110`, `ui-new/src/requests/request-model.ts:617`),
+  and **renaming and recolouring labels** through `PATCH /labels/:labelId` (added by agent 1 on the
+  user's request, 2026-11-17).
 - **Project manager:** flip `PAPERCLIP_UNIFIED_RUN_MCP` on by default, retire
   `/api/mcp/project-tools`, the local-instance run check, docs.
+
+Carried over from wave 1, to fold into the spec when wave 2 is planned:
+
+- `paperclip_search_api` needs `api:raw` (not `tasks:read`): it only lists what `call_api` can
+  reach. The run tools and `call_api` are not requestable.
+- `call_api` operation ids are `"METHOD /path"`; the OpenAPI document has no `operationId`s.
+- After agent 1 merges, agent 2 adds rename and recolour to `paperclip_manage_labels` (it creates
+  and deletes only until `PATCH /labels/:labelId` exists).
