@@ -2976,6 +2976,7 @@ export type { BoardBootstrap, BoardBootstrapSession } from "./types/board-bootst
 export { readBoardBootstrap } from "./board-bootstrap.js";
 export * from "./provider-rate-limits.js";
 export * from "./agent-interaction-permissions.js";
+export * from "./agent-access.js";
 export * from "./run-failure-cause.js";
 export {
   TASK_IDENTITY_CHANGED_FIELD,
