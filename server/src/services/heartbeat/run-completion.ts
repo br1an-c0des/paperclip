@@ -78,6 +78,8 @@ import type { createHeartbeatRunState, getAdapterSessionCodec } from "./run-stat
 import type { EffectiveRunSessionConfigMetadata } from "./workspaces.js";
 import type { Db, agents } from "@paperclipai/db";
 import { setupCommandFailureResultJson } from "../workspace-setup-command-failure.js";
+import { readRunDisposition, recordRunDisposition } from "./run-disposition.js";
+import type { RunDisposition } from "@paperclipai/shared";
 
 type Run = typeof heartbeatRuns.$inferSelect;
 type Agent = typeof agents.$inferSelect;
@@ -202,6 +204,31 @@ function nonRetryablePreflightFailureCode(error: unknown): string | null {
 }
 
 export const MAX_TURN_CONTINUATION_WAKE_REASON = "max_turns_continuation_retry";
+
+/** Task statuses that count as a run's disposition when the run leaves its task in one of them. */
+const TASK_STATUSES_COVERING_A_RUN = new Set(["done", "in_review", "blocked"]);
+
+/**
+ * The run's final `result_json` is written whole, so a disposition recorded during the run
+ * (`paperclip_finish`, `paperclip_block`, `paperclip_report_progress`) has to be carried over.
+ */
+function carryRecordedRunDisposition(
+  previous: Record<string, unknown> | null | undefined,
+  next: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  const recorded = previous?.paperclipDisposition;
+  if (recorded === undefined || recorded === null) return next;
+  if (next && next.paperclipDisposition !== undefined) return next;
+  return { ...(next ?? {}), paperclipDisposition: recorded };
+}
+
+function describeRunDisposition(disposition: RunDisposition | null): string {
+  if (!disposition) {
+    return "Run disposition: none recorded (no disposition); missing-disposition recovery decides the next step";
+  }
+  if (disposition.kind === "task_state") return `Run disposition: task set to ${disposition.taskStatus ?? "a closed status"}`;
+  return `Run disposition: ${disposition.kind}${disposition.tool ? ` (${disposition.tool})` : ""}`;
+}
 
 // Build the configuration-incomplete result payload for a workspace base ref
 // that never resolved to a commit. The setup catch maps this to errorCode
@@ -437,6 +464,53 @@ export function createHeartbeatRunCompletion(db: Db, dependencies: HeartbeatRunC
     failedProcessRunCancellations,
   } = dependencies;
 
+  /**
+   * The completion rule for a task-bound legacy run. A run is covered when it recorded a disposition
+   * (`paperclip_finish`, `paperclip_block`, `paperclip_report_progress` with `continue: true`) or
+   * left its task done, in review or blocked by any route; the latter is recorded here as a
+   * `task_state` disposition. A run with none is left to missing-disposition recovery
+   * (`reconcileLegacyContinuation`), unchanged. Exempt: runs without a task, chat turns, and wakes
+   * on a task that was already done or cancelled. The run's events get one line naming the outcome.
+   */
+  async function settleRunDisposition(
+    run: Run,
+    input: { issueId: string | null; statusAtWake: string | null; outcome: RunSessionOutcome; recorded: RunDisposition | null },
+  ) {
+    if (!input.issueId) return;
+    if (parseObject(run.contextSnapshot).conversationMode === true) return;
+    if (input.statusAtWake === "done" || input.statusAtWake === "cancelled") return;
+    let disposition = input.recorded;
+    if (!disposition) {
+      const current = await db
+        .select({ status: issues.status })
+        .from(issues)
+        .where(and(eq(issues.id, input.issueId), eq(issues.companyId, run.companyId)))
+        .then((rows) => rows[0] ?? null);
+      if (current && TASK_STATUSES_COVERING_A_RUN.has(current.status)) {
+        await recordRunDisposition(db, run.id, {
+          kind: "task_state",
+          at: new Date().toISOString(),
+          via: "task_status",
+          taskStatus: current.status,
+        });
+        // The first disposition wins, so read back whichever one was kept.
+        disposition = await db
+          .select({ resultJson: heartbeatRuns.resultJson })
+          .from(heartbeatRuns)
+          .where(eq(heartbeatRuns.id, run.id))
+          .then((rows) => readRunDisposition({ resultJson: rows[0]?.resultJson ?? null }));
+      }
+    }
+    if (!disposition && input.outcome !== "succeeded") return;
+    await appendRunEvent(run, {
+      eventType: "run.disposition",
+      stream: "system",
+      level: disposition ? "info" : "warn",
+      message: describeRunDisposition(disposition),
+      payload: { disposition },
+    });
+  }
+
   async function completeRun(input: CompleteHeartbeatRunInput) {
     const { run, agent, issueId, issueRef, signal, output, session, readFailureReportSecrets, adapterResult, sessionCodec, taskSessionForRun, sessionCompaction,
       configFreshnessResultMetadata, runLedgerScope, currentUserRedactionOptions,
@@ -667,7 +741,7 @@ export function createHeartbeatRunCompletion(db: Db, dependencies: HeartbeatRunC
       ),
     };
 
-    const persistedResultJson = cancellationResultJson(latestRun ?? run, outcome, mergeHeartbeatRunResultJson(
+    const persistedResultJson = carryRecordedRunDisposition(latestRun?.resultJson, cancellationResultJson(latestRun ?? run, outcome, mergeHeartbeatRunResultJson(
       mergeRunStopMetadataForAgent(agent, outcome, {
         resultJson: mergeAdapterRecoveryMetadata({
           resultJson: {
@@ -689,7 +763,7 @@ export function createHeartbeatRunCompletion(db: Db, dependencies: HeartbeatRunC
         errorMessage: runErrorMessage,
       }),
       adapterResult.summary ?? null,
-    ), runErrorCode, runErrorMessage);
+    ), runErrorCode, runErrorMessage));
 
     const ledgerScope = runLedgerScope;
     const finalRunPatch: Partial<typeof heartbeatRuns.$inferInsert> = {
@@ -1036,6 +1110,14 @@ export function createHeartbeatRunCompletion(db: Db, dependencies: HeartbeatRunC
       if (!conversationSettled) {
         await handleIssueReviewPathDisposition(livenessRun);
         if (livenessRun.runtimeMode !== "native") {
+          await settleRunDisposition(livenessRun, {
+            issueId,
+            statusAtWake: issueContext?.status ?? null,
+            outcome,
+            recorded: readRunDisposition({ resultJson: persistedResultJson ?? null }),
+          }).catch((err) => {
+            logger.warn({ err, runId: livenessRun.id }, "Could not settle the run's disposition");
+          });
           await recovery.reconcileLegacyContinuation(livenessRun.id);
         } else {
           await handleRunLivenessContinuation(livenessRun);

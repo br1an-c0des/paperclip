@@ -1,8 +1,15 @@
 import { createHash } from "node:crypto";
+import { readRunDisposition } from "../heartbeat/run-disposition.js";
 
 /** This contract deliberately has no narrative, liveness label or progress count. */
 export interface LegacyContinuationInput {
-  run: { id: string; companyId: string; agentId: string; status: string; runtimeMode?: string | null };
+  run: {
+    id: string; companyId: string; agentId: string; status: string; runtimeMode?: string | null;
+    /** Read for `paperclipDisposition`. */
+    resultJson?: unknown;
+    /** Read for the `paperclipContinuation` count. */
+    contextSnapshot?: unknown;
+  };
   issue: { id: string; companyId: string; status: string; assigneeAgentId: string | null; assigneeUserId?: string | null } | null;
   agent: { id: string; companyId: string; status: string } | null;
   episode: LegacyDispositionEpisode;
@@ -23,6 +30,16 @@ export interface LegacyDispositionEpisode {
   maxAttempts: number;
 }
 export const LEGACY_DISPOSITION_REPAIR_MAX_ATTEMPTS = 2;
+/**
+ * How many runs in a row may end with `paperclip_report_progress` and `continue: true` before the
+ * next one no longer counts as covered and goes to disposition repair like a run with no disposition.
+ */
+export const PAPERCLIP_CONTINUATION_MAX = 10;
+/** The skip reason that asks the caller to schedule the continuation the run asked for. */
+export const CONTINUATION_REQUESTED = "continuation_requested";
+export function readPaperclipContinuationCount(contextSnapshot: unknown) {
+  return count(record(contextSnapshot).paperclipContinuation);
+}
 export const LEGACY_DISPOSITION_REPAIR_INSTRUCTION =
   "The previous task run ended without a recorded disposition or an owned next execution path. " +
   "Re-read the current task state. Use Paperclip tools/API to record completion, a real blocker, " +
@@ -69,6 +86,9 @@ export function decideLegacyContinuation(input: LegacyContinuationInput):
   if (!issue || !agent || issue.companyId !== run.companyId || agent.companyId !== run.companyId || agent.id !== run.agentId) return { kind: "skip", reason: "invalid_binding" };
   if (issue.assigneeAgentId !== run.agentId || issue.assigneeUserId) return { kind: "skip", reason: "owner_changed" };
   if (!["todo", "in_progress"].includes(issue.status)) return { kind: "skip", reason: "recorded_disposition" };
+  // A disposition recorded by a Paperclip tool covers the run even while the task stays open.
+  const disposition = readRunDisposition({ resultJson: record(run.resultJson) });
+  if (disposition && disposition.kind !== "continuing") return { kind: "skip", reason: "recorded_disposition" };
   for (const [blocked, reason] of [
     [gates.stopped, "stopped"], [gates.paused, "paused"],
     [gates.budgetBlocked, "budget_blocked"], [gates.pendingWait, "durable_wait"],
@@ -76,6 +96,9 @@ export function decideLegacyContinuation(input: LegacyContinuationInput):
     [gates.conversation, "conversation"],
     [!gates.agentInvokable || ["paused", "terminated", "pending_approval"].includes(agent.status), "agent_not_invokable"],
   ] as const) if (blocked) return { kind: "skip", reason };
+  if (disposition?.kind === "continuing" && readPaperclipContinuationCount(run.contextSnapshot) < PAPERCLIP_CONTINUATION_MAX) {
+    return { kind: "skip", reason: CONTINUATION_REQUESTED };
+  }
   if (episode.attempt >= episode.maxAttempts) return { kind: "exhausted", attempt: episode.attempt, maxAttempts: episode.maxAttempts };
   const nextAttempt = episode.attempt + 1;
   return {
