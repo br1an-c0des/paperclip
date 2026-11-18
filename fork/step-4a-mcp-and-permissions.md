@@ -1,6 +1,6 @@
 # Step 4a: Paperclip over MCP, with agent permissions
 
-**Status: design, 2026-11-17, awaiting approval; builder check done.** The first half of
+**Status: approved 2026-11-17; wave 1 built on `feat/step-4a` (see [the plan](step-4a-plan.md) and [the handoff](step-4a-handoff.md) for what changed while building).** The first half of
 [hard-fork plan step 4](hard-fork-plan.md#4-make-runs-claude-native). The second half, 4b
 (Claude-native runs: repo working folder, all setting sources, the repo's `.mcp.json` and skills,
 memory), comes after this and gets its own design.

@@ -535,8 +535,10 @@ tests.
 
 ### Wave 1 status (2026-11-17)
 
-**Paused while [step 3a](hard-fork-plan.md#3a-renovate-the-test-suite) (renovating the test suite)
-is current.** The regression runs below wait for the faster suite.
+**Regression runs wait for [step 3a](hard-fork-plan.md#3a-renovate-the-test-suite)** (renovating
+the test suite). Building continues (decided 2026-11-18): agents run typechecks, their own new test
+files one at a time, and `ui-new` unit tests, but no broad server suites. Handed off to a new
+manager session on server1: [step-4a-handoff.md](step-4a-handoff.md).
 
 All four branches are merged into `feat/step-4a`. Each agent's new tests passed. **The regression
 runs were stopped at the user's request** (they're working on the test suite separately), so these
@@ -555,9 +557,10 @@ are still to do before `feat/step-4a` goes to `main`:
 
 Found in wave 1, to settle:
 
-- **New agents that should hire:** agents created after 0491 start at `worker`, so a new CEO can't
-  hire even though `canCreateAgents` defaults to true on create. Needs a rule (open question to the
-  user).
+- **New agents that should hire (decided 2026-11-18, not built yet):** agents created after 0491
+  start at `worker`, so a new CEO couldn't hire. Rule: a new agent with the CEO role starts at
+  `manager` with the `agents:create` override; any new agent created with `canCreateAgents: true`
+  gets the `agents:create` override.
 - **The skill and the switch ship together:** the rewritten `paperclip` skill assumes the
   `paperclip` MCP server, which is off by default (`PAPERCLIP_UNIFIED_RUN_MCP`). Flip the default
   before `feat/step-4a` reaches `main`.
