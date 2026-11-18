@@ -267,18 +267,21 @@ include patterns; `area-review.md` totals match the audit within about 5%.
 - Review and merge C, then B, then A (A's default worker count may move with B's isolation
   setting). Benchmark the combination, then run the whole thorough tier once with `pnpm test` and
   put the real number in the audit.
-- Take `area-review.md` to the user, area by area.
+- Take `area-review.md` to the user, area by area. **Done 2026-11-18** (its Decisions section).
 - Step 4a: run its regression set with the new runner, and merge `feat/step-4a` before round 2
   starts editing test files. Its branches change many route-test fixtures.
 
 ## Round 2 (proposed after the review)
 
-- **Tiers and removals:** fill `optIn` in `scripts/test-tiers.json` from the user's decisions, and
-  remove the tests the user approves removing.
+- **Tiers:** fill `optIn` in `scripts/test-tiers.json` from `classification.csv` and the user's
+  decisions ([area-review.md, Decisions](test-suite-audit/area-review.md#decisions-2026-11-18)):
+  dormant areas, the CLI and plugins opt-in; cases and tool access thorough. Nothing is removed.
+- **Splits:** the 9 split files and `heartbeat-process-recovery.test.ts`. Dormant tests move to an
+  opt-in file next to each, and the live-path tests stay in thorough.
 - **Slow core tests:** fake timers or test-sized intervals, from D's list, each one signed off.
 - **CI:** a GitHub Actions workflow that runs the thorough tier on every push to a branch and to
   `main`, sharded if needed. Upstream's 38 workflows are retired, which needs the user's OK because
   it's a large removal.
-- **Large core files:** split them if the thorough tier's parallel run is held up by one file.
+- **Large core files:** split others only if the thorough tier's parallel run is held up by one file.
 - **PM:** write down the workflow (quick before pushing, thorough in CI and before merging into
   `main`, opt-in on demand) in `CLAUDE.md` and the `/pm` briefs.

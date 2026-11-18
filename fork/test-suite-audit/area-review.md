@@ -91,6 +91,24 @@ that undercounts. This review also reads imports and test names, and puts these 
 took **34 minutes measured** here, as 6 shards. It isn't in the profile CSV, so its `local_s` is
 blank. Counting the measured time, dormant suites are about 50% of the server's time.
 
+## Decisions (2026-11-18)
+
+Gone through with the user on 2026-11-18. These override the proposals in the table below where they
+differ.
+
+| Question | Decision |
+| --- | --- |
+| Dormant areas (native runtime, chat channels, Cloud, remote, sandbox, managed, other adapters, voice, connectors, and the rest proposed opt-in) | **Opt-in, files kept.** Nothing is removed; tests go when their subsystem does (hard-fork step 3). |
+| Tool access (69 files) | **Thorough.** Step 4a reworks this area. |
+| Cases (13 files) | **Thorough.** The user uses cases. |
+| CLI (66 files) | **Opt-in.** Not used. |
+| Plugins (38 files: the plugin host's server tests and the plugin SDK) | **Opt-in.** No plugin is used. |
+| The 9 split files | **Split:** dormant tests move to an opt-in file next to each, and the live-path tests stay in thorough. |
+| `heartbeat-process-recovery.test.ts` | **Split** along its `describe` blocks; the native and sandbox blocks go to opt-in. |
+| Slow core tests | **Stay in thorough**, and are fixed in round 2 (fake timers, test-sized intervals), each fix signed off. |
+| When the opt-in tier runs | **Only on demand,** never on a schedule. |
+| Everything else in the table | As proposed. |
+
 ## Areas
 
 Biggest recorded time first. Areas with no recorded time (the packages) are at the end.
