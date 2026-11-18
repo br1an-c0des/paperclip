@@ -3149,8 +3149,21 @@ function renderPaperclipEnvNote(env: Record<string, string>): string {
   ].join("\n");
 }
 
-function renderApiAccessNote(env: Record<string, string>): string {
+/** Paperclip's own MCP server for the run (`PAPERCLIP_UNIFIED_RUN_MCP=1` on the server). */
+function hasPaperclipMcpServer(ctx: AdapterExecutionContext): boolean {
+  return (ctx.runtimeMcp?.getServers() ?? []).some((server) => server.connectionId === "paperclip");
+}
+
+function renderApiAccessNote(env: Record<string, string>, paperclipMcp = false): string {
   if (!env.PAPERCLIP_API_URL || !env.PAPERCLIP_API_KEY) return "";
+  if (paperclipMcp) {
+    return [
+      "Paperclip API access note:",
+      "Work with Paperclip through the `paperclip` MCP server's `paperclip_*` tools, not HTTP requests.",
+      "Start with `paperclip_task_context`; end the run with `paperclip_finish`, `paperclip_block`, or `paperclip_report_progress` with `continue: true`.",
+      "PAPERCLIP_API_KEY is there for scripts that need the REST API.",
+    ].join("\n");
+  }
   const lines = [
     "Paperclip API access note:",
     "Use terminal commands with curl to make Paperclip API requests.",
@@ -3233,7 +3246,7 @@ async function buildPrompt(ctx: AdapterExecutionContext, resumedSession: boolean
       : renderTemplate(promptTemplate, templateData);
   const sessionHandoffNote = asString(context.paperclipSessionHandoffMarkdown, "").trim();
   const paperclipEnvNote = externalChatTurn || resumedSession ? "" : renderPaperclipEnvNote(env);
-  const apiAccessNote = externalChatTurn || resumedSession ? "" : renderApiAccessNote(env);
+  const apiAccessNote = externalChatTurn || resumedSession ? "" : renderApiAccessNote(env, hasPaperclipMcpServer(ctx));
   const prompt = joinPromptSections([
     promptInstructionsPrefix,
     renderedBootstrapPrompt,

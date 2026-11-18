@@ -887,6 +887,25 @@ describe("shared ACPX engine runtime behavior", () => {
     expect(promptMetrics?.runtimeNoteChars).toBeGreaterThan(0);
   });
 
+  it("points to the paperclip MCP tools instead of curl when the run has the paperclip server", async () => {
+    const server = { name: "paperclip", url: "http://127.0.0.1:3100/api/mcp/paperclip", token: "runtime-secret-token", connectionId: "paperclip" };
+    const { meta } = await runExecutor(
+      { agent: "custom", agentCommand: "node ./fake-acp.js" },
+      {
+        authToken: "runtime-secret-token",
+        runtimeMcp: { getServers: () => [server] },
+        context: { taskId: "issue-1", wakeReason: "issue_assigned", paperclipWake: { reason: "issue_assigned", issue: { id: "issue-1", identifier: "TEST-1" } } },
+      },
+    );
+    const prompt = String(meta[0]?.prompt ?? "");
+    expect(prompt).toContain("Paperclip API access note:");
+    expect(prompt).toContain("paperclip_task_context");
+    expect(prompt).toContain("paperclip_finish");
+    expect(prompt).toContain("PAPERCLIP_API_KEY");
+    expect(prompt).not.toContain("curl");
+    expect(prompt).not.toContain("runtime-secret-token");
+  });
+
   it("keeps large continuation history in ACP turns and preserves resume deltas", async () => {
     const root = await makeTempRoot();
     const config = {
