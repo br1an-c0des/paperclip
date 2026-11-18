@@ -359,6 +359,18 @@ Open question: where agent personas live. Either stay with Paperclip's per-agent
 read roles from a folder in the repo (for example `.claude/agents/<role>.md`), so the same roles
 work in an interactive Claude Code session.
 
+Idea, not decided (2026-11-17): **run agents in their own container.** A second Compose service
+(`agents`) holds a small, long-lived supervisor that starts `claude --print` when the server asks,
+writes each run's output to a log file on a shared folder and records its exit code. The server's
+`claude_local` adapter asks it to start or cancel a run, reads the log for live output, and picks
+up running runs again after a restart. Two gains: runs survive server restarts and deploys (only
+`server` is recreated), and agents no longer share the server's container, user, environment and
+data folder (the secrets key, #20040). Limits: agents still call the API mid-run, so a restart
+briefly fails those calls; restarting `agents` or the host still ends runs. Building blocks: the CLI
+engine already runs on SSH execution targets (`adapter-utils/src/execution-target.ts`) and the
+server adopts detached CLI runs after a hot restart. Cheapest to design in while step 4 reworks how
+`claude_local` launches Claude.
+
 ### 5. One prompt builder
 
 Replace the five sources with one builder the fork owns:
