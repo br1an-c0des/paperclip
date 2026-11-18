@@ -42,12 +42,13 @@ set up for one person running Claude agents.
   is historical). Fix them in our tree.
 - **`ui-new` talks to the API** (`/api`, proxied to the server on :3100) and imports types from
   `@paperclipai/shared` with `import type`. When the API lacks something, change the server rather
-  than designing around the gap. `ui/` (the old React UI) isn't deployed; it stays as a reference
-  for how the API is used, and doesn't need to keep up with server changes.
+  than designing around the gap. The old React UI (`ui/`) was removed on 2026-11-17: it's in git at
+  `upstream-freeze` (`git show upstream-freeze:ui/<path>`), and the ui-new inventory docs
+  ([ui-new/docs/inventory/](ui-new/docs/inventory/README.md)) catalogue it.
 - **Deploys** build the image from source: `deploy/deploy.sh` builds the root `Dockerfile`
   (`paperclip-core:<commit>`) and swaps `ui-new` in, so every change on `main` reaches server1 at
-  its next deploy. The root build still runs `vite build` for `ui/`, so `ui/` has to keep building
-  (it isn't type-checked there).
+  its next deploy. The core image doesn't build `ui-new`; `deploy/Dockerfile` builds it and puts it
+  in `ui-new/dist`, where the server serves it from.
 - `pnpm` isn't installed globally on this machine; use `corepack pnpm`.
 - For the repo's conventions (repo map, dev setup, API rules), see `AGENTS.md`. Its pull-request
   template and Paperclip-issue workflow rules are upstream's and don't apply here.
@@ -88,13 +89,12 @@ set up for one person running Claude agents.
 ## Common commands
 
 ```bash
-PAPERCLIP_AGENT_JWT_SECRET=$(openssl rand -hex 32) corepack pnpm dev  # server + old UI on :3100; without the secret (or BETTER_AUTH_SECRET) agent runs get no API key
+PAPERCLIP_AGENT_JWT_SECRET=$(openssl rand -hex 32) corepack pnpm dev  # server (API) on :3100, plus ui-new's last build if there is one; without the secret (or BETTER_AUTH_SECRET) agent runs get no API key
 corepack pnpm --filter @paperclipai/ui-new dev       # new UI on :5174
 corepack pnpm --filter @paperclipai/ui-new exec vite --port 5181 --strictPort  # a second new UI, e.g. for an agent (5181–5184)
 corepack pnpm --filter @paperclipai/ui-new typecheck
 corepack pnpm --filter @paperclipai/ui-new test
 corepack pnpm --filter @paperclipai/ui-new test:e2e   # Playwright smoke suite, mocked API (E2E_LIVE=1: read-only against :3100)
-corepack pnpm --filter @paperclipai/ui-new inventory # regenerate the existing-UI inventory
 corepack pnpm --filter @paperclipai/plugin-sdk build # after install, a cherry-pick, or in a fresh worktree; else the server dies with "does not provide an export named …"
 ssh server1 'cd ~/paperclip && git pull --ff-only && deploy/deploy.sh'   # deploy main to server1 (the real instance)
 ```

@@ -21,7 +21,7 @@ Read the doc that matches your change before you start:
 | Setup, commands, testing, worktrees | `doc/DEVELOPING.md` |
 | Schema, migrations, DB clients | `doc/DATABASE.md` |
 | An Apps catalog connection | `doc/connections/CONNECTOR-PLAYBOOK.md` (the canonical connection authoring runbook) |
-| Anything under `ui/` | `DESIGN.md` |
+| Anything under `ui-new/` | `ui-new/README.md`, `ui-new/docs/design/` |
 
 ### Scoped repository rules
 
@@ -52,7 +52,7 @@ Greptile setup.
 ## 3. Repo Map
 
 - `server/`: Express REST API and orchestration services
-- `ui/`: React + Vite board UI
+- `ui-new/`: SolidJS + Vite board UI (the server serves its build from `ui-new/dist`; the old React UI, `ui/`, was removed and is in git at `upstream-freeze`)
 - `packages/db/`: Drizzle schema, migrations, DB clients
 - `packages/shared/`: shared types, constants, validators, API path constants
 - `packages/adapters/`: agent adapter implementations (Claude, Codex, Cursor, etc.)
@@ -70,7 +70,7 @@ Greptile setup.
 
 ```sh
 node scripts/agent-preflight.mjs   # prepare a new or updated worktree
-pnpm dev                           # API and UI at http://localhost:3100
+pnpm dev                           # API at http://localhost:3100; the UI runs from ui-new (ui-new/README.md)
 ```
 
 Leave `DATABASE_URL` unset to use the embedded database. See "Agent worktree
@@ -87,7 +87,7 @@ preflight", "Start Dev", "Quick Health Checks", and "Database in Dev" in
    - `packages/db` schema and exports
    - `packages/shared` types/constants/validators
    - `server` routes/services
-   - `ui` API clients and pages
+   - `ui-new` API clients and pages
 
 3. **Preserve control-plane invariants.**
    - Single-assignee task model
@@ -160,7 +160,7 @@ pnpm build
 `node scripts/typecheck-low-memory.mjs` instead of `pnpm -r typecheck`. See
 "Typecheck memory" in `doc/test-infrastructure.md`.
 
-### Maps and Storybook
+### Maps
 
 The [feature map](maps/feature-map/README.md) and the sibling
 [agent access map](maps/agent-access-map/README.md) are optional references for
@@ -171,10 +171,7 @@ map updates. When you do edit a map, follow
 [the feature-map scope rule](rules/feature-map-scope.mdc) and
 [the map contract](maps/README.md), then run `node scripts/check-maps.mjs`.
 
-After story or recipe changes, update the affected source annotations or recipe
-and run `node scripts/storybook-catalog.mjs`. Indexes are generated and ignored;
-never commit them. See the [Storybook feature catalog](maps/storybook-map/README.md)
-for the full workflow. Structural checks are not production acceptance.
+The Storybook catalog went with the old React UI (`ui/`, removed 2026-11-17).
 
 ## 8. API and Auth
 
@@ -209,6 +206,6 @@ A change is done when all are true:
 
 1. Behavior matches what the task asked for and preserves the invariants in section 5
 2. Relevant local verification and required CI typecheck, test, and build checks pass for the final revision, with any acceptance or platform-specific gaps resolved (section 7)
-3. Contracts are synced across db/shared/server/ui
+3. Contracts are synced across db/shared/server/ui-new
 4. Docs updated when behavior or commands change. `doc/DEVELOPING.md` holds setup, commands, and everyday workflow only, and `doc/DATABASE.md` holds database setup and the rules for every schema change. Put a note about how a subsystem behaves in that subsystem's doc (see "More documentation" in `doc/DEVELOPING.md`), or leave it in the PR description when the code and tests already say it.
 5. PR description follows the [PR template](.github/PULL_REQUEST_TEMPLATE.md) with all sections filled in (including Model Used)
