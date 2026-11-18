@@ -44,9 +44,10 @@ set up for one person running Claude agents.
   `@paperclipai/shared` with `import type`. When the API lacks something, change the server rather
   than designing around the gap. `ui/` (the old React UI) isn't deployed; it stays as a reference
   for how the API is used, and doesn't need to keep up with server changes.
-- **Deploys** still use upstream's published image for `upstream-freeze` with `ui-new` swapped in,
-  so server source changes don't reach server1 until the deployment builds from source (hard-fork
-  plan step 2). Say so whenever a server change is meant for server1.
+- **Deploys** build the image from source: `deploy/deploy.sh` builds the root `Dockerfile`
+  (`paperclip-core:<commit>`) and swaps `ui-new` in, so every change on `main` reaches server1 at
+  its next deploy. The root build still runs `vite build` for `ui/`, so `ui/` has to keep building
+  (it isn't type-checked there).
 - `pnpm` isn't installed globally on this machine; use `corepack pnpm`.
 - For the repo's conventions (repo map, dev setup, API rules), see `AGENTS.md`. Its pull-request
   template and Paperclip-issue workflow rules are upstream's and don't apply here.
@@ -68,7 +69,7 @@ set up for one person running Claude agents.
 | [fork/hard-fork-plan.md](fork/hard-fork-plan.md) | **Adopted 2026-11-17.** The plan and its progress: leave unused code, make runs Claude-native, Paperclip over MCP, one prompt builder, first-class chat, the build plan in core. |
 | [fork/repo-map.md](fork/repo-map.md) | The whole repo, labelled ours / shared core / dormant: where features live, where dormant code is wired in, which tests cover what. |
 | [fork/claude-local-run.md](fork/claude-local-run.md) | One `claude_local` run from wake to finish (CLI and ACP engines), with file references and the change points for hard-fork steps 4 and 5. |
-| [FORK-PATCHES.md](FORK-PATCHES.md) | The two image patches the deployment applies to upstream's image, until it builds from source. |
+| [FORK-PATCHES.md](FORK-PATCHES.md) | Retired: since the deployment builds from source there are no patches; history in git. |
 | [fork/upstream-fixes.md](fork/upstream-fixes.md) | The fork's bug list: what's wrong, where, and the likely fix. |
 | [.claude/skills/upstream-watch/SKILL.md](.claude/skills/upstream-watch/SKILL.md) | The weekly upstream review: list what's new, triage, cherry-pick what you choose. Ledger in [fork/upstream-watch.md](fork/upstream-watch.md); older sync reports in `fork/sync-reports/`. |
 | [.claude/skills/pm/SKILL.md](.claude/skills/pm/SKILL.md) | Project-manager mode (`/pm`): plan and review, delegate building to 3–5 agents, propose each one first. |

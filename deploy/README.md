@@ -7,36 +7,87 @@ why things are set up this way, see [FORK.md](../FORK.md).
 
 | File | Purpose |
 | --- | --- |
-| `Dockerfile` | Upstream's published image with `ui-new` built and swapped in for the React UI |
+| `Dockerfile` | The core image built from source, with `ui-new` built and swapped in for the React UI |
 | `docker-compose.yml` | Postgres + Paperclip, with bind mounts for all data |
 | `.env.example` | Settings template; copy it to `deploy/.env` (gitignored) |
-| `deploy.sh` | Picks the matching upstream image, then builds and (re)starts the stack |
-| `patches/` | Temporary build-time fixes to upstream's built server, each in FORK-PATCHES.md |
+| `deploy.sh` | Builds the core image for the checked-out commit, then builds and (re)starts the stack |
 
 ### How the image is built
 
-The server serves whatever is in `ui/dist`. `Dockerfile` therefore:
+Since 2026-11-17 (hard-fork step 2) the image is built from this repo's source, so every change on
+`main` (server, packages, migrations, `ui-new`) reaches the server at its next deploy. There are no
+image patches and no upstream images involved. `deploy.sh` builds two images:
 
-1. Builds `ui-new` in a small Node stage. The build copies the app logos (`ui/public/brands`) and
-   the favicons and home-screen icons from `ui/public`, adds `ui-new/public` (the web app manifest
-   and the service worker), and stamps the worker with a build id; the stage fails if any of these
-   is missing.
-2. Starts `FROM ghcr.io/paperclipai/paperclip:sha-<UPSTREAM_SHA>`, the image upstream publishes
-   for each `master` commit.
-3. Replaces `/app/ui/dist` with the `ui-new` build.
-4. Applies the temporary patches in `patches/` to upstream's built server, until upstream ships
-   each fix:
-   - `runner-libc-probe.mjs` (PR #17905): detects glibc reliably at startup. Without it the server
-     sometimes offers only the legacy runner, depending on how fast it starts.
-   - `runner-provider-authority.mjs` (PR #20710): lets Claude and Codex agents on the Paperclip
-     Runner pass verification.
+1. **`paperclip-core:<commit>`**, from the repo's root `Dockerfile` (upstream's, unchanged) with
+   `--target production`: the server, the Paperclip Runner (Rust), the agent CLIs (Claude Code,
+   Codex, OpenCode, Gemini, Kimi) and the React UI. `<commit>` is the checkout's
+   `git rev-parse HEAD`. If an image with that tag exists, `deploy.sh` reuses it; pass `--rebuild`
+   to build it again. A checkout with uncommitted or untracked files always rebuilds it, since the
+   build reads the working tree, not the commit. The root `Dockerfile` copies the whole build
+   context into the final image, so the root `.dockerignore` keeps every `.env` and `.env.*` file
+   out (only the committed `*.example` templates go in); otherwise `deploy/.env` and its secrets
+   would be readable by agents inside the container.
+2. **`paperclip-fork:local`**, from `deploy/Dockerfile` through `docker compose up -d --build`:
+   - builds `ui-new` in a small Node stage. The build copies the app logos (`ui/public/brands`)
+     and the favicons and home-screen icons from `ui/public`, adds `ui-new/public` (the web app
+     manifest and the service worker), and stamps the worker with a build id; the stage fails if
+     any of these is missing;
+   - starts `FROM` the core image (the `BASE_IMAGE` build arg; a build without `deploy.sh` fails on
+     the placeholder `paperclip-core-missing-run-deploy-sh`);
+   - replaces `/app/ui/dist` with the `ui-new` build.
 
-   Each script skips code that already has upstream's fix and fails the build if the code it patches
-   has changed. Each has an entry in [FORK-PATCHES.md](../FORK-PATCHES.md#image-patches).
+Two build arguments of the root `Dockerfile` matter here:
 
-This works because the fork doesn't change upstream's source. Fork plugins keep it that way, and get
-a build step here once the first one exists. Changing upstream's source would mean building the
-image from source instead ([FORK.md](../FORK.md#when-the-fork-starts-changing-source)).
+- `CLI_TOOLS_CACHE_EPOCH` is the ISO week (e.g. `2026-W47`), as upstream's CI does. The agent CLIs
+  are installed at `@latest` in a cached layer, so they move forward once a week, at the first
+  deploy of the week; between those the layer is reused.
+- `PAPERCLIP_BUILD_COMMIT` is **not** passed: in the root `Dockerfile` it also builds the remote
+  provider pack (about 2.5 GB of provider binaries for cloud and sandbox runs, which this setup
+  doesn't use). `deploy/Dockerfile` sets `PAPERCLIP_BUILD_COMMIT` as an environment variable
+  instead, which is where the server reads its commit from first (`server/src/build-commit.ts`).
+  Upstream's published image had the pack; nothing that runs locally uses it.
+
+Run `deploy/deploy.sh --dry-run` to see the commit, whether the core image would be built or
+reused, and the exact build command, without building anything.
+
+The root build also runs `vite build` for the React UI in `ui/` (its output is replaced, but the
+step has to pass), so `ui/` has to keep building even though it isn't deployed. It isn't
+type-checked there.
+
+### Build time and disk use
+
+Measured on the dev machine (16 cores, Docker Desktop on WSL):
+
+- **First build** of the core image, with an empty layer cache: about 9 minutes (552 s on
+  2026-11-17). The slow parts are compiling the Rust Runner daemon (about 2.5 minutes), installing
+  the workspace's dependencies, the agent CLIs, and the TypeScript server build. Expect longer on a
+  smaller machine like server1, and a few GB of downloads (Node and Rust toolchains, npm packages).
+- **Later builds** reuse Docker's layer cache. A commit that changes no package manifest rebuilds
+  only the app layers (the React `ui/` build, the server build and the copy into the final image),
+  not the dependency install, the Rust daemon or the agent CLIs: about 2.5 minutes for the core
+  image (136 s), then under a minute for the `ui-new` image (53 s). A lockfile change also reruns
+  the dependency install (about 2 minutes more), and the first deploy of each ISO week reinstalls
+  the agent CLIs (about 1.5 minutes).
+- **Size:** about 9.6 GB for `paperclip-core:<commit>` (upstream's published image, which also
+  carries the remote provider pack, was about 15.7 GB); `paperclip-fork:local` adds only `ui-new`.
+  Consecutive core images share most of their layers (the dependency `node_modules` layer changes
+  only with the lockfile), but each deploy leaves the previous `paperclip-core:*` tag behind, and
+  the build cache grows too.
+
+To prune old core images, keep the one in use and remove the rest:
+
+```bash
+docker images 'paperclip-core' --format '{{.Repository}}:{{.Tag}}'   # list them
+in_use=paperclip-core:$(docker image inspect paperclip-fork:local \
+  --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^PAPERCLIP_BUILD_COMMIT=//p')
+docker images 'paperclip-core' --format '{{.Repository}}:{{.Tag}}' | grep -vx "$in_use" | xargs -r docker rmi
+docker builder prune --filter until=168h   # build cache older than a week
+```
+
+Removing a `paperclip-core` tag only untags it; its layers stay while the current image uses them.
+Each deploy also leaves the previous `paperclip-fork:local` build behind as an untagged image once
+the container has been recreated; `docker image prune` removes untagged images (all of them on the
+machine, not only Paperclip's).
 
 The service worker (`/sw.js`) replaces the old UI's in every browser that had it, since it's served
 at the same address with new contents. Each deploy changes its build id, so open tabs and the
@@ -48,13 +99,10 @@ same memory. Runs on the default ACP engine inherit an allowlist of variables th
 Claude's auto memory stays on for them ([fork/claude-local-run.md](../fork/claude-local-run.md)). Paperclip Runner agents
 don't inherit the server's environment; set it in their adapter's `env`.
 
-`deploy.sh` sets `UPSTREAM_SHA` to the newest upstream commit already merged into your branch
-that has a published image. The server in the image then matches the API your UI was
-type-checked against. Run `deploy/deploy.sh --dry-run` to see which image it would use.
-
-It also sets `UI_COMMIT` to the checkout's `git rev-parse HEAD`, which Compose passes as the
-`PAPERCLIP_UI_COMMIT` build arg. The `ui` stage bakes it into `ui-new`, whose nav shows
-`ui <commit> · server <commit>` under your name (the server's commit comes from `/api/health`). The
+`deploy.sh` also exports `BUILD_COMMIT` (the checkout's `git rev-parse HEAD`), which Compose
+passes as the `PAPERCLIP_UI_COMMIT` build arg. The `ui` stage bakes it into `ui-new`, and the final
+stage sets it as the server's `PAPERCLIP_BUILD_COMMIT`, so the nav shows `ui <commit> · server
+<commit>` under your name (the server's commit comes from `/api/health`), the same commit twice. The
 arg is needed because the build context has no `.git`; a build without it works and shows
 `ui unknown`.
 
@@ -64,7 +112,10 @@ arg is needed because the build context has no `.git`; a build without it works 
 - RAM: agents run on this machine (the Claude/Codex CLIs live in the container), so don't go too
   small. 4 GB is a reasonable floor (an estimate, not a measured figure).
 - Disk: repo clones, per-task worktrees and their `node_modules` grow quickly. Put
-  `PAPERCLIP_DATA_ROOT` on a disk with plenty of room.
+  `PAPERCLIP_DATA_ROOT` on a disk with plenty of room. Docker needs room too: the image is built
+  on the server (see [Build time and disk use](#build-time-and-disk-use)).
+- CPU and RAM for the build: the TypeScript server build is given up to 4 GB of Node heap
+  (`NODE_OPTIONS` in the root `Dockerfile`), and compiling the Rust daemon uses every core.
 
 ## First-time setup
 
@@ -140,6 +191,11 @@ fresh instance (nothing was copied from the earlier desktop deployment):
   ssh server1 'cd ~/paperclip && git pull --ff-only && deploy/deploy.sh'
   ```
 
+  The build runs on server1, so a deploy that rebuilds the core image takes a while (see
+  [Build time and disk use](#build-time-and-disk-use)); the running instance stays up until
+  Compose swaps the container at the end. If the deploy adds a migration, `deploy.sh` stops and
+  asks for a backup first ([Updating](#updating)).
+
 ## On the dev machine (WSL with Docker Desktop)
 
 No longer in use: the deployment moved to server1, and the desktop stack was stopped on Nov 16,
@@ -174,17 +230,24 @@ server:
 
 ## Updating
 
-Sync with upstream on your dev machine (`git sync-ui`, see [FORK.md](../FORK.md)), push, then on
-the server:
+Push `main` from your dev machine, then on the server:
 
 ```bash
 cd paperclip
-git pull
+git pull --ff-only
+deploy/deploy.sh --dry-run   # optional: what it would build, and any new migrations
 deploy/deploy.sh
 ```
 
-Postgres data and everything under `PAPERCLIP_DATA_ROOT` survives rebuilds. `deploy.sh` also
-updates the base image to match what you merged.
+Postgres data and everything under `PAPERCLIP_DATA_ROOT` survives rebuilds.
+
+**Back up the database before a deploy that adds a migration.** Migrations run when the server
+starts and don't run backwards, so restoring the backup is the only way back. `deploy.sh` checks
+this for you: it compares the commit the running image was built from with the checkout, lists any
+new files in `packages/db/src/migrations`, and stops until you run it again with `--backed-up`
+(after taking the backup in [Backups](#backups)). When it can't tell which commit is deployed (no
+`paperclip-fork:local` image yet, or a commit this clone doesn't have), it prints a reminder
+instead.
 
 ## Data on the host
 
@@ -222,8 +285,8 @@ docker compose exec db pg_dump -U paperclip paperclip | gzip > paperclip-$(date 
 
 ## Operating
 
-Run these from `deploy/`. Building always goes through `deploy.sh`, which supplies the upstream
-base image; everything else is plain Compose. The Compose project is named `paperclip`
+Run these from `deploy/`. Building always goes through `deploy.sh`, which builds the core image
+and supplies it as the base; everything else is plain Compose. The Compose project is named `paperclip`
 (`name:` in `docker-compose.yml`), which is what Docker Desktop lists; a stack started before
 Nov 11, 2026 runs as `deploy` and is stopped with `docker compose -p deploy down`.
 
@@ -239,7 +302,13 @@ docker compose down               # stop (data is kept)
 - **Slow first start:** on first boot, or after changing `USER_UID`/`USER_GID`, the image's
   startup script checks ownership of every file under `/paperclip`. With many worktrees this can
   take minutes. Later boots skip the full check.
-- **`deploy.sh` finds no published image:** upstream only publishes images for commits that pass
-  its CI. The script looks back up to 50 commits; if that fails, sync to a newer upstream commit.
+- **The core image build fails:** the output names the stage. Common causes: a change that
+  breaks the server's TypeScript build or the React `ui/` build (`vite build` still runs there);
+  `pnpm-lock.yaml` behind a package manifest (the `runner-lockfile` stage says so and gives the
+  command to run in the checkout); a new workspace package the server depends on, whose
+  `package.json` the root `Dockerfile`'s `deps` stage doesn't copy yet (add a `COPY` line there);
+  or a full disk (`docker system df`, then prune as above). Fix it on `main`, then deploy again.
+  The running instance is untouched by a failed build.
+- **`deploy.sh` stops about migrations:** see [Updating](#updating).
 - **Login fails or requests are rejected:** `PAPERCLIP_PUBLIC_URL` must match the URL in the
   browser exactly. Add extra hostnames to `PAPERCLIP_ALLOWED_HOSTNAMES`.

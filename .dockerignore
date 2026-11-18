@@ -8,6 +8,17 @@ coverage
 data
 tmp
 *.log
+# Env files hold real secrets (deploy/.env on the server) and the root
+# Dockerfile copies the whole context into the final image, so keep them out.
+# Committed *.example templates stay.
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!.env.*.example
+!**/.env.example
+!**/.env.*.example
 packages/paperclip-runner/dist
 packages/paperclip-runner/dist-*
 packages/paperclip-eval-kernel/dist

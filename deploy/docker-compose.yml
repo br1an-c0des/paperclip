@@ -2,8 +2,9 @@
 # Adapted from docker/docker-compose.yml upstream, with bind mounts so every
 # repo clone and agent worktree is a normal directory on the host.
 #
-# Run it through deploy/deploy.sh, which supplies UPSTREAM_SHA. Settings come
-# from deploy/.env (copy .env.example).
+# Run it through deploy/deploy.sh, which builds the core image from source and
+# supplies BASE_IMAGE and BUILD_COMMIT. Settings come from deploy/.env (copy
+# .env.example).
 
 # The Compose project name, shown in Docker Desktop and used for container names
 # (paperclip-server-1, paperclip-db-1). Without it Compose names the project
@@ -32,13 +33,15 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile
       args:
-        # Taken from the environment, where deploy/deploy.sh sets it. Omitted
-        # when unset, so logs/ps/restart work without it and a stray build
-        # fails on the Dockerfile's placeholder base image.
-        - UPSTREAM_SHA
-        # This checkout's commit, shown under You in the nav (deploy.sh sets
-        # it too). Without it the build still works and shows "ui unknown".
-        - PAPERCLIP_UI_COMMIT=${UI_COMMIT:-}
+        # The core image (paperclip-core:<commit>), taken from the environment,
+        # where deploy/deploy.sh sets it after building it. Omitted when unset,
+        # so logs/ps/restart work without it and a stray build fails on the
+        # Dockerfile's placeholder base image.
+        - BASE_IMAGE
+        # This checkout's commit, shown under You in the nav and reported by
+        # the server (deploy.sh sets it too). Without it the build still works
+        # and shows "ui unknown".
+        - PAPERCLIP_UI_COMMIT=${BUILD_COMMIT:-}
     image: paperclip-fork:local
     restart: unless-stopped
     # The image makes tini PID 1 itself; see upstream's compose file for why
