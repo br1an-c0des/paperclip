@@ -178,14 +178,26 @@ limiting.
 Since Nov 16, 2026 the working instance runs on `server1`, an Ubuntu mini PC on the tailnet, as a
 fresh instance (nothing was copied from the earlier desktop deployment):
 
-- **Checkout:** `~/paperclip` on `main`, used only for deploys; `deploy/.env` lives there (mode
-  600). Data is in `~/paperclip-data`.
+- **Layout:** since Nov 18, 2026 server1 is also a second dev machine, so deployment and dev work
+  live in separate folders:
+
+  ```
+  ~/deployments/paperclip/
+  ├── repo/      the deploy checkout, on main, used only for deploys; deploy/.env is here (mode 600)
+  ├── data/      PAPERCLIP_DATA_ROOT (postgres/ and home/, see Data on the host)
+  └── backups/   database dumps taken before deploys, e.g. paperclip-2026-11-18-1210.dump
+  ~/coding/paperclip/   the dev checkout, for manual dev work on server1 (never deployed from)
+  ```
+
+  Never build, test or edit in `~/deployments`. Dev work on server1 happens in
+  `~/coding/paperclip`, and a dev instance there needs its own ports and data folder (see the
+  root [CLAUDE.md](../CLAUDE.md#dev-work-on-server1)).
 - **Access:** Paperclip on `127.0.0.1:3100`, fronted by `tailscale serve --bg 3100`, so it's
   `https://server1.<tailnet>.ts.net`.
-- **Updating from the dev machine** (after pushing `main`):
+- **Updating from a dev machine** (after pushing `main`):
 
   ```bash
-  ssh server1 'cd ~/paperclip && git pull --ff-only && deploy/deploy.sh'
+  ssh server1 'cd ~/deployments/paperclip/repo && git pull --ff-only && deploy/deploy.sh'
   ```
 
   The build runs on server1, so a deploy that rebuilds the core image takes a while (see
@@ -230,7 +242,7 @@ server:
 Push `main` from your dev machine, then on the server:
 
 ```bash
-cd paperclip
+cd ~/deployments/paperclip/repo   # the deploy checkout on server1
 git pull --ff-only
 deploy/deploy.sh --dry-run   # optional: what it would build, and any new migrations
 deploy/deploy.sh
@@ -279,6 +291,8 @@ stored secrets can't be decrypted. For a consistent database copy, either stop t
 cd deploy
 docker compose exec db pg_dump -U paperclip paperclip | gzip > paperclip-$(date +%F).sql.gz
 ```
+
+On server1, keep the dumps in `~/deployments/paperclip/backups/`.
 
 ## Operating
 
