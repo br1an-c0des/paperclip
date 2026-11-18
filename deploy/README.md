@@ -23,7 +23,10 @@ image patches and no upstream images involved. `deploy.sh` builds two images:
    Codex, OpenCode, Gemini, Kimi) and the React UI. `<commit>` is the checkout's
    `git rev-parse HEAD`. If an image with that tag exists, `deploy.sh` reuses it; pass `--rebuild`
    to build it again. A checkout with uncommitted or untracked files always rebuilds it, since the
-   build reads the working tree, not the commit.
+   build reads the working tree, not the commit. The root `Dockerfile` copies the whole build
+   context into the final image, so the root `.dockerignore` keeps every `.env` and `.env.*` file
+   out (only the committed `*.example` templates go in); otherwise `deploy/.env` and its secrets
+   would be readable by agents inside the container.
 2. **`paperclip-fork:local`**, from `deploy/Dockerfile` through `docker compose up -d --build`:
    - builds `ui-new` in a small Node stage. The build copies the app logos (`ui/public/brands`)
      and the favicons and home-screen icons from `ui/public`, adds `ui-new/public` (the web app
