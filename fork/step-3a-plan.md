@@ -328,17 +328,33 @@ Follow-ups reported by the agents, for round 2:
 - A SIGKILLed worker can still orphan a running Postgres (the sweep removes its directory only once
   the postmaster is dead).
 
-## Round 2 (proposed after the review)
+## Round 2
 
-- **Tiers:** fill `optIn` in `scripts/test-tiers.json` from `classification.csv` and the user's
-  decisions ([area-review.md, Decisions](test-suite-audit/area-review.md#decisions-2026-11-18)):
-  dormant areas, the CLI and plugins opt-in; cases and tool access thorough. Nothing is removed.
-- **Splits:** the 9 split files and `heartbeat-process-recovery.test.ts`. Dormant tests move to an
-  opt-in file next to each, and the live-path tests stay in thorough.
-- **Slow core tests:** fake timers or test-sized intervals, from D's list, each one signed off.
-- **CI:** a GitHub Actions workflow that runs the thorough tier on every push to a branch and to
-  `main`, sharded if needed. Upstream's 38 workflows are retired, which needs the user's OK because
-  it's a large removal.
-- **Large core files:** split others only if the thorough tier's parallel run is held up by one file.
-- **PM:** write down the workflow (quick before pushing, thorough in CI and before merging into
-  `main`, opt-in on demand) in `CLAUDE.md` and the `/pm` briefs.
+Approved by the user on 2026-11-18, with these decisions:
+
+- `test:quick` keeps agent A's selection (tests named after the changed file, plus tests that import
+  or mock it).
+- Upstream's 38 workflows in `.github/workflows/` are deleted; they stay readable at
+  `upstream-freeze`. Our CI runs on **every push to any branch** and on pull requests, on GitHub's
+  standard runners (the repo is public, so they're free).
+- Bug 42's `shipped-catalog` fix and a longer `github-launcher` timeout go to agent E; bug 40's
+  intermittent core lease test goes to agent G.
+- Approving agent G signs off D's slow-test list as a whole; each file's before-and-after is
+  reported at merge.
+- The old `/tmp` leftovers were deleted (2026-11-18: 2,502 test homes, 2,109 codex homes, 565
+  `pv-*` folders, ~4.2 GB).
+
+**Rules for every round 2 agent,** on top of round 1's Global Constraints: don't edit a file that
+another round 2 agent owns, and don't edit the 30 test files step 4a changes (`git diff --name-only
+$(git merge-base main origin/feat/step-4a) origin/feat/step-4a`). Report instead.
+
+| Agent | Branch | Owns | Goal |
+| --- | --- | --- | --- |
+| E. Tiers and splits | `test/tiers` | `scripts/test-tiers.json`, the 10 split files and their new opt-in siblings, `classification.csv`, `packages/skills-catalog/src/shipped-catalog.test.ts`, `packages/adapter-utils/src/github-launcher.test.ts` | Fill `optIn` from the [decisions](test-suite-audit/area-review.md#decisions-2026-11-18); split the 9 files and `heartbeat-process-recovery`; bug 42's two fixes |
+| F. Leaking files | `test/leaks` | `server/vitest.config.ts`, `server/src/__tests__/setup-supertest.ts`, new helpers in `server/src/__tests__/helpers/`, leaking files no one else owns | Find what the [39 suspects](test-suite-audit/leak-suspects.txt) were broken by; fix with resets or isolate the leakers; shared project back to `isolate: false`; test homes removed after each run |
+| G. Slow core tests | `test/slow` | The core files in D's [slow-test table](test-suite-audit/area-review.md#slow-core-tests), `issue-recovery.test-fixture.ts`, `legacy-controller-lease.test.ts`, small injection points in the source they test | Fake timers or test-sized intervals instead of real waits, shorter `pg_sleep`, single-statement seeding; bug 40 |
+| H. CI and runner | `test/ci` | `scripts/test.mjs`, `scripts/__tests__/test-runner.test.mjs`, the root `package.json` test scripts, `.github/workflows/` | `--shard i/n` balanced by recorded time; default workers from cores and free memory; `--fsModuleCache` on every phase; one workflow (typecheck + thorough, sharded, ~20 min) |
+
+Merge order: E and G, then F (its final full run includes G's changes), then H. Then the PM writes
+the workflow (quick before pushing, thorough in CI and before merging into `main`, opt-in on demand)
+into `CLAUDE.md`, the `/pm` briefs and `doc/test-infrastructure.md`.
