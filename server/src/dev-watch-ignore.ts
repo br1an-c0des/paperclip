@@ -29,10 +29,10 @@ export function resolveServerDevWatchIgnorePaths(serverRoot: string): string[] {
   ]);
 
   for (const relativePath of [
-    "../ui/node_modules",
-    "../ui/node_modules/.vite-temp",
-    "../ui/.vite",
-    "../ui/dist",
+    "../ui-new/node_modules",
+    "../ui-new/node_modules/.vite-temp",
+    "../ui-new/.vite",
+    "../ui-new/dist",
     // Git worktrees live under <repo>/.paperclip/worktrees, each a full
     // checkout (source + its own .paperclip). Watching them can add hundreds
     // of thousands of files, stalling tsx watch before it ever spawns the

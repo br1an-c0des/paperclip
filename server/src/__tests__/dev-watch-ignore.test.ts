@@ -10,7 +10,7 @@ describe("resolveServerDevWatchIgnorePaths", () => {
     const sharedUiRoot = path.join(tempRoot, "shared-ui");
     const worktreeRoot = path.join(tempRoot, "repo", ".paperclip", "worktrees", "PAP-884");
     const serverRoot = path.join(worktreeRoot, "server");
-    const worktreeUiRoot = path.join(worktreeRoot, "ui");
+    const worktreeUiRoot = path.join(worktreeRoot, "ui-new");
 
     fs.mkdirSync(path.join(sharedUiRoot, "node_modules"), { recursive: true });
     fs.mkdirSync(path.join(sharedUiRoot, ".vite"), { recursive: true });

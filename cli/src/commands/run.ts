@@ -188,14 +188,6 @@ function getMissingModuleSpecifier(err: unknown): string | null {
   return null;
 }
 
-function maybeEnableUiDevMiddleware(entrypoint: string): void {
-  if (process.env.PAPERCLIP_UI_DEV_MIDDLEWARE !== undefined) return;
-  const normalized = entrypoint.replaceAll("\\", "/");
-  if (normalized.endsWith("/server/src/index.ts") || normalized.endsWith("@paperclipai/server/src/index.ts")) {
-    process.env.PAPERCLIP_UI_DEV_MIDDLEWARE = "true";
-  }
-}
-
 function ensureDevWorkspaceBuildDeps(projectRoot: string): void {
   const buildScript = path.resolve(projectRoot, "scripts/ensure-plugin-build-deps.mjs");
   if (!fs.existsSync(buildScript)) return;
@@ -225,7 +217,6 @@ async function importServerEntry(): Promise<StartedServer> {
   const devEntry = path.resolve(projectRoot, "server/src/index.ts");
   if (fs.existsSync(devEntry)) {
     ensureDevWorkspaceBuildDeps(projectRoot);
-    maybeEnableUiDevMiddleware(devEntry);
     const mod = await import(pathToFileURL(devEntry).href);
     return await startServerFromModule(mod, devEntry);
   }
