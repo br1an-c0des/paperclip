@@ -1,0 +1,155 @@
+# The fork's CI (hard-fork step 3a, round 2): typecheck, and the thorough test tier split into
+# shards. Upstream's 38 workflows were removed; they're readable at the tag `upstream-freeze`.
+# Design and numbers: fork/test-suite-audit/results-ci.md.
+#
+# Runs on every push to any branch. Pull requests run it only when they come from another
+# repository: a branch in this one has already been tested by its push.
+name: Test
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+# The repo is public and the jobs need nothing but a read of the code: no secrets are used.
+permissions:
+  contents: read
+
+# A new push to a branch cancels that branch's run still in progress (a pull request's ref is
+# refs/pull/<n>/merge, so each pull request has its own group too).
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  NPM_CONFIG_AUDIT: "false"
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_UPDATE_NOTIFIER: "false"
+
+jobs:
+  typecheck:
+    name: Typecheck, ui-new and runner tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Enable corepack (pnpm from package.json's packageManager)
+        run: corepack enable && corepack pnpm --version
+
+      - name: Locate the pnpm store
+        id: pnpm-store
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build the plugin SDK
+        run: corepack pnpm --filter @paperclipai/plugin-sdk build
+
+      # Every workspace package's typecheck script, ui-new's included (tsc on src and e2e). The
+      # Paperclip Runner's runs `cargo check` with the toolchain in its rust-toolchain.toml.
+      - name: Typecheck
+        run: corepack pnpm typecheck
+
+      - name: ui-new tests
+        run: corepack pnpm --filter @paperclipai/ui-new test
+
+      # The runner's own tests (node --test), including a dry run that checks the shards cover
+      # the tier.
+      - name: Test runner tests
+        run: corepack pnpm test:runner
+
+  thorough:
+    name: Thorough tier, shard ${{ matrix.shard }}/${{ matrix.count }}
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      # Every shard runs to the end, so one run shows every failing file.
+      fail-fast: false
+      matrix:
+        # To change the shard count, change `count` and list 1..count in `shard`.
+        count: [10]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Enable corepack (pnpm from package.json's packageManager)
+        run: corepack enable && corepack pnpm --version
+
+      - name: Locate the pnpm store
+        id: pnpm-store
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build the plugin SDK
+        run: corepack pnpm --filter @paperclipai/plugin-sdk build
+
+      # Vitest's module cache (fsModuleCache). Its entries are keyed by each module's source and
+      # the config, so a stale entry is never used. Only pushes to main save it (one entry per
+      # shard and commit); every branch restores main's latest for its shard.
+      - name: Restore the Vitest module cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.vitest-cache
+          key: vitest-cache-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-shard-${{ matrix.shard }}-of-${{ matrix.count }}-${{ github.sha }}
+          restore-keys: vitest-cache-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-shard-${{ matrix.shard }}-of-${{ matrix.count }}-
+
+      # Workers default to the machine: half of the runner's 4 cores, so 2 (scripts/test.mjs).
+      - name: Run shard ${{ matrix.shard }} of the thorough tier
+        run: node scripts/test.mjs --tier thorough --shard ${{ matrix.shard }}/${{ matrix.count }} --report-dir test-reports
+
+      - name: Save the Vitest module cache
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.vitest-cache
+          key: vitest-cache-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-shard-${{ matrix.shard }}-of-${{ matrix.count }}-${{ github.sha }}
+
+      # Each phase's Vitest JSON report: per-file durations to rebalance the shards, and the failures.
+      - name: Upload the test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-reports-shard-${{ matrix.shard }}-of-${{ matrix.count }}
+          path: test-reports/
+          if-no-files-found: ignore
+          retention-days: 14
