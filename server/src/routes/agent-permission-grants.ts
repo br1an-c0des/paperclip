@@ -8,6 +8,9 @@ import { accessService } from "../services/access.js";
 import { logActivity, publishActivity, type ActivityPublication } from "../services/activity-log.js";
 import { assertAuthenticated, assertBoard, assertCompanyAccess, hasCompanyAccess } from "./authz.js";
 
+/** Permission keys whose agent grants became access actions in step 4a. */
+const RETIRED_AGENT_GRANT_KEYS = new Set<string>(["tasks:assign", "tasks:assign_scope", "agents:create", "agents:configure"]);
+
 export function agentPermissionGrantRoutes(db: Db) {
   const router = Router();
 
@@ -17,6 +20,15 @@ export function agentPermissionGrantRoutes(db: Db) {
     const id = req.params.id as string;
     if (!isUuidLike(id)) throw badRequest("Agent ID must be a UUID");
     const { permissionKey, enabled } = req.body;
+    // Since step 4a an agent's assignment, hiring and configure authority is its access level
+    // (permissions.access): grants for those keys are no longer read for agents.
+    if (RETIRED_AGENT_GRANT_KEYS.has(permissionKey)) {
+      res.status(410).json({
+        error: `Agent grants for ${permissionKey} are retired: set the agent's access level and overrides (permissions.access) with PATCH /api/agents/${id}/permissions.`,
+        code: "agent_grant_retired",
+      });
+      return;
+    }
     const publications: ActivityPublication[] = [];
     const result = await db.transaction(async (tx) => {
       const agent = await tx.select({ id: agents.id, companyId: agents.companyId, status: agents.status })

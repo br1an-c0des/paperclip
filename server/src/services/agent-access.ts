@@ -3,8 +3,10 @@ import { and, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { agents, temporaryAccessGrants, type Db } from "@paperclipai/db";
 import {
   AGENT_ACCESS_ACTIONS,
+  DEFAULT_AGENT_ACCESS_LEVEL,
   agentAccessSchema,
   resolveAgentAccess,
+  type AgentAccess,
   type AgentAccessAction,
   type ResolvedAgentAccess,
 } from "@paperclipai/shared";
@@ -42,6 +44,19 @@ export async function loadAgentAccess(db: Db, agentId: string): Promise<Resolved
     if (isAgentAccessAction(action) && access[action] === false) access[action] = true;
   }
   return access;
+}
+
+/**
+ * The agent's stored access with one override set, starting from the default level when it has
+ * none stored yet. For callers that change a single action (the old hiring toggle).
+ */
+export function withAccessOverride(permissions: unknown, action: AgentAccessAction, value: boolean): AgentAccess {
+  const record = permissions && typeof permissions === "object" && !Array.isArray(permissions)
+    ? permissions as Record<string, unknown>
+    : {};
+  const parsed = agentAccessSchema.safeParse(record.access);
+  const current: AgentAccess = parsed.success ? parsed.data : { level: DEFAULT_AGENT_ACCESS_LEVEL };
+  return { ...current, overrides: { ...current.overrides, [action]: value } };
 }
 
 export function isAgentAccessAction(value: unknown): value is AgentAccessAction {

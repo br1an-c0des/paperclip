@@ -1,4 +1,7 @@
 import { randomUUID } from "node:crypto";
+import express from "express";
+import request from "supertest";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   agents,
@@ -15,7 +18,11 @@ import {
   startEmbeddedPostgresTestDatabase,
 } from "./helpers/embedded-postgres.js";
 import { authorizationService, type AuthorizationActor } from "../services/authorization.js";
-import { grantTemporaryAccess } from "../services/agent-access.js";
+import { grantTemporaryAccess, loadAgentAccess } from "../services/agent-access.js";
+import { errorHandler } from "../middleware/error-handler.js";
+import { accessRoutes } from "../routes/access.js";
+import { agentPermissionGrantRoutes } from "../routes/agent-permission-grants.js";
+import { agentRoutes } from "../routes/agents.js";
 
 const support = await getEmbeddedPostgresTestSupport();
 type TestDb = ReturnType<typeof createDb>;
@@ -247,6 +254,72 @@ describe.skipIf(!support.supported)("agent access in the authorization service",
     expect(first.allowed).toBe(true);
     const second = await authz.decide({ actor: agentActor(worker), action: "tasks:delete", resource: issueResource(own) });
     expect(second).toMatchObject({ allowed: false, reason: "access_level" });
+  });
+
+  describe("retiring the agent grants endpoints", () => {
+    function appAs(actor: AuthorizationActor) {
+      const app = express();
+      app.use(express.json());
+      app.use((req, _res, next) => {
+        req.actor = actor as typeof req.actor;
+        next();
+      });
+      app.use("/api", accessRoutes(db, {
+        deploymentMode: "authenticated", deploymentExposure: "private", bindHost: "127.0.0.1", allowedHostnames: [],
+      }));
+      app.use("/api", agentPermissionGrantRoutes(db));
+      app.use("/api", agentRoutes(db));
+      app.use(errorHandler);
+      return app;
+    }
+    const localBoard = (companyId: string): AuthorizationActor => ({
+      type: "board", userId: "local-board", source: "local_implicit", companyIds: [companyId], isInstanceAdmin: true,
+    });
+
+    it("setting grants on an agent member is refused", async () => {
+      const company = await createCompany(db);
+      const agent = await createAgent(db, company.id, { access: { level: "worker" } });
+      const [membership] = await db.select().from(companyMemberships).where(and(
+        eq(companyMemberships.companyId, company.id), eq(companyMemberships.principalId, agent.id),
+      ));
+      const app = appAs(localBoard(company.id));
+      const memberGrants = await request(app).patch(`/api/companies/${company.id}/members/${membership!.id}/permissions`)
+        .send({ grants: [{ permissionKey: "tasks:assign" }] });
+      expect(memberGrants.status, JSON.stringify(memberGrants.body)).toBe(410);
+      expect(memberGrants.body.error).toMatch(/permissions\.access/);
+
+      const assignGrant = await request(app).patch(`/api/agents/${agent.id}/permission-grants`)
+        .send({ permissionKey: "tasks:assign", enabled: true });
+      expect(assignGrant.status, JSON.stringify(assignGrant.body)).toBe(410);
+      expect(await db.select().from(principalPermissionGrants).where(eq(principalPermissionGrants.principalId, agent.id))).toHaveLength(0);
+    });
+
+    it("PATCH permissions with access saves it", async () => {
+      const company = await createCompany(db);
+      const agent = await createAgent(db, company.id, { access: { level: "worker" } });
+      const app = appAs(localBoard(company.id));
+      const saved = await request(app).patch(`/api/agents/${agent.id}/permissions`)
+        .send({ access: { level: "admin", overrides: { "tasks:delete": true } } });
+      expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+      const access = await loadAgentAccess(db, agent.id);
+      expect(access["api:raw"]).toBe(true);
+      expect(access["tasks:delete"]).toBe(true);
+
+      const invalid = await request(app).patch(`/api/agents/${agent.id}/permissions`).send({ access: { level: "owner" } });
+      expect(invalid.status).toBe(400);
+
+      // The old hiring toggle keeps working: it sets the agents:create override.
+      const hiring = await request(app).patch(`/api/agents/${agent.id}/permissions`).send({ canCreateAgents: false, canAssignTasks: true });
+      expect(hiring.status, JSON.stringify(hiring.body)).toBe(200);
+      expect((await loadAgentAccess(db, agent.id))["agents:create"]).toBe(false);
+      expect((await loadAgentAccess(db, agent.id))["api:raw"]).toBe(true);
+
+      // An agent can't set access, not even a CEO.
+      const ceo = await createAgent(db, company.id, { role: "ceo", access: { level: "admin" } });
+      const byAgent = await request(appAs(agentActor(ceo))).patch(`/api/agents/${agent.id}/permissions`)
+        .send({ access: { level: "admin" } });
+      expect(byAgent.status).toBe(403);
+    });
   });
 
   it("people are unaffected: board members keep their task actions", async () => {
