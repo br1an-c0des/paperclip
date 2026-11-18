@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import express from "express";
 import request from "supertest";
+import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   activityLog,
@@ -95,7 +96,7 @@ async function seedAgent(
       adapterType: "process",
       adapterConfig: {},
       runtimeConfig: {},
-      permissions: input.permissions ?? {},
+      permissions: { access: { level: "manager" }, ...(input.permissions ?? {}) }, // pre-step-4a agents start at manager (migration 0491)
     })
     .returning()
     .then((rows) => rows[0]!);
@@ -323,14 +324,12 @@ describeEmbeddedPostgres("permissions upgrade visibility and route boundaries", 
       status: "active",
       membershipRole: "member",
     });
-    await db.insert(principalPermissionGrants).values({
-      companyId: company.id,
-      principalType: "agent",
-      principalId: actorAgent.id,
-      permissionKey: "tasks:assign_scope",
-      scope: { assigneeAgentIds: [privateTargetAgent.id] },
-      grantedByUserId: null,
-    });
+    // Since step 4a a scoped assignment grant is a scoped tasks:assign access override.
+    await db.update(agents).set({
+      permissions: {
+        access: { level: "manager", overrides: { "tasks:assign": { scope: { assigneeAgentIds: [privateTargetAgent.id] } } } },
+      },
+    }).where(eq(agents.id, actorAgent.id));
 
     const allowedPrivateAssignment = await request(app)
       .post(`/api/companies/${company.id}/issues`)

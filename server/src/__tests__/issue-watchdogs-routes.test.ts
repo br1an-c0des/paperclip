@@ -162,7 +162,7 @@ describeEmbeddedPostgres("issue watchdog routes", () => {
       adapterType: overrides.adapterType ?? "codex_local",
       adapterConfig: overrides.adapterConfig ?? {},
       runtimeConfig: overrides.runtimeConfig ?? {},
-      permissions: overrides.permissions ?? {},
+      permissions: { access: { level: "manager" }, ...(overrides.permissions ?? {}) }, // pre-step-4a agents start at manager (migration 0491)
       reportsTo: overrides.reportsTo,
     });
     return id;

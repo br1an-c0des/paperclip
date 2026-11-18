@@ -89,7 +89,7 @@ describeEmbeddedPostgres("stalled review decision routes", () => {
         adapterType: "codex_local",
         adapterConfig: {},
         runtimeConfig: {},
-        permissions: {},
+        permissions: { access: { level: "manager" } }, // pre-step-4a agents start at manager (migration 0491)
       },
       {
         id: peerAgentId,
@@ -100,7 +100,7 @@ describeEmbeddedPostgres("stalled review decision routes", () => {
         adapterType: "codex_local",
         adapterConfig: {},
         runtimeConfig: {},
-        permissions: {},
+        permissions: { access: { level: "manager" } },
       },
     ]);
     await db.insert(companyMemberships).values([
