@@ -14,7 +14,12 @@ import {
 } from "./embedded-postgres-error.js";
 import { prepareEmbeddedPostgresNativeRuntime } from "./embedded-postgres-native.js";
 import { loadWithoutEmbeddedPostgresExitHooks } from "./embedded-postgres-lifecycle.js";
-import { ownTestPostgres, TestPostgresShutdownError, type TestPostgresInstance } from "./test-postgres-owner.js";
+import {
+  beforeTestPostgresShutdown,
+  ownTestPostgres,
+  TestPostgresShutdownError,
+  type TestPostgresInstance,
+} from "./test-postgres-owner.js";
 import postgres from "postgres";
 import {
   checkTestPostgresAdmin,
@@ -40,6 +45,7 @@ type EmbeddedPostgresCtor = new (opts: {
   port: number;
   persistent: boolean;
   initdbFlags?: string[];
+  postgresFlags?: string[];
   onLog?: (message: unknown) => void;
   onError?: (message: unknown) => void;
 }) => TestPostgresInstance;
@@ -126,9 +132,220 @@ async function getAvailablePort(): Promise<number> {
 const EMBEDDED_POSTGRES_USER = "paperclip";
 const EMBEDDED_POSTGRES_PASSWORD = "paperclip";
 const EMBEDDED_POSTGRES_INITDB_FLAGS = ["--encoding=UTF8", "--locale=C", "--lc-messages=C"];
+// Test clusters hold throwaway data, so they run without durability: Postgres
+// skips fsync, commits without waiting for the WAL flush, and writes no
+// full-page images. Test cleanup deletes rows one statement at a time, and
+// with durability on every statement waits on a disk flush. These are server
+// flags passed at every start, not settings in `postgresql.conf`, so a
+// template's data directory is the same with or without them and the template
+// key does not include them. A crash of the host can corrupt a running test
+// cluster, which is thrown away anyway; the template is synced to disk before
+// it is published (`syncDirectoryTree`).
+const EMBEDDED_POSTGRES_SERVER_FLAGS = [
+  "-c", "fsync=off",
+  "-c", "synchronous_commit=off",
+  "-c", "full_page_writes=off",
+];
 
-async function createEmbeddedPostgresTestInstance(tempDirPrefix: string) {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), tempDirPrefix));
+// ---------------------------------------------------------------------------
+// Where cluster data lives
+//
+// Each running suite cluster holds a copy of the template (about 90 MB) that
+// Postgres reads and writes for the whole suite. It goes under
+// PAPERCLIP_TEST_POSTGRES_DATA_ROOT when that is set; otherwise under
+// `/dev/shm` on Linux when it exists and has at least 1 GB free (a RAM disk,
+// so the copy and every write skip the disk); otherwise under the OS temp
+// directory. The check runs at every start, so once `/dev/shm` fills up later
+// clusters go to the temp directory. The template cache stays in the temp
+// directory either way: it is shared by every checkout on the host, survives
+// a reboot, and is read from the page cache once it is warm.
+//
+// Inside the data root, clusters go in a private directory of this user,
+// `paperclip-test-postgres-<uid>`. A cluster directory a run leaves behind
+// costs RAM on `/dev/shm` until the next reboot, so:
+// - a process removes its cluster directories when it is interrupted or
+//   terminated (after Postgres has stopped) and when it exits (synchronously,
+//   for a suite that never called its cleanup);
+// - the first cluster start in each process removes what a killed process
+//   left: directories whose `postmaster.pid` names a process that is gone, and
+//   directories without one that are older than 15 minutes (a copy that never
+//   started, or a cluster stopped by a signal). A running cluster, of this
+//   checkout or another one, is never touched.
+// The template build stays beside the template cache, because it is published
+// by a rename, which cannot cross filesystems.
+// ---------------------------------------------------------------------------
+
+const DATA_ROOT_ENV = "PAPERCLIP_TEST_POSTGRES_DATA_ROOT";
+const SHM_DIR = "/dev/shm";
+const SHM_MIN_FREE_BYTES = 1024 ** 3;
+const CLUSTER_PARENT_DIR_NAME = "paperclip-test-postgres";
+const LEFTOVER_UNSTARTED_CLUSTER_AGE_MS = 15 * 60 * 1000;
+
+type TestPostgresDataRootOptions = {
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+  shmDir?: string;
+  minFreeBytes?: number;
+};
+
+function resolveTestPostgresDataRoot(options: TestPostgresDataRootOptions = {}): string {
+  const configured = (options.env ?? process.env)[DATA_ROOT_ENV]?.trim();
+  if (configured) {
+    const dir = path.resolve(configured);
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+  const shmDir = options.shmDir ?? SHM_DIR;
+  if ((options.platform ?? process.platform) === "linux" && hasFreeSpace(shmDir, options.minFreeBytes ?? SHM_MIN_FREE_BYTES)) {
+    return shmDir;
+  }
+  return os.tmpdir();
+}
+
+function hasFreeSpace(dir: string, minFreeBytes: number): boolean {
+  try {
+    if (!fs.statSync(dir).isDirectory()) return false;
+    const { bavail, bsize } = fs.statfsSync(dir);
+    return Number(bavail) * Number(bsize) >= minFreeBytes;
+  } catch {
+    return false;
+  }
+}
+
+// The private directory for this user's clusters under the data root. When it
+// cannot be made private (another user pre-created the path), clusters go in
+// the data root itself and nothing there is swept.
+function clusterParentDir(): { dir: string; owned: boolean } {
+  const dataRoot = resolveTestPostgresDataRoot();
+  const dir = path.join(dataRoot, `${CLUSTER_PARENT_DIR_NAME}-${templateOwnerTag()}`);
+  let problem: string | null;
+  try {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    problem = describePrivateDirectoryProblem(dir);
+  } catch (error) {
+    problem = `could not be prepared (${(error as Error).message})`;
+  }
+  if (problem === null) return { dir, owned: true };
+  warnTemplateOnce("cluster-root", `cluster directory ${dir} ${problem}; using ${dataRoot} directly`);
+  return { dir: dataRoot, owned: false };
+}
+
+const liveClusterDirs = new Set<string>();
+const clusterDirRemovals = new Map<string, Promise<void>>();
+const sweptClusterParents = new Set<string>();
+let removeClusterDirShutdownTask: (() => void) | null = null;
+
+// Creates a directory for one cluster: under `parentDir` when given (the
+// template build), otherwise in this user's directory under the data root.
+async function makeClusterDir(tempDirPrefix: string, parentDir?: string): Promise<string> {
+  let parent = parentDir;
+  if (parent === undefined) {
+    const resolved = clusterParentDir();
+    parent = resolved.dir;
+    if (resolved.owned && !sweptClusterParents.has(parent)) {
+      sweptClusterParents.add(parent);
+      await removeLeftoverClusterDirs(parent);
+    }
+  }
+  const dir = fs.mkdtempSync(path.join(parent, tempDirPrefix));
+  trackClusterDir(dir);
+  return dir;
+}
+
+function trackClusterDir(dir: string): void {
+  liveClusterDirs.add(dir);
+  if (removeClusterDirShutdownTask !== null) return;
+  process.on("exit", removeClusterDirsAtExit);
+  // Runs after the shutdown handler has stopped every owned cluster.
+  const removeTask = beforeTestPostgresShutdown({
+    stop: async () => {},
+    interrupt: () => {},
+    afterStop: async () => {
+      await Promise.allSettled([...liveClusterDirs].map((tracked) => removeClusterDir(tracked)));
+    },
+  });
+  removeClusterDirShutdownTask = () => {
+    removeTask();
+    process.removeListener("exit", removeClusterDirsAtExit);
+  };
+}
+
+function untrackClusterDir(dir: string): void {
+  liveClusterDirs.delete(dir);
+  if (liveClusterDirs.size === 0 && removeClusterDirShutdownTask !== null) {
+    removeClusterDirShutdownTask();
+    removeClusterDirShutdownTask = null;
+  }
+}
+
+// The exit guard cannot wait, so it removes synchronously. A cluster still
+// running at exit is sent an immediate shutdown by its owner's exit guard; its
+// files are freed when it exits.
+function removeClusterDirsAtExit(): void {
+  for (const dir of liveClusterDirs) {
+    try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 2 }); }
+    catch { /* the next start's sweep removes it */ }
+  }
+  liveClusterDirs.clear();
+}
+
+// Removes a cluster directory once, even when a suite's cleanup and the
+// shutdown handler ask at the same time.
+function removeClusterDir(dir: string): Promise<void> {
+  let removal = clusterDirRemovals.get(dir);
+  if (!removal) {
+    removal = removeDirectoryTree(dir)
+      .then(() => { untrackClusterDir(dir); })
+      .finally(() => { clusterDirRemovals.delete(dir); });
+    clusterDirRemovals.set(dir, removal);
+  }
+  return removal;
+}
+
+function isProcessRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+// A fresh cluster keeps `postmaster.pid` at the top of its directory, a
+// template copy in `data/`. A pid file that is still being written (no pid
+// yet) counts as missing. Without a pid file the age is the newer of the two
+// directories' times: a clean stop removes the pid file, which refreshes the
+// data directory's time, so a cluster that ran for an hour and has just
+// stopped is not mistaken for an old leftover while its owner removes it.
+function isLeftoverClusterDir(dir: string, now: number): boolean {
+  for (const pidFile of [path.join(dir, "postmaster.pid"), path.join(dir, "data", "postmaster.pid")]) {
+    let text: string;
+    try { text = fs.readFileSync(pidFile, "utf8"); } catch { continue; }
+    const pid = Number.parseInt(text.split("\n")[0] ?? "", 10);
+    if (Number.isInteger(pid) && pid > 0) return !isProcessRunning(pid);
+  }
+  let changed = fs.statSync(dir).mtimeMs;
+  try { changed = Math.max(changed, fs.statSync(path.join(dir, "data")).mtimeMs); } catch { /* fresh layout */ }
+  return now - changed > LEFTOVER_UNSTARTED_CLUSTER_AGE_MS;
+}
+
+async function removeLeftoverClusterDirs(parent: string): Promise<void> {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(parent, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  const now = Date.now();
+  await Promise.allSettled(entries.map(async (entry) => {
+    const dir = path.join(parent, entry.name);
+    if (!entry.isDirectory() || liveClusterDirs.has(dir) || !isLeftoverClusterDir(dir, now)) return;
+    await removeDirectoryTree(dir);
+  }));
+}
+
+async function createEmbeddedPostgresTestInstance(tempDirPrefix: string, parentDir?: string) {
+  const dataDir = await makeClusterDir(tempDirPrefix, parentDir);
   try {
     return await createEmbeddedPostgresTestInstanceAt(dataDir);
   } catch (error) {
@@ -155,6 +372,7 @@ async function createEmbeddedPostgresTestInstanceAt(dataDir: string) {
     port,
     persistent: true,
     initdbFlags: EMBEDDED_POSTGRES_INITDB_FLAGS,
+    postgresFlags: EMBEDDED_POSTGRES_SERVER_FLAGS,
     onLog: (message) => logBuffer.append(message),
     onError: (message) => logBuffer.append(message),
   }), dataDir);
@@ -177,6 +395,10 @@ function databaseConnectionStringFor(port: number): string {
 }
 
 async function cleanupEmbeddedPostgresTestDirs(dataDir: string): Promise<void> {
+  await removeClusterDir(dataDir);
+}
+
+async function removeDirectoryTree(dataDir: string): Promise<void> {
   if (process.platform !== "win32") {
     try {
       await promisify(execFile)("/bin/rm", ["-rf", "--", dataDir], { maxBuffer: 64 * 1024 });
@@ -207,7 +429,8 @@ const EMBEDDED_POSTGRES_START_MAX_ATTEMPTS = 5;
 // fresh port and a fresh data directory. On a failed attempt we stop the cluster
 // and remove its data directory before the next attempt. After the last attempt
 // we throw with the real Postgres output so the failure is loud and diagnosable.
-async function startEmbeddedPostgresWithRetry(tempDirPrefix: string): Promise<{
+// The directory goes under the data root unless `parentDir` is given.
+async function startEmbeddedPostgresWithRetry(tempDirPrefix: string, parentDir?: string): Promise<{
   port: number;
   dataDir: string;
   instance: EmbeddedPostgresInstance;
@@ -215,7 +438,7 @@ async function startEmbeddedPostgresWithRetry(tempDirPrefix: string): Promise<{
   let lastError = new Error("embedded Postgres startup failed");
 
   for (let attempt = 1; attempt <= EMBEDDED_POSTGRES_START_MAX_ATTEMPTS; attempt += 1) {
-    const created = await createEmbeddedPostgresTestInstance(tempDirPrefix);
+    const created = await createEmbeddedPostgresTestInstance(tempDirPrefix, parentDir);
     try {
       await created.instance.initialise();
       await created.instance.start();
@@ -464,14 +687,37 @@ async function stopForTemplatePublish(instance: EmbeddedPostgresInstance): Promi
   } catch { return false; }
 }
 
+// Flushes every file and directory under `dir` to disk. The template build runs
+// with fsync off, so its clean shutdown leaves the data in the page cache; the
+// template outlives the build (it is reused for up to a week), so it is made
+// durable before it is published. Directory fsync is best effort: Windows
+// cannot open a directory for it.
+function syncDirectoryTree(dir: string): void {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) syncDirectoryTree(entryPath);
+    else if (entry.isFile()) syncPath(entryPath);
+  }
+  try { syncPath(dir); } catch { /* best effort */ }
+}
+
+function syncPath(target: string): void {
+  const fd = fs.openSync(target, "r");
+  try { fs.fsyncSync(fd); }
+  finally { fs.closeSync(fd); }
+}
+
 // Builds a migrated cluster and publishes its data directory at `templateDir`.
 // Throws when the cluster cannot start or a migration cannot apply. Returns
 // false when the cluster started but the template could not be published;
 // callers then use the fresh path for this process.
 async function buildEmbeddedPostgresTemplate(templateDir: string): Promise<boolean> {
   const rootDir = path.dirname(templateDir);
+  // Built beside the cache root, not under the data root: publishing is a
+  // rename, which cannot cross filesystems.
   const { port, dataDir, instance } = await startEmbeddedPostgresWithRetry(
     "paperclip-embedded-postgres-template-build-",
+    os.tmpdir(),
   );
   let published = false;
   try {
@@ -479,9 +725,12 @@ async function buildEmbeddedPostgresTemplate(templateDir: string): Promise<boole
     await applyPendingMigrations(databaseConnectionStringFor(port));
     const stopped = await stopForTemplatePublish(instance);
     if (!stopped || !isUsableTemplate(dataDir)) return false;
+    syncDirectoryTree(dataDir);
     try {
       fs.renameSync(dataDir, templateDir);
       published = true;
+      untrackClusterDir(dataDir);
+      try { syncPath(rootDir); } catch { /* best effort: the rename itself */ }
     } catch (error) {
       // Another process published the same key first. Use theirs.
       const code = (error as NodeJS.ErrnoException).code;
@@ -549,7 +798,7 @@ async function startEmbeddedPostgresFromTemplateWithRetry(
     if (!isUsableTemplate(templateDir)) {
       throw new Error(`embedded Postgres template ${templateDir} is no longer usable`);
     }
-    const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), tempDirPrefix));
+    const rootDir = await makeClusterDir(tempDirPrefix);
     const dataDir = path.join(rootDir, "data");
     let created: Awaited<ReturnType<typeof createEmbeddedPostgresTestInstanceAt>> | null = null;
     try {
@@ -586,16 +835,22 @@ export const __startEmbeddedPostgresWithRetryForTests = startEmbeddedPostgresWit
 export const __embeddedPostgresStartMaxAttemptsForTests = EMBEDDED_POSTGRES_START_MAX_ATTEMPTS;
 export const __embeddedPostgresTemplateRootDirForTests = templateRootDir;
 export const __isUsableEmbeddedPostgresTemplateForTests = isUsableTemplate;
+export const __resolveTestPostgresDataRootForTests = resolveTestPostgresDataRoot;
+export function __testPostgresClusterParentDirForTests(): string {
+  return clusterParentDir().dir;
+}
 export function __lastEmbeddedPostgresStartModeForTests(): EmbeddedPostgresStartMode | null {
   return lastStartMode;
 }
-// Forgets the support probe result, the resolved template, and the one-time
-// warnings so a test can drive the probe and the cache again in one process.
+// Forgets the support probe result, the resolved template, the one-time
+// warnings, and which cluster directories were swept, so a test can drive the
+// probe and the cache again in one process.
 export function __resetEmbeddedPostgresTemplateStateForTests(): void {
   embeddedPostgresSupportPromise = null;
   templateDirPromise = null;
   templateFallbackWarned = false;
   warnedTemplateTopics.clear();
+  sweptClusterParents.clear();
   lastStartMode = null;
 }
 
