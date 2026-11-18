@@ -287,6 +287,22 @@ include patterns; `area-review.md` totals match the audit within about 5%.
   (497 files that replace modules with `vi.mock` and the like). Bench set: 538.8 s at 1 worker,
   116–120 s at 6 workers. [results-overhead.md](test-suite-audit/results-overhead.md).
 
+**Full runs after round 1** (2026-11-18, `pnpm test`, 8 workers, every file since `optIn` is empty):
+
+| Run | Wall | Server | Packages | Failed files |
+| --- | --- | --- | --- | --- |
+| As merged (shared project without isolation), with the chat suite | 51m27s | 48m (47,434 passed, 204 failed) | 3m30s | 47 |
+| Isolation forced everywhere, without the chat suite | 55m22s | 51m52s (45,660 passed, 12 failed) | 3m30s | 8 |
+
+- About 39 files failed only without isolation, from state left by earlier files in the same worker
+  ("Cloud runtime configuration has not been initialized", `PAPERCLIP_MANAGED_CONFIG` blank,
+  counters). The shared project is isolated again (`4473fad4dc`) until round 2 finds them. The 8
+  that remain are bug 42.
+- The time is total work, not one long file: the files' own durations add up to ~280
+  worker-minutes, plus ~4 s of import per isolated file (~150 worker-minutes). With the user's tiers
+  (~55% of server work stays), the thorough tier should take about 30–35 minutes isolated, or 20–25
+  once the shared project works.
+
 Follow-ups reported by the agents, for round 2:
 
 - Update `doc/test-infrastructure.md` ("Embedded Postgres template cache") for C's changes: flags,
