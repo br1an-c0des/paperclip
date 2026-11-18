@@ -60,15 +60,7 @@
       "inputs": [
         "server/**",
         "cli/**",
-        "packages/**",
-        "ui/src/lib/**",
-        "ui/src/api/**",
-        "ui/src/types/**",
-        "ui/src/index.css",
-        "ui/src/bootstrapSetup.ts",
-        "ui/src/pages/CompanyExport.tsx",
-        "ui/*",
-        "ui/src/components/MarkdownBody.tsx"
+        "packages/**"
       ],
       "outputs": [],
       "cache": true
@@ -77,15 +69,7 @@
       "inputs": [
         "server/**",
         "cli/**",
-        "packages/**",
-        "ui/src/lib/**",
-        "ui/src/api/**",
-        "ui/src/types/**",
-        "ui/src/index.css",
-        "ui/src/bootstrapSetup.ts",
-        "ui/src/pages/CompanyExport.tsx",
-        "ui/*",
-        "ui/src/components/MarkdownBody.tsx"
+        "packages/**"
       ],
       "outputs": [],
       "cache": true
@@ -94,8 +78,7 @@
       "inputs": [
         "server/**",
         "cli/**",
-        "packages/**",
-        "ui/**"
+        "packages/**"
       ],
       "outputs": [],
       "cache": true
@@ -104,9 +87,7 @@
       "inputs": [
         "server/**",
         "cli/**",
-        "packages/**",
-        "ui/src/lib/**",
-        "ui/public/**"
+        "packages/**"
       ],
       "outputs": [],
       "cache": true
@@ -122,15 +103,7 @@
       "inputs": [
         "server/**",
         "cli/**",
-        "packages/**",
-        "ui/src/lib/**",
-        "ui/src/api/**",
-        "ui/src/types/**",
-        "ui/src/index.css",
-        "ui/src/bootstrapSetup.ts",
-        "ui/src/pages/CompanyExport.tsx",
-        "ui/*",
-        "ui/src/components/MarkdownBody.tsx"
+        "packages/**"
       ],
       "outputs": [],
       "cache": true
@@ -139,15 +112,7 @@
       "inputs": [
         "server/**",
         "cli/**",
-        "packages/**",
-        "ui/src/lib/**",
-        "ui/src/api/**",
-        "ui/src/types/**",
-        "ui/src/index.css",
-        "ui/src/bootstrapSetup.ts",
-        "ui/src/pages/CompanyExport.tsx",
-        "ui/*",
-        "ui/src/components/MarkdownBody.tsx"
+        "packages/**"
       ],
       "outputs": [],
       "cache": false
@@ -163,15 +128,7 @@
       "inputs": [
         "server/**",
         "cli/**",
-        "packages/**",
-        "ui/src/lib/**",
-        "ui/src/api/**",
-        "ui/src/types/**",
-        "ui/src/index.css",
-        "ui/src/bootstrapSetup.ts",
-        "ui/src/pages/CompanyExport.tsx",
-        "ui/*",
-        "ui/src/components/MarkdownBody.tsx"
+        "packages/**"
       ],
       "outputs": [],
       "cache": false
@@ -180,8 +137,7 @@
       "inputs": [
         "server/**",
         "cli/**",
-        "packages/**",
-        "ui/**"
+        "packages/**"
       ],
       "outputs": [],
       "cache": false
@@ -190,8 +146,7 @@
       "inputs": [
         "server/**",
         "cli/**",
-        "packages/**",
-        "ui/**"
+        "packages/**"
       ],
       "outputs": [],
       "cache": false
@@ -209,8 +164,7 @@
       "inputs": [
         "server/**",
         "cli/**",
-        "packages/**",
-        "ui/**"
+        "packages/**"
       ],
       "outputs": [],
       "cache": false
@@ -219,8 +173,7 @@
       "inputs": [
         "server/**",
         "cli/**",
-        "packages/**",
-        "ui/**"
+        "packages/**"
       ],
       "outputs": [],
       "cache": false
@@ -229,8 +182,7 @@
       "inputs": [
         "server/**",
         "cli/**",
-        "packages/**",
-        "ui/**"
+        "packages/**"
       ],
       "outputs": [],
       "cache": false
@@ -239,8 +191,7 @@
       "inputs": [
         "server/**",
         "cli/**",
-        "packages/**",
-        "ui/**"
+        "packages/**"
       ],
       "outputs": [],
       "cache": false

@@ -50,7 +50,6 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY cli/package.json cli/
 COPY server/package.json server/
-COPY ui/package.json ui/
 COPY packages/shared/package.json packages/shared/
 COPY packages/db/package.json packages/db/
 COPY packages/adapter-utils/package.json packages/adapter-utils/
@@ -322,10 +321,9 @@ RUN --mount=type=bind,from=runner-artifacts,source=/runner-image.json,target=/tm
   node scripts/check-runner-image-expectation.mjs /tmp/runner-image.json
 ENV PAPERCLIP_RUNNER_VENDOR_REQUIRE_CURRENT=1
 RUN node server/scripts/prepare-runner-vendor.mjs
-# Both the browser bundle and server stamp need the source commit. Declare it
-# after the stable dependency layers, before either application build.
+# The server stamp needs the source commit. Declare it after the stable
+# dependency layers, before the application build.
 ARG PAPERCLIP_BUILD_COMMIT=""
-RUN pnpm --filter @paperclipai/ui build
 RUN pnpm --filter @paperclipai/plugin-sdk build
 # The server build runs scripts/write-build-stamp.mjs, which stamps the built
 # commit into dist/build-info.json. The build context has no .git, so the
