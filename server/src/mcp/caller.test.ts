@@ -55,10 +55,10 @@ describe("createCatalogDispatch", () => {
       res.status(403).json({ error: "Deleting tasks needs tasks:delete", code: "access_denied", missingAction: "tasks:delete", requestable: true });
     });
     const dispatch = createCatalogDispatch(api, await runCaller());
-    const error = await dispatch("DELETE", "/issues/abc").catch(e => e);
+    const error: unknown = await dispatch("DELETE", "/issues/abc").catch((e: unknown) => e);
     expect(error).toBeInstanceOf(McpToolError);
     expect(error).toMatchObject({ status: 403, code: "access_denied", missingAction: "tasks:delete", requestable: true });
-    expect(error.message).toBe("Deleting tasks needs tasks:delete");
+    expect((error as Error).message).toBe("Deleting tasks needs tasks:delete");
   });
 
   it("re-enters the API as the caller, with the run id header and a JSON body", async () => {
