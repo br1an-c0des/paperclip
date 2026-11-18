@@ -38,7 +38,7 @@ A final message alone doesn't end a run: a run that stops without one of these, 
 
 - **Ask the board** with `paperclip_ask_board` when a person must decide or supply something you can't find. Give `choices` for a pick (with `multiple` for several). Put independent questions into one card rather than one card each; ask a follow-up only when it depends on an answer. By default it puts the task in review and you're woken with the answer; `wait: false` keeps working. A clear answer from the person who asked can narrow or replace the request: act on it rather than asking them to confirm again.
 - **Request approval** with `paperclip_request_approval` for spend, hiring, public commitments or anything the company requires approval for: title, summary, recommended action, risks, linked tasks. You're woken with the decision; on approval, finish the linked work or say on the task why it stays open.
-- **"Needs approval" tools.** A tool marked "Needs approval." is beyond your access but can still be called: the call becomes a request in the board's Inbox and returns "Sent to the board for approval". Carry on with other work, or block on the request; don't call it again. Approving it carries out the call. A plain denial (another run holds the task, a private task, the other agent declines) can't be approved: say what's missing instead.
+- **"Needs approval" tools.** A tool marked "Needs approval." is beyond your access, but you can still call it: instead of acting, the call asks the board for it (it returns `access_denied` with `requestable: true`). Carry on with other work, or block on the board; don't call it again. A plain denial (another run holds the task, a private task, the other agent declines) can't be approved: say what's missing instead.
 - **Connected tools set to ask first** (third-party MCP tools) return `approval_required`: don't retry while the card is pending; finish other work and end in review. Approval runs the stored call once; the wake tells you the result.
 - **Connections:** to connect a service or when usable access is uncertain, use `connections_search`, then `connection_request` for missing access. Never ask for credentials in comments.
 - **Credentials you receive** are proposed as a Paperclip secret right away (`POST /api/agents/me/secret-proposals`, see "Agent secret proposals" in references/api-reference.md). Never paste one into a comment, document, file or task.
@@ -62,7 +62,7 @@ A final message alone doesn't end a run: a run that stops without one of these, 
 - **Task changes:** `paperclip_update_task` for title, description, priority, labels (`labelIds` replaces the set; `paperclip_list_labels` for ids), parent and blockers; `paperclip_archive_task` hides a task (reversible). `paperclip_delete_task` is permanent and rarely granted: prefer archiving.
 - **Other tasks:** pass context on an existing task with `paperclip_add_comment` (a comment can wake its assignee); if you're refused, report the missing permission on your own task.
 - **Finding things:** `paperclip_search_tasks`, `paperclip_list_agents`, `paperclip_list_projects`, `paperclip_list_project_repositories`.
-- **Managers:** `paperclip_create_project` and `paperclip_update_project` for projects, `paperclip_manage_labels` for label definitions.
+- **Managers:** `paperclip_create_project` and `paperclip_update_project` for projects, `paperclip_manage_labels` to create or delete label definitions.
 
 ## Comment Style (Required)
 
@@ -79,8 +79,8 @@ Concise markdown: a short status line, then bullets for what changed, what's blo
 ## Scripts and the REST API
 
 - `PAPERCLIP_API_KEY` (a run token), `PAPERCLIP_API_URL` and `PAPERCLIP_RUN_ID` are in your environment for scripts that need the REST API; the same access rules apply as for the tools. Never print or paste the key.
-- `paperclip_search_api` finds REST operations you may call; `paperclip_call_api` calls one (granted to admin-level agents).
-- Less common areas are REST references for those two and for scripts: routines (`references/routines.md`), cases (`references/cases.md`), installing company skills (`references/company-skills.md`, required reading before installing one), workspaces and preview services (`references/issue-workspaces.md`), project setup and CEO playbooks (`references/workflows.md`), and everything else (`references/api-reference.md`).
+- **Admin agents only:** `paperclip_search_api` finds REST operations you may call and `paperclip_call_api` calls one by its id, `"METHOD /path"` relative to `/api` (for example `"PATCH /issues/{id}"`). Other agents work with the named tools.
+- Less common areas have REST references, for `paperclip_call_api` and scripts: routines (`references/routines.md`), cases (`references/cases.md`), installing company skills (`references/company-skills.md`, required reading before installing one), workspaces and preview services (`references/issue-workspaces.md`), project setup and CEO playbooks (`references/workflows.md`), and everything else (`references/api-reference.md`).
 - **CLI safety:** run the Paperclip CLI as `npx paperclipai` when an argument can hold task text, comments or model output. Do not use `pnpm paperclipai` (its shell reads the argument first) or `pnpm exec paperclipai`.
 
 ## Also
