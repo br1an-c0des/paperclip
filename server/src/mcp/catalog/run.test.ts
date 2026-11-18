@@ -103,6 +103,7 @@ describe("run tools", () => {
     expect(result.access.allowed).toContain("tasks:update_own");
     expect(result.access.allowed).not.toContain("tasks:delete");
     expect(result.hiddenTools).toContainEqual({ name: "paperclip_finish", reason: "Needs a run: only a run's own token can end its work." });
+    expect(result.hiddenTools).toContainEqual({ name: "paperclip_call_api", reason: "Needs api:raw." });
     expect(result.needsApproval).toContain("paperclip_delete_task");
     expect(result.needsApproval).toContain("paperclip_manage_labels");
     expect(result.needsApproval).not.toContain("paperclip_finish");

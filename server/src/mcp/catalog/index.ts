@@ -1,4 +1,5 @@
 import type { RunDisposition } from "@paperclipai/shared";
+import { API_TOOLS } from "./api.js";
 import { DIRECTORY_TOOLS } from "./directory.js";
 import { DOCUMENT_TOOLS } from "./documents.js";
 import { LABEL_TOOLS } from "./labels.js";
@@ -19,7 +20,7 @@ export function createPaperclipCatalog(deps: CatalogDeps): readonly PaperclipToo
   const catalog: PaperclipTool[] = [];
   catalog.push(
     ...createRunTools(deps, () => catalog),
-    ...TASK_TOOLS, ...DOCUMENT_TOOLS, ...LABEL_TOOLS, ...DIRECTORY_TOOLS, ...REQUEST_TOOLS,
+    ...TASK_TOOLS, ...DOCUMENT_TOOLS, ...LABEL_TOOLS, ...DIRECTORY_TOOLS, ...REQUEST_TOOLS, ...API_TOOLS,
   );
   return catalog;
 }
