@@ -231,6 +231,7 @@ export const AGENT_ROUTE_POLICY: ReadonlyArray<AgentRoutePolicyEntry> = [
   ...tag("labels:manage", [
     "POST /companies/:companyId/labels",
     "DELETE /labels/:labelId",
+    "PATCH /labels/:labelId",
   ]),
   // Projects, goals, routines, workflows, status cards, and the company fields a CEO agent may change.
   ...tag("projects:manage", [

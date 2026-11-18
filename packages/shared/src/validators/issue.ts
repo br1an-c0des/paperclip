@@ -997,6 +997,12 @@ export const createIssueLabelSchema = z.object({
 
 export type CreateIssueLabel = z.infer<typeof createIssueLabelSchema>;
 
+/** Renaming or recoloring a label: the create rules, each optional, at least one given. */
+export const updateIssueLabelSchema = createIssueLabelSchema.partial().strict()
+  .refine((value) => value.name !== undefined || value.color !== undefined, "Provide name or color");
+
+export type UpdateIssueLabel = z.infer<typeof updateIssueLabelSchema>;
+
 const issueCommentAttachmentIdsSchema = z
   .array(z.string().uuid())
   .max(20)
