@@ -40,6 +40,9 @@ export default defineConfig({
     // headroom; 15s is far above the observed module-load cost yet still
     // catches a genuinely hung test well inside the 20 minute job limit.
     testTimeout: 15000,
+    // Persist transformed modules across runs (node_modules/.vitest-cache at the workspace root).
+    // Keys hash each module's source and the config, so an edited file is re-transformed.
+    fsModuleCache: true,
     isolate: true,
     maxConcurrency: 1,
     maxWorkers: 1,
