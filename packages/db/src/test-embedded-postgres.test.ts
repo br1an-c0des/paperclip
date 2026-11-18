@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import postgres from "postgres";
-import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { inspectMigrations } from "./client.js";
 import { drainTestPostgresOwners, TestPostgresShutdownError } from "./test-postgres-owner.js";
 import {
@@ -37,6 +37,7 @@ type FakeOptions = {
   port: number;
   persistent: boolean;
   initdbFlags?: string[];
+  postgresFlags?: string[];
   onLog?: (message: unknown) => void;
   onError?: (message: unknown) => void;
 };
@@ -128,6 +129,81 @@ describe("startEmbeddedPostgresWithRetry", () => {
     // The thrown message carries the captured Postgres output, not only the
     // generic "embedded Postgres startup failed" text.
     expect((error as Error).message).toContain("Address already in use");
+  });
+});
+
+// Test clusters hold throwaway data, so they run without durability: no fsync,
+// no synchronous commit, no full-page writes. These are server flags, passed
+// at every start, so a template's data directory is the same as without them.
+const TUNED_SERVER_FLAGS = ["-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"];
+
+describe("test cluster server flags", () => {
+  afterEach(() => {
+    __setEmbeddedPostgresCtorProviderForTests(null);
+  });
+
+  it("starts a fresh suite cluster with durability off", async () => {
+    const { ctor, constructed } = makeFakeCtor(0);
+    __setEmbeddedPostgresCtorProviderForTests(async () => ctor);
+
+    const started = await startWithRetry("paperclip-flags-fresh-");
+    try {
+      expect(constructed).toHaveLength(1);
+      expect(constructed[0]?.postgresFlags).toEqual(TUNED_SERVER_FLAGS);
+    } finally {
+      await started.instance.stop();
+      fs.rmSync(started.dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it("builds the template and runs the probe with durability off", async () => {
+    const originalTemplateSetting = process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE;
+    delete process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE;
+    const scratch = useScratchTmpdir("paperclip-flags-build-");
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      // The fake cluster does not listen, so the template build fails at the
+      // migration step and the probe falls through to a throwaway cluster.
+      const { ctor, constructed } = makeFakeCtor(0);
+      __setEmbeddedPostgresCtorProviderForTests(async () => ctor);
+      resetTemplateState();
+      expect(await getEmbeddedPostgresTestSupport()).toEqual({ supported: true });
+      expect(constructed).toHaveLength(2);
+      expect(constructed[0]?.databaseDir).toContain("paperclip-embedded-postgres-template-build-");
+      for (const options of constructed) expect(options.postgresFlags).toEqual(TUNED_SERVER_FLAGS);
+    } finally {
+      console.warn = warn;
+      scratch.restore();
+      if (originalTemplateSetting === undefined) delete process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE;
+      else process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE = originalTemplateSetting;
+    }
+  });
+
+  it("starts a suite cluster copied from the template with durability off", async () => {
+    const originalTemplateSetting = process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE;
+    delete process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE;
+    const scratch = useScratchTmpdir("paperclip-flags-copy-");
+    try {
+      // A stand-in template: a private directory with a stopped "cluster".
+      const rootDir = templateRootDir();
+      fs.mkdirSync(rootDir, { recursive: true, mode: 0o700 });
+      const templateDir = path.join(rootDir, computeEmbeddedPostgresTemplateKey());
+      fs.mkdirSync(templateDir, { mode: 0o700 });
+      fs.writeFileSync(path.join(templateDir, "PG_VERSION"), "18\n");
+      const { ctor, constructed } = makeFakeCtor(0);
+      __setEmbeddedPostgresCtorProviderForTests(async () => ctor);
+      resetTemplateState();
+      // The fake cluster does not listen, so the start fails after the copy.
+      await expect(startEmbeddedPostgresTestDatabase("paperclip-flags-copy-start-")).rejects.toThrow();
+      expect(constructed.length).toBeGreaterThanOrEqual(1);
+      expect(path.basename(constructed[0]!.databaseDir)).toBe("data");
+      for (const options of constructed) expect(options.postgresFlags).toEqual(TUNED_SERVER_FLAGS);
+    } finally {
+      scratch.restore();
+      if (originalTemplateSetting === undefined) delete process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE;
+      else process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE = originalTemplateSetting;
+    }
   });
 });
 
@@ -347,6 +423,31 @@ describeWithPostgres("startEmbeddedPostgresTestDatabase template path", () => {
     }
   });
 
+  it.each([
+    { mode: "template", setting: undefined },
+    { mode: "fresh", setting: "0" },
+  ])("runs the $mode cluster with durability off", { timeout: EMBEDDED_POSTGRES_TEST_TIMEOUT_MS }, async ({ mode, setting }) => {
+    if (setting === undefined) delete process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE;
+    else process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE = setting;
+    const database = await startEmbeddedPostgresTestDatabase("paperclip-durability-off-");
+    try {
+      expect(lastStartMode()).toBe(mode);
+      const sql = postgres(database.connectionString, { max: 1 });
+      try {
+        const rows = await sql<{ name: string; setting: string }[]>`
+          select name, setting from pg_settings
+          where name in ('fsync', 'synchronous_commit', 'full_page_writes') order by name`;
+        expect(rows.map((row) => `${row.name}=${row.setting}`)).toEqual([
+          "fsync=off", "full_page_writes=off", "synchronous_commit=off",
+        ]);
+      } finally {
+        await sql.end();
+      }
+    } finally {
+      await database.cleanup();
+    }
+  });
+
   it("refreshes the template's timestamp on every reuse so idle time drives pruning", { timeout: EMBEDDED_POSTGRES_TEST_TIMEOUT_MS }, async () => {
     delete process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE;
     // Make sure a template exists before ageing it: the support probe does
@@ -371,6 +472,26 @@ describeWithPostgres("startEmbeddedPostgresTestDatabase template path", () => {
       await database.cleanup();
     }
     expect(fs.statSync(templateDir).mtimeMs).toBeGreaterThan(Date.now() - 60 * 1000);
+  });
+
+  it("syncs the template to disk before publishing it, since it was built with fsync off", { timeout: EMBEDDED_POSTGRES_TEST_TIMEOUT_MS }, async () => {
+    delete process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE;
+    const scratch = useScratchTmpdir("paperclip-template-sync-");
+    const fsync = vi.spyOn(fs, "fsyncSync");
+    try {
+      resetTemplateState();
+      const database = await startEmbeddedPostgresTestDatabase("paperclip-template-sync-copy-");
+      await database.cleanup();
+      expect(lastStartMode()).toBe("template");
+      const templateDir = path.join(templateRootDir(), computeEmbeddedPostgresTemplateKey());
+      const files = (fs.readdirSync(templateDir, { recursive: true, withFileTypes: true }) as fs.Dirent[])
+        .filter((entry) => entry.isFile());
+      expect(files.length).toBeGreaterThan(100);
+      expect(fsync.mock.calls.length).toBeGreaterThanOrEqual(files.length);
+    } finally {
+      fsync.mockRestore();
+      scratch.restore();
+    }
   });
 
   it("rebuilds the template when it was pruned after this process resolved it", { timeout: EMBEDDED_POSTGRES_TEST_TIMEOUT_MS }, async () => {

@@ -40,6 +40,7 @@ type EmbeddedPostgresCtor = new (opts: {
   port: number;
   persistent: boolean;
   initdbFlags?: string[];
+  postgresFlags?: string[];
   onLog?: (message: unknown) => void;
   onError?: (message: unknown) => void;
 }) => TestPostgresInstance;
@@ -126,6 +127,20 @@ async function getAvailablePort(): Promise<number> {
 const EMBEDDED_POSTGRES_USER = "paperclip";
 const EMBEDDED_POSTGRES_PASSWORD = "paperclip";
 const EMBEDDED_POSTGRES_INITDB_FLAGS = ["--encoding=UTF8", "--locale=C", "--lc-messages=C"];
+// Test clusters hold throwaway data, so they run without durability: Postgres
+// skips fsync, commits without waiting for the WAL flush, and writes no
+// full-page images. Test cleanup deletes rows one statement at a time, and
+// with durability on every statement waits on a disk flush. These are server
+// flags passed at every start, not settings in `postgresql.conf`, so a
+// template's data directory is the same with or without them and the template
+// key does not include them. A crash of the host can corrupt a running test
+// cluster, which is thrown away anyway; the template is synced to disk before
+// it is published (`syncDirectoryTree`).
+const EMBEDDED_POSTGRES_SERVER_FLAGS = [
+  "-c", "fsync=off",
+  "-c", "synchronous_commit=off",
+  "-c", "full_page_writes=off",
+];
 
 async function createEmbeddedPostgresTestInstance(tempDirPrefix: string) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), tempDirPrefix));
@@ -155,6 +170,7 @@ async function createEmbeddedPostgresTestInstanceAt(dataDir: string) {
     port,
     persistent: true,
     initdbFlags: EMBEDDED_POSTGRES_INITDB_FLAGS,
+    postgresFlags: EMBEDDED_POSTGRES_SERVER_FLAGS,
     onLog: (message) => logBuffer.append(message),
     onError: (message) => logBuffer.append(message),
   }), dataDir);
@@ -464,6 +480,26 @@ async function stopForTemplatePublish(instance: EmbeddedPostgresInstance): Promi
   } catch { return false; }
 }
 
+// Flushes every file and directory under `dir` to disk. The template build runs
+// with fsync off, so its clean shutdown leaves the data in the page cache; the
+// template outlives the build (it is reused for up to a week), so it is made
+// durable before it is published. Directory fsync is best effort: Windows
+// cannot open a directory for it.
+function syncDirectoryTree(dir: string): void {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) syncDirectoryTree(entryPath);
+    else if (entry.isFile()) syncPath(entryPath);
+  }
+  try { syncPath(dir); } catch { /* best effort */ }
+}
+
+function syncPath(target: string): void {
+  const fd = fs.openSync(target, "r");
+  try { fs.fsyncSync(fd); }
+  finally { fs.closeSync(fd); }
+}
+
 // Builds a migrated cluster and publishes its data directory at `templateDir`.
 // Throws when the cluster cannot start or a migration cannot apply. Returns
 // false when the cluster started but the template could not be published;
@@ -479,9 +515,11 @@ async function buildEmbeddedPostgresTemplate(templateDir: string): Promise<boole
     await applyPendingMigrations(databaseConnectionStringFor(port));
     const stopped = await stopForTemplatePublish(instance);
     if (!stopped || !isUsableTemplate(dataDir)) return false;
+    syncDirectoryTree(dataDir);
     try {
       fs.renameSync(dataDir, templateDir);
       published = true;
+      try { syncPath(rootDir); } catch { /* best effort: the rename itself */ }
     } catch (error) {
       // Another process published the same key first. Use theirs.
       const code = (error as NodeJS.ErrnoException).code;
