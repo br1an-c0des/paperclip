@@ -38,6 +38,8 @@ import type {
 import {
   LOW_TRUST_REVIEW_PRESET,
   PERMISSION_KEYS,
+  agentAccessSchema,
+  hasAgentAccess,
   extractAgentMentionIds,
   trustPresetSchema,
   lowTrustBoundarySchema,
@@ -51,7 +53,12 @@ import {
   type TrustPresetResolution,
 } from "./trust-preset-resolver.js";
 import { logger } from "../middleware/logger.js";
-import { normalizeAgentPermissions } from "../lib/agent-permissions.js";
+import {
+  consumeTemporaryAccessOncePerRequest,
+  isAgentAccessAction,
+  loadAgentAccess,
+  type TemporaryAccessResource,
+} from "./agent-access.js";
 import { grantsForHumanRole, normalizeHumanRole } from "./company-member-roles.js";
 import { isRunPhaseActive, measureRunPhase, type ExecutionPhase } from "./execution-preparation-timing.js";
 
@@ -144,6 +151,8 @@ export type AuthorizationDecision = {
   inboxPolicyMode?: InboxAgentPolicyMode | "grant_override";
   code?: "RESPONSIBLE_USER_UNAUTHORIZED" | "RESPONSIBLE_USER_UNAVAILABLE" | "agent_interaction_denied";
   interactionDenial?: AgentInteractionDenial;
+  /** Set with reason `access_level`: the access action the caller's level and overrides lack. */
+  missingAction?: AgentAccessAction;
   reason:
     | "allow_low_trust_boundary"
     | "allow_local_board"
@@ -162,6 +171,8 @@ export type AuthorizationDecision = {
     | "allow_company_member"
     | "allow_simple_company_member"
     | "allow_manager_chain"
+    | "allow_access_level"
+    | "allow_temporary_grant"
     | "inbox_target_user_unresolved"
     | "inbox_management_disabled"
     | "inbox_agent_not_allowed"
@@ -177,7 +188,12 @@ export type AuthorizationDecision = {
     | "deny_issue_private"
     | "deny_project_private"
     | "deny_scope"
-    | "deny_unsupported_action";
+    | "deny_unsupported_action"
+    /**
+     * The agent's access level and overrides don't include the action, and no temporary grant
+     * does. The only refusal a permission request can get past (step 4a, section 7).
+     */
+    | "access_level";
   grant?: {
     principalType: PrincipalType;
     principalId: string;
@@ -242,6 +258,7 @@ const PLAIN_DELEGATED_USER_DENIALS: Record<AuthorizationDenialReason, (subject: 
   deny_agent_interaction: (_subject, action) => `Agents are not allowed to ${action} in this company; a person who manages permissions can change this.`,
   deny_issue_private: (subject) => `${subject} cannot see this private task.`,
   deny_project_private: (subject) => `${subject} cannot see this private project.`,
+  access_level: (subject, action) => `${subject}'s access level does not let it ${action}.`,
   inbox_target_user_unresolved: () => "Paperclip could not tell whose inbox this is.",
   inbox_management_disabled: () => "This person has turned off agent management of their inbox.",
   inbox_agent_not_allowed: () => "This agent is not on the list of agents this person allows to manage their inbox.",
@@ -284,15 +301,8 @@ function isPermissionKey(action: AuthorizationAction): action is PermissionKey {
   return (PERMISSION_KEYS as readonly string[]).includes(action);
 }
 
-function canCreateAgentsLegacy(agent: { role: string; permissions: unknown }) {
-  // An explicit canCreateAgents value is the saved access policy, including
-  // for CEOs: the board can turn hiring off on any agent's permissions page,
-  // and the CEO title must not override that denial. The CEO role only fills
-  // in hiring authority for rows that never saved an explicit value. Raw rows
-  // may predate permission normalization; apply the same defaults the agent
-  // service applies on read so enforcement matches what the API reports.
-  return normalizeAgentPermissions(agent.permissions, { role: agent.role }).canCreateAgents;
-}
+/** How far up the task tree an agent's own task is looked for. */
+const OWN_TASK_ANCESTRY_MAX_DEPTH = 50;
 
 function scopeValueList(value: unknown): string[] {
   if (typeof value === "string" && value.trim()) return [value.trim()];
@@ -838,11 +848,47 @@ function scopeBoolean(scope: Record<string, unknown> | null | undefined, key: st
 }
 
 export function authorizationDeniedDetails(decision: AuthorizationDecision) {
+  if (decision.reason === "access_level" && decision.missingAction) {
+    return { code: "access_denied", missingAction: decision.missingAction, requestable: true, reason: decision.reason };
+  }
   return {
     ...decision.interactionDenial,
     ...(decision.code ? { code: decision.code } : {}),
     reason: decision.reason,
   };
+}
+
+/**
+ * The 403 body for an access refusal (step 4a): `requestable` is true only when the refusal came
+ * from the level or overrides (reason `access_level`), the one kind a permission request can get
+ * past. Every other refusal is a plain denial naming the action that was being checked.
+ */
+export function accessDeniedBody(decision: Pick<AuthorizationDecision, "explanation" | "reason" | "missingAction">, fallbackAction: AgentAccessAction) {
+  return {
+    error: decision.explanation,
+    code: "access_denied" as const,
+    missingAction: decision.missingAction ?? fallbackAction,
+    requestable: decision.reason === "access_level",
+  };
+}
+
+/** Access actions that exist only in the agent access model, not as a stored permission key. */
+function isAccessOnlyAction(action: AuthorizationAction): action is AgentAccessAction {
+  return isAgentAccessAction(action) && !isPermissionKey(action);
+}
+
+function temporaryAccessResourceFor(resource: AuthorizationResource): TemporaryAccessResource {
+  if (resource.type === "issue" && resource.issueId) return { type: "issue", id: resource.issueId };
+  if (resource.type === "agent" && resource.agentId) return { type: "agent", id: resource.agentId };
+  if (resource.type === "project" && resource.projectId) return { type: "project", id: resource.projectId };
+  return { type: "company", id: resource.companyId };
+}
+
+/** The agent's stored override for an action, if any: an explicit allow, unlike a level default. */
+function storedAccessOverride(permissions: unknown, action: AgentAccessAction) {
+  const record = isPlainRecord(permissions) ? permissions : null;
+  const parsed = agentAccessSchema.safeParse(record?.access);
+  return parsed.success ? parsed.data.overrides?.[action] : undefined;
 }
 
 type DbTransaction = Parameters<Parameters<Db["transaction"]>[0]>[0];
@@ -1774,6 +1820,98 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
     return isAgentInSubtree(db, companyId, managerAgentId, assigneeAgentId);
   }
 
+  function loadActorAccess(agentId: string) {
+    return batchRead(`access:${agentId}`, () => loadAgentAccess(db as Db, agentId));
+  }
+
+  /**
+   * Whether the task is the agent's own (step 4a, section 2): assigned to it or created by it, or
+   * below such a task in the tree. A manager's reports' tasks count too: the same test with the
+   * owner anywhere in the agent's reporting subtree.
+   */
+  async function agentOwnsIssue(companyId: string, actorAgentId: string, issueId: string): Promise<boolean> {
+    return batchRead(`owns:${companyId}:${actorAgentId}:${issueId}`, async () => {
+      const rows = await db.execute(sql`
+        WITH RECURSIVE chain(id, parent_id, assignee_agent_id, created_by_agent_id, depth) AS (
+          SELECT id, parent_id, assignee_agent_id, created_by_agent_id, 0
+          FROM issues
+          WHERE company_id = ${companyId} AND id = ${issueId}
+          UNION ALL
+          SELECT parent.id, parent.parent_id, parent.assignee_agent_id, parent.created_by_agent_id, chain.depth + 1
+          FROM issues parent
+          JOIN chain ON parent.id = chain.parent_id
+          WHERE parent.company_id = ${companyId} AND chain.depth < ${OWN_TASK_ANCESTRY_MAX_DEPTH}
+        )
+        SELECT assignee_agent_id, created_by_agent_id FROM chain
+      `);
+      const owners = new Set<string>();
+      for (const row of (Array.isArray(rows) ? rows : []) as Array<Record<string, unknown>>) {
+        for (const value of [row.assignee_agent_id, row.created_by_agent_id]) {
+          if (typeof value === "string") owners.add(value);
+        }
+      }
+      if (owners.has(actorAgentId)) return true;
+      if (owners.size === 0) return false;
+      const hierarchy = await loadCompanyAgentHierarchy(db, companyId);
+      return [...owners].some((owner) => agentIsInSubtree(hierarchy, actorAgentId, owner));
+    });
+  }
+
+  /** Decides one access action for an agent: its level and overrides, then a temporary grant. */
+  async function decideAgentAccess(input: {
+    actorAgentId: string;
+    companyId: string;
+    action: AgentAccessAction;
+    decisionAction: AuthorizationAction;
+    resource: AuthorizationResource;
+  }): Promise<AuthorizationDecision> {
+    const access = await loadActorAccess(input.actorAgentId);
+    if (hasAgentAccess(access, input.action)) {
+      return allow({
+        action: input.decisionAction,
+        reason: "allow_access_level",
+        explanation: `Allowed by the agent's access level (${input.action}).`,
+      });
+    }
+    if (await consumeTemporaryAccessOncePerRequest(db, {
+      companyId: input.companyId,
+      principal: { type: "agent", id: input.actorAgentId },
+      action: input.action,
+      resource: temporaryAccessResourceFor(input.resource),
+    })) {
+      return allow({
+        action: input.decisionAction,
+        reason: "allow_temporary_grant",
+        explanation: `Allowed by a temporary grant for ${input.action}.`,
+      });
+    }
+    return deny({
+      action: input.decisionAction,
+      reason: "access_level",
+      missingAction: input.action,
+      explanation: `This agent's access level does not let it ${plainAuthorizationActionPhrase(input.action)} (needs ${input.action}).`,
+    });
+  }
+
+  /**
+   * Changing a task: `tasks:update_any` covers every task, `tasks:update_own` only the agent's own.
+   * Replaces the default-open visible-issue write rule for agents.
+   */
+  async function decideAgentIssueWriteAccess(input: {
+    actorAgentId: string;
+    companyId: string;
+    decisionAction: AuthorizationAction;
+    resource: AuthorizationResource;
+    ownTasksOnly: boolean;
+  }): Promise<AuthorizationDecision> {
+    const access = await loadActorAccess(input.actorAgentId);
+    const issueId = input.resource.type === "issue" ? input.resource.issueId ?? null : null;
+    const own = input.ownTasksOnly && !hasAgentAccess(access, "tasks:update_any") && issueId
+      ? await agentOwnsIssue(input.companyId, input.actorAgentId, issueId)
+      : false;
+    return decideAgentAccess({ ...input, action: own ? "tasks:update_own" : "tasks:update_any" });
+  }
+
   function commentAuthorCanGrantIssueMention(input: {
     mentionedAgentId: string;
     issueAssigneeAgentId: string | null;
@@ -1997,14 +2135,24 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
       principalId: string,
       keys: { direct: PermissionKey; suggest: PermissionKey },
     ): Promise<AuthorizationDecision> {
-      const directDecision = await decidePrincipalGrant({
-        companyId,
-        principalType,
-        principalId,
-        action: input.action,
-        permissionKey: keys.direct,
-        scope: input.scope,
-      });
+      // An agent's direct configure authority is its access level's agents:configure, no longer a
+      // stored grant; suggest-only grants keep their consent flow.
+      const directDecision: AuthorizationDecision = principalType === "agent" && isAgentAccessAction(keys.direct)
+        ? await decideAgentAccess({
+            actorAgentId: principalId,
+            companyId,
+            action: keys.direct,
+            decisionAction: input.action,
+            resource: input.resource,
+          })
+        : await decidePrincipalGrant({
+            companyId,
+            principalType,
+            principalId,
+            action: input.action,
+            permissionKey: keys.direct,
+            scope: input.scope,
+          });
       if (directDecision.allowed) {
         return allow({
           action: input.action,
@@ -2042,6 +2190,7 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
       if (suggestDecision.reason === "deny_missing_membership") return suggestDecision;
       if (directDecision.reason === "deny_scope") return directDecision;
       if (suggestDecision.reason === "deny_scope") return suggestDecision;
+      if (directDecision.reason === "access_level") return directDecision;
 
       return deny({
         action: input.action,
@@ -2252,6 +2401,30 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
         });
       }
       if (!permissionKey) {
+        // People keep their membership rules: the agent access actions map onto them, so a board
+        // member may do what the issue routes already let it do.
+        if (isAccessOnlyAction(input.action)) {
+          const membership = await getActiveMembership(companyId, "user", input.actor.userId);
+          if (membership && (input.action === "tasks:read" || membership.membershipRole !== "viewer")) {
+            return allow({
+              action: input.action,
+              reason: "allow_simple_company_member",
+              explanation: "Allowed by standard same-company board membership.",
+            });
+          }
+          if (membership) {
+            return deny({
+              action: input.action,
+              reason: "deny_missing_grant",
+              explanation: `Viewer membership does not grant ${input.action}.`,
+            });
+          }
+          return deny({
+            action: input.action,
+            reason: "deny_missing_membership",
+            explanation: "This user is not an active member of this company.",
+          });
+        }
         if (input.action === "issue:comment" || input.action === "issue:mutate") {
           if (
             input.resource.type !== "issue" ||
@@ -2434,6 +2607,12 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
     });
     if (lowTrustDecision) {
       if (!lowTrustDecision.allowed) return lowTrustDecision;
+      if (input.action === "issue:comment") {
+        const commentAccess = await decideAgentAccess({
+          actorAgentId, companyId, action: "tasks:comment", decisionAction: input.action, resource: input.resource,
+        });
+        if (!commentAccess.allowed) return commentAccess;
+      }
       if (
         input.action === "agent:read" ||
         input.action === "agent:wake" ||
@@ -2450,6 +2629,18 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
       }
     }
 
+    // Agent access actions (step 4a): the level, overrides and temporary grants decide. Assignment
+    // has its own branch below, since a worker may assign subtasks of its own tasks.
+    if (isAgentAccessAction(input.action) && !taskAssignmentAction) {
+      if ((input.action === "tasks:update_own" || input.action === "tasks:update_any") && input.resource.type === "issue") {
+        return decideAgentIssueWriteAccess({
+          actorAgentId, companyId, decisionAction: input.action, resource: input.resource,
+          ownTasksOnly: input.action === "tasks:update_own",
+        });
+      }
+      return decideAgentAccess({ actorAgentId, companyId, action: input.action, decisionAction: input.action, resource: input.resource });
+    }
+
     const visibleIssueWriteDecision =
       trustResolution.kind === "standard" &&
       (input.action === "issue:comment" || input.action === "issue:mutate")
@@ -2457,6 +2648,18 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
         : null;
     if (visibleIssueWriteDecision && !visibleIssueWriteDecision.allowed) {
       return visibleIssueWriteDecision;
+    }
+
+    // Visibility first, so a task the agent can't see is a plain denial rather than a requestable
+    // one; then the access level: commenting needs tasks:comment, changing needs tasks:update_own
+    // for its own task or tasks:update_any for anyone else's.
+    if (input.action === "issue:comment" || input.action === "issue:mutate") {
+      const writeAccess = input.action === "issue:comment"
+        ? await decideAgentAccess({ actorAgentId, companyId, action: "tasks:comment", decisionAction: input.action, resource: input.resource })
+        : await decideAgentIssueWriteAccess({
+            actorAgentId, companyId, decisionAction: input.action, resource: input.resource, ownTasksOnly: true,
+          });
+      if (!writeAccess.allowed) return writeAccess;
     }
 
     if (
@@ -2671,10 +2874,41 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
       const policyEffect = await requestedAssignmentPolicy();
       const policyDeny = await denyForAssignmentPolicyIfNeeded(policyEffect);
       if (policyDeny) return policyDeny;
+      const requestedScope = input.scope ?? (input.resource.type === "issue" ? {
+        issueId: input.resource.issueId ?? null,
+        projectId: input.resource.projectId ?? null,
+        parentIssueId: input.resource.parentIssueId ?? null,
+        assigneeAgentId: input.resource.assigneeAgentId ?? null,
+        assigneeUserId: input.resource.assigneeUserId ?? null,
+      } : null);
       if (policyEffect.kind === "restricted") {
-        const grantDecision = await decideWithTaskAssignmentGrants("agent", actorAgentId);
-        if (grantDecision.allowed) return grantDecision;
+        // A protected target needs an explicit allow, as it needed an explicit grant before step
+        // 4a: an override (carried over from those grants), never a level's default.
+        const override = storedAccessOverride(actorAgent.permissions, "tasks:assign");
+        if (override === true || (typeof override === "object" && await scopeAllows(db, companyId, override.scope, requestedScope))) {
+          return allow({
+            action: input.action,
+            reason: "allow_explicit_grant",
+            explanation: "Allowed by the agent's explicit tasks:assign override.",
+          });
+        }
         return denyRestrictedAssignmentPolicy(policyEffect);
+      }
+      const access = await loadActorAccess(actorAgentId);
+      const assignAccess = access["tasks:assign"];
+      let assignAllowed = assignAccess === true ||
+        (typeof assignAccess === "object" && await scopeAllows(db, companyId, assignAccess.scope, requestedScope));
+      // tasks:create covers handing off its own task and assigning subtasks of its own tasks
+      // (a new task without a parent is its own: it creates it).
+      if (!assignAllowed && hasAgentAccess(access, "tasks:create") && input.resource.type === "issue") {
+        const ownTarget = input.resource.issueId ?? input.resource.parentIssueId ?? null;
+        assignAllowed = ownTarget ? await agentOwnsIssue(companyId, actorAgentId, ownTarget) : true;
+      }
+      if (!assignAllowed) {
+        const grantDecision = await decideAgentAccess({
+          actorAgentId, companyId, action: "tasks:assign", decisionAction: input.action, resource: input.resource,
+        });
+        if (!grantDecision.allowed) return grantDecision;
       }
       if (trustResolution.kind === "standard") return decideVisibleIssueWrite();
       return allow({
@@ -2736,6 +2970,13 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
           explanation: "Allowed because the actor is reading its own agent configuration.",
         });
       }
+      if (hasAgentAccess(await loadActorAccess(actorAgentId), "agents:configure")) {
+        return allow({
+          action: input.action,
+          reason: "allow_access_level",
+          explanation: "Allowed by the agent's access level (agents:configure).",
+        });
+      }
       return decideWithAgentConfigReadGrant("agent", actorAgentId);
     }
 
@@ -2748,7 +2989,8 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
       const restricted = await decideWithProtectedChangeGrants("agent", actorAgentId, {
         direct: "agents:configure", suggest: "agents:suggest-changes",
       });
-      if (restricted.reason !== "deny_no_grant" || input.resource.type !== "agent" || input.resource.agentId !== actorAgentId) return restricted;
+      const noAuthority = restricted.reason === "deny_no_grant" || restricted.reason === "access_level";
+      if (!noAuthority || input.resource.type !== "agent" || input.resource.agentId !== actorAgentId) return restricted;
       return allow({ action: input.action, reason: "allow_self", explanation: "Own instruction content edit, subject to the responsible user's target edit access." });
     }
 
@@ -2776,14 +3018,6 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
         scope: input.scope,
       });
       if (grantDecision.allowed) return grantDecision;
-    }
-
-    if (input.action === "agents:create" && canCreateAgentsLegacy(actorAgent)) {
-      return allow({
-        action: input.action,
-        reason: "allow_legacy_agent_creator",
-        explanation: "Allowed by legacy agent creator authority.",
-      });
     }
 
     // Active-checkout management deliberately does not ride on

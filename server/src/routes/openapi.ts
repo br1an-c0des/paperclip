@@ -89,6 +89,7 @@ import {
   updateIssueSchema,
   stalledReviewDecisionSchema,
   createIssueLabelSchema,
+  updateIssueLabelSchema,
   addIssueCommentSchema,
   checkoutIssueSchema,
   linkIssueApprovalSchema,
@@ -5204,6 +5205,18 @@ registry.registerPath({
     body: jsonBody(createIssueLabelSchema),
   },
   responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/api/labels/{labelId}",
+  tags: ["issues"],
+  summary: "Rename or recolor a label",
+  request: {
+    params: z.object({ labelId: z.string() }),
+    body: jsonBody(updateIssueLabelSchema),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden, 404: r.notFound, 409: r.conflict },
 });
 
 registry.registerPath({

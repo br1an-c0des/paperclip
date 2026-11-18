@@ -13447,6 +13447,27 @@ export function issueService(db: Db) {
       return created;
     },
 
+    /**
+     * Renames or recolors a label. Names are unique per company, so a clash is a 409. Returns
+     * the label before and after the change, or null when it doesn't exist.
+     */
+    updateLabel: async (id: string, patch: { name?: string; color?: string }) => db.transaction(async tx => {
+      const [before] = await tx.select().from(labels).where(eq(labels.id, id)).for("update");
+      if (!before) return null;
+      const name = patch.name?.trim();
+      if (name !== undefined && name !== before.name) {
+        const [clash] = await tx.select({ id: labels.id }).from(labels)
+          .where(and(eq(labels.companyId, before.companyId), eq(labels.name, name)));
+        if (clash) throw conflict(`A label named "${name}" already exists in this company.`, { code: "label_name_taken" });
+      }
+      const [after] = await tx.update(labels)
+        .set({ ...(name !== undefined ? { name } : {}), ...(patch.color !== undefined ? { color: patch.color } : {}), updatedAt: new Date() })
+        .where(eq(labels.id, id))
+        .returning();
+      await notifyStatusCardIssueChange(tx, before.companyId);
+      return { before, after: after! };
+    }),
+
     deleteLabel: async (id: string) => db.transaction(async tx => {
       const [label] = await tx.select({ companyId: labels.companyId }).from(labels).where(eq(labels.id, id));
       if (!label) return null;

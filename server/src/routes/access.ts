@@ -2632,6 +2632,14 @@ async function probeInviteResolutionTarget(
   }
 }
 
+/** Since step 4a an agent's standing permissions are its access level, not member grants. */
+function retiredAgentGrantsBody(agentId: string) {
+  return {
+    error: `Agent member grants are retired: set the agent's access level and overrides (permissions.access) with PATCH /api/agents/${agentId}/permissions.`,
+    code: "agent_grant_retired",
+  };
+}
+
 export function accessRoutes(
   db: Db,
   opts: {
@@ -4519,6 +4527,10 @@ export function accessRoutes(
       await assertCompanyPermission(req, companyId, "users:manage_permissions");
       const memberToUpdate = await access.getMemberById(companyId, memberId);
       if (!memberToUpdate) throw notFound("Member not found");
+      if (memberToUpdate.principalType === "agent") {
+        res.status(410).json(retiredAgentGrantsBody(memberToUpdate.principalId));
+        return;
+      }
       await assertCanManageCompanyMember(req, access, companyId, memberToUpdate);
 
       const updated = await access.updateMemberAndPermissions(
@@ -4605,6 +4617,10 @@ export function accessRoutes(
       await assertCompanyPermission(req, companyId, "users:manage_permissions");
       const memberToUpdate = await access.getMemberById(companyId, memberId);
       if (!memberToUpdate) throw notFound("Member not found");
+      if (memberToUpdate.principalType === "agent") {
+        res.status(410).json(retiredAgentGrantsBody(memberToUpdate.principalId));
+        return;
+      }
       await assertCanManageCompanyMember(req, access, companyId, memberToUpdate);
       const updated = await access.setMemberPermissions(
         companyId,

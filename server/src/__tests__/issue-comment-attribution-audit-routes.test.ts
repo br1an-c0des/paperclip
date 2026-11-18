@@ -89,6 +89,7 @@ describeEmbeddedPostgres("issue comment attribution and patch audit routes", () 
       adapterType: "process",
       adapterConfig: {},
       runtimeConfig: {},
+      permissions: { access: { level: "manager" as const } }, // pre-step-4a agents start at manager (migration 0491)
     }))).returning();
     const responsibleUserId = `responsible-${randomUUID()}`;
     const boardUserId = `board-${randomUUID()}`;

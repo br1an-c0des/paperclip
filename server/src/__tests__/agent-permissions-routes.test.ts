@@ -2306,6 +2306,8 @@ describe("agent permission routes", () => {
     expect(mockAgentService.updatePermissions).toHaveBeenCalledWith(agentId, {
       canCreateAgents: false,
       canAssignTasks: true,
+      // The hiring toggle also sets the agents:create access override (step 4a).
+      access: { level: "worker", overrides: { "agents:create": false } },
     }, { actorAgentId: null });
     expect(res.body.permissions.canCreateSkills).toBe(false);
   });
@@ -2377,7 +2379,9 @@ describe("agent permission routes", () => {
     await requestApp(app, (baseUrl) => request(baseUrl)
       .patch(`/api/agents/${agentId}/permissions`)
       .send({ canCreateAgents: false, canAssignTasks: true }));
-    expect(mockAgentService.updatePermissions).toHaveBeenCalledWith(agentId, { canCreateAgents: false, canAssignTasks: true }, { actorAgentId: null });
+    expect(mockAgentService.updatePermissions).toHaveBeenCalledWith(agentId, {
+      canCreateAgents: false, canAssignTasks: true, access: { level: "worker", overrides: { "agents:create": false } },
+    }, { actorAgentId: null });
   });
 
   it("rejects CEO permission updates outside the caller company scope", async () => {

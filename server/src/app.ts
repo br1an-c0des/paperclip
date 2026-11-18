@@ -81,6 +81,7 @@ import type { StorageService } from "./storage/types.js";
 import { httpLogger, errorHandler } from "./middleware/index.js";
 import { skillAccessRequestContext } from "./services/skill-access.js";
 import { actorMiddleware } from "./middleware/auth.js";
+import { agentRoutePolicy } from "./middleware/agent-route-policy.js";
 import { boardMutationGuard } from "./middleware/board-mutation-guard.js";
 import {
   privateHostnameGuard,
@@ -679,6 +680,7 @@ export async function createApp(
 
   // Mount API routes
   const api = Router();
+  api.use(agentRoutePolicy(db));
   const agentAvatars = agentAvatarRoutes();
   api.use(agentAvatars.router);
   api.use(boardMutationGuard());

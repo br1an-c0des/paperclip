@@ -128,6 +128,7 @@ import {
   createIssueThreadInteractionSchema,
   createIssueWorkProductSchema,
   createIssueLabelSchema,
+  updateIssueLabelSchema,
   createAcceptedPlanDecompositionSchema,
   checkoutIssueSchema,
   createDocumentAnnotationCommentSchema,
@@ -360,10 +361,13 @@ import {
   type ParentPlacement,
 } from "../services/issue-hierarchy.js";
 import {
+  accessDeniedBody,
   authorizationDeniedDetails,
   issueReadSqlCondition,
   projectReadSqlCondition,
+  type AuthorizationResource,
 } from "../services/authorization.js";
+import type { AgentAccessAction } from "@paperclipai/shared";
 import { stalledReviewDecisionService } from "../services/stalled-review-decisions.js";
 import { environmentService } from "../services/environments.js";
 import { environmentRuntimeService } from "../services/environment-runtime.js";
@@ -5812,6 +5816,46 @@ export function issueRoutes(
     })) as T[];
   }
 
+  /**
+   * Refuses an agent's write with the access body (step 4a) when its access level lacks the action:
+   * `{ error, code: "access_denied", missingAction, requestable }`. Requestable only when the level
+   * or overrides refused it; any other refusal is plain.
+   */
+  function denyAgentAccess(
+    res: Response,
+    decision: Awaited<ReturnType<typeof decideIssueAccess>>,
+    action: AgentAccessAction,
+  ) {
+    res.status(403).json(accessDeniedBody(decision, action));
+    return false as const;
+  }
+
+  /** An explicit access check for an agent caller; people pass through to the route's own checks. */
+  async function assertAgentAccessAction(
+    req: Request,
+    res: Response,
+    action: AgentAccessAction,
+    resource: AuthorizationResource,
+  ) {
+    if (req.actor.type !== "agent") return true;
+    const decision = await access.decide({ actor: req.actor, action, resource });
+    if (decision.allowed) return true;
+    return denyAgentAccess(res, decision, action);
+  }
+
+  function issueAccessResource(issue: Parameters<typeof decideIssueAccess>[1]): AuthorizationResource {
+    return {
+      type: "issue",
+      companyId: issue.companyId,
+      issueId: issue.id,
+      projectId: issue.projectId,
+      parentIssueId: issue.parentId,
+      assigneeAgentId: issue.assigneeAgentId,
+      assigneeUserId: issue.assigneeUserId,
+      status: issue.status,
+    };
+  }
+
   async function assertIssueWriteInfluenceAllowed(
     req: Request,
     res: Response,
@@ -5825,6 +5869,7 @@ export function issueRoutes(
       return true;
     const decision = await decideIssueAccess(req, issue, "issue:mutate");
     if (decision.allowed) return true;
+    if (decision.reason === "access_level") return denyAgentAccess(res, decision, "tasks:update_any");
     return denyIssueWrite(
       req,
       res,
@@ -5887,6 +5932,9 @@ export function issueRoutes(
       issue,
       "issue:comment",
     );
+    if (!boundaryDecision.allowed && boundaryDecision.reason === "access_level") {
+      return denyAgentAccess(res, boundaryDecision, "tasks:comment");
+    }
     if (!boundaryDecision.allowed) {
       return denyIssueWrite(
         req,
@@ -6034,6 +6082,11 @@ export function issueRoutes(
       issue,
       "issue:mutate",
     );
+    // The access level: tasks:update_own for its own task, tasks:update_any for anyone else's
+    // (step 4a; replaces the canEditOtherTasks switch, which migration 0491 carried over).
+    if (!boundaryDecision.allowed && boundaryDecision.reason === "access_level") {
+      return denyAgentAccess(res, boundaryDecision, "tasks:update_any");
+    }
     if (!boundaryDecision.allowed) {
       return denyIssueWrite(
         req,
@@ -9645,6 +9698,7 @@ export function issueRoutes(
     async (req, res) => {
       const companyId = req.params.companyId as string;
       assertCompanyAccess(req, companyId);
+      if (!(await assertAgentAccessAction(req, res, "labels:manage", { type: "company", companyId }))) return;
       const label = await svc.createLabel(companyId, req.body);
       const actor = getActorInfo(req);
       await logActivity(db, {
@@ -9663,6 +9717,40 @@ export function issueRoutes(
     },
   );
 
+  router.patch("/labels/:labelId", validate(updateIssueLabelSchema), async (req, res) => {
+    const labelId = req.params.labelId as string;
+    const existing = await getAccessibleResource(
+      req,
+      res,
+      svc.getLabelById(labelId),
+      "Label not found",
+    );
+    if (!existing) return;
+    if (!(await assertAgentAccessAction(req, res, "labels:manage", { type: "company", companyId: existing.companyId }))) return;
+    const updated = await svc.updateLabel(labelId, req.body);
+    if (!updated) {
+      res.status(404).json({ error: "Label not found" });
+      return;
+    }
+    const actor = getActorInfo(req);
+    await logActivity(db, {
+      companyId: updated.after.companyId,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      agentId: actor.agentId,
+      runId: actor.runId,
+      agentApiKeyId: actor.agentApiKeyId,
+      action: "label.updated",
+      entityType: "label",
+      entityId: labelId,
+      details: {
+        before: { name: updated.before.name, color: updated.before.color },
+        after: { name: updated.after.name, color: updated.after.color },
+      },
+    });
+    res.json(updated.after);
+  });
+
   router.delete("/labels/:labelId", async (req, res) => {
     const labelId = req.params.labelId as string;
     const existing = await getAccessibleResource(
@@ -9672,6 +9760,7 @@ export function issueRoutes(
       "Label not found",
     );
     if (!existing) return;
+    if (!(await assertAgentAccessAction(req, res, "labels:manage", { type: "company", companyId: existing.companyId }))) return;
     const removed = await svc.deleteLabel(labelId);
     if (!removed) {
       res.status(404).json({ error: "Label not found" });
@@ -15061,6 +15150,9 @@ export function issueRoutes(
         { allowVisibleIssueWrite: true },
       );
       if (!issueMutationAccess) return;
+      // Archiving and labels are task changes: tasks:update_own on its own task, else tasks:update_any.
+      if ((req.body.hiddenAt !== undefined || req.body.labelIds !== undefined)
+        && !(await assertAgentAccessAction(req, res, "tasks:update_own", issueAccessResource(existing)))) return;
       if (req.body.comment && !(await assertBoardCommentNotPaused(req, res, existing))) return;
       const issueMutationAuthorizationReason =
         req.actor.type === "agent"
@@ -17474,6 +17566,8 @@ export function issueRoutes(
     );
     if (!existing) return;
     if (!(await assertAgentIssueMutationAllowed(req, res, existing))) return;
+    // Hard delete is its own action, in no level: only an override (or a temporary grant) allows it.
+    if (!(await assertAgentAccessAction(req, res, "tasks:delete", issueAccessResource(existing)))) return;
     const attachments = await svc.listAttachments(id);
 
     const issue = await svc.remove(id, req.actor.type === "agent" ? req.actor.agentId : null);
