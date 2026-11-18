@@ -389,6 +389,14 @@ This also delivers COMPANY.md
 run ([F6](../ui-new/docs/build-plan.md#317-smaller-feature-ideas)) and project docs in the prompt
 ([3.4](../ui-new/docs/build-plan.md#34-project-knowledge-base)).
 
+Also in this step, left over from removing the old `ui/` (2026-11-17):
+
+- **Board links in agent guidance.** The server's API catalog and chat directives give agents links
+  to board pages that were checked against the old UI's routes. Point them at `ui-new`'s routes
+  and turn the 5 skipped tests (marked "ui/ removed 2026-11-17") back on against those routes.
+- **The `paperclip-board` skill** (`skills/paperclip-board/SKILL.md`) describes the old UI's search
+  palette and sidebar. Rewrite it for `ui-new`.
+
 ### 6. First-class chat
 
 Build chat next to the hidden-task chat, then move over and delete the old path:

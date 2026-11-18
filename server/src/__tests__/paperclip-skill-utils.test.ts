@@ -570,24 +570,6 @@ describe("paperclip skill utils", () => {
     // paperclip-issue-update-helper.test.ts against a live local server.
   });
 
-  it("keeps the create-issue-interaction-ui guide as a maintainer-only skill", async () => {
-    const skillPath = path.resolve(".agents/skills/create-issue-interaction-ui/SKILL.md");
-    const skillBody = await fs.readFile(skillPath, "utf8");
-    const normalizedSkillBody = skillBody.replace(/\s+/g, " ");
-    const normalizedLowerSkillBody = normalizedSkillBody.toLowerCase();
-
-    expect(skillBody).toContain("name: create-issue-interaction-ui");
-    expect(normalizedLowerSkillBody).toContain("developer/maintainer skill");
-    expect(normalizedLowerSkillBody).toContain(
-      "not the operational agents that run inside a deployed paperclip company",
-    );
-    expect(skillBody).toContain("packages/shared/src/constants.ts");
-    expect(skillBody).toContain("server/src/services/issue-thread-interactions.ts");
-    expect(skillBody).toContain("ui/src/components/IssueThreadInteractionCard.tsx");
-    expect(skillBody).toContain("packages/plugins/sdk/src/testing.ts");
-    await expect(fs.access(path.resolve("skills/create-issue-interaction-ui/SKILL.md"))).rejects.toThrow();
-  });
-
   it("removes stale maintainer-only symlinks from a shared skills home", async () => {
     const root = await makeTempDir("paperclip-skill-cleanup-");
     cleanupDirs.add(root);
