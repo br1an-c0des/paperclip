@@ -170,9 +170,11 @@ Calls the wave 1 agents made, to fold into the spec when wave 2 is planned (also
 
 ## Working on server1
 
-- server1 **is the real instance.** `~/paperclip` is the deploy checkout and `~/paperclip-data` its
-  data, behind the `paperclip-server-1` and `paperclip-db-1` containers. Don't build, test or run dev
-  servers there, and don't touch ports 3100 or 3200. Use a separate clone.
+- server1 **runs the real instance** and is also a dev machine (as of Nov 18, 2026).
+  `~/deployments/paperclip/` holds the deployment: `repo/` (the deploy checkout), `data/` and
+  `backups/`, behind the `paperclip-server-1` and `paperclip-db-1` containers. Don't build, test or
+  run dev servers there, and don't touch ports 3100 or 3200. Do dev work in the dev checkout,
+  `~/coding/paperclip` ([CLAUDE.md](../CLAUDE.md#dev-work-on-server1)).
 - **Node:** nvm has Node 26 as the default, but the repo wants Node 24 (`.nvmrc`), and Node 26
   doesn't ship corepack. `nvm install 24` (or `nvm use 24` in the clone) gives `corepack pnpm`.
 - **Already installed:** Claude Code (signed in) and `gh` (signed in as the repo owner), so agents can
@@ -183,8 +185,9 @@ Calls the wave 1 agents made, to fold into the spec when wave 2 is planned (also
 - **A fresh clone or worktree** needs `corepack pnpm install` and
   `corepack pnpm --filter @paperclipai/plugin-sdk build`, or the server dies with "does not provide an
   export named …".
-- **A local dev instance** for the final check would need its own ports and data folder, away from
-  the real one, or happen on the desktop instead.
+- **A local dev instance** for the final check runs on the desktop, or on server1 with its own port
+  and data folder (:3101 and `~/coding/paperclip-dev-data`, see
+  [CLAUDE.md](../CLAUDE.md#dev-work-on-server1)).
 
 ## Lessons from wave 1
 

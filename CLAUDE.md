@@ -97,7 +97,7 @@ corepack pnpm --filter @paperclipai/ui-new typecheck
 corepack pnpm --filter @paperclipai/ui-new test
 corepack pnpm --filter @paperclipai/ui-new test:e2e   # Playwright smoke suite, mocked API (E2E_LIVE=1: read-only against :3100)
 corepack pnpm --filter @paperclipai/plugin-sdk build # after install, a cherry-pick, or in a fresh worktree; else the server dies with "does not provide an export named …"
-ssh server1 'cd ~/paperclip && git pull --ff-only && deploy/deploy.sh'   # deploy main to server1 (the real instance)
+ssh server1 'cd ~/deployments/paperclip/repo && git pull --ff-only && deploy/deploy.sh'   # deploy main to server1 (the real instance)
 ```
 
 To review upstream, run `/upstream-watch`: it lists upstream's new commits since the last review,
@@ -109,7 +109,9 @@ triages them, and cherry-picks only what you choose, on a branch, after approval
   `main`. Before working: `git merge-base --is-ancestor main HEAD || git reset --hard main`.
 - `git sync-master` checks out `master`, so don't run it in a checkout the dev servers run from. Instead:
   `git fetch upstream && git push origin upstream/master:master && git branch -f master upstream/master && git branch --set-upstream-to=origin/master master`.
-- server1 is the real instance with real data: never test against it, and never run M7 test data there.
+- server1 runs the real instance with real data: never test against it, and never run M7 test data there.
+  server1 is also a dev machine, so check `hostname` first: on server1, `localhost:3100` is the real
+  instance ([Dev work on server1](#dev-work-on-server1)).
 - `pnpm verify` and similar scripts compare against `origin/master`, which is upstream now: pass `--base main`
   where they take one ([fork/repo-map.md](fork/repo-map.md#5-tests)).
 - Finished agent worktrees can be locked: `git worktree unlock <path>` before `git worktree remove`.
@@ -119,7 +121,31 @@ triages them, and cherry-picks only what you choose, on a branch, after approval
   `ldd` on its binary reports them missing, ask the user to run `sudo apt install -y libnss3 libnspr4 libasound2t64`
   rather than extracting them into a temporary folder, which is gone after a restart.
 
+## Dev work on server1
+
+There are two dev machines: the desktop (WSL) and server1. server1 also runs the real instance, so its
+deployment and dev work live in separate folders ([deploy/README.md](deploy/README.md#this-forks-deployment-server1)):
+
+- `~/deployments/paperclip/` holds the deployment: `repo/` (the deploy checkout), `data/` and
+  `backups/`. Never build, test, edit or run dev servers there.
+- `~/coding/paperclip` is the dev checkout. Do dev work there and in its worktrees.
+- The real instance owns ports 3100 and 3200, and its containers are `paperclip-server-1` and
+  `paperclip-db-1`. Leave them alone. Commands in this file that say `:3100` (`pnpm dev`, ui-new's API
+  proxy, `E2E_LIVE=1`) mean the desktop's dev instance. On server1, they would reach the real instance.
+- A dev instance on server1, when one is needed, gets its own port and data folder: the API on :3101
+  and data in `~/coding/paperclip-dev-data`. Untested so far:
+  `PAPERCLIP_HOME=~/coding/paperclip-dev-data PORT=3101 PAPERCLIP_AGENT_JWT_SECRET=$(openssl rand -hex 32) corepack pnpm dev`,
+  then `PAPERCLIP_API_URL=http://localhost:3101` for ui-new's dev server and for `E2E_LIVE=1`. It
+  starts empty, so it has no TES company until one is made.
+- Node: nvm defaults to Node 26, which doesn't ship corepack. The repo wants Node 24 (`.nvmrc`), so
+  run `nvm use 24` first.
+- The machine has 20 CPUs and 14 GB of memory, shared with the real instance. Cap heavy jobs with
+  `systemd-run --user --scope -p MemoryMax=… -p CPUQuota=…`.
+
 ## Testing against the local instance
+
+"The local instance" means a dev instance: the desktop's on :3100, or server1's on :3101. It never
+means the real instance on server1.
 
 - The test company is TES (`c3948f92-4af2-414f-81c4-88f1c59bf2ab`). Never change the agent Bob
   (`8997b521-5718-4fce-988f-e79a301dc876`).
