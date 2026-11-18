@@ -304,6 +304,11 @@ Follow-ups reported by the agents, for round 2:
   `paperclip-vitest-codex-home-*` and 545 `/tmp/pv-*` folders from upstream's runner.
 - The setup file's `beforeEach` costs ~0.4 s in isolated files that don't otherwise load drizzle
   (`services/instance-settings-cache.ts`).
+- **The default worker count is a fixed 8** (`defaultWorkers` in `scripts/test.mjs`), measured on
+  the desktop (16 cores, 22 GB). server1 has 14 GB shared with the real instance: until the default
+  scales with the machine's cores and free memory, run it there with `--workers 4` inside
+  `systemd-run --user --scope -p MemoryMax=…` (CLAUDE.md, "Dev work on server1"). Memory with
+  B's shared (non-isolated) workers hasn't been measured.
 - A SIGKILLed worker can still orphan a running Postgres (the sweep removes its directory only once
   the postmaster is dead).
 
