@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { expect } from "@playwright/test";
 import { createDb } from "../../../packages/db/src/index.js";
-import { listenOnFetchAllowedPort } from "../../e2e/fetch-allowed-port.js";
+import { listenOnFetchAllowedPort } from "../../fixtures/fetch-allowed-port.js";
 import type { ChatCatalogContext } from "../chat-catalog-contract.js";
 import { pollUntil } from "../api.js";
 import { sendChatMessage } from "../chat-flow.js";
@@ -200,5 +200,5 @@ dev.cleanup = async ctx => { const o = owned.get(ctx); if (!o) return; await sto
   const root = await realpath(process.env.PAPERCLIP_RUNNER_E2E_TEMP_ROOT!), directory = await realpath(o.root);
   if (!directory.startsWith(root + path.sep) || !path.basename(directory).startsWith("operator-dev-")) throw new Error("Refusing non-owned development cleanup");
   await rm(directory, { recursive: true }); owned.delete(ctx); };
-dev.sourceFiles = [...dev.sourceFiles, "../../cli/src/index.ts", "../../cli/src/commands/worktree.ts", "../../cli/src/commands/run.ts", "../e2e/fetch-allowed-port.ts", "redaction.ts"];
+dev.sourceFiles = [...dev.sourceFiles, "../../cli/src/index.ts", "../../cli/src/commands/worktree.ts", "../../cli/src/commands/run.ts", "../fixtures/fetch-allowed-port.ts", "redaction.ts"];
 export const privilegedOwnedDevCases = [dev];

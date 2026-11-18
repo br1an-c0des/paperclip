@@ -526,7 +526,7 @@ export const personalSecretExternalCases = [
         "run-observations.ts",
         "chat-flow.ts",
         "../../server/src/home-paths.ts",
-        "../e2e/fetch-allowed-port.ts",
+        "../fixtures/fetch-allowed-port.ts",
         "../../server/src/routes/secrets.ts",
         "../../server/src/services/secrets.ts",
         "../../server/src/services/heartbeat/run-preparation.ts",

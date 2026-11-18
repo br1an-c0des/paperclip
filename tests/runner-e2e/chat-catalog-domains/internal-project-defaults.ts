@@ -123,7 +123,7 @@ function defaults(): ChatCatalogCase {
       ctx.input.api.get<PreparedAgent>(`/api/agents/${ctx.input.fixtures.agent.id}`), ctx.input.api.get<PreparedAgent>(`/api/agents/${entity(state, "futureWorker").id}`), ctx.input.api.get<PreparedAgent>(`/api/agents/${entity(state, "worker").id}`),
       ctx.input.api.get<Entity & { executionRunId?: string }>(`/api/issues/${entity(state, "task").id}`), ctx.allRuns() ]);
       return gradeProjectDefaultsSetup({ lead, future, held, task: t, runs, activeRunId: String(state.activeRunId), gateCalls: gate?.calls ?? [] }); },
-    sourceFiles: [...base.sourceFiles, "chat-catalog-domains/internal-project-defaults.ts", "chat-catalog-domains/internal-native-run-brief.ts", "../e2e/fetch-allowed-port.ts", "run-observations.ts"],
+    sourceFiles: [...base.sourceFiles, "chat-catalog-domains/internal-project-defaults.ts", "chat-catalog-domains/internal-native-run-brief.ts", "../fixtures/fetch-allowed-port.ts", "run-observations.ts"],
     async act(ctx, state) {
       // This boundary depends only on the canonical run and conversation.
       // Rebuilding domain/DOM evidence on each wait poll adds unrelated load

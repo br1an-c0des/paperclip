@@ -5,7 +5,7 @@ import path from "node:path";
 import type { ChatCatalogContext } from "../chat-catalog-contract.js";
 const handlers = vi.hoisted(() => [] as Array<(request: unknown, response: unknown) => Promise<void>>);
 vi.mock("node:http", () => ({ createServer: (handler: (request: unknown, response: unknown) => Promise<void>) => { handlers.push(handler); return { close: (done: () => void) => done() }; } }));
-vi.mock("../../e2e/fetch-allowed-port.js", () => ({ listenOnFetchAllowedPort: async () => 40001 }));
+vi.mock("../../fixtures/fetch-allowed-port.js", () => ({ listenOnFetchAllowedPort: async () => 40001 }));
 import { readSecretEndpointConsumerRun, readSecretEndpointTaskBinding, secretTestEndpoint } from "./external-secret-endpoint.js";
 const roots: string[] = [];
 afterEach(async () => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); handlers.length = 0; for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });

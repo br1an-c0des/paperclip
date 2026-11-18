@@ -214,7 +214,7 @@
             "chat-catalog-domains/internal-privacy.ts",
             "chat-catalog-domains/identity-auth.ts",
             "chat-catalog-domains/internal-routine-audit.ts",
-            "../e2e/fetch-allowed-port.ts"
+            "../fixtures/fetch-allowed-port.ts"
           ],
           "current": [
             "chat-catalog-domains/internal-definition.ts",
@@ -227,7 +227,7 @@
             "chat-catalog-domains/internal-privacy.ts",
             "chat-catalog-domains/identity-auth.ts",
             "chat-catalog-domains/internal-routine-audit.ts",
-            "../e2e/fetch-allowed-port.ts",
+            "../fixtures/fetch-allowed-port.ts",
             "../../server/src/services/native-runtime/status-decision-committer.ts",
             "../../server/src/services/work-timeline.ts",
             "../../server/src/services/native-runtime/runner-api-catalog.ts"
@@ -674,7 +674,7 @@
             "run-observations.ts",
             "chat-flow.ts",
             "../../server/src/home-paths.ts",
-            "../e2e/fetch-allowed-port.ts",
+            "../fixtures/fetch-allowed-port.ts",
             "../../server/src/routes/secrets.ts",
             "../../server/src/services/secrets.ts",
             "../../server/src/services/heartbeat/run-preparation.ts",
@@ -707,7 +707,7 @@
             "run-observations.ts",
             "chat-flow.ts",
             "../../server/src/home-paths.ts",
-            "../e2e/fetch-allowed-port.ts",
+            "../fixtures/fetch-allowed-port.ts",
             "../../server/src/routes/secrets.ts",
             "../../server/src/services/secrets.ts",
             "../../server/src/services/heartbeat/run-preparation.ts",
@@ -1241,7 +1241,7 @@
             "chat-catalog-domains/internal-privacy.ts",
             "chat-catalog-domains/identity-auth.ts",
             "chat-catalog-domains/internal-routine-audit.ts",
-            "../e2e/fetch-allowed-port.ts"
+            "../fixtures/fetch-allowed-port.ts"
           ],
           "current": [
             "chat-catalog-domains/internal-definition.ts",
@@ -1254,7 +1254,7 @@
             "chat-catalog-domains/internal-privacy.ts",
             "chat-catalog-domains/identity-auth.ts",
             "chat-catalog-domains/internal-routine-audit.ts",
-            "../e2e/fetch-allowed-port.ts",
+            "../fixtures/fetch-allowed-port.ts",
             "../../server/src/services/native-runtime/status-decision-committer.ts",
             "../../server/src/services/work-timeline.ts",
             "../../server/src/services/native-runtime/runner-api-catalog.ts"
@@ -1671,7 +1671,7 @@
             "run-observations.ts",
             "chat-flow.ts",
             "../../server/src/home-paths.ts",
-            "../e2e/fetch-allowed-port.ts",
+            "../fixtures/fetch-allowed-port.ts",
             "../../server/src/routes/secrets.ts",
             "../../server/src/services/secrets.ts",
             "../../server/src/services/heartbeat/run-preparation.ts",
@@ -1704,7 +1704,7 @@
             "run-observations.ts",
             "chat-flow.ts",
             "../../server/src/home-paths.ts",
-            "../e2e/fetch-allowed-port.ts",
+            "../fixtures/fetch-allowed-port.ts",
             "../../server/src/routes/secrets.ts",
             "../../server/src/services/secrets.ts",
             "../../server/src/services/heartbeat/run-preparation.ts",
@@ -2675,7 +2675,7 @@
         "chat-scenarios/activity.yaml",
         "chat-catalog-domains/internal-run-history.ts",
         "chat-catalog-domains/internal-run-brief.ts",
-        "../e2e/fetch-allowed-port.ts"
+        "../fixtures/fetch-allowed-port.ts"
       ],
       "screenshot": "final-state.png",
       "evidenceKind": "private-final-state-png",
@@ -2770,7 +2770,7 @@
         "chat-catalog-domains/internal-privacy.ts",
         "chat-catalog-domains/identity-auth.ts",
         "chat-catalog-domains/internal-routine-audit.ts",
-        "../e2e/fetch-allowed-port.ts",
+        "../fixtures/fetch-allowed-port.ts",
         "../../server/src/services/native-runtime/status-decision-committer.ts",
         "../../server/src/services/work-timeline.ts",
         "../../server/src/services/native-runtime/runner-api-catalog.ts"
@@ -5856,7 +5856,7 @@
         "../../cli/src/index.ts",
         "../../cli/src/commands/worktree.ts",
         "../../cli/src/commands/run.ts",
-        "../e2e/fetch-allowed-port.ts"
+        "../fixtures/fetch-allowed-port.ts"
       ],
       "screenshot": "final-state.png",
       "evidenceKind": "private-final-state-png",
@@ -8354,7 +8354,7 @@
         "chat-scenarios/inbox-search.yaml",
         "chat-catalog-domains/internal-archive-partial.ts",
         "chat-catalog-domains/internal-archive-transport.ts",
-        "../e2e/fetch-allowed-port.ts",
+        "../fixtures/fetch-allowed-port.ts",
         "chat-archive-fault-control.ts"
       ],
       "screenshot": "final-state.png",
@@ -9845,7 +9845,7 @@
         "chat-scenarios/projects.yaml",
         "chat-catalog-domains/internal-project-defaults.ts",
         "chat-catalog-domains/internal-native-run-brief.ts",
-        "../e2e/fetch-allowed-port.ts",
+        "../fixtures/fetch-allowed-port.ts",
         "run-observations.ts"
       ],
       "screenshot": "final-state.png",
@@ -11634,7 +11634,7 @@
         "chat-catalog-domains/external-support.ts",
         "chat-catalog-domains/internal-support.ts",
         "run-observations.ts",
-        "../e2e/fetch-allowed-port.ts",
+        "../fixtures/fetch-allowed-port.ts",
         "../../server/src/home-paths.ts",
         "../../server/src/routes/secrets.ts",
         "../../server/src/services/secrets.ts",
@@ -11713,7 +11713,7 @@
         "run-observations.ts",
         "chat-flow.ts",
         "../../server/src/home-paths.ts",
-        "../e2e/fetch-allowed-port.ts",
+        "../fixtures/fetch-allowed-port.ts",
         "../../server/src/routes/secrets.ts",
         "../../server/src/services/secrets.ts",
         "../../server/src/services/heartbeat/run-preparation.ts",
@@ -13045,7 +13045,7 @@
         "chat-catalog-domains/internal-task-ownership.ts",
         "chat-catalog-domains/internal-run-brief.ts",
         "chat-catalog-domains/identity-support.ts",
-        "../e2e/fetch-allowed-port.ts"
+        "../fixtures/fetch-allowed-port.ts"
       ],
       "screenshot": "final-state.png",
       "evidenceKind": "private-final-state-png",
@@ -13317,7 +13317,7 @@
         "chat-scenarios/tasks.yaml",
         "chat-catalog-domains/internal-edit-ownership.ts",
         "chat-catalog-domains/internal-run-brief.ts",
-        "../e2e/fetch-allowed-port.ts",
+        "../fixtures/fetch-allowed-port.ts",
         "run-observations.ts"
       ],
       "screenshot": "final-state.png",

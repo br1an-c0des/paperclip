@@ -98,7 +98,7 @@ export function withEditOwnership(primary: ChatCatalogCase): ChatCatalogCase {
   return { ...primary, coverageGaps: [], expectedRunCount: 4, minimumRunCount: 3, expectedHumanMessageCount: 2, attemptTimeoutMs: 600000,
     runPolicy: { kind: "source-settled-with-active-work", maximumActiveWorkerRuns: 1, expectedWorkerCancellation: "owned-task-reassignment" },
     expectedCancelledWorkerRun: expectedEditReassignmentCancellation,
-    sourceFiles: [...primary.sourceFiles, "chat-catalog-domains/internal-edit-ownership.ts", "chat-catalog-domains/internal-run-brief.ts", "../e2e/fetch-allowed-port.ts", "run-observations.ts"],
+    sourceFiles: [...primary.sourceFiles, "chat-catalog-domains/internal-edit-ownership.ts", "chat-catalog-domains/internal-run-brief.ts", "../fixtures/fetch-allowed-port.ts", "run-observations.ts"],
     async setup(ctx) { const state = await primary.setup(ctx); const riley = await fixtureWorker(ctx); await ctx.input.api.patch(`/api/agents/${riley.id}`, { name: "Riley" }); return { ...state, riley, canonicalEditQuery: ctx.scenario.query }; },
     grade: value => gradeEditOwnership(value, primary.grade),
     async act(ctx, state) {
