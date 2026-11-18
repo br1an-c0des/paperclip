@@ -89,9 +89,24 @@ server's `/openapi.json` in the spike.
 - **Keep the key away from agents.** `claude_local` CLI runs inherit `process.env`
   (`packages/adapters/claude-local/src/server/execute.ts:324`), so the adapter must strip
   `PAPERCLIP_MEMORY_*` from agent environments. Otherwise an agent could curl another agent's bank.
-- **LLM:** Anthropic, Haiku for retain and consolidation (high volume, extraction), a larger model for
-  reflect if it's used. This is API billing, separate from the Claude subscription. The `claude-code`
-  provider might use the subscription instead; check its terms and behaviour in the spike.
+- **LLM:** the Anthropic API with Claude Haiku 5.5 (`claude-haiku-5-5`, $0.10 input and $0.50 output
+  per million tokens) for retain and consolidation, a larger model for reflect if it's used. A run
+  digest is roughly 5,000 input and 1,500 output tokens of extraction, about a tenth of a cent;
+  with consolidation and thinking tokens, still well under a cent a run. Hindsight's batch discount
+  covers only OpenAI, Groq and Gemini.
+- **Not the subscription.** Hindsight's `claude-code` provider runs each LLM call through the Claude
+  Agent SDK (`claude_code_llm.py`), signed in with `claude auth login` or a `claude setup-token`
+  token. Its docs say it is "intended for local, personal development use only" and "Do not use it
+  in production deployments or shared environments", and it logs that it "may conflict with
+  Anthropic's terms". The Agent SDK docs say: "Unless previously approved, Anthropic does not allow
+  third party developers to offer claude.ai login or rate limits for their products, including
+  agents built on the Claude Agent SDK." It would also spend the same subscription limits the
+  agents' runs use, with up to 32 concurrent calls (`HINDSIGHT_API_LLM_MAX_CONCURRENT`), a process
+  start per call, and no native structured output.
+- **Check in the spike:** Haiku 5.5 rejects non-default `temperature`, and Hindsight sends one
+  (`HINDSIGHT_API_LLM_TEMPERATURE_CONSOLIDATION`, 0.0); its thinking is on by default. If Hindsight's
+  `anthropic` provider can't handle that, Haiku 4.5 ($1 / $5) is the fallback, still a cent or so a
+  run.
 - **Dev:** the same image with `pg0`, started by hand; the server treats memory as off when
   `PAPERCLIP_MEMORY_URL` is unset.
 
@@ -245,8 +260,9 @@ In `ui-new`:
 
 ## Decisions to make
 
-1. **Which LLM pays for extraction:** an Anthropic API key with Haiku (simple, billed separately),
-   or the `claude-code` provider on the subscription (check first).
+1. **Which LLM pays for extraction:** leaning to an Anthropic API key with Haiku 5.5 (well under a
+   cent a run, see [Deployment](#1-deployment)); the `claude-code` provider on the subscription is
+   meant for local use only.
 2. **A company bank:** in the first version or later.
 3. **Digest or transcript:** the proposal says digest; a transcript could be an option for
    long research runs.
