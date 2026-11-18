@@ -522,13 +522,18 @@ Taken on adoption, 2026-11-17:
 4. **Branch:** `new-ui` renamed `main`, GitHub's default; `origin/new-ui` kept as a frozen pointer.
 5. **The upstream watch:** written in step 1, run by hand weekly to start.
 6. **Open upstream pull requests** (#17828, #17905, #20710): left open.
+7. **Engine, decided 2026-11-17: the CLI** (`claude --print`). Steps 4 and 5 build on
+   `packages/adapters/claude-local/src/server/execute.ts`; `cli` becomes the default engine and
+   server1's agents switch to it (sessions start fresh once). Why: it *is* Claude Code (native
+   skills, instructions in the system prompt, the latest CLI weekly, no bridge or patch to keep),
+   it's ~1,500 lines of Claude-only code instead of the 6,000-line engine shared with four other
+   adapters, and ACP's advantages are small changes on the CLI side (an env allowlist as in #20040,
+   dropping `--strict-mcp-config` with MCP trust settings). CLI runs are also the ones a hot restart
+   can adopt. Still to check in step 6: multi-turn chat through `--input-format stream-json`, where
+   ACP is naturally stronger. ACP stays in the tree, dormant.
 
 Still open:
 
-0. **Which Claude engine steps 4 and 5 build on:** the CLI (`claude --print`, which the plan was
-   written around) or ACP (`claude-agent-acp`, the adapter's default and what agents use unless set
-   otherwise). They differ in how instructions, skills, MCP servers, settings and memory load
-   ([claude-local-run.md](claude-local-run.md)). Decide before step 4.
 1. **Where agent personas live:** Paperclip's per-agent `AGENTS.md`, or role files in the repo
    (step 4).
 2. **Which open upstream pull requests to take** (step 2): surveyed 2026-11-17 in
