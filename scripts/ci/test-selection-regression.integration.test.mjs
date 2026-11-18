@@ -30,7 +30,8 @@ test("selected server tests can launch independent chat runner fixtures", (t) =>
   assert.match(stripVTControlCharacters(result.stdout), /Test Files\s+1 passed/);
 });
 
-test("production runner catches the filesystem regression that raw Vitest selection misses", async (t) => {
+// ui/ removed 2026-11-17 (hard fork): this upstream CI test-selection check used the old UI's project (@paperclipai/ui) and paths in ui/src. Dormant CI tooling.
+test.skip("production runner catches the filesystem regression that raw Vitest selection misses", async (t) => {
   const repo = process.cwd();
   const root = realpathSync(mkdtempSync(path.join(tmpdir(), "ci-vr-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));

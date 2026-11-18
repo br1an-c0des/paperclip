@@ -394,5 +394,5 @@ test("oversized-file reporters warn above the configurable budget and never thro
 test("CI test configs wire the oversized-file reporters for GitHub Actions", () => {
   assert.match(readFileSync("vitest.config.ts", "utf8"), /GITHUB_ACTIONS === "true"[\s\S]{0,120}oversized-test-files\.mjs/);
   assert.match(readFileSync("packages/paperclip-runner/vitest.config.ts", "utf8"), /GITHUB_ACTIONS === "true"[^\n]*oversized-test-files\.mjs/);
-  assert.match(readFileSync("tests/e2e/playwright.config.ts", "utf8"), /GITHUB_ACTIONS === "true"[\s\S]{0,120}oversized-test-files-playwright\.mjs/);
+  // ui/ removed 2026-11-17 (hard fork), and with it the old UI's Playwright suite (tests/e2e).
 });

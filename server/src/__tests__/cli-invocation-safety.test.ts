@@ -729,19 +729,6 @@ describe("paperclipai CLI invocation safety", () => {
     expect(scanText("src/build-cmd.ts", substitution)).toHaveLength(1);
   });
 
-  it("still accepts the legitimate source literals in the Playwright configs", () => {
-    // A backtick template literal and a double-quote string literal each end at a
-    // real source terminator (a comma), so the source-terminator rule proves the
-    // literal context and the allowlist matches. These two real files must pass.
-    expect(scanText("tests/e2e/playwright.config.ts", read("tests/e2e/playwright.config.ts"))).toEqual([]);
-    expect(
-      scanText(
-        "tests/perf/issue-detail/playwright.config.ts",
-        read("tests/perf/issue-detail/playwright.config.ts"),
-      ),
-    ).toEqual([]);
-  });
-
   // ── Fail closed on a comma-terminated fragment that a join concatenates ───
   //
   // The round-6 guard trusted any source quote span whose close delimiter a comma
@@ -819,7 +806,8 @@ describe("paperclipai CLI invocation safety", () => {
   });
 
   it("emits the safe form from the agent onboarding prompt", () => {
-    const source = read("ui/src/lib/agent-onboarding-prompt.ts");
+    // The board UI's copy; ui/src/lib/agent-onboarding-prompt.ts went with ui/ (removed 2026-11-17).
+    const source = read("ui-new/src/agents/new/outside-agent-model.ts");
     expect(source).not.toContain("pnpm paperclipai allowed-hostname");
     expect(source).not.toContain("pnpm exec paperclipai allowed-hostname");
     expect(source).toContain("npx paperclipai allowed-hostname <host>");
@@ -833,13 +821,6 @@ describe("paperclipai CLI invocation safety", () => {
     expect(readme).toContain("npx paperclipai company import this-github-url-or-folder");
     expect(readme).not.toContain("pnpm paperclipai company import");
     expect(readme).not.toContain("pnpm exec paperclipai company import");
-  });
-
-  it("emits the safe form in the company-export preview builder", () => {
-    const source = read("ui/src/pages/CompanyExport.tsx");
-    expect(source).not.toContain("pnpm paperclipai company import");
-    expect(source).not.toContain("pnpm exec paperclipai company import");
-    expect(source).toContain("npx paperclipai company import");
   });
 
   // ── Runtime surfaces and their fixed literal lifecycle hints ─────────────
@@ -889,7 +870,8 @@ describe("paperclipai CLI invocation safety", () => {
   });
 
   it("emits the bootstrap fallback command from the UI", () => {
-    const source = read("ui/src/bootstrapSetup.ts");
+    // The board UI's copy; ui/src/bootstrapSetup.ts went with ui/ (removed 2026-11-17).
+    const source = read("ui-new/src/auth/BootstrapPending.tsx");
     expect(source).toContain("npx paperclipai auth bootstrap-ceo");
     expect(source).not.toContain("pnpm paperclipai auth bootstrap-ceo");
     expect(source).not.toContain("pnpm exec paperclipai auth bootstrap-ceo");

@@ -38,7 +38,7 @@ function fixture(t) {
   write("package.json", JSON.stringify({ name: "local-verification-fixture", private: true, type: "module", packageManager: "pnpm@9.15.4",
     scripts: { verify: "node scripts/local-verify.mjs", "test:run": "vitest run" } }));
   write("vitest.config.mjs", 'export default {test:{projects:["ui","cli"]}};');
-  for (const [directory, name] of [["ui", "@paperclipai/ui"], ["cli", "paperclipai"]]) {
+  for (const [directory, name] of [["ui", "paperclipai"], ["cli", "@paperclipai/shared"]]) {
     write(`${directory}/vitest.config.mjs`, `export default {test:{name:${JSON.stringify(name)},include:["src/**/*.test.ts"]}};`);
   }
   write("ui/src/leaf.ts", "export const value = 1;\n");
@@ -71,7 +71,7 @@ test("real selected execution reuses passes and invalidates source, environment,
   const first = f.run();
   assert.equal(first.status, 0, first.text);
   assert.match(first.text, /Test Files\s+1 passed/);
-  assert.match(first.text, /1\/3 Vitest test files selected/);
+  assert.match(first.text, /1\/2 Vitest test files selected/);
   assert.doesNotMatch(first.text, /unrelated full-suite control/);
   const reused = f.run();
   assert.equal(reused.status, 0, reused.text);
@@ -114,7 +114,7 @@ test("real selected execution reuses passes and invalidates source, environment,
   assert.equal(failedAgain.status, 1, failedAgain.text);
   assert.doesNotMatch(failedAgain.text, /reusing a passing local result/);
   rmSync(path.join(f.root, "ui/src/new.test.ts"));
-  f.write("ui/vitest.config.mjs", 'export default {test:{name:"@paperclipai/ui",include:["src/**/*.test.ts"],testTimeout:10000}};');
+  f.write("ui/vitest.config.mjs", 'export default {test:{name:"paperclipai",include:["src/**/*.test.ts"],testTimeout:10000}};');
   const config = f.run();
   assert.equal(config.status, 2, config.text);
   assert.match(config.text, /Broader verification required/);

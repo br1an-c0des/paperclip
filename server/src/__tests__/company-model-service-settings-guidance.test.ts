@@ -28,7 +28,8 @@ it("names the experiment that hides the Fast response section", () => {
 // The catalog text is the only place these page paths live on the server, so a renamed UI route
 // would leave agents linking a page that no longer exists. Every page the guidance names must be
 // a route the board UI mounts under the company prefix.
-it("names only pages that the board UI mounts", () => {
+// ui/ removed 2026-11-17 (hard fork): this checked the links against the old UI's routes (ui/src).
+it.skip("names only pages that the board UI mounts", () => {
   const appRoutes = readFileSync(path.join(repoRoot, "ui/src/App.tsx"), "utf8");
   const pages = new Set(
     runnerApiCatalog()

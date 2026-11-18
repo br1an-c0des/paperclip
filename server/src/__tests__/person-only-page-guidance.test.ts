@@ -50,7 +50,8 @@ it("says on the interaction listing that only the addressee resolves a connectio
   expect(list?.description).toContain("Only that person can connect or decline it");
 });
 
-it("names only pages that the board UI mounts", () => {
+// ui/ removed 2026-11-17 (hard fork): this checked the links against the old UI's routes (ui/src).
+it.skip("names only pages that the board UI mounts", () => {
   const appRoutes = readFileSync(path.join(repoRoot, "ui/src/App.tsx"), "utf8");
   const pages = new Set(
     runnerApiCatalog()
@@ -74,7 +75,8 @@ it.each([
   for (const operation of found) expect(operation.description).toContain("[Connect your own MCP server](/<prefix>/apps/byo)");
 });
 
-it("links only mounted pages from connections_search", () => {
+// ui/ removed 2026-11-17 (hard fork): this checked the links against the old UI's routes (ui/src).
+it.skip("links only mounted pages from connections_search", () => {
   const appRoutes = readFileSync(path.join(repoRoot, "ui/src/App.tsx"), "utf8");
   const search = readFileSync(path.join(repoRoot, "server/src/services/connection-intents.ts"), "utf8");
   for (const page of ["apps/byo", "company/settings/instance/experimental"]) {

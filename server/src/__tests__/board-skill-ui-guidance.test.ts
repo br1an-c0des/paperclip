@@ -10,35 +10,27 @@ const read = (relPath: string) => readFileSync(path.join(repoRoot, relPath), "ut
 // had no source for the web UI's quick search and told people to ask in chat instead.
 describe("paperclip-board skill web UI guidance", () => {
   const skill = read("skills/paperclip-board/SKILL.md");
-  const palette = read("ui/src/components/CommandPalette.tsx");
+  // ui/ removed 2026-11-17 (hard fork): the checks against the old UI's command palette, routes and sidebar are gone.
   const section = skill.slice(skill.indexOf("## Finding Things in the Web UI"), skill.indexOf("## Presentation Rules"));
 
   it("documents the quick-search shortcut the command palette actually binds", () => {
     expect(section.length).toBeGreaterThan(0);
-    expect(palette).toMatch(/e\.key === "k" && \(e\.metaKey \|\| e\.ctrlKey\)/);
     expect(section).toContain("**Cmd+K**");
     expect(section).toContain("**Ctrl+K**");
   });
 
   it("documents the handoff to full search and the search route it opens", () => {
-    expect(palette).toMatch(/event\.key === "Enter" && \(event\.metaKey \|\| event\.ctrlKey\)/);
-    expect(palette).toContain("Search all for");
     expect(section).toContain("**Search all**");
     expect(section).toContain("Cmd/Ctrl+Enter");
-    expect(read("ui/src/App.tsx")).toContain('<Route path="search"');
     expect(section).toContain("/{prefix}/search");
   });
 
   it("keeps the overlay promise to the shortcut and describes the sidebar Search item as full search", () => {
-    // The classic sidebar Search item is a link to the full search page, not the overlay.
-    expect(read("ui/src/components/Sidebar.tsx")).toMatch(/<SidebarNavItem to="\/search" label="Search"/);
     expect(section).toMatch(/sidebar \*\*Search\*\* item[^\n]*opens the full search page/);
     expect(section).not.toMatch(/search icon[^\n]*opens over the current page/i);
   });
 
   it("does not claim operators narrow the quick-search results", () => {
-    // The palette sends only the parsed free text; operators apply after the full-search handoff.
-    expect(palette).toMatch(/issuesApi\.list\(selectedCompanyId!, \{ q: quickSearchQuery, limit: 10/);
     expect(section).toContain("they do not narrow the quick-search results");
   });
 

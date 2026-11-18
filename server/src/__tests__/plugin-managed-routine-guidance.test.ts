@@ -26,7 +26,8 @@ it.each([
   }
 });
 
-it("links a plugin settings page the board UI mounts", () => {
+// ui/ removed 2026-11-17 (hard fork): this checked the links against the old UI's routes (ui/src).
+it.skip("links a plugin settings page the board UI mounts", () => {
   const appRoutes = readFileSync(path.join(repoRoot, "ui/src/App.tsx"), "utf8");
   expect(appRoutes).toContain('path="company/settings/instance/plugins/:pluginId"');
 });

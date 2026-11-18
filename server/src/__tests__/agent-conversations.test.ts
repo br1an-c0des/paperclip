@@ -1133,8 +1133,7 @@ describe("chat prompt policy", () => {
   });
 
   it("tells chat how to link execution runs to the registered run route and name their agents", () => {
-    const app = readFileSync(new URL("../../../ui/src/App.tsx", import.meta.url), "utf8");
-    expect(app).toMatch(/<Route\s+path="agents\/:agentId\/runs\/:runId"/);
+    // ui/ removed 2026-11-17 (hard fork): the route check against ui/src/App.tsx is gone.
     expect(AGENT_CHAT_DIRECTIVE).toContain("/<prefix>/agents/<agentId>/runs/<runId> using the run's returned agentId.");
     // Issue run listings expose the run ID as runId, not id; the guidance must name the field each response returns.
     const activity = readFileSync(new URL("../services/activity.ts", import.meta.url), "utf8");
@@ -1150,8 +1149,7 @@ describe("chat prompt policy", () => {
   });
 
   it("tells chat how to link projects and to link only the workspace pages a tool result gives", () => {
-    const app = readFileSync(new URL("../../../ui/src/App.tsx", import.meta.url), "utf8");
-    expect(app).toMatch(/<Route\s+path="projects\/:projectId"/);
+    // ui/ removed 2026-11-17 (hard fork): the route check against ui/src/App.tsx is gone.
     expect(AGENT_CHAT_DIRECTIVE).toContain("agent profiles, projects, goals) uses that same prefix");
     expect(AGENT_CHAT_DIRECTIVE).toContain("For a project, link /<prefix>/projects/<projectId>.");
     expect(AGENT_CHAT_DIRECTIVE).toContain("When a tool result gives a record's href, such as a project or a workspace, link that href; a workspace without an href has no page on this instance");
@@ -1169,10 +1167,8 @@ describe("chat prompt policy", () => {
   });
 
   it("links reference pages for a component or chat state instead of creating a real card or a mock", () => {
-    const app = readFileSync(new URL("../../../ui/src/App.tsx", import.meta.url), "utf8");
-    expect(app).toMatch(/<Route\s+path="design-guide"/);
+    // ui/ removed 2026-11-17 (hard fork): the route check against ui/src/App.tsx is gone.
     for (const lab of ["responsible-user-denial", "bootstrap-setup", "cross-issue-collaboration"]) {
-      expect(app).toMatch(new RegExp(`<Route\\s+path="ux-lab/${lab}"`));
       expect(AGENT_CHAT_DIRECTIVE).toContain(`/ux-lab/${lab}`);
     }
     expect(AGENT_CHAT_DIRECTIVE).toContain("link its existing reference page instead of creating a real card, request or record and instead of drawing a mock");
@@ -1182,8 +1178,7 @@ describe("chat prompt policy", () => {
   });
 
   it("explains a task's purpose from its saved goal chain with goal links", () => {
-    const app = readFileSync(new URL("../../../ui/src/App.tsx", import.meta.url), "utf8");
-    expect(app).toMatch(/<Route\s+path="goals\/:goalId"/);
+    // ui/ removed 2026-11-17 (hard fork): the route check against ui/src/App.tsx is gone.
     expect(AGENT_CHAT_DIRECTIVE).toContain("For a goal, link /<prefix>/goals/<goalId>.");
     expect(AGENT_CHAT_DIRECTIVE).toContain("its goal with GET /api/goals/{id} and each parent goal through parentId, and give the reason the goals' own descriptions state");
     expect(AGENT_CHAT_DIRECTIVE).toContain("When the task has no goal, say so instead of supplying a reason.");

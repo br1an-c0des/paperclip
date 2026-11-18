@@ -131,7 +131,8 @@ function fixturePlan() {
   return { files, ...refineTestPlan({ plan, head, owners, graphs }) };
 }
 
-test("runner consumes the exact manifest, and rejects stale, missing, or mismatched manifests", (t) => {
+// ui/ removed 2026-11-17 (hard fork): this upstream CI test-selection check used the old UI's project (@paperclipai/ui) and paths in ui/src. Dormant CI tooling.
+test.skip("runner consumes the exact manifest, and rejects stale, missing, or mismatched manifests", (t) => {
   const directory = realpathSync(mkdtempSync(path.join(tmpdir(), "ci-vm-")));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const { manifest, plan } = fixturePlan();
@@ -164,7 +165,8 @@ test("runner consumes the exact manifest, and rejects stale, missing, or mismatc
   assert.match(misplaced.stderr, /belongs to another server lane/);
 });
 
-test("forced modes, config, fixtures, deletions and unknown inputs cannot narrow CI", () => {
+// ui/ removed 2026-11-17 (hard fork): this upstream CI test-selection check used the old UI's project (@paperclipai/ui) and paths in ui/src. Dormant CI tooling.
+test.skip("forced modes, config, fixtures, deletions and unknown inputs cannot narrow CI", () => {
   const plan = fixturePlan().plan;
   assert.equal(selectionEligibility(plan), null);
   for (const changed of [["ui/vitest.setup.ts"], ["ui/vite.config.ts"], ["package.json"], ["pnpm-lock.yaml"],
@@ -223,7 +225,8 @@ test("the CLI publishes the complete coarse plan if setup mutates tracked inputs
 });
 
 
-test("mixed audited documentation stays graph eligible and large complete source diffs are allowed", () => {
+// ui/ removed 2026-11-17 (hard fork): this upstream CI test-selection check used the old UI's project (@paperclipai/ui) and paths in ui/src. Dormant CI tooling.
+test.skip("mixed audited documentation stays graph eligible and large complete source diffs are allowed", () => {
   const plan = fixturePlan().plan;
   for (const doc of ["doc/DEVELOPING.md", "doc/DATABASE.md", "doc/plans/2026-10-30-example.md"]) {
     assert.equal(selectionEligibility({ ...plan, changed: [...plan.changed, doc] }), null);
