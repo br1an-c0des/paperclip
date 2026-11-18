@@ -74,6 +74,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 37 | [Log participant changes for every review stage (optional)](#37-log-participant-changes-for-every-review-stage-optional) | candidate | | | 2026-10-24 | | |
 | 38 | [Report the review-stage bypass, with failing tests](#38-report-the-review-stage-bypass-with-failing-tests) | candidate | | | 2026-10-24 | | |
 | 39 | [Turn off Claude Code's auto memory when an agent has `para-memory-files`](#39-turn-off-claude-codes-auto-memory-when-an-agent-has-para-memory-files) | candidate | | | 2026-10-24 | | |
+| 40 | [Find why 11 server tests fail on `main` (one file is core)](#40-find-why-11-server-tests-fail-on-main-one-file-is-core) | candidate | | | 2026-11-18 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -620,3 +621,21 @@ option 3 (was build plan 2a-6). Revives #2700.
   environment variable, unlike #2700's settings files, also works with `--setting-sources user`.
 - **Fork workaround:** `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in `deploy/docker-compose.yml`, and in the
   adapter `env` of each Runner agent.
+
+### 40. Find why 11 server tests fail on `main` (one file is core)
+
+Found in step 3a's profiled run of `pnpm test` on `main` at `93c3289557`, 2026-11-18
+([test-suite-audit.md](test-suite-audit.md#8-failures-seen)). The run was stopped before Vitest
+printed its failure summary, so the reasons weren't captured.
+
+- **Core:** `server/src/services/legacy-controller-lease.test.ts`, 2 tests ("durable legacy controller
+  ownership > keeps the run and lease of a live earlier-boot controller…", "…keeps an expired lease of
+  a live earlier-boot controller…"). The lease keeps a `claude_local` run owned by this server
+  ([claude-local-run.md](claude-local-run.md)).
+- **Dormant (native runtime):** `retained-provider-pack-source.test.ts` (6),
+  `heartbeat-native-restart-suspension.test.ts` (2; also failed in step 4a's overloaded run),
+  `native-session-resume.test.ts` (1).
+- **Next:** re-run each file alone to see whether it fails on its own or only after other files in
+  the same run. A real failure in the core file gets a fix; the dormant ones are skipped with a note
+  (hard-fork step 3) unless step 3a moves their suites out of the default run anyway.
+

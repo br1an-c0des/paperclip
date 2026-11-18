@@ -476,7 +476,7 @@ in whatever order matters most ([The build plan after the hard fork](#the-build-
 | Repo map and `claude_local` trace | Done 2026-11-17: [repo-map.md](repo-map.md) (ours, shared core, dormant, the seams, tests) and [claude-local-run.md](claude-local-run.md) (one run from wake to finish, both engines, with the change points for steps 4 and 5). |
 | 2. Take the fixes already written | In progress. Our three pull requests are in `main`; the image builds from source (no patches) on `deploy/build-from-source`, not yet deployed; upstream's open pull requests surveyed in [upstream-open-prs.md](upstream-open-prs.md), picks pending. |
 | 3. Leave unused code | Ongoing, as decided. |
-| **3a. Renovate the test suite** | **Current step**, added 2026-11-17. The full suite takes ~7 hours; the goal is 10–20 minutes (30 at most). First profile and audit: [test-suite-audit.md](test-suite-audit.md). |
+| **3a. Renovate the test suite** | **Current step**, added 2026-11-17. The full suite takes ~7 hours; the goal is 10–20 minutes (30 at most). First profile and audit: [test-suite-audit.md](test-suite-audit.md). Round 1 planned (4 agents: runner, per-file overhead, Postgres, classification): [step-3a-plan.md](step-3a-plan.md). |
 | 4. Make runs Claude-native | Split in two. 4a (Paperclip over MCP, agent permissions): designed and planned 2026-11-17 ([design](step-4a-mcp-and-permissions.md), [plan](step-4a-plan.md)); building on `feat/step-4a`, **paused while 3a is current** (2026-11-17). 4b (Claude-native runs): after 4a. |
 | 5–7 | Not started. |
 
