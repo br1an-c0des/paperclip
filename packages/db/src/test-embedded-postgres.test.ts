@@ -1,6 +1,9 @@
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
 import postgres from "postgres";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { inspectMigrations } from "./client.js";
@@ -11,6 +14,8 @@ import {
   __isUsableEmbeddedPostgresTemplateForTests as isUsableTemplate,
   __lastEmbeddedPostgresStartModeForTests as lastStartMode,
   __resetEmbeddedPostgresTemplateStateForTests as resetTemplateState,
+  __resolveTestPostgresDataRootForTests as resolveDataRoot,
+  __testPostgresClusterParentDirForTests as clusterParentDir,
   __setEmbeddedPostgresCtorProviderForTests,
   __startEmbeddedPostgresWithRetryForTests as startWithRetry,
   computeEmbeddedPostgresTemplateKey,
@@ -19,6 +24,7 @@ import {
   startEmbeddedPostgresTestDatabase,
 } from "./test-embedded-postgres.js";
 
+const DATA_ROOT_VARIABLE = "PAPERCLIP_TEST_POSTGRES_DATA_ROOT";
 const originalAdminUrl = process.env.PAPERCLIP_TEST_POSTGRES_ADMIN_URL;
 delete process.env.PAPERCLIP_TEST_POSTGRES_ADMIN_URL;
 afterAll(() => {
@@ -207,6 +213,156 @@ describe("test cluster server flags", () => {
   });
 });
 
+describe("test cluster data root", () => {
+  let root: string | undefined;
+  const previousDataRoot = process.env[DATA_ROOT_VARIABLE];
+
+  afterEach(() => {
+    __setEmbeddedPostgresCtorProviderForTests(null);
+    resetTemplateState();
+    if (previousDataRoot === undefined) delete process.env[DATA_ROOT_VARIABLE];
+    else process.env[DATA_ROOT_VARIABLE] = previousDataRoot;
+    if (root) fs.rmSync(root, { recursive: true, force: true });
+    root = undefined;
+  });
+
+  function makeRoot(): string {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "paperclip-data-root-"));
+    return root;
+  }
+
+  it("uses PAPERCLIP_TEST_POSTGRES_DATA_ROOT when it is set, creating it", () => {
+    const configured = path.join(makeRoot(), "nested", "clusters");
+    expect(resolveDataRoot({ env: { [DATA_ROOT_VARIABLE]: configured }, platform: "linux" })).toBe(configured);
+    expect(fs.statSync(configured).isDirectory()).toBe(true);
+  });
+
+  it("defaults to /dev/shm on Linux when it exists and has room", () => {
+    const shm = path.join(makeRoot(), "shm");
+    fs.mkdirSync(shm);
+    expect(resolveDataRoot({ env: {}, platform: "linux", shmDir: shm, minFreeBytes: 1 })).toBe(shm);
+  });
+
+  it("falls back to the temp directory when shm is too full, missing, or not on Linux", () => {
+    const shm = path.join(makeRoot(), "shm");
+    fs.mkdirSync(shm);
+    expect(resolveDataRoot({ env: {}, platform: "linux", shmDir: shm, minFreeBytes: Number.MAX_SAFE_INTEGER })).toBe(os.tmpdir());
+    expect(resolveDataRoot({ env: {}, platform: "linux", shmDir: path.join(shm, "missing"), minFreeBytes: 1 })).toBe(os.tmpdir());
+    expect(resolveDataRoot({ env: {}, platform: "darwin", shmDir: shm, minFreeBytes: 1 })).toBe(os.tmpdir());
+    // A blank setting counts as unset.
+    expect(resolveDataRoot({ env: { [DATA_ROOT_VARIABLE]: "  " }, platform: "darwin", shmDir: shm })).toBe(os.tmpdir());
+  });
+
+  it("asks for at least 1 GB free in /dev/shm by default", () => {
+    const shm = makeRoot();
+    const { bavail, bsize } = fs.statfsSync(shm);
+    const expected = Number(bavail) * Number(bsize) >= 1024 ** 3 ? shm : os.tmpdir();
+    expect(resolveDataRoot({ env: {}, platform: "linux", shmDir: shm })).toBe(expected);
+  });
+
+  it("puts fresh suite clusters in a private directory under the data root", async () => {
+    process.env[DATA_ROOT_VARIABLE] = makeRoot();
+    const { ctor, constructed } = makeFakeCtor(0);
+    __setEmbeddedPostgresCtorProviderForTests(async () => ctor);
+    const parent = clusterParentDir();
+    expect(path.dirname(parent)).toBe(root);
+    expect(path.basename(parent)).toMatch(/^paperclip-test-postgres-/);
+    if (process.platform !== "win32") expect(fs.statSync(parent).mode & 0o777).toBe(0o700);
+    const started = await startWithRetry("paperclip-data-root-fresh-");
+    try {
+      expect(path.dirname(constructed[0]!.databaseDir)).toBe(parent);
+    } finally {
+      await started.instance.stop();
+      fs.rmSync(started.dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it("copies the template into the data root but builds it beside the template cache", async () => {
+    const originalTemplateSetting = process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE;
+    delete process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE;
+    const scratch = useScratchTmpdir("paperclip-data-root-template-");
+    const clusters = path.join(makeRoot(), "clusters");
+    process.env[DATA_ROOT_VARIABLE] = clusters;
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      // The build fails at the migration step (the fake cluster does not
+      // listen), then the probe starts a throwaway cluster.
+      const { ctor, constructed } = makeFakeCtor(0);
+      __setEmbeddedPostgresCtorProviderForTests(async () => ctor);
+      resetTemplateState();
+      expect(await getEmbeddedPostgresTestSupport()).toEqual({ supported: true });
+      expect(constructed).toHaveLength(2);
+      // A template is published by a rename, so its build stays on the
+      // template cache's filesystem; the probe goes to the data root.
+      expect(path.dirname(constructed[0]!.databaseDir)).toBe(os.tmpdir());
+      expect(constructed[1]!.databaseDir.startsWith(clusters)).toBe(true);
+
+      // A stand-in template: suites copy it into the data root.
+      const templateDir = path.join(templateRootDir(), computeEmbeddedPostgresTemplateKey());
+      fs.mkdirSync(templateDir, { recursive: true, mode: 0o700 });
+      fs.writeFileSync(path.join(templateDir, "PG_VERSION"), "18\n");
+      resetTemplateState();
+      await expect(startEmbeddedPostgresTestDatabase("paperclip-data-root-copy-")).rejects.toThrow();
+      const copy = constructed[2]!.databaseDir;
+      expect(path.basename(copy)).toBe("data");
+      expect(path.dirname(path.dirname(copy))).toBe(clusterParentDir());
+      expect(copy.startsWith(clusters)).toBe(true);
+    } finally {
+      console.warn = warn;
+      scratch.restore();
+      if (originalTemplateSetting === undefined) delete process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE;
+      else process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE = originalTemplateSetting;
+    }
+  });
+
+  it("removes cluster directories a killed run left behind and keeps live ones", async () => {
+    process.env[DATA_ROOT_VARIABLE] = makeRoot();
+    const { ctor } = makeFakeCtor(0);
+    __setEmbeddedPostgresCtorProviderForTests(async () => ctor);
+    resetTemplateState();
+    const parent = clusterParentDir();
+    const deadPid = spawnSync(process.execPath, ["-e", ""]).pid;
+    const hours = 60 * 60 * 1000;
+    // A fresh cluster keeps `postmaster.pid` at the top of its directory; a
+    // template copy keeps it in `data/`.
+    function leftover(name: string, pid: number | null, pidFile = "postmaster.pid", ageMs = 0): string {
+      const dir = path.join(parent, name);
+      fs.mkdirSync(path.join(dir, "data"), { recursive: true });
+      if (pid !== null) fs.writeFileSync(path.join(dir, pidFile), `${pid}\n${dir}\n`);
+      const when = new Date(Date.now() - ageMs);
+      fs.utimesSync(path.join(dir, "data"), when, when);
+      fs.utimesSync(dir, when, when);
+      return dir;
+    }
+    const deadFresh = leftover("dead-fresh", deadPid);
+    const deadCopy = leftover("dead-copy", deadPid, path.join("data", "postmaster.pid"));
+    const stoppedOld = leftover("stopped-old", null, undefined, 2 * hours);
+    const live = leftover("live", process.pid, path.join("data", "postmaster.pid"), 2 * hours);
+    const starting = leftover("starting", null);
+    // A copy made two hours ago whose cluster stopped just now: its owner is
+    // removing it.
+    const justStopped = leftover("just-stopped", null, undefined, 2 * hours);
+    const now = new Date();
+    fs.utimesSync(path.join(justStopped, "data"), now, now);
+
+    const started = await startWithRetry("paperclip-data-root-sweep-");
+    try {
+      expect(fs.existsSync(deadFresh)).toBe(false);
+      expect(fs.existsSync(deadCopy)).toBe(false);
+      expect(fs.existsSync(stoppedOld)).toBe(false);
+      // A running cluster, one too new to have written its pid file yet, and
+      // one that has just stopped.
+      expect(fs.existsSync(live)).toBe(true);
+      expect(fs.existsSync(starting)).toBe(true);
+      expect(fs.existsSync(justStopped)).toBe(true);
+    } finally {
+      await started.instance.stop();
+      fs.rmSync(started.dataDir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("computeEmbeddedPostgresTemplateKey", () => {
   function writeMigrations(dir: string, files: Record<string, string>) {
     fs.mkdirSync(path.join(dir, "meta"), { recursive: true });
@@ -320,9 +476,10 @@ const describeWithPostgres = support.supported ? describe : describe.skip;
 // Points `os.tmpdir()` at a private scratch directory so a test can drive the
 // cache root from an empty state. `os.tmpdir()` reads the environment on every
 // call: TMPDIR on POSIX, TEMP and then TMP on Windows, so all three are set.
-// Returns the scratch directory; `restore` puts the environment and the
-// fixture's cached state back.
-const TMPDIR_VARIABLES = ["TMPDIR", "TEMP", "TMP"] as const;
+// Cluster data goes under PAPERCLIP_TEST_POSTGRES_DATA_ROOT, so that is pointed
+// at the scratch directory too. Returns the scratch directory; `restore` puts
+// the environment and the fixture's cached state back.
+const TMPDIR_VARIABLES = ["TMPDIR", "TEMP", "TMP", DATA_ROOT_VARIABLE] as const;
 
 function useScratchTmpdir(prefix: string): { scratch: string; restore(): void } {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -702,6 +859,72 @@ describe("support probe when the template cannot be built", () => {
       scratch.restore();
       if (originalTemplateSetting === undefined) delete process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE;
       else process.env.PAPERCLIP_TEST_POSTGRES_TEMPLATE = originalTemplateSetting;
+    }
+  });
+});
+
+// A worker that is interrupted, terminated, or exits without its suite's
+// cleanup must not leave cluster directories behind: on /dev/shm they hold RAM
+// until the next reboot. Each case starts a real cluster in a child process
+// with the data root in a scratch directory, ends the child, and checks that
+// Postgres exited and the directory is gone.
+const CHILD_SCRIPT = `
+import fs from "node:fs";
+const { startEmbeddedPostgresTestDatabase } = await import(process.env.FIXTURE_MODULE);
+await startEmbeddedPostgresTestDatabase("paperclip-interrupt-child-");
+const root = process.env.PAPERCLIP_TEST_POSTGRES_DATA_ROOT;
+const parents = fs.readdirSync(root).map((name) => root + "/" + name);
+const clusters = fs.readdirSync(parents[0]).map((name) => parents[0] + "/" + name);
+const pidFile = [clusters[0] + "/postmaster.pid", clusters[0] + "/data/postmaster.pid"].find((file) => fs.existsSync(file));
+const pid = Number.parseInt(fs.readFileSync(pidFile, "utf8").split("\\n")[0], 10);
+fs.writeFileSync(process.env.READY_FILE, JSON.stringify({ parents, clusters, pid }));
+if (process.env.CHILD_MODE === "exit") process.exit(0);
+setInterval(() => {}, 1000);
+`;
+
+function isRunning(pid: number): boolean {
+  try { process.kill(pid, 0); return true; }
+  catch (error) { return (error as NodeJS.ErrnoException).code === "EPERM"; }
+}
+
+const describeInterruptCases = support.supported && process.platform !== "win32" ? describe : describe.skip;
+
+describeInterruptCases("cluster directories when a worker ends early", () => {
+  it.each(["SIGINT", "SIGTERM", "exit"] as const)("are removed on %s", { timeout: EMBEDDED_POSTGRES_TEST_TIMEOUT_MS }, async (ending) => {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "paperclip-interrupt-"));
+    const dataRoot = path.join(scratch, "clusters");
+    const ready = path.join(scratch, "ready");
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      [DATA_ROOT_VARIABLE]: dataRoot,
+      READY_FILE: ready,
+      FIXTURE_MODULE: new URL("./test-embedded-postgres.ts", import.meta.url).href,
+      CHILD_MODE: ending === "exit" ? "exit" : "wait",
+    };
+    delete env.PAPERCLIP_TEST_POSTGRES_ADMIN_URL;
+    const child = spawn(process.execPath, [
+      "--import", fileURLToPath(new URL("../node_modules/tsx/dist/loader.mjs", import.meta.url)),
+      "--input-type=module", "-e", CHILD_SCRIPT,
+    ], { env, stdio: ["ignore", "pipe", "pipe"] });
+    let output = "";
+    child.stdout.on("data", (data) => { output = (output + String(data)).slice(-8000); });
+    child.stderr.on("data", (data) => { output = (output + String(data)).slice(-8000); });
+    const exited = new Promise<number | null>((resolve) => child.once("exit", (code) => resolve(code)));
+    try {
+      for (let i = 0; i < 2400 && !fs.existsSync(ready) && child.exitCode === null; i++) await delay(25);
+      expect(fs.existsSync(ready), output).toBe(true);
+      const started = JSON.parse(fs.readFileSync(ready, "utf8")) as { parents: string[]; clusters: string[]; pid: number };
+      expect(started.parents).toHaveLength(1);
+      expect(started.clusters).toHaveLength(1);
+      expect(started.pid, output).toBeGreaterThan(0);
+      if (ending !== "exit") child.kill(ending);
+      expect(await exited, output).toBe({ SIGINT: 130, SIGTERM: 143, exit: 0 }[ending]);
+      for (let i = 0; i < 200 && isRunning(started.pid); i++) await delay(25);
+      expect(isRunning(started.pid)).toBe(false);
+      expect(fs.readdirSync(started.parents[0]!), output).toEqual([]);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) { child.kill("SIGKILL"); await exited; }
+      fs.rmSync(scratch, { recursive: true, force: true });
     }
   });
 });
