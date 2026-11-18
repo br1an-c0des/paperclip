@@ -645,7 +645,7 @@ cancel). The adapter (`toAdapterResult`, `execute.ts:1028-1332`) maps it:
 | Lost process | `recoverActiveExecutions` (`server/src/services/heartbeat/recovery.ts:2534-3071`): a live pid with no handle stays `process_detached` (never killed); a dead one becomes `failed`/`process_lost` with one retry (:2956-3039) | Legacy |
 | Graceful shutdown | Children killed, run `interrupted`, retry queued (`recovery.ts:1329-1540`) | Legacy (Runner runs are suspended instead) |
 | Server crash | First recovery pass after start finds the orphan; the detached `claude` may still be running → `process_detached` | Legacy |
-| Hot restart adoption | ACP engine runs only (`recovery.ts:481-663`) | ACP |
+| Hot restart adoption | Detached (CLI engine) runs are left alive and adopted by the new server. An active ACP run is bound to the server's stdio, so it blocks adoption: the server drains and retries instead (`isServerStdioBoundHotRestartRun`, `prepareHotRestartShutdown`, `recovery.ts:481-663`). In Docker a container restart kills every run either way | CLI |
 | `semantic_result_missing`, `paperclip_finish`/`paperclip_block`, `finalizeNativeRun`, restart resume, liveness continuation, successful-run handoff | — | **Runner only** (`run-completion.ts:1040-1049`; `heartbeat.ts:3903-3945`; `packages/paperclip-runner/src/contracts/completion-result.ts:2-8`) |
 
 ## 10. Change points for steps 4 and 5
