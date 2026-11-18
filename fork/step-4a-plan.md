@@ -535,6 +535,9 @@ tests.
 
 ### Wave 1 status (2026-11-17)
 
+**Paused while [step 3a](hard-fork-plan.md#3a-renovate-the-test-suite) (renovating the test suite)
+is current.** The regression runs below wait for the faster suite.
+
 All four branches are merged into `feat/step-4a`. Each agent's new tests passed. **The regression
 runs were stopped at the user's request** (they're working on the test suite separately), so these
 are still to do before `feat/step-4a` goes to `main`:

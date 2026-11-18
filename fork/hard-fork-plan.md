@@ -2,7 +2,8 @@
 
 **Status: adopted 2026-11-17.** Frozen at upstream `79c8cf8b6` (tag `upstream-freeze`, the last
 commit merged, [sync 2026-11-17](sync-reports/2026-11-17.md)). `new-ui` was renamed `main`. Step 1
-is done; [Progress](#progress) tracks the rest. Written 2026-11-16 as a proposal; the decisions
+is done; [Progress](#progress) tracks the rest. The current step is
+[3a, renovating the test suite](#3a-renovate-the-test-suite). Written 2026-11-16 as a proposal; the decisions
 taken on adoption are under [Decisions](#decisions).
 
 The plan: stop syncing with upstream `paperclipai/paperclip`, treat this repo as our own codebase,
@@ -304,6 +305,54 @@ don't run (`google-sheets-mcp-server`, `kv-demo-mcp-server`, `paperclip-eval-ker
 old `ui/` (done 2026-11-17); and the Paperclip Runner with Claude Managed, which reach into heartbeat, tool authority
 and recovery.
 
+### 3a. Renovate the test suite
+
+Added 2026-11-17, and the current step. The full suite takes about 7 hours on this machine, so
+nobody runs it. The goals:
+
+- **Two tiers with a clear workflow.** A quick local set to run before pushing: typecheck plus the
+  tests for the area changed, in minutes. Then **CI** runs the thorough set on every push. The
+  thorough set aims for **10–20 minutes, 30 at most**.
+- **Keep what's valuable.** Long, in-depth tests aren't cut for being long. Each area is reviewed,
+  and an in-depth suite worth keeping goes in the thorough set (or a slower, opt-in set) rather than
+  being removed.
+- **A gate before `main`.** A feature branch merges once the thorough set is green on it.
+
+What a first profile found ([test-suite-audit.md](test-suite-audit.md)):
+
+- **It was built for upstream's CI.** `pnpm test` (`scripts/run-vitest-stable.mjs`) runs ~2,000
+  server files one at a time (`--maxWorkers=1`) in 27 separate Vitest runs. Upstream
+  spreads the same work across many CI machines.
+- **About a quarter tests dormant code**: the Runner and native runtime, chat channels (one
+  86,000-line file run as 6 shards, ~34 minutes), other adapters, cloud, managed and remote
+  execution.
+- **Every file reloads the server.** With `isolate: true` each file imports the module graph again,
+  and every Vitest process compiles the TypeScript from cold (`fsModuleCache` is off).
+- **Embedded Postgres isn't the main cost.** A suite's cluster starts in ~0.5 s from a cached
+  template. Durability settings (fsync on) slow the tests' own writes by about 20%.
+- **Unmanaged growth.** 27,000 server tests, test files up to 86,000 lines, and about half the
+  server test files start a real database. Much of it was added by agents, a test per change.
+
+The work, each part measured before and after:
+
+1. **Profile the whole suite** per file (import, setup and test time) and label each file ours,
+   shared core or dormant, using [repo-map.md](repo-map.md).
+2. **Review each area with the user** and sort its tests: quick local set, thorough CI set, opt-in
+   (slow or dormant, run on demand), or removal. Dormant tests leave the default run. Removing
+   tests follows step 3's rule: ask before removing anything large.
+3. **Run files in parallel** locally, with a worker count that suits this machine, and fix or
+   quarantine the files that can't share a machine.
+4. **Cut per-file overhead:** the module cache, isolation only where a file needs it, Postgres
+   tuned for throwaway test databases.
+5. **Prune and split** the oversized and duplicated suites in the code we keep.
+6. **Set up CI**: a GitHub Actions workflow that runs the thorough set on every push to a branch and
+   to `main`, sharded across jobs if that keeps it under the budget. Upstream's workflows in
+   `.github/workflows/` (38 files) are reviewed and replaced, not inherited. Actions is enabled on
+   the fork; they last ran on 2026-10-25 (scheduled, on `master`) and have never run on `main`.
+7. **Write down the workflow and keep it fast:** one command per tier (quick local, thorough,
+   opt-in), when to run each (before pushing, in CI, before merging into `main`), in CLAUDE.md and
+   the `/pm` agent briefs, and a time budget checked when tests are added.
+
 ### 4. Make runs Claude-native
 
 A run should behave like a Claude Code session in the project's repo:
@@ -427,7 +476,8 @@ in whatever order matters most ([The build plan after the hard fork](#the-build-
 | Repo map and `claude_local` trace | Done 2026-11-17: [repo-map.md](repo-map.md) (ours, shared core, dormant, the seams, tests) and [claude-local-run.md](claude-local-run.md) (one run from wake to finish, both engines, with the change points for steps 4 and 5). |
 | 2. Take the fixes already written | In progress. Our three pull requests are in `main`; the image builds from source (no patches) on `deploy/build-from-source`, not yet deployed; upstream's open pull requests surveyed in [upstream-open-prs.md](upstream-open-prs.md), picks pending. |
 | 3. Leave unused code | Ongoing, as decided. |
-| 4. Make runs Claude-native | Split in two. 4a (Paperclip over MCP, agent permissions): designed and planned 2026-11-17 ([design](step-4a-mcp-and-permissions.md), [plan](step-4a-plan.md)); building on `feat/step-4a`. 4b (Claude-native runs): after 4a. |
+| **3a. Renovate the test suite** | **Current step**, added 2026-11-17. The full suite takes ~7 hours; the goal is 10–20 minutes (30 at most). First profile and audit: [test-suite-audit.md](test-suite-audit.md). |
+| 4. Make runs Claude-native | Split in two. 4a (Paperclip over MCP, agent permissions): designed and planned 2026-11-17 ([design](step-4a-mcp-and-permissions.md), [plan](step-4a-plan.md)); building on `feat/step-4a`, **paused while 3a is current** (2026-11-17). 4b (Claude-native runs): after 4a. |
 | 5–7 | Not started. |
 
 ## Watching upstream

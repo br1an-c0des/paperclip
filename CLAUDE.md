@@ -72,6 +72,7 @@ set up for one person running Claude agents.
 | [fork/claude-local-run.md](fork/claude-local-run.md) | One `claude_local` run from wake to finish (CLI and ACP engines), with file references and the change points for hard-fork steps 4 and 5. |
 | [FORK-PATCHES.md](FORK-PATCHES.md) | Retired: since the deployment builds from source there are no patches; history in git. |
 | [fork/upstream-fixes.md](fork/upstream-fixes.md) | The fork's bug list: what's wrong, where, and the likely fix. |
+| [fork/test-suite-audit.md](fork/test-suite-audit.md) | Step 3a: what the full test suite costs (~7.6 h), where the time goes, and the fixes to try. |
 | [.claude/skills/upstream-watch/SKILL.md](.claude/skills/upstream-watch/SKILL.md) | The weekly upstream review: list what's new, triage, cherry-pick what you choose. Ledger in [fork/upstream-watch.md](fork/upstream-watch.md); older sync reports in `fork/sync-reports/`. |
 | [.claude/skills/pm/SKILL.md](.claude/skills/pm/SKILL.md) | Project-manager mode (`/pm`): plan and review, delegate building to 3–5 agents, propose each one first. |
 | [ui-new/README.md](ui-new/README.md) | Running and building the SolidJS app; layout; lockfile-conflict fix. |
