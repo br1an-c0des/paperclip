@@ -1,6 +1,6 @@
 # Step 4a: Paperclip over MCP, with agent permissions
 
-**Status: approved 2026-11-17; wave 1 built on `feat/step-4a` (see [the plan](step-4a-plan.md) and [the handoff](step-4a-handoff.md) for what changed while building).** The first half of
+**Status: approved 2026-11-17; wave 1 built on `feat/step-4a`, wave 2 planned 2026-11-18 (see [the plan](step-4a-plan.md) and [the handoff](step-4a-handoff.md) for what changed while building).** The first half of
 [hard-fork plan step 4](hard-fork-plan.md#4-make-runs-claude-native). The second half, 4b
 (Claude-native runs: repo working folder, all setting sources, the repo's `.mcp.json` and skills,
 memory), comes after this and gets its own design.
@@ -165,7 +165,7 @@ work it out from the old flags; an agent created later without `access` gets the
 
 **One source of truth (my call).** After 4a, `permissions.access` is the only standing permission
 record for agent callers: `decide` stops consulting `principal_permission_grants` for agents (people
-keep theirs), and the agent grants UI and endpoints are retired. The one other input is
+keep theirs), and the agent grants UI and endpoints are retired. (As built, narrower: agents still read `principal_permission_grants` for keys with no access action: `tools:*`, `inbox:manage`, `skills:*`, `tasks:manage_active_checkouts`, `agents:read`, `agents:suggest-changes`. The task-watchdog scope stays computed per request rather than a temporary grant.) The one other input is
 **temporary grants**: a time-limited, scoped allow, used today by task-watchdog runs and in 4a by
 approved permission requests (section 7). Both use the same mechanism, which `decide` checks after
 the level and overrides.
@@ -174,7 +174,7 @@ the level and overrides.
 override; an agent's existing `principal_permission_grants` become overrides, keeping their scope.
 Existing agents start at manager (decided); agents created after 4a default to worker.
 
-**The interaction switches.** The six actor-side switches (`canAssignTasksToAgents`,
+**The interaction switches.** (As built: four of the six fold into actions; `canCommentOnOtherTasks` and `canMentionAgents` stay as switches.) The six actor-side switches (`canAssignTasksToAgents`,
 `canAssignTasksToHumans`, `canMentionAgents`, `canCommentOnOtherTasks`, `canEditOtherTasks`,
 `canConfigureOtherAgents`) fold into the actions above and are migrated into overrides when they're
 set to `false`. The five receiver-side switches (`canReceive…`) stay: they're the target agent's
@@ -237,8 +237,8 @@ The proposed tools, about 22:
 | `paperclip_request_approval` | `requests:create` | |
 | `paperclip_report_progress` | run only | |
 | `paperclip_finish`, `paperclip_block` | run only | Record the run's disposition (section 6) |
-| `paperclip_search_api` | `tasks:read` | Searches the OpenAPI document; returns only operations the caller may call |
-| `paperclip_call_api` | `api:raw` | Any REST operation from `search_api`, by operation id and arguments |
+| `paperclip_search_api` | `api:raw` | Searches the OpenAPI document; returns only operations the caller may call (built: `api:raw`, since it only lists what `call_api` can reach) |
+| `paperclip_call_api` | `api:raw` | Any REST operation from `search_api`, by operation id (`"METHOD /path"`; the OpenAPI document has no `operationId`s) and arguments |
 
 The project tools from `/api/mcp/project-tools` fold in (`create_project` and friends under
 `projects:manage`). **Every tool the public MCP offers today carries over** as a named tool (my
@@ -304,7 +304,7 @@ the approval records the refusal. If the request came from a task, a comment on 
 outcome, which wakes the assigned agent in the normal way. Requests expire after 7 days (my call).
 The request can also offer "approve and always allow", which adds the override.
 
-Reads are never requestable; writes are requestable unless the tool says otherwise.
+Reads are never requestable; writes are requestable unless the tool says otherwise. The run tools (`finish`, `block`, `report_progress`), `search_api` and `call_api` are not requestable (as built).
 
 ### 8. `ui-new`
 
