@@ -2,8 +2,10 @@
 
 **Status: approved 2026-11-17; wave 1 built on `feat/step-4a` (see [the plan](step-4a-plan.md) and [the handoff](step-4a-handoff.md) for what changed while building).** The first half of
 [hard-fork plan step 4](hard-fork-plan.md#4-make-runs-claude-native). The second half, 4b
-(Claude-native runs: repo working folder, all setting sources, the repo's `.mcp.json` and skills,
-memory), comes after this and gets its own design.
+(Claude-native runs: the CLI engine, sealed runs that get only what Paperclip gives them, the repo's
+`CLAUDE.md` behind a switch per project, the repo working folder, memory), gets its own design.
+Its direction changed on 2026-11-18 ([hard-fork plan, decision 8](hard-fork-plan.md#decisions)):
+the repo's and user's MCP servers, settings and skills no longer load at all.
 
 ## Why
 
@@ -29,7 +31,7 @@ tools it sees and what it can do.
 
 ## Non-goals
 
-- Half 4b: working folder, setting sources, dropping `--strict-mcp-config`, repo skills, memory.
+- Half 4b: the engine switch, sealed runs, the `CLAUDE.md` switch, working folder, memory.
 - Agents in their own container (deferred).
 - Where personas live: they stay in Paperclip's per-agent `AGENTS.md` (decided).
 - The other adapters, the Runner and its tool gateway, cloud and sandbox execution: dormant, not
@@ -269,7 +271,7 @@ tools it may not use (marked as needing approval), so an agent can still ask for
   `/api/mcp/paperclip` with the run token, replacing "Paperclip projects". The connection tools
   ("Paperclip connections") fold in if their separate token can be replaced by the run token, else
   stay as they are (builder's call). "paperclip-assigned" gateways are unchanged.
-  `--strict-mcp-config` stays until 4b.
+  `--strict-mcp-config` stays (since 2026-11-18, 4b keeps it on for every run).
 - **Finish or block (my calls).** A run's **disposition** is any of: `paperclip_finish` (task to
   done or in review, with a summary), `paperclip_block` (task to blocked, with the owner and what's
   needed), `paperclip_report_progress` with `continue: true` (the work carries on in a later run),

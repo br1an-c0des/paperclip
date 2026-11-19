@@ -650,6 +650,17 @@ cancel). The adapter (`toAdapterResult`, `execute.ts:1028-1332`) maps it:
 
 ## 10. Change points for steps 4 and 5
 
+**Goals changed 2026-11-18** ([hard-fork plan, decision 8](hard-fork-plan.md#decisions)): runs are
+sealed, getting only what Paperclip gives them. So the rows "All setting sources", "Repo `.mcp.json`
+and the user's MCP servers" and "Repo skills first" are reversed. Runs keep `--strict-mcp-config`
+on, always, and skip the user and project setting sources, not just with managed connections. Each
+agent gets its own lasting config folder. The company library is where skills come from, and the
+repo's `CLAUDE.md` loads only when its project's switch is on. The code locations in those rows
+still apply. Facts found on server1 the same day: all five agents run `claude_local` with no
+`engine` set (so ACP), and all use one managed AI connection with the subscription method. The run
+gets `CLAUDE_CODE_OAUTH_TOKEN` (`packages/shared/src/ai-connections.ts:94-97`), and the container
+has no Claude login of its own.
+
 "CLI" means `packages/adapters/claude-local/src/server/execute.ts`; "ACP" means
 `packages/adapter-utils/src/acpx-engine/execute.ts`. A first decision underlies all of them: **pick
 one engine.** The plan assumes the CLI; agents are on ACP unless `engine: "cli"` is set. Either

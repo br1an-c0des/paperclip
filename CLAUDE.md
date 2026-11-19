@@ -14,9 +14,10 @@ set up for one person running Claude agents.
   (every one is catalogued). Stage 1 of the [build plan](ui-new/docs/build-plan.md) is complete.
 - **Make Claude runs first-class.** Agents run on the `claude_local` adapter, whose default engine is
   ACP (`claude-agent-acp`), with `claude --print` as the CLI engine
-  ([fork/claude-local-run.md](fork/claude-local-run.md)). The plan: runs that behave like a Claude Code session in the project's repo (its CLAUDE.md, skills and
-  MCP servers), Paperclip reached through MCP instead of curl, one prompt builder we own, and chat
-  as its own concept rather than a hidden task (hard-fork plan steps 4–7).
+  ([fork/claude-local-run.md](fork/claude-local-run.md)). The plan: sealed runs, where a run gets exactly what Paperclip gives it (instructions, skills, MCP
+  servers, credential, settings) and Paperclip shows what that is, with the repo's `CLAUDE.md` behind
+  a switch per project; Paperclip reached through MCP instead of curl; one prompt builder we own; and
+  chat as its own concept rather than a hidden task (hard-fork plan steps 4–7).
 - **Then the build plan's features, in core,** without the plugin limits the fork used to work under.
 - **Leave unused code alone until it gets in the way.** The other adapters, the Paperclip Runner,
   Claude Managed and cloud execution stay in the tree, dormant. Remove a subsystem only when it
