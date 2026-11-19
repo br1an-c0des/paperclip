@@ -123,7 +123,7 @@ import {
 } from "./native-runtime/provider-profile.js";
 import { managedAgentProfileService } from "./managed-agent-profiles.js";
 import { CEO_HIRING_DENIAL_KEY, ceoHiringDenial } from "../lib/agent-permissions.js";
-import { withAccessOverride } from "./agent-access.js";
+import { withAccessOverride, withStoredAccess } from "./agent-access.js";
 import { remoteAgentProfileService } from "./remote-agent-profiles.js";
 
 const EXPORT_READ_CONCURRENCY = 8;
@@ -257,6 +257,18 @@ function assertInlineSourceComplete(source: CompanyPortabilityImport["source"]) 
  * only differ by issue prefix. Explicit user-typed names bypass this — they
  * are the caller's deliberate choice.
  */
+
+/**
+ * An imported package's permissions for an agent that already exists, with the agent's own access
+ * level kept (fork bug 43): a package never sets `access`, so importing can't raise an agent, the
+ * importer itself included. Only a person changes a level, through `PATCH /agents/:id/permissions`.
+ */
+export function importedPermissionsKeepingAccess(incoming: unknown, existing: unknown): Record<string, unknown> {
+  const record = (value: unknown) => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const kept = record(existing).access;
+  return withStoredAccess(record(incoming), kept && typeof kept === "object" ? kept as Parameters<typeof withStoredAccess>[1] : null);
+}
+
 export function dedupeImportedCompanyName(baseName: string, existingNames: string[]): string {
   const normalized = new Set(existingNames.map((name) => name.trim().toLowerCase()));
   if (!normalized.has(baseName.trim().toLowerCase())) return baseName;
@@ -5781,8 +5793,10 @@ export function companyPortabilityService(db: Db, storage?: StorageService) {
 
           if (planAgent.action === "update" && planAgent.existingAgentId) {
             if (pauseAutomations) await agentsLifecycle().pauseAgent(planAgent.existingAgentId, "import");
+            const existingAgent = await agents.getById(planAgent.existingAgentId);
             let updated = await updateImportedAgent(planAgent.existingAgentId, {
               ...patch,
+              permissions: importedPermissionsKeepingAccess(manifestAgent.permissions, existingAgent?.permissions),
             });
             if (updated) updated = await applyImportedCeoHiringDenial(targetCompany.id, updated, manifestAgent.permissions) ?? updated;
             if (!updated) {
