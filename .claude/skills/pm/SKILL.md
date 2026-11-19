@@ -52,7 +52,8 @@ but the user approves each one, and may change or drop any of them. For each, gi
 - **Owns:** the files and folders it will write. No two running agents own the same file. Shared
   docs (`capabilities.md`, `decisions.md`, `build-plan.md`) belong to you, not to agents.
 - **Branch:** `<area>/<slice>` in its own worktree, based on `main`.
-- **Done when:** what works, plus `typecheck` and the tests passing.
+- **Done when:** what works, plus `typecheck` and `corepack pnpm test:quick` passing (and `ui-new`'s
+  `test` for UI work).
 - **Depends on:** other agents' work it needs merged first, if any.
 
 ## Limits
@@ -73,21 +74,29 @@ Agents start cold, so the brief carries everything. Include:
    code. Follow the design in `ui-new/docs/design/` (boards, `design-system.md`, `tokens.css`).
 3. **The work:** the goal, the boards and plan sections to read, the files it owns, and what to leave
    alone.
-4. **Finish:** commit on its branch with clear messages; don't push, don't merge, don't edit the
+4. **Tests:** run `corepack pnpm test:quick` before finishing, plus the specific files it changed
+   or added. Don't run the whole thorough tier (about 21 min; CI runs it). Any full local run takes
+   the machine lock: `flock /tmp/paperclip-test-bench.lock …`. A change that reaches into opt-in
+   areas (dormant halves, the Runner, other adapters, plugins, chat channels) runs those files too.
+5. **Finish:** commit on its branch with clear messages; don't push, don't merge, don't edit the
    shared docs.
-5. **Report back:** what it built, what it left out and why, API gaps it hit (with the requests
+6. **Report back:** what it built, what it left out and why, API gaps it hit (with the requests
    involved), files touched, and the checks it ran with their results.
 
 ## When an agent finishes
 
 1. Check the branch is based on `main` and stays inside its files.
-2. Review the diff, and run `corepack pnpm --filter @paperclipai/ui-new typecheck` and `test`.
-3. Problems go back to the agent. When it's clean, merge into `main` with `--no-ff` and a message
-   like `Merge the run modal (M2, boards 16-18)`.
-4. Record it: capability statuses and notes, new API gaps in `decisions.md`, milestone progress in
+2. Review the diff, and run `corepack pnpm test:quick` from its worktree (plus
+   `corepack pnpm --filter @paperclipai/ui-new typecheck` and `test` for UI work).
+3. Push the branch so CI runs the thorough tier (`.github/workflows/test.yml`), and wait for it to
+   be green: that's the gate before `main`. Failures go back to the agent, on the branch.
+4. When it's clean and green, merge into `main` with `--no-ff` and a message like
+   `Merge the run modal (M2, boards 16-18)`.
+5. Record it: capability statuses and notes, new API gaps in `decisions.md`, milestone progress in
    the build plan. Commit those as one docs commit.
-5. Tell the user what landed and what's left, then propose the next agent if a slot is free.
-6. Push `main` when the user asks, and remove merged worktrees.
+6. Tell the user what landed and what's left, then propose the next agent if a slot is free.
+7. Push `main` when the user asks, then delete the merged branch locally and on `origin`, and
+   remove its worktree.
 
 ## Bugs found along the way
 

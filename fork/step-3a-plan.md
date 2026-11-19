@@ -389,6 +389,25 @@ $(git merge-base main origin/feat/step-4a) origin/feat/step-4a`). Report instead
 - **Upstream's 38 workflows disabled on GitHub** 2026-11-18 (`gh workflow disable`, reversible), so
   pushing the `master` mirror no longer starts them. Our `test.yml` comes with agent H's merge.
 
+- **F merged** 2026-11-18 (`8dec929354`): the `shared` server project is back to `isolate: false`.
+  The setup file puts env, stubbed globals, fake timers and cwd back between files and resets 16
+  modules' process state; 64 files are isolated by name (pending idle-tracked work, cached log
+  stores, the idle-sleep report, the issue-recovery family, an import-order bug). Test homes are
+  removed at worker teardown. Full server runs 38–42 min against 52 min isolated (every file,
+  opt-in included). [results-leaks.md](test-suite-audit/results-leaks.md). Five shared files failed
+  once each across F's three final runs and passed on re-run, under load from other agents' runs;
+  left as they are unless they recur. Source changes that would let 43 isolated files share again
+  (log-store caches keyed on their base path, idle-work resets, the codex test-support workspace)
+  and an import cycle in `execution-recovery-attempt.ts` are noted there, not yet bugs-list entries.
+- **H merged** 2026-11-18 (`aaa8ccd240`): `.github/workflows/test.yml` (typecheck, 10 thorough
+  shards), `--shard`, machine-sized workers, `--report-dir`.
+  [results-ci.md](test-suite-audit/results-ci.md).
+- **Final thorough run on `main`** 2026-11-18 (`aaa8ccd240`, 8 workers, under the lock): **21m09s**,
+  1,412 files, 24,457 passed, 0 failed, 52 skipped (server 19m14s, packages 1m55s). The audit's
+  serial estimate for the whole suite was ~6 h.
+- **Workflow written** into `CLAUDE.md` (Tests), the `/pm` skill and `doc/test-infrastructure.md`
+  (Test tiers).
+
 Merge order: E and G, then F (its final full run includes G's changes), then H. Then the PM writes
 the workflow (quick before pushing, thorough in CI and before merging into `main`, opt-in on demand)
 into `CLAUDE.md`, the `/pm` briefs and `doc/test-infrastructure.md`.

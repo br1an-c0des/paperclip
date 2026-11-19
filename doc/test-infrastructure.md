@@ -2,6 +2,60 @@
 
 Internals of the local and CI test tooling, plus the benchmarks and live smoke tests. For everyday commands, see [DEVELOPING.md](DEVELOPING.md#test-commands).
 
+## Test tiers
+
+Hard-fork step 3a (2026-11-18) split the suite into tiers. The workflow (when to run which) is in
+[CLAUDE.md](../CLAUDE.md#tests); the measurements behind it are in
+[fork/step-3a-plan.md](../fork/step-3a-plan.md) and [fork/test-suite-audit/](../fork/test-suite-audit/).
+
+| Tier | Command | What runs |
+| --- | --- | --- |
+| quick | `pnpm test:quick [--changed <ref>]` | The thorough-tier tests a change touches since its merge base with `main` (default), plus untracked files: changed test files, test files named after or importing a changed source file, and small directories' tests. |
+| thorough | `pnpm test` | Every test file except `optIn` ones. CI runs it on every push. |
+| optin | `pnpm test:optin` | Files matching `optIn` globs in `scripts/test-tiers.json`, each with its reason: dormant halves of split files (`*.dormant.test.ts`), the Runner, other adapters, the CLI, plugins, chat channels, cloud and sandbox code. On demand only. |
+| all | `pnpm test:all` | thorough, then optin. |
+
+`scripts/test.mjs` runs a tier as a few `vitest run` invocations from the repo root (server files
+in parallel, then `serialServer` files one at a time, then every other project), runs every phase
+even after a failure, and prints one summary. Before running it lists each phase with
+`vitest list --filesOnly` and stops unless every test file lands in exactly one phase, so a new file
+can't be silently skipped. Options: `--workers N` (default min(8, cores ÷ 2, free memory ÷ 1.5 GB)),
+`--shard i/n` (longest-first split by `fork/test-suite-audit/classification.csv`'s timings, the same
+on every machine), `--report-dir <dir>` (keep each phase's Vitest JSON report), `--files <list>`,
+`--dry-run`, and `-- <vitest args>`.
+
+**CI.** `.github/workflows/test.yml` runs on every push to any branch (pull requests only from forks):
+a typecheck job and the thorough tier in 10 shards, each with `--report-dir`. Vitest's module
+cache is restored from `main`'s last run.
+
+**Server projects.** `server/vitest.config.ts` splits the server's files into two Vitest projects:
+
+- `@paperclipai/server (shared)` runs with `isolate: false`: a worker loads the server's module
+  graph once (~4 s) and runs many files in turn. The setup file
+  (`src/__tests__/setup-supertest.ts`, with `helpers/shared-worker-state.ts`) puts environment
+  variables, stubbed globals, fake timers and the working directory back before each file, and
+  resets the process-wide state of 16 modules (run admission, the controller lease, caches).
+- `@paperclipai/server (isolated)` runs each file in a fresh process: every file that calls
+  `vi.mock`, `vi.doMock`, `vi.hoisted` and the like, plus `ISOLATED_BY_NAME`, the files that leave
+  module state the setup file can't reset (pending idle-tracked work, cached log stores, the
+  idle-sleep report). The config throws if a listed file no longer exists.
+
+A new server test that passes alone but fails in a full run, or makes a later file fail, is
+usually a leak: `PAPERCLIP_TEST_LEAK_REPORT=<file>` appends what each file left behind, and
+`PAPERCLIP_TEST_NO_RESET=1` also turns the reset off to reproduce it
+([results-leaks.md](../fork/test-suite-audit/results-leaks.md)).
+
+**Embedded Postgres.** Every test cluster starts with `fsync`, `synchronous_commit` and
+`full_page_writes` off (passed as flags, so the template cache key is unchanged), and keeps its data
+under `/dev/shm` on Linux when it has at least 1 GB free (`PAPERCLIP_TEST_POSTGRES_DATA_ROOT` moves
+it). Together they took 10% off the serial benchmark and most of the disk contention with several
+workers ([results-postgres.md](../fork/test-suite-audit/results-postgres.md)). Interrupted runs
+stop their clusters, and leftovers from killed runs are swept at the next start.
+
+**Test homes.** Each server test file gets a throwaway `PAPERCLIP_HOME`, and each worker one Codex
+home; they are removed when the worker stops. Under `scripts/test.mjs` they also sit in the run's
+own `TMPDIR`, which the runner deletes.
+
 ## Runner transport suite
 
 The Runner transport suite keeps attachment recovery, warm attachment, live

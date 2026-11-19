@@ -54,6 +54,28 @@ set up for one person running Claude agents.
 - For the repo's conventions (repo map, dev setup, API rules), see `AGENTS.md`. Its pull-request
   template and Paperclip-issue workflow rules are upstream's and don't apply here.
 
+## Tests
+
+The suite runs in tiers through `scripts/test.mjs`; `scripts/test-tiers.json` says which files are
+opt-in ([doc/test-infrastructure.md](doc/test-infrastructure.md#test-tiers), step 3a).
+
+- **Before pushing:** `corepack pnpm test:quick` runs the tests your change touches since its merge
+  base with `main` (`--changed <ref>` for another base). A few minutes at most. `ui-new` has its
+  own `typecheck` and `test` (Common commands).
+- **CI** (`.github/workflows/test.yml`) runs the thorough tier, `corepack pnpm test`, on every push
+  to any branch: a typecheck and 10 shards in parallel. Locally the same tier takes about 21 min, so
+  leave it to CI unless you're checking a fix for a CI failure.
+- **Before merging into `main`:** the branch's latest push is green in CI. Push the branch, wait for
+  the run, then merge with `--no-ff`. Fix a red run on the branch, not on `main`.
+- **On demand:** `corepack pnpm test:optin` runs the opt-in tier (dormant halves, the Runner,
+  other adapters, the CLI, plugins, chat channels). Run it, or the files concerned, when a change
+  reaches into those areas.
+- **New test files** land in thorough unless an `optIn` glob matches them. A server test file that
+  leaves module state behind for the next file in its worker goes in `ISOLATED_BY_NAME` in
+  `server/vitest.config.ts` ([results-leaks.md](fork/test-suite-audit/results-leaks.md)).
+- **Full local runs** (thorough, opt-in, or a long file set) take the machine lock so two don't
+  share the machine: `flock /tmp/paperclip-test-bench.lock corepack pnpm test`.
+
 ## UI text
 
 - **Help text goes behind an "i" icon, not in the page body.** When you write a short description
@@ -73,7 +95,7 @@ set up for one person running Claude agents.
 | [fork/claude-local-run.md](fork/claude-local-run.md) | One `claude_local` run from wake to finish (CLI and ACP engines), with file references and the change points for hard-fork steps 4 and 5. |
 | [FORK-PATCHES.md](FORK-PATCHES.md) | Retired: since the deployment builds from source there are no patches; history in git. |
 | [fork/upstream-fixes.md](fork/upstream-fixes.md) | The fork's bug list: what's wrong, where, and the likely fix. |
-| [fork/test-suite-audit.md](fork/test-suite-audit.md) | Step 3a: what the full test suite costs (~7.6 h), where the time goes, and the fixes to try. |
+| [fork/test-suite-audit.md](fork/test-suite-audit.md) | Step 3a: what the full test suite cost (~6 h serial), where the time went, and the fixes to try. Results in [fork/step-3a-plan.md](fork/step-3a-plan.md). |
 | [.claude/skills/upstream-watch/SKILL.md](.claude/skills/upstream-watch/SKILL.md) | The weekly upstream review: list what's new, triage, cherry-pick what you choose. Ledger in [fork/upstream-watch.md](fork/upstream-watch.md); older sync reports in `fork/sync-reports/`. |
 | [.claude/skills/pm/SKILL.md](.claude/skills/pm/SKILL.md) | Project-manager mode (`/pm`): plan and review, delegate building to 3–5 agents, propose each one first. |
 | [ui-new/README.md](ui-new/README.md) | Running and building the SolidJS app; layout; lockfile-conflict fix. |
