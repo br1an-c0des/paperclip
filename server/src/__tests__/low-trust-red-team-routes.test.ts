@@ -1106,6 +1106,14 @@ describeEmbeddedPostgres(
 
     it("preserves direct-parent reporting while default-opening visible standard-trust writes", async () => {
       const fixture = await seedLowTrustFixture(db);
+      // Since step 4a a new agent's default level (worker) changes only its own tasks, so the
+      // default-open peer write this test pins needs tasks:update_any (what existing agents keep at
+      // manager). With it, the peer write must still stop at the assignee's run lock (409), not at
+      // the access level (403). The low-trust actor's access is unchanged.
+      await db
+        .update(agents)
+        .set({ permissions: { access: { level: "worker", overrides: { "tasks:update_any": true } } } })
+        .where(eq(agents.id, fixture.agents.standard.id));
       const standardApp = createApp(db, standardReportActor(fixture));
       const lowTrustApp = createApp(db, agentActor(fixture));
 

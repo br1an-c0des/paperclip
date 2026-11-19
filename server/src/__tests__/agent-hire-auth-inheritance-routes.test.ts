@@ -126,7 +126,7 @@ describeEmbeddedPostgres("hired agent provider credential inheritance", () => {
         adapterType,
         adapterConfig: { env },
         runtimeConfig: {},
-        permissions: { canCreateAgents: true },
+        permissions: { canCreateAgents: true, access: { level: "worker", overrides: { "agents:create": true } } },
       })
       .returning();
     return row!;
