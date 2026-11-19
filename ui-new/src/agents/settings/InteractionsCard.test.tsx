@@ -1,4 +1,4 @@
-import type { AgentDetail, AgentInteractionPermissionsState } from "@paperclipai/shared";
+import { AGENT_INTERACTION_PERMISSION_KEYS as KEYS, type AgentDetail, type AgentInteractionPermissionsState } from "@paperclipai/shared";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,20 +13,6 @@ vi.mock("@/api/agents", () => ({ agentsApi: api }));
 vi.mock("@/lib/company", () => ({ useCompany: () => () => ({ id: "co1", issuePrefix: "TES" }) }));
 
 const { InteractionsCard } = await import("./InteractionsCard");
-
-const KEYS = [
-  "canAssignTasksToAgents",
-  "canReceiveAssignmentsFromAgents",
-  "canAssignTasksToHumans",
-  "canMentionAgents",
-  "canReceiveMentionsFromAgents",
-  "canCommentOnOtherTasks",
-  "canReceiveCommentsFromAgents",
-  "canEditOtherTasks",
-  "canReceiveTaskEditsFromAgents",
-  "canConfigureOtherAgents",
-  "canReceiveConfigurationChangesFromAgents",
-] as const;
 
 function state(overrides: AgentInteractionPermissionsState["overrides"]): AgentInteractionPermissionsState {
   const effective = Object.fromEntries(KEYS.map((key) => [key, overrides[key] !== false])) as AgentInteractionPermissionsState["effective"];
@@ -87,15 +73,6 @@ describe("InteractionsCard", () => {
     await waitFor(() =>
       expect(api.updateInteractionPermissions).toHaveBeenLastCalledWith("a1", { canCommentOnOtherTasks: null, canReceiveCommentsFromAgents: null }),
     );
-  });
-
-  it("offers to clear a retired switch still stored as off", async () => {
-    api.interactionPermissions.mockResolvedValue(state({ canEditOtherTasks: false, canConfigureOtherAgents: false }));
-    renderCard();
-    expect(await screen.findByText(/Still off from an older setting: Edit other tasks, Configure other agents\./)).toBeTruthy();
-    expect(screen.getByText("Nothing turned off.")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
-    await waitFor(() => expect(api.updateInteractionPermissions).toHaveBeenCalledWith("a1", { canEditOtherTasks: null, canConfigureOtherAgents: null }));
   });
 
   it("waits for a pending hire to be approved", async () => {

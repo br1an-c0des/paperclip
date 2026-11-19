@@ -4,7 +4,9 @@ import { agents, type Db } from "@paperclipai/db";
 import { isUuidLike, updateAgentInteractionPermissionsSchema } from "@paperclipai/shared";
 import { badRequest, notFound } from "../errors.js";
 import { validate } from "../middleware/validate.js";
-import { readAgentInteractionPermissions, updateAgentInteractionPermissions } from "../services/agent-interaction-permissions.js";
+import {
+  assertNoRetiredAgentInteractionPermissions, readAgentInteractionPermissions, updateAgentInteractionPermissions,
+} from "../services/agent-interaction-permissions.js";
 import { assertAuthenticated, assertBoard, assertCompanyAccess, hasCompanyAccess } from "./authz.js";
 
 export function agentInteractionPermissionRoutes(db: Db) {
@@ -22,7 +24,13 @@ export function agentInteractionPermissionRoutes(db: Db) {
     const agent = await target(req);
     res.json(await readAgentInteractionPermissions(db, req.actor, agent.companyId, agent.id));
   });
-  router.patch("/agents/:id/interaction-permissions", validate(updateAgentInteractionPermissionsSchema), async (req, res) => {
+  router.patch("/agents/:id/interaction-permissions", (req, _res, next) => {
+    // Before validation, so a retired switch gets a pointer to access rather than "unrecognized key".
+    assertAuthenticated(req);
+    assertBoard(req);
+    assertNoRetiredAgentInteractionPermissions(req.params.id as string, req.body);
+    next();
+  }, validate(updateAgentInteractionPermissionsSchema), async (req, res) => {
     assertAuthenticated(req);
     assertBoard(req);
     const agent = await target(req);
