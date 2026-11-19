@@ -17,6 +17,7 @@ import {
 import { errorHandler } from "../middleware/index.js";
 import { issueRoutes } from "../routes/issues.js";
 import { CROSS_ISSUE_INFLUENCE_LIMIT } from "../services/cross-issue-influence-limit.js";
+import { heartbeatService } from "../services/heartbeat.js";
 import {
   getEmbeddedPostgresTestSupport,
   startEmbeddedPostgresTestDatabase,
@@ -52,6 +53,11 @@ describeEmbeddedPostgres("cross-issue interaction resolution cap (routes + postg
   // order. Every assertion below is scoped to its own seeded company instead of
   // relying on an empty database.
   afterEach(async () => {
+    // The wake starts a real background run of the assignee. Await it here: left
+    // running, it outlives this file's database, and in a shared test worker a
+    // later file's heartbeat drain waits on it (bug 62). (The seeded `running`
+    // runs have no execution, so this drains executions, not the run table.)
+    await heartbeatService(db).drainActiveRunExecutions();
     const cleanups = [
       () => db.delete(issueThreadInteractions),
       () => db.delete(activityLog),

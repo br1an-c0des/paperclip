@@ -50,7 +50,12 @@ suite("Retry after a shutdown interrupted workspace restore before provider work
     await db.insert(companyMemberships).values({ companyId, principalType: "user", principalId: "local-board", membershipRole: "owner" });
   }, 30_000);
 
-  afterAll(async () => { await temporary?.cleanup(); });
+  afterAll(async () => {
+    // A started Retry's terminal status lands before its trailing writes; await the run so it
+    // doesn't outlive this file's database and stall a later file's heartbeat drain (bug 62).
+    await heartbeatService(db).drainActiveRunExecutions();
+    await temporary?.cleanup();
+  });
 
   async function interruptedRestore(options: { cancellationSource?: string; terminationReceipt?: boolean;
     controllerLeaseExpiresAt?: Date; recoveredSnapshotId?: string } = {}) {

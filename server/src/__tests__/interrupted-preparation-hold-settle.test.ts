@@ -70,14 +70,24 @@ suite("held interrupted preparations on the shared ownership path", () => {
   }, 30_000);
 
   afterEach(async () => {
-    await db.delete(activityLog);
-    await db.delete(issueRecoveryActions);
-    await db.delete(environmentLeases);
-    await db.delete(executionWorkspaces);
-    await db.delete(heartbeatRunEvents);
-    await db.delete(heartbeatRuns);
-    await db.delete(agentWakeupRequests);
-    await db.delete(issues);
+    // A replay or Retry starts a real background run. Await it before clearing the tables:
+    // left running, it outlives this file's database, and in a shared test worker a later
+    // file's heartbeat drain waits on it (bug 62). A finished run also writes rows that
+    // reference its run and task (completion contracts, native finalizations, ...), hence
+    // CASCADE. The company, agent, environment and memberships from beforeAll stay.
+    await heartbeatService(db).drainActiveRunExecutions();
+    await db.execute(sql.raw(`
+      TRUNCATE TABLE
+        "activity_log",
+        "issue_recovery_actions",
+        "environment_leases",
+        "execution_workspaces",
+        "heartbeat_run_events",
+        "heartbeat_runs",
+        "agent_wakeup_requests",
+        "issues"
+      CASCADE
+    `));
   });
 
   afterAll(async () => { await temporary?.cleanup(); });
