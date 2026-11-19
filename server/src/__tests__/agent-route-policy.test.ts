@@ -210,10 +210,9 @@ describe.skipIf(!support.supported)("agentRoutePolicy", () => {
     expect((await dispatch(runActor(admin), "POST", "/not-a-documented-route")).statusCode).toBe(200);
     const deletion = await dispatch(runActor(admin), "DELETE", `/issues/${randomUUID()}`);
     expect(deletion.json()).toMatchObject({ code: "access_denied", missingAction: "tasks:delete" });
-    // The MCP endpoints themselves are open to every level that can read.
+    // The MCP endpoint itself is open to every level that can read.
     const worker = await agentWith({ level: "worker" });
     expect((await dispatch(runActor(worker), "POST", "/mcp/paperclip")).statusCode).toBe(200);
-    expect((await dispatch(runActor(worker), "POST", "/mcp/project-tools")).statusCode).toBe(200);
   });
 
   it("board callers are not affected", async () => {

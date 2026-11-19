@@ -25,10 +25,10 @@ it("says the call_api protocol rejection is final instead of inviting another se
 });
 
 it("points at the catalog description only when the protocol endpoint has one", () => {
-  const undocumented = searchRunnerApi({ query: "POST /api/mcp/project-tools" }).results.find(row => row.operationId === "POST /api/mcp/project-tools");
+  const undocumented = searchRunnerApi({ query: "GET /api/mcp/paperclip" }).results.find(row => row.operationId === "GET /api/mcp/paperclip");
   expect(undocumented?.description).toBe("");
   let message = "";
-  try { validateRunnerApiCall({ operationId: "POST /api/mcp/project-tools" }, context); } catch (error) { message = (error as Error).message; }
+  try { validateRunnerApiCall({ operationId: "GET /api/mcp/paperclip" }, context); } catch (error) { message = (error as Error).message; }
   expect(message).toContain("no other API route substitutes for it.");
   expect(message).not.toContain("catalog description");
 });

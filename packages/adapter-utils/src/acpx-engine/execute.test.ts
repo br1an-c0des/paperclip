@@ -64,6 +64,10 @@ import type { AcpxAgentSpawnHooks } from "./stock-runtime-options.js";
 
 
 const tempRoots: string[] = [];
+/** The `paperclip` MCP server the server gives every run with a token. */
+const paperclipRunMcp: AdapterRuntimeMcpAccess = {
+  getServers: () => [{ name: "paperclip", url: "http://127.0.0.1:3100/api/mcp/paperclip", token: "runtime-secret-token", connectionId: "paperclip" }],
+};
 let defaultGeminiTestHome: string | undefined;
 
 async function makeTempRoot() {
@@ -814,7 +818,7 @@ describe("shared ACPX engine runtime behavior", () => {
     const root = await makeTempRoot();
     const context = createPromptContextFixture();
     const config = { agent, agentCommand: "node ./fixture-acp.js", cwd: root, stateDir: path.join(root, "state"), mode: "persistent" };
-    const fresh = await runExecutor(config, { context, authToken: "runtime-secret-token" });
+    const fresh = await runExecutor(config, { context, authToken: "runtime-secret-token", runtimeMcp: paperclipRunMcp });
     expect(fresh.turnInputs).toHaveLength(1);
     const prompt = String(fresh.turnInputs[0]?.text ?? "");
     expect(prompt).toContain("You are agent agent-1");
@@ -832,7 +836,7 @@ describe("shared ACPX engine runtime behavior", () => {
     expect(prompt).toContain("receipt-1");
     expect(prompt).toContain("Paperclip runtime note:");
     expect(prompt).toContain("Paperclip API access note:");
-    const resumed = await runExecutor(config, { context, authToken: "runtime-secret-token", runtime: { sessionParams: fresh.result.sessionParams } });
+    const resumed = await runExecutor(config, { context, authToken: "runtime-secret-token", runtimeMcp: paperclipRunMcp, runtime: { sessionParams: fresh.result.sessionParams } });
     expect(resumed.sessionInputs[0]?.resumeSessionId).toBe(fresh.result.sessionId);
     const resumedPrompt = String(resumed.turnInputs[0]?.text ?? "");
     expect(resumedPrompt).not.toContain("Paperclip runtime note:");
@@ -856,6 +860,7 @@ describe("shared ACPX engine runtime behavior", () => {
       { agent: "custom", agentCommand: "node ./fake-acp.js" },
       {
         authToken: "runtime-secret-token",
+        runtimeMcp: paperclipRunMcp,
         context: {
           taskId: "issue-1",
           wakeReason: "issue_assigned",
@@ -876,24 +881,16 @@ describe("shared ACPX engine runtime behavior", () => {
     expect(prompt).toContain("## Paperclip Wake Payload");
     expect(prompt).toContain("TEST-1");
     expect(prompt).toContain("Paperclip API access note:");
-    expect(prompt).toContain('PAPERCLIP_API_BASE="${PAPERCLIP_API_URL%/}"; PAPERCLIP_API_BASE="${PAPERCLIP_API_BASE%/api}"');
-    expect(prompt).toContain("$PAPERCLIP_API_BASE/api/agents/me");
-    expect(prompt).toContain("$PAPERCLIP_API_BASE/api/issues/$PAPERCLIP_TASK_ID");
-    expect(prompt).toContain("X-Paperclip-Run-Id");
-    expect(prompt).not.toContain("$PAPERCLIP_API_URL/api/");
-    expect(prompt).not.toContain("/api/issues/{id}");
-    expect(prompt).not.toContain("-d '{...}'");
     expect(prompt).not.toContain("runtime-secret-token");
     expect(promptMetrics?.runtimeNoteChars).toBeGreaterThan(0);
   });
 
   it("points to the paperclip MCP tools instead of curl when the run has the paperclip server", async () => {
-    const server = { name: "paperclip", url: "http://127.0.0.1:3100/api/mcp/paperclip", token: "runtime-secret-token", connectionId: "paperclip" };
     const { meta } = await runExecutor(
       { agent: "custom", agentCommand: "node ./fake-acp.js" },
       {
         authToken: "runtime-secret-token",
-        runtimeMcp: { getServers: () => [server] },
+        runtimeMcp: paperclipRunMcp,
         context: { taskId: "issue-1", wakeReason: "issue_assigned", paperclipWake: { reason: "issue_assigned", issue: { id: "issue-1", identifier: "TEST-1" } } },
       },
     );
@@ -1068,6 +1065,7 @@ describe("shared ACPX engine runtime behavior", () => {
       { agent: "custom", agentCommand: "node ./fake-acp.js" },
       {
         authToken: "runtime-secret-token",
+        runtimeMcp: paperclipRunMcp,
         context: {
           taskId: "issue-chat-overflow",
           paperclipTaskMarkdown: "# CHAT-2 — Answer every queued message",
@@ -1150,16 +1148,28 @@ describe("shared ACPX engine runtime behavior", () => {
     );
   });
 
-  it("does not show a scoped issue API command when the task id is unavailable", async () => {
+  it("gives a run without a task the same MCP note", async () => {
+    const { meta } = await runExecutor(
+      { agent: "custom", agentCommand: "node ./fake-acp.js" },
+      { authToken: "runtime-secret-token", runtimeMcp: paperclipRunMcp },
+    );
+
+    const prompt = String(meta[0]?.prompt ?? "");
+    expect(prompt).toContain("Paperclip API access note:");
+    expect(prompt).toContain("paperclip_task_context");
+    expect(prompt).not.toContain("curl");
+  });
+
+  it("shows no API access note, and no curl recipe, when the run has no paperclip server", async () => {
     const { meta } = await runExecutor(
       { agent: "custom", agentCommand: "node ./fake-acp.js" },
       { authToken: "runtime-secret-token" },
     );
 
     const prompt = String(meta[0]?.prompt ?? "");
-    expect(prompt).toContain("Paperclip API access note:");
-    expect(prompt).toContain("Use a real issue id from the current context before making issue write requests.");
-    expect(prompt).not.toContain("$PAPERCLIP_API_BASE/api/issues/$PAPERCLIP_TASK_ID");
+    expect(prompt).toContain("Paperclip runtime note:");
+    expect(prompt).not.toContain("Paperclip API access note:");
+    expect(prompt).not.toContain("curl");
   });
 
   it("emits ACP text deltas as stdout transcript records", async () => {

@@ -1759,7 +1759,7 @@ function resolveOperationAuthLevel(
   if (key === "GET /api/agents/me/mcp-skills/{skillId}/files") return "agent_heartbeat";
   // Agents may read their own commentary, or all of it with commentary:view; the routes enforce that.
   if (method.toUpperCase() === "GET" && path.startsWith("/api/companies/{companyId}/agent-commentary")) return "authenticated";
-  if (key === "POST /api/mcp/project-tools" || key === "POST /api/companies/{companyId}/slack/tasks/{issueId}/tools") return "agent_run";
+  if (key === "POST /api/companies/{companyId}/slack/tasks/{issueId}/tools") return "agent_run";
   // Paperclip's MCP server: a run token or an agent API key, never a board session.
   if (path === "/api/mcp/paperclip") return "agent";
   if (RUNTIME_TOOLS_OPERATIONS.has(key)) return "runtime_tools";
@@ -11837,20 +11837,6 @@ for (const route of [
 }
 
 // --- Connection intents ------------------------------------------------------
-
-registerCurrentRoute({
-  method: "post",
-  path: "/api/mcp/project-tools",
-  tags: ["projects"],
-  summary: "Call project and task tools through the active task run's MCP transport",
-  body: z.object({
-    jsonrpc: z.literal("2.0"),
-    id: z.union([z.string(), z.number()]).nullable().optional(),
-    method: z.string(),
-    params: z.record(z.string(), z.unknown()).optional(),
-  }),
-  responses: { 200: r.ok(), 202: r.ok(), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden, 409: r.conflict },
-});
 
 const paperclipMcpMessageSchema = z.object({
   jsonrpc: z.literal("2.0"),

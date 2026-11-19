@@ -1284,9 +1284,9 @@ describe("claude execute", () => {
         context: {},
         runtimeMcp: {
           getServers: () => [{
-            name: "Paperclip projects",
-            url: "http://localhost:3100/api/mcp/project-tools",
-            connectionId: "paperclip-project-tools",
+            name: "paperclip",
+            url: "http://localhost:3100/api/mcp/paperclip",
+            connectionId: "paperclip",
             token: "run-jwt-token",
           }],
         },
@@ -1370,9 +1370,9 @@ describe("claude execute", () => {
         },
         runtimeMcp: {
           getServers: () => change === "removed" ? [] : [{
-            name: "Paperclip projects",
-            url: "http://localhost:3100/api/mcp/project-tools",
-            connectionId: "paperclip-project-tools",
+            name: "paperclip",
+            url: "http://localhost:3100/api/mcp/paperclip",
+            connectionId: "paperclip",
             token: "next-run-jwt-token",
           }, ...(change === "added" ? [{ name: "GitHub", url: "https://example.test/github/mcp", connectionId: "github", token: "fresh-github-token" }] : [])],
         },

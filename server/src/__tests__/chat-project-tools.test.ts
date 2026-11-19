@@ -20,22 +20,17 @@ import { recoveryPostgresSupport as support } from "./helpers/recovery-postgres.
   afterAll(async () => { await server?.close(); if (originalSecret === undefined) delete process.env.PAPERCLIP_AGENT_JWT_SECRET; else process.env.PAPERCLIP_AGENT_JWT_SECRET = originalSecret; });
   const call = (fixture: Awaited<ReturnType<typeof server.fixture>>, tool: string, args: Record<string, unknown>) => fixture.authority.execute({ tool, arguments: args, callId: randomUUID() });
 
-  it("gives MCP list_projects rows the company-scoped project page href", async () => {
+  // `/api/mcp/project-tools` is retired (runs use `/api/mcp/paperclip`). The service it called stays
+  // for the dormant Runner, so this checks the service with the prefix the route used to look up.
+  it("gives list_projects rows the company-scoped project page href", async () => {
     const f = await server.fixture({ conversation: true, disableWakeOnDemand: true });
     const [{ issuePrefix }] = await server.db.select({ issuePrefix: companies.issuePrefix }).from(companies).where(eq(companies.id, f.companyId));
     const token = createLocalAgentJwt(f.agentId, f.companyId, "paperclip_runner", f.runId, f.responsibleUserId)!;
-    const originalApiUrl = process.env.PAPERCLIP_API_URL;
-    process.env.PAPERCLIP_API_URL = server.apiUrl;
-    try {
-      const response = await fetch(`${server.apiUrl}/api/mcp/project-tools`, { method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "list_projects", arguments: {} } }) });
-      const { result } = await response.json() as { result: { isError?: boolean; structuredContent?: { projects: Array<{ id: string; href?: string }> } } };
-      expect(result.isError).toBeUndefined();
-      expect(result.structuredContent?.projects.find(row => row.id === f.projectId)?.href).toBe(`/${issuePrefix}/projects/${f.projectId}`);
-    } finally {
-      if (originalApiUrl === undefined) delete process.env.PAPERCLIP_API_URL; else process.env.PAPERCLIP_API_URL = originalApiUrl;
-    }
+    const result = await callProjectTool({
+      name: "list_projects", arguments: {}, apiUrl: server.apiUrl, token,
+      companyId: f.companyId, issueId: f.issueId, agentId: f.agentId, conversation: true, companyPrefix: issuePrefix,
+    });
+    expect(result.projects.find((row: { id: string; href?: string }) => row.id === f.projectId)?.href).toBe(`/${issuePrefix}/projects/${f.projectId}`);
   });
 
   it("links another task's bound workspace page from get_task and call_api reads only while the page exists", async () => {
