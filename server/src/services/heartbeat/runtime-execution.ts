@@ -27,7 +27,7 @@ import {
   createManagedMcpRunConfig,
   revokeHeartbeatRunGatewayTokens,
 } from "./run-preparation.js";
-import { isUnifiedRunMcpEnabled, paperclipRunMcpServers } from "./paperclip-run-mcp.js";
+import { paperclipRunMcpServers } from "./paperclip-run-mcp.js";
 import {
   WorkspaceValidationFailure,
   isWorkspaceValidationFailure,
@@ -867,8 +867,6 @@ export async function executeHeartbeatRuntime(db: Db, input: HeartbeatRuntimeExe
       runtimeMcpServers.unshift(...paperclipRunMcpServers({
         authToken,
         apiBaseUrl: configuredPaperclipApiBaseUrl(),
-        taskBound: Boolean(issueRef),
-        unified: isUnifiedRunMcpEnabled(),
       }));
       const runtimeMcp = createAdapterRuntimeMcpAccess(runtimeMcpServers);
       if (runtimeTools && runtimeToolDelivery === "invocation_context") {
