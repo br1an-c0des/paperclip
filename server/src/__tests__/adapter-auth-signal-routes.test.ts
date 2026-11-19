@@ -6,6 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // runs no shell command or model process, so every test drives it through a
 // plain in-process Express app with fake services -- no database, no
 // sandbox provider, and no adapter execution.
+//
+// The codex_local and sandbox-environment cases are in adapter-auth-signal-routes.dormant.test.ts
+// (opt-in tier). The module mocks are repeated there: vi.mock factories only apply in the file
+// that declares them.
 
 const COMPANY_1 = "company-1";
 const OTHER_COMPANY = "company-2";
@@ -186,151 +190,6 @@ describe("adapter auth-signal route", () => {
     vi.clearAllMocks();
   });
 
-  it("returns present for codex_local when the readiness predictor reports ready", async () => {
-    mockEvaluateCodexCredentialReadiness.mockResolvedValueOnce({
-      managed: true,
-      authMode: "subscription",
-      ready: true,
-      effectiveHome: "/tmp/codex-home",
-      sharedSourceHome: "/tmp/codex-shared-home",
-    });
-    const app = await createApp();
-
-    const res = await request(app).get(authSignalPath(COMPANY_1, "codex_local"));
-
-    expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body).toEqual({ status: "present" });
-    expect(mockEvaluateCodexCredentialReadiness).toHaveBeenCalledWith(
-      expect.objectContaining({ companyId: COMPANY_1 }),
-    );
-  });
-
-  it("returns absent for codex_local when the readiness predictor reports not ready", async () => {
-    mockEvaluateCodexCredentialReadiness.mockResolvedValueOnce({
-      managed: true,
-      authMode: "subscription",
-      ready: false,
-      effectiveHome: "/tmp/codex-home",
-      sharedSourceHome: "/tmp/codex-shared-home",
-    });
-    const app = await createApp();
-
-    const res = await request(app).get(authSignalPath(COMPANY_1, "codex_local"));
-
-    expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body).toEqual({ status: "absent" });
-  });
-
-  it("returns unknown for codex_local when the readiness predictor throws", async () => {
-    mockEvaluateCodexCredentialReadiness.mockRejectedValueOnce(new Error("boom"));
-    const app = await createApp();
-
-    const res = await request(app).get(authSignalPath(COMPANY_1, "codex_local"));
-
-    expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body).toEqual({ status: "unknown" });
-  });
-
-  it("returns unknown for codex_local on a sandbox environment even when the host reports ready", async () => {
-    // The host readiness predictor is ready, but the selected sandbox holds no
-    // credential of its own. The route must not let the unrelated host login
-    // hide the sandbox's own sign-in panel.
-    mockEvaluateCodexCredentialReadiness.mockResolvedValueOnce({
-      managed: true,
-      authMode: "subscription",
-      ready: true,
-      effectiveHome: "/tmp/codex-home",
-      sharedSourceHome: "/tmp/codex-shared-home",
-    });
-    const app = await createApp();
-
-    const res = await request(app).get(authSignalPath(COMPANY_1, "codex_local", ENVIRONMENT_1));
-
-    expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body).toEqual({ status: "unknown" });
-    expect(mockEvaluateCodexCredentialReadiness).not.toHaveBeenCalled();
-  });
-
-  it("returns present for codex_local on a sandbox environment that holds its own API key", async () => {
-    mockEnvironmentService.getById.mockResolvedValue({
-      id: ENVIRONMENT_1,
-      companyId: COMPANY_1,
-      name: "Sandbox QA",
-      driver: "sandbox",
-      status: "active",
-      config: { provider: "fake-plugin" },
-      envVars: {
-        OPENAI_API_KEY: { type: "secret_ref", secretId: "secret-1" },
-      },
-    });
-    mockSecretService.resolveEnvBindings.mockResolvedValueOnce({
-      env: { OPENAI_API_KEY: "resolved-key" },
-      secretKeys: new Set(["OPENAI_API_KEY"]),
-      manifest: [],
-    });
-    const app = await createApp();
-
-    const res = await request(app).get(authSignalPath(COMPANY_1, "codex_local", ENVIRONMENT_1));
-
-    expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body).toEqual({ status: "present" });
-    expect(mockEvaluateCodexCredentialReadiness).not.toHaveBeenCalled();
-  });
-
-  it("uses the host readiness predictor for codex_local on a local-driver environment", async () => {
-    mockEnvironmentService.getById.mockResolvedValue({
-      id: ENVIRONMENT_1,
-      companyId: COMPANY_1,
-      name: "Local host",
-      driver: "local",
-      status: "active",
-      config: {},
-      envVars: {},
-    });
-    mockEvaluateCodexCredentialReadiness.mockResolvedValueOnce({
-      managed: true,
-      authMode: "subscription",
-      ready: true,
-      effectiveHome: "/tmp/codex-home",
-      sharedSourceHome: "/tmp/codex-shared-home",
-    });
-    const app = await createApp();
-
-    const res = await request(app).get(authSignalPath(COMPANY_1, "codex_local", ENVIRONMENT_1));
-
-    expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body).toEqual({ status: "present" });
-    expect(mockEvaluateCodexCredentialReadiness).toHaveBeenCalledWith(
-      expect.objectContaining({ companyId: COMPANY_1 }),
-    );
-  });
-
-  it("returns present for claude_local when the environment holds a non-empty token", async () => {
-    mockEnvironmentService.getById.mockResolvedValue({
-      id: ENVIRONMENT_1,
-      companyId: COMPANY_1,
-      name: "Sandbox QA",
-      driver: "sandbox",
-      status: "active",
-      config: { provider: "fake-plugin" },
-      envVars: {
-        CLAUDE_CODE_OAUTH_TOKEN: { type: "secret_ref", secretId: "secret-1" },
-      },
-    });
-    mockSecretService.resolveEnvBindings.mockResolvedValueOnce({
-      env: { CLAUDE_CODE_OAUTH_TOKEN: "resolved-token" },
-      secretKeys: new Set(["CLAUDE_CODE_OAUTH_TOKEN"]),
-      manifest: [],
-    });
-    const app = await createApp();
-
-    const res = await request(app).get(authSignalPath(COMPANY_1, "claude_local", ENVIRONMENT_1));
-
-    expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body).toEqual({ status: "present" });
-    expect(mockSecretService.readClaudeOAuthUserSecretStatus).not.toHaveBeenCalled();
-  });
-
   it("returns present for claude_local when the owner holds a stored login and the environment holds no key", async () => {
     mockSecretService.readClaudeOAuthUserSecretStatus.mockResolvedValueOnce({
       secretId: "secret-1",
@@ -405,16 +264,6 @@ describe("adapter auth-signal route", () => {
 
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(Object.keys(res.body)).toEqual(["status"]);
-  });
-
-  it("takes no sandbox lease and starts no model process", async () => {
-    const app = await createApp();
-
-    const res = await request(app).get(authSignalPath(COMPANY_1, "codex_local", ENVIRONMENT_1));
-
-    expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(mockEnvironmentRuntime.acquireRunLease).not.toHaveBeenCalled();
-    expect(mockResolveEnvironmentExecutionTarget).not.toHaveBeenCalled();
   });
 });
 
