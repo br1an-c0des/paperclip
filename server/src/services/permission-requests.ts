@@ -1,6 +1,6 @@
 import type { Router } from "express";
-import { and, eq, gt, inArray, sql } from "drizzle-orm";
-import { agents, approvals, companies, issues, mcpOauthGrants, temporaryAccessGrants, type Db } from "@paperclipai/db";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { agents, approvals, companies, issues, mcpOauthGrants, type Db } from "@paperclipai/db";
 import {
   agentAccessOverridesSchema,
   hasAgentAccess,
@@ -14,15 +14,19 @@ import type { McpCaller, PaperclipTool } from "../mcp/catalog/types.js";
 import { createCatalogDispatch, McpToolError, type CatalogDispatchOptions } from "../mcp/dispatch.js";
 import { HttpError } from "../errors.js";
 import { logActivity } from "./activity-log.js";
-import { grantTemporaryAccess, loadAgentAccess, withAccessOverride, withStoredAccess } from "./agent-access.js";
+import {
+  loadAgentAccess,
+  runWithReplayAccess,
+  withAccessOverride,
+  withStoredAccess,
+  type TemporaryAccessResource,
+} from "./agent-access.js";
 import { writeApprovalChange } from "./approval-work-notifications.js";
 import { issueApprovalService } from "./issue-approvals.js";
 import { connectionAccess } from "./public-mcp/connection-access.js";
 
 /** A permission request is good for 7 days (step 4a, section 7). */
 export const PERMISSION_REQUEST_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
-/** The replay's one-use grant lives this long. */
-const REPLAY_GRANT_LIFETIME_MS = 10 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type ApprovalRow = typeof approvals.$inferSelect;
@@ -225,6 +229,18 @@ export interface PermissionRequestReplayerDeps {
   resolveGrantCaller?: (grantId: string) => Promise<McpCaller>;
 }
 
+/**
+ * What the replay's allow covers: the task, when the call names one (its `taskId` argument, stored
+ * as the UUID), otherwise the company. A request from a run records the run's task for the report
+ * comment, but a call that doesn't name it (`paperclip_manage_labels`) acts on company resources,
+ * which an allow scoped to that task wouldn't cover.
+ */
+function replayResource(companyId: string, payload: PermissionRequestPayload): TemporaryAccessResource {
+  return payload.taskId && payload.arguments.taskId === payload.taskId
+    ? { type: "issue", id: payload.taskId }
+    : { type: "company", id: companyId };
+}
+
 function result(status: PermissionRequestResult["status"], detail: string): PermissionRequestResult {
   return { status, detail: detail.length > 1000 ? detail.slice(0, 997) + "..." : detail, at: new Date().toISOString() };
 }
@@ -270,23 +286,20 @@ export function createPermissionRequestReplayer(deps: PermissionRequestReplayerD
       if (!definition) return result("failed", `${payload.tool} is no longer a Paperclip tool.`);
       const parsed = definition.input.safeParse(payload.arguments);
       if (!parsed.success) return result("failed", "The stored arguments are no longer valid for this tool.");
-      let grantId: string | null = null;
       try {
         const caller = await rebuildCaller(approval.companyId, payload);
         const principal = caller.kind === "oauth_person"
           ? { type: "user" as const, id: caller.userId! }
           : { type: "agent" as const, id: caller.agentId! };
-        ({ id: grantId } = await grantTemporaryAccess(db, {
+        const dispatch = createCatalogDispatch(deps.api, caller, deps.dispatchOptions);
+        // The missing action is allowed on the request's resource for this replay only, every write
+        // of it (a tool may make several), and for nothing after it: no grant is stored.
+        const output = await runWithReplayAccess({
           companyId: approval.companyId,
           principal,
           action: payload.missingAction,
-          resource: payload.taskId ? { type: "issue", id: payload.taskId } : { type: "company", id: approval.companyId },
-          expiresAt: new Date(Date.now() + REPLAY_GRANT_LIFETIME_MS),
-          reason: `permission_request:${approval.id}`,
-          usesLeft: 1,
-        }));
-        const dispatch = createCatalogDispatch(deps.api, caller, deps.dispatchOptions);
-        const output = await definition.run(caller, parsed.data, dispatch);
+          resource: replayResource(approval.companyId, payload),
+        }, () => definition.run(caller, parsed.data, dispatch));
         return result("done", output === undefined || output === null ? "Done." : JSON.stringify(output));
       } catch (error) {
         if (error instanceof McpToolError || error instanceof HttpError) {
@@ -294,13 +307,6 @@ export function createPermissionRequestReplayer(deps: PermissionRequestReplayerD
         }
         logger.error({ err: error, approvalId: approval.id, tool: payload.tool }, "permission request replay failed");
         return result("failed", `${payload.tool} failed unexpectedly.`);
-      } finally {
-        // An unspent grant (the replay was refused before using it) must not outlive the replay.
-        if (grantId) {
-          await db.delete(temporaryAccessGrants)
-            .where(and(eq(temporaryAccessGrants.id, grantId), gt(temporaryAccessGrants.usesLeft, 0)))
-            .catch(() => undefined);
-        }
       }
     },
 
