@@ -93,7 +93,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 56 | [Decide whether catalog task creation needs a retry key](#56-decide-whether-catalog-task-creation-needs-a-retry-key) | candidate | | | 2026-11-18 | | |
 | 57 | [Make `attentionService.list` fast over many failed runs](#57-make-attentionservicelist-fast-over-many-failed-runs) | candidate | | | 2026-11-18 | | |
 | 58 | [Check the scope of a scoped `agents:configure` override](#58-check-the-scope-of-a-scoped-agentsconfigure-override) | fixed on `feat/step-4a` (`1c870f14d`) | | | 2026-11-19 | | |
-| 59 | [Keep provider `access_denied` errors apart from agent access refusals](#59-keep-provider-access_denied-errors-apart-from-agent-access-refusals) | candidate | | | 2026-11-19 | | |
+| 59 | [Keep provider `access_denied` errors apart from agent access refusals](#59-keep-provider-access_denied-errors-apart-from-agent-access-refusals) | fixed on `feat/step-4a` (`d162c3255`) | | | 2026-11-19 | | |
 | 60 | [Let a worker pick a workspace for its own subtask](#60-let-a-worker-pick-a-workspace-for-its-own-subtask) | fixed on `feat/step-4a` (`1c870f14d`) | | | 2026-11-19 | | |
 | 61 | [Don't write or lock on an access check with no temporary grant](#61-dont-write-or-lock-on-an-access-check-with-no-temporary-grant) | fixed on `feat/step-4a` (`0a1c2721d`) | | | 2026-11-19 | | |
 
@@ -968,6 +968,9 @@ Found by the step 4a regression agent A (2026-11-19), on `feat/step-4a`. 3 tests
   `requestable: false` is added.
 - **Likely fix:** recognise an agent refusal by `details.missingAction`, or give agent refusals
   their own code.
+- **Fixed** by regression agent B (`d162c3255`): an agent refusal is `access_denied` with a string
+  `missingAction`; other `access_denied` errors keep their details. The plugin origin check
+  (`plugin-host-services.ts`) now always names its `missingAction`, the one producer that didn't.
 
 ### 60. Let a worker pick a workspace for its own subtask
 
