@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { createIsolatedTestHome } from "./helpers/isolated-test-home.js";
+import { probeModuleSingletons, resetModuleSingletons, resetSharedWorkerState } from "./helpers/shared-worker-state.js";
 import { beforeEach } from "vitest";
 import { createRequire } from "node:module";
 import type { AddressInfo, Server as NetServer } from "node:net";
@@ -24,6 +25,11 @@ type SupertestTestConstructor = {
   };
 };
 
+// Before anything else, put back what the previous test file in this worker changed: environment,
+// stubbed globals, fake timers, working directory. Only the `shared` project runs several files in
+// one worker; elsewhere this records the baseline and nothing more (helpers/shared-worker-state.ts).
+const workerState = resetSharedWorkerState();
+
 // Keep the original home available only for read-only host port-lease checks.
 process.env.PAPERCLIP_TEST_HOST_HOME ??= process.env.PAPERCLIP_HOME?.trim() || path.join(os.homedir(), ".paperclip");
 
@@ -34,31 +40,22 @@ const { home: paperclipTestHome, cleanup: cleanupPaperclipTestHome } = createIso
 process.env.PAPERCLIP_HOME = paperclipTestHome;
 process.env.PAPERCLIP_CONFIG = path.join(paperclipTestHome, "config.json");
 process.env.PAPERCLIP_INSTANCE_ID = `vt-${process.pid}`;
-// Setup-file afterAll hooks run before suites drain asynchronous heartbeats.
-// Cleanup at worker exit, after all suite teardown, avoids deleting live state.
-// One exit listener per worker cleans every home made in it.
-const testHomeRegistry = globalThis as { __paperclipTestHomeCleanups?: Array<() => void> };
-if (!testHomeRegistry.__paperclipTestHomeCleanups) {
-  const cleanups: Array<() => void> = [];
-  testHomeRegistry.__paperclipTestHomeCleanups = cleanups;
-  process.once("exit", () => {
-    let firstError: unknown;
-    for (const cleanup of cleanups) {
-      try { cleanup(); }
-      catch (error) { firstError ??= error; }
-    }
-    if (firstError) throw firstError;
-  });
-}
-testHomeRegistry.__paperclipTestHomeCleanups.push(cleanupPaperclipTestHome);
+// Setup-file afterAll hooks run before suites drain asynchronous heartbeats, so the homes are
+// removed when the worker stops, after every file's teardown (helpers/shared-worker-state.ts).
+workerState.cleanups.push(cleanupPaperclipTestHome);
 
 const require = createRequire(import.meta.url);
 const SupertestTest = require("supertest/lib/test.js") as SupertestTestConstructor;
 
+// One Codex home per worker, removed with the test homes.
 if (!process.env.CODEX_HOME) {
-  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "paperclip-vitest-codex-home-"));
-  fs.writeFileSync(path.join(codexHome, "auth.json"), '{"OPENAI_API_KEY":"sk-vitest"}\n', { mode: 0o600 });
-  process.env.CODEX_HOME = codexHome;
+  if (!workerState.codexHome) {
+    const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "paperclip-vitest-codex-home-"));
+    fs.writeFileSync(path.join(codexHome, "auth.json"), '{"OPENAI_API_KEY":"sk-vitest"}\n', { mode: 0o600 });
+    workerState.codexHome = codexHome;
+    workerState.cleanups.push(() => fs.rmSync(codexHome, { recursive: true, force: true }));
+  }
+  process.env.CODEX_HOME = workerState.codexHome;
 }
 
 // The automatic Tailscale HTTPS default (PAP-17158) probes for a real host
@@ -93,6 +90,12 @@ if (!SupertestTest.prototype.__paperclipLoopbackPatched) {
 
   SupertestTest.prototype.__paperclipLoopbackPatched = true;
 }
+
+// Report mode only (see helpers/shared-worker-state.ts): what the previous files left set.
+if (process.env.PAPERCLIP_TEST_LEAK_REPORT) await probeModuleSingletons();
+// Shared workers: reset server modules' process-wide state (run admission, controller lease,
+// caches) that the previous file in this worker may have left set.
+await resetModuleSingletons(workerState);
 
 beforeEach(async () => {
   const { invalidateInstanceSettingsCache } = await import("../services/instance-settings-cache.js");
