@@ -85,6 +85,9 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 48 | [Cover every write of an approved multi-write tool call](#48-cover-every-write-of-an-approved-multi-write-tool-call) | candidate | | | 2026-11-18 | | |
 | 49 | [Check the act-as agent's level on outside-connection file uploads](#49-check-the-act-as-agents-level-on-outside-connection-file-uploads) | candidate | | | 2026-11-18 | | |
 | 50 | [Check access on plugin-origin agent configure and edit calls](#50-check-access-on-plugin-origin-agent-configure-and-edit-calls) | candidate | | | 2026-11-18 | | |
+| 51 | [Give runs a title tool now that project-tools is gone](#51-give-runs-a-title-tool-now-that-project-tools-is-gone) | candidate | | | 2026-11-18 | | |
+| 52 | [Use the MCP tool names in the chat directive](#52-use-the-mcp-tool-names-in-the-chat-directive) | candidate | | | 2026-11-18 | | |
+| 53 | [Stop the ACP engine tests writing settings into the repo](#53-stop-the-acp-engine-tests-writing-settings-into-the-repo) | candidate | | | 2026-11-18 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -813,3 +816,38 @@ Found by the step 4a bug-fix agent (2026-11-18, after bug 45's fix).
     the new 410;
   - `agent-interaction-mutations.test.ts:150` fails on a dormant Runner fixture with no access
     level (the regression's fixture work).
+
+### 51. Give runs a title tool now that project-tools is gone
+
+Found by the step 4a run-MCP agent (2026-11-18, on `feat/step-4a`).
+
+- **What's wrong:** `server/src/services/heartbeat/task-markdown.ts:230` tells runs to "use
+  set_task_title". That was a project-tools tool, and `/api/mcp/project-tools` is retired. The
+  `paperclip` catalog has no tool that only sets the title while it's provisional
+  (`onlyIfProvisional`). The directive's REST fallback (`PUT /api/issues/:id/title`) works only
+  through curl with `PAPERCLIP_API_KEY`, because `paperclip_call_api` is admin-only.
+- **Likely fix:**
+  - add a provisional-title option to `paperclip_update_task` (or a small `paperclip_set_task_title`)
+    that calls `PUT /issues/:id/title`;
+  - point the directive at it.
+
+  This is a capability runs lost in step 4a, so fix it before `main`.
+
+### 52. Use the MCP tool names in the chat directive
+
+Found by the step 4a run-MCP agent (2026-11-18).
+
+- **What's wrong:** `server/src/services/agent-conversations.ts:117` names `create_project` and
+  `create_task`. The run's tools are `paperclip_create_project` and `paperclip_create_task`.
+- **Likely fix:** rename them in the directive, and check the other prompt texts for project-tools
+  names. Fix before `main`.
+
+### 53. Stop the ACP engine tests writing settings into the repo
+
+Found by the step 4a run-MCP agent (2026-11-18).
+
+- **What's wrong:** running `packages/adapter-utils/src/acpx-engine/execute.test.ts` leaves
+  `packages/adapter-utils/.claude/settings.local.json` in the package folder. Some claude-agent
+  tests run without a temporary `cwd`, and `acpx-engine/execute.ts:1674` writes
+  `<cwd>/.claude/settings.local.json`. It can slip into a commit.
+- **Likely fix:** give those tests a temporary `cwd`, or add the path to `.gitignore` as a guard.

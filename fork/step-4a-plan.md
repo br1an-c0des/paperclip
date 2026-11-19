@@ -556,6 +556,18 @@ YAML editor edits `access`, and the legacy assignment fields are gone. New: bug 
 configure and edit calls may skip the access check). Wave 2's building is done. Open before
 `main`: bugs 48–50, then the project manager's list below.
 
+**Run MCP merged 2026-11-18** (`0b0beb9e6`): every `claude_local` run with a token gets the
+`paperclip` server, on both engines, task or not. `PAPERCLIP_UNIFIED_RUN_MCP` is gone and
+`/api/mcp/project-tools` is retired (`services/project-tools.ts` stays for the dormant Runner). The
+ACP prompt's API note is MCP-only, with no curl recipe.
+- **Side effect:** every run now passes `--strict-mcp-config`, including task-less runs that used
+  to load the repo's `.mcp.json` and the user's MCP servers. Step 4b drops the flag.
+- **New bugs:** 51 (runs lost `set_task_title`), 52 (the chat directive uses old tool names) and 53
+  (the ACP tests write `.claude/settings.local.json` into the repo).
+- **Docs to update before `main`:** `fork/claude-local-run.md`, `repo-map.md` and
+  `hard-fork-plan.md`. The agent listed the out-of-date lines: claude-local-run 75, 192, 412-416,
+  513, 528-563, 666, 684-691; repo-map 127, 150, 184, 202; hard-fork plan 380, 404.
+
 **Outside connections may break (decided 2026-11-18):** the user would rather the public MCP be
 built the right way than stay compatible. Existing OAuth connections may have to be removed and
 made again; consent doesn't have to keep the old checkbox meaning; old public tool names don't
