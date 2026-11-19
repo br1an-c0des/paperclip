@@ -92,6 +92,9 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 55 | [Make the title route's access refusal requestable](#55-make-the-title-routes-access-refusal-requestable) | candidate | | | 2026-11-18 | | |
 | 56 | [Decide whether catalog task creation needs a retry key](#56-decide-whether-catalog-task-creation-needs-a-retry-key) | candidate | | | 2026-11-18 | | |
 | 57 | [Make `attentionService.list` fast over many failed runs](#57-make-attentionservicelist-fast-over-many-failed-runs) | candidate | | | 2026-11-18 | | |
+| 58 | [Check the scope of a scoped `agents:configure` override](#58-check-the-scope-of-a-scoped-agentsconfigure-override) | candidate | | | 2026-11-19 | | |
+| 59 | [Keep provider `access_denied` errors apart from agent access refusals](#59-keep-provider-access_denied-errors-apart-from-agent-access-refusals) | candidate | | | 2026-11-19 | | |
+| 60 | [Let a worker pick a workspace for its own subtask](#60-let-a-worker-pick-a-workspace-for-its-own-subtask) | candidate | | | 2026-11-19 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -933,3 +936,42 @@ made a single statement: the time is inside `attentionService.list` itself, over
   company with many failures could see a slow inbox.
 - **Likely fix:** profile the query or queries `list` makes for that case (probably one per chunk of
   runs, or an unindexed lookup of newer runs) and replace them with one set-based query.
+
+### 58. Check the scope of a scoped `agents:configure` override
+
+Found by the step 4a regression agent A (2026-11-19), on `feat/step-4a` only; not on `main` or
+server1. 10 tests in `agent-instruction-revisions` and `connection-management.integration` show it.
+
+- **What's wrong:** `isAllowed` in `packages/shared/src/agent-access.ts` counts any `{scope}` override
+  as allowed, and `hasAgentAccess` uses it, so `decideAgentAccess`
+  (`server/src/services/authorization.ts`, ~1871) and the `agent_config:read` check (~2975) never
+  look at the scope. Migration 0491 turns scoped configure grants into `{scope}` overrides, so after
+  deploying, an agent limited to configuring agent X could configure every agent. **Security; fix
+  before `feat/step-4a` merges.**
+- **Likely fix:** check the target against the scope for `agents:configure`, as `tasks:assign` does
+  with `scopeAllows` (~2890–2902), and decide whether any other action takes a scope.
+
+### 59. Keep provider `access_denied` errors apart from agent access refusals
+
+Found by the step 4a regression agent A (2026-11-19), on `feat/step-4a`. 3 tests in
+`secrets-routes`.
+
+- **What's wrong:** `server/src/middleware/error-handler.ts` treats any `details.code ===
+  "access_denied"` as an agent access refusal. AWS Secrets Manager errors use the same code, so their
+  sanitized details (region, required capability, actionable message) are dropped and
+  `requestable: false` is added.
+- **Likely fix:** recognise an agent refusal by `details.missingAction`, or give agent refusals
+  their own code.
+
+### 60. Let a worker pick a workspace for its own subtask
+
+Found by the step 4a regression agent A (2026-11-19), on `feat/step-4a`. 1 test in
+`task-workspace-api`.
+
+- **What's wrong:** `assertSelectedWorkspaceTrust` (`server/src/services/task-repository-acquisition.ts`,
+  creation branch) probes `issue:mutate` with no `issueId`, so `decideAgentIssueWriteAccess` treats
+  the write as not the agent's own and asks for `tasks:update_any`. By design a worker's
+  `tasks:create` covers subtasks of its own tasks, so a worker can't create a subtask with an
+  explicit workspace selection.
+- **Likely fix:** for creation, check against the parent task (own parent: `tasks:create`), not a
+  missing issue.
