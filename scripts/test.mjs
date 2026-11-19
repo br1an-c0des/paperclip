@@ -40,7 +40,8 @@ export const serverProjectFilter = "@paperclipai/server*";
 const serverProjectPattern = /^@paperclipai\/server/;
 // The default worker count is the smallest of this cap (the fastest of 2, 4, 6 and 8 workers on the
 // 60-file benchmark set, with no file failing only in parallel: results-runner.md), half the
-// cores, and the free memory divided by what one worker takes (measured in results-ci.md).
+// cores, and the free memory divided by what one worker takes: at most 1.46 GB (PSS of the whole
+// process tree, Postgres included, at 4 isolated workers; fork/test-suite-audit/results-ci.md).
 export const maxDefaultWorkers = 8;
 export const bytesPerWorker = 1.5 * 1024 ** 3;
 // Expected seconds per test file, for balancing shards: local_s (this machine's profile), else ci_s
@@ -724,6 +725,8 @@ async function main() {
     if (files !== null) {
       const known = new Set(inventory.map((entry) => entry.file));
       for (const file of files.filter((item) => !known.has(item))) log(`warning: not a test file in any project: ${file}`);
+      // Left out of the plan: as a Vitest filter it could only match nothing or other files.
+      files = files.filter((item) => known.has(item));
     }
 
     const planOptions = { root: repoRoot, workers, inventory, files, sharedDatabase };

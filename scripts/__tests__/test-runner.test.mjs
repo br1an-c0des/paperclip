@@ -415,6 +415,18 @@ test("--dry-run --shard lists one shard's phases, every shard's size, and checks
   assert.match(result.stdout, /coverage: shard 2\/3's \d+ files are exactly what its phases list/);
 });
 
+test("--files with a path that isn't a test file warns and leaves it out, sharded or not", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "test-runner-files-"));
+  const list = path.join(dir, "files.txt");
+  writeFileSync(list, "scripts/__tests__/not-a-vitest-file.test.ts\npackages/shared/src/app-definitions-url.test.ts\n");
+  for (const extra of [[], ["--shard", "1/2"]]) {
+    const result = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "test.mjs"), "--dry-run", "--workers", "1",
+      "--files", list, ...extra], { cwd: repoRoot, encoding: "utf8" });
+    assert.equal(result.status, 0, `${extra.join(" ")}: ${result.stderr}${result.stdout}`);
+    assert.match(result.stdout, /warning: not a test file in any project: scripts\/__tests__\/not-a-vitest-file\.test\.ts/);
+  }
+});
+
 test("removeRunRoot removes a run directory that holds read-only and unreadable directories", () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "test-runner-"));
   mkdirSync(path.join(dir, "t", "bundle", "inner"), { recursive: true });
