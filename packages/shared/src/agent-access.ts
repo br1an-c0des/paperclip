@@ -53,6 +53,8 @@ export const AGENT_ACCESS_LEVEL_ACTIONS: Record<AgentAccessLevel, readonly Agent
 
 /** Agents created without `access` get this level. */
 export const DEFAULT_AGENT_ACCESS_LEVEL: AgentAccessLevel = "worker";
+/** A new agent with the CEO role starts here, with the `agents:create` override (decided 2026-11-18). */
+export const NEW_CEO_ACCESS_LEVEL: AgentAccessLevel = "manager";
 /** Agents that existed when access levels were introduced (migration 0491) start here. */
 export const EXISTING_AGENT_ACCESS_LEVEL: AgentAccessLevel = "manager";
 /** An outside connection acting as the person defaults to this level. */
