@@ -6,6 +6,7 @@ import { BudgetsSection } from "./BudgetsSection";
 import { ConnectionsSection } from "./ConnectionsSection";
 import { EnvironmentsSection } from "./EnvironmentsSection";
 import { GeneralSection } from "./GeneralSection";
+import { LabelsSection } from "./LabelsSection";
 import { MembersSection } from "./MembersSection";
 import { PluginPageSection, PluginsOverview } from "./PluginSection";
 import { SecretsSection } from "./SecretsSection";
@@ -94,6 +95,9 @@ export function CompanySettingsPage() {
                 </Match>
                 <Match when={key() === "members"}>
                   <MembersSection />
+                </Match>
+                <Match when={key() === "labels"}>
+                  <LabelsSection />
                 </Match>
                 <Match when={key() === "connections"}>
                   <ConnectionsSection />

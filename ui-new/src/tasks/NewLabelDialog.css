@@ -16,3 +16,9 @@
   border-radius: var(--r-field);
   background: var(--ground);
 }
+
+/* "Edit labels" sits at the footer's start, apart from Cancel and Create. */
+.nl-manage {
+  margin-right: auto;
+  text-decoration: none;
+}

@@ -1,28 +1,37 @@
 import type { IssueLabel } from "@paperclipai/shared";
+import { A } from "@solidjs/router";
 import { useQueryClient } from "@tanstack/solid-query";
-import { createSignal } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { queryKeys } from "@/api/queryKeys";
 import { taskActionsApi } from "@/api/task-actions";
 import { useCompany } from "@/lib/company";
-import { Button } from "@/ui/Button";
+import { Button, buttonClass } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { TextInput } from "@/ui/Field";
 import { pushToast } from "@/ui/Toast";
 import "./NewLabelDialog.css";
 
-const LABEL_COLORS = ["#6366f1", "#22b5a5", "#f5822a", "#f2286f", "#8b2cf0", "#2fd12f"];
+export const LABEL_COLORS = ["#6366f1", "#22b5a5", "#f5822a", "#f2286f", "#8b2cf0", "#2fd12f"];
 
 /**
  * A new company label (`POST /companies/:id/labels`), added to the task once it exists. The label
  * pickers of the task's details, the list's rows and the board's cards end with "New label…", which
  * opens it. The menu item that opened it is gone by the time it closes, so focus goes back to
  * `returnFocus`, the menu's trigger.
+ *
+ * The footer links to the label manager (company settings → Labels), where labels are renamed,
+ * recoloured and deleted. The manager opens this dialog itself with `submitLabel="Create"` and
+ * `manageLink={false}`.
  */
 export function NewLabelDialog(props: {
   open: boolean;
   onClose: () => void;
   onCreated: (id: string) => void;
   returnFocus?: () => HTMLElement | undefined;
+  /** The create button's text; "Create and add" where the label goes on a task. */
+  submitLabel?: string;
+  /** Whether the footer links to the label manager (default true). */
+  manageLink?: boolean;
 }) {
   const company = useCompany();
   const client = useQueryClient();
@@ -62,11 +71,16 @@ export function NewLabelDialog(props: {
       returnFocus={props.returnFocus}
       footer={
         <>
+          <Show when={props.manageLink !== false}>
+            <A class={`${buttonClass({ variant: "quiet" })} nl-manage`} href={`/${company().issuePrefix}/company/settings/labels`} onClick={close}>
+              Edit labels
+            </A>
+          </Show>
           <Button variant="quiet" onClick={close}>
             Cancel
           </Button>
           <Button variant="primary" disabled={busy() || !name().trim()} onClick={() => void create()}>
-            {busy() ? "Creating…" : "Create and add"}
+            {busy() ? "Creating…" : (props.submitLabel ?? "Create and add")}
           </Button>
         </>
       }
