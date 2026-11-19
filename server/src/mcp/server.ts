@@ -3,7 +3,8 @@ import { HttpError } from "../errors.js";
 import { logger } from "../middleware/logger.js";
 import { McpToolError } from "./dispatch.js";
 import type { CatalogDispatch, McpCaller, PaperclipTool } from "./catalog/types.js";
-import { toolVisibility } from "./catalog/visibility.js";
+import { isRequestable, toolVisibility } from "./catalog/visibility.js";
+import type { AgentAccessAction } from "@paperclipai/shared";
 
 const SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 const DEFAULT_PROTOCOL_VERSION = "2025-03-26";
@@ -18,13 +19,24 @@ export interface McpToolDefinition {
 export interface CallToolResult {
   content: Array<{ type: "text"; text: string }>;
   structuredContent?: Record<string, unknown>;
-  isError?: true;
+  isError?: boolean;
 }
+
+/** Turns a requestable denial into a `permission_request` for the board (step 4a, section 7). */
+export type RequestPermission = (input: {
+  caller: McpCaller;
+  tool: string;
+  arguments: Record<string, unknown>;
+  missingAction: AgentAccessAction;
+  taskId: string | null;
+}) => Promise<{ approvalId: string; url: string; reused?: boolean }>;
 
 export interface McpSession {
   caller: McpCaller;
   catalog: readonly PaperclipTool[];
   dispatch: CatalogDispatch;
+  /** When set, a requestable denial becomes a request instead of an error. */
+  requestPermission?: RequestPermission;
 }
 
 type JsonRpcId = string | number | null;
@@ -78,6 +90,23 @@ function errorResult(message: string, details: Record<string, unknown>): CallToo
   return { isError: true, content: [{ type: "text", text: message }], structuredContent: { ...details, error: message } };
 }
 
+async function requested(
+  session: McpSession,
+  definition: PaperclipTool,
+  args: Record<string, unknown>,
+  missingAction: AgentAccessAction,
+): Promise<CallToolResult> {
+  const taskId = typeof args.taskId === "string" ? args.taskId : null;
+  const request = await session.requestPermission!({ caller: session.caller, tool: definition.name, arguments: args, missingAction, taskId });
+  const text = `Sent to the board for approval (request ${request.approvalId}, ${request.url}): ${definition.name} needs ${missingAction}.`
+    + " If it's approved, Paperclip carries the call out once and comments on the task. Carry on with other work, or block on it.";
+  return {
+    isError: false,
+    content: [{ type: "text", text }],
+    structuredContent: { status: "requested", approvalId: request.approvalId, url: request.url, missingAction },
+  };
+}
+
 /** Calls a catalog tool as the caller. Every failure comes back as an `isError` result. */
 export async function callTool(session: McpSession, name: unknown, args: unknown): Promise<CallToolResult> {
   const definition = session.catalog.find(candidate => candidate.name === name);
@@ -88,22 +117,34 @@ export async function callTool(session: McpSession, name: unknown, args: unknown
       ? errorResult(`You don't have ${visibility.missingAction}, which ${definition.name} needs.`, {
         code: "access_denied", missingAction: visibility.missingAction, requestable: false,
       })
-      : errorResult("This tool works only during a run, with the run's own token.", { code: "run_required" });
-  }
-  if (visibility.state === "needs_approval") {
-    return errorResult(`You don't have ${visibility.missingAction}, which ${definition.name} needs; it needs the board's approval.`, {
-      code: "access_denied", missingAction: visibility.missingAction, requestable: true,
-    });
+      : visibility.code === "grant_required"
+        ? errorResult(visibility.reason, { code: "grant_required" })
+        : errorResult("This tool works only during a run, with the run's own token.", { code: "run_required" });
   }
   const parsed = definition.input.safeParse(args ?? {});
   if (!parsed.success) return errorResult(`Invalid arguments: ${z.prettifyError(parsed.error)}`, { code: "invalid_arguments" });
+  const input = parsed.data !== null && typeof parsed.data === "object" ? parsed.data as Record<string, unknown> : {};
   try {
+    if (visibility.state === "needs_approval") {
+      if (session.requestPermission) return await requested(session, definition, input, visibility.missingAction);
+      return errorResult(`You don't have ${visibility.missingAction}, which ${definition.name} needs; it needs the board's approval.`, {
+        code: "access_denied", missingAction: visibility.missingAction, requestable: true,
+      });
+    }
     const result = await definition.run(session.caller, parsed.data, session.dispatch);
     const structured = result !== null && typeof result === "object" && !Array.isArray(result)
       ? result as Record<string, unknown> : { result };
     return { content: [{ type: "text", text: JSON.stringify(structured) }], structuredContent: structured };
   } catch (error) {
     if (error instanceof McpToolError) {
+      // A route's refusal by the level or an override becomes a request, like a refusal up front.
+      if (error.code === "access_denied" && error.requestable && error.missingAction && isRequestable(definition) && session.requestPermission) {
+        try {
+          return await requested(session, definition, input, error.missingAction);
+        } catch (requestError) {
+          logger.error({ err: requestError, tool: definition.name }, "Paperclip MCP permission request failed");
+        }
+      }
       return errorResult(error.message, {
         code: error.code ?? "request_failed", status: error.status,
         ...(error.missingAction ? { missingAction: error.missingAction } : {}),

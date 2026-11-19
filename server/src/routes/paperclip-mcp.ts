@@ -4,19 +4,24 @@ import { resolveMcpCaller } from "../mcp/caller.js";
 import { catalogDeps } from "../mcp/catalog-deps.js";
 import { createPaperclipCatalog } from "../mcp/catalog/index.js";
 import { createCatalogDispatch, type CatalogDispatchOptions } from "../mcp/dispatch.js";
-import { handleMcpMessage } from "../mcp/server.js";
+import { handleMcpMessage, type RequestPermission } from "../mcp/server.js";
 
 /**
  * Paperclip's own MCP server for runs and agent keys: stateless Streamable HTTP with JSON
  * responses. Mounted on the API router after actor middleware; `api` is that same router, which
  * the tools re-enter in-process as the caller.
  */
-export function paperclipMcpRoutes(db: Db, api: Router, options: CatalogDispatchOptions = {}) {
+export function paperclipMcpRoutes(
+  db: Db,
+  api: Router,
+  options: CatalogDispatchOptions & { requestPermission?: RequestPermission } = {},
+) {
   const router = Router();
   const catalog = createPaperclipCatalog(catalogDeps(db));
+  const { requestPermission, ...dispatchOptions } = options;
   router.post("/mcp/paperclip", async (req, res) => {
     const caller = await resolveMcpCaller(db, req.actor);
-    const session = { caller, catalog, dispatch: createCatalogDispatch(api, caller, options) };
+    const session = { caller, catalog, dispatch: createCatalogDispatch(api, caller, dispatchOptions), requestPermission };
     if (Array.isArray(req.body)) {
       const responses = (await Promise.all(req.body.map(message => handleMcpMessage(session, message)))).filter(Boolean);
       if (responses.length === 0) return res.status(202).end();
