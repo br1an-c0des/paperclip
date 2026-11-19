@@ -530,6 +530,66 @@ since it builds on the real route-policy table.
 regression fixture changes: CEOs and agents created with `canCreateAgents: true` now store
 `permissions.access`.
 
+**Agent 5 merged 2026-11-18** (`7e2c2527a`): label manager, Access card, permission request card,
+connection access and consent. Until agent 4 merges, `feat/step-4a`'s consent and connection
+editing aren't backed by the server. Agent 5 found bugs 45 (the four retired interaction switches
+are still enforced) and 46 (the YAML editor overwrites hiring access), to fix before `main`, and
+47 (stale assignment fields).
+
+**Agent 4 merged 2026-11-18** (`4f12573de`): permission requests and replay, outside connections
+acting as the person or an agent at their level, the public MCP serving the catalog (old lists
+deleted), and bug 43. Notes:
+- **Worker run list:** 26 tools, about 4.2k tokens (was 23, about 3.1k). Admin: 29 tools, about
+  5.3k tokens.
+- **File tools are hidden from runs and agent keys:** `mcp_file_tickets.grant_id` and the uploads'
+  `user_id` are NOT NULL, so opening them to runs and agent keys needs a migration.
+- **An `mcp_oauth` actor can't approve or reject approvals,** so a connection can't approve its
+  own requests through `call_api`.
+- **Old grants keep their backfilled level.** No reconnect is forced. Clients see the new tool
+  names on their next `tools/list`.
+- **New bugs:** 48 (a multi-write replay is covered for its first write only) and 49 (file uploads
+  check the connection's level only).
+
+**Bugs 45–47 fixed and merged 2026-11-18** (`093b94b3b`), plus agent 5's `paperclip_me` rename
+(`61b948c8c`). The four retired interaction switches are no longer enforced or accepted (410), the
+YAML editor edits `access`, and the legacy assignment fields are gone. New: bug 50 (plugin-origin
+configure and edit calls may skip the access check). Wave 2's building is done. Open before
+`main`: bugs 48–50, then the project manager's list below.
+
+**Run MCP merged 2026-11-18** (`0b0beb9e6`): every `claude_local` run with a token gets the
+`paperclip` server, on both engines, task or not. `PAPERCLIP_UNIFIED_RUN_MCP` is gone and
+`/api/mcp/project-tools` is retired (`services/project-tools.ts` stays for the dormant Runner). The
+ACP prompt's API note is MCP-only, with no curl recipe.
+- **Side effect:** every run now passes `--strict-mcp-config`, including task-less runs that used
+  to load the repo's `.mcp.json` and the user's MCP servers. Step 4b drops the flag.
+- **New bugs:** 51 (runs lost `set_task_title`), 52 (the chat directive uses old tool names) and 53
+  (the ACP tests write `.claude/settings.local.json` into the repo).
+- **Docs to update before `main`:** `fork/claude-local-run.md`, `repo-map.md` and
+  `hard-fork-plan.md`. The agent listed the out-of-date lines: claude-local-run 75, 192, 412-416,
+  513, 528-563, 666, 684-691; repo-map 127, 150, 184, 202; hard-fork plan 380, 404.
+
+**Bugs 48–50 fixed and merged 2026-11-18** (`3c33eb7ad`):
+- An approved replay runs under an in-memory allow for its `missingAction`, for that caller, for
+  as long as the replay runs. Nothing is stored. The allow covers the task when the call names
+  one, else the company.
+- Act-as uploads check the agent's level as capped by the connection.
+- Plugin calls made for an agent check that agent's access.
+- **New:** bug 54 (the other plugin-origin writes), plugins only.
+
+**Left before `main`:**
+- bugs 51 and 52 (runs lost the title tool, and the chat directive uses old names);
+- bugs 53 and 54, optional;
+- the docs listed above;
+- the local-instance run check;
+- the regression, after step 3a;
+- the user's approval.
+
+**Outside connections may break (decided 2026-11-18):** the user would rather the public MCP be
+built the right way than stay compatible. Existing OAuth connections may have to be removed and
+made again; consent doesn't have to keep the old checkbox meaning; old public tool names don't
+have to map. Capabilities still carry over: nothing an outside agent could do is lost. Agents
+existing at 0491 still start at `manager` (that rule is about runs, not connections).
+
 **Testing while step 3a renovates the suite:** typechecks, each agent's own new or changed test
 files one at a time by path, and `ui-new`'s unit tests. No package suites, directories or broad
 patterns.
