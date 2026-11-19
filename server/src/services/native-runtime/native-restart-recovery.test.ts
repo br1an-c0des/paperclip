@@ -293,13 +293,14 @@ describe("native controller takeover fencing", () => {
   // Phase 2: the local branch is the shared prover (proveOwnerGone).
   it("accepts a reused PID only when the live process started definitely later", async () => {
     const live = { isProcessAlive: () => true };
+    // Gaps with a sub-second part: a whole-second gap on Linux may be one process across a clock step.
     await expect(evaluateNativeControllerTakeover({ owner: owner(), now, ...live,
-      readProcessStartedAt: async () => new Date(recordedStart.getTime() + 5_000) }))
+      readProcessStartedAt: async () => new Date(recordedStart.getTime() + 5_010) }))
       .resolves.toEqual({ allowed: true, reason: "controller_pid_recycled" });
     // An observed start before the recorded one is an inconsistent stamp,
     // which the previous private proof accepted as recycled.
     await expect(evaluateNativeControllerTakeover({ owner: owner(), now, ...live,
-      readProcessStartedAt: async () => new Date(recordedStart.getTime() - 5_000) }))
+      readProcessStartedAt: async () => new Date(recordedStart.getTime() - 5_010) }))
       .resolves.toEqual({ allowed: false, reason: "controller_pid_start_inconsistent" });
     // Within the 1 s precision window it is the same live controller.
     await expect(evaluateNativeControllerTakeover({ owner: owner(), now, ...live,
@@ -393,7 +394,8 @@ describe("native controller takeover fencing", () => {
         owner: owner(),
         now,
         isProcessAlive: () => true,
-        readProcessStartedAt: async () => new Date("2026-09-04T11:30:00.000Z"),
+        // Not a whole number of seconds after the recorded start: on Linux that gap may be one process across a clock step.
+        readProcessStartedAt: async () => new Date("2026-09-04T11:30:00.010Z"),
       }),
     ).resolves.toEqual({
       allowed: true,
