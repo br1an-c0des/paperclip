@@ -318,7 +318,8 @@ describeEmbeddedPostgres("native workspace sync retention", () => {
   });
 
   it("deletes a terminal run whose recorded pid was recycled by another process", async () => {
-    livePids.set(1234, new Date(now.getTime() - DAY_MS).toISOString());
+    // Not a whole number of seconds from the recorded start: on Linux that gap may be one process across a clock step.
+    livePids.set(1234, new Date(now.getTime() - DAY_MS - 10).toISOString());
     const { folder } = await seed({ processPid: 1234, processStartedAt: processStart });
     expect((await service().tick()).expired).toBe(1);
     expect(await exists(folder)).toBe(false);

@@ -782,7 +782,8 @@ describeEmbeddedPostgres("heartbeat native recovery interrupted by graceful shut
     expect(before.controllerHostHash).toBe((await controllerProcess.currentControllerProcess()).hostHash);
     const now = new Date();
     const isProcessAlive = vi.fn(() => mode === "recycled");
-    const readProcessStartedAt = vi.fn(async () => new Date(birth.getTime() + 2_000));
+    // Not a whole number of seconds later: on Linux that gap may be one process across a clock step.
+    const readProcessStartedAt = vi.fn(async () => new Date(birth.getTime() + 2_010));
     expect(await settleOwnableKind(f.db, "native_accepted_result_lease", { now, runIds: [f.runId], probe: { ...currentProcessProbe(), deployment: null, controllerInstance: undefined, pidExists: isProcessAlive, readStartedAt: readProcessStartedAt } }))
       .toEqual([{ kind: "native_accepted_result_lease", recordId: f.runId, runId: f.runId,
         reason: mode === "dead" ? "pid_dead" : "pid_reused" }]);
@@ -822,7 +823,7 @@ describeEmbeddedPostgres("heartbeat native recovery interrupted by graceful shut
       await f.db.update(nativeRunFinalizations).set(changed === "lease-token" ? { leaseOwner: `new-owner:${replacement}` }
         : changed === "boot" ? { controllerBootId: replacement } : { controllerHostHash: `new-space:${replacement}` })
         .where(eq(nativeRunFinalizations.runId, f.runId));
-      return new Date(birth.getTime() + 2_000);
+      return new Date(birth.getTime() + 2_010); // a different birth (not a whole-second gap, see bug 40)
     });
     expect(await settleOwnableKind(f.db, "native_accepted_result_lease", { now: new Date(), runIds: [f.runId],
       probe: { ...currentProcessProbe(), deployment: null, controllerInstance: undefined,
