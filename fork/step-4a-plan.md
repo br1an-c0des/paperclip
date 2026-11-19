@@ -568,6 +568,22 @@ ACP prompt's API note is MCP-only, with no curl recipe.
   `hard-fork-plan.md`. The agent listed the out-of-date lines: claude-local-run 75, 192, 412-416,
   513, 528-563, 666, 684-691; repo-map 127, 150, 184, 202; hard-fork plan 380, 404.
 
+**Bugs 48–50 fixed and merged 2026-11-18** (`3c33eb7ad`):
+- An approved replay runs under an in-memory allow for its `missingAction`, for that caller, for
+  as long as the replay runs. Nothing is stored. The allow covers the task when the call names
+  one, else the company.
+- Act-as uploads check the agent's level as capped by the connection.
+- Plugin calls made for an agent check that agent's access.
+- **New:** bug 54 (the other plugin-origin writes), plugins only.
+
+**Left before `main`:**
+- bugs 51 and 52 (runs lost the title tool, and the chat directive uses old names);
+- bugs 53 and 54, optional;
+- the docs listed above;
+- the local-instance run check;
+- the regression, after step 3a;
+- the user's approval.
+
 **Outside connections may break (decided 2026-11-18):** the user would rather the public MCP be
 built the right way than stay compatible. Existing OAuth connections may have to be removed and
 made again; consent doesn't have to keep the old checkbox meaning; old public tool names don't

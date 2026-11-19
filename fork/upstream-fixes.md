@@ -82,12 +82,13 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 45 | [Stop enforcing the four interaction switches that became access actions](#45-stop-enforcing-the-four-interaction-switches-that-became-access-actions) | fixed on `feat/step-4a` (`eedeba3ca`) | | | 2026-11-18 | | |
 | 46 | [Stop the Advanced YAML editor overwriting an agent's hiring access](#46-stop-the-advanced-yaml-editor-overwriting-an-agents-hiring-access) | fixed on `feat/step-4a` (`a17d98cb6`) | | | 2026-11-18 | | |
 | 47 | [Drop the legacy assignment fields from the agent access state](#47-drop-the-legacy-assignment-fields-from-the-agent-access-state) | fixed on `feat/step-4a` (`6706dab30`) | | | 2026-11-18 | | |
-| 48 | [Cover every write of an approved multi-write tool call](#48-cover-every-write-of-an-approved-multi-write-tool-call) | candidate | | | 2026-11-18 | | |
-| 49 | [Check the act-as agent's level on outside-connection file uploads](#49-check-the-act-as-agents-level-on-outside-connection-file-uploads) | candidate | | | 2026-11-18 | | |
-| 50 | [Check access on plugin-origin agent configure and edit calls](#50-check-access-on-plugin-origin-agent-configure-and-edit-calls) | candidate | | | 2026-11-18 | | |
+| 48 | [Cover every write of an approved multi-write tool call](#48-cover-every-write-of-an-approved-multi-write-tool-call) | fixed on `feat/step-4a` (`70b8d7198`) | | | 2026-11-18 | | |
+| 49 | [Check the act-as agent's level on outside-connection file uploads](#49-check-the-act-as-agents-level-on-outside-connection-file-uploads) | fixed on `feat/step-4a` (`867374de7`) | | | 2026-11-18 | | |
+| 50 | [Check access on plugin-origin agent configure and edit calls](#50-check-access-on-plugin-origin-agent-configure-and-edit-calls) | fixed on `feat/step-4a` (`5c499f719`) | | | 2026-11-18 | | |
 | 51 | [Give runs a title tool now that project-tools is gone](#51-give-runs-a-title-tool-now-that-project-tools-is-gone) | candidate | | | 2026-11-18 | | |
 | 52 | [Use the MCP tool names in the chat directive](#52-use-the-mcp-tool-names-in-the-chat-directive) | candidate | | | 2026-11-18 | | |
 | 53 | [Stop the ACP engine tests writing settings into the repo](#53-stop-the-acp-engine-tests-writing-settings-into-the-repo) | candidate | | | 2026-11-18 | | |
+| 54 | [Check access on the other plugin-origin agent writes](#54-check-access-on-the-other-plugin-origin-agent-writes) | candidate | | | 2026-11-18 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -851,3 +852,19 @@ Found by the step 4a run-MCP agent (2026-11-18).
   tests run without a temporary `cwd`, and `acpx-engine/execute.ts:1674` writes
   `<cwd>/.claude/settings.local.json`. It can slip into a commit.
 - **Likely fix:** give those tests a temporary `cwd`, or add the path to `.gitignore` as a guard.
+
+### 54. Check access on the other plugin-origin agent writes
+
+Found by the step 4a bug-fix agent (2026-11-18), while fixing bug 50.
+
+- **What's wrong:** bug 50's fix covers `plugin-host-services.ts` only. Other places use the plugin
+  origin as the acting agent but check only the target's consent:
+  - `server/src/services/agent-configuration.ts:28-38` (`lockAgentConfigurationInteractions`);
+  - probably the plugin-origin writes in `issues.ts` (create at `:10620`, and `:13733`);
+  - probably `routines.ts:983` and `:1818`.
+
+  The `issues.ts` and `routines.ts` cases aren't verified.
+- **Who it affects:** only setups with plugins installed (opt-in here).
+- **Likely fix:** one central check. In `agentInteractionDenial` (`agent-interaction-policy.ts`),
+  when the actor comes from a plugin origin, also check the matching access action. Then the
+  per-call checks from bug 50 can go.
