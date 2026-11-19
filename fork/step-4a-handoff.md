@@ -1,5 +1,8 @@
 # Step 4a handoff (2026-11-18)
 
+> **Done:** step 4a was merged into `main` on 2026-11-19 (`549e76036`); see the end of
+> [step-4a-plan.md](step-4a-plan.md)'s wave 2 status. This page is kept as the record of the handoff.
+
 For the manager session that takes over step 4a (Paperclip over MCP, with agent permissions) on
 server1. The first manager session designed it, planned it, ran wave 0 and wave 1, and merged them
 into `feat/step-4a`. This page is where that stands and what's next. Read it with:
