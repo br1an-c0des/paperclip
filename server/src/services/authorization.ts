@@ -1859,16 +1859,24 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
     });
   }
 
-  /** Decides one access action for an agent: its level and overrides, then a temporary grant. */
+  /**
+   * Decides one access action for an agent: its level and overrides, then a temporary grant. A
+   * scoped override (carried over from a scoped grant) allows only inside its scope, checked
+   * against `scope` as a scoped grant was before step 4a; outside it, the refusal is `deny_scope`,
+   * an explicit restriction rather than a missing level.
+   */
   async function decideAgentAccess(input: {
     actorAgentId: string;
     companyId: string;
     action: AgentAccessAction;
     decisionAction: AuthorizationAction;
     resource: AuthorizationResource;
+    scope?: Record<string, unknown> | null;
   }): Promise<AuthorizationDecision> {
     const access = await loadActorAccess(input.actorAgentId);
-    if (hasAgentAccess(access, input.action)) {
+    const value = access[input.action];
+    const scoped = typeof value === "object" && value !== null;
+    if (value === true || (scoped && await scopeAllows(db, input.companyId, value.scope, input.scope))) {
       return allow({
         action: input.decisionAction,
         reason: "allow_access_level",
@@ -1887,6 +1895,13 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
         explanation: `Allowed by a temporary grant for ${input.action}.`,
       });
     }
+    if (scoped) {
+      return deny({
+        action: input.decisionAction,
+        reason: "deny_scope",
+        explanation: `The agent's ${input.action} override does not cover the requested scope.`,
+      });
+    }
     return deny({
       action: input.decisionAction,
       reason: "access_level",
@@ -1897,7 +1912,9 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
 
   /**
    * Changing a task: `tasks:update_any` covers every task, `tasks:update_own` only the agent's own.
-   * Replaces the default-open visible-issue write rule for agents.
+   * Replaces the default-open visible-issue write rule for agents. A resource for a task not created
+   * yet (a new subtask: `parentIssueId` without `issueId`) is judged by its parent, as the
+   * visible-issue write rule judges it: a subtask of the agent's own task is its own.
    */
   async function decideAgentIssueWriteAccess(input: {
     actorAgentId: string;
@@ -1905,11 +1922,14 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
     decisionAction: AuthorizationAction;
     resource: AuthorizationResource;
     ownTasksOnly: boolean;
+    scope?: Record<string, unknown> | null;
   }): Promise<AuthorizationDecision> {
     const access = await loadActorAccess(input.actorAgentId);
-    const issueId = input.resource.type === "issue" ? input.resource.issueId ?? null : null;
-    const own = input.ownTasksOnly && !hasAgentAccess(access, "tasks:update_any") && issueId
-      ? await agentOwnsIssue(input.companyId, input.actorAgentId, issueId)
+    const ownershipTarget = input.resource.type === "issue"
+      ? input.resource.issueId ?? input.resource.parentIssueId ?? null
+      : null;
+    const own = input.ownTasksOnly && access["tasks:update_any"] !== true && ownershipTarget
+      ? await agentOwnsIssue(input.companyId, input.actorAgentId, ownershipTarget)
       : false;
     return decideAgentAccess({ ...input, action: own ? "tasks:update_own" : "tasks:update_any" });
   }
@@ -2146,6 +2166,7 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
             action: keys.direct,
             decisionAction: input.action,
             resource: input.resource,
+            scope: input.scope,
           })
         : await decidePrincipalGrant({
             companyId,
@@ -2611,7 +2632,7 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
       if (!lowTrustDecision.allowed) return lowTrustDecision;
       if (input.action === "issue:comment") {
         const commentAccess = await decideAgentAccess({
-          actorAgentId, companyId, action: "tasks:comment", decisionAction: input.action, resource: input.resource,
+          actorAgentId, companyId, action: "tasks:comment", decisionAction: input.action, resource: input.resource, scope: input.scope,
         });
         if (!commentAccess.allowed) return commentAccess;
       }
@@ -2637,10 +2658,12 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
       if ((input.action === "tasks:update_own" || input.action === "tasks:update_any") && input.resource.type === "issue") {
         return decideAgentIssueWriteAccess({
           actorAgentId, companyId, decisionAction: input.action, resource: input.resource,
-          ownTasksOnly: input.action === "tasks:update_own",
+          ownTasksOnly: input.action === "tasks:update_own", scope: input.scope,
         });
       }
-      return decideAgentAccess({ actorAgentId, companyId, action: input.action, decisionAction: input.action, resource: input.resource });
+      return decideAgentAccess({
+        actorAgentId, companyId, action: input.action, decisionAction: input.action, resource: input.resource, scope: input.scope,
+      });
     }
 
     const visibleIssueWriteDecision =
@@ -2657,9 +2680,11 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
     // for its own task or tasks:update_any for anyone else's.
     if (input.action === "issue:comment" || input.action === "issue:mutate") {
       const writeAccess = input.action === "issue:comment"
-        ? await decideAgentAccess({ actorAgentId, companyId, action: "tasks:comment", decisionAction: input.action, resource: input.resource })
+        ? await decideAgentAccess({
+            actorAgentId, companyId, action: "tasks:comment", decisionAction: input.action, resource: input.resource, scope: input.scope,
+          })
         : await decideAgentIssueWriteAccess({
-            actorAgentId, companyId, decisionAction: input.action, resource: input.resource, ownTasksOnly: true,
+            actorAgentId, companyId, decisionAction: input.action, resource: input.resource, ownTasksOnly: true, scope: input.scope,
           });
       if (!writeAccess.allowed) return writeAccess;
     }
@@ -2909,6 +2934,7 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
       if (!assignAllowed) {
         const grantDecision = await decideAgentAccess({
           actorAgentId, companyId, action: "tasks:assign", decisionAction: input.action, resource: input.resource,
+          scope: requestedScope,
         });
         if (!grantDecision.allowed) return grantDecision;
       }
@@ -2972,7 +2998,9 @@ function createAuthorizationService(db: Db | DbTransaction, readSnapshot?: ReadA
           explanation: "Allowed because the actor is reading its own agent configuration.",
         });
       }
-      if (hasAgentAccess(await loadActorAccess(actorAgentId), "agents:configure")) {
+      const configureAccess = (await loadActorAccess(actorAgentId))["agents:configure"];
+      if (configureAccess === true || (typeof configureAccess === "object" && configureAccess !== null &&
+          await scopeAllows(db, companyId, configureAccess.scope, input.scope))) {
         return allow({
           action: input.action,
           reason: "allow_access_level",
