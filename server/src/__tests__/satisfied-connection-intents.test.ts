@@ -190,7 +190,9 @@ describePostgres("already available connection requests", () => {
       await new Promise<void>(resolve => setImmediate(resolve));
     };
     try {
-      await coordinator.register(DELIVERY_QUEUES.connection, { retryMs: 5000, run: () => service.sweepPending(),
+      // A test-sized maintenance interval (the worker discovers the unsignalled
+      // access change on its next passive pass).
+      await coordinator.register(DELIVERY_QUEUES.connection, { retryMs: 1000, run: () => service.sweepPending(),
         hasPending: async () => { const pending = await service.hasPending();
           if (!pending && service.nextRunAt() !== null) sawPassive();
           if (!pending && wakeup.mock.calls.length > 0) sawDelivered();
