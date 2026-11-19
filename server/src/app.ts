@@ -57,7 +57,6 @@ import { decisionModelRoutes } from "./routes/decision-models.js";
 import { agentObservabilityRoutes } from "./routes/agent-observability.js";
 import { aiConnectionRoutes } from "./routes/ai-connections.js";
 import { taskWorkspaceRoutes } from "./routes/task-workspaces.js";
-import { projectToolRoutes } from "./routes/project-tools.js";
 import { paperclipMcpRoutes } from "./routes/paperclip-mcp.js";
 import { resolveMcpCaller } from "./mcp/caller.js";
 import { catalogDeps } from "./mcp/catalog-deps.js";
@@ -792,7 +791,6 @@ export async function createApp(
   api.use(agentInteractionPermissionRoutes(db));
   api.use(assetRoutes(db, opts.storageService));
   api.use(agentProfileAvatarRoutes(db, opts.storageService));
-  api.use(projectToolRoutes(db));
   // Step 4a, section 7: a requestable denial becomes a permission request; approving replays it.
   const permissionRequests = createPermissionRequestReplayer({
     db, api, catalog: createPaperclipCatalog(catalogDeps(db)), dispatchOptions: { parentLocals: app.locals },

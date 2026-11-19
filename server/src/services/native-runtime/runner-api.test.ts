@@ -349,7 +349,6 @@ describe("runner API request boundary", () => {
     },
   );
   it.each([
-    "POST /api/mcp/project-tools",
     "POST /api/agents/{id}/claude-login",
   ])(
     "directs authentication handshake %s to its existing client",

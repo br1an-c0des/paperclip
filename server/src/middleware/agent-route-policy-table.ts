@@ -28,9 +28,9 @@ function tag(action: AgentRoutePolicyAction, routes: readonly string[]): AgentRo
 }
 
 export const AGENT_ROUTE_POLICY: ReadonlyArray<AgentRoutePolicyEntry> = [
-  // The Paperclip MCP endpoints: their tools filter by access themselves and re-enter these routes
+  // The Paperclip MCP endpoint: its tools filter by access themselves and re-enter these routes
   // as the caller (through the API router, so this policy still applies to every call they make).
-  ...tag("route_checks", ["POST /mcp/paperclip", "POST /mcp/project-tools"]),
+  ...tag("route_checks", ["POST /mcp/paperclip"]),
   // The task routes a run uses (update, comment, documents, checkout, release, interactions,
   // deliverables) and agent routes with their own checks: the route decides own-or-any per task.
   ...tag("route_checks", [
