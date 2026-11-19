@@ -12,13 +12,14 @@
 import type { SettingsEntry } from "../SettingsBody";
 import type { PluginSettingsPage } from "./plugin-pages";
 
-export type SectionKey = "general" | "members" | "connections" | "secrets" | "budgets" | "environments" | "transfer";
+export type SectionKey = "general" | "members" | "labels" | "connections" | "secrets" | "budgets" | "environments" | "transfer";
 
 export type SectionDef = { key: SectionKey; label: string; path: string };
 
 export const SECTIONS: readonly SectionDef[] = [
   { key: "general", label: "General", path: "" },
   { key: "members", label: "Members", path: "/members" },
+  { key: "labels", label: "Labels", path: "/labels" },
   { key: "connections", label: "Paperclip Models", path: "/paperclip-models" },
   { key: "secrets", label: "Secrets", path: "/secrets" },
   { key: "budgets", label: "Budgets", path: "/budgets" },

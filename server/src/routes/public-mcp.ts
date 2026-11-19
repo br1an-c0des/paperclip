@@ -9,10 +9,11 @@ import { z } from "zod";
 import { type PublicMcpEvents } from "../services/public-mcp/events.js";
 import type { PublicMcpToolExtension } from "../services/public-mcp/dot-runner.js";
 import { McpEventError } from "../services/public-mcp/event-webhooks.js";
-import { DOT_RUNNER_MCP_PATH, mcpConsentSchema, mcpInvitation, mcpSetupUrl } from "@paperclipai/shared";
+import { DOT_RUNNER_MCP_PATH, mcpConsentSchema, mcpInvitation, mcpSetupUrl, updateMcpConnectionSchema } from "@paperclipai/shared";
 import { renderMcpSetup, mcpSetupMarkdown } from "../services/public-mcp/setup.js";
 import { McpOAuthError, type PublicMcpOAuth } from "../services/public-mcp/oauth.js";
-import { McpApiError, McpCapabilityError, publicMcpCapabilities, type createPublicMcpExecutor } from "../services/public-mcp/capabilities.js";
+import { McpApiError, McpCapabilityError } from "../services/public-mcp/capabilities.js";
+import type { PublicMcpCatalog } from "../services/public-mcp/catalog.js";
 
 const oauthErrors: ErrorRequestHandler = (error, _req, res, next) => {
   if (res.headersSent) { next(error); return; }
@@ -40,7 +41,12 @@ function authRateLimit(): RequestHandler {
   };
 }
 
-export function publicMcpIngressRoutes(oauth: PublicMcpOAuth, execute: ReturnType<typeof createPublicMcpExecutor>, events?: PublicMcpEvents, extension?: PublicMcpToolExtension) {
+/**
+ * The OAuth MCP endpoints. On the personal endpoint (`/mcp/paperclip`) the tools are the Paperclip
+ * catalog (`catalog`), filtered for the connection; the dormant Dot endpoint serves only its
+ * extension's tools.
+ */
+export function publicMcpIngressRoutes(oauth: PublicMcpOAuth, catalog?: PublicMcpCatalog, events?: PublicMcpEvents, extension?: PublicMcpToolExtension) {
   const router = Router();
   const { origin, resource } = oauth.config;
   const endpoint = new URL(resource).pathname;
@@ -91,18 +97,23 @@ export function publicMcpIngressRoutes(oauth: PublicMcpOAuth, execute: ReturnTyp
       res.status(401).json({ error: "invalid_token" }); return;
     }
     if (req.method !== "POST") { res.setHeader("Allow", "POST"); res.status(405).end(); return; }
+    const personalCatalog = agentConnection ? undefined : catalog;
     const listTools = async () => ({
-      tools: [...(agentConnection ? [] : publicMcpCapabilities).map((c) => ({
-        name: c.name, description: c.description, inputSchema: z.toJSONSchema(c.schema) as { type: "object"; properties: Record<string, unknown> },
-        annotations: { readOnlyHint: !c.write && !c.configure, destructiveHint: !!c.destructive, idempotentHint: true, openWorldHint: !!c.write || !!c.configure },
-      })), ...await extension?.listTools(principal!) ?? []],
+      tools: [
+        ...(personalCatalog ? (await personalCatalog.listTools(principal!)) as Array<{ name: string; description: string; inputSchema: { type: "object"; properties?: Record<string, unknown> } }> : []),
+        ...await extension?.listTools(principal!) ?? [],
+      ],
     });
-    const callTool = async (request: z.infer<typeof CallToolRequestSchema>) => {
+    const callTool = async (request: z.infer<typeof CallToolRequestSchema>): Promise<Record<string, unknown>> => {
       try {
         const extensionTools = await extension?.listTools(principal!) ?? [];
-        const result = extensionTools.some(t => t.name === request.params.name)
-          ? await extension!.callTool(principal!, request.params.name, request.params.arguments ?? {})
-          : agentConnection ? (() => { throw new McpOAuthError("access_denied", "This tool is unavailable on the agent connection."); })() : await execute(token!, request.params.name, request.params.arguments ?? {});
+        if (!extensionTools.some(t => t.name === request.params.name)) {
+          if (!personalCatalog) throw new McpOAuthError("access_denied", "This tool is unavailable on the agent connection.");
+          // Recheck membership, pause/archive state and revocation at invocation.
+          const current = await oauth.authenticate(token!);
+          return { ...await personalCatalog.callTool(current, request.params.name, request.params.arguments ?? {}) };
+        }
+        const result = await extension!.callTool(principal!, request.params.name, request.params.arguments ?? {});
         return { isError: result.outcome === "unknown" || result.outcome === "rejected", content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
       } catch (error) {
         if (error instanceof z.ZodError) {
@@ -241,10 +252,16 @@ export function publicMcpManagementRoutes(oauth: PublicMcpOAuth, agentOAuth?: Pu
     enabled: await oauth.isEnabled(), serverUrl: oauth.config.resource,
     invitationUrl: mcpSetupUrl(oauth.config.resource), invitation: mcpInvitation(oauth.config.resource),
   }));
-  router.get("/mcp/connections", realUser, async (req, res) => res.json(await oauth.listConnections(req.actor.userId!)));
+  router.get("/mcp/connections", realUser, async (req, res) => res.json(await oauth.listConnections(req.actor)));
   router.delete("/mcp/connections/:id", realUser, sameOrigin, async (req, res) => {
     if (!z.uuid().safeParse(req.params.id).success) throw new McpOAuthError("invalid_request", "Invalid connection ID.");
     await oauth.revokeConnection(String(req.params.id), req.actor.userId!); res.status(204).end();
+  });
+  router.patch("/mcp/connections/:id", realUser, sameOrigin, async (req, res) => {
+    if (!z.uuid().safeParse(req.params.id).success) throw new McpOAuthError("invalid_request", "Invalid connection ID.");
+    const parsed = updateMcpConnectionSchema.safeParse(req.body);
+    if (!parsed.success) throw new McpOAuthError("invalid_request", "Choose who the connection acts as, its access level or its overrides.");
+    res.json(await oauth.updateConnection(String(req.params.id), req.actor, parsed.data));
   });
   router.use(["/mcp", "/dot-mcp"], oauthErrors);
   return router;

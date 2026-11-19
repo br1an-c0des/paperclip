@@ -16,7 +16,7 @@ import {
   projects,
   userInboxAgentPolicies,
 } from "@paperclipai/db";
-import { LOW_TRUST_REVIEW_PRESET, type PermissionKey } from "@paperclipai/shared";
+import { LOW_TRUST_REVIEW_PRESET, type AgentAccess, type AgentAccessAction, type PermissionKey } from "@paperclipai/shared";
 import {
   getEmbeddedPostgresTestSupport,
   startEmbeddedPostgresTestDatabase,
@@ -56,7 +56,8 @@ async function createAgent(
       name: `Agent ${randomUUID()}`,
       role: input.role ?? "engineer",
       reportsTo: input.reportsTo ?? null,
-      permissions: input.permissions ?? {},
+      // Agents that existed before step 4a start at manager (migration 0491); these cases describe them.
+      permissions: { access: { level: "manager" }, ...(input.permissions ?? {}) },
       adapterType: "process",
       adapterConfig: {},
       runtimeConfig: {},
@@ -125,7 +126,8 @@ async function createIssue(
     .then((rows) => rows[0]!);
 }
 
-async function grantAgentPermission(
+/** Stores a grant row as is, for the cases that test grant matching itself. */
+async function insertAgentGrant(
   db: ReturnType<typeof createDb>,
   companyId: string,
   agentId: string,
@@ -148,6 +150,49 @@ async function grantAgentPermission(
     grantedByUserId: null,
   });
 }
+
+async function grantAgentPermission(
+  db: ReturnType<typeof createDb>,
+  companyId: string,
+  agentId: string,
+  permissionKey: PermissionKey,
+  scope: Record<string, unknown> | null = null,
+) {
+  await db.insert(companyMemberships).values({
+    companyId,
+    principalType: "agent",
+    principalId: agentId,
+    status: "active",
+    membershipRole: "member",
+  });
+  // The grant keys that access replaced become access overrides, as migration 0491 carries them over.
+  const accessAction = RETIRED_GRANT_ACCESS_ACTIONS[permissionKey];
+  if (accessAction) {
+    const [agent] = await db.select({ permissions: agents.permissions }).from(agents).where(eq(agents.id, agentId));
+    const permissions = (agent?.permissions ?? {}) as { access?: AgentAccess };
+    const access: AgentAccess = permissions.access ?? { level: "manager" };
+    const value = scope ? { scope } : true;
+    await db.update(agents).set({
+      permissions: { ...permissions, access: { ...access, overrides: { ...access.overrides, [accessAction]: value } } },
+    }).where(eq(agents.id, agentId));
+    return;
+  }
+  await db.insert(principalPermissionGrants).values({
+    companyId,
+    principalType: "agent",
+    principalId: agentId,
+    permissionKey,
+    scope,
+    grantedByUserId: null,
+  });
+}
+
+const RETIRED_GRANT_ACCESS_ACTIONS: Partial<Record<PermissionKey, AgentAccessAction>> = {
+  "tasks:assign": "tasks:assign",
+  "tasks:assign_scope": "tasks:assign",
+  "agents:create": "agents:create",
+  "agents:configure": "agents:configure",
+};
 
 async function createUser(
   db: ReturnType<typeof createDb>,
@@ -357,19 +402,21 @@ describeEmbeddedPostgres("authorization service", () => {
 
   it("enforces direct or consented suggest grants for agent configuration changes", async () => {
     const company = await createCompany(db, "AgentChangeGrant");
-    const directAgent = await createAgent(db, company.id);
+    // Direct configure authority is the access action agents:configure, no longer a stored grant.
+    const directAgent = await createAgent(db, company.id, {
+      permissions: { access: { level: "manager", overrides: { "agents:configure": true } } },
+    });
     const suggestAgent = await createAgent(db, company.id);
     const noGrantAgent = await createAgent(db, company.id);
     const targetAgent = await createAgent(db, company.id);
-    await grantAgentPermission(db, company.id, directAgent.id, "agents:configure");
     await grantAgentPermission(db, company.id, suggestAgent.id, "agents:suggest-changes");
-    await db.insert(companyMemberships).values({
+    await db.insert(companyMemberships).values([directAgent, noGrantAgent].map((agent) => ({
       companyId: company.id,
-      principalType: "agent",
-      principalId: noGrantAgent.id,
+      principalType: "agent" as const,
+      principalId: agent.id,
       status: "active",
       membershipRole: "member",
-    });
+    })));
 
     const authz = authorizationService(db);
     await expect(authz.decide({
@@ -380,7 +427,6 @@ describeEmbeddedPostgres("authorization service", () => {
     })).resolves.toMatchObject({
       allowed: true,
       reason: "allow_direct_change",
-      grant: { permissionKey: "agents:configure" },
     });
 
     await expect(authz.decide({
@@ -412,7 +458,9 @@ describeEmbeddedPostgres("authorization service", () => {
       scope: { requiresChangeGrant: true },
     })).resolves.toMatchObject({
       allowed: false,
-      reason: "deny_no_grant",
+      // Without either, the missing access action is what an approved request would add.
+      reason: "access_level",
+      missingAction: "agents:configure",
     });
   });
 
@@ -1409,10 +1457,10 @@ describeEmbeddedPostgres("authorization service", () => {
       reason: "deny_policy_restricted",
     });
     expect(denied.explanation).toContain("private");
+    // The scoped grant is now a scoped tasks:assign access override, so no grant row is cited.
     expect(allowed).toMatchObject({
       allowed: true,
       reason: "allow_explicit_grant",
-      grant: { permissionKey: "tasks:assign_scope" },
     });
   });
 
@@ -2112,94 +2160,29 @@ describeEmbeddedPostgres("authorization service", () => {
     });
   });
 
-  it("preserves legacy CEO agent creator authority", async () => {
-    const company = await createCompany(db, "Legacy");
-    const actorAgent = await createAgent(db, company.id, { role: "ceo" });
-
-    const decision = await authorizationService(db).decide({
-      actor: { type: "agent", agentId: actorAgent.id, companyId: company.id, source: "agent_jwt" },
-      action: "agents:create",
-      resource: { type: "company", companyId: company.id },
-    });
-
-    expect(decision).toMatchObject({
-      allowed: true,
-      reason: "allow_legacy_agent_creator",
-    });
-  });
-
-  it("honors a board-recorded hiring denial on a CEO instead of the CEO title", async () => {
-    const company = await createCompany(db, "CeoHireDenied");
-    const actorAgent = await createAgent(db, company.id, {
+  // Hiring is the access action agents:create. The legacy rules (CEO title, a board-recorded
+  // denial, an unrecorded false, the canCreateAgents flag) are carried into access by migration
+  // 0491 and tested in agent-access-migration.test.ts.
+  it("hiring needs the access action agents:create", async () => {
+    const company = await createCompany(db, "HireAccess");
+    const hirer = await createAgent(db, company.id, {
       role: "ceo",
-      permissions: { canCreateAgents: false, canCreateSkills: true, ceoHiringDeniedBy: { actorType: "user", actorId: "board-user", at: "2026-11-08T00:00:00.000Z" } },
+      permissions: { access: { level: "manager", overrides: { "agents:create": true } } },
     });
-
-    const decision = await authorizationService(db).decide({
-      actor: { type: "agent", agentId: actorAgent.id, companyId: company.id, source: "agent_jwt" },
+    const manager = await createAgent(db, company.id, { role: "ceo", permissions: { canCreateAgents: true } });
+    const authz = authorizationService(db);
+    const hire = (agentId: string) => authz.decide({
+      actor: { type: "agent", agentId, companyId: company.id, source: "agent_jwt" },
       action: "agents:create",
       resource: { type: "company", companyId: company.id },
     });
 
-    expect(decision).toMatchObject({
+    await expect(hire(hirer.id)).resolves.toMatchObject({ allowed: true, reason: "allow_access_level" });
+    // Neither the CEO title nor the old flag grants it any more.
+    await expect(hire(manager.id)).resolves.toMatchObject({
       allowed: false,
-      reason: "deny_missing_grant",
-      explanation: "Missing permission: agents:create.",
-    });
-  });
-
-  it("keeps CEO hiring when a false was saved without a board-recorded denial", async () => {
-    // Stale full-object saves, import updates and the low-trust default can
-    // all save false on a CEO without the board choosing to restrict it.
-    const company = await createCompany(db, "CeoUnrecordedFalse");
-    const actorAgent = await createAgent(db, company.id, {
-      role: "ceo",
-      permissions: { canCreateAgents: false, canCreateSkills: true },
-    });
-
-    const decision = await authorizationService(db).decide({
-      actor: { type: "agent", agentId: actorAgent.id, companyId: company.id, source: "agent_jwt" },
-      action: "agents:create",
-      resource: { type: "company", companyId: company.id },
-    });
-
-    expect(decision).toMatchObject({ allowed: true, reason: "allow_legacy_agent_creator" });
-  });
-
-  it("grants hire authority through the persisted new-agent default", async () => {
-    const company = await createCompany(db, "DefaultHire");
-    // The service create path persists the create-context default
-    // (canCreateAgents: true for standard trust); enforcement reads it back.
-    const actorAgent = await createAgent(db, company.id, {
-      role: "engineer",
-      permissions: { canCreateAgents: true, canCreateSkills: true },
-    });
-
-    const decision = await authorizationService(db).decide({
-      actor: { type: "agent", agentId: actorAgent.id, companyId: company.id, source: "agent_jwt" },
-      action: "agents:create",
-      resource: { type: "company", companyId: company.id },
-    });
-
-    expect(decision).toMatchObject({
-      allowed: true,
-      reason: "allow_legacy_agent_creator",
-    });
-  });
-
-  it("keeps legacy rows without an explicit canCreateAgents fail-closed", async () => {
-    const company = await createCompany(db, "LegacyRowFailClosed");
-    const actorAgent = await createAgent(db, company.id, { role: "engineer", permissions: {} });
-
-    const decision = await authorizationService(db).decide({
-      actor: { type: "agent", agentId: actorAgent.id, companyId: company.id, source: "agent_jwt" },
-      action: "agents:create",
-      resource: { type: "company", companyId: company.id },
-    });
-
-    expect(decision).toMatchObject({
-      allowed: false,
-      reason: "deny_missing_grant",
+      reason: "access_level",
+      missingAction: "agents:create",
     });
   });
 
@@ -2256,7 +2239,7 @@ describeEmbeddedPostgres("authorization service", () => {
     const otherProject = await createProject(db, company.id, "Denied");
     const actorAgent = await createAgent(db, company.id);
     const targetAgent = await createAgent(db, company.id);
-    await grantAgentPermission(db, company.id, actorAgent.id, "tasks:assign_scope", {
+    await insertAgentGrant(db, company.id, actorAgent.id, "tasks:assign_scope", {
       projectIds: [project.id],
     });
 
@@ -2292,7 +2275,7 @@ describeEmbeddedPostgres("authorization service", () => {
     const company = await createCompany(db, "UnknownScopeMetadata");
     const actorAgent = await createAgent(db, company.id);
     const targetAgent = await createAgent(db, company.id);
-    await grantAgentPermission(db, company.id, actorAgent.id, "tasks:assign_scope", {
+    await insertAgentGrant(db, company.id, actorAgent.id, "tasks:assign_scope", {
       note: "CEO-approved",
     });
 
@@ -2318,7 +2301,7 @@ describeEmbeddedPostgres("authorization service", () => {
     const childAgent = await createAgent(db, company.id, { reportsTo: managerAgent.id });
     const grandchildAgent = await createAgent(db, company.id, { reportsTo: childAgent.id });
     const outsideAgent = await createAgent(db, company.id);
-    await grantAgentPermission(db, company.id, actorAgent.id, "tasks:assign_scope", {
+    await insertAgentGrant(db, company.id, actorAgent.id, "tasks:assign_scope", {
       managedSubtreeAgentIds: [managerAgent.id],
     });
 
@@ -2352,7 +2335,7 @@ describeEmbeddedPostgres("authorization service", () => {
     const actorAgent = await createAgent(db, company.id);
     const allowedTarget = await createAgent(db, company.id);
     const deniedTarget = await createAgent(db, company.id);
-    await grantAgentPermission(db, company.id, actorAgent.id, "tasks:assign_scope", {
+    await insertAgentGrant(db, company.id, actorAgent.id, "tasks:assign_scope", {
       assigneeAgentIds: [allowedTarget.id],
     });
 
@@ -2381,7 +2364,7 @@ describeEmbeddedPostgres("authorization service", () => {
     const company = await createCompany(db, "BroadAssign");
     const actorAgent = await createAgent(db, company.id);
     const targetAgent = await createAgent(db, company.id);
-    await grantAgentPermission(db, company.id, actorAgent.id, "tasks:assign");
+    await insertAgentGrant(db, company.id, actorAgent.id, "tasks:assign");
 
     const decision = await authorizationService(db).decidePrincipalGrant({
       companyId: company.id,

@@ -1,5 +1,6 @@
 import type {
   Agent,
+  AgentAccess,
   AgentApiKeyScope,
   AgentConfigRevision,
   AgentDesiredSkillEntry,
@@ -72,11 +73,18 @@ export function adapterModelKeyOptions(options: AdapterModelOptions | undefined)
 /** An agent's API key as the list returns it (ui/src/api/agents.ts `AgentKey`); the token is shown only once, on creation. */
 export type AgentKey = { id: string; name: string; scope: AgentApiKeyScope; createdAt: string; revokedAt: string | null };
 
-/** `PATCH /agents/:id/permissions` (ui/src/api/agents.ts `AgentPermissionUpdate`). */
+/**
+ * `PATCH /agents/:id/permissions`. Since step 4a an agent's standing permissions are its `access`
+ * (level and overrides): the Permissions page and the Advanced tab's YAML always send `access`,
+ * whole, and never the old `canCreateAgents`/`canAssignTasks` flags. The server takes either
+ * `access` or both old flags, and lets the flags change `agents:create` only for an agent with no
+ * access stored (or a CEO's hiring denial).
+ */
 export type AgentPermissionUpdate = {
-  canCreateAgents: boolean;
-  canCreateSkills: boolean;
-  canAssignTasks: boolean;
+  access?: AgentAccess;
+  canCreateAgents?: boolean;
+  canCreateSkills?: boolean;
+  canAssignTasks?: boolean;
   trustPreset?: AgentPermissions["trustPreset"];
   authorizationPolicy?: AgentPermissions["authorizationPolicy"];
 };

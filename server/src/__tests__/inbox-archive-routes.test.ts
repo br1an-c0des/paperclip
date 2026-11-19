@@ -454,6 +454,8 @@ describeEmbeddedPostgres("inbox archive routes", () => {
 
   it("does not archive a responsible user's inbox when an agent moves an issue to done", async () => {
     const seeded = await seed();
+    // The agent finishes its own task: a new agent's default level (worker) changes only its own.
+    await db.update(issues).set({ assigneeAgentId: seeded.agentId }).where(eq(issues.id, seeded.issueId));
 
     await request(appFor(agentActor(seeded)))
       .patch(`/api/issues/${seeded.issueId}`)

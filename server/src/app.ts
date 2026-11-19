@@ -48,7 +48,8 @@ import { grokBotRoutes } from "./routes/grok-bot.js";
 import { createGrokRoutineDispatcher } from "./services/grok-bot/dispatcher.js";
 import { dotRunnerRoutes } from "./routes/dot-runner.js";
 import { createPublicMcpTransfers } from "./services/public-mcp/file-transfers.js";
-import { createMcpApiDispatch, createPublicMcpExecutor } from "./services/public-mcp/capabilities.js";
+import { createMcpApiDispatch } from "./services/public-mcp/capabilities.js";
+import { createPublicMcpCatalog } from "./services/public-mcp/catalog.js";
 import { createPublicMcpEvents, type PublicMcpEvents } from "./services/public-mcp/events.js";
 import { publicMcpIngressRoutes, publicMcpManagementRoutes } from "./routes/public-mcp.js";
 import { agentAvatarRoutes } from "./routes/agent-avatars.js";
@@ -56,7 +57,11 @@ import { decisionModelRoutes } from "./routes/decision-models.js";
 import { agentObservabilityRoutes } from "./routes/agent-observability.js";
 import { aiConnectionRoutes } from "./routes/ai-connections.js";
 import { taskWorkspaceRoutes } from "./routes/task-workspaces.js";
-import { projectToolRoutes } from "./routes/project-tools.js";
+import { paperclipMcpRoutes } from "./routes/paperclip-mcp.js";
+import { resolveMcpCaller } from "./mcp/caller.js";
+import { catalogDeps } from "./mcp/catalog-deps.js";
+import { createPaperclipCatalog } from "./mcp/catalog/index.js";
+import { createPermissionRequestReplayer, permissionRequestCreator } from "./services/permission-requests.js";
 import { emailChannelService } from "./services/email-channels.js";
 import { emailRoutes, emailWebhookRoutes } from "./routes/email.js";
 import { toolActionDeliveryService } from "./services/tool-action-delivery.js";
@@ -80,6 +85,7 @@ import type { StorageService } from "./storage/types.js";
 import { httpLogger, errorHandler } from "./middleware/index.js";
 import { skillAccessRequestContext } from "./services/skill-access.js";
 import { actorMiddleware } from "./middleware/auth.js";
+import { agentRoutePolicy } from "./middleware/agent-route-policy.js";
 import { boardMutationGuard } from "./middleware/board-mutation-guard.js";
 import {
   privateHostnameGuard,
@@ -678,6 +684,7 @@ export async function createApp(
 
   // Mount API routes
   const api = Router();
+  api.use(agentRoutePolicy(db));
   const agentAvatars = agentAvatarRoutes();
   api.use(agentAvatars.router);
   api.use(boardMutationGuard());
@@ -784,7 +791,15 @@ export async function createApp(
   api.use(agentInteractionPermissionRoutes(db));
   api.use(assetRoutes(db, opts.storageService));
   api.use(agentProfileAvatarRoutes(db, opts.storageService));
-  api.use(projectToolRoutes(db));
+  // Step 4a, section 7: a requestable denial becomes a permission request; approving replays it.
+  const permissionRequests = createPermissionRequestReplayer({
+    db, api, catalog: createPaperclipCatalog(catalogDeps(db)), dispatchOptions: { parentLocals: app.locals },
+    ...(publicMcpOAuth ? { resolveGrantCaller: async (grantId: string) => {
+      const principal = await publicMcpOAuth.authorizeGrant(grantId);
+      return resolveMcpCaller(db, principal.actor, { grant: principal.grant });
+    } } : {}),
+  });
+  api.use(paperclipMcpRoutes(db, api, { parentLocals: app.locals, requestPermission: permissionRequestCreator(db) }));
   api.use(taskWorkspaceRoutes(db));
   api.use(projectRoutes(db));
   api.use(caseRoutes(db, opts.storageService));
@@ -816,7 +831,7 @@ export async function createApp(
   api.use(onboardingSeedRoutes(db));
   api.use(boardChatRoutes(db, { deploymentMode: opts.deploymentMode }));
   api.use(voiceSessionRoutes(db, chatChannels.voice));
-  api.use(approvalRoutes(db, { pluginWorkerManager: workerManager }));
+  api.use(approvalRoutes(db, { pluginWorkerManager: workerManager, permissionRequests }));
   api.use(secretRoutes(db));
   api.use(managedAgentProfileRoutes(db));
   api.use(remoteAgentProfileRoutes(db));
@@ -1037,14 +1052,16 @@ export async function createApp(
     });
     const transfers = createPublicMcpTransfers(db, publicMcpOAuth, dispatch, opts.storageService);
     publicMcpIngress.use(transfers.router);
-    publicMcpIngress.use(publicMcpIngressRoutes(publicMcpOAuth, createPublicMcpExecutor(db, publicMcpOAuth, dispatch, transfers), publicMcpEvents));
+    publicMcpIngress.use(publicMcpIngressRoutes(publicMcpOAuth, createPublicMcpCatalog(db, publicMcpOAuth, {
+      api, parentLocals: app.locals, transfers, requestPermission: permissionRequestCreator(db),
+    }), publicMcpEvents));
     const dotOAuth = createPublicMcpOAuth(db, { ...publicMcpOAuth.config, resource: publicMcpOAuth.config.origin + "/mcp/runner" });
     dotPrincipalOAuth = dotOAuth;
     dotMcpEvents = createPublicMcpEvents(db, dotOAuth, dispatch, { enableDotRunner: true, isBackgroundWorkEnabled: () => !isWarmStandby() && !isIdleTaskDrainActive() });
     const grokTransfers = createPublicMcpTransfers(db, dotOAuth, dispatch, opts.storageService, { pathPrefix: "/mcp/runner/files",
       agentSession: { authorize: (principal, sessionId, taskId, write, database) => dotRunnerBroker(database ?? db).authorizeFileSession(principal, sessionId, taskId, write) } });
     publicMcpIngress.use(grokTransfers.router);
-    publicMcpIngress.use(publicMcpIngressRoutes(dotOAuth, createPublicMcpExecutor(db, dotOAuth, dispatch), dotMcpEvents, createDotRunnerMcpTools(db, connectionIntentHeartbeat, grokTransfers)));
+    publicMcpIngress.use(publicMcpIngressRoutes(dotOAuth, undefined, dotMcpEvents, createDotRunnerMcpTools(db, connectionIntentHeartbeat, grokTransfers)));
     api.use(publicMcpManagementRoutes(publicMcpOAuth, dotOAuth));
     api.use(dotRunnerRoutes(db, publicMcpOAuth.config.origin + "/mcp/runner"));
     api.use(grokBotRoutes(db, publicMcpOAuth.config.origin + "/mcp/runner"));

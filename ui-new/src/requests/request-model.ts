@@ -1,6 +1,7 @@
 import type { Approval, IssueExecutionStagePrincipal, IssueExecutionState, IssueStatus, IssueThreadInteraction } from "@paperclipai/shared";
 import type { CompanyJoinRequest } from "@/api/access";
 import type { DecisionOutcome } from "@/api/decisions";
+import { missingActionWords, permissionExpired, permissionRequestOf, permissionResult, toolWords, viaConnection } from "./permission-model";
 import { appQuestion } from "./question-set";
 
 /*
@@ -618,6 +619,7 @@ const APPROVAL_LABELS: Record<string, string> = {
   approve_ceo_strategy: "CEO strategy",
   budget_override_required: "Budget stop",
   request_board_approval: "Board approval",
+  permission_request: "Permission",
 };
 
 function text(value: unknown) {
@@ -633,6 +635,10 @@ export function approvalTitle(approval: Pick<Approval, "type" | "payload">) {
 }
 
 export function requestFromApproval(approval: Approval, ctx: RequestContext): Request {
+  if (approval.type === "permission_request") {
+    const permission = requestFromPermission(approval, ctx);
+    if (permission) return permission;
+  }
   const payload = approval.payload ?? {};
   const asker = who(ctx, approval.requestedByAgentId, approval.requestedByUserId);
   const open = approval.status === "pending" || approval.status === "revision_requested";
@@ -677,6 +683,61 @@ export function requestFromApproval(approval: Approval, ctx: RequestContext): Re
     respond: !open ? { allowed: false, reason: null } : budget ? { allowed: false, reason: "Budget stops are resolved from the budget controls, not approved here." } : { allowed: true, reason: null },
     verdict: open ? null : { ...(verdicts[approval.status] ?? { text: approval.status, tone: "muted" }), at: date(approval.decidedAt ?? approval.updatedAt) },
     result: !open && approval.decisionNote ? { text: approval.decisionNote, tone: "muted" } : null,
+    createdAt: new Date(approval.createdAt),
+  };
+}
+
+/**
+ * A permission request (permission-model.ts): who was refused (an agent, or a person or agent
+ * through an outside connection), the call in plain words, the task it came from, and once decided
+ * what the replay did. Past its expiry it can only be denied.
+ */
+function requestFromPermission(approval: Approval, ctx: RequestContext): Request | null {
+  const payload = permissionRequestOf(approval);
+  if (!payload) return null;
+  const now = ctx.now ?? new Date();
+  const agentId = approval.requestedByAgentId ?? payload.caller.agentId;
+  const userId = payload.caller.kind === "oauth_person" ? (approval.requestedByUserId ?? payload.caller.userId) : null;
+  const caller = who(ctx, userId ? null : agentId, userId);
+  const through = payload.connectionName?.trim();
+  const asker = viaConnection(payload) ? (through ? `${caller} via ${through}` : `${caller} (outside connection)`) : caller;
+  const open = approval.status === "pending" || approval.status === "revision_requested";
+  const expired = permissionExpired(payload, now);
+  const tool = toolWords(payload.tool);
+  const decidedBy = approval.decidedByUserId ? who(ctx, null, approval.decidedByUserId) : "Someone";
+  const verdicts: Record<string, { text: string; tone: Tone }> = {
+    approved: { text: `${decidedBy} approved`, tone: "ok" },
+    rejected: { text: `${decidedBy} denied`, tone: "bad" },
+    cancelled: { text: "Cancelled", tone: "muted" },
+  };
+  const lifetime = open ? expiryLabel(new Date(payload.expiresAt), now) : { text: "Decided", soon: false };
+  return {
+    key: `approval:${approval.id}`,
+    source: { type: "approval", approval },
+    kind: "approval",
+    shape: "approval",
+    outcome: "apply",
+    audience: { kind: "people_only", label: "People only" },
+    subject: ctx.task
+      ? taskSubject(ctx.task)
+      : payload.taskId
+        ? { kind: "task", label: "Its task", issueId: payload.taskId }
+        : { kind: "company", label: "The company" },
+    formal: true,
+    acts: true,
+    asker: { agentId: userId ? null : agentId, userId, name: asker },
+    askVerb: "asks for permission",
+    title: text(payload.summary) ?? tool,
+    body: null,
+    next: expired
+      ? "This request has expired, so approving can't run it. Deny it to clear it."
+      : `Approving runs “${tool}” once as ${caller}${payload.taskId ? ", and a comment on the task says how it went" : ""}. Always allow also turns on “${missingActionWords(payload)}” for it.`,
+    lifetime: lifetime.text,
+    lifetimeSoon: lifetime.soon,
+    state: open ? "open" : "settled",
+    respond: open ? { allowed: true, reason: null } : { allowed: false, reason: null },
+    verdict: open ? null : { ...(verdicts[approval.status] ?? { text: approval.status, tone: "muted" }), at: date(approval.decidedAt ?? approval.updatedAt) },
+    result: open ? null : (permissionResult(payload) ?? (approval.decisionNote ? { text: approval.decisionNote, tone: "muted" } : null)),
     createdAt: new Date(approval.createdAt),
   };
 }

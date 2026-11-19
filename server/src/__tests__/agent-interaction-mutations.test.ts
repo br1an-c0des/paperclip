@@ -93,10 +93,10 @@ describe("agent interaction mutation boundaries", () => {
 
   it("keeps comments independent from task-edit permission", async () => {
     const f = await seed(), svc = issueService(db);
-    await restrict(f.sender, { canEditOtherTasks: false });
+    await restrict(f.recipient, { canReceiveTaskEditsFromAgents: false });
     await svc.addComment(f.issueId, "Allowed comment", { agentId: f.sender });
     await svc.update(f.issueId, { actorAgentId: f.sender });
-    await expect(svc.update(f.issueId, { title: "No", actorAgentId: f.sender })).rejects.toMatchObject(denied("canEditOtherTasks"));
+    await expect(svc.update(f.issueId, { title: "No", actorAgentId: f.sender })).rejects.toMatchObject(denied("canReceiveTaskEditsFromAgents"));
   });
 
   it("rejects creating work for a protected recipient without inserting a task", async () => {
@@ -109,13 +109,12 @@ describe("agent interaction mutation boundaries", () => {
 
   it("allows initial plan content under assignment authority without requiring peer edit permission", async () => {
     const f = await seed();
-    await restrict(f.sender, { canEditOtherTasks: false });
     await restrict(f.recipient, { canReceiveTaskEditsFromAgents: false });
     const created = await issueService(db).create(f.companyId, { title: "New assigned work", createdByAgentId: f.sender,
       assigneeAgentId: f.recipient, initialPlan: "Initial instructions", status: "todo" });
     expect((await documentService(db).getIssueDocumentByKey(created.id, "plan"))?.body).toBe("Initial instructions");
     await expect(documentService(db).upsertIssueDocument({ issueId: created.id, key: "notes", format: "markdown",
-      body: "Later instructions", createdByAgentId: f.sender })).rejects.toMatchObject(denied("canEditOtherTasks"));
+      body: "Later instructions", createdByAgentId: f.sender })).rejects.toMatchObject(denied("canReceiveTaskEditsFromAgents"));
   });
 
   it("checks assignment restrictions on native create_task before saving tasks or enqueueing wakes", async () => {
@@ -151,7 +150,10 @@ describe("agent interaction mutation boundaries", () => {
   it("rejects a native reassignment reason before stopping the currently running recipient", async () => {
     const f = await seed(), runId = randomUUID(), targetRunId = randomUUID(), stop = vi.fn(), wake = vi.fn();
     await db.update(issues).set({ assigneeAgentId: f.sender, status: "in_progress" }).where(eq(issues.id, f.issueId));
-    await db.update(agents).set({ adapterType: "paperclip_runner", status: "active" }).where(eq(agents.id, f.sender));
+    // Reassigning a peer's task takes tasks:assign since step 4a (manager; new agents default to
+    // worker), so the recipient's consent switch is what refuses it here.
+    await db.update(agents).set({ adapterType: "paperclip_runner", status: "active",
+      permissions: { access: { level: "manager" } } }).where(eq(agents.id, f.sender));
     const [target] = await db.insert(issues).values({ companyId: f.companyId, title: "Running peer task",
       status: "in_progress", assigneeAgentId: f.recipient }).returning();
     await db.insert(heartbeatRuns).values([

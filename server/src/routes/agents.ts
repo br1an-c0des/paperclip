@@ -5,9 +5,10 @@ import { isObjectJournalBusyError } from "../services/object-byte-journal.js";
 import { readTaskPanelActivations } from "../services/plugin-task-panels.js";
 import { enqueueNativeRuntimeResponse } from "../services/native-runtime/native-runtime-response-delivery.js";
 import { latestFailedRunsByAgent } from "@paperclipai/shared";
-import { agentConfigurationSpec } from "@paperclipai/shared";
+import { agentConfigurationSpec, agentAccessSchema } from "@paperclipai/shared";
 import { agentConfigurationRevision, restoreAgentConfigurationRedactions } from "../lib/agent-configuration-revision.js";
 import { CEO_HIRING_DENIAL_KEY, ceoHiringDenial, normalizeAgentPermissions } from "../lib/agent-permissions.js";
+import { withAccessOverride } from "../services/agent-access.js";
 import { prepareRuntimeSettingsPatch } from "../services/agent-runtime-settings.js";
 import { completeSetupTokenAiConnection } from "../services/setup-token-ai-connection.js";
 import { connectionManagementService, continuingConnectionManagement } from "../services/connection-management.js";
@@ -1272,60 +1273,15 @@ export function agentRoutes(
     };
   }
 
-  function canCreateAgents(agent: { role: string; permissions: Record<string, unknown> | null | undefined }) {
-    if (!agent.permissions || typeof agent.permissions !== "object") return false;
-    return Boolean((agent.permissions as Record<string, unknown>).canCreateAgents);
-  }
-
+  // The agent's membership and grants. It no longer reports canAssignTasks/taskAssignSource: since
+  // step 4a assigning is the tasks:assign access action (permissions.access), which the old grant
+  // logic could contradict, and nothing read them (bug 47).
   async function buildAgentAccessState(agent: NonNullable<Awaited<ReturnType<typeof svc.getById>>>) {
     const membership = await access.getMembership(agent.companyId, "agent", agent.id);
     const grants = membership
       ? await access.listPrincipalGrants(agent.companyId, "agent", agent.id)
       : [];
-    const hasExplicitTaskAssignGrant = grants.some((grant) => grant.permissionKey === "tasks:assign");
-
-    if (agent.role === "ceo") {
-      return {
-        canAssignTasks: true,
-        taskAssignSource: "ceo_role" as const,
-        membership,
-        grants,
-      };
-    }
-
-    if (canCreateAgents(agent)) {
-      return {
-        canAssignTasks: true,
-        taskAssignSource: "agent_creator" as const,
-        membership,
-        grants,
-      };
-    }
-
-    if (hasExplicitTaskAssignGrant) {
-      return {
-        canAssignTasks: true,
-        taskAssignSource: "explicit_grant" as const,
-        membership,
-        grants,
-      };
-    }
-
-    if (membership?.status === "active") {
-      return {
-        canAssignTasks: true,
-        taskAssignSource: "simple_default" as const,
-        membership,
-        grants,
-      };
-    }
-
-    return {
-      canAssignTasks: false,
-      taskAssignSource: "none" as const,
-      membership,
-      grants,
-    };
+    return { membership, grants };
   }
 
   async function buildAgentDetail(
@@ -5073,6 +5029,11 @@ export function agentRoutes(
     if (!existing) return;
 
     if (req.actor.type === "agent") {
+      // An agent never sets access levels, its own or another's: that would let it raise itself.
+      if (req.body.access !== undefined) {
+        res.status(403).json({ error: "Only a person can change an agent's access level." });
+        return;
+      }
       const actorAgent = req.actor.agentId ? await svc.getById(req.actor.agentId) : null;
       if (!actorAgent || actorAgent.companyId !== existing.companyId) {
         res.status(403).json({ error: "Forbidden" });
@@ -5093,16 +5054,28 @@ export function agentRoutes(
       await assertBoardCanManageAgentsForCompany(req, existing.companyId);
     }
 
-    // Saving a CEO's hiring as off here is the board's restriction, since this
-    // control shows the effective value; record who and when, so it is told
-    // apart from a false saved by other writes. Keep an earlier record.
-    const permissionsPatch = existing.role === "ceo" && req.body.canCreateAgents === false
+    // Saving a CEO's hiring as off with the old flag is the board's restriction;
+    // record who and when, so it is told apart from a false saved by other
+    // writes. Keep an earlier record. A body with access says what the agent
+    // may do itself, so it records none.
+    const ceoHiringDenied = existing.role === "ceo" && req.body.canCreateAgents === false && req.body.access === undefined;
+    const hiringPatch = ceoHiringDenied
       ? { ...req.body, [CEO_HIRING_DENIAL_KEY]: ceoHiringDenial(existing.permissions) ?? {
           actorType: req.actor.type === "agent" ? "agent" : "user",
           actorId: (req.actor.type === "agent" ? req.actor.agentId : req.actor.userId) ?? null,
           at: new Date().toISOString(),
         } }
       : req.body;
+    // Since step 4a hiring is the agents:create access action. Like creation (newAgentAccess), the
+    // old flag sets that override only when no access is sent and none is stored: once the agent
+    // has access, it decides, so a stale flag (the Advanced YAML used to send one) can't undo the
+    // Access card. A CEO's hiring denial still turns the override off, as an import's does.
+    const hasStoredAccess = agentAccessSchema.safeParse(asRecord(existing.permissions)?.access).success;
+    const hiringFlagSetsAccess = typeof req.body.canCreateAgents === "boolean" && req.body.access === undefined
+      && (!hasStoredAccess || ceoHiringDenied);
+    const permissionsPatch = hiringFlagSetsAccess
+      ? { ...hiringPatch, access: withAccessOverride(existing.permissions, "agents:create", req.body.canCreateAgents!) }
+      : hiringPatch;
     const agent = await svc.updatePermissions(id, permissionsPatch, { actorAgentId: req.actor.type === "agent" ? req.actor.agentId : null });
     if (!agent) {
       res.status(404).json({ error: "Agent not found" });
@@ -5110,21 +5083,23 @@ export function agentRoutes(
     }
 
     const effectiveCanAssignTasks =
-      agent.role === "ceo" || Boolean(agent.permissions?.canCreateAgents) || req.body.canAssignTasks;
+      agent.role === "ceo" || Boolean(agent.permissions?.canCreateAgents) || Boolean(req.body.canAssignTasks);
     await access.ensureMembership(agent.companyId, "agent", agent.id, "member", "active");
     // The toggle is the visible hiring control: turning it off also removes an
     // explicit agents:create grant that would otherwise still allow hiring.
     if (req.body.canCreateAgents === false) {
       await access.setPrincipalPermission(agent.companyId, "agent", agent.id, "agents:create", false, null);
     }
-    await access.setPrincipalPermission(
-      agent.companyId,
-      "agent",
-      agent.id,
-      "tasks:assign",
-      effectiveCanAssignTasks,
-      req.actor.type === "board" ? (req.actor.userId ?? null) : null,
-    );
+    if (typeof req.body.canAssignTasks === "boolean") {
+      await access.setPrincipalPermission(
+        agent.companyId,
+        "agent",
+        agent.id,
+        "tasks:assign",
+        effectiveCanAssignTasks,
+        req.actor.type === "board" ? (req.actor.userId ?? null) : null,
+      );
+    }
 
     const actor = getActorInfo(req);
     await logActivity(db, {
@@ -5142,6 +5117,7 @@ export function agentRoutes(
         canCreateSkills: agent.permissions?.canCreateSkills ?? true,
         canAssignTasks: effectiveCanAssignTasks,
         trustPreset: agent.permissions?.trustPreset ?? "standard",
+        ...(req.body.access !== undefined ? { access: req.body.access } : {}),
       },
     });
 

@@ -15,7 +15,12 @@ export const approvalsApi = {
   issues: (id: string, signal?: AbortSignal) => api.get<Issue[]>(`/approvals/${encodeURIComponent(id)}/issues`, { signal }),
   list: (companyId: string, status?: string, signal?: AbortSignal) =>
     api.get<Approval[]>(`/companies/${companyId}/approvals${status ? `?status=${encodeURIComponent(status)}` : ""}`, { signal }),
-  approve: (id: string, decisionNote?: string) => api.post<Approval>(`/approvals/${id}/approve`, { decisionNote }),
+  /**
+   * Approves. For a `permission_request`, `alwaysAllow` also turns the missing action on for the
+   * caller (step 4a): the agent's override, or the outside connection's for a person.
+   */
+  approve: (id: string, decisionNote?: string, options?: { alwaysAllow?: boolean }) =>
+    api.post<Approval>(`/approvals/${id}/approve`, { decisionNote, ...(options?.alwaysAllow ? { alwaysAllow: true } : {}) }),
   reject: (id: string, decisionNote?: string) => api.post<Approval>(`/approvals/${id}/reject`, { decisionNote }),
   requestRevision: (id: string, decisionNote?: string) => api.post<Approval>(`/approvals/${id}/request-revision`, { decisionNote }),
   /** Marks a request that was sent back as resubmitted; the payload stays as it is unless one is given. */

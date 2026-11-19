@@ -1,4 +1,4 @@
-import type { AgentInteractionPermissionsState, AgentPermissions } from "@paperclipai/shared";
+import { AGENT_INTERACTION_PERMISSION_KEYS, type AgentInteractionPermissionsState, type AgentPermissions } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import { trustUpdate } from "../trust-model";
 import {
@@ -22,23 +22,25 @@ function state(overrides: AgentInteractionPermissionsState["overrides"]): AgentI
 }
 
 describe("interaction switches", () => {
-  it("lists all eleven keys once, six outgoing and five incoming", () => {
+  it("lists the seven switches access didn't absorb, two outgoing and five incoming", () => {
     const groups = interactionGroups("Ada");
     expect(groups.map((group) => [group.direction, group.rows.length])).toEqual([
-      ["outgoing", 6],
+      ["outgoing", 2],
       ["incoming", 5],
     ]);
     const keys = groups.flatMap((group) => group.rows.map((row) => row.key));
-    expect(new Set(keys).size).toBe(11);
+    expect(new Set(keys).size).toBe(7);
     expect(keys).toEqual([...INTERACTION_KEYS]);
+    // The card lists every switch the server still has.
+    expect([...keys].sort()).toEqual([...AGENT_INTERACTION_PERMISSION_KEYS].sort());
     expect(groups[1]!.title).toBe("What other agents may do to Ada");
   });
 
   it("is on unless the agent's own setting turns it off", () => {
-    const current = state({ canMentionAgents: false, canEditOtherTasks: true });
+    const current = state({ canMentionAgents: false, canCommentOnOtherTasks: true });
     expect(interactionAllowed(current, "canMentionAgents")).toBe(false);
-    expect(interactionAllowed(current, "canEditOtherTasks")).toBe(true);
-    expect(interactionAllowed(current, "canAssignTasksToAgents")).toBe(true);
+    expect(interactionAllowed(current, "canCommentOnOtherTasks")).toBe(true);
+    expect(interactionAllowed(current, "canReceiveMentionsFromAgents")).toBe(true);
     // Before the state loads, or without an effective map, the sparse overrides decide.
     expect(interactionAllowed(undefined, "canMentionAgents")).toBe(true);
     expect(interactionAllowed({ overrides: { canMentionAgents: false } } as AgentInteractionPermissionsState, "canMentionAgents")).toBe(false);
@@ -46,10 +48,10 @@ describe("interaction switches", () => {
   });
 
   it("counts an explicit true as the agent's own setting, which Reset removes", () => {
-    const current = state({ canMentionAgents: false, canEditOtherTasks: true });
-    expect(interactionOverridden(current, "canEditOtherTasks")).toBe(true);
+    const current = state({ canMentionAgents: false, canReceiveMentionsFromAgents: true });
+    expect(interactionOverridden(current, "canReceiveMentionsFromAgents")).toBe(true);
     expect(interactionOverridden(current, "canCommentOnOtherTasks")).toBe(false);
-    expect(overriddenKeys(current)).toEqual(["canMentionAgents", "canEditOtherTasks"]);
+    expect(overriddenKeys(current)).toEqual(["canMentionAgents", "canReceiveMentionsFromAgents"]);
   });
 
   it("writes a boolean for a switch and null for a reset", () => {
@@ -59,14 +61,14 @@ describe("interaction switches", () => {
   });
 
   it("resets every setting at once, and sends nothing when there's none", () => {
-    expect(resetAllPatch(state({ canMentionAgents: false, canEditOtherTasks: true }))).toEqual({ canMentionAgents: null, canEditOtherTasks: null });
+    expect(resetAllPatch(state({ canMentionAgents: false, canReceiveMentionsFromAgents: true }))).toEqual({ canMentionAgents: null, canReceiveMentionsFromAgents: null });
     expect(resetAllPatch(state({}))).toBeNull();
     expect(resetAllPatch(undefined)).toBeNull();
   });
 
   it("keeps interactions out of the legacy /permissions body", () => {
     const permissions = { canCreateAgents: false, trustPreset: "standard", interactions: { canMentionAgents: false } } as Partial<AgentPermissions>;
-    const body = trustUpdate({ canCreateAgents: false, canCreateSkills: true, canAssignTasks: false }, permissions);
+    const body = trustUpdate({ canCreateSkills: true, access: { level: "worker" } }, permissions);
     expect(body).not.toHaveProperty("interactions");
   });
 });

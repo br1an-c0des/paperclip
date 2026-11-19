@@ -12,6 +12,7 @@ import { trustAuthorizationPolicySchema, trustPresetSchema } from "./trust-polic
 import { agentDesiredSkillSelectionSchema } from "./adapter-skills.js";
 import { objectWithoutDefaults } from "./partial.js";
 import { agentInteractionPermissionsSchema } from "../agent-interaction-permissions.js";
+import { agentAccessSchema } from "../agent-access.js";
 
 export const agentPermissionsSchema = z.object({
   // No schema default: the server derives the default (enabled unless the
@@ -317,7 +318,8 @@ export const testAdapterEnvironmentSchema = z.object({
 
 export type TestAdapterEnvironment = z.infer<typeof testAdapterEnvironmentSchema>;
 
-export const updateAgentPermissionsSchema = z.object({
+/** The permission fields an agent configuration carries (configuration resources reuse it). */
+export const agentPermissionFieldsSchema = z.object({
   canCreateAgents: z.boolean(),
   canCreateSkills: z.boolean().optional(),
   canAssignTasks: z.boolean(),
@@ -325,6 +327,14 @@ export const updateAgentPermissionsSchema = z.object({
   authorizationPolicy: trustAuthorizationPolicySchema.optional(),
   interactions: z.never({ error: "Use /api/agents/:id/interaction-permissions to change interaction permissions" }).optional(),
 });
+
+export const updateAgentPermissionsSchema = agentPermissionFieldsSchema.partial({ canCreateAgents: true, canAssignTasks: true }).extend({
+  /** The agent's access level and overrides (step 4a); only people may set it. */
+  access: agentAccessSchema.optional(),
+}).refine(
+  (value) => value.access !== undefined || (value.canCreateAgents !== undefined && value.canAssignTasks !== undefined),
+  { message: "Provide access, or canCreateAgents and canAssignTasks" },
+);
 
 export type UpdateAgentPermissions = z.infer<typeof updateAgentPermissionsSchema>;
 

@@ -90,7 +90,7 @@ const apiPrefixes: Record<string, string> = {
   "projects.ts": "/api",
   "primary-agent.ts": "/api",
   "public-mcp.ts": "/api",
-  "project-tools.ts": "/api",
+  "paperclip-mcp.ts": "/api",
   "resource-memberships.ts": "/api",
   "remote-agent-profiles.ts": "/api",
   "routines.ts": "/api",
@@ -787,8 +787,11 @@ describe("openapi routes", () => {
       AgentBearerAuth: { type: "http", scheme: "bearer" },
     });
     expect(res.body.paths["/api/health"].get.security).toEqual([]);
-    expect(res.body.paths["/api/mcp/project-tools"].post.security).toEqual([{ AgentRunAuth: [] }]);
-    expect(res.body.paths["/api/mcp/project-tools"].post["x-paperclip-authorization"]).toEqual({ actor: "agent", heartbeatBound: true, taskBound: true });
+    // Retired: runs reach Paperclip through `/api/mcp/paperclip`.
+    expect(res.body.paths["/api/mcp/project-tools"]).toBeUndefined();
+    const slackTools = res.body.paths["/api/companies/{companyId}/slack/tasks/{issueId}/tools"].post;
+    expect(slackTools.security).toEqual([{ AgentRunAuth: [] }]);
+    expect(slackTools["x-paperclip-authorization"]).toEqual({ actor: "agent", heartbeatBound: true, taskBound: true });
     expect(res.body.paths["/mcp/gateways/{gatewayPublicId}"].post.security).toEqual([]);
     expect(res.body.paths["/api/mcp/gateways/{gatewayPublicId}"]).toBeUndefined();
     expect(res.body.paths["/api/companies"].get.parameters).toContainEqual({

@@ -12,6 +12,7 @@ import {
 } from "@paperclipai/shared";
 import type { ConfigurationClient } from "@/api/agent-configuration";
 import { agentConfigurationPatch } from "./configuration-yaml";
+import { storedAccess } from "./settings/access-model";
 
 /*
  * The agent YAML editor's model (agents/settings/AdvancedSection.tsx), ported from the old UI's
@@ -184,10 +185,11 @@ export async function loadAgentConfiguration(client: ConfigurationClient, id: st
     spec: {
       ...agentConfigurationSpec(core),
       adapterConfig,
+      // Hiring and assigning are access actions since step 4a, so the document carries `access`
+      // (the stored level and overrides, or the default level) instead of the old flags.
       permissions: {
-        canCreateAgents: Boolean(agent.permissions.canCreateAgents),
+        access: storedAccess(agent.permissions),
         canCreateSkills: agent.permissions.canCreateSkills !== false,
-        canAssignTasks: Boolean(agent.access?.canAssignTasks),
         trustPreset: agent.permissions.trustPreset ?? "standard",
         ...(agent.permissions.authorizationPolicy ? { authorizationPolicy: agent.permissions.authorizationPolicy } : {}),
       },
@@ -601,9 +603,6 @@ function planResolved(
     add(`Agent configuration: ${fields.join(", ")}`, () => client.agents.update(id, { ...corePatch, expectedConfigurationRevision: snapshot.core.configurationRevision }, companyId));
   }
   const permissions = document.spec.permissions;
-  if (permissions && !permissions.canAssignTasks && (document.spec.role === "ceo" || permissions.canCreateAgents)) {
-    throw new Error("CEO agents and agents that can create agents also have task assignment authority. Set canAssignTasks to true.");
-  }
   planInstructions(plan);
   if (document.spec.skills && !equal(document.spec.skills, snapshot.document.spec.skills)) {
     unique(document.spec.skills.map((skill) => (typeof skill === "string" ? skill : skill.key)), "skills");

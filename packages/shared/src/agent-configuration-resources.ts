@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { updateAgentPermissionsSchema, createAgentKeySchema } from "./validators/agent.js";
+import { agentAccessSchema } from "./agent-access.js";
+import { agentPermissionFieldsSchema, createAgentKeySchema } from "./validators/agent.js";
 import { agentDesiredSkillSelectionSchema, agentDesiredSkillEntrySchema } from "./validators/adapter-skills.js";
 import { createToolProfileWithEntriesSchema, createToolProfileEntryForProfileSchema, createToolPolicySchema } from "./validators/tool-access.js";
 import { chatProviderSchema, updateChatEndpointSchema, replaceChatEndpointResourcesSchema, createChatEndpointSchema, configureChatEndpointSchema } from "./validators/chat-channels.js";
@@ -8,9 +9,19 @@ import { createSecretSchema, rotateSecretSchema, updateSecretSchema } from "./va
 const id = z.string().min(1);
 const filePath = z.string().min(1).max(512).refine(value => !value.startsWith("/") && !value.includes("\\") && !value.split("/").some(part => part === ".." || part === "." || !part), "Use a relative file path without traversal.");
 
+/** A flag the document no longer takes: since step 4a it's an access action. */
+const retiredPermissionFlag = (flag: string, action: string) =>
+  z.never({ error: `${flag} is retired: set access (its level, or the ${action} override) instead.` }).optional();
+
 export const agentConfigurationResourceShape = {
-  permissions: updateAgentPermissionsSchema.extend({
-    canCreateSkills: z.boolean(), trustPreset: updateAgentPermissionsSchema.shape.trustPreset.unwrap(),
+  // The agent's standing permissions are its access level and overrides (step 4a), sent whole.
+  permissions: z.object({
+    access: agentAccessSchema,
+    canCreateSkills: z.boolean(),
+    trustPreset: agentPermissionFieldsSchema.shape.trustPreset.unwrap(),
+    authorizationPolicy: agentPermissionFieldsSchema.shape.authorizationPolicy,
+    canCreateAgents: retiredPermissionFlag("canCreateAgents", "agents:create"),
+    canAssignTasks: retiredPermissionFlag("canAssignTasks", "tasks:assign"),
   }).strict().optional(),
   instructions: z.object({
     mode: z.enum(["managed", "external"]).nullable(),

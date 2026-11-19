@@ -177,6 +177,10 @@ export function errorHandler(
       details?.code === "workspace_repair_precondition_failed";
     // Its code and remediation are already top-level; repeating them only lengthens agent context.
     const boardAccessDenial = details?.code === "board_access_required";
+    // An agent access refusal (step 4a) has a fixed shape: { error, code, missingAction, requestable }.
+    // It's recognised by its missingAction: other errors share the code (an AWS Secrets Manager
+    // refusal is `access_denied` too), and they keep their details.
+    const agentAccessDenial = details?.code === "access_denied" && typeof details.missingAction === "string";
     const structuredConnectionError = new Set([
       "user_authorization_required",
       "organization_authorization_required",
@@ -258,9 +262,13 @@ export function errorHandler(
             typeof responseDetails?.grantId === "string"
               ? { grantId: responseDetails.grantId }
               : {}),
+            ...(agentAccessDenial
+              ? { missingAction: responseDetails?.missingAction, requestable: responseDetails?.requestable === true }
+              : {}),
             ...(!redactedSkillPolicyDenial &&
             !workspaceRepairPreconditionFailure &&
             !boardAccessDenial &&
+            !agentAccessDenial &&
             responseDetailsValue
               ? { details: responseDetailsValue }
               : {}),

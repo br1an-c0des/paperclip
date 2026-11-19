@@ -2,12 +2,17 @@ import type { AgentInteractionPermissionKey, AgentInteractionPermissionsPatch, A
 
 /*
  * The agent's interaction switches (U105, upstream #20411 and #20422,
- * doc/agent-interaction-permissions.md): eleven deny-only restrictions on what an agent may do to
+ * doc/agent-interaction-permissions.md): seven deny-only restrictions on what an agent may do to
  * other agents and their work, and what other agents may do to it. Each is allowed until someone
  * turns it off, and nothing is stored for a switch left alone. `GET` and
  * `PATCH /agents/:id/interaction-permissions` read and set them: a switch writes `true` or
  * `false` for itself, and Reset writes `null`, which removes the setting so the default applies.
  * The old UI has no screen for them; this card follows the Trust card's switches.
+ *
+ * Since step 4a four of the six outgoing switches are access actions instead (the Access card,
+ * AccessCard.tsx): assigning to agents and to people is `tasks:assign`, editing other tasks
+ * `tasks:update_any`, configuring other agents `agents:configure`. The server no longer reads,
+ * reports or accepts them (`RETIRED_AGENT_INTERACTION_PERMISSION_KEYS` in the shared package).
  *
  * They live under `permissions.interactions` but only this route changes them: the agent and
  * `/permissions` routes answer 422 to a body that carries them, and the Trust card's
@@ -19,15 +24,8 @@ export type InteractionGroup = { direction: "outgoing" | "incoming"; title: stri
 
 /** Every switch's words. A `Record` over the shared key type, so a new key fails the typecheck here. */
 const WORDS: Record<AgentInteractionPermissionKey, { label: string; help: string }> = {
-  canAssignTasksToAgents: { label: "Assign tasks to agents", help: "Assign or hand off work to another agent, including new subtasks." },
-  canAssignTasksToHumans: { label: "Assign tasks to people", help: "Assign work to a person. The person's own access still applies." },
   canMentionAgents: { label: "Mention agents", help: "Link another agent in a comment or a task. A name in plain text isn't a mention." },
   canCommentOnOtherTasks: { label: "Comment on other tasks", help: "Comment on tasks another agent or a person owns." },
-  canEditOtherTasks: {
-    label: "Edit other tasks",
-    help: "Change the status, instructions, assignee, dependencies, documents or files of tasks it doesn't own.",
-  },
-  canConfigureOtherAgents: { label: "Configure other agents", help: "Change another agent's instructions, settings, skills or tools." },
   canReceiveAssignmentsFromAgents: { label: "Take assignments from agents", help: "Other agents may assign or hand off work to it." },
   canReceiveMentionsFromAgents: { label: "Be mentioned by agents", help: "Other agents may mention it in comments and tasks." },
   canReceiveCommentsFromAgents: { label: "Take comments from agents", help: "Other agents may comment on its tasks and send it messages." },
@@ -38,14 +36,7 @@ const WORDS: Record<AgentInteractionPermissionKey, { label: string; help: string
   },
 };
 
-const OUTGOING: AgentInteractionPermissionKey[] = [
-  "canAssignTasksToAgents",
-  "canAssignTasksToHumans",
-  "canMentionAgents",
-  "canCommentOnOtherTasks",
-  "canEditOtherTasks",
-  "canConfigureOtherAgents",
-];
+const OUTGOING: AgentInteractionPermissionKey[] = ["canMentionAgents", "canCommentOnOtherTasks"];
 
 const INCOMING: AgentInteractionPermissionKey[] = [
   "canReceiveAssignmentsFromAgents",
@@ -55,7 +46,7 @@ const INCOMING: AgentInteractionPermissionKey[] = [
   "canReceiveConfigurationChangesFromAgents",
 ];
 
-/** Every key, in the order the card lists them. */
+/** Every key the card lists, in its order. */
 export const INTERACTION_KEYS: readonly AgentInteractionPermissionKey[] = [...OUTGOING, ...INCOMING];
 
 const row = (key: AgentInteractionPermissionKey): InteractionRow => ({ key, ...WORDS[key] });

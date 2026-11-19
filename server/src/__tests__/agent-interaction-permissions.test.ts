@@ -79,9 +79,9 @@ describe("individual agent interaction permissions", () => {
     const first = await request(api).patch(path(f)).send({ canReceiveCommentsFromAgents: false });
     expect(first.status, first.text).toBe(200);
     expect(first.body.overrides).toEqual({ canReceiveCommentsFromAgents: false });
-    const second = await request(api).patch(path(f)).send({ canAssignTasksToHumans: true });
-    expect(second.body.overrides).toEqual({ canReceiveCommentsFromAgents: false, canAssignTasksToHumans: true });
-    const reset = await request(api).patch(path(f)).send({ canReceiveCommentsFromAgents: null, canAssignTasksToHumans: null });
+    const second = await request(api).patch(path(f)).send({ canMentionAgents: true });
+    expect(second.body.overrides).toEqual({ canReceiveCommentsFromAgents: false, canMentionAgents: true });
+    const reset = await request(api).patch(path(f)).send({ canReceiveCommentsFromAgents: null, canMentionAgents: null });
     expect(reset.status, reset.text).toBe(200);
     expect(reset.body.overrides).toEqual({});
     expect((await read(f)).permissions).toEqual(initial.permissions);
@@ -114,17 +114,40 @@ describe("individual agent interaction permissions", () => {
     expect((await read(f)).permissions).not.toHaveProperty("interactions");
   });
 
+  it("neither reports nor accepts the four switches that became access actions, and drops stored leftovers on write", async () => {
+    const f = await seed(), api = app(board(f));
+    const leftovers = { canEditOtherTasks: false, canAssignTasksToAgents: false, canAssignTasksToHumans: false,
+      canConfigureOtherAgents: false, canReceiveMentionsFromAgents: false };
+    await db.update(agents).set({ permissions: { canCreateAgents: true, interactions: leftovers } }).where(eq(agents.id, f.agentId));
+    const current = await request(api).get(path(f));
+    expect(current.status, current.text).toBe(200);
+    expect(current.body.overrides).toEqual({ canReceiveMentionsFromAgents: false });
+    expect(Object.keys(current.body.effective).sort()).toEqual([...AGENT_INTERACTION_PERMISSION_KEYS].sort());
+    for (const body of [{ canEditOtherTasks: true }, { canMentionAgents: false, canConfigureOtherAgents: null }]) {
+      const refused = await request(api).patch(path(f)).send(body);
+      expect(refused.status, refused.text).toBe(410);
+      expect(refused.body.error).toContain(`PATCH /api/agents/${f.agentId}/permissions`);
+      expect(refused.body.code).toBe("agent_interaction_permission_retired");
+    }
+    await expect(updateAgentInteractionPermissions(db, board(f), f.companyId, f.agentId,
+      { canAssignTasksToHumans: true } as never)).rejects.toMatchObject({ status: 410 });
+    expect((await read(f)).permissions.interactions).toEqual(leftovers);
+    const write = await request(api).patch(path(f)).send({ canMentionAgents: false });
+    expect(write.status, write.text).toBe(200);
+    expect((await read(f)).permissions.interactions).toEqual({ canReceiveMentionsFromAgents: false, canMentionAgents: false });
+  });
+
   it("serializes independent policy patches and preserves restrictions through legacy permission saves", async () => {
     const f = await seed(), api = app(board(f));
     const responses = await Promise.all([
       request(api).patch(path(f)).send({ canMentionAgents: false }),
-      request(api).patch(path(f)).send({ canAssignTasksToAgents: false }),
+      request(api).patch(path(f)).send({ canReceiveAssignmentsFromAgents: false }),
       agentService(db).updatePermissions(f.agentId, { canCreateAgents: false }),
     ]);
     expect(responses.slice(0, 2).map(result => result && "status" in result ? result.status : null)).toEqual([200, 200]);
     const saved = await read(f);
     expect(saved.permissions).toMatchObject({ canCreateAgents: false, unrelated: "preserved",
-      interactions: { canMentionAgents: false, canAssignTasksToAgents: false } });
+      interactions: { canMentionAgents: false, canReceiveAssignmentsFromAgents: false } });
     await expect(agentService(db).updatePermissions(f.agentId, { canCreateAgents: false, interactions: {} }))
       .rejects.toMatchObject({ status: 403 });
     await agentService(db).update(f.agentId, { permissions: { canCreateSkills: true } }, { recordRevision: { createdByUserId: f.userId } });
@@ -133,7 +156,7 @@ describe("individual agent interaction permissions", () => {
     expect(() => assertNoInitialAgentInteractionPermissions({ interactions: {} })).toThrow(/interaction-permissions/);
   });
 
-  it("uses the real CLI against HTTP and PostgreSQL for inspect, all eleven settings, and reset", async () => {
+  it("uses the real CLI against HTTP and PostgreSQL for inspect, every setting, and reset", async () => {
     const f = await seed(), api = app(board(f));
     const server = api.listen(0, "127.0.0.1");
     await new Promise<void>(resolve => server.once("listening", resolve));

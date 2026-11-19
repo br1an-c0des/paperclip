@@ -73,7 +73,9 @@ describePg("decisionService", () => {
       { companyId, principalType: "user", principalId: originResponsibleUserId, status: "active", membershipRole: "member" },
       { companyId, principalType: "user", principalId: decidedByUserId, status: "active", membershipRole: "member" },
     ]);
-    await db.insert(agents).values({ id: agentId, companyId, name: "Proposer", role: "engineer", status: "active", adapterType: "codex_local", adapterConfig: {}, runtimeConfig: {}, permissions: {} });
+    await db.insert(agents).values({ id: agentId, companyId, name: "Proposer", role: "engineer", status: "active", adapterType: "codex_local", adapterConfig: {}, runtimeConfig: {},
+      // Its effects reach tasks it doesn't own, which since step 4a takes manager access (new agents default to worker).
+      permissions: { access: { level: "manager" } } });
     await db.insert(issues).values([
       { id: originIssueId, companyId, title: "Origin", status: "in_progress", priority: "medium", assigneeAgentId: agentId, responsibleUserId: originResponsibleUserId },
       { id: targetIssueId, companyId, title: "Target", status: "todo", priority: "medium", responsibleUserId: decidedByUserId },
@@ -424,7 +426,7 @@ describePg("decisionService", () => {
       options: [{ id: "yes", label: "Yes", effects: [{ type: "cancel_issue_tree", targetIssueId,
         staleness: "strict", reasonComment: "Agent-authored cancellation reason" }] }],
     });
-    await db.update(agents).set({ permissions: { interactions: { [permission]: false } } })
+    await db.update(agents).set({ permissions: { access: { level: "manager" }, interactions: { [permission]: false } } })
       .where(eq(agents.id, permission === "canCommentOnOtherTasks" ? agentId : peerId));
 
     const result = await service().decide({ id: created.id, optionId: "yes", decidedByUserId, userActor: boardActor() });

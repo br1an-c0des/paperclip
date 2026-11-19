@@ -1,4 +1,5 @@
-import type { McpConnection } from "@paperclipai/shared";
+import { DEFAULT_CONNECTION_ACCESS_LEVEL, type AgentAccess, type McpConnection, type UpdateMcpConnection } from "@paperclipai/shared";
+import { LEVEL_WORDS, overrideCount } from "@/agents/settings/access-model";
 
 /*
  * View model for Connections → Assistants (`/connections/assistant-connection`, the old UI's
@@ -63,7 +64,7 @@ export function setupSteps(serverUrl: string, assistant: AssistantClient): Setup
           code: "codex mcp login paperclip --scopes paperclip:read,paperclip:write,paperclip:configure,offline_access",
         },
         {
-          text: "If the current conversation does not reload its MCP tools, start a new conversation or restart the client. Verify the connection with paperclip_connection before claiming success.",
+          text: "If the current conversation does not reload its MCP tools, start a new conversation or restart the client. Verify the connection with paperclip_me before claiming success.",
         },
       ];
     case "claude":
@@ -75,7 +76,7 @@ export function setupSteps(serverUrl: string, assistant: AssistantClient): Setup
         {
           text: "In Claude Code, run /mcp, select paperclip, and choose Authenticate. Versions that offer `claude mcp login --help` can also start authorization with `claude mcp login paperclip`. Give the user the approval link.",
         },
-        { text: "Reconnect through /mcp, or start a new session if needed. Verify the account and organization with paperclip_connection." },
+        { text: "Reconnect through /mcp, or start a new session if needed. Verify the account and organization with paperclip_me." },
       ];
     case "opencode":
       return [
@@ -88,7 +89,7 @@ export function setupSteps(serverUrl: string, assistant: AssistantClient): Setup
           code: "opencode mcp auth paperclip",
         },
         {
-          text: "If OpenCode was already running, restart it to load the connection. For the browser app, use this command. Verify the tools with paperclip_connection.",
+          text: "If OpenCode was already running, restart it to load the connection. For the browser app, use this command. Verify the tools with paperclip_me.",
           code: "opencode web",
         },
       ];
@@ -113,14 +114,14 @@ export function setupSteps(serverUrl: string, assistant: AssistantClient): Setup
           code: `paperclipai mcp proxy --url ${quoted}`,
         },
         {
-          text: "The user code is for the human to verify the request. The private device code remains inside the CLI. After connecting, call paperclip_connection to verify the account and organization.",
+          text: "The user code is for the human to verify the request. The private device code remains inside the CLI. After connecting, call paperclip_me to verify the account and organization.",
         },
       ];
     default:
       return [
         { text: "Add a remote HTTP MCP server at this URL, then choose OAuth / browser sign-in.", code: serverUrl },
         {
-          text: "If the client cannot install MCP servers from chat, use its connection settings. If it cannot receive a browser callback, use the Headless instructions. After approval, verify the account and organization with paperclip_connection.",
+          text: "If the client cannot install MCP servers from chat, use its connection settings. If it cannot receive a browser callback, use the Headless instructions. After approval, verify the account and organization with paperclip_me.",
         },
       ];
   }
@@ -138,8 +139,33 @@ export function assistantRows(connections: readonly McpConnection[] | undefined,
   return (connections ?? []).filter((row) => row.companyId === companyId && !row.revokedAt && !row.scopes.includes("paperclip:agent"));
 }
 
-/** "Connected as you · Read and write · Configure agents, projects and skills". */
-export function assistantAccess(scopes: readonly string[]) {
-  const base = scopes.includes("paperclip:write") ? "Read and write" : "Read only";
-  return `Connected as you · ${base}${scopes.includes("paperclip:configure") ? " · Configure agents, projects and skills" : ""}`;
+/**
+ * A connection's access (step 4a) as an access the Access controls edit: its level and overrides.
+ * Acting as an agent, the level caps the agent's own access.
+ */
+export function connectionAccessOf(connection: Pick<McpConnection, "accessLevel" | "accessOverrides">): AgentAccess {
+  const level = connection.accessLevel && LEVEL_WORDS[connection.accessLevel] ? connection.accessLevel : DEFAULT_CONNECTION_ACCESS_LEVEL;
+  const overrides = connection.accessOverrides ?? {};
+  return Object.keys(overrides).length ? { level, overrides: { ...overrides } } : { level };
+}
+
+/** The `PATCH /mcp/connections/:id` body for a new access: the level and every override (`{}` clears them). */
+export function connectionAccessPatch(next: AgentAccess): UpdateMcpConnection {
+  return { accessLevel: next.level, accessOverrides: next.overrides ?? {} };
+}
+
+/** "Acts as you · Manager", "Acts as Ada · Manager at most · 1 action set". */
+export function connectionAccessLine(connection: Pick<McpConnection, "actAsAgent" | "accessLevel" | "accessOverrides">) {
+  const access = connectionAccessOf(connection);
+  const who = connection.actAsAgent ? `Acts as ${connection.actAsAgent.name}` : "Acts as you";
+  const level = connection.actAsAgent ? `${LEVEL_WORDS[access.level].label} at most` : LEVEL_WORDS[access.level].label;
+  const count = overrideCount(access);
+  return [who, level, count ? `${count === 1 ? "1 action" : `${count} actions`} set` : null].filter(Boolean).join(" · ");
+}
+
+/** Who a connection may act as: you, then the agents you may configure (keeping its current one). */
+export function actAsChoices(connection: Pick<McpConnection, "actAsAgent" | "actAsAgentChoices">): { id: string | null; name: string }[] {
+  const agents = [...(connection.actAsAgentChoices ?? [])];
+  if (connection.actAsAgent && !agents.some((agent) => agent.id === connection.actAsAgent!.id)) agents.unshift(connection.actAsAgent);
+  return [{ id: null, name: "You" }, ...agents];
 }

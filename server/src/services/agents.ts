@@ -44,7 +44,7 @@ export function agentService(db: Db, budgetHooks: BudgetServiceHooks = {}) {
 
     getById,
 
-    updatePermissions: async (id: string, permissions: Record<string, unknown> & { canCreateAgents: boolean }, options?: { actorAgentId?: string | null }) => {
+    updatePermissions: async (id: string, permissions: Record<string, unknown> & { canCreateAgents?: boolean }, options?: { actorAgentId?: string | null }) => {
       const existing = await getById(id);
       if (!existing) return null;
       if (existing.status === "pending_approval") {

@@ -6,6 +6,25 @@ and 5 ("One prompt builder"). Traced from the code at `955c81d2f` (2026-11-17, t
 paths are repo-relative and line numbers are for that commit. For where things live in the repo
 generally, see [repo-map.md](repo-map.md).
 
+**Updated for step 4a (2026-11-18, `feat/step-4a`).** These sections describe the new state:
+- the run in brief;
+- the `runtimeMcp` row;
+- the ACP prompt;
+- §6's MCP row;
+- §7;
+- the change points for the endpoint and finish-or-block;
+- the corrections.
+
+The rest is still the freeze trace. The changes:
+- a run reaches Paperclip through one `paperclip` MCP server (`/api/mcp/paperclip`) instead of
+  curl;
+- the curl-free `paperclip` skill;
+- agent access levels enforced on every REST route;
+- the finish-or-block completion rule.
+
+The design is in [step-4a-mcp-and-permissions.md](step-4a-mcp-and-permissions.md) and the build
+record in [step-4a-plan.md](step-4a-plan.md). Line numbers in the updated parts are approximate.
+
 It covers the legacy path (the server spawns the agent's harness itself). Where the Paperclip
 Runner diverges it says so, without tracing it.
 
@@ -63,7 +82,8 @@ side) are the same for both engines.
 3. `executeRun` resolves the runtime mode (`legacy` for any `claude_local` agent), the session
    (`agent_task_sessions` per agent per issue), the workspace (project checkout, git worktree,
    isolated task folder or agent home) and the task context (task brief, wake payload, handoff).
-4. It mints a 48-hour run JWT, builds up to three Paperclip MCP servers, and calls
+4. It mints a 48-hour run JWT and builds the run's MCP servers: always `paperclip` when there's a
+   token, plus "Paperclip connections" and "paperclip-assigned" when they apply. Then it calls
    `adapter.execute(ctx)`.
 5. The adapter builds a content-addressed prompt bundle (agent instructions + company skills),
    decides whether to `--resume`, joins seven prompt sections into the first message, and spawns
@@ -71,8 +91,10 @@ side) are the same for both engines.
    [--resume <id>] --model … [--append-system-prompt-file …] [--mcp-config … --strict-mcp-config]
    --add-dir <bundle>` in the workspace, with the prompt on stdin.
 6. Claude loads user, project and local settings (so the repo's `CLAUDE.md` and `.claude/skills`),
-   but only Paperclip's MCP servers when the run is bound to a task. It talks to Paperclip with
-   `curl` and `PAPERCLIP_API_KEY`, taught by the `paperclip` skill.
+   but only Paperclip's MCP servers. Since step 4a every run with a token has the `paperclip`
+   server, so the CLI engine always passes `--strict-mcp-config`. It talks to Paperclip through
+   the `paperclip_*` MCP tools, taught by the `paperclip` skill. Its access level decides which
+   tools it sees and what the REST routes allow.
 7. Every stdout chunk is appended to the run log file and published as a `heartbeat.run.log` live
    event; the board parses stream-json into a transcript in the browser.
 8. When Claude exits (no wall-clock timeout by default), the adapter parses the `result` line and
@@ -189,7 +211,7 @@ else `adapter.execute({...})` (:890-971). The adapter is `claudeLocalAdapter`
 | `config` | The agent's adapter config with secrets resolved, plus `instructionsFilePath`, `paperclipRuntimeSkills`, managed-AI env | `server/src/services/heartbeat/execution-configuration.ts:205-452`; instructions path set in `instruction-working-copy.ts:212` |
 | `context` | The run's `contextSnapshot` plus `paperclipWorkspace` (`heartbeat.ts:3351`), `paperclipWorkspaces` (:3369), `paperclipWake` (`task-context.ts:178`), `paperclipTaskMarkdown*` (:369-386), `paperclipTaskCommunicationGuidance` (:229, :388), `paperclipFreshSessionHandoffMarkdown` (`session-preparation.ts:238-243`), `paperclipSessionHandoffMarkdown` (`session-preparation.ts:323-341`), `conversationMode` (`agent-conversations.ts:207`) | `runtime-execution.ts:825-834` |
 | `authToken` | The run JWT, legacy runs only | `runtime-execution.ts:275-286` |
-| `runtimeMcp` | Paperclip MCP servers for this run | `runtime-execution.ts:852-871` |
+| `runtimeMcp` | Paperclip MCP servers for this run: `paperclip` (from `paperclipRunMcpServers`, `server/src/services/heartbeat/paperclip-run-mcp.ts`) first, then connections and assigned gateways | `runtime-execution.ts:852-871` |
 | `getFreshSessionHandoff` | Lazy loader for the fresh-session history packet | `session-preparation.ts:218-221` |
 | `onLog`, `onMeta`, `onEvent`, `onUsage`, `onSpawn` | Output and process callbacks | `run-output.ts:258`, :309; `runtime-execution.ts:953-966` |
 
@@ -411,15 +433,18 @@ omitted.
 
 `buildPrompt` (`acpx-engine/execute.ts:3170-3260`) uses the same selectors but a different order and
 carrier (:3234-3244): the **instructions file contents go into the user message**, not the system
-prompt, and are dropped on resume-delta turns (:3226); it adds a `PAPERCLIP_*` env note and an API
-access note with curl examples (:3132-3168); and every turn is prefixed with a text list of
-materialized skills and their paths (:5102), instead of native skills.
+prompt, and are dropped on resume-delta turns (:3226). It adds a `PAPERCLIP_*` env note and an API
+access note. Since step 4a the note points at the `paperclip` MCP tools, has no curl recipe, and
+is left out when the run has no `paperclip` server (`renderApiAccessNote`, about :3158). Every turn
+is prefixed with a text list of materialized skills and their paths (:5102), instead of native
+skills.
 
 ### Things the prompt says that don't hold on the legacy path
 
-- The default heartbeat template tells the agent to use `search_api` and `call_api`
-  (`connection-intent-guidance.ts:12`). Those exist on the Runner; a legacy run's MCP servers offer
-  only `connections_search` and `connection_request` (`server/src/routes/connection-intents.ts:99-112`).
+- The default heartbeat template told every agent to use `search_api` and `call_api`
+  (`connection-intent-guidance.ts:12`). **Fixed in step 4a:** a legacy run has
+  `paperclip_search_api`/`paperclip_call_api`, but only at `admin` (`api:raw`). The guidance now
+  says only some agents have them, and what to do without them.
 - The working-copy guidance names `read_agent_instructions`, `update_agent_instructions` and
   related tools (`server/src/services/agent-instruction-working-copies.ts:86`), which aren't in a
   legacy run's tool set either.
@@ -510,7 +535,7 @@ For the CLI engine on a local target, no managed AI connection, task-bound run (
 | Company skills assigned in Paperclip | Yes | `--add-dir <bundle>` with `.claude/skills` symlinks; always includes `paperclip`, `complain`, `suggestion-box` (`resolveLegacyPaperclipDesiredSkillNames`, `server-utils.ts:4401-4420`) |
 | Agent instructions (`AGENTS.md` entry) | Yes, fresh sessions | `--append-system-prompt-file`; siblings (`HEARTBEAT.md`, `SOUL.md`, `TOOLS.md`) only if the agent reads them |
 | Paperclip MCP servers | Yes | `--mcp-config` (§7) |
-| Repo `.mcp.json`, user MCP servers | **No**, when the run has any Paperclip MCP server | `--strict-mcp-config` (`execute.ts:904-906`). A run with no Paperclip server (no task, no responsible user, no assigned connections) gets neither flag, so they would load. |
+| Repo `.mcp.json`, user MCP servers | **No** | `--strict-mcp-config` (`execute.ts:904-906`). Since step 4a every run with a token has the `paperclip` server, so the flag applies to task-less runs too (before, a run with no Paperclip server got neither flag and loaded them). Step 4b drops the flag. |
 | Hooks, permissions, env from settings | Hooks and env yes; permission prompts are bypassed | `--dangerously-skip-permissions` |
 | Auto memory | Yes, unless `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` is in the environment; **off on server1** (`deploy/docker-compose.yml:80`) | Inherited env. Memory is keyed by project path, so it differs between the repo, each worktree and private folders. |
 | `para-memory-files` | Only if assigned (core skill for CEO hires, `server/src/services/company-skills.ts:687-693`) | A Paperclip skill writing to `$AGENT_HOME` |
@@ -555,7 +580,32 @@ per case. This is the groundwork for 4b's sealed runs ([hard-fork plan, decision
 
 ## 7. How the agent talks to Paperclip
 
+### The `paperclip` MCP server (since step 4a)
+
+- **What it is:** `POST /api/mcp/paperclip` (`server/src/routes/paperclip-mcp.ts`,
+  `server/src/mcp/server.ts`), stateless JSON-RPC, authenticated with the run JWT.
+  `resolveMcpCaller` (`server/src/mcp/caller.ts`) makes the caller:
+  - `run`: a run token, with its run id;
+  - `agent_key`: an agent API key, no run;
+  - for the public OAuth MCP, `oauth_person` or `oauth_agent`.
+- **The tools:** come from `createPaperclipCatalog(catalogDeps(db))` (`server/src/mcp/catalog/`).
+  Each tool re-enters the REST API in-process as the caller (`createCatalogDispatch`,
+  `server/src/mcp/dispatch.ts`), so the routes' own checks and the route policy apply.
+  `tools/list` shows only what the caller's access allows, plus requestable tools marked "Needs
+  approval."
+  - A worker run sees 22 tools plus 4 that need approval.
+  - Run-only tools (`paperclip_task_context`, `paperclip_report_progress`, `paperclip_finish`,
+    `paperclip_block`) need a run id. On a run without a task they refuse with `run_without_task`.
+- **A denied call that can be requested** becomes a `permission_request` approval in the Inbox.
+  Approving it replays the call once (`server/src/services/permission-requests.ts`).
+- **The skill:** `skills/paperclip/SKILL.md` (91 lines, was 809) is a workflow in terms of these
+  tools. It starts with `paperclip_task_context` and ends with finish or block.
+
 ### REST with `curl`
+
+Still possible with `PAPERCLIP_API_KEY`, for scripts. The route policy
+(`server/src/middleware/agent-route-policy.ts`) makes it no wider than the MCP tools: every write
+route is tagged with an access action, and an untagged write needs `api:raw`.
 
 - `PAPERCLIP_API_KEY` is a JWT from `createLocalAgentJwt` (`server/src/agent-auth-jwt.ts:123-164`):
   `sub` agent, `company_id`, `adapter_type`, `run_id`, `responsible_user_id`, optional
@@ -572,10 +622,11 @@ per case. This is the groundwork for 4b's sealed runs ([hard-fork plan, decision
   agent's own `in_progress` issue needs the run to own the checkout) and comments through
   `assertAgentIssueCommentAllowed` (:5805-5867); checkout only as itself (:17509-17515). Legacy runs
   may PATCH their own status; the Runner-only guard returns early for them (:14829-14858).
-- The `paperclip` skill (`skills/paperclip/SKILL.md`, 809 lines; ~4,100 with references) teaches
-  the procedure: `GET /api/agents/me`, inbox, `POST /api/issues/{id}/checkout`, heartbeat context,
-  work, then comment and status update, every write with `Authorization: Bearer $PAPERCLIP_API_KEY`
-  and `X-Paperclip-Run-Id`.
+- **Since step 4a:** `authorizationService.decide` also checks the agent's access level and
+  overrides (`permissions.access`). Temporary grants come next, then a denial with
+  `reason: "access_level"` and a `missingAction`.
+- At the freeze, the `paperclip` skill (809 lines; ~4,100 with references) taught this as a curl
+  procedure. Since step 4a it uses the MCP tools above.
 
 ### MCP servers in a legacy run
 
@@ -584,15 +635,14 @@ Built at `runtime-execution.ts:852-871`, written as HTTP servers with a bearer h
 
 | Server | When | Auth | Tools |
 | --- | --- | --- | --- |
-| "Paperclip projects" `<api>/api/mcp/project-tools` | Run token exists, `PAPERCLIP_API_URL` set (always at boot, `server/src/index.ts:1076`), run bound to an issue | The run JWT; requires `source === "agent_jwt"` and a task-bound run (`server/src/services/project-tool-context.ts:12-23`) | `create_project`, `list_project_repositories`, `list_projects`, `create_task`, `set_task_title`, filtered by work mode (`server/src/services/project-tools.ts:6-16`); each re-enters the REST API |
+| `paperclip` `<api>/api/mcp/paperclip` | Run token exists and `PAPERCLIP_API_URL` is set (always at boot, `server/src/index.ts:1076`), task or not (`paperclipRunMcpServers`) | The run JWT, as a `run` caller | The `paperclip_*` catalog, filtered by the agent's access (above). Replaced "Paperclip projects" (`/api/mcp/project-tools`, retired in step 4a; `services/project-tools.ts` stays for the dormant Runner) |
 | "Paperclip connections" `<api>/mcp/runtime-tools` | The run has a `responsibleUserId` and a JWT secret (`run-preparation.ts:1237-1269`) | A separate 1 h token, scope `connection_intents` (`server/src/runtime-tools-token.ts:15-67`) | `connections_search`, `connection_request` (`routes/connection-intents.ts:99-112`) |
 | "paperclip-assigned" `<api>/mcp/gateways/<id>` | The agent has assigned, healthy tool connections (`run-preparation.ts:905-1225`) | Per-run gateway token, 1 h, revoked at run end | Whatever the connections expose, deny by default |
 
-So a task-bound run nearly always has at least "Paperclip projects", which is enough to trigger
-`--strict-mcp-config`. **No legacy run has task tools for comment, status, finish or block**; those
-are `curl`. The `paperclip_finish_task`/`paperclip_block_task` tools in the public MCP
-(`server/src/services/public-mcp/expanded-capabilities.ts:64-75`) act as a connected person and
-aren't given to runs.
+So every run with a token has `paperclip`, which is enough to trigger `--strict-mcp-config`. At the
+freeze no legacy run had task tools for comment, status, finish or block; since step 4a they're
+all in the catalog. The public MCP (`/mcp/paperclip`, OAuth) serves the same catalog, and its old
+tool lists are deleted.
 
 ## 8. Live output
 
@@ -676,7 +726,8 @@ cancel). The adapter (`toAdapterResult`, `execute.ts:1028-1332`) maps it:
 | Graceful shutdown | Children killed, run `interrupted`, retry queued (`recovery.ts:1329-1540`) | Legacy (Runner runs are suspended instead) |
 | Server crash | First recovery pass after start finds the orphan; the detached `claude` may still be running → `process_detached` | Legacy |
 | Hot restart adoption | Detached (CLI engine) runs are left alive and adopted by the new server. An active ACP run is bound to the server's stdio, so it blocks adoption: the server drains and retries instead (`isServerStdioBoundHotRestartRun`, `prepareHotRestartShutdown`, `recovery.ts:481-663`). In Docker a container restart kills every run either way | CLI |
-| `semantic_result_missing`, `paperclip_finish`/`paperclip_block`, `finalizeNativeRun`, restart resume, liveness continuation, successful-run handoff | — | **Runner only** (`run-completion.ts:1040-1049`; `heartbeat.ts:3903-3945`; `packages/paperclip-runner/src/contracts/completion-result.ts:2-8`) |
+| `semantic_result_missing`, `finalizeNativeRun`, restart resume, liveness continuation, successful-run handoff | — | **Runner only** (`run-completion.ts:1040-1049`; `heartbeat.ts:3903-3945`; `packages/paperclip-runner/src/contracts/completion-result.ts:2-8`) |
+| No disposition (step 4a) | `settleRunDisposition` (`run-completion.ts`): a run is covered by a recorded disposition (`paperclip_finish`, `paperclip_block`, `paperclip_report_progress` with `continue: true`) or by its task ending `done`, `in_review` or `blocked` by any route; otherwise the missing-disposition repair below. A "continuing" run queues one continuation wake (at most 10 in a row). Exempt: chat turns, runs without a task, wakes on a done or cancelled task | Legacy |
 
 ## 10. Change points for steps 4 and 5
 
@@ -704,8 +755,8 @@ server1's agents, or move the plan to ACP. Changing both doubles the work.
 | **Repo `.mcp.json` and the user's MCP servers** | Drop `--strict-mcp-config` (`execute.ts:904-906`) | Project servers need trust: `.mcp.json` servers prompt for approval unless `enableAllProjectMcpServers`/`enabledMcpjsonServers` is set; `--print` can't answer a prompt. Name clashes with Paperclip's servers (`writePaperclipClaudeMcpConfig` dedups only among its own). Resume ignores MCP changes already (:819-821). |
 | **Repo skills first; company library optional** | `resolveLegacyPaperclipDesiredSkillNames` (`server-utils.ts:4401-4420`, forces `paperclip`, `complain`, `suggestion-box`); `prepareClaudePromptBundle` and `--add-dir` (`prompt-cache.ts:134-174`; `execute.ts:907`); the manifest appended to instructions (`execute.ts:545-553`) | The bundle key covers skills, so changing the set resets sessions (:802-803). Repo skills already load when cwd is the repo; the work is making the library opt-in and avoiding duplicates by name. ACP uses a separate skill path (`acpx-engine/execute.ts:1158-1250`). |
 | **Keep the agent's Claude memory** | Nothing in code disables it; it's `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in `deploy/docker-compose.yml:80`, and memory is keyed by `cwd`. Decide one memory: Claude auto memory (remove the env, keep a stable cwd per agent+repo) vs `para-memory-files` in `$AGENT_HOME` ([decision 5](../ui-new/docs/decisions.md#5-agents-can-have-three-memory-systems-that-dont-know-about-each-other), [upstream-fixes 39](upstream-fixes.md#39-turn-off-claude-codes-auto-memory-when-an-agent-has-para-memory-files)) | Per-task worktrees give each task its own memory folder unless Claude Code groups worktrees by repo; check before relying on it. Managed connections lose memory with their temporary config dir. On ACP, auto memory is on today regardless of the compose setting. |
-| **One Paperclip MCP endpoint** | Replace the three servers at `runtime-execution.ts:852-871` with one in-process route modelled on `server/src/routes/project-tools.ts` (already JWT-authenticated, re-enters REST with the same token); tools borrowed from `packages/mcp-server/src/tools.ts` and the Runner catalog (`CAPABILITY_SEMANTIC_TOOL_CATALOG`, used by `project-tools.ts:3`); shrink `skills/paperclip/SKILL.md` and the curl note in ACP (`acpx-engine/execute.ts:3149-3168`) | Authority stays in the REST routes (`assertAgentIssueMutationAllowed` etc.), so the endpoint is a thin layer. Connection tools use a separate token type and route mounted before `actorMiddleware` (`app.ts:605`); folding them in means one auth model. The default heartbeat template's `search_api`/`call_api` lines become true once added. |
-| **Finish-or-block** | Add `finish`/`block` tools to that endpoint; enforce in `completeRun` next to `reconcileLegacyContinuation` (`run-completion.ts:1037-1050`), replacing the after-the-fact disposition repair (`recovery/legacy-continuation.ts`, `recovery/service.ts:3392-3430`, :3854-3960) and the auto-comment fallback (`heartbeat-run-summary.ts:613-624`) | Chat turns (`conversationMode`) must stay exempt: they finish with a reply, not a status. The Runner's version is in `run-completion.ts:1040-1049` and `native-session-executor.ts`; borrow the schema, not the code. Recovery sweeps (`reconcileStrandedAssignedIssues`) reuse disposition repair and need to agree with the new rule. |
+| **One Paperclip MCP endpoint** | **Built in step 4a** (§7): `/api/mcp/paperclip`, the catalog in `server/src/mcp/catalog/`, project-tools retired, the skill and ACP note rewritten; "Paperclip connections" stays separate. Original note: Replace the three servers at `runtime-execution.ts:852-871` with one in-process route modelled on `server/src/routes/project-tools.ts` (already JWT-authenticated, re-enters REST with the same token); tools borrowed from `packages/mcp-server/src/tools.ts` and the Runner catalog (`CAPABILITY_SEMANTIC_TOOL_CATALOG`, used by `project-tools.ts:3`); shrink `skills/paperclip/SKILL.md` and the curl note in ACP (`acpx-engine/execute.ts:3149-3168`) | Authority stays in the REST routes (`assertAgentIssueMutationAllowed` etc.), so the endpoint is a thin layer. Connection tools use a separate token type and route mounted before `actorMiddleware` (`app.ts:605`); folding them in means one auth model. The default heartbeat template's `search_api`/`call_api` lines become true once added. |
+| **Finish-or-block** | **Built in step 4a** (`settleRunDisposition`, §9); the auto-comment fallback stays for now. Original note: Add `finish`/`block` tools to that endpoint; enforce in `completeRun` next to `reconcileLegacyContinuation` (`run-completion.ts:1037-1050`), replacing the after-the-fact disposition repair (`recovery/legacy-continuation.ts`, `recovery/service.ts:3392-3430`, :3854-3960) and the auto-comment fallback (`heartbeat-run-summary.ts:613-624`) | Chat turns (`conversationMode`) must stay exempt: they finish with a reply, not a status. The Runner's version is in `run-completion.ts:1040-1049` and `native-session-executor.ts`; borrow the schema, not the code. Recovery sweeps (`reconcileStrandedAssignedIssues`) reuse disposition repair and need to agree with the new rule. |
 | **Recovery handoff** | Mostly exists: the fresh-session handoff packet (`native-session-handoff.ts`) already reaches legacy fresh sessions through `hydrateFreshSessionHandoff` (`execute.ts:929`). The gap is the content (no summary of what the previous session did beyond final replies and run summaries) and `paperclipSessionHandoffMarkdown`, which never fires for Claude | Fires on every fresh session, including every new assignment (`run-state.ts:813-831`), so size matters (24 KB cap). Shared with the Runner. |
 | **Structured live events** | Already there: stream-json reaches the board as raw log chunks and is parsed in the browser. Server-side events (for search, the transcript API or finish detection) would go in `onLog` handling or a new `onEvent` call from the CLI adapter (`run-output.ts:325-339` already accepts adapter events) | Low risk; the run log format is shared by all adapters. |
 | **One prompt builder** | Today's pieces: `execute.ts:928-951` (CLI order), `acpx-engine/execute.ts:3170-3260` (ACP order), `selectPaperclipPromptSections` and the wake renderer (`server-utils.ts:2212-3262`, ~1,050 lines), task brief (`server/src/services/heartbeat/task-markdown.ts`, `task-context.ts`), templates (`server-utils.ts:214-223`, `bootstrapPromptTemplate`, `promptTemplate`), fresh handoff (`native-session-handoff.ts`), instruction working-copy guidance (`instruction-working-copy.ts:220`, `agent-instruction-working-copies.ts:84-87`), skill manifest (`packages/adapter-utils/src/skill-library-manifest.ts`). System prompt = `agent-instructions.md` in the bundle (`prompt-cache.ts:161-166`) | The bundle is content-addressed and its key gates `--resume` (`execute.ts:802-803`), so anything moved into the system prompt (COMPANY.md, project brief) resets sessions when it changes. Per-run paths must stay out of it (comment at `execute.ts:516-517`). The wake renderer is shared with every adapter and the Runner; a new builder can live beside it for `claude_local` only. Many wake kinds come from features this setup doesn't use (external chat, watchdogs, GitHub reviews). |
@@ -722,15 +773,16 @@ server1's agents, or move the plan to ACP. Changing both doubles the work.
   it"): the flag doesn't govern Claude. Hiring with `runner: "auto"` picks the Runner whenever it's
   supported on the platform, flag on or off; Claude Runner runs are exempt from the flag at run
   time. Use the legacy runner choice per agent, or disable the `paperclip_runner` adapter type.
-- "`--strict-mcp-config` loads only Paperclip's MCP servers": true, but only when the run has
-  Paperclip MCP servers (almost every task-bound run). The ACP engine has no strict mode.
+- "`--strict-mcp-config` loads only Paperclip's MCP servers": true, but at the freeze only when the
+  run had Paperclip MCP servers. Since step 4a that's every run with a token. The ACP engine has no
+  strict mode.
 - "Without a project workspace that's the agent's own folder": a task without a project runs in a
   private `isolated-workspaces/<company>/<issue>` folder; the agent home is for runs without a task.
 - Agent instructions "fresh sessions only" via `--append-system-prompt-file`: CLI only. ACP puts
   them in the user message.
 - The Runner's "recovery handoff" (up to 24 KB) already reaches legacy fresh sessions.
-- Run MCP servers are "Paperclip projects", plus "Paperclip connections" when the run has a
-  responsible user, plus assigned connections: three, not two.
+- Run MCP servers are `paperclip` (was "Paperclip projects" before step 4a), plus "Paperclip
+  connections" when the run has a responsible user, plus assigned connections: three, not two.
 
 **[ui-new/docs/guides/repo-instructions-and-skills.md](../ui-new/docs/guides/repo-instructions-and-skills.md)**
 

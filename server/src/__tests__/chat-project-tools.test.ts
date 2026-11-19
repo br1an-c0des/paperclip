@@ -19,23 +19,23 @@ import { recoveryPostgresSupport as support } from "./helpers/recovery-postgres.
   beforeAll(async () => { process.env.PAPERCLIP_AGENT_JWT_SECRET = randomUUID(); server = await startRunnerApiTestServer(); }, 60_000);
   afterAll(async () => { await server?.close(); if (originalSecret === undefined) delete process.env.PAPERCLIP_AGENT_JWT_SECRET; else process.env.PAPERCLIP_AGENT_JWT_SECRET = originalSecret; });
   const call = (fixture: Awaited<ReturnType<typeof server.fixture>>, tool: string, args: Record<string, unknown>) => fixture.authority.execute({ tool, arguments: args, callId: randomUUID() });
+  // Creating a project needs projects:manage since step 4a, which a new agent's default level
+  // (worker) lacks; the project tests give the fixture agent just that override.
+  const allowProjectManagement = (fixture: Awaited<ReturnType<typeof server.fixture>>) => server.db.update(agents)
+    .set({ permissions: { access: { level: "worker", overrides: { "projects:manage": true } } } })
+    .where(eq(agents.id, fixture.agentId));
 
-  it("gives MCP list_projects rows the company-scoped project page href", async () => {
+  // `/api/mcp/project-tools` is retired (runs use `/api/mcp/paperclip`). The service it called stays
+  // for the dormant Runner, so this checks the service with the prefix the route used to look up.
+  it("gives list_projects rows the company-scoped project page href", async () => {
     const f = await server.fixture({ conversation: true, disableWakeOnDemand: true });
     const [{ issuePrefix }] = await server.db.select({ issuePrefix: companies.issuePrefix }).from(companies).where(eq(companies.id, f.companyId));
     const token = createLocalAgentJwt(f.agentId, f.companyId, "paperclip_runner", f.runId, f.responsibleUserId)!;
-    const originalApiUrl = process.env.PAPERCLIP_API_URL;
-    process.env.PAPERCLIP_API_URL = server.apiUrl;
-    try {
-      const response = await fetch(`${server.apiUrl}/api/mcp/project-tools`, { method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "list_projects", arguments: {} } }) });
-      const { result } = await response.json() as { result: { isError?: boolean; structuredContent?: { projects: Array<{ id: string; href?: string }> } } };
-      expect(result.isError).toBeUndefined();
-      expect(result.structuredContent?.projects.find(row => row.id === f.projectId)?.href).toBe(`/${issuePrefix}/projects/${f.projectId}`);
-    } finally {
-      if (originalApiUrl === undefined) delete process.env.PAPERCLIP_API_URL; else process.env.PAPERCLIP_API_URL = originalApiUrl;
-    }
+    const result = await callProjectTool({
+      name: "list_projects", arguments: {}, apiUrl: server.apiUrl, token,
+      companyId: f.companyId, issueId: f.issueId, agentId: f.agentId, conversation: true, companyPrefix: issuePrefix,
+    });
+    expect(result.projects.find((row: { id: string; href?: string }) => row.id === f.projectId)?.href).toBe(`/${issuePrefix}/projects/${f.projectId}`);
   });
 
   it("links another task's bound workspace page from get_task and call_api reads only while the page exists", async () => {
@@ -454,6 +454,7 @@ import { recoveryPostgresSupport as support } from "./helpers/recovery-postgres.
 
   it("creates a project once through the production API and records it on the source feed", async () => {
     const f = await server.fixture({ conversation: true });
+    await allowProjectManagement(f);
     const input = { name: "New non-code project", description: "A well-scoped outcome", idempotencyKey: "project" };
     const results = await Promise.all(Array.from({ length: 4 }, () => call(f, "create_project", input))) as any[];
     const project = results[0];
@@ -468,6 +469,7 @@ import { recoveryPostgresSupport as support } from "./helpers/recovery-postgres.
 
   it("recovers a committed project after losing its HTTP response without repeating the effect", async () => {
     const f = await server.fixture({ conversation: true, disableWakeOnDemand: true });
+    await allowProjectManagement(f);
     const request = { tool: "create_project", arguments: { name: "Surviving project", idempotencyKey: "lost-response" }, callId: randomUUID() };
     const realFetch = globalThis.fetch;
     const lostResponse = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, options) => {
@@ -491,6 +493,7 @@ import { recoveryPostgresSupport as support } from "./helpers/recovery-postgres.
     expect(after.projects.map(project => project.id).sort()).toEqual(committed.projects.map(project => project.id).sort());
     expect(after.activity.filter(event => event.action === "project.created")).toHaveLength(1);
     const foreign = await server.fixture({ disableWakeOnDemand: true });
+    await allowProjectManagement(foreign);
     expect(await foreign.authority.recover(request)).toBeNull();
     await server.db.update(heartbeatRuns).set({ status: "cancelled" }).where(eq(heartbeatRuns.id, f.runId));
     await expect(new PaperclipRunnerToolAuthority(server.db, f).recover(request)).rejects.toThrow();
@@ -498,6 +501,7 @@ import { recoveryPostgresSupport as support } from "./helpers/recovery-postgres.
 
   it("holds an unknown project mutation without creating a project or audit event", async () => {
     const f = await server.fixture({ disableWakeOnDemand: true });
+    await allowProjectManagement(f);
     const before = await f.snapshot();
     const request = { tool: "create_project", arguments: { name: "Uncertain project", idempotencyKey: "unknown" }, callId: randomUUID() };
     expect(await f.authority.recover(request)).toBeNull();
@@ -519,6 +523,7 @@ import { recoveryPostgresSupport as support } from "./helpers/recovery-postgres.
 
   it("includes an explicit workspace repository in the committed project card", async () => {
     const f = await server.fixture({ conversation: true });
+    await allowProjectManagement(f);
     const project = await call(f, "create_project", { name: "Workspace repo", workspace: { repoUrl: "https://github.com/example/web" }, idempotencyKey: "workspace" }) as any;
     const feed = await activityService(server.db).forIssue(f.issueId);
     expect(feed.find(event => event.entityId === project.id)?.details?.repositories).toEqual([
@@ -528,6 +533,7 @@ import { recoveryPostgresSupport as support } from "./helpers/recovery-postgres.
 
   it("registers multiple previously unknown GitHub URLs and deduplicates equivalent URLs", async () => {
     const f = await server.fixture({ conversation: true });
+    await allowProjectManagement(f);
     const project = await call(f, "create_project", { name: "Across repos", repositoryUrls: ["https://github.com/example/web.git", "https://github.com/example/api", "https://github.com/example/web/"], idempotencyKey: "urls" }) as any;
     expect(project.workspaces.map((w: any) => w.repoUrl).sort()).toEqual(["https://github.com/example/api", "https://github.com/example/web"]);
     expect(project.workspaces.filter((w: any) => w.isPrimary)).toHaveLength(1);
@@ -546,6 +552,7 @@ import { recoveryPostgresSupport as support } from "./helpers/recovery-postgres.
 
   it("rejects invented repository IDs and cancelled runs without creating a project", async () => {
     const f = await server.fixture({ conversation: true });
+    await allowProjectManagement(f);
     await expect(call(f, "create_project", { name: "Missing repo", repositoryIds: ["999999"], idempotencyKey: "missing" })).rejects.toThrow(/repository.*available/);
     await server.db.update(heartbeatRuns).set({ status: "cancelled" }).where(eq(heartbeatRuns.id, f.runId));
     await expect(call(f, "create_project", { name: "Cancelled", idempotencyKey: "cancelled" })).rejects.toThrow();

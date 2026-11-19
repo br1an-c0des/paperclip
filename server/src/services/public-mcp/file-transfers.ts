@@ -13,7 +13,10 @@ import { prepareExternalDeliverablePublication, readExternalDeliverablePublicati
 import { logActivity } from "../activity-log.js";
 import { DELIVERY_QUEUES, notifyDeliveryWork } from "../delivery-work-notifications.js";
 import { hashMcpSecret, McpOAuthError, type PublicMcpOAuth, type McpPrincipal } from "./oauth.js";
-import { McpCapabilityError, company, task, requestId, pick, object, stable, type ApiDispatch, type Capability } from "./contracts.js";
+import { McpCapabilityError, task, requestId, pick, object, stable, type ApiDispatch } from "./contracts.js";
+import { hasAgentAccess } from "@paperclipai/shared";
+import { connectionAccess } from "./connection-access.js";
+import { runWithAccessCap } from "../agent-access.js";
 
 const lifetime = 10 * 60_000;
 export const uploadSchema = z.object({ ...task, requestId,
@@ -24,8 +27,10 @@ export const uploadSchema = z.object({ ...task, requestId,
 }).strict();
 const attachmentFields = ["id", "issueId", "originalFilename", "contentType", "byteSize", "sha256", "createdAt"];
 const unavailable = () => new McpCapabilityError("This transfer is expired, revoked, invalid or no longer authorized. Request a new transfer link from Paperclip.");
+/** Attaching a file is a task change: the connection's level must allow one (step 4a). */
 function requireWrite(p: McpPrincipal) {
-  if (!p.grant.scopes.includes("paperclip:write") || p.actor.memberships?.[0]?.membershipRole === "viewer") throw unavailable();
+  const access = connectionAccess(p.grant, p.actor.memberships?.[0]?.membershipRole);
+  if (!hasAgentAccess(access, ["tasks:update_own", "tasks:update_any"])) throw unavailable();
 }
 
 export interface AgentFileSession {
@@ -71,8 +76,24 @@ export function createPublicMcpTransfers(db: Db, oauth: PublicMcpOAuth, api: Api
     if (write) {
       if (p.grant.purpose !== "agent") requireWrite(p);
       if (p.grant.purpose !== "agent" && issue.conversationAgentId && issue.conversationUserId !== p.grant.userId) throw unavailable();
+      if (p.grant.purpose !== "agent") await requireActAsAgentWrite(p, issue, queryDb ?? db);
     }
     return issue;
+  }
+  /**
+   * A connection acting as an agent: the agent's own access, capped by the connection's, must allow
+   * changing this task (`tasks:update_own` on its own, `tasks:update_any` on another's), as the REST
+   * attachment route decides it behind the route policy's cap.
+   */
+  async function requireActAsAgentWrite(p: McpPrincipal, issue: Record<string, unknown>, database: Db) {
+    if (p.actor.type !== "agent" || !p.actor.agentId) return;
+    const scope = { issueId: String(issue.id), projectId: (issue.projectId ?? null) as string | null,
+      parentIssueId: (issue.parentId ?? null) as string | null, assigneeAgentId: (issue.assigneeAgentId ?? null) as string | null,
+      assigneeUserId: (issue.assigneeUserId ?? null) as string | null };
+    const decision = await runWithAccessCap(p.actor.agentId, connectionAccess(p.grant, null), () =>
+      authorizationService(database).decide({ actor: p.actor, action: "issue:mutate",
+        resource: { type: "issue", companyId: p.grant.companyId, ...scope, status: String(issue.status) } }));
+    if (!decision.allowed) throw unavailable();
   }
   async function attachmentAccess(p: McpPrincipal, id: string, queryDb?: Db, sessionId?: string) {
     const attachment = await (queryDb ? issueService(queryDb) : svc).getAttachmentById(id);
@@ -280,11 +301,3 @@ export function createPublicMcpTransfers(db: Db, oauth: PublicMcpOAuth, api: Api
   };
 }
 export type PublicMcpTransfers = ReturnType<typeof createPublicMcpTransfers>;
-export const fileTransferCapabilities: Capability[] = [
-  { name: "paperclip_get_upload_url", write: true, ephemeral: true,
-    description: "Get a temporary URL to attach a file, video or document to a task. Compute its size and SHA-256 locally, then PUT the exact bytes to the URL. A successful upload saves the attachment immediately and returns its ID. Reuse requestId after a lost response. Requires host file/HTTP tools; if unavailable explain the manual upload step.",
-    schema: uploadSchema, run: async (p, a, _api, _origin, transfers) => { if (!transfers) throw unavailable(); return transfers.getUploadUrl(p, a); } },
-  { name: "paperclip_get_download_url", ephemeral: true,
-    description: "Get a ten-minute download URL for one task attachment from paperclip_list_deliverables. Use your host's HTTP/file tools to download it. This temporary credential does not grant access to other files.",
-    schema: z.object({ ...company, attachmentId: z.uuid() }).strict(), run: async (p, a, _api, _origin, transfers) => { if (!transfers) throw unavailable(); return transfers.getDownloadUrl(p, String(a.attachmentId)); } },
-];

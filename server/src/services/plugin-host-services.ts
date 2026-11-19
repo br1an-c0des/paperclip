@@ -1,5 +1,7 @@
 import { assertAgentInteraction } from "./agent-interaction-policy.js";
 import { currentPluginInteractionOrigin } from "./plugin-interaction-context.js";
+import { loadAgentAccess } from "./agent-access.js";
+import { forbidden } from "../errors.js";
 import { projectGitAuthorizationService } from "./project-git-authorization.js";
 import { createLiveEventDelivery } from "../realtime/live-event-delivery.js";
 import { createLiveRunEventRedactor } from "./live-run-event-redaction.js";
@@ -36,7 +38,7 @@ import type {
   PluginExecutionWorkspaceMetadata,
 } from "@paperclipai/plugin-sdk";
 import type { CreateIssueThreadInteraction, InviteJoinType, IssueDocumentSummary, IssueRelationIssueSummary, PermissionKey, PrincipalType } from "@paperclipai/shared";
-import { pluginOperationIssueOriginKind } from "@paperclipai/shared";
+import { hasAgentAccess, pluginOperationIssueOriginKind } from "@paperclipai/shared";
 import { companyService } from "./companies.js";
 import { agentService } from "./agents.js";
 import { projectService } from "./projects.js";
@@ -91,6 +93,7 @@ import {
   issuePrivacyMode,
   issueReadSqlCondition,
   type AuthorizationActor,
+  type AuthorizationResource,
   type IssuePrivacyRow,
 } from "./authorization.js";
 import { redactEventPayload, sanitizeRecord } from "../redaction.js";
@@ -1532,6 +1535,38 @@ export function buildHostServices(
       grants: grants.map(redactGrant),
     };
   };
+
+  /**
+   * A host call a plugin makes for an agent (while running a tool the agent called, or an action
+   * the agent performed: `currentPluginInteractionOrigin`) is limited by that agent's access, as the
+   * REST route for the same change would be. `assertAgentInteraction` checks only the target's
+   * consent since the actor-side switches became access actions (bug 50). Called after it, so a
+   * consent refusal is reported first where both apply. Without an agent origin the plugin acts on
+   * its own (a job, an event, a person's action in its UI): its declared capabilities are the limit.
+   */
+  async function assertPluginOriginAgentAccess(
+    dbOrTx: Db | Parameters<Parameters<Db["transaction"]>[0]>[0],
+    action: "agent_config:update" | "issue:mutate",
+    resource: AuthorizationResource,
+  ) {
+    const origin = currentPluginInteractionOrigin();
+    if (!origin) return;
+    const decision = await authorizationService(dbOrTx as Db).decide({
+      actor: { type: "agent", agentId: origin.agentId, companyId: origin.companyId, source: "agent_key" },
+      action,
+      resource,
+    }, { interactionPolicy: "defer_to_mutation" });
+    // A suggest-only grant changes through the consent flow; a plugin's direct write isn't one.
+    if (!decision.allowed || decision.reason === "allow_consented_change") {
+      // Every access refusal names an action, as accessDeniedBody does: the one the level lacks,
+      // else the one being checked.
+      throw forbidden(decision.allowed ? "This agent may only suggest configuration changes." : decision.explanation, {
+        code: "access_denied", actorAgentId: origin.agentId,
+        missingAction: decision.allowed ? "agents:configure"
+          : decision.missingAction ?? (action === "agent_config:update" ? "agents:configure" : "tasks:update_any"),
+      });
+    }
+  }
 
   const pluginAssignmentActor = (actor: {
     type: "agent" | "board";
@@ -3114,6 +3149,14 @@ export function buildHostServices(
         const origin = currentPluginInteractionOrigin();
         await assertAgentInteraction(db, { companyId, actorAgentId: origin?.agentId,
           operation: "assign", targetAgentId: params.agentId, texts: params.prompt ? [params.prompt] : [] });
+        // Directing work at another agent needs tasks:assign, as the retired canAssignTasksToAgents
+        // switch required (bug 50); an agent may always wake itself.
+        if (origin && origin.agentId !== params.agentId
+          && !hasAgentAccess(await loadAgentAccess(db, origin.agentId), "tasks:assign")) {
+          throw forbidden("This agent's access level does not let it assign work to other agents (needs tasks:assign).", {
+            code: "access_denied", actorAgentId: origin.agentId, missingAction: "tasks:assign",
+          });
+        }
         const run = await heartbeat.wakeup(params.agentId, {
           source: "automation",
           triggerDetail: "system",
@@ -3410,6 +3453,7 @@ export function buildHostServices(
           const agent = requireInCompany("Agent", await agents.getById(params.resourceId), companyId);
           await db.transaction(async tx => {
             await assertAgentInteraction(tx, { companyId, operation: "configure", targetAgentId: agent.id, lock: "update" });
+            await assertPluginOriginAgentAccess(tx, "agent_config:update", { type: "agent", companyId, agentId: agent.id });
             await tx.update(agentsTable)
               .set({ permissions: policy
                 ? sql`jsonb_set(${agentsTable.permissions}, '{authorizationPolicy}', ${JSON.stringify(policy)}::jsonb)`
@@ -3433,6 +3477,10 @@ export function buildHostServices(
               eq(issuesTable.id, params.resourceId), eq(issuesTable.companyId, companyId))).for("update");
             const issue = requireInCompany("Issue", locked ?? null, companyId);
             await assertAgentInteraction(tx, { companyId, operation: "edit", issueId: issue.id, lock: true });
+            await assertPluginOriginAgentAccess(tx, "issue:mutate", {
+              type: "issue", companyId, issueId: issue.id, projectId: issue.projectId, parentIssueId: issue.parentId,
+              assigneeAgentId: issue.assigneeAgentId, assigneeUserId: issue.assigneeUserId, status: issue.status,
+            });
             const executionPolicy = issue.executionPolicy && typeof issue.executionPolicy === "object"
               ? { ...(issue.executionPolicy as Record<string, unknown>) } : {};
             if (policy) executionPolicy.authorizationPolicy = policy;

@@ -39,9 +39,9 @@ describePostgres("agent-created follow-ups: parent links and creation source", (
       { id: otherCompanyId, name: "Other", issuePrefix: "OTH", defaultResponsibleUserId: "board-user", requireBoardApprovalForNewAgents: false },
     ]);
     await db.insert(agents).values([
-      { id: qaAgentId, companyId, name: "Paperclip QA", role: "qa", adapterType: "codex_local", status: "active" },
-      { id: engineerAgentId, companyId, name: "Engineer", role: "engineer", adapterType: "codex_local", status: "active" },
-      { id: foreignAgentId, companyId: otherCompanyId, name: "Other QA", role: "qa", adapterType: "codex_local", status: "active" },
+      { id: qaAgentId, companyId, name: "Paperclip QA", role: "qa", adapterType: "codex_local", status: "active", permissions: { access: { level: "manager" } } },
+      { id: engineerAgentId, companyId, name: "Engineer", role: "engineer", adapterType: "codex_local", status: "active", permissions: { access: { level: "manager" } } },
+      { id: foreignAgentId, companyId: otherCompanyId, name: "Other QA", role: "qa", adapterType: "codex_local", status: "active", permissions: { access: { level: "manager" } } },
     ]);
     await db.insert(issues).values([
       { id: sourceId, companyId, title: "Verify Tailscale fix", identifier: "PAP-168", issueNumber: 168, status: "in_progress", assigneeAgentId: qaAgentId, createdByAgentId: engineerAgentId },

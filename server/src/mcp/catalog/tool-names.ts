@@ -1,0 +1,37 @@
+/** Every tool the Paperclip MCP catalog can serve, to runs, agent keys and outside connections alike. */
+export const PAPERCLIP_TOOL_NAMES = [
+  "paperclip_me",
+  "paperclip_task_context",
+  "paperclip_search_tasks",
+  "paperclip_read_task",
+  "paperclip_create_task",
+  "paperclip_update_task",
+  "paperclip_archive_task",
+  "paperclip_delete_task",
+  "paperclip_add_comment",
+  "paperclip_read_document",
+  "paperclip_write_document",
+  "paperclip_list_labels",
+  "paperclip_manage_labels",
+  "paperclip_list_agents",
+  "paperclip_list_projects",
+  "paperclip_ask_board",
+  "paperclip_request_approval",
+  "paperclip_report_progress",
+  "paperclip_finish",
+  "paperclip_block",
+  "paperclip_search_api",
+  "paperclip_call_api",
+  "paperclip_create_project",
+  "paperclip_update_project",
+  "paperclip_list_project_repositories",
+  // Carried over from the public MCP (step 4a, wave 2).
+  "paperclip_list_requests",
+  "paperclip_deliverables",
+  "paperclip_configure_agent",
+  "paperclip_skills",
+  "paperclip_file_upload",
+  "paperclip_file_download",
+] as const;
+
+export type PaperclipToolName = (typeof PAPERCLIP_TOOL_NAMES)[number];

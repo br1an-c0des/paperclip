@@ -5,7 +5,7 @@ import { readDotOriginalTokenPrincipal } from "./original-token-principal.js";
 const origin="https://dot-principal.example.test",resource=origin+"/mcp/runner",token="original-access-boundary-input";
 const expected={accessToken:token,upstreamClientId:"actual-upstream-client",selectingUserId:"actual-user",canonicalVerifiedResource:resource};
 function boundary(){
-  const principal:McpPrincipal={grant:{id:"actual-grant",companyId:"actual-company",userId:"actual-user",clientId:"actual-upstream-client",resource,purpose:"agent",agentId:null,scopes:["paperclip:agent","offline_access"],revokedAt:null,revocationRevision:0,revocationIndexReceipt:null,createdAt:new Date(0)},actor:{type:"none",source:"mcp_oauth",companyId:"actual-company"},company:{id:"actual-company",name:"Actual authenticated company",issuePrefix:"DOT",status:"active"}};
+  const principal:McpPrincipal={grant:{id:"actual-grant",companyId:"actual-company",userId:"actual-user",clientId:"actual-upstream-client",resource,purpose:"agent",agentId:null,scopes:["paperclip:agent","offline_access"],revokedAt:null,revocationRevision:0,revocationIndexReceipt:null,actAsAgentId:null,accessLevel:null,accessOverrides:null,createdAt:new Date(0)},actor:{type:"none",source:"mcp_oauth",companyId:"actual-company"},company:{id:"actual-company",name:"Actual authenticated company",issuePrefix:"DOT",status:"active"}};
   const authenticate=vi.fn(async(_token:string)=>principal);
   const oauth:Pick<PublicMcpOAuth,"mode"|"config"|"authenticate">={mode:"openai_dot_agent",config:{origin,resource},authenticate};
   return{principal,oauth,authenticate};

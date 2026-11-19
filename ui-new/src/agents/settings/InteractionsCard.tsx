@@ -7,13 +7,23 @@ import { Button } from "@/ui/Button";
 import { SettingsCard } from "@/ui/Field";
 import { InfoTip } from "@/ui/InfoTip";
 import { CardNote, failure, SwitchRow, useAgentSaver } from "../shared";
-import { deniedCount, interactionAllowed, interactionGroups, interactionOverridden, resetAllPatch, resetPatch, switchPatch } from "./interactions-model";
+import {
+  deniedCount,
+  INTERACTION_KEYS,
+  interactionAllowed,
+  interactionGroups,
+  interactionOverridden,
+  resetAllPatch,
+  resetPatch,
+  switchPatch,
+} from "./interactions-model";
 import "./Interactions.css";
 
 /*
- * The Interactions card on the agent's Permissions page (U105, interactions-model.ts): eleven
- * switches for what the agent may do to other agents and their work, and what they may do to it,
- * each allowed by default. A switch saves at once; one the agent has its own setting for shows
+ * The Interactions card on the agent's Permissions page (U105, interactions-model.ts): seven
+ * switches for what the agent may do to other agents (mention them, comment on their tasks) and
+ * what they may do to it, each allowed by default. The other four outgoing switches became access
+ * actions (AccessCard.tsx). A switch saves at once; one the agent has its own setting for shows
  * "Set for this agent" and Reset, which puts the default back. Changing them takes a person who
  * can manage permissions (the server answers 403 otherwise, shown under the card's title).
  */
@@ -40,10 +50,10 @@ export function InteractionsCard(props: { agent: AgentDetail }) {
     <section id="interactions" class="ag-anchor">
       <SettingsCard
         title="Interactions"
-        info="What it may do to other agents and their work, and what they may do to it. Each is allowed until you turn it off, and changes save at once."
+        info="What it may do to other agents and their work, and what they may do to it. Each is allowed until you turn it off, and changes save at once. Assigning, editing other tasks and configuring agents are under Access."
         description={
           <CardNote state={saver.state()} error={saver.error()}>
-            {pendingHire() ? "These can be set once the hire is approved." : denied() > 0 ? `${denied()} of 11 turned off.` : "Nothing turned off."}
+            {pendingHire() ? "These can be set once the hire is approved." : denied() > 0 ? `${denied()} of ${INTERACTION_KEYS.length} turned off.` : "Nothing turned off."}
           </CardNote>
         }
         footer={

@@ -23,11 +23,11 @@ import {
   configuredPaperclipApiBaseUrl,
   buildPaperclipRuntimeMcpServers,
   createAdapterRuntimeToolAccess,
-  paperclipApiBaseUrl,
   createAdapterRuntimeMcpAccess,
   createManagedMcpRunConfig,
   revokeHeartbeatRunGatewayTokens,
 } from "./run-preparation.js";
+import { paperclipRunMcpServers } from "./paperclip-run-mcp.js";
 import {
   WorkspaceValidationFailure,
   isWorkspaceValidationFailure,
@@ -864,10 +864,10 @@ export async function executeHeartbeatRuntime(db: Db, input: HeartbeatRuntimeExe
           connectionId: "paperclip-runtime-tools",
         });
       }
-      if (authToken && configuredPaperclipApiBaseUrl() && issueRef) {
-        runtimeMcpServers.unshift({ name: "Paperclip projects", url: `${paperclipApiBaseUrl()}/api/mcp/project-tools`,
-          token: authToken, connectionId: "paperclip-project-tools" });
-      }
+      runtimeMcpServers.unshift(...paperclipRunMcpServers({
+        authToken,
+        apiBaseUrl: configuredPaperclipApiBaseUrl(),
+      }));
       const runtimeMcp = createAdapterRuntimeMcpAccess(runtimeMcpServers);
       if (runtimeTools && runtimeToolDelivery === "invocation_context") {
         adapterContext.paperclipRuntimeTools = runtimeTools;

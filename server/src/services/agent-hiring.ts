@@ -4,7 +4,7 @@ import { assertEphemeralAgentInstructions } from "./agent-instructions.js";
 import { initializeDurableAgentFiles } from "./agent-file-durability.js";
 import { notifyAttentionRetentionWork } from "./retention-work-notifications.js";
 import { notifySkillVersionRetention, notifySkillVersionPinChange } from "./skill-version-retention-notifications.js";
-import { agentAppearanceSchema, randomAgentAppearance } from "@paperclipai/shared";
+import { agentAccessSchema, agentAppearanceSchema, randomAgentAppearance } from "@paperclipai/shared";
 import { normalizePaperclipRunnerAdapterConfig } from "@paperclipai/adapter-utils/server-utils";
 import { agents, toolConnectionInstalls, principalPermissionGrants, type Db } from "@paperclipai/db";
 import { eq } from "drizzle-orm";
@@ -14,6 +14,7 @@ import { agentRecordQueries, isPlainRecord, configPatchFromApprovalPayload, norm
 import { CEO_HIRING_DENIAL_KEY, normalizeAgentPermissions, permissionsImplyLowTrust, NEW_STANDARD_AGENT_DEFAULT_GRANT_KEYS,
   newStandardAgentGrantScope } from "../lib/agent-permissions.js";
 import { readBuiltInAgentMarker } from "../lib/built-in-agent-metadata.js";
+import { newAgentAccess, withStoredAccess } from "./agent-access.js";
 import { secretService, assertClaudeOAuthBindingInvariant } from "./secrets.js";
 import { agentCredentialService } from "./agent-credentials.js";
 import { agentIdentityService } from "./agent-identity.js";
@@ -52,7 +53,9 @@ export async function prepareAgentHire(db: Db, companyId: string, input: CreateA
   // Only the permissions control records a CEO hiring restriction.
   const requestedPermissions = data.permissions && typeof data.permissions === "object" && !Array.isArray(data.permissions)
     ? Object.fromEntries(Object.entries(data.permissions).filter(([key]) => key !== CEO_HIRING_DENIAL_KEY)) : data.permissions;
-  const normalizedPermissions = normalizeAgentPermissions(requestedPermissions, { context: "create" });
+  // The new agent's access level (decided 2026-11-18): an explicit one only from a person.
+  const normalizedPermissions = withStoredAccess(normalizeAgentPermissions(requestedPermissions, { context: "create" }),
+    newAgentAccess({ role, requestedPermissions, explicitAllowed: !options?.createdByAgentId }));
   const runtimeConfig = normalizeRuntimeConfigForNewAgent(data.runtimeConfig);
   const adapterType = data.adapterType ?? "process";
   const rawAdapterConfig = isPlainRecord(data.adapterConfig)
@@ -141,6 +144,12 @@ export async function prepareAgentHireApproval(txDb: Db, existing: AgentHireReco
     // The pending-approval activation replays the original hire
     // request, so the new-agent creation default applies.
     patch.permissions = normalizeAgentPermissions(preserveAgentInteractionPermissions(existing.permissions, patch.permissions), { context: "create" });
+    // The access set when the pending agent was created stays; the payload can be resubmitted by
+    // the requesting agent, so its own access is never taken. With none stored, the new-agent rule
+    // applies to the approved request.
+    const stored = agentAccessSchema.safeParse((existing.permissions as Record<string, unknown> | null)?.access);
+    patch.permissions = withStoredAccess(patch.permissions, stored.success ? stored.data
+      : newAgentAccess({ role: patch.role ?? existing.role, requestedPermissions: approvedPatch.permissions, explicitAllowed: false }));
   }
   if (hasApprovedAdapterConfig) {
     await agentCredentialService(txDb).enforceClaudeOAuthBindingClaim(txDb, {

@@ -12,6 +12,16 @@ describe("connection result guidance", () => {
     expect(CONNECTION_INTENT_AGENT_GUIDANCE).toContain("never ask for credentials in comments");
     expect(CONNECTION_INTENT_AGENT_GUIDANCE).toContain("arbitrary MCP URLs");
   });
+  it("offers the raw API tools only to agents that have them", () => {
+    // search_api/call_api need api:raw (admin agents); the rest are pointed at access requests and the board.
+    expect(CONNECTION_INTENT_AGENT_GUIDANCE).not.toMatch(/Use `search_api`|Use `search_api` and `call_api`/);
+    expect(CONNECTION_INTENT_AGENT_GUIDANCE).not.toContain("Standard agents can manage connections");
+    expect(CONNECTION_INTENT_AGENT_GUIDANCE).toContain("which only some agents have");
+    expect(CONNECTION_INTENT_AGENT_GUIDANCE).toContain("`paperclip_search_api`/`paperclip_call_api`");
+    expect(CONNECTION_INTENT_AGENT_GUIDANCE).toContain("Without them, don't work around it: use `connection_request`");
+    expect(CONNECTION_INTENT_AGENT_GUIDANCE).toContain("ask the board on your task");
+    expect(CONNECTIONS_SEARCH_TOOL_DESCRIPTION).toContain("search_api/call_api if you have them");
+  });
   it("binds a request card to the person it is addressed to", () => {
     expect(CONNECTION_INTENT_AGENT_GUIDANCE).toContain("Only that person can complete or decline it");
   });

@@ -38,7 +38,9 @@ import { isExplicitContinuationRetryClaim } from "../explicit-continuation-retry
 import {
   decideLegacyContinuation, legacyDispositionEpisode, legacyDispositionFingerprint,
   LEGACY_DISPOSITION_REPAIR_INSTRUCTION, type LegacyDispositionEpisode,
+  CONTINUATION_REQUESTED, readPaperclipContinuationCount,
 } from "./legacy-continuation.js";
+import { readRunDisposition } from "../heartbeat/run-disposition.js";
 import { CONTROLLER_LEASE_LOST_FAILURE_CODE, hasLiveLegacyController, legacyControllerBootId, liveLegacyControllerExpiresAt } from "../legacy-controller-lease.js";
 import { isCompletedOnboardingHandoffWake } from "../chat-completion-delivery.js";
 import { instanceSettingsService } from "../instance-settings.js";
@@ -4077,6 +4079,45 @@ export function recoveryService(
     return reconcileDispositionRepair(issue, run, { legacyEpisode: legacyDispositionEpisode(run) });
   }
 
+  /**
+   * The run ended with `paperclip_report_progress` and `continue: true`: wake the same agent on
+   * the task for the next run, once per source run. Not a disposition repair: the count travels in
+   * `paperclipContinuation`, and decideLegacyContinuation stops covering it past the maximum.
+   */
+  async function enqueueRequestedContinuation(
+    issue: RecoveryIssue,
+    sourceRun: NonNullable<LatestIssueRun>,
+  ) {
+    const agentId = issue.assigneeAgentId;
+    if (!agentId) return null;
+    const reason = "issue_continuation_needed";
+    const nextCount = readPaperclipContinuationCount(sourceRun.contextSnapshot) + 1;
+    return deps.enqueueWakeup(agentId, {
+      source: "automation",
+      triggerDetail: "system",
+      reason,
+      idempotencyKey: `paperclip_continuation:${issue.id}:${sourceRun.id}`,
+      issueStateGuard: { statuses: ["todo", "in_progress"], assigneeAgentId: agentId },
+      payload: withRecoveryContext(
+        { issueId: issue.id, mutation: "paperclip_continuation", previousRunId: sourceRun.id },
+        "normal_model",
+      ),
+      requestedByActorType: "system",
+      requestedByActorId: null,
+      contextSnapshot: withRecoveryContext(
+        {
+          issueId: issue.id,
+          taskId: issue.id,
+          wakeReason: reason,
+          source: "issue.paperclip_continuation",
+          previousRunId: sourceRun.id,
+          paperclipContinuation: nextCount,
+        },
+        "normal_model",
+      ),
+    });
+  }
+
   async function reconcileDispositionRepair(
     issue: Pick<RecoveryIssue, "id" | "companyId">,
     latestRun: LatestIssueRun,
@@ -4092,6 +4133,15 @@ export function recoveryService(
       .then((rows) => rows[0] ?? null);
     if (!current || current.status === "done" || current.status === "cancelled")
       return "skipped";
+    // A finish, block or task-state disposition recorded on the latest run covers it (the
+    // legacy-episode path checks the same in decideLegacyContinuation).
+    const recordedDisposition = !options.legacyEpisode && latestRun?.status === "succeeded"
+      ? readRunDisposition({ resultJson: parseObject(latestRun.resultJson) })
+      : null;
+    if (recordedDisposition && recordedDisposition.kind !== "continuing") {
+      await resolveDispositionRepairActionAsCovered(current, `recorded_disposition:${recordedDisposition.kind}`);
+      return "covered";
+    }
 
     const episode = options.legacyEpisode ?? (
       parseObject(parseObject(latestRun?.contextSnapshot).legacyDispositionEpisode).id && latestRun
@@ -4113,6 +4163,9 @@ export function recoveryService(
     if (episode) {
       if (!latestRun) return "skipped";
       const decision = await decidePersistedLegacyContinuation(current, latestRun.id, state, episode);
+      if (decision.kind === "skip" && decision.reason === CONTINUATION_REQUESTED) {
+        return (await enqueueRequestedContinuation(current, latestRun)) ? "covered" : "skipped";
+      }
       if (decision.kind === "skip") return "skipped";
       state.fingerprint = legacyDispositionFingerprint(current.companyId, current.id, latestRun.agentId, episode.id);
     }

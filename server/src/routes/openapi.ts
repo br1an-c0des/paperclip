@@ -89,6 +89,7 @@ import {
   updateIssueSchema,
   stalledReviewDecisionSchema,
   createIssueLabelSchema,
+  updateIssueLabelSchema,
   addIssueCommentSchema,
   checkoutIssueSchema,
   linkIssueApprovalSchema,
@@ -327,6 +328,7 @@ import {
   unbindToolProfileBindingSchema,
   importMcpJsonSchema,
   mcpConsentSchema,
+  updateMcpConnectionSchema,
   toolPolicyTestRequestSchema,
   createToolMcpGatewaySchema,
   completeConnectionIntentSchema,
@@ -1362,6 +1364,7 @@ type OpenApiAuthLevel =
   | "public"
   | "agent_run"
   | "agent_heartbeat"
+  | "agent"
   | "runtime_tools"
   | "authenticated"
   | "board"
@@ -1756,7 +1759,9 @@ function resolveOperationAuthLevel(
   if (key === "GET /api/agents/me/mcp-skills/{skillId}/files") return "agent_heartbeat";
   // Agents may read their own commentary, or all of it with commentary:view; the routes enforce that.
   if (method.toUpperCase() === "GET" && path.startsWith("/api/companies/{companyId}/agent-commentary")) return "authenticated";
-  if (key === "POST /api/mcp/project-tools" || key === "POST /api/companies/{companyId}/slack/tasks/{issueId}/tools") return "agent_run";
+  if (key === "POST /api/companies/{companyId}/slack/tasks/{issueId}/tools") return "agent_run";
+  // Paperclip's MCP server: a run token or an agent API key, never a board session.
+  if (path === "/api/mcp/paperclip") return "agent";
   if (RUNTIME_TOOLS_OPERATIONS.has(key)) return "runtime_tools";
   if (INSTANCE_ADMIN_OPERATIONS.has(key)) return "instance_admin";
   if (
@@ -1827,7 +1832,7 @@ function applyDocumentFixups(document: any): any {
         operation.security = [];
       } else if (authLevel === "agent_run") {
         operation.security = [securityRequirement(AGENT_RUN_AUTH_SCHEME)];
-      } else if (authLevel === "agent_heartbeat") {
+      } else if (authLevel === "agent_heartbeat" || authLevel === "agent") {
         operation.security = [securityRequirement(AGENT_BEARER_AUTH_SCHEME)];
       } else if (authLevel === "runtime_tools") {
         operation.security = RUNTIME_TOOLS_SECURITY;
@@ -1846,6 +1851,8 @@ function applyDocumentFixups(document: any): any {
               ? { actor: "agent", heartbeatBound: true, taskBound: true }
             : authLevel === "agent_heartbeat"
               ? { actor: "agent", heartbeatBound: true }
+            : authLevel === "agent"
+              ? { actor: "agent" }
             : authLevel === "runtime_tools"
               ? { actor: "runtime_tools", heartbeatBound: true }
               : authLevel === "authenticated"
@@ -5199,6 +5206,18 @@ registry.registerPath({
     body: jsonBody(createIssueLabelSchema),
   },
   responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/api/labels/{labelId}",
+  tags: ["issues"],
+  summary: "Rename or recolor a label",
+  request: {
+    params: z.object({ labelId: z.string() }),
+    body: jsonBody(updateIssueLabelSchema),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden, 404: r.notFound, 409: r.conflict },
 });
 
 registry.registerPath({
@@ -11819,18 +11838,29 @@ for (const route of [
 
 // --- Connection intents ------------------------------------------------------
 
+const paperclipMcpMessageSchema = z.object({
+  jsonrpc: z.literal("2.0"),
+  id: z.union([z.string(), z.number()]).nullable().optional(),
+  method: z.string(),
+  params: z.record(z.string(), z.unknown()).optional(),
+});
+
 registerCurrentRoute({
   method: "post",
-  path: "/api/mcp/project-tools",
-  tags: ["projects"],
-  summary: "Call project and task tools through the active task run's MCP transport",
-  body: z.object({
-    jsonrpc: z.literal("2.0"),
-    id: z.union([z.string(), z.number()]).nullable().optional(),
-    method: z.string(),
-    params: z.record(z.string(), z.unknown()).optional(),
-  }),
-  responses: { 200: r.ok(), 202: r.ok(), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden, 409: r.conflict },
+  path: "/api/mcp/paperclip",
+  tags: ["mcp"],
+  summary: "Paperclip's MCP server for agent runs and agent API keys (stateless Streamable HTTP, JSON responses)",
+  description: "JSON-RPC initialize, tools/list and tools/call. tools/list returns the tools the agent's access level allows, plus requestable ones marked paperclipNeedsApproval; run-only tools (finish, block, report_progress, task_context) need the run's own token.",
+  body: z.union([paperclipMcpMessageSchema, z.array(paperclipMcpMessageSchema)]),
+  responses: { 200: r.ok(), 202: r.ok(), 401: r.unauthorized, 403: r.forbidden },
+});
+
+registerCurrentRoute({
+  method: "get",
+  path: "/api/mcp/paperclip",
+  tags: ["mcp"],
+  summary: "Not supported: Paperclip's MCP server answers POST only",
+  responses: { 405: r.ok() },
 });
 
 registerCurrentRoute({
@@ -13686,6 +13716,13 @@ registerCurrentRoute({
   summary: "List the signed-in person's assistant connections",
   description: ASSISTANT_CONNECTIONS_PERSON_ONLY,
   responses: { 200: r.ok(), 401: r.unauthorized },
+});
+registerCurrentRoute({
+  method: "patch", path: "/api/mcp/connections/{id}", tags: ["tool-gateway"],
+  summary: "Change who an assistant connection acts as, its access level or overrides, using a same-origin browser session",
+  description: ASSISTANT_CONNECTIONS_PERSON_ONLY,
+  body: updateMcpConnectionSchema,
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden, 404: r.notFound },
 });
 registerCurrentRoute({
   method: "delete", path: "/api/mcp/connections/{id}", tags: ["tool-gateway"],

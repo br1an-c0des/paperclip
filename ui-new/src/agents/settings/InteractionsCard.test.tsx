@@ -1,4 +1,4 @@
-import type { AgentDetail, AgentInteractionPermissionsState } from "@paperclipai/shared";
+import { AGENT_INTERACTION_PERMISSION_KEYS as KEYS, type AgentDetail, type AgentInteractionPermissionsState } from "@paperclipai/shared";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,20 +13,6 @@ vi.mock("@/api/agents", () => ({ agentsApi: api }));
 vi.mock("@/lib/company", () => ({ useCompany: () => () => ({ id: "co1", issuePrefix: "TES" }) }));
 
 const { InteractionsCard } = await import("./InteractionsCard");
-
-const KEYS = [
-  "canAssignTasksToAgents",
-  "canReceiveAssignmentsFromAgents",
-  "canAssignTasksToHumans",
-  "canMentionAgents",
-  "canReceiveMentionsFromAgents",
-  "canCommentOnOtherTasks",
-  "canReceiveCommentsFromAgents",
-  "canEditOtherTasks",
-  "canReceiveTaskEditsFromAgents",
-  "canConfigureOtherAgents",
-  "canReceiveConfigurationChangesFromAgents",
-] as const;
 
 function state(overrides: AgentInteractionPermissionsState["overrides"]): AgentInteractionPermissionsState {
   const effective = Object.fromEntries(KEYS.map((key) => [key, overrides[key] !== false])) as AgentInteractionPermissionsState["effective"];
@@ -56,14 +42,17 @@ beforeEach(() => {
 });
 
 describe("InteractionsCard", () => {
-  it("shows the eleven switches with the agent's own setting and its Reset", async () => {
+  it("shows the seven switches with the agent's own setting and its Reset", async () => {
     renderCard();
     expect(await screen.findByRole("switch", { name: "Take comments from agents" })).toBeTruthy();
-    expect(screen.getAllByRole("switch")).toHaveLength(11);
+    expect(screen.getAllByRole("switch")).toHaveLength(7);
+    // The four that became access actions are on the Access card now.
+    expect(screen.queryByRole("switch", { name: "Edit other tasks" })).toBeNull();
+    expect(screen.queryByRole("switch", { name: "Assign tasks to agents" })).toBeNull();
     expect(screen.getByRole("switch", { name: "Take comments from agents" }).getAttribute("aria-checked")).toBe("false");
     expect(screen.getByRole("switch", { name: "Mention agents" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getAllByRole("button", { name: /^Reset “/ })).toHaveLength(1);
-    expect(screen.getByText("1 of 11 turned off.")).toBeTruthy();
+    expect(screen.getByText("1 of 7 turned off.")).toBeTruthy();
   });
 
   it("saves a switch through the interaction route only", async () => {
@@ -77,12 +66,12 @@ describe("InteractionsCard", () => {
     renderCard();
     fireEvent.click(await screen.findByRole("button", { name: "Reset “Take comments from agents” to the default" }));
     await waitFor(() => expect(api.updateInteractionPermissions).toHaveBeenCalledWith("a1", { canReceiveCommentsFromAgents: null }));
-    api.interactionPermissions.mockResolvedValue(state({ canReceiveCommentsFromAgents: false, canEditOtherTasks: true }));
+    api.interactionPermissions.mockResolvedValue(state({ canReceiveCommentsFromAgents: false, canCommentOnOtherTasks: true }));
     cleanup();
     renderCard();
     fireEvent.click(await screen.findByRole("button", { name: "Reset all" }));
     await waitFor(() =>
-      expect(api.updateInteractionPermissions).toHaveBeenLastCalledWith("a1", { canReceiveCommentsFromAgents: null, canEditOtherTasks: null }),
+      expect(api.updateInteractionPermissions).toHaveBeenLastCalledWith("a1", { canCommentOnOtherTasks: null, canReceiveCommentsFromAgents: null }),
     );
   });
 

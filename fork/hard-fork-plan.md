@@ -420,7 +420,7 @@ How agents reach Paperclip today:
 | --- | --- | --- |
 | REST through curl | `claude_local` runs (the main path) | A run token in `PAPERCLIP_API_KEY`, taught by the `paperclip` skill (809 lines, ~4,000 with references). Reaches the whole API, but fragile: the skill has to warn that a piped `curl` can hide a failed write. Costs context every run. |
 | Semantic tools | Paperclip Runner runs only | Typed tools (`paperclip_finish`, `paperclip_block`, `paperclip_report_progress`, dedicated task operations) plus `search_api`/`call_api` over the OpenAPI catalog. The server checks each call's authority. Covers only what upstream wrote (no status-card operations), behind a 14,000-line tool gateway (`server/src/services/tool-gateway.ts`). |
-| Run MCP servers | `claude_local` runs, partly | "Paperclip projects" (`/api/mcp/project-tools`), plus connection tools when assigned. Core task actions still go through curl. |
+| Run MCP servers | `claude_local` runs, partly | At the freeze: "Paperclip projects" (`/api/mcp/project-tools`), plus connection tools when assigned; core task actions went through curl. **Since step 4a:** one `paperclip` server (`/api/mcp/paperclip`) with the whole task tool set, and project-tools is retired. |
 | `packages/mcp-server` | Standalone | A stdio MCP server, ~40 tools in ~700 lines, wrapping the REST API. |
 | Public MCP (`/mcp/paperclip`) | Outside assistants acting as a person | [doc/public-mcp.md](../doc/public-mcp.md) |
 
@@ -444,7 +444,12 @@ The plan: every run gets one Paperclip MCP connection, and agents work through i
 - **Keep the tool set small,** since each definition costs context. Claude Code loads MCP tool
   definitions lazily when there are many, which keeps the cost low.
 
-Starting points: the project-tools route (`server/src/routes/project-tools.ts`) shows the server
+**Built in 4a** (on `feat/step-4a`): the endpoint, the catalog, finish-or-block, the short skill,
+the same tools for people (the public MCP serves the catalog), and per-agent access levels. Still
+for 4b: dropping `--strict-mcp-config`, so repo MCP servers load alongside. See
+[step-4a-plan.md](step-4a-plan.md) and [claude-local-run.md](claude-local-run.md).
+
+Starting points (as written before 4a): the project-tools route (`server/src/routes/project-tools.ts`, since retired) showed the server
 hosting an MCP endpoint in-process, `packages/mcp-server/src/tools.ts` has a tool list to borrow
 from, and the Runner has the finish and block schemas. None of it needs the Runner's tool gateway.
 

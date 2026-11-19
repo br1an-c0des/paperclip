@@ -16,7 +16,7 @@ import { api } from "./client";
  * The requests behind a task's header actions, health notices and execution properties, as
  * ui/src/api/issues.ts and ui/src/api/agents.ts make them: privacy, pausing and cancelling a task
  * tree, resuming a paused assignee, the agent's project access, the watchdog, the monitor's check,
- * a scheduled retry, new labels, and the workspaces a task can reuse. Kept apart from issues.ts so
+ * a scheduled retry, labels, and the workspaces a task can reuse. Kept apart from issues.ts so
  * the slices of M2 that add to that file don't collide.
  */
 
@@ -78,6 +78,10 @@ export const taskActionsApi = {
   /** Pulls a scheduled retry forward. */
   retryScheduledNow: (id: string) => api.post<IssueRetryNowResponse>(`/issues/${id}/scheduled-retry/retry-now`, {}),
   createLabel: (companyId: string, body: { name: string; color: string }) => api.post<IssueLabel>(`/companies/${companyId}/labels`, body),
+  /** Renames or recolours a label. A name another label has is a 409 with `details.code: "label_name_taken"`. */
+  updateLabel: (labelId: string, body: { name?: string; color?: string }) => api.patch<IssueLabel>(`/labels/${encodeURIComponent(labelId)}`, body),
+  /** Deletes a label; the tasks that had it lose it. */
+  deleteLabel: (labelId: string) => api.delete<IssueLabel>(`/labels/${encodeURIComponent(labelId)}`),
 
   /** Workspaces in the project a task can be moved onto (`reuseEligible`). */
   reusableWorkspaces: (companyId: string, filters: { projectId: string; projectWorkspaceId?: string | null }, signal?: AbortSignal) => {

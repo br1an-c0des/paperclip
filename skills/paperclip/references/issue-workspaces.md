@@ -30,7 +30,7 @@ If `currentExecutionWorkspace` is `null`, the issue does not currently have a re
 - `{ "kind": "existing", "workspaceId": "<authorized-id>" }`: intentionally reuse a workspace.
 - `{ "kind": "configured_source", "projectWorkspaceId": "<authorized-source-id>", "mode": "shared" }`: use its configured folder; `managed_isolated` requests an isolated checkout.
 
-`POST /api/issues/:issueId/workspace/repositories` accepts a stable `requestKey`, optional `ref`, and `repository: { kind: "catalog", id: "<authorized-repository-id>" }`. Discover IDs with `list_project_repositories`. Existing public HTTPS GitHub URLs can use `{ kind: "url", url: "https://github.com/owner/repo" }`; URLs do not grant private credentials or create a remote repository.
+`POST /api/issues/:issueId/workspace/repositories` accepts a stable `requestKey`, optional `ref`, and `repository: { kind: "catalog", id: "<authorized-repository-id>" }`. Discover IDs with `paperclip_list_project_repositories`. Existing public HTTPS GitHub URLs can use `{ kind: "url", url: "https://github.com/owner/repo" }`; URLs do not grant private credentials or create a remote repository.
 
 Root selections and repository preparation return `next_normal_admission`. The active process retains its root. Do not claim a queued checkout is ready or repeatedly request it. A different ref cannot silently reset an existing checkout. New noncoding work can proceed immediately in task files without any repository. Explicitly shared folders remain shared; do not remove them when finishing one task.
 

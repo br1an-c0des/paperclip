@@ -11,8 +11,11 @@ import {
   cloudCreateUrl,
   cloudOf,
   cloudSignInUrl,
-  connectionAccess,
   connectionTitle,
+  consentDefaultLevel,
+  consentInput,
+  isAgentPairing,
+  levelWithin,
   inviteView,
   mcpProblem,
   nestedString,
@@ -155,8 +158,28 @@ describe("MCP connect", () => {
     expect(connectionTitle({ clientName: "Claude", user: { name: "Sam Smith" } })).toBe("Sam’s Claude connection");
     expect(connectionTitle({ clientName: "Claude", user: { name: "James" } })).toBe("James’ Claude connection");
     expect(connectionTitle({ clientName: "Codex", user: null })).toBe("Codex connection");
-    expect(connectionAccess(["paperclip:read", "paperclip:write", "paperclip:configure"])).toBe("Read and edit work; configure agents, projects and skills");
-    expect(connectionAccess(["paperclip:agent"])).toBe("Agent connection");
+    expect(isAgentPairing({ scopes: ["paperclip:agent"] })).toBe(true);
+    expect(isAgentPairing({ scopes: ["paperclip:read", "paperclip:write"] })).toBe(false);
+  });
+
+  it("starts consent at manager, or the most a viewer may give", () => {
+    expect(consentDefaultLevel("admin")).toBe("manager");
+    expect(consentDefaultLevel(undefined)).toBe("manager");
+    expect(consentDefaultLevel("read_only")).toBe("read_only");
+    expect(levelWithin("admin", "read_only")).toBe(false);
+    expect(levelWithin("read_only", "read_only")).toBe(true);
+    expect(levelWithin("admin", "admin")).toBe(true);
+  });
+
+  it("sends who it acts as and the level only when approving an assistant", () => {
+    const options = { companyId: "co-1", actAsAgentId: "a-1", accessLevel: "worker" as const };
+    expect(consentInput("approve", options)).toEqual({ decision: "approve", companyId: "co-1", actAsAgentId: "a-1", accessLevel: "worker" });
+    expect(consentInput("approve", { ...options, actAsAgentId: null })).toEqual({ decision: "approve", companyId: "co-1", actAsAgentId: null, accessLevel: "worker" });
+    expect(consentInput("deny", options)).toEqual({ decision: "deny", companyId: "co-1" });
+    expect(consentInput("approve", { ...options, agentPairing: true })).toEqual({ decision: "approve", companyId: "co-1" });
+    expect(consentInput("approve", { ...options, companyId: undefined })).not.toHaveProperty("companyId");
+    // The old checkboxes are gone: the server's schema is strict.
+    expect(consentInput("approve", options)).not.toHaveProperty("allowWrites");
   });
 });
 

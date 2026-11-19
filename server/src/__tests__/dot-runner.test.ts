@@ -22,7 +22,7 @@ import { budgetPolicies, costEvents, grokBotRoutines, grokBotDispatches, agents,
   heartbeatRuns, mcpOauthGrants, issueAttachments, activityLog, agentWakeupRequests, issueComments, issues, nativeRunResults, nativeRunFinalizations, completionContracts, mcpEventDeliveries, mcpEventSubscriptions, workspaceOperations, workAssessments, statusDecisions, issueThreadInteractions } from "@paperclipai/db";
 import { startEmbeddedPostgresTestDatabase } from "./helpers/embedded-postgres.js";
 import { createPublicMcpOAuth, DEVICE_GRANT } from "../services/public-mcp/oauth.js";
-import { createPublicMcpExecutor } from "../services/public-mcp/capabilities.js";
+import { createPublicMcpCatalog } from "../services/public-mcp/catalog.js";
 import { publicMcpIngressRoutes, publicMcpManagementRoutes } from "../routes/public-mcp.js";
 import { createPublicMcpEvents } from "../services/public-mcp/events.js";
 import type { EventFetch } from "../services/public-mcp/event-webhooks.js";
@@ -138,7 +138,7 @@ describe("durable Dot Runner integration", () => {
     const input = { client_id: client.client_id, redirect_uri: "https://chatgpt.com/connector_platform/oauth/callback", response_type: "code", resource: config.resource,
       scope: "paperclip:agent offline_access", code_challenge: createHash("sha256").update(verifier).digest("base64url"), code_challenge_method: "S256" };
     const requestId = (await oauth.authorize(input)).split("/").at(-1)!;
-    const consent = await oauth.consent(requestId, { type: "board", source: "session", userId }, { decision: "approve", companyId: company!.id, allowWrites: false });
+    const consent = await oauth.consent(requestId, { type: "board", source: "session", userId }, { decision: "approve", companyId: company!.id, accessLevel: "read_only" });
     const tokens = await oauth.token({ grant_type: "authorization_code", client_id: client.client_id, redirect_uri: input.redirect_uri,
       resource: config.resource, code: new URL(consent.redirectUrl).searchParams.get("code"), code_verifier: verifier });
     const unpaired = await oauth.authenticate(tokens.access_token);
@@ -211,11 +211,11 @@ describe("durable Dot Runner integration", () => {
 
   function gateway(oauth: ReturnType<typeof createPublicMcpOAuth>, actor: Request["actor"]) {
     const personal = createPublicMcpOAuth(db, { ...oauth.config, resource: oauth.config.origin + "/mcp/paperclip" });
-    const dispatch = async () => { throw new Error("Personal API dispatch forbidden"); };
+    // No personal API is reachable from this gateway: its catalog dispatches into an empty router.
     const app = express();
     app.use(express.json());
-    app.use(publicMcpIngressRoutes(personal, createPublicMcpExecutor(db, personal, dispatch)));
-    app.use(publicMcpIngressRoutes(oauth, createPublicMcpExecutor(db, oauth, dispatch)));
+    app.use(publicMcpIngressRoutes(personal, createPublicMcpCatalog(db, personal, { api: express.Router() })));
+    app.use(publicMcpIngressRoutes(oauth));
     app.use((req, _res, next) => { req.actor = actor; next(); });
     app.use("/api", publicMcpManagementRoutes(personal, oauth));
     return { app, personal };
@@ -915,9 +915,9 @@ describe("durable Dot Runner integration", () => {
     expect(description.body).toMatchObject({ agentConnection: true, requestedCompanyId: f.company.id, clientOrigin: new URL(clientId).origin });
     expect(description.body.companies.map((c: { id: string }) => c.id)).toEqual([f.company.id]);
     expect((await request(app).post(`/api/mcp/requests/${id}/consent`).set("Origin", oauth.config.origin)
-      .send({ decision: "approve", companyId: randomUUID(), allowWrites: false })).status).toBe(403);
+      .send({ decision: "approve", companyId: randomUUID(), accessLevel: "read_only" })).status).toBe(403);
     const consent = await request(app).post(`/api/mcp/requests/${id}/consent`).set("Origin", oauth.config.origin)
-      .send({ decision: "approve", companyId: f.company.id, allowWrites: false });
+      .send({ decision: "approve", companyId: f.company.id, accessLevel: "read_only" });
     expect(consent.status).toBe(200);
     const redirect = new URL(consent.body.redirectUrl);
     expect(redirect.searchParams.get("iss")).toBe(issuer.body.issuer);
@@ -943,10 +943,10 @@ describe("durable Dot Runner integration", () => {
     expect(description.body).toMatchObject({ agentConnection: true, requestedCompanyId: f.company.id });
     await db.update(companyMemberships).set({ membershipRole: "viewer" }).where(eq(companyMemberships.principalId, f.userId));
     expect((await request(app).post("/api/mcp/device/consent").set("Origin", f.oauth.config.origin)
-      .send({ userCode: codes.user_code, decision: "approve", companyId: f.company.id, allowWrites: false })).status).toBe(403);
+      .send({ userCode: codes.user_code, decision: "approve", companyId: f.company.id, accessLevel: "read_only" })).status).toBe(403);
     await db.update(companyMemberships).set({ membershipRole: "owner" }).where(eq(companyMemberships.principalId, f.userId));
     const approved = await request(app).post("/api/mcp/device/consent").set("Origin", f.oauth.config.origin)
-      .send({ userCode: codes.user_code, decision: "approve", companyId: f.company.id, allowWrites: false });
+      .send({ userCode: codes.user_code, decision: "approve", companyId: f.company.id, accessLevel: "read_only" });
     expect(approved.body).toEqual({ status: "approved" });
     const exchange = { grant_type: DEVICE_GRANT, client_id: client.client_id, resource: f.oauth.config.resource, device_code: codes.device_code };
     const tokens = (await request(app).post("/mcp/runner/oauth/token").send(exchange)).body;

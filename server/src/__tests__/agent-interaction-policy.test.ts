@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { agents, authUsers, companies, companyMemberships, createDb, issues, principalPermissionGrants,
   EMBEDDED_POSTGRES_TEST_TIMEOUT_MS } from "@paperclipai/db";
-import { AGENT_INTERACTION_PERMISSION_KEYS, type AgentInteractionPermissionKey } from "@paperclipai/shared";
+import { AGENT_INTERACTION_PERMISSION_KEYS, RETIRED_AGENT_INTERACTION_PERMISSION_KEYS,
+  type AgentInteractionPermissionKey } from "@paperclipai/shared";
 import { eq } from "drizzle-orm";
 import { startEmbeddedPostgresTestDatabase } from "./helpers/embedded-postgres.js";
 import { agentInteractionDenial, assertAgentInteraction, type AgentInteractionInput } from "../services/agent-interaction-policy.js";
@@ -43,18 +44,15 @@ describe("agent interaction authorization", () => {
   });
 
   const cases: Array<[AgentInteractionPermissionKey, "incoming" | "outgoing", AgentInteractionInput["operation"]]> = [
-    ["canAssignTasksToAgents", "outgoing", "assign"], ["canReceiveAssignmentsFromAgents", "incoming", "assign"],
-    ["canAssignTasksToHumans", "outgoing", "assign"], ["canMentionAgents", "outgoing", "mention"],
+    ["canReceiveAssignmentsFromAgents", "incoming", "assign"], ["canMentionAgents", "outgoing", "mention"],
     ["canReceiveMentionsFromAgents", "incoming", "mention"], ["canCommentOnOtherTasks", "outgoing", "comment"],
-    ["canReceiveCommentsFromAgents", "incoming", "comment"], ["canEditOtherTasks", "outgoing", "edit"],
-    ["canReceiveTaskEditsFromAgents", "incoming", "edit"], ["canConfigureOtherAgents", "outgoing", "configure"],
+    ["canReceiveCommentsFromAgents", "incoming", "comment"], ["canReceiveTaskEditsFromAgents", "incoming", "edit"],
     ["canReceiveConfigurationChangesFromAgents", "incoming", "configure"],
   ];
   it.each(cases)("%s independently restricts its operation and can be restored", async (key, direction, operation) => {
     const f = await seed();
     const action = input(f, operation, {
-      ...(operation === "comment" || operation === "edit" ? { issueId: f.task.id } :
-        key === "canAssignTasksToHumans" ? { assigneeUserId: "human" } : { targetAgentId: f.targetAgentId }),
+      ...(operation === "comment" || operation === "edit" ? { issueId: f.task.id } : { targetAgentId: f.targetAgentId }),
     });
     expect(await agentInteractionDenial(db, action)).toBeNull();
     const policyAgentId = direction === "incoming" ? f.targetAgentId : f.actorAgentId;
@@ -73,11 +71,14 @@ describe("agent interaction authorization", () => {
     const f = await seed();
     await db.update(agents).set({ reportsTo: f.actorAgentId }).where(eq(agents.id, f.targetAgentId));
     await db.update(issues).set({ createdByAgentId: f.actorAgentId, parentId: f.own.id }).where(eq(issues.id, f.task.id));
-    for (const operation of ["comment", "edit"] as const) {
-      await set(f.actorAgentId, operation === "comment" ? "canCommentOnOtherTasks" : "canEditOtherTasks");
-      for (const task of [f.own, f.conversation]) expect(await agentInteractionDenial(db, input(f, operation, { issueId: task.id }))).toBeNull();
-      for (const task of [f.task, f.unassigned, f.human]) expect(await agentInteractionDenial(db, input(f, operation, { issueId: task.id }))).not.toBeNull();
+    await set(f.actorAgentId, "canCommentOnOtherTasks");
+    for (const task of [f.own, f.conversation]) expect(await agentInteractionDenial(db, input(f, "comment", { issueId: task.id }))).toBeNull();
+    for (const task of [f.task, f.unassigned, f.human]) expect(await agentInteractionDenial(db, input(f, "comment", { issueId: task.id }))).not.toBeNull();
+    await set(f.targetAgentId, "canReceiveTaskEditsFromAgents");
+    for (const task of [f.own, f.conversation, f.unassigned, f.human]) {
+      expect(await agentInteractionDenial(db, input(f, "edit", { issueId: task.id }))).toBeNull();
     }
+    expect(await agentInteractionDenial(db, input(f, "edit", { issueId: f.task.id }))).not.toBeNull();
     await db.update(issues).set({ assigneeAgentId: f.targetAgentId }).where(eq(issues.id, f.own.id));
     expect(await agentInteractionDenial(db, input(f, "edit", { issueId: f.own.id }))).not.toBeNull();
   });
@@ -117,7 +118,7 @@ describe("agent interaction authorization", () => {
     const decision = await authorizationService(db).decide({ actor, action: "tasks:assign", resource });
     expect(decision).toMatchObject({ allowed: false, reason: "deny_agent_interaction" });
     expect(authorizationDeniedDetails(decision)).toMatchObject({ code: "agent_interaction_denied", permission: "canReceiveAssignmentsFromAgents", direction: "incoming" });
-    await db.update(agents).set({ permissions: { trustPreset: "low_trust_review", interactions: { canAssignTasksToAgents: true },
+    await db.update(agents).set({ permissions: { trustPreset: "low_trust_review", interactions: { canMentionAgents: true },
       authorizationPolicy: { trustBoundary: { mode: "low_trust_review", companyId: f.companyId, issueIds: [f.own.id] } } } }).where(eq(agents.id, f.actorAgentId));
     await set(f.targetAgentId, "canReceiveAssignmentsFromAgents", true);
     expect((await authorizationService(db).decide({ actor, action: "tasks:assign", resource })).allowed).toBe(false);
@@ -188,10 +189,43 @@ describe("agent interaction authorization", () => {
     await expect(agentInteractionDenial(db, action)).rejects.toMatchObject({ status: 404 });
     const attributed = { ...action, actorCompanyId: source.companyId };
     expect(await agentInteractionDenial(db, attributed)).toBeNull();
-    await set(source.actorAgentId, "canAssignTasksToAgents");
-    expect(await agentInteractionDenial(db, attributed)).toMatchObject({ permission: "canAssignTasksToAgents", direction: "outgoing" });
-    await set(source.actorAgentId, "canAssignTasksToAgents", true);
     await set(destination.targetAgentId, "canReceiveAssignmentsFromAgents");
     expect(await agentInteractionDenial(db, attributed)).toMatchObject({ permission: "canReceiveAssignmentsFromAgents", direction: "incoming" });
+  });
+  it("no longer enforces the four actor-side switches that became access actions (step 4a)", async () => {
+    const f = await seed();
+    const retiredOff = Object.fromEntries(RETIRED_AGENT_INTERACTION_PERMISSION_KEYS.map(key => [key, false]));
+    await db.update(agents).set({ permissions: { interactions: retiredOff } }).where(eq(agents.id, f.actorAgentId));
+    const actions = [
+      input(f, "assign", { issueId: f.task.id, targetAgentId: f.targetAgentId }),
+      input(f, "assign", { issueId: f.unassigned.id, assigneeUserId: "human" }),
+      input(f, "edit", { issueId: f.task.id }),
+      input(f, "edit", { issueId: f.human.id }),
+      input(f, "configure", { targetAgentId: f.targetAgentId }),
+    ];
+    for (const action of actions) expect(await agentInteractionDenial(db, action)).toBeNull();
+    // The receiver's consent still applies.
+    await set(f.targetAgentId, "canReceiveAssignmentsFromAgents");
+    expect(await agentInteractionDenial(db, input(f, "assign", { targetAgentId: f.targetAgentId })))
+      .toMatchObject({ permission: "canReceiveAssignmentsFromAgents", direction: "incoming" });
+    await set(f.targetAgentId, "canReceiveConfigurationChangesFromAgents");
+    expect(await agentInteractionDenial(db, input(f, "configure", { targetAgentId: f.targetAgentId })))
+      .toMatchObject({ permission: "canReceiveConfigurationChangesFromAgents", direction: "incoming" });
+  });
+
+  it("lets access decide: a stored canEditOtherTasks false no longer blocks an agent with tasks:update_any", async () => {
+    const f = await seed();
+    await db.update(agents).set({ permissions: {
+      access: { level: "worker", overrides: { "tasks:update_any": true } },
+      interactions: { canEditOtherTasks: false, canAssignTasksToAgents: false },
+    } }).where(eq(agents.id, f.actorAgentId));
+    const actor = { type: "agent" as const, agentId: f.actorAgentId, companyId: f.companyId };
+    const edit = { actor, action: "issue:mutate" as const, resource: { type: "issue" as const, companyId: f.companyId,
+      issueId: f.task.id, assigneeAgentId: f.targetAgentId, assigneeUserId: null, status: "todo" } };
+    expect(await authorizationService(db).decide(edit)).toMatchObject({ allowed: true });
+    await set(f.targetAgentId, "canReceiveTaskEditsFromAgents");
+    const denied = await authorizationService(db).decide(edit);
+    expect(denied).toMatchObject({ allowed: false, reason: "deny_agent_interaction" });
+    expect(authorizationDeniedDetails(denied)).toMatchObject({ permission: "canReceiveTaskEditsFromAgents", direction: "incoming" });
   });
 });

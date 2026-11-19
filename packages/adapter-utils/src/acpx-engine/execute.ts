@@ -3149,25 +3149,20 @@ function renderPaperclipEnvNote(env: Record<string, string>): string {
   ].join("\n");
 }
 
-function renderApiAccessNote(env: Record<string, string>): string {
-  if (!env.PAPERCLIP_API_URL || !env.PAPERCLIP_API_KEY) return "";
-  const lines = [
+/** Paperclip's own MCP server for the run, which the server gives every run with a token. */
+function hasPaperclipMcpServer(ctx: AdapterExecutionContext): boolean {
+  return (ctx.runtimeMcp?.getServers() ?? []).some((server) => server.connectionId === "paperclip");
+}
+
+/** Points the run at the `paperclip` MCP tools; nothing when the run has no Paperclip API access. */
+function renderApiAccessNote(env: Record<string, string>, paperclipMcp: boolean): string {
+  if (!paperclipMcp || !env.PAPERCLIP_API_URL || !env.PAPERCLIP_API_KEY) return "";
+  return [
     "Paperclip API access note:",
-    "Use terminal commands with curl to make Paperclip API requests.",
-    "Normalize the base URL before adding API paths:",
-    `  PAPERCLIP_API_BASE="\${PAPERCLIP_API_URL%/}"; PAPERCLIP_API_BASE="\${PAPERCLIP_API_BASE%/api}"`,
-    "GET example:",
-    `  curl -s -H "Authorization: Bearer $PAPERCLIP_API_KEY" "$PAPERCLIP_API_BASE/api/agents/me"`,
-  ];
-  if (env.PAPERCLIP_TASK_ID) {
-    lines.push(
-      "Scoped issue comment example:",
-      `  curl -s -X POST -H "Authorization: Bearer $PAPERCLIP_API_KEY" -H "Content-Type: application/json" -H "X-Paperclip-Run-Id: $PAPERCLIP_RUN_ID" -d '{"body":"Status update from agent."}' "$PAPERCLIP_API_BASE/api/issues/$PAPERCLIP_TASK_ID/comments"`,
-    );
-  } else {
-    lines.push("Use a real issue id from the current context before making issue write requests.");
-  }
-  return lines.join("\n");
+    "Work with Paperclip through the `paperclip` MCP server's `paperclip_*` tools, not HTTP requests.",
+    "Start with `paperclip_task_context`; end the run with `paperclip_finish`, `paperclip_block`, or `paperclip_report_progress` with `continue: true`.",
+    "PAPERCLIP_API_KEY is there for scripts that need the REST API.",
+  ].join("\n");
 }
 
 async function buildPrompt(ctx: AdapterExecutionContext, resumedSession: boolean, env: Record<string, string>): Promise<{
@@ -3233,7 +3228,7 @@ async function buildPrompt(ctx: AdapterExecutionContext, resumedSession: boolean
       : renderTemplate(promptTemplate, templateData);
   const sessionHandoffNote = asString(context.paperclipSessionHandoffMarkdown, "").trim();
   const paperclipEnvNote = externalChatTurn || resumedSession ? "" : renderPaperclipEnvNote(env);
-  const apiAccessNote = externalChatTurn || resumedSession ? "" : renderApiAccessNote(env);
+  const apiAccessNote = externalChatTurn || resumedSession ? "" : renderApiAccessNote(env, hasPaperclipMcpServer(ctx));
   const prompt = joinPromptSections([
     promptInstructionsPrefix,
     renderedBootstrapPrompt,

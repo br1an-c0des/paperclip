@@ -82,6 +82,12 @@ describe("connection management with production default agents", () => {
     expect(created.status).toBe(201);
     await lifecycle.process(agent.id);
     await vi.waitFor(async () => expect((await agentService(server.db).getById(agent.id))?.status).toBe("idle"), { timeout: 10_000 });
+    // Since step 4a a new agent starts at the worker level: the route policy puts connection
+    // configuration routes behind api:raw, and configuring agents takes the access level's
+    // agents:configure (the agents:configure grant new agents still receive no longer counts for
+    // agents). The agent gets those two overrides, standing in for the access these tests were
+    // written against, so the routes' own connection-management checks are what they exercise.
+    await server.db.update(agents).set({ permissions: { access: { level: "worker", overrides: { "api:raw": true, "agents:configure": true } } } }).where(eq(agents.id, agent.id));
     await server.db.update(heartbeatRuns).set({ agentId: agent.id }).where(eq(heartbeatRuns.id, base.runId));
     await server.db.update(issues).set({ assigneeAgentId: agent.id, responsibleUserId: userId }).where(eq(issues.id, base.issueId));
     const key = await agentService(server.db).createApiKey(agent.id, "integration", { kind: "standard" }, { responsibleUserId: userId });
@@ -90,7 +96,10 @@ describe("connection management with production default agents", () => {
       const response = await fetch(server.apiUrl + (path.startsWith("/mcp/") ? "" : "/api") + path, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
       return { status: response.status, body: await response.json().catch(() => null) };
     };
-    return { ...base, agentId: agent.id, userId, key, jwt, request,
+    /** Narrows the agent's agents:configure to its own agent, as a scoped grant did before step 4a. */
+    const narrowConfigureToSelf = () => server.db.update(agents).set({ permissions: { access: { level: "worker",
+      overrides: { "api:raw": true, "agents:configure": { scope: { targetAgentIds: [agent.id] } } } } } }).where(eq(agents.id, agent.id));
+    return { ...base, agentId: agent.id, userId, key, jwt, request, narrowConfigureToSelf,
       authority: new PaperclipRunnerToolAuthority(server.db, { companyId: base.companyId, agentId: agent.id, issueId: base.issueId, runId: base.runId, apiUrl: server.apiUrl, storage: server.storage }) };
   }
 
@@ -545,7 +554,7 @@ describe("connection management with production default agents", () => {
     const otherId = other?.id ?? targets.find(agent => agent.id !== f.agentId)!.id;
     expect(await f.request("POST", path, { ...body, access: { agentIds: [otherId] } })).toMatchObject({ status: 403 });
     await server.db.update(principalPermissionGrants).set({ scope: null }).where(and(eq(principalPermissionGrants.principalId, f.agentId), eq(principalPermissionGrants.permissionKey, "tools:manage_profiles")));
-    await server.db.update(principalPermissionGrants).set({ scope: { targetAgentIds: [f.agentId] } }).where(and(eq(principalPermissionGrants.principalId, f.agentId), eq(principalPermissionGrants.permissionKey, "agents:configure")));
+    await f.narrowConfigureToSelf();
     expect(await f.request("POST", path, { ...body, access: { agentIds: [otherId] } })).toMatchObject({ status: 403 });
     const bindings = await server.db.select().from(toolProfileBindings).where(eq(toolProfileBindings.companyId, f.companyId));
     expect(bindings.map(binding => binding.targetId)).toEqual([f.agentId]);
@@ -764,8 +773,7 @@ describe("connection management with production default agents", () => {
     expect(gateway, JSON.stringify(gateway)).toMatchObject({ status: 201 });
     const [issue] = await server.db.insert(issues).values({ companyId: f.companyId, title: "Other agent task", assigneeAgentId: other.id, status: "in_progress", responsibleUserId: f.userId }).returning();
     const [routine] = await server.db.insert(routines).values({ companyId: f.companyId, title: "Other agent routine", assigneeAgentId: other.id, responsibleUserId: f.userId }).returning();
-    const [configurationGrant] = await server.db.select().from(principalPermissionGrants).where(and(eq(principalPermissionGrants.principalId, f.agentId), eq(principalPermissionGrants.permissionKey, "agents:configure")));
-    await server.db.update(principalPermissionGrants).set({ scope: { ...configurationGrant.scope, targetAgentIds: [f.agentId] } }).where(and(eq(principalPermissionGrants.principalId, f.agentId), eq(principalPermissionGrants.permissionKey, "agents:configure")));
+    await f.narrowConfigureToSelf();
     const path = `/companies/${f.companyId}/tools/profiles/${profile.body.id}`;
     const ownBinding = await f.request("POST", `${path}/bind`, { targetType: "issue", targetId: f.issueId });
     expect(ownBinding, JSON.stringify(ownBinding)).toMatchObject({ status: 201 });
@@ -799,7 +807,7 @@ describe("connection management with production default agents", () => {
   it("keeps narrow policy create, update, reorder, and delete within their actual audiences", async () => {
     const f = await fixture();
     const other = (await server.db.select({ id: agents.id }).from(agents).where(eq(agents.companyId, f.companyId))).find(agent => agent.id !== f.agentId)!;
-    await server.db.update(principalPermissionGrants).set({ scope: { targetAgentIds: [f.agentId] } }).where(and(eq(principalPermissionGrants.principalId, f.agentId), eq(principalPermissionGrants.permissionKey, "agents:configure")));
+    await f.narrowConfigureToSelf();
     const path = `/companies/${f.companyId}/tools/policies`;
     const created = await f.request("POST", path, { name: "Own target rule", policyType: "allow", selectors: { agentId: f.agentId } });
     expect(created, JSON.stringify(created)).toMatchObject({ status: 201 });
@@ -962,7 +970,7 @@ describe("connection management with production default agents", () => {
     const definitions = await f.authority.definitions();
     const names = definitions.map(d => d.name);
     const context = await f.authority.execute({ tool: "get_task_context", callId: "configuration-guidance", arguments: {} });
-    expect(JSON.stringify(context)).toContain("Standard agents can manage connections under their responsible user's authority");
+    expect(JSON.stringify(context)).toContain("under your responsible user's authority");
     expect(JSON.stringify(definitions.find(d => d.name === "connections_search"))).toContain("search_api/call_api");
     expect(names).toEqual(expect.arrayContaining(["search_api", "call_api"]));
     const search = await f.authority.execute({ tool: "search_api", callId: "find-profile", arguments: { query: "create tools profiles", limit: 10 } });
