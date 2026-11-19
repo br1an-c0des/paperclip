@@ -80,7 +80,22 @@ The CLI engine (`claude --print`) comes first because its flags control exactly 
 | --- | --- | --- |
 | **A. Change the default, patch today's CLI path:** write skills into the temporary folder, copy session files between runs, add the environment allowlist | Smallest, but all of it patches the temporary per-run folder that sealed runs replace | No |
 | **B. Switch the engine and seal the launch together** | Delivers the core of 4b at once; sessions reset once; step 5 gets a fixed base | **Yes** (2026-11-18) |
-| **C. Seal ACP instead** | ACP has no strict MCP mode, writes `.claude/settings.local.json` into the repo, and decision 7 chose the CLI | No |
+| **C. Seal ACP instead** | Possible, but through patches we'd maintain rather than flags (see below) | No |
+
+**On ACP, corrected 2026-11-18.** ACP *could* be sealed. The bridge patch Paperclip carries
+(`patches/@agentclientprotocol__claude-agent-acp@0.73.0.patch`) already has
+`PAPERCLIP_ACPX_ISOLATED_CONTEXT=1`, which the Runner uses to load only the user setting source.
+With a config folder Paperclip owns, that would also keep out the repo's and user's MCP servers.
+Its other gaps can be fixed with work: rewriting `.claude/settings.local.json` in the repo each run
+(`acpx-engine/execute.ts:1663-1674`), skills passed as text, and instructions in the first message.
+So the reason for the CLI is maintenance, not capability:
+- the CLI is Claude Code itself, sealed with its documented flags, and it gets new features first;
+- ACP goes through a pinned, patched third-party bridge and a 6,000-line engine shared with other
+  adapters, so every sealing behaviour would be a patch to keep up to date;
+- `bwrap` confinement and picking up runs after a hot restart work only on the CLI;
+- only the CLI was tested.
+
+The isolated-context switch also makes a later Runner hybrid more plausible (decision 9).
 
 ## Design
 
@@ -294,6 +309,21 @@ test files, no broad suites.
 - **Step 5:** builds its prompt on this launch. The manifest and step 5's prompt preview belong
   together in the run's details.
 
+## Keep the launch portable
+
+Added 2026-11-18. The user wants to keep running agents elsewhere open for later: a container that
+manages the agents' runs, a CLI driver inside the Paperclip Runner, or remote and sandbox targets
+([hard-fork plan, decision 9](hard-fork-plan.md#decisions)). Part 1 builds none of those, but it
+keeps the seam:
+
+- **The launch is built as data, then started.** The server produces a launch description: the
+  arguments, the environment, the files to put in place (the config folder's `skills/`, the MCP
+  config, the `CLAUDE.md` folder) and the manifest. A local starter then spawns it. Whatever starts
+  runs elsewhere later takes the same description.
+- **The config folder can be copied.** Nothing in it points at paths that only exist on the server.
+  For example, skills are copies, or symlinks that a copy step can resolve. Copying a folder to a
+  target is how remote runs already move Claude's files (`prepareAdapterExecutionTargetRuntime`).
+
 ## Later parts of 4b (not designed here)
 
 - **Part 2, what an agent's runs get:** the same list as the manifest, shown on the agent's page
@@ -305,6 +335,18 @@ test files, no broad suites.
   carry over between tasks.
 - **The recovery handoff's content** and **server-side structured live events**
   ([claude-local-run.md §10](claude-local-run.md#10-change-points-for-steps-4-and-5)).
+- **Part 4, live sessions on the CLI** (planned 2026-11-18, decision 9). This is what ACP offers,
+  built on the CLI. None of it is tested in this repo yet:
+  - follow-up messages into a running session (`--input-format stream-json`), which step 6's chat
+    needs;
+  - permission prompts answered through Paperclip instead of skipped (`--permission-prompt-tool` or
+    `--permission-prompts host`), each one becoming an Inbox request;
+  - text streamed as it's written (`--include-partial-messages`), for example the status card's live
+    summary.
+- **Later, where runs execute** (after parts 1 to 4 have been used for a while): the CLI's dormant
+  remote targets (SSH and sandbox, `packages/adapter-utils/src/execution-target.ts`), the agents
+  container from [step 4's idea](hard-fork-plan.md#4-make-runs-claude-native), or a CLI driver in
+  the Runner.
 
 ## Left to the builder
 

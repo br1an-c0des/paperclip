@@ -225,6 +225,15 @@ mean resolving conflicts in upstream's busiest area every week, for code we don'
 3. **Watch it instead of syncing it.** The [upstream watch](#watching-upstream) covers Runner
    commits too. If upstream builds something we want, we decide then whether to port the idea or
    restore the Runner.
+4. **A hybrid, later** (decision 9, 2026-11-18). With more agents, spreading runs over cloud
+   instances or runners could help. Once 4b's CLI launch has been used for a while, explore either
+   of these:
+   - a CLI driver in the Runner, running the same sealed launch. Today the Runner starts Claude only
+     through ACP (`acpx`) or Claude Managed;
+   - the lighter agents container from [step 4](#4-make-runs-claude-native), acting as the runner.
+
+   4b keeps the launch portable so either can take it
+   ([step-4b-sealed-runs.md](step-4b-sealed-runs.md#keep-the-launch-portable)).
 
 Some of the reasons to want it later are already covered elsewhere: `claude_local` can already
 confine local runs to the workspace's files and limit network access (`bwrap`), and Claude Code
@@ -394,6 +403,10 @@ Split in two. **4a** (Paperclip over MCP, agent permissions) has its own
 - Add the three things kept from the Runner: finish-or-block completion (built in 4a), a recovery
   handoff and structured live events.
 - Agents use Paperclip through MCP, not curl ([below](#agents-use-paperclip-through-mcp); 4a).
+- **Live sessions on the CLI** (decision 9): follow-up messages into a running session, permission
+  prompts answered through the Inbox, and streamed text. This is what ACP offers, built on the CLI.
+- **A portable launch:** built as data, so an agents container, the Runner or a remote target could
+  start it later ([4b design](step-4b-sealed-runs.md#keep-the-launch-portable)).
 
 Importing what a repo holds (its `.claude/skills`, `.claude/agents`, maybe settings) into Paperclip,
 so it shows up like everything else, is a feature of its own, not part of 4b
@@ -646,6 +659,15 @@ Taken 2026-11-18:
    server1's agents already use a managed AI connection with the Claude subscription
    (`CLAUDE_CODE_OAUTH_TOKEN`, no login in the container), which stays the main method, with an API
    key sometimes.
+9. **ACP's strengths come to the CLI; the Runner stays in reserve.** After 4b part 1 was designed,
+   ACP and the Runner were weighed again.
+   - **ACP:** its real advantage is a live session Paperclip can talk to mid-run. 4b plans that on
+     the CLI (part 4): follow-up messages, permission prompts answered through the Inbox, streamed
+     text.
+   - **The Runner:** not needed now. Cloud and sandbox runs aren't Runner-only, since the CLI
+     engine has dormant SSH and sandbox targets. The Runner stays in the tree for a possible hybrid
+     later ([Keeping the option open](#keeping-the-option-open), item 4).
+   - **The launch stays portable** so a container, the Runner or a remote target can start it.
 
 Still open:
 
