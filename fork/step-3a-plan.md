@@ -377,9 +377,15 @@ $(git merge-base main origin/feat/step-4a) origin/feat/step-4a`). Report instead
   from the wall clock on every read, drifting ~1 s per 30 s on WSL) plus start ticks, so two readings
   of a live process can differ by whole seconds and recovery fails a live run as `process_lost`. The
   user chose G's option 1: a whole-second gap counts as the same process for `btime`-based readings
-  (a reused PID matches by chance 1 time in 100, and its record is held until the PID exits). G is
-  finishing it on `test/bug40`. Exact boot-relative start ticks in every stamp (option 2, a new field
+  (a reused PID matches by chance 1 time in 100, and its record is held until the PID exits).
+  **Merged** 2026-11-18 (`741e8c5231`). Exact boot-relative start ticks in every stamp (option 2, a new field
   and a migration) are worth revisiting in step 4b.
+- **Found by G's bug 40 sweep, opt-in only, same on `main`:** `chat-channels.integration` has 9
+  failing tests of 1,970; 7 of them ("reconciled chat retry delivery ownership") pass alone, so they
+  depend on test order within the file. In an agent worktree nested in the main checkout,
+  `resolvePaperclipSkillsDir` (`packages/adapter-utils/src/server-utils.ts`) climbs into the main
+  checkout's `.claude/skills` instead of the repo's `skills/`, so 7 Slack-skill tests fail with
+  `ENOENT`; a normal checkout or CI isn't affected.
 - **Upstream's 38 workflows disabled on GitHub** 2026-11-18 (`gh workflow disable`, reversible), so
   pushing the `master` mirror no longer starts them. Our `test.yml` comes with agent H's merge.
 

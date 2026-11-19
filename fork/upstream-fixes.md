@@ -628,7 +628,9 @@ option 3 (was build plan 2a-6). Revives #2700.
   `claude_local` run, not only those with `para-memory-files`, and Paperclip sets the variable itself
   ([step-4b-sealed-runs.md](step-4b-sealed-runs.md), section 6). This closes when 4b part 1 merges.
 
-### 40. Find why 11 server tests fail on `main` (one file is core)
+### 40. Find why 11 server tests fail on `main` (one file is core) — fixed
+
+**Fixed 2026-11-18** (`741e8c5231`, option 1 below).
 
 Found in step 3a's profiled run of `pnpm test` on `main` at `93c3289557`, 2026-11-18
 ([test-suite-audit.md](test-suite-audit.md#8-failures-seen)). The run was stopped before Vitest
@@ -668,10 +670,15 @@ printed its failure summary, so the reasons weren't captured.
   same process (`controller-process-identity.ts`, `owner-proof.ts`). A reused PID matches by chance 1
   time in 100, and its record is then held until the PID exits. Four tests that modelled PID reuse
   with a whole-second offset get a sub-second one. Option 2, exact boot-relative start ticks in every
-  stamp (a new field and a migration), is worth revisiting in step 4b. Being finished on
-  `test/bug40`.
-- **Next:** the core file gets a fix once the user signs off. The dormant ones are skipped with a note
-  (hard-fork step 3), unless step 3a moves their suites out of the default run anyway.
+  stamp (a new field and a migration), is worth revisiting in step 4b.
+- **Done (2026-11-18, `741e8c5231`):** `processStartsDefinitelyDiffer` takes the reading's clock and
+  `owner-proof.ts` passes `linux_btime` from its process probe. Seven test files modelled PID reuse
+  with a whole-second gap; each gap now has a 10 ms part, with no assertion changed. G ran the 189
+  server files that touch process start times: every failure left also fails the same way without
+  the fix.
+- **Left alone (dormant Runner):** `evaluateNativeProviderProcesses` in
+  `native-runtime/native-restart-recovery.ts` still compares provider-process starts without a
+  clock, so it keeps the whole-second rule. Pass the clock there if the Runner comes back.
 
 ### 41. Give `para-memory-files` a recall tool that exists
 
