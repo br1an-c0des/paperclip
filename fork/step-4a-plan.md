@@ -518,10 +518,69 @@ tests.
 
 - **Agent 4, requests and outside connections:** `permission_request` creation on a requestable
   denial and replay through a one-use temporary grant (spec section 7); the public MCP resolving
-  OAuth grants to `oauth_person` / `oauth_agent` callers and serving `PAPERCLIP_CATALOG`; carrying
+  OAuth grants to `oauth_person` / `oauth_agent` callers and serving the catalog
+  (`createPaperclipCatalog(catalogDeps(db))`; there's no `PAPERCLIP_CATALOG` constant); carrying
   over every public tool (spec section 4); "act as" and level on grants and the consent screen;
-  retiring `capabilities.ts`/`expanded-capabilities.ts` lists.
+  retiring `capabilities.ts`/`expanded-capabilities.ts` lists. Also: refuse direct creation of
+  `permission_request` approvals through `POST` approvals (today `createApprovalSchema` accepts the
+  type from anyone who can create approvals); and make sure the public MCP's in-process dispatch
+  passes through the agent route policy, as the catalog's does.
 - **Agent 5, `ui-new`:** the Permissions section (level and overrides), outside-connection settings,
-  the Inbox permission request card (spec section 8).
+  the Inbox permission request card (spec section 8), a label for `permission_request` in the
+  approval label maps (`ui-new/src/inbox/row-model.ts:110`, `ui-new/src/requests/request-model.ts:617`),
+  and **renaming and recolouring labels** through `PATCH /labels/:labelId` (added by agent 1 on the
+  user's request, 2026-11-17).
 - **Project manager:** flip `PAPERCLIP_UNIFIED_RUN_MCP` on by default, retire
   `/api/mcp/project-tools`, the local-instance run check, docs.
+
+### Wave 1 status (2026-11-17)
+
+**Regression runs wait for [step 3a](hard-fork-plan.md#3a-renovate-the-test-suite)** (renovating
+the test suite). Building continues (decided 2026-11-18): agents run typechecks, their own new test
+files one at a time, and `ui-new` unit tests, but no broad server suites. Handed off to a new
+manager session on server1: [step-4a-handoff.md](step-4a-handoff.md).
+
+All four branches are merged into `feat/step-4a`. Each agent's new tests passed. **The regression
+runs were stopped at the user's request** (they're working on the test suite separately), so these
+are still to do before `feat/step-4a` goes to `main`:
+
+- Run the existing server tests on `feat/step-4a`: agent 1's grep list (149 files:
+  `ls server/src/__tests__ | grep -iE "authoriz|access|permission|issue"`) plus the 69 hiring and
+  assignment files, and agent 3's 226 heartbeat, recovery and completion files. **Expect fixture
+  failures:** tests that insert agents without `permissions.access` now get `worker`; the fix is
+  `access: { level: "manager" }` in the fixture.
+- Re-run alone: `heartbeat-native-restart-suspension.test.ts` (2 of 115 failed) and
+  `heartbeat/runtime-selection.test.ts` (6 of 82 failed), both dormant native paths that failed in an
+  overloaded run. Skip with a note if they're real and dormant.
+- Swap agent 2's route-policy stub (`server/src/mcp/catalog/route-policy.ts`) for the real
+  `AGENT_ROUTE_POLICY` import.
+
+Found in wave 1, to settle:
+
+- **New agents that should hire (decided 2026-11-18, not built yet):** agents created after 0491
+  start at `worker`, so a new CEO couldn't hire. Rule: a new agent with the CEO role starts at
+  `manager` with the `agents:create` override; any new agent created with `canCreateAgents: true`
+  gets the `agents:create` override.
+- **The skill and the switch ship together:** the rewritten `paperclip` skill assumes the
+  `paperclip` MCP server, which is off by default (`PAPERCLIP_UNIFIED_RUN_MCP`). Flip the default
+  before `feat/step-4a` reaches `main`.
+- **Continuing runs wake again:** agent 3 added a wake after a run ends with
+  `report_progress` + `continue: true` (once per run, at most 10 in a row, then normal repair).
+- **No checkout tool:** the skill relies on the harness checking out the run's task.
+- `CONNECTION_INTENT_AGENT_GUIDANCE` (`packages/shared`) still tells every agent to use
+  `search_api`/`call_api`, which are admin-only now.
+- **One source of truth is narrower than the spec:** agents still use `principal_permission_grants`
+  for keys with no access action (`tools:*`, `inbox:manage`, `skills:*`,
+  `tasks:manage_active_checkouts`, `agents:read`, `agents:suggest-changes`).
+- `mcp_oauth_grants` already has `agent_id` and purpose `"agent"`; wave 2 settles how they relate to
+  the new `act_as_agent_id`.
+- Agent-side interaction checks in `agent-interaction-policy.ts` are redundant after 0491; remove in
+  a cleanup.
+
+Carried over from wave 1, to fold into the spec when wave 2 is planned:
+
+- `paperclip_search_api` needs `api:raw` (not `tasks:read`): it only lists what `call_api` can
+  reach. The run tools and `call_api` are not requestable.
+- `call_api` operation ids are `"METHOD /path"`; the OpenAPI document has no `operationId`s.
+- After agent 1 merges, agent 2 adds rename and recolour to `paperclip_manage_labels` (it creates
+  and deletes only until `PATCH /labels/:labelId` exists).

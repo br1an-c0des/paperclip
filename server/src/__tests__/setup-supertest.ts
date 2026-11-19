@@ -28,13 +28,29 @@ type SupertestTestConstructor = {
 process.env.PAPERCLIP_TEST_HOST_HOME ??= process.env.PAPERCLIP_HOME?.trim() || path.join(os.homedir(), ".paperclip");
 
 // Receipt-spool recovery must never scan a developer's instance during tests.
+// Each test file gets its own home, also when files share a worker process
+// (`isolate: false`), where this setup file runs again before every file.
 const { home: paperclipTestHome, cleanup: cleanupPaperclipTestHome } = createIsolatedTestHome();
 process.env.PAPERCLIP_HOME = paperclipTestHome;
 process.env.PAPERCLIP_CONFIG = path.join(paperclipTestHome, "config.json");
 process.env.PAPERCLIP_INSTANCE_ID = `vt-${process.pid}`;
 // Setup-file afterAll hooks run before suites drain asynchronous heartbeats.
 // Cleanup at worker exit, after all suite teardown, avoids deleting live state.
-process.once("exit", cleanupPaperclipTestHome);
+// One exit listener per worker cleans every home made in it.
+const testHomeRegistry = globalThis as { __paperclipTestHomeCleanups?: Array<() => void> };
+if (!testHomeRegistry.__paperclipTestHomeCleanups) {
+  const cleanups: Array<() => void> = [];
+  testHomeRegistry.__paperclipTestHomeCleanups = cleanups;
+  process.once("exit", () => {
+    let firstError: unknown;
+    for (const cleanup of cleanups) {
+      try { cleanup(); }
+      catch (error) { firstError ??= error; }
+    }
+    if (firstError) throw firstError;
+  });
+}
+testHomeRegistry.__paperclipTestHomeCleanups.push(cleanupPaperclipTestHome);
 
 const require = createRequire(import.meta.url);
 const SupertestTest = require("supertest/lib/test.js") as SupertestTestConstructor;

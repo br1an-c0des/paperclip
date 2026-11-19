@@ -85,7 +85,7 @@ it gets built. Numbers like 3.4 and F3 refer to stage 3 further down; "fix 39" i
 | --- | --- | --- |
 | Memory files visible per agent in its settings | 1 | A Memory section reading `MEMORY.md`, `memory/` and `life/` from the agent's files (`GET /api/agents/:id/instructions-bundle`), plus the agent's memory connections ([decision 5](decisions.md#5-agents-can-have-three-memory-systems-that-dont-know-about-each-other), option 4). |
 | Every run sees the same per-agent memory | Deploy setting now, then a fix | Now: `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in `deploy/docker-compose.yml`, a fork-only file, which reaches `claude_local` runs. Paperclip Runner agents don't inherit the server's variables, so they need it in their adapter `env` (decision 5, option 1). Later: the upstream fix ([fix 39](../../fork/upstream-fixes.md#39-turn-off-claude-codes-auto-memory-when-an-agent-has-para-memory-files)). Claude Managed agents keep no memory between sessions unless they have a memory connector, or [3.5](#35-memory-service). |
-| Clean up memory across harnesses; maybe Postgres or a memory MCP server | 3 | A memory plugin with its own schema and agent tools ([3.5](#35-memory-service)). |
+| One memory per agent, kept by the server | 3 | Hindsight in core: recall before each run, save after, agent tools, a Memory section ([3.5](#35-memory-service)). |
 
 ### Projects, goals, docs and artifacts
 
@@ -959,7 +959,7 @@ alone; anything else is deferred or waits on upstream.
 | [3.7](#37-announcement-channels) Announcement channels | Yes, plugin plus skill | — |
 | [3.9](#39-meetings) Meetings | Yes, scheduled tasks plus a plugin calendar | — |
 | [3.8](#38-assigned-comments-and-review-assignments) Assigned comments | Yes, the assigned comments | Driving review stages from them |
-| [3.5](#35-memory-service) Memory service | Yes, after fix 39; check upstream's memory direction and that plugin tools reach Claude Managed agents first | — |
+| [3.5](#35-memory-service) Memory service | Yes, in core on Hindsight ([proposal](proposals/memory-service-hindsight.md)); agent tools after hard-fork step 4a | — |
 | [3.4](#34-project-knowledge-base) Project knowledge base | Yes, as a new feature (no longer waiting on upstream) | Docs in the run prompt (a plugin tool and the skill stand in) |
 | [3.14](#314-company-instructions-companymd) Company instructions | Partly: a plugin keeping a shared section of each agent's instructions in sync | One `COMPANY.md` added to every run's prompt, unless upstream takes it |
 | [3.3](#33-lists-and-sprints-on-hold) Lists and sprints | On hold. A plugin first if it resumes | Server-side filters and agent visibility, if the plugin's limits matter |
@@ -1020,18 +1020,19 @@ Lists section on the dashboard.
 
 ### 3.5 Memory service
 
-- **Have:** three memory systems that don't coordinate (decision 5). Your agents run on
-  `claude_local`, the Paperclip Runner and Claude Managed ([question 9](#questions-for-you)). Claude
-  Managed agents have no agent folder, so file memory can't work for them at all.
-- **Missing:** one memory store per agent, the same for every harness, that people can read and edit.
-- **Approach:** after upstream fix 39, a plugin with a memory schema in Postgres (per agent, optionally per
-  project), agent tools to search and save, and a Memory section in agent settings to review and
-  correct entries. The fork skill takes over from `para-memory-files` for agents that opt in. A memory
-  MCP server is the same idea for harnesses that only speak MCP. Check first that plugin tools reach
-  Claude Managed agents, since they're the ones with no memory today. Until then, a memory connector
-  (`enableMemoryConnectors`) is their only option, which makes that flag's decision (E) matter more.
-- **Risk:** medium. It competes with upstream's memory connectors and its unbuilt memory-service plan,
-  so check upstream's direction before building.
+- **Have:** three memory systems that don't coordinate (decision 5): `para-memory-files`, Claude
+  Code's auto memory, and memory connectors. None of them recalls or saves on its own; each depends
+  on the model following prompt text.
+- **Missing:** one memory per agent that the server keeps up to date and people can read and edit.
+- **Approach (proposed Nov 18, 2026):** [Hindsight](https://github.com/vectorize-io/hindsight) run
+  beside Paperclip, in core. The server recalls an agent's memories before each run and puts them in
+  the wake prompt, and saves a digest of each run afterwards; agents get `memory_search` and
+  `memory_save` in the Paperclip MCP endpoint; a Memory section in agent settings lists, edits and
+  retires memories. Auto memory and `para-memory-files` go off for agents that opt in. Design, build
+  order and open decisions: [proposals/memory-service-hindsight.md](proposals/memory-service-hindsight.md).
+- **Depends on:** hard-fork step 4a for the agent tools. Not hard-fork work: it waits for stage 3.
+- **Risk:** medium. Another service to run, an LLM bill for extraction, and stale memories steering
+  agents. A short spike decides whether to go ahead.
 
 ### 3.6 Voting
 
