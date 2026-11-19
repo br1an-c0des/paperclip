@@ -26,7 +26,7 @@ set up for one person running Claude agents.
 ## Ground rules
 
 - **Branches:** work on `main`; larger work on a feature branch merged into `main` with `--no-ff`.
-  `master` mirrors upstream for the upstream watch and is never merged into `main` and never
+  `master` mirrors upstream locally for the upstream watch; it is never pushed, never merged into `main` and never
   committed to. Don't rebase `main`. `origin/new-ui` is a frozen pointer at the branch point; don't
   push to it.
 - **Upstream code is ours to change.** No `FORK:` markers and no patch records needed. Keep each
@@ -130,12 +130,14 @@ triages them, and cherry-picks only what you choose, on a branch, after approval
 
 - Git worktrees here, including agents' `isolation: "worktree"`, may start from `master` rather than
   `main`. Before working: `git merge-base --is-ancestor main HEAD || git reset --hard main`.
-- `git sync-master` checks out `master`, so don't run it in a checkout the dev servers run from. Instead:
-  `git fetch upstream && git push origin upstream/master:master && git branch -f master upstream/master && git branch --set-upstream-to=origin/master master`.
+- `master` mirrors upstream locally only: `git sync-master` fast-forwards it without a checkout.
+  Never push it to `origin`, where its upstream workflows would run in the fork (`origin/master` is
+  a stale copy from before 2026-11-19). Re-run `fork/setup-clone.sh` in a clone whose alias still
+  pushes.
 - server1 runs the real instance with real data: never test against it, and never run M7 test data there.
   server1 is also a dev machine, so check `hostname` first: on server1, `localhost:3100` is the real
   instance ([Dev work on server1](#dev-work-on-server1)).
-- `pnpm verify` and similar scripts compare against `origin/master`, which is upstream now: pass `--base main`
+- `pnpm verify` and similar scripts compare against `origin/master`, a stale upstream copy: pass `--base main`
   where they take one ([fork/repo-map.md](fork/repo-map.md#5-tests)).
 - Finished agent worktrees can be locked: `git worktree unlock <path>` before `git worktree remove`.
 - Stop a dev server by its port (`ss -ltnp | grep ':5181 '`), not `pkill -f <pattern>`, which also matches and kills the

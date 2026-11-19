@@ -17,7 +17,11 @@ git config remote.upstream.pushurl DISABLE
 git config rerere.enabled true
 git config rerere.autoupdate true
 
-git config alias.sync-master '!f() { set -e; cur=$(git branch --show-current); git fetch upstream; git checkout -q master; git merge --ff-only upstream/master; git push origin master; git checkout -q "$cur"; echo "master now at $(git rev-parse --short master); you are on $cur"; }; f'
+# master mirrors upstream locally only: pushing it to origin would let GitHub run upstream's
+# workflows in the fork (they are in master's .github/workflows). No checkout, so it is safe in a
+# checkout the dev servers run from.
+git config alias.sync-master '!f() { set -e; git fetch upstream; git merge-base --is-ancestor master upstream/master || { echo "master is not an ancestor of upstream/master: stopping" >&2; exit 1; }; git branch -f master upstream/master; git branch -q --set-upstream-to=upstream/master master; echo "master now at $(git rev-parse --short master), local only (never pushed to origin)"; }; f'
+git config branch.master.pushRemote no_push
 
 git fetch upstream
-echo "Configured upstream (fetch master only, push disabled), rerere, and the sync-master alias (master mirrors upstream for /upstream-watch; never merge it into main)."
+echo "Configured upstream (fetch master only, push disabled), rerere, and the sync-master alias (master mirrors upstream locally for /upstream-watch; never push it, never merge it into main)."
