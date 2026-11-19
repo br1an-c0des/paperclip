@@ -328,6 +328,7 @@ import {
   unbindToolProfileBindingSchema,
   importMcpJsonSchema,
   mcpConsentSchema,
+  updateMcpConnectionSchema,
   toolPolicyTestRequestSchema,
   createToolMcpGatewaySchema,
   completeConnectionIntentSchema,
@@ -13729,6 +13730,13 @@ registerCurrentRoute({
   summary: "List the signed-in person's assistant connections",
   description: ASSISTANT_CONNECTIONS_PERSON_ONLY,
   responses: { 200: r.ok(), 401: r.unauthorized },
+});
+registerCurrentRoute({
+  method: "patch", path: "/api/mcp/connections/{id}", tags: ["tool-gateway"],
+  summary: "Change who an assistant connection acts as, its access level or overrides, using a same-origin browser session",
+  description: ASSISTANT_CONNECTIONS_PERSON_ONLY,
+  body: updateMcpConnectionSchema,
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden, 404: r.notFound },
 });
 registerCurrentRoute({
   method: "delete", path: "/api/mcp/connections/{id}", tags: ["tool-gateway"],

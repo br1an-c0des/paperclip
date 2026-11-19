@@ -14,6 +14,8 @@ import { logActivity } from "../activity-log.js";
 import { DELIVERY_QUEUES, notifyDeliveryWork } from "../delivery-work-notifications.js";
 import { hashMcpSecret, McpOAuthError, type PublicMcpOAuth, type McpPrincipal } from "./oauth.js";
 import { McpCapabilityError, company, task, requestId, pick, object, stable, type ApiDispatch, type Capability } from "./contracts.js";
+import { hasAgentAccess } from "@paperclipai/shared";
+import { connectionAccess } from "./connection-access.js";
 
 const lifetime = 10 * 60_000;
 export const uploadSchema = z.object({ ...task, requestId,
@@ -24,8 +26,10 @@ export const uploadSchema = z.object({ ...task, requestId,
 }).strict();
 const attachmentFields = ["id", "issueId", "originalFilename", "contentType", "byteSize", "sha256", "createdAt"];
 const unavailable = () => new McpCapabilityError("This transfer is expired, revoked, invalid or no longer authorized. Request a new transfer link from Paperclip.");
+/** Attaching a file is a task change: the connection's level must allow one (step 4a). */
 function requireWrite(p: McpPrincipal) {
-  if (!p.grant.scopes.includes("paperclip:write") || p.actor.memberships?.[0]?.membershipRole === "viewer") throw unavailable();
+  const access = connectionAccess(p.grant, p.actor.memberships?.[0]?.membershipRole);
+  if (!hasAgentAccess(access, ["tasks:update_own", "tasks:update_any"])) throw unavailable();
 }
 
 export interface AgentFileSession {

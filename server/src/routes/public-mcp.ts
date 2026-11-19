@@ -9,7 +9,7 @@ import { z } from "zod";
 import { type PublicMcpEvents } from "../services/public-mcp/events.js";
 import type { PublicMcpToolExtension } from "../services/public-mcp/dot-runner.js";
 import { McpEventError } from "../services/public-mcp/event-webhooks.js";
-import { DOT_RUNNER_MCP_PATH, mcpConsentSchema, mcpInvitation, mcpSetupUrl } from "@paperclipai/shared";
+import { DOT_RUNNER_MCP_PATH, mcpConsentSchema, mcpInvitation, mcpSetupUrl, updateMcpConnectionSchema } from "@paperclipai/shared";
 import { renderMcpSetup, mcpSetupMarkdown } from "../services/public-mcp/setup.js";
 import { McpOAuthError, type PublicMcpOAuth } from "../services/public-mcp/oauth.js";
 import { McpApiError, McpCapabilityError, publicMcpCapabilities, type createPublicMcpExecutor } from "../services/public-mcp/capabilities.js";
@@ -245,6 +245,12 @@ export function publicMcpManagementRoutes(oauth: PublicMcpOAuth, agentOAuth?: Pu
   router.delete("/mcp/connections/:id", realUser, sameOrigin, async (req, res) => {
     if (!z.uuid().safeParse(req.params.id).success) throw new McpOAuthError("invalid_request", "Invalid connection ID.");
     await oauth.revokeConnection(String(req.params.id), req.actor.userId!); res.status(204).end();
+  });
+  router.patch("/mcp/connections/:id", realUser, sameOrigin, async (req, res) => {
+    if (!z.uuid().safeParse(req.params.id).success) throw new McpOAuthError("invalid_request", "Invalid connection ID.");
+    const parsed = updateMcpConnectionSchema.safeParse(req.body);
+    if (!parsed.success) throw new McpOAuthError("invalid_request", "Choose who the connection acts as, its access level or its overrides.");
+    res.json(await oauth.updateConnection(String(req.params.id), req.actor, parsed.data));
   });
   router.use(["/mcp", "/dot-mcp"], oauthErrors);
   return router;
