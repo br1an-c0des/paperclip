@@ -23,11 +23,17 @@ describe("buildPaperclipTaskMarkdown", () => {
     const issue = { id: "task-id", identifier: "PAP-1", title: "Please investigate", description: "Please investigate sign-in failures", titleNeedsGeneration: true };
     const markdown = buildPaperclipTaskMarkdown({ issue });
     expect(markdown).toContain("As one of your first tool calls");
-    expect(markdown).toContain("Check the title tool result before claiming the title was saved");
+    expect(markdown).toContain("Check the title tool result (changed: true) before claiming the title was saved");
     expect(markdown).not.toContain("rejected as credential material");
-    expect(markdown).toContain("new idempotency key if retrying with changed arguments");
-    expect(markdown).toContain("set_task_title");
+    // A claude_local run retitles through the paperclip catalog, not the retired project-tools server.
+    expect(markdown).toContain("use paperclip_update_task");
     expect(markdown).toContain("onlyIfProvisional: true");
+    expect(markdown).not.toContain("set_task_title");
+    expect(markdown).not.toContain("/api/issues/task-id/title");
+    // The dormant Paperclip Runner keeps its own tool.
+    const native = buildPaperclipTaskMarkdown({ issue, nativeRunner: true });
+    expect(native).toContain("set_task_title");
+    expect(native).toContain("new idempotency key if retrying with changed arguments");
     expect(buildPaperclipTaskMarkdown({ issue: { ...issue, titleNeedsGeneration: false } })).not.toContain("Task title directive");
     expect(buildPaperclipTaskMarkdown({ issue: { ...issue, conversationAgentId: "agent" } })).not.toContain("Task title directive");
   });
