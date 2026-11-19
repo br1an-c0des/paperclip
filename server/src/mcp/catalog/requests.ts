@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { object, pathId, pick, taskId, tool } from "./util.js";
+import { object, pathId, pick, rows, taskId, tool } from "./util.js";
 
 const APPROVAL_FIELDS = ["id", "type", "status", "createdAt"] as const;
 
@@ -17,6 +17,19 @@ function questionSet(question: string, choices: string[] | undefined, multiple: 
 
 /** Questions to the board and approval requests. */
 export const REQUEST_TOOLS = [
+  tool({
+    name: "paperclip_list_requests",
+    description: "List the company's pending requests for the board (approvals, permission requests). Only the board decides them, in Paperclip.",
+    action: "tasks:read",
+    input: z.object({}).strict(),
+    run: async (caller, _args, api) => ({
+      requests: rows(await api("GET", `/companies/${pathId(caller.companyId)}/approvals?status=pending`)).map(row => {
+        const payload = object(object(row).payload);
+        const title = typeof payload.title === "string" ? payload.title : typeof payload.summary === "string" ? payload.summary : null;
+        return { ...pick(row, ["id", "type", "status", "requestedByAgentId", "requestedByUserId", "createdAt"]), title };
+      }),
+    }),
+  }),
   tool({
     name: "paperclip_ask_board",
     description: "Ask the board a question on a task, as a card in its thread, and put the task in review to wait for the answer (wait: false keeps its status).",

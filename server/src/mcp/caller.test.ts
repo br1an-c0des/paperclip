@@ -44,6 +44,53 @@ describe("resolveMcpCaller", () => {
   });
 });
 
+describe("resolveMcpCaller for outside connections", () => {
+  const GRANT = "55555555-5555-4555-8555-555555555555";
+  const grant = (input: { accessLevel: "read_only" | "worker" | "manager" | "admin"; actAsAgentId?: string | null; accessOverrides?: Record<string, boolean> }) => ({
+    id: GRANT, companyId: COMPANY, userId: "user-1", clientId: "client", resource: "https://paperclip.example/mcp/paperclip",
+    purpose: "personal" as const, agentId: null, scopes: ["paperclip:read"], revokedAt: null,
+    actAsAgentId: input.actAsAgentId ?? null, accessLevel: input.accessLevel, accessOverrides: input.accessOverrides ?? null,
+    revocationRevision: 0, revocationIndexReceipt: null, createdAt: new Date(),
+  });
+  const person = { type: "board" as const, source: "mcp_oauth" as const, userId: "user-1", companyIds: [COMPANY], memberships: [{ companyId: COMPANY, membershipRole: "member", status: "active" }], grantId: GRANT };
+
+  it("a personal grant acting as the person is oauth_person at the grant's level", async () => {
+    const caller = await resolveMcpCaller(db, person, { grant: grant({ accessLevel: "read_only", accessOverrides: { "tasks:comment": true } }) });
+    expect(caller).toMatchObject({ kind: "oauth_person", companyId: COMPANY, agentId: null, userId: "user-1", runId: null, grantId: GRANT });
+    expect(caller.access["tasks:read"]).toBe(true);
+    expect(caller.access["tasks:comment"]).toBe(true);
+    expect(caller.access["tasks:create"]).toBe(false);
+  });
+
+  it("a viewer's connection is read-only whatever its level", async () => {
+    const viewer = { ...person, memberships: [{ companyId: COMPANY, membershipRole: "viewer", status: "active" }] };
+    const caller = await resolveMcpCaller(db, viewer, { grant: grant({ accessLevel: "admin" }) });
+    expect(caller.access["tasks:update_own"]).toBe(false);
+    expect(caller.access["tasks:read"]).toBe(true);
+  });
+
+  it("a grant acting as an agent uses the lower of the two levels", async () => {
+    vi.mocked(loadAgentAccess).mockResolvedValueOnce(resolveAgentAccess({ level: "manager" }));
+    const asAgent = { type: "agent" as const, source: "mcp_oauth" as const, agentId: AGENT, companyId: COMPANY, grantId: GRANT };
+    const caller = await resolveMcpCaller(db, asAgent, { grant: grant({ accessLevel: "worker", actAsAgentId: AGENT }) });
+    expect(caller).toMatchObject({ kind: "oauth_agent", agentId: AGENT, userId: "user-1", grantId: GRANT, runId: null });
+    expect(caller.access["tasks:update_own"]).toBe(true);
+    // The agent is a manager, but the connection is worker.
+    expect(caller.access["labels:manage"]).toBe(false);
+    vi.mocked(loadAgentAccess).mockResolvedValueOnce(resolveAgentAccess({ level: "worker" }));
+    const capped = await resolveMcpCaller(db, asAgent, { grant: grant({ accessLevel: "admin", actAsAgentId: AGENT }) });
+    // And the other way round: an admin connection can't lift a worker agent.
+    expect(capped.access["labels:manage"]).toBe(false);
+  });
+
+  it("a dormant agent grant (Dot) is oauth_agent on its agent, uncapped", async () => {
+    vi.mocked(loadAgentAccess).mockResolvedValueOnce(resolveAgentAccess({ level: "manager" }));
+    const caller = await resolveMcpCaller(db, { type: "agent", source: "mcp_oauth", agentId: AGENT, companyId: COMPANY });
+    expect(caller).toMatchObject({ kind: "oauth_agent", agentId: AGENT, grantId: null });
+    expect(caller.access["labels:manage"]).toBe(true);
+  });
+});
+
 describe("createCatalogDispatch", () => {
   async function runCaller() {
     return resolveMcpCaller(db, { type: "agent", source: "agent_jwt", agentId: AGENT, companyId: COMPANY, runId: RUN });

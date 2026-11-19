@@ -7,11 +7,27 @@ const status = z.enum(ISSUE_STATUSES);
 const priority = z.enum(ISSUE_PRIORITIES);
 const UPDATE_TASK = ["tasks:update_own", "tasks:update_any"] as const;
 
-/** Maps the tool's `blockedByTaskIds` onto the API's `blockedByIssueIds`, dropping unset fields. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Who must act on a blocked task: "board", an agent id (UUID), or a user id. */
+function unblockOwner(owner: string) {
+  if (owner === "board") return "board";
+  return UUID.test(owner) ? { agentId: owner } : { userId: owner };
+}
+
+/**
+ * Maps the tool's `blockedByTaskIds` onto the API's `blockedByIssueIds` and `unblock` onto its
+ * `unblockDescriptor`, dropping unset fields.
+ */
 function taskBody(args: Record<string, unknown>) {
-  const { blockedByTaskIds, ...rest } = args;
+  const { blockedByTaskIds, unblock, ...rest } = args;
+  const descriptor = unblock && typeof unblock === "object"
+    ? { owner: unblockOwner(String((unblock as Record<string, unknown>).owner)), action: (unblock as Record<string, unknown>).action }
+    : undefined;
   return Object.fromEntries(Object.entries({
-    ...rest, ...(blockedByTaskIds !== undefined ? { blockedByIssueIds: blockedByTaskIds } : {}),
+    ...rest,
+    ...(blockedByTaskIds !== undefined ? { blockedByIssueIds: blockedByTaskIds } : {}),
+    ...(descriptor ? { unblockDescriptor: descriptor } : {}),
   }).filter(([, value]) => value !== undefined));
 }
 
@@ -26,6 +42,10 @@ const taskChanges = {
   parentId: z.string().min(1).nullable().optional(),
   labelIds: z.array(uuid).max(50).optional().describe("Replaces the task's labels"),
   blockedByTaskIds: z.array(uuid).max(100).optional().describe("Replaces the task's blockers"),
+  unblock: z.object({
+    owner: z.string().trim().min(1).max(200).describe('"board", an agent id or a user id'),
+    action: z.string().trim().min(1).max(2000),
+  }).strict().optional().describe("With status blocked: who must act and what unblocks it"),
 };
 
 export const TASK_TOOLS = [
@@ -53,14 +73,17 @@ export const TASK_TOOLS = [
   }),
   tool({
     name: "paperclip_read_task",
-    description: "Read a task and its latest comments.",
+    description: "Read a task and its latest comments (and, with history: true, its activity).",
     action: "tasks:read",
-    input: z.object({ taskId, comments: z.number().int().min(0).max(100).default(20) }).strict(),
+    input: z.object({ taskId, comments: z.number().int().min(0).max(100).default(20), history: z.boolean().default(false) }).strict(),
     run: async (_caller, args, api) => {
       const task = await api("GET", `/issues/${pathId(args.taskId)}`);
       const comments = args.comments === 0 ? []
         : rows(await api("GET", `/issues/${pathId(args.taskId)}/comments?order=desc&limit=${args.comments}`));
-      return { task: pick(task, TASK_FIELDS), comments: comments.map(row => pick(row, COMMENT_FIELDS)) };
+      const history = args.history
+        ? rows(await api("GET", `/issues/${pathId(args.taskId)}/activity?limit=30`)).slice(0, 30).map(row => pick(row, ["id", "action", "actorType", "actorId", "createdAt"]))
+        : undefined;
+      return { task: pick(task, TASK_FIELDS), comments: comments.map(row => pick(row, COMMENT_FIELDS)), ...(history ? { history } : {}) };
     },
   }),
   tool({

@@ -53,7 +53,12 @@ export function createRunTools(deps: CatalogDeps, catalog: () => readonly Paperc
         const visibility = catalog().map(definition => ({ name: definition.name, visibility: toolVisibility(caller, definition) }));
         return {
           kind: caller.kind,
-          agent: pick(await api("GET", "/agents/me"), ["id", "name", "role", "title", "status", "reportsTo"]),
+          // A connection acting as the person has no agent: it acts as them, and assigning a task
+          // to an agent never impersonates that agent.
+          ...(caller.agentId
+            ? { agent: pick(await api("GET", "/agents/me"), ["id", "name", "role", "title", "status", "reportsTo"]) }
+            : { user: { id: caller.userId } }),
+          ...(caller.grantId ? { connectionId: caller.grantId } : {}),
           companyId: caller.companyId,
           runId: caller.runId,
           access: {

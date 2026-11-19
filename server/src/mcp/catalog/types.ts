@@ -32,7 +32,15 @@ export interface PaperclipTool<S extends z.ZodType = z.ZodType> {
   action: AgentAccessAction | readonly AgentAccessAction[];
   /** Hidden from callers without a run id. */
   needsRun?: boolean;
+  /** Hidden from callers without an OAuth grant (the file-link tools: tickets belong to a grant). */
+  needsGrant?: boolean;
   /** Whether a denial becomes an Inbox request. Defaults to `true` unless the action is `tasks:read`. */
   requestable?: boolean;
+  /**
+   * For a tool that reads or writes by its arguments: whether this call writes. A call that doesn't
+   * needs only `readAction` (default `tasks:read`); one that does needs `action`.
+   */
+  writes?: (args: z.infer<S>) => boolean;
+  readAction?: AgentAccessAction;
   run(caller: McpCaller, args: z.infer<S>, api: CatalogDispatch): Promise<unknown>;
 }

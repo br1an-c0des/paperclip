@@ -1,4 +1,4 @@
-/** Every tool the Paperclip MCP catalog can serve. Wave 2 adds the tools carried over from the public MCP. */
+/** Every tool the Paperclip MCP catalog can serve, to runs, agent keys and outside connections alike. */
 export const PAPERCLIP_TOOL_NAMES = [
   "paperclip_me",
   "paperclip_task_context",
@@ -25,6 +25,13 @@ export const PAPERCLIP_TOOL_NAMES = [
   "paperclip_create_project",
   "paperclip_update_project",
   "paperclip_list_project_repositories",
+  // Carried over from the public MCP (step 4a, wave 2).
+  "paperclip_list_requests",
+  "paperclip_deliverables",
+  "paperclip_configure_agent",
+  "paperclip_skills",
+  "paperclip_file_upload",
+  "paperclip_file_download",
 ] as const;
 
 export type PaperclipToolName = (typeof PAPERCLIP_TOOL_NAMES)[number];

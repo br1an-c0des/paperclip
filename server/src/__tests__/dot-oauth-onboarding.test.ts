@@ -153,7 +153,7 @@ describe("Dot onboarding with an operator-issued pairing capability", () => {
     const personal = createPublicMcpOAuth(db, { ...config, authorizationOrigin: browserOrigin, resource: config.origin + "/mcp/paperclip" });
     const app = express(); app.use(express.json());
     app.use((req, _res, next) => { req.actor = { type: "none" }; next(); });
-    app.use(publicMcpIngressRoutes(f.oauth, vi.fn()));
+    app.use(publicMcpIngressRoutes(f.oauth));
     app.use("/api", publicMcpManagementRoutes(personal, f.oauth));
     const metadata = await request(app).get("/.well-known/oauth-authorization-server/mcp/runner/oauth");
     expect(metadata.body).toMatchObject({ issuer: config.origin + "/mcp/runner/oauth",
