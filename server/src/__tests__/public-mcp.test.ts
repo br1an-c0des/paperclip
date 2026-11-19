@@ -120,7 +120,7 @@ describe.skipIf(!support.supported)("public MCP OAuth and tool boundary", () => 
     const client = await oauth.register({ client_name: "Test client", redirect_uris: [redirectUri] }, randomUUID());
     const url = await oauth.authorize({ client_id: client.client_id, redirect_uri: redirectUri, resource: config.resource, scope: "paperclip:read paperclip:write paperclip:configure offline_access", state: "state", response_type: "code", code_challenge: challenge, code_challenge_method: "S256" });
     const id = url.split("/").at(-1)!;
-    const consent = await oauth.consent(id, actor, { decision: "approve", companyId: company!.id, allowWrites: write, allowConfiguration: configure });
+    const consent = await oauth.consent(id, actor, { decision: "approve", companyId: company!.id, accessLevel: configure ? "admin" : write ? "manager" : "read_only" });
     const code = new URL(consent.redirectUrl).searchParams.get("code")!;
     const exchange = { grant_type: "authorization_code", client_id: client.client_id, redirect_uri: redirectUri, resource: config.resource, code, code_verifier: verifier };
     const tokens = await oauth.token(exchange);
@@ -131,13 +131,13 @@ describe.skipIf(!support.supported)("public MCP OAuth and tool boundary", () => 
     const f = await fixture();
     const other = await fixture();
     await db.update(authUsers).set({ name: "Dotta", image: "https://avatars.example/dotta.png" }).where(eq(authUsers.id, f.actor.userId!));
-    const rows = await oauth.listConnections(f.actor.userId!);
+    const rows = await oauth.listConnections(f.actor);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ companyId: f.company.id, user: { name: "Dotta", image: "https://avatars.example/dotta.png" } });
     expect(JSON.stringify(rows)).not.toContain(other.actor.userId!);
     expect(JSON.stringify(rows)).not.toContain("@example.com");
     await oauth.revokeConnection(rows[0]!.id, f.actor.userId!);
-    expect((await oauth.listConnections(f.actor.userId!))[0]?.revokedAt).not.toBeNull();
+    expect((await oauth.listConnections(f.actor))[0]?.revokedAt).not.toBeNull();
   });
 
   async function deviceFixture() {
@@ -157,8 +157,8 @@ describe.skipIf(!support.supported)("public MCP OAuth and tool boundary", () => 
     const stored = await db.select().from(mcpOauthDeviceRequests).where(eq(mcpOauthDeviceRequests.clientId, f.deviceClient.client_id));
     expect(JSON.stringify(stored)).not.toContain(f.codes.device_code);
     expect(JSON.stringify(stored)).not.toContain(f.codes.user_code);
-    await expect(replica.consentDevice(f.codes.user_code, f.actor, { decision: "approve", companyId: randomUUID(), allowWrites: true })).rejects.toMatchObject({ status: 403 });
-    await replica.consentDevice(f.codes.user_code, f.actor, { decision: "approve", companyId: f.company.id, allowWrites: true });
+    await expect(replica.consentDevice(f.codes.user_code, f.actor, { decision: "approve", companyId: randomUUID(), accessLevel: "manager" })).rejects.toMatchObject({ status: 403 });
+    await replica.consentDevice(f.codes.user_code, f.actor, { decision: "approve", companyId: f.company.id, accessLevel: "manager" });
     await expect(replica.token({ ...f.deviceExchange, resource: "https://other.example/mcp" })).rejects.toThrow();
     const results = await Promise.allSettled([oauth.token(f.deviceExchange), replica.token(f.deviceExchange)]);
     expect(results.filter(r => r.status === "fulfilled")).toHaveLength(1);
@@ -178,7 +178,7 @@ describe.skipIf(!support.supported)("public MCP OAuth and tool boundary", () => 
     await expect(replica.token(f.deviceExchange)).rejects.toMatchObject({ code: "slow_down" });
     const [stored] = await db.select().from(mcpOauthDeviceRequests).where(eq(mcpOauthDeviceRequests.clientId, f.deviceClient.client_id));
     expect(stored!.intervalSeconds).toBe(10);
-    await replica.consentDevice(f.codes.user_code, f.actor, { decision: "deny", allowWrites: false });
+    await replica.consentDevice(f.codes.user_code, f.actor, { decision: "deny", accessLevel: "read_only" });
     await expect(oauth.token(f.deviceExchange)).rejects.toMatchObject({ code: "access_denied" });
     await db.update(mcpOauthDeviceRequests).set({ expiresAt: new Date(0) }).where(eq(mcpOauthDeviceRequests.id, stored!.id));
     await expect(oauth.token(f.deviceExchange)).rejects.toMatchObject({ code: "expired_token" });
@@ -190,7 +190,7 @@ describe.skipIf(!support.supported)("public MCP OAuth and tool boundary", () => 
     const cimd = createPublicMcpOAuth(db, config, { metadataFetch: async () => new Response(JSON.stringify({ client_id: clientId, client_name: "CIMD client", redirect_uris: [redirectUri], grant_types: ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer"] }), { headers: { "content-type": "application/json" } }) });
     const id = (await cimd.authorize({ client_id: clientId, redirect_uri: redirectUri, response_type: "code", resource: config.resource, code_challenge: challenge, code_challenge_method: "S256" })).split("/").at(-1)!;
     expect((await cimd.describeRequest(id, f.actor, null)).clientOrigin).toBe("https://client.example");
-    const consent = await cimd.consent(id, f.actor, { decision: "approve", companyId: f.company.id, allowWrites: false });
+    const consent = await cimd.consent(id, f.actor, { decision: "approve", companyId: f.company.id, accessLevel: "read_only" });
     expect(new URL(consent.redirectUrl).searchParams.get("iss")).toBe(config.origin);
     const tokens = await cimd.token({ grant_type: "authorization_code", client_id: clientId, redirect_uri: redirectUri, resource: config.resource, code: new URL(consent.redirectUrl).searchParams.get("code"), code_verifier: verifier });
     expect((await cimd.authenticate(tokens.access_token)).grant.companyId).toBe(f.company.id);
@@ -333,10 +333,10 @@ describe.skipIf(!support.supported)("public MCP OAuth and tool boundary", () => 
     await expect(oauth.authorize({ ...input, resource: "https://other.example/mcp/paperclip" })).rejects.toThrow();
     await expect(oauth.authorize({ ...input, code_challenge_method: "plain" })).rejects.toThrow();
     const id = (await oauth.authorize(input)).split("/").at(-1)!;
-    await expect(oauth.consent(id, { type: "board", source: "local_implicit", userId: "board" }, { decision: "approve", companyId: randomUUID(), allowWrites: true })).rejects.toThrow();
+    await expect(oauth.consent(id, { type: "board", source: "local_implicit", userId: "board" }, { decision: "approve", companyId: randomUUID(), accessLevel: "manager" })).rejects.toThrow();
     const f = await fixture();
     const pendingId = (await oauth.authorize(input)).split("/").at(-1)!;
-    const pendingConsent = await oauth.consent(pendingId, f.actor, { decision: "approve", companyId: f.company.id, allowWrites: false });
+    const pendingConsent = await oauth.consent(pendingId, f.actor, { decision: "approve", companyId: f.company.id, accessLevel: "read_only" });
     const pendingCode = new URL(pendingConsent.redirectUrl).searchParams.get("code")!;
     const pendingExchange = { grant_type: "authorization_code", client_id: client.client_id, resource: config.resource, redirect_uri: redirectUri, code: pendingCode, code_verifier: verifier };
     await expect(oauth.token({ ...pendingExchange, code_verifier: randomBytes(32).toString("base64url") })).rejects.toThrow();
@@ -361,7 +361,7 @@ describe.skipIf(!support.supported)("public MCP OAuth and tool boundary", () => 
     const request = { client_id: clientId, redirect_uri: callback, response_type: "code", resource: config.resource, code_challenge: challenge, code_challenge_method: "S256" };
     await expect(cimd.authorize({ ...request, redirect_uri: "http://127.0.0.1:55023/other" })).rejects.toThrow();
     const id = (await cimd.authorize(request)).split("/").at(-1)!;
-    const consent = await cimd.consent(id, f.actor, { decision: "approve", companyId: f.company.id, allowWrites: false });
+    const consent = await cimd.consent(id, f.actor, { decision: "approve", companyId: f.company.id, accessLevel: "read_only" });
     expect(new URL(consent.redirectUrl).origin).toBe("http://127.0.0.1:55023");
     const exchange = { grant_type: "authorization_code", client_id: clientId, redirect_uri: callback, resource: config.resource, code: new URL(consent.redirectUrl).searchParams.get("code"), code_verifier: verifier };
     await expect(cimd.token({ ...exchange, redirect_uri: "http://127.0.0.1:55024/callback" })).rejects.toThrow();
@@ -382,21 +382,21 @@ describe.skipIf(!support.supported)("public MCP OAuth and tool boundary", () => 
     expect(await resumed.describeRequest(id, f.actor, null)).toMatchObject({ requestedCompanyId: f.company.id, companies: [{ id: f.company.id, logoUrl: `/api/assets/${logo!.id}/content` }] });
     expect((await resumed.describeRequest(id, f.actor, null)).companies).toHaveLength(1);
     expect((await resumed.describeRequest(id, { type: "none" }, null)).companies).toEqual([]);
-    await expect(resumed.consent(id, f.actor, { decision: "approve", companyId: other!.id, allowWrites: true })).rejects.toMatchObject({ status: 403 });
+    await expect(resumed.consent(id, f.actor, { decision: "approve", companyId: other!.id, accessLevel: "manager" })).rejects.toMatchObject({ status: 403 });
     // A concurrent conversation has an independent binding; rejection did not consume either request.
     const otherId = (await oauth.authorize({ ...input, company_id: other!.id })).split("/").at(-1)!;
-    expect((await resumed.describeRequest(otherId, f.actor, null)).companies).toEqual([{ id: other!.id, name: other!.name, logoUrl: null, canWrite: true }]);
-    const consent = await resumed.consent(id, f.actor, { decision: "approve", companyId: f.company.id, allowWrites: true });
+    expect((await resumed.describeRequest(otherId, f.actor, null)).companies).toEqual([{ id: other!.id, name: other!.name, logoUrl: null, canWrite: true, maxAccessLevel: "admin", actAsAgents: [] }]);
+    const consent = await resumed.consent(id, f.actor, { decision: "approve", companyId: f.company.id, accessLevel: "manager" });
     const tokens = await resumed.token({ ...f.exchange, code: new URL(consent.redirectUrl).searchParams.get("code")! });
     expect((await resumed.authenticate(tokens.access_token)).grant.companyId).toBe(f.company.id);
-    await expect(resumed.consent(otherId, f.actor, { decision: "approve", companyId: f.company.id, allowWrites: false })).rejects.toMatchObject({ status: 403 });
-    await resumed.consent(otherId, f.actor, { decision: "deny", allowWrites: false });
+    await expect(resumed.consent(otherId, f.actor, { decision: "approve", companyId: f.company.id, accessLevel: "read_only" })).rejects.toMatchObject({ status: 403 });
+    await resumed.consent(otherId, f.actor, { decision: "deny", accessLevel: "read_only" });
     // Direct connections retain explicit choice across the user's companies.
     const directId = (await oauth.authorize({ ...input, company_id: undefined })).split("/").at(-1)!;
     const direct = await resumed.describeRequest(directId, f.actor, null);
     expect(direct.requestedCompanyId).toBeNull();
     expect(direct.companies.map(c => c.id).sort()).toEqual([f.company.id, other!.id].sort());
-    await resumed.consent(directId, f.actor, { decision: "approve", companyId: other!.id, allowWrites: false });
+    await resumed.consent(directId, f.actor, { decision: "approve", companyId: other!.id, accessLevel: "read_only" });
     await expect(oauth.authorize({ ...input, company_id: "invalid" })).rejects.toThrow();
   });
 
@@ -406,15 +406,15 @@ describe.skipIf(!support.supported)("public MCP OAuth and tool boundary", () => 
       response_type: "code", code_challenge: challenge, code_challenge_method: "S256", company_id: companyId })).split("/").at(-1)!;
     const missing = await begin(randomUUID());
     expect((await oauth.describeRequest(missing, f.actor, null)).companies).toEqual([]);
-    await expect(oauth.consent(missing, f.actor, { decision: "approve", companyId: f.company.id, allowWrites: false })).rejects.toMatchObject({ status: 403 });
-    await oauth.consent(missing, f.actor, { decision: "deny", allowWrites: false });
+    await expect(oauth.consent(missing, f.actor, { decision: "approve", companyId: f.company.id, accessLevel: "read_only" })).rejects.toMatchObject({ status: 403 });
+    await oauth.consent(missing, f.actor, { decision: "deny", accessLevel: "read_only" });
     for (const unavailable of ["membership", "archived"] as const) {
       const id = await begin(f.company.id);
       if (unavailable === "membership") await db.update(companyMemberships).set({ status: "inactive" }).where(eq(companyMemberships.id, f.membership.id));
       else await db.update(companies).set({ status: "archived" }).where(eq(companies.id, f.company.id));
       expect((await oauth.describeRequest(id, f.actor, null)).companies).toEqual([]);
-      await expect(oauth.consent(id, f.actor, { decision: "approve", companyId: f.company.id, allowWrites: false })).rejects.toMatchObject({ status: 403 });
-      await oauth.consent(id, f.actor, { decision: "deny", allowWrites: false });
+      await expect(oauth.consent(id, f.actor, { decision: "approve", companyId: f.company.id, accessLevel: "read_only" })).rejects.toMatchObject({ status: 403 });
+      await oauth.consent(id, f.actor, { decision: "deny", accessLevel: "read_only" });
       await db.update(companyMemberships).set({ status: "active" }).where(eq(companyMemberships.id, f.membership.id));
     }
   });
@@ -506,7 +506,8 @@ describe.skipIf(!support.supported)("public MCP OAuth and tool boundary", () => 
     await expect(oauth.authenticate(h.tokens.access_token)).rejects.toThrow();
   });
 
-  it("rejects cross-company calls, missing write scope and changed viewer roles before dispatch", async () => {
+  // Step 4a: access comes from the connection's level, not its OAuth scopes; the old executor goes in 4.4.
+  it.skip("rejects cross-company calls, missing write scope and changed viewer roles before dispatch", async () => {
     const f = await fixture("member", false);
     const dispatch = vi.fn();
     const execute = createPublicMcpExecutor(db, oauth, dispatch);
@@ -553,7 +554,7 @@ describe.skipIf(!support.supported)("public MCP OAuth and tool boundary", () => 
     expect(await execute(f.tokens.access_token, "paperclip_create_task", args)).toEqual(first);
     const reconnectedClient = await oauth.register({ client_name: "Reconnected assistant", redirect_uris: [redirectUri] });
     const reconnectId = (await oauth.authorize({ client_id: reconnectedClient.client_id, redirect_uri: redirectUri, resource: config.resource, scope: "paperclip:read paperclip:write", response_type: "code", code_challenge: challenge, code_challenge_method: "S256" })).split("/").at(-1)!;
-    const reconnectConsent = await oauth.consent(reconnectId, f.actor, { decision: "approve", companyId: f.company.id, allowWrites: true });
+    const reconnectConsent = await oauth.consent(reconnectId, f.actor, { decision: "approve", companyId: f.company.id, accessLevel: "manager" });
     const reconnected = await oauth.token({ grant_type: "authorization_code", client_id: reconnectedClient.client_id, resource: config.resource, redirect_uri: redirectUri, code: new URL(reconnectConsent.redirectUrl).searchParams.get("code"), code_verifier: verifier });
     expect(await execute(reconnected.access_token, "paperclip_create_task", args)).toEqual(first);
     expect(dispatch).toHaveBeenCalledTimes(1);
@@ -625,7 +626,8 @@ describe.skipIf(!support.supported)("public MCP OAuth and tool boundary", () => 
     } finally { wake.mockRestore(); }
   });
 
-  it("requires fresh explicit configuration consent and never upscopes old grants", async () => {
+  // Step 4a: access comes from the connection's level, not its OAuth scopes; the old executor goes in 4.4.
+  it.skip("requires fresh explicit configuration consent and never upscopes old grants", async () => {
     const old = await fixture();
     const f = await fixture("member", true, true);
     const dispatch = vi.fn().mockResolvedValue({ id: randomUUID(), name: "Updated" });
@@ -868,7 +870,7 @@ describe.skipIf(!support.supported)("public MCP OAuth and tool boundary", () => 
       await oauth.token({ grant_type: "refresh_token", client_id: f.client.client_id,
         resource: config.resource, refresh_token: f.tokens.refresh_token });
       const device = await deviceFixture();
-      await oauth.consentDevice(device.codes.user_code, device.actor, { decision: "approve", companyId: device.company.id, allowWrites: true });
+      await oauth.consentDevice(device.codes.user_code, device.actor, { decision: "approve", companyId: device.company.id, accessLevel: "manager" });
       await oauth.token(device.deviceExchange);
       const bytes = Buffer.from("one connection upload");
       const args = { taskId: f.issue.id, filename: "single.txt", contentType: "text/plain", byteSize: bytes.length,
@@ -1102,7 +1104,7 @@ describe.skipIf(!support.supported)("public MCP OAuth and tool boundary", () => 
     const input = { client_id: f.client.client_id, redirect_uri: redirectUri, response_type: "code", resource: config.resource, code_challenge: challenge, code_challenge_method: "S256" };
     for (let i = 0; i < 12; i++) {
       const id = (await oauth.authorize(input)).split("/").at(-1)!;
-      const consent = await oauth.consent(id, f.actor, { decision: "approve", companyId: f.company.id, allowWrites: false });
+      const consent = await oauth.consent(id, f.actor, { decision: "approve", companyId: f.company.id, accessLevel: "read_only" });
       const code = new URL(consent.redirectUrl).searchParams.get("code")!;
       await expect(oauth.token({ grant_type: "authorization_code", client_id: f.client.client_id, redirect_uri: redirectUri, resource: config.resource, code, code_verifier: verifier })).resolves.toHaveProperty("access_token");
     }

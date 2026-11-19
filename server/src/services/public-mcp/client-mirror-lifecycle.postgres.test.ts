@@ -83,7 +83,7 @@ describe.skipIf(!configured)("MCP mirror actual transaction lifecycle",()=>{
     const grantInsert=vi.spyOn(PgDatabase.prototype,"insert"),intents:Array<{hints:string[];grantInserts:number}>=[];
     const unsubscribe=subscribeDatabaseWork(db,DELIVERY_QUEUES.mcpRevocationIndex,(event,hints)=>{if(event==="intent"&&hints?.size)intents.push({hints:[...hints],grantInserts:grantInsert.mock.calls.filter(([table])=>table===grants).length});});
     try{
-      const approved=await oauth.consent(new URL(location).pathname.split("/").at(-1)!,actor,{decision:"approve",companyId,allowWrites:false});
+      const approved=await oauth.consent(new URL(location).pathname.split("/").at(-1)!,actor,{decision:"approve",companyId,accessLevel: "read_only"});
       expect(new URL(approved.redirectUrl).searchParams.get("code")).toBeTruthy();
       const [approvedGrant]=await db.select().from(grants);
       expect(intents,JSON.stringify({expectedGrantInserts:0,observed:intents})).toEqual([{hints:[approvedGrant.id],grantInserts:0}]);
@@ -138,7 +138,7 @@ describe.skipIf(!configured)("MCP mirror actual transaction lifecycle",()=>{
   });
   it("actual company deletion rolls back mirror intent and invalidates source status and token proof on commit",async()=>{
     const f=await device();const actor:Request["actor"]={type:"board",source:"session",userId,companyIds:[companyId]};
-    await f.oauth.consentDevice(f.authorization.user_code,actor,{decision:"approve",companyId,allowWrites:false});
+    await f.oauth.consentDevice(f.authorization.user_code,actor,{decision:"approve",companyId,accessLevel: "read_only"});
     const approved=(await db.select().from(devices))[0];expect(approved.grantId).toBeTruthy();
     await new Promise(resolve=>setTimeout(resolve,5001));
     const tokens=await f.oauth.token({grant_type:DEVICE_GRANT,client_id:f.client.client_id,resource:f.oauth.config.resource,device_code:f.authorization.device_code});expect(tokens.access_token).toMatch(/^pcmcp_at_/);

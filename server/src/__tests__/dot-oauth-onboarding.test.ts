@@ -47,7 +47,7 @@ describe("Dot onboarding with an operator-issued pairing capability", () => {
   it("invalidates setup when a broker pairing is applied or revoked", async () => {
     const f = await fixture(undefined, "preparing");
     const consent = await f.oauth.consent(f.id, { type: "board", source: "session", userId: f.userId },
-      { decision: "approve", companyId: f.company.id, allowWrites: false });
+      { decision: "approve", companyId: f.company.id, accessLevel: "read_only" });
     const tokens = await f.oauth.token({ grant_type: "authorization_code", client_id: f.client.client_id,
       redirect_uri: callback, resource: config.resource, code: new URL(consent.redirectUrl).searchParams.get("code"), code_verifier: f.verifier });
     const principal = await f.oauth.authenticate(tokens.access_token);

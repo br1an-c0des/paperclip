@@ -325,14 +325,14 @@ describe.skipIf(!support.supported)("MCP event committed work", () => {
         response_type:"code",code_challenge:createHash("sha256").update(verifier).digest("base64url"),code_challenge_method:"S256",scope:"paperclip:read offline_access",company_id:companyId});
       const id = new URL(start).pathname.split("/").at(-1)!;
       expect((await inspectHandoffs()).blocked).toBe(false);
-      const approved = await f.oauth.consent(id,actor,{decision:"approve",companyId,allowWrites:false});
+      const approved = await f.oauth.consent(id,actor,{decision:"approve",companyId,accessLevel: "read_only"});
       grantId = (await db.select().from(mcpOauthRequests).where(eq(mcpOauthRequests.id,id)))[0].grantId!;
       exchange = () => f.oauth.token({grant_type:"authorization_code",client_id:client.client_id,resource:f.oauth.config.resource,redirect_uri:"https://receiver.example/oauth",
         code:new URL(approved.redirectUrl).searchParams.get("code"),code_verifier:verifier});
     } else {
       const start = await f.oauth.deviceAuthorize({client_id:client.client_id,resource:f.oauth.config.resource,scope:"paperclip:read offline_access",company_id:companyId});
       expect((await inspectHandoffs()).blocked).toBe(false);
-      await f.oauth.consentDevice(start.user_code,actor,{decision:"approve",companyId,allowWrites:false});
+      await f.oauth.consentDevice(start.user_code,actor,{decision:"approve",companyId,accessLevel: "read_only"});
       grantId = (await db.select().from(mcpOauthDeviceRequests))[0].grantId!;
       await vi.advanceTimersByTimeAsync(5001);
       exchange = () => f.oauth.token({grant_type:DEVICE_GRANT,client_id:client.client_id,resource:f.oauth.config.resource,device_code:start.device_code});
