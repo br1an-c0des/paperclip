@@ -79,6 +79,9 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 42 | [Fix or move the 8 test files that fail in a full run on `main`](#42-fix-or-move-the-8-test-files-that-fail-in-a-full-run-on-main) | candidate | | | 2026-11-18 | | |
 | 43 | [Stop a company import from setting an existing agent's access level](#43-stop-a-company-import-from-setting-an-existing-agents-access-level) | candidate | | | 2026-11-18 | | |
 | 44 | [Return 409, not 500, when a new label's name is taken](#44-return-409-not-500-when-a-new-labels-name-is-taken) | candidate | | | 2026-11-18 | | |
+| 45 | [Stop enforcing the four interaction switches that became access actions](#45-stop-enforcing-the-four-interaction-switches-that-became-access-actions) | candidate | | | 2026-11-18 | | |
+| 46 | [Stop the Advanced YAML editor overwriting an agent's hiring access](#46-stop-the-advanced-yaml-editor-overwriting-an-agents-hiring-access) | candidate | | | 2026-11-18 | | |
+| 47 | [Drop the legacy assignment fields from the agent access state](#47-drop-the-legacy-assignment-fields-from-the-agent-access-state) | candidate | | | 2026-11-18 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -725,3 +728,45 @@ Found by the step 4a follow-ups agent (2026-11-18).
 - **Likely fix:** make the same check as rename, or catch the unique violation, and return 409
   `label_name_taken`. The MCP tool `paperclip_manage_labels` then gives the same clear error for
   create as for rename.
+
+### 45. Stop enforcing the four interaction switches that became access actions
+
+Found by step 4a agent 5 (2026-11-18, on `feat/step-4a`).
+
+- **What's wrong:** four switches still block an agent even after its access level allows the
+  action: `canAssignTasksToAgents`, `canAssignTasksToHumans`, `canEditOtherTasks` and
+  `canConfigureOtherAgents`. `server/src/services/agent-interaction-policy.ts:103-116` still reads
+  them. Migration 0491 copied a `false` into the matching override but left the switch stored. The
+  Access card can turn the action on while the old switch keeps refusing it.
+- **In `ui-new`:** the Interactions card lists a retired switch still stored as off, with a Clear
+  button.
+- **Likely fix:**
+  - remove those four checks from the policy (the actions cover them now);
+  - clear the stored switches, either in a migration or on read;
+  - then drop the Clear workaround.
+
+  This is the cleanup the plan already lists ("agent-side interaction checks are redundant after
+  0491"). It's now a correctness bug, so fix it on `feat/step-4a` before it merges.
+
+### 46. Stop the Advanced YAML editor overwriting an agent's hiring access
+
+Found by step 4a agent 5 (2026-11-18).
+
+- **What's wrong:** saving permissions from the Advanced tab's YAML editor can undo the Access
+  card's hiring choice. The editor still sends `canCreateAgents`/`canAssignTasks`
+  (`ui-new/src/agents/configuration-model.ts:617`). `PATCH /agents/:id/permissions` then rewrites
+  the `agents:create` override from `canCreateAgents` (`server/src/routes/agents.ts:5114`).
+- **Likely fix:**
+  - the YAML editor edits `access` and stops sending the retired flags;
+  - or the route ignores `canCreateAgents` when the body or the stored permissions carry `access`.
+
+  Fix before `feat/step-4a` merges.
+
+### 47. Drop the legacy assignment fields from the agent access state
+
+Found by step 4a agent 5 (2026-11-18).
+
+- **What's wrong:** `buildAgentAccessState` (`server/src/routes/agents.ts:1280`) still reports
+  `canAssignTasks` and `taskAssignSource` from the old grants. Since step 4a, `tasks:assign` is an
+  access action, so these can disagree with the agent's real access. `ui-new` no longer shows them.
+- **Likely fix:** derive them from `access`, or remove them along with the retired grant keys.

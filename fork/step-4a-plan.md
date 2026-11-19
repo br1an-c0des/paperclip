@@ -530,6 +530,12 @@ since it builds on the real route-policy table.
 regression fixture changes: CEOs and agents created with `canCreateAgents: true` now store
 `permissions.access`.
 
+**Agent 5 merged 2026-11-18** (`7e2c2527a`): label manager, Access card, permission request card,
+connection access and consent. Until agent 4 merges, `feat/step-4a`'s consent and connection
+editing aren't backed by the server. Agent 5 found bugs 45 (the four retired interaction switches
+are still enforced) and 46 (the YAML editor overwrites hiring access), to fix before `main`, and
+47 (stale assignment fields).
+
 **Outside connections may break (decided 2026-11-18):** the user would rather the public MCP be
 built the right way than stay compatible. Existing OAuth connections may have to be removed and
 made again; consent doesn't have to keep the old checkbox meaning; old public tool names don't
