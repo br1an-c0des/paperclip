@@ -1277,6 +1277,10 @@ describe("report-only ownership reconciliation", () => {
   });
 
   it("goes quiet with nothing in progress and follows up while records change", async () => {
+    // The clock follows wall time but is fake, so the wait below steps to the
+    // worker's next pass (at most one full pass per 30 s interval) instead of
+    // waiting it out.
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"], shouldAdvanceTime: true });
     const errors: unknown[] = [];
     const coordinator = createDeliveryWorkCoordinator({ owner: db, canRun: () => true, onError: error => errors.push(error) });
     const reports: OwnershipReport[] = [];
@@ -1290,12 +1294,17 @@ describe("report-only ownership reconciliation", () => {
 
       await seed();
       worker.wake();
-      await expect.poll(() => reports.length, { timeout: 60_000, interval: 100 }).toBe(2);
+      await expect.poll(async () => {
+        const next = coordinator.nextWakeAt();
+        if (reports.length < 2 && next !== null && next > Date.now()) await vi.advanceTimersByTimeAsync(next - Date.now());
+        return reports.length;
+      }, { timeout: 60_000, interval: 100 }).toBe(2);
       expect(reports[1]!.inProgress).toBeGreaterThan(0);
       expect(coordinator.nextWakeAt()).not.toBeNull();
       expect(errors).toEqual([]);
     } finally {
       await coordinator.stop();
+      vi.useRealTimers();
     }
   }, 90_000);
 });
