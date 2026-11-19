@@ -3,15 +3,34 @@ import { and, eq } from "drizzle-orm";
 import { agents, type Db } from "@paperclipai/db";
 import {
   agentInteractionPermissionsSchema, resolveAgentInteractionPermissions, updateAgentInteractionPermissionsSchema,
+  RETIRED_AGENT_INTERACTION_PERMISSION_ACTIONS, retiredAgentInteractionPermissionKeys,
+  withoutRetiredAgentInteractionPermissions,
   type AgentInteractionPermissionsPatch, type AgentInteractionPermissionsState,
 } from "@paperclipai/shared";
-import { conflict, forbidden, notFound } from "../errors.js";
+import { conflict, forbidden, HttpError, notFound } from "../errors.js";
 import { accessService } from "./access.js";
 import type { AuthorizationActor } from "./authorization.js";
 import { logActivity, publishActivity, type ActivityPublication } from "./activity-log.js";
 
+/**
+ * Refuses a patch that sets one of the four switches retired in step 4a (410, like retired agent
+ * grants): they're access actions now, set with `PATCH /api/agents/:id/permissions`.
+ */
+export function assertNoRetiredAgentInteractionPermissions(agentId: string, body: unknown) {
+  const retired = retiredAgentInteractionPermissionKeys(body);
+  if (!retired.length) return;
+  const actions = [...new Set(retired.map(key => RETIRED_AGENT_INTERACTION_PERMISSION_ACTIONS[key]))];
+  throw new HttpError(410,
+    `${retired.join(", ")} ${retired.length === 1 ? "is" : "are"} retired: set the agent's access `
+    + `(${actions.join(", ")}, in permissions.access) with PATCH /api/agents/${agentId}/permissions.`,
+    { code: "agent_interaction_permission_retired", keys: retired, actions });
+}
+
 function state(agent: { id: string; companyId: string; permissions: Record<string, unknown> }): AgentInteractionPermissionsState {
-  const parsed = agentInteractionPermissionsSchema.safeParse(agent.permissions.interactions ?? {});
+  // Interactions stored before step 4a may still hold a retired switch. It isn't read, so it's left
+  // out here, and the next write through this service drops it.
+  const parsed = agentInteractionPermissionsSchema.safeParse(
+    withoutRetiredAgentInteractionPermissions(agent.permissions.interactions ?? {}));
   if (!parsed.success) throw conflict("Stored interaction permissions are invalid", { code: "invalid_agent_interaction_permissions" });
   return { agentId: agent.id, companyId: agent.companyId, overrides: parsed.data,
     effective: resolveAgentInteractionPermissions(parsed.data) };
@@ -30,6 +49,7 @@ export async function readAgentInteractionPermissions(db: Db, actor: Authorizati
 export async function updateAgentInteractionPermissions(db: Db, actor: AuthorizationActor, companyId: string,
   agentId: string, input: AgentInteractionPermissionsPatch) {
   if (actor.type !== "board" || currentPluginInteractionOrigin()) throw forbidden("Only human permission managers can change interaction permissions");
+  assertNoRetiredAgentInteractionPermissions(agentId, input);
   const patch = updateAgentInteractionPermissionsSchema.parse(input);
   const publications: ActivityPublication[] = [];
   const result = await db.transaction(async tx => {

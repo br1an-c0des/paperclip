@@ -8,7 +8,6 @@ import { SettingsCard } from "@/ui/Field";
 import { InfoTip } from "@/ui/InfoTip";
 import { CardNote, failure, SwitchRow, useAgentSaver } from "../shared";
 import {
-  clearRetiredPatch,
   deniedCount,
   INTERACTION_KEYS,
   interactionAllowed,
@@ -16,7 +15,6 @@ import {
   interactionOverridden,
   resetAllPatch,
   resetPatch,
-  retiredStillOff,
   switchPatch,
 } from "./interactions-model";
 import "./Interactions.css";
@@ -25,7 +23,7 @@ import "./Interactions.css";
  * The Interactions card on the agent's Permissions page (U105, interactions-model.ts): seven
  * switches for what the agent may do to other agents (mention them, comment on their tasks) and
  * what they may do to it, each allowed by default. The other four outgoing switches became access
- * actions (AccessCard.tsx); one still stored as off is listed under the switches, with Clear. A switch saves at once; one the agent has its own setting for shows
+ * actions (AccessCard.tsx). A switch saves at once; one the agent has its own setting for shows
  * "Set for this agent" and Reset, which puts the default back. Changing them takes a person who
  * can manage permissions (the server answers 403 otherwise, shown under the card's title).
  */
@@ -47,7 +45,6 @@ export function InteractionsCard(props: { agent: AgentDetail }) {
     }, fallback);
   const denied = () => deniedCount(state.data);
   const resetAll = () => resetAllPatch(state.data);
-  const retired = () => retiredStillOff(state.data);
 
   return (
     <section id="interactions" class="ag-anchor">
@@ -115,19 +112,6 @@ export function InteractionsCard(props: { agent: AgentDetail }) {
               </div>
             )}
           </For>
-          <Show when={retired().length > 0}>
-            <div class="ix-retired" role="note">
-              <span>
-                Still off from an older setting: {retired().map((entry) => entry.label).join(", ")}.
-                <InfoTip label="About older settings">
-                  These switches are access actions now, set under Access. The server still applies the old switch while it's stored, so clearing it leaves Access to decide.
-                </InfoTip>
-              </span>
-              <Button size="compact" variant="quiet" disabled={disabled()} onClick={() => save(clearRetiredPatch(state.data)!, "Couldn't clear the older settings.")}>
-                Clear
-              </Button>
-            </div>
-          </Show>
         </Show>
       </SettingsCard>
     </section>

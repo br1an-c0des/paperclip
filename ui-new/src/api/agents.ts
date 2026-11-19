@@ -75,10 +75,10 @@ export type AgentKey = { id: string; name: string; scope: AgentApiKeyScope; crea
 
 /**
  * `PATCH /agents/:id/permissions`. Since step 4a an agent's standing permissions are its `access`
- * (level and overrides): the Permissions page always sends `access`, whole, and never the old
- * `canCreateAgents`/`canAssignTasks` flags, which the server would turn into an `agents:create`
- * override of their own. The server takes either `access` or both old flags; the Advanced tab's
- * YAML still sends the flags.
+ * (level and overrides): the Permissions page and the Advanced tab's YAML always send `access`,
+ * whole, and never the old `canCreateAgents`/`canAssignTasks` flags. The server takes either
+ * `access` or both old flags, and lets the flags change `agents:create` only for an agent with no
+ * access stored (or a CEO's hiring denial).
  */
 export type AgentPermissionUpdate = {
   access?: AgentAccess;

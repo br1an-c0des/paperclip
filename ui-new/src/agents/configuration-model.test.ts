@@ -22,7 +22,7 @@ const agent = {
   appearance: appearanceForPalette("bubblegum-sky"), reportsTo: null, capabilities: null,
   adapterType: "process", adapterConfig: { command: "echo", instructionsBundleMode: "managed", paperclipSkillSync: { desiredSkills: ["paperclip"] } },
   runtimeConfig: {}, defaultEnvironmentId: null, budgetMonthlyCents: 0, metadata: null,
-  permissions: { canCreateAgents: false, canCreateSkills: true }, access: { canAssignTasks: false },
+  permissions: { canCreateAgents: false, canCreateSkills: true, access: { level: "manager" } },
   configurationRevision: "a".repeat(64),
 };
 const file = { path: "AGENTS.md", content: "# Codie\n", contentHash: "hash", revision: { id: "revision-file" }, editable: true, binary: false };
@@ -107,14 +107,40 @@ describe("complete agent configuration", () => {
     expect(api.agents.updateInstructionsBundle).not.toHaveBeenCalled();
   });
 
-  it("rejects ignored managed-root changes and impossible task-assignment permissions", async () => {
+  it("rejects ignored managed-root changes", async () => {
     const saved = await snapshot(); const doc = copy(saved.document);
     doc.spec.instructions!.rootPath = "/ignored/root";
     await expect(saveAgentConfiguration(client, saved, doc, receipt, progress)).rejects.toThrow("assigned by Paperclip");
-    doc.spec.instructions = saved.document.spec.instructions;
-    doc.spec.permissions!.canCreateAgents = true;
-    await expect(saveAgentConfiguration(client, saved, doc, receipt, progress)).rejects.toThrow("task assignment authority");
     expect(api.agents.updatePermissions).not.toHaveBeenCalled();
+  });
+
+  it("edits access, never the retired hiring and assignment flags (bug 46)", async () => {
+    const input = (spec: AgentConfigurationInput["spec"]): AgentConfigurationInput => ({ apiVersion: "paperclip/v1", kind: "Agent", spec });
+    // The Access card turned hiring on; the stale old flag still says off.
+    const hiring = { ...agent, permissions: { ...agent.permissions, access: { level: "manager", overrides: { "agents:create": true } } } };
+    api.agents.get.mockResolvedValue(copy(hiring));
+    api.agents.getConfiguration.mockResolvedValue(copy(hiring));
+    const saved = await snapshot();
+    // The document shows the stored access, which the Access card set.
+    expect(saved.document.spec.permissions).toMatchObject({ access: { level: "manager", overrides: { "agents:create": true } } });
+    expect(saved.document.spec.permissions).not.toHaveProperty("canCreateAgents");
+    expect(saved.document.spec.permissions).not.toHaveProperty("canAssignTasks");
+    // An unrelated permission edit sends access as stored, so hiring stays on.
+    await saveAgentConfiguration(client, saved, input({ permissions: { trustPreset: "standard", canCreateSkills: false } }), receipt, progress);
+    const body = api.agents.updatePermissions.mock.calls[0]![1];
+    expect(body).toMatchObject({ access: { level: "manager", overrides: { "agents:create": true } }, canCreateSkills: false });
+    expect(body).not.toHaveProperty("canCreateAgents");
+    expect(body).not.toHaveProperty("canAssignTasks");
+    // Editing access sends it whole.
+    await saveAgentConfiguration(client, await snapshot(), input({ permissions: { access: { level: "worker" } } }), receipt, progress);
+    expect(api.agents.updatePermissions).toHaveBeenLastCalledWith(agentId, expect.objectContaining({ access: { level: "worker" } }), "company");
+    // The old flags are refused with a pointer to access.
+    expect(() => planAgentConfiguration(client, saved, input({ permissions: { canCreateAgents: true } as never }))).toThrow(/canCreateAgents is retired/);
+  });
+
+  it("shows the default level for an agent with no access stored", async () => {
+    api.agents.get.mockResolvedValue({ ...agent, permissions: { canCreateSkills: true } });
+    expect((await snapshot()).document.spec.permissions).toMatchObject({ access: { level: "worker" } });
   });
 
   it("creates a secret and binds its returned ID without exporting the value", async () => {
@@ -443,7 +469,7 @@ describe("compact agent configuration", () => {
   it("preserves unmentioned permission fields and channel resources", async () => {
     const saved = await snapshot();
     await saveAgentConfiguration(client, saved, input({ permissions: { canCreateSkills: false }, channels: [{ id: "channel", settings: { allowUnlinkedPeople: true } }] }), receipt, progress);
-    expect(api.agents.updatePermissions).toHaveBeenCalledWith(agentId, expect.objectContaining({ canCreateAgents: false, canAssignTasks: false, canCreateSkills: false, trustPreset: "standard" }), "company");
+    expect(api.agents.updatePermissions).toHaveBeenCalledWith(agentId, expect.objectContaining({ access: agent.permissions.access, canCreateSkills: false, trustPreset: "standard" }), "company");
     expect(api.channels.update).toHaveBeenCalledWith("channel", { allowUnlinkedPeople: true });
     expect(api.channels.updateResources).not.toHaveBeenCalled();
   });

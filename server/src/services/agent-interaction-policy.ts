@@ -84,6 +84,17 @@ export async function agentInteractionDenial(
       policyAgentId, actorAgentId: actorAgentId!, targetAgentId, issueId };
   }
 
+  // Consent: whether the target agent accepts this from other agents (its receiver-side switch).
+  function receiver(
+    targetAgentId: string | null,
+    incoming: AgentInteractionPermissionKey,
+    operation = input.operation,
+    issueId = input.issueId ?? null,
+  ) {
+    if (!targetAgentId || targetAgentId === actorAgentId) return null;
+    return denied(incoming, targetAgentId, "incoming", targetAgentId, operation, issueId);
+  }
+
   function peer(
     targetAgentId: string | null,
     outgoing: AgentInteractionPermissionKey,
@@ -93,31 +104,32 @@ export async function agentInteractionDenial(
   ) {
     if (targetAgentId === actorAgentId) return null;
     return denied(outgoing, actorAgentId!, "outgoing", targetAgentId, operation, issueId)
-      ?? (targetAgentId ? denied(incoming, targetAgentId, "incoming", targetAgentId, operation, issueId) : null);
+      ?? receiver(targetAgentId, incoming, operation, issueId);
   }
 
+  // Assigning, editing another's task and configuring another agent are access actions since step 4a
+  // (tasks:assign, tasks:update_any, agents:configure in authorization.ts and the agent route
+  // policy); the actor-side switches that covered them are retired. Only the receiver's consent is
+  // checked here.
   let result: AgentInteractionDenial | null = null;
   switch (input.operation) {
     case "assign":
       if (!input.delivery) {
-        if (issue) result = peer(owner(issue), "canEditOtherTasks", "canReceiveTaskEditsFromAgents", "edit");
-        if (!result && parent) result = peer(owner(parent), "canEditOtherTasks", "canReceiveTaskEditsFromAgents", "edit", parent.id);
+        if (issue) result = receiver(owner(issue), "canReceiveTaskEditsFromAgents", "edit");
+        if (!result && parent) result = receiver(owner(parent), "canReceiveTaskEditsFromAgents", "edit", parent.id);
       }
-      if (!result && input.targetAgentId) result = peer(input.targetAgentId,
-        "canAssignTasksToAgents", "canReceiveAssignmentsFromAgents");
-      if (!result && input.assigneeUserId) result = denied("canAssignTasksToHumans", actorAgentId, "outgoing", null);
+      if (!result && input.targetAgentId) result = receiver(input.targetAgentId, "canReceiveAssignmentsFromAgents");
       break;
     case "comment":
       result = peer(input.delivery && input.targetAgentId ? input.targetAgentId : owner(issue),
         "canCommentOnOtherTasks", "canReceiveCommentsFromAgents");
       break;
     case "edit":
-      result = peer(owner(issue), "canEditOtherTasks", "canReceiveTaskEditsFromAgents");
-      if (!result && parent) result = peer(owner(parent), "canEditOtherTasks", "canReceiveTaskEditsFromAgents", "edit", parent.id);
+      result = receiver(owner(issue), "canReceiveTaskEditsFromAgents");
+      if (!result && parent) result = receiver(owner(parent), "canReceiveTaskEditsFromAgents", "edit", parent.id);
       break;
     case "configure":
-      if (input.targetAgentId) result = peer(input.targetAgentId,
-        "canConfigureOtherAgents", "canReceiveConfigurationChangesFromAgents");
+      if (input.targetAgentId) result = receiver(input.targetAgentId, "canReceiveConfigurationChangesFromAgents");
       break;
     case "mention":
       if (input.targetAgentId) result = peer(input.targetAgentId, "canMentionAgents", "canReceiveMentionsFromAgents");

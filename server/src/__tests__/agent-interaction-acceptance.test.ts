@@ -30,8 +30,10 @@ it("configures each control with the CLI against the assembled app and enforces 
     const hash = (token: string) => createHash("sha256").update(token).digest("hex");
     await db.insert(companies).values({ id: companyId, name: "Permission acceptance", issuePrefix: "IPA", requireBoardApprovalForNewAgents: false });
     await db.insert(authUsers).values({ id: userId, name: "Operator", email: `${userId}@example.com`, createdAt: new Date(), updatedAt: new Date() });
+    // The sender's access level allows every action, so the interaction switches are what refuses it.
     await db.insert(agents).values([sender, recipient].map((id, index) => ({ id, companyId, name: index ? "Recipient" : "Sender",
-      adapterType: "process", status: "idle", permissions: {}, runtimeConfig: { heartbeat: { wakeOnDemand: false, intervalSec: 0 } } })));
+      adapterType: "process", status: "idle", permissions: index ? {} : { access: { level: "admin" as const } },
+      runtimeConfig: { heartbeat: { wakeOnDemand: false, intervalSec: 0 } } })));
     await db.insert(companyMemberships).values([
       { companyId, principalType: "user", principalId: userId, membershipRole: "operator", status: "active" },
       ...[sender, recipient].map(principalId => ({ companyId, principalType: "agent", principalId, membershipRole: "member", status: "active" })),
@@ -82,7 +84,7 @@ it("configures each control with the CLI against the assembled app and enforces 
       expect((await cli(policyAgent, { [key]: false })).overrides).toEqual({ [key]: false });
       const before = await snapshot();
       const response = key.includes("Assign") ? await api(`/companies/${companyId}/issues`, {
-        title: "Prohibited delegation", status: "todo", ...(key === "canAssignTasksToHumans" ? { assigneeUserId: userId } : { assigneeAgentId: recipient }),
+        title: "Prohibited delegation", status: "todo", assigneeAgentId: recipient,
       }) : key.includes("Mention") ? await api(`/issues/${owned!.id}/comments`, { body: `[@Recipient](agent://${recipient})` })
         : key.includes("Comment") ? await api(`/issues/${peer!.id}/comments`, { body: "Prohibited reply" })
         : key.includes("Edit") ? await api(`/issues/${peer!.id}`, { title: "Prohibited edit" }, "PATCH")
@@ -109,7 +111,7 @@ it("configures each control with the CLI against the assembled app and enforces 
     expect((await api(`/agents/${sender}/interaction-permissions`, { canMentionAgents: true }, "PATCH")).status).toBe(403);
     await cli(recipient, { canReceiveCommentsFromAgents: null });
     const audit = await db.select().from(activityLog).where(and(eq(activityLog.companyId, companyId), eq(activityLog.action, "agent.interaction_permissions_updated")));
-    expect(audit).toHaveLength(25);
+    expect(audit).toHaveLength(AGENT_INTERACTION_PERMISSION_KEYS.length * 2 + 3);
     expect(audit.every(row => row.actorId === userId)).toBe(true);
     expect((await db.select().from(agents).where(eq(agents.companyId, companyId))).every(row => !Object.hasOwn(row.permissions, "interactions"))).toBe(true);
   } finally {

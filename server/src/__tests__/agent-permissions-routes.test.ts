@@ -2205,7 +2205,7 @@ describe("agent permission routes", () => {
     expect(mockAgentService.update).not.toHaveBeenCalled();
   });
 
-  it("exposes explicit task assignment access on agent detail", async () => {
+  it("reports the agent's membership and grants on agent detail, without the retired assignment fields", async () => {
     mockAccessService.listPrincipalGrants.mockResolvedValue([
       {
         id: "grant-1",
@@ -2231,26 +2231,11 @@ describe("agent permission routes", () => {
     const res = await requestApp(app, (baseUrl) => request(baseUrl).get(`/api/agents/${agentId}`));
 
     expect(res.status).toBe(200);
-    expect(res.body.access.canAssignTasks).toBe(true);
-    expect(res.body.access.taskAssignSource).toBe("explicit_grant");
-  }, 15_000);
-
-  it("reports simple-mode task assignment as enabled for active company agent members", async () => {
-    mockAccessService.listPrincipalGrants.mockResolvedValue([]);
-
-    const app = await createApp({
-      type: "board",
-      userId: "board-user",
-      source: "local_implicit",
-      isInstanceAdmin: true,
-      companyIds: [companyId],
-    });
-
-    const res = await requestApp(app, (baseUrl) => request(baseUrl).get(`/api/agents/${agentId}`));
-
-    expect(res.status).toBe(200);
-    expect(res.body.access.canAssignTasks).toBe(true);
-    expect(res.body.access.taskAssignSource).toBe("simple_default");
+    expect(res.body.access.grants).toEqual([expect.objectContaining({ permissionKey: "tasks:assign" })]);
+    expect(res.body.access).toHaveProperty("membership");
+    // Assigning is the tasks:assign access action since step 4a (bug 47).
+    expect(res.body.access).not.toHaveProperty("canAssignTasks");
+    expect(res.body.access).not.toHaveProperty("taskAssignSource");
   }, 15_000);
 
   it("keeps task assignment enabled when agent creation privilege is enabled", async () => {
@@ -2280,8 +2265,6 @@ describe("agent permission routes", () => {
       true,
       "board-user",
     );
-    expect(res.body.access.canAssignTasks).toBe(true);
-    expect(res.body.access.taskAssignSource).toBe("agent_creator");
   });
 
   it("preserves disabled skill creation when unrelated permission updates omit that field", async () => {

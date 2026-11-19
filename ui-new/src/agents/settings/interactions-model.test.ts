@@ -1,8 +1,7 @@
-import type { AgentInteractionPermissionsState, AgentPermissions } from "@paperclipai/shared";
+import { AGENT_INTERACTION_PERMISSION_KEYS, type AgentInteractionPermissionsState, type AgentPermissions } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import { trustUpdate } from "../trust-model";
 import {
-  clearRetiredPatch,
   deniedCount,
   INTERACTION_KEYS,
   interactionAllowed,
@@ -11,12 +10,10 @@ import {
   overriddenKeys,
   resetAllPatch,
   resetPatch,
-  RETIRED_KEYS,
-  retiredStillOff,
   switchPatch,
 } from "./interactions-model";
 
-const allowed = Object.fromEntries([...INTERACTION_KEYS, ...RETIRED_KEYS].map((key) => [key, true])) as AgentInteractionPermissionsState["effective"];
+const allowed = Object.fromEntries(INTERACTION_KEYS.map((key) => [key, true])) as AgentInteractionPermissionsState["effective"];
 
 function state(overrides: AgentInteractionPermissionsState["overrides"]): AgentInteractionPermissionsState {
   const effective = { ...allowed };
@@ -33,8 +30,9 @@ describe("interaction switches", () => {
     ]);
     const keys = groups.flatMap((group) => group.rows.map((row) => row.key));
     expect(new Set(keys).size).toBe(7);
-    expect(keys.filter((key) => RETIRED_KEYS.includes(key))).toEqual([]);
     expect(keys).toEqual([...INTERACTION_KEYS]);
+    // The card lists every switch the server still has.
+    expect([...keys].sort()).toEqual([...AGENT_INTERACTION_PERMISSION_KEYS].sort());
     expect(groups[1]!.title).toBe("What other agents may do to Ada");
   });
 
@@ -50,10 +48,9 @@ describe("interaction switches", () => {
   });
 
   it("counts an explicit true as the agent's own setting, which Reset removes", () => {
-    const current = state({ canMentionAgents: false, canReceiveMentionsFromAgents: true, canEditOtherTasks: false });
+    const current = state({ canMentionAgents: false, canReceiveMentionsFromAgents: true });
     expect(interactionOverridden(current, "canReceiveMentionsFromAgents")).toBe(true);
     expect(interactionOverridden(current, "canCommentOnOtherTasks")).toBe(false);
-    // A retired switch isn't one of the card's own settings.
     expect(overriddenKeys(current)).toEqual(["canMentionAgents", "canReceiveMentionsFromAgents"]);
   });
 
@@ -67,14 +64,6 @@ describe("interaction switches", () => {
     expect(resetAllPatch(state({ canMentionAgents: false, canReceiveMentionsFromAgents: true }))).toEqual({ canMentionAgents: null, canReceiveMentionsFromAgents: null });
     expect(resetAllPatch(state({}))).toBeNull();
     expect(resetAllPatch(undefined)).toBeNull();
-  });
-
-  it("lists retired switches still stored as off, and clears every stored one", () => {
-    const current = state({ canEditOtherTasks: false, canAssignTasksToHumans: true, canMentionAgents: false });
-    expect(retiredStillOff(current).map((row) => row.label)).toEqual(["Edit other tasks"]);
-    expect(clearRetiredPatch(current)).toEqual({ canAssignTasksToHumans: null, canEditOtherTasks: null });
-    expect(clearRetiredPatch(state({ canMentionAgents: false }))).toBeNull();
-    expect(retiredStillOff(undefined)).toEqual([]);
   });
 
   it("keeps interactions out of the legacy /permissions body", () => {

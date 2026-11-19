@@ -93,10 +93,10 @@ describe("agent interaction mutation boundaries", () => {
 
   it("keeps comments independent from task-edit permission", async () => {
     const f = await seed(), svc = issueService(db);
-    await restrict(f.sender, { canEditOtherTasks: false });
+    await restrict(f.recipient, { canReceiveTaskEditsFromAgents: false });
     await svc.addComment(f.issueId, "Allowed comment", { agentId: f.sender });
     await svc.update(f.issueId, { actorAgentId: f.sender });
-    await expect(svc.update(f.issueId, { title: "No", actorAgentId: f.sender })).rejects.toMatchObject(denied("canEditOtherTasks"));
+    await expect(svc.update(f.issueId, { title: "No", actorAgentId: f.sender })).rejects.toMatchObject(denied("canReceiveTaskEditsFromAgents"));
   });
 
   it("rejects creating work for a protected recipient without inserting a task", async () => {
@@ -109,13 +109,12 @@ describe("agent interaction mutation boundaries", () => {
 
   it("allows initial plan content under assignment authority without requiring peer edit permission", async () => {
     const f = await seed();
-    await restrict(f.sender, { canEditOtherTasks: false });
     await restrict(f.recipient, { canReceiveTaskEditsFromAgents: false });
     const created = await issueService(db).create(f.companyId, { title: "New assigned work", createdByAgentId: f.sender,
       assigneeAgentId: f.recipient, initialPlan: "Initial instructions", status: "todo" });
     expect((await documentService(db).getIssueDocumentByKey(created.id, "plan"))?.body).toBe("Initial instructions");
     await expect(documentService(db).upsertIssueDocument({ issueId: created.id, key: "notes", format: "markdown",
-      body: "Later instructions", createdByAgentId: f.sender })).rejects.toMatchObject(denied("canEditOtherTasks"));
+      body: "Later instructions", createdByAgentId: f.sender })).rejects.toMatchObject(denied("canReceiveTaskEditsFromAgents"));
   });
 
   it("checks assignment restrictions on native create_task before saving tasks or enqueueing wakes", async () => {

@@ -74,13 +74,12 @@ describe.skipIf(!support.supported)("pending agent interaction delivery", () => 
     expect((await db.select().from(agentWakeupRequests).where(eq(agentWakeupRequests.id, receipt.id)))[0]).toEqual(wakeBefore);
   });
 
-  it.each(["incoming", "outgoing"])("refuses a previously accepted assignment after %s revocation", async direction => {
+  it("refuses a previously accepted assignment after the recipient's revocation", async () => {
     const f = await seed(); const receipt = await wake(f);
-    await restriction(direction === "incoming" ? f.recipient : f.sender,
-      direction === "incoming" ? { canReceiveAssignmentsFromAgents: false } : { canAssignTasksToAgents: false });
+    await restriction(f.recipient, { canReceiveAssignmentsFromAgents: false });
     const result = await recheckQueuedRunInteractions(db, await readRun(f.run.id));
     expect(result.denied).toBe(true);
-    expect(result.denials.assignment).toMatchObject({ code: "agent_interaction_denied", direction });
+    expect(result.denials.assignment).toMatchObject({ code: "agent_interaction_denied", direction: "incoming", actorAgentId: f.sender });
     expect((await db.select().from(agentWakeupRequests).where(eq(agentWakeupRequests.id, receipt.id)))[0]!.status).toBe("skipped");
     expect((await db.select().from(issues).where(eq(issues.id, f.issueId)))[0]!.assigneeAgentId).toBe(f.recipient);
     await restriction(f.sender, {}); await restriction(f.recipient, {});
@@ -102,7 +101,7 @@ describe.skipIf(!support.supported)("pending agent interaction delivery", () => 
   });
 
   it.each(["queued", "prepared"] as const)("rechecks every assignment in a %s run with an allowed coalesced comment", async boundary => {
-    for (const assignmentFirst of [true, false]) for (const direction of ["outgoing", "incoming"]) {
+    for (const assignmentFirst of [true, false]) {
       const f = await seed();
       const messageId = await comment(f, "user");
       const primary = await wake(f, assignmentFirst ? {} : { commentIds: [messageId], actorType: "user", actorId: "human" });
@@ -128,8 +127,8 @@ describe.skipIf(!support.supported)("pending agent interaction delivery", () => 
       expect(assignment.payload?.interactionOrigin).toEqual({ actorType: "agent", actorId: f.sender });
       if (boundary === "queued") expect((await recheckQueuedRunInteractions(db, await readRun(f.run.id))).denied).toBe(false);
       else expect(await preparedRunInteractionDeliveryDenied(db, await readRun(f.run.id))).toBe(false);
-      const permission = direction === "outgoing" ? "canAssignTasksToAgents" : "canReceiveAssignmentsFromAgents";
-      await restriction(direction === "outgoing" ? f.sender : f.recipient, { [permission]: false });
+      const permission = "canReceiveAssignmentsFromAgents";
+      await restriction(f.recipient, { [permission]: false });
       if (boundary === "queued") expect((await recheckQueuedRunInteractions(db, await readRun(f.run.id))).denied).toBe(true);
       else expect(await preparedRunInteractionDeliveryDenied(db, await readRun(f.run.id))).toBe(true);
       const denied = await readRun(f.run.id);
@@ -152,7 +151,6 @@ describe.skipIf(!support.supported)("pending agent interaction delivery", () => 
 
   it("does not apply assignment restrictions to a comment-only pending run", async () => {
     const f = await seed(); const message = await comment(f, "agent"); const receipt = await wake(f, { commentIds: [message] });
-    await restriction(f.sender, { canAssignTasksToAgents: false });
     await restriction(f.recipient, { canReceiveAssignmentsFromAgents: false });
     expect((await recheckQueuedRunInteractions(db, await readRun(f.run.id))).denied).toBe(false);
     expect(await preparedRunInteractionDeliveryDenied(db, await readRun(f.run.id))).toBe(false);
@@ -171,12 +169,12 @@ describe.skipIf(!support.supported)("pending agent interaction delivery", () => 
       createdAt: new Date(f.run.createdAt.getTime() - 1), details: { assigneeAgentId: f.recipient } });
     await db.update(heartbeatRuns).set({ contextSnapshot: { issueId: f.issueId, wakeReason: "issue_assigned",
       wakeCommentId: messageId, wakeCommentIds: [messageId] } }).where(eq(heartbeatRuns.id, f.run.id));
-    await restriction(f.sender, { canAssignTasksToAgents: false });
+    await restriction(f.recipient, { canReceiveAssignmentsFromAgents: false });
     if (boundary === "queued") expect((await recheckQueuedRunInteractions(db, await readRun(f.run.id))).denied).toBe(true);
     else expect(await preparedRunInteractionDeliveryDenied(db, await readRun(f.run.id))).toBe(true);
     expect(((await readRun(f.run.id)).resultJson?.interactionPermissionDenials as Record<string, unknown>).assignment)
-      .toMatchObject({ actorAgentId: f.sender, permission: "canAssignTasksToAgents" });
-    await restriction(f.sender, {});
+      .toMatchObject({ actorAgentId: f.sender, permission: "canReceiveAssignmentsFromAgents" });
+    await restriction(f.recipient, {});
     if (boundary === "queued") expect((await recheckQueuedRunInteractions(db, await readRun(f.run.id))).denied).toBe(true);
     else expect(await preparedRunInteractionDeliveryDenied(db, await readRun(f.run.id))).toBe(true);
   });
@@ -216,9 +214,9 @@ describe.skipIf(!support.supported)("pending agent interaction delivery", () => 
       await db.update(heartbeatRuns).set({ createdAt: sql`'2026-11-09T12:00:00.000900Z'::timestamptz` })
         .where(eq(heartbeatRuns.id, f.run.id));
     }
-    await restriction(f.sender, { canAssignTasksToAgents: false });
+    await restriction(f.recipient, { canReceiveAssignmentsFromAgents: false });
     const result = await recheckQueuedRunInteractions(db, await readRun(f.run.id));
-    expect(result.denials.assignment).toMatchObject({ actorAgentId: f.sender, permission: "canAssignTasksToAgents" });
+    expect(result.denials.assignment).toMatchObject({ actorAgentId: f.sender, permission: "canReceiveAssignmentsFromAgents" });
   });
 
   it.each(["canCommentOnOtherTasks", "canMentionAgents"])("checks %s for saved parent reports through a system dispatch envelope", async permission => {
@@ -253,9 +251,9 @@ describe.skipIf(!support.supported)("pending agent interaction delivery", () => 
     await db.update(heartbeatRuns).set({ status: "failed", errorCode: "controller_lease_lost" }).where(eq(heartbeatRuns.id, f.run.id));
     const [retry] = await db.insert(heartbeatRuns).values({ companyId: f.companyId, agentId: f.recipient, status: "queued",
       retryOfRunId: f.run.id, invocationSource: "automation", contextSnapshot: { issueId: f.issueId }, nativeIssueId: f.issueId }).returning();
-    await restriction(f.sender, { canAssignTasksToAgents: false });
+    await restriction(f.recipient, { canReceiveAssignmentsFromAgents: false });
     expect((await recheckQueuedRunInteractions(db, retry!)).denials.assignment)
-      .toMatchObject({ actorAgentId: f.sender, permission: "canAssignTasksToAgents" });
+      .toMatchObject({ actorAgentId: f.sender, permission: "canReceiveAssignmentsFromAgents" });
   });
 
   it("preserves a server-authorized import routine's source company at delivery", async () => {
@@ -264,9 +262,9 @@ describe.skipIf(!support.supported)("pending agent interaction delivery", () => 
     await db.update(agentWakeupRequests).set({ payload: withInteractionDeliveryOrigin(receipt.payload,
       "agent", source.sender, undefined, source.companyId) }).where(eq(agentWakeupRequests.id, receipt.id));
     expect((await recheckQueuedRunInteractions(db, await readRun(target.run.id))).denied).toBe(false);
-    await restriction(source.sender, { canAssignTasksToAgents: false });
+    await restriction(target.recipient, { canReceiveAssignmentsFromAgents: false });
     expect((await recheckQueuedRunInteractions(db, await readRun(target.run.id))).denials.assignment)
-      .toMatchObject({ actorAgentId: source.sender, permission: "canAssignTasksToAgents" });
+      .toMatchObject({ actorAgentId: source.sender, permission: "canReceiveAssignmentsFromAgents" });
   });
 
   it("uses an originating agent run even when a decision effect is presented as a human comment", async () => {

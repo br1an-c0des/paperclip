@@ -78,9 +78,11 @@ export interface AgentInstructionsBundle {
   files: AgentInstructionsFileSummary[];
 }
 
+/**
+ * The agent's company membership and grants. What it may do is its access level
+ * (`permissions.access`, step 4a), so the old `canAssignTasks`/`taskAssignSource` are gone.
+ */
 export interface AgentAccessState {
-  canAssignTasks: boolean;
-  taskAssignSource: "simple_default" | "explicit_grant" | "agent_creator" | "ceo_role" | "none";
   membership: CompanyMembership | null;
   grants: PrincipalPermissionGrant[];
 }

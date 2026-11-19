@@ -176,7 +176,7 @@ export function installDefaultHandlers(api: MockApi, options: MockOptions = {}):
   api.get("/agents/:agentId", ({ params }) => {
     const found = world.AGENTS.find((a) => a.id === params.agentId || a.urlKey === params.agentId);
     if (!found) return reply(404, { error: "Agent not found" });
-    return { ...found, chainOfCommand: [], access: { canAssignTasks: true, taskAssignSource: "board", membership: null, grants: [] } };
+    return { ...found, chainOfCommand: [], access: { membership: null, grants: [] } };
   });
   api.get("/companies/:companyId/adapters/:adapterType/models", () => [
     { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },

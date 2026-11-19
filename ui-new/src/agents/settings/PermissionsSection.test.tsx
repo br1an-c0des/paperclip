@@ -25,7 +25,7 @@ const { PermissionsSection } = await import("./PermissionsSection");
 let client: QueryClient;
 
 function agent(permissions: Record<string, unknown> = {}, extra: Partial<AgentDetail> = {}) {
-  return { id: "a1", companyId: "co1", name: "Ada", role: "engineer", status: "idle", permissions: { canCreateAgents: false, ...permissions }, access: { canAssignTasks: true, taskAssignSource: "simple_default" }, ...extra } as unknown as AgentDetail;
+  return { id: "a1", companyId: "co1", name: "Ada", role: "engineer", status: "idle", permissions: { canCreateAgents: false, ...permissions }, access: { membership: null, grants: [] }, ...extra } as unknown as AgentDetail;
 }
 
 function mount(value: AgentDetail) {

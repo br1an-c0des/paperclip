@@ -308,11 +308,31 @@ describe.skipIf(!support.supported)("agent access in the authorization service",
       const invalid = await request(app).patch(`/api/agents/${agent.id}/permissions`).send({ access: { level: "owner" } });
       expect(invalid.status).toBe(400);
 
-      // The old hiring toggle keeps working: it sets the agents:create override.
+      // Once access is stored, the old hiring flag doesn't touch it (bug 46): a stale flag, as the
+      // Advanced YAML used to send, can't undo the Access card.
       const hiring = await request(app).patch(`/api/agents/${agent.id}/permissions`).send({ canCreateAgents: false, canAssignTasks: true });
       expect(hiring.status, JSON.stringify(hiring.body)).toBe(200);
-      expect((await loadAgentAccess(db, agent.id))["agents:create"]).toBe(false);
-      expect((await loadAgentAccess(db, agent.id))["api:raw"]).toBe(true);
+      expect((await loadAgentAccess(db, agent.id))["agents:create"]).toBe(true);
+      expect((await loadAgentAccess(db, agent.id))["tasks:delete"]).toBe(true);
+      const bothSent = await request(app).patch(`/api/agents/${agent.id}/permissions`)
+        .send({ access: { level: "worker", overrides: { "agents:create": true } }, canCreateAgents: false });
+      expect(bothSent.status, JSON.stringify(bothSent.body)).toBe(200);
+      expect(await loadAgentAccess(db, agent.id)).toMatchObject({ "agents:create": true, "api:raw": false });
+
+      // With no access stored, the flag still sets the agents:create override, at the default level.
+      const legacy = await createAgent(db, company.id);
+      const legacyHiring = await request(app).patch(`/api/agents/${legacy.id}/permissions`).send({ canCreateAgents: true, canAssignTasks: true });
+      expect(legacyHiring.status, JSON.stringify(legacyHiring.body)).toBe(200);
+      expect((await db.select().from(agents).where(eq(agents.id, legacy.id)))[0]!.permissions.access)
+        .toEqual({ level: "worker", overrides: { "agents:create": true } });
+
+      // A CEO's hiring denial still turns agents:create off, and is recorded.
+      const hiringCeo = await createAgent(db, company.id, { role: "ceo", access: { level: "manager", overrides: { "agents:create": true } } });
+      const denial = await request(app).patch(`/api/agents/${hiringCeo.id}/permissions`).send({ canCreateAgents: false, canAssignTasks: true });
+      expect(denial.status, JSON.stringify(denial.body)).toBe(200);
+      expect((await loadAgentAccess(db, hiringCeo.id))["agents:create"]).toBe(false);
+      expect((await db.select().from(agents).where(eq(agents.id, hiringCeo.id)))[0]!.permissions)
+        .toMatchObject({ canCreateAgents: false, ceoHiringDeniedBy: expect.objectContaining({ at: expect.any(String) }) });
 
       // An agent can't set access, not even a CEO.
       const ceo = await createAgent(db, company.id, { role: "ceo", access: { level: "admin" } });

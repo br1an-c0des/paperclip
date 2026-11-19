@@ -244,9 +244,9 @@ describeEmbeddedPostgres("routine service live-execution coalescing", () => {
     const editorId = randomUUID();
     await db.insert(agents).values({ id: editorId, companyId: f.companyId, name: "Editor", status: "active", adapterType: "process" });
     await f.svc.update(f.routine.id, { description: "Agent-authored instructions" }, { agentId: editorId });
-    await db.update(agents).set({ permissions: { interactions: { canAssignTasksToAgents: false } } }).where(eq(agents.id, editorId));
+    await db.update(agents).set({ permissions: { interactions: { canReceiveAssignmentsFromAgents: false } } }).where(eq(agents.id, f.agentId));
     await expect(f.svc.runRoutine(f.routine.id, { source: "api" }, {})).rejects.toMatchObject({ status: 403,
-      details: expect.objectContaining({ permission: "canAssignTasksToAgents", actorAgentId: editorId }) });
+      details: expect.objectContaining({ permission: "canReceiveAssignmentsFromAgents", actorAgentId: editorId }) });
     expect(await db.select().from(routineRuns).where(eq(routineRuns.routineId, f.routine.id))).toEqual([]);
     expect(f.wakeups).toEqual([]);
   });
