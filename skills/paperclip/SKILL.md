@@ -62,7 +62,7 @@ A final message alone doesn't end a run: a run that stops without one of these, 
 - **Task changes:** `paperclip_update_task` for title, description, priority, labels (`labelIds` replaces the set; `paperclip_list_labels` for ids), parent and blockers; `paperclip_archive_task` hides a task (reversible). `paperclip_delete_task` is permanent and rarely granted: prefer archiving.
 - **Other tasks:** pass context on an existing task with `paperclip_add_comment` (a comment can wake its assignee); if you're refused, report the missing permission on your own task.
 - **Finding things:** `paperclip_search_tasks`, `paperclip_list_agents`, `paperclip_list_projects`, `paperclip_list_project_repositories`.
-- **Managers:** `paperclip_create_project` and `paperclip_update_project` for projects, `paperclip_manage_labels` to create or delete label definitions.
+- **Managers:** `paperclip_create_project` and `paperclip_update_project` for projects, `paperclip_manage_labels` to create, rename, recolour or delete label definitions.
 
 ## Comment Style (Required)
 

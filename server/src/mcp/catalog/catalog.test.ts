@@ -65,7 +65,7 @@ describe("the Paperclip catalog", () => {
       paperclip_add_comment: { taskId: "TES-1", body: "hi" },
       paperclip_read_document: { taskId: "TES-1" },
       paperclip_write_document: { taskId: "TES-1", key: "plan", body: "# Plan", baseRevisionId: null },
-      paperclip_manage_labels: { create: [{ name: "bug", color: "#ff0000" }], delete: [labelId] },
+      paperclip_manage_labels: { create: [{ name: "bug", color: "#ff0000" }], update: [{ labelId, name: "defect" }], delete: [labelId] },
       paperclip_create_project: { name: "Website" },
       paperclip_update_project: { projectId, changes: { name: "Site" } },
       paperclip_ask_board: { taskId: "TES-1", question: "Which?" },
