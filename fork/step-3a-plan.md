@@ -366,6 +366,23 @@ $(git merge-base main origin/feat/step-4a) origin/feat/step-4a`). Report instead
   directory drops everything under it; plain `vitest` in a built tree also runs packages' `dist/`
   test copies (the runner excludes them).
 
+- **G merged** 2026-11-18 (`88e1b5bb6b`): the slow core files went from 2,317 s to 1,322 s of file
+  time with the same tests and assertions (the `issue-recovery-*` family 621 s → 57 s,
+  `deferred-execution-receipt-work` 268 → 142 s, `live-recovery-work` 228 → 133 s): wall-following
+  fake clocks stepped over idle deadlines, `pg_cancel_backend` on `pg_sleep` waits, single-statement
+  seeding. [results-slow.md](test-suite-audit/results-slow.md). Decided with the user: the five
+  census files (idle-backstop, live-run-agent-census and others, ~500 s, which simulate a large
+  company over 10–70 minutes) stay in thorough; `failed-continuation-continues-again` is left as is.
+- **Bug 40 is a real production bug** (G): Linux start times are `btime` (whole seconds, recomputed
+  from the wall clock on every read, drifting ~1 s per 30 s on WSL) plus start ticks, so two readings
+  of a live process can differ by whole seconds and recovery fails a live run as `process_lost`. The
+  user chose G's option 1: a whole-second gap counts as the same process for `btime`-based readings
+  (a reused PID matches by chance 1 time in 100, and its record is held until the PID exits). G is
+  finishing it on `test/bug40`. Exact boot-relative start ticks in every stamp (option 2, a new field
+  and a migration) are worth revisiting in step 4b.
+- **Upstream's 38 workflows disabled on GitHub** 2026-11-18 (`gh workflow disable`, reversible), so
+  pushing the `master` mirror no longer starts them. Our `test.yml` comes with agent H's merge.
+
 Merge order: E and G, then F (its final full run includes G's changes), then H. Then the PM writes
 the workflow (quick before pushing, thorough in CI and before merging into `main`, opt-in on demand)
 into `CLAUDE.md`, the `/pm` briefs and `doc/test-infrastructure.md`.
