@@ -142,9 +142,49 @@ export async function grantTemporaryAccess(db: DbOrTransaction, input: {
 }
 
 /**
+ * An allow for one action on one resource (or a whole company), held only by the async chain of an
+ * approved permission request's replay (step 4a, section 7). Every write the replayed tool makes is
+ * covered, however many there are, and nothing outside the replay is: there is no stored grant, and
+ * the allow is switched off when the replay ends, so work it left running doesn't keep it.
+ */
+export interface ReplayAccess {
+  companyId: string;
+  principal: TemporaryAccessPrincipal;
+  action: AgentAccessAction;
+  resource: TemporaryAccessResource;
+}
+
+const replayAccess = new AsyncLocalStorage<ReplayAccess & { active: boolean }>();
+
+export async function runWithReplayAccess<T>(allow: ReplayAccess, fn: () => Promise<T>): Promise<T> {
+  const scope = { ...allow, active: true };
+  try {
+    return await replayAccess.run(scope, fn);
+  } finally {
+    scope.active = false;
+  }
+}
+
+function replayAllows(input: {
+  companyId: string;
+  principal: TemporaryAccessPrincipal;
+  action: AgentAccessAction;
+  resource: TemporaryAccessResource;
+}): boolean {
+  const allow = replayAccess.getStore();
+  if (!allow?.active) return false;
+  if (allow.companyId !== input.companyId || allow.action !== input.action) return false;
+  if (allow.principal.type !== input.principal.type || allow.principal.id !== input.principal.id) return false;
+  return allow.resource.type === "company"
+    ? allow.resource.id === input.companyId
+    : allow.resource.type === input.resource.type && allow.resource.id === input.resource.id;
+}
+
+/**
  * True when an unexpired grant matches the principal, action and resource (or covers the whole
- * company). A grant without a use limit is never used up; otherwise one use is taken atomically, so
- * two concurrent calls can't both spend a one-use grant.
+ * company), or a permission request's replay holds an allow for them. A grant without a use limit
+ * is never used up; otherwise one use is taken atomically, so two concurrent calls can't both spend
+ * a one-use grant.
  */
 export async function consumeTemporaryAccess(db: DbOrTransaction, input: {
   companyId: string;
@@ -152,6 +192,7 @@ export async function consumeTemporaryAccess(db: DbOrTransaction, input: {
   action: AgentAccessAction;
   resource: TemporaryAccessResource;
 }): Promise<boolean> {
+  if (replayAllows(input)) return true;
   const matches = and(
     eq(temporaryAccessGrants.companyId, input.companyId),
     eq(temporaryAccessGrants.principalType, input.principal.type),

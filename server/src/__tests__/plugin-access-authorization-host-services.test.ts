@@ -9,8 +9,10 @@ import {
   companyMemberships,
   createDb,
   invites,
+  issues,
   principalPermissionGrants,
 } from "@paperclipai/db";
+import { eq } from "drizzle-orm";
 import { buildHostServices } from "../services/plugin-host-services.js";
 import {
   getEmbeddedPostgresTestSupport,
@@ -55,6 +57,8 @@ describeEmbeddedPostgres("plugin access and authorization host services", () => 
 
   afterEach(async () => {
     await db.delete(activityLog);
+    await db.delete(agentWakeupRequests);
+    await db.delete(issues);
     await db.delete(principalPermissionGrants);
     await db.delete(invites);
     await db.delete(agents);
@@ -79,6 +83,95 @@ describeEmbeddedPostgres("plugin access and authorization host services", () => 
         .rejects.toMatchObject({ status: 403, details: { permission: "canReceiveAssignmentsFromAgents", actorAgentId: sender!.id } });
       expect(await db.select().from(agentWakeupRequests)).toEqual([]);
     } finally { services.dispose(); }
+  });
+
+  describe("a plugin acting for an agent is limited by the agent's access (bug 50)", () => {
+    async function seed(actorLevel: "worker" | "manager" | "admin") {
+      const company = await createCompany(db, "POA");
+      const [actor, other] = await db.insert(agents).values([
+        { companyId: company.id, name: "M7 test actor", adapterType: "process", permissions: { access: { level: actorLevel } } },
+        { companyId: company.id, name: "M7 test other", adapterType: "process", permissions: {} },
+      ]).returning();
+      // As hiring an agent records it (routes/agents.ts, ensureMembership).
+      await db.insert(companyMemberships).values([actor!, other!].map(agent => ({
+        companyId: company.id, principalType: "agent", principalId: agent.id, status: "active", membershipRole: "member",
+      })));
+      const [ownTask, othersTask] = await db.insert(issues).values([
+        { companyId: company.id, title: "M7 test own", status: "todo", assigneeAgentId: actor!.id },
+        { companyId: company.id, title: "M7 test other's", status: "todo", assigneeAgentId: other!.id },
+      ]).returning();
+      const services = buildHostServices(db, pluginId, "permissions-extension", createEventBusStub());
+      const asActor = <T>(fn: () => Promise<T>) => withPluginInteractionOrigin({ companyId: company.id, agentId: actor!.id }, fn);
+      const agentPolicy = async (agentId: string) =>
+        (await db.select().from(agents).where(eq(agents.id, agentId)))[0]!.permissions as Record<string, unknown>;
+      const taskPolicy = async (issueId: string) =>
+        (await db.select().from(issues).where(eq(issues.id, issueId)))[0]!.executionPolicy as Record<string, unknown> | null;
+      return { company, actor: actor!, other: other!, ownTask: ownTask!, othersTask: othersTask!, services, asActor, agentPolicy, taskPolicy };
+    }
+    const policy = { assignmentPolicy: { mode: "protected" } };
+    const accessDenied = (missingAction: string) => ({ status: 403, details: expect.objectContaining({ code: "access_denied", missingAction }) });
+
+    it("configuring another agent needs agents:configure; its own policy doesn't", async () => {
+      const worker = await seed("worker");
+      try {
+        await expect(worker.asActor(() => worker.services.authorization.updatePolicy({
+          companyId: worker.company.id, resourceType: "agent", resourceId: worker.other.id, policy,
+        }))).rejects.toMatchObject(accessDenied("agents:configure"));
+        expect(await worker.agentPolicy(worker.other.id)).not.toHaveProperty("authorizationPolicy");
+        await worker.asActor(() => worker.services.authorization.updatePolicy({
+          companyId: worker.company.id, resourceType: "agent", resourceId: worker.actor.id, policy,
+        }));
+        expect(await worker.agentPolicy(worker.actor.id)).toMatchObject({ authorizationPolicy: policy });
+      } finally { worker.services.dispose(); }
+      const admin = await seed("admin");
+      try {
+        await admin.asActor(() => admin.services.authorization.updatePolicy({
+          companyId: admin.company.id, resourceType: "agent", resourceId: admin.other.id, policy,
+        }));
+        expect(await admin.agentPolicy(admin.other.id)).toMatchObject({ authorizationPolicy: policy });
+      } finally { admin.services.dispose(); }
+    });
+
+    it("editing another agent's task needs tasks:update_any; its own task needs tasks:update_own", async () => {
+      const worker = await seed("worker");
+      try {
+        await expect(worker.asActor(() => worker.services.authorization.updatePolicy({
+          companyId: worker.company.id, resourceType: "issue", resourceId: worker.othersTask.id, policy,
+        }))).rejects.toMatchObject(accessDenied("tasks:update_any"));
+        expect(await worker.taskPolicy(worker.othersTask.id)).toBeNull();
+        await worker.asActor(() => worker.services.authorization.updatePolicy({
+          companyId: worker.company.id, resourceType: "issue", resourceId: worker.ownTask.id, policy,
+        }));
+        expect(await worker.taskPolicy(worker.ownTask.id)).toMatchObject({ authorizationPolicy: policy });
+      } finally { worker.services.dispose(); }
+      const manager = await seed("manager");
+      try {
+        await manager.asActor(() => manager.services.authorization.updatePolicy({
+          companyId: manager.company.id, resourceType: "issue", resourceId: manager.othersTask.id, policy,
+        }));
+        expect(await manager.taskPolicy(manager.othersTask.id)).toMatchObject({ authorizationPolicy: policy });
+      } finally { manager.services.dispose(); }
+    });
+
+    it("invoking another agent needs tasks:assign", async () => {
+      const worker = await seed("worker");
+      try {
+        await expect(worker.asActor(() => worker.services.agents.invoke({
+          companyId: worker.company.id, agentId: worker.other.id, prompt: "Start work",
+        }))).rejects.toMatchObject(accessDenied("tasks:assign"));
+        expect(await db.select().from(agentWakeupRequests)).toEqual([]);
+      } finally { worker.services.dispose(); }
+    });
+
+    it("without an agent origin the plugin's own call isn't limited by an agent's access", async () => {
+      const worker = await seed("worker");
+      try {
+        await worker.services.authorization.updatePolicy({
+          companyId: worker.company.id, resourceType: "issue", resourceId: worker.othersTask.id, policy,
+        });
+        expect(await worker.taskPolicy(worker.othersTask.id)).toMatchObject({ authorizationPolicy: policy });
+      } finally { worker.services.dispose(); }
+    });
   });
 
   it("rejects grant writes for principals outside the requested company", async () => {
