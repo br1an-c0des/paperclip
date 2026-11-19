@@ -445,8 +445,9 @@ The plan: every run gets one Paperclip MCP connection, and agents work through i
   definitions lazily when there are many, which keeps the cost low.
 
 **Built in 4a** (merged into `main` 2026-11-19): the endpoint, the catalog, finish-or-block, the short skill,
-the same tools for people (the public MCP serves the catalog), and per-agent access levels. Still
-for 4b: dropping `--strict-mcp-config`, so repo MCP servers load alongside. See
+the same tools for people (the public MCP serves the catalog), and per-agent access levels. Since
+decision 8, 4b keeps `--strict-mcp-config` on every run, so only Paperclip's servers load; the repo's
+and the user's don't. See
 [step-4a-plan.md](step-4a-plan.md) and [claude-local-run.md](claude-local-run.md).
 
 Starting points (as written before 4a): the project-tools route (`server/src/routes/project-tools.ts`, since retired) showed the server
@@ -525,7 +526,7 @@ in whatever order matters most ([The build plan after the hard fork](#the-build-
 | 2. Take the fixes already written | In progress. Our three pull requests are in `main`; the image builds from source (no patches) on `deploy/build-from-source`, not yet deployed; upstream's open pull requests surveyed in [upstream-open-prs.md](upstream-open-prs.md), picks pending. |
 | 3. Leave unused code | Ongoing, as decided. |
 | 3a. Renovate the test suite | **Done 2026-11-19**, added 2026-11-17. The full suite took ~6 hours serially; the goal was 10–20 minutes (30 at most). Audit: [test-suite-audit.md](test-suite-audit.md); plan and results: [step-3a-plan.md](step-3a-plan.md). Rounds 1 and 2 merged 2026-11-18: tiers (quick, thorough, opt-in), the thorough tier at **21 min** locally with 0 failures, a CI workflow in 10 shards, and the workflow in `CLAUDE.md`. CI's first run on `main` (2026-11-19) was green in 11.5 min. |
-| 4. Make runs Claude-native | Split in two. 4a (Paperclip over MCP, agent permissions): designed and planned 2026-11-17 ([design](step-4a-mcp-and-permissions.md), [plan](step-4a-plan.md)); building on `feat/step-4a`: wave 1 merged there; regression runs wait for 3a, building continues; handed off to a manager session on server1 on 2026-11-18 ([handoff](step-4a-handoff.md)). Wave 2 and the follow-up fixes merged on `feat/step-4a` on 2026-11-18; the real run passed on server1's dev instance; the regression after 3a found bugs 58–61, fixed. **4a merged into `main` 2026-11-19** (`549e76036`, CI green), not yet deployed (back up server1's database first: migration 0491). 4b (Claude-native runs): next. |
+| 4. Make runs Claude-native | Split in two. 4a (Paperclip over MCP, agent permissions): designed and planned 2026-11-17 ([design](step-4a-mcp-and-permissions.md), [plan](step-4a-plan.md)); building on `feat/step-4a`: wave 1 merged there; regression runs wait for 3a, building continues; handed off to a manager session on server1 on 2026-11-18 ([handoff](step-4a-handoff.md)). Wave 2 and the follow-up fixes merged on `feat/step-4a` on 2026-11-18; the real run passed on server1's dev instance; the regression after 3a found bugs 58–61, fixed. **4a merged into `main` 2026-11-19** (`549e76036`, CI green), not yet deployed (back up server1's database first: migration 0491). 4b (Claude-native runs): next; part 1 designed ([design](step-4b-sealed-runs.md), approved 2026-11-18, updated for 4a on 2026-11-19), not yet planned. |
 | 5–7 | Not started. |
 
 ## Watching upstream

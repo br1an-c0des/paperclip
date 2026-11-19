@@ -535,7 +535,7 @@ For the CLI engine on a local target, no managed AI connection, task-bound run (
 | Company skills assigned in Paperclip | Yes | `--add-dir <bundle>` with `.claude/skills` symlinks; always includes `paperclip`, `complain`, `suggestion-box` (`resolveLegacyPaperclipDesiredSkillNames`, `server-utils.ts:4401-4420`) |
 | Agent instructions (`AGENTS.md` entry) | Yes, fresh sessions | `--append-system-prompt-file`; siblings (`HEARTBEAT.md`, `SOUL.md`, `TOOLS.md`) only if the agent reads them |
 | Paperclip MCP servers | Yes | `--mcp-config` (§7) |
-| Repo `.mcp.json`, user MCP servers | **No** | `--strict-mcp-config` (`execute.ts:904-906`). Since step 4a every run with a token has the `paperclip` server, so the flag applies to task-less runs too (before, a run with no Paperclip server got neither flag and loaded them). Step 4b drops the flag. |
+| Repo `.mcp.json`, user MCP servers | **No** | `--strict-mcp-config` (`execute.ts:904-906`). Since step 4a every run with a token has the `paperclip` server, so the flag applies to task-less runs too (before, a run with no Paperclip server got neither flag and loaded them). Step 4b keeps the flag on every run ([decision 8](hard-fork-plan.md#decisions)). |
 | Hooks, permissions, env from settings | Hooks and env yes; permission prompts are bypassed | `--dangerously-skip-permissions` |
 | Auto memory | Yes, unless `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` is in the environment; **off on server1** (`deploy/docker-compose.yml:80`) | Inherited env. Memory is keyed by project path, so it differs between the repo, each worktree and private folders. |
 | `para-memory-files` | Only if assigned (core skill for CEO hires, `server/src/services/company-skills.ts:687-693`) | A Paperclip skill writing to `$AGENT_HOME` |
