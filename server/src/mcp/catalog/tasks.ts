@@ -101,6 +101,8 @@ export const TASK_TOOLS = [
       status: z.enum(["backlog", "todo"]).optional(),
       labelIds: z.array(uuid).max(50).optional(),
       blockedByTaskIds: z.array(uuid).max(100).optional(),
+      initialPlan: z.string().trim().min(1).max(200000).optional()
+        .describe("Markdown saved as the new task's plan document, before its assignee starts"),
     }).strict(),
     run: async (caller, args, api) => ({
       task: pick(await api("POST", `/companies/${pathId(caller.companyId)}/issues`, taskBody(args)), TASK_FIELDS),

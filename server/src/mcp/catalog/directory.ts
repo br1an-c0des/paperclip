@@ -64,9 +64,9 @@ export const DIRECTORY_TOOLS = [
   }),
   tool({
     name: "paperclip_create_project",
-    description: "Create a project, optionally with repositories from paperclip_list_project_repositories.",
+    description: "Create a project, optionally with repositories from paperclip_list_project_repositories (repositoryIds) or GitHub HTTPS URLs not listed there (repositoryUrls).",
     action: "projects:manage",
-    input: createProjectSchema.pick({ ...projectFields, repositoryIds: true }).strict(),
+    input: createProjectSchema.pick({ ...projectFields, repositoryIds: true, repositoryUrls: true }).strict(),
     run: async (caller, args, api) => ({
       project: pick(await api("POST", `/companies/${pathId(caller.companyId)}/projects`, args), PROJECT_FIELDS),
     }),

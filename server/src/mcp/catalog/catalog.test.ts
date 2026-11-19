@@ -167,6 +167,13 @@ describe("the Paperclip catalog", () => {
     } }]);
   });
 
+  it("creates a task with its plan, and a project with repository URLs", async () => {
+    expect((await call("paperclip_create_task", { title: "Ship", initialPlan: "# Plan" })).calls)
+      .toEqual([{ method: "POST", path: `/companies/${TEST_COMPANY_ID}/issues`, body: { title: "Ship", initialPlan: "# Plan" } }]);
+    expect((await call("paperclip_create_project", { name: "Site", repositoryUrls: ["https://github.com/acme/site"] })).calls)
+      .toEqual([{ method: "POST", path: `/companies/${TEST_COMPANY_ID}/projects`, body: { name: "Site", status: "backlog", repositoryUrls: ["https://github.com/acme/site"] } }]);
+  });
+
   it("writes a document with its base revision", async () => {
     const { calls } = await call("paperclip_write_document", { taskId: "TES-1", key: "plan", body: "# Plan", baseRevisionId: null });
     expect(calls).toEqual([{ method: "PUT", path: "/issues/TES-1/documents/plan", body: { format: "markdown", body: "# Plan", baseRevisionId: null } }]);

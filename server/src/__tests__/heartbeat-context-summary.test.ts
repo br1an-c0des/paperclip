@@ -6,6 +6,7 @@ import {
   summarizeHeartbeatRunListResultJson,
 } from "../services/heartbeat.js";
 import { renderPaperclipWakePrompt } from "@paperclipai/adapter-utils/server-utils";
+import { createPaperclipCatalog } from "../mcp/catalog/index.js";
 
 describe("buildPaperclipTaskMarkdown", () => {
   it("treats retained questions as conversation data in fresh and resumed task prompts", () => {
@@ -36,6 +37,21 @@ describe("buildPaperclipTaskMarkdown", () => {
     expect(native).toContain("new idempotency key if retrying with changed arguments");
     expect(buildPaperclipTaskMarkdown({ issue: { ...issue, titleNeedsGeneration: false } })).not.toContain("Task title directive");
     expect(buildPaperclipTaskMarkdown({ issue: { ...issue, conversationAgentId: "agent" } })).not.toContain("Task title directive");
+  });
+
+  it("names the paperclip catalog's project and task tools, with arguments they accept, in the chat directive", () => {
+    const markdown = buildPaperclipTaskMarkdown({ issue: { id: "chat", identifier: "PAP-2", title: "Chat", conversationAgentId: "agent" } });
+    expect(markdown).toContain("otherwise use paperclip_create_project");
+    expect(markdown).toContain("With paperclip_create_task, create the top-level task first, then pass its ID as parentId");
+    expect(markdown).toContain("Use paperclip_create_task with initialPlan");
+    // No bare project-tools names (the retired /api/mcp/project-tools server's).
+    expect(markdown).not.toMatch(/(?<![\w/])(create_task|create_project|set_task_title|update_project|list_projects|list_project_repositories)\b/);
+    const catalog = createPaperclipCatalog({ runTask: async () => ({ taskId: null, wakeCommentId: null }), recordDisposition: async () => {} });
+    const input = (name: string) => catalog.find(definition => definition.name === name)!.input;
+    expect(input("paperclip_create_task").safeParse({ title: "Child", parentId: "PAP-3", initialPlan: "# Plan" }).success).toBe(true);
+    expect(input("paperclip_create_project").safeParse({
+      name: "Site", repositoryIds: ["12"], repositoryUrls: ["https://github.com/acme/site"],
+    }).success).toBe(true);
   });
 
   it("carries current confirmation IDs and proposal data in every fresh or resumed chat assignment", () => {
