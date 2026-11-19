@@ -44,7 +44,7 @@ describe.skipIf(!url)("actual OAuth producer and original-token principal leaf; 
     const start=await request(app).get("/mcp/runner/oauth/authorize").query({client_id:clientId,redirect_uri:redirect,response_type:"code",resource,scope:"paperclip:agent offline_access",code_challenge:createHash("sha256").update(verifier).digest("base64url"),code_challenge_method:"S256"});
     expect(start.status,JSON.stringify(start.body)).toBe(303);
     const id=new URL(start.headers.location,origin).pathname.split("/").at(-1)!;
-    const consent=await request(app).post(`/api/mcp/requests/${id}/consent`).set("Origin",origin).set("x-selected-operator",userId).send({decision:"approve",companyId,allowWrites:false});
+    const consent=await request(app).post(`/api/mcp/requests/${id}/consent`).set("Origin",origin).set("x-selected-operator",userId).send({decision:"approve",companyId,accessLevel: "read_only"});
     expect(consent.status,JSON.stringify(consent.body)).toBe(200);
     const tokens=await request(app).post("/mcp/runner/oauth/token").send({grant_type:"authorization_code",client_id:clientId,redirect_uri:redirect,resource,code:new URL(consent.body.redirectUrl).searchParams.get("code"),code_verifier:verifier});
     expect(tokens.status,JSON.stringify(tokens.body)).toBe(200);

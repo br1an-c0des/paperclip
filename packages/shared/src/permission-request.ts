@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AGENT_ACCESS_ACTIONS, type AgentAccessAction } from "./agent-access.js";
+import { resolveApprovalSchema } from "./validators/approval.js";
 
 /**
  * The payload of a `permission_request` approval: a tool call refused by the caller's level or an
@@ -15,6 +16,8 @@ export interface PermissionRequestPayload {
     runId: string | null;
     grantId: string | null;
   };
+  /** For an outside connection: its client's name, e.g. "Claude Code". */
+  connectionName?: string | null;
   taskId: string | null;
   tool: string;
   arguments: Record<string, unknown>;
@@ -35,6 +38,7 @@ export const permissionRequestPayloadSchema = z.object({
     runId: z.string().nullable(),
     grantId: z.string().nullable(),
   }),
+  connectionName: z.string().nullable().optional(),
   taskId: z.string().nullable(),
   tool: z.string().min(1),
   arguments: z.record(z.string(), z.unknown()),
@@ -47,3 +51,13 @@ export const permissionRequestPayloadSchema = z.object({
     at: z.string().min(1),
   }).optional(),
 }) satisfies z.ZodType<PermissionRequestPayload>;
+
+/**
+ * `POST /approvals/:id/approve`. `alwaysAllow` is for a `permission_request` only: before the call
+ * is replayed, the missing action becomes an override on the agent (or, for a connection acting as
+ * the person, on the connection), so it isn't asked for again.
+ */
+export const approveApprovalSchema = resolveApprovalSchema.extend({
+  alwaysAllow: z.boolean().optional(),
+});
+export type ApproveApproval = z.infer<typeof approveApprovalSchema>;

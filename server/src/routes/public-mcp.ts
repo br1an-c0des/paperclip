@@ -241,7 +241,7 @@ export function publicMcpManagementRoutes(oauth: PublicMcpOAuth, agentOAuth?: Pu
     enabled: await oauth.isEnabled(), serverUrl: oauth.config.resource,
     invitationUrl: mcpSetupUrl(oauth.config.resource), invitation: mcpInvitation(oauth.config.resource),
   }));
-  router.get("/mcp/connections", realUser, async (req, res) => res.json(await oauth.listConnections(req.actor.userId!)));
+  router.get("/mcp/connections", realUser, async (req, res) => res.json(await oauth.listConnections(req.actor)));
   router.delete("/mcp/connections/:id", realUser, sameOrigin, async (req, res) => {
     if (!z.uuid().safeParse(req.params.id).success) throw new McpOAuthError("invalid_request", "Invalid connection ID.");
     await oauth.revokeConnection(String(req.params.id), req.actor.userId!); res.status(204).end();

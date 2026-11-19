@@ -62,9 +62,11 @@ export const DEFAULT_CONNECTION_ACCESS_LEVEL: AgentAccessLevel = "manager";
 
 export type AgentAccessOverride = boolean | { scope: Record<string, unknown> };
 
+export type AgentAccessOverrides = Partial<Record<AgentAccessAction, AgentAccessOverride>>;
+
 export interface AgentAccess {
   level: AgentAccessLevel;
-  overrides?: Partial<Record<AgentAccessAction, AgentAccessOverride>>;
+  overrides?: AgentAccessOverrides;
 }
 
 export type ResolvedAgentAccess = Record<AgentAccessAction, false | true | { scope: Record<string, unknown> }>;
@@ -78,9 +80,11 @@ const overridesShape = Object.fromEntries(
   AGENT_ACCESS_ACTIONS.map(action => [action, agentAccessOverrideSchema.optional()]),
 ) as Record<AgentAccessAction, z.ZodOptional<typeof agentAccessOverrideSchema>>;
 
+export const agentAccessOverridesSchema = z.object(overridesShape).strict();
+
 export const agentAccessSchema = z.object({
   level: z.enum(AGENT_ACCESS_LEVELS),
-  overrides: z.object(overridesShape).strict().optional(),
+  overrides: agentAccessOverridesSchema.optional(),
 }).strict();
 
 function isAllowed(value: ResolvedAgentAccess[AgentAccessAction]): boolean {
