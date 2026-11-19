@@ -133,10 +133,20 @@ deployment and dev work live in separate folders ([deploy/README.md](deploy/READ
   `paperclip-db-1`. Leave them alone. Commands in this file that say `:3100` (`pnpm dev`, ui-new's API
   proxy, `E2E_LIVE=1`) mean the desktop's dev instance. On server1, they would reach the real instance.
 - A dev instance on server1, when one is needed, gets its own port and data folder: the API on :3101
-  and data in `~/coding/paperclip-dev-data`. Untested so far:
-  `PAPERCLIP_HOME=~/coding/paperclip-dev-data PORT=3101 PAPERCLIP_AGENT_JWT_SECRET=$(openssl rand -hex 32) corepack pnpm dev`,
-  then `PAPERCLIP_API_URL=http://localhost:3101` for ui-new's dev server and for `E2E_LIVE=1`. It
-  starts empty, so it has no TES company until one is made.
+  and data in `~/coding/paperclip-dev-data`. Used for step 4a's run check (2026-11-18):
+  `PAPERCLIP_HOME=~/coding/paperclip-dev-data PORT=3101 PAPERCLIP_API_URL=http://localhost:3101 PAPERCLIP_AGENT_JWT_SECRET=<saved secret> corepack pnpm dev`.
+  - **Always set `PAPERCLIP_API_URL`:** it's the address agent runs use to reach Paperclip, and it
+    keeps them off :3100.
+  - **In a linked worktree,** the dev runner also needs a `.paperclip/.env` (gitignored). A file
+    holding the same three variables does.
+  - **The first start compiles the Runner's Rust crate,** which takes several minutes.
+  - **Memory:** the server peaks near 4 GB, so cap it (`systemd-run … -p MemoryMax=4G`).
+  - **Agent runs use your own Claude login** in `~/.claude`; no second login is needed. Don't copy
+    production's login: two copies of one refresh token break each other.
+  - **Stop it** with `systemctl --user stop <its run-….scope>`.
+  - Its TES company (`17ad7e05-6ab8-4bdf-a8ec-76a1c806d513`) and agent "M7 test runner" (`98b9fcf0-3ba7-45eb-8bc1-53b49c20f0bf`)
+    are server1's own, not the desktop's TES.
+  - For ui-new's dev server and `E2E_LIVE=1`, use `PAPERCLIP_API_URL=http://localhost:3101`.
 - Node: nvm defaults to Node 26, which doesn't ship corepack. The repo wants Node 24 (`.nvmrc`), so
   run `nvm use 24` first.
 - The machine has 20 CPUs and 14 GB of memory, shared with the real instance. Cap heavy jobs with

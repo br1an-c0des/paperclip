@@ -585,10 +585,20 @@ ACP prompt's API note is MCP-only, with no curl recipe.
 - **New:** bugs 55 (the title route's refusal isn't requestable) and 56 (no retry key for task
   creation).
 
+**Real-run check passed 2026-11-18** on a server1 dev instance on :3101, built from
+`feat/step-4a` at `6e3c7e22b`, with the TES company and agent "M7 test runner" at `worker`, on
+`claude_local` with the ACP engine:
+- **Run 1 (TES-1):** the agent used only the `paperclip` server's tools (`paperclip_task_context`,
+  `paperclip_add_comment`, `paperclip_finish`). It made no shell or curl calls. The disposition was
+  recorded `via: tool`, and the task ended `done`.
+- **Run 2 (TES-2):** `paperclip_delete_task` was refused and became a pending `permission_request`
+  for `tasks:delete`, with a 7-day expiry. TES-1 was left alone, and the agent finished through
+  `paperclip_finish`. The request wasn't approved, so approving and replaying it is still checked
+  only by tests.
+
 **Left before `main`:**
 - bugs 53 and 54, optional;
 - the docs listed above;
-- the local-instance run check;
 - the regression, after step 3a;
 - the user's approval.
 
