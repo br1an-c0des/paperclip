@@ -74,10 +74,24 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 37 | [Log participant changes for every review stage (optional)](#37-log-participant-changes-for-every-review-stage-optional) | candidate | | | 2026-10-24 | | |
 | 38 | [Report the review-stage bypass, with failing tests](#38-report-the-review-stage-bypass-with-failing-tests) | candidate | | | 2026-10-24 | | |
 | 39 | [Turn off Claude Code's auto memory when an agent has `para-memory-files`](#39-turn-off-claude-codes-auto-memory-when-an-agent-has-para-memory-files) | candidate | | | 2026-10-24 | | |
-| 40 | [Find why 11 server tests fail on `main` (one file is core)](#40-find-why-11-server-tests-fail-on-main-one-file-is-core) | candidate | | | 2026-11-18 | | |
+| 40 | [Find why 11 server tests fail on `main` (one file is core)](#40-find-why-11-server-tests-fail-on-main-one-file-is-core) | fixed | `test/bug40` | | 2026-11-18 | | `741e8c5231` (2026-11-18) |
 | 41 | [Give `para-memory-files` a recall tool that exists](#41-give-para-memory-files-a-recall-tool-that-exists) | candidate | | | 2026-11-18 | | |
 | 42 | [Fix or move the 8 test files that fail in a full run on `main`](#42-fix-or-move-the-8-test-files-that-fail-in-a-full-run-on-main) | fixed | `test/tiers` | | 2026-11-18 | | `b6e7076fae` (2026-11-18) |
-| 43 | [Make `attentionService.list` fast over many failed runs](#43-make-attentionservicelist-fast-over-many-failed-runs) | candidate | | | 2026-11-18 | | |
+| 43 | [Stop a company import from setting an existing agent's access level](#43-stop-a-company-import-from-setting-an-existing-agents-access-level) | fixed on `feat/step-4a` (`fd0acf010`) | | | 2026-11-18 | | |
+| 44 | [Return 409, not 500, when a new label's name is taken](#44-return-409-not-500-when-a-new-labels-name-is-taken) | candidate | | | 2026-11-18 | | |
+| 45 | [Stop enforcing the four interaction switches that became access actions](#45-stop-enforcing-the-four-interaction-switches-that-became-access-actions) | fixed on `feat/step-4a` (`eedeba3ca`) | | | 2026-11-18 | | |
+| 46 | [Stop the Advanced YAML editor overwriting an agent's hiring access](#46-stop-the-advanced-yaml-editor-overwriting-an-agents-hiring-access) | fixed on `feat/step-4a` (`a17d98cb6`) | | | 2026-11-18 | | |
+| 47 | [Drop the legacy assignment fields from the agent access state](#47-drop-the-legacy-assignment-fields-from-the-agent-access-state) | fixed on `feat/step-4a` (`6706dab30`) | | | 2026-11-18 | | |
+| 48 | [Cover every write of an approved multi-write tool call](#48-cover-every-write-of-an-approved-multi-write-tool-call) | fixed on `feat/step-4a` (`70b8d7198`) | | | 2026-11-18 | | |
+| 49 | [Check the act-as agent's level on outside-connection file uploads](#49-check-the-act-as-agents-level-on-outside-connection-file-uploads) | fixed on `feat/step-4a` (`867374de7`) | | | 2026-11-18 | | |
+| 50 | [Check access on plugin-origin agent configure and edit calls](#50-check-access-on-plugin-origin-agent-configure-and-edit-calls) | fixed on `feat/step-4a` (`5c499f719`) | | | 2026-11-18 | | |
+| 51 | [Give runs a title tool now that project-tools is gone](#51-give-runs-a-title-tool-now-that-project-tools-is-gone) | fixed on `feat/step-4a` (`846bc008d`) | | | 2026-11-18 | | |
+| 52 | [Use the MCP tool names in the chat directive](#52-use-the-mcp-tool-names-in-the-chat-directive) | fixed on `feat/step-4a` (`1137643cc`) | | | 2026-11-18 | | |
+| 53 | [Stop the ACP engine tests writing settings into the repo](#53-stop-the-acp-engine-tests-writing-settings-into-the-repo) | candidate | | | 2026-11-18 | | |
+| 54 | [Check access on the other plugin-origin agent writes](#54-check-access-on-the-other-plugin-origin-agent-writes) | candidate | | | 2026-11-18 | | |
+| 55 | [Make the title route's access refusal requestable](#55-make-the-title-routes-access-refusal-requestable) | candidate | | | 2026-11-18 | | |
+| 56 | [Decide whether catalog task creation needs a retry key](#56-decide-whether-catalog-task-creation-needs-a-retry-key) | candidate | | | 2026-11-18 | | |
+| 57 | [Make `attentionService.list` fast over many failed runs](#57-make-attentionservicelist-fast-over-many-failed-runs) | candidate | | | 2026-11-18 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -628,7 +642,7 @@ option 3 (was build plan 2a-6). Revives #2700.
   `claude_local` run, not only those with `para-memory-files`, and Paperclip sets the variable itself
   ([step-4b-sealed-runs.md](step-4b-sealed-runs.md), section 6). This closes when 4b part 1 merges.
 
-### 40. Find why 11 server tests fail on `main` (one file is core) — fixed
+### 40. Find why 11 server tests fail on `main` (one file is core)
 
 **Fixed 2026-11-18** (`741e8c5231`, option 1 below).
 
@@ -726,7 +740,190 @@ round 1: each fails the same way when re-run on its own, except `github-launcher
   because they read `.claude/skills/slack/SKILL.md`, which `ea326e0202` removed. They're connector-skill
   (dormant) tests and moved to the opt-in `runtime-selection.dormant.test.ts`.
 
-### 43. Make `attentionService.list` fast over many failed runs
+### 43. Stop a company import from setting an existing agent's access level
+
+Found by the step 4a follow-ups agent (2026-11-18, on `feat/step-4a`).
+
+- **What's wrong:** importing a company package over an existing agent can set that agent's access
+  level, because the package's `permissions`, including `access`, are copied straight onto it.
+  `company-portability.ts` (around line 5754) passes `manifestAgent.permissions` to
+  `updateImportedAgent`, and `agent-configuration.ts:93-101` replaces the agent's permissions with
+  them. An agent that may import could raise another agent, or itself, to `admin`.
+- **Not affected:** creating new agents. Since the follow-ups, an agent creator's `access` is
+  dropped.
+- **Likely fix:** on the update path, keep the existing agent's `access` and never take it from the
+  package. Only a person can change a level, through `PATCH /agents/:id/permissions`. Part of step
+  4a; fix it on `feat/step-4a` before it merges.
+
+### 44. Return 409, not 500, when a new label's name is taken
+
+Found by the step 4a follow-ups agent (2026-11-18).
+
+- **What's wrong:** creating a label with a name the company already uses probably fails as a 500.
+  `createLabel` in `server/src/services/issues.ts` (around line 13436) doesn't check for a clash,
+  so the unique index `labels_company_name_idx` refuses the insert. Renaming already returns 409
+  `label_name_taken`.
+- **Likely fix:** make the same check as rename, or catch the unique violation, and return 409
+  `label_name_taken`. The MCP tool `paperclip_manage_labels` then gives the same clear error for
+  create as for rename.
+
+### 45. Stop enforcing the four interaction switches that became access actions
+
+Found by step 4a agent 5 (2026-11-18, on `feat/step-4a`).
+
+- **What's wrong:** four switches still block an agent even after its access level allows the
+  action: `canAssignTasksToAgents`, `canAssignTasksToHumans`, `canEditOtherTasks` and
+  `canConfigureOtherAgents`. `server/src/services/agent-interaction-policy.ts:103-116` still reads
+  them. Migration 0491 copied a `false` into the matching override but left the switch stored. The
+  Access card can turn the action on while the old switch keeps refusing it.
+- **In `ui-new`:** the Interactions card lists a retired switch still stored as off, with a Clear
+  button.
+- **Likely fix:**
+  - remove those four checks from the policy (the actions cover them now);
+  - clear the stored switches, either in a migration or on read;
+  - then drop the Clear workaround.
+
+  This is the cleanup the plan already lists ("agent-side interaction checks are redundant after
+  0491"). It's now a correctness bug, so fix it on `feat/step-4a` before it merges.
+
+### 46. Stop the Advanced YAML editor overwriting an agent's hiring access
+
+Found by step 4a agent 5 (2026-11-18).
+
+- **What's wrong:** saving permissions from the Advanced tab's YAML editor can undo the Access
+  card's hiring choice. The editor still sends `canCreateAgents`/`canAssignTasks`
+  (`ui-new/src/agents/configuration-model.ts:617`). `PATCH /agents/:id/permissions` then rewrites
+  the `agents:create` override from `canCreateAgents` (`server/src/routes/agents.ts:5114`).
+- **Likely fix:**
+  - the YAML editor edits `access` and stops sending the retired flags;
+  - or the route ignores `canCreateAgents` when the body or the stored permissions carry `access`.
+
+  Fix before `feat/step-4a` merges.
+
+### 47. Drop the legacy assignment fields from the agent access state
+
+Found by step 4a agent 5 (2026-11-18).
+
+- **What's wrong:** `buildAgentAccessState` (`server/src/routes/agents.ts:1280`) still reports
+  `canAssignTasks` and `taskAssignSource` from the old grants. Since step 4a, `tasks:assign` is an
+  access action, so these can disagree with the agent's real access. `ui-new` no longer shows them.
+- **Likely fix:** derive them from `access`, or remove them along with the retired grant keys.
+
+### 48. Cover every write of an approved multi-write tool call
+
+Found by step 4a agent 4 (2026-11-18, on `feat/step-4a`).
+
+- **What's wrong:** approving a request for a tool call that makes several writes only lets the
+  first one through. The replay gets a one-use temporary grant, so in `paperclip_manage_labels`
+  with three labels, the second write is refused again.
+- **Likely fix:** give the replay grant one use per write the tool makes, or a short-lived grant
+  scoped to the replay's request.
+
+### 49. Check the act-as agent's level on outside-connection file uploads
+
+Found by step 4a agent 4 (2026-11-18).
+
+- **What's wrong:** an upload through a connection that acts as an agent is checked against the
+  connection's level only, not the agent's own level as capped by the connection. Every other
+  route checks the capped level. The check is in `server/src/services/public-mcp/file-transfers.ts`.
+- **Likely fix:** check `capAgentAccess(agent's access, connection's access)`, as the route policy
+  does.
+
+### 50. Check access on plugin-origin agent configure and edit calls
+
+Found by the step 4a bug-fix agent (2026-11-18, after bug 45's fix).
+
+- **What's wrong:** plugin-origin calls that configure an agent or edit a task may no longer check
+  the acting agent's access. In `server/src/services/plugin-host-services.ts` (around `:3412` and
+  `:3435`), the authorization-policy updates call `assertAgentInteraction` with `configure` and
+  `edit`. Those calls used to be limited by the actor's `canConfigureOtherAgents` and
+  `canEditOtherTasks`. Since bug 45's fix, only the target's consent switch is checked. Whether
+  the plugin path checks `agents:configure` and `tasks:update_any` anywhere else isn't verified.
+- **Who it affects:** only setups with plugins installed (opt-in here).
+- **Likely fix:** check the matching access action there (`decide` with the actor), or confirm the
+  plugin host checks it already.
+- **Also left from that fix:**
+  - `doc/agent-interaction-permissions.md:18-23` still lists the four retired switches;
+  - the OpenAPI entry for `PATCH /agents/{id}/interaction-permissions` (`openapi.ts:3963`) lacks
+    the new 410;
+  - `agent-interaction-mutations.test.ts:150` fails on a dormant Runner fixture with no access
+    level (the regression's fixture work).
+
+### 51. Give runs a title tool now that project-tools is gone
+
+Found by the step 4a run-MCP agent (2026-11-18, on `feat/step-4a`).
+
+- **What's wrong:** `server/src/services/heartbeat/task-markdown.ts:230` tells runs to "use
+  set_task_title". That was a project-tools tool, and `/api/mcp/project-tools` is retired. The
+  `paperclip` catalog has no tool that only sets the title while it's provisional
+  (`onlyIfProvisional`). The directive's REST fallback (`PUT /api/issues/:id/title`) works only
+  through curl with `PAPERCLIP_API_KEY`, because `paperclip_call_api` is admin-only.
+- **Likely fix:**
+  - add a provisional-title option to `paperclip_update_task` (or a small `paperclip_set_task_title`)
+    that calls `PUT /issues/:id/title`;
+  - point the directive at it.
+
+  This is a capability runs lost in step 4a, so fix it before `main`.
+
+### 52. Use the MCP tool names in the chat directive
+
+Found by the step 4a run-MCP agent (2026-11-18).
+
+- **What's wrong:** `server/src/services/agent-conversations.ts:117` names `create_project` and
+  `create_task`. The run's tools are `paperclip_create_project` and `paperclip_create_task`.
+- **Likely fix:** rename them in the directive, and check the other prompt texts for project-tools
+  names. Fix before `main`.
+
+### 53. Stop the ACP engine tests writing settings into the repo
+
+Found by the step 4a run-MCP agent (2026-11-18).
+
+- **What's wrong:** running `packages/adapter-utils/src/acpx-engine/execute.test.ts` leaves
+  `packages/adapter-utils/.claude/settings.local.json` in the package folder. Some claude-agent
+  tests run without a temporary `cwd`, and `acpx-engine/execute.ts:1674` writes
+  `<cwd>/.claude/settings.local.json`. It can slip into a commit.
+- **Likely fix:** give those tests a temporary `cwd`, or add the path to `.gitignore` as a guard.
+
+### 54. Check access on the other plugin-origin agent writes
+
+Found by the step 4a bug-fix agent (2026-11-18), while fixing bug 50.
+
+- **What's wrong:** bug 50's fix covers `plugin-host-services.ts` only. Other places use the plugin
+  origin as the acting agent but check only the target's consent:
+  - `server/src/services/agent-configuration.ts:28-38` (`lockAgentConfigurationInteractions`);
+  - probably the plugin-origin writes in `issues.ts` (create at `:10620`, and `:13733`);
+  - probably `routines.ts:983` and `:1818`.
+
+  The `issues.ts` and `routines.ts` cases aren't verified.
+- **Who it affects:** only setups with plugins installed (opt-in here).
+- **Likely fix:** one central check. In `agentInteractionDenial` (`agent-interaction-policy.ts`),
+  when the actor comes from a plugin origin, also check the matching access action. Then the
+  per-call checks from bug 50 can go.
+
+### 55. Make the title route's access refusal requestable
+
+Found by the step 4a bug-fix agent (2026-11-18).
+
+- **What's wrong:** when the access level is what refuses `PUT /issues/:id/title`, the route
+  answers `issue_write_not_visible` (`denyIssueWrite`, `server/src/routes/issues.ts:14903-14907`).
+  `PATCH /issues/:id` answers `denyAgentAccess(res, decision, "tasks:update_any")`, which can be
+  requested. In practice the title route also requires the assigned agent's own run, so a worker
+  rarely reaches this.
+- **Likely fix:** use `denyAgentAccess` there, as `PATCH /issues/:id` does.
+
+### 56. Decide whether catalog task creation needs a retry key
+
+Found by the step 4a bug-fix agent (2026-11-18).
+
+- **What's wrong:** `paperclip_create_task` takes no idempotency key, so a retried call can create a
+  duplicate task. The chat directive's REST sentences still mention one. The old project-tools
+  server prefixed the key per conversation (`chat-handoff:<issueId>:<key>`). A plain key on the
+  catalog tool could collide across tasks in a company.
+- **Likely fix (to decide):** a `requestId` scoped to the caller and the parent or conversation
+  task, like the public MCP's write receipts. Or leave creation without one, and drop the mention
+  from the directive.
+
+### 57. Make `attentionService.list` fast over many failed runs
 
 Found by step 3a agent G (2026-11-18). In `server/src/__tests__/attention-service.test.ts`, "checks
 more failed runs for a newer run than one statement can bind" still takes ~25 s after its seeding was
@@ -736,4 +933,3 @@ made a single statement: the time is inside `attentionService.list` itself, over
   company with many failures could see a slow inbox.
 - **Likely fix:** profile the query or queries `list` makes for that case (probably one per chunk of
   runs, or an unindexed lookup of newer runs) and replace them with one set-based query.
-

@@ -28,8 +28,9 @@ your tasks; this plan argues from it and doesn't repeat its reasoning.
 | 1 | Permissions core | 1.1–1.6 | `step4a/permissions` |
 | 1 | MCP endpoint and catalog | 2.1–2.5 | `step4a/mcp` |
 | 1 | Runs | 3.1–3.3 | `step4a/runs` |
-| 2 | Requests and outside connections | 4.x | planned after wave 1 merges |
-| 2 | `ui-new` | 5.x | planned after wave 1 merges |
+| 2 | Follow-ups | (handoff item 1) | `step4a/followups` |
+| 2 | Requests and outside connections | 4.0–4.4 | `step4a/requests` |
+| 2 | `ui-new` | 5.1–5.4 | `step4a/ui` |
 
 Two agents touch `server/src/app.ts` (1.4 mounts the route policy, 2.5 mounts the endpoint): one
 line each, merged by hand.
@@ -514,24 +515,435 @@ tests.
 
 ---
 
-## Wave 2 (planned after wave 1 merges)
+## Wave 2 (planned 2026-11-18, after wave 1 merged)
 
-- **Agent 4, requests and outside connections:** `permission_request` creation on a requestable
-  denial and replay through a one-use temporary grant (spec section 7); the public MCP resolving
-  OAuth grants to `oauth_person` / `oauth_agent` callers and serving the catalog
-  (`createPaperclipCatalog(catalogDeps(db))`; there's no `PAPERCLIP_CATALOG` constant); carrying
-  over every public tool (spec section 4); "act as" and level on grants and the consent screen;
-  retiring `capabilities.ts`/`expanded-capabilities.ts` lists. Also: refuse direct creation of
-  `permission_request` approvals through `POST` approvals (today `createApprovalSchema` accepts the
-  type from anyone who can create approvals); and make sure the public MCP's in-process dispatch
-  passes through the agent route policy, as the catalog's does.
-- **Agent 5, `ui-new`:** the Permissions section (level and overrides), outside-connection settings,
-  the Inbox permission request card (spec section 8), a label for `permission_request` in the
-  approval label maps (`ui-new/src/inbox/row-model.ts:110`, `ui-new/src/requests/request-model.ts:617`),
-  and **renaming and recolouring labels** through `PATCH /labels/:labelId` (added by agent 1 on the
-  user's request, 2026-11-17).
-- **Project manager:** flip `PAPERCLIP_UNIFIED_RUN_MCP` on by default, retire
-  `/api/mcp/project-tools`, the local-instance run check, docs.
+Two agents in parallel, plus a follow-ups agent (`step4a/followups`) that runs first or alongside:
+it swaps the route-policy stub for `AGENT_ROUTE_POLICY`, adds rename and recolour to
+`paperclip_manage_labels`, builds the new-agent hiring rule, and rewords
+`CONNECTION_INTENT_AGENT_GUIDANCE`. Agent 4 starts from `feat/step-4a` after the follow-ups merge,
+since it builds on the real route-policy table.
+
+**Follow-ups merged 2026-11-18** (`8652daf9b` on `feat/step-4a`). They also found bugs
+[43](upstream-fixes.md#43-stop-a-company-import-from-setting-an-existing-agents-access-level)
+(an import can set an existing agent's level; fix before `main`) and
+[44](upstream-fixes.md#44-return-409-not-500-when-a-new-labels-name-is-taken). Expect
+regression fixture changes: CEOs and agents created with `canCreateAgents: true` now store
+`permissions.access`.
+
+**Agent 5 merged 2026-11-18** (`7e2c2527a`): label manager, Access card, permission request card,
+connection access and consent. Until agent 4 merges, `feat/step-4a`'s consent and connection
+editing aren't backed by the server. Agent 5 found bugs 45 (the four retired interaction switches
+are still enforced) and 46 (the YAML editor overwrites hiring access), to fix before `main`, and
+47 (stale assignment fields).
+
+**Agent 4 merged 2026-11-18** (`4f12573de`): permission requests and replay, outside connections
+acting as the person or an agent at their level, the public MCP serving the catalog (old lists
+deleted), and bug 43. Notes:
+- **Worker run list:** 26 tools, about 4.2k tokens (was 23, about 3.1k). Admin: 29 tools, about
+  5.3k tokens.
+- **File tools are hidden from runs and agent keys:** `mcp_file_tickets.grant_id` and the uploads'
+  `user_id` are NOT NULL, so opening them to runs and agent keys needs a migration.
+- **An `mcp_oauth` actor can't approve or reject approvals,** so a connection can't approve its
+  own requests through `call_api`.
+- **Old grants keep their backfilled level.** No reconnect is forced. Clients see the new tool
+  names on their next `tools/list`.
+- **New bugs:** 48 (a multi-write replay is covered for its first write only) and 49 (file uploads
+  check the connection's level only).
+
+**Bugs 45–47 fixed and merged 2026-11-18** (`093b94b3b`), plus agent 5's `paperclip_me` rename
+(`61b948c8c`). The four retired interaction switches are no longer enforced or accepted (410), the
+YAML editor edits `access`, and the legacy assignment fields are gone. New: bug 50 (plugin-origin
+configure and edit calls may skip the access check). Wave 2's building is done. Open before
+`main`: bugs 48–50, then the project manager's list below.
+
+**Run MCP merged 2026-11-18** (`0b0beb9e6`): every `claude_local` run with a token gets the
+`paperclip` server, on both engines, task or not. `PAPERCLIP_UNIFIED_RUN_MCP` is gone and
+`/api/mcp/project-tools` is retired (`services/project-tools.ts` stays for the dormant Runner). The
+ACP prompt's API note is MCP-only, with no curl recipe.
+- **Side effect:** every run now passes `--strict-mcp-config`, including task-less runs that used
+  to load the repo's `.mcp.json` and the user's MCP servers. Step 4b drops the flag.
+- **New bugs:** 51 (runs lost `set_task_title`), 52 (the chat directive uses old tool names) and 53
+  (the ACP tests write `.claude/settings.local.json` into the repo).
+- **Docs to update before `main`:** `fork/claude-local-run.md`, `repo-map.md` and
+  `hard-fork-plan.md`. The agent listed the out-of-date lines: claude-local-run 75, 192, 412-416,
+  513, 528-563, 666, 684-691; repo-map 127, 150, 184, 202; hard-fork plan 380, 404.
+
+**Bugs 48–50 fixed and merged 2026-11-18** (`3c33eb7ad`):
+- An approved replay runs under an in-memory allow for its `missingAction`, for that caller, for
+  as long as the replay runs. Nothing is stored. The allow covers the task when the call names
+  one, else the company.
+- Act-as uploads check the agent's level as capped by the connection.
+- Plugin calls made for an agent check that agent's access.
+- **New:** bug 54 (the other plugin-origin writes), plugins only.
+
+**Bugs 51 and 52 fixed and merged 2026-11-18** (`4f88dbd19`):
+- `paperclip_update_task` takes `onlyIfProvisional` with `title` alone, and goes through
+  `PUT /issues/:id/title`. The run directive points at it; the native Runner keeps its own text.
+- The chat directive names `paperclip_create_project` and `paperclip_create_task`. Those tools now
+  take `repositoryUrls` and `initialPlan`.
+- A worker run sees 22 tools plus 4 that need approval.
+- **New:** bugs 55 (the title route's refusal isn't requestable) and 56 (no retry key for task
+  creation).
+
+**Real-run check passed 2026-11-18** on a server1 dev instance on :3101, built from
+`feat/step-4a` at `6e3c7e22b`, with the TES company and agent "M7 test runner" at `worker`, on
+`claude_local` with the ACP engine:
+- **Run 1 (TES-1):** the agent used only the `paperclip` server's tools (`paperclip_task_context`,
+  `paperclip_add_comment`, `paperclip_finish`). It made no shell or curl calls. The disposition was
+  recorded `via: tool`, and the task ended `done`.
+- **Run 2 (TES-2):** `paperclip_delete_task` was refused and became a pending `permission_request`
+  for `tasks:delete`, with a 7-day expiry. TES-1 was left alone, and the agent finished through
+  `paperclip_finish`. The request wasn't approved, so approving and replaying it is still checked
+  only by tests.
+
+**Left before `main`:**
+- bugs 53 and 54, optional;
+- the docs listed above;
+- the regression, after step 3a;
+- the user's approval.
+
+**Outside connections may break (decided 2026-11-18):** the user would rather the public MCP be
+built the right way than stay compatible. Existing OAuth connections may have to be removed and
+made again; consent doesn't have to keep the old checkbox meaning; old public tool names don't
+have to map. Capabilities still carry over: nothing an outside agent could do is lost. Agents
+existing at 0491 still start at `manager` (that rule is about runs, not connections).
+
+**Testing while step 3a renovates the suite:** typechecks, each agent's own new or changed test
+files one at a time by path, and `ui-new`'s unit tests. No package suites, directories or broad
+patterns.
+
+**What wave 1 left that wave 2 builds on** (facts on `feat/step-4a`, 2026-11-18):
+
+- There are two endpoints with the same tail. **`/mcp/paperclip`** is the public OAuth MCP
+  (`publicMcpIngressRoutes`, `server/src/routes/public-mcp.ts:43`). It's behind the instance flag
+  `enablePublicMcp` and needs `PAPERCLIP_PUBLIC_URL`. **`/api/mcp/paperclip`** is the catalog
+  (`server/src/routes/paperclip-mcp.ts:17`).
+- **How the public MCP sees a caller.** `actorForGrant` (`server/src/services/public-mcp/oauth.ts:124`)
+  makes a `board` actor (`source: "mcp_oauth"`) for a personal grant. For a grant with purpose
+  `"agent"` it makes an `agent` actor. Purpose `"agent"` belongs to the Dot, Grok Bot and Muse
+  runtime pairings, which are dormant here.
+- **The public MCP's dispatch already goes through the route policy.** `createMcpApiDispatch`
+  (`capabilities.ts:25`) re-enters the main `api` Router, where `agentRoutePolicy` is mounted first
+  (`app.ts:682`). But the policy only acts on `agent` actors, so personal grants pass it untouched.
+- **The grant columns aren't wired up.** `mcp_oauth_grants.act_as_agent_id`, `access_level` and
+  `access_overrides` exist (migration 0491 backfills `access_level`), but no server code reads or
+  writes them.
+- **`resolveMcpCaller` (`server/src/mcp/caller.ts:12`) only makes run and agent-key callers.**
+  `McpCallerKind` already has `oauth_person` and `oauth_agent`.
+- **A denied requestable call creates nothing yet.** `server/src/mcp/server.ts:82-117` returns
+  `{ code: "access_denied", missingAction, requestable }` as an error result, and that's all.
+- **`approvalService.decide` (`server/src/services/approvals.ts:193`) routes by type in one place:**
+  `hire_agent` goes to `decideHire`, and every other type to `resolveApproval`.
+- **Approvals never expire.** Only retention archives pending ones, after 90 days.
+- **There's no endpoint to update a grant.** `/mcp/connections` has `GET` and `DELETE` only
+  (`routes/public-mcp.ts:248`).
+- **The consent page is in `ui-new`** (`ui-new/src/auth/McpConnect.tsx`). It posts
+  `mcpConsentSchema { decision, companyId?, allowWrites, allowConfiguration }`
+  (`packages/shared/src/public-mcp.ts:7`).
+- **The public tool list: 33 tools** in `capabilities.ts`, `expanded-capabilities.ts` and
+  `file-transfers.ts`. The catalog already covers 12 of them by name or meaning. The rest are listed
+  in task 4.4.
+
+---
+
+## Wave 2, agent 4: requests and outside connections
+
+Branch `step4a/requests`. Owns:
+- `server/src/services/public-mcp/**`, `server/src/routes/public-mcp.ts`;
+- `server/src/mcp/**` (after the follow-ups merge);
+- `server/src/services/approvals.ts`, `server/src/routes/approvals.ts`;
+- a new `server/src/services/permission-requests.ts`;
+- the grant and consent types in `packages/shared` (`public-mcp.ts`, `permission-request.ts`);
+- `server/src/middleware/agent-route-policy.ts` (for 4.3 only).
+
+It doesn't touch `ui-new/`.
+
+### Task 4.0: The wave 2 contracts (first commit, so agent 5 can build against it)
+
+**Files:**
+- Modify: `packages/shared/src/public-mcp.ts`, the shared index
+- Test: `packages/shared/src/public-mcp.test.ts` (or the existing nearest test)
+
+**Interfaces:**
+- Produces:
+  - `mcpConsentSchema` gains `actAsAgentId?: string | null` and `accessLevel?: AgentAccessLevel`.
+    Existing clients that send neither keep today's behaviour: the level comes from
+    `allowWrites`/`allowConfiguration` (configure → admin, write → manager, else read-only), and
+    the grant acts as the person.
+  - `McpConnection` (the `GET /mcp/connections` row) gains `actAsAgent: { id, name } | null`,
+    `accessLevel`, `accessOverrides`.
+  - `updateMcpConnectionSchema = { actAsAgentId?: string | null; accessLevel?: AgentAccessLevel; accessOverrides?: AgentAccessOverrides }`
+    for `PATCH /mcp/connections/:id`.
+- The project manager merges this commit into `feat/step-4a` on its own as soon as it lands, and
+  tells agent 5.
+
+- [ ] Steps: schema tests, implement, commit.
+
+### Task 4.1: Permission requests from a requestable denial
+
+**Files:**
+- Create: `server/src/services/permission-requests.ts`
+- Modify: `server/src/mcp/server.ts`
+- Test: `server/src/services/permission-requests.test.ts`
+
+**Interfaces:**
+- Consumes: `PermissionRequestPayload` (0.4), the `access_denied` tool error (2.x), `McpCaller`.
+- Produces:
+  - `createPermissionRequest(db, { caller, tool, arguments, missingAction, taskId }): Promise<{ approvalId; url }>`.
+    It writes an approval of type `permission_request`:
+    - `requestedByAgentId` is the caller's agent, if any;
+    - the issue link is the task, if any;
+    - `payload.expiresAt` is 7 days out;
+    - `summary` is one plain sentence, e.g. "Delete task TES-12".
+  - **Only for a requestable denial:** the level or an override refused it, and the tool doesn't set
+    `requestable: false`. Every other refusal returns the plain denial, as now.
+  - **No duplicates:** an identical pending request (same caller principal, tool, arguments and
+    task) is reused, not duplicated.
+  - **The tool result** becomes "Sent to the board for approval" with the request's link and id. It
+    carries `isError: false` and `structuredContent { status: "requested", approvalId }`, so the
+    agent carries on or blocks.
+  - This covers both refusal points: the `needs_approval` visibility check in `callTool`, and a 403
+    with `requestable: true` from a route.
+
+- [ ] Steps: failing tests:
+  - `a worker calling paperclip_delete_task creates one permission_request`;
+  - `a second identical call reuses it`;
+  - `a refusal for a reason other than access_level creates nothing`;
+  - `run-only tools never create one`.
+
+  See them fail, implement, see them pass, commit.
+
+### Task 4.2: Approve, replay once, record
+
+**Files:**
+- Modify: `server/src/services/approvals.ts` (a `permission_request` branch in `decide`, beside
+  `hire_agent`), `server/src/routes/approvals.ts`, `server/src/services/permission-requests.ts`,
+  `server/src/app.ts` (wiring only)
+- Test: `server/src/__tests__/permission-request-replay.test.ts`
+
+**Interfaces:**
+- Consumes: `grantTemporaryAccess` (1.1), `createCatalogDispatch` and `createPaperclipCatalog` (2.x).
+- Produces:
+  - **The replayer.** On approve, the server rebuilds the caller from `payload.caller` **without a
+    run id**. A run caller becomes an agent-key-like caller for its agent; an OAuth caller is
+    rebuilt from its grant and refuses if the grant was revoked.
+    - It grants `{ action: missingAction, resource: <the task, else the company>, usesLeft: 1, expiresAt: +10 min }`.
+    - It runs the tool once through the catalog with the stored arguments.
+    - It writes `payload.result { status: "done" | "refused" | "failed", detail, at }`.
+    - The approval is resolved approved either way. The result says what happened.
+  - **Wiring:** the replayer needs the `api` Router, so it's built in `app.ts` and injected into
+    the approval route and service, like `createMcpApiDispatch`. No import cycle from services into
+    `app.ts`.
+  - **"Approve and always allow"** is `POST /approvals/:id/approve` with
+    `{ alwaysAllow: true }`, for `permission_request` only. Before replaying, it adds the
+    `missingAction` override to the agent (`withAccessOverride`), or to the grant's
+    `access_overrides` for an OAuth person caller.
+  - **Expiry:** an approve after `payload.expiresAt` doesn't replay. It records
+    `result { status: "refused", detail: "expired" }`. No sweeper; the Inbox shows the request as
+    expired (agent 5).
+  - **Reporting:** if the request has a task, a comment on it reports the outcome in one line. That
+    wakes the assignee in the normal way. Reject records nothing beyond the normal rejection.
+  - **No direct creation:** `POST /companies/:companyId/approvals` refuses `type: "permission_request"`
+    (422, `code: "permission_request_reserved"`). Only `createPermissionRequest` makes them.
+
+- [ ] Steps: failing tests:
+  - `approving replays the call once and records done`;
+  - `the temporary grant is used up by the replay`;
+  - `a replay refused by another check records refused`;
+  - `approve after expiry doesn't replay`;
+  - `always-allow adds the override`;
+  - `POST approvals refuses permission_request`;
+  - `a task comment reports the outcome`.
+
+  See them fail, implement, see them pass, commit.
+
+### Task 4.3: OAuth callers and the connection's level
+
+**Files:**
+- Modify: `server/src/mcp/caller.ts`, `server/src/services/public-mcp/oauth.ts`,
+  `server/src/middleware/agent-route-policy.ts`, `server/src/routes/public-mcp.ts`
+- Test: `server/src/mcp/caller.test.ts`, `server/src/__tests__/public-mcp-grant-access.test.ts`
+
+**Interfaces:**
+- Produces:
+  - `resolveMcpCaller` handles `mcp_oauth` actors:
+    - **A personal grant without `act_as_agent_id`** is `oauth_person`. Its access is the grant's
+      `access_level` and `access_overrides`. The person's membership checks still apply in the
+      routes, as today.
+    - **A personal grant with `act_as_agent_id`** is `oauth_agent`. It acts as that agent, with no
+      run id. Its access is `capAgentAccess(agent's access, grant's access)`.
+    - **A purpose-`"agent"` grant (Dot, Grok Bot, Muse; dormant)** also maps to `oauth_agent` on its
+      `agent_id`, without a cap. Don't extend those pairings.
+  - **`actorForGrant`:** for a personal grant with `act_as_agent_id`, it gives an `agent` actor
+    (`source: "mcp_oauth"`, plus `grantId`), so the routes and the route policy treat it as that
+    agent.
+  - **The route policy caps `oauth_person`:** a `board` actor with `source: "mcp_oauth"` must hold
+    the route's action at the grant's level, or it gets the same 403 body. This is the "cap applies
+    through the same route policy" in spec section 3. A person's own browser session is unchanged.
+  - **Consent:** `approveGrant` writes `access_level` and `act_as_agent_id` from the extended
+    `mcpConsentSchema` (4.0).
+    - **Act as:** the person may pick only agents they may configure. Anything else is a 403.
+    - **Level:** a level above what the old checkbox would give needs `allowConfiguration`.
+    - **The scope ceiling:** a read-only consent stays read-only whatever level is sent.
+  - **`PATCH /mcp/connections/:id`** takes `updateMcpConnectionSchema`. It's open to the grant's own
+    person, or to a person who may configure the act-as agent, and is logged as
+    `mcp_connection.updated`.
+  - **`GET /mcp/connections`** returns the new fields.
+
+- [ ] Steps: failing tests:
+  - `a personal grant at read_only can't create a task through call_api or a tool`;
+  - `a grant acting as an agent uses the lower of the two levels`;
+  - `consent can't act as an agent the person can't configure`;
+  - `PATCH changes the level and the next call sees it`;
+  - `an existing grant with no new consent fields keeps its backfilled level`.
+
+  See them fail, implement, see them pass, commit.
+
+### Task 4.4: The public MCP serves the catalog
+
+**Files:**
+- Modify: `server/src/services/public-mcp/**`, `server/src/mcp/catalog/**` (new tools)
+- Delete (at the end, once nothing imports them): the tool definitions in `capabilities.ts` and
+  `expanded-capabilities.ts`. Keep the OAuth, consent, idempotency-receipt and file-ticket code.
+- Test: `server/src/mcp/catalog/catalog.test.ts`, `server/src/__tests__/public-mcp-catalog.test.ts`
+
+**Interfaces:**
+- Produces:
+  - **The handler:** the public MCP's `tools/list` and `tools/call` come from
+    `createPaperclipCatalog(catalogDeps(db))`, through the same filtering as `/api/mcp/paperclip`,
+    with the caller from 4.3. Run-only tools are hidden; there's no run id. Writes still record
+    `mcp_mutation_receipts`, as today.
+  - **Carry over every public tool** that the catalog lacks. To keep a worker's list near today's
+    23, fold reads into existing tools where the shape allows:
+
+    | Public tool | Becomes |
+    | --- | --- |
+    | `paperclip_connection` | `paperclip_me` |
+    | `finish_task`, `block_task` | `paperclip_update_task` with a status (spec section 4) |
+    | `get_agent` | `paperclip_list_agents` with `agentId` |
+    | `get_project` | `paperclip_list_projects` with `projectId` |
+    | `pending_approvals` | `paperclip_list_requests` (`tasks:read`) |
+    | `list_deliverables`, `register_deliverable`, `update_deliverable` | `paperclip_deliverables` (read `tasks:read`; write `update_own`/`_any`) |
+    | `list_document_revisions` | `paperclip_read_document` with `revisions: true` |
+    | `read_agent_instructions`, `list_agent_instruction_revisions`, `update_agent`, `update_agent_instructions` | `paperclip_configure_agent` (`agents:configure`; reads included) |
+    | `set_project_repositories` | `paperclip_update_project` |
+    | `list_skills`, `get_skill`, `read_skill_file`, `create_skill`, `update_skill`, `write_skill_file` | `paperclip_skills` (read `tasks:read`; write `agents:configure`) |
+    | `get_upload_url`, `get_download_url` | `paperclip_file_upload`, `paperclip_file_download` (`update_own`/`_any`, `tasks:read`) |
+
+    A tool whose action depends on its arguments (read or write) declares the write action for
+    visibility and checks per call. The new names go into `tool-names.ts`. The skill test
+    (`paperclip-skill-tools.test.ts`) still passes.
+  - **The file tools** work for every caller kind, through the existing ticket code. The Dot prefix
+    `/mcp/runner/files` stays.
+  - **Report two numbers:** the worker run list (count and definition tokens) before and after.
+
+- [ ] Steps: failing tests:
+  - `the public MCP lists the catalog for a personal grant`;
+  - `every former public tool name maps to a catalog tool` (a table test over the old names);
+  - `a read_only grant sees no write tools`;
+  - `upload then download a file through the catalog tools`.
+
+  See them fail, implement, then delete the old lists, see the tests pass, commit.
+
+---
+
+## Wave 2, agent 5: `ui-new`
+
+Branch `step4a/ui`. Owns `ui-new/**` only. Load the `solidjs` skill. Follow `ui-new/docs/design/`
+(the boards, `design-system.md`, `tokens.css`), and put help text behind info tips (decision 52).
+Types come from `@paperclipai/shared` with `import type`. Tasks 5.1–5.3 need nothing from agent 4.
+Task 5.4 starts once 4.0 is merged into `feat/step-4a`; the project manager says when. Until then,
+merge `feat/step-4a` into the branch with `--no-ff`; no rebases.
+
+### Task 5.1: Rename and recolour labels
+
+**Files:**
+- Create: a label manager reachable from the company's settings (where the board puts company-wide
+  settings; ask the PM if no board covers it), plus an "Edit labels" link from `NewLabelDialog`
+- Modify: `ui-new/src/api/task-actions.ts` (`updateLabel`, `deleteLabel`)
+- Test: a component test beside the new files
+
+**Interfaces:**
+- Consumes: `PATCH /labels/:labelId` (`{ name?, color? }`; 409 `label_name_taken`) and
+  `DELETE /labels/:labelId`.
+- Produces:
+  - list, rename, recolour and delete, with confirmation on delete and the clash shown on the field;
+  - the shared label query (`lib/company-data.ts:55`) is invalidated after each change.
+
+- [ ] Steps: test, implement, typecheck, commit.
+
+### Task 5.2: The Permissions section
+
+**Files:**
+- Modify: `ui-new/src/agents/settings/PermissionsSection.tsx`, `InteractionsCard.tsx`,
+  `interactions-model.ts`, `ui-new/src/api/agents.ts`
+- Test: `PermissionsSection.test.tsx` (new or existing)
+
+**Interfaces:**
+- Consumes: `AGENT_ACCESS_ACTIONS`, `AGENT_ACCESS_LEVELS`, `AGENT_ACCESS_LEVEL_ACTIONS`,
+  `resolveAgentAccess` (`packages/shared/src/agent-access.ts`); `PATCH /agents/:id/permissions`
+  with `{ access: { level, overrides } }`.
+- Produces:
+  - **The level picker** (read-only, worker, manager, admin).
+  - **The 13 actions as switches.** Each shows its level default, marks an override, and offers to
+    reset it. `tasks:delete` is shown as override-only.
+  - **What it replaces:** "Hire agents" and the assignment switch become the `agents:create` and
+    `tasks:assign` rows. `InteractionsCard` keeps only the five receiver-side switches and
+    `canCommentOnOtherTasks`/`canMentionAgents`. The others moved into actions; the server returns
+    410 `agent_grant_retired` for them.
+  - **Trust preset and project access** stay as they are.
+
+- [ ] Steps: test, implement, typecheck, commit.
+
+### Task 5.3: The permission request in the Inbox
+
+**Files:**
+- Modify: `ui-new/src/inbox/row-model.ts:110`, `ui-new/src/requests/request-model.ts:617`,
+  `ui-new/src/requests/RequestCard.tsx`
+- Test: `RequestCard.test.tsx` (new or existing)
+
+**Interfaces:**
+- Consumes: `PermissionRequestPayload` (`packages/shared/src/permission-request.ts`);
+  `POST /approvals/:id/approve` (with `{ alwaysAllow: true }` for always-allow, 4.2) and `/reject`.
+- Produces:
+  - a `permission_request` label in both maps ("Permission");
+  - **a card body** saying who (agent, or person by connection), what (`summary`, then the tool and
+    its arguments in plain words, collapsible), from which task (a link), and the missing action;
+  - **three buttons:** Approve, Approve and always allow, Deny;
+  - **after a decision,** the recorded `result` (done, refused with its detail, failed);
+  - **expired requests:** past `expiresAt`, the card says so, and approving is disabled.
+
+- [ ] Steps: test, implement, typecheck, commit.
+
+### Task 5.4: Outside connections and the consent screen (after 4.0)
+
+**Files:**
+- Modify: `ui-new/src/auth/McpConnect.tsx` (consent and `AssistantConnectionsPage`),
+  `ui-new/src/apps/assistant/AssistantConnection.tsx`, `assistant-model.ts`, `ui-new/src/api/mcp.ts`
+- Test: beside the changed files
+
+**Interfaces:**
+- Consumes: the extended `mcpConsentSchema`, `McpConnection` and `updateMcpConnectionSchema` (4.0);
+  `PATCH /mcp/connections/:id`.
+- Produces:
+  - **Consent:** "Acts as: me / agent …" (only agents the person may configure) and a level. The
+    default is manager, or what the old checkbox gives, keeping the checkbox's meaning for the scope
+    ceiling.
+  - **The connections list** shows each connection's "acts as" and level, editable in place, with
+    overrides as in 5.2.
+
+- [ ] Steps: test, implement, typecheck, commit.
+
+---
+
+## After wave 2: project manager
+
+- **Turn `PAPERCLIP_UNIFIED_RUN_MCP` on by default** and retire `/api/mcp/project-tools`. That's a
+  small agent; it touches the run code.
+- **Check a real run on a local dev instance:** TES with an "M7 test" agent, never Bob, and the run
+  finishing through the MCP tools.
+- **The regression on `feat/step-4a`,** once step 3a's suite is ready.
+- **Update the docs** (repo-map, hard-fork plan), then the user approves, then merge into `main`.
 
 ### Wave 1 status (2026-11-17)
 
