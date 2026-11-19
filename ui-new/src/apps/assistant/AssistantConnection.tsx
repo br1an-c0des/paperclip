@@ -14,11 +14,11 @@ import { InfoTip } from "@/ui/InfoTip";
 import { pushToast } from "@/ui/Toast";
 import { CopyBlock } from "../advanced/parts";
 import { failureText } from "../shared";
+import { ConnectionAccess } from "./ConnectionAccess";
 import {
   ASSISTANT_NAMES,
   ASSISTANTS,
   AUTHORIZATION_HANDOFF,
-  assistantAccess,
   assistantRows,
   docsUrl,
   invitation,
@@ -29,7 +29,8 @@ import {
 /*
  * Connections → Assistants (`/connections/assistant-connection`, the old UI's AssistantConnection): connect an
  * outside assistant (Codex, Claude Code, OpenCode, a browser assistant or a headless client) to
- * Paperclip's MCP endpoint, then see and revoke the assistants connected as you.
+ * Paperclip's MCP endpoint, then see the assistants connected as you, change who each acts as and
+ * its access (ConnectionAccess.tsx, step 4a), and revoke them.
  *
  * The endpoint needs a public URL and the experimental setting `enablePublicMcp`. Without a public
  * URL the MCP routes aren't mounted and answer 404; with the setting off `GET /mcp/setup` says
@@ -150,7 +151,7 @@ export function AssistantConnection() {
                     </For>
                   </ol>
                   <p class="cx-note">
-                    When Paperclip asks, choose <b>{company().name}</b>, review the access, then click <b>Connect organization</b>. Creating tasks and adding comments
+                    When Paperclip asks, choose <b>{company().name}</b>, pick who it acts as and its access level, then click <b>Connect organization</b>. Creating tasks and adding comments
                     may start agent work on the organization's budget.
                   </p>
                   <div class="field-stack">
@@ -205,17 +206,22 @@ export function AssistantConnection() {
           </Match>
           <Match when={true}>
             <ul class="ap-rows">
-              <For each={rows()}>
-                {(row) => (
-                  <li class="ap-row">
-                    <div class="ap-row-main">
-                      <span class="ap-row-name">{connectionTitle(row)}</span>
-                      <span class="ap-row-meta">{assistantAccess(row.scopes)}</span>
-                    </div>
-                    <Button size="compact" variant="danger" disabled={revoke.isPending} aria-label={`Revoke ${connectionTitle(row)}`} onClick={() => setRevoking(row)}>
-                      Revoke
-                    </Button>
-                  </li>
+              {/* By id, so a change to one connection keeps its row (and its open editor). */}
+              <For each={rows().map((entry) => entry.id)}>
+                {(id) => (
+                  <Show when={rows().find((entry) => entry.id === id)}>
+                    {(row) => (
+                      <li class="ap-row ca-row">
+                        <div class="ap-row-main">
+                          <span class="ap-row-name">{connectionTitle(row())}</span>
+                          <ConnectionAccess connection={row()} queryKey={queryKeys.mcp.connections} />
+                        </div>
+                        <Button size="compact" variant="danger" disabled={revoke.isPending} aria-label={`Revoke ${connectionTitle(row())}`} onClick={() => setRevoking(row())}>
+                          Revoke
+                        </Button>
+                      </li>
+                    )}
+                  </Show>
                 )}
               </For>
             </ul>

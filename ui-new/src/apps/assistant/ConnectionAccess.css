@@ -1,0 +1,42 @@
+/* An outside connection's access under its row: the summary line, then the folded editor. */
+.ca {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ca-line {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ca-edit > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ca-body {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-field);
+}
+
+.ca-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+}
+
+/* A connection row whose access editor can unfold: keep Revoke at the top. */
+.ap-row.ca-row {
+  align-items: flex-start;
+}
+
+.ca-row > .ap-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}

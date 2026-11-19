@@ -1,4 +1,11 @@
-import { checkOAuthEndpointUrl, oauthEndpointUrlRejectionMessage } from "@paperclipai/shared";
+import {
+  AGENT_ACCESS_LEVELS,
+  checkOAuthEndpointUrl,
+  DEFAULT_CONNECTION_ACCESS_LEVEL,
+  oauthEndpointUrlRejectionMessage,
+  type AgentAccessLevel,
+  type McpConsent,
+} from "@paperclipai/shared";
 import type { InviteSummary } from "@/api/invites";
 import type { HealthStatus } from "@/api/health";
 import { ApiError } from "@/api/client";
@@ -299,11 +306,36 @@ export function connectionTitle(connection: { clientName: string; user?: { name:
   return `${owner} ${client} connection`;
 }
 
-/** What a connection may do, from its scopes. */
-export function connectionAccess(scopes: readonly string[]) {
-  if (scopes.includes("paperclip:agent")) return "Agent connection";
-  const base = scopes.includes("paperclip:write") ? "Read and edit work" : "Read only";
-  return scopes.includes("paperclip:configure") ? `${base}; configure agents, projects and skills` : base;
+/** Whether a connection is a Dot agent pairing (dormant here), whose access is its agent's. */
+export function isAgentPairing(connection: { scopes: readonly string[] }) {
+  return connection.scopes.includes("paperclip:agent");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Consent (step 4a): who a connection acts as, and its level
+
+/** Whether `level` is at most `max`. */
+export function levelWithin(level: AgentAccessLevel, max: AgentAccessLevel | undefined) {
+  return !max || AGENT_ACCESS_LEVELS.indexOf(level) <= AGENT_ACCESS_LEVELS.indexOf(max);
+}
+
+/** The consent screen's starting level: manager (`DEFAULT_CONNECTION_ACCESS_LEVEL`), or the most the person may give. */
+export function consentDefaultLevel(max: AgentAccessLevel | undefined): AgentAccessLevel {
+  return levelWithin(DEFAULT_CONNECTION_ACCESS_LEVEL, max) ? DEFAULT_CONNECTION_ACCESS_LEVEL : max!;
+}
+
+/**
+ * The consent body (`mcpConsentSchema`). Approving an assistant's connection names who it acts as
+ * (null for the person) and its level; a deny, and a Dot agent pairing, send only the decision and
+ * the organization.
+ */
+export function consentInput(
+  decision: "approve" | "deny",
+  options: { companyId?: string; agentPairing?: boolean; actAsAgentId: string | null; accessLevel: AgentAccessLevel },
+): McpConsent {
+  const base: McpConsent = { decision, ...(options.companyId ? { companyId: options.companyId } : {}) };
+  if (decision === "deny" || options.agentPairing) return base;
+  return { ...base, actAsAgentId: options.actAsAgentId, accessLevel: options.accessLevel };
 }
 
 export const DOT_PAIRING_CODE = /^[A-Za-z0-9_-]{32}$/;

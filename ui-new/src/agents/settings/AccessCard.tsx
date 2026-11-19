@@ -1,30 +1,15 @@
-import type { AgentAccess, AgentAccessLevel, AgentDetail } from "@paperclipai/shared";
+import type { AgentAccess, AgentDetail } from "@paperclipai/shared";
 import { useQueryClient } from "@tanstack/solid-query";
-import { Check } from "lucide-solid";
-import { createMemo, For, Show } from "solid-js";
+import { createMemo } from "solid-js";
 import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { Button } from "@/ui/Button";
-import { FieldButton, SettingsCard, SettingsRow } from "@/ui/Field";
+import { SettingsCard } from "@/ui/Field";
 import { InfoTip } from "@/ui/InfoTip";
-import { Menu } from "@/ui/Menu";
-import { CardNote, SwitchRow, useAgentSaver } from "../shared";
-import {
-  ACCESS_LEVELS,
-  accessSummary,
-  actionRows,
-  defaultNote,
-  LEVEL_WORDS,
-  lowestLevel,
-  overrideCount,
-  storedAccess,
-  withAction,
-  withLevel,
-  withoutOverride,
-  type ActionRow,
-} from "./access-model";
-import "./Interactions.css";
+import { CardNote, useAgentSaver } from "../shared";
+import { ActionGroups, LevelRow } from "./AccessControls";
+import { accessSummary, overrideCount, storedAccess } from "./access-model";
 
 /*
  * The Access card on the agent's Permissions page (step 4a, access-model.ts): the agent's level,
@@ -34,26 +19,9 @@ import "./Interactions.css";
  * (`PATCH /agents/:id/permissions` `{ access }`); changing it takes a person who can manage agents.
  *
  * This replaces the Hire agents and Assign tasks switches (the `agents:create` and `tasks:assign`
- * rows) and the actor-side Interactions switches that became actions.
+ * rows) and the actor-side Interactions switches that became actions. The level menu and the
+ * switches are AccessControls.tsx, which outside connections share.
  */
-
-type Group = { title: string; rows: ActionRow[] };
-
-const GROUP_TITLES: Record<AgentAccessLevel | "none", string> = {
-  read_only: "Every level",
-  worker: "Worker and up",
-  manager: "Manager and up",
-  admin: "Admin",
-  none: "Only set here",
-};
-
-function groups(access: AgentAccess): Group[] {
-  const rows = actionRows(access);
-  const keys: (AgentAccessLevel | "none")[] = [...ACCESS_LEVELS, "none"];
-  return keys
-    .map((key) => ({ title: GROUP_TITLES[key], rows: rows.filter((row) => (lowestLevel(row.action) ?? "none") === key) }))
-    .filter((group) => group.rows.length > 0);
-}
 
 export function AccessCard(props: { agent: AgentDetail }) {
   const company = useCompany();
@@ -94,60 +62,8 @@ export function AccessCard(props: { agent: AgentDetail }) {
           ) : undefined
         }
       >
-        <SettingsRow label="Level" info="Read only reads; worker works its own tasks; manager runs the board; admin also configures and hires agents and may call the whole API.">
-          <Menu>
-            <Menu.Trigger as={FieldButton} class="ps-field-240" disabled={disabled()} aria-label={`Level: ${LEVEL_WORDS[level()].label}`}>
-              {LEVEL_WORDS[level()].label}
-            </Menu.Trigger>
-            <Menu.Content label="Level" width={340}>
-              <For each={ACCESS_LEVELS}>
-                {(entry) => (
-                  <Menu.Item
-                    description={LEVEL_WORDS[entry].description}
-                    hint={entry === level() ? <Check size={14} /> : undefined}
-                    onSelect={() => entry !== level() && save(withLevel(access(), entry), "Couldn't change the level.")}
-                  >
-                    {LEVEL_WORDS[entry].label}
-                  </Menu.Item>
-                )}
-              </For>
-            </Menu.Content>
-          </Menu>
-        </SettingsRow>
-        <For each={groups(access())}>
-          {(group) => (
-            <div class="ix-group" role="group" aria-label={group.title}>
-              <h4 class="ix-group-title">{group.title}</h4>
-              <For each={group.rows}>
-                {(row) => (
-                  <SwitchRow
-                    label={row.label}
-                    info={row.help}
-                    help={defaultNote(row, level())}
-                    checked={row.allowed}
-                    disabled={disabled()}
-                    onChange={(value) => save(withAction(access(), row.action, value), `Couldn't change “${row.label}”.`)}
-                  >
-                    <Show when={row.override !== undefined}>
-                      <span class="ix-override">
-                        Set for this agent
-                        <Button
-                          size="compact"
-                          variant="quiet"
-                          disabled={disabled()}
-                          aria-label={`Reset “${row.label}” to the level's default`}
-                          onClick={() => save(withoutOverride(access(), row.action), `Couldn't reset “${row.label}”.`)}
-                        >
-                          Reset
-                        </Button>
-                      </span>
-                    </Show>
-                  </SwitchRow>
-                )}
-              </For>
-            </div>
-          )}
-        </For>
+        <LevelRow access={access()} disabled={disabled()} onChange={save} />
+        <ActionGroups access={access()} disabled={disabled()} overrideLabel="Set for this agent" onChange={save} />
       </SettingsCard>
     </section>
   );

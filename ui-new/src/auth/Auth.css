@@ -250,3 +250,17 @@
 .stand-select {
   width: 100%;
 }
+
+/* A choice with a line under its name (the consent screen's access levels). */
+.stand-option--described {
+  align-items: flex-start;
+}
+
+.stand-option--described input {
+  margin-top: 3px;
+}
+
+.stand-option-note {
+  display: block;
+  font-weight: 400;
+}

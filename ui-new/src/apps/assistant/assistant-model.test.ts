@@ -1,6 +1,6 @@
 import type { McpConnection } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { ASSISTANTS, assistantAccess, assistantRows, invitation, setupSteps, setupUrl } from "./assistant-model";
+import { actAsChoices, ASSISTANTS, assistantRows, connectionAccessLine, connectionAccessOf, connectionAccessPatch, invitation, setupSteps, setupUrl } from "./assistant-model";
 
 const SERVER = "https://paperclip.example.com/mcp";
 
@@ -31,8 +31,26 @@ describe("assistantRows", () => {
     expect(rows.map((entry) => entry.id)).toEqual(["a"]);
   });
 
-  it("says what a connection may do", () => {
-    expect(assistantAccess(["paperclip:read"])).toBe("Connected as you · Read only");
-    expect(assistantAccess(["paperclip:write", "paperclip:configure"])).toBe("Connected as you · Read and write · Configure agents, projects and skills");
+  it("says who a connection acts as and its level", () => {
+    expect(connectionAccessLine({ actAsAgent: null, accessLevel: "manager", accessOverrides: {} })).toBe("Acts as you · Manager");
+    expect(connectionAccessLine({ actAsAgent: { id: "a", name: "Ada" }, accessLevel: "worker", accessOverrides: { "tasks:delete": true } })).toBe(
+      "Acts as Ada · Worker at most · 1 action set",
+    );
+  });
+
+  it("edits a connection's access as an agent's, and sends it whole", () => {
+    expect(connectionAccessOf({ accessLevel: "admin", accessOverrides: {} })).toEqual({ level: "admin" });
+    // An older server without the field reads as the connection default.
+    expect(connectionAccessOf({ accessLevel: undefined as never, accessOverrides: undefined as never })).toEqual({ level: "manager" });
+    expect(connectionAccessPatch({ level: "worker" })).toEqual({ accessLevel: "worker", accessOverrides: {} });
+    expect(connectionAccessPatch({ level: "worker", overrides: { "api:raw": true } })).toEqual({ accessLevel: "worker", accessOverrides: { "api:raw": true } });
+  });
+
+  it("offers you, then the agents you may configure, keeping the current one", () => {
+    expect(actAsChoices({ actAsAgent: null, actAsAgentChoices: [{ id: "a", name: "Ada" }] })).toEqual([
+      { id: null, name: "You" },
+      { id: "a", name: "Ada" },
+    ]);
+    expect(actAsChoices({ actAsAgent: { id: "b", name: "Bea" }, actAsAgentChoices: [{ id: "a", name: "Ada" }] }).map((choice) => choice.name)).toEqual(["You", "Bea", "Ada"]);
   });
 });
