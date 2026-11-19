@@ -44,8 +44,8 @@ Read the ledger: `LAST` is its "Last reviewed" commit (the first review starts a
 ## 2. Fetch and update the mirror
 
 `master` mirrors upstream **locally only**. Never push it to `origin`: it holds upstream's
-workflows, and a push would let GitHub run them in the fork (decided 2026-11-19). `origin/master`
-is a stale copy from before then; ignore it.
+workflows, and a push would let GitHub run them in the fork (decided 2026-11-19; `origin`'s
+`master` was deleted then).
 
 ```bash
 git sync-master                          # fetch upstream, fast-forward local master; stops if it can't

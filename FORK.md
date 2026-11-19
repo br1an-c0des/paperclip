@@ -29,7 +29,7 @@ its own codebase ([fork/hard-fork-plan.md](fork/hard-fork-plan.md)).
 | Branch | Rule |
 | --- | --- |
 | `main` | Our codebase, GitHub's default branch. Feature branches merge into it with `--no-ff`. Don't rebase it. |
-| `master` | A local mirror of `upstream/master`, so the upstream watch can compare. Only fast-forwards (`git sync-master`); never committed to, never merged into `main`, and since 2026-11-19 never pushed: on `origin` its upstream workflows would run in the fork. `origin/master` is a stale copy from before then. |
+| `master` | A local mirror of `upstream/master`, so the upstream watch can compare. Only fast-forwards (`git sync-master`); never committed to, never merged into `main`, and since 2026-11-19 never pushed: on `origin` its upstream workflows would run in the fork. `origin`'s `master` was deleted the same day. |
 | `new-ui` (on origin) | Frozen pointer at the branch point, from before the rename. Don't push to it. |
 | `upstream-watch/<date>` | Short-lived: cherry-picks chosen in a watch, merged into `main` after approval. |
 | `fix/*` | The three open upstream pull requests above. No new ones. |

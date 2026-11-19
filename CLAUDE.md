@@ -131,13 +131,13 @@ triages them, and cherry-picks only what you choose, on a branch, after approval
 - Git worktrees here, including agents' `isolation: "worktree"`, may start from `master` rather than
   `main`. Before working: `git merge-base --is-ancestor main HEAD || git reset --hard main`.
 - `master` mirrors upstream locally only: `git sync-master` fast-forwards it without a checkout.
-  Never push it to `origin`, where its upstream workflows would run in the fork (`origin/master` is
-  a stale copy from before 2026-11-19). Re-run `fork/setup-clone.sh` in a clone whose alias still
-  pushes.
+  Never push it to `origin`, where its upstream workflows would run in the fork (`origin`'s
+  `master` was deleted on 2026-11-19). Re-run `fork/setup-clone.sh` in a clone whose alias still
+  pushes, and `git fetch --prune origin` there to drop the old `origin/master`.
 - server1 runs the real instance with real data: never test against it, and never run M7 test data there.
   server1 is also a dev machine, so check `hostname` first: on server1, `localhost:3100` is the real
   instance ([Dev work on server1](#dev-work-on-server1)).
-- `pnpm verify` and similar scripts compare against `origin/master`, a stale upstream copy: pass `--base main`
+- `pnpm verify` and similar scripts compare against `origin/master` (gone) or `master` (upstream): pass `--base main`
   where they take one ([fork/repo-map.md](fork/repo-map.md#5-tests)).
 - Finished agent worktrees can be locked: `git worktree unlock <path>` before `git worktree remove`.
 - Stop a dev server by its port (`ss -ltnp | grep ':5181 '`), not `pkill -f <pattern>`, which also matches and kills the
