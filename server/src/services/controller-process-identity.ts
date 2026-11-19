@@ -194,15 +194,43 @@ export const PROCESS_START_PRECISION_MS = 1_000;
  * True only when two start times for one PID prove different processes.
  * `ps -o lstart` on macOS and BSD has whole-second precision, while a recorded
  * start can come from a millisecond clock, so a sub-second gap is ambiguous
- * and fails closed (same process). A missing or unparsable time proves nothing.
+ * and fails closed (same process). With `clock: "linux_btime"` a gap of a
+ * whole number of seconds is ambiguous too (`ProcessStartClock`). A missing or
+ * unparsable time proves nothing.
  */
 export function processStartsDefinitelyDiffer(
   recorded: Date | string | null | undefined,
   observed: Date | string | null | undefined,
+  options: { clock?: ProcessStartClock | null } = {},
 ): boolean {
   const left = recorded instanceof Date ? recorded.getTime() : Date.parse(recorded ?? "");
   const right = observed instanceof Date ? observed.getTime() : Date.parse(observed ?? "");
-  return Number.isFinite(left) && Number.isFinite(right) && Math.abs(left - right) >= PROCESS_START_PRECISION_MS;
+  if (!Number.isFinite(left) || !Number.isFinite(right)) return false;
+  const gap = Math.abs(left - right);
+  if (gap < PROCESS_START_PRECISION_MS) return false;
+  return !(options.clock === "linux_btime" && gap % 1_000 === 0);
+}
+
+/**
+ * How an observed start time was derived, when that matters for comparing it.
+ *
+ * `linux_btime`: `/proc/stat` btime plus the process's start ticks from
+ * `/proc/PID/stat` (`readLinuxProcessStartedAt`). btime is whole seconds and
+ * is re-derived from the wall clock on every read (wall clock minus time since
+ * boot), so when the wall clock is stepped or slewed against the boot clock
+ * (NTP, a VM or WSL resyncing its clock: on WSL it moved by a second every
+ * ~30 s) every later reading of one live process moves by whole seconds,
+ * while the sub-second part, from the ticks, stays the same. A gap of a whole
+ * number of seconds between a stamp and such a reading may be one process
+ * seen across a clock change, so it proves nothing (fail closed). A reused
+ * PID lands on the same sub-second part only by chance (1 in 100 at 100 ticks
+ * a second); that record then stays held until the PID exits.
+ */
+export type ProcessStartClock = "linux_btime";
+
+/** The start-time derivation `observedProcessStartedAt` uses on this platform. */
+export function currentProcessStartClock(platform: NodeJS.Platform = process.platform): ProcessStartClock | null {
+  return platform === "linux" ? "linux_btime" : null;
 }
 
 /** This process's PID-space hash. An unreadable space is stored as
