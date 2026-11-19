@@ -64,7 +64,7 @@ export function setupSteps(serverUrl: string, assistant: AssistantClient): Setup
           code: "codex mcp login paperclip --scopes paperclip:read,paperclip:write,paperclip:configure,offline_access",
         },
         {
-          text: "If the current conversation does not reload its MCP tools, start a new conversation or restart the client. Verify the connection with paperclip_connection before claiming success.",
+          text: "If the current conversation does not reload its MCP tools, start a new conversation or restart the client. Verify the connection with paperclip_me before claiming success.",
         },
       ];
     case "claude":
@@ -76,7 +76,7 @@ export function setupSteps(serverUrl: string, assistant: AssistantClient): Setup
         {
           text: "In Claude Code, run /mcp, select paperclip, and choose Authenticate. Versions that offer `claude mcp login --help` can also start authorization with `claude mcp login paperclip`. Give the user the approval link.",
         },
-        { text: "Reconnect through /mcp, or start a new session if needed. Verify the account and organization with paperclip_connection." },
+        { text: "Reconnect through /mcp, or start a new session if needed. Verify the account and organization with paperclip_me." },
       ];
     case "opencode":
       return [
@@ -89,7 +89,7 @@ export function setupSteps(serverUrl: string, assistant: AssistantClient): Setup
           code: "opencode mcp auth paperclip",
         },
         {
-          text: "If OpenCode was already running, restart it to load the connection. For the browser app, use this command. Verify the tools with paperclip_connection.",
+          text: "If OpenCode was already running, restart it to load the connection. For the browser app, use this command. Verify the tools with paperclip_me.",
           code: "opencode web",
         },
       ];
@@ -114,14 +114,14 @@ export function setupSteps(serverUrl: string, assistant: AssistantClient): Setup
           code: `paperclipai mcp proxy --url ${quoted}`,
         },
         {
-          text: "The user code is for the human to verify the request. The private device code remains inside the CLI. After connecting, call paperclip_connection to verify the account and organization.",
+          text: "The user code is for the human to verify the request. The private device code remains inside the CLI. After connecting, call paperclip_me to verify the account and organization.",
         },
       ];
     default:
       return [
         { text: "Add a remote HTTP MCP server at this URL, then choose OAuth / browser sign-in.", code: serverUrl },
         {
-          text: "If the client cannot install MCP servers from chat, use its connection settings. If it cannot receive a browser callback, use the Headless instructions. After approval, verify the account and organization with paperclip_connection.",
+          text: "If the client cannot install MCP servers from chat, use its connection settings. If it cannot receive a browser callback, use the Headless instructions. After approval, verify the account and organization with paperclip_me.",
         },
       ];
   }
