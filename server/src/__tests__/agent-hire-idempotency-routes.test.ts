@@ -59,7 +59,7 @@ async function seedHiringFixture(db: Db) {
       adapterType: "process",
       adapterConfig: {},
       runtimeConfig: {},
-      permissions: { canCreateAgents: true },
+      permissions: { canCreateAgents: true, access: { level: "worker", overrides: { "agents:create": true } } },
     })
     .returning();
   const [run] = await db

@@ -174,7 +174,10 @@ const support = await getEmbeddedPostgresTestSupport();
   it.each(["board", "agent"] as const)("lets a configuration-authorized %s migrate without separate manual-pause authority", async type => {
     const id = await agent(otherEnvironmentId, { status: "running", adapterType: "paperclip_runner",
       adapterConfig: { provider: "codex" }, lifecycleRequiredPluginIds: [] });
-    const principalId = type === "agent" ? await agent(otherEnvironmentId) : randomUUID();
+    // Since step 4a an agent's configure authority is its access level's agents:configure.
+    const principalId = type === "agent"
+      ? await agent(otherEnvironmentId, { permissions: { access: { level: "worker", overrides: { "agents:configure": true } } } })
+      : randomUUID();
     await db.insert(companyMemberships).values({ companyId, principalType: type === "board" ? "user" : "agent",
       principalId, membershipRole: "member", status: "active" });
     await db.insert(principalPermissionGrants).values({ companyId, principalType: type === "board" ? "user" : "agent",
