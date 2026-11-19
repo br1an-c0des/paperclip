@@ -57,7 +57,7 @@ import { QuestionSetForm } from "./QuestionSetForm";
 import { WithdrawDialog } from "./WithdrawDialog";
 import { canWithdrawApproval } from "@/approvals/approval-model";
 import { alreadyClosed, alreadyClosedText } from "@/inbox/routing-model";
-import { argumentRows, missingActionWords, permissionExpired, permissionRequestOf, toolWords, viaConnection } from "./permission-model";
+import { argumentRows, connectionLabel, missingActionWords, permissionExpired, permissionRequestOf, toolWords } from "./permission-model";
 import { answerRefusal, declineNote, documentLabel, documentReviewTarget, KIND_LABEL, planLabel, planReviewTarget, suggestedOwner, type Request, type RequestKind } from "./request-model";
 import "./RequestCard.css";
 
@@ -1086,9 +1086,13 @@ function PermissionPayload(props: { request: Request }) {
               </dd>
               <dt>Needs</dt>
               <dd>{missingActionWords(found())}</dd>
-              <Show when={viaConnection(found())}>
-                <dt>Through</dt>
-                <dd>An outside connection</dd>
+              <Show when={connectionLabel(found())}>
+                {(label) => (
+                  <>
+                    <dt>Through</dt>
+                    <dd>{label()}</dd>
+                  </>
+                )}
               </Show>
             </dl>
             <Show when={args().length > 0}>

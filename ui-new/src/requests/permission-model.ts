@@ -56,6 +56,12 @@ export function viaConnection(payload: Pick<PermissionRequestPayload, "caller">)
   return payload.caller.kind === "oauth_person" || payload.caller.kind === "oauth_agent";
 }
 
+/** The outside connection the call came through: its client's name ("Claude Code"), or a plain fallback. */
+export function connectionLabel(payload: Pick<PermissionRequestPayload, "caller" | "connectionName">): string | null {
+  if (!viaConnection(payload)) return null;
+  return payload.connectionName?.trim() || "An outside connection";
+}
+
 /** Whether it's past its expiry, after which approving can't run it. */
 export function permissionExpired(payload: Pick<PermissionRequestPayload, "expiresAt">, now: Date) {
   const at = new Date(payload.expiresAt);

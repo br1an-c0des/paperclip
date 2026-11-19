@@ -337,6 +337,14 @@ describe("RequestCard: a permission request", () => {
     expect(screen.getByText("Issue id")).toBeTruthy();
     expect(screen.getByRole("link", { name: /TRA-41/ }).getAttribute("href")).toBe("/TRA/issues/TRA-41");
     expect(screen.queryByRole("button", { name: "Request changes" })).toBeNull();
+    expect(screen.queryByText("Through")).toBeNull();
+  });
+
+  it("names the outside connection a call came through", () => {
+    mountApproval(permission({}, { caller: { kind: "oauth_agent", agentId: "a1", userId: null, runId: null, grantId: "g1" }, connectionName: "Claude Code" }));
+    expect(screen.getByText("Through")).toBeTruthy();
+    expect(screen.getByText("Claude Code")).toBeTruthy();
+    expect(screen.getByText("Quant Researcher via Claude Code")).toBeTruthy();
   });
 
   it("approves, approves and always allows, or denies", async () => {

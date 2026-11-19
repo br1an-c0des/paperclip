@@ -1,7 +1,7 @@
 import type { Approval, PermissionRequestPayload } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import { requestType } from "@/inbox/row-model";
-import { argumentRows, missingActionWords, permissionExpired, permissionRequestOf, permissionResult, toolWords } from "./permission-model";
+import { argumentRows, connectionLabel, missingActionWords, permissionExpired, permissionRequestOf, permissionResult, toolWords } from "./permission-model";
 import { approvalTitle, requestFromApproval } from "./request-model";
 
 const payload = (extra: Partial<PermissionRequestPayload> = {}): PermissionRequestPayload => ({
@@ -98,6 +98,18 @@ describe("a permission request as a request", () => {
     );
     expect(request.asker).toEqual({ agentId: null, userId: "u1", name: "Brian (outside connection)" });
     expect(request.subject).toEqual({ kind: "company", label: "The company" });
+    const named = requestFromApproval(
+      approval({ requestedByAgentId: null, requestedByUserId: "u1" }, { caller: { kind: "oauth_person", agentId: null, userId: "u1", runId: null, grantId: "g1" }, connectionName: "Claude Code" }),
+      ctx,
+    );
+    expect(named.asker.name).toBe("Brian via Claude Code");
+  });
+
+  it("names the connection only for an outside caller", () => {
+    const oauth = { kind: "oauth_agent", agentId: "a1", userId: null, runId: null, grantId: "g1" } as const;
+    expect(connectionLabel({ caller: oauth, connectionName: "Claude Code" })).toBe("Claude Code");
+    expect(connectionLabel({ caller: oauth, connectionName: null })).toBe("An outside connection");
+    expect(connectionLabel({ caller: payload().caller, connectionName: "Claude Code" })).toBeNull();
   });
 
   it("links the task from the payload when the approval's task isn't loaded", () => {

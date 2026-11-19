@@ -699,7 +699,8 @@ function requestFromPermission(approval: Approval, ctx: RequestContext): Request
   const agentId = approval.requestedByAgentId ?? payload.caller.agentId;
   const userId = payload.caller.kind === "oauth_person" ? (approval.requestedByUserId ?? payload.caller.userId) : null;
   const caller = who(ctx, userId ? null : agentId, userId);
-  const asker = viaConnection(payload) ? `${caller} (outside connection)` : caller;
+  const through = payload.connectionName?.trim();
+  const asker = viaConnection(payload) ? (through ? `${caller} via ${through}` : `${caller} (outside connection)`) : caller;
   const open = approval.status === "pending" || approval.status === "revision_requested";
   const expired = permissionExpired(payload, now);
   const tool = toolWords(payload.tool);
