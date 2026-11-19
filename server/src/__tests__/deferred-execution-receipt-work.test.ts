@@ -88,7 +88,10 @@ describe("deferred receipt durable dispatch", () => {
   // Waits for the workers' own deadlines (the 30 s reconstruction interval, a
   // delayed resume) without spending them in wall time: while no pass is in
   // flight and no run executes, each failed attempt steps the fake clock to the
-  // coordinator's next wake. The assertion itself is unchanged.
+  // coordinator's next wake, then sets it back to wall time: a run claimed
+  // later gets a PostgreSQL-stamped 60 s lease that its controller times
+  // against Date.now(). Pending timers keep their remaining delays. The
+  // assertion itself is unchanged.
   function waitForWake(assertion: () => unknown | Promise<unknown>, options?: { timeout?: number }) {
     return waitForReal(async () => {
       try { await assertion(); } catch (error) {
@@ -98,6 +101,7 @@ describe("deferred receipt durable dispatch", () => {
         if (next !== null && next > Date.now() && passes.size === 0 && !executing) {
           await vi.advanceTimersByTimeAsync(next - Date.now());
           await Promise.allSettled([...passes]); await immediate();
+          vi.setSystemTime(vi.getRealSystemTime());
         }
         throw error;
       }
@@ -904,7 +908,11 @@ describe("deferred receipt durable dispatch", () => {
       await db.update(agents).set({ status: "paused" }).where(eq(agents.id, f.agent.id));
       await heartbeat.registerDeferredReceiptWork(coordinator, () => !drain).ready;
       await heartbeat.registerRunDispatchWork(coordinator, () => !drain).ready;
-      await waitForWake(async () => {
+      // Wall time here: the saved input's 30 s resume delay is stamped with
+      // Date.now() while the resumed run's lease is stamped by PostgreSQL, so
+      // this case can step only the idle window below (31 s ahead of
+      // PostgreSQL, inside the run's 60 s lease).
+      await waitForReal(async () => {
         await Promise.allSettled([...passes]);
         expect(coordinator.nextWakeAt()).toBeNull(); expect(idleWorkSnapshot().active).toBe(0);
       }, { timeout: 40_000 });
