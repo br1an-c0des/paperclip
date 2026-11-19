@@ -77,6 +77,8 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 40 | [Find why 11 server tests fail on `main` (one file is core)](#40-find-why-11-server-tests-fail-on-main-one-file-is-core) | candidate | | | 2026-11-18 | | |
 | 41 | [Give `para-memory-files` a recall tool that exists](#41-give-para-memory-files-a-recall-tool-that-exists) | candidate | | | 2026-11-18 | | |
 | 42 | [Fix or move the 8 test files that fail in a full run on `main`](#42-fix-or-move-the-8-test-files-that-fail-in-a-full-run-on-main) | candidate | | | 2026-11-18 | | |
+| 43 | [Stop a company import from setting an existing agent's access level](#43-stop-a-company-import-from-setting-an-existing-agents-access-level) | candidate | | | 2026-11-18 | | |
+| 44 | [Return 409, not 500, when a new label's name is taken](#44-return-409-not-500-when-a-new-labels-name-is-taken) | candidate | | | 2026-11-18 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -697,3 +699,29 @@ round 1: each fails the same way when re-run on its own, except `github-launcher
   (hard-fork step 3: they're not fixed). `shipped-catalog` gets the one-line fix; `github-launcher`
   gets a test-sized timeout or less work.
 
+### 43. Stop a company import from setting an existing agent's access level
+
+Found by the step 4a follow-ups agent (2026-11-18, on `feat/step-4a`).
+
+- **What's wrong:** importing a company package over an existing agent can set that agent's access
+  level, because the package's `permissions`, including `access`, are copied straight onto it.
+  `company-portability.ts` (around line 5754) passes `manifestAgent.permissions` to
+  `updateImportedAgent`, and `agent-configuration.ts:93-101` replaces the agent's permissions with
+  them. An agent that may import could raise another agent, or itself, to `admin`.
+- **Not affected:** creating new agents. Since the follow-ups, an agent creator's `access` is
+  dropped.
+- **Likely fix:** on the update path, keep the existing agent's `access` and never take it from the
+  package. Only a person can change a level, through `PATCH /agents/:id/permissions`. Part of step
+  4a; fix it on `feat/step-4a` before it merges.
+
+### 44. Return 409, not 500, when a new label's name is taken
+
+Found by the step 4a follow-ups agent (2026-11-18).
+
+- **What's wrong:** creating a label with a name the company already uses probably fails as a 500.
+  `createLabel` in `server/src/services/issues.ts` (around line 13436) doesn't check for a clash,
+  so the unique index `labels_company_name_idx` refuses the insert. Renaming already returns 409
+  `label_name_taken`.
+- **Likely fix:** make the same check as rename, or catch the unique violation, and return 409
+  `label_name_taken`. The MCP tool `paperclip_manage_labels` then gives the same clear error for
+  create as for rename.
