@@ -1273,60 +1273,15 @@ export function agentRoutes(
     };
   }
 
-  function canCreateAgents(agent: { role: string; permissions: Record<string, unknown> | null | undefined }) {
-    if (!agent.permissions || typeof agent.permissions !== "object") return false;
-    return Boolean((agent.permissions as Record<string, unknown>).canCreateAgents);
-  }
-
+  // The agent's membership and grants. It no longer reports canAssignTasks/taskAssignSource: since
+  // step 4a assigning is the tasks:assign access action (permissions.access), which the old grant
+  // logic could contradict, and nothing read them (bug 47).
   async function buildAgentAccessState(agent: NonNullable<Awaited<ReturnType<typeof svc.getById>>>) {
     const membership = await access.getMembership(agent.companyId, "agent", agent.id);
     const grants = membership
       ? await access.listPrincipalGrants(agent.companyId, "agent", agent.id)
       : [];
-    const hasExplicitTaskAssignGrant = grants.some((grant) => grant.permissionKey === "tasks:assign");
-
-    if (agent.role === "ceo") {
-      return {
-        canAssignTasks: true,
-        taskAssignSource: "ceo_role" as const,
-        membership,
-        grants,
-      };
-    }
-
-    if (canCreateAgents(agent)) {
-      return {
-        canAssignTasks: true,
-        taskAssignSource: "agent_creator" as const,
-        membership,
-        grants,
-      };
-    }
-
-    if (hasExplicitTaskAssignGrant) {
-      return {
-        canAssignTasks: true,
-        taskAssignSource: "explicit_grant" as const,
-        membership,
-        grants,
-      };
-    }
-
-    if (membership?.status === "active") {
-      return {
-        canAssignTasks: true,
-        taskAssignSource: "simple_default" as const,
-        membership,
-        grants,
-      };
-    }
-
-    return {
-      canAssignTasks: false,
-      taskAssignSource: "none" as const,
-      membership,
-      grants,
-    };
+    return { membership, grants };
   }
 
   async function buildAgentDetail(
