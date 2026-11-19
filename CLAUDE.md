@@ -124,7 +124,7 @@ corepack pnpm --filter @paperclipai/ui-new typecheck
 corepack pnpm --filter @paperclipai/ui-new test
 corepack pnpm --filter @paperclipai/ui-new test:e2e   # Playwright smoke suite, mocked API (E2E_LIVE=1: read-only against :3100)
 corepack pnpm --filter @paperclipai/plugin-sdk build # after install, a cherry-pick, or in a fresh worktree; else the server dies with "does not provide an export named …"
-ssh server1 'cd ~/deployments/paperclip/repo && git pull --ff-only && deploy/deploy.sh'   # deploy main to server1 (the real instance)
+ssh server1 'cd ~/deployments/paperclip/repo && git pull --ff-only && deploy/deploy.sh --wait-ci'   # deploy main to server1 (the real instance), once its CI run passes
 ```
 
 To review upstream, run `/upstream-watch`: it lists upstream's new commits since the last review,
