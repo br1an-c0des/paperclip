@@ -123,6 +123,7 @@ import {
 } from "./native-runtime/provider-profile.js";
 import { managedAgentProfileService } from "./managed-agent-profiles.js";
 import { CEO_HIRING_DENIAL_KEY, ceoHiringDenial } from "../lib/agent-permissions.js";
+import { withAccessOverride } from "./agent-access.js";
 import { remoteAgentProfileService } from "./remote-agent-profiles.js";
 
 const EXPORT_READ_CONCURRENCY = 8;
@@ -5305,11 +5306,11 @@ export function companyPortabilityService(db: Db, storage?: StorageService) {
     // package; create and configuration writes never take one from input.
     // Like the permissions toggle, the denial also removes an explicit
     // agents:create grant, and the package's grants cannot restore one.
-    const applyImportedCeoHiringDenial = async <T extends { id: string; role: string }>(companyId: string, agent: T, permissions: unknown) => {
+    const applyImportedCeoHiringDenial = async <T extends { id: string; role: string; permissions?: unknown }>(companyId: string, agent: T, permissions: unknown) => {
       if (agent.role !== "ceo" || !ceoHiringDenial(permissions)) return null;
       const updated = await agents.updatePermissions(agent.id, { canCreateAgents: false, [CEO_HIRING_DENIAL_KEY]: {
         actorType: "user", actorId: actorUserId ?? null, at: new Date().toISOString(),
-      } }) as T | null;
+      }, access: withAccessOverride(agent.permissions, "agents:create", false) }) as T | null;
       await access.setPrincipalPermission(companyId, "agent", agent.id, "agents:create", false, null);
       return updated;
     };

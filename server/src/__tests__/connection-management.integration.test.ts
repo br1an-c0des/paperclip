@@ -962,7 +962,7 @@ describe("connection management with production default agents", () => {
     const definitions = await f.authority.definitions();
     const names = definitions.map(d => d.name);
     const context = await f.authority.execute({ tool: "get_task_context", callId: "configuration-guidance", arguments: {} });
-    expect(JSON.stringify(context)).toContain("Standard agents can manage connections under their responsible user's authority");
+    expect(JSON.stringify(context)).toContain("under your responsible user's authority");
     expect(JSON.stringify(definitions.find(d => d.name === "connections_search"))).toContain("search_api/call_api");
     expect(names).toEqual(expect.arrayContaining(["search_api", "call_api"]));
     const search = await f.authority.execute({ tool: "search_api", callId: "find-profile", arguments: { query: "create tools profiles", limit: 10 } });

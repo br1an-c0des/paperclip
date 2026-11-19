@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { agentRouteRequirement } from "../../middleware/agent-route-policy-table.js";
+import { listTools } from "../server.js";
 import { PAPERCLIP_TOOL_NAMES } from "./tool-names.js";
 import { createPaperclipCatalog } from "./index.js";
 import type { PaperclipTool } from "./types.js";
-import { TEST_COMPANY_ID, recordingDispatch, testCaller } from "./test-support.js";
+import { TEST_COMPANY_ID, TEST_TASK_ID, recordingDispatch, testCaller } from "./test-support.js";
 
 const catalog = createPaperclipCatalog({
   runTask: async () => ({ taskId: null, wakeCommentId: null }),
@@ -30,6 +32,63 @@ describe("the Paperclip catalog", () => {
     for (const definition of catalog) {
       expect(definition.description.length, definition.name).toBeLessThanOrEqual(240);
     }
+  });
+
+  it("a worker run sees 19 tools and 4 more marked as needing approval", () => {
+    const tools = listTools(testCaller({ access: { level: "worker" } }), catalog);
+    const needsApproval = tools.filter(definition => definition.annotations?.paperclipNeedsApproval).map(definition => definition.name);
+    expect(tools.length - needsApproval.length).toBe(19);
+    expect(needsApproval.sort()).toEqual([
+      "paperclip_create_project", "paperclip_delete_task", "paperclip_manage_labels", "paperclip_update_project",
+    ]);
+    expect(tools.map(definition => definition.name)).not.toContain("paperclip_call_api");
+  });
+
+  it("each tool's action passes the route policy of every write it makes", async () => {
+    // A caller allowed a tool must not then be refused by the agent route policy on the routes it
+    // re-enters: each tool action must be one the route accepts (or the route checks access itself).
+    const boundCatalog = createPaperclipCatalog({
+      runTask: async () => ({ taskId: TEST_TASK_ID, wakeCommentId: null }),
+      recordDisposition: async () => {},
+    });
+    const labelId = "77777777-7777-4777-8777-777777777777";
+    const projectId = "99999999-9999-4999-8999-999999999999";
+    const sampleArgs: Record<string, unknown> = {
+      paperclip_report_progress: { summary: "halfway" },
+      paperclip_finish: { summary: "done" },
+      paperclip_block: { summary: "stuck", unblockAction: "approve" },
+      paperclip_read_task: { taskId: "TES-1" },
+      paperclip_create_task: { title: "New" },
+      paperclip_update_task: { taskId: "TES-1", title: "Renamed" },
+      paperclip_archive_task: { taskId: "TES-1" },
+      paperclip_delete_task: { taskId: "TES-1" },
+      paperclip_add_comment: { taskId: "TES-1", body: "hi" },
+      paperclip_read_document: { taskId: "TES-1" },
+      paperclip_write_document: { taskId: "TES-1", key: "plan", body: "# Plan", baseRevisionId: null },
+      paperclip_manage_labels: { create: [{ name: "bug", color: "#ff0000" }], update: [{ labelId, name: "defect" }], delete: [labelId] },
+      paperclip_create_project: { name: "Website" },
+      paperclip_update_project: { projectId, changes: { name: "Site" } },
+      paperclip_ask_board: { taskId: "TES-1", question: "Which?" },
+      paperclip_request_approval: { title: "Spend", summary: "Hosting" },
+    };
+    const caller = testCaller({ access: { level: "admin", overrides: { "tasks:delete": true } } });
+    let writes = 0;
+    for (const definition of boundCatalog) {
+      if (definition.name === "paperclip_call_api" || definition.name === "paperclip_search_api") continue;
+      const api = recordingDispatch(({ method }) => method === "GET" ? [] : { id: "x" });
+      await definition.run(caller, definition.input.parse(sampleArgs[definition.name] ?? {}), api);
+      const actions = typeof definition.action === "string" ? [definition.action] : definition.action;
+      for (const call of api.calls.filter(recorded => recorded.method !== "GET")) {
+        writes += 1;
+        const requirement = agentRouteRequirement(call.method, call.path);
+        expect(requirement.tagged, `${definition.name}: ${call.method} ${call.path} is in the route policy`).toBe(true);
+        if (requirement.routeChecks) continue;
+        for (const action of actions) {
+          expect(requirement.actions, `${definition.name} (${action}) on ${call.method} ${call.path}`).toContain(action);
+        }
+      }
+    }
+    expect(writes).toBeGreaterThan(15);
   });
 
   it("update_task sends labelIds", async () => {

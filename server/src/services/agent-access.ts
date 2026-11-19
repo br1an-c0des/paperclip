@@ -4,13 +4,15 @@ import { agents, temporaryAccessGrants, type Db } from "@paperclipai/db";
 import {
   AGENT_ACCESS_ACTIONS,
   DEFAULT_AGENT_ACCESS_LEVEL,
+  NEW_CEO_ACCESS_LEVEL,
   agentAccessSchema,
   resolveAgentAccess,
   type AgentAccess,
   type AgentAccessAction,
   type ResolvedAgentAccess,
 } from "@paperclipai/shared";
-import { notFound } from "../errors.js";
+import { notFound, unprocessable } from "../errors.js";
+import { permissionsImplyLowTrust } from "../lib/agent-permissions.js";
 
 type DbOrTransaction = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];
 
@@ -57,6 +59,46 @@ export function withAccessOverride(permissions: unknown, action: AgentAccessActi
   const parsed = agentAccessSchema.safeParse(record.access);
   const current: AgentAccess = parsed.success ? parsed.data : { level: DEFAULT_AGENT_ACCESS_LEVEL };
   return { ...current, overrides: { ...current.overrides, [action]: value } };
+}
+
+/**
+ * The access a new agent starts with (decided 2026-11-18), from the permissions its creator sent:
+ *
+ * - an explicit `access` is kept when `explicitAllowed` (a person, or the server, created it); an
+ *   agent never chooses a level, so an agent creator's `access` is dropped;
+ * - otherwise a CEO starts at manager with the `agents:create` override, which a low-trust CEO gets
+ *   only when `canCreateAgents: true` was sent (a plain `false` on a CEO isn't a restriction, as in
+ *   `normalizeAgentPermissions`; a recorded hiring denial is applied after creation);
+ * - and any other agent sent with `canCreateAgents: true` gets the `agents:create` override at the
+ *   default level.
+ *
+ * Null means store no access: the agent resolves to the default level.
+ */
+export function newAgentAccess(input: {
+  role: string | null | undefined;
+  requestedPermissions: unknown;
+  explicitAllowed: boolean;
+}): AgentAccess | null {
+  const requested = input.requestedPermissions && typeof input.requestedPermissions === "object" && !Array.isArray(input.requestedPermissions)
+    ? input.requestedPermissions as Record<string, unknown>
+    : {};
+  if (input.explicitAllowed && requested.access !== undefined) {
+    const parsed = agentAccessSchema.safeParse(requested.access);
+    if (!parsed.success) throw unprocessable("permissions.access must be an access level with optional overrides");
+    return parsed.data;
+  }
+  const hiring = { overrides: { "agents:create": true } } as const;
+  if (input.role === "ceo") {
+    const hires = requested.canCreateAgents === true || !permissionsImplyLowTrust(requested);
+    return { level: NEW_CEO_ACCESS_LEVEL, ...(hires ? hiring : {}) };
+  }
+  return requested.canCreateAgents === true ? { level: DEFAULT_AGENT_ACCESS_LEVEL, ...hiring } : null;
+}
+
+/** `permissions` with `access` set to the given value, or without `access` when it's null. */
+export function withStoredAccess<T extends Record<string, unknown>>(permissions: T, access: AgentAccess | null): T {
+  const { access: _previous, ...rest } = permissions;
+  return (access ? { ...rest, access } : rest) as T;
 }
 
 export function isAgentAccessAction(value: unknown): value is AgentAccessAction {
