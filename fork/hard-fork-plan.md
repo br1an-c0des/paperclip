@@ -2,8 +2,8 @@
 
 **Status: adopted 2026-11-17.** Frozen at upstream `79c8cf8b6` (tag `upstream-freeze`, the last
 commit merged, [sync 2026-11-17](sync-reports/2026-11-17.md)). `new-ui` was renamed `main`. Step 1
-is done; [Progress](#progress) tracks the rest. The current step is
-[3a, renovating the test suite](#3a-renovate-the-test-suite). Written 2026-11-16 as a proposal; the decisions
+is done; [Progress](#progress) tracks the rest. [3a, renovating the test suite](#3a-renovate-the-test-suite),
+was done on 2026-11-19; 4a and 4b are in progress. Written 2026-11-16 as a proposal; the decisions
 taken on adoption are under [Decisions](#decisions).
 
 The plan: stop syncing with upstream `paperclipai/paperclip`, treat this repo as our own codebase,
@@ -75,7 +75,14 @@ Many bugs we hit already have an upstream pull request waiting for review, and m
 [upstream-fixes.md](upstream-fixes.md) (39 entries at adoption), most as candidates. After the freeze, we take the fixes
 ourselves ([step 2](#2-take-the-fixes-already-written)).
 
-### CLAUDE.md, repo skills and repo MCP servers aren't used
+### It's unclear what a run loads
+
+**Reframed 2026-11-18** ([decision 8](#decisions)): the problem isn't that a run differs from a
+Claude Code session. It's that nobody can tell what a run got: the server's login or Paperclip's,
+the repo's `CLAUDE.md` and MCP servers or not, the user's `~/.claude` or not. The answer depends on
+the engine, the workspace and whether a managed connection is in use, and nothing shows it. The
+findings below are the evidence. They were first written as "CLAUDE.md, repo skills and repo MCP
+servers aren't used".
 
 The `claude_local` adapter has two engines: the CLI (`claude --print`, `engine: "cli"`) and ACP
 (`claude-agent-acp`), which is the **default** when an agent's config doesn't set `engine`. The full
@@ -165,7 +172,9 @@ at run time ([claude-local-run.md](claude-local-run.md), "Where legacy vs Runner
   hosted product.
 - It moves Claude further from a normal Claude Code setup. By default each session gets a new,
   empty Claude config folder, so user settings, memory and plugins don't come along, auto memory
-  only lasts for the session, and only an allowlist of environment variables gets through.
+  only lasts for the session, and only an allowlist of environment variables gets through. (Step
+  4b seals runs too, but with one lasting folder per agent, and Paperclip shows what each run gets:
+  [decision 8](#decisions).)
 - Its semantic tools only cover what upstream added to them. They had no status-card operations,
   for example.
 - It's close to half a million lines, including a Rust codebase with its own protocol, release
@@ -216,6 +225,15 @@ mean resolving conflicts in upstream's busiest area every week, for code we don'
 3. **Watch it instead of syncing it.** The [upstream watch](#watching-upstream) covers Runner
    commits too. If upstream builds something we want, we decide then whether to port the idea or
    restore the Runner.
+4. **A hybrid, later** (decision 9, 2026-11-18). With more agents, spreading runs over cloud
+   instances or runners could help. Once 4b's CLI launch has been used for a while, explore either
+   of these:
+   - a CLI driver in the Runner, running the same sealed launch. Today the Runner starts Claude only
+     through ACP (`acpx`) or Claude Managed;
+   - the lighter agents container from [step 4](#4-make-runs-claude-native), acting as the runner.
+
+   4b keeps the launch portable so either can take it
+   ([step-4b-sealed-runs.md](step-4b-sealed-runs.md#keep-the-launch-portable)).
 
 Some of the reasons to want it later are already covered elsewhere: `claude_local` can already
 confine local runs to the workspace's files and limit network access (`bwrap`), and Claude Code
@@ -307,8 +325,8 @@ and recovery.
 
 ### 3a. Renovate the test suite
 
-Added 2026-11-17, and the current step. The full suite takes about 7 hours on this machine, so
-nobody runs it. The goals:
+Added 2026-11-17; **done 2026-11-19** (results below and in [step-3a-plan.md](step-3a-plan.md)). The
+full suite took about 6 hours serially on this machine, so nobody ran it. The goals:
 
 - **Two tiers with a clear workflow.** A quick local set to run before pushing: typecheck plus the
   tests for the area changed, in minutes. Then **CI** runs the thorough set on every push. The
@@ -355,19 +373,44 @@ The work, each part measured before and after:
 
 ### 4. Make runs Claude-native
 
-A run should behave like a Claude Code session in the project's repo:
+**Direction changed 2026-11-18** ([decision 8](#decisions)). The proposal was a run that behaves
+like a Claude Code session in the project's repo, loading the repo's and the user's settings, skills
+and MCP servers alongside Paperclip's. Mixing three sources is what made runs hard to follow, so
+instead: **a run gets exactly what Paperclip gives it, and Paperclip shows what that is.**
 
+Split in two. **4a** (Paperclip over MCP, agent permissions) has its own
+[design](step-4a-mcp-and-permissions.md) and comes first. **4b**, Claude-native runs:
+
+- **The CLI engine** (`claude --print`) becomes the default ([decision 7](#decisions)). Its flags
+  give exact control over what loads. The switch comes first in 4b, since step 5 builds on it.
+- **Sealed runs.** Each agent gets its own lasting Claude config folder, owned by Paperclip.
+  Nothing loads from the server's `~/.claude`, the user's MCP servers or the repo's `.claude/`
+  settings, skills and agents. `--strict-mcp-config` is always on, including for runs with no
+  Paperclip server.
+- **Everything comes from Paperclip:** instructions, skills (the company library), MCP servers,
+  the credential (managed AI connections; a Claude subscription is the main one, an API key
+  sometimes), environment and settings.
+- **The repo's `CLAUDE.md` is the one exception,** behind a switch per project: whether agents on
+  that project's tasks read it.
+- **Paperclip shows what a run gets:** for each agent and each run, the engine, credential source,
+  skills, MCP servers, instructions, and whether `CLAUDE.md` is on. Step 5's prompt preview fits
+  beside it.
 - Run in the project's repo, or a per-task git worktree of it, never the agent's private folder
   when a project has a repo.
-- Load all setting sources (user, project, local), so the repo's CLAUDE.md, `.claude/skills`,
-  `.claude/agents` and settings apply.
-- Use the repo's `.mcp.json` and the user's MCP servers, plus Paperclip's own MCP server, instead of
-  `--strict-mcp-config`.
-- Make the company skill library optional and additive: repo skills first.
-- Keep the agent's own Claude memory between runs.
-- Add the three things kept from the Runner: finish-or-block completion, a recovery handoff and
-  structured live events.
-- Agents use Paperclip through MCP, not curl ([below](#agents-use-paperclip-through-mcp)).
+- Claude Code's auto memory is off for every run (decided 2026-11-18). Agents remember through
+  `para-memory-files` where it's assigned, until the memory service
+  ([build plan 3.5](../ui-new/docs/build-plan.md#35-memory-service)).
+- Add the three things kept from the Runner: finish-or-block completion (built in 4a), a recovery
+  handoff and structured live events.
+- Agents use Paperclip through MCP, not curl ([below](#agents-use-paperclip-through-mcp); 4a).
+- **Live sessions on the CLI** (decision 9): follow-up messages into a running session, permission
+  prompts answered through the Inbox, and streamed text. This is what ACP offers, built on the CLI.
+- **A portable launch:** built as data, so an agents container, the Runner or a remote target could
+  start it later ([4b design](step-4b-sealed-runs.md#keep-the-launch-portable)).
+
+Importing what a repo holds (its `.claude/skills`, `.claude/agents`, maybe settings) into Paperclip,
+so it shows up like everything else, is a feature of its own, not part of 4b
+([build plan 3.18](../ui-new/docs/build-plan.md#318-importing-from-a-repo-and-project-skills)).
 
 #### Agents use Paperclip through MCP
 
@@ -481,8 +524,8 @@ in whatever order matters most ([The build plan after the hard fork](#the-build-
 | Repo map and `claude_local` trace | Done 2026-11-17: [repo-map.md](repo-map.md) (ours, shared core, dormant, the seams, tests) and [claude-local-run.md](claude-local-run.md) (one run from wake to finish, both engines, with the change points for steps 4 and 5). |
 | 2. Take the fixes already written | In progress. Our three pull requests are in `main`; the image builds from source (no patches) on `deploy/build-from-source`, not yet deployed; upstream's open pull requests surveyed in [upstream-open-prs.md](upstream-open-prs.md), picks pending. |
 | 3. Leave unused code | Ongoing, as decided. |
-| **3a. Renovate the test suite** | **Current step**, added 2026-11-17. The full suite takes ~7 hours; the goal is 10–20 minutes (30 at most). First profile and audit: [test-suite-audit.md](test-suite-audit.md). Round 1 planned (4 agents: runner, per-file overhead, Postgres, classification): [step-3a-plan.md](step-3a-plan.md). |
-| 4. Make runs Claude-native | Split in two. 4a (Paperclip over MCP, agent permissions): designed and planned 2026-11-17 ([design](step-4a-mcp-and-permissions.md), [plan](step-4a-plan.md)); building on `feat/step-4a`: wave 1 merged there; regression runs wait for 3a, building continues; handed off to a manager session on server1 on 2026-11-18 ([handoff](step-4a-handoff.md)). 4b (Claude-native runs): after 4a. |
+| 3a. Renovate the test suite | **Done 2026-11-19**, added 2026-11-17. The full suite took ~6 hours serially; the goal was 10–20 minutes (30 at most). Audit: [test-suite-audit.md](test-suite-audit.md); plan and results: [step-3a-plan.md](step-3a-plan.md). Rounds 1 and 2 merged 2026-11-18: tiers (quick, thorough, opt-in), the thorough tier at **21 min** locally with 0 failures, a CI workflow in 10 shards, and the workflow in `CLAUDE.md`. CI's first run on `main` (2026-11-19) was green in 11.5 min. |
+| 4. Make runs Claude-native | Split in two. 4a (Paperclip over MCP, agent permissions): designed and planned 2026-11-17 ([design](step-4a-mcp-and-permissions.md), [plan](step-4a-plan.md)); building on `feat/step-4a`: wave 1 merged there; regression runs wait for 3a, building continues; handed off to a manager session on server1 on 2026-11-18 ([handoff](step-4a-handoff.md)). Wave 2 and the follow-up fixes merged on `feat/step-4a` on 2026-11-18 (pushed); left before `main`: a real run on a dev instance, the regression after 3a, and approval. 4b (Claude-native runs): after 4a. |
 | 5–7 | Not started. |
 
 ## Watching upstream
@@ -604,15 +647,37 @@ Taken on adoption, 2026-11-17:
    server1's agents switch to it (sessions start fresh once). Why: it *is* Claude Code (native
    skills, instructions in the system prompt, the latest CLI weekly, no bridge or patch to keep),
    it's ~1,500 lines of Claude-only code instead of the 6,000-line engine shared with four other
-   adapters, and ACP's advantages are small changes on the CLI side (an env allowlist as in #20040,
-   dropping `--strict-mcp-config` with MCP trust settings). CLI runs are also the ones a hot restart
+   adapters, and ACP's advantages are small changes on the CLI side (an env allowlist as in #20040;
+   the other, loading the repo's and user's MCP servers, is no longer wanted since decision 8). CLI runs are also the ones a hot restart
    can adopt. Still to check in step 6: multi-turn chat through `--input-format stream-json`, where
-   ACP is naturally stronger. ACP stays in the tree, dormant.
+   ACP is naturally stronger. ACP stays in the tree, dormant. **Not switched yet** (2026-11-18): all
+   five agents on server1 have no `engine` set, so they run on ACP. Switching is the start of 4b.
+
+Taken 2026-11-18:
+
+8. **Sealed runs (step 4b).** A run gets exactly what Paperclip gives it, and Paperclip shows what
+   that is. It no longer loads the server's or user's Claude settings, MCP servers and skills, or
+   the repo's `.claude/` folder. Combining repo, user and Paperclip settings is rarely wanted and
+   hard to keep track of. What bothered us was not knowing which applied. The one exception is the
+   repo's `CLAUDE.md`, behind a switch per project. Importing a repo's skills, agents and settings
+   into Paperclip is a separate feature (build plan 3.18). The credential comes from Paperclip:
+   server1's agents already use a managed AI connection with the Claude subscription
+   (`CLAUDE_CODE_OAUTH_TOKEN`, no login in the container), which stays the main method, with an API
+   key sometimes.
+9. **ACP's strengths come to the CLI; the Runner stays in reserve.** After 4b part 1 was designed,
+   ACP and the Runner were weighed again.
+   - **ACP:** its real advantage is a live session Paperclip can talk to mid-run. 4b plans that on
+     the CLI (part 4): follow-up messages, permission prompts answered through the Inbox, streamed
+     text.
+   - **The Runner:** not needed now. Cloud and sandbox runs aren't Runner-only, since the CLI
+     engine has dormant SSH and sandbox targets. The Runner stays in the tree for a possible hybrid
+     later ([Keeping the option open](#keeping-the-option-open), item 4).
+   - **The launch stays portable** so a container, the Runner or a remote target can start it.
 
 Still open:
 
-1. **Where agent personas live:** Paperclip's per-agent `AGENTS.md`, or role files in the repo
-   (step 4).
+1. **Where agent personas live:** decided in [step 4a's design](step-4a-mcp-and-permissions.md):
+   they stay in Paperclip's per-agent `AGENTS.md`.
 2. **Which open upstream pull requests to take** (step 2): surveyed 2026-11-17 in
    [upstream-open-prs.md](upstream-open-prs.md) (25 to take now, 7 to port by hand); the picks are
    the user's.

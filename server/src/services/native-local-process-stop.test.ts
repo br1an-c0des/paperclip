@@ -62,7 +62,8 @@ const support = await getEmbeddedPostgresTestSupport();
 
   it("is stopped when a later process reused its PID and leads the group", async () => {
     // This test process started definitely after the recorded execution.
-    const recorded = new Date((await ownStart()).getTime() - 5_000);
+    // (Not a whole number of seconds earlier: on Linux that gap may be one process across a clock step.)
+    const recorded = new Date((await ownStart()).getTime() - 5_010);
     // A group with this id is either empty or led by this later process, so
     // it cannot hold the recorded execution's children.
     expect(await recordedLocalExecutionStopped(db, await execution({ pid: process.pid, startedAt: recorded,

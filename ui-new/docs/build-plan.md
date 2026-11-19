@@ -118,6 +118,7 @@ it gets built. Numbers like 3.4 and F3 refer to stage 3 further down; "fix 39" i
 | Agents message you first: a morning briefing, scheduled reports, reports after milestones | 1, then 3 | Raised in discussion on Oct 24, 2026. A recurring task does the work, and the agent sends the result to your chat with upstream's `send_chat_message` (added Nov 1, 2026), so the fork plugin tool and the upstream ask aren't needed ([3.13](#313-briefings-and-reports)). |
 | A "fast mode" for meetings | 3 (feature idea) | Codex agents already have a `fastMode` setting (`codex_local`). `claude_local` has none ([F3](#317-smaller-feature-ideas)). A fast model or low effort per message works today. |
 | A core skill add-on for new behaviour | 3 | [3.10](#310-core-skill-add-on). Fork-owned, with no conflict. |
+| Import a repo's skills, agent definitions and maybe settings into Paperclip, and give a project's tasks its own skills | Idea, then 3 | Raised Nov 18, 2026, with hard-fork step 4b's sealed runs ([3.18](#318-importing-from-a-repo-and-project-skills)). Skills from a project's GitHub repo are imported today, but scoping limits who sees them, not which runs get them. Not designed yet. |
 | A `COMPANY.md`: company-wide instructions every run in the company receives, like an agent's `AGENTS.md` | Idea, then 3 | Raised Oct 27, 2026 ([3.14](#314-company-instructions-companymd)). Not designed yet. |
 | Help people understand what Paperclip is and how to use each feature: a user guide with worked examples, and an interactive guide in the app | Idea, then 1 or 3 | Raised Oct 28, 2026 ([3.15](#315-an-in-app-guide-to-paperclip)). Notes collect in [guides/](guides/README.md). Not designed yet. |
 | Investigate and design upstream's Coordinator workspace (one conversation per agent, task proposals from chat, decision cards, a Needs You queue) against `ui-new`'s Inbox, requests and chat | 1 | Raised Oct 29, 2026, from the upstream sync ([3.16](#316-upstreams-coordinator-workspace)). Not investigated yet. |
@@ -1307,6 +1308,32 @@ hard fork. "Today" is what `ui-new` does without it.
 | F10 | Optional `from`, `to` and `projectId` on run summaries (`GET /api/companies/:companyId/heartbeat-runs?summary=true`) | Workload views fetch up to 1,000 runs and may still miss days | Workload marks the days it couldn't load ([decision 28](decisions.md#28-gaps-found-building-agent-workload)) | Upstream fix 11 |
 | F11 | `/api/health` says whether sign-up is allowed (`PAPERCLIP_AUTH_DISABLE_SIGN_UP`) | A sign-in page can't tell whether to offer sign-up | Always offers sign-up ([decision 36](decisions.md#36-gaps-found-building-onboarding-and-the-pages-outside-a-company)) | Upstream fix 12 |
 | F12 | `executionBlocker` on compact issues (`CompactIssue` and the compact list query) | A list row can't tell why an interrupted task is blocked before offering Retry | Retry on list rows reads the interruption's run | Upstream fix 13 |
+
+### 3.18 Importing from a repo, and project skills
+
+Raised Nov 18, 2026, while designing hard-fork step 4b; not designed or scheduled yet.
+
+- **Why:** since [decision 8](../../fork/hard-fork-plan.md#decisions), runs are sealed: they don't
+  load a repo's `.claude/skills`, `.claude/agents` or settings, only what Paperclip gives them (the
+  repo's `CLAUDE.md` is the one exception, behind a switch per project). Whatever a repo holds that
+  agents should use has to reach Paperclip some other way, where it shows up like everything else.
+- **The idea, two parts:**
+  1. **Import from a repo:** its skills, its Claude Code agent definitions (`.claude/agents`), and
+     maybe its settings, into Paperclip.
+  2. **Project skills for runs:** a run on a project's task gets the project's skills as well as
+     its agent's, and the run's list says which came from where.
+- **Have today:**
+  - Adding a GitHub repository in a project's settings (Code section) imports the skills it contains
+    into the company library and keeps them in sync with the tracked branch
+    (`server/src/services/project-skill-source-bindings.ts`, `skill-sources.ts`). Which folders
+    the scan covers (for example `.claude/skills`) is unchecked.
+  - Those become "project skills" (`accessScope: 'projects'`). That limits **who can see** them
+    (people and agents who can read the project, `skill-access.ts`), not **which runs get them**.
+  - A run gets exactly the skills assigned to its agent, whatever the task's project.
+- **Missing:** importing agent definitions and settings; skills added to runs by project.
+- **Questions:** whether an imported `.claude/agents` file becomes a Paperclip agent, a subagent the
+  run can call, or both; which settings are worth importing (permissions, hooks, env) and how each
+  shows in Paperclip; and whether an imported item tracks the repo or becomes an editable copy.
 
 ## Stage 4: source-change features (merged into stage 3)
 

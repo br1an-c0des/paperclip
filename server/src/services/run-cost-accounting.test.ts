@@ -183,7 +183,8 @@ const support = external ? { supported: true } : await getEmbeddedPostgresTestSu
     const reused = await proveRunProcessGone(base, 'legacy-accounting-reuse-component', {
       ...currentProcessProbe(), controllerInstance: undefined,
       pidExists: () => true, processGroupExists: () => false,
-      readStartedAt: async () => new Date(Date.parse(child.processStartedAt!) + 2000),
+      // A later start that is not a whole number of seconds later (that may be a clock step on Linux).
+      readStartedAt: async () => new Date(Date.parse(child.processStartedAt!) + 2_010),
     });
     expect(reused).toEqual({ verdict: 'gone', reason: 'pid_reused' });
     for (const change of [

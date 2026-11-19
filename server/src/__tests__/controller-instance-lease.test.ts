@@ -247,7 +247,10 @@ suite("controller instance lease: a replaced container's records are provable", 
         .where(eq(controllerInstances.bootId, currentControllerBootId()));
       expect(after.renewedAt!.getTime()).toBeGreaterThan(before.renewedAt!.getTime());
       expect(lost).not.toHaveBeenCalled();
-      await hold;
+      // The saturation is proven; end the sleep instead of waiting out its 12 s.
+      await db.execute(sql`select pg_cancel_backend(pid) from pg_stat_activity
+        where query = 'select pg_sleep(12)' and state = 'active' and pid <> pg_backend_pid()`);
+      await hold.catch(() => undefined);
     } finally {
       await stopControllerInstanceLease(busy);
       await busy.$client.end({ timeout: 5 });

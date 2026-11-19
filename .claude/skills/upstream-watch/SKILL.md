@@ -43,14 +43,12 @@ Read the ledger: `LAST` is its "Last reviewed" commit (the first review starts a
 
 ## 2. Fetch and update the mirror
 
-Don't run `git sync-master` in a checkout dev servers run from (it checks out `master`). Instead:
+`master` mirrors upstream **locally only**. Never push it to `origin`: it holds upstream's
+workflows, and a push would let GitHub run them in the fork (decided 2026-11-19; `origin`'s
+`master` was deleted then).
 
 ```bash
-git fetch upstream
-git merge-base --is-ancestor origin/master upstream/master   # must succeed, else stop and report
-git push origin upstream/master:master
-git branch -f master upstream/master
-git branch --set-upstream-to=origin/master master
+git sync-master                          # fetch upstream, fast-forward local master; stops if it can't
 TIP=$(git rev-parse upstream/master)
 git log --oneline --no-merges $LAST..$TIP | wc -l
 ```

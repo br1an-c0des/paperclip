@@ -596,7 +596,8 @@ describe("durable sandbox creation through the runtime entry point", () => {
     });
     it("treats a restarted server that reused the creator PID as a different process", async () => {
       await interruptedCreation(async current => ({ ...current, bootId: randomUUID(),
-        processStartedAt: new Date(Date.parse(String(current.processStartedAt)) - 60_000).toISOString() }));
+        // Not a whole number of seconds: on Linux that gap may be one process across a clock step.
+        processStartedAt: new Date(Date.parse(String(current.processStartedAt)) - 60_010).toISOString() }));
       await runtime().flushDeferredOrphanCleanups();
       expect(await db.select().from(environmentLeases)).toEqual([expect.objectContaining({ status: "pending_cleanup" })]);
     });

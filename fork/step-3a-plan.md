@@ -328,17 +328,91 @@ Follow-ups reported by the agents, for round 2:
 - A SIGKILLed worker can still orphan a running Postgres (the sweep removes its directory only once
   the postmaster is dead).
 
-## Round 2 (proposed after the review)
+## Round 2
 
-- **Tiers:** fill `optIn` in `scripts/test-tiers.json` from `classification.csv` and the user's
-  decisions ([area-review.md, Decisions](test-suite-audit/area-review.md#decisions-2026-11-18)):
-  dormant areas, the CLI and plugins opt-in; cases and tool access thorough. Nothing is removed.
-- **Splits:** the 9 split files and `heartbeat-process-recovery.test.ts`. Dormant tests move to an
-  opt-in file next to each, and the live-path tests stay in thorough.
-- **Slow core tests:** fake timers or test-sized intervals, from D's list, each one signed off.
-- **CI:** a GitHub Actions workflow that runs the thorough tier on every push to a branch and to
-  `main`, sharded if needed. Upstream's 38 workflows are retired, which needs the user's OK because
-  it's a large removal.
-- **Large core files:** split others only if the thorough tier's parallel run is held up by one file.
-- **PM:** write down the workflow (quick before pushing, thorough in CI and before merging into
-  `main`, opt-in on demand) in `CLAUDE.md` and the `/pm` briefs.
+Approved by the user on 2026-11-18, with these decisions:
+
+- `test:quick` keeps agent A's selection (tests named after the changed file, plus tests that import
+  or mock it).
+- Upstream's 38 workflows in `.github/workflows/` are deleted; they stay readable at
+  `upstream-freeze`. Our CI runs on **every push to any branch** and on pull requests, on GitHub's
+  standard runners (the repo is public, so they're free).
+- Bug 42's `shipped-catalog` fix and a longer `github-launcher` timeout go to agent E; bug 40's
+  intermittent core lease test goes to agent G.
+- Approving agent G signs off D's slow-test list as a whole; each file's before-and-after is
+  reported at merge.
+- The old `/tmp` leftovers were deleted (2026-11-18: 2,502 test homes, 2,109 codex homes, 565
+  `pv-*` folders, ~4.2 GB).
+
+**Rules for every round 2 agent,** on top of round 1's Global Constraints: don't edit a file that
+another round 2 agent owns, and don't edit the 30 test files step 4a changes (`git diff --name-only
+$(git merge-base main origin/feat/step-4a) origin/feat/step-4a`). Report instead.
+
+| Agent | Branch | Owns | Goal |
+| --- | --- | --- | --- |
+| E. Tiers and splits | `test/tiers` | `scripts/test-tiers.json`, the 10 split files and their new opt-in siblings, `classification.csv`, `packages/skills-catalog/src/shipped-catalog.test.ts`, `packages/adapter-utils/src/github-launcher.test.ts` | Fill `optIn` from the [decisions](test-suite-audit/area-review.md#decisions-2026-11-18); split the 9 files and `heartbeat-process-recovery`; bug 42's two fixes |
+| F. Leaking files | `test/leaks` | `server/vitest.config.ts`, `server/src/__tests__/setup-supertest.ts`, new helpers in `server/src/__tests__/helpers/`, leaking files no one else owns | Find what the [39 suspects](test-suite-audit/leak-suspects.txt) were broken by; fix with resets or isolate the leakers; shared project back to `isolate: false`; test homes removed after each run |
+| G. Slow core tests | `test/slow` | The core files in D's [slow-test table](test-suite-audit/area-review.md#slow-core-tests), `issue-recovery.test-fixture.ts`, `legacy-controller-lease.test.ts`, small injection points in the source they test | Fake timers or test-sized intervals instead of real waits, shorter `pg_sleep`, single-statement seeding; bug 40 |
+| H. CI and runner | `test/ci` | `scripts/test.mjs`, `scripts/__tests__/test-runner.test.mjs`, the root `package.json` test scripts, `.github/workflows/` | `--shard i/n` balanced by recorded time; default workers from cores and free memory; `--fsModuleCache` on every phase; one workflow (typecheck + thorough, sharded, ~20 min) |
+
+**Round 2 progress:**
+
+- **E merged** 2026-11-18 (`b6e7076fae`): `optIn` has 256 entries; thorough 1,412 files (server
+  1,189, packages 223), opt-in 1,333. 9 files split into live and `.dormant.test.ts` halves, with
+  shared setup in `.fixture.ts` files; `agent-instructions-service` stays whole (its "managed" tests
+  are Paperclip-managed instruction bundles, which `claude_local` uses). Bug 42 fixed. The hermes
+  adapter's `vitest.config.ts` no longer sets `exclude`, which made Vitest ignore the runner's.
+  Notes for H: a project-relative `--exclude` never matches a leading `**/`, and one that matches a
+  directory drops everything under it; plain `vitest` in a built tree also runs packages' `dist/`
+  test copies (the runner excludes them).
+
+- **G merged** 2026-11-18 (`88e1b5bb6b`): the slow core files went from 2,317 s to 1,322 s of file
+  time with the same tests and assertions (the `issue-recovery-*` family 621 s → 57 s,
+  `deferred-execution-receipt-work` 268 → 142 s, `live-recovery-work` 228 → 133 s): wall-following
+  fake clocks stepped over idle deadlines, `pg_cancel_backend` on `pg_sleep` waits, single-statement
+  seeding. [results-slow.md](test-suite-audit/results-slow.md). Decided with the user: the five
+  census files (idle-backstop, live-run-agent-census and others, ~500 s, which simulate a large
+  company over 10–70 minutes) stay in thorough; `failed-continuation-continues-again` is left as is.
+- **Bug 40 is a real production bug** (G): Linux start times are `btime` (whole seconds, recomputed
+  from the wall clock on every read, drifting ~1 s per 30 s on WSL) plus start ticks, so two readings
+  of a live process can differ by whole seconds and recovery fails a live run as `process_lost`. The
+  user chose G's option 1: a whole-second gap counts as the same process for `btime`-based readings
+  (a reused PID matches by chance 1 time in 100, and its record is held until the PID exits).
+  **Merged** 2026-11-18 (`741e8c5231`). Exact boot-relative start ticks in every stamp (option 2, a new field
+  and a migration) are worth revisiting in step 4b.
+- **Found by G's bug 40 sweep, opt-in only, same on `main`:** `chat-channels.integration` has 9
+  failing tests of 1,970; 7 of them ("reconciled chat retry delivery ownership") pass alone, so they
+  depend on test order within the file. In an agent worktree nested in the main checkout,
+  `resolvePaperclipSkillsDir` (`packages/adapter-utils/src/server-utils.ts`) climbs into the main
+  checkout's `.claude/skills` instead of the repo's `skills/`, so 7 Slack-skill tests fail with
+  `ENOENT`; a normal checkout or CI isn't affected.
+- **Upstream's 38 workflows disabled on GitHub** 2026-11-18 (`gh workflow disable`, reversible), so
+  pushing the `master` mirror no longer starts them. Our `test.yml` comes with agent H's merge.
+
+- **F merged** 2026-11-18 (`8dec929354`): the `shared` server project is back to `isolate: false`.
+  The setup file puts env, stubbed globals, fake timers and cwd back between files and resets 16
+  modules' process state; 64 files are isolated by name (pending idle-tracked work, cached log
+  stores, the idle-sleep report, the issue-recovery family, an import-order bug). Test homes are
+  removed at worker teardown. Full server runs 38–42 min against 52 min isolated (every file,
+  opt-in included). [results-leaks.md](test-suite-audit/results-leaks.md). Five shared files failed
+  once each across F's three final runs and passed on re-run, under load from other agents' runs;
+  left as they are unless they recur. Source changes that would let 43 isolated files share again
+  (log-store caches keyed on their base path, idle-work resets, the codex test-support workspace)
+  and an import cycle in `execution-recovery-attempt.ts` are noted there, not yet bugs-list entries.
+- **H merged** 2026-11-18 (`aaa8ccd240`): `.github/workflows/test.yml` (typecheck, 10 thorough
+  shards), `--shard`, machine-sized workers, `--report-dir`.
+  [results-ci.md](test-suite-audit/results-ci.md).
+- **Final thorough run on `main`** 2026-11-18 (`aaa8ccd240`, 8 workers, under the lock): **21m09s**,
+  1,412 files, 24,457 passed, 0 failed, 52 skipped (server 19m14s, packages 1m55s). The audit's
+  serial estimate for the whole suite was ~6 h.
+- **Workflow written** into `CLAUDE.md` (Tests), the `/pm` skill and `doc/test-infrastructure.md`
+  (Test tiers).
+
+- **First CI run** 2026-11-19 on `main` (`b04d4507b2`, run 44542707607): green, 11.5 min wall;
+  the typecheck job 8 min, the shards 6.5–11.5 min. After Actions was enabled on the fork, `master`
+  stopped being pushed to `origin` (its upstream workflows would run there) and `origin`'s `master`
+  was deleted. **Step 3a done.**
+
+Merge order: E and G, then F (its final full run includes G's changes), then H. Then the PM writes
+the workflow (quick before pushing, thorough in CI and before merging into `main`, opt-in on demand)
+into `CLAUDE.md`, the `/pm` briefs and `doc/test-infrastructure.md`.

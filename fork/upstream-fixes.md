@@ -74,9 +74,9 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 37 | [Log participant changes for every review stage (optional)](#37-log-participant-changes-for-every-review-stage-optional) | candidate | | | 2026-10-24 | | |
 | 38 | [Report the review-stage bypass, with failing tests](#38-report-the-review-stage-bypass-with-failing-tests) | candidate | | | 2026-10-24 | | |
 | 39 | [Turn off Claude Code's auto memory when an agent has `para-memory-files`](#39-turn-off-claude-codes-auto-memory-when-an-agent-has-para-memory-files) | candidate | | | 2026-10-24 | | |
-| 40 | [Find why 11 server tests fail on `main` (one file is core)](#40-find-why-11-server-tests-fail-on-main-one-file-is-core) | candidate | | | 2026-11-18 | | |
+| 40 | [Find why 11 server tests fail on `main` (one file is core)](#40-find-why-11-server-tests-fail-on-main-one-file-is-core) | fixed | `test/bug40` | | 2026-11-18 | | `741e8c5231` (2026-11-18) |
 | 41 | [Give `para-memory-files` a recall tool that exists](#41-give-para-memory-files-a-recall-tool-that-exists) | candidate | | | 2026-11-18 | | |
-| 42 | [Fix or move the 8 test files that fail in a full run on `main`](#42-fix-or-move-the-8-test-files-that-fail-in-a-full-run-on-main) | candidate | | | 2026-11-18 | | |
+| 42 | [Fix or move the 8 test files that fail in a full run on `main`](#42-fix-or-move-the-8-test-files-that-fail-in-a-full-run-on-main) | fixed | `test/tiers` | | 2026-11-18 | | `b6e7076fae` (2026-11-18) |
 | 43 | [Stop a company import from setting an existing agent's access level](#43-stop-a-company-import-from-setting-an-existing-agents-access-level) | fixed on `feat/step-4a` (`fd0acf010`) | | | 2026-11-18 | | |
 | 44 | [Return 409, not 500, when a new label's name is taken](#44-return-409-not-500-when-a-new-labels-name-is-taken) | candidate | | | 2026-11-18 | | |
 | 45 | [Stop enforcing the four interaction switches that became access actions](#45-stop-enforcing-the-four-interaction-switches-that-became-access-actions) | fixed on `feat/step-4a` (`eedeba3ca`) | | | 2026-11-18 | | |
@@ -85,10 +85,13 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 48 | [Cover every write of an approved multi-write tool call](#48-cover-every-write-of-an-approved-multi-write-tool-call) | fixed on `feat/step-4a` (`70b8d7198`) | | | 2026-11-18 | | |
 | 49 | [Check the act-as agent's level on outside-connection file uploads](#49-check-the-act-as-agents-level-on-outside-connection-file-uploads) | fixed on `feat/step-4a` (`867374de7`) | | | 2026-11-18 | | |
 | 50 | [Check access on plugin-origin agent configure and edit calls](#50-check-access-on-plugin-origin-agent-configure-and-edit-calls) | fixed on `feat/step-4a` (`5c499f719`) | | | 2026-11-18 | | |
-| 51 | [Give runs a title tool now that project-tools is gone](#51-give-runs-a-title-tool-now-that-project-tools-is-gone) | candidate | | | 2026-11-18 | | |
-| 52 | [Use the MCP tool names in the chat directive](#52-use-the-mcp-tool-names-in-the-chat-directive) | candidate | | | 2026-11-18 | | |
+| 51 | [Give runs a title tool now that project-tools is gone](#51-give-runs-a-title-tool-now-that-project-tools-is-gone) | fixed on `feat/step-4a` (`846bc008d`) | | | 2026-11-18 | | |
+| 52 | [Use the MCP tool names in the chat directive](#52-use-the-mcp-tool-names-in-the-chat-directive) | fixed on `feat/step-4a` (`1137643cc`) | | | 2026-11-18 | | |
 | 53 | [Stop the ACP engine tests writing settings into the repo](#53-stop-the-acp-engine-tests-writing-settings-into-the-repo) | candidate | | | 2026-11-18 | | |
 | 54 | [Check access on the other plugin-origin agent writes](#54-check-access-on-the-other-plugin-origin-agent-writes) | candidate | | | 2026-11-18 | | |
+| 55 | [Make the title route's access refusal requestable](#55-make-the-title-routes-access-refusal-requestable) | candidate | | | 2026-11-18 | | |
+| 56 | [Decide whether catalog task creation needs a retry key](#56-decide-whether-catalog-task-creation-needs-a-retry-key) | candidate | | | 2026-11-18 | | |
+| 57 | [Make `attentionService.list` fast over many failed runs](#57-make-attentionservicelist-fast-over-many-failed-runs) | candidate | | | 2026-11-18 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -635,8 +638,13 @@ option 3 (was build plan 2a-6). Revives #2700.
   environment variable, unlike #2700's settings files, also works with `--setting-sources user`.
 - **Fork workaround:** `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in `deploy/docker-compose.yml`, and in the
   adapter `env` of each Runner agent.
+- **Planned fix (2026-11-18):** wider than this entry. Step 4b turns auto memory off for **every**
+  `claude_local` run, not only those with `para-memory-files`, and Paperclip sets the variable itself
+  ([step-4b-sealed-runs.md](step-4b-sealed-runs.md), section 6). This closes when 4b part 1 merges.
 
 ### 40. Find why 11 server tests fail on `main` (one file is core)
+
+**Fixed 2026-11-18** (`741e8c5231`, option 1 below).
 
 Found in step 3a's profiled run of `pnpm test` on `main` at `93c3289557`, 2026-11-18
 ([test-suite-audit.md](test-suite-audit.md#8-failures-seen)). The run was stopped before Vitest
@@ -666,8 +674,25 @@ printed its failure summary, so the reasons weren't captured.
   passed in a full parallel run, and alone it failed 1 time in 3. That fits a timing-sensitive
   start-time comparison. The dormant `heartbeat-native-restart-suspension` also passed in the full
   run.
-- **Next:** the core file gets a fix once the user signs off. The dormant ones are skipped with a note
-  (hard-fork step 3), unless step 3a moves their suites out of the default run anyway.
+- **Cause found (2026-11-18, step 3a agent G): a real production bug.** On Linux a process's start
+  time is `btime` from `/proc/stat` plus its start ticks. `btime` is whole seconds and is recomputed
+  from the wall clock on every read; on this WSL desktop it grew by 1 s every ~31–33 s (375 s over
+  ~3 h). Two readings of the same live process then differ by whole seconds with the same sub-second
+  part, the owner check concludes the PID was reused, and recovery fails a live `claude_local` run
+  as `process_lost` (or releases a live owner's record). It affects child-process stamps too.
+- **Fix chosen by the user: option 1.** For `btime`-based readings a whole-second gap counts as the
+  same process (`controller-process-identity.ts`, `owner-proof.ts`). A reused PID matches by chance 1
+  time in 100, and its record is then held until the PID exits. Four tests that modelled PID reuse
+  with a whole-second offset get a sub-second one. Option 2, exact boot-relative start ticks in every
+  stamp (a new field and a migration), is worth revisiting in step 4b.
+- **Done (2026-11-18, `741e8c5231`):** `processStartsDefinitelyDiffer` takes the reading's clock and
+  `owner-proof.ts` passes `linux_btime` from its process probe. Seven test files modelled PID reuse
+  with a whole-second gap; each gap now has a 10 ms part, with no assertion changed. G ran the 189
+  server files that touch process start times: every failure left also fails the same way without
+  the fix.
+- **Left alone (dormant Runner):** `evaluateNativeProviderProcesses` in
+  `native-runtime/native-restart-recovery.ts` still compares provider-process starts without a
+  clock, so it keeps the whole-second rule. Pass the clock there if the Runner comes back.
 
 ### 41. Give `para-memory-files` a recall tool that exists
 
@@ -708,6 +733,12 @@ round 1: each fails the same way when re-run on its own, except `github-launcher
 - **Likely fix:** the dormant ones leave the default run when step 3a round 2 fills the opt-in tier
   (hard-fork step 3: they're not fixed). `shipped-catalog` gets the one-line fix; `github-launcher`
   gets a test-sized timeout or less work.
+- **Fixed 2026-11-18** (`b6e7076fae`, step 3a agent E): `shipped-catalog` no longer scans `.agents/`;
+  `github-launcher`'s process-heavy test (18 launcher processes in a row, ~4.6 s alone) has a 20 s
+  timeout. The other six files are in the opt-in tier, so `pnpm test` no longer runs them.
+- **Also found:** 6 tests in `server/src/services/heartbeat/runtime-selection.test.ts` failed on `main`
+  because they read `.claude/skills/slack/SKILL.md`, which `ea326e0202` removed. They're connector-skill
+  (dormant) tests and moved to the opt-in `runtime-selection.dormant.test.ts`.
 
 ### 43. Stop a company import from setting an existing agent's access level
 
@@ -868,3 +899,37 @@ Found by the step 4a bug-fix agent (2026-11-18), while fixing bug 50.
 - **Likely fix:** one central check. In `agentInteractionDenial` (`agent-interaction-policy.ts`),
   when the actor comes from a plugin origin, also check the matching access action. Then the
   per-call checks from bug 50 can go.
+
+### 55. Make the title route's access refusal requestable
+
+Found by the step 4a bug-fix agent (2026-11-18).
+
+- **What's wrong:** when the access level is what refuses `PUT /issues/:id/title`, the route
+  answers `issue_write_not_visible` (`denyIssueWrite`, `server/src/routes/issues.ts:14903-14907`).
+  `PATCH /issues/:id` answers `denyAgentAccess(res, decision, "tasks:update_any")`, which can be
+  requested. In practice the title route also requires the assigned agent's own run, so a worker
+  rarely reaches this.
+- **Likely fix:** use `denyAgentAccess` there, as `PATCH /issues/:id` does.
+
+### 56. Decide whether catalog task creation needs a retry key
+
+Found by the step 4a bug-fix agent (2026-11-18).
+
+- **What's wrong:** `paperclip_create_task` takes no idempotency key, so a retried call can create a
+  duplicate task. The chat directive's REST sentences still mention one. The old project-tools
+  server prefixed the key per conversation (`chat-handoff:<issueId>:<key>`). A plain key on the
+  catalog tool could collide across tasks in a company.
+- **Likely fix (to decide):** a `requestId` scoped to the caller and the parent or conversation
+  task, like the public MCP's write receipts. Or leave creation without one, and drop the mention
+  from the directive.
+
+### 57. Make `attentionService.list` fast over many failed runs
+
+Found by step 3a agent G (2026-11-18). In `server/src/__tests__/attention-service.test.ts`, "checks
+more failed runs for a newer run than one statement can bind" still takes ~25 s after its seeding was
+made a single statement: the time is inside `attentionService.list` itself, over 16,400 failed runs.
+
+- **Problem:** the attention feed's failed-run check scales badly with the number of failed runs; a
+  company with many failures could see a slow inbox.
+- **Likely fix:** profile the query or queries `list` makes for that case (probably one per chunk of
+  runs, or an unindexed lookup of newer runs) and replace them with one set-based query.

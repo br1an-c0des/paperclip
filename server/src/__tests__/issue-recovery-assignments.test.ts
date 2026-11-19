@@ -46,9 +46,12 @@ describeIssueRecovery("issue recovery production producers and assignments", () 
     const issue = await issueService(state.db).create(f.companyId, { title: "Drained assignment", status: "todo", assigneeAgentId: f.agentId });
     await new Promise(resolve => setTimeout(resolve, 100));
     const reads = vi.spyOn(state.db, "select");
-    if (!vi.isFakeTimers()) vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    // The fixture's workers already run on a fake clock that follows wall time;
+    // keep it (and their armed deadlines) after this check, back at wall time.
+    const installed = !vi.isFakeTimers();
+    if (installed) vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     try { await vi.advanceTimersByTimeAsync(90_000); expect(reads).not.toHaveBeenCalled(); }
-    finally { vi.useRealTimers(); reads.mockRestore(); }
+    finally { if (installed) vi.useRealTimers(); else vi.setSystemTime(vi.getRealSystemTime()); reads.mockRestore(); }
     expect(await state.db.select().from(heartbeatRuns)).toHaveLength(0);
     state.draining = false; state.worker.wake(); state.dispatch.wake();
     await completed(issue.id); await finish(issue.id); await quiet();

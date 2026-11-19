@@ -11,8 +11,11 @@ import { hasLiveLegacyController, LEGACY_CONTROLLER_LEASE_MS, LEGACY_CONTROLLER_
   LEGACY_CONTROLLER_RENEWAL_RETRY_DELAY_MS, legacyControllerBootId, legacyControllerClaim, LegacyControllerLeaseLostError,
   legacyControllerOwnerStamp, renewLegacyControllerLease, revokeExpiredLegacyController,
   revokeExpiredLegacyControllerWithState, watchLegacyControllerLease } from "./legacy-controller-lease.js";
-import { currentProcessSpaceHash, currentProcessStartedAtMs } from "./controller-process-identity.js";
-import { proveOwnerGone } from "./owner-proof.js";
+import { hostname } from "node:os";
+import { currentControllerBootId, currentProcessSpaceHash, currentProcessStartedAtMs, processStartsDefinitelyDiffer }
+  from "./controller-process-identity.js";
+import { proveOwnerGone, type LocalOwnerStamp, type ProcessProbe } from "./owner-proof.js";
+import { readLinuxProcessStartedAt } from "../vendor/paperclip-runner/index.js";
 import * as legacyControllerLease from "./legacy-controller-lease.js";
 
 /** Runs just before recovery's revocation, to model a controller that saved
@@ -81,6 +84,17 @@ const support = external ? { supported: true } : await getEmbeddedPostgresTestSu
     const [run] = await db.update(heartbeatRuns).set({ status: "running", ...legacyControllerClaim("legacy") })
       .where(eq(heartbeatRuns.id, queued.id)).returning();
     return run;
+  }
+  /** Ends a case's pg_sleep saturation once its assertion has passed, instead
+   * of waiting the sleeps out (queued ones start as earlier ones end). */
+  async function cancelSleeps(statement: string, work: Array<Promise<unknown>>) {
+    let done = false;
+    const all = Promise.allSettled(work).then(() => { done = true; });
+    while (!done) {
+      await db.execute(sql`select pg_cancel_backend(pid) from pg_stat_activity
+        where query = ${statement} and pid <> pg_backend_pid()`);
+      await Promise.race([all, new Promise(resolve => setTimeout(resolve, 50))]);
+    }
   }
   async function expire(id: string) {
     await db.update(heartbeatRuns).set({ controllerLeaseExpiresAt: sql`clock_timestamp() - interval '1 second'` })
@@ -254,7 +268,7 @@ const support = external ? { supported: true } : await getEmbeddedPostgresTestSu
       expect(controller.signal.aborted).toBe(false);
       const [saved] = await db.select().from(heartbeatRuns).where(eq(heartbeatRuns.id, run.id));
       expect(saved.executionStage).toBe("dispatching");
-    } finally { watch.stop(); await slow; }
+    } finally { watch.stop(); await cancelSleeps("select pg_sleep(5)", [slow]); }
   }, 15_000);
 
   it("renews on one private pool per client that shutdown can end", async () => {
@@ -290,7 +304,7 @@ const support = external ? { supported: true } : await getEmbeddedPostgresTestSu
       expect(controller.signal.aborted).toBe(false);
     } finally {
       watch.stop();
-      await Promise.all(nativeRenewals);
+      await cancelSleeps("select pg_sleep(5)", nativeRenewals);
       await closeLivenessDb(owner, 1);
       await owner.$client.end({ timeout: 1 });
     }
@@ -483,6 +497,23 @@ const support = external ? { supported: true } : await getEmbeddedPostgresTestSu
     expect(await saved(id)).toMatchObject({ status: "running", errorCode: null });
   });
 
+  // Bug 40: on Linux a start time is /proc/stat btime plus the process's start
+  // ticks, and btime follows the wall clock (on WSL it moved by a second every
+  // ~30 s). A stamp read before such a move and a reading after it differ by
+  // whole seconds for the same live process.
+  it.runIf(process.platform === "linux").each([1_000, 3_000, -2_000])(
+    "keeps the run and lease of a live earlier-boot controller whose start reads %i ms off after a wall-clock step", async shiftMs => {
+      const startedAt = (await currentProcessStartedAtMs())!;
+      const id = await dispatchedBy({ bootId: randomUUID(), pid: process.pid, hostHash: currentProcessSpaceHash(),
+        processStartedAt: new Date(startedAt - shiftMs).toISOString() });
+      const before = await saved(id);
+      await reapOnly(id);
+      await runOwnershipReconciliationPass(db, { state: createOwnershipReportState() });
+      const after = await saved(id);
+      expect({ status: after.status, errorCode: after.errorCode, expiresAt: after.controllerLeaseExpiresAt })
+        .toEqual({ status: "running", errorCode: null, expiresAt: before.controllerLeaseExpiresAt });
+    });
+
   it("settles a dead controller's lease in the reconciler pass, never in a read-only pass", async () => {
     const id = await dispatchedBy(deadController());
     const kind = OWNABLE_KINDS.find(candidate => candidate.id === "legacy_controller_lease")!;
@@ -510,6 +541,41 @@ const support = external ? { supported: true } : await getEmbeddedPostgresTestSu
     expect(await kind.settle!(db, record!, { now: new Date(), proof: { verdict: "gone", reason: "pid_dead" } }))
       .toEqual({ settled: false, reason: "owner_changed_since_proof" });
     expect((await saved(id)).controllerLeaseExpiresAt).toEqual(before.controllerLeaseExpiresAt);
+  });
+});
+
+describe("process start comparison across a wall-clock step (bug 40)", () => {
+  // /proc/4242/stat with start ticks 123456 (field 22) at 100 ticks a second.
+  const stat = (startTicks: number) => `4242 (node worker) ${["S", ...Array(18).fill("0"), String(startTicks), "0"].join(" ")}`;
+  const read = (startTicks: number, btime: number) => readLinuxProcessStartedAt(4242, { clockTicksPerSecond: 100,
+    readFile: path => path === "/proc/4242/stat" ? stat(startTicks) : `cpu 0 0 0 0\nbtime ${btime}\n` });
+  const stamp = (processStartedAt: string): LocalOwnerStamp => ({ kind: "local", scope: "bug-40", generation: null,
+    host: hostname(), processSpace: "space-a", bootId: randomUUID(), pid: 4242, processStartedAt });
+  const probe = (observed: string, startClock: ProcessProbe["startClock"]): ProcessProbe => ({ bootId: currentControllerBootId(),
+    host: hostname(), processSpace: "space-a", pidExists: pid => pid === 4242, processGroupExists: () => false,
+    readStartedAt: async () => new Date(observed), startClock });
+
+  it("moves every reading of one process by whole seconds when btime moves", () => {
+    const [stamped, later] = [read(123_456, 1_794_960_007), read(123_456, 1_794_960_008)];
+    expect(Date.parse(later) - Date.parse(stamped)).toBe(1_000);
+    expect(processStartsDefinitelyDiffer(stamped, later)).toBe(true);
+    expect(processStartsDefinitelyDiffer(stamped, later, { clock: "linux_btime" })).toBe(false);
+    expect(processStartsDefinitelyDiffer(stamped, read(123_456, 1_794_960_067), { clock: "linux_btime" })).toBe(false);
+  });
+
+  it("keeps a live owner whose Linux start reading moved by whole seconds", async () => {
+    for (const btime of [1_794_960_008, 1_794_960_090, 1_794_959_990]) {
+      expect(await proveOwnerGone(stamp(read(123_456, 1_794_960_007)), probe(read(123_456, btime), "linux_btime")))
+        .toEqual({ verdict: "alive", reason: "pid_alive" });
+    }
+  });
+
+  it("still proves a reused PID gone on Linux, and keeps the 1 s rule for plain timestamps", async () => {
+    const stamped = read(123_456, 1_794_960_007);
+    expect(await proveOwnerGone(stamp(stamped), probe(read(123_606, 1_794_960_008), "linux_btime")))
+      .toEqual({ verdict: "gone", reason: "pid_reused" });
+    expect(await proveOwnerGone(stamp(stamped), probe(read(123_456, 1_794_960_008), null)))
+      .toEqual({ verdict: "gone", reason: "pid_reused" });
   });
 });
 

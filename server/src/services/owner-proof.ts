@@ -4,11 +4,13 @@ import {
   currentControllerDeployment,
   currentControllerProcessStamp,
   currentProcessSpaceHash,
+  currentProcessStartClock,
   observedProcessStartedAt,
   processExists,
   processStartsDefinitelyDiffer,
   PROCESS_START_PRECISION_MS,
   UNKNOWN_PROCESS_SPACE,
+  type ProcessStartClock,
 } from "./controller-process-identity.js";
 import type { WorkspaceWorker } from "./native-runtime/native-workspace-platform-proof.js";
 import { ephemeralServerEnabled } from "./ephemeral-server-mode.js";
@@ -141,6 +143,9 @@ export type ProcessProbe = {
   pidExists(pid: number): boolean;
   processGroupExists(processGroupId: number): boolean;
   readStartedAt(pid: number): Promise<Date | null>;
+  /** How `readStartedAt` derives a start time, when that affects comparing it
+   * (`ProcessStartClock`). Absent: a plain timestamp. */
+  startClock?: ProcessStartClock | null;
   /** This process's platform deployment. `exclusiveVolume` is true only when
    * the platform stops every earlier deployment of the service before it
    * starts this one (a Railway service with an attached volume). */
@@ -185,6 +190,7 @@ export function currentProcessProbe(): ProcessProbe {
       const startedAt = await observedProcessStartedAt(pid);
       return startedAt === null ? null : new Date(startedAt);
     },
+    startClock: currentProcessStartClock(),
   };
 }
 
@@ -219,8 +225,9 @@ const validPid = (pid: number | null | undefined): pid is number =>
  * - the stamp must name this PID space (host, kernel boot, PID namespace); a
  *   different host or namespace is never proof;
  * - the PID must be dead, or reused: a live PID that started at least 1 s
- *   after the stamp (`ps lstart` has 1 s precision). An earlier start is
- *   inconsistent and unprovable. EPERM is alive;
+ *   after the stamp (`ps lstart` has 1 s precision), and on Linux not a
+ *   whole number of seconds after it (a clock step moves btime by whole
+ *   seconds). An earlier start is inconsistent and unprovable. EPERM is alive;
  * - the recorded process group must be empty, or led by a process that
  *   started definitely after the recorded group leader. A non-empty group without a
  *   recorded leader start time is unprovable: it may hold surviving children.
@@ -295,7 +302,7 @@ async function proveLocalProcessGone(stamp: LocalOwnerStamp, probe: ProcessProbe
     if (!stamp.processStartedAt || observed === null) {
       return { verdict: "unprovable", reason: "pid_start_unreadable" };
     }
-    const order = compareStarts(stamp.processStartedAt, observed);
+    const order = compareStarts(stamp.processStartedAt, observed, probe.startClock);
     if (order === "same") return { verdict: "alive", reason: "pid_alive" };
     // A reused PID belongs to a later process. An earlier start means the
     // stamp is inconsistent (clock skew or a migrated value): never proof.
@@ -315,7 +322,7 @@ async function proveLocalProcessGone(stamp: LocalOwnerStamp, probe: ProcessProbe
     if (!recordedLeaderStart || leaderStartedAt === null) {
       return { verdict: "unprovable", reason: "process_group_ambiguous" };
     }
-    const order = compareStarts(recordedLeaderStart, leaderStartedAt);
+    const order = compareStarts(recordedLeaderStart, leaderStartedAt, probe.startClock);
     if (order === "same") return { verdict: "alive", reason: "process_group_alive" };
     if (order !== "later") return { verdict: "unprovable", reason: "process_group_ambiguous" };
   }
@@ -336,14 +343,15 @@ function deploymentReplaced(stamp: LocalOwnerStamp, current: ProcessProbe["deplo
     && stamped.deploymentId !== worker.deploymentId;
 }
 
-/** "same" within `ps lstart` precision (1 s), "later" when the observed process
+/** "same" within `ps lstart` precision (1 s), or a whole-second gap on a
+ * Linux btime reading (`ProcessStartClock`); "later" when the observed process
  * started definitely after the recorded one, "earlier" when definitely before,
  * "unknown" when either time is unreadable. */
-function compareStarts(recorded: string, observed: Date): "same" | "later" | "earlier" | "unknown" {
+function compareStarts(recorded: string, observed: Date, clock?: ProcessStartClock | null): "same" | "later" | "earlier" | "unknown" {
   const left = Date.parse(recorded);
   const right = observed.getTime();
   if (!Number.isFinite(left) || !Number.isFinite(right)) return "unknown";
-  if (!processStartsDefinitelyDiffer(recorded, observed)) return "same";
+  if (!processStartsDefinitelyDiffer(recorded, observed, { clock })) return "same";
   return right - left >= PROCESS_START_PRECISION_MS ? "later" : "earlier";
 }
 

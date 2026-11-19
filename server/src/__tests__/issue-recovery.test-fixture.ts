@@ -57,6 +57,11 @@ export function issueRecoveryFixture(options: { meter?: boolean } = {}) {
   });
   afterAll(async () => { meter?.uninstall(); await db?.$client.end({ timeout: 1 }); await database?.cleanup(); });
   async function start(options: { backstopMs?: number; fullBackstopMs?: number } = { backstopMs: 0 }) {
+    // The workers' clock follows wall time, so child processes and PostgreSQL
+    // leases behave as in production, but it is fake: the waits below step
+    // over idle worker deadlines (stepToWake) instead of spending them in wall
+    // time. A case that installed its own clock keeps it.
+    if (!vi.isFakeTimers()) vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"], shouldAdvanceTime: true });
     coordinator = createDeliveryWorkCoordinator({ owner: db, canRun: () => !draining, canReconcile: () => true,
       onError: error => errors.push(error) });
     tasks.clear();
@@ -128,12 +133,32 @@ export function issueRecoveryFixture(options: { meter?: boolean } = {}) {
       .where(eq(agents.id, f.agentId));
     return failures;
   }
+  /** Steps the fake clock to the earliest of `deadlines` when no delivery
+   * pass is in flight and no run is queued or executing, so a wait for a
+   * worker's own deadline costs no wall time. Live work keeps wall time. */
+  async function stepToWake(deadlines: Array<number | null | undefined>) {
+    const due = deadlines.filter((at): at is number => typeof at === "number");
+    if (!vi.isFakeTimers() || passes.size > 0 || due.length === 0) return;
+    const next = Math.min(...due);
+    if (next <= Date.now()) return;
+    const executing = await db.select({ id: heartbeatRuns.id }).from(heartbeatRuns)
+      .where(sql`${heartbeatRuns.status} in ('queued', 'running')`).limit(1);
+    if (executing.length > 0 || passes.size > 0) return;
+    await vi.advanceTimersByTimeAsync(next - Date.now());
+    await Promise.allSettled([...passes]);
+    // Back to wall time: runs claimed later get PostgreSQL leases, which the
+    // controller times against Date.now(). Pending timers keep their delays.
+    vi.setSystemTime(vi.getRealSystemTime());
+  }
   async function settled(options: { backstopPending?: boolean } = {}) {
     await vi.waitFor(async () => {
       await Promise.allSettled([...passes]);
       await heartbeat.drainActiveRunExecutions();
       const next = coordinator.nextWakeAt();
       const wake = options.backstopPending && next !== null && next > Date.now() + 60_000 ? null : next;
+      if (wake !== null || extraDeadlines.some(deadline => deadline() !== null)) {
+        await stepToWake([wake, ...extraDeadlines.map(deadline => deadline())]);
+      }
       const detail = wake === null ? "" : JSON.stringify({ now: Date.now(), tasks: await Promise.all([...tasks].map(async ([queue, task]) => ({ queue, at: task.nextRunAt?.(), pending: await task.hasPending() }))),
         runs: (await db.select().from(heartbeatRuns)).map(run => ({ id: run.id, status: run.status, error: run.errorCode, lease: run.controllerLeaseExpiresAt, reason: run.contextSnapshot?.wakeReason })) });
       expect(wake, detail).toBeNull();
@@ -148,12 +173,18 @@ export function issueRecoveryFixture(options: { meter?: boolean } = {}) {
     const selected = reads.mock.calls.length, executed = executes.mock.calls.length;
     const statements: string[] = [], priorDebug = db.$client.options.debug;
     db.$client.options.debug = (_connection, query) => { statements.push(query); };
-    if (!vi.isFakeTimers()) vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    // A clock installed here ends with this check; the workers' own clock
+    // (start) stays, so their armed deadlines keep running after it.
+    const installed = !vi.isFakeTimers();
+    if (installed) vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     try {
       await vi.advanceTimersByTimeAsync(20 * 60_000);
       expect(reads).toHaveBeenCalledTimes(selected); expect(executes).toHaveBeenCalledTimes(executed);
       expect(statements).toEqual([]);
-    } finally { vi.useRealTimers(); db.$client.options.debug = priorDebug; reads.mockRestore(); executes.mockRestore(); }
+    } finally {
+      if (installed) vi.useRealTimers(); else vi.setSystemTime(vi.getRealSystemTime());
+      db.$client.options.debug = priorDebug; reads.mockRestore(); executes.mockRestore();
+    }
   }
   async function finish(issueId: string) {
     const retries = () => db.select().from(heartbeatRuns).where(and(eq(heartbeatRuns.status, "scheduled_retry"),
@@ -176,6 +207,7 @@ export function issueRecoveryFixture(options: { meter?: boolean } = {}) {
       await vi.waitFor(async () => {
         await Promise.allSettled([...passes]);
         await heartbeat.drainActiveRunExecutions();
+        if ((await retries()).length > 0) await stepToWake([coordinator.nextWakeAt(), ...extraDeadlines.map(next => next())]);
         const remaining = await retries();
         if (remaining.length > 0) trace.push({ now: Date.now(),
           deadlines: [coordinator.nextWakeAt(), ...extraDeadlines.map(next => next())],

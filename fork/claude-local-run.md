@@ -548,6 +548,36 @@ How the variants change it:
 | ACP engine (default) | All three sources even with a managed connection (`PAPERCLIP_ACPX_ISOLATED_CONTEXT` is never set outside the Runner; patch `patches/@agentclientprotocol__claude-agent-acp@0.73.0.patch:213-219`); **no strict MCP**, so repo and user MCP servers load next to Paperclip's; company skills as prompt text, not native skills; writes `<cwd>/.claude/settings.local.json`; auto memory on even on server1 (env allowlist) |
 | Paperclip Runner | Empty per-session config folder, user source only, no repo files ([guide](../ui-new/docs/guides/repo-instructions-and-skills.md#paperclip-runner)) |
 
+### Tested 2026-11-18: what loads with the user source only
+
+A throwaway repo with marked files (a root and a subfolder `CLAUDE.md`, a `.claude/skills` skill,
+an `env` value in `.claude/settings.json`), Claude Code 2.1.325 (`claude -p`), hooks off, run twice
+per case. This is the groundwork for 4b's sealed runs ([hard-fork plan, decision 8](hard-fork-plan.md#decisions)).
+
+| Flags | Root `CLAUDE.md` | Subfolder `CLAUDE.md` | Repo skill | Repo settings `env` | Skills in the `--add-dir` folder |
+| --- | --- | --- | --- | --- | --- |
+| None (all sources) | ✓ | ✓ (on reading a file there) | ✓ | ✓ | ✓ |
+| `--setting-sources user` | ✗ | ✗ | ✗ | ✗ | — |
+| `--setting-sources user --add-dir <dir with a CLAUDE.md>` | ✗ | ✗ | ✗ | ✗ | **✗** |
+| the same, plus `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1` | ✓ (the copy in that folder) | ✗ | ✗ | ✗ | ✗ |
+| `--setting-sources user --add-dir <the repo>` plus that variable | ✓ | ✗ | ✗ | ✗ | — |
+
+- **`--setting-sources user` seals the run off from the repo:** no `CLAUDE.md`, skills or settings.
+- **The repo's root `CLAUDE.md` can be loaded on its own:** `--add-dir` with
+  `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1` loads that folder's `CLAUDE.md` and nothing else
+  from it. Subfolder `CLAUDE.md` files don't load this way.
+- **Paperclip's `--add-dir` skills don't load with `--setting-sources user`** (the bundle's
+  `.claude/skills`). So a CLI run with a managed connection gets none of its company skills today,
+  and sealed runs need another way to hand them over. Two ways that work: `--plugin-dir <dir>` (the
+  skills load, but namespaced as `<plugin>:<skill>`), or the `skills/` folder of the run's own
+  `CLAUDE_CONFIG_DIR` (loads under their own names).
+- **A fresh `CLAUDE_CONFIG_DIR` with `--setting-sources user --strict-mcp-config`** loads that
+  folder's skills, Claude Code's built-in skills and plugins, no MCP servers, and keeps auto memory
+  inside the folder (`<config>/projects/<cwd>/memory/`). It needs a credential
+  (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`); without one it stops at "Not logged in".
+- `--bare` would also skip `CLAUDE.md` auto-discovery, but it reads only an API key, never a
+  subscription login, so it doesn't fit.
+
 ## 7. How the agent talks to Paperclip
 
 ### The `paperclip` MCP server (since step 4a)
@@ -700,6 +730,17 @@ cancel). The adapter (`toAdapterResult`, `execute.ts:1028-1332`) maps it:
 | No disposition (step 4a) | `settleRunDisposition` (`run-completion.ts`): a run is covered by a recorded disposition (`paperclip_finish`, `paperclip_block`, `paperclip_report_progress` with `continue: true`) or by its task ending `done`, `in_review` or `blocked` by any route; otherwise the missing-disposition repair below. A "continuing" run queues one continuation wake (at most 10 in a row). Exempt: chat turns, runs without a task, wakes on a done or cancelled task | Legacy |
 
 ## 10. Change points for steps 4 and 5
+
+**Goals changed 2026-11-18** ([hard-fork plan, decision 8](hard-fork-plan.md#decisions)): runs are
+sealed, getting only what Paperclip gives them. So the rows "All setting sources", "Repo `.mcp.json`
+and the user's MCP servers" and "Repo skills first" are reversed. Runs keep `--strict-mcp-config`
+on, always, and skip the user and project setting sources, not just with managed connections. Each
+agent gets its own lasting config folder. The company library is where skills come from, and the
+repo's `CLAUDE.md` loads only when its project's switch is on. The code locations in those rows
+still apply. Facts found on server1 the same day: all five agents run `claude_local` with no
+`engine` set (so ACP), and all use one managed AI connection with the subscription method. The run
+gets `CLAUDE_CODE_OAUTH_TOKEN` (`packages/shared/src/ai-connections.ts:94-97`), and the container
+has no Claude login of its own.
 
 "CLI" means `packages/adapters/claude-local/src/server/execute.ts`; "ACP" means
 `packages/adapter-utils/src/acpx-engine/execute.ts`. A first decision underlies all of them: **pick

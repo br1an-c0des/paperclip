@@ -55,11 +55,12 @@ describe("shared process identity proof", () => {
       const startedAt = new Date(observed.getTime() + 500).toISOString();
       await expect(recoveryProcessMayBeAlive({ pid: live.pid!, startedAt })).resolves.toBe(true);
       // The live PID started definitely after the recorded runner: reused, so gone.
-      const recycled = new Date(observed.getTime() - 5_000).toISOString();
+      // Gaps with a sub-second part: a whole-second gap on Linux may be one process across a clock step.
+      const recycled = new Date(observed.getTime() - 5_010).toISOString();
       await expect(recoveryProcessMayBeAlive({ pid: live.pid!, startedAt: recycled })).resolves.toBe(false);
       // A live PID that started before the recorded runner is an inconsistent
       // stamp (shared prover), never exit evidence.
-      const inconsistent = new Date(observed.getTime() + 5_000).toISOString();
+      const inconsistent = new Date(observed.getTime() + 5_010).toISOString();
       await expect(recoveryProcessMayBeAlive({ pid: live.pid!, startedAt: inconsistent })).resolves.toBe(true);
     } finally {
       const exited = once(live, "exit");

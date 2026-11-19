@@ -99,8 +99,15 @@ describe("residual recovery production matrix", () => {
     const [issue] = await db.insert(issues).values({ companyId, title: "Recovered work", status: "done", assigneeAgentId: agent.id }).returning();
     return { companyId, agent, issue, actorId };
   }
-  async function start(realClock = false) {
-    if (!realClock && !vi.isFakeTimers()) vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+  async function start(realClock: boolean | "unfaked" = false) {
+    // A real clock follows wall time, so leases expire in PostgreSQL's time as
+    // they would in production, but stays fake: quiet() then steps over the
+    // workers' 30 s follow-ups instead of waiting them out. "unfaked" keeps
+    // Node's own timers (the native lease case, which times recovery against
+    // PostgreSQL's clock to the second).
+    if (realClock !== "unfaked" && !vi.isFakeTimers()) {
+      vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"], shouldAdvanceTime: realClock });
+    }
     const admitted = () => !draining && !standby;
     await heartbeat.registerResidualRecoveryWork(coordinator, admitted).ready;
     await heartbeat.registerActiveRunSilenceWork(coordinator, admitted).ready;
@@ -596,7 +603,7 @@ describe("residual recovery production matrix", () => {
     const savedExpiry = async () => (await db.select().from(nativeRunFinalizations)
       .where(eq(nativeRunFinalizations.runId, run.id)))[0].leaseExpiresAt!.getTime();
     const expiry = await savedExpiry();
-    await start(true);
+    await start("unfaked");
     await vi.waitFor(() => expect(deadlines.get("active-execution-recovery")!()).toBe(expiry));
     await Promise.allSettled([...passes]);
     const before = timeline.length;

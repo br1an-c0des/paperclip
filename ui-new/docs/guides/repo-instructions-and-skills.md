@@ -15,6 +15,12 @@ the Claude CLI (2.1.325).
   task.
 - The ACP engine rewrites `<cwd>/.claude/settings.local.json` in the repo on every run.
 
+**Direction since Nov 18, 2026** ([hard-fork plan, decision 8](../../../fork/hard-fork-plan.md#decisions)):
+this page describes how runs behave today. Step 4b changes it: runs get only what Paperclip gives
+them (no repo or user settings, skills or MCP servers), the repo's `CLAUDE.md` loads when its
+project's switch is on, and Paperclip shows what each run gets. A repo's skills reach agents by
+importing them into the company library ([build plan 3.18](../build-plan.md#318-importing-from-a-repo-and-project-skills)).
+
 ## What it is
 
 Many repos carry instructions for coding agents: a `CLAUDE.md` or `AGENTS.md` at the root and skills

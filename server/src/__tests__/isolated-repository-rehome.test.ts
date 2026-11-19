@@ -643,12 +643,13 @@ describeEmbeddedPostgres("isolated repository source re-home", () => {
     await makeWork(f.cwd);
     await crashedRehome(f);
     await fs.appendFile(path.join(f.clone, ".git", "info", "exclude"), "\nscratch-*/\n");
-    for (let index = 0; index <= 1_000; index += 1) {
+    // The same 1,001 folders, written and removed concurrently.
+    await Promise.all(Array.from({ length: 1_001 }, async (_, index) => {
       await fs.mkdir(path.join(f.clone, `scratch-${index}`, "node_modules"), { recursive: true });
       await fs.writeFile(path.join(f.clone, `scratch-${index}`, "node_modules", "x.js"), "x\n");
-    }
+    }));
     expect(await rehomeIsolatedRepositoryWorkspace(db, await f.row())).toMatchObject({ cloneRemoved: false, cloneKeptReason: "clone_file_budget" });
-    for (let index = 1; index <= 1_000; index += 1) await fs.rm(path.join(f.clone, `scratch-${index}`), { recursive: true });
+    await Promise.all(Array.from({ length: 1_000 }, (_, index) => fs.rm(path.join(f.clone, `scratch-${index + 1}`), { recursive: true })));
     expect(await rehomeIsolatedRepositoryWorkspace(db, await f.row())).toMatchObject({ outcome: "cleaned", cloneRemoved: true });
   });
 });

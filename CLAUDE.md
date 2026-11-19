@@ -14,9 +14,10 @@ set up for one person running Claude agents.
   (every one is catalogued). Stage 1 of the [build plan](ui-new/docs/build-plan.md) is complete.
 - **Make Claude runs first-class.** Agents run on the `claude_local` adapter, whose default engine is
   ACP (`claude-agent-acp`), with `claude --print` as the CLI engine
-  ([fork/claude-local-run.md](fork/claude-local-run.md)). The plan: runs that behave like a Claude Code session in the project's repo (its CLAUDE.md, skills and
-  MCP servers), Paperclip reached through MCP instead of curl, one prompt builder we own, and chat
-  as its own concept rather than a hidden task (hard-fork plan steps 4–7).
+  ([fork/claude-local-run.md](fork/claude-local-run.md)). The plan: sealed runs, where a run gets exactly what Paperclip gives it (instructions, skills, MCP
+  servers, credential, settings) and Paperclip shows what that is, with the repo's `CLAUDE.md` behind
+  a switch per project; Paperclip reached through MCP instead of curl; one prompt builder we own; and
+  chat as its own concept rather than a hidden task (hard-fork plan steps 4–7).
 - **Then the build plan's features, in core,** without the plugin limits the fork used to work under.
 - **Leave unused code alone until it gets in the way.** The other adapters, the Paperclip Runner,
   Claude Managed and cloud execution stay in the tree, dormant. Remove a subsystem only when it
@@ -25,7 +26,7 @@ set up for one person running Claude agents.
 ## Ground rules
 
 - **Branches:** work on `main`; larger work on a feature branch merged into `main` with `--no-ff`.
-  `master` mirrors upstream for the upstream watch and is never merged into `main` and never
+  `master` mirrors upstream locally for the upstream watch; it is never pushed, never merged into `main` and never
   committed to. Don't rebase `main`. `origin/new-ui` is a frozen pointer at the branch point; don't
   push to it.
 - **Upstream code is ours to change.** No `FORK:` markers and no patch records needed. Keep each
@@ -53,6 +54,28 @@ set up for one person running Claude agents.
 - For the repo's conventions (repo map, dev setup, API rules), see `AGENTS.md`. Its pull-request
   template and Paperclip-issue workflow rules are upstream's and don't apply here.
 
+## Tests
+
+The suite runs in tiers through `scripts/test.mjs`; `scripts/test-tiers.json` says which files are
+opt-in ([doc/test-infrastructure.md](doc/test-infrastructure.md#test-tiers), step 3a).
+
+- **Before pushing:** `corepack pnpm test:quick` runs the tests your change touches since its merge
+  base with `main` (`--changed <ref>` for another base). A few minutes at most. `ui-new` has its
+  own `typecheck` and `test` (Common commands).
+- **CI** (`.github/workflows/test.yml`) runs the thorough tier, `corepack pnpm test`, on every push
+  to any branch: a typecheck and 10 shards in parallel. Locally the same tier takes about 21 min, so
+  leave it to CI unless you're checking a fix for a CI failure.
+- **Before merging into `main`:** the branch's latest push is green in CI. Push the branch, wait for
+  the run, then merge with `--no-ff`. Fix a red run on the branch, not on `main`.
+- **On demand:** `corepack pnpm test:optin` runs the opt-in tier (dormant halves, the Runner,
+  other adapters, the CLI, plugins, chat channels). Run it, or the files concerned, when a change
+  reaches into those areas.
+- **New test files** land in thorough unless an `optIn` glob matches them. A server test file that
+  leaves module state behind for the next file in its worker goes in `ISOLATED_BY_NAME` in
+  `server/vitest.config.ts` ([results-leaks.md](fork/test-suite-audit/results-leaks.md)).
+- **Full local runs** (thorough, opt-in, or a long file set) take the machine lock so two don't
+  share the machine: `flock /tmp/paperclip-test-bench.lock corepack pnpm test`.
+
 ## UI text
 
 - **Help text goes behind an "i" icon, not in the page body.** When you write a short description
@@ -72,7 +95,7 @@ set up for one person running Claude agents.
 | [fork/claude-local-run.md](fork/claude-local-run.md) | One `claude_local` run from wake to finish (CLI and ACP engines), with file references and the change points for hard-fork steps 4 and 5. |
 | [FORK-PATCHES.md](FORK-PATCHES.md) | Retired: since the deployment builds from source there are no patches; history in git. |
 | [fork/upstream-fixes.md](fork/upstream-fixes.md) | The fork's bug list: what's wrong, where, and the likely fix. |
-| [fork/test-suite-audit.md](fork/test-suite-audit.md) | Step 3a: what the full test suite costs (~7.6 h), where the time goes, and the fixes to try. |
+| [fork/test-suite-audit.md](fork/test-suite-audit.md) | Step 3a: what the full test suite cost (~6 h serial), where the time went, and the fixes to try. Results in [fork/step-3a-plan.md](fork/step-3a-plan.md). |
 | [.claude/skills/upstream-watch/SKILL.md](.claude/skills/upstream-watch/SKILL.md) | The weekly upstream review: list what's new, triage, cherry-pick what you choose. Ledger in [fork/upstream-watch.md](fork/upstream-watch.md); older sync reports in `fork/sync-reports/`. |
 | [.claude/skills/pm/SKILL.md](.claude/skills/pm/SKILL.md) | Project-manager mode (`/pm`): plan and review, delegate building to 3–5 agents, propose each one first. |
 | [ui-new/README.md](ui-new/README.md) | Running and building the SolidJS app; layout; lockfile-conflict fix. |
@@ -107,12 +130,14 @@ triages them, and cherry-picks only what you choose, on a branch, after approval
 
 - Git worktrees here, including agents' `isolation: "worktree"`, may start from `master` rather than
   `main`. Before working: `git merge-base --is-ancestor main HEAD || git reset --hard main`.
-- `git sync-master` checks out `master`, so don't run it in a checkout the dev servers run from. Instead:
-  `git fetch upstream && git push origin upstream/master:master && git branch -f master upstream/master && git branch --set-upstream-to=origin/master master`.
+- `master` mirrors upstream locally only: `git sync-master` fast-forwards it without a checkout.
+  Never push it to `origin`, where its upstream workflows would run in the fork (`origin`'s
+  `master` was deleted on 2026-11-19). Re-run `fork/setup-clone.sh` in a clone whose alias still
+  pushes, and `git fetch --prune origin` there to drop the old `origin/master`.
 - server1 runs the real instance with real data: never test against it, and never run M7 test data there.
   server1 is also a dev machine, so check `hostname` first: on server1, `localhost:3100` is the real
   instance ([Dev work on server1](#dev-work-on-server1)).
-- `pnpm verify` and similar scripts compare against `origin/master`, which is upstream now: pass `--base main`
+- `pnpm verify` and similar scripts compare against `origin/master` (gone) or `master` (upstream): pass `--base main`
   where they take one ([fork/repo-map.md](fork/repo-map.md#5-tests)).
 - Finished agent worktrees can be locked: `git worktree unlock <path>` before `git worktree remove`.
 - Stop a dev server by its port (`ss -ltnp | grep ':5181 '`), not `pkill -f <pattern>`, which also matches and kills the
@@ -133,10 +158,20 @@ deployment and dev work live in separate folders ([deploy/README.md](deploy/READ
   `paperclip-db-1`. Leave them alone. Commands in this file that say `:3100` (`pnpm dev`, ui-new's API
   proxy, `E2E_LIVE=1`) mean the desktop's dev instance. On server1, they would reach the real instance.
 - A dev instance on server1, when one is needed, gets its own port and data folder: the API on :3101
-  and data in `~/coding/paperclip-dev-data`. Untested so far:
-  `PAPERCLIP_HOME=~/coding/paperclip-dev-data PORT=3101 PAPERCLIP_AGENT_JWT_SECRET=$(openssl rand -hex 32) corepack pnpm dev`,
-  then `PAPERCLIP_API_URL=http://localhost:3101` for ui-new's dev server and for `E2E_LIVE=1`. It
-  starts empty, so it has no TES company until one is made.
+  and data in `~/coding/paperclip-dev-data`. Used for step 4a's run check (2026-11-18):
+  `PAPERCLIP_HOME=~/coding/paperclip-dev-data PORT=3101 PAPERCLIP_API_URL=http://localhost:3101 PAPERCLIP_AGENT_JWT_SECRET=<saved secret> corepack pnpm dev`.
+  - **Always set `PAPERCLIP_API_URL`:** it's the address agent runs use to reach Paperclip, and it
+    keeps them off :3100.
+  - **In a linked worktree,** the dev runner also needs a `.paperclip/.env` (gitignored). A file
+    holding the same three variables does.
+  - **The first start compiles the Runner's Rust crate,** which takes several minutes.
+  - **Memory:** the server peaks near 4 GB, so cap it (`systemd-run … -p MemoryMax=4G`).
+  - **Agent runs use your own Claude login** in `~/.claude`; no second login is needed. Don't copy
+    production's login: two copies of one refresh token break each other.
+  - **Stop it** with `systemctl --user stop <its run-….scope>`.
+  - Its TES company (`17ad7e05-6ab8-4bdf-a8ec-76a1c806d513`) and agent "M7 test runner" (`98b9fcf0-3ba7-45eb-8bc1-53b49c20f0bf`)
+    are server1's own, not the desktop's TES.
+  - For ui-new's dev server and `E2E_LIVE=1`, use `PAPERCLIP_API_URL=http://localhost:3101`.
 - Node: nvm defaults to Node 26, which doesn't ship corepack. The repo wants Node 24 (`.nvmrc`), so
   run `nvm use 24` first.
 - The machine has 20 CPUs and 14 GB of memory, shared with the real instance. Cap heavy jobs with

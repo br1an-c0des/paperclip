@@ -85,6 +85,28 @@ describe("deferred receipt durable dispatch", () => {
     } });
     return worker;
   }
+  // Waits for the workers' own deadlines (the 30 s reconstruction interval, a
+  // delayed resume) without spending them in wall time: while no pass is in
+  // flight and no run executes, each failed attempt steps the fake clock to the
+  // coordinator's next wake, then sets it back to wall time: a run claimed
+  // later gets a PostgreSQL-stamped 60 s lease that its controller times
+  // against Date.now(). Pending timers keep their remaining delays. The
+  // assertion itself is unchanged.
+  function waitForWake(assertion: () => unknown | Promise<unknown>, options?: { timeout?: number }) {
+    return waitForReal(async () => {
+      try { await assertion(); } catch (error) {
+        const next = coordinator.nextWakeAt();
+        const executing = next !== null && passes.size === 0 && (await db.select({ id: heartbeatRuns.id }).from(heartbeatRuns)
+          .where(sql`${heartbeatRuns.status} in ('queued', 'running')`).limit(1)).length > 0;
+        if (next !== null && next > Date.now() && passes.size === 0 && !executing) {
+          await vi.advanceTimersByTimeAsync(next - Date.now());
+          await Promise.allSettled([...passes]); await immediate();
+          vi.setSystemTime(vi.getRealSystemTime());
+        }
+        throw error;
+      }
+    }, options);
+  }
   afterEach(async () => {
     await coordinator.stop(); await heartbeat.drainActiveRunExecutions();
     for (const stop of extraStops.splice(0)) await stop();
@@ -520,7 +542,7 @@ describe("deferred receipt durable dispatch", () => {
     } else await lifecycle.resumeAgent(f.agent.id);
     await lifecycleWorker.process(f.agent.id);
     let runId: string | null = null;
-    await waitForReal(async () => {
+    await waitForWake(async () => {
       const wake = await read(); expect(wake.runId).toBeTruthy(); runId = wake.runId;
     }, { timeout: 40_000 });
     await waitForReal(async () => {
@@ -855,7 +877,7 @@ describe("deferred receipt durable dispatch", () => {
     await lifecycle.resumeAgent(f.agent.id);
     await lifecycleWorker.process(f.agent.id);
     let runId: string | null = null;
-    await waitForReal(async () => {
+    await waitForWake(async () => {
       const saved = await read(); expect(saved.runId).toBeTruthy(); runId = saved.runId;
     }, { timeout: 40_000 });
     await waitForReal(async () => {
@@ -886,12 +908,16 @@ describe("deferred receipt durable dispatch", () => {
       await db.update(agents).set({ status: "paused" }).where(eq(agents.id, f.agent.id));
       await heartbeat.registerDeferredReceiptWork(coordinator, () => !drain).ready;
       await heartbeat.registerRunDispatchWork(coordinator, () => !drain).ready;
+      // Wall time here: the saved input's 30 s resume delay is stamped with
+      // Date.now() while the resumed run's lease is stamped by PostgreSQL, so
+      // this case can step only the idle window below (31 s ahead of
+      // PostgreSQL, inside the run's 60 s lease).
       await waitForReal(async () => {
         await Promise.allSettled([...passes]);
         expect(coordinator.nextWakeAt()).toBeNull(); expect(idleWorkSnapshot().active).toBe(0);
       }, { timeout: 40_000 });
       const idleStatements = statements.length;
-      await new Promise(resolve => setTimeout(resolve, 31_000));
+      await vi.advanceTimersByTimeAsync(31_000);
       expect(statements).toHaveLength(idleStatements);
       const read = async () => (await db.select().from(agentWakeupRequests).where(eq(agentWakeupRequests.id, wake.id)))[0];
       expect(await read()).toMatchObject({ status: "deferred_issue_execution", runId: null });
@@ -1000,10 +1026,10 @@ describe("deferred receipt durable dispatch", () => {
       expect(wake.payload?.executionWait).toMatchObject({ reason: "issue_tree_hold_active" });
       expect(wake.runId).toBeNull();
     }, { timeout: 5_000 });
-    await waitForReal(() => { expect(coordinator.nextWakeAt()).toBeNull(); expect(idleWorkSnapshot().active).toBe(0); }, { timeout: 40_000 });
+    await waitForWake(() => { expect(coordinator.nextWakeAt()).toBeNull(); expect(idleWorkSnapshot().active).toBe(0); }, { timeout: 40_000 });
     await tree.releaseHold(f.companyId, f.issue.id, hold.hold.id, { actor, reason: "Resume saved Retry" });
     let runId: string | null = null;
-    await waitForReal(async () => {
+    await waitForWake(async () => {
       const [wake] = await db.select().from(agentWakeupRequests).where(eq(agentWakeupRequests.id, request.requestId!));
       expect(wake.runId, JSON.stringify(wake)).toBeTruthy(); runId = wake.runId;
     }, { timeout: 40_000 });

@@ -1,4 +1,1029 @@
 {
   "serialServer": [],
-  "optIn": []
+  "optIn": [
+    {
+      "glob": "server/**/*.dormant.test.ts",
+      "reason": "Dormant half of a split file (native, Runner, remote, sandbox, cloud, managed, other adapters)"
+    },
+    {
+      "glob": "packages/adapter-utils/**/*.dormant.test.ts",
+      "reason": "Dormant half of a split file (native, Runner, remote, sandbox, cloud, managed, other adapters)"
+    },
+    {
+      "glob": "cli/**",
+      "reason": "paperclipai CLI: not used (decision 2026-11-18)"
+    },
+    {
+      "glob": "packages/adapters/codex-local/**",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "packages/adapters/cursor-cloud/**",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "packages/adapters/cursor-local/**",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "packages/adapters/gemini-local/**",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "packages/adapters/grok-local/**",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "packages/adapters/hermes/**",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "packages/adapters/kimi-local/**",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "packages/adapters/openclaw-gateway/**",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "packages/adapters/opencode-local/**",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "packages/adapters/pi-local/**",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "packages/plugins/**",
+      "reason": "Plugin SDK, sandbox provider plugins and plugin scaffolding: no plugin is used"
+    },
+    {
+      "glob": "packages/skills-catalog/**",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/src/services/native-runtime/**",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/services/chat-channels/**",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "server/src/__tests__/photon/**",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "server/src/services/connectors/**",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "server/src/google-workspace-rest-tools/**",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "server/src/services/public-mcp/**",
+      "reason": "Public MCP (off): dormant"
+    },
+    {
+      "glob": "server/src/services/runtime-exposure/**",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "server/src/modules/external-agents/**",
+      "reason": "External agents (Muse, Dot, Grok, Antigravity, browser-use): dormant"
+    },
+    {
+      "glob": "server/src/services/grok-bot/**",
+      "reason": "External agents (Muse, Dot, Grok, Antigravity, browser-use): dormant"
+    },
+    {
+      "glob": "server/src/maintenance/**",
+      "reason": "Paperclip Cloud hosting: dormant"
+    },
+    {
+      "glob": "server/src/adapters/http/**",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "server/src/__tests__/*native*.test.*",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/services/*native*.test.*",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/services/heartbeat/*native*.test.*",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "packages/shared/**/*native*.test.*",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "packages/db/**/*native*.test.*",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/**/*paperclip-runner*.test.*",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/**/*paperclip-runner*.test.*",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "packages/shared/**/*runner-goal*.test.*",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/__tests__/runner-*.test.*",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/services/runner-*.test.*",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/realtime/runner-*.test.*",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/services/workspace-recovery-*.test.*",
+      "reason": "Retained-workspace recovery: acts only on Runner runs"
+    },
+    {
+      "glob": "server/src/__tests__/chat-{action,admission,channels,completion,delivery,execution,failed,interaction,native,receiver,run,webhook}-*.test.*",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant; chat-project-tools is agent chat and stays"
+    },
+    {
+      "glob": "server/src/__tests__/chat-channels.*.test.*",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "server/src/services/chat-*.test.*",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "packages/db/src/chat-*.test.*",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "server/**/*chat-channels*.test.*",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "packages/shared/**/*chat-channels*.test.*",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "server/**/*chat-wake*.test.*",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "server/**/*reviewed-chat*.test.*",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "server/**/*github-review*.test.*",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "server/**/*slack*.test.*",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "packages/shared/**/*slack*.test.*",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "server/**/*teams*.test.*",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "server/**/*email*.test.*",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "server/src/{__tests__,middleware,services}/cloud-*.test.*",
+      "reason": "Paperclip Cloud hosting: dormant; adapters/cloud-external-adapters stays"
+    },
+    {
+      "glob": "server/**/*-cloud*.test.*",
+      "reason": "Paperclip Cloud hosting: dormant"
+    },
+    {
+      "glob": "server/**/*maintenance*.test.*",
+      "reason": "Paperclip Cloud hosting: dormant"
+    },
+    {
+      "glob": "server/src/**/ephemeral-*.test.*",
+      "reason": "Paperclip Cloud hosting: dormant"
+    },
+    {
+      "glob": "server/**/*customer-success*.test.*",
+      "reason": "Paperclip Cloud hosting: dormant"
+    },
+    {
+      "glob": "server/**/*railway*.test.*",
+      "reason": "Paperclip Cloud hosting: dormant"
+    },
+    {
+      "glob": "server/**/*unikraft*.test.*",
+      "reason": "Paperclip Cloud hosting: dormant"
+    },
+    {
+      "glob": "server/src/**/*-idle*.test.*",
+      "reason": "Cloud idle sleep: sleep-safety reports and proofs, dormant"
+    },
+    {
+      "glob": "server/src/**/*sleep*.test.*",
+      "reason": "Cloud idle sleep: sleep-safety reports and proofs, dormant"
+    },
+    {
+      "glob": "server/src/**/idle-{accounting,api,completed,connection,database,deadline,domain,incoming,issue,local,recovery,response,scheduled,sleep}-*.test.*",
+      "reason": "Cloud idle sleep: sleep-safety reports and proofs, dormant; idle-admission is mounted on every request and stays"
+    },
+    {
+      "glob": "server/**/*remote*.test.*",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "packages/shared/**/*remote*.test.*",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/**/*remote*.test.*",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "packages/adapters/claude-local/**/*remote*.test.*",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "server/**/*ssh*.test.*",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/**/*ssh*.test.*",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "server/**/*tailscale*.test.*",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/**/*tailscale*.test.*",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "server/**/*tailnet*.test.*",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "server/**/*runtime-exposure*.test.*",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "packages/shared/**/*runtime-exposure*.test.*",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "server/**/*sandbox*.test.*",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/**/*sandbox*.test.*",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapters/claude-local/**/*sandbox*.test.*",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "server/**/*daytona*.test.*",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "server/**/*custom-image*.test.*",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/shared/**/*custom-image*.test.*",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/db/**/*custom-image*.test.*",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/**/workspace-checkpoint*.test.*",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/**/workspace-seed*.test.*",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/**/workspace-snapshot*.test.*",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "server/**/*directory-merge-lock*.test.*",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/**/*directory-merge-lock*.test.*",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/src/login-*.test.*",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "server/**/*plugin-environment*.test.*",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/**/*managed-environment*.test.*",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/**/*environment-lease*.test.*",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/**/environment-runtime-*.test.*",
+      "reason": "Non-local environment drivers, leases and probes: dormant; environment-runtime itself is split"
+    },
+    {
+      "glob": "server/**/environment-execution-target-*.test.*",
+      "reason": "Non-local environment drivers, leases and probes: dormant; environment-execution-target itself stays"
+    },
+    {
+      "glob": "server/**/ai-*.test.*",
+      "reason": "Claude Managed and managed AI connections: dormant"
+    },
+    {
+      "glob": "server/**/*ai-connection*.test.*",
+      "reason": "Claude Managed and managed AI connections: dormant"
+    },
+    {
+      "glob": "server/**/local-ai-*.test.*",
+      "reason": "Claude Managed and managed AI connections: dormant"
+    },
+    {
+      "glob": "server/src/**/managed-config*.test.*",
+      "reason": "Claude Managed and managed AI connections: dormant"
+    },
+    {
+      "glob": "server/**/*codex*.test.*",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "packages/adapter-utils/**/*codex*.test.*",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "server/**/*cursor*.test.*",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "server/**/*gemini*.test.*",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "server/**/*opencode*.test.*",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "server/**/*kimi*.test.*",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "server/**/*grok*.test.*",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "server/**/*pi-local*.test.*",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "server/**/*openclaw*.test.*",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "server/**/*openrouter*.test.*",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "packages/shared/**/*openrouter*.test.*",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "server/**/*copilot*.test.*",
+      "reason": "Other adapter: only claude_local runs here"
+    },
+    {
+      "glob": "server/**/*muse*.test.*",
+      "reason": "External agents (Muse, Dot, Grok, Antigravity, browser-use): dormant"
+    },
+    {
+      "glob": "packages/shared/**/*muse*.test.*",
+      "reason": "External agents (Muse, Dot, Grok, Antigravity, browser-use): dormant"
+    },
+    {
+      "glob": "packages/db/**/*muse*.test.*",
+      "reason": "External agents (Muse, Dot, Grok, Antigravity, browser-use): dormant"
+    },
+    {
+      "glob": "server/**/*antigravity*.test.*",
+      "reason": "External agents (Muse, Dot, Grok, Antigravity, browser-use): dormant"
+    },
+    {
+      "glob": "packages/shared/**/*antigravity*.test.*",
+      "reason": "External agents (Muse, Dot, Grok, Antigravity, browser-use): dormant"
+    },
+    {
+      "glob": "server/**/*browser-use*.test.*",
+      "reason": "External agents (Muse, Dot, Grok, Antigravity, browser-use): dormant"
+    },
+    {
+      "glob": "server/**/dot-*.test.*",
+      "reason": "External agents (Muse, Dot, Grok, Antigravity, browser-use): dormant"
+    },
+    {
+      "glob": "server/**/*connector*.test.*",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "packages/shared/**/*connector*.test.*",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "packages/db/**/*connector*.test.*",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "server/**/*aggregator*.test.*",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "packages/shared/**/*aggregator*.test.*",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "server/**/*google-*.test.*",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "packages/shared/**/*google-*.test.*",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "server/**/*gmail*.test.*",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "server/**/*vercel*.test.*",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "packages/db/**/*vercel*.test.*",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "server/**/*mcp-apps*.test.*",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "packages/shared/**/*mcp-apps*.test.*",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "server/**/deployment-*.test.*",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "server/**/*public-mcp*.test.*",
+      "reason": "Public MCP (off): dormant"
+    },
+    {
+      "glob": "server/**/mcp-task*.test.*",
+      "reason": "Public MCP (off): dormant"
+    },
+    {
+      "glob": "server/**/*voice*.test.*",
+      "reason": "Voice sessions (Speko): dormant"
+    },
+    {
+      "glob": "packages/db/**/*voice*.test.*",
+      "reason": "Voice sessions (Speko): dormant"
+    },
+    {
+      "glob": "server/**/*speko*.test.*",
+      "reason": "Voice sessions (Speko): dormant"
+    },
+    {
+      "glob": "packages/db/**/*speko*.test.*",
+      "reason": "Voice sessions (Speko): dormant"
+    },
+    {
+      "glob": "server/**/*telemetry*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/**/*posthog*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/**/*sentry*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/**/*instrumentation*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/src/**/*otel*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/**/*feedback*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/**/*announcement*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "packages/shared/**/*announcement*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/**/*portability*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "packages/shared/**/*portability*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/**/*company-import*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "packages/shared/**/*company-import*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/**/*built-in-agent*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "packages/db/**/*built-in-agent*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/**/*skills-catalog*.test.*",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/scripts/reporting-lock-policy.test.mjs",
+      "reason": "Lockfile proof for upstream's Runner end-to-end CI reporting: dormant (bug 42)"
+    },
+    {
+      "glob": "packages/adapter-utils/src/chat-file-delivery.test.ts",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/src/duplex-frame-codec.test.ts",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/src/duplex-observability.test.ts",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/src/github-launcher-environment.test.ts",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/src/github-launcher.test.ts",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/src/http2-bridge-server.test.ts",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/src/managed-clone-staging.test.ts",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/src/runner-connectivity.test.ts",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapter-utils/src/sync-operation-schedule.test.ts",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "packages/adapters/claude-local/src/server/setup-token-characterization.test.ts",
+      "reason": "claude_local's setup-token, remote and sandbox paths: dormant"
+    },
+    {
+      "glob": "packages/adapters/claude-local/src/server/setup-token-parse.test.ts",
+      "reason": "claude_local's setup-token, remote and sandbox paths: dormant"
+    },
+    {
+      "glob": "packages/adapters/claude-local/src/server/setup-token-runner.test.ts",
+      "reason": "claude_local's setup-token, remote and sandbox paths: dormant"
+    },
+    {
+      "glob": "packages/db/src/dedicated-connection-pool.test.ts",
+      "reason": "Claude Managed and managed AI connections: dormant"
+    },
+    {
+      "glob": "packages/shared/src/frontmatter-runner-contract.test.ts",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/__tests__/agent-runner-platform.test.ts",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/__tests__/agent-runner-qualification-routes.test.ts",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/__tests__/agent-test-environment-routes.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/aws-secrets-manager-provider.test.ts",
+      "reason": "AWS Secrets Manager provider: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/board-chat-route-feature-flag.test.ts",
+      "reason": "Conference Room chat (enableConferenceRoomChat off): dormant"
+    },
+    {
+      "glob": "server/src/__tests__/braintrust-connection.test.ts",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/browser-tracing-config.test.ts",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/bundled-plugin-package.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/bundled-plugin-registration.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/bundled-plugin-runtime.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/bundled-plugins.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/company-transfer-runs.test.ts",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/composio-app-setup.test.ts",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/container-init-reaping.test.ts",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/distribution-plugin-catalog.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/docker-image-layer-reuse.test.ts",
+      "reason": "Sandbox providers, drivers and helpers: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/docker-runner-workflows.test.ts",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-acquisition-diagnostics.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-capability-contract.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-cleanup-work.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-config.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-driver-traits.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-instance-routes.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-login-probe-lease-ownership.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-pending-cleanup-queue-owner.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-probe.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-retained-orphan-listing-cost.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-routes.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-run-lease-ownership.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-selection-route-guards.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-skills.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-sync-out-error.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-task-authority.integration.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-task-runtime.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/environment-test-harness.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/export-fidelity.test.ts",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/generic-mcp-connection.test.ts",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/heartbeat-chat-task-link.test.ts",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "server/src/__tests__/heartbeat-ephemeral-queued-migration.test.ts",
+      "reason": "Paperclip Cloud hosting: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/heartbeat-lease-release-before-runner-attach.test.ts",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/__tests__/historical-cleanup-verification.test.ts",
+      "reason": "Paperclip Cloud hosting: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/historical-provider-credentials.test.ts",
+      "reason": "Claude Managed and managed AI connections: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/managed-agent-profile-routes-authz.test.ts",
+      "reason": "Claude Managed and managed AI connections: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/managed-instance-default.test.ts",
+      "reason": "Claude Managed and managed AI connections: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/managed-loopback-auth.test.ts",
+      "reason": "Claude Managed and managed AI connections: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/managed-plugin-worker-env.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/managed-runtime-public-url.test.ts",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/oauth-client-metadata.test.ts",
+      "reason": "Public MCP (off): dormant"
+    },
+    {
+      "glob": "server/src/__tests__/onepassword-connection.test.ts",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/owner-gone-attestation.test.ts",
+      "reason": "Paperclip Cloud hosting: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/paperclip-semantic-conformance.test.ts",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-config-startup-delivery.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-config-validator.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-database.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-host-services-span.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-inspection-concurrency.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-lifecycle-delivery.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-loader-activation-timeout.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-local-folders.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-managed-agents.test.ts",
+      "reason": "Claude Managed and managed AI connections: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-managed-routine-guidance.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-managed-routines.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-orchestration-apis.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-organization-switcher.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-project-snapshots.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-runner-task.integration.test.ts",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-scheduled-work.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-scoped-api-routes.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-sdk-orchestration-contract.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-sdk-testing.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-secrets-handler.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-ui-static.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-worker-manager-duplex.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/plugin-worker-manager.test.ts",
+      "reason": "Plugin host and plugin SDK: no plugin is used (decision 2026-11-18)"
+    },
+    {
+      "glob": "server/src/__tests__/project-environments.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/smoke-lab.test.ts",
+      "reason": "Import/export, catalogs, telemetry and feedback: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/vitest-chat-shards.test.ts",
+      "reason": "Checks upstream runner's chat-channel shard split: dormant"
+    },
+    {
+      "glob": "server/src/__tests__/workspace-runtime-https-live-exercise.test.ts",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "server/src/middleware/runner-call-outcome.test.ts",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/modules/wake-queue/adapters/chat-declined-outcome-reported.test.ts",
+      "reason": "External chat channels (Slack, Teams, Discord, Telegram, GitHub, email): dormant"
+    },
+    {
+      "glob": "server/src/services/__tests__/run-failure-report-native-usage-limit.test.ts",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/services/agent-environment-test-status.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/services/environment-provider-unavailable-error.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/services/finalized-workspace-recovery-migration.test.ts",
+      "reason": "Retained-workspace recovery: acts only on Runner runs"
+    },
+    {
+      "glob": "server/src/services/fireflies-webhook.test.ts",
+      "reason": "App connectors and connection providers: dormant"
+    },
+    {
+      "glob": "server/src/services/governed-wait-runner-loss.test.ts",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/services/heartbeat-runner-provider-config.test.ts",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/services/heartbeat/live-runner-adoption.test.ts",
+      "reason": "Paperclip Runner (native runtime): dormant"
+    },
+    {
+      "glob": "server/src/services/login-environment.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/services/managed-resource-drift.test.ts",
+      "reason": "Claude Managed and managed AI connections: dormant"
+    },
+    {
+      "glob": "server/src/services/owner-proof.test.ts",
+      "reason": "Paperclip Cloud hosting: dormant"
+    },
+    {
+      "glob": "server/src/services/protected-environment-keys.test.ts",
+      "reason": "Non-local environment drivers, leases and probes: dormant"
+    },
+    {
+      "glob": "server/src/services/setup-token-transport-binding.test.ts",
+      "reason": "Remote workspaces and runtime exposure: dormant"
+    },
+    {
+      "glob": "server/src/services/superseded-workspace-export-recovery.test.ts",
+      "reason": "Retained-workspace recovery: acts only on Runner runs"
+    }
+  ]
 }
