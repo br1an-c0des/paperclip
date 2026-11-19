@@ -44,7 +44,7 @@ describeDatabase("new agent configuration defaults", () => {
     await cleanup?.();
   });
 
-  it("grants standard new agents direct peer configuration, but keeps restricted agents narrow", async () => {
+  it("seeds standard new agents' default grants, configuring peers only at admin access, and keeps restricted agents narrow", async () => {
     const companyId = randomUUID();
     await db.insert(companies).values({
       id: companyId,
@@ -118,13 +118,21 @@ describeDatabase("new agent configuration defaults", () => {
       expect(await accessService(db).hasPermission(companyId, "agent", standard.id, permissionKey)).toBe(false);
     }
 
-    const decision = await authorizationService(db).decide({
+    // Since step 4a an agent's direct configure authority is its access level's agents:configure
+    // (admin), not the agents:configure grant: a new hire starts at worker, so a direct peer change
+    // falls back to its suggest-changes grant, which needs accepted consent, until it's given admin
+    // or the override.
+    const configurePeer = () => authorizationService(db).decide({
       actor: { type: "agent", agentId: standard.id, companyId, source: "agent_key" },
       action: "agent_config:update",
       resource: { type: "agent", agentId: peer.id, companyId },
       scope: { requiresChangeGrant: true },
     });
-    expect(decision).toMatchObject({ allowed: true, reason: "allow_direct_change" });
+    expect(await configurePeer()).toMatchObject({ allowed: false, reason: "deny_missing_consent" });
+    const [standardRow] = await db.select({ permissions: agents.permissions }).from(agents).where(eq(agents.id, standard.id));
+    await db.update(agents).set({ permissions: { ...standardRow!.permissions, access: { level: "admin" } } })
+      .where(eq(agents.id, standard.id));
+    expect(await configurePeer()).toMatchObject({ allowed: true, reason: "allow_direct_change" });
 
     // A later ordinary self-update must not recreate a grant removed by an operator.
     await db.delete(principalPermissionGrants).where(eq(principalPermissionGrants.principalId, standard.id));

@@ -210,9 +210,14 @@ export async function consumeTemporaryAccess(db: DbOrTransaction, input: {
       ),
     ),
   );
-  const [standing] = await db.select({ id: temporaryAccessGrants.id }).from(temporaryAccessGrants)
-    .where(and(matches, isNull(temporaryAccessGrants.usesLeft))).limit(1);
-  if (standing) return true;
+  // One plain read first, preferring a standing grant: most checks that get here have no grant at
+  // all, and they must not write or take row locks (a denied check runs on read paths too).
+  const [usable] = await db.select({ usesLeft: temporaryAccessGrants.usesLeft }).from(temporaryAccessGrants)
+    .where(and(matches, or(isNull(temporaryAccessGrants.usesLeft), gt(temporaryAccessGrants.usesLeft, 0))))
+    .orderBy(sql`${temporaryAccessGrants.usesLeft} is null desc`)
+    .limit(1);
+  if (!usable) return false;
+  if (usable.usesLeft === null) return true;
   const used = await db.update(temporaryAccessGrants)
     .set({ usesLeft: sql`${temporaryAccessGrants.usesLeft} - 1` })
     .where(inArray(

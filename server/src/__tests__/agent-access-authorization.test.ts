@@ -241,6 +241,57 @@ describe.skipIf(!support.supported)("agent access in the authorization service",
       .toBe("access_level");
   });
 
+  it("a worker's write to a new subtask is judged by its parent", async () => {
+    const company = await createCompany(db);
+    const worker = await createAgent(db, company.id, { access: { level: "worker" } });
+    const other = await createAgent(db, company.id, { access: { level: "manager" } });
+    const authz = authorizationService(db);
+    const newChildOf = (parent: typeof issues.$inferSelect) => authz.decide({
+      actor: agentActor(worker), action: "issue:mutate",
+      resource: { type: "issue", companyId: company.id, parentIssueId: parent.id, assigneeAgentId: worker.id },
+    });
+    expect((await newChildOf(await createIssue(db, company.id, { assigneeAgentId: worker.id }))).allowed).toBe(true);
+    expect(await newChildOf(await createIssue(db, company.id, { assigneeAgentId: other.id })))
+      .toMatchObject({ allowed: false, reason: "access_level", missingAction: "tasks:update_any" });
+  });
+
+  it("a scoped override allows only inside its scope", async () => {
+    const company = await createCompany(db);
+    const peer = await createAgent(db, company.id);
+    const outsider = await createAgent(db, company.id);
+    const configurer = await createAgent(db, company.id, {
+      access: { level: "worker", overrides: { "agents:configure": { scope: { agentIds: [peer.id] } } } },
+    });
+    const authz = authorizationService(db);
+    const configure = (target: { id: string }) => authz.decide({
+      actor: agentActor(configurer), action: "agent_config:update",
+      resource: { type: "agent", companyId: company.id, agentId: target.id }, scope: { targetAgentId: target.id },
+    });
+    expect((await configure(peer)).allowed).toBe(true);
+    expect(await configure(outsider)).toMatchObject({ allowed: false, reason: "deny_scope" });
+    // Without a requested scope, a scoped override fails closed, as a scoped grant did.
+    expect((await authz.decide({
+      actor: agentActor(configurer), action: "agent_config:update",
+      resource: { type: "agent", companyId: company.id, agentId: peer.id },
+    })).allowed).toBe(false);
+    const read = (target: { id: string }) => authz.decide({
+      actor: agentActor(configurer), action: "agent_config:read",
+      resource: { type: "agent", companyId: company.id, agentId: target.id }, scope: { targetAgentId: target.id },
+    });
+    expect((await read(peer)).allowed).toBe(true);
+    expect((await read(outsider)).allowed).toBe(false);
+
+    const assigner = await createAgent(db, company.id, {
+      access: { level: "worker", overrides: { "tasks:assign": { scope: { agentIds: [peer.id] } } } },
+    });
+    const othersTask = await createIssue(db, company.id, { assigneeAgentId: outsider.id });
+    const assign = (target: { id: string }) => authz.decide({
+      actor: agentActor(assigner), action: "tasks:assign", resource: { ...issueResource(othersTask), assigneeAgentId: target.id },
+    });
+    expect((await assign(peer)).allowed).toBe(true);
+    expect(await assign(assigner)).toMatchObject({ allowed: false, reason: "deny_scope" });
+  });
+
   it("a temporary grant allows one call", async () => {
     const company = await createCompany(db);
     const worker = await createAgent(db, company.id, { access: { level: "worker" } });
