@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Fake curl for deploy/tests/deploy-sh.test.sh: answers /api/health with the
+# commit of the image the stub server container runs. STUB_HEALTH=down fails
+# every call; STUB_HEALTH_DOWN_FIRST=N fails the first N; STUB_HEALTH_COMMIT
+# overrides the reported commit.
+set -euo pipefail
+state=${STUB_STATE:?}
+printf 'curl %s\n' "$*" >> "$state/calls.log"
+
+n=$(cat "$state/curl_calls" 2>/dev/null || echo 0)
+echo $((n + 1)) > "$state/curl_calls"
+[ "${STUB_HEALTH:-up}" = up ] || exit 7
+[ "$n" -ge "${STUB_HEALTH_DOWN_FIRST:-0}" ] || exit 7
+[ -f "$state/running_server" ] || exit 7
+
+id=$(cat "$state/running_server")
+key=$(printf '%s' "$id" | tr ':/' '__')
+commit=${STUB_HEALTH_COMMIT:-$(cat "$state/commits/$key")}
+printf '{"status":"ok","deploymentMode":"authenticated","commit":"%s","bootstrapStatus":"ready"}' "$commit"

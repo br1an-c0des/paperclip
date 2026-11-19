@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# Fake docker for deploy/tests/deploy-sh.test.sh. Records every call in
+# $STUB_STATE/calls.log and answers from files under $STUB_STATE:
+#   images/<ref>     the image id a tag points to (":" and "/" become "_")
+#   commits/<id>     the PAPERCLIP_BUILD_COMMIT of an image id
+#   running_server   the image id the server container runs (absent: not running)
+#   containers/<n>   throwaway containers started with `docker run -d --name n`
+#   networks/<n>     networks created
+# Behaviour switches (environment): STUB_DB_RUNNING=0, STUB_DUMP=empty|fail,
+# STUB_RESTORE_LIST=fail|empty, STUB_REHEARSAL_RESTORE=fail, STUB_MIGRATE=fail,
+# STUB_UP=fail, STUB_LOGS (extra server log lines), STUB_DB_BYTES.
+set -euo pipefail
+state=${STUB_STATE:?}
+mkdir -p "$state/images" "$state/commits" "$state/containers" "$state/networks"
+printf 'docker %s\n' "$*" >> "$state/calls.log"
+
+key() { printf '%s' "$1" | tr ':/' '__'; }
+resolve() { # ref or id -> id
+  if [ -f "$state/images/$(key "$1")" ]; then cat "$state/images/$(key "$1")"
+  elif [ -f "$state/commits/$(key "$1")" ]; then echo "$1"
+  else return 1; fi
+}
+format_of() { # value after --format
+  while [ $# -gt 0 ]; do
+    if [ "$1" = --format ]; then echo "$2"; return; fi
+    shift
+  done
+}
+last_arg() { local a; for a in "$@"; do :; done; echo "$a"; }
+
+case "$1" in
+  image)
+    [ "$2" = inspect ] || exit 1
+    id=$(resolve "$3") || { echo "Error: No such image: $3" >&2; exit 1; }
+    fmt=$(format_of "$@")
+    case "$fmt" in
+      *Config.Env*) echo "NODE_ENV=production"; echo "PAPERCLIP_BUILD_COMMIT=$(cat "$state/commits/$(key "$id")")" ;;
+      *.Id*) echo "$id" ;;
+    esac
+    ;;
+  ps)
+    service=""
+    for a in "$@"; do
+      case "$a" in label=com.docker.compose.service=*) service=${a#label=com.docker.compose.service=} ;; esac
+    done
+    case "$service" in
+      server) [ -f "$state/running_server" ] && echo ctr-server ;;
+      db) [ "${STUB_DB_RUNNING:-1}" = 1 ] && echo ctr-db ;;
+    esac
+    exit 0
+    ;;
+  inspect)
+    fmt=$(format_of "$@")
+    target=$(last_arg "$@")
+    case "$target:$fmt" in
+      ctr-server:*.Image*) cat "$state/running_server" ;;
+      ctr-db:*Config.Image*) echo postgres:17-alpine ;;
+      *) exit 1 ;;
+    esac
+    ;;
+  tag)
+    id=$(resolve "$2") || { echo "Error: No such image: $2" >&2; exit 1; }
+    echo "$id" > "$state/images/$(key "$3")"
+    ;;
+  build)
+    tag=""
+    while [ $# -gt 0 ]; do [ "$1" = -t ] && tag=$2; shift; done
+    id=sha256:core-${tag#paperclip-core:}
+    echo "$id" > "$state/images/$(key "$tag")"
+    echo "${tag#paperclip-core:}" > "$state/commits/$(key "$id")"
+    ;;
+  compose)
+    shift
+    case "$1" in
+      build)
+        [ -n "${BASE_IMAGE:-}" ] && [ -n "${BUILD_COMMIT:-}" ] || { echo "stub: BASE_IMAGE/BUILD_COMMIT unset" >&2; exit 1; }
+        resolve "$BASE_IMAGE" >/dev/null || { echo "stub: base $BASE_IMAGE missing" >&2; exit 1; }
+        id=sha256:fork-$BUILD_COMMIT
+        echo "$id" > "$state/images/paperclip-fork_local"
+        echo "$BUILD_COMMIT" > "$state/commits/$(key "$id")"
+        ;;
+      up)
+        [ "${STUB_UP:-}" = fail ] && { echo "stub: compose up failed" >&2; exit 1; }
+        cat "$state/images/paperclip-fork_local" > "$state/running_server"
+        ;;
+      exec)
+        case "$*" in
+          *pg_dump*)
+            case "${STUB_DUMP:-}" in
+              empty) ;;
+              fail) echo "pg_dump: error: connection failed" >&2; exit 1 ;;
+              *) printf 'PGDMP fake custom-format dump\n' ;;
+            esac
+            ;;
+          *pg_database_size*) echo "${STUB_DB_BYTES:-104857600}" ;;
+          *) exit 1 ;;
+        esac
+        ;;
+      *) ;;
+    esac
+    ;;
+  network)
+    case "$2" in
+      create) touch "$state/networks/$(last_arg "$@")" ;;
+      rm) rm -f "$state/networks/$3" ;;
+    esac
+    ;;
+  run)
+    case "$*" in
+      *"pg_restore --list"*)
+        cat > /dev/null
+        case "${STUB_RESTORE_LIST:-}" in
+          fail) echo "pg_restore: error: input file does not appear to be a valid archive" >&2; exit 1 ;;
+          empty) echo ";" ; echo "; Archive created at ..." ;;
+          *) printf ';\n; Archive created at ...\n1; 2615 2200 SCHEMA - public\n2; 0 0 TABLE DATA public agents paperclip\n' ;;
+        esac
+        ;;
+      *src/migrate.ts*)
+        name=""
+        prev=""
+        for a in "$@"; do [ "$prev" = --name ] && name=$a; prev=$a; done
+        [ -f "$state/networks/$(printf '%s' "$name" | sed 's/-migrate$//')" ] || { echo "stub: network missing" >&2; exit 1; }
+        echo "Migrating database via DATABASE_URL"
+        if [ "${STUB_MIGRATE:-}" = fail ]; then
+          echo "error: column \"access_level\" of relation \"agents\" already exists" >&2
+          exit 1
+        fi
+        echo "Applying 1 pending migration(s)..."
+        echo "Migrations complete"
+        ;;
+      *)
+        # docker run -d --name <n> ...
+        name=""
+        prev=""
+        for a in "$@"; do [ "$prev" = --name ] && name=$a; prev=$a; done
+        touch "$state/containers/$name"
+        echo "0123456789ab"
+        ;;
+    esac
+    ;;
+  exec)
+    case "$*" in
+      *pg_isready*) exit 0 ;;
+      *pg_restore*)
+        cat > /dev/null
+        [ "${STUB_REHEARSAL_RESTORE:-}" = fail ] && { echo "pg_restore: error: could not execute query" >&2; exit 1; }
+        exit 0
+        ;;
+    esac
+    ;;
+  rm)
+    rm -f "$state/containers/$(last_arg "$@")"
+    ;;
+  logs)
+    echo '2026-11-19T19:21:59Z docker-entrypoint.sh: starting'
+    if [ -f "$state/migrations_pending" ]; then
+      echo '{"level":30,"time":1,"pid":7,"pendingMigrations":["0002_b.sql"],"msg":"Applying 1 pending migrations for PostgreSQL"}'
+    fi
+    echo '{"level":40,"time":2,"pid":7,"msg":"a warning, not an error"}'
+    echo '{"level":30,"time":3,"pid":7,"msg":"Server listener bound on 0.0.0.0:3100"}'
+    if [ -n "${STUB_LOGS:-}" ]; then printf '%b\n' "$STUB_LOGS"; fi
+    ;;
+  *)
+    echo "stub docker: unhandled: $*" >&2
+    exit 1
+    ;;
+esac

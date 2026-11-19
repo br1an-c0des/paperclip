@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Fake sleep for deploy/tests/deploy-sh.test.sh: the polls run instantly.
+printf 'sleep %s\n' "$*" >> "${STUB_STATE:?}/calls.log"

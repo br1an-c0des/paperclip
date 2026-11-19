@@ -10,7 +10,8 @@ why things are set up this way, see [FORK.md](../FORK.md).
 | `Dockerfile` | The core image built from source, with `ui-new` built and added |
 | `docker-compose.yml` | Postgres + Paperclip, with bind mounts for all data |
 | `.env.example` | Settings template; copy it to `deploy/.env` (gitignored) |
-| `deploy.sh` | Builds the core image for the checked-out commit, then builds and (re)starts the stack |
+| `deploy.sh` | Checks CI, builds the core image for the checked-out commit, backs up and rehearses new migrations, (re)starts the stack and checks it came up; `--rollback` undoes the last deploy ([Updating](#updating)) |
+| `tests/` | `deploy-sh.test.sh`, the tests for `deploy.sh`, with fake `docker`, `gh` and `curl` in `tests/stubs/` ([Testing deploy.sh](#testing-deploysh)) |
 
 ### How the image is built
 
@@ -48,8 +49,9 @@ Two build arguments of the root `Dockerfile` matter here:
   instead, which is where the server reads its commit from first (`server/src/build-commit.ts`).
   Upstream's published image had the pack; nothing that runs locally uses it.
 
-Run `deploy/deploy.sh --dry-run` to see the commit, whether the core image would be built or
-reused, and the exact build command, without building anything.
+Run `deploy/deploy.sh --dry-run` to see the commit, its CI state, whether the core image would be
+built or reused (and the exact build command), any new migrations and what each later stage would
+do, without changing anything.
 
 ### Build time and disk use
 
@@ -71,19 +73,21 @@ Measured on the dev machine (16 cores, Docker Desktop on WSL):
   only with the lockfile), but each deploy leaves the previous `paperclip-core:*` tag behind, and
   the build cache grows too.
 
-To prune old core images, keep the one in use and remove the rest:
+To prune old core images, keep the one in use and the one `paperclip-fork:previous` (the rollback
+image) was built from, and remove the rest:
 
 ```bash
 docker images 'paperclip-core' --format '{{.Repository}}:{{.Tag}}'   # list them
-in_use=paperclip-core:$(docker image inspect paperclip-fork:local \
-  --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^PAPERCLIP_BUILD_COMMIT=//p')
-docker images 'paperclip-core' --format '{{.Repository}}:{{.Tag}}' | grep -vx "$in_use" | xargs -r docker rmi
+commit_of() { docker image inspect "$1" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+  | sed -n 's/^PAPERCLIP_BUILD_COMMIT=//p'; }
+keep="paperclip-core:$(commit_of paperclip-fork:local)|paperclip-core:$(commit_of paperclip-fork:previous)"
+docker images 'paperclip-core' --format '{{.Repository}}:{{.Tag}}' | grep -vxE "$keep" | xargs -r docker rmi
 docker builder prune --filter until=168h   # build cache older than a week
 ```
 
-Removing a `paperclip-core` tag only untags it; its layers stay while the current image uses them.
-Each deploy also leaves the previous `paperclip-fork:local` build behind as an untagged image once
-the container has been recreated; `docker image prune` removes untagged images (all of them on the
+Removing a `paperclip-core` tag only untags it; its layers stay while a tagged image uses them.
+`deploy.sh` tags the image that was running before each deploy `paperclip-fork:previous`, and the
+one before that becomes untagged; `docker image prune` removes untagged images (all of them on the
 machine, not only Paperclip's).
 
 The service worker (`/sw.js`) replaces the old UI's in every browser that had it, since it's served
@@ -185,7 +189,8 @@ fresh instance (nothing was copied from the earlier desktop deployment):
   ~/deployments/paperclip/
   ├── repo/      the deploy checkout, on main, used only for deploys; deploy/.env is here (mode 600)
   ├── data/      PAPERCLIP_DATA_ROOT (postgres/ and home/, see Data on the host)
-  └── backups/   database dumps taken before deploys, e.g. paperclip-2026-11-18-1210.dump
+  └── backups/   database dumps taken before deploys, e.g. paperclip-2026-11-18-1210.dump,
+                 and last-deploy.env (what the last deploy did, for --rollback)
   ~/coding/paperclip/   the dev checkout, for manual dev work on server1 (never deployed from)
   ```
 
@@ -202,8 +207,9 @@ fresh instance (nothing was copied from the earlier desktop deployment):
 
   The build runs on server1, so a deploy that rebuilds the core image takes a while (see
   [Build time and disk use](#build-time-and-disk-use)); the running instance stays up until
-  Compose swaps the container at the end. If the deploy adds a migration, `deploy.sh` stops and
-  asks for a backup first ([Updating](#updating)).
+  Compose swaps the container at the end. `deploy.sh` refuses a commit whose CI run didn't pass,
+  and backs up and rehearses a deploy that adds a migration ([Updating](#updating)). Right after a
+  push CI is still running, so add `--wait-ci` to deploy when it passes.
 
 ## On the dev machine (WSL with Docker Desktop)
 
@@ -244,19 +250,143 @@ Push `main` from your dev machine, then on the server:
 ```bash
 cd ~/deployments/paperclip/repo   # the deploy checkout on server1
 git pull --ff-only
-deploy/deploy.sh --dry-run   # optional: what it would build, and any new migrations
+deploy/deploy.sh --dry-run   # optional: CI state, what it would build, any new migrations
 deploy/deploy.sh
 ```
 
 Postgres data and everything under `PAPERCLIP_DATA_ROOT` survives rebuilds.
 
-**Back up the database before a deploy that adds a migration.** Migrations run when the server
-starts and don't run backwards, so restoring the backup is the only way back. `deploy.sh` checks
-this for you: it compares the commit the running image was built from with the checkout, lists any
-new files in `packages/db/src/migrations`, and stops until you run it again with `--backed-up`
-(after taking the backup in [Backups](#backups)). When it can't tell which commit is deployed (no
-`paperclip-fork:local` image yet, or a commit this clone doesn't have), it prints a reminder
-instead.
+### What a deploy does
+
+In order, stopping at the first problem. Nothing touches the running instance until step 7, so a
+deploy that stops before then leaves it as it was.
+
+1. **CI gate.** Looks up the run of the Test workflow (`.github/workflows/test.yml`) for the
+   checkout's `HEAD` on GitHub and goes on only if the newest one passed (see
+   [The CI gate](#the-ci-gate)).
+2. **Core image.** Builds `paperclip-core:<commit>`, or reuses it
+   ([How the image is built](#how-the-image-is-built)).
+3. **Fork image.** `docker compose build server` builds `paperclip-fork:local` (`ui-new` on top
+   of the core image). Building it before the backup means a `ui-new` build failure stops the
+   deploy before anything else, and the backup is taken as close to the restart as it can be.
+4. **New migrations?** Compares the commit the running server container's image was built from
+   with `HEAD` and lists new files in `packages/db/src/migrations`. If there are none, steps 5
+   and 6 are skipped. When it can't tell what's deployed (an image without a commit, or a commit
+   this clone doesn't have) and a database is running, it carries on as if there were some.
+5. **Backup** ([Automatic backups](#automatic-backups)).
+6. **Rehearsal** ([Migration rehearsal](#migration-rehearsal)).
+7. **Restart.** Tags the image the server is running now `paperclip-fork:previous`, writes
+   `last-deploy.env` next to the backups (the commit, the previous image and commit, the
+   migrations, the backup), then `docker compose up -d --no-build`. Migrations run when the new
+   server starts.
+8. **Check.** Waits for `/api/health` on `PAPERCLIP_PORT` (up to `DEPLOY_HEALTH_TIMEOUT`, 300 s by
+   default) and checks that the commit it reports is `HEAD`. Then it scans the server's log since
+   the restart for error-level lines (pino's JSON `"level":50` and `60`, or `ERROR` / `FATAL` in
+   pretty output) and prints a summary: commit, migrations, backup, rehearsal, health and the
+   error lines it found. A health or commit failure exits non-zero, with the last lines of the
+   server log and the way back. Error lines on their own are reported, not fatal.
+
+### Flags and settings
+
+| Flag | What it does |
+| --- | --- |
+| `--dry-run` | Reports each stage (CI state, build or reuse, migrations, the backup path and free space, the rehearsal, the image it would tag as previous, the health URL) and exits 0. Changes nothing, and runs only read-only `docker` and `gh` queries; doesn't need `deploy/.env`. |
+| `--rebuild` | Builds the core image even if one exists for this commit. |
+| `--wait-ci` | If HEAD's CI run hasn't finished (or hasn't appeared yet), waits for it, polling every 30 s for up to `DEPLOY_CI_TIMEOUT` (3600 s), and deploys if it passes. |
+| `--skip-ci` | Deploys without a passing CI run, after a loud warning that says what the CI state was. |
+| `--backed-up` | You took your own backup: no automatic one. The rehearsal still runs, on a temporary dump that's deleted afterwards. |
+| `--skip-rehearsal` | Takes the backup but doesn't rehearse the migrations. |
+| `--rollback` | Puts `paperclip-fork:previous` back and restarts ([Rolling back](#rolling-back)). |
+| `--rollback --force` | Rolls back even though the last deploy applied migrations, or was already rolled back. |
+
+| Setting (environment) | Default |
+| --- | --- |
+| `DEPLOY_BACKUP_DIR` | `backups/` beside the checkout: `~/deployments/paperclip/backups` on server1. Holds the dumps and `last-deploy.env`. |
+| `DEPLOY_BACKUP_KEEP` | 10: how many automatic dumps to keep. |
+| `DEPLOY_BACKUP_MIN_FREE_MB` | 1024: free space to leave on the backup disk beyond the database's size. |
+| `DEPLOY_HEALTH_TIMEOUT` | 300: seconds to wait for `/api/health` after the restart. |
+| `DEPLOY_CI_TIMEOUT` | 3600: seconds `--wait-ci` waits. |
+
+### The CI gate
+
+`deploy.sh` asks GitHub (with `gh run list -R <origin's repo> --commit <HEAD> --workflow
+test.yml`) for the newest Test run of the commit it's about to deploy. The repository comes from
+the `origin` remote and is passed with `-R`, because `gh` on its own picks the `upstream` remote.
+It stops when:
+
+- **there's no run:** the commit isn't pushed (it says so when no remote branch has it), or CI
+  hasn't started yet (`--wait-ci` waits for it to appear);
+- **the run hasn't finished:** run again with `--wait-ci`;
+- **the run failed or was cancelled:** it prints the jobs that didn't pass and the run's URL;
+- **`gh` is missing or not logged in** (`gh auth login`).
+
+To deploy anyway, for example when the only failure is a known flaky test, add `--skip-ci`. Look at
+the failing job first (`gh run view <id> -R br1an-c0des/paperclip --log-failed`), or re-run it
+(`gh run rerun <id> --failed -R br1an-c0des/paperclip`) and deploy with `--wait-ci`. A docs-only
+commit gets a CI run like any other push, so it's gated too.
+
+### Automatic backups
+
+Migrations run when the server starts and don't run backwards, so restoring a backup is the only
+way back from a deploy that adds one. When the deploy adds migrations, `deploy.sh` takes that
+backup itself, after building and before the restart:
+
+1. checks the backup disk has room for the whole database (its size from `pg_database_size`, an
+   upper bound for the compressed dump) plus `DEPLOY_BACKUP_MIN_FREE_MB`;
+2. dumps it with `docker compose exec -T db pg_dump -Fc -U paperclip paperclip` to
+   `paperclip-YYYY-MM-DD-HHMM.dump` in `DEPLOY_BACKUP_DIR` (written as `.partial` until checked);
+3. checks the dump isn't empty and that `pg_restore --list` reads it, in a throwaway container of
+   the db service's Postgres image with no network (not in the production container);
+4. prunes: keeps the newest `DEPLOY_BACKUP_KEEP` automatic dumps. It only removes dumps it took
+   itself, which it lists in `.automatic-dumps` in the same folder; a dump you took by hand,
+   even under the same name pattern, and every other file are left alone.
+
+If any of these fails, it stops and nothing is deployed. With no new migrations, no backup is
+taken. `--backed-up` skips it, for when you took one yourself ([Backups](#backups)).
+
+### Migration rehearsal
+
+After the backup, `deploy.sh` tries the new migrations on a copy of the production database before
+they run for real:
+
+1. creates a Docker network and a throwaway Postgres container on it (the db service's image,
+   capped at 2 GB, no published port);
+2. restores the fresh dump into it (`pg_restore --exit-on-error --no-owner`);
+3. runs `packages/db`'s migrate script from the new `paperclip-core:<commit>` image against it:
+   `tsx src/migrate.ts` in `/app/packages/db` (what `pnpm db:migrate` runs, without its numbering
+   checks). It calls `applyPendingMigrations`, the same function the server calls at startup, and
+   fails unless every migration is applied afterwards;
+4. removes the containers and the network, on success, failure or Ctrl-C.
+
+If the restore or a migration fails, it prints the output and stops: production is untouched and
+nothing is deployed. Rehearsing migration 0491 on a dump of server1's database (4.8 MB) took under
+20 seconds. `--skip-rehearsal` skips it.
+
+### Rolling back
+
+Before each restart, `deploy.sh` tags the image that was running `paperclip-fork:previous` (its
+`paperclip-core:<commit>` stays too) and records the deploy in `last-deploy.env` next to the
+backups. `deploy/deploy.sh --rollback` tags `paperclip-fork:previous` back as
+`paperclip-fork:local`, recreates the server container, and runs the same health, commit and log
+checks against the previous commit. `--rollback --dry-run` says what it would do.
+
+It refuses when the deploy being rolled back applied migrations, or might have (its deployed
+commit was unknown and the server's log didn't settle it). Migrations don't run backwards,
+so the previous server would run against a schema it doesn't know; the way back is restoring the
+backup taken before the deploy, whose path the refusal names, then rolling back with `--force`:
+
+```bash
+cd ~/deployments/paperclip/repo/deploy
+docker compose stop server
+docker compose exec -T db psql -U paperclip -d postgres -v ON_ERROR_STOP=1 \
+  -c 'DROP DATABASE paperclip WITH (FORCE)' -c 'CREATE DATABASE paperclip'
+docker compose exec -T db pg_restore -U paperclip -d paperclip --exit-on-error --no-owner \
+  < ~/deployments/paperclip/backups/paperclip-YYYY-MM-DD-HHMM.dump
+cd .. && deploy/deploy.sh --rollback --force
+```
+
+Everything written to the database since the backup is lost. Only one step back is kept: a
+second `--rollback` is refused, and the next deploy tags whatever is running then as previous.
 
 ## Data on the host
 
@@ -289,10 +419,13 @@ stored secrets can't be decrypted. For a consistent database copy, either stop t
 
 ```bash
 cd deploy
-docker compose exec db pg_dump -U paperclip paperclip | gzip > paperclip-$(date +%F).sql.gz
+docker compose exec -T db pg_dump -Fc -U paperclip paperclip > ../../backups/paperclip-$(date +%Y-%m-%d-%H%M).dump
 ```
 
-On server1, keep the dumps in `~/deployments/paperclip/backups/`.
+That's the command `deploy.sh` runs for its [automatic backups](#automatic-backups), in
+`pg_dump`'s custom format, which `pg_restore` reads ([Rolling back](#rolling-back) restores one).
+On server1, keep the dumps in `~/deployments/paperclip/backups/`; dumps you take by hand there are
+never pruned.
 
 ## Operating
 
@@ -308,6 +441,24 @@ docker compose restart server
 docker compose down               # stop (data is kept)
 ```
 
+## Testing deploy.sh
+
+`deploy/tests/deploy-sh.test.sh` runs `deploy.sh` in a scratch git repo with fake `docker`, `gh`,
+`curl` and `sleep` (`deploy/tests/stubs/`) first on `PATH`, so it touches no Docker, GitHub or
+running Paperclip. The fakes record their calls, and each case checks the output, the calls and the
+files left behind: the CI gate's every state, the backup and its failures (empty dump, unreadable
+dump, low disk, no database), pruning, the rehearsal and its cleanup, the checks after the restart,
+and rollback. Plain bash, no dependencies; it takes a few seconds:
+
+```bash
+deploy/tests/deploy-sh.test.sh            # every case
+deploy/tests/deploy-sh.test.sh rollback   # the cases whose name contains "rollback"
+```
+
+Run it after changing `deploy.sh`, and `shellcheck` the script too (it isn't installed on server1;
+`docker run --rm --network none -v "$PWD/deploy:/mnt:ro" koalaman/shellcheck:v0.10.0 deploy.sh`
+works). It's not part of the CI workflow.
+
 ## Troubleshooting
 
 - **Slow first start:** on first boot, or after changing `USER_UID`/`USER_GID`, the image's
@@ -320,6 +471,13 @@ docker compose down               # stop (data is kept)
   `package.json` the root `Dockerfile`'s `deps` stage doesn't copy yet (add a `COPY` line there);
   or a full disk (`docker system df`, then prune as above). Fix it on `main`, then deploy again.
   The running instance is untouched by a failed build.
-- **`deploy.sh` stops about migrations:** see [Updating](#updating).
+- **`deploy.sh` stops at the CI gate:** see [The CI gate](#the-ci-gate); `--skip-ci` overrides.
+- **The backup or the rehearsal fails:** nothing was deployed. A rehearsal failure means the
+  migration fails on the real data: fix it on `main`. A leftover rehearsal container (only after
+  a `kill -9`) is labelled `paperclip.deploy.rehearsal=1`:
+  `docker rm -f -v $(docker ps -aq --filter label=paperclip.deploy.rehearsal=1)`.
+- **The check after the restart fails:** the summary shows what failed and the last lines of the
+  server log. `deploy/deploy.sh --rollback` puts the previous image back, unless migrations ran
+  ([Rolling back](#rolling-back)).
 - **Login fails or requests are rejected:** `PAPERCLIP_PUBLIC_URL` must match the URL in the
   browser exactly. Add extra hostnames to `PAPERCLIP_ALLOWED_HOSTNAMES`.
