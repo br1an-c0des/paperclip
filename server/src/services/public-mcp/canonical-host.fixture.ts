@@ -15,7 +15,8 @@ import {issueRoutes} from "../../routes/issues.js";
 import {activityRoutes} from "../../routes/activity.js";
 import {errorHandler} from "../../middleware/error-handler.js";
 import {createPublicMcpOAuth} from "./oauth.js";
-import {createMcpApiDispatch,createPublicMcpExecutor} from "./capabilities.js";
+import {createMcpApiDispatch} from "./capabilities.js";
+import {createPublicMcpCatalog} from "./catalog.js";
 import {createPublicMcpEvents} from "./events.js";
 import {startMcpClientMirrorSync} from "./client-mirror-sync.js";
 import {readIdleMcpClientMirror} from "./idle-client-mirror.js";
@@ -106,7 +107,7 @@ async function initialize(input:Input){
   const dispatch=createMcpApiDispatch(api),app=express();app.use(express.json({limit:"1mb"}));
   app.use((req,_res,next)=>{req.actor=req.headers["x-canonical-browser"]===input.browserSecret?{type:"board",source:"session",userId:input.userId,companyIds:[input.companyId,input.otherCompanyId]}:{type:"none",source:"none"};next();});
   events=createPublicMcpEvents(db,oauth,dispatch,{fetch:mappedFetch,cloudOrigin:input.cloudOrigin,isBackgroundWorkEnabled:()=>!draining});
-  app.use(publicMcpIngressRoutes(oauth,createPublicMcpExecutor(db,oauth,dispatch),events));app.use("/api",publicMcpManagementRoutes(oauth));app.use(errorHandler);
+  app.use(publicMcpIngressRoutes(oauth,createPublicMcpCatalog(db,oauth,{api}),events));app.use("/api",publicMcpManagementRoutes(oauth));app.use(errorHandler);
   server=createServer(app);server.listen(0,"127.0.0.1");await once(server,"listening");
   delivery=createDeliveryWorkCoordinator({owner:db,canRun:()=>!draining,canReconcile:()=>true,onError:error=>errors.push(error instanceof Error?error.message:String(error))});
   await events.start(delivery).ready;

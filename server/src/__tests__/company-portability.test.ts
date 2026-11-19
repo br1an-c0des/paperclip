@@ -6172,6 +6172,31 @@ describe("company portability", () => {
     expect(agentSvc.create).not.toHaveBeenCalled();
   });
 
+  it("keeps an existing agent's access level when a replace import updates it (bug 43)", async () => {
+    const [fixture] = await agentSvc.list();
+    // The package carries an admin level with hard delete; the agent in this company is a worker.
+    agentSvc.list.mockResolvedValue([{ ...fixture, permissions: { ...fixture.permissions, access: { level: "admin", overrides: { "tasks:delete": true } } } }]);
+    const portability = companyPortabilityService({} as any);
+    const exported = await portability.exportBundle("company-1", { include: { company: false, agents: true, projects: false, issues: false } });
+    expect(asTextFile(exported.files[".paperclip.yaml"])).toContain("admin");
+    const existing = { ...fixture, permissions: { ...fixture.permissions, access: { level: "worker" } } };
+    agentSvc.list.mockResolvedValue([existing]);
+    agentSvc.getById.mockResolvedValue(existing);
+    agentSvc.update.mockImplementation(async (id: string, input: Record<string, unknown>) => ({ id, ...existing, ...input }));
+    await portability.importBundle({ source: { type: "inline", rootPath: exported.rootPath, files: exported.files }, include: { company: false, agents: true, projects: false, issues: false }, target: { mode: "existing_company", companyId: "company-1" }, agents: "all", collisionStrategy: "replace" }, "user-1");
+    const permissions = agentSvc.update.mock.calls.find(([id]) => id === "agent-1")?.[1]?.permissions as Record<string, unknown> | undefined;
+    expect(permissions?.access).toEqual({ level: "worker" });
+    // An existing agent with no stored level gets none from the package either.
+    agentSvc.update.mockClear();
+    const unset = { ...fixture, permissions: {} };
+    agentSvc.list.mockResolvedValue([unset]);
+    agentSvc.getById.mockResolvedValue(unset);
+    await portability.importBundle({ source: { type: "inline", rootPath: exported.rootPath, files: exported.files }, include: { company: false, agents: true, projects: false, issues: false }, target: { mode: "existing_company", companyId: "company-1" }, agents: "all", collisionStrategy: "replace" }, "user-1");
+    const unsetPermissions = agentSvc.update.mock.calls.find(([id]) => id === "agent-1")?.[1]?.permissions as Record<string, unknown> | undefined;
+    expect(unsetPermissions).toBeDefined();
+    expect(unsetPermissions).not.toHaveProperty("access");
+  });
+
   it("imports an unpaired Dot using its own option without enabling other Runner providers", async () => {
     const portability = companyPortabilityService({} as any);
     const exported = await portability.exportBundle("company-1", { include: { company: false, agents: true, projects: false, issues: false } });

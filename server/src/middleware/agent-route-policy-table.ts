@@ -605,6 +605,7 @@ export const AGENT_ROUTE_POLICY: ReadonlyArray<AgentRoutePolicyEntry> = [
     "POST /issues/:id/admin/force-release",
     "POST /join-requests/:requestId/claim-api-key",
     "DELETE /mcp/connections/:id",
+    "PATCH /mcp/connections/:id",
     "POST /mcp/device/consent",
     "POST /mcp/requests/:id/consent",
     "POST /mcp/requests/:id/dot-pairing",

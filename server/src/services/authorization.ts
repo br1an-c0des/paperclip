@@ -87,6 +87,8 @@ export type AuthorizationActor =
     keyScope?: AgentApiKeyScope | null;
     runId?: string | null;
     onBehalfOfUserId?: string | null;
+    /** The OAuth grant behind an `mcp_oauth` actor (step 4a). */
+    grantId?: string | null;
     /** Pinned, server-derived external authorizer; never an agent-selected principal. */
     authorizingUserId?: string | null;
     source?:

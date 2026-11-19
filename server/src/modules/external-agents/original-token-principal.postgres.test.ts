@@ -7,7 +7,7 @@ import { applyPendingMigrations, createDb, closeRegisteredClients, companies, au
 import { resolveExternalTestDatabaseUrl } from "../../lib/dedicated-test-database-url.js";
 import { accessService } from "../../services/access.js";
 import { instanceSettingsService } from "../../services/instance-settings.js";
-import { createMcpApiDispatch, createPublicMcpExecutor } from "../../services/public-mcp/capabilities.js";
+import { createMcpApiDispatch } from "../../services/public-mcp/capabilities.js";
 import { createPublicMcpOAuth } from "../../services/public-mcp/oauth.js";
 import { publicMcpIngressRoutes, publicMcpManagementRoutes } from "../../routes/public-mcp.js";
 import { errorHandler } from "../../middleware/error-handler.js";
@@ -31,7 +31,7 @@ describe.skipIf(!url)("actual OAuth producer and original-token principal leaf; 
     app=express();app.use(express.json());
     app.use((req,_res,next)=>{req.actor={type:"none",source:"none"};next();});
     const personal=createPublicMcpOAuth(db,{origin,resource:origin+"/mcp/paperclip"}),dispatch=createMcpApiDispatch(express.Router());
-    app.use(publicMcpIngressRoutes(oauth,createPublicMcpExecutor(db,oauth,dispatch)));
+    void dispatch;app.use(publicMcpIngressRoutes(oauth));
     app.use((req,_res,next)=>{if(req.get("x-selected-operator")===userId)req.actor={type:"board",source:"session",userId,companyIds:[companyId],memberships:[{companyId,membershipRole:"owner",status:"active"}]};next();});
     app.use("/api",publicMcpManagementRoutes(personal,oauth));app.use(errorHandler);
   });

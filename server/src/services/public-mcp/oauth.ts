@@ -7,7 +7,7 @@ import { updateAgentConfigurationInTransaction } from "../agent-configuration-tr
 import { instanceSettingsService } from "../instance-settings.js";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { canConfigureAgentConnection } from "../../modules/agent-lifecycle/index.js";
-import { and, eq, gt, inArray, isNull, lt, lte, notExists, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lt, lte, notExists, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import type { Request } from "express";
@@ -15,7 +15,7 @@ import {
   type Db, activityLog, agents, authUsers, companies, companyLogos, dotAgentBindings, museAgentBindings, mcpOauthClients, mcpOauthGrants, mcpOauthRequests, mcpOauthTokens, mcpOauthDeviceRequests, mcpOauthMetadataAdmissions,
 } from "@paperclipai/db";
 import { DEFAULT_CONNECTION_ACCESS_LEVEL, DOT_RUNNER_MCP_PATH, DOT_RUNNER_MCP_SCOPES, PUBLIC_MCP_PATH, PUBLIC_MCP_SCOPES, MUSE_RESOURCE_PATH, MUSE_OAUTH_PATH, MUSE_OAUTH_SCOPES, type AgentAccessLevel, type McpActAsAgentChoice, type McpConnection, type McpConnectionRequest, type McpConsent, type McpDotPairingPreview, type UpdateMcpConnection } from "@paperclipai/shared";
-import { actAsAgentChoices, actAsAgentIfAllowed, levelWithin, maxConnectionAccessLevel, storedConnectionAccess } from "./connection-access.js";
+import { actAsAgentChoices, actAsAgentIfAllowed, levelWithin, maxConnectionAccessLevel, personMayConfigureAgent, storedConnectionAccess } from "./connection-access.js";
 import { HttpError } from "../../errors.js";
 import { withExternalAdmissionGuard } from "../../modules/external-agents/index.js";
 import { assertMuseCurrentAuthority, revokeMuseOAuthGrant } from "../muse-identity.js";
@@ -149,11 +149,21 @@ export function createPublicMcpOAuth(db: Db, config: PublicMcpConfig, options: {
       return { type: "agent", source: "mcp_oauth", agentId: agent.id, companyId: grant.companyId };
     }
     if (grant.purpose !== "personal") throw invalidGrant();
+    if (grant.actAsAgentId) {
+      // Acting as an agent (step 4a): the person must still be a non-viewer member who may
+      // configure it, and the agent must still be working. The routes see the agent; the grant's
+      // level caps it (the route policy reads `grantId`).
+      if (membership.membershipRole === "viewer") throw invalidGrant();
+      const person: Request["actor"] = { type: "board", source: "session", userId: grant.userId, companyIds: [grant.companyId], memberships: [membership], isInstanceAdmin: false };
+      if (!await actAsAgentIfAllowed(queryDb, person, grant.companyId, grant.actAsAgentId)) throw invalidGrant();
+      return { type: "agent", source: "mcp_oauth", agentId: grant.actAsAgentId, companyId: grant.companyId, grantId: grant.id };
+    }
     return {
       type: "board", source: "mcp_oauth", userId: grant.userId,
       userName: access.user.name, userEmail: access.user.email,
       // Even instance administrators get only the explicitly consented company.
       companyIds: [grant.companyId], memberships: [membership], isInstanceAdmin: false,
+      grantId: grant.id,
     };
   }
 
@@ -433,6 +443,35 @@ export function createPublicMcpOAuth(db: Db, config: PublicMcpConfig, options: {
       if (!row) throw new McpOAuthError("invalid_token", "Connect Paperclip again.", 401);
       try { return { grant: row.grant, company: row.company, actor: await actorForGrant(row.grant), accessTokenId: row.token.id }; }
       catch (error) { if (museAgentConnection && !(error instanceof McpOAuthError) && !(error instanceof HttpError && [401,403,404,410].includes(error.status))) throw error; throw new McpOAuthError("invalid_token", "Paperclip access is no longer available.", 401); }
+  }
+
+  async function connectionRows(actor: Request["actor"], where: SQL | undefined): Promise<McpConnection[]> {
+    const actAs = alias(agents, "act_as_agent");
+    const rows = await db.select({ grant: mcpOauthGrants, clientName: mcpOauthClients.name, companyName: companies.name, companyPrefix: companies.issuePrefix, userName: authUsers.name, userImage: authUsers.image, agent: { id: agents.id, name: agents.name, config: agents.adapterConfig }, actAsAgent: { id: actAs.id, name: actAs.name } })
+      .from(mcpOauthGrants).innerJoin(mcpOauthClients, eq(mcpOauthGrants.clientId, mcpOauthClients.id))
+      .innerJoin(companies, eq(companies.id, mcpOauthGrants.companyId))
+      .leftJoin(authUsers, eq(authUsers.id, mcpOauthGrants.userId))
+      .leftJoin(agents, and(eq(agents.id, mcpOauthGrants.agentId), eq(agents.companyId, mcpOauthGrants.companyId)))
+      .leftJoin(actAs, and(eq(actAs.id, mcpOauthGrants.actAsAgentId), eq(actAs.companyId, mcpOauthGrants.companyId)))
+      .where(where);
+    const choices = new Map<string, Promise<McpActAsAgentChoice[]>>();
+    const choicesFor = (companyId: string) => {
+      let found = choices.get(companyId);
+      if (!found) { found = actAsAgentChoices(db, actor, companyId); choices.set(companyId, found); }
+      return found;
+    };
+    return Promise.all(rows.map(async ({ grant, clientName, companyName, companyPrefix, userName, userImage, agent, actAsAgent }) => {
+      const stored = storedConnectionAccess(grant);
+      const personal = grant.purpose === "personal" && !grant.revokedAt;
+      return {
+        id: grant.id, companyId: grant.companyId, clientName, companyName, companyPrefix,
+        agent: agent ? { id: agent.id, name: agent.name, provider: String(agent.config.provider ?? "") } : null,
+        user: userName === null ? null : { name: userName, image: userImage }, scopes: grant.scopes,
+        actAsAgent: actAsAgent ?? null, accessLevel: stored.level, accessOverrides: stored.overrides,
+        actAsAgentChoices: personal ? await choicesFor(grant.companyId) : [],
+        createdAt: grant.createdAt.toISOString(), revokedAt: grant.revokedAt?.toISOString() ?? null,
+      };
+    }));
   }
 
   const authenticateAccess=(token:string)=>authenticateToken(token);
@@ -763,34 +802,46 @@ export function createPublicMcpOAuth(db: Db, config: PublicMcpConfig, options: {
       await fenceAgentGrant(grant);
     },
     /** The signed-in person's connections, with who each acts as and its access (step 4a). */
-    async listConnections(actor: Request["actor"]): Promise<McpConnection[]> {
-      const userId = actor.userId!;
-      const actAs = alias(agents, "act_as_agent");
-      const rows = await db.select({ grant: mcpOauthGrants, clientName: mcpOauthClients.name, companyName: companies.name, companyPrefix: companies.issuePrefix, userName: authUsers.name, userImage: authUsers.image, agent: { id: agents.id, name: agents.name, config: agents.adapterConfig }, actAsAgent: { id: actAs.id, name: actAs.name } })
-        .from(mcpOauthGrants).innerJoin(mcpOauthClients, eq(mcpOauthGrants.clientId, mcpOauthClients.id))
-        .innerJoin(companies, eq(companies.id, mcpOauthGrants.companyId))
-        .leftJoin(authUsers, eq(authUsers.id, mcpOauthGrants.userId))
-        .leftJoin(agents, and(eq(agents.id, mcpOauthGrants.agentId), eq(agents.companyId, mcpOauthGrants.companyId)))
-        .leftJoin(actAs, and(eq(actAs.id, mcpOauthGrants.actAsAgentId), eq(actAs.companyId, mcpOauthGrants.companyId)))
-        .where(eq(mcpOauthGrants.userId, userId));
-      const choices = new Map<string, Promise<McpActAsAgentChoice[]>>();
-      const choicesFor = (companyId: string) => {
-        let found = choices.get(companyId);
-        if (!found) { found = actAsAgentChoices(db, actor, companyId); choices.set(companyId, found); }
-        return found;
-      };
-      return Promise.all(rows.map(async ({ grant, clientName, companyName, companyPrefix, userName, userImage, agent, actAsAgent }) => {
-        const stored = storedConnectionAccess(grant);
-        const personal = grant.purpose === "personal" && !grant.revokedAt;
-        return {
-          id: grant.id, companyId: grant.companyId, clientName, companyName, companyPrefix,
-          agent: agent ? { id: agent.id, name: agent.name, provider: String(agent.config.provider ?? "") } : null,
-          user: userName === null ? null : { name: userName, image: userImage }, scopes: grant.scopes,
-          actAsAgent: actAsAgent ?? null, accessLevel: stored.level, accessOverrides: stored.overrides,
-          actAsAgentChoices: personal ? await choicesFor(grant.companyId) : [],
-          createdAt: grant.createdAt.toISOString(), revokedAt: grant.revokedAt?.toISOString() ?? null,
-        };
-      }));
+    listConnections(actor: Request["actor"]): Promise<McpConnection[]> {
+      return connectionRows(actor, eq(mcpOauthGrants.userId, actor.userId!));
+    },
+    /**
+     * `PATCH /mcp/connections/:id` (step 4a): who a personal connection acts as, its level and its
+     * overrides. Open to the person who made it, or to a person who may configure the agent it acts
+     * as. Acting as an agent needs one the editor may configure; the level can't go above what the
+     * connection's person may hold (read-only for a viewer).
+     */
+    async updateConnection(id: string, actor: Request["actor"], changes: UpdateMcpConnection): Promise<McpConnection> {
+      const [grant] = await db.select().from(mcpOauthGrants).where(and(eq(mcpOauthGrants.id, id), eq(mcpOauthGrants.resource, config.resource)));
+      if (!grant || grant.revokedAt || grant.purpose !== "personal") throw new McpOAuthError("invalid_request", "Connection not found.", 404);
+      const owner = grant.userId === actor.userId;
+      if (!owner && !(grant.actAsAgentId && await personMayConfigureAgent(db, actor, grant.companyId, grant.actAsAgentId))) {
+        throw new McpOAuthError("invalid_request", "Connection not found.", 404);
+      }
+      const ownerAccess = await boardAuth.resolveBoardAccess(grant.userId);
+      const membership = ownerAccess.memberships.find(m => m.companyId === grant.companyId && m.status === "active");
+      if (!membership) throw new McpOAuthError("access_denied", "The connection's person is no longer a member of this company.", 403);
+      const update: Partial<typeof mcpOauthGrants.$inferInsert> = {};
+      if (changes.actAsAgentId !== undefined) {
+        if (changes.actAsAgentId === null) update.actAsAgentId = null;
+        else {
+          const agent = await actAsAgentIfAllowed(db, actor, grant.companyId, changes.actAsAgentId);
+          if (!agent || membership.membershipRole === "viewer") throw new McpOAuthError("access_denied", "You can only connect as an agent you may configure.", 403);
+          update.actAsAgentId = agent.id;
+        }
+      }
+      if (changes.accessLevel !== undefined) {
+        if (!levelWithin(changes.accessLevel, maxConnectionAccessLevel(membership.membershipRole))) {
+          throw new McpOAuthError("access_denied", "Viewer access is read-only.", 403);
+        }
+        update.accessLevel = changes.accessLevel;
+      }
+      if (changes.accessOverrides !== undefined) update.accessOverrides = changes.accessOverrides;
+      await db.update(mcpOauthGrants).set(update).where(eq(mcpOauthGrants.id, grant.id));
+      await logActivity(db, { companyId: grant.companyId, actorType: "user", actorId: actor.userId!, action: "mcp_connection.updated",
+        entityType: "mcp_connection", entityId: grant.id, details: { clientId: grant.clientId, ...update } });
+      const [row] = await connectionRows(actor, eq(mcpOauthGrants.id, grant.id));
+      return row!;
     },
     async revokeConnection(id: string, userId: string) {
       const [candidate]=await db.select().from(mcpOauthGrants).where(and(eq(mcpOauthGrants.id,id),eq(mcpOauthGrants.userId,userId)));

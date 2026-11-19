@@ -6,6 +6,7 @@ import {
   DEFAULT_AGENT_ACCESS_LEVEL,
   NEW_CEO_ACCESS_LEVEL,
   agentAccessSchema,
+  capAgentAccess,
   resolveAgentAccess,
   type AgentAccess,
   type AgentAccessAction,
@@ -45,7 +46,19 @@ export async function loadAgentAccess(db: Db, agentId: string): Promise<Resolved
   for (const { action } of standing) {
     if (isAgentAccessAction(action) && access[action] === false) access[action] = true;
   }
-  return access;
+  const capped = accessCaps.getStore();
+  return capped?.agentId === agentId ? capAgentAccess(access, capped.cap) : access;
+}
+
+/**
+ * A cap on one agent's access for the rest of a request: an outside connection acting as the agent
+ * may do no more than the connection's level allows (step 4a, section 1). The route policy opens it,
+ * so every access check in the request, the routes' own included, sees the capped access.
+ */
+const accessCaps = new AsyncLocalStorage<{ agentId: string; cap: ResolvedAgentAccess }>();
+
+export function runWithAccessCap<T>(agentId: string, cap: ResolvedAgentAccess, fn: () => T): T {
+  return accessCaps.run({ agentId, cap }, fn);
 }
 
 /**
