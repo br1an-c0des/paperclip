@@ -92,9 +92,10 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 55 | [Make the title route's access refusal requestable](#55-make-the-title-routes-access-refusal-requestable) | candidate | | | 2026-11-18 | | |
 | 56 | [Decide whether catalog task creation needs a retry key](#56-decide-whether-catalog-task-creation-needs-a-retry-key) | candidate | | | 2026-11-18 | | |
 | 57 | [Make `attentionService.list` fast over many failed runs](#57-make-attentionservicelist-fast-over-many-failed-runs) | candidate | | | 2026-11-18 | | |
-| 58 | [Check the scope of a scoped `agents:configure` override](#58-check-the-scope-of-a-scoped-agentsconfigure-override) | candidate | | | 2026-11-19 | | |
+| 58 | [Check the scope of a scoped `agents:configure` override](#58-check-the-scope-of-a-scoped-agentsconfigure-override) | fixed on `feat/step-4a` (`1c870f14d`) | | | 2026-11-19 | | |
 | 59 | [Keep provider `access_denied` errors apart from agent access refusals](#59-keep-provider-access_denied-errors-apart-from-agent-access-refusals) | candidate | | | 2026-11-19 | | |
-| 60 | [Let a worker pick a workspace for its own subtask](#60-let-a-worker-pick-a-workspace-for-its-own-subtask) | candidate | | | 2026-11-19 | | |
+| 60 | [Let a worker pick a workspace for its own subtask](#60-let-a-worker-pick-a-workspace-for-its-own-subtask) | fixed on `feat/step-4a` (`1c870f14d`) | | | 2026-11-19 | | |
+| 61 | [Don't write or lock on an access check with no temporary grant](#61-dont-write-or-lock-on-an-access-check-with-no-temporary-grant) | fixed on `feat/step-4a` (`0a1c2721d`) | | | 2026-11-19 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -950,6 +951,11 @@ server1. 10 tests in `agent-instruction-revisions` and `connection-management.in
   before `feat/step-4a` merges.**
 - **Likely fix:** check the target against the scope for `agents:configure`, as `tasks:assign` does
   with `scopeAllows` (~2890–2902), and decide whether any other action takes a scope.
+- **Fixed** by regression agent B (`1c870f14d`): `decideAgentAccess` takes the requested scope and
+  checks a scoped override with `scopeAllows`; outside it the refusal is `deny_scope` (an explicit
+  restriction, not requestable); with no requested scope a scoped override fails closed, as a
+  scoped grant did on `main`. The same gap in `agent_config:read` and the `tasks:assign` fallback is
+  closed too. `isAllowed`/`hasAgentAccess` stay a coarse gate (route policy, MCP tool filtering).
 
 ### 59. Keep provider `access_denied` errors apart from agent access refusals
 
@@ -975,3 +981,16 @@ Found by the step 4a regression agent A (2026-11-19), on `feat/step-4a`. 1 test 
   explicit workspace selection.
 - **Likely fix:** for creation, check against the parent task (own parent: `tasks:create`), not a
   missing issue.
+- **Fixed** by regression agent B (`1c870f14d`): `decideAgentIssueWriteAccess` judges ownership by
+  `issueId ?? parentIssueId`, as the visible-issue write rule does for a new child.
+
+### 61. Don't write or lock on an access check with no temporary grant
+
+Found and fixed by the step 4a regression agent B (2026-11-19, `0a1c2721d`), on `feat/step-4a`.
+`agent-file-checkpoint-locking` caught it.
+
+- **What was wrong:** `consumeTemporaryAccess` (`server/src/services/agent-access.ts`) ran
+  `UPDATE temporary_access_grants … FOR UPDATE SKIP LOCKED` on every check the access level refused,
+  even with no grant, so read paths (the warm instruction checkpoint) issued a write.
+- **Fix:** one read first, preferring a standing grant; the UPDATE runs only when a one-use grant
+  exists, and spending it stays atomic.
