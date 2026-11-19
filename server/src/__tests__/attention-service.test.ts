@@ -1275,6 +1275,26 @@ describeEmbeddedPostgres("attention service", () => {
     expect(remaining?.count).toBe(2001);
   });
 
+  /** The same rows the chunked inserts wrote (runs in order, one exhausted-retry
+   * event each), in two statements: the ids travel as one array parameter each,
+   * so the bind-parameter limit the cases are about never applies here. */
+  async function insertFailedRunsWithEvents(companyId: string, failures: Array<{ id: string; agentId: string;
+    contextSnapshot: Record<string, unknown>; createdAt: Date }>) {
+    const array = (values: string[]) => `{${values.join(",")}}`;
+    const [first] = failures;
+    await db.execute(sql`insert into heartbeat_runs (id, company_id, agent_id, invocation_source, status, error,
+        context_snapshot, created_at, updated_at, finished_at)
+      select f.id, ${companyId}::uuid, f.agent_id, 'automation', 'failed', 'adapter failed', ${JSON.stringify(first!.contextSnapshot)}::jsonb,
+        ${first!.createdAt.toISOString()}::timestamptz, ${first!.createdAt.toISOString()}::timestamptz, ${first!.createdAt.toISOString()}::timestamptz
+      from unnest(${array(failures.map(run => run.id))}::uuid[], ${array(failures.map(run => run.agentId))}::uuid[])
+        with ordinality as f(id, agent_id, n) order by f.n`);
+    await db.execute(sql`insert into heartbeat_run_events (company_id, run_id, agent_id, seq, event_type, message, created_at)
+      select ${companyId}::uuid, f.id, f.agent_id, 1, 'lifecycle',
+        'Bounded retry exhausted after 4 scheduled attempts; no further automatic retry will be queued', ${"2026-07-09T12:00:01.000Z"}::timestamptz
+      from unnest(${array(failures.map(run => run.id))}::uuid[], ${array(failures.map(run => run.agentId))}::uuid[])
+        with ordinality as f(id, agent_id, n) order by f.n`);
+  }
+
   it("reads keyless history once per agent despite thousands of failures", async () => {
     const { companyId, workerId, reviewerId } = await seedCompany("ATB");
     const failedAt = new Date("2026-07-09T12:00:00.000Z");
@@ -1287,15 +1307,7 @@ describeEmbeddedPostgres("attention service", () => {
     });
     const failures = hiddenIds.map((id) => failure(id, workerId));
     keptIds.forEach((id, index) => failures.splice(index * 1_700, 0, failure(id, reviewerId)));
-    for (let start = 0; start < failures.length; start += 1_000) {
-      const chunk = failures.slice(start, start + 1_000);
-      await db.insert(heartbeatRuns).values(chunk);
-      await db.insert(heartbeatRunEvents).values(chunk.map((run) => ({
-        companyId, runId: run.id, agentId: run.agentId, seq: 1, eventType: "lifecycle",
-        message: "Bounded retry exhausted after 4 scheduled attempts; no further automatic retry will be queued",
-        createdAt: new Date("2026-07-09T12:00:01.000Z"),
-      })));
-    }
+    await insertFailedRunsWithEvents(companyId, failures);
     await db.insert(heartbeatRuns).values({
       id: randomUUID(), companyId, agentId: workerId, invocationSource: "automation", status: "succeeded",
       contextSnapshot: { wakeReason: "timer" }, createdAt: laterAt, updatedAt: laterAt, finishedAt: laterAt,
@@ -1333,15 +1345,7 @@ describeEmbeddedPostgres("attention service", () => {
     });
     const failures = hiddenIds.map((id) => failure(id, workerId));
     keptIds.forEach((id, index) => failures.splice(index * 1_700, 0, failure(id, reviewerId)));
-    for (let start = 0; start < failures.length; start += 1_000) {
-      const chunk = failures.slice(start, start + 1_000);
-      await db.insert(heartbeatRuns).values(chunk);
-      await db.insert(heartbeatRunEvents).values(chunk.map((run) => ({
-        companyId, runId: run.id, agentId: run.agentId, seq: 1, eventType: "lifecycle",
-        message: "Bounded retry exhausted after 4 scheduled attempts; no further automatic retry will be queued",
-        createdAt: new Date("2026-07-09T12:00:01.000Z"),
-      })));
-    }
+    await insertFailedRunsWithEvents(companyId, failures);
     await db.insert(heartbeatRuns).values({
       id: randomUUID(), companyId, agentId: workerId, invocationSource: "automation", status: "succeeded",
       contextSnapshot: { issueId }, createdAt: laterAt, updatedAt: laterAt, finishedAt: laterAt,
