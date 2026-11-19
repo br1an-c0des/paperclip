@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { API_TOOLS, searchOperations } from "./api.js";
+import { agentRouteRequirement } from "../../middleware/agent-route-policy-table.js";
 import { routeAction, type RoutePolicyEntry } from "./route-policy.js";
 import type { PaperclipTool } from "./types.js";
 import { recordingDispatch, testCaller } from "./test-support.js";
@@ -50,6 +51,33 @@ describe("routeAction", () => {
     expect(routeAction("PATCH", "/issues/{id}", table)).toBe("tasks:read");
     expect(routeAction("POST", "/companies/{companyId}/labels", table)).toBe("labels:manage");
     expect(routeAction("POST", "/companies/{companyId}/secrets", table)).toBe("api:raw");
+  });
+
+  it("uses the real agent route policy by default", () => {
+    expect(routeAction("PATCH", "/issues/{id}")).toBe("tasks:read");
+    expect(routeAction("POST", "/companies/{companyId}/labels")).toBe("labels:manage");
+    expect(routeAction("PATCH", "/labels/{labelId}")).toBe("labels:manage");
+    expect(routeAction("DELETE", "/issues/{id}")).toBe("tasks:delete");
+    expect(routeAction("POST", "/companies/{companyId}/issues")).toBe("tasks:create");
+    expect(routeAction("POST", "/no/such/route")).toBe("api:raw");
+  });
+
+  it("agrees with the route policy middleware on every operation search_api can list", () => {
+    const everything = searchOperations(testCaller({ access: { level: "admin", overrides: { "tasks:delete": true } } }), "", 5000);
+    expect(everything.length).toBeGreaterThan(100);
+    for (const operation of everything) {
+      const concrete = operation.path.replace(/\{([^}]+)\}/g, "param-value");
+      const actual = routeAction(operation.method, operation.path);
+      expect(typeof actual === "string" ? [actual] : actual, operation.operationId)
+        .toEqual(agentRouteRequirement(operation.method, concrete).actions);
+    }
+  });
+
+  it("search_api hides routes tagged with an action the admin lacks", () => {
+    // tasks:delete is in no level, so even an admin's search leaves out the hard delete.
+    expect(searchOperations(admin(), "delete issue", 20).some(op => op.operationId === "DELETE /issues/{id}")).toBe(false);
+    const granted = testCaller({ access: { level: "admin", overrides: { "tasks:delete": true } } });
+    expect(searchOperations(granted, "delete issue", 20).some(op => op.operationId === "DELETE /issues/{id}")).toBe(true);
   });
 });
 

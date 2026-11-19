@@ -1,16 +1,8 @@
 import type { AgentAccessAction } from "@paperclipai/shared";
+import { AGENT_ROUTE_POLICY, type AgentRoutePolicyEntry } from "../../middleware/agent-route-policy-table.js";
 
-/** One row of the agent route policy (wave 1, task 1.4): an Express pattern as mounted under `/api`. */
-export interface RoutePolicyEntry {
-  method: "POST" | "PATCH" | "PUT" | "DELETE";
-  path: string;
-  action: AgentAccessAction | readonly AgentAccessAction[] | "route_checks";
-}
-
-// STUB until the route policy merges: an empty table, so every write needs api:raw (and every
-// read tasks:read). At merge, replace this line with
-//   import { AGENT_ROUTE_POLICY } from "../../middleware/agent-route-policy-table.js";
-const AGENT_ROUTE_POLICY: readonly RoutePolicyEntry[] = [];
+/** One row of the agent route policy: an Express pattern as mounted under `/api`. */
+export type RoutePolicyEntry = AgentRoutePolicyEntry;
 
 /** `/issues/{id}` and `/issues/:issueId` both become `/issues/:`. */
 const normalize = (path: string) => path.replace(/\{[^}]+\}|:[A-Za-z0-9_]+/g, ":").replace(/\/+$/, "");
@@ -19,7 +11,7 @@ const normalize = (path: string) => path.replace(/\{[^}]+\}|:[A-Za-z0-9_]+/g, ":
  * The action an agent caller needs to call a route under `/api` (`path` in OpenAPI or Express
  * form, without the `/api` prefix): reads need `tasks:read`; a write needs its tag in the route
  * policy (`route_checks` means the route checks access itself, so `tasks:read`), and an untagged
- * write needs `api:raw`.
+ * write needs `api:raw`. The same rule the agent route policy middleware applies at request time.
  */
 export function routeAction(
   method: string,
