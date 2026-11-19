@@ -150,7 +150,10 @@ describe("agent interaction mutation boundaries", () => {
   it("rejects a native reassignment reason before stopping the currently running recipient", async () => {
     const f = await seed(), runId = randomUUID(), targetRunId = randomUUID(), stop = vi.fn(), wake = vi.fn();
     await db.update(issues).set({ assigneeAgentId: f.sender, status: "in_progress" }).where(eq(issues.id, f.issueId));
-    await db.update(agents).set({ adapterType: "paperclip_runner", status: "active" }).where(eq(agents.id, f.sender));
+    // Reassigning a peer's task takes tasks:assign since step 4a (manager; new agents default to
+    // worker), so the recipient's consent switch is what refuses it here.
+    await db.update(agents).set({ adapterType: "paperclip_runner", status: "active",
+      permissions: { access: { level: "manager" } } }).where(eq(agents.id, f.sender));
     const [target] = await db.insert(issues).values({ companyId: f.companyId, title: "Running peer task",
       status: "in_progress", assigneeAgentId: f.recipient }).returning();
     await db.insert(heartbeatRuns).values([

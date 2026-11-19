@@ -318,7 +318,9 @@ describe("cli auth routes", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toContain("text/markdown");
-    expect(res.text).toContain("# Paperclip Skill");
+    // The paperclip skill itself (rewritten in step 4a as an MCP workflow guide), frontmatter first.
+    expect(res.text).toMatch(/^---\nname: paperclip\n/);
+    expect(res.text).toContain("\n# Paperclip\n");
   });
 
   it("marks challenge status as requiring sign-in for anonymous viewers", async () => {

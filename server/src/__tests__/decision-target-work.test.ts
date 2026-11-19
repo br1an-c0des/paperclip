@@ -41,7 +41,9 @@ const support = externalUrl ? { supported: true } : await getEmbeddedPostgresTes
     await db.insert(companies).values({ id: companyId, name: "Recovery", issuePrefix: `R${companyId.slice(0, 6)}`, requireBoardApprovalForNewAgents: false });
     await db.insert(authUsers).values({ id: userId, name: "Decider", email: `${userId}@example.test`, createdAt: new Date(), updatedAt: new Date() });
     await db.insert(companyMemberships).values({ companyId, principalType: "user", principalId: userId, status: "active", membershipRole: "member" });
-    await db.insert(agents).values({ id: agentId, companyId, name: "Proposer", role: "engineer", status: "active", adapterType: "codex_local", adapterConfig: {}, runtimeConfig: {}, permissions: {} });
+    await db.insert(agents).values({ id: agentId, companyId, name: "Proposer", role: "engineer", status: "active", adapterType: "codex_local", adapterConfig: {}, runtimeConfig: {},
+      // Its effects reach tasks it doesn't own, which since step 4a takes manager access (new agents default to worker).
+      permissions: { access: { level: "manager" } } });
     await db.insert(issues).values([
       { id: originId, companyId, title: "Origin", status: "in_progress", priority: "medium", assigneeAgentId: agentId, responsibleUserId: userId },
       { id: targetId, companyId, title: "Target", status: "todo", priority: "medium", responsibleUserId: userId },

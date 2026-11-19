@@ -796,17 +796,20 @@ describe("durable same-task case handoffs", () => {
   });
 
   it("rechecks the original agent's current assignment grant on a protected task", async () => {
-    let grantId = "";
+    // Since step 4a an agent's explicit assignment grant is a tasks:assign override on its access
+    // (what migration 0491 makes of a tasks:assign grant); a protected task needs that override.
+    const setAssignOverride = (agentId: string, granted: boolean) => db.update(agents).set({ permissions: granted
+      ? { access: { level: "worker", overrides: { "tasks:assign": true } } }
+      : { access: { level: "worker" } } }).where(eq(agents.id, agentId));
     const f = await delayedTransfer(async (f, taskId) => {
       await db.update(issues).set({ executionPolicy: { authorizationPolicy: { assignmentPolicy: { mode: "protected" } } } }).where(eq(issues.id, taskId));
       await db.insert(companyMemberships).values({ companyId: f.companyId, principalType: "agent", principalId: f.triage, status: "active", membershipRole: "member" });
-      const [grant] = await db.insert(principalPermissionGrants).values({ companyId: f.companyId, principalType: "agent", principalId: f.triage, permissionKey: "tasks:assign" }).returning();
-      grantId = grant!.id;
+      await setAssignOverride(f.triage, true);
     });
-    await db.delete(principalPermissionGrants).where(eq(principalPermissionGrants.id, grantId));
+    await setAssignOverride(f.triage, false);
     await f.release(); await f.sweep();
     await f.assertHeld(/protected|assignment|permission/i);
-    await db.insert(principalPermissionGrants).values({ companyId: f.companyId, principalType: "agent", principalId: f.triage, permissionKey: "tasks:assign" });
+    await setAssignOverride(f.triage, true);
     await f.sweep();
     expect((await db.select().from(caseHandoffs).where(eq(caseHandoffs.id, f.receipt.handoffId)))[0]!.state).toBe("delivered");
   });

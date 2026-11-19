@@ -275,8 +275,10 @@ describe("owner-chat instruction authority", () => {
       principalId: f.agentId, permissionKey: "agents:suggest-changes" });
     await expect(authorize(f)).rejects.toMatchObject({ status: 403, details: { code: "reflection_coach_mutation_gate_required" } });
     await db.delete(principalPermissionGrants).where(eq(principalPermissionGrants.principalId, f.agentId));
-    await db.insert(principalPermissionGrants).values({ companyId: f.companyId, principalType: "agent",
-      principalId: f.agentId, permissionKey: "agents:configure", scope: { agentIds: [randomUUID()] } });
+    // Since step 4a an agent's configure authority is its access, so a scoped configure restriction
+    // is an agents:configure override with a scope (what migration 0491 makes of a scoped grant).
+    await db.update(agents).set({ permissions: { ...f.permissions, access: { level: "worker",
+      overrides: { "agents:configure": { scope: { agentIds: [randomUUID()] } } } } } }).where(eq(agents.id, f.agentId));
     await expect(authorize(f)).rejects.toMatchObject({ status: 403 });
   });
 

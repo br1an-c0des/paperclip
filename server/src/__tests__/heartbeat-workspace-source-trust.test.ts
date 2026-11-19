@@ -184,8 +184,10 @@ suite("heartbeat physical workspace source trust", () => {
       expect(created.projectWorkspaceId).toBe(sourceId);
       expect(created.workspaceSelection).toMatchObject({ source: "project" });
     } else await db.insert(issues).values(taskInput);
-    if (grants !== "none") await db.insert(principalPermissionGrants).values({ companyId, principalType: "agent", principalId: agentId,
-      permissionKey: "tasks:assign_scope", scope: { projectId, assigneeAgentId: agentId } });
+    // Since step 4a an agent's assignment grant is a scoped tasks:assign override on its access
+    // (what migration 0491 makes of a tasks:assign_scope grant); people keep their grants.
+    if (grants !== "none") await db.update(agents).set({ permissions: { access: { level: "worker",
+      overrides: { "tasks:assign": { scope: { projectId, assigneeAgentId: agentId } } } } } }).where(eq(agents.id, agentId));
     if (grants === "both") await db.insert(principalPermissionGrants).values({ companyId, principalType: "user", principalId: "responsible-user",
       permissionKey: "tasks:assign_scope", scope: { projectId, assigneeAgentId: agentId } });
     const actor = { type: "agent" as const, agentId, companyId, source: "agent_jwt" as const, onBehalfOfUserId: "responsible-user" };
