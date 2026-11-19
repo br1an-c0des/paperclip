@@ -223,12 +223,17 @@ Seven server test files read `.github/workflows/*.yml` at load and now fail with
 | `server/src/__tests__/runner-lockfile-guards.test.ts` | `release.yml` and others | opt-in |
 | `server/src/__tests__/docker-build-stamp.test.ts` | `docker.yml`, `release.yml`, `docker-merge-group.yml`, `docker-app-check.yml` | **thorough** |
 
-They test the workflows that are gone, so they're results of the deletion, not bugs. Not changed
-here (not this agent's files). Six are opt-in once agent E's tiers land. `docker-build-stamp` stays
-in thorough and fails in its shard until it's changed: its Dockerfile checks guard the root
-`Dockerfile` that `deploy/deploy.sh` builds, so the suggestion is to drop its workflow assertions
-and keep the Dockerfile ones. `runner-image-resolve.test.ts` only names workflow paths in fixtures
-and still passes.
+They test the workflows that are gone, so they're results of the deletion, not bugs. The six
+dormant ones are opt-in in agent E's tiers and weren't changed. `docker-build-stamp` is in thorough
+and guards the root `Dockerfile` that `deploy/deploy.sh` builds, so (at the PM's request) its
+workflow assertions were removed and every Dockerfile assertion kept: 18 tests before, **17 after,
+all passing**. Removed: the test "passes PAPERCLIP_BUILD_COMMIT as a build-arg for standard and
+explicit preview builds" (workflows only; `deploy.sh` deliberately passes no build commit), the
+workflow loop of "gives an inline Runner the build commit as its revision and no publication
+argument" (kept as "gives an inline Runner the build commit as its revision", its Dockerfile half),
+and one workflow line each from the two provider-pack tests (`target: production` in `docker.yml`,
+`target: cloud` in `release.yml`). `runner-image-resolve.test.ts` only names workflow paths in
+fixtures and still passes.
 
 Tests outside the Vitest projects that read deleted files (not run by our CI): in `scripts/`,
 `__tests__/release-verify-workflow.test.mjs`, `__tests__/e2e-shard.test.mjs`,
@@ -268,8 +273,8 @@ go in a later cleanup:
 - **Merge order matters.** Before agent E's `optIn` lands, the tier holds every file, including
   `chat-channels.integration.test.ts` (34 minutes alone): its shard would take over 35 minutes,
   near the 45-minute limit. After E, the chat suite is opt-in.
-- **`docker-build-stamp.test.ts`** fails in whichever shard holds it (above), and so do the six
-  opt-in workflow tests until E's tiers land. The known bug-42 files fail too.
+- **Failures expected:** the known bug-42 files. The six workflow-reading files are opt-in in E's
+  tiers, and `docker-build-stamp.test.ts` no longer reads workflows.
 - **Wall time per shard** against the ~15–16 minute estimate, and how even the shards are. The
   uploaded JSON reports hold each file's duration; if shards are uneven, refresh the weights from
   them (a `ci_s`-style column) and revisit the count (`count` and the `shard` list in the matrix).

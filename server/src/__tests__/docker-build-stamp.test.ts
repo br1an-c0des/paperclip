@@ -17,16 +17,19 @@ import { runnerImageExpectationProblem } from "../../../scripts/check-runner-ima
  * before the server build; the production ARG alone stamps nothing, because
  * the server build already ran in the earlier stage.
  *
- * This guard fails if a refactor drops the build-stage ARG, moves it after the
- * server build, or removes the build-arg the docker workflow passes.
+ * This guard fails if a refactor drops the build-stage ARG or moves it after
+ * the server build.
+ *
+ * Upstream's image workflows (.github/workflows/docker.yml, release.yml,
+ * docker-merge-group.yml, docker-app-check.yml) were removed with the rest of
+ * upstream's CI in step 3a, so the checks of what they passed to the build went
+ * with them (still readable at the tag upstream-freeze). deploy/deploy.sh
+ * builds this Dockerfile and deliberately passes no PAPERCLIP_BUILD_COMMIT
+ * (deploy/README.md).
  */
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const dockerfile = readFileSync(path.join(repoRoot, "Dockerfile"), "utf8");
-const workflow = readFileSync(path.join(repoRoot, ".github", "workflows", "docker.yml"), "utf8");
-const previewWorkflow = readFileSync(path.join(repoRoot, ".github", "workflows", "release.yml"), "utf8");
-const mergeGroupWorkflow = readFileSync(path.join(repoRoot, ".github", "workflows", "docker-merge-group.yml"), "utf8");
-const appCheckWorkflow = readFileSync(path.join(repoRoot, ".github", "workflows", "docker-app-check.yml"), "utf8");
 
 /**
  * Return the text of the Dockerfile stage that starts at the named target.
@@ -71,13 +74,6 @@ describe("docker build-stamp wiring", () => {
       argIdx,
       "ARG PAPERCLIP_BUILD_COMMIT must precede the server build so the stamp script reads it",
     ).toBeLessThan(serverBuildIdx);
-  });
-
-  it("passes PAPERCLIP_BUILD_COMMIT as a build-arg for standard and explicit preview builds", () => {
-    for (const [name, source] of [["standard", workflow], ["preview", previewWorkflow]]) {
-      expect(source, `${name} must pass the source commit into the image build`)
-        .toMatch(/^\s*PAPERCLIP_BUILD_COMMIT=\$\{\{ (?:github.sha|inputs.source_ref) \}\}$/m);
-    }
   });
 });
 
@@ -169,15 +165,9 @@ describe("Application image Runner", () => {
     }
   });
 
-  it("gives an inline Runner the build commit as its revision and no publication argument", () => {
+  it("gives an inline Runner the build commit as its revision", () => {
     const runner = stageBody(dockerfile, "runner-artifacts-build");
     expect(runner).toContain('revision="${PAPERCLIP_RUNNER_SOURCE_REVISION:-${PAPERCLIP_BUILD_COMMIT}}";');
-    for (const [name, source] of [["standard", workflow], ["preview", previewWorkflow], ["merge group", mergeGroupWorkflow], ["pull request", appCheckWorkflow]]) {
-      expect(source, name).toContain("PAPERCLIP_BUILD_COMMIT=");
-      expect(source, name).not.toMatch(/PAPERCLIP_RUNNER_(?:SOURCE_REVISION|IMAGE_PUBLICATION)/);
-      if (name !== "standard") expect(source, name).not.toMatch(/runner-artifacts|build-contexts?\b/);
-    }
-    expect(workflow.match(/runner-artifacts|build-contexts?\b/g)).toEqual(["runner-artifacts", "build-contexts"]);
   });
 });
 
@@ -209,7 +199,6 @@ describe("Standard image remote provider pack", () => {
     expect(production).toContain("gosu 65534:65534 node");
     expect(production).toContain("Object.values(manifest.payload.artifacts)");
     expect(production).toContain("PAPERCLIP_RUNNER_REMOTE_PROVIDER_PACK_PATH=/opt/paperclip-runner/provider-pack");
-    expect(workflow).toMatch(/^\s*target: production$/m);
     expect(dockerfile).not.toContain("provision-grok.mjs");
   });
 
@@ -219,6 +208,5 @@ describe("Standard image remote provider pack", () => {
     expect(cloud).not.toContain("/opt/paperclip-runner/provider-pack");
     expect(cloud).not.toContain("PAPERCLIP_RUNNER_REMOTE_PROVIDER_PACK_PATH");
     expect(dockerfile.match(/build-provider-pack\.mjs/g)).toHaveLength(1);
-    expect(previewWorkflow).toMatch(/^\s*target: cloud$/m);
   });
 });
