@@ -530,6 +530,12 @@ since it builds on the real route-policy table.
 regression fixture changes: CEOs and agents created with `canCreateAgents: true` now store
 `permissions.access`.
 
+**Outside connections may break (decided 2026-11-18):** the user would rather the public MCP be
+built the right way than stay compatible. Existing OAuth connections may have to be removed and
+made again; consent doesn't have to keep the old checkbox meaning; old public tool names don't
+have to map. Capabilities still carry over: nothing an outside agent could do is lost. Agents
+existing at 0491 still start at `manager` (that rule is about runs, not connections).
+
 **Testing while step 3a renovates the suite:** typechecks, each agent's own new or changed test
 files one at a time by path, and `ui-new`'s unit tests. No package suites, directories or broad
 patterns.
