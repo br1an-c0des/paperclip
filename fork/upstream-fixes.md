@@ -77,13 +77,14 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 40 | [Find why 11 server tests fail on `main` (one file is core)](#40-find-why-11-server-tests-fail-on-main-one-file-is-core) | candidate | | | 2026-11-18 | | |
 | 41 | [Give `para-memory-files` a recall tool that exists](#41-give-para-memory-files-a-recall-tool-that-exists) | candidate | | | 2026-11-18 | | |
 | 42 | [Fix or move the 8 test files that fail in a full run on `main`](#42-fix-or-move-the-8-test-files-that-fail-in-a-full-run-on-main) | candidate | | | 2026-11-18 | | |
-| 43 | [Stop a company import from setting an existing agent's access level](#43-stop-a-company-import-from-setting-an-existing-agents-access-level) | candidate | | | 2026-11-18 | | |
+| 43 | [Stop a company import from setting an existing agent's access level](#43-stop-a-company-import-from-setting-an-existing-agents-access-level) | fixed on `feat/step-4a` (`fd0acf010`) | | | 2026-11-18 | | |
 | 44 | [Return 409, not 500, when a new label's name is taken](#44-return-409-not-500-when-a-new-labels-name-is-taken) | candidate | | | 2026-11-18 | | |
-| 45 | [Stop enforcing the four interaction switches that became access actions](#45-stop-enforcing-the-four-interaction-switches-that-became-access-actions) | candidate | | | 2026-11-18 | | |
-| 46 | [Stop the Advanced YAML editor overwriting an agent's hiring access](#46-stop-the-advanced-yaml-editor-overwriting-an-agents-hiring-access) | candidate | | | 2026-11-18 | | |
-| 47 | [Drop the legacy assignment fields from the agent access state](#47-drop-the-legacy-assignment-fields-from-the-agent-access-state) | candidate | | | 2026-11-18 | | |
+| 45 | [Stop enforcing the four interaction switches that became access actions](#45-stop-enforcing-the-four-interaction-switches-that-became-access-actions) | fixed on `feat/step-4a` (`eedeba3ca`) | | | 2026-11-18 | | |
+| 46 | [Stop the Advanced YAML editor overwriting an agent's hiring access](#46-stop-the-advanced-yaml-editor-overwriting-an-agents-hiring-access) | fixed on `feat/step-4a` (`a17d98cb6`) | | | 2026-11-18 | | |
+| 47 | [Drop the legacy assignment fields from the agent access state](#47-drop-the-legacy-assignment-fields-from-the-agent-access-state) | fixed on `feat/step-4a` (`6706dab30`) | | | 2026-11-18 | | |
 | 48 | [Cover every write of an approved multi-write tool call](#48-cover-every-write-of-an-approved-multi-write-tool-call) | candidate | | | 2026-11-18 | | |
 | 49 | [Check the act-as agent's level on outside-connection file uploads](#49-check-the-act-as-agents-level-on-outside-connection-file-uploads) | candidate | | | 2026-11-18 | | |
+| 50 | [Check access on plugin-origin agent configure and edit calls](#50-check-access-on-plugin-origin-agent-configure-and-edit-calls) | candidate | | | 2026-11-18 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -792,3 +793,23 @@ Found by step 4a agent 4 (2026-11-18).
   route checks the capped level. The check is in `server/src/services/public-mcp/file-transfers.ts`.
 - **Likely fix:** check `capAgentAccess(agent's access, connection's access)`, as the route policy
   does.
+
+### 50. Check access on plugin-origin agent configure and edit calls
+
+Found by the step 4a bug-fix agent (2026-11-18, after bug 45's fix).
+
+- **What's wrong:** plugin-origin calls that configure an agent or edit a task may no longer check
+  the acting agent's access. In `server/src/services/plugin-host-services.ts` (around `:3412` and
+  `:3435`), the authorization-policy updates call `assertAgentInteraction` with `configure` and
+  `edit`. Those calls used to be limited by the actor's `canConfigureOtherAgents` and
+  `canEditOtherTasks`. Since bug 45's fix, only the target's consent switch is checked. Whether
+  the plugin path checks `agents:configure` and `tasks:update_any` anywhere else isn't verified.
+- **Who it affects:** only setups with plugins installed (opt-in here).
+- **Likely fix:** check the matching access action there (`decide` with the actor), or confirm the
+  plugin host checks it already.
+- **Also left from that fix:**
+  - `doc/agent-interaction-permissions.md:18-23` still lists the four retired switches;
+  - the OpenAPI entry for `PATCH /agents/{id}/interaction-permissions` (`openapi.ts:3963`) lacks
+    the new 410;
+  - `agent-interaction-mutations.test.ts:150` fails on a dormant Runner fixture with no access
+    level (the regression's fixture work).

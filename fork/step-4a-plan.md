@@ -550,6 +550,12 @@ deleted), and bug 43. Notes:
 - **New bugs:** 48 (a multi-write replay is covered for its first write only) and 49 (file uploads
   check the connection's level only).
 
+**Bugs 45–47 fixed and merged 2026-11-18** (`093b94b3b`), plus agent 5's `paperclip_me` rename
+(`61b948c8c`). The four retired interaction switches are no longer enforced or accepted (410), the
+YAML editor edits `access`, and the legacy assignment fields are gone. New: bug 50 (plugin-origin
+configure and edit calls may skip the access check). Wave 2's building is done. Open before
+`main`: bugs 48–50, then the project manager's list below.
+
 **Outside connections may break (decided 2026-11-18):** the user would rather the public MCP be
 built the right way than stay compatible. Existing OAuth connections may have to be removed and
 made again; consent doesn't have to keep the old checkbox meaning; old public tool names don't
