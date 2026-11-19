@@ -82,6 +82,8 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 45 | [Stop enforcing the four interaction switches that became access actions](#45-stop-enforcing-the-four-interaction-switches-that-became-access-actions) | candidate | | | 2026-11-18 | | |
 | 46 | [Stop the Advanced YAML editor overwriting an agent's hiring access](#46-stop-the-advanced-yaml-editor-overwriting-an-agents-hiring-access) | candidate | | | 2026-11-18 | | |
 | 47 | [Drop the legacy assignment fields from the agent access state](#47-drop-the-legacy-assignment-fields-from-the-agent-access-state) | candidate | | | 2026-11-18 | | |
+| 48 | [Cover every write of an approved multi-write tool call](#48-cover-every-write-of-an-approved-multi-write-tool-call) | candidate | | | 2026-11-18 | | |
+| 49 | [Check the act-as agent's level on outside-connection file uploads](#49-check-the-act-as-agents-level-on-outside-connection-file-uploads) | candidate | | | 2026-11-18 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -770,3 +772,23 @@ Found by step 4a agent 5 (2026-11-18).
   `canAssignTasks` and `taskAssignSource` from the old grants. Since step 4a, `tasks:assign` is an
   access action, so these can disagree with the agent's real access. `ui-new` no longer shows them.
 - **Likely fix:** derive them from `access`, or remove them along with the retired grant keys.
+
+### 48. Cover every write of an approved multi-write tool call
+
+Found by step 4a agent 4 (2026-11-18, on `feat/step-4a`).
+
+- **What's wrong:** approving a request for a tool call that makes several writes only lets the
+  first one through. The replay gets a one-use temporary grant, so in `paperclip_manage_labels`
+  with three labels, the second write is refused again.
+- **Likely fix:** give the replay grant one use per write the tool makes, or a short-lived grant
+  scoped to the replay's request.
+
+### 49. Check the act-as agent's level on outside-connection file uploads
+
+Found by step 4a agent 4 (2026-11-18).
+
+- **What's wrong:** an upload through a connection that acts as an agent is checked against the
+  connection's level only, not the agent's own level as capped by the connection. Every other
+  route checks the capped level. The check is in `server/src/services/public-mcp/file-transfers.ts`.
+- **Likely fix:** check `capAgentAccess(agent's access, connection's access)`, as the route policy
+  does.

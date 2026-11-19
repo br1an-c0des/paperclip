@@ -536,6 +536,20 @@ editing aren't backed by the server. Agent 5 found bugs 45 (the four retired int
 are still enforced) and 46 (the YAML editor overwrites hiring access), to fix before `main`, and
 47 (stale assignment fields).
 
+**Agent 4 merged 2026-11-18** (`4f12573de`): permission requests and replay, outside connections
+acting as the person or an agent at their level, the public MCP serving the catalog (old lists
+deleted), and bug 43. Notes:
+- **Worker run list:** 26 tools, about 4.2k tokens (was 23, about 3.1k). Admin: 29 tools, about
+  5.3k tokens.
+- **File tools are hidden from runs and agent keys:** `mcp_file_tickets.grant_id` and the uploads'
+  `user_id` are NOT NULL, so opening them to runs and agent keys needs a migration.
+- **An `mcp_oauth` actor can't approve or reject approvals,** so a connection can't approve its
+  own requests through `call_api`.
+- **Old grants keep their backfilled level.** No reconnect is forced. Clients see the new tool
+  names on their next `tools/list`.
+- **New bugs:** 48 (a multi-write replay is covered for its first write only) and 49 (file uploads
+  check the connection's level only).
+
 **Outside connections may break (decided 2026-11-18):** the user would rather the public MCP be
 built the right way than stay compatible. Existing OAuth connections may have to be removed and
 made again; consent doesn't have to keep the old checkbox meaning; old public tool names don't
