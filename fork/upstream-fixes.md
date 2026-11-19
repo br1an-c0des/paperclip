@@ -77,6 +77,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 40 | [Find why 11 server tests fail on `main` (one file is core)](#40-find-why-11-server-tests-fail-on-main-one-file-is-core) | candidate | | | 2026-11-18 | | |
 | 41 | [Give `para-memory-files` a recall tool that exists](#41-give-para-memory-files-a-recall-tool-that-exists) | candidate | | | 2026-11-18 | | |
 | 42 | [Fix or move the 8 test files that fail in a full run on `main`](#42-fix-or-move-the-8-test-files-that-fail-in-a-full-run-on-main) | fixed | `test/tiers` | | 2026-11-18 | | `b6e7076fae` (2026-11-18) |
+| 43 | [Make `attentionService.list` fast over many failed runs](#43-make-attentionservicelist-fast-over-many-failed-runs) | candidate | | | 2026-11-18 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -657,6 +658,18 @@ printed its failure summary, so the reasons weren't captured.
   passed in a full parallel run, and alone it failed 1 time in 3. That fits a timing-sensitive
   start-time comparison. The dormant `heartbeat-native-restart-suspension` also passed in the full
   run.
+- **Cause found (2026-11-18, step 3a agent G): a real production bug.** On Linux a process's start
+  time is `btime` from `/proc/stat` plus its start ticks. `btime` is whole seconds and is recomputed
+  from the wall clock on every read; on this WSL desktop it grew by 1 s every ~31–33 s (375 s over
+  ~3 h). Two readings of the same live process then differ by whole seconds with the same sub-second
+  part, the owner check concludes the PID was reused, and recovery fails a live `claude_local` run
+  as `process_lost` (or releases a live owner's record). It affects child-process stamps too.
+- **Fix chosen by the user: option 1.** For `btime`-based readings a whole-second gap counts as the
+  same process (`controller-process-identity.ts`, `owner-proof.ts`). A reused PID matches by chance 1
+  time in 100, and its record is then held until the PID exits. Four tests that modelled PID reuse
+  with a whole-second offset get a sub-second one. Option 2, exact boot-relative start ticks in every
+  stamp (a new field and a migration), is worth revisiting in step 4b. Being finished on
+  `test/bug40`.
 - **Next:** the core file gets a fix once the user signs off. The dormant ones are skipped with a note
   (hard-fork step 3), unless step 3a moves their suites out of the default run anyway.
 
@@ -705,4 +718,15 @@ round 1: each fails the same way when re-run on its own, except `github-launcher
 - **Also found:** 6 tests in `server/src/services/heartbeat/runtime-selection.test.ts` failed on `main`
   because they read `.claude/skills/slack/SKILL.md`, which `ea326e0202` removed. They're connector-skill
   (dormant) tests and moved to the opt-in `runtime-selection.dormant.test.ts`.
+
+### 43. Make `attentionService.list` fast over many failed runs
+
+Found by step 3a agent G (2026-11-18). In `server/src/__tests__/attention-service.test.ts`, "checks
+more failed runs for a newer run than one statement can bind" still takes ~25 s after its seeding was
+made a single statement: the time is inside `attentionService.list` itself, over 16,400 failed runs.
+
+- **Problem:** the attention feed's failed-run check scales badly with the number of failed runs; a
+  company with many failures could see a slow inbox.
+- **Likely fix:** profile the query or queries `list` makes for that case (probably one per chunk of
+  runs, or an unindexed lookup of newer runs) and replace them with one set-based query.
 
