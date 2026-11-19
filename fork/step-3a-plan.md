@@ -408,6 +408,11 @@ $(git merge-base main origin/feat/step-4a) origin/feat/step-4a`). Report instead
 - **Workflow written** into `CLAUDE.md` (Tests), the `/pm` skill and `doc/test-infrastructure.md`
   (Test tiers).
 
+- **First CI run** 2026-11-19 on `main` (`b04d4507b2`, run 44542707607): green, 11.5 min wall;
+  the typecheck job 8 min, the shards 6.5–11.5 min. After Actions was enabled on the fork, `master`
+  stopped being pushed to `origin` (its upstream workflows would run there) and `origin`'s `master`
+  was deleted. **Step 3a done.**
+
 Merge order: E and G, then F (its final full run includes G's changes), then H. Then the PM writes
 the workflow (quick before pushing, thorough in CI and before merging into `main`, opt-in on demand)
 into `CLAUDE.md`, the `/pm` briefs and `doc/test-infrastructure.md`.

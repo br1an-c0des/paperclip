@@ -2,8 +2,8 @@
 
 **Status: adopted 2026-11-17.** Frozen at upstream `79c8cf8b6` (tag `upstream-freeze`, the last
 commit merged, [sync 2026-11-17](sync-reports/2026-11-17.md)). `new-ui` was renamed `main`. Step 1
-is done; [Progress](#progress) tracks the rest. The current step is
-[3a, renovating the test suite](#3a-renovate-the-test-suite). Written 2026-11-16 as a proposal; the decisions
+is done; [Progress](#progress) tracks the rest. [3a, renovating the test suite](#3a-renovate-the-test-suite),
+was done on 2026-11-19; 4a and 4b are in progress. Written 2026-11-16 as a proposal; the decisions
 taken on adoption are under [Decisions](#decisions).
 
 The plan: stop syncing with upstream `paperclipai/paperclip`, treat this repo as our own codebase,
@@ -325,8 +325,8 @@ and recovery.
 
 ### 3a. Renovate the test suite
 
-Added 2026-11-17, and the current step. The full suite takes about 7 hours on this machine, so
-nobody runs it. The goals:
+Added 2026-11-17; **done 2026-11-19** (results below and in [step-3a-plan.md](step-3a-plan.md)). The
+full suite took about 6 hours serially on this machine, so nobody ran it. The goals:
 
 - **Two tiers with a clear workflow.** A quick local set to run before pushing: typecheck plus the
   tests for the area changed, in minutes. Then **CI** runs the thorough set on every push. The
@@ -519,7 +519,7 @@ in whatever order matters most ([The build plan after the hard fork](#the-build-
 | Repo map and `claude_local` trace | Done 2026-11-17: [repo-map.md](repo-map.md) (ours, shared core, dormant, the seams, tests) and [claude-local-run.md](claude-local-run.md) (one run from wake to finish, both engines, with the change points for steps 4 and 5). |
 | 2. Take the fixes already written | In progress. Our three pull requests are in `main`; the image builds from source (no patches) on `deploy/build-from-source`, not yet deployed; upstream's open pull requests surveyed in [upstream-open-prs.md](upstream-open-prs.md), picks pending. |
 | 3. Leave unused code | Ongoing, as decided. |
-| **3a. Renovate the test suite** | **Current step**, added 2026-11-17. The full suite took ~6 hours serially; the goal was 10–20 minutes (30 at most). Audit: [test-suite-audit.md](test-suite-audit.md); plan and results: [step-3a-plan.md](step-3a-plan.md). Rounds 1 and 2 merged 2026-11-18: tiers (quick, thorough, opt-in), the thorough tier at **21 min** locally with 0 failures, a CI workflow in 10 shards, and the workflow in `CLAUDE.md`. Done once CI's first runs are green. |
+| 3a. Renovate the test suite | **Done 2026-11-19**, added 2026-11-17. The full suite took ~6 hours serially; the goal was 10–20 minutes (30 at most). Audit: [test-suite-audit.md](test-suite-audit.md); plan and results: [step-3a-plan.md](step-3a-plan.md). Rounds 1 and 2 merged 2026-11-18: tiers (quick, thorough, opt-in), the thorough tier at **21 min** locally with 0 failures, a CI workflow in 10 shards, and the workflow in `CLAUDE.md`. CI's first run on `main` (2026-11-19) was green in 11.5 min. |
 | 4. Make runs Claude-native | Split in two. 4a (Paperclip over MCP, agent permissions): designed and planned 2026-11-17 ([design](step-4a-mcp-and-permissions.md), [plan](step-4a-plan.md)); building on `feat/step-4a`: wave 1 merged there; regression runs wait for 3a, building continues; handed off to a manager session on server1 on 2026-11-18 ([handoff](step-4a-handoff.md)). Wave 2 and the follow-up fixes merged on `feat/step-4a` on 2026-11-18 (pushed); left before `main`: a real run on a dev instance, the regression after 3a, and approval. 4b (Claude-native runs): after 4a. |
 | 5–7 | Not started. |
 
