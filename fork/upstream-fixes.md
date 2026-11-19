@@ -97,6 +97,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 60 | [Let a worker pick a workspace for its own subtask](#60-let-a-worker-pick-a-workspace-for-its-own-subtask) | fixed on `feat/step-4a` (`1c870f14d`) | | | 2026-11-19 | | |
 | 61 | [Don't write or lock on an access check with no temporary grant](#61-dont-write-or-lock-on-an-access-check-with-no-temporary-grant) | fixed on `feat/step-4a` (`0a1c2721d`) | | | 2026-11-19 | | |
 | 62 | [Steady two server tests that flaked in CI](#62-steady-two-server-tests-that-flaked-in-ci) | fixed (`d5435c29b`); `run-start-handover` open | | | 2026-11-19 | | |
+| 63 | [Find what adds 11 close listeners to the HTTP server](#63-find-what-adds-11-close-listeners-to-the-http-server) | candidate | | | 2026-11-19 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1034,3 +1035,15 @@ Found 2026-11-19. CI run 44544972878 on `main` (`282b37631`, a docs-only commit 
 - **Still open:** `run-start-handover` (shard 1, once) looks like a timing flake under load (1.5 s
   lease, 200 ms renew, statement timeouts just before the failing assertion at line 134). If it
   recurs, loosen that test's timings.
+
+### 63. Find what adds 11 close listeners to the HTTP server
+
+Seen on server1 at the step 4a deploy (2026-11-19, `5bde9aec2`), once at startup:
+`MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 close listeners added
+to [Server]. MaxListeners is 10.` Not known whether it predates the fork's changes (the previous
+container's logs are gone).
+
+- **Problem:** probably harmless (one listener per subsystem that stops on close), but if it grows
+  with use it's a leak.
+- **Likely fix:** run with `--trace-warnings` to see who adds them; if it's a fixed set, raise the
+  limit for that server; if it grows over time, fix the subsystem that adds one per use.
