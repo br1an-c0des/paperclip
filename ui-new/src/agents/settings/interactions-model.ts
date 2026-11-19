@@ -9,6 +9,13 @@ import type { AgentInteractionPermissionKey, AgentInteractionPermissionsPatch, A
  * `false` for itself, and Reset writes `null`, which removes the setting so the default applies.
  * The old UI has no screen for them; this card follows the Trust card's switches.
  *
+ * Since step 4a four of the six outgoing switches are access actions instead (the Access card,
+ * AccessCard.tsx): assigning to agents and to people is `tasks:assign`, editing other tasks
+ * `tasks:update_any`, configuring other agents `agents:configure`. The card no longer shows them.
+ * Migration 0491 copied a `false` into the matching override but left the switch stored, and the
+ * server's interaction policy still reads it, so a switch left off is listed as an older setting
+ * the card can clear (`RETIRED_KEYS`).
+ *
  * They live under `permissions.interactions` but only this route changes them: the agent and
  * `/permissions` routes answer 422 to a body that carries them, and the Trust card's
  * `trustUpdate` body names its fields one by one, so it never does.
@@ -38,11 +45,12 @@ const WORDS: Record<AgentInteractionPermissionKey, { label: string; help: string
   },
 };
 
-const OUTGOING: AgentInteractionPermissionKey[] = [
+const OUTGOING: AgentInteractionPermissionKey[] = ["canMentionAgents", "canCommentOnOtherTasks"];
+
+/** The outgoing switches that became access actions; the card offers only to clear them. */
+export const RETIRED_KEYS: readonly AgentInteractionPermissionKey[] = [
   "canAssignTasksToAgents",
   "canAssignTasksToHumans",
-  "canMentionAgents",
-  "canCommentOnOtherTasks",
   "canEditOtherTasks",
   "canConfigureOtherAgents",
 ];
@@ -55,7 +63,7 @@ const INCOMING: AgentInteractionPermissionKey[] = [
   "canReceiveConfigurationChangesFromAgents",
 ];
 
-/** Every key, in the order the card lists them. */
+/** Every key the card lists, in its order. */
 export const INTERACTION_KEYS: readonly AgentInteractionPermissionKey[] = [...OUTGOING, ...INCOMING];
 
 const row = (key: AgentInteractionPermissionKey): InteractionRow => ({ key, ...WORDS[key] });
@@ -104,4 +112,15 @@ export function resetAllPatch(state: State | undefined): AgentInteractionPermiss
 /** How many switches are off, for the card's summary. */
 export function deniedCount(state: State | undefined) {
   return INTERACTION_KEYS.filter((key) => !interactionAllowed(state, key)).length;
+}
+
+/** The retired switches still stored as off, with their words. */
+export function retiredStillOff(state: State | undefined): InteractionRow[] {
+  return RETIRED_KEYS.filter((key) => state?.overrides?.[key] === false).map(row);
+}
+
+/** The body that clears every retired switch still stored, or null when there's none. */
+export function clearRetiredPatch(state: State | undefined): AgentInteractionPermissionsPatch | null {
+  const keys = RETIRED_KEYS.filter((key) => typeof state?.overrides?.[key] === "boolean");
+  return keys.length ? Object.fromEntries(keys.map((key) => [key, null])) : null;
 }

@@ -736,25 +736,6 @@ export function isMemoryFile(path: string) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Permissions
-
-/** Why the agent may assign tasks (or why the switch is locked), after the old UI's permissions tab; nothing for a plain on or off. */
-export function taskAssignHelp(source: string): string | undefined {
-  switch (source) {
-    case "ceo_role":
-      return "On for every CEO agent.";
-    case "agent_creator":
-      return "On while it can hire agents.";
-    case "explicit_grant":
-      return "Granted to it directly.";
-    case "simple_default":
-      return "On for every agent, by the company's defaults.";
-    default:
-      return undefined;
-  }
-}
-
-// ---------------------------------------------------------------------------------------------
 // Budget
 
 /** The agent's spend policies (billed cents), from the company's budget overview. */

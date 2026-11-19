@@ -9,7 +9,7 @@ import { boundaryEditable, boundaryHasScope, boundaryTarget, lowTrustBoundary, t
 
 /* The pure parts of the M7 agent settings: trust, harness settings and changes, revisions, skills, the bundle and built-ins. */
 
-const switches = { canCreateAgents: true, canCreateSkills: true, canAssignTasks: true };
+const switches = { canCreateSkills: true, access: { level: "admin" as const } };
 
 describe("trust presets", () => {
   it("reads standard unless the preset says low trust", () => {
@@ -25,7 +25,13 @@ describe("trust presets", () => {
       reviewPreset: { id: "low_trust_review", version: 1, rawOutputDisposition: "quarantine" },
       protectedAgent: { enabled: true },
     });
-    expect(trustUpdate(switches, next)).toMatchObject({ canCreateAgents: false, canAssignTasks: true, trustPreset: "low_trust_review" });
+    // Hiring is the agents:create access action, turned off in access rather than sent as the old flag.
+    const body = trustUpdate(switches, next);
+    expect(body).toMatchObject({ canCreateSkills: true, trustPreset: "low_trust_review", access: { level: "admin", overrides: { "agents:create": false } } });
+    expect(body).not.toHaveProperty("canCreateAgents");
+    expect(body).not.toHaveProperty("canAssignTasks");
+    // Going to low trust from a level without hiring stores nothing extra.
+    expect(trustUpdate({ canCreateSkills: true, access: { level: "worker" } }, next).access).toEqual({ level: "worker" });
   });
 
   it("going back to standard sends a policy without the trust keys", () => {

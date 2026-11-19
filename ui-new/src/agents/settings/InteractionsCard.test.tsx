@@ -56,14 +56,17 @@ beforeEach(() => {
 });
 
 describe("InteractionsCard", () => {
-  it("shows the eleven switches with the agent's own setting and its Reset", async () => {
+  it("shows the seven switches with the agent's own setting and its Reset", async () => {
     renderCard();
     expect(await screen.findByRole("switch", { name: "Take comments from agents" })).toBeTruthy();
-    expect(screen.getAllByRole("switch")).toHaveLength(11);
+    expect(screen.getAllByRole("switch")).toHaveLength(7);
+    // The four that became access actions are on the Access card now.
+    expect(screen.queryByRole("switch", { name: "Edit other tasks" })).toBeNull();
+    expect(screen.queryByRole("switch", { name: "Assign tasks to agents" })).toBeNull();
     expect(screen.getByRole("switch", { name: "Take comments from agents" }).getAttribute("aria-checked")).toBe("false");
     expect(screen.getByRole("switch", { name: "Mention agents" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getAllByRole("button", { name: /^Reset “/ })).toHaveLength(1);
-    expect(screen.getByText("1 of 11 turned off.")).toBeTruthy();
+    expect(screen.getByText("1 of 7 turned off.")).toBeTruthy();
   });
 
   it("saves a switch through the interaction route only", async () => {
@@ -77,13 +80,22 @@ describe("InteractionsCard", () => {
     renderCard();
     fireEvent.click(await screen.findByRole("button", { name: "Reset “Take comments from agents” to the default" }));
     await waitFor(() => expect(api.updateInteractionPermissions).toHaveBeenCalledWith("a1", { canReceiveCommentsFromAgents: null }));
-    api.interactionPermissions.mockResolvedValue(state({ canReceiveCommentsFromAgents: false, canEditOtherTasks: true }));
+    api.interactionPermissions.mockResolvedValue(state({ canReceiveCommentsFromAgents: false, canCommentOnOtherTasks: true }));
     cleanup();
     renderCard();
     fireEvent.click(await screen.findByRole("button", { name: "Reset all" }));
     await waitFor(() =>
-      expect(api.updateInteractionPermissions).toHaveBeenLastCalledWith("a1", { canReceiveCommentsFromAgents: null, canEditOtherTasks: null }),
+      expect(api.updateInteractionPermissions).toHaveBeenLastCalledWith("a1", { canCommentOnOtherTasks: null, canReceiveCommentsFromAgents: null }),
     );
+  });
+
+  it("offers to clear a retired switch still stored as off", async () => {
+    api.interactionPermissions.mockResolvedValue(state({ canEditOtherTasks: false, canConfigureOtherAgents: false }));
+    renderCard();
+    expect(await screen.findByText(/Still off from an older setting: Edit other tasks, Configure other agents\./)).toBeTruthy();
+    expect(screen.getByText("Nothing turned off.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    await waitFor(() => expect(api.updateInteractionPermissions).toHaveBeenCalledWith("a1", { canEditOtherTasks: null, canConfigureOtherAgents: null }));
   });
 
   it("waits for a pending hire to be approved", async () => {

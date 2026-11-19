@@ -1,5 +1,6 @@
 import type { AgentPermissions, LowTrustBoundary, TrustAuthorizationPolicy, TrustPreset } from "@paperclipai/shared";
 import type { AgentPermissionUpdate } from "@/api/agents";
+import { withAction } from "./settings/access-model";
 
 /*
  * An agent's trust preset and its low-trust boundary, ported from the old UI's
@@ -120,13 +121,16 @@ export function withoutBoundaryTarget(permissions: Partial<AgentPermissions> | n
 }
 
 /**
- * The `PATCH /agents/:id/permissions` body for new trust settings: the three switches as they are,
- * then the preset, its policy and (from the preset) hiring authority, as the old page sends it.
+ * The `PATCH /agents/:id/permissions` body for new trust settings: the current settings (`access`
+ * and Create skills) as they are, then the preset and its policy. Going to low trust drops hiring
+ * (`withPreset` sets `canCreateAgents: false`), which since step 4a is the `agents:create` access
+ * action, so it's turned off in `access` rather than sent as the old flag.
  */
-export function trustUpdate(switches: AgentPermissionUpdate, next: Partial<AgentPermissions>): AgentPermissionUpdate {
+export function trustUpdate(current: AgentPermissionUpdate, next: Partial<AgentPermissions>): AgentPermissionUpdate {
+  const access = next.canCreateAgents === false && current.access ? withAction(current.access, "agents:create", false) : current.access;
   return {
-    ...switches,
-    canCreateAgents: next.canCreateAgents ?? switches.canCreateAgents,
+    ...current,
+    ...(access ? { access } : {}),
     trustPreset: next.trustPreset === LOW_TRUST ? LOW_TRUST : STANDARD,
     authorizationPolicy: next.authorizationPolicy,
   };
