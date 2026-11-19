@@ -999,3 +999,24 @@
   margin-top: -2px;
   font-size: 12px;
 }
+
+/* A permission request's arguments, folded under the call (step 4a). */
+.rq-args {
+  margin-top: 6px;
+}
+
+.rq-args > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rq-args > .rq-kv {
+  margin-top: 6px;
+}
+
+.rq-muted {
+  color: var(--muted);
+  font-size: 12px;
+}

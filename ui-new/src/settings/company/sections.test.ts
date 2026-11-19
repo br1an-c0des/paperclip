@@ -9,7 +9,7 @@ describe("parseSettingsPath", () => {
   });
 
   it("knows each section's address", () => {
-    for (const key of ["members", "secrets", "budgets", "environments", "transfer"] as const) {
+    for (const key of ["members", "labels", "secrets", "budgets", "environments", "transfer"] as const) {
       expect(parseSettingsPath(key)).toEqual({ kind: "section", key });
     }
     expect(parseSettingsPath("paperclip-models")).toEqual({ kind: "section", key: "connections" });
@@ -62,6 +62,7 @@ describe("companySettingsEntries", () => {
       "# Organization",
       "General /TES/company/settings end",
       "Members /TES/company/settings/members",
+      "Labels /TES/company/settings/labels",
       "Paperclip Models /TES/company/settings/paperclip-models",
       "Secrets /TES/company/settings/secrets",
       "Budgets /TES/company/settings/budgets",

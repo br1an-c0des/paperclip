@@ -57,6 +57,7 @@ import { QuestionSetForm } from "./QuestionSetForm";
 import { WithdrawDialog } from "./WithdrawDialog";
 import { canWithdrawApproval } from "@/approvals/approval-model";
 import { alreadyClosed, alreadyClosedText } from "@/inbox/routing-model";
+import { argumentRows, connectionLabel, missingActionWords, permissionExpired, permissionRequestOf, toolWords } from "./permission-model";
 import { answerRefusal, declineNote, documentLabel, documentReviewTarget, KIND_LABEL, planLabel, planReviewTarget, suggestedOwner, type Request, type RequestKind } from "./request-model";
 import "./RequestCard.css";
 
@@ -1065,6 +1066,57 @@ function cents(value: unknown) {
   return typeof value === "number" ? `$${(value / 100).toFixed(2)}` : null;
 }
 
+/**
+ * A permission request's call (permission-model.ts): the tool in plain words, the action the caller
+ * lacked, how it came in, and the arguments, folded. The task it came from is the card's subject.
+ */
+function PermissionPayload(props: { request: Request }) {
+  const approval = () => (props.request.source as Extract<Request["source"], { type: "approval" }>).approval;
+  const payload = createMemo(() => permissionRequestOf(approval()));
+  return (
+    <Show when={payload()}>
+      {(found) => {
+        const args = createMemo(() => argumentRows(found().arguments));
+        return (
+          <>
+            <dl class="rq-kv">
+              <dt>Tool</dt>
+              <dd>
+                {toolWords(found().tool)} <span class="mono rq-muted">{found().tool}</span>
+              </dd>
+              <dt>Needs</dt>
+              <dd>{missingActionWords(found())}</dd>
+              <Show when={connectionLabel(found())}>
+                {(label) => (
+                  <>
+                    <dt>Through</dt>
+                    <dd>{label()}</dd>
+                  </>
+                )}
+              </Show>
+            </dl>
+            <Show when={args().length > 0}>
+              <details class="rq-args">
+                <summary>{args().length === 1 ? "1 argument" : `${args().length} arguments`}</summary>
+                <dl class="rq-kv">
+                  <For each={args()}>
+                    {([label, value]) => (
+                      <>
+                        <dt>{label}</dt>
+                        <dd>{value}</dd>
+                      </>
+                    )}
+                  </For>
+                </dl>
+              </details>
+            </Show>
+          </>
+        );
+      }}
+    </Show>
+  );
+}
+
 /** An approval's payload, after the old UI's ApprovalPayload renderers. */
 function ApprovalPayload(props: { request: Request }) {
   const approval = () => (props.request.source as Extract<Request["source"], { type: "approval" }>).approval;
@@ -1125,10 +1177,17 @@ function ApprovalControls(props: { request: Request; people: TaskPeople; onDone:
   const [note, setNote] = createSignal("");
   const [noting, setNoting] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  const permission = createMemo(() => permissionRequestOf(approval()));
+  // Checked when the card draws; a card left open past the expiry is refused by the server anyway.
+  const expired = () => {
+    const found = permission();
+    return !!found && permissionExpired(found, new Date());
+  };
   const decide = createMutation(() => ({
-    mutationFn: (action: "approve" | "reject" | "revise") => {
+    mutationFn: (action: "approve" | "always" | "reject" | "revise") => {
       const decisionNote = note().trim() || undefined;
       if (action === "approve") return approvalsApi.approve(approval().id, decisionNote);
+      if (action === "always") return approvalsApi.approve(approval().id, decisionNote, { alwaysAllow: true });
       if (action === "reject") return approvalsApi.reject(approval().id, decisionNote);
       return approvalsApi.requestRevision(approval().id, decisionNote);
     },
@@ -1149,20 +1208,44 @@ function ApprovalControls(props: { request: Request; people: TaskPeople; onDone:
   );
   return (
     <>
-      <ApprovalPayload request={props.request} />
+      <Show when={permission()} fallback={<ApprovalPayload request={props.request} />}>
+        <PermissionPayload request={props.request} />
+      </Show>
       <Show when={noting()}>
         <TextArea aria-label="Decision note" rows={2} placeholder="A note with your decision (optional)" value={note()} onInput={(event) => setNote(event.currentTarget.value)} />
       </Show>
       <Footer request={props.request} error={error()} extra={budgetLink()}>
-        <Button size="compact" variant="primary" disabled={busy()} onClick={() => decide.mutate("approve")}>
-          Approve
-        </Button>
-        <Button size="compact" disabled={busy()} onClick={() => decide.mutate("revise")}>
-          Request changes
-        </Button>
-        <Button size="compact" variant="danger" disabled={busy()} onClick={() => decide.mutate("reject")}>
-          Reject
-        </Button>
+        <Show
+          when={permission()}
+          fallback={
+            <>
+              <Button size="compact" variant="primary" disabled={busy()} onClick={() => decide.mutate("approve")}>
+                Approve
+              </Button>
+              <Button size="compact" disabled={busy()} onClick={() => decide.mutate("revise")}>
+                Request changes
+              </Button>
+              <Button size="compact" variant="danger" disabled={busy()} onClick={() => decide.mutate("reject")}>
+                Reject
+              </Button>
+            </>
+          }
+        >
+          <>
+            <Show when={expired()}>
+              <p class="rq-note">Expired: approving can't run it now.</p>
+            </Show>
+            <Button size="compact" variant="primary" disabled={busy() || expired()} onClick={() => decide.mutate("approve")}>
+              Approve
+            </Button>
+            <Button size="compact" disabled={busy() || expired()} onClick={() => decide.mutate("always")}>
+              Approve and always allow
+            </Button>
+            <Button size="compact" variant="danger" disabled={busy()} onClick={() => decide.mutate("reject")}>
+              Deny
+            </Button>
+          </>
+        </Show>
         <Show when={!noting()}>
           <Button size="compact" variant="quiet" onClick={() => setNoting(true)}>
             Add a note

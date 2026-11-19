@@ -112,6 +112,7 @@ const APPROVAL_TYPE: Record<string, string> = {
   budget_override_required: "Budget stop",
   approve_ceo_strategy: "CEO strategy",
   request_board_approval: "Board approval",
+  permission_request: "Permission",
 };
 
 /** The specific type a loaded request's pill names. */

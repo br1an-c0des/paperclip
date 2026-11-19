@@ -1,10 +1,10 @@
-import type { IssueThreadInteraction } from "@paperclipai/shared";
+import type { Approval, IssueThreadInteraction } from "@paperclipai/shared";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TaskPeople } from "@/tasks/people";
 import { Menu } from "@/ui/Menu";
-import { requestFromInteraction, requestFromReview, type ReviewTask } from "./request-model";
+import { requestFromApproval, requestFromInteraction, requestFromReview, type ReviewTask } from "./request-model";
 
 afterEach(cleanup);
 
@@ -22,6 +22,15 @@ vi.mock("@/api/interactions", () => ({
   },
 }));
 vi.mock("@/api/issues", () => ({ issuesApi: { update: (...args: unknown[]) => update(...(args as [])) } }));
+const approvals = vi.hoisted(() => ({
+  approve: vi.fn(async () => ({})),
+  reject: vi.fn(async () => ({})),
+  requestRevision: vi.fn(async () => ({})),
+  comments: vi.fn(async () => []),
+  addComment: vi.fn(async () => ({})),
+  cancel: vi.fn(async () => ({})),
+}));
+vi.mock("@/api/approvals", () => ({ approvalsApi: approvals }));
 
 const { RequestCard } = await import("./RequestCard");
 
@@ -278,5 +287,87 @@ describe("RequestCard", () => {
     fireEvent.click(approve);
     await waitFor(() => expect(update).toHaveBeenCalledWith("t1", { status: "done", comment: "Checked the backtest" }));
     expect(screen.getByRole("link", { name: "Open the task" }).getAttribute("href")).toBe("/TRA/issues/TRA-44");
+  });
+});
+
+describe("RequestCard: a permission request", () => {
+  const permission = (extra: Partial<Approval> = {}, payload: Record<string, unknown> = {}) =>
+    ({
+      id: "ap1",
+      companyId: "co1",
+      type: "permission_request",
+      requestedByAgentId: "a1",
+      requestedByUserId: null,
+      status: "pending",
+      decisionNote: null,
+      decidedByUserId: null,
+      decidedAt: null,
+      createdAt: "2026-11-18T12:00:00Z",
+      updatedAt: "2026-11-18T12:00:00Z",
+      payload: {
+        version: 1,
+        caller: { kind: "run", agentId: "a1", userId: null, runId: "r1", grantId: null },
+        taskId: "t1",
+        tool: "paperclip_delete_task",
+        arguments: { issueId: "TRA-41" },
+        missingAction: "tasks:delete",
+        summary: "Delete task TRA-41",
+        expiresAt: new Date(Date.now() + 3 * 86_400_000).toISOString(),
+        ...payload,
+      },
+      ...extra,
+    }) as unknown as Approval;
+
+  function mountApproval(approval: Approval) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(() => (
+      <QueryClientProvider client={client}>
+        <RequestCard request={requestFromApproval(approval, ctx)} taskId="t1" people={people} />
+      </QueryClientProvider>
+    ));
+  }
+
+  it("says who, what and from which task, with the arguments folded", () => {
+    mountApproval(permission());
+    expect(screen.getByRole("heading", { name: "Delete task TRA-41" })).toBeTruthy();
+    expect(screen.getByText("asks for permission")).toBeTruthy();
+    expect(screen.getByText("Delete tasks")).toBeTruthy();
+    expect(screen.getByText("paperclip_delete_task")).toBeTruthy();
+    expect(screen.getByText("1 argument").closest("details")?.hasAttribute("open")).toBe(false);
+    expect(screen.getByText("Issue id")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /TRA-41/ }).getAttribute("href")).toBe("/TRA/issues/TRA-41");
+    expect(screen.queryByRole("button", { name: "Request changes" })).toBeNull();
+    expect(screen.queryByText("Through")).toBeNull();
+  });
+
+  it("names the outside connection a call came through", () => {
+    mountApproval(permission({}, { caller: { kind: "oauth_agent", agentId: "a1", userId: null, runId: null, grantId: "g1" }, connectionName: "Claude Code" }));
+    expect(screen.getByText("Through")).toBeTruthy();
+    expect(screen.getByText("Claude Code")).toBeTruthy();
+    expect(screen.getByText("Quant Researcher via Claude Code")).toBeTruthy();
+  });
+
+  it("approves, approves and always allows, or denies", async () => {
+    mountApproval(permission());
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(approvals.approve).toHaveBeenLastCalledWith("ap1", undefined));
+    fireEvent.click(screen.getByRole("button", { name: "Approve and always allow" }));
+    await waitFor(() => expect(approvals.approve).toHaveBeenLastCalledWith("ap1", undefined, { alwaysAllow: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Deny" }));
+    await waitFor(() => expect(approvals.reject).toHaveBeenCalledWith("ap1", undefined));
+  });
+
+  it("can't be approved once it has expired, only denied", () => {
+    mountApproval(permission({}, { expiresAt: "2026-01-01T00:00:00Z" }));
+    expect(screen.getByText("Expired: approving can't run it now.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Approve" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Approve and always allow" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Deny" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("shows what the replay did once decided", () => {
+    mountApproval(permission({ status: "approved", decidedByUserId: "me", decidedAt: "2026-11-18T13:00:00Z" } as unknown as Partial<Approval>, { result: { status: "refused", detail: "The task is locked by another run", at: "2026-11-18T13:00:01Z" } }));
+    expect(screen.getByText("Refused when it ran: The task is locked by another run")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
   });
 });

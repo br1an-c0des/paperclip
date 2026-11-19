@@ -1,4 +1,4 @@
-import type { AgentDetail, AgentPermissions } from "@paperclipai/shared";
+import { resolveAgentAccess, type AgentDetail, type AgentPermissions } from "@paperclipai/shared";
 import { A, useSearchParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { ArrowLeft, Check, ChevronRight, FolderOpen, Lock, Plus, ShieldAlert, X } from "lucide-solid";
@@ -15,8 +15,9 @@ import { InfoTip } from "@/ui/InfoTip";
 import { Menu } from "@/ui/Menu";
 import { Popover } from "@/ui/Popover";
 import { pushToast } from "@/ui/Toast";
-import { taskAssignHelp } from "../agent-model";
 import { failure, refreshAgent, saveNote, SectionTitle, SwitchRow, useAgentSaver } from "../shared";
+import { AccessCard } from "./AccessCard";
+import { storedAccess } from "./access-model";
 import { InteractionsCard } from "./InteractionsCard";
 import {
   BOUNDARY_TYPES,
@@ -35,20 +36,27 @@ import {
 } from "../trust-model";
 
 /*
- * Permissions and trust (board 30's outline): the agent's trust preset, what it may do without
- * asking (`PATCH /agents/:id/permissions`, which takes all three switches together), and its project
- * access. Project access is where the task page's "can't access this project" notice links
- * (`/agents/:key/permissions?fromTask=…`): a low-trust agent reads only the projects in its
- * boundary, and adding one keeps its other restrictions (`POST /agents/:id/project-access`).
+ * Permissions and trust (board 30's outline): the agent's access (level and actions, step 4a), its
+ * trust preset, and its project access. Everything on the agent saves through
+ * `PATCH /agents/:id/permissions`, always with the whole `access`, so the server never turns an old
+ * flag into an override (api/agents.ts `AgentPermissionUpdate`). Project access is where the task
+ * page's "can't access this project" notice links (`/agents/:key/permissions?fromTask=…`): a
+ * low-trust agent reads only the projects in its boundary, and adding one keeps its other
+ * restrictions (`POST /agents/:id/project-access`).
  *
- * The trust preset (trust-model.ts) saves at once with the switches. A low-trust agent's boundary
- * takes one target here (a project, a task and its subtasks, or one task), as upstream's community
- * edition edits it; "View policy" lists the rest of the boundary (agents, tools, secrets, where
- * output is promoted), which only the API or the EE extension sets.
+ * The Access card (AccessCard.tsx) replaces the old Hire agents and Assign tasks switches, which
+ * are its `agents:create` and `tasks:assign` rows now; the server answers 410 `agent_grant_retired`
+ * to the old grants for them.
  *
- * Below Trust, the Interactions card (U105, InteractionsCard.tsx) holds the eleven deny-only
- * switches for how the agent deals with other agents. They save through their own route; the
- * `/permissions` body here never carries `interactions`, which that route refuses.
+ * The trust preset (trust-model.ts) saves at once. A low-trust agent's boundary takes one target
+ * here (a project, a task and its subtasks, or one task), as upstream's community edition edits
+ * it; "View policy" lists the rest of the boundary (agents, tools, secrets, where output is
+ * promoted), which only the API or the EE extension sets.
+ *
+ * Below Trust, the Interactions card (U105, InteractionsCard.tsx) holds the deny-only switches the
+ * access actions didn't absorb: the five for what other agents may do to this one, and commenting
+ * and mentioning. They save through their own route; the `/permissions` body here never carries
+ * `interactions`, which that route refuses.
  */
 
 export function PermissionsSection(props: { agent: AgentDetail }) {
@@ -56,20 +64,15 @@ export function PermissionsSection(props: { agent: AgentDetail }) {
   const client = useQueryClient();
   const saver = useAgentSaver(() => props.agent);
   const current = (): AgentPermissionUpdate => ({
-    canCreateAgents: Boolean(props.agent.permissions?.canCreateAgents),
     canCreateSkills: props.agent.permissions?.canCreateSkills !== false,
-    canAssignTasks: Boolean(props.agent.access?.canAssignTasks),
+    access: storedAccess(props.agent.permissions),
   });
-  const assignLocked = () => props.agent.role === "ceo" || current().canCreateAgents;
-  const change = (patch: Partial<AgentPermissionUpdate>) => {
-    const next = { ...current(), ...patch };
-    // Hiring authority brings task assignment with it, as the old UI sets it.
-    if (patch.canCreateAgents) next.canAssignTasks = true;
+  const canHire = () => resolveAgentAccess(storedAccess(props.agent.permissions))["agents:create"] !== false;
+  const change = (patch: AgentPermissionUpdate) =>
     void saver.run(async () => {
-      const saved = await agentsApi.updatePermissions(props.agent.id, next, company().id);
+      const saved = await agentsApi.updatePermissions(props.agent.id, { ...current(), ...patch }, company().id);
       client.setQueryData(queryKeys.agents.detail(props.agent.id), saved);
     }, "Couldn't change the permission.");
-  };
   const saveTrust = (next: Partial<AgentPermissions>) =>
     void saver.run(async () => {
       const saved = await agentsApi.updatePermissions(props.agent.id, trustUpdate(current(), next), company().id);
@@ -83,31 +86,23 @@ export function PermissionsSection(props: { agent: AgentDetail }) {
         title="Permissions and trust"
         info={`What ${props.agent.name} may do without asking, which projects it can reach, and how it deals with other agents.`}
       />
+      <AccessCard agent={props.agent} />
       <ProjectAccessCard agent={props.agent} />
       <SettingsCard
         title="Trust"
         info="Changes save at once."
         description={saveNote(saver.state(), saver.error())}
       >
-        <TrustRows agent={props.agent} disabled={saver.state() === "saving"} onChange={saveTrust} />
-        <SwitchRow label="Hire agents" info="Create or hire agents. This also lets it assign tasks." checked={current().canCreateAgents} disabled={saver.state() === "saving"} onChange={(value) => change({ canCreateAgents: value })} />
+        <TrustRows agent={props.agent} canHire={canHire()} disabled={saver.state() === "saving"} onChange={saveTrust} />
         {/* `permissions.canCreateSkills` is saved and logged, but no route reads it: the company
             skill policy and `skills:create` grants decide (server routes/company-skills.ts). */}
         <SwitchRow
           label="Create skills"
           info="Meant to let it install, import, create and scan the company's skills. Today the company's skill policy decides that."
           help="Not used by the server yet."
-          checked={current().canCreateSkills}
+          checked={current().canCreateSkills !== false}
           disabled={saver.state() === "saving"}
           onChange={(value) => change({ canCreateSkills: value })}
-        />
-        <SwitchRow
-          label="Assign tasks"
-          info="Give tasks to other agents and people."
-          help={taskAssignHelp(props.agent.access?.taskAssignSource ?? "none")}
-          checked={current().canAssignTasks}
-          disabled={saver.state() === "saving" || assignLocked()}
-          onChange={(value) => change({ canAssignTasks: value })}
         />
       </SettingsCard>
       <InteractionsCard agent={props.agent} />
@@ -258,7 +253,7 @@ function ProjectAccessCard(props: { agent: AgentDetail }) {
 }
 
 /** The trust preset, and for a low-trust agent its containment and one boundary target. */
-function TrustRows(props: { agent: AgentDetail; disabled: boolean; onChange: (next: Partial<AgentPermissions>) => void }) {
+function TrustRows(props: { agent: AgentDetail; canHire: boolean; disabled: boolean; onChange: (next: Partial<AgentPermissions>) => void }) {
   const company = useCompany();
   const projects = useProjectsQuery();
   const permissions = () => props.agent.permissions as Partial<AgentPermissions> | undefined;
@@ -311,7 +306,7 @@ function TrustRows(props: { agent: AgentDetail; disabled: boolean; onChange: (ne
               </For>
             </Menu.Content>
           </Menu>
-          <Show when={!lowTrust() && props.agent.permissions?.canCreateAgents}>
+          <Show when={!lowTrust() && props.canHire}>
             <span class="fhelp">Choosing low trust also takes away hiring.</span>
           </Show>
         </div>

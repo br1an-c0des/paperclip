@@ -1,4 +1,5 @@
-import type { McpConnection } from "@paperclipai/shared";
+import { DEFAULT_CONNECTION_ACCESS_LEVEL, type AgentAccess, type McpConnection, type UpdateMcpConnection } from "@paperclipai/shared";
+import { LEVEL_WORDS, overrideCount } from "@/agents/settings/access-model";
 
 /*
  * View model for Connections → Assistants (`/connections/assistant-connection`, the old UI's
@@ -138,8 +139,33 @@ export function assistantRows(connections: readonly McpConnection[] | undefined,
   return (connections ?? []).filter((row) => row.companyId === companyId && !row.revokedAt && !row.scopes.includes("paperclip:agent"));
 }
 
-/** "Connected as you · Read and write · Configure agents, projects and skills". */
-export function assistantAccess(scopes: readonly string[]) {
-  const base = scopes.includes("paperclip:write") ? "Read and write" : "Read only";
-  return `Connected as you · ${base}${scopes.includes("paperclip:configure") ? " · Configure agents, projects and skills" : ""}`;
+/**
+ * A connection's access (step 4a) as an access the Access controls edit: its level and overrides.
+ * Acting as an agent, the level caps the agent's own access.
+ */
+export function connectionAccessOf(connection: Pick<McpConnection, "accessLevel" | "accessOverrides">): AgentAccess {
+  const level = connection.accessLevel && LEVEL_WORDS[connection.accessLevel] ? connection.accessLevel : DEFAULT_CONNECTION_ACCESS_LEVEL;
+  const overrides = connection.accessOverrides ?? {};
+  return Object.keys(overrides).length ? { level, overrides: { ...overrides } } : { level };
+}
+
+/** The `PATCH /mcp/connections/:id` body for a new access: the level and every override (`{}` clears them). */
+export function connectionAccessPatch(next: AgentAccess): UpdateMcpConnection {
+  return { accessLevel: next.level, accessOverrides: next.overrides ?? {} };
+}
+
+/** "Acts as you · Manager", "Acts as Ada · Manager at most · 1 action set". */
+export function connectionAccessLine(connection: Pick<McpConnection, "actAsAgent" | "accessLevel" | "accessOverrides">) {
+  const access = connectionAccessOf(connection);
+  const who = connection.actAsAgent ? `Acts as ${connection.actAsAgent.name}` : "Acts as you";
+  const level = connection.actAsAgent ? `${LEVEL_WORDS[access.level].label} at most` : LEVEL_WORDS[access.level].label;
+  const count = overrideCount(access);
+  return [who, level, count ? `${count === 1 ? "1 action" : `${count} actions`} set` : null].filter(Boolean).join(" · ");
+}
+
+/** Who a connection may act as: you, then the agents you may configure (keeping its current one). */
+export function actAsChoices(connection: Pick<McpConnection, "actAsAgent" | "actAsAgentChoices">): { id: string | null; name: string }[] {
+  const agents = [...(connection.actAsAgentChoices ?? [])];
+  if (connection.actAsAgent && !agents.some((agent) => agent.id === connection.actAsAgent!.id)) agents.unshift(connection.actAsAgent);
+  return [{ id: null, name: "You" }, ...agents];
 }

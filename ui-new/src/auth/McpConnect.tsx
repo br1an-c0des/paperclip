@@ -1,25 +1,41 @@
-import type { McpConnection, McpDotPairingPreview } from "@paperclipai/shared";
+import { AGENT_ACCESS_LEVELS, type AgentAccessLevel, type McpConnection, type McpDotPairingPreview } from "@paperclipai/shared";
 import { A, useParams } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Globe } from "lucide-solid";
 import { createEffect, createSignal, For, Match, on, onCleanup, Show, Switch } from "solid-js";
-import { mcpApi, type McpConsentInput } from "@/api/mcp";
+import { mcpApi } from "@/api/mcp";
+import { LEVEL_WORDS } from "@/agents/settings/access-model";
+import { ConnectionAccess } from "@/apps/assistant/ConnectionAccess";
 import { CompanyMark } from "@/routes/Companies";
 import { Splash } from "@/routes/Splash";
 import { Button, buttonClass } from "@/ui/Button";
 import { Field, TextInput } from "@/ui/Field";
-import { assistantName, connectionAccess, connectionTitle, DOT_PAIRING_CODE, mcpProblem, signInHref } from "./auth-model";
+import { InfoTip } from "@/ui/InfoTip";
+import {
+  assistantName,
+  connectionTitle,
+  consentDefaultLevel,
+  consentInput,
+  DOT_PAIRING_CODE,
+  isAgentPairing,
+  levelWithin,
+  mcpProblem,
+  signInHref,
+} from "./auth-model";
 import { Facts, Note, Standalone } from "./Standalone";
 
 /*
  * Approving an assistant's connection to Paperclip over MCP, as ui/src/pages/McpConnect.tsx:
  *
  * - `/mcp-connect/:id`: an assistant's OAuth request. Pick the organization (unless the request
- *   fixed one), allow writes when asked and your role permits, then Connect or Cancel. The server
- *   answers with the address to send the browser back to the assistant.
+ *   fixed one), who the connection acts as (you, or an agent you may configure) and its access
+ *   level (step 4a: manager to start, read only at most for a viewer), then Connect or Cancel. The
+ *   server answers with the address to send the browser back to the assistant. The scopes the
+ *   assistant asked for don't decide its access any more.
  * - `/dot-connect/:id`: the same for a Dot agent, which pairs with a one-use code first.
  * - `/mcp-device?user_code=`: a device code typed into the browser; the assistant finishes on its own.
- * - `/assistant-connections`: your connections, to revoke.
+ * - `/assistant-connections`: your connections, to change who each acts as and its access
+ *   (apps/assistant/ConnectionAccess.tsx), or revoke.
  *
  * All of them need the instance's public MCP: a public URL and `enablePublicMcp` on (build plan
  * 3.12). When it's off, the page says so instead of failing vaguely (`mcpProblem`).
@@ -116,18 +132,27 @@ function McpRequest(props: { id: string; device?: boolean; agentPairingOnly?: bo
   });
   const selectedId = () => data()?.requestedCompanyId ?? companyId();
   const company = () => data()?.companies.find((entry) => entry.id === selectedId());
-  const [writeEnabled, setWriteEnabled] = createSignal(true);
-  const canApproveWrites = () => !data()?.agentConnection && !!company()?.canWrite && writeEnabled();
+  // Who it acts as and its level, for the chosen organization; both start over when it changes.
+  const [actAs, setActAs] = createSignal<string | null>(null);
+  const [level, setLevel] = createSignal<AgentAccessLevel | null>(null);
+  createEffect(
+    on(selectedId, () => {
+      setActAs(null);
+      setLevel(null);
+    }),
+  );
+  const maxLevel = () => company()?.maxAccessLevel;
+  const chosenLevel = () => level() ?? consentDefaultLevel(maxLevel());
   const [deviceResult, setDeviceResult] = createSignal<"approved" | "denied" | null>(null);
 
   const consent = createMutation(() => ({
     mutationFn: (decision: "approve" | "deny") => {
-      const input: McpConsentInput = {
-        decision,
+      const input = consentInput(decision, {
         companyId: selectedId() || undefined,
-        allowWrites: decision === "approve" && !!data()?.requestedWrite && canApproveWrites(),
-        allowConfiguration: decision === "approve" && !!data()?.requestedConfigure && canApproveWrites(),
-      };
+        agentPairing: !!data()?.agentConnection,
+        actAsAgentId: actAs(),
+        accessLevel: chosenLevel(),
+      });
       return props.device ? mcpApi.consentDevice(props.id, input) : mcpApi.consent(props.id, input);
     },
     onSuccess: (result: { redirectUrl?: string; status?: "approved" | "denied" }) => {
@@ -291,24 +316,61 @@ function McpRequest(props: { id: string; device?: boolean; agentPairingOnly?: bo
                 </fieldset>
               </Show>
 
-              <p class="stand-body">
-                {req().agentConnection
-                  ? "Connect Dot as a Paperclip agent. Pair it with an agent after connecting; its work uses that agent's permissions."
-                  : "It can read all of your Paperclip data in this organization."}
-              </p>
-              <Show when={(req().requestedWrite || req().requestedConfigure) && !req().agentConnection}>
-                <label class="stand-option">
-                  <input
-                    type="checkbox"
-                    checked={canApproveWrites()}
-                    disabled={!company()?.canWrite || consent.isPending}
-                    onChange={(event) => setWriteEnabled(event.currentTarget.checked)}
-                  />
-                  <span>{req().requestedConfigure ? "Also edit work, and configure agents, projects and skills" : "Also edit work"}</span>
-                </label>
+              <Show when={req().agentConnection}>
+                <p class="stand-body">Connect Dot as a Paperclip agent. Pair it with an agent after connecting; its work uses that agent's permissions.</p>
               </Show>
-              <Show when={company() && !company()!.canWrite}>
-                <p class="stand-muted">Your role in this organization is read-only.</p>
+              <Show when={!req().agentConnection && company()}>
+                {(found) => (
+                  <>
+                    <fieldset class="stand-options" disabled={consent.isPending}>
+                      <legend class="info-line">
+                        Acts as
+                        <InfoTip label="About Acts as">
+                          As you, it has your access, capped by the level below. As an agent, it works as that agent, with the agent's own access capped by the level. You can pick the agents you may configure.
+                        </InfoTip>
+                      </legend>
+                      <label class="stand-option">
+                        <input type="radio" name="mcp-act-as" value="" checked={actAs() === null} onChange={() => setActAs(null)} />
+                        <span>You</span>
+                      </label>
+                      <For each={found().actAsAgents}>
+                        {(agent) => (
+                          <label class="stand-option">
+                            <input type="radio" name="mcp-act-as" value={agent.id} checked={actAs() === agent.id} onChange={() => setActAs(agent.id)} />
+                            <span>{agent.name}</span>
+                          </label>
+                        )}
+                      </For>
+                    </fieldset>
+                    <fieldset class="stand-options" disabled={consent.isPending}>
+                      <legend class="info-line">
+                        Access level
+                        <InfoTip label="About Access level">The most it may do. You can change it, or turn single actions on and off, from your assistant connections later.</InfoTip>
+                      </legend>
+                      <For each={AGENT_ACCESS_LEVELS}>
+                        {(entry) => (
+                          <label class="stand-option stand-option--described">
+                            <input
+                              type="radio"
+                              name="mcp-level"
+                              value={entry}
+                              checked={chosenLevel() === entry}
+                              disabled={!levelWithin(entry, maxLevel())}
+                              onChange={() => setLevel(entry)}
+                            />
+                            <span>
+                              {LEVEL_WORDS[entry].label}
+                              <span class="stand-muted stand-option-note">{LEVEL_WORDS[entry].description}</span>
+                            </span>
+                          </label>
+                        )}
+                      </For>
+                    </fieldset>
+                    <Show when={maxLevel() === "read_only"}>
+                      <p class="stand-muted">Your role in this organization is read-only, so the connection can only read.</p>
+                    </Show>
+                  </>
+                )}
               </Show>
               <Show when={consent.error}>{(error) => <Note tone="red" alert>{mcpProblem(error()).message}</Note>}</Show>
               <div class="stand-actions stand-actions--split">
@@ -331,7 +393,7 @@ function McpRequest(props: { id: string; device?: boolean; agentPairingOnly?: bo
   );
 }
 
-/** `/assistant-connections`: the assistants connected as you, to revoke. */
+/** `/assistant-connections`: the assistants connected as you, to change their access or revoke. */
 export function AssistantConnectionsPage() {
   const client = useQueryClient();
   const connections = createQuery(() => ({ queryKey: ["mcp-connections"] as const, queryFn: mcpApi.connections, retry: false }));
@@ -368,29 +430,36 @@ export function AssistantConnectionsPage() {
         </Match>
         <Match when={active().length > 0}>
           <ul class="stand-list">
-            <For each={active()}>
-              {(connection) => (
-                <li class="stand-item">
-                  <h2 class="disp">{connectionTitle(connection)}</h2>
-                  <span class="stand-muted">Organization: {connection.companyName}</span>
-                  <Show when={connection.agent}>
-                    {(agent) => (
-                      <span class="stand-body">
-                        Works as{" "}
-                        <A class="stand-link" href={`/${connection.companyPrefix ?? connection.companyId}/agents/${agent().id}`}>
-                          {agent().name}
-                        </A>
-                        {connection.user ? ` · authorized by ${connection.user.name}` : ""}
-                      </span>
-                    )}
-                  </Show>
-                  <span class="stand-body">{connectionAccess(connection.scopes)}</span>
-                  <div class="stand-actions">
-                    <Button size="compact" variant="danger" disabled={revoke.isPending} onClick={() => revoke.mutate(connection.id)}>
-                      Revoke
-                    </Button>
-                  </div>
-                </li>
+            {/* By id, so a change to one connection keeps its row (and its open editor). */}
+            <For each={active().map((row) => row.id)}>
+              {(id) => (
+                <Show when={active().find((row) => row.id === id)}>
+                  {(connection) => (
+                    <li class="stand-item">
+                      <h2 class="disp">{connectionTitle(connection())}</h2>
+                      <span class="stand-muted">Organization: {connection().companyName}</span>
+                      <Show when={connection().agent}>
+                        {(agent) => (
+                          <span class="stand-body">
+                            Works as{" "}
+                            <A class="stand-link" href={`/${connection().companyPrefix ?? connection().companyId}/agents/${agent().id}`}>
+                              {agent().name}
+                            </A>
+                            {connection().user ? ` · authorized by ${connection().user?.name}` : ""}
+                          </span>
+                        )}
+                      </Show>
+                      <Show when={!isAgentPairing(connection())} fallback={<span class="stand-body">Agent connection</span>}>
+                        <ConnectionAccess connection={connection()} queryKey={["mcp-connections"]} />
+                      </Show>
+                      <div class="stand-actions">
+                        <Button size="compact" variant="danger" disabled={revoke.isPending} onClick={() => revoke.mutate(connection().id)}>
+                          Revoke
+                        </Button>
+                      </div>
+                    </li>
+                  )}
+                </Show>
               )}
             </For>
           </ul>
