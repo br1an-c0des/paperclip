@@ -109,6 +109,26 @@ describe("the Paperclip catalog", () => {
     expect(() => find("paperclip_update_task").input.parse({ taskId: "TES-1" })).toThrow();
   });
 
+  it("update_task with onlyIfProvisional sets only a provisional title, through the title route", async () => {
+    const { calls, result } = await call("paperclip_update_task", { taskId: "TES-1", title: "Fix sign-in", onlyIfProvisional: true },
+      () => ({ id: "t1", title: "Fix sign-in", titleNeedsGeneration: false, changed: true }));
+    expect(calls).toEqual([{ method: "PUT", path: "/issues/TES-1/title", body: { title: "Fix sign-in", onlyIfProvisional: true } }]);
+    expect(result).toEqual({ task: { id: "t1", title: "Fix sign-in", titleNeedsGeneration: false }, changed: true });
+    // A title someone already chose stays, and the result says so.
+    const kept = await call("paperclip_update_task", { taskId: "TES-1", title: "Fix sign-in", onlyIfProvisional: true },
+      () => ({ id: "t1", title: "Chosen", titleNeedsGeneration: false, changed: false }));
+    expect(kept.result).toEqual({ task: { id: "t1", title: "Chosen", titleNeedsGeneration: false }, changed: false });
+    // Without it (or with false), a title is an ordinary change.
+    expect((await call("paperclip_update_task", { taskId: "TES-1", title: "Renamed", onlyIfProvisional: false })).calls)
+      .toEqual([{ method: "PATCH", path: "/issues/TES-1", body: { title: "Renamed" } }]);
+    const input = find("paperclip_update_task").input;
+    expect(() => input.parse({ taskId: "TES-1", onlyIfProvisional: true })).toThrow();
+    expect(() => input.parse({ taskId: "TES-1", onlyIfProvisional: false })).toThrow();
+    expect(() => input.parse({ taskId: "TES-1", title: "x", status: "done", onlyIfProvisional: true })).toThrow(/title alone/);
+    // The route decides own-or-any itself (and needs the assigned agent's active run).
+    expect(agentRouteRequirement("PUT", "/issues/TES-1/title")).toMatchObject({ tagged: true, routeChecks: true });
+  });
+
   it("archive_task sets and clears hiddenAt", async () => {
     const archived = await call("paperclip_archive_task", { taskId: "TES-1" });
     expect(archived.calls).toHaveLength(1);
@@ -145,6 +165,13 @@ describe("the Paperclip catalog", () => {
     expect(calls).toEqual([{ method: "POST", path: `/companies/${TEST_COMPANY_ID}/issues`, body: {
       title: "Write tests", parentId: "TES-1", assigneeAgentId: "66666666-6666-4666-8666-666666666666", blockedByIssueIds: [],
     } }]);
+  });
+
+  it("creates a task with its plan, and a project with repository URLs", async () => {
+    expect((await call("paperclip_create_task", { title: "Ship", initialPlan: "# Plan" })).calls)
+      .toEqual([{ method: "POST", path: `/companies/${TEST_COMPANY_ID}/issues`, body: { title: "Ship", initialPlan: "# Plan" } }]);
+    expect((await call("paperclip_create_project", { name: "Site", repositoryUrls: ["https://github.com/acme/site"] })).calls)
+      .toEqual([{ method: "POST", path: `/companies/${TEST_COMPANY_ID}/projects`, body: { name: "Site", status: "backlog", repositoryUrls: ["https://github.com/acme/site"] } }]);
   });
 
   it("writes a document with its base revision", async () => {

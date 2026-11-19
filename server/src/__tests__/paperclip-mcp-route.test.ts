@@ -176,10 +176,10 @@ const { recoveryPostgresSupport: support } = await import("./helpers/recovery-po
     if (originalSecret === undefined) delete process.env.PAPERCLIP_AGENT_JWT_SECRET; else process.env.PAPERCLIP_AGENT_JWT_SECRET = originalSecret;
   });
 
-  it("serves a run: task context, a comment, and finish recording the disposition", async () => {
+  /** A claude_local CLI run (the fixture is a native Runner run, dormant here) and a JSON-RPC caller for it. */
+  async function claudeRun() {
     const { createLocalAgentJwt } = await import("../agent-auth-jwt.js");
     const f = await server.fixture({ disableWakeOnDemand: true });
-    // The fixture is a native Runner run (dormant here); make it a claude_local CLI run.
     await server.db.update(agents).set({ adapterType: "claude_local", adapterConfig: {} }).where(eq(agents.id, f.agentId));
     await server.db.update(heartbeatRuns).set({ runtimeMode: "legacy", nativeIssueId: null }).where(eq(heartbeatRuns.id, f.runId));
     const token = createLocalAgentJwt(f.agentId, f.companyId, "claude_local", f.runId, f.responsibleUserId)!;
@@ -195,6 +195,11 @@ const { recoveryPostgresSupport: support } = await import("./helpers/recovery-po
       expect(body).toMatchObject({ jsonrpc: "2.0", id });
       return body.result;
     };
+    return { f, call };
+  }
+
+  it("serves a run: task context, a comment, and finish recording the disposition", async () => {
+    const { f, call } = await claudeRun();
 
     expect((await call("initialize", { protocolVersion: "2025-03-26" })).serverInfo).toEqual({ name: "paperclip", version: "1" });
     const tools = (await call("tools/list")).tools as Tool[];
@@ -218,5 +223,26 @@ const { recoveryPostgresSupport: support } = await import("./helpers/recovery-po
     expect(task.status).toBe("done");
     const [run] = await server.db.select().from(heartbeatRuns).where(eq(heartbeatRuns.id, f.runId));
     expect(readRunDisposition(run)).toMatchObject({ kind: "finished", tool: "paperclip_finish", taskStatus: "done", summary: "Smoke test finished" });
+  }, 60_000);
+
+  it("a worker run retitles its own provisional task, and leaves a chosen title alone", async () => {
+    const { f, call } = await claudeRun();
+    await server.db.update(issues).set({ title: "Please investigate", titleNeedsGeneration: true }).where(eq(issues.id, f.issueId));
+    const retitle = (title: string) => call("tools/call", {
+      name: "paperclip_update_task", arguments: { taskId: f.issueId, title, onlyIfProvisional: true },
+    });
+
+    const first = await retitle("Fix the sign-in redirect");
+    expect(first.isError, JSON.stringify(first)).toBeUndefined();
+    expect(first.structuredContent).toEqual({ task: { id: f.issueId, title: "Fix the sign-in redirect", titleNeedsGeneration: false }, changed: true });
+    const [renamed] = await server.db.select().from(issues).where(eq(issues.id, f.issueId));
+    expect(renamed).toMatchObject({ title: "Fix the sign-in redirect", titleNeedsGeneration: false });
+
+    // The title is no longer provisional, so a second provisional rename changes nothing.
+    const second = await retitle("Something else");
+    expect(second.isError, JSON.stringify(second)).toBeUndefined();
+    expect(second.structuredContent).toMatchObject({ task: { title: "Fix the sign-in redirect" }, changed: false });
+    const [kept] = await server.db.select().from(issues).where(eq(issues.id, f.issueId));
+    expect(kept.title).toBe("Fix the sign-in redirect");
   }, 60_000);
 });

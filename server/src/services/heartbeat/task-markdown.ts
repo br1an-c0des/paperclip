@@ -227,8 +227,13 @@ export function buildPaperclipTaskMarkdown(input: {
       lines.push(
         "",
         "Task title directive:",
-        "The current title is a provisional slice of the user's prompt. As one of your first tool calls, use set_task_title with a concise title describing the requested outcome and onlyIfProvisional: true. If that tool is unavailable, PUT /api/issues/" + issue.id + "/title with {title, onlyIfProvisional: true} using your normal Paperclip authentication. Do this in Ask and Plan modes too. Preserve the full task description and any title already chosen by the user; then continue the task.",
-        "Check the title tool result before claiming the title was saved. Use a new idempotency key if retrying with changed arguments.",
+        // The dormant Paperclip Runner keeps its own set_task_title tool; other runs use the paperclip MCP catalog.
+        input.nativeRunner
+          ? "The current title is a provisional slice of the user's prompt. As one of your first tool calls, use set_task_title with a concise title describing the requested outcome and onlyIfProvisional: true. If that tool is unavailable, PUT /api/issues/" + issue.id + "/title with {title, onlyIfProvisional: true} using your normal Paperclip authentication. Do this in Ask and Plan modes too. Preserve the full task description and any title already chosen by the user; then continue the task."
+          : "The current title is a provisional slice of the user's prompt. As one of your first tool calls, use paperclip_update_task with this task's taskId, a concise title describing the requested outcome, and onlyIfProvisional: true (no other changes in that call). Do this in Ask and Plan modes too. Preserve the full task description and any title already chosen by the user; then continue the task.",
+        input.nativeRunner
+          ? "Check the title tool result before claiming the title was saved. Use a new idempotency key if retrying with changed arguments."
+          : "Check the title tool result (changed: true) before claiming the title was saved; changed: false means a title was already chosen, so keep it.",
       );
     }
     if (issue.conversationAgentId) {

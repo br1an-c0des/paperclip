@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ISSUE_PRIORITIES, ISSUE_STATUSES } from "@paperclipai/shared";
-import { COMMENT_FIELDS, TASK_FIELDS, TASK_ROW_FIELDS, pathId, pick, rows, taskId, tool } from "./util.js";
+import { COMMENT_FIELDS, TASK_FIELDS, TASK_ROW_FIELDS, object, pathId, pick, rows, taskId, tool } from "./util.js";
 
 const uuid = z.uuid();
 const status = z.enum(ISSUE_STATUSES);
@@ -101,6 +101,8 @@ export const TASK_TOOLS = [
       status: z.enum(["backlog", "todo"]).optional(),
       labelIds: z.array(uuid).max(50).optional(),
       blockedByTaskIds: z.array(uuid).max(100).optional(),
+      initialPlan: z.string().trim().min(1).max(200000).optional()
+        .describe("Markdown saved as the new task's plan document, before its assignee starts"),
     }).strict(),
     run: async (caller, args, api) => ({
       task: pick(await api("POST", `/companies/${pathId(caller.companyId)}/issues`, taskBody(args)), TASK_FIELDS),
@@ -108,14 +110,26 @@ export const TASK_TOOLS = [
   }),
   tool({
     name: "paperclip_update_task",
-    description: "Change a task's fields, status, assignee, labels, parent or blockers; an optional comment is posted with the change.",
+    description: "Change a task's fields, status, assignee, labels, parent or blockers; an optional comment is posted with the change. With onlyIfProvisional, sets only a provisional title (your run's own task).",
     action: UPDATE_TASK,
-    input: z.object({ taskId, ...taskChanges, comment: z.string().trim().min(1).max(50000).optional() })
+    input: z.object({
+      taskId, ...taskChanges, comment: z.string().trim().min(1).max(50000).optional(),
+      onlyIfProvisional: z.boolean().optional()
+        .describe("true: set only the title, and only while it's still the provisional one taken from the prompt. Send it with title alone"),
+    })
       .strict()
-      .refine(args => Object.keys(args).some(key => key !== "taskId"), "Supply at least one change"),
-    run: async (_caller, { taskId: id, ...changes }, api) => ({
-      task: pick(await api("PATCH", `/issues/${pathId(id)}`, taskBody(changes)), TASK_FIELDS),
-    }),
+      .refine(args => Object.keys(args).some(key => key !== "taskId" && key !== "onlyIfProvisional"), "Supply at least one change")
+      .refine(args => !args.onlyIfProvisional || (args.title !== undefined
+        && Object.keys(args).every(key => key === "taskId" || key === "title" || key === "onlyIfProvisional")),
+      "onlyIfProvisional goes with title alone; send other changes in a separate call"),
+    run: async (_caller, { taskId: id, onlyIfProvisional, ...changes }, api) => {
+      // The title route keeps a title someone already chose, and reports whether it changed it.
+      if (onlyIfProvisional) {
+        const result = object(await api("PUT", `/issues/${pathId(id)}/title`, { title: changes.title, onlyIfProvisional: true }));
+        return { task: pick(result, ["id", "title", "titleNeedsGeneration"]), changed: result.changed === true };
+      }
+      return { task: pick(await api("PATCH", `/issues/${pathId(id)}`, taskBody(changes)), TASK_FIELDS) };
+    },
   }),
   tool({
     name: "paperclip_archive_task",
