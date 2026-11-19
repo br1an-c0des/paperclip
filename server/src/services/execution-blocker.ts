@@ -325,6 +325,7 @@ export async function getExecutionBlocker(db: Db, companyId: string, issueId: st
   conversationResetCommentId?: string | null;
   /** The native run being dispatched; its own scheduled resume does not block it. */
   resumingNativeRunId?: string | null;
+  recoveryHoldOnly?: boolean;
 }): Promise<ExecutionBlocker | null> {
   const [conversation] = await db.select({ agentId: issues.conversationAgentId,
     boundaryId: issues.conversationBoundaryCommentId, status: issues.status,
@@ -356,7 +357,7 @@ export async function getExecutionBlocker(db: Db, companyId: string, issueId: st
       eq(issueComments.id, conversation.boundaryId),
     )).limit(1) : [];
 
-  const ownership = await getConversationOwnershipBlocker(db, companyId, issueId);
+  const ownership = options?.recoveryHoldOnly ? null : await getConversationOwnershipBlocker(db, companyId, issueId);
   if (ownership) return { ...ownership, recoveryActionId: null };
   const [action] = restoreHold ? [restoreHold] : await db.select().from(issueRecoveryActions).where(and(
     eq(issueRecoveryActions.companyId, companyId),
