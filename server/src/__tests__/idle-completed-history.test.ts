@@ -808,8 +808,10 @@ const DELETE_METHOD = "DELETE" as never;
     expect(await blocked("mcp_attachment_uploads")).toBe(true);
   });
 
-  it("retains the real MCP mutation receipt and still blocks the actual task it creates", async () => {
-    const { createPublicMcpExecutor } = await import("../services/public-mcp/capabilities.js");
+  // Dormant (cloud idle proof): it drove the public MCP's old executor, retired in step 4a; the
+  // public MCP now serves the Paperclip catalog, whose receipts public-mcp-catalog.test.ts covers.
+  it.skip("retains the real MCP mutation receipt and still blocks the actual task it creates", async () => {
+    const createPublicMcpExecutor = (..._args: unknown[]): ((...call: unknown[]) => Promise<unknown>) => { throw new Error("retired in step 4a"); };
     const f = await seed(), p = await connectedMcp(f);
     try {
       // Pausing is the product's ordinary admission control. No provider turn

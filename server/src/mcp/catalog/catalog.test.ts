@@ -34,14 +34,21 @@ describe("the Paperclip catalog", () => {
     }
   });
 
-  it("a worker run sees 19 tools and 4 more marked as needing approval", () => {
+  it("a worker run sees 22 tools and 4 more marked as needing approval", () => {
     const tools = listTools(testCaller({ access: { level: "worker" } }), catalog);
     const needsApproval = tools.filter(definition => definition.annotations?.paperclipNeedsApproval).map(definition => definition.name);
-    expect(tools.length - needsApproval.length).toBe(19);
+    expect(tools.length - needsApproval.length).toBe(22);
     expect(needsApproval.sort()).toEqual([
       "paperclip_create_project", "paperclip_delete_task", "paperclip_manage_labels", "paperclip_update_project",
     ]);
-    expect(tools.map(definition => definition.name)).not.toContain("paperclip_call_api");
+    const names = tools.map(definition => definition.name);
+    expect(names).not.toContain("paperclip_call_api");
+    // File links belong to an outside connection's grant.
+    expect(names).not.toContain("paperclip_file_upload");
+    expect(names).not.toContain("paperclip_file_download");
+    // Skills and deliverables are listed for their reads; their changes need approval.
+    expect(tools.find(definition => definition.name === "paperclip_skills")!.description).toMatch(/Changes need approval\.$/);
+    expect(tools.find(definition => definition.name === "paperclip_deliverables")!.description).not.toMatch(/approval/);
   });
 
   it("each tool's action passes the route policy of every write it makes", async () => {
@@ -70,11 +77,14 @@ describe("the Paperclip catalog", () => {
       paperclip_update_project: { projectId, changes: { name: "Site" } },
       paperclip_ask_board: { taskId: "TES-1", question: "Which?" },
       paperclip_request_approval: { title: "Spend", summary: "Hosting" },
+      paperclip_deliverables: { taskId: "TES-1", register: { type: "artifact", provider: "paperclip", title: "Report" } },
+      paperclip_configure_agent: { agentId: projectId, changes: { title: "Editor" } },
+      paperclip_skills: { create: { name: "Review" } },
     };
     const caller = testCaller({ access: { level: "admin", overrides: { "tasks:delete": true } } });
     let writes = 0;
     for (const definition of boundCatalog) {
-      if (definition.name === "paperclip_call_api" || definition.name === "paperclip_search_api") continue;
+      if (definition.name === "paperclip_call_api" || definition.name === "paperclip_search_api" || definition.needsGrant) continue;
       const api = recordingDispatch(({ method }) => method === "GET" ? [] : { id: "x" });
       await definition.run(caller, definition.input.parse(sampleArgs[definition.name] ?? {}), api);
       const actions = typeof definition.action === "string" ? [definition.action] : definition.action;
@@ -167,5 +177,32 @@ describe("the Paperclip catalog", () => {
     expect(calls).toEqual([{ method: "POST", path: `/companies/${TEST_COMPANY_ID}/approvals`, body: {
       type: "request_board_approval", payload: { title: "Spend $42", summary: "Hosting" }, issueIds: ["88888888-8888-4888-8888-888888888888"],
     } }]);
+  });
+
+  it("tools carried over from the public MCP fold reads into existing tools", async () => {
+    const agentId = "66666666-6666-4666-8666-666666666666";
+    const projectId = "99999999-9999-4999-8999-999999999999";
+    expect((await call("paperclip_list_agents", { agentId }, () => ({ id: agentId, adapterType: "claude_local", adapterConfig: { model: "m", env: { SECRET: "x" } } }))).calls)
+      .toEqual([{ method: "GET", path: `/agents/${agentId}/configuration` }]);
+    expect((await call("paperclip_list_projects", { projectId })).calls).toEqual([{ method: "GET", path: `/projects/${projectId}` }]);
+    expect((await call("paperclip_read_document", { taskId: "TES-1", key: "plan", revisions: true })).calls)
+      .toEqual([{ method: "GET", path: "/issues/TES-1/documents/plan/revisions" }]);
+    expect((await call("paperclip_update_project", { projectId, repositoryIds: ["12"] })).calls)
+      .toEqual([{ method: "PUT", path: `/projects/${projectId}/repositories`, body: { repositoryIds: ["12"] } }]);
+    expect((await call("paperclip_update_task", { taskId: "TES-1", status: "blocked", unblock: { owner: "board", action: "Send the file" } })).calls)
+      .toEqual([{ method: "PATCH", path: "/issues/TES-1", body: { status: "blocked", unblockDescriptor: { owner: "board", action: "Send the file" } } }]);
+    const listed = await call("paperclip_list_requests", {}, () => [{ id: "a1", type: "permission_request", status: "pending", payload: { summary: "Delete task TES-1" } }]);
+    expect(listed.result).toEqual({ requests: [{ id: "a1", type: "permission_request", status: "pending", title: "Delete task TES-1" }] });
+  });
+
+  it("configure_agent and skills read without writing", async () => {
+    const agentId = "66666666-6666-4666-8666-666666666666";
+    expect((await call("paperclip_configure_agent", { agentId, read: "instructions" })).calls)
+      .toEqual([{ method: "GET", path: `/agents/${agentId}/instructions-bundle/file?path=AGENTS.md` }]);
+    expect(() => find("paperclip_configure_agent").input.parse({ agentId })).toThrow();
+    const skills = find("paperclip_skills");
+    expect(skills.writes?.({})).toBe(false);
+    expect(skills.writes?.({ create: { name: "x" } })).toBe(true);
+    expect((await call("paperclip_skills", {})).calls).toEqual([{ method: "GET", path: `/companies/${TEST_COMPANY_ID}/skills` }]);
   });
 });

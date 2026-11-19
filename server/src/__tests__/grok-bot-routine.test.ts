@@ -2,7 +2,6 @@ import express from "express";
 import request from "supertest";
 import { grokBotRoutes } from "../routes/grok-bot.js";
 import { publicMcpIngressRoutes } from "../routes/public-mcp.js";
-import { createPublicMcpExecutor } from "../services/public-mcp/capabilities.js";
 import { createDotRunnerMcpTools } from "../services/dot-runner-broker.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
@@ -145,7 +144,8 @@ describe("durable Grok routine qualification", () => {
     await f.service.send(f.company.id, f.agent.id, row.id);
     const app = express(); app.use(express.json());
     const dispatch = async () => { throw new Error("Personal dispatch forbidden"); };
-    app.use(publicMcpIngressRoutes(f.oauth, createPublicMcpExecutor(db, f.oauth, dispatch), undefined, createDotRunnerMcpTools(db)));
+    void dispatch;
+    app.use(publicMcpIngressRoutes(f.oauth, undefined, undefined, createDotRunnerMcpTools(db)));
     const invoke = (method: string, params: unknown) => request(app).post("/mcp/runner")
       .set("Authorization", `Bearer ${f.tokens.access_token}`).set("Accept", "application/json, text/event-stream")
       .send({ jsonrpc: "2.0", id: 1, method, params });

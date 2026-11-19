@@ -3,7 +3,8 @@ import { HttpError } from "../errors.js";
 import { logger } from "../middleware/logger.js";
 import { McpToolError } from "./dispatch.js";
 import type { CatalogDispatch, McpCaller, PaperclipTool } from "./catalog/types.js";
-import { isRequestable, toolVisibility } from "./catalog/visibility.js";
+import { hasAgentAccess } from "@paperclipai/shared";
+import { callAccess, isRequestable, toolVisibility } from "./catalog/visibility.js";
 import type { AgentAccessAction } from "@paperclipai/shared";
 
 const SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
@@ -80,9 +81,12 @@ export function listTools(caller: McpCaller, catalog: readonly PaperclipTool[]):
     const visibility = toolVisibility(caller, definition);
     if (visibility.state === "hidden") return [];
     const base = { name: definition.name, inputSchema: inputSchema(definition) };
-    return visibility.state === "allowed"
-      ? [{ ...base, description: definition.description }]
-      : [{ ...base, description: `${definition.description} Needs approval.`, annotations: { paperclipNeedsApproval: true } }];
+    if (visibility.state === "needs_approval") {
+      return [{ ...base, description: `${definition.description} Needs approval.`, annotations: { paperclipNeedsApproval: true } }];
+    }
+    // A tool that reads or writes by its arguments, listed for its reads: say its changes need approval.
+    const changesNeedApproval = definition.writes && !hasAgentAccess(caller.access, definition.action);
+    return [{ ...base, description: changesNeedApproval ? `${definition.description} Changes need approval.` : definition.description }];
   });
 }
 
@@ -125,10 +129,16 @@ export async function callTool(session: McpSession, name: unknown, args: unknown
   if (!parsed.success) return errorResult(`Invalid arguments: ${z.prettifyError(parsed.error)}`, { code: "invalid_arguments" });
   const input = parsed.data !== null && typeof parsed.data === "object" ? parsed.data as Record<string, unknown> : {};
   try {
-    if (visibility.state === "needs_approval") {
-      if (session.requestPermission) return await requested(session, definition, input, visibility.missingAction);
-      return errorResult(`You don't have ${visibility.missingAction}, which ${definition.name} needs; it needs the board's approval.`, {
-        code: "access_denied", missingAction: visibility.missingAction, requestable: true,
+    const access = callAccess(session.caller, definition, input);
+    if (access.state === "denied") {
+      return errorResult(`You don't have ${access.missingAction}, which this call needs.`, {
+        code: "access_denied", missingAction: access.missingAction, requestable: false,
+      });
+    }
+    if (access.state === "needs_approval") {
+      if (session.requestPermission) return await requested(session, definition, input, access.missingAction);
+      return errorResult(`You don't have ${access.missingAction}, which ${definition.name} needs; it needs the board's approval.`, {
+        code: "access_denied", missingAction: access.missingAction, requestable: true,
       });
     }
     const result = await definition.run(session.caller, parsed.data, session.dispatch);

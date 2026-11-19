@@ -22,7 +22,7 @@ import { budgetPolicies, costEvents, grokBotRoutines, grokBotDispatches, agents,
   heartbeatRuns, mcpOauthGrants, issueAttachments, activityLog, agentWakeupRequests, issueComments, issues, nativeRunResults, nativeRunFinalizations, completionContracts, mcpEventDeliveries, mcpEventSubscriptions, workspaceOperations, workAssessments, statusDecisions, issueThreadInteractions } from "@paperclipai/db";
 import { startEmbeddedPostgresTestDatabase } from "./helpers/embedded-postgres.js";
 import { createPublicMcpOAuth, DEVICE_GRANT } from "../services/public-mcp/oauth.js";
-import { createPublicMcpExecutor } from "../services/public-mcp/capabilities.js";
+import { createPublicMcpCatalog } from "../services/public-mcp/catalog.js";
 import { publicMcpIngressRoutes, publicMcpManagementRoutes } from "../routes/public-mcp.js";
 import { createPublicMcpEvents } from "../services/public-mcp/events.js";
 import type { EventFetch } from "../services/public-mcp/event-webhooks.js";
@@ -211,11 +211,11 @@ describe("durable Dot Runner integration", () => {
 
   function gateway(oauth: ReturnType<typeof createPublicMcpOAuth>, actor: Request["actor"]) {
     const personal = createPublicMcpOAuth(db, { ...oauth.config, resource: oauth.config.origin + "/mcp/paperclip" });
-    const dispatch = async () => { throw new Error("Personal API dispatch forbidden"); };
+    // No personal API is reachable from this gateway: its catalog dispatches into an empty router.
     const app = express();
     app.use(express.json());
-    app.use(publicMcpIngressRoutes(personal, createPublicMcpExecutor(db, personal, dispatch)));
-    app.use(publicMcpIngressRoutes(oauth, createPublicMcpExecutor(db, oauth, dispatch)));
+    app.use(publicMcpIngressRoutes(personal, createPublicMcpCatalog(db, personal, { api: express.Router() })));
+    app.use(publicMcpIngressRoutes(oauth));
     app.use((req, _res, next) => { req.actor = actor; next(); });
     app.use("/api", publicMcpManagementRoutes(personal, oauth));
     return { app, personal };
