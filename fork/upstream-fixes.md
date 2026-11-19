@@ -96,6 +96,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 59 | [Keep provider `access_denied` errors apart from agent access refusals](#59-keep-provider-access_denied-errors-apart-from-agent-access-refusals) | fixed on `feat/step-4a` (`d162c3255`) | | | 2026-11-19 | | |
 | 60 | [Let a worker pick a workspace for its own subtask](#60-let-a-worker-pick-a-workspace-for-its-own-subtask) | fixed on `feat/step-4a` (`1c870f14d`) | | | 2026-11-19 | | |
 | 61 | [Don't write or lock on an access check with no temporary grant](#61-dont-write-or-lock-on-an-access-check-with-no-temporary-grant) | fixed on `feat/step-4a` (`0a1c2721d`) | | | 2026-11-19 | | |
+| 62 | [Steady two server tests that flaked in CI](#62-steady-two-server-tests-that-flaked-in-ci) | candidate | | | 2026-11-19 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -997,3 +998,18 @@ Found and fixed by the step 4a regression agent B (2026-11-19, `0a1c2721d`), on 
   even with no grant, so read paths (the warm instruction checkpoint) issued a write.
 - **Fix:** one read first, preferring a standing grant; the UPDATE runs only when a one-use grant
   exists, and spending it stays atomic.
+
+### 62. Steady two server tests that flaked in CI
+
+Found 2026-11-19. CI run 44544972878 on `main` (`282b37631`, a docs-only commit after the green run
+44542707607) failed one test in each of two shards, on CI's 4-core runners with 2 workers:
+
+- `server/src/__tests__/heartbeat-worktree-suppression.test.ts`: "suppresses new assignment wakes in
+  worktree instances without creating heartbeat runs" (shard 5/10).
+- `server/src/__tests__/run-start-handover.test.ts`: "the old server stops starting runs once the new
+  one starts them, and the new one starts the queued run" (shard 1/10).
+
+- **Problem:** both passed the run before with no code change, so they're timing-sensitive under
+  CI's load. A red run blocks a merge into `main` under the step 3a workflow.
+- **Likely fix:** read each failure in the run's log, then replace wall-clock waits with fake
+  clocks or condition waits, as step 3a agent G did for the slow core tests.
