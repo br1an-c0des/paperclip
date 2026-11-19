@@ -58,6 +58,10 @@ import { aiConnectionRoutes } from "./routes/ai-connections.js";
 import { taskWorkspaceRoutes } from "./routes/task-workspaces.js";
 import { projectToolRoutes } from "./routes/project-tools.js";
 import { paperclipMcpRoutes } from "./routes/paperclip-mcp.js";
+import { resolveMcpCaller } from "./mcp/caller.js";
+import { catalogDeps } from "./mcp/catalog-deps.js";
+import { createPaperclipCatalog } from "./mcp/catalog/index.js";
+import { createPermissionRequestReplayer, permissionRequestCreator } from "./services/permission-requests.js";
 import { emailChannelService } from "./services/email-channels.js";
 import { emailRoutes, emailWebhookRoutes } from "./routes/email.js";
 import { toolActionDeliveryService } from "./services/tool-action-delivery.js";
@@ -788,7 +792,15 @@ export async function createApp(
   api.use(assetRoutes(db, opts.storageService));
   api.use(agentProfileAvatarRoutes(db, opts.storageService));
   api.use(projectToolRoutes(db));
-  api.use(paperclipMcpRoutes(db, api, { parentLocals: app.locals }));
+  // Step 4a, section 7: a requestable denial becomes a permission request; approving replays it.
+  const permissionRequests = createPermissionRequestReplayer({
+    db, api, catalog: createPaperclipCatalog(catalogDeps(db)), dispatchOptions: { parentLocals: app.locals },
+    ...(publicMcpOAuth ? { resolveGrantCaller: async (grantId: string) => {
+      const principal = await publicMcpOAuth.authorizeGrant(grantId);
+      return resolveMcpCaller(db, principal.actor, { grant: principal.grant });
+    } } : {}),
+  });
+  api.use(paperclipMcpRoutes(db, api, { parentLocals: app.locals, requestPermission: permissionRequestCreator(db) }));
   api.use(taskWorkspaceRoutes(db));
   api.use(projectRoutes(db));
   api.use(caseRoutes(db, opts.storageService));
@@ -820,7 +832,7 @@ export async function createApp(
   api.use(onboardingSeedRoutes(db));
   api.use(boardChatRoutes(db, { deploymentMode: opts.deploymentMode }));
   api.use(voiceSessionRoutes(db, chatChannels.voice));
-  api.use(approvalRoutes(db, { pluginWorkerManager: workerManager }));
+  api.use(approvalRoutes(db, { pluginWorkerManager: workerManager, permissionRequests }));
   api.use(secretRoutes(db));
   api.use(managedAgentProfileRoutes(db));
   api.use(remoteAgentProfileRoutes(db));

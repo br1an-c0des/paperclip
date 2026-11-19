@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { heartbeatRuns, type Db } from "@paperclipai/db";
 import {
   addApprovalCommentSchema,
+  approveApprovalSchema,
   cancelApprovalSchema,
   createApprovalSchema,
   requestApprovalRevisionSchema,
@@ -29,6 +30,10 @@ import type { PluginWorkerManager } from "../services/plugin-worker-manager.js";
 import { issueService } from "../services/issues.js";
 import { approvalReadSqlCondition, canActorReadApproval } from "../services/authorization.js";
 import { REVIEW_PATH_RECOVERY_INSTRUCTION } from "../services/recovery/review-path-recovery.js";
+import { permissionRequestOutcomeComment, type PermissionRequestReplayer, type PermissionRequestResult } from "../services/permission-requests.js";
+import type { PermissionRequestPayload } from "@paperclipai/shared";
+
+type PermissionRequestOutcome = { payload: PermissionRequestPayload; result: PermissionRequestResult };
 
 function redactApprovalPayload<T extends { payload: Record<string, unknown> }>(approval: T): T {
   return {
@@ -296,7 +301,11 @@ export async function cancelApprovalAndNotify(input: {
 
 export function approvalRoutes(
   db: Db,
-  options: { pluginWorkerManager?: PluginWorkerManager } = {},
+  options: {
+    pluginWorkerManager?: PluginWorkerManager;
+    /** Replays approved permission requests (built in app.ts, which has the API router). */
+    permissionRequests?: PermissionRequestReplayer;
+  } = {},
 ) {
   const router = Router();
   router.param("id", async (req, res, next, id) => {
@@ -397,6 +406,14 @@ export function approvalRoutes(
   router.post("/companies/:companyId/approvals", validate(createApprovalSchema), async (req, res) => {
     const companyId = req.params.companyId as string;
     assertCompanyAccess(req, companyId);
+    if (req.body.type === "permission_request") {
+      // Only a refused tool call makes these (createPermissionRequest), so their payload is trusted.
+      res.status(422).json({
+        error: "Permission requests are made by Paperclip when a tool call is refused; they can't be created directly.",
+        code: "permission_request_reserved",
+      });
+      return;
+    }
     if (!(await assertApprovalAccessAllowed(req, res, companyId))) return;
     if (!(await assertApprovalMutationAllowedByRunContext(req, res, companyId))) return;
     const rawIssueIds = req.body.issueIds;
@@ -458,17 +475,41 @@ export function approvalRoutes(
     res.json(issues);
   });
 
-  router.post("/approvals/:id/approve", validate(resolveApprovalSchema), async (req, res) => {
+  router.post("/approvals/:id/approve", validate(approveApprovalSchema), async (req, res) => {
     assertBoard(req);
     const id = req.params.id as string;
     if (!(await requireApprovalAccess(req, id))) {
       res.status(404).json({ error: "Approval not found" });
       return;
     }
+    if (req.actor.source === "mcp_oauth") {
+      // Decisions are the person's, in Paperclip: an outside connection can't approve its own requests.
+      res.status(403).json({ error: "Decide approvals in Paperclip; an outside connection can't decide them.", code: "approval_decision_in_app" });
+      return;
+    }
     const decidedByUserId = req.actor.userId ?? "board";
     // Who the card was for, read before the decision (PAP-749 plan §6).
     const handledFor = await approvalHandledFor(id, req.actor.userId);
-    const { approval, applied } = await svc.approve(id, decidedByUserId, req.body.decisionNote);
+    const decision = await svc.approve(id, decidedByUserId, req.body.decisionNote, {
+      alwaysAllow: req.body.alwaysAllow === true,
+      replayer: options.permissionRequests,
+    });
+    const { approval, applied } = decision;
+    const permissionRequest = (decision as { permissionRequest?: PermissionRequestOutcome }).permissionRequest;
+    // An approved permission request reports its outcome on its task, which wakes the assignee.
+    let reportedOnTask = false;
+    if (applied && permissionRequest?.payload.taskId && options.permissionRequests) {
+      try {
+        await options.permissionRequests.report(
+          permissionRequest.payload.taskId,
+          permissionRequestOutcomeComment(permissionRequest.payload, permissionRequest.result),
+          req.actor,
+        );
+        reportedOnTask = true;
+      } catch (err) {
+        logger.warn({ err, approvalId: approval.id }, "failed to report a permission request's outcome on its task");
+      }
+    }
 
     if (applied) {
       const linkedIssues = await issueApprovalsSvc.listIssuesForApproval(approval.id);
@@ -495,7 +536,7 @@ export function approvalRoutes(
       });
 
       let primaryReviewPathWakeCovered = false;
-      if (approval.requestedByAgentId) {
+      if (approval.requestedByAgentId && !reportedOnTask) {
         try {
           const wakeRun = await heartbeat.wakeup(approval.requestedByAgentId, {
             source: "automation",
@@ -582,6 +623,10 @@ export function approvalRoutes(
     const id = req.params.id as string;
     if (!(await requireApprovalAccess(req, id))) {
       res.status(404).json({ error: "Approval not found" });
+      return;
+    }
+    if (req.actor.source === "mcp_oauth") {
+      res.status(403).json({ error: "Decide approvals in Paperclip; an outside connection can't decide them.", code: "approval_decision_in_app" });
       return;
     }
     const decidedByUserId = req.actor.userId ?? "board";

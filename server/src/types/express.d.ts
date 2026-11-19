@@ -32,6 +32,8 @@ declare global {
         onBehalfOfUserId?: string | null;
         authorizingUserId?: string;
         identityContextId?: string | null;
+        /** The OAuth grant behind an `mcp_oauth` actor (step 4a): its level caps the actor. */
+        grantId?: string;
         source?: "local_implicit" | "session" | "board_key" | "agent_key" | "agent_jwt" | "mcp_oauth" | "cloud_tenant" | "cloud_control" | "none";
       };
     }
