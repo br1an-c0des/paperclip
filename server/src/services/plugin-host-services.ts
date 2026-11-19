@@ -1558,9 +1558,12 @@ export function buildHostServices(
     }, { interactionPolicy: "defer_to_mutation" });
     // A suggest-only grant changes through the consent flow; a plugin's direct write isn't one.
     if (!decision.allowed || decision.reason === "allow_consented_change") {
+      // Every access refusal names an action, as accessDeniedBody does: the one the level lacks,
+      // else the one being checked.
       throw forbidden(decision.allowed ? "This agent may only suggest configuration changes." : decision.explanation, {
         code: "access_denied", actorAgentId: origin.agentId,
-        ...(decision.missingAction ? { missingAction: decision.missingAction } : {}),
+        missingAction: decision.allowed ? "agents:configure"
+          : decision.missingAction ?? (action === "agent_config:update" ? "agents:configure" : "tasks:update_any"),
       });
     }
   }

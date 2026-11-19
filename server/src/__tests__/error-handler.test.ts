@@ -279,6 +279,31 @@ describe("errorHandler", () => {
     ).not.toContain("setup-error-token-canary");
   });
 
+  it("answers an agent access refusal with its fixed shape and no details", () => {
+    const res = makeRes() as any;
+    errorHandler(new HttpError(403, "This agent's access level does not let it delete this task (needs tasks:delete).", {
+      code: "access_denied", missingAction: "tasks:delete", requestable: true, reason: "access_level",
+    }), makeReq(), res, vi.fn() as unknown as NextFunction);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "This agent's access level does not let it delete this task (needs tasks:delete).",
+      code: "access_denied",
+      missingAction: "tasks:delete",
+      requestable: true,
+    });
+  });
+
+  it("keeps the details of a provider access_denied error that isn't an agent access refusal", () => {
+    const res = makeRes() as any;
+    const details = {
+      code: "access_denied", provider: "aws_secrets_manager", operation: "secret.create", region: "us-east-1",
+      requiredCapability: "secretsmanager:CreateSecret",
+    };
+    errorHandler(new HttpError(403, "AWS Secrets Manager denied the request", details), makeReq(), res,
+      vi.fn() as unknown as NextFunction);
+    expect(res.json).toHaveBeenCalledWith({ error: "AWS Secrets Manager denied the request", code: "access_denied", details });
+  });
+
   it("keeps actionable setup validation details while removing submitted credentials", () => {
     const req = {
       ...makeReq(),
