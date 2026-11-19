@@ -623,6 +623,9 @@ option 3 (was build plan 2a-6). Revives #2700.
   environment variable, unlike #2700's settings files, also works with `--setting-sources user`.
 - **Fork workaround:** `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in `deploy/docker-compose.yml`, and in the
   adapter `env` of each Runner agent.
+- **Planned fix (2026-11-18):** wider than this entry. Step 4b turns auto memory off for **every**
+  `claude_local` run, not only those with `para-memory-files`, and Paperclip sets the variable itself
+  ([step-4b-sealed-runs.md](step-4b-sealed-runs.md), section 6). This closes when 4b part 1 merges.
 
 ### 40. Find why 11 server tests fail on `main` (one file is core)
 

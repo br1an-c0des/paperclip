@@ -329,6 +329,12 @@ also needs a decision, like the other flags.
 upstream PR, and option 4 goes into the agent page design. The `enableMemoryConnectors` flag isn't
 decided yet.
 
+**Update 2026-11-18 (hard-fork step 4b).** Auto memory is off for every `claude_local` run, set by
+Paperclip in each run's environment rather than inherited from the server
+([step-4b-sealed-runs.md](../../fork/step-4b-sealed-runs.md), section 6). Agents remember through
+`para-memory-files` where it's assigned. The long-term answer is the memory service
+([build plan 3.5](build-plan.md#35-memory-service)).
+
 Harnesses in use (Oct 24, 2026): `claude_local`, the Paperclip Runner and Claude Managed. So:
 
 - Option 1 also needs the variable in the adapter `env` of each Runner agent, since the Runner

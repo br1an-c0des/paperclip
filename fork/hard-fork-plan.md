@@ -388,8 +388,9 @@ Split in two. **4a** (Paperclip over MCP, agent permissions) has its own
   beside it.
 - Run in the project's repo, or a per-task git worktree of it, never the agent's private folder
   when a project has a repo.
-- Keep the agent's own Claude memory between runs, in its config folder, where Paperclip can show
-  it.
+- Claude Code's auto memory is off for every run (decided 2026-11-18). Agents remember through
+  `para-memory-files` where it's assigned, until the memory service
+  ([build plan 3.5](../ui-new/docs/build-plan.md#35-memory-service)).
 - Add the three things kept from the Runner: finish-or-block completion (built in 4a), a recovery
   handoff and structured live events.
 - Agents use Paperclip through MCP, not curl ([below](#agents-use-paperclip-through-mcp); 4a).
