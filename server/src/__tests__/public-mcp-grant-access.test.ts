@@ -3,7 +3,7 @@ import express, { type Request } from "express";
 import request from "supertest";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { agents, authUsers, companies, companyMemberships, createDb, mcpOauthGrants, principalPermissionGrants } from "@paperclipai/db";
+import { agents, authUsers, companies, companyMemberships, createDb, issues, mcpOauthGrants, principalPermissionGrants } from "@paperclipai/db";
 import type { AgentAccessLevel } from "@paperclipai/shared";
 import {
   EMBEDDED_POSTGRES_TEST_TIMEOUT_MS,
@@ -20,7 +20,10 @@ import { callTool } from "../mcp/server.js";
 import { publicMcpManagementRoutes } from "../routes/public-mcp.js";
 import { loadAgentAccess } from "../services/agent-access.js";
 import { instanceSettingsService } from "../services/instance-settings.js";
+import { McpCapabilityError } from "../services/public-mcp/contracts.js";
+import { createPublicMcpTransfers } from "../services/public-mcp/file-transfers.js";
 import { createPublicMcpOAuth } from "../services/public-mcp/oauth.js";
+import type { StorageService } from "../storage/types.js";
 
 const support = await getEmbeddedPostgresTestSupport();
 const config = { origin: "https://paperclip.example", resource: "https://paperclip.example/mcp/paperclip" };
@@ -179,6 +182,55 @@ describe.skipIf(!support.supported)("an outside connection's access level", () =
     otherApp.use("/api", publicMcpManagementRoutes(oauth));
     expect((await request(otherApp).patch(`/api/mcp/connections/${connection!.id}`).set("Origin", config.origin).send({ accessLevel: "admin" })).status).toBe(404);
     expect((await request(app).patch(`/api/mcp/connections/${connection!.id}`).send({ accessLevel: "admin" })).status).toBe(403);
+  });
+
+  describe("file uploads through a connection acting as an agent", () => {
+    // Storage is never reached before the upload link is issued; the sweep finds nothing to clean.
+    const storage = {
+      provider: "local_disk",
+      putFile: async () => { throw new Error("not used"); },
+      getObject: async () => { throw new Error("not used"); },
+      headObject: async () => ({ exists: false }),
+      deleteObject: async () => undefined,
+    } as unknown as StorageService;
+    // The public MCP reads the task through REST as the connection; a stand-in returns the row.
+    const transfers = () => createPublicMcpTransfers(db, oauth, async (_p, _method, path) => {
+      const [row] = await db.select().from(issues).where(eq(issues.id, path.split("/").at(-1)!));
+      return row ?? null;
+    }, storage);
+
+    async function setup(agentLevel: AgentAccessLevel, connectionLevel: AgentAccessLevel, ownTask: boolean) {
+      const p = await person();
+      const agent = await agentIn(p.company.id, agentLevel);
+      const other = await agentIn(p.company.id, "worker");
+      const [task] = await db.insert(issues).values({
+        companyId: p.company.id, title: "M7 test task", status: "todo", assigneeAgentId: ownTask ? agent.id : other.id,
+      }).returning();
+      const principal = await oauth.authenticate(await connect(p, { accessLevel: connectionLevel, actAsAgentId: agent.id }));
+      expect(principal.actor).toMatchObject({ type: "agent", agentId: agent.id });
+      const upload = (requestId = randomUUID()) => transfers().getUploadUrl(principal, {
+        companyId: p.company.id, taskId: task!.id, requestId, filename: "notes.txt", contentType: "text/plain",
+        byteSize: 5, sha256: createHash("sha256").update("hello").digest("hex"),
+      });
+      return { upload };
+    }
+
+    it("a manager connection acting as a read-only agent can't upload", async () => {
+      const { upload } = await setup("read_only", "manager", true);
+      await expect(upload()).rejects.toBeInstanceOf(McpCapabilityError);
+    });
+
+    it("a manager connection acting as a worker agent can upload to the agent's own task, not another's", async () => {
+      const own = await setup("worker", "manager", true);
+      await expect(own.upload()).resolves.toMatchObject({ method: "PUT", uploadId: expect.any(String) });
+      const others = await setup("worker", "manager", false);
+      await expect(others.upload()).rejects.toBeInstanceOf(McpCapabilityError);
+    });
+
+    it("a read-only connection acting as a manager agent can't upload", async () => {
+      const { upload } = await setup("manager", "read_only", true);
+      await expect(upload()).rejects.toBeInstanceOf(McpCapabilityError);
+    });
   });
 
   it("an existing grant with no new consent fields keeps its backfilled level", async () => {

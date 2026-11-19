@@ -16,6 +16,7 @@ import { hashMcpSecret, McpOAuthError, type PublicMcpOAuth, type McpPrincipal } 
 import { McpCapabilityError, task, requestId, pick, object, stable, type ApiDispatch } from "./contracts.js";
 import { hasAgentAccess } from "@paperclipai/shared";
 import { connectionAccess } from "./connection-access.js";
+import { runWithAccessCap } from "../agent-access.js";
 
 const lifetime = 10 * 60_000;
 export const uploadSchema = z.object({ ...task, requestId,
@@ -75,8 +76,24 @@ export function createPublicMcpTransfers(db: Db, oauth: PublicMcpOAuth, api: Api
     if (write) {
       if (p.grant.purpose !== "agent") requireWrite(p);
       if (p.grant.purpose !== "agent" && issue.conversationAgentId && issue.conversationUserId !== p.grant.userId) throw unavailable();
+      if (p.grant.purpose !== "agent") await requireActAsAgentWrite(p, issue, queryDb ?? db);
     }
     return issue;
+  }
+  /**
+   * A connection acting as an agent: the agent's own access, capped by the connection's, must allow
+   * changing this task (`tasks:update_own` on its own, `tasks:update_any` on another's), as the REST
+   * attachment route decides it behind the route policy's cap.
+   */
+  async function requireActAsAgentWrite(p: McpPrincipal, issue: Record<string, unknown>, database: Db) {
+    if (p.actor.type !== "agent" || !p.actor.agentId) return;
+    const scope = { issueId: String(issue.id), projectId: (issue.projectId ?? null) as string | null,
+      parentIssueId: (issue.parentId ?? null) as string | null, assigneeAgentId: (issue.assigneeAgentId ?? null) as string | null,
+      assigneeUserId: (issue.assigneeUserId ?? null) as string | null };
+    const decision = await runWithAccessCap(p.actor.agentId, connectionAccess(p.grant, null), () =>
+      authorizationService(database).decide({ actor: p.actor, action: "issue:mutate",
+        resource: { type: "issue", companyId: p.grant.companyId, ...scope, status: String(issue.status) } }));
+    if (!decision.allowed) throw unavailable();
   }
   async function attachmentAccess(p: McpPrincipal, id: string, queryDb?: Db, sessionId?: string) {
     const attachment = await (queryDb ? issueService(queryDb) : svc).getAttachmentById(id);
