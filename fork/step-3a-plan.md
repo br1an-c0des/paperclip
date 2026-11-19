@@ -355,6 +355,17 @@ $(git merge-base main origin/feat/step-4a) origin/feat/step-4a`). Report instead
 | G. Slow core tests | `test/slow` | The core files in D's [slow-test table](test-suite-audit/area-review.md#slow-core-tests), `issue-recovery.test-fixture.ts`, `legacy-controller-lease.test.ts`, small injection points in the source they test | Fake timers or test-sized intervals instead of real waits, shorter `pg_sleep`, single-statement seeding; bug 40 |
 | H. CI and runner | `test/ci` | `scripts/test.mjs`, `scripts/__tests__/test-runner.test.mjs`, the root `package.json` test scripts, `.github/workflows/` | `--shard i/n` balanced by recorded time; default workers from cores and free memory; `--fsModuleCache` on every phase; one workflow (typecheck + thorough, sharded, ~20 min) |
 
+**Round 2 progress:**
+
+- **E merged** 2026-11-18 (`b6e7076fae`): `optIn` has 256 entries; thorough 1,412 files (server
+  1,189, packages 223), opt-in 1,333. 9 files split into live and `.dormant.test.ts` halves, with
+  shared setup in `.fixture.ts` files; `agent-instructions-service` stays whole (its "managed" tests
+  are Paperclip-managed instruction bundles, which `claude_local` uses). Bug 42 fixed. The hermes
+  adapter's `vitest.config.ts` no longer sets `exclude`, which made Vitest ignore the runner's.
+  Notes for H: a project-relative `--exclude` never matches a leading `**/`, and one that matches a
+  directory drops everything under it; plain `vitest` in a built tree also runs packages' `dist/`
+  test copies (the runner excludes them).
+
 Merge order: E and G, then F (its final full run includes G's changes), then H. Then the PM writes
 the workflow (quick before pushing, thorough in CI and before merging into `main`, opt-in on demand)
 into `CLAUDE.md`, the `/pm` briefs and `doc/test-infrastructure.md`.

@@ -76,7 +76,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 39 | [Turn off Claude Code's auto memory when an agent has `para-memory-files`](#39-turn-off-claude-codes-auto-memory-when-an-agent-has-para-memory-files) | candidate | | | 2026-10-24 | | |
 | 40 | [Find why 11 server tests fail on `main` (one file is core)](#40-find-why-11-server-tests-fail-on-main-one-file-is-core) | candidate | | | 2026-11-18 | | |
 | 41 | [Give `para-memory-files` a recall tool that exists](#41-give-para-memory-files-a-recall-tool-that-exists) | candidate | | | 2026-11-18 | | |
-| 42 | [Fix or move the 8 test files that fail in a full run on `main`](#42-fix-or-move-the-8-test-files-that-fail-in-a-full-run-on-main) | candidate | | | 2026-11-18 | | |
+| 42 | [Fix or move the 8 test files that fail in a full run on `main`](#42-fix-or-move-the-8-test-files-that-fail-in-a-full-run-on-main) | fixed | `test/tiers` | | 2026-11-18 | | `b6e7076fae` (2026-11-18) |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -696,4 +696,10 @@ round 1: each fails the same way when re-run on its own, except `github-launcher
 - **Likely fix:** the dormant ones leave the default run when step 3a round 2 fills the opt-in tier
   (hard-fork step 3: they're not fixed). `shipped-catalog` gets the one-line fix; `github-launcher`
   gets a test-sized timeout or less work.
+- **Fixed 2026-11-18** (`b6e7076fae`, step 3a agent E): `shipped-catalog` no longer scans `.agents/`;
+  `github-launcher`'s process-heavy test (18 launcher processes in a row, ~4.6 s alone) has a 20 s
+  timeout. The other six files are in the opt-in tier, so `pnpm test` no longer runs them.
+- **Also found:** 6 tests in `server/src/services/heartbeat/runtime-selection.test.ts` failed on `main`
+  because they read `.claude/skills/slack/SKILL.md`, which `ea326e0202` removed. They're connector-skill
+  (dormant) tests and moved to the opt-in `runtime-selection.dormant.test.ts`.
 
