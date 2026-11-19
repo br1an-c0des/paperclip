@@ -1,5 +1,4 @@
 import type { IssueLabel } from "@paperclipai/shared";
-import { A } from "@solidjs/router";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createSignal, Show } from "solid-js";
 import { queryKeys } from "@/api/queryKeys";
@@ -72,9 +71,10 @@ export function NewLabelDialog(props: {
       footer={
         <>
           <Show when={props.manageLink !== false}>
-            <A class={`${buttonClass({ variant: "quiet" })} nl-manage`} href={`/${company().issuePrefix}/company/settings/labels`} onClick={close}>
+            {/* A plain link: the router picks it up, and the dialog works outside one (tests). */}
+            <a class={`${buttonClass({ variant: "quiet" })} nl-manage`} href={`/${company().issuePrefix}/company/settings/labels`} onClick={close}>
               Edit labels
-            </A>
+            </a>
           </Show>
           <Button variant="quiet" onClick={close}>
             Cancel
