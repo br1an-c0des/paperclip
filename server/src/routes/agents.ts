@@ -5,7 +5,7 @@ import { isObjectJournalBusyError } from "../services/object-byte-journal.js";
 import { readTaskPanelActivations } from "../services/plugin-task-panels.js";
 import { enqueueNativeRuntimeResponse } from "../services/native-runtime/native-runtime-response-delivery.js";
 import { latestFailedRunsByAgent } from "@paperclipai/shared";
-import { agentConfigurationSpec } from "@paperclipai/shared";
+import { agentConfigurationSpec, agentAccessSchema } from "@paperclipai/shared";
 import { agentConfigurationRevision, restoreAgentConfigurationRedactions } from "../lib/agent-configuration-revision.js";
 import { CEO_HIRING_DENIAL_KEY, ceoHiringDenial, normalizeAgentPermissions } from "../lib/agent-permissions.js";
 import { withAccessOverride } from "../services/agent-access.js";
@@ -5099,20 +5099,27 @@ export function agentRoutes(
       await assertBoardCanManageAgentsForCompany(req, existing.companyId);
     }
 
-    // Saving a CEO's hiring as off here is the board's restriction, since this
-    // control shows the effective value; record who and when, so it is told
-    // apart from a false saved by other writes. Keep an earlier record.
-    const hiringPatch = existing.role === "ceo" && req.body.canCreateAgents === false
+    // Saving a CEO's hiring as off with the old flag is the board's restriction;
+    // record who and when, so it is told apart from a false saved by other
+    // writes. Keep an earlier record. A body with access says what the agent
+    // may do itself, so it records none.
+    const ceoHiringDenied = existing.role === "ceo" && req.body.canCreateAgents === false && req.body.access === undefined;
+    const hiringPatch = ceoHiringDenied
       ? { ...req.body, [CEO_HIRING_DENIAL_KEY]: ceoHiringDenial(existing.permissions) ?? {
           actorType: req.actor.type === "agent" ? "agent" : "user",
           actorId: (req.actor.type === "agent" ? req.actor.agentId : req.actor.userId) ?? null,
           at: new Date().toISOString(),
         } }
       : req.body;
-    // Since step 4a hiring is the agents:create access action, so the old hiring toggle sets that
-    // override on the agent's current access (or its default level) unless access is sent too.
-    const permissionsPatch = typeof req.body.canCreateAgents === "boolean" && req.body.access === undefined
-      ? { ...hiringPatch, access: withAccessOverride(existing.permissions, "agents:create", req.body.canCreateAgents) }
+    // Since step 4a hiring is the agents:create access action. Like creation (newAgentAccess), the
+    // old flag sets that override only when no access is sent and none is stored: once the agent
+    // has access, it decides, so a stale flag (the Advanced YAML used to send one) can't undo the
+    // Access card. A CEO's hiring denial still turns the override off, as an import's does.
+    const hasStoredAccess = agentAccessSchema.safeParse(asRecord(existing.permissions)?.access).success;
+    const hiringFlagSetsAccess = typeof req.body.canCreateAgents === "boolean" && req.body.access === undefined
+      && (!hasStoredAccess || ceoHiringDenied);
+    const permissionsPatch = hiringFlagSetsAccess
+      ? { ...hiringPatch, access: withAccessOverride(existing.permissions, "agents:create", req.body.canCreateAgents!) }
       : hiringPatch;
     const agent = await svc.updatePermissions(id, permissionsPatch, { actorAgentId: req.actor.type === "agent" ? req.actor.agentId : null });
     if (!agent) {

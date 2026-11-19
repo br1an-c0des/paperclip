@@ -103,7 +103,7 @@ export function compactAgentConfiguration(document: AgentConfigurationDocument):
   }
   if (spec.budgetMonthlyCents === 0) delete spec.budgetMonthlyCents;
   if (spec.permissions) {
-    const defaults: Record<string, unknown> = { canCreateAgents: false, canCreateSkills: true, canAssignTasks: false, trustPreset: "standard" };
+    const defaults: Record<string, unknown> = { canCreateSkills: true, trustPreset: "standard" };
     spec.permissions = Object.fromEntries(
       Object.entries(spec.permissions).filter(([key, value]) => value !== defaults[key] && nonempty(value)),
     );
