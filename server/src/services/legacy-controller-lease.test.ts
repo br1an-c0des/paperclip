@@ -82,6 +82,17 @@ const support = external ? { supported: true } : await getEmbeddedPostgresTestSu
       .where(eq(heartbeatRuns.id, queued.id)).returning();
     return run;
   }
+  /** Ends a case's pg_sleep saturation once its assertion has passed, instead
+   * of waiting the sleeps out (queued ones start as earlier ones end). */
+  async function cancelSleeps(statement: string, work: Array<Promise<unknown>>) {
+    let done = false;
+    const all = Promise.allSettled(work).then(() => { done = true; });
+    while (!done) {
+      await db.execute(sql`select pg_cancel_backend(pid) from pg_stat_activity
+        where query = ${statement} and pid <> pg_backend_pid()`);
+      await Promise.race([all, new Promise(resolve => setTimeout(resolve, 50))]);
+    }
+  }
   async function expire(id: string) {
     await db.update(heartbeatRuns).set({ controllerLeaseExpiresAt: sql`clock_timestamp() - interval '1 second'` })
       .where(eq(heartbeatRuns.id, id));
@@ -254,7 +265,7 @@ const support = external ? { supported: true } : await getEmbeddedPostgresTestSu
       expect(controller.signal.aborted).toBe(false);
       const [saved] = await db.select().from(heartbeatRuns).where(eq(heartbeatRuns.id, run.id));
       expect(saved.executionStage).toBe("dispatching");
-    } finally { watch.stop(); await slow; }
+    } finally { watch.stop(); await cancelSleeps("select pg_sleep(5)", [slow]); }
   }, 15_000);
 
   it("renews on one private pool per client that shutdown can end", async () => {
@@ -290,7 +301,7 @@ const support = external ? { supported: true } : await getEmbeddedPostgresTestSu
       expect(controller.signal.aborted).toBe(false);
     } finally {
       watch.stop();
-      await Promise.all(nativeRenewals);
+      await cancelSleeps("select pg_sleep(5)", nativeRenewals);
       await closeLivenessDb(owner, 1);
       await owner.$client.end({ timeout: 1 });
     }
