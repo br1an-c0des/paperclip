@@ -25,6 +25,14 @@ describe("canonical instruction revisions", () => {
   let actor: AuthorizationActor;
   const entryFile = "policy/INSTRUCTIONS.txt";
   const initial = "\uFEFF# Original\r\n☃\0\n";
+  // Since step 4a an agent's direct configure authority is its access level's agents:configure
+  // (an override here, as migration 0491 carries a scoped agents:configure grant), not a stored grant.
+  type ConfigureOverride = boolean | { scope: Record<string, unknown> };
+  const writerPermissions = (configure: ConfigureOverride, extra: Record<string, unknown> = {}) =>
+    ({ ...extra, access: { level: "worker" as const, overrides: { "agents:configure": configure } } });
+  async function setWriterConfigure(configure: ConfigureOverride) {
+    await db.update(agents).set({ permissions: writerPermissions(configure) }).where(eq(agents.id, actorId));
+  }
   beforeAll(async () => {
     home = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "instruction-revisions-")));
     process.env.PAPERCLIP_HOME = home;
@@ -45,7 +53,7 @@ describe("canonical instruction revisions", () => {
     root = resolveManagedInstructionsRoot({ id: agentId, companyId, name: "Target", adapterConfig: {} });
     await db.insert(agents).values([
       { id: agentId, companyId, name: "Target", adapterConfig: { instructionsBundleMode: "managed", instructionsRootPath: root, instructionsEntryFile: entryFile } },
-      { id: actorId, companyId, name: "Writer" },
+      { id: actorId, companyId, name: "Writer", permissions: writerPermissions({ scope: { agentIds: [agentId] } }) },
     ]);
     await db.insert(companyMemberships).values([
       { companyId, principalType: "user", principalId: userId, membershipRole: "operator" },
@@ -72,7 +80,7 @@ describe("canonical instruction revisions", () => {
     const sourceDir = path.join(home, `incoming-${randomUUID()}`);
     await fs.cp(root, sourceDir, { recursive: true });
     const baseline = await snapshotAgentFiles(root);
-    await db.update(agents).set({ permissions: { interactions: { canMentionAgents: false } } }).where(eq(agents.id, actorId));
+    await db.update(agents).set({ permissions: writerPermissions({ scope: { agentIds: [agentId] } }, { interactions: { canMentionAgents: false } }) }).where(eq(agents.id, actorId));
     await fs.writeFile(path.join(sourceDir, "other.md"), "Unrelated instructions");
     await agentFileStore(db).apply({ ...target(), sourceDir, baseline }, actor);
     expect(await fs.readFile(path.join(root, "other.md"), "utf8")).toBe("Unrelated instructions");
@@ -109,6 +117,7 @@ describe("canonical instruction revisions", () => {
   });
   it("reads peer instructions with read-only agent and responsible-user grants but denies saves", async () => {
     await db.delete(principalPermissionGrants).where(eq(principalPermissionGrants.companyId, companyId));
+    await setWriterConfigure(false);
     await db.insert(principalPermissionGrants).values([
       { companyId, principalType: "user", principalId: userId, permissionKey: "agents:read", scope: { agentIds: [agentId] } },
       { companyId, principalType: "agent", principalId: actorId, permissionKey: "agents:read", scope: { agentIds: [agentId] } },
@@ -138,6 +147,7 @@ describe("canonical instruction revisions", () => {
   it.each(["current", "history", "revision", "diff", "candidates", "write"])("requires the caller's own target-scoped grant for peer %s access", async (operation) => {
     const first = await base();
     await db.delete(principalPermissionGrants).where(eq(principalPermissionGrants.principalId, actorId));
+    await setWriterConfigure(false);
     const access = () => {
       if (operation === "current") return service.readCurrent(target(), actor);
       if (operation === "history") return service.history({ ...target(), entryFile }, actor);
@@ -148,9 +158,9 @@ describe("canonical instruction revisions", () => {
     };
     // The responsible user retains permission on the target throughout.
     await expect(access()).rejects.toMatchObject({ status: 403 });
-    await db.insert(principalPermissionGrants).values({ companyId, principalType: "agent", principalId: actorId, permissionKey: "agents:configure", scope: { agentIds: [actorId] } });
+    await setWriterConfigure({ scope: { agentIds: [actorId] } });
     await expect(access()).rejects.toMatchObject({ status: 403 });
-    await db.update(principalPermissionGrants).set({ scope: { agentIds: [agentId] } }).where(eq(principalPermissionGrants.principalId, actorId));
+    await setWriterConfigure({ scope: { agentIds: [agentId] } });
     // New saves have no historical revision row; authorized history lookups
     // reach the normal not-found response rather than an authorization denial.
     if (operation === "revision" || operation === "diff") await expect(access()).rejects.toMatchObject({ status: 404 });
@@ -209,17 +219,18 @@ describe("canonical instruction revisions", () => {
     await db.update(principalPermissionGrants).set({ scope: { agentIds: [actorId] } }).where(eq(principalPermissionGrants.principalId, userId));
     await expect(save("denied", first.revision.id)).rejects.toMatchObject({ status: 403 });
     await db.update(principalPermissionGrants).set({ scope: null }).where(eq(principalPermissionGrants.principalId, userId));
-    await db.update(agents).set({ permissions: { trustPreset: "low_trust_review" } }).where(eq(agents.id, actorId));
+    await db.update(agents).set({ permissions: writerPermissions({ scope: { agentIds: [agentId] } }, { trustPreset: "low_trust_review" }) }).where(eq(agents.id, actorId));
     await expect(save("restricted", first.revision.id)).rejects.toMatchObject({ status: 403 });
     if (previousShadow === undefined) delete process.env.PAPERCLIP_RESPONSIBLE_USER_AUTHZ_SHADOW; else process.env.PAPERCLIP_RESPONSIBLE_USER_AUTHZ_SHADOW = previousShadow;
   });
   it("keeps suggest-only protected-change consent and explicit configure scope restrictions", async () => {
     const first = await base();
     await db.delete(principalPermissionGrants).where(eq(principalPermissionGrants.principalId, actorId));
+    await setWriterConfigure(false);
     await db.insert(principalPermissionGrants).values({ companyId, principalType: "agent", principalId: actorId, permissionKey: "agents:suggest-changes" });
     await expect(save("needs approval", first.revision.id)).rejects.toMatchObject({ status: 403 });
     await db.delete(principalPermissionGrants).where(eq(principalPermissionGrants.principalId, actorId));
-    await db.insert(principalPermissionGrants).values({ companyId, principalType: "agent", principalId: actorId, permissionKey: "agents:configure", scope: { agentIds: [actorId] } });
+    await setWriterConfigure({ scope: { agentIds: [actorId] } });
     await expect(save("out of scope", first.revision.id)).rejects.toMatchObject({ status: 403 });
   });
   it("consumes accepted protected-change approval only with a successful CAS commit", async () => {
@@ -228,6 +239,7 @@ describe("canonical instruction revisions", () => {
     await db.insert(heartbeatRuns).values({ id: sourceRunId, companyId, agentId: actorId, status: "succeeded" });
     await db.insert(issues).values({ id: issueId, companyId, title: "Review instructions" });
     await db.delete(principalPermissionGrants).where(eq(principalPermissionGrants.principalId, actorId));
+    await setWriterConfigure(false);
     await db.insert(principalPermissionGrants).values({ companyId, principalType: "agent", principalId: actorId, permissionKey: "agents:suggest-changes" });
     await db.insert(issueThreadInteractions).values({ id: interactionId, companyId, issueId, kind: "request_confirmation", status: "accepted", sourceRunId, createdByAgentId: actorId,
       payload: { version: 1, prompt: "Apply the instruction change?", detailsMarkdown: "```diff\n+approved\n```", target: { type: "custom", key: `agent:${agentId}:instructions`, revisionId: "proposal" } },
