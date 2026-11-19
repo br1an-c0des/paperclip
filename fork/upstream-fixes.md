@@ -85,10 +85,12 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 48 | [Cover every write of an approved multi-write tool call](#48-cover-every-write-of-an-approved-multi-write-tool-call) | fixed on `feat/step-4a` (`70b8d7198`) | | | 2026-11-18 | | |
 | 49 | [Check the act-as agent's level on outside-connection file uploads](#49-check-the-act-as-agents-level-on-outside-connection-file-uploads) | fixed on `feat/step-4a` (`867374de7`) | | | 2026-11-18 | | |
 | 50 | [Check access on plugin-origin agent configure and edit calls](#50-check-access-on-plugin-origin-agent-configure-and-edit-calls) | fixed on `feat/step-4a` (`5c499f719`) | | | 2026-11-18 | | |
-| 51 | [Give runs a title tool now that project-tools is gone](#51-give-runs-a-title-tool-now-that-project-tools-is-gone) | candidate | | | 2026-11-18 | | |
-| 52 | [Use the MCP tool names in the chat directive](#52-use-the-mcp-tool-names-in-the-chat-directive) | candidate | | | 2026-11-18 | | |
+| 51 | [Give runs a title tool now that project-tools is gone](#51-give-runs-a-title-tool-now-that-project-tools-is-gone) | fixed on `feat/step-4a` (`846bc008d`) | | | 2026-11-18 | | |
+| 52 | [Use the MCP tool names in the chat directive](#52-use-the-mcp-tool-names-in-the-chat-directive) | fixed on `feat/step-4a` (`1137643cc`) | | | 2026-11-18 | | |
 | 53 | [Stop the ACP engine tests writing settings into the repo](#53-stop-the-acp-engine-tests-writing-settings-into-the-repo) | candidate | | | 2026-11-18 | | |
 | 54 | [Check access on the other plugin-origin agent writes](#54-check-access-on-the-other-plugin-origin-agent-writes) | candidate | | | 2026-11-18 | | |
+| 55 | [Make the title route's access refusal requestable](#55-make-the-title-routes-access-refusal-requestable) | candidate | | | 2026-11-18 | | |
+| 56 | [Decide whether catalog task creation needs a retry key](#56-decide-whether-catalog-task-creation-needs-a-retry-key) | candidate | | | 2026-11-18 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -868,3 +870,26 @@ Found by the step 4a bug-fix agent (2026-11-18), while fixing bug 50.
 - **Likely fix:** one central check. In `agentInteractionDenial` (`agent-interaction-policy.ts`),
   when the actor comes from a plugin origin, also check the matching access action. Then the
   per-call checks from bug 50 can go.
+
+### 55. Make the title route's access refusal requestable
+
+Found by the step 4a bug-fix agent (2026-11-18).
+
+- **What's wrong:** when the access level is what refuses `PUT /issues/:id/title`, the route
+  answers `issue_write_not_visible` (`denyIssueWrite`, `server/src/routes/issues.ts:14903-14907`).
+  `PATCH /issues/:id` answers `denyAgentAccess(res, decision, "tasks:update_any")`, which can be
+  requested. In practice the title route also requires the assigned agent's own run, so a worker
+  rarely reaches this.
+- **Likely fix:** use `denyAgentAccess` there, as `PATCH /issues/:id` does.
+
+### 56. Decide whether catalog task creation needs a retry key
+
+Found by the step 4a bug-fix agent (2026-11-18).
+
+- **What's wrong:** `paperclip_create_task` takes no idempotency key, so a retried call can create a
+  duplicate task. The chat directive's REST sentences still mention one. The old project-tools
+  server prefixed the key per conversation (`chat-handoff:<issueId>:<key>`). A plain key on the
+  catalog tool could collide across tasks in a company.
+- **Likely fix (to decide):** a `requestId` scoped to the caller and the parent or conversation
+  task, like the public MCP's write receipts. Or leave creation without one, and drop the mention
+  from the directive.

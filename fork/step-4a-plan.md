@@ -576,8 +576,16 @@ ACP prompt's API note is MCP-only, with no curl recipe.
 - Plugin calls made for an agent check that agent's access.
 - **New:** bug 54 (the other plugin-origin writes), plugins only.
 
+**Bugs 51 and 52 fixed and merged 2026-11-18** (`4f88dbd19`):
+- `paperclip_update_task` takes `onlyIfProvisional` with `title` alone, and goes through
+  `PUT /issues/:id/title`. The run directive points at it; the native Runner keeps its own text.
+- The chat directive names `paperclip_create_project` and `paperclip_create_task`. Those tools now
+  take `repositoryUrls` and `initialPlan`.
+- A worker run sees 22 tools plus 4 that need approval.
+- **New:** bugs 55 (the title route's refusal isn't requestable) and 56 (no retry key for task
+  creation).
+
 **Left before `main`:**
-- bugs 51 and 52 (runs lost the title tool, and the chat directive uses old names);
 - bugs 53 and 54, optional;
 - the docs listed above;
 - the local-instance run check;
