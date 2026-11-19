@@ -364,7 +364,7 @@ process.stdout.write(JSON.stringify({identity, token:process.env.GH_TOKEN ?? nul
     expect(await git("status", "--porcelain")).toBe(""); // unrelated public/local Git still works
     expect(env.GH_TOKEN).toBe("");
     expect(env.GIT_AUTHOR_NAME).toBe("");
-  });
+  }, 20_000); // 18 launcher processes one after another, each starting Node and Git (~0.25 s each): ~5 s alone, more under a full run's load
   it("keeps local Git commands off the broker and still asks for the rest", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "paperclip-github-local-skip-"));
     cleanups.push(() => rm(root, { recursive: true, force: true }));
