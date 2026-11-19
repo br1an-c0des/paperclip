@@ -286,11 +286,21 @@ export async function probeModuleSingletons() {
   catch { /* not initialized, as expected */ }
   const idle = admission.idleWorkSnapshot();
   const drain = admission.readTaskDrain(new Date());
+  // Background heartbeat runs and wakes an earlier file left in flight (module-level sets in
+  // services/heartbeat.ts). Left running past their file's database, they stall the next
+  // file's `drainActiveRunExecutions()` until they give up (bug 62).
+  let heartbeatWork: unknown = "not-loaded";
+  if (loaded("../../services/heartbeat.ts")) {
+    const heartbeat = await import("../../services/heartbeat.js");
+    const status = heartbeat.getTaskDrainStatus();
+    heartbeatWork = { activeRuns: status.activeRuns, pendingWakes: status.pendingWakes };
+  }
   fs.appendFileSync(reportFile, `${JSON.stringify({
     pid: process.pid,
     probe: vitestWorkerState()?.filepath,
     idleActive: idle.active,
     drain: Boolean(drain),
     cloudSnapshot,
+    heartbeatWork,
   })}\n`);
 }

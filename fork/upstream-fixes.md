@@ -92,6 +92,11 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 55 | [Make the title route's access refusal requestable](#55-make-the-title-routes-access-refusal-requestable) | candidate | | | 2026-11-18 | | |
 | 56 | [Decide whether catalog task creation needs a retry key](#56-decide-whether-catalog-task-creation-needs-a-retry-key) | candidate | | | 2026-11-18 | | |
 | 57 | [Make `attentionService.list` fast over many failed runs](#57-make-attentionservicelist-fast-over-many-failed-runs) | candidate | | | 2026-11-18 | | |
+| 58 | [Check the scope of a scoped `agents:configure` override](#58-check-the-scope-of-a-scoped-agentsconfigure-override) | fixed on `feat/step-4a` (`1c870f14d`) | | | 2026-11-19 | | |
+| 59 | [Keep provider `access_denied` errors apart from agent access refusals](#59-keep-provider-access_denied-errors-apart-from-agent-access-refusals) | fixed on `feat/step-4a` (`d162c3255`) | | | 2026-11-19 | | |
+| 60 | [Let a worker pick a workspace for its own subtask](#60-let-a-worker-pick-a-workspace-for-its-own-subtask) | fixed on `feat/step-4a` (`1c870f14d`) | | | 2026-11-19 | | |
+| 61 | [Don't write or lock on an access check with no temporary grant](#61-dont-write-or-lock-on-an-access-check-with-no-temporary-grant) | fixed on `feat/step-4a` (`0a1c2721d`) | | | 2026-11-19 | | |
+| 62 | [Steady two server tests that flaked in CI](#62-steady-two-server-tests-that-flaked-in-ci) | fixed (`d5435c29b`); `run-start-handover` open | | | 2026-11-19 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -933,3 +938,99 @@ made a single statement: the time is inside `attentionService.list` itself, over
   company with many failures could see a slow inbox.
 - **Likely fix:** profile the query or queries `list` makes for that case (probably one per chunk of
   runs, or an unindexed lookup of newer runs) and replace them with one set-based query.
+
+### 58. Check the scope of a scoped `agents:configure` override
+
+Found by the step 4a regression agent A (2026-11-19), on `feat/step-4a` only; not on `main` or
+server1. 10 tests in `agent-instruction-revisions` and `connection-management.integration` show it.
+
+- **What's wrong:** `isAllowed` in `packages/shared/src/agent-access.ts` counts any `{scope}` override
+  as allowed, and `hasAgentAccess` uses it, so `decideAgentAccess`
+  (`server/src/services/authorization.ts`, ~1871) and the `agent_config:read` check (~2975) never
+  look at the scope. Migration 0491 turns scoped configure grants into `{scope}` overrides, so after
+  deploying, an agent limited to configuring agent X could configure every agent. **Security; fix
+  before `feat/step-4a` merges.**
+- **Likely fix:** check the target against the scope for `agents:configure`, as `tasks:assign` does
+  with `scopeAllows` (~2890–2902), and decide whether any other action takes a scope.
+- **Fixed** by regression agent B (`1c870f14d`): `decideAgentAccess` takes the requested scope and
+  checks a scoped override with `scopeAllows`; outside it the refusal is `deny_scope` (an explicit
+  restriction, not requestable); with no requested scope a scoped override fails closed, as a
+  scoped grant did on `main`. The same gap in `agent_config:read` and the `tasks:assign` fallback is
+  closed too. `isAllowed`/`hasAgentAccess` stay a coarse gate (route policy, MCP tool filtering).
+
+### 59. Keep provider `access_denied` errors apart from agent access refusals
+
+Found by the step 4a regression agent A (2026-11-19), on `feat/step-4a`. 3 tests in
+`secrets-routes`.
+
+- **What's wrong:** `server/src/middleware/error-handler.ts` treats any `details.code ===
+  "access_denied"` as an agent access refusal. AWS Secrets Manager errors use the same code, so their
+  sanitized details (region, required capability, actionable message) are dropped and
+  `requestable: false` is added.
+- **Likely fix:** recognise an agent refusal by `details.missingAction`, or give agent refusals
+  their own code.
+- **Fixed** by regression agent B (`d162c3255`): an agent refusal is `access_denied` with a string
+  `missingAction`; other `access_denied` errors keep their details. The plugin origin check
+  (`plugin-host-services.ts`) now always names its `missingAction`, the one producer that didn't.
+
+### 60. Let a worker pick a workspace for its own subtask
+
+Found by the step 4a regression agent A (2026-11-19), on `feat/step-4a`. 1 test in
+`task-workspace-api`.
+
+- **What's wrong:** `assertSelectedWorkspaceTrust` (`server/src/services/task-repository-acquisition.ts`,
+  creation branch) probes `issue:mutate` with no `issueId`, so `decideAgentIssueWriteAccess` treats
+  the write as not the agent's own and asks for `tasks:update_any`. By design a worker's
+  `tasks:create` covers subtasks of its own tasks, so a worker can't create a subtask with an
+  explicit workspace selection.
+- **Likely fix:** for creation, check against the parent task (own parent: `tasks:create`), not a
+  missing issue.
+- **Fixed** by regression agent B (`1c870f14d`): `decideAgentIssueWriteAccess` judges ownership by
+  `issueId ?? parentIssueId`, as the visible-issue write rule does for a new child.
+
+### 61. Don't write or lock on an access check with no temporary grant
+
+Found and fixed by the step 4a regression agent B (2026-11-19, `0a1c2721d`), on `feat/step-4a`.
+`agent-file-checkpoint-locking` caught it.
+
+- **What was wrong:** `consumeTemporaryAccess` (`server/src/services/agent-access.ts`) ran
+  `UPDATE temporary_access_grants … FOR UPDATE SKIP LOCKED` on every check the access level refused,
+  even with no grant, so read paths (the warm instruction checkpoint) issued a write.
+- **Fix:** one read first, preferring a standing grant; the UPDATE runs only when a one-use grant
+  exists, and spending it stays atomic.
+
+### 62. Steady two server tests that flaked in CI
+
+Found 2026-11-19. CI run 44544972878 on `main` (`282b37631`, a docs-only commit after the green run
+44542707607) failed one test in each of two shards, on CI's 4-core runners with 2 workers:
+
+- `server/src/__tests__/heartbeat-worktree-suppression.test.ts`: "suppresses new assignment wakes in
+  worktree instances without creating heartbeat runs" (shard 5/10).
+- `server/src/__tests__/run-start-handover.test.ts`: "the old server stops starting runs once the new
+  one starts them, and the new one starts the queued run" (shard 1/10).
+
+- **Problem:** both passed the run before with no code change, so they're timing-sensitive under
+  CI's load. A red run blocks a merge into `main` under the step 3a workflow.
+- **Since then:** `heartbeat-worktree-suppression` failed the same way in shard 5 on the next two
+  runs too (`main` `a0542e318`, run 44565887434; `feat/step-4a` `4bd93bce3`, run 44565891427): its
+  `afterEach` (line 75), which waits for in-flight heartbeat runs to settle, times out at 30 s. Alone
+  it passes every time (3 of 3 locally, ~9 s). So it's a leak: an earlier file in its shared worker
+  leaves heartbeat work running or module state behind. `run-start-handover` hasn't recurred.
+- **Likely fix:** find the file before it in shard 5's worker that leaves the work behind (the step
+  3a method in [results-leaks.md](test-suite-audit/results-leaks.md)) and fix or isolate that file;
+  as a stopgap, add `heartbeat-worktree-suppression` to `ISOLATED_BY_NAME` in
+  `server/vitest.config.ts`.
+- **Fixed** by agent C (`d5435c29b`), tests only. The leakers were
+  `interaction-resolution-cross-issue-cap-postgres` and `interrupted-preparation-hold-settle`: each
+  starts a real background heartbeat run (a wake, a replay or Retry) and ends its database without
+  awaiting it. The run sits ~60 s in teardown on the ended pool, stays in the module-level
+  `activeRunExecutionPromises` (`services/heartbeat.ts:643`), and the victim's
+  `drainActiveRunExecutions()` waits on it past 30 s. Both files now drain in `afterEach`
+  (hold-settle then truncates with CASCADE, since finished runs write rows that reference them);
+  `interrupted-preparation-restore-retry` drains in `afterAll` too. The leak-report probe
+  (`PAPERCLIP_TEST_LEAK_REPORT`, `helpers/shared-worker-state.ts`) now records in-flight heartbeat
+  runs and wakes per file, so other files with this pattern will show up. Shard 5 passed twice
+  locally with 2 workers.
+- **Still open:** `run-start-handover` (shard 1, once) looks like a timing flake under load (1.5 s
+  lease, 200 ms renew, statement timeouts just before the failing assertion at line 134). If it
+  recurs, loosen that test's timings.
