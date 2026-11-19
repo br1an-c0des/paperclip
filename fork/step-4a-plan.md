@@ -523,6 +523,13 @@ it swaps the route-policy stub for `AGENT_ROUTE_POLICY`, adds rename and recolou
 `CONNECTION_INTENT_AGENT_GUIDANCE`. Agent 4 starts from `feat/step-4a` after the follow-ups merge,
 since it builds on the real route-policy table.
 
+**Follow-ups merged 2026-11-18** (`8652daf9b` on `feat/step-4a`). They also found bugs
+[43](upstream-fixes.md#43-stop-a-company-import-from-setting-an-existing-agents-access-level)
+(an import can set an existing agent's level; fix before `main`) and
+[44](upstream-fixes.md#44-return-409-not-500-when-a-new-labels-name-is-taken). Expect
+regression fixture changes: CEOs and agents created with `canCreateAgents: true` now store
+`permissions.access`.
+
 **Testing while step 3a renovates the suite:** typechecks, each agent's own new or changed test
 files one at a time by path, and `ui-new`'s unit tests. No package suites, directories or broad
 patterns.
