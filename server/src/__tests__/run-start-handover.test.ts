@@ -140,6 +140,29 @@ suite("run start hand-over between an old and a new server during a deploy overl
     await vi.waitFor(() => expect(next.handover.isHandingOver()).toBe(false), { timeout: 10_000 });
   });
 
+  it("a start skipped right after the hand-over's first hint still wakes the new server, with one hint for the burst", async () => {
+    // A wide rate limit, so the skips below land inside it: they come right after the hint the hand-over sends.
+    const skipHintMinMs = 1_000;
+    const old = await bootServer("old", { timing: { skipHintMinMs } });
+    await old.handover.begin();
+    const next = await bootServer("new");
+    await next.handover.begin();
+    await vi.waitFor(() => expect(old.handover.isActive()).toBe(true), { timeout: 10_000 });
+    // That first hint was sent when the old server began yielding, before this run was queued.
+    await vi.waitFor(() => expect(next.dispatchHints).toBeGreaterThan(0), { timeout: 10_000 });
+
+    const hintsBefore = next.dispatchHints;
+    const skipped = await queueRun();
+    expect(await dispatch(old, skipped)).toBe(false);
+    expect(await dispatch(old, skipped)).toBe(false);
+    // The skips are not dropped: one hint follows them once the rate limit allows.
+    await vi.waitFor(() => expect(next.dispatchHints).toBe(hintsBefore + 1), { timeout: 10_000 });
+    // And only one: the burst shares it, and nothing more is owed.
+    await new Promise(resolve => setTimeout(resolve, skipHintMinMs + 300));
+    expect(next.dispatchHints).toBe(hintsBefore + 1);
+    expect(await dispatch(next, skipped)).toBe(true);
+  });
+
   it("the old server learns of the hand-over on its next start even without a notification", async () => {
     // The old server cannot hear this replacement: only its own dispatch path can tell it.
     const old = await bootServer("old", { listen: false });
