@@ -220,9 +220,15 @@ so a shared folder would have them rewrite each other's skills.
 - The run's skill set comes, as today, from `resolveLegacyPaperclipDesiredSkillNames`
   (`server-utils.ts:4431-4450`, which always adds `paperclip`, `complain` and `suggestion-box`) and
   goes into the prompt bundle (`prompt-cache.ts:134-174`), one immutable folder per skill set.
-- The bundle becomes a plugin (`.claude-plugin/plugin.json`, named `paperclip`, with a `skills/`
-  folder), and the launch passes `--plugin-dir <bundle>` (tested to load under the user source).
-  Skill names are namespaced: `paperclip:<skill>`.
+- The bundle holds a folder of plugins, and the launch passes `--plugin-dir <bundle>/plugins`
+  (a single plugin was tested to load under the user source on 2026-11-18; the CLI loads each
+  child of a folder of plugins). Skill names are namespaced `<plugin>:<skill>`, so the plugins are
+  named by where the skills come from (2026-11-20): `paperclip` for Paperclip's own skills (keys
+  starting `paperclipai/paperclip/`) and `company` for the company library. One plugin named
+  `paperclip` would have labelled every skill as being about Paperclip, a name the platform, the
+  MCP server and the main skill already share. A plugin with no skills is left out.
+- The prefix is how Claude Code loads a skill, not its name: the manifest and `ui-new` show the
+  plain names the Skills page uses, and the manifest records which plugin each came from.
 - Concurrent runs with different sets each get their own bundle, so nothing they share changes
   under them. The config folder holds only Claude Code's own files; a `skills/` folder there is set
   aside like any other configuration (section 2).

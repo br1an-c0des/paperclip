@@ -30,10 +30,21 @@ into the agent's config folder. Per-run skill sets are real (`pinnedSkillTest` a
 (`AGENT_DEFAULT_MAX_CONCURRENT_RUNS`), so a shared `skills/` folder would have concurrent runs
 rewrite each other's skills. The prompt bundle is already one immutable folder per skill set
 (`prepareClaudePromptBundle`, keyed by `bundleKey`); Task 4 makes it a plugin and the launch passes
-`--plugin-dir <bundle>`. Concurrent runs never share mutable skill state, the bundle copies as-is
+`--plugin-dir <bundle>/plugins`. Concurrent runs never share mutable skill state, the bundle copies as-is
 (portable launch), and the config folder holds only Claude Code's own files: any `skills/` entry
-there is set aside. Cost: skill names are namespaced, `paperclip:<skill>` (tested 2026-11-18).
+there is set aside. Cost: skill names are namespaced, `<plugin>:<skill>` (tested 2026-11-18).
 The design doc's section 4 is updated to match.
+
+**Two plugins, named by where the skills come from** (decided 2026-11-20). One plugin named
+`paperclip` would label every skill a run gets, say `paperclip:frontend-design`, as being about
+Paperclip, and "paperclip" already names the platform, the MCP server and the main skill. So the
+bundle holds two plugins: `paperclip` for Paperclip's own skills (keys starting
+`paperclipai/paperclip/`: `paperclip`, `complain`, `suggestion-box`, `paperclip-create-agent`,
+`para-memory-files`…) and `company` for everything from the company library. `--plugin-dir` is
+repeatable and "a folder of plugins loads each child" (CLI 2.1.325 help), so the launch still
+passes one path, the bundle root. A plugin with no skills is left out. The prefix is how Claude
+Code loads them, not their name: the manifest and `ui-new` use the plain names the Skills page
+shows.
 
 ## Global Constraints
 
@@ -121,7 +132,8 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
     credential: ClaudeRunCredential;
     setAside: { dir: string; entries: string[] } | null;
     overriddenEnv: string[];
-    skills: Array<{ name: string; key: string; origin: "always_on" | "assigned" }>;
+    /** name: the plain name the Skills page shows; plugin: which plugin loaded it (Claude sees `<plugin>:<name>`) */
+    skills: Array<{ name: string; key: string; origin: "always_on" | "assigned"; plugin: "paperclip" | "company" }>;
     builtInSkills: true;
     mcpServers: Array<{ name: string; url: string }>;
     strictMcpConfig: true;
@@ -264,20 +276,39 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
 - Test: `packages/adapters/claude-local/src/server/prompt-cache.test.ts` (create)
 
 **Interfaces:**
-- Produces: `ClaudePromptBundle.pluginDir: string` (the bundle root). The root holds
-  `.claude-plugin/plugin.json` = `{"name":"paperclip","description":"Skills Paperclip gives this run"}`
-  and `skills/<runtimeName>` symlinks to each skill's source, beside today's `.claude/skills/` (kept
-  for the dormant remote path) and `agent-instructions.md`.
+- Produces: `ClaudePromptBundle.pluginDir: string`, a folder of plugins inside the bundle
+  (`<bundle>/plugins`), beside today's `.claude/skills/` (kept for the dormant remote path) and
+  `agent-instructions.md`. It holds up to two plugins, each only when it has skills:
+  - `plugins/paperclip/`: `.claude-plugin/plugin.json` =
+    `{"name":"paperclip","description":"Paperclip's own skills: working in Paperclip, feedback, hiring, memory"}`
+    and `skills/<runtimeName>` symlinks for skills whose key starts `paperclipai/paperclip/`;
+  - `plugins/company/`: `plugin.json` =
+    `{"name":"company","description":"Skills from this company's skill library"}` and symlinks for
+    every other skill.
+- Produces: `export function claudeSkillPlugin(key: string): "paperclip" | "company"`, the rule
+  above, for the bundle and the manifest (Task 8).
 - Produces: `export const CLAUDE_PROMPT_BUNDLE_LAYOUT = 2`; `buildClaudePromptBundleKey` takes an
   optional `layout` (default that constant) and hashes it, so cached bundles from before (layout 1,
-  no `plugin.json`) aren't reused.
+  no plugins) aren't reused.
 
-- [ ] **Step 1:** Tests with two temporary skill folders: `plugin.json` has `name: "paperclip"`;
-  `skills/` and `.claude/skills/` list both runtime names; `buildClaudePromptBundleKey` gives
-  different keys for `layout: 1` and `layout: 2` with the same skills and instructions.
+- [ ] **Step 1:** Tests with three temporary skill folders, keys `paperclipai/paperclip/paperclip`,
+  `paperclipai/paperclip/complain` and a company-library key:
+  - `plugins/paperclip/.claude-plugin/plugin.json` has `name: "paperclip"` and its `skills/` lists
+    the two Paperclip skills; `plugins/company/` has `name: "company"` and the third;
+  - with only Paperclip skills, `plugins/company/` doesn't exist;
+  - `.claude/skills/` still lists all three runtime names;
+  - `claudeSkillPlugin` on each key;
+  - `buildClaudePromptBundleKey` gives different keys for `layout: 1` and `layout: 2` with the same
+    skills and instructions.
 - [ ] **Step 2:** Run; expect FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run; expect PASS, and `server/src/__tests__/claude-local-skill-sync.test.ts` still passes.
+- [ ] **Step 4a (manager, when reviewing):** check the layout with the real CLI, once: a
+  `claude --print --output-format stream-json --verbose --setting-sources user --strict-mcp-config
+  --plugin-dir <bundle>/plugins` run with a one-line prompt lists both plugins' skills in its
+  `init` event, as namespaced names (one small call on the user's own login, as the 2026-11-18
+  test was). If a folder of plugins doesn't load, the launch passes one `--plugin-dir` per plugin
+  instead; send that back to the agent.
 - [ ] **Step 5:** Commit: `claude_local: the prompt bundle doubles as a plugin`.
 
 ### Task 5: Which `CLAUDE.md` loads
@@ -407,11 +438,11 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
 - Produces: `buildClaudeRunManifest(input: { … every field's source … }): ClaudeRunManifest`, pure.
   Skill `origin` is `always_on` for `PAPERCLIP_OPERATIONAL_SKILL_KEY` and
   `PAPERCLIP_FEEDBACK_SKILL_KEYS` (`server-utils.ts:4370-4376`), else `assigned`; `name` is
-  `paperclip:<runtimeName>`. `envKeys` is sorted. `mcpServers` never includes the token.
+  the plain `<runtimeName>`, and `plugin` is `claudeSkillPlugin(key)` (Task 4). `envKeys` is sorted. `mcpServers` never includes the token.
 - Arguments on a local target, in order: `--print --output-format stream-json --verbose
   --setting-sources user [--resume <id>] <permission args> [--chrome] [--model …] [--effort …]
   [--max-turns …] [--append-system-prompt-file …] --mcp-config <file> --strict-mcp-config
-  --plugin-dir <bundle> [--add-dir <repo root>] [extraArgs…]`. No `--add-dir <bundle>`. With
+  --plugin-dir <bundle>/plugins [--add-dir <repo root>] [extraArgs…]`. No `--add-dir <bundle>`. With
   `addDir`, `env.CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD = "1"`. Remote targets keep today's
   arguments.
 - Prompt: `renderPaperclipMcpNote(env, true)` joins the sections after `taskContextNote` on fresh
@@ -426,6 +457,7 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
   servers, CLAUDE.md <loaded|skipped: reason>").
 
 - [ ] **Step 1:** `run-manifest.test.ts`: a full input maps to the expected manifest; origins;
+  skill names are plain (no `paperclip:` prefix) and `plugin` is `paperclip` or `company` by key;
   the token is absent from `mcpServers`; `claudeMd` passes through.
 - [ ] **Step 2:** Sealed-run tests:
   - `passes the sealed flags`: `--setting-sources user`, `--strict-mcp-config`, `--mcp-config`,
@@ -444,7 +476,7 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
 - [ ] **Step 4:** Implement.
 - [ ] **Step 5:** Run the two files and the design's existing CLI test files; expect PASS. Update
   assertions that expected `--add-dir <bundle>` or `.claude/skills` under it (the fake `claude`'s
-  `skillEntries` reads `<plugin-dir>/skills` instead).
+  `skillEntries` reads `<plugin-dir>/*/skills` instead).
 - [ ] **Step 6:** Commit: `claude_local: sealed arguments, the MCP note and the run manifest`.
 
 ### Task 9: The project switch: column, API
@@ -509,7 +541,7 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
   "When on, agent runs in this project's repository load the `CLAUDE.md` at the repository's root.
   Nothing else from the repository's Claude settings loads, and subfolder `CLAUDE.md` files don't."
 - The list, above the raw command in the Input tab, one line each: credential (method and
-  connection name), skills (names), MCP servers (names), access level, `CLAUDE.md` (path or the
+  connection name), skills (plain names, as on the Skills page; the prefix Claude sees in the info tip), MCP servers (names), access level, `CLAUDE.md` (path or the
   reason in words), instructions (sent or not), session (resumed, or fresh and why), auto memory off;
   set-aside entries and overridden variables only when there are any. Old runs without a manifest
   show nothing new.
@@ -538,6 +570,12 @@ Design rollout step 2. Nothing merges into `main` before it passes.
 - [ ] **Step 5:** Turn the project's switch off; run 3: `CLAUDE.md` skipped, `project_switch_off`.
 - [ ] **Step 6:** Run 4, a task asking it to delete another task: the refusal becomes a pending
   permission request in the Inbox, and the run still finishes. Don't approve it.
+- [ ] **Step 6a:** Skills by plain name. The agent has one company-library skill assigned as well
+  as Paperclip's own. Run 5, a task asking it to describe how it would hire a new agent, without
+  hiring (the `paperclip` skill points to "the `paperclip-create-agent` skill" by its plain name):
+  the run's `init` event lists `paperclip:paperclip-create-agent` and `company:<that skill>`, and
+  the transcript shows it loading `paperclip:paperclip-create-agent`. If it doesn't find the skill,
+  the skills' cross-references change to the namespaced names (a follow-up, on this branch).
 - [ ] **Step 7:** Record the results in the design doc's rollout section, and anything that failed
   in `fork/upstream-fixes.md`.
 
