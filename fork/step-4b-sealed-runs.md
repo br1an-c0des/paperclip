@@ -1,6 +1,7 @@
 # Step 4b: sealed runs on the CLI engine
 
-**Status: draft, 2026-11-18; builder-checked, waiting for approval.** The second half of
+**Status: approved 2026-11-18; updated 2026-11-19 for 4a and 3a, both merged into `main`
+([what changed](#updated-2026-11-19-after-4a-and-3a)).** The second half of
 [hard-fork plan step 4](hard-fork-plan.md#4-make-runs-claude-native), following
 [decision 8](hard-fork-plan.md#decisions) (sealed runs). This document designs **part 1**: the
 switch to the CLI engine together with a sealed launch. Part 2 and later are listed at the end, not
@@ -38,9 +39,38 @@ The CLI engine (`claude --print`) comes first because its flags control exactly 
     including `BETTER_AUTH_SECRET`, `PAPERCLIP_AGENT_JWT_SECRET` and `DATABASE_URL` (upstream
     #20040).
   - **`--strict-mcp-config` is added only when the run has a Paperclip MCP server** (`execute.ts:904-906`).
+    Since 4a, every run with a token gets the `paperclip` server, so in practice the flag is on
+    for every run except one with no token (see the update below).
 
   So simply changing the default would make server1's agents worse: no company skills (including
   `paperclip`), no resumed sessions, and the server's secrets in their environment.
+
+### Updated 2026-11-19, after 4a and 3a
+
+4a (`549e76036`) and 3a are on `main`. What that changes here:
+
+- **Nothing waits on 4a.** The `CLAUDE.md` switch's migration is `0492` (section 5), and tests
+  follow the tiers 3a built (Testing).
+- **One Paperclip MCP server per run.** `paperclipRunMcpServers`
+  (`server/src/services/heartbeat/paperclip-run-mcp.ts`) gives every run that has a token and a
+  `PAPERCLIP_API_URL` the `paperclip` server at `/api/mcp/paperclip`, task-bound or not. Connector
+  tool servers are still added beside it. A run with no token gets no server and can't finish or
+  block, so section 7 refuses to start it.
+- **The completion rule is live.** A run that stops without `paperclip_finish`, `paperclip_block`
+  or `paperclip_report_progress` with `continue: true`, and without leaving its task done, in review
+  or blocked, is woken again to record one, then sent to the board as needing attention.
+- **The CLI's prompt doesn't mention the tools.** 4a gave ACP's prompt a short note pointing the
+  run at the `paperclip_*` tools (`renderApiAccessNote`, `acpx-engine/execute.ts:3158-3166`). The
+  CLI's prompt (`claude-local/src/server/execute.ts:943-951`) got none, and leaves it to the
+  `paperclip` skill, which Claude reads only when it chooses to. Switching the default as it stands
+  would drop the note, and runs that miss the completion rule would end up as board work. Section 3
+  carries the note over.
+- **4a's real-run check was ACP only** (server1's dev instance, 2026-11-18). The CLI has had no real
+  run with the MCP server and the completion rule, so rollout step 2 is also that check.
+- **Access levels** (4a) are part of what a run gets. The manifest shows the agent's level
+  (section 8).
+- **Permission requests** (4a: a refused action becomes an Inbox request, and approving it carries
+  the action out) give part 4's permission prompts a pattern to follow.
 
 ## Goals
 
@@ -61,8 +91,8 @@ The CLI engine (`claude --print`) comes first because its flags control exactly 
 - Importing a repo's skills, agents or settings, and project skills added to runs
   ([build plan 3.18](../ui-new/docs/build-plan.md#318-importing-from-a-repo-and-project-skills)).
 - Consolidating the memory systems ([build plan 3.5](../ui-new/docs/build-plan.md#35-memory-service)).
-- Paperclip over MCP and the completion rule (4a).
-- The prompt itself (step 5).
+- Paperclip over MCP and the completion rule (4a, merged).
+- The prompt itself (step 5), apart from carrying ACP's MCP note over to the CLI (section 3).
 - ACP, the Runner, remote (SSH) and sandbox execution targets: dormant, left as they are.
 
 ## Anti-goals (a failure even if it works)
@@ -156,8 +186,8 @@ Every CLI run, on a local target:
 ```text
 claude --print --output-format stream-json --verbose
   --setting-sources user              # always, not only with managed connections
-  --strict-mcp-config                 # always, even with no Paperclip MCP server
-  --mcp-config <file>                 # Paperclip's servers; an empty server list when there are none
+  --strict-mcp-config                 # always
+  --mcp-config <file>                 # the paperclip server, plus any connector tool servers
   [--resume <id>] --model … [--effort …] [--max-turns …]
   [--append-system-prompt-file <bundle>/agent-instructions.md]   # fresh sessions, as today
   [--add-dir <workspace root>]        # only when the CLAUDE.md switch is on (section 5)
@@ -170,6 +200,16 @@ claude --print --output-format stream-json --verbose
   user source (tested), and section 4 replaces it. The instructions file is still read through
   `--append-system-prompt-file`.
 - `extraArgs` stays, since it's the agent's own configuration. The manifest lists it.
+- There's always at least the `paperclip` server, since a run without a token doesn't start
+  (section 7). The `mcp-config.json` holding the run's token stays where it is today, under the
+  agent's runtime state folder (`<stateDir>/runs/<runId>/mcp`, `claude-config.ts:169-176`), outside
+  the config folder.
+- **The MCP note in the prompt** (added 2026-11-19): fresh CLI sessions get the same short note as
+  ACP's, telling the run to work through the `paperclip_*` tools, start with
+  `paperclip_task_context`, and end with `paperclip_finish`, `paperclip_block`, or
+  `paperclip_report_progress` with `continue: true`. Like ACP, it's left out on resumed sessions and
+  external chat turns. It's a small exception to leaving the prompt to step 5, which then merges the
+  two builders.
 
 ### 4. Skills
 
@@ -188,7 +228,7 @@ claude --print --output-format stream-json --verbose
 ### 5. The repo's `CLAUDE.md`, per project
 
 - **The switch:** a new project setting, "Agents read the repo's `CLAUDE.md`", stored as a boolean
-  column on `projects` (a migration in the numbered sequence, after 4a's `0491`). It's shown in
+  column on `projects` (migration `0492`, the next after 4a's `0491`). It's shown in
   `ui-new`'s project settings, in the Code section (`ui-new/src/projects/settings/CodeSection.tsx`),
   with its help text behind an info tip (CLAUDE.md, "UI text").
 - **Default: on.** On ACP today, server1's agents read the repo's `CLAUDE.md` whenever the run
@@ -238,6 +278,11 @@ claude --print --output-format stream-json --verbose
   `claude_credential_missing`), naming where to set one. There's no fallback to the server's login.
 - This affects dev instances whose agents rely on the machine's `claude` login: they need a managed
   connection.
+- **No Paperclip token, no run either** (added 2026-11-19, my call). A run gets the `paperclip`
+  server only with a run token and `PAPERCLIP_API_URL`. Without them it can't finish or block, so
+  the completion rule would always send it to the board. The run fails before starting Claude with
+  its own error code (such as `paperclip_mcp_unavailable`), naming the missing piece: the JWT secret
+  (`PAPERCLIP_AGENT_JWT_SECRET` or `BETTER_AUTH_SECRET`) or `PAPERCLIP_API_URL`.
 
 ### 8. The run manifest
 
@@ -254,7 +299,8 @@ claude --print --output-format stream-json --verbose
   | `setAside` | Files moved out of the config folder before the run (section 2), if any |
   | `overriddenEnv` | Variable names from the agent's `env` that the launch overrode (section 2) |
   | `skills` | Name and origin of each (agent assignment, always-on, connector, skill test), plus `builtIns: true` |
-  | `mcpServers` | Name and URL of each, `strict: true` |
+  | `mcpServers` | Name and URL of each (`paperclip`, plus any connector tool servers), `strict: true`; never the token |
+  | `access` | The agent's access level (`read_only`, `worker`, `manager` or `admin`) and its per-action overrides, as resolved when the run started (4a) |
   | `instructions` | The entry file, and whether it was sent (fresh sessions only) |
   | `claudeMd` | `{ enabled, path }` when loaded, or `{ enabled: false, reason }`, the reason being `project_switch_off`, `not_in_repo` or `no_project` |
   | `autoMemory` | `false` |
@@ -273,15 +319,23 @@ claude --print --output-format stream-json --verbose
 2. Try it on the desktop's dev instance with an "M7 test" agent set to `engine: "cli"`, given a
    managed subscription connection. This means real runs, with the user's go-ahead, never on Bob.
    Check: it resumes its session on a second wake, loads its skills, sees the repo's `CLAUDE.md` only
-   with the switch on, has no server secrets in its environment, and its manifest matches.
+   with the switch on, has no server secrets in its environment, and its manifest matches. It's
+   also the CLI's first real run with 4a in place, so check 4a's two runs again on the CLI:
+   - it works only through the `paperclip_*` tools, and its finish is recorded `via: tool`;
+   - with the agent at `worker`, a refused action (such as deleting a task) becomes a pending
+     permission request in the Inbox, and the run still finishes.
 3. Change the default to CLI in the same branch, then merge into `main`.
 4. server1 moves at its next deploy, which stays on hold until the user asks. Back up the database
-   first, since the `CLAUDE.md` switch adds a migration.
+   first, since the `CLAUDE.md` switch adds a migration. My recommendation: deploy 4a (migration
+   `0491`) on its own first, so moving the five agents from ACP to the CLI isn't mixed up with the
+   new access levels in one deploy.
 
 ## Testing
 
-Until step 3a's faster runner and CI land, the agents' rule from 4a applies: typecheck, the named
-test files, no broad suites.
+The repo's test tiers (step 3a, [CLAUDE.md](../CLAUDE.md#tests)): `corepack pnpm test:quick`
+before pushing, and the branch's latest push green in CI before merging into `main`. The adapters'
+remote and sandbox paths are opt-in; run `test:optin` on the files concerned if shared changes reach
+them.
 
 - **Unit tests in `packages/adapters/claude-local`:**
   - the arguments: `--setting-sources user` and `--strict-mcp-config` always, no `--add-dir` for the
@@ -290,8 +344,9 @@ test files, no broad suites.
     Paperclip, the credential present, the server's `HOME` absent;
   - set-aside files: a `settings.json` or stray skill in the folder is moved aside and listed;
   - the skills folder matches the set exactly, including removing a skill that was unassigned;
-  - the missing-credential error;
-  - the manifest's fields.
+  - the missing-credential error, and the missing-token error (section 7);
+  - the MCP note in a fresh CLI prompt, and its absence on a resumed session (section 3);
+  - the manifest's fields, including `access`.
 - **Existing tests to keep passing:** `packages/adapters/claude-local/src/server/*.test.ts`, and
   `server/src/__tests__/claude-local-execute.test.ts`, `claude-local-skill-sync.test.ts`,
   `claude-local-adapter-environment.test.ts`, `claude-local-adapter.test.ts`. Tests of the remote and
@@ -301,11 +356,10 @@ test files, no broad suites.
 
 ## Relation to 4a and step 5
 
-- **4a:** no code dependency. The launch passes whatever MCP servers the run is given: today's
-  three, or 4a's single `paperclip` server once `PAPERCLIP_UNIFIED_RUN_MCP` is on. The migration
-  for the `CLAUDE.md` switch takes the next number after 4a's `0491`, so this branch merges after
-  `feat/step-4a`, or renumbers if it goes first. Both touch
-  `server/src/services/heartbeat/runtime-execution.ts` lightly.
+- **4a (merged 2026-11-19):** builds on it, with no ordering left to manage. The launch passes the
+  servers the run is given (the `paperclip` server, plus connector tool servers). The run needs 4a's
+  token to start (section 7), its prompt carries ACP's MCP note (section 3), and its manifest shows
+  4a's access level (section 8). The `CLAUDE.md` switch's migration is `0492`.
 - **Step 5:** builds its prompt on this launch. The manifest and step 5's prompt preview belong
   together in the run's details.
 
@@ -340,7 +394,10 @@ keeps the seam:
   - follow-up messages into a running session (`--input-format stream-json`), which step 6's chat
     needs;
   - permission prompts answered through Paperclip instead of skipped (`--permission-prompt-tool` or
-    `--permission-prompts host`), each one becoming an Inbox request;
+    `--permission-prompts host`), each one becoming an Inbox request. 4a's permission requests
+    (`server/src/services/permission-requests.ts`) are the pattern to follow. They differ in one way:
+    a 4a request ends the tool call and carries the action out after approval, while a Claude
+    permission prompt holds the run until it's answered;
   - text streamed as it's written (`--include-partial-messages`), for example the status card's live
     summary.
 - **Later, where runs execute** (after parts 1 to 4 have been used for a while): the CLI's dormant
@@ -356,3 +413,6 @@ keeps the seam:
 - The exact allowlist, starting from ACP's.
 - The error code's name and wording.
 - How the confinement paths (`filesystemScope`, `execute.ts:590-606`) point at the new folder.
+- How the agent's resolved access level reaches the adapter for the manifest (the server loads it,
+  `loadAgentAccess` in `server/src/services/agent-access.ts`, and passes it in the run's context),
+  and the MCP note's exact wording, starting from ACP's.

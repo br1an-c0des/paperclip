@@ -561,7 +561,8 @@ configure and edit calls may skip the access check). Wave 2's building is done. 
 `/api/mcp/project-tools` is retired (`services/project-tools.ts` stays for the dormant Runner). The
 ACP prompt's API note is MCP-only, with no curl recipe.
 - **Side effect:** every run now passes `--strict-mcp-config`, including task-less runs that used
-  to load the repo's `.mcp.json` and the user's MCP servers. Step 4b drops the flag.
+  to load the repo's `.mcp.json` and the user's MCP servers. Step 4b keeps the flag on every run
+  (decided 2026-11-18, [hard-fork plan decision 8](hard-fork-plan.md#decisions)).
 - **New bugs:** 51 (runs lost `set_task_title`), 52 (the chat directive uses old tool names) and 53
   (the ACP tests write `.claude/settings.local.json` into the repo).
 - **Docs to update before `main`:** `fork/claude-local-run.md`, `repo-map.md` and
