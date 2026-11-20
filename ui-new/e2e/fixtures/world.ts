@@ -120,6 +120,8 @@ export function project(overrides: Partial<Project> = {}): Project {
     color: "#6366f1",
     icon: null,
     env: null,
+    agentsReadClaudeMd: true,
+    agentsUseRepoSkills: true,
     pauseReason: null,
     pausedAt: null,
     executionWorkspacePolicy: null,

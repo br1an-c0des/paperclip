@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, timestamp, date, index, jsonb, check, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, date, index, jsonb, check, uniqueIndex, boolean } from "drizzle-orm/pg-core";
 import type { AgentEnvConfig } from "@paperclipai/shared";
 import { companies } from "./companies.js";
 import { goals } from "./goals.js";
@@ -29,6 +29,10 @@ export const projects = pgTable(
     color: text("color"),
     icon: text("icon"),
     env: jsonb("env").$type<AgentEnvConfig>(),
+    // Step 4b: whether sealed claude_local runs in this project's repository load the root
+    // CLAUDE.md, and the skills in its .claude/skills folder. Both default on.
+    agentsReadClaudeMd: boolean("agents_read_claude_md").notNull().default(true),
+    agentsUseRepoSkills: boolean("agents_use_repo_skills").notNull().default(true),
     gitAuthorizationGrantId: uuid("git_authorization_grant_id").references(() => connectionGrants.id, { onDelete: "set null" }),
     gitAuthorizedByUserId: text("git_authorized_by_user_id"),
     pauseReason: text("pause_reason"),

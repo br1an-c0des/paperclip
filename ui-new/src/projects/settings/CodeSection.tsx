@@ -40,6 +40,7 @@ import {
   type CheckoutDraft,
   type WorkspaceDraft,
 } from "./settings-model";
+import { RepoInstructionsCard } from "./RepoInstructionsCard";
 import { failure, FootError, refreshProject, saveNote, useProjectSaver, useSaveRunner } from "./shared";
 import { COMMANDS_EXAMPLE, commandEntries, commandsRequest, commandsText, parseCommands } from "./workspace-commands";
 
@@ -68,6 +69,8 @@ import { COMMANDS_EXAMPLE, commandEntries, commandsRequest, commandsText, parseC
  *   setup command runs, in a task's worktree), so its field says so. Its Cleanup command and
  *   commands JSON apply to every task working from the workspace, shared or in a worktree
  *   (server/src/routes/execution-workspaces.ts).
+ * - Repository instructions (step 4b, RepoInstructionsCard.tsx): whether sealed Claude runs in the
+ *   project's repository load its root CLAUDE.md and its `.claude/skills`. Each switch saves at once.
  * - Workspace storage is fixed when the project is created and only shown, with the environments that
  *   can use it (#20835, build plan U126). A project has no run environment of its own: runs follow
  *   the agent's default, then the instance's.
@@ -82,6 +85,7 @@ export function CodeSection(props: { project: Project }) {
       <RepositoriesCard project={props.project} hideHostPaths={hideHostPaths()} />
       <WorkspacesCard project={props.project} hideHostPaths={hideHostPaths()} />
       <CheckoutsCard project={props.project} inForce={checkoutsInForce(props.project, experimental.data?.enableIsolatedWorkspaces === true)} />
+      <RepoInstructionsCard project={props.project} />
     </>
   );
 }

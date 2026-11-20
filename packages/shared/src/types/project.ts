@@ -155,6 +155,16 @@ export interface Project {
   color: string | null;
   icon: string | null;
   env: AgentEnvConfig | null;
+  /**
+   * Step 4b: whether sealed claude_local runs in this project's repository load the root
+   * `CLAUDE.md` ("Agents read the repo's CLAUDE.md"). Default on.
+   */
+  agentsReadClaudeMd: boolean;
+  /**
+   * Step 4b: whether sealed claude_local runs get the skills in the repository's
+   * `.claude/skills`, from the run's own checkout ("Agents use the repo's skills"). Default on.
+   */
+  agentsUseRepoSkills: boolean;
   pauseReason: PauseReason | null;
   pausedAt: Date | null;
   executionWorkspacePolicy: ProjectExecutionWorkspacePolicy | null;
