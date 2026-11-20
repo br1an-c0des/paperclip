@@ -391,7 +391,13 @@ export function watchLegacyControllerLease(
     deadline.unref();
   };
   const initialRemainingMs = (run.controllerLeaseExpiresAt?.getTime() ?? 0) - Date.now();
-  armDeadline(Math.max(0, initialRemainingMs));
+  // The expiry was written by the database's clock and is read here with this
+  // process's. When this clock runs ahead by more than a lease, a lease the
+  // database still holds looks expired, and a deadline of 0 would beat the
+  // renewal below. The database decides: the renewal is refused if the lease
+  // really lapsed. Until it answers, bound the wait by one renewal statement.
+  // Nothing is dispatched before a renewal succeeds.
+  armDeadline(initialRemainingMs > 0 ? initialRemainingMs : renewalStatementTimeoutMs);
   const assertOwned = async (stage?: "dispatching") => {
     if (stopped) return;
     controller.signal.throwIfAborted();
