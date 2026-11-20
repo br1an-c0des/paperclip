@@ -616,7 +616,12 @@ on every refused check (61). CI then failed only on bug 62, a test leak on `main
 backup (`~/deployments/paperclip/backups/paperclip-2026-11-19-1215.dump`): 0491 applied, health
 `ok`; the 5 agents carried over at `manager` with `agents:create`, `agents:configure` and
 `tasks:assign` overrides; the one outside OAuth connection carried over at `admin`, acting as the
-person.
+person. **Redeployed** 2026-11-20 (`8de8a2763`, CI run 44669786038): the follow-ups (bugs 62, 64
+and 65, the step 4b design update) and the first deploy through the new `deploy.sh`, with its CI
+gate, health check and rollback image. No migrations. Health `ok` after 5 s at that commit, no
+error lines, UI 200, MCP endpoints 401 without auth, OAuth discovery 200. `paperclip-fork:previous`
+was rebuilt for `5bde9aec2` (bug 65), and `--rollback --dry-run` would restore it. The first try,
+at `18b6f3e1e`, stopped before the restart on bug 65, leaving production untouched.
 
 **Open after the merge:** bugs 53–56 (optional); B's design question, whether a refusal outside a
 scoped override (`deny_scope`) should be requestable (now it isn't); the invite route serves the
