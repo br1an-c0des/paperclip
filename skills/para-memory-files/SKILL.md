@@ -81,20 +81,26 @@ Memory does not survive session restarts. Files do.
 - Make a mistake -> document it so future-you does not repeat it.
 - On-disk text files are always better than holding it in temporary context.
 
-## Memory Recall -- Use qmd
+## Memory Recall -- Summaries First, Then Search
 
-Use `qmd` rather than grepping files:
+Read before you search. The layout is built for it:
+
+1. `$AGENT_HOME/life/index.md` -- which entities exist.
+2. The entity's `summary.md` -- quick context. Open `items.yaml` only when you need the atomic facts.
+3. `$AGENT_HOME/MEMORY.md` -- how the user operates.
+
+When you don't know where something lives, search the files with `rg` (`grep -r` if `rg` is missing):
 
 ```bash
-qmd query "what happened at Christmas"   # Semantic search with reranking
-qmd search "specific phrase"              # BM25 keyword search
-qmd vsearch "conceptual question"         # Pure vector similarity
+rg -i "christmas" "$AGENT_HOME"                  # Keyword, case-insensitive
+rg -il "acme" "$AGENT_HOME"                      # List matching files only
+rg -i "deadline" "$AGENT_HOME/life/projects"     # One PARA area
+rg -i -C 2 "jeff" "$AGENT_HOME/memory"           # Daily notes, with 2 lines of context
+grep -ril "acme" "$AGENT_HOME"                   # Fallback when rg is missing
 ```
 
-Index your personal folder: `qmd index $AGENT_HOME`
-
-Vectors + BM25 + reranking finds things even when the wording differs.
+Search matches words, not meaning. If nothing turns up, try synonyms, partial names, and dates (`2026-03`) before concluding there is no memory of it. Cold facts drop out of `summary.md` but stay in `items.yaml`, so a search still finds them. Skip facts marked `status: superseded` unless you need the history.
 
 ## Planning
 
-Keep plans in timestamped files in `plans/` at the project root (outside personal memory so other agents can access them). Use `qmd` to search plans. Plans go stale -- if a newer plan exists, do not confuse yourself with an older version. If you notice staleness, update the file to note what it is supersededBy.
+Keep plans in timestamped files in `plans/` at the project root (outside personal memory so other agents can access them). Search them with `rg -i "<topic>" plans/`. Plans go stale -- if a newer plan exists, do not confuse yourself with an older version. If you notice staleness, update the file to note what it is supersededBy.
