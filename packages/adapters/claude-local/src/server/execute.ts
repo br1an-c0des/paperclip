@@ -7,7 +7,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AdapterExecutionContext, AdapterExecutionResult } from "@paperclipai/adapter-utils";
-import type { ClaudeRunCredential } from "@paperclipai/shared";
+import type { ClaudeFreshSessionReason, ClaudeMdLoad, ClaudeRepoSkillsLoad, ClaudeRunCredential } from "@paperclipai/shared";
 import type { RunProcessResult } from "@paperclipai/adapter-utils/server-utils";
 import {
   managedRemoteHomeEnvironment,
@@ -123,6 +123,20 @@ import {
   resolveAgentClaudeConfigDir,
   resolveAgentClaudeSetAsideDir,
 } from "./agent-config-dir.js";
+import { findRepoRoot, resolveClaudeMdLoad } from "./claude-md.js";
+import {
+  prepareRepoSkillsPlugin,
+  removeRunPluginsDir,
+  resolveRepoSkills,
+  resolveRunPluginsDir,
+  type RepoSkill,
+} from "./repo-skills.js";
+import {
+  buildClaudeRunManifest,
+  summarizeClaudeRunManifest,
+  type ClaudeRunSessionStart,
+  type SealedClaudeLaunch,
+} from "./run-manifest.js";
 
 const __moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const executeClaudeAcp = createClaudeAcpExecutor();
@@ -205,10 +219,14 @@ interface SealedClaudeRun {
   overriddenEnv: string[];
   /**
    * Values the launch sets over the agent's `env`: Paperclip's `HOME` and `XDG_*` folders
-   * (without a managed connection), `CLAUDE_CONFIG_DIR`, and `CLAUDE_CODE_DISABLE_AUTO_MEMORY`,
-   * last. Re-applied after anything re-reads `config.env`.
+   * (without a managed connection), `CLAUDE_CONFIG_DIR`, the `CLAUDE.md` switch's variable, and
+   * `CLAUDE_CODE_DISABLE_AUTO_MEMORY`, last. Re-applied after anything re-reads `config.env`.
    */
   envOverrides: Record<string, string>;
+  claudeMd: { load: ClaudeMdLoad; addDir: string | null };
+  repoSkills: { load: ClaudeRepoSkillsLoad; skills: RepoSkill[] };
+  /** The per-run plugins folder holding `project`, when the repo's skills load. */
+  runPluginsDir: string | null;
 }
 
 /** Keys the sealed launch replaces in the agent's `env` when it has no managed connection. */
@@ -277,9 +295,15 @@ function checkSealedRunGates(input: {
   return { refusal: null, credential };
 }
 
+function readOptionalBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
 /**
  * Prepares a sealed local run after its gates: Paperclip's `HOME` (without a managed
- * connection) and the agent's config folder with stray configuration set aside. Cleanups go into `runCleanups`, which the caller runs after the run.
+ * connection), the agent's config folder with stray configuration set aside, and what the run
+ * takes from its repo (fork/step-4b-plan.md, Task 8). Cleanups go into `runCleanups`, which
+ * the caller runs after the run.
  */
 async function prepareSealedClaudeRun(input: {
   runId: string;
@@ -322,6 +346,28 @@ async function prepareSealedClaudeRun(input: {
         return typeof configured === "string" && configured.trim().length > 0 && configured !== envOverrides[key];
       });
 
+  // The repo's root CLAUDE.md and its skills, from the run's own checkout, when its project
+  // allows them. The repo skills load as a per-run `project` plugin, removed after the run.
+  const repoRoot = await findRepoRoot(cwd);
+  const projectId = asString(workspaceContext.projectId, "").trim() || null;
+  const claudeMd = await resolveClaudeMdLoad({
+    projectId,
+    agentsReadClaudeMd: readOptionalBoolean(workspaceContext.agentsReadClaudeMd),
+    repoRoot,
+  });
+  const repoSkills = await resolveRepoSkills({
+    projectId,
+    agentsUseRepoSkills: readOptionalBoolean(workspaceContext.agentsUseRepoSkills),
+    repoRoot,
+  });
+  let runPluginsDir: string | null = null;
+  if (repoSkills.load.enabled && repoRoot) {
+    const dir = resolveRunPluginsDir(process.env, agent.companyId, agent.id, runId);
+    // Registered first, so a half-built folder is removed too.
+    runCleanups.push(() => removeRunPluginsDir(dir));
+    runPluginsDir = await prepareRepoSkillsPlugin({ runPluginsDir: dir, repoRoot, skills: repoSkills.skills });
+  }
+  if (claudeMd.addDir) envOverrides.CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD = "1";
   // Last, so nothing overrides it.
   envOverrides.CLAUDE_CODE_DISABLE_AUTO_MEMORY = "1";
 
@@ -331,6 +377,9 @@ async function prepareSealedClaudeRun(input: {
     setAside: { dir: setAsideDir, entries: setAside },
     overriddenEnv,
     envOverrides,
+    claudeMd,
+    repoSkills,
+    runPluginsDir,
   };
 }
 
@@ -814,6 +863,9 @@ async function executeClaudeCli(
               .filter((entry) => path.isAbsolute(entry.source))
               .map((entry) => ({ path: entry.source, access: "ro" as const })),
             { path: localMcpConfigDir, access: "ro" },
+            ...(sealed.runPluginsDir ? [{ path: sealed.runPluginsDir, access: "ro" as const }] : []),
+            ...sealed.repoSkills.skills.map((skill) => ({ path: skill.dir, access: "ro" as const })),
+            ...(sealed.claudeMd.load.enabled ? [{ path: sealed.claudeMd.load.path, access: "ro" as const }] : []),
           ],
           extraPaths: parseLocalProcessSandboxExtraPaths(config.filesystemExtraPaths),
           // runChildProcess sets HOME to this after merging the env: it must be the sealed HOME
@@ -1042,6 +1094,19 @@ async function executeClaudeCli(
       hasMatchingSessionCwd &&
       hasMatchingExecutionTarget;
     const sessionId = canResumeSession ? runtimeSessionId : null;
+    // Why a run starts fresh, for the manifest. The repo's skills don't count: a changed set
+    // resumes, as a terminal session would after `git checkout`.
+    const freshSessionReason: ClaudeFreshSessionReason = runtimeSessionId.length === 0
+      ? "no_saved_session"
+      : !isValidUuid
+      ? "invalid_session_id"
+      : !hasMatchingExecutionTarget
+      ? "target_changed"
+      : !hasMatchingSessionCwd
+      ? "cwd_changed"
+      : !hasMatchingPromptBundle
+      ? "prompt_bundle_changed"
+      : "session_unavailable";
     if (runtimeSessionId && !isValidUuid) {
       await onLog(
         "stdout",
@@ -1099,7 +1164,8 @@ async function executeClaudeCli(
       attemptInstructionsFilePath: string | undefined,
     ) => {
       const args = ["--print", "--output-format", "stream-json", "--verbose"];
-      if (config.managedAiConnection) args.push("--setting-sources", "user");
+      // A sealed run's user setting source is the agent's own config folder.
+      if (sealed || config.managedAiConnection) args.push("--setting-sources", "user");
       if (resumeSessionId) args.push("--resume", resumeSessionId);
       args.push(...buildClaudeExecutionPermissionArgs({
         dangerouslySkipPermissions,
@@ -1121,10 +1187,20 @@ async function executeClaudeCli(
       if (attemptInstructionsFilePath && !resumeSessionId) {
         args.push("--append-system-prompt-file", attemptInstructionsFilePath);
       }
-      if (runtimeMcpServers.length > 0) {
+      if (sealed) {
+        // Always the `paperclip` server (a run without it doesn't start), strictly. Skills load
+        // as plugins: the bundle's `paperclip` and `company`, then the run's `project`. The bundle
+        // isn't passed with --add-dir; only the repo root is, for its CLAUDE.md.
         args.push("--mcp-config", effectiveMcpConfigPath, "--strict-mcp-config");
+        args.push("--plugin-dir", promptBundle.pluginDir);
+        if (sealed.runPluginsDir) args.push("--plugin-dir", sealed.runPluginsDir);
+        if (sealed.claudeMd.addDir) args.push("--add-dir", sealed.claudeMd.addDir);
+      } else {
+        if (runtimeMcpServers.length > 0) {
+          args.push("--mcp-config", effectiveMcpConfigPath, "--strict-mcp-config");
+        }
+        args.push("--add-dir", effectivePromptBundleAddDir);
       }
-      args.push("--add-dir", effectivePromptBundleAddDir);
       if (extraArgs.length > 0) args.push(...extraArgs);
       return args;
     };
@@ -1145,7 +1221,57 @@ async function executeClaudeCli(
         : `Claude exited with code ${proc.exitCode ?? -1}`;
     };
 
-    const runAttempt = async (resumeSessionId: string | null) => {
+    /**
+     * The sealed launch as data (design, "Keep the launch portable"): what the local starter
+     * spawns, with the manifest that describes it. Nothing changes it before the spawn.
+     */
+    const buildSealedLaunch = (input: {
+      sealedRun: SealedClaudeRun;
+      args: string[];
+      resumeSessionId: string | null;
+      attemptInstructionsFilePath: string | undefined;
+      freshReason: ClaudeFreshSessionReason;
+    }): SealedClaudeLaunch => {
+      const launchEnv = buildSealedLaunchEnv(env, input.sealedRun);
+      const session: ClaudeRunSessionStart = input.resumeSessionId
+        ? { mode: "resumed", sessionId: input.resumeSessionId }
+        : { mode: "fresh", reason: input.freshReason };
+      return {
+        command,
+        args: input.args,
+        env: launchEnv,
+        cwd,
+        files: {
+          configDir: input.sealedRun.configDir,
+          pluginDir: promptBundle.pluginDir,
+          runPluginsDir: input.sealedRun.runPluginsDir,
+          mcpConfigPath: effectiveMcpConfigPath,
+          claudeMdRoot: input.sealedRun.claudeMd.addDir,
+        },
+        manifest: buildClaudeRunManifest({
+          configDir: input.sealedRun.configDir,
+          credential: input.sealedRun.credential,
+          setAside: input.sealedRun.setAside,
+          overriddenEnv: input.sealedRun.overriddenEnv,
+          skills: mountableSkillEntries,
+          repoSkills: input.sealedRun.repoSkills,
+          mcpServers: runtimeMcpServers,
+          access: context.paperclipAgentAccess,
+          instructions: {
+            entryFile: instructionsFilePath || null,
+            // The agent's instructions went out with --append-system-prompt-file: a fresh
+            // session, and the entry file was read (the directive is set only then).
+            sent: Boolean(instructionsPathDirective && input.attemptInstructionsFilePath && !input.resumeSessionId),
+          },
+          claudeMd: input.sealedRun.claudeMd.load,
+          env: launchEnv,
+          extraArgs,
+          session,
+        }),
+      };
+    };
+
+    const runAttempt = async (resumeSessionId: string | null, freshReason: ClaudeFreshSessionReason) => {
       await hydrateFreshSessionHandoff(ctx, { resumedSession: Boolean(resumeSessionId) });
       const renderedBootstrapPrompt =
         !resumeSessionId && bootstrapPromptTemplate.trim().length > 0
@@ -1160,6 +1286,11 @@ async function executeClaudeCli(
         ? ""
         : renderTemplate(promptTemplate, templateData);
       const sessionHandoffNote = asString(context.paperclipSessionHandoffMarkdown, "").trim();
+      // Fresh sealed sessions are pointed at the `paperclip_*` tools, as ACP's are; resumed
+      // sessions and external chat turns aren't.
+      const paperclipMcpNote = sealed && !resumeSessionId && !isPaperclipExternalChatTurn(context.paperclipWake)
+        ? renderPaperclipMcpNote(env, true)
+        : "";
       const prompt = joinPromptSections([
         instructionsPathDirective,
         renderedBootstrapPrompt,
@@ -1167,6 +1298,7 @@ async function executeClaudeCli(
         wakePrompt,
         sessionHandoffNote,
         taskContextNote,
+        paperclipMcpNote,
         renderedPrompt,
       ]);
       const promptMetrics = {
@@ -1179,7 +1311,11 @@ async function executeClaudeCli(
       };
       const attemptInstructionsFilePath = resumeSessionId ? undefined : effectiveInstructionsFilePath;
       const args = buildClaudeArgs(resumeSessionId, attemptInstructionsFilePath);
+      const launch = sealed
+        ? buildSealedLaunch({ sealedRun: sealed, args, resumeSessionId, attemptInstructionsFilePath, freshReason })
+        : null;
       const commandNotes: string[] = [];
+      if (launch) commandNotes.push(summarizeClaudeRunManifest(launch.manifest));
       if (!resumeSessionId) {
         commandNotes.push(`Using stable Claude prompt bundle ${promptBundle.bundleKey}.`);
       }
@@ -1209,6 +1345,7 @@ async function executeClaudeCli(
           prompt,
           promptMetrics,
           context,
+          ...(launch ? { runManifest: launch.manifest as unknown as Record<string, unknown> } : {}),
         });
       }
 
@@ -1220,13 +1357,13 @@ async function executeClaudeCli(
           billingType, model: Object.keys(parseObject(parsed.resultJson?.modelUsage)).length > 1 ? "mixed" : parsed.model || model,
             usageByModel: claudeModelReceipts(parsed.resultJson?.modelUsage), complete: parsed.resultJson !== null };
       });
-      const proc = await runAdapterExecutionTargetProcess(runId, runtimeExecutionTarget, command, args, {
+      const proc = await runAdapterExecutionTargetProcess(runId, runtimeExecutionTarget, launch?.command ?? command, launch?.args ?? args, {
         onProcessStopped: providerStop.beginInvocation(),
-        cwd,
+        cwd: launch?.cwd ?? cwd,
         // A sealed run gets the host allowlist and what Paperclip gives it, never the server's
         // whole environment.
-        env: sealed ? buildSealedLaunchEnv(env, sealed) : env,
-        ...(sealed ? { inheritHostEnv: false } : {}),
+        env: launch?.env ?? env,
+        ...(launch ? { inheritHostEnv: false } : {}),
         stdin: prompt,
         timeoutSec,
         graceSec,
@@ -1628,7 +1765,7 @@ async function executeClaudeCli(
       }
     }
 
-    const initial = await runAttempt(sessionId ?? null);
+    const initial = await runAttempt(sessionId ?? null, freshSessionReason);
     const sessionErrorKind =
       sessionId &&
       !initial.proc.timedOut &&
@@ -1674,7 +1811,7 @@ async function executeClaudeCli(
           }
         }
       }
-      const retry = await runAttempt(null);
+      const retry = await runAttempt(null, "session_unavailable");
       return toAdapterResult(retry, { fallbackSessionId: null, clearSessionOnMissingSession: true });
     }
 

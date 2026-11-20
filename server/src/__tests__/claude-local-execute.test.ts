@@ -65,16 +65,26 @@ const instructionsIndex = argv.indexOf("--append-system-prompt-file");
 const instructionsFilePath = instructionsIndex >= 0 ? argv[instructionsIndex + 1] : null;
 const mcpConfigIndex = argv.indexOf("--mcp-config");
 const mcpConfigPath = mcpConfigIndex >= 0 ? argv[mcpConfigIndex + 1] : null;
+// Sealed local runs load skills as plugins (--plugin-dir <folder of plugins>); the dormant
+// remote paths still pass the bundle with --add-dir.
+const pluginDirs = argv.flatMap((arg, index) => (arg === "--plugin-dir" ? [argv[index + 1]] : []));
+const pluginSkillEntries = pluginDirs.flatMap((dir) => fs.readdirSync(dir).flatMap((plugin) => {
+  const skillsDir = path.join(dir, plugin, "skills");
+  return fs.existsSync(skillsDir) ? fs.readdirSync(skillsDir) : [];
+}));
 const capturePath = process.env.PAPERCLIP_TEST_CAPTURE_PATH;
 const payload = {
   argv,
   prompt: fs.readFileSync(0, "utf8"),
   addDir,
+  pluginDir: pluginDirs[0] ?? null,
   instructionsFilePath,
   instructionsContents: instructionsFilePath ? fs.readFileSync(instructionsFilePath, "utf8") : null,
   mcpConfigPath,
   mcpConfigContents: mcpConfigPath ? fs.readFileSync(mcpConfigPath, "utf8") : null,
-  skillEntries: addDir ? fs.readdirSync(path.join(addDir, ".claude", "skills")).sort() : [],
+  skillEntries: pluginDirs.length > 0
+    ? pluginSkillEntries.sort()
+    : addDir ? fs.readdirSync(path.join(addDir, ".claude", "skills")).sort() : [],
   claudeConfigDir: process.env.CLAUDE_CONFIG_DIR || null,
   claudeConfigEntries: process.env.CLAUDE_CONFIG_DIR && fs.existsSync(process.env.CLAUDE_CONFIG_DIR)
     ? fs.readdirSync(process.env.CLAUDE_CONFIG_DIR).sort()
@@ -177,6 +187,7 @@ type CapturePayload = {
   argv: string[];
   prompt: string;
   addDir: string | null;
+  pluginDir?: string | null;
   instructionsFilePath: string | null;
   instructionsContents: string | null;
   skillEntries: string[];
@@ -1412,11 +1423,13 @@ describe("claude execute", () => {
         "claude-prompt-cache",
       );
 
-      expect(capture1.addDir).toBeTruthy();
-      expect(capture1.addDir).toBe(capture2.addDir);
+      // Sealed: the bundle loads as plugins (--plugin-dir), not with --add-dir.
+      expect(capture1.addDir).toBeNull();
+      expect(capture1.pluginDir).toBeTruthy();
+      expect(capture1.pluginDir).toBe(capture2.pluginDir);
       expect(capture1.instructionsFilePath).toBeTruthy();
       expect(capture2.instructionsFilePath ?? null).toBeNull();
-      expect(capture1.addDir?.startsWith(expectedRoot)).toBe(true);
+      expect(capture1.pluginDir?.startsWith(expectedRoot)).toBe(true);
       expect(capture1.instructionsFilePath?.startsWith(expectedRoot)).toBe(true);
       expect(capture1.instructionsContents).toContain("You are managed instructions.");
       expect(capture1.instructionsContents).not.toContain(instructionsPath);

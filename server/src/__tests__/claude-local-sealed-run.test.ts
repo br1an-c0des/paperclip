@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { AdapterExecutionContext } from "@paperclipai/adapter-utils";
+import type { AdapterExecutionContext, AdapterInvocationMeta } from "@paperclipai/adapter-utils";
+import { isClaudeRunManifest, type ClaudeRunManifest } from "@paperclipai/shared";
 import { execute } from "@paperclipai/adapter-claude-local/server";
 import { sealedRunInputs, SEALED_TEST_CLAUDE_TOKEN } from "./helpers/claude-local-sealed-run.js";
 
@@ -18,6 +19,7 @@ type Capture = {
   env: Record<string, string>;
   homeExists: boolean;
   pluginSkills: string[];
+  runPluginsAtEnd?: string[] | null;
 };
 
 async function writeFakeClaude(commandPath: string): Promise<void> {
@@ -56,6 +58,13 @@ if (process.env.PAPERCLIP_TEST_POISON_RESUME === "1" && argv.includes("--resume"
 }
 const delayMs = Number(process.env.PAPERCLIP_TEST_DELAY_MS || 0);
 setTimeout(() => {
+  // What the run's own plugins folder (the second --plugin-dir) holds as the run ends.
+  const runPluginsDir = argv.filter((arg, index) => argv[index - 1] === "--plugin-dir")[1];
+  if (capturePath && runPluginsDir) {
+    const capture = JSON.parse(fs.readFileSync(capturePath, "utf8"));
+    capture.runPluginsAtEnd = fs.existsSync(runPluginsDir) ? fs.readdirSync(runPluginsDir).sort() : null;
+    fs.writeFileSync(capturePath, JSON.stringify(capture), "utf8");
+  }
   const sessionId = "11111111-1111-4111-8111-111111111111";
   console.log(JSON.stringify({ type: "system", subtype: "init", session_id: sessionId, model: "claude-sonnet" }));
   console.log(JSON.stringify({ type: "result", subtype: "success", session_id: sessionId, result: "done", usage: { input_tokens: 1, cache_read_input_tokens: 0, output_tokens: 1 } }));
@@ -314,5 +323,271 @@ process.exit(result.status ?? 1);
     const binds = (flag: string) => bwrap.args.flatMap((arg, index) => (arg === flag ? [bwrap.args[index + 1]] : []));
     expect(binds("--bind")).toEqual(expect.arrayContaining([configDir, capture.env.HOME, workspace]));
     expect(binds("--bind")).not.toContain(path.join(root, ".claude"));
+  });
+});
+
+async function makeCheckout(dir: string, options: { claudeMd?: boolean; skills?: string[]; gitFile?: boolean } = {}) {
+  await fs.mkdir(dir, { recursive: true });
+  if (options.gitFile) await fs.writeFile(path.join(dir, ".git"), "gitdir: /elsewhere/.git/worktrees/x\n", "utf8");
+  else await fs.mkdir(path.join(dir, ".git"), { recursive: true });
+  if (options.claudeMd) await fs.writeFile(path.join(dir, "CLAUDE.md"), "# Repo instructions\n", "utf8");
+  for (const skill of options.skills ?? []) {
+    await fs.mkdir(path.join(dir, ".claude", "skills", skill), { recursive: true });
+    await fs.writeFile(path.join(dir, ".claude", "skills", skill, "SKILL.md"), `---\nname: ${skill}\n---\n`, "utf8");
+  }
+  return dir;
+}
+
+function workspaceContext(
+  cwd: string,
+  switches: { agentsReadClaudeMd?: boolean | null; agentsUseRepoSkills?: boolean | null } = {},
+) {
+  return {
+    paperclipWorkspace: {
+      cwd,
+      source: "project_primary",
+      projectId: "project-sealed",
+      agentsReadClaudeMd: switches.agentsReadClaudeMd ?? true,
+      agentsUseRepoSkills: switches.agentsUseRepoSkills ?? true,
+    },
+  };
+}
+
+function flagValues(argv: string[], flag: string): string[] {
+  return argv.flatMap((arg, index) => (arg === flag ? [argv[index + 1]] : []));
+}
+
+function metaCollector() {
+  const metas: AdapterInvocationMeta[] = [];
+  return { metas, onMeta: async (meta: AdapterInvocationMeta) => { metas.push(meta); } };
+}
+
+function manifestOf(meta: AdapterInvocationMeta | undefined): ClaudeRunManifest {
+  const manifest = meta?.runManifest;
+  if (!isClaudeRunManifest(manifest)) throw new Error("onMeta carried no run manifest");
+  return manifest;
+}
+
+describe("sealed claude_local CLI runs: arguments, repo, prompt and manifest", () => {
+  it("passes the sealed flags", async () => {
+    await execute(buildContext());
+    const { argv } = await readCapture();
+
+    expect(argv.slice(0, 6)).toEqual(["--print", "--output-format", "stream-json", "--verbose", "--setting-sources", "user"]);
+    expect(argv).toContain("--strict-mcp-config");
+    expect(flagValues(argv, "--mcp-config")).toHaveLength(1);
+    expect(flagValues(argv, "--plugin-dir")).toHaveLength(1);
+    expect(flagValues(argv, "--plugin-dir")[0]).toMatch(/claude-prompt-cache\/[0-9a-f]{64}\/plugins$/);
+    expect(argv).not.toContain("--add-dir");
+  });
+
+  it("loads the bundle's skills as the paperclip plugin", async () => {
+    await execute(buildContext());
+    const { pluginSkills } = await readCapture();
+    expect(pluginSkills).toContain("paperclip:paperclip");
+  });
+
+  it("adds the repo root when the project allows it", async () => {
+    const repo = await makeCheckout(path.join(root, "repo"), { claudeMd: true });
+    const on = metaCollector();
+    await execute(buildContext({ context: workspaceContext(repo), onMeta: on.onMeta }));
+    const onCapture = await readCapture();
+
+    expect(flagValues(onCapture.argv, "--add-dir")).toEqual([repo]);
+    expect(onCapture.env.CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD).toBe("1");
+    expect(manifestOf(on.metas[0]).claudeMd).toEqual({ enabled: true, path: path.join(repo, "CLAUDE.md") });
+
+    const off = metaCollector();
+    await execute(buildContext({
+      runId: "run-sealed-2",
+      context: workspaceContext(repo, { agentsReadClaudeMd: false }),
+      onMeta: off.onMeta,
+    }));
+    const offCapture = await readCapture();
+    expect(offCapture.argv).not.toContain("--add-dir");
+    expect(offCapture.env).not.toHaveProperty("CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD");
+    expect(manifestOf(off.metas[0]).claudeMd).toEqual({ enabled: false, reason: "project_switch_off" });
+  });
+
+  it("adds the repo's skills when the project allows it", async () => {
+    const repo = await makeCheckout(path.join(root, "repo"), { skills: ["m7"] });
+    const on = metaCollector();
+    await execute(buildContext({ runId: "run-repo-skills", context: workspaceContext(repo), onMeta: on.onMeta }));
+    const onCapture = await readCapture();
+    const runPluginsDir = path.join(agentFolder(), "claude-run-plugins", "run-repo-skills");
+
+    expect(flagValues(onCapture.argv, "--plugin-dir")).toHaveLength(2);
+    expect(flagValues(onCapture.argv, "--plugin-dir")[1]).toBe(runPluginsDir);
+    expect(onCapture.pluginSkills).toContain("project:m7");
+    expect(await exists(runPluginsDir)).toBe(false);
+    const manifest = manifestOf(on.metas[0]);
+    expect(manifest.repoSkills).toEqual({ enabled: true, dir: path.join(repo, ".claude", "skills"), count: 1 });
+    expect(manifest.skills.at(-1)).toEqual({ name: "m7", key: "repo:.claude/skills/m7", origin: "repo", plugin: "project" });
+
+    const off = metaCollector();
+    await execute(buildContext({
+      runId: "run-repo-skills-off",
+      context: workspaceContext(repo, { agentsUseRepoSkills: false }),
+      onMeta: off.onMeta,
+    }));
+    const offCapture = await readCapture();
+    expect(flagValues(offCapture.argv, "--plugin-dir")).toHaveLength(1);
+    expect(offCapture.pluginSkills.some((skill) => skill.startsWith("project:"))).toBe(false);
+    expect(manifestOf(off.metas[0]).repoSkills).toEqual({ enabled: false, reason: "project_switch_off" });
+  });
+
+  it("removes the repo-skills plugin folder after a failed run", async () => {
+    const repo = await makeCheckout(path.join(root, "repo"), { skills: ["m7"] });
+    const failing = path.join(root, "bin", "claude-failing");
+    await fs.writeFile(failing, "#!/usr/bin/env node\nprocess.stderr.write('boom\\n');\nprocess.exit(3);\n", "utf8");
+    await fs.chmod(failing, 0o755);
+
+    const result = await execute(buildContext({ runId: "run-fails", config: { command: failing }, context: workspaceContext(repo) }));
+
+    expect(result.exitCode).toBe(3);
+    expect(await exists(path.join(agentFolder(), "claude-run-plugins", "run-fails"))).toBe(false);
+  });
+
+  it("gives concurrent runs in two worktrees their own repo skills", async () => {
+    const repo = await makeCheckout(path.join(root, "repo"), { skills: ["main-only"] });
+    const worktreeA = await makeCheckout(path.join(repo, ".paperclip", "worktrees", "a"), { gitFile: true, skills: ["skill-a"] });
+    const worktreeB = await makeCheckout(path.join(repo, ".paperclip", "worktrees", "b"), { gitFile: true, skills: ["skill-b"] });
+    const captureA = path.join(root, "capture-a.json");
+    const captureB = path.join(root, "capture-b.json");
+
+    // Run b finishes while run a is still running: a's plugin folder must survive b's cleanup.
+    await Promise.all([
+      execute(buildContext({
+        runId: "run-a",
+        capture: captureA,
+        context: workspaceContext(worktreeA),
+        configEnv: { PAPERCLIP_TEST_DELAY_MS: "400" },
+      })),
+      execute(buildContext({ runId: "run-b", capture: captureB, context: workspaceContext(worktreeB) })),
+    ]);
+
+    const a = await readCapture(captureA);
+    const b = await readCapture(captureB);
+    expect(a.pluginSkills.filter((skill) => skill.startsWith("project:"))).toEqual(["project:skill-a"]);
+    expect(b.pluginSkills.filter((skill) => skill.startsWith("project:"))).toEqual(["project:skill-b"]);
+    expect(a.runPluginsAtEnd).toEqual(["project"]);
+    expect(await exists(path.join(agentFolder(), "claude-run-plugins", "run-a"))).toBe(false);
+    expect(await exists(path.join(agentFolder(), "claude-run-plugins", "run-b"))).toBe(false);
+  });
+
+  it("resumes when only the repo's skill set changed", async () => {
+    const repo = await makeCheckout(path.join(root, "repo"), { skills: ["m7"] });
+    const first = await execute(buildContext({ runId: "run-first", context: workspaceContext(repo) }));
+    await makeCheckout(repo, { skills: ["m7-added"] });
+    const { metas, onMeta } = metaCollector();
+
+    await execute(buildContext({
+      runId: "run-second",
+      context: workspaceContext(repo),
+      runtime: { sessionId: null, sessionParams: first.sessionParams ?? null, sessionDisplayId: null, taskKey: null },
+      onMeta,
+    }));
+    const capture = await readCapture();
+
+    expect(flagValues(capture.argv, "--resume")).toEqual(["11111111-1111-4111-8111-111111111111"]);
+    expect(capture.pluginSkills).toEqual(expect.arrayContaining(["project:m7", "project:m7-added"]));
+    expect(manifestOf(metas[0]).session).toEqual({ mode: "resumed", sessionId: "11111111-1111-4111-8111-111111111111" });
+  });
+
+  it("points fresh runs at the MCP tools", async () => {
+    const first = await execute(buildContext());
+    const fresh = await readCapture();
+    expect(fresh.prompt).toContain("paperclip_task_context");
+    expect(fresh.prompt).toContain("paperclip_finish");
+
+    await execute(buildContext({
+      runId: "run-resumed",
+      runtime: { sessionId: null, sessionParams: first.sessionParams ?? null, sessionDisplayId: null, taskKey: null },
+    }));
+    const resumed = await readCapture();
+    expect(resumed.argv).toContain("--resume");
+    expect(resumed.prompt).not.toContain("paperclip_task_context");
+  });
+
+  it("records the manifest", async () => {
+    const { metas, onMeta } = metaCollector();
+    await execute(buildContext({
+      context: { paperclipAgentAccess: { level: "worker", overrides: { "tasks:delete": false } } },
+      configEnv: { HOME: path.join(root, "agent-home") },
+      config: { extraArgs: ["--debug"] },
+      onMeta,
+    }));
+    const capture = await readCapture();
+    const manifest = manifestOf(metas[0]);
+
+    expect(manifest).toMatchObject({
+      autoMemory: false,
+      settingSources: ["user"],
+      strictMcpConfig: true,
+      builtInSkills: true,
+      configDir: path.join(agentFolder(), "claude-config"),
+      credential: { kind: "agent_env", method: "subscription", connectionId: null, connectionName: null },
+      access: { level: "worker", overrides: { "tasks:delete": false } },
+      overriddenEnv: ["HOME"],
+      setAside: null,
+      claudeMd: { enabled: false, reason: "no_project" },
+      repoSkills: { enabled: false, reason: "no_project" },
+      mcpServers: [{ name: "paperclip", url: "http://127.0.0.1:3100/api/mcp/paperclip" }],
+      extraArgs: ["--debug"],
+      instructions: { entryFile: null, sent: false },
+      session: { mode: "fresh", reason: "no_saved_session" },
+    });
+    expect(manifest.skills).toContainEqual({
+      name: "paperclip",
+      key: "paperclipai/paperclip/paperclip",
+      origin: "always_on",
+      plugin: "paperclip",
+    });
+    expect(manifest.envKeys).toEqual(Object.keys(capture.env).sort());
+    expect(JSON.stringify(manifest)).not.toContain("run-jwt-token");
+    expect(JSON.stringify(manifest)).not.toContain(SEALED_TEST_CLAUDE_TOKEN);
+    expect(metas[0]?.commandNotes?.[0]).toMatch(
+      /^Sealed run: \d+ skills, 1 MCP servers, CLAUDE\.md skipped: no_project, repo skills skipped: no_project\.$/,
+    );
+  });
+
+  it("records the instructions as sent on a fresh session only", async () => {
+    const instructions = path.join(root, "AGENTS.md");
+    await fs.writeFile(instructions, "# M7 test agent\n", "utf8");
+    const fresh = metaCollector();
+    const first = await execute(buildContext({ config: { instructionsFilePath: instructions }, onMeta: fresh.onMeta }));
+    expect(manifestOf(fresh.metas[0]).instructions).toEqual({ entryFile: instructions, sent: true });
+
+    const resumed = metaCollector();
+    await execute(buildContext({
+      runId: "run-resumed-instructions",
+      config: { instructionsFilePath: instructions },
+      runtime: { sessionId: null, sessionParams: first.sessionParams ?? null, sessionDisplayId: null, taskKey: null },
+      onMeta: resumed.onMeta,
+    }));
+    expect(manifestOf(resumed.metas[0]).instructions).toEqual({ entryFile: instructions, sent: false });
+  });
+
+  it("starts fresh after the skill set changed, and says why", async () => {
+    const first = await execute(buildContext());
+    const saved = { ...(first.sessionParams ?? {}), promptBundleKey: "an-older-bundle" };
+    const changed = metaCollector();
+
+    await execute(buildContext({
+      runId: "run-bundle-changed",
+      runtime: { sessionId: null, sessionParams: saved, sessionDisplayId: null, taskKey: null },
+      onMeta: changed.onMeta,
+    }));
+    const changedCapture = await readCapture();
+    expect(changedCapture.argv).not.toContain("--resume");
+    expect(manifestOf(changed.metas[0]).session).toEqual({ mode: "fresh", reason: "prompt_bundle_changed" });
+
+    const matching = metaCollector();
+    await execute(buildContext({
+      runId: "run-bundle-matching",
+      runtime: { sessionId: null, sessionParams: first.sessionParams ?? null, sessionDisplayId: null, taskKey: null },
+      onMeta: matching.onMeta,
+    }));
+    expect(manifestOf(matching.metas[0]).session).toEqual({ mode: "resumed", sessionId: "11111111-1111-4111-8111-111111111111" });
   });
 });
