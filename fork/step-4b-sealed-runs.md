@@ -328,7 +328,7 @@ so a shared folder would have them rewrite each other's skills.
   | `mcpServers` | Name and URL of each (`paperclip`, plus any connector tool servers), `strict: true`; never the token |
   | `access` | The agent's access level (`read_only`, `worker`, `manager` or `admin`) and its per-action overrides, as resolved when the run started (4a) |
   | `instructions` | The entry file, and whether it was sent (fresh sessions only) |
-  | `claudeMd` | `{ enabled, path }` when loaded, or `{ enabled: false, reason }`, the reason being `project_switch_off`, `not_in_repo` or `no_project` |
+  | `claudeMd` | `{ enabled, path }` when loaded, or `{ enabled: false, reason }`, the reason being `project_switch_off`, `not_in_repo`, `no_project` or `no_file` (no root `CLAUDE.md`). The switches follow the run's *workspace* project: a project task run outside a project workspace reads `no_project` |
   | `autoMemory` | `false` |
   | `envKeys` | The variable names passed (no values) |
   | `extraArgs` | As configured |
