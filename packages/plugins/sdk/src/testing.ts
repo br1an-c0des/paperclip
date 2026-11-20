@@ -1145,6 +1145,8 @@ export function createTestHarness(options: TestHarnessOptions): TestHarness {
             color: declaration.color ?? null,
             icon: null,
             env: null,
+            agentsReadClaudeMd: true,
+            agentsUseRepoSkills: true,
             pauseReason: null,
             pausedAt: null,
             executionWorkspacePolicy: null,
