@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 const {
   ensureAdapterExecutionTargetCommandResolvable,
@@ -78,19 +81,30 @@ function buildContext(config: Record<string, unknown> = {}) {
       sessionDisplayId: null,
       taskKey: null,
     },
-    config: { model: "claude-opus-5", ...config },
+    // What a sealed CLI run needs to start: a credential, a run token and the `paperclip` server.
+    config: { model: "claude-opus-5", env: { CLAUDE_CODE_OAUTH_TOKEN: "test-token" }, ...config },
     context: {},
+    authToken: "run-jwt-token",
+    runtimeMcp: {
+      getServers: () => [{ name: "paperclip", url: PAPERCLIP_MCP_URL, token: "run-jwt-token", connectionId: "paperclip" }],
+    },
     onLog: vi.fn(async () => {}),
   };
 }
+
+const PAPERCLIP_MCP_URL = "http://127.0.0.1:4310/api/mcp/paperclip";
 
 describe("claude_local ACP startup fallback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
+  let paperclipHome: string | null = null;
+
+  afterEach(async () => {
     vi.unstubAllEnvs();
+    if (paperclipHome) await rm(paperclipHome, { recursive: true, force: true });
+    paperclipHome = null;
   });
 
   it("does not start CLI after default ACP fails", async () => {
@@ -103,6 +117,8 @@ describe("claude_local ACP startup fallback", () => {
   it("trusts the Paperclip API URL when network access is allowlisted", async () => {
     const paperclipApiUrl = "http://127.0.0.1:4310";
     vi.stubEnv("PAPERCLIP_API_URL", paperclipApiUrl);
+    paperclipHome = await mkdtemp(path.join(os.tmpdir(), "paperclip-claude-acp-fallback-"));
+    vi.stubEnv("PAPERCLIP_HOME", paperclipHome);
     const ctx = buildContext({ engine: "cli", networkScope: "allowlist" });
 
     await execute(ctx as never);
@@ -116,7 +132,7 @@ describe("claude_local ACP startup fallback", () => {
       expect.objectContaining({
         localProcessSandbox: expect.objectContaining({
           networkScope: "allowlist",
-          networkTrustedUrls: [paperclipApiUrl],
+          networkTrustedUrls: [paperclipApiUrl, PAPERCLIP_MCP_URL],
         }),
       }),
     );

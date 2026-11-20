@@ -8,10 +8,15 @@ import { buildPaperclipTaskMarkdown } from "../services/heartbeat.js";
 import {
   claudeCommandSupportsEffortFlag,
   claudeSessionCwdMatchesExecutionTarget,
-  execute,
+  execute as executeClaudeLocal,
   resetClaudeCliCapabilitiesCacheForTests,
   sessionCodec,
 } from "@paperclipai/adapter-claude-local/server";
+import { withSealedRunInputs } from "./helpers/claude-local-sealed-run.js";
+
+// Local runs are sealed (step 4b): each call gets a run token, the `paperclip` MCP server and a
+// Claude credential. Remote calls pass through unchanged.
+const execute: typeof executeClaudeLocal = (ctx) => executeClaudeLocal(withSealedRunInputs(ctx));
 
 async function writeFailingClaudeCommand(
   commandPath: string,
@@ -446,7 +451,9 @@ describe("claude execute", () => {
     }
   });
 
-  it("uses a strict per-agent MCP config only when managed servers are present", async () => {
+  // Sealed runs always carry the `paperclip` server (a run without it doesn't start; see
+  // claude-local-sealed-run.test.ts), so the strict config holds it beside any connector servers.
+  it("uses a strict per-agent MCP config holding the paperclip server and connector servers", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-claude-mcp-config-"));
     const { workspace, commandPath, capturePath, restore } = await setupExecuteEnv(root);
     try {
@@ -476,11 +483,16 @@ describe("claude execute", () => {
         token: "alpha-token",
         connectionId: "connection-alpha",
       }]);
-      const zero = await run("run-zero", "agent-zero", []);
+      const paperclipOnly = await run("run-zero", "agent-zero", []);
 
       expect(alpha.argv).toEqual(expect.arrayContaining(["--strict-mcp-config", "--mcp-config"]));
       expect(JSON.parse(alpha.mcpConfigContents)).toEqual({
         mcpServers: {
+          paperclip: {
+            type: "http",
+            url: "http://127.0.0.1:3100/api/mcp/paperclip",
+            headers: { Authorization: "Bearer tok" },
+          },
           alpha: {
             type: "http",
             url: "https://paperclip.example/api/tool-gateway/gateways/alpha/mcp",
@@ -488,11 +500,10 @@ describe("claude execute", () => {
           },
         },
       });
-      expect(zero.argv).not.toContain("--mcp-config");
-      expect(zero.argv).not.toContain("--strict-mcp-config");
-      expect(zero.mcpConfigPath).toBeNull();
-      expect(zero.mcpConfigContents).toBeNull();
+      expect(paperclipOnly.argv).toEqual(expect.arrayContaining(["--strict-mcp-config", "--mcp-config"]));
+      expect(Object.keys(JSON.parse(paperclipOnly.mcpConfigContents).mcpServers)).toEqual(["paperclip"]);
       expect(alpha.mcpConfigPath).toContain("/agents/agent-alpha/");
+      expect(paperclipOnly.mcpConfigPath).toContain("/agents/agent-zero/");
     } finally {
       restore();
       await fs.rm(root, { recursive: true, force: true });
@@ -609,7 +620,9 @@ describe("claude execute", () => {
     }
   });
 
-  it("commandNotes is empty on a resumed session even when instructionsFile is set", async () => {
+  // A sealed run always has the `paperclip` MCP server, so its note stays; the bundle and
+  // instruction notes are left out.
+  it("commandNotes has no bundle or instructions note on a resumed session even when instructionsFile is set", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-claude-exec-notes-resume-"));
     const { workspace, commandPath, restore } = await setupExecuteEnv(root);
     const instructionsFile = path.join(root, "instructions.md");
@@ -633,7 +646,8 @@ describe("claude execute", () => {
         onLog: async () => {},
         onMeta: async (meta) => { capturedNotes = (meta.commandNotes as string[]) ?? []; },
       });
-      expect(capturedNotes).toHaveLength(0);
+      expect(capturedNotes).not.toContain("sentinel");
+      expect(capturedNotes.filter((note) => /prompt bundle|instructions/i.test(note))).toEqual([]);
     } finally {
       restore();
       await fs.rm(root, { recursive: true, force: true });
@@ -702,7 +716,7 @@ describe("claude execute", () => {
         `./HEARTBEAT.md, ./SOUL.md, and ./TOOLS.md; do not resolve those from the parent agent directory.`,
       );
       expect(metaEvents).toHaveLength(2);
-      expect(metaEvents[0]?.commandNotes).toHaveLength(0);
+      expect(metaEvents[0]?.commandNotes.filter((note) => /prompt bundle|instructions/i.test(note))).toEqual([]);
       expect(metaEvents[1]?.commandNotes.some((note) => note.includes("--append-system-prompt-file"))).toBe(true);
       expect(result.sessionId).toBe("22222222-2222-4222-8222-222222222222");
       expect(result.clearSession).toBe(false);
@@ -828,7 +842,7 @@ describe("claude execute", () => {
     }
   });
 
-  it("logs HOME, CLAUDE_CONFIG_DIR, and the resolved executable path in invocation metadata", async () => {
+  it("logs Paperclip's HOME, the agent's CLAUDE_CONFIG_DIR, and the resolved executable path in invocation metadata", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-claude-execute-meta-"));
     const workspace = path.join(root, "workspace");
     const binDir = path.join(root, "bin");
@@ -889,8 +903,11 @@ describe("claude execute", () => {
       expect(result.usageBasis).toBe("per_run");
       expect(result.costUsd).toBeNull();
       expect(loggedCommand).toBe(commandPath);
-      expect(loggedEnv.HOME).toBe(root);
-      expect(loggedEnv.CLAUDE_CONFIG_DIR).toBe(claudeConfigDir);
+      // Sealed: neither the server's HOME nor its CLAUDE_CONFIG_DIR reaches the run.
+      expect(loggedEnv.HOME).not.toBe(root);
+      expect(path.basename(loggedEnv.HOME ?? "")).toMatch(/^paperclip-claude-home-agent-1-/);
+      expect(loggedEnv.CLAUDE_CONFIG_DIR).not.toBe(claudeConfigDir);
+      expect(loggedEnv.CLAUDE_CONFIG_DIR).toMatch(/\/companies\/company-1\/agents\/agent-1\/claude-config$/);
       expect(loggedEnv.PAPERCLIP_RESOLVED_COMMAND).toBe(commandPath);
     } finally {
       if (previousHome === undefined) delete process.env.HOME;
@@ -1283,12 +1300,13 @@ describe("claude execute", () => {
         },
         context: {},
         runtimeMcp: {
+          // A sealed run always has the `paperclip` server, so "removed" drops a connector's.
           getServers: () => [{
             name: "paperclip",
             url: "http://localhost:3100/api/mcp/paperclip",
             connectionId: "paperclip",
             token: "run-jwt-token",
-          }],
+          }, ...(change === "removed" ? [{ name: "GitHub", url: "https://example.test/github/mcp", connectionId: "github", token: "old-github-token" }] : [])],
         },
         authToken: "run-jwt-token",
         onLog: async () => {},
@@ -1369,7 +1387,7 @@ describe("claude execute", () => {
           },
         },
         runtimeMcp: {
-          getServers: () => change === "removed" ? [] : [{
+          getServers: () => [{
             name: "paperclip",
             url: "http://localhost:3100/api/mcp/paperclip",
             connectionId: "paperclip",
@@ -1408,12 +1426,10 @@ describe("claude execute", () => {
       expect(capture2.argv).toContain("--resume");
       expect(getFreshSessionHandoff).not.toHaveBeenCalled();
       expect(capture2.argv).toContain("11111111-1111-4111-8111-111111111111");
-      if (change === "removed") expect(capture2.mcpConfigContents).toBeNull();
-      else {
-        expect(capture2.mcpConfigContents).toContain("next-run-jwt-token");
-        expect(capture2.mcpConfigContents).not.toContain('"run-jwt-token"');
-        if (change === "added") expect(capture2.mcpConfigContents).toContain("fresh-github-token");
-      }
+      expect(capture2.mcpConfigContents).toContain("next-run-jwt-token");
+      expect(capture2.mcpConfigContents).not.toContain('"run-jwt-token"');
+      if (change === "added") expect(capture2.mcpConfigContents).toContain("fresh-github-token");
+      if (change === "removed") expect(capture2.mcpConfigContents).not.toContain("GitHub");
       expect(capture2.prompt).toContain("## Paperclip Resume Delta");
       expect(capture2.prompt).not.toContain("Follow the paperclip heartbeat.");
     } finally {
