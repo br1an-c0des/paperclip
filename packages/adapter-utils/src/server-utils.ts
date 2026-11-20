@@ -22,6 +22,7 @@ import {
 import type {
   AdapterExecutionContext,
   AgentRuntimeIdentity,
+  AdapterRuntimeMcpServer,
   AdapterRuntimeToolAccess,
   AdapterSkillEntry,
   AdapterSkillSnapshot,
@@ -2172,6 +2173,26 @@ export function isPaperclipExternalChatTurn(value: unknown): boolean {
   return isNormalizedPaperclipExternalChatTurn(
     normalizePaperclipWakePayload(value),
   );
+}
+
+/** Paperclip's own MCP server for the run, which the server gives every run with a token. */
+export function hasPaperclipMcpServer(servers: readonly AdapterRuntimeMcpServer[]): boolean {
+  return servers.some((server) => server.connectionId === "paperclip");
+}
+
+/**
+ * Points the run at the `paperclip` MCP tools; nothing when the run has no Paperclip API access.
+ * Shared by the ACP and CLI engines, which leave it out on resumed sessions and external chat
+ * turns.
+ */
+export function renderPaperclipMcpNote(env: Record<string, string>, paperclipMcp: boolean): string {
+  if (!paperclipMcp || !env.PAPERCLIP_API_URL || !env.PAPERCLIP_API_KEY) return "";
+  return [
+    "Paperclip API access note:",
+    "Work with Paperclip through the `paperclip` MCP server's `paperclip_*` tools, not HTTP requests.",
+    "Start with `paperclip_task_context`; end the run with `paperclip_finish`, `paperclip_block`, or `paperclip_report_progress` with `continue: true`.",
+    "PAPERCLIP_API_KEY is there for scripts that need the REST API.",
+  ].join("\n");
 }
 
 /**
