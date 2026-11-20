@@ -323,6 +323,12 @@ export interface AdapterExecutionTargetProcessOptions {
    */
   settleRunDisposition?: (() => DuplexBrokerRunDisposition) | null;
   localProcessSandbox?: LocalProcessSandboxOptions | null;
+  /**
+   * Local-only: `false` gives the child `env` alone instead of the server's
+   * environment with `env` on top (see `runChildProcess`). Remote targets
+   * ignore it.
+   */
+  inheritHostEnv?: boolean;
 }
 
 export interface AdapterExecutionTargetShellOptions {
@@ -987,6 +993,7 @@ export async function runAdapterExecutionTargetProcess(
     onSpawn: options.onSpawn,
     terminalResultCleanup: options.terminalResultCleanup,
     localProcessSandbox: target?.kind === "local" || !target ? options.localProcessSandbox : null,
+    ...(target?.kind === "local" || !target ? { inheritHostEnv: options.inheritHostEnv } : {}),
     remoteExecution: adapterExecutionTargetToRemoteSpec(target),
   });
   // Closing an SSH client on timeout/disconnect does not prove the remote
