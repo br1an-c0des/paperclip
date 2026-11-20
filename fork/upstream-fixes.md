@@ -96,8 +96,9 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 59 | [Keep provider `access_denied` errors apart from agent access refusals](#59-keep-provider-access_denied-errors-apart-from-agent-access-refusals) | fixed on `feat/step-4a` (`d162c3255`) | | | 2026-11-19 | | |
 | 60 | [Let a worker pick a workspace for its own subtask](#60-let-a-worker-pick-a-workspace-for-its-own-subtask) | fixed on `feat/step-4a` (`1c870f14d`) | | | 2026-11-19 | | |
 | 61 | [Don't write or lock on an access check with no temporary grant](#61-dont-write-or-lock-on-an-access-check-with-no-temporary-grant) | fixed on `feat/step-4a` (`0a1c2721d`) | | | 2026-11-19 | | |
-| 62 | [Steady two server tests that flaked in CI](#62-steady-two-server-tests-that-flaked-in-ci) | fixed (`d5435c29b`); `run-start-handover` open, recurring | | | 2026-11-19 | | |
+| 62 | [Steady two server tests that flaked in CI](#62-steady-two-server-tests-that-flaked-in-ci) | fixed (`d5435c29b`, `3a668926a`) | | | 2026-11-19 | | |
 | 63 | [Find what adds 11 close listeners to the HTTP server](#63-find-what-adds-11-close-listeners-to-the-http-server) | candidate | | | 2026-11-19 | | |
+| 64 | [Find the file that leaves a heartbeat run behind for heartbeat-task-drain](#64-find-the-file-that-leaves-a-heartbeat-run-behind-for-heartbeat-task-drain) | candidate | | | 2026-11-20 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1039,6 +1040,16 @@ Found 2026-11-19. CI run 44544972878 on `main` (`282b37631`, a docs-only commit 
   the commit deployed to server1) and `deploy/safer-deploys` `a1e26349e` (run 44629241078, a
   deploy-files-only branch). That's 3 of the last 5 runs, so it now blocks merges and, with the new
   CI gate in `deploy.sh`, deploys (unless `--skip-ci`). Loosen its timings next.
+- **Fixed** (`3a668926a`): not timings but a dropped hint. When the old server skips a run start
+  during the hand-over it hints the new server to dispatch, at most one hint per `skipHintMinMs`; a
+  skip inside that window returned without one (`skipHint()` in
+  `server/src/services/run-start-handover.ts`). The test queues its run ~40–50 ms after the first
+  hint, inside its 50 ms window, so no hint ever came (`expected 1 to be greater than 1` after the
+  full 10 s wait, in all three failing jobs; the statement-timeout warnings were later tests'). Now
+  such a skip owes one trailing hint, sent by the hand-over worker when the window ends, shared by a
+  burst. In production (1 s window) the bug only delayed a run until another wake or the new server's
+  60 s redrive: claims are atomic, so nothing started twice or was lost. Under CPU load the test failed
+  12 of 30 before and passed 30 of 30 after; a new test pins the trailing hint.
 
 ### 63. Find what adds 11 close listeners to the HTTP server
 
@@ -1051,3 +1062,17 @@ container's logs are gone).
   with use it's a leak.
 - **Likely fix:** run with `--trace-warnings` to see who adds them; if it's a fixed set, raise the
   limit for that server; if it grows over time, fix the subsystem that adds one per use.
+
+### 64. Find the file that leaves a heartbeat run behind for heartbeat-task-drain
+
+Found 2026-11-20. CI run 44645544091 (`fix/run-start-handover-flake`, `3a668926a`, a change that
+doesn't reach this shard) failed `server/src/__tests__/heartbeat-task-drain.test.ts` >
+"status_reports_quiescent_when_both_promise_sets_are_empty" in shard 9/10: `expected 1 to be +0` at
+line 60, `getTaskDrainStatus().activeRuns`. The rerun of that shard passed.
+
+- **Problem:** the same pattern as bug 62: the test reads the module-level heartbeat run set
+  (`activeRunExecutionPromises`, `services/heartbeat.ts`), and an earlier file in its shared worker
+  left a background heartbeat run in it. A red shard blocks merges and, through the CI gate, deploys.
+- **Likely fix:** run shard 9 with `PAPERCLIP_TEST_LEAK_REPORT` (bug 62 added in-flight heartbeat runs
+  and wakes to the probe) to find the file that ends with a run in flight, and make it drain
+  (`heartbeatService(db).drainActiveRunExecutions()`) in `afterEach`, as bug 62's fix did.
