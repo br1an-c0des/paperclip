@@ -100,6 +100,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 63 | [Find what adds 11 close listeners to the HTTP server](#63-find-what-adds-11-close-listeners-to-the-http-server) | candidate | | | 2026-11-19 | | |
 | 64 | [Find the file that leaves a heartbeat run behind for heartbeat-task-drain](#64-find-the-file-that-leaves-a-heartbeat-run-behind-for-heartbeat-task-drain) | fixed (`877fe4dd7`, `ec3d65627`) | | | 2026-11-20 | | |
 | 65 | [Tag the running image as previous before Compose builds the new one](#65-tag-the-running-image-as-previous-before-compose-builds-the-new-one) | fixed (`49b1c703d`) | | | 2026-11-20 | | |
+| 66 | [Let the database decide a lease that looks expired on the server's clock](#66-let-the-database-decide-a-lease-that-looks-expired-on-the-servers-clock) | fixed (`c67fff236`) | | | 2026-11-20 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1121,3 +1122,31 @@ sha256:cb3d2c34…`, and the script stopped before `compose up`. Production kept
   `--rollback` also refuses when `paperclip-fork:previous` isn't the image the record names. The
   docker stub now deletes an image when its last tag moves (the old script fails 30 of its 49
   cases); harness 49/49.
+
+### 66. Let the database decide a lease that looks expired on the server's clock
+
+Found 2026-11-20, when CI on `upstream-watch/2026-11-19` failed shard 10 (run 44674823660):
+`issue-recovery-activity-hints` ("re-checks only the tasks seven runs a minute touch") counted 8
+failed runs against a limit of 6. A rerun passed. It reproduces on `main` with the test capped to
+two CPUs, and even passing runs had 2–4 failed runs out of 60, all `controller_lease_lost` with no
+exit code or output.
+
+- **Problem:** `watchLegacyControllerLease` (`server/src/services/legacy-controller-lease.ts`) arms
+  its first deadline from `controller_lease_expires_at`, which the database writes with its own
+  clock (`clock_timestamp() + 60 s`), minus this process's `Date.now()`. When the server's clock is
+  ahead of the database's by more than a lease, a lease the database still holds looks expired:
+  the deadline is armed at 0 ms and fires before the immediate renewal answers, so the run fails
+  before dispatch. The test fakes `Date` and fast-forwards about 10 minutes before measuring, so
+  every run started 8½–9½ minutes "late"; whether the renewal won the race depended on load. In
+  production the same would hit every run on a server whose clock runs a minute ahead of
+  Postgres's.
+- **Likely fix:** the database decides. The renewal already refuses a lease that lapsed, and no
+  dispatch happens before a renewal succeeds, so a lease that looks expired locally can wait for the
+  database's answer, bounded by one renewal statement for a hung database.
+- **Fixed** (`c67fff236`). A lease that looks expired locally arms its first deadline at
+  `LEGACY_CONTROLLER_RENEWAL_STATEMENT_TIMEOUT_MS` (10 s) instead of 0. Two new tests in
+  `legacy-controller-lease.test.ts`: a held lease 10 minutes "expired" on the local clock renews and
+  dispatches, and the same lease with a database that never answers is still lost at the deadline
+  (`renewal_deadline`). With two CPUs, `issue-recovery-activity-hints` now has 0 failed runs out of
+  60 (three runs; before, 2–4 in every run). The test's 10% allowance for failed runs is left as
+  upstream wrote it.
