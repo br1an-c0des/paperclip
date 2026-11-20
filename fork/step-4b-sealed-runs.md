@@ -76,11 +76,13 @@ The CLI engine (`claude --print`) comes first because its flags control exactly 
 
 - `cli` is the default engine for `claude_local`. `engine` unset or `"auto"` means CLI.
 - A CLI run is sealed. Nothing loads from the server user's `~/.claude`, the user's MCP servers, or
-  the repo's `.claude/` settings, skills, agents or `.mcp.json`.
+  the repo's `.claude/` settings, agents, commands, hooks or `.mcp.json`. The repo's skills load
+  only through Paperclip, behind a project switch (section 5).
 - Each agent has one lasting Claude config folder, owned by Paperclip. Sessions resume across runs.
 - Claude Code's auto memory is off for every run (section 6).
 - Skills, MCP servers, instructions, the credential and the environment all come from Paperclip.
-- The repo's root `CLAUDE.md` loads only when its project's switch is on.
+- The repo's root `CLAUDE.md`, and its `.claude/skills`, each load only when its project's switch
+  is on.
 - Each run records what it got (the **run manifest**), and the run's details show it.
 
 ## Non-goals (part 1)
@@ -88,8 +90,9 @@ The CLI engine (`claude --print`) comes first because its flags control exactly 
 - An agent-level page saying what this agent's runs get (part 2).
 - Where runs work: running in the project's repo or a per-task worktree by default (part 3).
 - The recovery handoff's content and server-side structured live events (later in 4b).
-- Importing a repo's skills, agents or settings, and project skills added to runs
+- Importing a repo's agents or settings, and library project skills added to runs by project
   ([build plan 3.18](../ui-new/docs/build-plan.md#318-importing-from-a-repo-and-project-skills)).
+  The repo's own skills, read from the run's checkout, moved into part 1 on 2026-11-20 (section 5).
 - Consolidating the memory systems ([build plan 3.5](../ui-new/docs/build-plan.md#35-memory-service)).
 - Paperclip over MCP and the completion rule (4a, merged).
 - The prompt itself (step 5), apart from carrying ACP's MCP note over to the CLI (section 3).
@@ -229,13 +232,15 @@ so a shared folder would have them rewrite each other's skills.
   MCP server and the main skill already share. A plugin with no skills is left out.
 - The prefix is how Claude Code loads a skill, not its name: the manifest and `ui-new` show the
   plain names the Skills page uses, and the manifest records which plugin each came from.
+- A third plugin, `project`, carries the repo's own skills when its project allows them
+  (section 5). It's built per run, outside the shared bundle.
 - Concurrent runs with different sets each get their own bundle, so nothing they share changes
   under them. The config folder holds only Claude Code's own files; a `skills/` folder there is set
   aside like any other configuration (section 2).
 - Claude Code's built-in skills and plugins still load. The manifest says "plus Claude Code's
   built-in skills" rather than listing them.
 
-### 5. The repo's `CLAUDE.md`, per project
+### 5. The repo's `CLAUDE.md` and skills, per project
 
 - **The switch:** a new project setting, "Agents read the repo's `CLAUDE.md`", stored as a boolean
   column on `projects` (migration `0492`, the next after 4a's `0491`). It's shown in
@@ -249,6 +254,16 @@ so a shared folder would have them rewrite each other's skills.
   counts: subfolder `CLAUDE.md` files don't load in a sealed run, and the user is fine with that.
 - **When it's off, or the run isn't in the repo** (a task without a project, an isolated task
   folder, the agent home), no `CLAUDE.md` loads, and the manifest says why.
+- **The repo's skills** (added 2026-11-20, [the plan](step-4b-plan.md#one-decision-this-plan-makes-changes-design-section-4)):
+  a second switch, "Agents use the repo's skills", a second column in the same migration, default
+  on like the first. Skills a repo keeps for work in that repo should change with it, so they're
+  read from the run's own checkout (a worktree on a feature branch gets that branch's skills), not
+  imported into the library. When it's on and the run is in a checkout, the launch builds a plugin
+  named `project` for that run only, of symlinks to `<root>/.claude/skills/<name>`, and passes it
+  as a second `--plugin-dir`; it's removed after the run. Claude sees `project:<skill>`. The
+  `--add-dir <root>` above doesn't load them (tested 2026-11-18), so nothing loads twice. A repo
+  skill named like an assigned one loads under both prefixes, and the manifest flags the clash. The
+  rest of the repo's `.claude/` (settings, hooks, agents, commands) still doesn't load.
 
 ### 6. The environment
 
@@ -308,7 +323,8 @@ so a shared folder would have them rewrite each other's skills.
   | `credential` | Its kind (`managed_connection` or `agent_env`), method (`subscription`, `api_key`, `auth_token`, `bedrock`, `vertex`, `foundry` or `routed`), and the connection's id and name; never the secret |
   | `setAside` | Files moved out of the config folder before the run (section 2), if any |
   | `overriddenEnv` | Variable names from the agent's `env` that the launch overrode (section 2) |
-  | `skills` | Name and origin of each (agent assignment, always-on, connector, skill test), plus `builtIns: true` |
+  | `skills` | Plain name, origin (agent assignment, always-on, connector, skill test, repo) and plugin (`paperclip`, `company`, `project`) of each, plus `builtIns: true` and any names loaded twice |
+  | `repoSkills` | `{ enabled, dir, count }` when the repo's skills loaded, or `{ enabled: false, reason }`: `project_switch_off`, `not_in_repo`, `no_project` or `no_skills` |
   | `mcpServers` | Name and URL of each (`paperclip`, plus any connector tool servers), `strict: true`; never the token |
   | `access` | The agent's access level (`read_only`, `worker`, `manager` or `admin`) and its per-action overrides, as resolved when the run started (4a) |
   | `instructions` | The entry file, and whether it was sent (fresh sessions only) |

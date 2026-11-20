@@ -1334,7 +1334,11 @@ Raised Nov 18, 2026, while designing hard-fork step 4b; not designed or schedule
   - Those become "project skills" (`accessScope: 'projects'`). That limits **who can see** them
     (people and agents who can read the project, `skill-access.ts`), not **which runs get them**.
   - A run gets exactly the skills assigned to its agent, whatever the task's project.
-- **Missing:** importing agent definitions and settings; skills added to runs by project.
+- **Coming in hard-fork step 4b part 1** (2026-11-20): a repo's own `.claude/skills`, read from
+  the run's checkout behind a project switch and loaded as a `project` plugin
+  ([4b plan](../../fork/step-4b-plan.md#one-decision-this-plan-makes-changes-design-section-4)).
+- **Missing:** importing agent definitions and settings; library project skills added to runs by
+  project (for skills that live in another repo, or that aren't in a repo at all).
 - **Questions:** whether an imported `.claude/agents` file becomes a Paperclip agent, a subagent the
   run can call, or both; which settings are worth importing (permissions, hooks, env) and how each
   shows in Paperclip; and whether an imported item tracks the repo or becomes an editable copy.

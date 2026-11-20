@@ -5,14 +5,16 @@
 > checkbox (`- [ ]`) syntax for tracking. Each agent implements only the tasks its brief names.
 
 **Goal:** A `claude_local` CLI run gets exactly what Paperclip gives it (credential, skills, MCP
-servers, instructions, environment, and the repo's root `CLAUDE.md` when its project allows it),
+servers, instructions, environment, and the repo's root `CLAUDE.md` and `.claude/skills` when its
+project allows them),
 records that in a run manifest the run's details show, and CLI becomes the default engine.
 
 **Architecture:** The CLI adapter (`packages/adapters/claude-local`) gains small pure modules
-(sealed environment, the agent's config folder, `CLAUDE.md` resolution, the manifest) and
+(sealed environment, the agent's config folder, `CLAUDE.md` and repo-skill resolution, the
+manifest) and
 `execute.ts` wires them into the local launch. `runChildProcess` learns not to inherit the server's
-environment. The server adds one project column (migration `0492`) and three context fields;
-`ui-new` adds the project switch and a "What this run got" list. The engine default flips last,
+environment. The server adds two project columns (migration `0492`) and four context fields;
+`ui-new` adds the two project switches and a "What this run got" list. The engine default flips last,
 after a real-run check.
 
 **Tech Stack:** TypeScript, Node child processes, Drizzle/Postgres, Zod, vitest, SolidJS
@@ -45,6 +47,23 @@ repeatable and "a folder of plugins loads each child" (CLI 2.1.325 help), so the
 passes one path, the bundle root. A plugin with no skills is left out. The prefix is how Claude
 Code loads them, not their name: the manifest and `ui-new` use the plain names the Skills page
 shows.
+
+**The repo's own skills, as a third plugin, `project`** (decided 2026-11-20; this was a non-goal
+in the design). Skills a repo keeps for work in that repo (`<root>/.claude/skills/<name>/SKILL.md`)
+should change with the repo: a run in a worktree on a feature branch gets that branch's skills.
+So, like the root `CLAUDE.md`, they're read from the run's own checkout at launch, behind a second
+project switch ("Agents use the repo's skills", default on, like the `CLAUDE.md` one), and listed
+in the manifest. The launch builds a small plugin for that run only, named `project`, of symlinks
+to the repo's skill folders, in `<agent folder>/claude-run-plugins/<runId>/project/`, and passes it
+as a second `--plugin-dir <agent folder>/claude-run-plugins/<runId>`; it's removed after the run.
+One folder per run means concurrent runs on different branches never share it. Nothing else
+from the repo's `.claude/` loads (settings, hooks, agents, commands): importing those stays in
+[build plan 3.18](../ui-new/docs/build-plan.md#318-importing-from-a-repo-and-project-skills). The
+`--add-dir <root>` that loads `CLAUDE.md` doesn't load the repo's skills (tested 2026-11-18,
+[claude-local-run.md](claude-local-run.md)), so nothing loads twice. A repo skill whose name
+matches an assigned one loads under both prefixes; the manifest lists both and `ui-new` marks the
+clash. The repo skills don't count towards a fresh session: a changed set resumes, as a terminal
+session would after `git checkout`.
 
 ## Global Constraints
 
@@ -84,6 +103,10 @@ shows.
    a credential. Tests in Tasks 2 and 7.
 5. **A resumed session after the skill set changed** starts fresh and the manifest says why
    (`prompt_bundle_changed`), rather than resuming with a different `--plugin-dir`. Test in Task 8.
+6. **Repo skills from the run's own checkout:** a run in a per-task worktree whose branch adds a
+   skill gets it, and a run in the main checkout doesn't; two concurrent runs of one agent each get
+   their own `project` plugin folder, and one finishing doesn't remove the other's. Tests in
+   Tasks 5 and 8.
 
 ## How the work is split
 
@@ -121,6 +144,10 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
   }
   export type ClaudeMdSkipReason = "project_switch_off" | "not_in_repo" | "no_project" | "no_file";
   export type ClaudeMdLoad = { enabled: true; path: string } | { enabled: false; reason: ClaudeMdSkipReason };
+  export type ClaudeRepoSkillsSkipReason = "project_switch_off" | "not_in_repo" | "no_project" | "no_skills";
+  export type ClaudeRepoSkillsLoad =
+    | { enabled: true; dir: string; count: number }   // dir: <root>/.claude/skills
+    | { enabled: false; reason: ClaudeRepoSkillsSkipReason };
   export type ClaudeFreshSessionReason =
     | "no_saved_session" | "invalid_session_id" | "cwd_changed" | "prompt_bundle_changed"
     | "target_changed" | "session_unavailable";
@@ -133,13 +160,17 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
     setAside: { dir: string; entries: string[] } | null;
     overriddenEnv: string[];
     /** name: the plain name the Skills page shows; plugin: which plugin loaded it (Claude sees `<plugin>:<name>`) */
-    skills: Array<{ name: string; key: string; origin: "always_on" | "assigned"; plugin: "paperclip" | "company" }>;
+    /** key: the library key, or `repo:.claude/skills/<name>` for a repo skill */
+    skills: Array<{ name: string; key: string; origin: "always_on" | "assigned" | "repo"; plugin: "paperclip" | "company" | "project" }>;
+    /** plain names that more than one plugin supplied */
+    skillNameClashes: string[];
     builtInSkills: true;
     mcpServers: Array<{ name: string; url: string }>;
     strictMcpConfig: true;
     access: { level: AgentAccessLevel; overrides: AgentAccessOverrides } | null;
     instructions: { entryFile: string | null; sent: boolean };
     claudeMd: ClaudeMdLoad;
+    repoSkills: ClaudeRepoSkillsLoad;
     autoMemory: false;
     envKeys: string[];
     extraArgs: string[];
@@ -150,6 +181,7 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
 - Produces, in `@paperclipai/adapter-utils`: `AdapterInvocationMeta.runManifest?: Record<string, unknown>`.
 - Produces, the context the server adds (Task 10) and the adapter reads (Task 7):
   - `context.paperclipWorkspace.agentsReadClaudeMd: boolean | null` (null: no project);
+  - `context.paperclipWorkspace.agentsUseRepoSkills: boolean | null` (null: no project);
   - `context.paperclipAgentAccess: { level: AgentAccessLevel; overrides: AgentAccessOverrides } | null`;
   - `context.paperclipAiConnectionName: string | null`.
 
@@ -311,34 +343,61 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
   instead; send that back to the agent.
 - [ ] **Step 5:** Commit: `claude_local: the prompt bundle doubles as a plugin`.
 
-### Task 5: Which `CLAUDE.md` loads
+### Task 5: What a run takes from the repo: `CLAUDE.md` and its skills
 
 **Files:**
 - Create: `packages/adapters/claude-local/src/server/claude-md.ts`
-- Test: `packages/adapters/claude-local/src/server/claude-md.test.ts`
+- Create: `packages/adapters/claude-local/src/server/repo-skills.ts`
+- Test: `packages/adapters/claude-local/src/server/claude-md.test.ts`,
+  `packages/adapters/claude-local/src/server/repo-skills.test.ts`
 
 **Interfaces:**
-- Consumes: `ClaudeMdLoad` (Task 0).
-- Produces:
+- Consumes: `ClaudeMdLoad`, `ClaudeRepoSkillsLoad` (Task 0).
+- Produces, in `claude-md.ts`:
   ```ts
+  /** The first folder at cwd or above holding a `.git` file or folder, else null. */
+  export function findRepoRoot(cwd: string): Promise<string | null>;
   export function resolveClaudeMdLoad(input: {
     projectId: string | null;
     agentsReadClaudeMd: boolean | null;  // null with a project: an older server, counts as on
-    cwd: string;
+    repoRoot: string | null;             // findRepoRoot(cwd)
   }): Promise<{ load: ClaudeMdLoad; addDir: string | null }>;
   ```
-- Order: no `projectId` → `no_project`; switch `false` → `project_switch_off`; no `.git` (file or
-  folder) at `cwd` or above → `not_in_repo`; the first such folder is the root; no `<root>/CLAUDE.md`
-  → `no_file`; else `{ enabled: true, path: <root>/CLAUDE.md }` and `addDir: <root>`.
+- `resolveClaudeMdLoad` order: no `projectId` → `no_project`; switch `false` →
+  `project_switch_off`; no `repoRoot` → `not_in_repo`; no `<root>/CLAUDE.md` → `no_file`; else
+  `{ enabled: true, path: <root>/CLAUDE.md }` and `addDir: <root>`.
+- Produces, in `repo-skills.ts`:
+  ```ts
+  export interface RepoSkill { name: string; dir: string }  // dir: <root>/.claude/skills/<name>
+  export function resolveRepoSkills(input: {
+    projectId: string | null;
+    agentsUseRepoSkills: boolean | null; // null with a project: an older server, counts as on
+    repoRoot: string | null;
+  }): Promise<{ load: ClaudeRepoSkillsLoad; skills: RepoSkill[] }>;
+  /** <instanceRoot>/companies/<companyId>/agents/<agentId>/claude-run-plugins/<runId> */
+  export function resolveRunPluginsDir(env: NodeJS.ProcessEnv, companyId: string, agentId: string, runId: string): string;
+  /** Writes <runPluginsDir>/project/.claude-plugin/plugin.json
+   *  ({"name":"project","description":"Skills from this project's repository (<root>/.claude/skills)"})
+   *  and skills/<name> symlinks to each skill's dir. Returns runPluginsDir, the folder the launch passes. */
+  export function prepareRepoSkillsPlugin(input: { runPluginsDir: string; repoRoot: string; skills: RepoSkill[] }): Promise<string>;
+  export function removeRunPluginsDir(runPluginsDir: string): Promise<void>; // missing folder is fine
+  ```
+- `resolveRepoSkills` order: no `projectId` → `no_project`; switch `false` →
+  `project_switch_off`; no `repoRoot` → `not_in_repo`; no `<root>/.claude/skills/*/SKILL.md` →
+  `no_skills`; else `{ enabled: true, dir: <root>/.claude/skills, count }`, skills sorted by name.
+  A subfolder without `SKILL.md` is skipped; a symlinked skill folder counts, as in Claude Code.
 
-- [ ] **Step 1:** Tests for each reason and the loaded case, plus **Review Focus 2**: a repo with
-  `CLAUDE.md` at its root and a nested worktree folder `.paperclip/worktrees/b` containing a `.git`
-  *file* and its own `CLAUDE.md`; from `cwd` = a subfolder of the worktree, `addDir` is the
-  worktree root.
+- [ ] **Step 1:** Tests for each reason and the loaded case of both resolvers, plus **Review
+  Focus 2** and **6**: a repo with `CLAUDE.md` and `.claude/skills/a/SKILL.md` at its root, and a
+  nested worktree folder `.paperclip/worktrees/b` containing a `.git` *file*, its own `CLAUDE.md`
+  and `.claude/skills/{a,b}/SKILL.md`. From `cwd` = a subfolder of the worktree, `findRepoRoot` is
+  the worktree root, `addDir` is it, and the repo skills are `a` and `b` from the worktree; from
+  the main checkout, only `a`. `prepareRepoSkillsPlugin` twice with different `runId`s gives two
+  folders; removing one leaves the other.
 - [ ] **Step 2:** Run; expect FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run; expect PASS.
-- [ ] **Step 5:** Commit: `claude_local: resolve the repo CLAUDE.md a run may load`.
+- [ ] **Step 5:** Commit: `claude_local: resolve the repo CLAUDE.md and skills a run may load`.
 
 ### Task 6: One MCP note for both engines
 
@@ -434,15 +493,21 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
 
 **Interfaces:**
 - Consumes: Tasks 0, 4, 5, 6, 7; `context.paperclipAgentAccess`,
-  `context.paperclipWorkspace.agentsReadClaudeMd`, `context.paperclipWorkspace.projectId`.
+  `context.paperclipWorkspace.agentsReadClaudeMd`, `.agentsUseRepoSkills`, `.projectId`.
+- Repo skills: `findRepoRoot(cwd)` once, then `resolveRepoSkills`; when enabled,
+  `prepareRepoSkillsPlugin` before the spawn and `removeRunPluginsDir` in the outer `finally`
+  (also on a failed or cancelled run). The run plugins folder joins the confinement's readable
+  paths (`localProcessSandbox`) beside the bundle.
 - Produces: `buildClaudeRunManifest(input: { … every field's source … }): ClaudeRunManifest`, pure.
   Skill `origin` is `always_on` for `PAPERCLIP_OPERATIONAL_SKILL_KEY` and
   `PAPERCLIP_FEEDBACK_SKILL_KEYS` (`server-utils.ts:4370-4376`), else `assigned`; `name` is
-  the plain `<runtimeName>`, and `plugin` is `claudeSkillPlugin(key)` (Task 4). `envKeys` is sorted. `mcpServers` never includes the token.
+  the plain `<runtimeName>`, and `plugin` is `claudeSkillPlugin(key)` (Task 4). Repo skills follow,
+  as `{ name, key: "repo:.claude/skills/<name>", origin: "repo", plugin: "project" }`.
+  `skillNameClashes` lists, sorted, each plain name more than one plugin supplied. `envKeys` is sorted. `mcpServers` never includes the token.
 - Arguments on a local target, in order: `--print --output-format stream-json --verbose
   --setting-sources user [--resume <id>] <permission args> [--chrome] [--model …] [--effort …]
   [--max-turns …] [--append-system-prompt-file …] --mcp-config <file> --strict-mcp-config
-  --plugin-dir <bundle>/plugins [--add-dir <repo root>] [extraArgs…]`. No `--add-dir <bundle>`. With
+  --plugin-dir <bundle>/plugins [--plugin-dir <run plugins dir>] [--add-dir <repo root>] [extraArgs…]`. No `--add-dir <bundle>`. With
   `addDir`, `env.CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD = "1"`. Remote targets keep today's
   arguments.
 - Prompt: `renderPaperclipMcpNote(env, true)` joins the sections after `taskContextNote` on fresh
@@ -450,21 +515,30 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
   as ACP does at `acpx-engine/execute.ts:3222`).
 - **The launch as data** (design, "Keep the launch portable"): `run-manifest.ts` also exports
   `interface SealedClaudeLaunch { command: string; args: string[]; env: Record<string, string>;
-  cwd: string; files: { configDir: string; pluginDir: string; mcpConfigPath: string;
-  claudeMdRoot: string | null }; manifest: ClaudeRunManifest }`. `runAttempt` builds one, then
+  cwd: string; files: { configDir: string; pluginDir: string; runPluginsDir: string | null;
+  mcpConfigPath: string; claudeMdRoot: string | null }; manifest: ClaudeRunManifest }`. `runAttempt` builds one, then
   passes its parts to `runAdapterExecutionTargetProcess`; nothing between the two changes them.
 - `onMeta` gains `runManifest`; a `commandNotes` line summarises it ("Sealed run: N skills, M MCP
-  servers, CLAUDE.md <loaded|skipped: reason>").
+  servers, CLAUDE.md <loaded|skipped: reason>, repo skills <N|skipped: reason>").
 
 - [ ] **Step 1:** `run-manifest.test.ts`: a full input maps to the expected manifest; origins;
   skill names are plain (no `paperclip:` prefix) and `plugin` is `paperclip` or `company` by key;
-  the token is absent from `mcpServers`; `claudeMd` passes through.
+  repo skills come last with `plugin: "project"`; a repo skill named like an assigned one appears
+  twice and in `skillNameClashes`; the token is absent from `mcpServers`; `claudeMd` and
+  `repoSkills` pass through.
 - [ ] **Step 2:** Sealed-run tests:
   - `passes the sealed flags`: `--setting-sources user`, `--strict-mcp-config`, `--mcp-config`,
     `--plugin-dir` present, no `--add-dir` (no project);
   - `adds the repo root when the project allows it`: a git repo with `CLAUDE.md`,
     `paperclipWorkspace: { cwd, projectId, agentsReadClaudeMd: true }` → `--add-dir <root>` and the
     variable is `"1"`; with `false` → neither, manifest reason `project_switch_off`;
+  - `adds the repo's skills when the project allows it`: the same repo with
+    `.claude/skills/m7/SKILL.md` and `agentsUseRepoSkills: true` → a second `--plugin-dir` whose
+    `project/skills/m7` the fake `claude` saw; the folder is gone after the run; with `false` → one
+    `--plugin-dir`, manifest `repoSkills` reason `project_switch_off`;
+  - **Review Focus 6:** two concurrent `execute` calls of one agent in two worktrees with different
+    `.claude/skills` each see only their own worktree's skills;
+  - a changed repo skill set alone doesn't start a fresh session;
   - `points fresh runs at the MCP tools`: the prompt contains `paperclip_task_context`; a resumed run's
     prompt doesn't;
   - `records the manifest`: `onMeta`'s `runManifest` passes `isClaudeRunManifest`, has
@@ -477,29 +551,32 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
 - [ ] **Step 5:** Run the two files and the design's existing CLI test files; expect PASS. Update
   assertions that expected `--add-dir <bundle>` or `.claude/skills` under it (the fake `claude`'s
   `skillEntries` reads `<plugin-dir>/*/skills` instead).
-- [ ] **Step 6:** Commit: `claude_local: sealed arguments, the MCP note and the run manifest`.
+- [ ] **Step 6:** Commit: `claude_local: sealed arguments, repo skills, the MCP note and the run manifest`.
 
-### Task 9: The project switch: column, API
+### Task 9: The project switches: columns, API
 
 **Files:**
-- Modify: `packages/db/src/schema/projects.ts` (`agentsReadClaudeMd: boolean("agents_read_claude_md").notNull().default(true)`)
-- Create: `packages/db/src/migrations/0492_project_claude_md.sql` and its meta entry
-  (`corepack pnpm db:generate`, then rename the file and the journal tag to `0492_project_claude_md`)
-- Modify: `packages/shared/src/validators/project.ts:109-126` (`agentsReadClaudeMd: z.boolean().optional()`),
-  `packages/shared/src/types/project.ts:128` (`agentsReadClaudeMd: boolean`)
+- Modify: `packages/db/src/schema/projects.ts` (`agentsReadClaudeMd: boolean("agents_read_claude_md").notNull().default(true)`,
+  `agentsUseRepoSkills: boolean("agents_use_repo_skills").notNull().default(true)`)
+- Create: `packages/db/src/migrations/0492_project_repo_instructions.sql` and its meta entry
+  (`corepack pnpm db:generate`, then rename the file and the journal tag to `0492_project_repo_instructions`)
+- Modify: `packages/shared/src/validators/project.ts:109-126` (both, `z.boolean().optional()`),
+  `packages/shared/src/types/project.ts:128` (both, `boolean`)
 - Test: `server/src/__tests__/project-claude-md-switch.test.ts` (model on an existing projects route test)
 
 **Interfaces:**
-- Produces: `Project.agentsReadClaudeMd: boolean`; `PATCH /projects/:id` accepts it; the projects
+- Produces: `Project.agentsReadClaudeMd: boolean` and `Project.agentsUseRepoSkills: boolean`;
+  `PATCH /projects/:id` accepts each; the projects
   service spreads the row (`server/src/services/projects.ts:210`), so reads carry it.
 
-- [ ] **Step 1:** Tests: a new project reads `true`; `PATCH { agentsReadClaudeMd: false }` persists and
-  reads back; a non-boolean is a 400.
+- [ ] **Step 1:** Tests: a new project reads `true` for both; `PATCH { agentsReadClaudeMd: false }`
+  and `PATCH { agentsUseRepoSkills: false }` each persist and read back without touching the other;
+  a non-boolean is a 400.
 - [ ] **Step 2:** Run; expect FAIL.
 - [ ] **Step 3:** Schema, migration (header: `-- paperclip:migration-compat online_compatible: adds a
-  defaulted boolean to projects; the previous release ignores it.`), validator, type.
+  two defaulted booleans to projects; the previous release ignores them.`), validator, type.
 - [ ] **Step 4:** Run the test and `corepack pnpm --filter @paperclipai/db check:migrations`; expect PASS.
-- [ ] **Step 5:** Commit: `Projects: agents read the repo CLAUDE.md, a switch per project (migration 0492)`.
+- [ ] **Step 5:** Commit: `Projects: switches for the repo CLAUDE.md and the repo's skills (migration 0492)`.
 
 ### Task 10: The run's context: switch, access, connection name
 
@@ -508,22 +585,23 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
 - Test: `server/src/__tests__/heartbeat-claude-run-context.test.ts` (model on `heartbeat-project-env.test.ts`)
 
 **Interfaces:**
-- Consumes: Task 0's context fields; Task 9's column; `agentAccessSchema`
+- Consumes: Task 0's context fields; Task 9's columns; `agentAccessSchema`
   (`packages/shared/src/agent-access.ts:85`); `managedAiRuntime.accountName` (acquired at :2920).
-- Produces: `paperclipWorkspace.agentsReadClaudeMd` (the project row's value, `null` without a
-  project); `context.paperclipAgentAccess` (the agent's stored `permissions.access` parsed with
+- Produces: `paperclipWorkspace.agentsReadClaudeMd` and `.agentsUseRepoSkills` (the project row's
+  values, `null` without a project); `context.paperclipAgentAccess` (the agent's stored `permissions.access` parsed with
   `agentAccessSchema`, overrides defaulted to `{}`; `null` when it doesn't parse);
   `context.paperclipAiConnectionName` (`managedAiRuntime?.accountName ?? null`).
 
-- [ ] **Step 1:** Tests: a run on a project task with the switch off gets `agentsReadClaudeMd: false`;
-  a task-less run gets `null`; an agent at `worker` with an `agents:create` override gets
+- [ ] **Step 1:** Tests: a run on a project task with the `CLAUDE.md` switch off gets
+  `agentsReadClaudeMd: false` and `agentsUseRepoSkills: true`; with the skills switch off, the
+  reverse; a task-less run gets `null` for both; an agent at `worker` with an `agents:create` override gets
   `{ level: "worker", overrides: { "agents:create": true } }`.
 - [ ] **Step 2:** Run; expect FAIL.
 - [ ] **Step 3:** Implement (one project read by id where the workspace context is assembled).
 - [ ] **Step 4:** Run; expect PASS.
-- [ ] **Step 5:** Commit: `Heartbeat: give claude_local runs the CLAUDE.md switch, access level and connection name`.
+- [ ] **Step 5:** Commit: `Heartbeat: give claude_local runs the repo switches, access level and connection name`.
 
-### Task 11: `ui-new`: the switch and "What this run got"
+### Task 11: `ui-new`: the switches and "What this run got"
 
 **Files:**
 - Modify: `ui-new/src/projects/settings/CodeSection.tsx` (a card after `CheckoutsCard`)
@@ -531,17 +609,24 @@ Worktrees may start from `master`: reset onto `feat/step-4b` first (CLAUDE.md, "
 - Test: `ui-new/src/runs/invocation.test.ts`
 
 **Interfaces:**
-- Consumes: `Project.agentsReadClaudeMd` (Task 9) and `ClaudeRunManifest` (Task 0, with
+- Consumes: `Project.agentsReadClaudeMd`, `Project.agentsUseRepoSkills` (Task 9) and `ClaudeRunManifest` (Task 0, with
   `import type`). `ui-new` takes only types from `@paperclipai/shared`, so `readRunManifest` repeats
   the guard's two checks (`version === 1`, `engine === "cli"`) itself.
 - Produces: `readRunManifest(payload): ClaudeRunManifest | null` in `invocation.ts`, and
   `RunInvocation.manifest`.
-- The card: title "Repository instructions", one `SettingsRow` "Agents read the repo's `CLAUDE.md`"
-  with the existing `Toggle`, saved through `useProjectSaver` with `{ agentsReadClaudeMd }`; info tip:
-  "When on, agent runs in this project's repository load the `CLAUDE.md` at the repository's root.
-  Nothing else from the repository's Claude settings loads, and subfolder `CLAUDE.md` files don't."
+- The card: title "Repository instructions", two `SettingsRow`s with the existing `Toggle`, each
+  saved through `useProjectSaver` on its own:
+  - "Agents read the repo's `CLAUDE.md`" (`{ agentsReadClaudeMd }`); info tip: "When on, agent runs
+    in this project's repository load the `CLAUDE.md` at the repository's root. Subfolder
+    `CLAUDE.md` files don't load.";
+  - "Agents use the repo's skills" (`{ agentsUseRepoSkills }`); info tip: "When on, agent runs in
+    this project's repository also get the skills in its `.claude/skills` folder, from the branch
+    the run works on, alongside the agent's own. Nothing else in the repository's `.claude` folder
+    loads: settings, hooks, agents and commands stay out."
 - The list, above the raw command in the Input tab, one line each: credential (method and
-  connection name), skills (plain names, as on the Skills page; the prefix Claude sees in the info tip), MCP servers (names), access level, `CLAUDE.md` (path or the
+  connection name), skills (plain names, as on the Skills page, grouped Paperclip / company /
+  repository; the prefix Claude sees in the info tip; a name in `skillNameClashes` marked as
+  loaded twice), repo skills when skipped (the reason in words), MCP servers (names), access level, `CLAUDE.md` (path or the
   reason in words), instructions (sent or not), session (resumed, or fresh and why), auto memory off;
   set-aside entries and overridden variables only when there are any. Old runs without a manifest
   show nothing new.
@@ -562,12 +647,15 @@ Design rollout step 2. Nothing merges into `main` before it passes.
 - [ ] **Step 1:** Ask the user for the go-ahead and the credential: a managed subscription
   connection they set up, or a `CLAUDE_CODE_OAUTH_TOKEN` secret they add to the agent.
 - [ ] **Step 2:** On the desktop dev instance (`:3100`, `PAPERCLIP_AGENT_JWT_SECRET` set), an
-  "M7 test" agent in TES, `engine: "cli"`, at `worker`, on a project whose repo has a `CLAUDE.md`.
+  "M7 test" agent in TES, `engine: "cli"`, at `worker`, on a project whose repo has a `CLAUDE.md`
+  and a `.claude/skills/m7-test-repo-skill/SKILL.md`.
 - [ ] **Step 3:** Run 1, a small task. Check: the manifest matches (credential, skills, `paperclip`
-  server, access, `CLAUDE.md` loaded); the run used `paperclip_*` tools; the disposition is
+  server, access, `CLAUDE.md` loaded, repo skills 1); the `init` event lists
+  `project:m7-test-repo-skill`; the run plugins folder is gone afterwards; the run used `paperclip_*` tools; the disposition is
   `via: tool`; no server secrets in the logged env.
 - [ ] **Step 4:** Run 2, waking the same agent again: the session resumes.
-- [ ] **Step 5:** Turn the project's switch off; run 3: `CLAUDE.md` skipped, `project_switch_off`.
+- [ ] **Step 5:** Turn the project's two switches off; run 3: `CLAUDE.md` and repo skills skipped,
+  both `project_switch_off`, and no `project:` skills in the `init` event. Turn them back on.
 - [ ] **Step 6:** Run 4, a task asking it to delete another task: the refusal becomes a pending
   permission request in the Inbox, and the run still finishes. Don't approve it.
 - [ ] **Step 6a:** Skills by plain name. The agent has one company-library skill assigned as well
@@ -605,7 +693,8 @@ Design rollout step 2. Nothing merges into `main` before it passes.
 **Files:** `deploy/docker-compose.yml:78-83` (the comment: runs no longer inherit this; the
 adapter sets it; see the 4b design), `fork/claude-local-run.md` (the "what loads" table and §10's
 rows), `fork/upstream-fixes.md` (bug 39 fixed), `ui-new/docs/decisions.md` (decision 5's update),
-`fork/step-4b-sealed-runs.md` (status: built; section 4 as built), `fork/hard-fork-plan.md`
+`fork/step-4b-sealed-runs.md` (status: built; sections 4 and 5 as built),
+`ui-new/docs/build-plan.md` (3.18: repo skills done), `fork/hard-fork-plan.md`
 (progress), `ui-new/docs/inventory/capabilities.md` if it lists run details.
 
 - [ ] **Step 1:** Update them.
