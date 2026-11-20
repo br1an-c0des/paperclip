@@ -42,7 +42,8 @@ describe("instruction save history", () => {
     root = resolveManagedInstructionsRoot({ id: agentId, companyId, name: "Target", adapterConfig: {} });
     await db.insert(agents).values([
       { id: agentId, companyId, name: "Target", adapterConfig: { instructionsBundleMode: "managed", instructionsRootPath: root, instructionsEntryFile: entryFile } },
-      { id: actorId, companyId, name: "Writer" },
+      // Step 4a access levels: the writer needs agents:configure on the target.
+      { id: actorId, companyId, name: "Writer", permissions: { access: { level: "worker", overrides: { "agents:configure": { scope: { agentIds: [agentId] } } } } } },
     ]);
     await db.insert(companyMemberships).values([
       { companyId, principalType: "user", principalId: userId, membershipRole: "operator" },
