@@ -7,7 +7,7 @@ by cherry-pick from these reviews.
 
 - **Freeze point:** `79c8cf8b6` (tag `upstream-freeze`, 2026-11-17)
 - **Last reviewed:** `79c8cf8b6` (the freeze; no review yet)
-- **Last checked:** 2026-11-17
+- **Last checked:** 2026-11-19 (review of `79c8cf8b6..25b5cad7f9` reported, decisions pending)
 
 Decisions: **taken** (with our commit), **skipped** (with the reason), **port later** (a good idea
 whose code doesn't fit; becomes a task or a build plan entry), **pending** (reported, not decided).
@@ -17,6 +17,37 @@ whose code doesn't fit; becomes a task or a build plan entry), **pending** (repo
 single squashed commit of the pull request's own diff.
 
 ## Reviews
+
+### 2026-11-19: upstream `master` since the freeze
+
+Range `79c8cf8b6..25b5cad7f9` (2026-11-17 to 2026-11-19): 153 commits. 118 dropped by the filter:
+42 Runner, native, remote or sandbox execution; 33 connectors, connections, plugins, GitHub reviews
+or the tool gateway; 17 docs, CI, releases, lockfiles or tests; 15 Cloud, analytics or telemetry;
+11 old `ui/` only. None of the 35 candidates carries a migration. "Clean" means
+`git merge-tree` against `main` reported no conflicts.
+
+| Commit | PR | Title | Applies | Decision | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `d702f567bc` | [#22248](https://github.com/paperclipai/paperclip/pull/22248) | fix(recovery): keep a task's lock while its run's executor still settles it | clean | pending | Provider usage-limit waits resume at the reset instead of stopping on Retry |
+| `7eaf38130b` | [#22306](https://github.com/paperclipai/paperclip/pull/22306) | fix(tasks): keep a due automatic retry working while it is dispatched | clean | pending | No Retry button during the few seconds a due retry is promoted |
+| `397f163c7f` | [#22215](https://github.com/paperclipai/paperclip/pull/22215) | fix(issues): show tasks held by a resolved no-replay hold as Blocked | clean | pending | Pairs with #22245 |
+| `6be53f0831` | [#22245](https://github.com/paperclipai/paperclip/pull/22245) | fix(issues): keep a held task blocked when its agent tries to resume it | 1 conflict (`execution-blocker.ts`, 3 lines) | pending | |
+| `eaac8ed0f7` | [#22222](https://github.com/paperclipai/paperclip/pull/22222) | feat(adapters): add Claude Fable 5.2 and GPT-6.2 with CLI floors | clean | pending | claude_local model list, effort levels, CLI floor 2.1.321 |
+| `e2cee049f9` | [#19515](https://github.com/paperclipai/paperclip/pull/19515) | fix: show instruction saves in history, credit the real writer, speed up the agent tool-rule list | 1 conflict (a test file) | pending | |
+| `bf55063567` | [#22102](https://github.com/paperclipai/paperclip/pull/22102) | fix(server): keep chat titles current and space verification retries | conflict only in an e2e spec deleted on `main` | pending | Chat titles follow an agent rename; the retry half is native-runtime |
+| `da306ac2da` | [#22177](https://github.com/paperclipai/paperclip/pull/22177) | fix(routines): preserve the manual caller during execution dispatch | clean | pending | Only matters with several people |
+| `84a529df4f` | [#22212](https://github.com/paperclipai/paperclip/pull/22212) | fix(monitors): let low-trust reviewers schedule a self-wake on their own task | clean | pending | Only if we use `low_trust_review` agents |
+| `d668eeb660` | [#22206](https://github.com/paperclipai/paperclip/pull/22206) | fix(runner): keep Claude MCP bearer tokens out of process arguments | clean | pending | Runner only. claude_local's CLI engine writes MCP config to a 0600 file and passes only its path, so it isn't affected |
+| `875e4d375e` | | fix(auth): preserve identity across connection request handoffs | clean | pending | Connection requests between people; dormant here |
+| `78cf5aa81a` | [#22011](https://github.com/paperclipai/paperclip/pull/22011) | feat(public-mcp): let paperclip_create_task assign a person or no one | conflicts with 4a's `capabilities.ts` | pending | Port by hand if wanted |
+| `75ae377438` | [#22228](https://github.com/paperclipai/paperclip/pull/22228) | feat(ui): offer to cancel active subtasks | server part merges, `ui/` part gone | pending | Idea for ui-new |
+| `19a7381398` | [#22358](https://github.com/paperclipai/paperclip/pull/22358) | feat: restore personal archiving in task views | conflicts (`issues.ts`) | pending | |
+| `33fac97cad` | [#22205](https://github.com/paperclipai/paperclip/pull/22205) | feat(routines): ship the redesigned routine page and let live webhooks be tested again | server part merges, `ui/` part gone | pending | Idea for ui-new's routines |
+| `43b2d8be22`, `ffcd49f6aa`, `c0aa7751f8`, `b7319eb581`, `575ef12575` | #22069, #22253, #22261, #22274, #22275 | Areas and responsibilities (dashboard, agent read/write, routines in plain terms, skills under responsibilities) | large | pending | New multi-person product area |
+| `ce27dde855` | [#22077](https://github.com/paperclipai/paperclip/pull/22077) | Start onboarding in chat and defer execution until the user chooses work | large | pending | |
+| `f324238f73` … `87ef7097b6` (13 commits) | #22266–#22332 | wake-queue: move issue admission, locks and steering into `server/src/modules/wake-queue`, plus perf follow-ups | the later ones conflict | pending | A chain; all or none |
+| `f05b90508a` | [#22055](https://github.com/paperclipai/paperclip/pull/22055) | refactor(core): remove retired compatibility paths | 112 files | pending | |
+
 
 ### 2026-11-17: open pull requests (from the survey in upstream-open-prs.md)
 
