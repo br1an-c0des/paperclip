@@ -18,7 +18,14 @@ const support = await getEmbeddedPostgresTestSupport();
     db = createDb(temporary.connectionString);
     await instanceSettingsService(db).updateExperimental({ enableAgentChat: true });
   }, 90_000);
-  afterAll(async () => { await db?.$client.end({ timeout: 0 }); await temporary?.cleanup(); });
+  afterAll(async () => {
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
+    await db?.$client.end({ timeout: 0 });
+    await temporary?.cleanup();
+  });
 
   async function fixture(status = "paused") {
     const companyId = randomUUID(), agentId = randomUUID();

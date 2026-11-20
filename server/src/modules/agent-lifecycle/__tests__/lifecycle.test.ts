@@ -1,4 +1,5 @@
 import { subscribeDatabaseWork } from "@paperclipai/db";
+import { heartbeatService } from "../../../services/heartbeat.js";
 import { DELIVERY_QUEUES } from "../../../services/delivery-work-notifications.js";
 import { resolveExternalTestDatabaseUrl } from "../../../__tests__/helpers/external-test-database.js";
 import { createAgentLifecycle as createLifecycleCommands } from "../index.js";
@@ -45,6 +46,10 @@ const support = external ? { supported: true } : await getEmbeddedPostgresTestSu
   }, 90_000);
   afterAll(async () => {
     for (const worker of workers) await worker.stop();
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
     if (external) await closeRegisteredClients(external);
     else await database?.cleanup();
   });

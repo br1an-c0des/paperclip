@@ -19,7 +19,14 @@ describe("Retry of a legacy preparation that automatic recovery stopped", () => 
     postgres = await startEmbeddedPostgresTestDatabase("legacy-preparation-retry-");
     db = createDb(postgres.connectionString);
   }, 30_000);
-  afterAll(async () => { await db?.$client.end(); await postgres?.cleanup(); });
+  afterAll(async () => {
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
+    await db?.$client.end();
+    await postgres?.cleanup();
+  });
 
   async function seed() {
     const companyId = randomUUID(), issueId = randomUUID(), agentId = randomUUID();

@@ -10,6 +10,7 @@ import {
   activityLog, agents, agentWakeupRequests, applyPendingMigrations, companies, companyMemberships, createDb,
   environmentLeases, environments, heartbeatRunEvents, heartbeatRuns, issues, subscribeDatabaseWork,
 } from "@paperclipai/db";
+import { heartbeatService } from "../services/heartbeat.js";
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "./helpers/embedded-postgres.js";
 import { resolveExternalTestDatabaseUrl } from "./helpers/external-test-database.js";
 import { errorHandler } from "../middleware/index.js";
@@ -38,6 +39,10 @@ describe.skipIf(!support.supported)("confirming that an unidentified local run s
     }
   }, 30_000);
   afterAll(async () => {
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
     await db?.$client.end({ timeout: 1 });
     await tempDb?.cleanup();
   });

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { eq, sql } from "drizzle-orm";
 import { agents, companies, createDb, applyPendingMigrations, EMBEDDED_POSTGRES_TEST_TIMEOUT_MS,
   environments, environmentLeases, executionWorkspaces, heartbeatRuns, plugins, type Db } from "@paperclipai/db";
+import { heartbeatService } from "../services/heartbeat.js";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { requireServerAdapter } from "../adapters/index.js";
 import { agentHarnessVerificationService } from "../services/agent-harness-verification.js";
@@ -59,6 +60,10 @@ describe.skipIf(!support.supported)("Cursor Cloud API controller activation", ()
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
   afterAll(async () => {
     for (const worker of workers) await worker.stop();
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
     await db?.$client.end();
     await database?.cleanup();
     vi.unstubAllEnvs();

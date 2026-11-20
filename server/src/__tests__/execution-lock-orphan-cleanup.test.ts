@@ -37,6 +37,10 @@ describeEmbeddedPostgres("execution lock orphan cleanup", () => {
   }, 30_000);
 
   afterEach(async () => {
+    // Await background heartbeat runs and wakes before clearing the tables: left running, they
+    // outlive this file's database, and in a shared test worker a later file's heartbeat drain or
+    // task-drain status sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
     await db.delete(agentWakeupRequests);
     await db.delete(activityLog);
     await db.delete(heartbeatRunEvents);
