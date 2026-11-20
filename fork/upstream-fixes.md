@@ -98,7 +98,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 61 | [Don't write or lock on an access check with no temporary grant](#61-dont-write-or-lock-on-an-access-check-with-no-temporary-grant) | fixed on `feat/step-4a` (`0a1c2721d`) | | | 2026-11-19 | | |
 | 62 | [Steady two server tests that flaked in CI](#62-steady-two-server-tests-that-flaked-in-ci) | fixed (`d5435c29b`, `3a668926a`) | | | 2026-11-19 | | |
 | 63 | [Find what adds 11 close listeners to the HTTP server](#63-find-what-adds-11-close-listeners-to-the-http-server) | candidate | | | 2026-11-19 | | |
-| 64 | [Find the file that leaves a heartbeat run behind for heartbeat-task-drain](#64-find-the-file-that-leaves-a-heartbeat-run-behind-for-heartbeat-task-drain) | candidate | | | 2026-11-20 | | |
+| 64 | [Find the file that leaves a heartbeat run behind for heartbeat-task-drain](#64-find-the-file-that-leaves-a-heartbeat-run-behind-for-heartbeat-task-drain) | fixed (`877fe4dd7`, `ec3d65627`) | | | 2026-11-20 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1076,3 +1076,19 @@ line 60, `getTaskDrainStatus().activeRuns`. The rerun of that shard passed.
 - **Likely fix:** run shard 9 with `PAPERCLIP_TEST_LEAK_REPORT` (bug 62 added in-flight heartbeat runs
   and wakes to the probe) to find the file that ends with a run in flight, and make it drain
   (`heartbeatService(db).drainActiveRunExecutions()`) in `afterEach`, as bug 62's fix did.
+- **Fixed** (`877fe4dd7`, `ec3d65627`), tests only; CI run 44660284099 green first time. The leak
+  report alone missed it (shard 9 locally: all probes 0; the leak is timing-dependent), so the fix
+  traced each heartbeat run's start and settle per file with temporary instrumentation over the full
+  thorough tier. Two files' runs outlived them by ~60 s: `fresh-continuation-retry-delivery` (CI's
+  shard 9; a delivered continuation or Retry starts a real run, and `afterAll` ended the pool without
+  awaiting it) and `completed-turn-cleanup-hold-settle`. Each reproduced the CI error when run before
+  `heartbeat-task-drain` in one worker; the first also explains bug 62's
+  `heartbeat-worktree-suppression` failure. Both now drain in `afterEach`. Twenty more files, and
+  `helpers/runner-api-server.ts`'s `close()` (28 users), started real runs that settled only
+  milliseconds to seconds before teardown; they drain too. After: full thorough tier, 913 heartbeat
+  probes, all 0.
+- **Left open:** `heartbeatService()` registers module-level resumers bound to its db
+  (`registerCompletedTurnCleanupResumer`, `registerHeldPreparationResumer`); in a shared worker a
+  later file can call an earlier file's resumer on an ended pool (caught, logged as
+  `CONNECTION_ENDED`, harmless). A per-run start/settle probe in `helpers/shared-worker-state.ts`
+  would catch timing-hidden leaks like this one, but it needs a hook in `services/heartbeat.ts`.
