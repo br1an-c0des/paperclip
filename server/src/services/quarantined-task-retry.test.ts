@@ -33,7 +33,14 @@ describe("task Retry after inherited native cleanup quarantine", () => {
     db = createDb(postgres.connectionString);
     await instanceSettingsService(db).updateExperimental({ enableNativeRunner: true });
   }, 90_000);
-  afterAll(async () => { await db?.$client.end(); await postgres?.cleanup(); });
+  afterAll(async () => {
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
+    await db?.$client.end();
+    await postgres?.cleanup();
+  });
 
   async function seed(base: string, transient = false, provider: "codex" | "acpx" = "codex") {
     const companyId = randomUUID(), agentId = randomUUID(), issueId = randomUUID();

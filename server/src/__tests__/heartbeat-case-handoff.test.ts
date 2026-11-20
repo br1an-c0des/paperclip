@@ -27,7 +27,14 @@ describe("durable case handoff queue admission", () => {
   const heldRuns = new Set<string>();
   beforeAll(async () => { temporary = await startEmbeddedPostgresTestDatabase("case-handoff-queue-"); db = createDb(temporary.connectionString);
     await instanceSettingsService(db).updateExperimental({ enableCases: true }); });
-  afterAll(async () => { for (const id of heldRuns) runningProcesses.delete(id); await temporary?.cleanup(); });
+  afterAll(async () => {
+    for (const id of heldRuns) runningProcesses.delete(id);
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
+    await temporary?.cleanup();
+  });
   async function fixture() {
     const companyId = randomUUID(), agentId = randomUUID(), issueId = randomUUID(), caseId = randomUUID(), handoffId = randomUUID(),
       userId = randomUUID(), sessionId = randomUUID(), wakeupRequestId = randomUUID(), occupyingRunId = randomUUID();

@@ -3,6 +3,7 @@ import express from "express";
 import request from "supertest";
 import { eq } from "drizzle-orm";
 import { agents, companies, companyMemberships, principalPermissionGrants, environments, plugins, createDb, type Db } from "@paperclipai/db";
+import { heartbeatService } from "../../../services/heartbeat.js";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "../../../__tests__/helpers/embedded-postgres.js";
 import { createAgentLifecycle, configureAgentLifecycle, createAgentLifecycleEffects } from "../../../services/agent-lifecycle.js";
@@ -21,7 +22,14 @@ const support = await getEmbeddedPostgresTestSupport();
   let companyId: string;
   const workers: ReturnType<typeof configureAgentLifecycle>[] = [];
   beforeAll(async () => { database = await startEmbeddedPostgresTestDatabase("paperclip-agent-setup-"); db = createDb(database.connectionString); }, 90_000);
-  afterAll(async () => { for (const work of workers) await work.stop(); await database?.cleanup(); });
+  afterAll(async () => {
+    for (const work of workers) await work.stop();
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
+    await database?.cleanup();
+  });
   beforeEach(async () => {
     for (const work of workers) await work.stop();
     companyId = randomUUID();

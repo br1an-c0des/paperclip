@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { agents, companies, companyMemberships, environments, heartbeatRuns, instanceSettings, plugins, principalPermissionGrants, createDb, type Db } from "@paperclipai/db";
+import { heartbeatService } from "../../../services/heartbeat.js";
 import express from "express";
 import request from "supertest";
 import { agentRoutes } from "../../../routes/agents.js";
@@ -26,7 +27,14 @@ const support = await getEmbeddedPostgresTestSupport();
   const call = vi.fn(async (_id, _method, input) => ({ operationId: input.operationId, version: input.version, status: "complete" }));
 
   beforeAll(async () => { database = await startEmbeddedPostgresTestDatabase("paperclip-environment-plugins-"); db = createDb(database.connectionString); }, 90_000);
-  afterAll(async () => { for (const work of workers) await work.stop(); await database?.cleanup(); });
+  afterAll(async () => {
+    for (const work of workers) await work.stop();
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
+    await database?.cleanup();
+  });
   beforeEach(async () => {
     for (const work of workers.splice(0)) await work.stop();
     call.mockClear();

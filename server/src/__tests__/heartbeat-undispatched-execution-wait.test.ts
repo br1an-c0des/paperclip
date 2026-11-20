@@ -19,7 +19,13 @@ const support = await getEmbeddedPostgresTestSupport();
     database = await startEmbeddedPostgresTestDatabase("undispatched-execution-wait-");
     db = createDb(database.connectionString);
   }, 90_000);
-  afterAll(async () => { await database?.cleanup(); });
+  afterAll(async () => {
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
+    await database?.cleanup();
+  });
 
   async function seed(withHistoricalHold = false) {
     const companyId = randomUUID(), agentId = randomUUID(), issueId = randomUUID();

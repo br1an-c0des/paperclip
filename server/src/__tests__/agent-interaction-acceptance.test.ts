@@ -9,6 +9,7 @@ import { and, eq } from "drizzle-orm";
 import { expect, it } from "vitest";
 import { activityLog, agentApiKeys, agents, agentWakeupRequests, authUsers, boardApiKeys, companies,
   companyMemberships, createDb, heartbeatRuns, issueComments, issues, principalPermissionGrants } from "@paperclipai/db";
+import { heartbeatService } from "../services/heartbeat.js";
 import { AGENT_INTERACTION_PERMISSION_KEYS, PERMISSION_KEYS } from "@paperclipai/shared";
 import { createApp } from "../app.js";
 import { createStorageService } from "../storage/service.js";
@@ -117,6 +118,10 @@ it("configures each control with the CLI against the assembled app and enforces 
   } finally {
     await app?.locals.paperclipShutdown?.();
     if (server) await new Promise<void>((resolve, reject) => server!.close(error => error ? reject(error) : resolve()));
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
     await db.$client.end();
     await database.cleanup();
     await rm(directory, { recursive: true, force: true });

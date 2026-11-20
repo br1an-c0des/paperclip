@@ -4,6 +4,7 @@ import request from "supertest";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { agents, companies, createDb, issues } from "@paperclipai/db";
+import { heartbeatService } from "../services/heartbeat.js";
 import { errorHandler } from "../middleware/index.js";
 import { issueRoutes } from "../routes/issues.js";
 import { buildInitialIssueMonitorFields, normalizeIssueExecutionPolicy } from "../services/issue-execution-policy.js";
@@ -19,7 +20,13 @@ const support = await getEmbeddedPostgresTestSupport();
     temporary = await startEmbeddedPostgresTestDatabase("paperclip-status-version-route-");
     db = createDb(temporary.connectionString, { maxConnections: 4 });
   });
-  afterAll(async () => { await temporary?.cleanup(); });
+  afterAll(async () => {
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
+    await temporary?.cleanup();
+  });
 
   async function fixture() {
     const companyId = randomUUID();

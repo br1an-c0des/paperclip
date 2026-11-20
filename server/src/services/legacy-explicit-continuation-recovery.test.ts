@@ -14,7 +14,13 @@ describe("legacy recovery after an explicit user continuation", () => {
     temporary = await startEmbeddedPostgresTestDatabase("legacy-explicit-recovery-");
     db = createDb(temporary.connectionString);
   });
-  afterAll(async () => { await temporary?.cleanup(); });
+  afterAll(async () => {
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
+    await temporary?.cleanup();
+  });
 
   async function fixture() {
     const companyId = randomUUID(), agentId = randomUUID(), issueId = randomUUID();
