@@ -41,8 +41,8 @@ describe("readRunAgentAccess", () => {
     ["no stored access", {}],
     ["an unknown level", { access: { level: "owner" } }],
     ["an unknown override", { access: { level: "worker", overrides: { "agents:fly": true } } }],
-  ])("is null for %s", (_label, permissions) => {
-    expect(readRunAgentAccess(permissions)).toBeNull();
+  ])("reports the default level the agent runs at for %s", (_label, permissions) => {
+    expect(readRunAgentAccess(permissions)).toEqual({ level: "worker", overrides: {} });
   });
 });
 
@@ -146,9 +146,15 @@ describe.skipIf(!recoveryPostgresSupport.supported)("heartbeat: the claude_local
     expect(context.paperclipAiConnectionName).toBeNull();
   }, 60_000);
 
-  it("passes null access when the stored access doesn't parse", async () => {
+  it("passes the default level when the stored access doesn't parse", async () => {
     const { agentId } = await seed({ permissions: { access: { level: "superuser" } } });
     const context = await runAndCapture(agentId, null);
-    expect(context.paperclipAgentAccess).toBeNull();
+    expect(context.paperclipAgentAccess).toEqual({ level: "worker", overrides: {} });
+  }, 60_000);
+
+  it("passes the default level when the agent has no stored access", async () => {
+    const { agentId } = await seed({ permissions: {} });
+    const context = await runAndCapture(agentId, null);
+    expect(context.paperclipAgentAccess).toEqual({ level: "worker", overrides: {} });
   }, 60_000);
 });
