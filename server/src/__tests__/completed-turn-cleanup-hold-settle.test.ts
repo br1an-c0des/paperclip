@@ -71,6 +71,10 @@ suite("completed-turn cleanup holds on the shared ownership path", () => {
   }, 30_000);
 
   afterEach(async () => {
+    // A delivered continuation or Retry starts a real background run. Await it before clearing the
+    // tables: left running, it outlives this file's database, and in a shared test worker a later
+    // file's heartbeat drain or task-drain status sees it (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
     await db.delete(activityLog);
     await db.delete(issueRecoveryActions);
     await db.delete(workspaceOperations);

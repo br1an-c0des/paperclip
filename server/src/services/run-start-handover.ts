@@ -116,6 +116,8 @@ export function createRunStartHandover(input: {
   let readRequested = false;
   let lastSkipHintAt = Number.NEGATIVE_INFINITY;
   let hinting: Promise<void> | null = null;
+  /** A start was skipped after the last hint went out: one more hint is owed once the rate limit allows it. */
+  let hintOwed = false;
 
   /**
    * One statement under a statement timeout, so a slow database cancels it instead of holding a pool connection.
@@ -254,19 +256,39 @@ export function createRunStartHandover(input: {
     return reading;
   }
 
-  /** Runs this server skips stay queued; wake the replacement's dispatch so they do not wait for a sweep. */
+  /**
+   * Runs this server skips stay queued; wake the replacement's dispatch so they do not wait for a sweep.
+   * Every skipped start is followed by a hint sent after it: a skip inside the rate limit, or while a hint is
+   * in flight, is owed one trailing hint rather than dropped. Without it, a run queued just after the previous
+   * hint (which the replacement's dispatch may already have passed) waits for the replacement's redrive.
+   */
   function skipHint(force = false) {
     const now = Date.now();
     // Best effort and single flight: a busy pool delays one hint, never a queue of them (the replacement's own
-    // queued-run redrive still covers a lost hint).
-    if (hinting || (!force && now - lastSkipHintAt < t.skipHintMinMs)) return;
+    // queued-run redrive still covers a failed hint). Skips during the wait share the one trailing hint.
+    if (hinting || (!force && now - lastSkipHintAt < t.skipHintMinMs)) {
+      if (!hintOwed) { hintOwed = true; if (!hinting) worker.wake(); }
+      return;
+    }
+    hintOwed = false;
     lastSkipHintAt = now;
     hinting = controllerLeaseDb(db).transaction(async tx => {
       await tx.execute(sql`select set_config('statement_timeout', ${String(t.writeStatementTimeoutMs)}, true)`);
       await notifyDatabaseWorkOnCommit(tx, DELIVERY_QUEUES.queuedRunDispatch);
     })
       .catch(error => logger.warn({ err: error }, "queued run dispatch hint for the newer server failed"))
-      .finally(() => { hinting = null; });
+      .finally(() => {
+        hinting = null;
+        // Schedules the owed hint at the end of the rate limit.
+        if (hintOwed && !stopped) worker.wake();
+      });
+  }
+
+  /** Send the hint a skipped start is owed once the rate limit allows, while this server still yields. */
+  function sendOwedHint() {
+    if (!hintOwed) return;
+    if (!yieldingTo) { hintOwed = false; return; } // Starting runs again: this server starts them itself.
+    if (!hinting && Date.now() - lastSkipHintAt >= t.skipHintMinMs) skipHint();
   }
 
   function nextDeadline(): number | null {
@@ -278,6 +300,8 @@ export function createRunStartHandover(input: {
     // Renew while handing over and able to start runs; a drain change wakes the worker otherwise.
     if (handingOver() && input.canDispatch()) deadlines.push(lastWriteAt + t.renewMs);
     if (yieldingTo) deadlines.push(reading ? yieldUntil : Math.min(lastReadAt + t.recheckMs, yieldUntil));
+    // An owed hint goes out when the rate limit ends; one still in flight wakes the worker when it settles.
+    if (yieldingTo && hintOwed && !hinting) deadlines.push(lastSkipHintAt + t.skipHintMinMs);
     return deadlines.length ? Math.max(Date.now(), Math.min(...deadlines)) : null;
   }
 
@@ -290,6 +314,7 @@ export function createRunStartHandover(input: {
     run: async () => {
       if (stopped) return;
       expireYield();
+      sendOwedHint();
       if (handingOver()) await maintainLease();
       if (readRequested || (yieldingTo && !reading && Date.now() - lastReadAt >= t.recheckMs)) {
         readRequested = false;

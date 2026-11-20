@@ -35,8 +35,9 @@ set up for one person running Claude agents.
   cloud and sandbox execution). If a change to shared code breaks a test there, skip that test with
   a note saying why, or remove the subsystem if that's simpler. Ask before removing anything large.
 - **Migrations** continue upstream's numbered sequence in `packages/db/src/migrations` (the first
-  of ours is `0491`). Back up server1's database before deploying one; migrations don't run
-  backwards.
+  of ours is `0491`). Migrations don't run backwards, so a deploy that adds one backs up server1's
+  database and rehearses the migration on a copy first; `deploy.sh` does both
+  ([deploy/README.md](deploy/README.md#automatic-backups)).
 - **Upstream changes come in by choice**, through the `upstream-watch` skill (`/upstream-watch`):
   review, pick, cherry-pick on a branch, approve. Never merge `master` into `main`.
 - **Bugs** go in [fork/upstream-fixes.md](fork/upstream-fixes.md), the fork's bug list (the name
@@ -49,7 +50,10 @@ set up for one person running Claude agents.
 - **Deploys** build the image from source: `deploy/deploy.sh` builds the root `Dockerfile`
   (`paperclip-core:<commit>`) and swaps `ui-new` in, so every change on `main` reaches server1 at
   its next deploy. The core image doesn't build `ui-new`; `deploy/Dockerfile` builds it and puts it
-  in `ui-new/dist`, where the server serves it from.
+  in `ui-new/dist`, where the server serves it from. It deploys only a commit whose CI run passed
+  (`--skip-ci` overrides, `--wait-ci` waits), checks `/api/health` afterwards, and
+  `deploy.sh --rollback` puts the previous image back when no migration ran
+  ([deploy/README.md](deploy/README.md#updating)).
 - `pnpm` isn't installed globally on this machine; use `corepack pnpm`.
 - For the repo's conventions (repo map, dev setup, API rules), see `AGENTS.md`. Its pull-request
   template and Paperclip-issue workflow rules are upstream's and don't apply here.
@@ -120,7 +124,7 @@ corepack pnpm --filter @paperclipai/ui-new typecheck
 corepack pnpm --filter @paperclipai/ui-new test
 corepack pnpm --filter @paperclipai/ui-new test:e2e   # Playwright smoke suite, mocked API (E2E_LIVE=1: read-only against :3100)
 corepack pnpm --filter @paperclipai/plugin-sdk build # after install, a cherry-pick, or in a fresh worktree; else the server dies with "does not provide an export named …"
-ssh server1 'cd ~/deployments/paperclip/repo && git pull --ff-only && deploy/deploy.sh'   # deploy main to server1 (the real instance)
+ssh server1 'cd ~/deployments/paperclip/repo && git pull --ff-only && deploy/deploy.sh --wait-ci'   # deploy main to server1 (the real instance), once its CI run passes
 ```
 
 To review upstream, run `/upstream-watch`: it lists upstream's new commits since the last review,

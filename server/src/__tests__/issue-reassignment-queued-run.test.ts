@@ -12,6 +12,7 @@ import {
   heartbeatRuns,
   issues,
 } from "@paperclipai/db";
+import { heartbeatService } from "../services/heartbeat.js";
 import { errorHandler } from "../middleware/index.js";
 import { issueRoutes } from "../routes/issues.js";
 import {
@@ -39,6 +40,10 @@ describeEmbeddedPostgres("reassigning a task whose previous assignee's run has n
   }, 30_000);
 
   afterAll(async () => {
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
     await db?.$client.end();
     await tempDb?.cleanup();
   });

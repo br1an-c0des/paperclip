@@ -39,7 +39,14 @@ describe("durable task Retry admission", () => {
       db = createDb(postgres.connectionString);
     }
   }, 30_000);
-  afterAll(async () => { await db?.$client.end(); await postgres?.cleanup(); });
+  afterAll(async () => {
+    // Await background heartbeat runs and wakes before the database ends: left running, they
+    // outlive it, and in a shared test worker a later file's heartbeat drain or task-drain status
+    // sees them (bugs 62, 64).
+    await heartbeatService(db).drainActiveRunExecutions();
+    await db?.$client.end();
+    await postgres?.cleanup();
+  });
   async function seed() {
     const companyId = randomUUID(), issueId = randomUUID(), agentId = randomUUID(), runId = randomUUID();
     await db.insert(companies).values({ id: companyId, name: "Retry company", issuePrefix: `T${companyId.slice(0, 6)}` });

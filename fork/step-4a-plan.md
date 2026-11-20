@@ -612,8 +612,11 @@ override counted as unscoped (58, security), provider `access_denied` errors tak
 refusals (59), a worker's new subtask judged as someone else's task (60), and a write and row lock
 on every refused check (61). CI then failed only on bug 62, a test leak on `main` too, fixed on
 `main` and merged in. CI green on `feat/step-4a` `18ceb34cd` (run 44578190447) and `main`
-`0d5646ab9` (run 44578190090); merged with the user's approval. Not deployed: server1 needs a
-database backup first (migration 0491).
+`0d5646ab9` (run 44578190090); merged with the user's approval. **Deployed to server1** 2026-11-19 (`5bde9aec2`), after a
+backup (`~/deployments/paperclip/backups/paperclip-2026-11-19-1215.dump`): 0491 applied, health
+`ok`; the 5 agents carried over at `manager` with `agents:create`, `agents:configure` and
+`tasks:assign` overrides; the one outside OAuth connection carried over at `admin`, acting as the
+person.
 
 **Open after the merge:** bugs 53–56 (optional); B's design question, whether a refusal outside a
 scoped override (`deny_scope`) should be requestable (now it isn't); the invite route serves the

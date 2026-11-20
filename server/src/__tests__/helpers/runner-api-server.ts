@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { eq, sql } from "drizzle-orm";
 import { agents, authUsers, authAccounts, companies, companyMemberships, createDb, applyPendingMigrations, closeRegisteredClients, heartbeatRuns, issues, projects, projectWorkspaces, activityLog, issueComments, assets, goals, approvals, documents, documentRevisions, issueDocuments, issueRelations, issueThreadInteractions, connectionIntentDeliveries, toolApplications, toolConnections, toolConnectionInstalls, connectionGrants, toolCatalogEntries, toolProfiles, toolProfileBindings } from "@paperclipai/db";
+import { heartbeatService } from "../../services/heartbeat.js";
 import { documentService } from "../../services/documents.js";
 import { connectionIntentService } from "../../services/connection-intents.js";
 import { initializeRunIdentity } from "../../services/run-identity.js";
@@ -216,6 +217,10 @@ export async function startRunnerApiTestServer(options: {
       for (const socket of sockets) socket.destroy();
       http.closeAllConnections();
       await new Promise<void>((resolve) => http.close(() => resolve()));
+      // App shutdown stops the scheduler but leaves heartbeat runs and wakes the routes started.
+      // Await them before the database ends: left running, they outlive it, and in a shared test
+      // worker a later file's heartbeat drain or task-drain status sees them (bugs 62, 64).
+      await heartbeatService(db).drainActiveRunExecutions();
       await temporary.cleanup();
       await rm(root, { recursive: true, force: true });
     },
