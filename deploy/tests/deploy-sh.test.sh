@@ -130,9 +130,30 @@ expect_no_call() { ! grep -qE -- "$1" "$state/calls.log" || fail "unexpected cal
 expect_file() { [ -e "$1" ] || fail "missing file: $1"; }
 expect_no_file() { [ ! -e "$1" ] || fail "file should not exist: $1"; }
 expect_state() { grep -qxF -- "$1" "$site/backups/last-deploy.env" 2>/dev/null || fail "last-deploy.env lacks: $1"; }
+# The image id a tag points to in the stub (empty: no such tag).
+tag_of() { cat "$state/images/$(key "$1")" 2>/dev/null || true; }
+# The line numbers in calls.log of the first call matching each pattern, which
+# must be in that order.
+expect_order() {
+  local pattern line last=0
+  for pattern in "$@"; do
+    line=$(grep -nE -- "$pattern" "$state/calls.log" | head -n 1 | cut -d: -f1)
+    if [ -z "$line" ]; then fail "order: no call matching $pattern"; return; fi
+    [ "$line" -gt "$last" ] || fail "order: $pattern (line $line) comes before the call it should follow"
+    last=$line
+  done
+}
+# The server container runs the fork image of commit $1, which has no tag left
+# (the containerd store deleted it when a later build, of commit $2, took
+# paperclip-fork:local): server1's state after the failed deploy of bug 65.
+running_image_gone() {
+  echo "sha256:fork-$1" > "$state/running_server"
+  echo "$1" > "$state/commits/$(key "sha256:fork-$1")"
+  seed_image "paperclip-fork:local" "sha256:fork-later-$2" "$2"
+}
 # Nothing that changes anything: builds, tags, compose build/up/exec, runs.
 expect_read_only() {
-  expect_no_call '^docker (build|tag|run|exec|rm|network)( |$)'
+  expect_no_call '^docker (build|tag|rmi|run|exec|rm|network)( |$)'
   expect_no_call '^docker compose (build|up|exec|down|stop|restart)'
   expect_no_file "$site/backups"
 }
@@ -167,7 +188,7 @@ if selected "dry-run no migrations"; then
   expect_exit 0
   expect_out "CI:         passed"
   expect_out "Migrations: none added"
-  expect_out "would tag sha256:fork-$commit_b"
+  expect_out "would hold sha256:fork-$commit_b ($commit_b) as paperclip-fork:outgoing"
   expect_out "http://127.0.0.1:3999/api/health"
   expect_no_out "Backup:"
   expect_call "^gh run list -R test-owner/test-repo --commit $commit_c --workflow test.yml"
@@ -292,7 +313,7 @@ if selected "deploy no migrations"; then
   expect_out "Core image: paperclip-core:$commit_c (build: no image for this commit yet)"
   expect_call "^docker build --target production .* -t paperclip-core:$commit_c \.$"
   expect_call "^docker compose build server$"
-  expect_call "^docker tag sha256:fork-$commit_b paperclip-fork:previous$"
+  expect_call "^docker tag paperclip-fork:outgoing paperclip-fork:previous$"
   expect_call "^docker compose up -d --no-build$"
   expect_no_call "pg_dump|pg_restore|network create"
   expect_out "Migrations:  none"
@@ -303,11 +324,28 @@ if selected "deploy no migrations"; then
   expect_state "previous_commit=$commit_b"
   expect_state "migrations=none"
   expect_state "status=ok"
-  [ "$(cat "$state/images/paperclip-fork_previous")" = "sha256:fork-$commit_b" ] || fail "previous not tagged"
-  # Order: build before tag before up.
-  order=$(grep -nE '^docker (compose build|tag|compose up)' "$state/calls.log" | cut -d: -f1 | paste -sd ' ')
-  read -r o1 o2 o3 <<<"$order"
-  [ "$o1" -lt "$o2" ] && [ "$o2" -lt "$o3" ] || fail "order of build, tag, up: $order"
+  expect_state "previous_image=sha256:fork-$commit_b"
+  [ "$(tag_of paperclip-fork:previous)" = "sha256:fork-$commit_b" ] || fail "previous not tagged"
+  [ -z "$(tag_of paperclip-fork:outgoing)" ] || fail "paperclip-fork:outgoing left behind"
+  # Order: hold the running image, build, tag previous, restart.
+  expect_order "^docker tag sha256:fork-$commit_b paperclip-fork:outgoing$" "^docker compose build server$" \
+    "^docker tag paperclip-fork:outgoing paperclip-fork:previous$" "^docker rmi paperclip-fork:outgoing$" \
+    "^docker compose up -d --no-build$"
+  end
+
+  begin "deploy, previous held before the build: survives Compose moving paperclip-fork:local"
+  fresh "$commit_b"
+  run --
+  expect_exit 0
+  # The stub, like the containerd store, deletes an image whose last tag moves:
+  # fork-B kept a tag (outgoing, then previous) through the build, so it's still there.
+  expect_no_out "No such image"
+  [ "$(tag_of paperclip-fork:local)" = "sha256:fork-$commit_c" ] || fail "local isn't the new build"
+  [ "$(tag_of paperclip-fork:previous)" = "sha256:fork-$commit_b" ] || fail "previous isn't the old image"
+  : > "$state/calls.log"
+  run -- --rollback
+  expect_exit 0
+  expect_out "the server reports commit $commit_b"
   end
 
   begin "deploy, core image exists: reused, not rebuilt"
@@ -370,10 +408,9 @@ if selected "deploy migrations"; then
   [ "$(wc -l < "$site/backups/.automatic-dumps")" -eq 3 ] || fail "manifest: $(cat "$site/backups/.automatic-dumps")"
   [ -z "$(find "$site/backups" -name "*.partial" 2>/dev/null)" ] || fail "partial dump left"
   # Order: dump before rehearsal before tag before up.
-  order=$(grep -nE '^docker (compose exec -T db pg_dump|network create|tag|compose up)' "$state/calls.log" \
-    | cut -d: -f1 | paste -sd ' ')
-  read -r o1 o2 o3 o4 <<<"$order"
-  [ "$o1" -lt "$o2" ] && [ "$o2" -lt "$o3" ] && [ "$o3" -lt "$o4" ] || fail "order of dump, rehearsal, tag, up: $order"
+  expect_order "^docker tag sha256:fork-$commit_a paperclip-fork:outgoing$" "^docker compose build server$" \
+    "^docker compose exec -T db pg_dump" "^docker network create" \
+    "^docker tag paperclip-fork:outgoing paperclip-fork:previous$" "^docker compose up"
   end
 
   begin "deploy, migrations, DEPLOY_BACKUP_DIR: dumps go there"
@@ -393,7 +430,7 @@ if selected "backup"; then
   run STUB_DUMP=empty --
   expect_exit 1
   expect_out "the dump is empty"
-  expect_no_call "^docker compose up|^docker tag|network create"
+  expect_no_call "^docker compose up|^docker tag [^ ]+ paperclip-fork:previous|network create"
   [ "$(automatic_dumps)" -eq 0 ] || fail "a dump was kept"
   [ -z "$(find "$site/backups" -name "*.partial" 2>/dev/null)" ] || fail "partial dump left"
   end
@@ -489,7 +526,7 @@ if selected "rehearsal"; then
   expect_exit 1
   expect_out "column \"access_level\" of relation \"agents\" already exists"
   expect_out "the migrations failed on a copy of the production database"
-  expect_no_call "^docker compose up|^docker tag"
+  expect_no_call "^docker compose up|^docker tag [^ ]+ paperclip-fork:previous"
   expect_call "^docker rm -f -v paperclip-rehearsal-.*-migrate$"
   expect_call "^docker rm -f -v paperclip-rehearsal-.*-db$"
   expect_call "^docker network rm paperclip-rehearsal-"
@@ -569,6 +606,147 @@ if selected "verify"; then
   expect_exit 1
   expect_state "status=starting"
   expect_state "migrations=0002_b.sql"
+  end
+fi
+
+if selected "previous"; then
+  begin "previous, running image gone, its core image here: rebuilds it from the commit's tree"
+  fresh ""
+  running_image_gone "$commit_b" "$commit_c"
+  seed_image "paperclip-core:$commit_b" "sha256:core-$commit_b" "$commit_b"
+  run -- --dry-run
+  expect_exit 0
+  expect_out "Deployed:   $commit_b"
+  expect_out "Migrations: none added"
+  expect_out "the image the server runs (sha256:fork-$commit_b) no longer exists"
+  expect_out "would rebuild it from paperclip-core:$commit_b"
+  expect_read_only
+  run --
+  expect_exit 0
+  expect_call "^docker build -f deploy/Dockerfile --build-arg BASE_IMAGE=paperclip-core:$commit_b --build-arg PAPERCLIP_UI_COMMIT=$commit_b -t paperclip-fork:outgoing -$"
+  expect_no_call "pg_dump"
+  expect_order "^docker build -f deploy/Dockerfile" "^docker compose build server$" \
+    "^docker tag paperclip-fork:outgoing paperclip-fork:previous$" "^docker compose up -d --no-build$"
+  expect_no_out "WARNING"
+  [ "$(tag_of paperclip-fork:previous)" = "sha256:fork-rebuilt-$commit_b" ] || fail "previous isn't the rebuilt image"
+  [ -z "$(tag_of paperclip-fork:outgoing)" ] || fail "paperclip-fork:outgoing left behind"
+  expect_state "previous_image=sha256:fork-rebuilt-$commit_b"
+  expect_state "previous_commit=$commit_b"
+  expect_state "status=ok"
+  run -- --rollback
+  expect_exit 0
+  expect_out "the server reports commit $commit_b"
+  end
+
+  begin "previous, running image gone, no core image: warns, deploys, drops the old previous; --rollback refuses"
+  fresh ""
+  running_image_gone "$commit_b" "$commit_c"
+  # A paperclip-fork:previous from an older deploy, which must not survive.
+  seed_image "paperclip-fork:previous" "sha256:fork-$commit_a" "$commit_a"
+  run -- --dry-run
+  expect_exit 0
+  expect_out "WARNING: the image the server runs (sha256:fork-$commit_b, commit $commit_b)"
+  expect_out "paperclip-core:$commit_b, its core image, is gone too"
+  expect_out "would remove the older paperclip-fork:previous"
+  expect_read_only
+  run --
+  expect_exit 0
+  expect_out "Previous:   NONE: this deploy has no image to roll back to"
+  expect_out "After this deploy --rollback refuses; to go back, deploy $commit_b again."
+  expect_out "the server reports commit $commit_c"
+  expect_no_call "^docker build -f|^docker tag [^ ]+ paperclip-fork:(previous|outgoing)"
+  expect_call "^docker rmi paperclip-fork:previous$"
+  [ -z "$(tag_of paperclip-fork:previous)" ] || fail "the old paperclip-fork:previous is still there"
+  expect_state "previous_image="
+  expect_state "previous_commit=$commit_b"
+  expect_state "status=ok"
+  : > "$state/calls.log"
+  run -- --rollback
+  expect_exit 1
+  expect_out "kept no image to roll back to"
+  expect_out "git checkout $commit_b && deploy/deploy.sh"
+  expect_no_call "^docker (tag|compose)"
+  run -- --rollback --force
+  expect_exit 1
+  expect_out "kept no image to roll back to"
+  expect_no_call "^docker (tag|compose)"
+  end
+
+  begin "previous, running image gone, rebuild fails: warns, deploys without one"
+  fresh ""
+  running_image_gone "$commit_b" "$commit_c"
+  seed_image "paperclip-core:$commit_b" "sha256:core-$commit_b" "$commit_b"
+  run STUB_FORK_REBUILD=fail --
+  expect_exit 0
+  expect_out "rebuilding it from paperclip-core:$commit_b failed (above)"
+  expect_out "WARNING: the image the server runs"
+  [ -z "$(tag_of paperclip-fork:previous)" ] || fail "previous tagged"
+  [ -z "$(tag_of paperclip-fork:outgoing)" ] || fail "paperclip-fork:outgoing left behind"
+  expect_state "previous_image="
+  expect_state "status=ok"
+  end
+
+  begin "previous, running image gone, health fails: says to deploy the old commit, not --rollback"
+  fresh ""
+  running_image_gone "$commit_b" "$commit_c"
+  run STUB_HEALTH=down --
+  expect_exit 1
+  expect_out "kept no image to roll back to (above)"
+  expect_out "git checkout $commit_b && deploy/deploy.sh"
+  expect_no_out "--rollback puts"
+  expect_state "status=failed"
+  end
+
+  begin "previous, deploy stops after the build: previous and the record stay; --rollback undoes the last deploy"
+  fresh "$commit_b"
+  run --
+  expect_exit 0
+  : > "$state/calls.log"
+  run STUB_COMPOSE_BUILD=fail --
+  expect_exit 1
+  expect_no_call "^docker compose up|^docker tag [^ ]+ paperclip-fork:previous|^docker rmi"
+  [ "$(tag_of paperclip-fork:previous)" = "sha256:fork-$commit_b" ] || fail "previous moved"
+  [ "$(tag_of paperclip-fork:outgoing)" = "sha256:fork-$commit_c" ] || fail "the running image isn't held"
+  expect_state "commit=$commit_c"
+  expect_state "previous_image=sha256:fork-$commit_b"
+  expect_state "status=ok"
+  run -- --rollback
+  expect_exit 0
+  expect_out "the server reports commit $commit_b"
+  expect_state "status=rolled-back"
+  end
+
+  begin "previous, a deploy after a rollback: holds and keeps the rolled-back image"
+  run --
+  expect_exit 0
+  [ "$(tag_of paperclip-fork:previous)" = "sha256:fork-$commit_b" ] || fail "previous isn't the rolled-back image"
+  expect_state "commit=$commit_c"
+  expect_state "previous_commit=$commit_b"
+  end
+
+  begin "previous, rollback when paperclip-fork:previous isn't the recorded image: refused"
+  fresh "$commit_b"
+  run --
+  expect_exit 0
+  seed_image "paperclip-fork:previous" "sha256:fork-$commit_a" "$commit_a"
+  : > "$state/calls.log"
+  run -- --rollback
+  expect_exit 1
+  expect_out "not the image the deploy of $commit_c kept (sha256:fork-$commit_b)"
+  expect_no_call "^docker (tag|compose)"
+  end
+
+  begin "previous, first deploy with a leftover paperclip-fork:previous: removed"
+  fresh ""
+  seed_image "paperclip-fork:previous" "sha256:fork-$commit_a" "$commit_a"
+  run STUB_DB_RUNNING=0 --
+  expect_exit 0
+  expect_call "^docker rmi paperclip-fork:previous$"
+  [ -z "$(tag_of paperclip-fork:previous)" ] || fail "the leftover paperclip-fork:previous is still there"
+  expect_state "previous_image="
+  run -- --rollback
+  expect_exit 1
+  expect_out "kept no image to roll back to"
   end
 fi
 

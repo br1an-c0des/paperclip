@@ -2,22 +2,28 @@
 # Fake docker for deploy/tests/deploy-sh.test.sh. Records every call in
 # $STUB_STATE/calls.log and answers from files under $STUB_STATE:
 #   images/<ref>     the image id a tag points to (":" and "/" become "_")
-#   commits/<id>     the PAPERCLIP_BUILD_COMMIT of an image id
+#   commits/<id>     the PAPERCLIP_BUILD_COMMIT of an image id (also what a
+#                    container created from it keeps in its environment)
 #   running_server   the image id the server container runs (absent: not running)
 #   containers/<n>   throwaway containers started with `docker run -d --name n`
 #   networks/<n>     networks created
+# Like Docker's containerd image store (server1's), an image exists only while a
+# tag points to it: when its last tag moves away (`docker tag`, `compose build`)
+# or is removed (`docker rmi`), `image inspect` and `tag` on its id fail, even
+# while the server container still runs it.
 # Behaviour switches (environment): STUB_DB_RUNNING=0, STUB_DUMP=empty|fail,
 # STUB_RESTORE_LIST=fail|empty, STUB_REHEARSAL_RESTORE=fail, STUB_MIGRATE=fail,
-# STUB_UP=fail, STUB_LOGS (extra server log lines), STUB_DB_BYTES.
+# STUB_UP=fail, STUB_COMPOSE_BUILD=fail, STUB_FORK_REBUILD=fail (a docker build
+# of deploy/Dockerfile), STUB_LOGS (extra server log lines), STUB_DB_BYTES.
 set -euo pipefail
 state=${STUB_STATE:?}
 mkdir -p "$state/images" "$state/commits" "$state/containers" "$state/networks"
 printf 'docker %s\n' "$*" >> "$state/calls.log"
 
 key() { printf '%s' "$1" | tr ':/' '__'; }
-resolve() { # ref or id -> id
+resolve() { # ref or id -> id; an id resolves only while some tag points to it
   if [ -f "$state/images/$(key "$1")" ]; then cat "$state/images/$(key "$1")"
-  elif [ -f "$state/commits/$(key "$1")" ]; then echo "$1"
+  elif grep -qxF -- "$1" "$state"/images/* 2>/dev/null; then echo "$1"
   else return 1; fi
 }
 format_of() { # value after --format
@@ -53,6 +59,13 @@ case "$1" in
     fmt=$(format_of "$@")
     target=$(last_arg "$@")
     case "$target:$fmt" in
+      ctr-server:*Config.Env*)
+        echo "NODE_ENV=production"
+        id=$(cat "$state/running_server")
+        if [ -f "$state/commits/$(key "$id")" ]; then
+          echo "PAPERCLIP_BUILD_COMMIT=$(cat "$state/commits/$(key "$id")")"
+        fi
+        ;;
       ctr-server:*.Image*) cat "$state/running_server" ;;
       ctr-db:*Config.Image*) echo postgres:17-alpine ;;
       *) exit 1 ;;
@@ -62,9 +75,36 @@ case "$1" in
     id=$(resolve "$2") || { echo "Error: No such image: $2" >&2; exit 1; }
     echo "$id" > "$state/images/$(key "$3")"
     ;;
+  rmi)
+    [ -f "$state/images/$(key "$2")" ] || { echo "Error: No such image: $2" >&2; exit 1; }
+    rm -f "$state/images/$(key "$2")"
+    echo "Untagged: $2"
+    ;;
   build)
-    tag=""
-    while [ $# -gt 0 ]; do [ "$1" = -t ] && tag=$2; shift; done
+    tag="" file="" base="" ui_commit=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        -t) tag=$2 ;;
+        -f) file=$2 ;;
+        --build-arg)
+          case "$2" in
+            BASE_IMAGE=*) base=${2#BASE_IMAGE=} ;;
+            PAPERCLIP_UI_COMMIT=*) ui_commit=${2#PAPERCLIP_UI_COMMIT=} ;;
+          esac
+          ;;
+      esac
+      shift
+    done
+    if [ "$file" = deploy/Dockerfile ]; then
+      # A fork image rebuilt by hand, from a tar of the commit on stdin.
+      [ "$(wc -c)" -gt 0 ] || { echo "stub: empty build context" >&2; exit 1; }
+      [ "${STUB_FORK_REBUILD:-}" = fail ] && { echo "stub: ui-new build failed" >&2; exit 1; }
+      resolve "$base" >/dev/null || { echo "stub: base $base missing" >&2; exit 1; }
+      id=sha256:fork-rebuilt-$ui_commit
+      echo "$id" > "$state/images/$(key "$tag")"
+      echo "$ui_commit" > "$state/commits/$(key "$id")"
+      exit 0
+    fi
     id=sha256:core-${tag#paperclip-core:}
     echo "$id" > "$state/images/$(key "$tag")"
     echo "${tag#paperclip-core:}" > "$state/commits/$(key "$id")"
@@ -73,6 +113,7 @@ case "$1" in
     shift
     case "$1" in
       build)
+        [ "${STUB_COMPOSE_BUILD:-}" = fail ] && { echo "stub: compose build failed" >&2; exit 1; }
         [ -n "${BASE_IMAGE:-}" ] && [ -n "${BUILD_COMMIT:-}" ] || { echo "stub: BASE_IMAGE/BUILD_COMMIT unset" >&2; exit 1; }
         resolve "$BASE_IMAGE" >/dev/null || { echo "stub: base $BASE_IMAGE missing" >&2; exit 1; }
         id=sha256:fork-$BUILD_COMMIT
