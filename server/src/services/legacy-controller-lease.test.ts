@@ -8,7 +8,7 @@ import { resolveExternalTestDatabaseUrl } from "../__tests__/helpers/external-te
 import { DELIVERY_QUEUES } from "./delivery-work-notifications.js";
 import { heartbeatService } from "./heartbeat.js";
 import { hasLiveLegacyController, LEGACY_CONTROLLER_LEASE_MS, LEGACY_CONTROLLER_RENEW_MS,
-  LEGACY_CONTROLLER_RENEWAL_RETRY_DELAY_MS, legacyControllerBootId, legacyControllerClaim, LegacyControllerLeaseLostError,
+  LEGACY_CONTROLLER_RENEWAL_RETRY_DELAY_MS, LEGACY_CONTROLLER_RENEWAL_STATEMENT_TIMEOUT_MS, legacyControllerBootId, legacyControllerClaim, LegacyControllerLeaseLostError,
   legacyControllerOwnerStamp, renewLegacyControllerLease, revokeExpiredLegacyController,
   revokeExpiredLegacyControllerWithState, watchLegacyControllerLease } from "./legacy-controller-lease.js";
 import { hostname } from "node:os";
@@ -254,6 +254,32 @@ const support = external ? { supported: true } : await getEmbeddedPostgresTestSu
     } finally { watch.stop(); vi.useRealTimers(); }
   });
 
+  it("keeps a lease the database still holds when this server's clock runs past its expiry", async () => {
+    // The expiry is written by the database's clock and the watch reads this
+    // server's: with the server's clock ahead by more than a lease, a held
+    // lease looks expired locally. The database decides; it renews it.
+    const run = await seed();
+    const slow = fakeRenewalDb(async () => { await new Promise(resolve => setTimeout(resolve, 50)); return [{ id: run.id }]; });
+    const controller = new AbortController();
+    const watch = watchLegacyControllerLease(slow, { ...run, controllerLeaseExpiresAt: new Date(Date.now() - 10 * 60_000) }, controller);
+    try {
+      await expect(watch.assertOwned("dispatching")).resolves.toBeUndefined();
+      expect(controller.signal.aborted).toBe(false);
+    } finally { watch.stop(); }
+  });
+  it("still loses a lease that looks expired locally when the database never answers", async () => {
+    const run = await seed();
+    const hungDb = fakeRenewalDb(() => new Promise(() => {}));
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    const watch = watchLegacyControllerLease(hungDb, { ...run, controllerLeaseExpiresAt: new Date(Date.now() - 10 * 60_000) }, controller);
+    try {
+      const checked = expect(watch.assertOwned("dispatching")).rejects.toThrow("lease lost");
+      await vi.advanceTimersByTimeAsync(LEGACY_CONTROLLER_RENEWAL_STATEMENT_TIMEOUT_MS + 1);
+      await checked;
+      expect(controller.signal.reason.leaseLossCause).toBe("renewal_deadline");
+    } finally { watch.stop(); vi.useRealTimers(); }
+  });
   it("renews without queueing behind a slow statement on a saturated shared pool", async () => {
     const run = await seed();
     // postgres.js pipelines onto a busy connection when none is idle.
