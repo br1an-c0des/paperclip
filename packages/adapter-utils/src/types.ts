@@ -190,6 +190,8 @@ export interface AdapterInvocationMeta {
   prompt?: string;
   promptMetrics?: Record<string, number>;
   context?: Record<string, unknown>;
+  /** A sealed `claude_local` CLI run's manifest (`ClaudeRunManifest` in `@paperclipai/shared`). */
+  runManifest?: Record<string, unknown>;
 }
 
 export interface AdapterRuntimeMcpServer {
