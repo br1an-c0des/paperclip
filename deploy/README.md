@@ -87,8 +87,10 @@ docker builder prune --filter until=168h   # build cache older than a week
 
 Removing a `paperclip-core` tag only untags it; its layers stay while a tagged image uses them.
 `deploy.sh` tags the image that was running before each deploy `paperclip-fork:previous`, and the
-one before that becomes untagged; `docker image prune` removes untagged images (all of them on the
-machine, not only Paperclip's).
+one before that loses its last tag. server1's Docker uses the containerd image store, which deletes
+an image as soon as its last tag goes, even while a container runs it ([Rolling back](#rolling-back));
+on the classic store it stays as an untagged image, which `docker image prune` removes (all of them
+on the machine, not only Paperclip's).
 
 The service worker (`/sw.js`) replaces the old UI's in every browser that had it, since it's served
 at the same address with new contents. Each deploy changes its build id, so open tabs and the
@@ -266,16 +268,19 @@ deploy that stops before then leaves it as it was.
    [The CI gate](#the-ci-gate)).
 2. **Core image.** Builds `paperclip-core:<commit>`, or reuses it
    ([How the image is built](#how-the-image-is-built)).
-3. **Fork image.** `docker compose build server` builds `paperclip-fork:local` (`ui-new` on top
-   of the core image). Building it before the backup means a `ui-new` build failure stops the
-   deploy before anything else, and the backup is taken as close to the restart as it can be.
-4. **New migrations?** Compares the commit the running server container's image was built from
-   with `HEAD` and lists new files in `packages/db/src/migrations`. If there are none, steps 5
-   and 6 are skipped. When it can't tell what's deployed (an image without a commit, or a commit
-   this clone doesn't have) and a database is running, it carries on as if there were some.
+3. **Fork image.** First tags the image the server is running `paperclip-fork:outgoing`, so the
+   build doesn't delete it ([Rolling back](#rolling-back)). Then `docker compose build server`
+   builds `paperclip-fork:local` (`ui-new` on top of the core image). Building it before the
+   backup means a `ui-new` build failure stops the deploy before anything else, and the backup is
+   taken as close to the restart as it can be.
+4. **New migrations?** Compares the commit the running server reports (from its container's
+   environment, which outlives its image) with `HEAD` and lists new files in
+   `packages/db/src/migrations`. If there are none, steps 5 and 6 are skipped. When it can't tell
+   what's deployed (an image without a commit, or a commit this clone doesn't have) and a database
+   is running, it carries on as if there were some.
 5. **Backup** ([Automatic backups](#automatic-backups)).
 6. **Rehearsal** ([Migration rehearsal](#migration-rehearsal)).
-7. **Restart.** Tags the image the server is running now `paperclip-fork:previous`, writes
+7. **Restart.** Moves `paperclip-fork:outgoing` to `paperclip-fork:previous`, writes
    `last-deploy.env` next to the backups (the commit, the previous image and commit, the
    migrations, the backup), then `docker compose up -d --no-build`. Migrations run when the new
    server starts.
@@ -290,7 +295,7 @@ deploy that stops before then leaves it as it was.
 
 | Flag | What it does |
 | --- | --- |
-| `--dry-run` | Reports each stage (CI state, build or reuse, migrations, the backup path and free space, the rehearsal, the image it would tag as previous, the health URL) and exits 0. Changes nothing, and runs only read-only `docker` and `gh` queries; doesn't need `deploy/.env`. |
+| `--dry-run` | Reports each stage (CI state, build or reuse, migrations, the backup path and free space, the rehearsal, the image it would keep as previous or why there's none, the health URL) and exits 0. Changes nothing, and runs only read-only `docker` and `gh` queries; doesn't need `deploy/.env`. |
 | `--rebuild` | Builds the core image even if one exists for this commit. |
 | `--wait-ci` | If HEAD's CI run hasn't finished (or hasn't appeared yet), waits for it, polling every 30 s for up to `DEPLOY_CI_TIMEOUT` (3600 s), and deploys if it passes. |
 | `--skip-ci` | Deploys without a passing CI run, after a loud warning that says what the CI state was. |
@@ -368,7 +373,26 @@ Before each restart, `deploy.sh` tags the image that was running `paperclip-fork
 `paperclip-core:<commit>` stays too) and records the deploy in `last-deploy.env` next to the
 backups. `deploy/deploy.sh --rollback` tags `paperclip-fork:previous` back as
 `paperclip-fork:local`, recreates the server container, and runs the same health, commit and log
-checks against the previous commit. `--rollback --dry-run` says what it would do.
+checks against the previous commit. `--rollback --dry-run` says what it would do. It refuses when
+`paperclip-fork:previous` isn't the image `last-deploy.env` recorded, so a leftover tag never
+starts the wrong server.
+
+server1's Docker uses the containerd image store, which deletes an image when its last tag moves
+away, even while a container runs it. `docker compose build server` moves `paperclip-fork:local` to
+the new build, so `deploy.sh` holds the running image under `paperclip-fork:outgoing` before the
+build and moves that tag to `paperclip-fork:previous` just before the restart. A deploy that stops
+in between leaves `paperclip-fork:previous` and `last-deploy.env` as they were, so `--rollback`
+still undoes the last deploy that went out; the outgoing tag stays on the running image until the
+next deploy.
+
+If the running image is already gone when a deploy starts (a deploy that stopped after the build
+with an older `deploy.sh`, as on 2026-11-20, or a tag removed by hand), `deploy.sh` rebuilds it from
+`paperclip-core:<its commit>` and that commit's own tree (`git archive <commit> | docker build -f
+deploy/Dockerfile ... -`, not Compose, which would move `paperclip-fork:local`). When it can't (no
+core image for that commit, the commit isn't in the clone, or the rebuild fails), it warns that
+this deploy has no rollback image, removes any older `paperclip-fork:previous`, and records no
+previous image, so `--rollback` refuses afterwards. The way back is then to deploy the old commit
+again: `git checkout <commit> && deploy/deploy.sh`, then `git checkout main` for the next deploy.
 
 It refuses when the deploy being rolled back applied migrations, or might have (its deployed
 commit was unknown and the server's log didn't settle it). Migrations don't run backwards,
@@ -448,7 +472,9 @@ docker compose down               # stop (data is kept)
 running Paperclip. The fakes record their calls, and each case checks the output, the calls and the
 files left behind: the CI gate's every state, the backup and its failures (empty dump, unreadable
 dump, low disk, no database), pruning, the rehearsal and its cleanup, the checks after the restart,
-and rollback. Plain bash, no dependencies; it takes a few seconds:
+the previous image, and rollback. Like the containerd image store, the fake `docker` deletes an
+image when its last tag goes, so a step that tags an image after the build moved its tag fails
+there as it does on server1. Plain bash, no dependencies; it takes a few seconds:
 
 ```bash
 deploy/tests/deploy-sh.test.sh            # every case

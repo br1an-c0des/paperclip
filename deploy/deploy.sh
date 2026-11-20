@@ -32,6 +32,8 @@
 #                            place of the React UI; built by Compose.
 #   paperclip-fork:previous  the image that was running before the last deploy,
 #                            for --rollback.
+#   paperclip-fork:outgoing  the image running when a deploy started, held
+#                            through the build (see "Keep what's running now").
 set -euo pipefail
 
 # Prints the comment block above, up to "Two images".
@@ -131,6 +133,21 @@ image_commit() {
 
 image_id() {
   docker image inspect "$1" --format '{{.Id}}' 2>/dev/null || true
+}
+
+# The commit a container's server reports, from the container's own
+# environment, which it keeps even when its image is gone.
+container_commit() {
+  docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$1" 2>/dev/null \
+    | sed -n 's/^PAPERCLIP_BUILD_COMMIT=//p' || true
+}
+
+# Removes the tag $1 if it exists. Only the tag: an image with other tags keeps
+# them.
+drop_tag() {
+  [ -n "$(image_id "$1")" ] || return 0
+  docker rmi "$1" >/dev/null \
+    || echo "Warning:    couldn't remove the tag $1 (docker rmi $1)." >&2
 }
 
 # The running container of a Compose service, by the labels Compose puts on it.
@@ -541,14 +558,14 @@ print_summary() {
 # --- Rollback ----------------------------------------------------------------
 
 do_rollback() {
-  local last_commit prev_commit migrations backup status since
+  local last_commit prev_commit prev_image current migrations backup status since
   [ -f "$state_file" ] || die "no record of a deploy in $state_file, so there's nothing to roll back (DEPLOY_BACKUP_DIR sets where it's kept)."
   last_commit=$(state_get commit)
   migrations=$(state_get migrations)
   backup=$(state_get backup)
   status=$(state_get status)
-  [ -n "$(image_id paperclip-fork:previous)" ] || die "there's no paperclip-fork:previous image to roll back to."
-  prev_commit=$(image_commit paperclip-fork:previous)
+  prev_image=$(state_get previous_image)
+  prev_commit=$(state_get previous_commit)
 
   echo "Rollback:   from ${last_commit:-unknown} to ${prev_commit:-unknown} (paperclip-fork:previous)"
   if [ "$status" = rolled-back ] && ! $force; then
@@ -561,6 +578,20 @@ do_rollback() {
     fi
     echo "Warning:    $why Rolling back anyway (--force); restore the backup (${backup:-none recorded}) first if you haven't." >&2
   fi
+  # The record names the image the deploy kept; paperclip-fork:previous must
+  # still be that image, or it's a leftover that would start the wrong server.
+  if [ -z "$prev_image" ]; then
+    local how="check out the commit you want and deploy it (git checkout <commit> && deploy/deploy.sh), then git checkout main for the next deploy"
+    [ -z "$prev_commit" ] || how="deploy that commit again: git checkout $prev_commit && deploy/deploy.sh, then git checkout main for the next deploy"
+    die "the deploy of ${last_commit:-unknown} kept no image to roll back to: the image that was running before it (${prev_commit:-commit unknown}) was already gone and couldn't be rebuilt, which that deploy warned about."$'\n'"To go back, $how."
+  fi
+  current=$(image_id paperclip-fork:previous)
+  [ -n "$current" ] || die "there's no paperclip-fork:previous image to roll back to (last-deploy.env expects $prev_image)."
+  if [ "$current" != "$prev_image" ]; then
+    die "paperclip-fork:previous is $current, not the image the deploy of ${last_commit:-unknown} kept ($prev_image), so rolling back to it could start the wrong server. Nothing was changed."
+  fi
+  prev_commit=$(image_commit paperclip-fork:previous)
+
   if $dry_run; then
     echo "            would tag paperclip-fork:previous as paperclip-fork:local, recreate the server (docker compose up -d --no-build --force-recreate server) and wait for /api/health to report ${prev_commit:-its commit}"
     exit 0
@@ -624,15 +655,18 @@ echo "Fork image: paperclip-fork:local (deploy/Dockerfile FROM $core_image, with
 
 # What's deployed now: the running server container's image, else (stack
 # stopped) paperclip-fork:local. Taken before Compose builds, which moves the
-# paperclip-fork:local tag.
+# paperclip-fork:local tag. The commit comes from the container's environment
+# when there is one, since its image may be gone (see "Keep what's running
+# now" below).
 server_ctr=$(compose_container server)
+deployed=""
 if [ -n "$server_ctr" ]; then
   deployed_image=$(docker inspect --format '{{.Image}}' "$server_ctr")
+  deployed=$(container_commit "$server_ctr")
 else
   deployed_image=$(image_id paperclip-fork:local)
 fi
-deployed=""
-[ -z "$deployed_image" ] || deployed=$(image_commit "$deployed_image")
+[ -n "$deployed" ] || [ -z "$deployed_image" ] || deployed=$(image_commit "$deployed_image")
 
 # Migrations don't run backwards, so a deploy that adds one gets a verified
 # backup and a rehearsal first. "unknown" (no image, or a commit this clone
@@ -666,6 +700,59 @@ migrations_record=none
 [ "$migration_state" = new ] && migrations_record=$(echo "$new_migrations" | paste -sd ' ' -)
 [ "$migration_state" = unknown ] && migrations_record=unknown
 
+# --- Keep what's running now, for --rollback ---------------------------------
+#
+# With Docker's containerd image store (server1's), an image is deleted when its
+# last tag moves away, even while a container runs it. `docker compose build
+# server` moves paperclip-fork:local, so the running image is held under
+# paperclip-fork:outgoing before the build, and becomes paperclip-fork:previous
+# just before the restart. A deploy that stops in between leaves
+# paperclip-fork:previous and last-deploy.env as they were, so --rollback still
+# undoes the last deploy that went out; the outgoing tag stays on the running
+# image until the next deploy.
+#
+# previous_plan says what happens:
+#   keep     the running image exists: hold it
+#   rebuild  it's gone (an earlier build deleted it), but its commit and
+#            paperclip-core:<commit> are here: rebuild it from them (not with
+#            Compose, which would move paperclip-fork:local)
+#   gone     it's gone and can't be rebuilt: deploy without a rollback image,
+#            after a warning, and remove any older paperclip-fork:previous
+#   none     nothing is deployed (a first deploy)
+outgoing_ref=paperclip-fork:outgoing
+previous_plan=none
+previous_core=""
+previous_why=""
+if [ -n "$deployed_image" ]; then
+  if [ -n "$(image_id "$deployed_image")" ]; then
+    previous_plan=keep
+  else
+    previous_plan=gone
+    if [ -z "$deployed" ]; then
+      previous_why="the server's commit is unknown"
+    elif ! git cat-file -e "$deployed^{commit}" 2>/dev/null; then
+      previous_why="this clone doesn't have commit $deployed"
+    elif [ -z "$(image_id "paperclip-core:$deployed")" ]; then
+      previous_why="paperclip-core:$deployed, its core image, is gone too"
+    else
+      previous_plan=rebuild
+      previous_core=paperclip-core:$deployed
+    fi
+  fi
+fi
+
+# The loud warning for a deploy with no rollback image; $1 says why.
+warn_no_previous() {
+  echo "Previous:   NONE: this deploy has no image to roll back to" >&2
+  echo "  ************************************************************" >&2
+  echo "  WARNING: the image the server runs ($deployed_image, commit ${deployed:-unknown})" >&2
+  echo "  no longer exists (Docker's containerd image store deletes an image once its last" >&2
+  echo "  tag moves away, as when paperclip-fork:local moves to a later build)." >&2
+  echo "  It can't be rebuilt: $1." >&2
+  echo "  After this deploy --rollback refuses; to go back, deploy ${deployed:-the old commit} again." >&2
+  echo "  ************************************************************" >&2
+}
+
 if $dry_run; then
   if $needs_backup; then
     if $backed_up; then
@@ -683,9 +770,24 @@ if $dry_run; then
       echo "            packages/db's src/migrate.ts from $core_image against it"
     fi
   fi
-  if [ -n "$deployed_image" ]; then
-    echo "Previous:   would tag $deployed_image (${deployed:-commit unknown}) as paperclip-fork:previous"
-  fi
+  case "$previous_plan" in
+    keep)
+      echo "Previous:   would hold $deployed_image (${deployed:-commit unknown}) as $outgoing_ref"
+      echo "            through the build, then tag it paperclip-fork:previous before the restart"
+      ;;
+    rebuild)
+      echo "Previous:   the image the server runs ($deployed_image) no longer exists"
+      echo "            (Docker's containerd image store deletes an image once its last tag moves away)."
+      echo "            would rebuild it from $previous_core and $deployed's deploy/Dockerfile"
+      echo "            (git archive $deployed | docker build -f deploy/Dockerfile -t $outgoing_ref -),"
+      echo "            then tag it paperclip-fork:previous before the restart"
+      ;;
+    gone)
+      warn_no_previous "$previous_why"
+      [ -z "$(image_id paperclip-fork:previous)" ] \
+        || echo "            would remove the older paperclip-fork:previous, so --rollback can't use it"
+      ;;
+  esac
   echo "Restart:    would run docker compose up -d --no-build, then wait up to ${health_timeout}s for"
   echo "            $(health_url) to report $commit and scan the server log for errors"
   [ -f deploy/.env ] || echo "Note:       deploy/.env is missing; a real deploy stops until it exists."
@@ -709,6 +811,28 @@ fi
 # no .git).
 export BASE_IMAGE=$core_image
 export BUILD_COMMIT=$commit
+
+case "$previous_plan" in
+  keep)
+    docker tag "$deployed_image" "$outgoing_ref" \
+      || die "couldn't tag the running image $deployed_image as $outgoing_ref. Nothing was deployed."
+    echo "Previous:   holding $deployed_image (${deployed:-commit unknown}) as $outgoing_ref through the build"
+    ;;
+  rebuild)
+    echo "Previous:   the image the server runs ($deployed_image) is gone; rebuilding it from"
+    echo "            $previous_core and $deployed's deploy/Dockerfile"
+    # From the commit's own tree, so its ui-new goes in, not this checkout's.
+    if git archive --format=tar "$deployed" \
+        | docker build -f deploy/Dockerfile \
+            --build-arg BASE_IMAGE="$previous_core" --build-arg PAPERCLIP_UI_COMMIT="$deployed" \
+            -t "$outgoing_ref" -; then
+      echo "            rebuilt as $outgoing_ref"
+    else
+      previous_plan=gone
+      previous_why="rebuilding it from $previous_core failed (above)"
+    fi
+    ;;
+esac
 # Built before the backup, so a ui-new build failure stops the deploy before
 # anything else happens, and the backup is as close to the restart as it can be.
 (cd deploy && docker compose build server)
@@ -741,15 +865,30 @@ if $needs_backup; then
   fi
 fi
 
-# Keep what's running now for --rollback.
-if [ -n "$deployed_image" ]; then
-  docker tag "$deployed_image" paperclip-fork:previous
-  echo "Previous:   ${deployed:-unknown} tagged paperclip-fork:previous"
-fi
+# The image held before the build becomes the one --rollback uses. With none,
+# an older paperclip-fork:previous goes, so nothing can roll back to it (and
+# last-deploy.env records no previous image, which --rollback refuses).
+case "$previous_plan" in
+  keep|rebuild)
+    docker tag "$outgoing_ref" paperclip-fork:previous
+    docker rmi "$outgoing_ref" >/dev/null
+    echo "Previous:   ${deployed:-unknown} tagged paperclip-fork:previous"
+    ;;
+  gone)
+    warn_no_previous "$previous_why"
+    drop_tag paperclip-fork:previous
+    drop_tag "$outgoing_ref"
+    ;;
+  none)
+    drop_tag paperclip-fork:previous
+    ;;
+esac
+previous_image=""
+case "$previous_plan" in keep|rebuild) previous_image=$(image_id paperclip-fork:previous) ;; esac
 since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 # Recorded before the restart: if it dies halfway, --rollback still knows
 # migrations may have run.
-state_write "deployed_at=$since" "commit=$commit" "previous_image=$deployed_image" \
+state_write "deployed_at=$since" "commit=$commit" "previous_image=$previous_image" \
   "previous_commit=$deployed" "migrations=$migrations_record" "backup=${backup_path:-}" "status=starting"
 
 (cd deploy && docker compose up -d --no-build)
@@ -766,7 +905,7 @@ if [ "$migrations_record" = unknown ]; then
 fi
 status=ok
 $verify_ok || status=failed
-state_write "deployed_at=$since" "commit=$commit" "previous_image=$deployed_image" \
+state_write "deployed_at=$since" "commit=$commit" "previous_image=$previous_image" \
   "previous_commit=$deployed" "migrations=$migrations_record" "backup=${backup_path:-}" "status=$status"
 
 if [ "$migrations_record" = none ]; then
@@ -778,6 +917,9 @@ print_summary "$commit" "$migrations_line" "$backup_record" "$rehearsal_record"
 
 if ! $verify_ok; then
   if [ "$migrations_record" = none ]; then
+    if [ -z "$previous_image" ]; then
+      die "the deploy didn't verify, and it kept no image to roll back to (above). To go back, deploy ${deployed:-the previous commit} again: git checkout ${deployed:-<commit>} && deploy/deploy.sh."
+    fi
     die "the deploy didn't verify. deploy/deploy.sh --rollback puts ${deployed:-the previous image} back."
   fi
   die "the deploy didn't verify, and it applied migrations, so --rollback alone won't do: restore $backup_record first (deploy/README.md, Rolling back)."
