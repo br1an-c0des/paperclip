@@ -4852,16 +4852,26 @@ export async function runChildProcess(
     stdin?: string;
     remoteExecution?: RemoteExecutionSpec | null;
     localProcessSandbox?: LocalProcessSandboxOptions | null;
+    /**
+     * Default `true`: the child gets the server's environment (less inherited
+     * `PAPERCLIP_*` values) with `env` on top. With `false`, the child gets
+     * `env` only: a sealed run passes its own allowlist of host values in it.
+     * Nesting and service-manager variables are stripped and a PATH ensured
+     * either way.
+     */
+    inheritHostEnv?: boolean;
   },
 ): Promise<RunProcessResult> {
   const onLogError =
     opts.onLogError ??
     ((err, id, msg) => console.warn({ err, runId: id }, msg));
   return new Promise<RunProcessResult>((resolve, reject) => {
-    const rawMerged: NodeJS.ProcessEnv = {
-      ...sanitizeInheritedPaperclipEnv(process.env),
-      ...opts.env,
-    };
+    const rawMerged: NodeJS.ProcessEnv = opts.inheritHostEnv === false
+      ? { ...opts.env }
+      : {
+          ...sanitizeInheritedPaperclipEnv(process.env),
+          ...opts.env,
+        };
 
     // Strip Claude Code nesting-guard env vars so spawned `claude` processes
     // don't refuse to start with "cannot be launched inside another session".
