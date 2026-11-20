@@ -1,6 +1,7 @@
 import type { HeartbeatRunEvent } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { findInvokeEvent, promptSize, readInvocation } from "./invocation";
+import { findInvokeEvent, promptSize, readInvocation, readRunManifest } from "./invocation";
+import { accessText, claudeMdText, credentialText, instructionsText, repoSkillsSkipped, sessionText, skillGroups } from "./run-manifest";
 
 describe("readInvocation", () => {
   const payload = {
@@ -68,5 +69,86 @@ describe("helpers", () => {
     expect(promptSize("abc")).toBe("3 characters");
     expect(promptSize("x".repeat(1284))).toBe("1.3k characters");
     expect(promptSize(null)).toBeNull();
+  });
+});
+
+describe("the run manifest", () => {
+  const manifest = {
+    version: 1,
+    engine: "cli",
+    configDir: "/Users/brian/.paperclip/instances/default/companies/c/agents/a/claude",
+    settingSources: ["user"],
+    credential: { kind: "managed_connection", method: "subscription", connectionId: "conn-1", connectionName: "Max plan" },
+    setAside: null,
+    overriddenEnv: [],
+    skills: [
+      { name: "paperclip", key: "paperclipai/paperclip/paperclip", origin: "always_on", plugin: "paperclip" },
+      { name: "review", key: "acme/skills/review", origin: "assigned", plugin: "company" },
+      { name: "review", key: "repo:.claude/skills/review", origin: "repo", plugin: "project" },
+    ],
+    skillNameClashes: ["review"],
+    builtInSkills: true,
+    mcpServers: [{ name: "paperclip", url: "http://localhost:3100/mcp" }],
+    strictMcpConfig: true,
+    access: { level: "worker", overrides: { "agents:create": true } },
+    instructions: { entryFile: "AGENTS.md", sent: true },
+    claudeMd: { enabled: true, path: "/Users/brian/repo/CLAUDE.md" },
+    repoSkills: { enabled: true, dir: "/Users/brian/repo/.claude/skills", count: 1 },
+    autoMemory: false,
+    envKeys: ["HOME", "PAPERCLIP_RUN_ID"],
+    extraArgs: [],
+    session: { mode: "fresh", reason: "prompt_bundle_changed" },
+  } as const;
+
+  it("reads the manifest from the adapter.invoke payload", () => {
+    expect(readRunManifest({ command: "claude", runManifest: manifest })).toEqual(manifest);
+    expect(readInvocation({ command: "claude", runManifest: manifest })!.manifest).toEqual(manifest);
+  });
+
+  it("is null without a manifest", () => {
+    expect(readRunManifest({ command: "claude" })).toBeNull();
+    expect(readRunManifest(null)).toBeNull();
+    expect(readInvocation({ command: "claude" })!.manifest).toBeNull();
+  });
+
+  it("is null for a malformed manifest", () => {
+    expect(readRunManifest({ runManifest: { ...manifest, version: 2 } })).toBeNull();
+    expect(readRunManifest({ runManifest: { ...manifest, engine: "acp" } })).toBeNull();
+    expect(readRunManifest({ runManifest: "manifest" })).toBeNull();
+    expect(readRunManifest({ runManifest: [manifest] })).toBeNull();
+  });
+
+  it("masks the username in the manifest's paths when the instance asks for it", () => {
+    const read = readInvocation({ runManifest: manifest }, { censorUsername: true })!.manifest!;
+    expect(read.claudeMd).toMatchObject({ enabled: true });
+    expect(JSON.stringify(read)).not.toContain("/Users/brian");
+  });
+
+  it("puts each part in words", () => {
+    const read = readRunManifest({ runManifest: manifest })!;
+    expect(credentialText(read.credential)).toBe("Claude subscription · connection Max plan");
+    expect(credentialText({ kind: "agent_env", method: "api_key", connectionId: null, connectionName: null })).toBe("API key · from the agent's environment");
+    expect(skillGroups(read)).toEqual([
+      { plugin: "paperclip", label: "Paperclip", skills: [{ name: "paperclip", clash: false }] },
+      { plugin: "company", label: "Company", skills: [{ name: "review", clash: true }] },
+      { plugin: "project", label: "Repository", skills: [{ name: "review", clash: true }] },
+    ]);
+    expect(repoSkillsSkipped(read)).toBeNull();
+    expect(repoSkillsSkipped({ ...read, repoSkills: { enabled: false, reason: "project_switch_off" } })).toBe("Off for this project");
+    expect(claudeMdText(read)).toEqual({ loaded: true, text: "/Users/brian/repo/CLAUDE.md" });
+    expect(claudeMdText({ ...read, claudeMd: { enabled: false, reason: "not_in_repo" } }).text).toBe("Not loaded: the run wasn't in the project's repository");
+    expect(accessText(read.access)).toBe("Worker · Hire agents: on");
+    expect(accessText(null)).toBe("Not recorded");
+    expect(instructionsText(read.instructions)).toBe("AGENTS.md, sent");
+    expect(sessionText(read.session, (id) => id)).toBe("A new session: the agent's skills or instructions changed");
+    expect(sessionText({ mode: "resumed", sessionId: "s-1" }, (id) => id)).toBe("Resumed s-1");
+  });
+
+  it("copes with a manifest missing fields", () => {
+    const partial = readRunManifest({ runManifest: { version: 1, engine: "cli" } })!;
+    expect(skillGroups(partial)).toEqual([]);
+    expect(claudeMdText(partial).text).toBe("Not recorded");
+    expect(credentialText(partial.credential)).toBe("Not recorded");
+    expect(sessionText(partial.session, (id) => id)).toBe("Not recorded");
   });
 });
