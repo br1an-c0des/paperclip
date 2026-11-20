@@ -532,6 +532,8 @@ function existingProject(): Project {
     color: "#0f766e",
     icon: null,
     env: null,
+    agentsReadClaudeMd: true,
+    agentsUseRepoSkills: true,
     pauseReason: null,
     pausedAt: null,
     executionWorkspacePolicy: null,
