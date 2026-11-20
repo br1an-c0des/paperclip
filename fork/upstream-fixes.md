@@ -99,7 +99,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 62 | [Steady two server tests that flaked in CI](#62-steady-two-server-tests-that-flaked-in-ci) | fixed (`d5435c29b`, `3a668926a`) | | | 2026-11-19 | | |
 | 63 | [Find what adds 11 close listeners to the HTTP server](#63-find-what-adds-11-close-listeners-to-the-http-server) | candidate | | | 2026-11-19 | | |
 | 64 | [Find the file that leaves a heartbeat run behind for heartbeat-task-drain](#64-find-the-file-that-leaves-a-heartbeat-run-behind-for-heartbeat-task-drain) | fixed (`877fe4dd7`, `ec3d65627`) | | | 2026-11-20 | | |
-| 65 | [Tag the running image as previous before Compose builds the new one](#65-tag-the-running-image-as-previous-before-compose-builds-the-new-one) | candidate | | | 2026-11-20 | | |
+| 65 | [Tag the running image as previous before Compose builds the new one](#65-tag-the-running-image-as-previous-before-compose-builds-the-new-one) | fixed (`49b1c703d`) | | | 2026-11-20 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1111,3 +1111,13 @@ sha256:cb3d2c34…`, and the script stopped before `compose up`. Production kept
   `docker compose build server`, so the old image keeps a name, and make the stub drop an image when
   its last tag moves, so the harness covers it. This time there is no image for `5bde9aec2` to roll
   back to, but `paperclip-core:5bde9aec2` still exists, so one could be rebuilt from it if needed.
+- **Fixed** (`49b1c703d`, docs `4a70da3da`; CI run 44668408567 green). Before the build the running
+  image is held as `paperclip-fork:outgoing`, which becomes `paperclip-fork:previous` just before the
+  restart, so a deploy that stops partway leaves the last good rollback image and `last-deploy.env`
+  alone. The deployed commit is read from the server container's environment, which outlives its
+  image. When the running image is already gone (as at this deploy), it is rebuilt from
+  `paperclip-core:<commit>` and that commit's tree (`git archive | docker build -f deploy/Dockerfile`,
+  not Compose); if it can't be, the deploy warns and goes on without one, and `--rollback` refuses.
+  `--rollback` also refuses when `paperclip-fork:previous` isn't the image the record names. The
+  docker stub now deletes an image when its last tag moves (the old script fails 30 of its 49
+  cases); harness 49/49.
