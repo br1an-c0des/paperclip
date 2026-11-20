@@ -148,9 +148,9 @@ The isolated-context switch also makes a later Runner hybrid more plausible (dec
   existing `claude-runtime` folder (`resolveManagedClaudeRuntimeStateDir`, `claude-config.ts:156-166`).
   It's created on first use and kept for the agent's lifetime. Every run of that agent sets
   `CLAUDE_CONFIG_DIR` to it.
-- **Contents:** Claude Code's own files (sessions under `projects/<cwd>/`, `.claude.json`) plus
-  `skills/`, which Paperclip writes (section 4).
-  Paperclip writes nothing else there: no `settings.json`, no plugins, no `CLAUDE.md`.
+- **Contents:** Claude Code's own files (sessions under `projects/<cwd>/`, `.claude.json`).
+  Paperclip writes nothing there: no `settings.json`, no plugins, no `CLAUDE.md`, and since
+  2026-11-19 no `skills/` either (section 4).
 - **Managed connections:** for `claude_local`, the run's `CLAUDE_CONFIG_DIR` is this folder instead
   of the temporary `provider` folder. The credential still arrives as `CLAUDE_CODE_OAUTH_TOKEN` or
   `ANTHROPIC_API_KEY`. The temporary `HOME` and the `XDG_*` folders stay as they are (git, `gh` and
@@ -168,8 +168,7 @@ The isolated-context switch also makes a later Runner hybrid more plausible (dec
   on later runs: `settings.json` or `settings.local.json` (hooks, env, enabled plugins), a
   `CLAUDE.md`, `agents/`, `commands/`, `output-styles/`, or a skill in `skills/`. Before each run,
   Paperclip checks the folder against what Claude Code keeps there itself (`.claude.json`,
-  `projects/`, `sessions/`, `backups/`, its `plugins/` data, caches) and against its own
-  `skills/`. Anything else that would load as configuration is **moved aside, not deleted**, to
+  `projects/`, `sessions/`, `backups/`, its `plugins/` data, caches). Anything else that would load as configuration is **moved aside, not deleted**, to
   `<agent>/claude-config-set-aside/<runId>/`. The run log says so, and the manifest lists it
   (`setAside`). The builder confirms the list of what Claude Code keeps there, and that a plugin
   under `plugins/` doesn't load unless a settings file enables it.
@@ -213,17 +212,22 @@ claude --print --output-format stream-json --verbose
 
 ### 4. Skills
 
-- Before each run, Paperclip makes `<config>/skills/` match the run's skill set exactly: one entry
-  (a symlink or copy) per skill, named after the skill, and nothing else. Today's set comes from
-  `resolveLegacyPaperclipDesiredSkillNames` (`server-utils.ts:4401-4420`, which always adds
-  `paperclip`, `complain` and `suggestion-box`) and the prompt bundle (`prompt-cache.ts:134-174`).
-  Skills in this folder load under their own names (tested).
+**Changed 2026-11-19, while planning** ([the plan](step-4b-plan.md#one-decision-this-plan-makes-changes-design-section-4)).
+This section first put the run's skills into `<config>/skills/`. Runs of one agent can carry
+different skill sets (a skill test, skills named in the task) and run up to 20 at once by default,
+so a shared folder would have them rewrite each other's skills.
+
+- The run's skill set comes, as today, from `resolveLegacyPaperclipDesiredSkillNames`
+  (`server-utils.ts:4431-4450`, which always adds `paperclip`, `complain` and `suggestion-box`) and
+  goes into the prompt bundle (`prompt-cache.ts:134-174`), one immutable folder per skill set.
+- The bundle becomes a plugin (`.claude-plugin/plugin.json`, named `paperclip`, with a `skills/`
+  folder), and the launch passes `--plugin-dir <bundle>` (tested to load under the user source).
+  Skill names are namespaced: `paperclip:<skill>`.
+- Concurrent runs with different sets each get their own bundle, so nothing they share changes
+  under them. The config folder holds only Claude Code's own files; a `skills/` folder there is set
+  aside like any other configuration (section 2).
 - Claude Code's built-in skills and plugins still load. The manifest says "plus Claude Code's
   built-in skills" rather than listing them.
-- **Per-run additions** (connector skills from `connector-runtime.ts`, a skill test's skill): the
-  builder decides between writing them into `skills/` for that run and a per-run `--plugin-dir`.
-  `--plugin-dir` is tested to work but namespaces the names (`<plugin>:<skill>`). Concurrent runs of
-  one agent must not see each other's per-run skills.
 
 ### 5. The repo's `CLAUDE.md`, per project
 
@@ -325,10 +329,10 @@ claude --print --output-format stream-json --verbose
    - with the agent at `worker`, a refused action (such as deleting a task) becomes a pending
      permission request in the Inbox, and the run still finishes.
 3. Change the default to CLI in the same branch, then merge into `main`.
-4. server1 moves at its next deploy, which stays on hold until the user asks. Back up the database
-   first, since the `CLAUDE.md` switch adds a migration. My recommendation: deploy 4a (migration
-   `0491`) on its own first, so moving the five agents from ACP to the CLI isn't mixed up with the
-   new access levels in one deploy.
+4. server1 moves at its next deploy, when the user asks. Back up the database first, since the
+   `CLAUDE.md` switch adds a migration (`deploy.sh` now backs up and rehearses migrations itself).
+   4a was deployed on its own on 2026-11-19, so this deploy changes only the engine and the
+   sealing.
 
 ## Testing
 
@@ -371,7 +375,7 @@ manages the agents' runs, a CLI driver inside the Paperclip Runner, or remote an
 keeps the seam:
 
 - **The launch is built as data, then started.** The server produces a launch description: the
-  arguments, the environment, the files to put in place (the config folder's `skills/`, the MCP
+  arguments, the environment, the files to put in place (the skill bundle, the MCP
   config, the `CLAUDE.md` folder) and the manifest. A local starter then spawns it. Whatever starts
   runs elsewhere later takes the same description.
 - **The config folder can be copied.** Nothing in it points at paths that only exist on the server.
@@ -407,9 +411,6 @@ keeps the seam:
 
 ## Left to the builder
 
-- Whether `skills/` entries are symlinks or copies, and how they're swapped without disturbing a
-  run of the same agent that's already going.
-- Per-run skills: written into `skills/`, or a per-run `--plugin-dir` (section 4).
 - The exact allowlist, starting from ACP's.
 - The error code's name and wording.
 - How the confinement paths (`filesystemScope`, `execute.ts:590-606`) point at the new folder.
