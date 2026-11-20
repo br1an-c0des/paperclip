@@ -99,6 +99,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 62 | [Steady two server tests that flaked in CI](#62-steady-two-server-tests-that-flaked-in-ci) | fixed (`d5435c29b`, `3a668926a`) | | | 2026-11-19 | | |
 | 63 | [Find what adds 11 close listeners to the HTTP server](#63-find-what-adds-11-close-listeners-to-the-http-server) | candidate | | | 2026-11-19 | | |
 | 64 | [Find the file that leaves a heartbeat run behind for heartbeat-task-drain](#64-find-the-file-that-leaves-a-heartbeat-run-behind-for-heartbeat-task-drain) | fixed (`877fe4dd7`, `ec3d65627`) | | | 2026-11-20 | | |
+| 65 | [Tag the running image as previous before Compose builds the new one](#65-tag-the-running-image-as-previous-before-compose-builds-the-new-one) | candidate | | | 2026-11-20 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1092,3 +1093,21 @@ line 60, `getTaskDrainStatus().activeRuns`. The rerun of that shard passed.
   later file can call an earlier file's resumer on an ended pool (caught, logged as
   `CONNECTION_ENDED`, harmless). A per-run start/settle probe in `helpers/shared-worker-state.ts`
   would catch timing-hidden leaks like this one, but it needs a hook in `services/heartbeat.ts`.
+
+### 65. Tag the running image as previous before Compose builds the new one
+
+Found 2026-11-20, at the first deploy through the new `deploy.sh` (`18b6f3e1e` over `5bde9aec2`). CI
+passed, the core image built and `docker compose build server` built the new `paperclip-fork:local`;
+then `docker tag <running image id> paperclip-fork:previous` failed with `No such image:
+sha256:cb3d2c34…`, and the script stopped before `compose up`. Production kept running
+`5bde9aec2`, healthy, and no `last-deploy.env` was written.
+
+- **Problem:** server1's Docker (29.9.3) uses the containerd image store. When Compose moves the
+  `paperclip-fork:local` tag to the new build, the old image, now untagged, is removed even though
+  the running container was created from it. So the image ID read from the container before the
+  build no longer exists by the time the script tags it, after the build. Every deploy fails at this
+  step. The stub harness didn't catch it because its `docker` stub keeps untagged images.
+- **Likely fix:** in `deploy/deploy.sh`, tag the running image as `paperclip-fork:previous` before
+  `docker compose build server`, so the old image keeps a name, and make the stub drop an image when
+  its last tag moves, so the harness covers it. This time there is no image for `5bde9aec2` to roll
+  back to, but `paperclip-core:5bde9aec2` still exists, so one could be rebuilt from it if needed.
