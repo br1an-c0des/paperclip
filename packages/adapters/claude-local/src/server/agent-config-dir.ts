@@ -13,7 +13,8 @@ function nonEmpty(value: string | undefined): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
-function resolveAgentFolder(env: NodeJS.ProcessEnv, companyId: string, agentId: string): string {
+/** `<instanceRoot>/companies/<companyId>/agents/<agentId>`, the agent's folder under the instance root. */
+export function resolveAgentFolder(env: NodeJS.ProcessEnv, companyId: string, agentId: string): string {
   const instanceRoot = resolvePaperclipInstanceRootForAdapter({
     homeDir: nonEmpty(env.PAPERCLIP_HOME) ?? undefined,
     instanceId: nonEmpty(env.PAPERCLIP_INSTANCE_ID) ?? undefined,
