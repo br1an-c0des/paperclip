@@ -446,6 +446,47 @@ const managedCheckoutMaterializations = new Map<
   Promise<{ cwd: string; warning: string | null }>
 >();
 
+/**
+ * Where a run on a task in this project would read the repo from, without making anything
+ * (the run preview, fork/step-4b-parts-2-3.md, part 2). Walks the project's workspaces in the
+ * order a run does (`resolveAnchorWorkspaceForRun`: the preferred one first, then by creation),
+ * with the primary workspace preferred: a configured folder that exists is the checkout; a
+ * repo-only workspace is the managed checkout `ensureManagedProjectWorkspace` would use, if it's
+ * been cloned already, else `not_cloned`. No workspace at all: `none`. Never clones.
+ */
+export async function previewProjectCheckout(db: Db, input: {
+  companyId: string;
+  projectId: string;
+}): Promise<
+  | { kind: "local"; path: string; workspace: typeof projectWorkspaces.$inferSelect }
+  | { kind: "not_cloned"; repoUrl: string; workspace: typeof projectWorkspaces.$inferSelect }
+  | { kind: "none" }
+> {
+  const rows = await db
+    .select()
+    .from(projectWorkspaces)
+    .where(and(eq(projectWorkspaces.companyId, input.companyId), eq(projectWorkspaces.projectId, input.projectId)))
+    .orderBy(asc(projectWorkspaces.createdAt), asc(projectWorkspaces.id));
+  const primary = rows.find((workspace) => workspace.isPrimary) ?? null;
+  const ordered = prioritizeProjectWorkspaceCandidatesForRun(rows, primary?.id ?? null);
+  let notCloned: { kind: "not_cloned"; repoUrl: string; workspace: typeof projectWorkspaces.$inferSelect } | null = null;
+  for (const workspace of ordered) {
+    const configuredCwd = readNonEmptyString(workspace.cwd);
+    const repoUrl = readNonEmptyString(workspace.repoUrl);
+    const cwd = configuredCwd && configuredCwd !== REPO_ONLY_CWD_SENTINEL
+      ? configuredCwd
+      : resolveManagedProjectWorkspaceDir({
+          companyId: input.companyId,
+          projectId: input.projectId,
+          repoName: deriveRepoNameFromRepoUrl(repoUrl),
+        });
+    const exists = await fs.stat(cwd).then((stats) => stats.isDirectory()).catch(() => false);
+    if (exists) return { kind: "local", path: cwd, workspace };
+    if (repoUrl && !notCloned) notCloned = { kind: "not_cloned", repoUrl, workspace };
+  }
+  return notCloned ?? { kind: "none" };
+}
+
 export async function ensureManagedProjectWorkspace(input: {
   companyId: string;
   projectId: string;

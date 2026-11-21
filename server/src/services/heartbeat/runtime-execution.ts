@@ -27,7 +27,7 @@ import {
   createManagedMcpRunConfig,
   revokeHeartbeatRunGatewayTokens,
 } from "./run-preparation.js";
-import { paperclipRunMcpServers } from "./paperclip-run-mcp.js";
+import { orderRunMcpServers, paperclipRunMcpServers } from "./paperclip-run-mcp.js";
 import {
   WorkspaceValidationFailure,
   isWorkspaceValidationFailure,
@@ -849,25 +849,22 @@ export async function executeHeartbeatRuntime(db: Db, input: HeartbeatRuntimeExe
           "runtime connection tools could not be delivered",
         );
       }
-      const runtimeMcpServers = await buildPaperclipRuntimeMcpServers({
+      const assignedMcpServers = await buildPaperclipRuntimeMcpServers({
         db,
         agent,
         runId: run.id,
       });
       const runtimeToolDelivery =
         adapter.runtimeToolDelivery ?? "invocation_context";
-      if (runtimeTools && runtimeToolDelivery === "native_mcp") {
-        runtimeMcpServers.unshift({
-          name: "Paperclip connections",
-          url: runtimeTools.mcpEndpoint,
-          token: runtimeTools.bearerToken,
-          connectionId: "paperclip-runtime-tools",
-        });
-      }
-      runtimeMcpServers.unshift(...paperclipRunMcpServers({
-        authToken,
-        apiBaseUrl: configuredPaperclipApiBaseUrl(),
-      }));
+      const runtimeMcpServers = orderRunMcpServers({
+        paperclip: paperclipRunMcpServers({
+          authToken,
+          apiBaseUrl: configuredPaperclipApiBaseUrl(),
+        }),
+        runtimeTools,
+        runtimeToolDelivery,
+        assigned: assignedMcpServers,
+      });
       const runtimeMcp = createAdapterRuntimeMcpAccess(runtimeMcpServers);
       if (runtimeTools && runtimeToolDelivery === "invocation_context") {
         adapterContext.paperclipRuntimeTools = runtimeTools;

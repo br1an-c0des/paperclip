@@ -1,4 +1,4 @@
-import type { AdapterRuntimeMcpServer } from "../../adapters/index.js";
+import type { AdapterRuntimeMcpServer, AdapterRuntimeToolDelivery } from "../../adapters/index.js";
 
 /**
  * The Paperclip MCP server a run reaches with its own token: one server, `paperclip`, at
@@ -14,4 +14,27 @@ export function paperclipRunMcpServers(input: {
 }): AdapterRuntimeMcpServer[] {
   if (!input.authToken || !input.apiBaseUrl) return [];
   return [{ name: "paperclip", url: `${input.apiBaseUrl}/api/mcp/paperclip`, token: input.authToken, connectionId: "paperclip" }];
+}
+
+/**
+ * A run's MCP servers in launch order: `paperclip` first, then the connection tools (for an
+ * adapter that takes them over MCP), then the assigned-tools gateway. The run and its preview
+ * (`services/run-preview.ts`) both assemble them here.
+ */
+export function orderRunMcpServers(input: {
+  paperclip: AdapterRuntimeMcpServer[];
+  /** `runtimeTools` (mcpEndpoint, bearerToken) when the run has them. */
+  runtimeTools: { mcpEndpoint: string; bearerToken: string } | null | undefined;
+  runtimeToolDelivery: AdapterRuntimeToolDelivery;
+  assigned: AdapterRuntimeMcpServer[];
+}): AdapterRuntimeMcpServer[] {
+  const connections: AdapterRuntimeMcpServer[] = input.runtimeTools && input.runtimeToolDelivery === "native_mcp"
+    ? [{
+        name: "Paperclip connections",
+        url: input.runtimeTools.mcpEndpoint,
+        token: input.runtimeTools.bearerToken,
+        connectionId: "paperclip-runtime-tools",
+      }]
+    : [];
+  return [...input.paperclip, ...connections, ...input.assigned];
 }
