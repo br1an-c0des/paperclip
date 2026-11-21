@@ -145,7 +145,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
         const why = probeQualified(probe);
         if (why) throw new Error(why);
         const after = await agentsApi.adapters(company().id, environmentId);
-        if (after.find((adapter) => adapter.type === identity().harness)?.defaultRunner !== "paperclip") {
+        if (!after.find((adapter) => adapter.type === identity().harness)?.supportedRunners?.includes("paperclip")) {
           throw new Error(`This environment doesn't support Paperclip Runner. ${props.agent.name} still uses the legacy runner.`);
         }
       }

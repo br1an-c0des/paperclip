@@ -231,16 +231,18 @@ export function runnerHelp(
 
 /**
  * Whether Test must first qualify the environment for the Paperclip Runner, as the old UI's
- * `needsClaudeSetupQualification`: Claude Code left on "auto", on a sandbox whose image can be
- * qualified, where the server doesn't recommend the Runner yet.
+ * `needsClaudeSetupQualification` did for Claude Code left on "auto" on a sandbox whose image can be
+ * qualified. Never, now: "auto" means the legacy runner (the server's `defaultRunner` is `legacy`),
+ * so there's no Runner to qualify on the way to a hire. A sandbox is qualified for the Runner from
+ * the agent's settings (`runnerOffer`'s `qualify`).
  */
 export function needsRunnerQualification(
-  harness: string,
-  choice: RunnerChoice,
-  recommended: AgentRunner | undefined,
-  environment: Pick<Environment, "driver" | "config"> | null | undefined,
+  _harness: string,
+  _choice: RunnerChoice,
+  _recommended: AgentRunner | undefined,
+  _environment: Pick<Environment, "driver" | "config"> | null | undefined,
 ) {
-  return harness === "claude_local" && choice === "auto" && recommended !== "paperclip" && canQualifyRunnerEnvironment(environment);
+  return false;
 }
 
 /** Why a qualification probe failed, or null when it recorded the platform (`probeQualified`). */

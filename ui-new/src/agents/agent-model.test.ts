@@ -108,7 +108,7 @@ describe("harness and runner", () => {
   it("offers the Runner only where the adapters list allows it", () => {
     const legacyClaude = agent("claude_local");
     const runner = adapter("paperclip_runner");
-    const upgradeable = adapter("claude_local", { supportedRunners: ["legacy", "paperclip"], defaultRunner: "paperclip" });
+    const upgradeable = adapter("claude_local", { supportedRunners: ["legacy", "paperclip"], defaultRunner: "legacy" });
     expect(runnerOffer(legacyClaude, [upgradeable, runner], null)).toEqual({ kind: "upgrade" });
     expect(runnerOffer(legacyClaude, undefined, null)).toEqual({ kind: "none" });
     expect(runnerOffer(legacyClaude, [upgradeable, adapter("paperclip_runner", { disabled: true })], null)).toEqual({ kind: "none", reason: "runner-disabled" });
@@ -172,7 +172,7 @@ describe("requalifyEnvironment", () => {
       expect(requalifyEnvironment({ ...(agent as object), adapterConfig: { provider } } as never, input)).toBeNull();
     }
     expect(requalifyEnvironment({ ...(agent as object), runtimeConfig: { aiConnection: { mode: "router", connectionId: "c1" } } } as never, input)).toBeNull();
-    expect(requalifyEnvironment(agent, { ...input, adapters: [{ type: "opencode_local", defaultRunner: "paperclip" } as AdapterInfo] })).toBeNull();
+    expect(requalifyEnvironment(agent, { ...input, adapters: [{ type: "opencode_local", supportedRunners: ["paperclip", "legacy"], defaultRunner: "legacy" } as AdapterInfo] })).toBeNull();
   });
 
   it("reads the qualification", () => {
