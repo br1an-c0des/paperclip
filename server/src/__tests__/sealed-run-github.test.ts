@@ -1,10 +1,15 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanupGitHubOperationLaunchers, prepareGitHubExecutionEnvironment } from "@paperclipai/adapter-utils/execution-target";
+import { buildGitAuthInvocation } from "../services/git-credentials.js";
 import { prepareHeartbeatGitHubLaunchers } from "../services/heartbeat-github-launchers.js";
 import {
+  agentGitAuthor,
   decideRunGitHubAccess,
   isSealedClaudeRun,
   readServerGitIdentity,
@@ -19,6 +24,7 @@ import {
  * server's own `gh` login, tokens or SSH agent. Other adapters keep the host fallback.
  */
 
+const exec = promisify(execFile);
 const SEALED = { adapterType: "claude_local", adapterConfig: { engine: "cli" }, environmentDriver: "local" };
 const STANDARD = { trustKind: "standard", githubConfigured: false, useServerLogin: false };
 
@@ -112,13 +118,49 @@ describe("the server's git identity in server-login mode", () => {
     expect(await readServerGitIdentity(hostEnv())).toBeNull();
   });
 
-  it("becomes the committer of a sealed run in server-login mode only", async () => {
+  it("becomes the committer of a sealed run in server-login mode, with the agent as author", async () => {
     const readServerIdentity = async () => ({ name: "Server Person", email: "server@example.test" });
-    expect(await sealedRunGitHubEnv({ access: { sealed: true, useHostGitHub: true }, readServerIdentity }))
-      .toEqual({ GIT_COMMITTER_NAME: "Server Person", GIT_COMMITTER_EMAIL: "server@example.test" });
-    expect(await sealedRunGitHubEnv({ access: { sealed: true, useHostGitHub: true }, readServerIdentity: async () => null })).toEqual({});
-    expect(await sealedRunGitHubEnv({ access: { sealed: false, useHostGitHub: true }, readServerIdentity })).toEqual({});
-    expect(await sealedRunGitHubEnv({ access: { sealed: true, useHostGitHub: false }, readServerIdentity })).toEqual({});
+    expect(await sealedRunGitHubEnv({ access: { sealed: true, useHostGitHub: true }, agent: AGENT, readServerIdentity })).toEqual({
+      PAPERCLIP_GIT_AUTHOR_NAME: AGENT_NAME, PAPERCLIP_GIT_AUTHOR_EMAIL: AGENT_EMAIL,
+      GIT_AUTHOR_NAME: AGENT_NAME, GIT_AUTHOR_EMAIL: AGENT_EMAIL,
+      GIT_COMMITTER_NAME: "Server Person", GIT_COMMITTER_EMAIL: "server@example.test",
+    });
+  });
+});
+
+const AGENT = { id: "6f1c2b9e-0d4a-4e8b-9a51-3c7d2e8f1a20", name: "Builder", title: "Senior engineer" };
+const AGENT_NAME = "Builder (Senior engineer)";
+const AGENT_EMAIL = "6f1c2b9e-0d4a-4e8b-9a51-3c7d2e8f1a20@agents.paperclip.invalid";
+
+describe("the commit author", () => {
+  it("is the agent's name and title, with a stable .invalid address", () => {
+    expect(agentGitAuthor(AGENT)).toEqual({ name: AGENT_NAME, email: AGENT_EMAIL });
+    // Renaming keeps the address.
+    expect(agentGitAuthor({ ...AGENT, name: "Renamed" }).email).toBe(AGENT_EMAIL);
+  });
+
+  it("is the name alone without a title", () => {
+    expect(agentGitAuthor({ ...AGENT, title: null }).name).toBe("Builder");
+    expect(agentGitAuthor({ ...AGENT, title: "  " }).name).toBe("Builder");
+  });
+
+  it("drops characters git can't keep in a name", () => {
+    expect(agentGitAuthor({ ...AGENT, name: "Bob <evil>\nX", title: "QA\tlead" }).name).toBe("Bob evil X (QA lead)");
+  });
+
+  it("reaches the launchers in managed mode, which apply it", async () => {
+    expect(await sealedRunGitHubEnv({ access: { sealed: true, useHostGitHub: false }, agent: AGENT }))
+      .toEqual({ PAPERCLIP_GIT_AUTHOR_NAME: AGENT_NAME, PAPERCLIP_GIT_AUTHOR_EMAIL: AGENT_EMAIL });
+  });
+
+  it("is the committer too in server-login mode when the server has no git identity", async () => {
+    expect(await sealedRunGitHubEnv({ access: { sealed: true, useHostGitHub: true }, agent: AGENT, readServerIdentity: async () => null }))
+      .toMatchObject({ GIT_AUTHOR_NAME: AGENT_NAME, GIT_COMMITTER_NAME: AGENT_NAME, GIT_COMMITTER_EMAIL: AGENT_EMAIL });
+  });
+
+  it("leaves runs that aren't sealed alone", async () => {
+    expect(await sealedRunGitHubEnv({ access: { sealed: false, useHostGitHub: true }, agent: AGENT })).toEqual({});
+    expect(await sealedRunGitHubEnv({ access: { sealed: false, useHostGitHub: false }, agent: AGENT })).toEqual({});
   });
 });
 
@@ -152,21 +194,89 @@ describe("a sealed run's GitHub environment", () => {
     await rm(cwd, { recursive: true, force: true });
   });
 
-  /** What heartbeat.ts builds for the run: the Git context, then the launchers in managed mode. */
-  async function runGitHubEnv(githubConfigured: boolean, adapterType = "claude_local", useServerLogin = false) {
-    const { useHostGitHub } = decideRunGitHubAccess({ ...SEALED, ...STANDARD, adapterType, githubConfigured, useServerLogin });
-    const gitEnv = await prepareGitHubExecutionEnvironment({
-      target: null, cwd, env: {}, hostCredentials: useHostGitHub, networkAccess: true,
+  /**
+   * What execution-configuration.ts and heartbeat.ts build for the run: the GitHub variables
+   * of its mode, the Git context, then the launchers in managed mode.
+   */
+  async function runGitHubEnv(githubConfigured: boolean, adapterType = "claude_local", useServerLogin = false, options: {
+    brokerUrl?: string; agent?: { id: string; name: string; title?: string | null }; serverIdentity?: { name: string; email: string } | null;
+  } = {}) {
+    const access = decideRunGitHubAccess({ ...SEALED, ...STANDARD, adapterType, githubConfigured, useServerLogin });
+    const runEnv = await sealedRunGitHubEnv({
+      access, agent: options.agent ?? AGENT, readServerIdentity: async () => options.serverIdentity ?? null,
     });
-    if (useHostGitHub) return gitEnv;
+    const gitEnv = await prepareGitHubExecutionEnvironment({
+      target: null, cwd, env: runEnv, hostCredentials: access.useHostGitHub, networkAccess: true,
+    });
+    if (access.useHostGitHub) return gitEnv;
     const runId = `sealed-github-${runIds.length}-${Date.now()}`;
     runIds.push(runId);
     const launchers = await prepareHeartbeatGitHubLaunchers({
-      native: false, githubConfigured, agentId: "agent-sealed", runId, target: null, cwd, env: gitEnv,
-      brokerUrl: "http://127.0.0.1:1", createBrokerToken: () => "run-capability",
+      native: false, githubConfigured, agentId: AGENT.id, runId, target: null, cwd, env: gitEnv,
+      brokerUrl: options.brokerUrl ?? "http://127.0.0.1:1", createBrokerToken: () => "run-capability",
     });
     return launchers.env;
   }
+
+  /** A fake broker: the answer `/runtime-tools/github/credentials` gives the launchers. */
+  async function fakeBroker(answer: Record<string, unknown>): Promise<string> {
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(answer));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    brokers.push(server);
+    return `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  }
+  const brokers: Server[] = [];
+  afterEach(async () => {
+    for (const server of brokers.splice(0)) await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  /** Commits one file in a fresh repo with the run's `git` (the launcher, when the run has one). */
+  async function commitAs(env: Record<string, string>): Promise<string> {
+    const repo = path.join(cwd, `repo-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    await exec("git", ["init", "-q", repo]);
+    await writeFile(path.join(repo, "work.txt"), "work\n");
+    // The sealed launch: the server's allowlisted values, the run's env, Paperclip's HOME.
+    const home = path.join(cwd, "sealed-home");
+    await mkdir(home, { recursive: true });
+    const launchEnv = { PATH: process.env.PATH ?? "", ...env, HOME: home, XDG_CONFIG_HOME: path.join(home, ".config") };
+    const git = env.PAPERCLIP_GITHUB_LAUNCHER_DIR ? path.join(env.PAPERCLIP_GITHUB_LAUNCHER_DIR, "git") : "git";
+    await exec(git, ["-C", repo, "add", "work.txt"], { env: launchEnv });
+    await exec(git, ["-C", repo, "commit", "-q", "-m", "Work"], { env: launchEnv });
+    return (await exec("git", ["-C", repo, "log", "-1", "--format=%an <%ae> | %cn <%ce>"])).stdout.trim();
+  }
+
+  it("commits as the agent, with the connection's account as committer", async () => {
+    const answer = buildGitAuthInvocation({
+      token: "fake-token-not-real", source: "managed_connection", secretName: null,
+      githubIdentity: { userId: "583231", login: "octocat" },
+    });
+    const brokerUrl = await fakeBroker({ status: "available", login: "octocat", env: answer.env });
+    const env = await runGitHubEnv(true, "claude_local", false, { brokerUrl });
+    expect(await commitAs(env)).toBe(`${AGENT_NAME} <${AGENT_EMAIL}> | octocat <583231+octocat@users.noreply.github.com>`);
+  });
+
+  it("commits as the agent alone when no connection covers it", async () => {
+    const brokerUrl = await fakeBroker({ status: "absent", reason: "No GitHub identity connected" });
+    const env = await runGitHubEnv(false, "claude_local", false, { brokerUrl });
+    expect(await commitAs(env)).toBe(`${AGENT_NAME} <${AGENT_EMAIL}> | ${AGENT_NAME} <${AGENT_EMAIL}>`);
+  });
+
+  it("names a title-less agent alone", async () => {
+    const brokerUrl = await fakeBroker({ status: "absent" });
+    const env = await runGitHubEnv(false, "claude_local", false, { brokerUrl, agent: { ...AGENT, title: null } });
+    expect(await commitAs(env)).toBe(`Builder <${AGENT_EMAIL}> | Builder <${AGENT_EMAIL}>`);
+  });
+
+  it("commits as the agent, with the server's identity as committer, in server-login mode", async () => {
+    // The server's own author value reaches host mode, and the agent's wins over it.
+    if (!saved.has("GIT_AUTHOR_NAME")) saved.set("GIT_AUTHOR_NAME", process.env.GIT_AUTHOR_NAME);
+    process.env.GIT_AUTHOR_NAME = "Server Author";
+    const env = await runGitHubEnv(false, "claude_local", true, { serverIdentity: { name: "Server Person", email: "server@example.test" } });
+    expect(await commitAs(env)).toBe(`${AGENT_NAME} <${AGENT_EMAIL}> | Server Person <server@example.test>`);
+  });
 
   it.each([false, true])("gets none of the server's GitHub setup (connection: %s)", async (githubConfigured) => {
     const env = await runGitHubEnv(githubConfigured);

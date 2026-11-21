@@ -74,6 +74,10 @@ ${options.brokerFile ? String.raw`
     }
   } catch {}
 ` : ''}
+  // A sealed claude_local run names its agent as the author of its commits. The account (from
+  // the broker) stays the committer; without one the agent is the committer too.
+  const agentAuthor = env.PAPERCLIP_GIT_AUTHOR_NAME && env.PAPERCLIP_GIT_AUTHOR_EMAIL
+    ? { name: env.PAPERCLIP_GIT_AUTHOR_NAME, email: env.PAPERCLIP_GIT_AUTHOR_EMAIL } : null;
   const diagnostic = (code) => process.stderr.write('Paperclip: GitHub ' + code + '; continuing without managed credentials.\n');
   let connected = false;
   // Set when the broker answered that no GitHub connection covers this run: the command runs
@@ -164,6 +168,14 @@ ${options.brokerFile ? String.raw`
       }
     } else if (askBroker) { diagnostic('capability_missing'); }
     } catch { diagnostic('broker_transport_unavailable'); }
+    if (agentAuthor) {
+      env.GIT_AUTHOR_NAME = agentAuthor.name;
+      env.GIT_AUTHOR_EMAIL = agentAuthor.email;
+      if (!env.GIT_COMMITTER_NAME || !env.GIT_COMMITTER_EMAIL) {
+        env.GIT_COMMITTER_NAME = agentAuthor.name;
+        env.GIT_COMMITTER_EMAIL = agentAuthor.email;
+      }
+    }
   }
   const connectorTool = connected ? connectorRepositoryTool(process.argv.slice(2)) : null;
   if (connectorTool) {

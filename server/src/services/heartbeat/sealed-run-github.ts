@@ -97,15 +97,48 @@ export async function readServerGitIdentity(env: NodeJS.ProcessEnv = process.env
   return name && email ? { name, email } : null;
 }
 
+/** The reserved domain of agents' commit emails. */
+export const AGENT_COMMIT_EMAIL_DOMAIN = "agents.paperclip.invalid";
+
 /**
- * Variables a sealed run's GitHub mode adds to its environment. In server-login mode: the
- * server's git identity as the committer, when it has one. Nothing for other runs.
+ * The author of a sealed run's commits: the agent. Name: "<name> (<title>)", or the name alone
+ * without a title. Email: `<agent id>@agents.paperclip.invalid`. The id never changes, unlike
+ * the name, so one agent keeps one address; `.invalid` is reserved (RFC 2606), so the address
+ * never matches a GitHub account and GitHub shows "authored by <agent>, committed by <account>".
+ */
+export function agentGitAuthor(agent: { id: string; name: string; title?: string | null }): GitIdentity {
+  // Git drops <, > and newlines from names anyway; strip them, and other control characters, here.
+  const clean = (value: string | null | undefined) => (value ?? "").replace(/[\u0000-\u001f\u007f<>]/g, " ").replace(/\s+/g, " ").trim();
+  const name = clean(agent.name) || "Agent";
+  const title = clean(agent.title);
+  return { name: title ? `${name} (${title})` : name, email: `${agent.id}@${AGENT_COMMIT_EMAIL_DOMAIN}` };
+}
+
+/**
+ * Variables a sealed run's GitHub mode adds to its environment; nothing for other runs.
+ *
+ * - Always `PAPERCLIP_GIT_AUTHOR_NAME`/`_EMAIL`, the agent author: the managed `git`/`gh`
+ *   launchers make it the author, with the connection's account as the committer, or the agent
+ *   too without one (github-launcher.ts). They clear `GIT_AUTHOR_*` themselves, so the author
+ *   travels under its own names.
+ * - In server-login mode, where no launchers run: `GIT_AUTHOR_*` as the agent and
+ *   `GIT_COMMITTER_*` as the server's git identity, or the agent when it has none.
  */
 export async function sealedRunGitHubEnv(input: {
   access: { sealed: boolean; useHostGitHub: boolean };
+  agent: { id: string; name: string; title?: string | null };
   readServerIdentity?: () => Promise<GitIdentity | null>;
 }): Promise<Record<string, string>> {
-  if (!input.access.sealed || !input.access.useHostGitHub) return {};
-  const server = await (input.readServerIdentity ?? readServerGitIdentity)();
-  return server ? { GIT_COMMITTER_NAME: server.name, GIT_COMMITTER_EMAIL: server.email } : {};
+  if (!input.access.sealed) return {};
+  const author = agentGitAuthor(input.agent);
+  const env: Record<string, string> = { PAPERCLIP_GIT_AUTHOR_NAME: author.name, PAPERCLIP_GIT_AUTHOR_EMAIL: author.email };
+  if (!input.access.useHostGitHub) return env;
+  const committer = await (input.readServerIdentity ?? readServerGitIdentity)() ?? author;
+  return {
+    ...env,
+    GIT_AUTHOR_NAME: author.name,
+    GIT_AUTHOR_EMAIL: author.email,
+    GIT_COMMITTER_NAME: committer.name,
+    GIT_COMMITTER_EMAIL: committer.email,
+  };
 }

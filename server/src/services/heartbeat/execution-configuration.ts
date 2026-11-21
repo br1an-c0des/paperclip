@@ -206,7 +206,7 @@ export async function prepareHeartbeatExecutionConfiguration(db: Db, input: Hear
     useServerLogin: readUseServerGitHubLogin(agent.runtimeConfig),
   });
   const { useHostGitHub } = githubAccess;
-  const githubRunEnv = await sealedRunGitHubEnv({ access: githubAccess });
+  const githubRunEnv = await sealedRunGitHubEnv({ access: githubAccess, agent });
   // Server-owned, like paperclipSecrets: wake context can't supply it.
   if (githubAccess.sealed) context.paperclipGitHub = runGitHubManifest({ useHostGitHub, selection: githubSelection });
   else delete context.paperclipGitHub;

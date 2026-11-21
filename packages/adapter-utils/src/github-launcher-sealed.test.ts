@@ -56,6 +56,22 @@ describe("managed launchers in a sealed run", () => {
     await expect(commit).rejects.toMatchObject({ stderr: expect.not.stringContaining("without GitHub credentials") });
   });
 
+  it.each([
+    ["an account", { status: "available", env: { GH_TOKEN: "fake-token", GIT_AUTHOR_NAME: "octocat", GIT_AUTHOR_EMAIL: "1+octocat@users.noreply.github.com",
+      GIT_COMMITTER_NAME: "octocat", GIT_COMMITTER_EMAIL: "1+octocat@users.noreply.github.com" } }, "octocat <1+octocat@users.noreply.github.com>"],
+    ["no account", { status: "absent" }, "Builder <agent-1@agents.paperclip.invalid>"],
+  ])("makes the agent the author of a commit, with %s as committer", async (_label, answer, committer) => {
+    const { root, bin, repo, git } = await launcherRepo("paperclip-github-agent-author-");
+    const url = await fakeBroker(answer);
+    const env = { ...process.env, ...githubBrokerEnvironment({}, { url, token: "run-capability" }),
+      PAPERCLIP_GIT_AUTHOR_NAME: "Builder", PAPERCLIP_GIT_AUTHOR_EMAIL: "agent-1@agents.paperclip.invalid",
+      GH_CONFIG_DIR: path.join(root, "gh-config"), PATH: `${bin}${path.delimiter}${process.env.PATH}` };
+    await exec(git, ["-C", repo, "add", "work.txt"], { env });
+    await exec(git, ["-C", repo, "commit", "-q", "-m", "Work"], { env });
+    expect((await exec("git", ["-C", repo, "log", "-1", "--format=%an <%ae> | %cn <%ce>"])).stdout.trim())
+      .toBe(`Builder <agent-1@agents.paperclip.invalid> | ${committer}`);
+  });
+
   it("adds no hint when the operation succeeds", async () => {
     const { root, bin, repo, git } = await launcherRepo("paperclip-github-absent-ok-");
     const url = await fakeBroker({ status: "absent", reason: "No GitHub identity connected" });
