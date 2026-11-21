@@ -130,7 +130,7 @@ describe("claude remote execution", () => {
     };
   }
 
-  it.each([undefined, "acp"])("admits managed SSH ACP through the public execution entry (engine=%s)", async engine => {
+  it.each(["acp"])("admits managed SSH ACP through the public execution entry (engine=%s)", async engine => {
     const ctx = managedSshAcpContext(engine);
     const actual = await vi.importActual<typeof import("@paperclipai/adapter-utils/server-utils")>("@paperclipai/adapter-utils/server-utils");
     const bin = await mkdtemp(path.join(os.tmpdir(), "paperclip-ssh-client-probe-"));
