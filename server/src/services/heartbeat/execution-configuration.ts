@@ -40,7 +40,7 @@ import {
   resolveRunScopedMentionedSkillKeys, type createHeartbeatRunPreparation, type resolveAcceptedPlanWakeRoutingDecision,
 } from "./run-preparation.js";
 import { buildExecutionWorkspaceConfigSnapshot, stripWorkspaceRuntimeFromExecutionRunConfig } from "./workspaces.js";
-import { decideRunGitHubAccess } from "./sealed-run-github.js";
+import { decideRunGitHubAccess, readUseServerGitHubLogin, sealedRunGitHubEnv } from "./sealed-run-github.js";
 import type { HeartbeatWorkspacePreparationInput } from "./workspace-preparation.js";
 
 const ACCEPTED_PLAN_CONVERSION_SKILL_KEY =
@@ -196,14 +196,17 @@ export async function prepareHeartbeatExecutionConfiguration(db: Db, input: Hear
       ? [...runScopedMentionedSkillKeys, ACCEPTED_PLAN_CONVERSION_SKILL_KEY]
       : runScopedMentionedSkillKeys;
   const githubSelection = githubIdentity.value;
-  // A sealed claude_local CLI run never falls back to the server's own GitHub login.
-  const { useHostGitHub } = decideRunGitHubAccess({
+  // A sealed claude_local CLI run uses the server's own GitHub login only when the agent opted in.
+  const githubAccess = decideRunGitHubAccess({
     adapterType: agent.adapterType,
     adapterConfig: mergedConfig,
     environmentDriver: selectedEnvironmentForConfig?.driver,
     trustKind: trustPreset.kind,
     githubConfigured: githubSelection.configured,
+    useServerLogin: readUseServerGitHubLogin(agent.runtimeConfig),
   });
+  const { useHostGitHub } = githubAccess;
+  const githubRunEnv = await sealedRunGitHubEnv({ access: githubAccess });
 
   const { resolvedConfig, configuredTaskEnvironment, secretKeys, secretManifest } =
     await time("configuration_secrets", () => resolveExecutionRunAdapterConfig({
@@ -457,6 +460,11 @@ export async function prepareHeartbeatExecutionConfiguration(db: Db, input: Hear
     resolve: async () => preparedInstructions.value,
     context, config: connectorDelivery.config, native: agent.adapterType === "paperclip_runner",
   });
+  // A sealed run's GitHub identity variables. prepareGitHubExecutionEnvironment lays the run's
+  // env over what it read from the host, so these win over the server's own GIT_* values.
+  if (Object.keys(githubRunEnv).length > 0) {
+    runtimeConfig = { ...runtimeConfig, env: { ...parseObject(runtimeConfig.env), ...githubRunEnv } };
+  }
   const agentIdentity = supportsManagedAgentIdentity(agent.adapterType, agent.adapterConfig, run.runtimeMode === "native" ? run.driverKind : undefined)
     ? await time("configuration_agent_identity", () => agentIdentityService(db).ensureAgentIdentity(agent.companyId, agent.id))
     : undefined;

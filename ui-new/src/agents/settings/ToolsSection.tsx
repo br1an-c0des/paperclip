@@ -18,10 +18,12 @@ import { Button, buttonClass } from "@/ui/Button";
 import { InfoHeading, SettingsCard } from "@/ui/Field";
 import { Switch as Toggle } from "@/ui/Switch";
 import { pushToast } from "@/ui/Toast";
-import { SectionTitle } from "../shared";
+import { CardNote, SectionTitle, SwitchRow, useAgentSaver } from "../shared";
 import { ChannelsPanel } from "./ChannelsPanel";
 import "@/apps/Apps.css";
 import "@/connectors/Connectors.css";
+
+type AgentRuntimeConfig = AgentDetail["runtimeConfig"];
 
 /*
  * Tools and channels (board 30's outline, the old UI's AgentToolsTab): what the agent's runs get.
@@ -34,7 +36,9 @@ import "@/connectors/Connectors.css";
  * - Access profiles: the ones that apply, and assigning or removing one for this agent.
  * - Policies: the enabled ones that apply to it, such as Ask first on an action. They're set per
  *   action on each app's page, so they're read here.
- * - GitHub identity: the agent's own GitHub account, or the responsible person's.
+ * - GitHub identity: the agent's own GitHub account, or the responsible person's; for a Claude
+ *   agent, also "Use this server's GitHub login" (`runtimeConfig.github.useServerLogin`), which a
+ *   sealed run without a GitHub connection uses instead of running git and gh without credentials.
  * - Recent tool calls from the audit.
  *
  * - Its chat channels (ChannelsPanel).
@@ -356,9 +360,28 @@ export function ToolsSection(props: { agent: AgentDetail }) {
   );
 }
 
+/** `runtimeConfig.github.useServerLogin`: on only when exactly true. */
+export function usesServerGitHubLogin(runtimeConfig: AgentRuntimeConfig | null | undefined): boolean {
+  return runtimeConfig?.github?.useServerLogin === true;
+}
+
+/**
+ * The `PATCH /agents/:id` body that turns "Use this server's GitHub login" on or off. The server
+ * replaces the runtime config, so the rest of it travels along; off removes the setting.
+ */
+export function serverGitHubLoginPatch(agent: Pick<AgentDetail, "runtimeConfig">, on: boolean): { runtimeConfig: AgentRuntimeConfig } {
+  const { github, ...rest } = agent.runtimeConfig ?? {};
+  const { useServerLogin: _previous, ...otherGitHub } = github ?? {};
+  const nextGitHub = on ? { ...otherGitHub, useServerLogin: true } : otherGitHub;
+  return { runtimeConfig: Object.keys(nextGitHub).length > 0 ? { ...rest, github: nextGitHub } : rest };
+}
+
 /** The GitHub account its runs use: its own, which wins, or the responsible person's. */
 function GitHubIdentity(props: { agent: AgentDetail; connections: ToolConnection[]; loading: boolean }) {
   const company = useCompany();
+  const saver = useAgentSaver(() => props.agent);
+  // Only a sealed Claude run reads the switch; every other run already uses the machine's login.
+  const claude = () => props.agent.adapterType === "claude_local";
   const github = createMemo(() => agentGitHubConnections(props.connections, props.agent.id));
   const grants = createQueries(() => ({
     queries: github().map((connection) => ({
@@ -379,6 +402,7 @@ function GitHubIdentity(props: { agent: AgentDetail; connections: ToolConnection
   return (
     <SettingsCard
       title="GitHub identity"
+      description={claude() ? <CardNote state={saver.state()} error={saver.error()} /> : undefined}
       footer={
         <Show when={!loading() && !failed()}>
           <Show
@@ -432,6 +456,15 @@ function GitHubIdentity(props: { agent: AgentDetail; connections: ToolConnection
           </Match>
         </Switch>
       </p>
+      <Show when={claude()}>
+        <SwitchRow
+          label="Use this server's GitHub login"
+          info="Hands the server machine's own GitHub sign-in (gh, git and SSH) to this agent's runs. It's meant for a machine without a GitHub connection: a connection that covers the agent still comes first. Off, a run with no connection uses git and gh without credentials."
+          checked={usesServerGitHubLogin(props.agent.runtimeConfig)}
+          disabled={saver.state() === "saving"}
+          onChange={(on) => void saver.save(serverGitHubLoginPatch(props.agent, on))}
+        />
+      </Show>
     </SettingsCard>
   );
 }

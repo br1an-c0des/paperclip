@@ -36,6 +36,8 @@ export interface AgentProjectAccess {
 
 export type AgentRuntimeConfig = Record<string, unknown> & {
   aiConnection?: import("../ai-connection-router.js").AiRuntimeConnectionBinding;
+  /** See `agentRuntimeGitHubSchema`. */
+  github?: { useServerLogin?: boolean };
 };
 
 export type AgentInstructionsBundleMode = "managed" | "external";

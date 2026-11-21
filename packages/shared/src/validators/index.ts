@@ -353,6 +353,7 @@ export {
   agentRuntimeSettingsPatchSchema,
   type AgentRuntimeSettingsPatch,
   agentRuntimeConfigSchema,
+  agentRuntimeGitHubSchema,
   agentInstructionsBundleModeSchema,
   updateAgentInstructionsBundleSchema,
   upsertAgentInstructionsFileSchema,
