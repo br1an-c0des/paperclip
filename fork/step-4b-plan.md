@@ -688,6 +688,38 @@ Design rollout step 2. Nothing merges into `main` before it passes.
 - [ ] **Step 4:** Run the files; expect PASS. Then `corepack pnpm test:quick --changed main`.
 - [ ] **Step 5:** Commit: `claude_local: CLI is the default engine`.
 
+### Added after the real-run check (2026-11-20)
+
+The check's five findings ([design, "Real-run check"](step-4b-sealed-runs.md#real-run-check-2026-11-20-rollout-step-2))
+and the user's decisions on them, built by two agents before Task 14:
+
+- **Agent E** (with Task 13):
+  - New agents default to the classic runner (code `legacy`), Claude on the CLI engine: a
+    `claude_local` hire is no longer turned into `paperclip_runner` (`agent-runner-selection.ts`).
+    No migration; existing agents keep their stored runner.
+  - `ui-new` calls the legacy runner **"Classic runner"**; code and API keep `legacy`.
+  - `claudeSkillPlugin`: every `paperclipai/` key loads under `paperclip:` (bundled status-card
+    skills included).
+  - Plain skill names: inside each plugin a skill's folder is its plain name, with the suffixed
+    runtime name only when two skills in that plugin share it; the manifest uses the plain name.
+  - The sealed launch drops empty-valued variables (the managed connection's ~90 blanked provider
+    keys), so `envKeys` lists only what's set.
+- **Agent F:**
+  - **GitHub only through a Paperclip connection.** A sealed run never gets the server's own
+    GitHub setup (`GH_*`, `GIT_*`, `SSH_*`, the default `GH_CONFIG_DIR`,
+    `PAPERCLIP_GITHUB_HOST_HOME`) unless the agent opts in. Without a connection, `git`/`gh` run
+    without credentials.
+  - **Opt-in per agent:** "Use this server's GitHub login", off by default, in the agent's GitHub
+    identity card. When on, the run gets today's server-login mode, plus the server's git committer
+    identity, since the sealed `HOME` hides its `~/.gitconfig`.
+  - **The manifest records GitHub:** `github: { mode: "connection", identitySource, login } |
+    { mode: "server_login" } | { mode: "none" }` (an added, optional field: version stays 1), and
+    the run's "What this run got" list shows it.
+  - **Commit author per agent:** author = the agent's name and title ("Builder (Senior engineer)",
+    name alone without a title) with a stable per-agent `.invalid` email, so GitHub shows "authored
+    by Builder, committed by <account>". Committer: the connection's account, the server's git
+    identity when opted in, else the agent too.
+
 ### Task 14: Docs, then merge
 
 **Files:** `deploy/docker-compose.yml:78-83` (the comment: runs no longer inherit this; the
