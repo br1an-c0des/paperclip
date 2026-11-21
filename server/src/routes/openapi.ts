@@ -4122,6 +4122,72 @@ registry.registerPath({
   responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound },
 });
 
+// `ClaudeRunPreview` (@paperclipai/shared): what the agent's next sealed claude_local CLI run
+// would get. The manifest is `ClaudeRunManifest` less session and setAside; the fields the UI
+// reads are described, the rest pass through.
+const claudeRunPreviewRepoLoad = z.union([
+  z.object({ enabled: z.literal(true) }).passthrough(),
+  z.object({ enabled: z.literal(false), reason: z.string() }),
+]);
+const claudeRunPreviewSchema = z.union([
+  z.object({
+    supported: z.literal(true),
+    project: z.object({
+      id: z.string(),
+      name: z.string(),
+      checkout: z.union([
+        z.object({ kind: z.literal("local"), path: z.string() }),
+        z.object({ kind: z.literal("not_cloned"), repoUrl: z.string() }),
+        z.object({ kind: z.literal("none") }),
+      ]),
+    }).nullable(),
+    manifest: z.object({
+      version: z.literal(1),
+      engine: z.literal("cli"),
+      configDir: z.string(),
+      credential: z.object({
+        kind: z.enum(["managed_connection", "agent_env"]),
+        method: z.string(),
+        connectionId: z.string().nullable(),
+        connectionName: z.string().nullable(),
+      }).nullable(),
+      overriddenEnv: z.array(z.string()),
+      skills: z.array(z.object({
+        name: z.string(),
+        key: z.string(),
+        origin: z.enum(["always_on", "assigned", "repo"]),
+        plugin: z.enum(["paperclip", "company", "project"]),
+      })),
+      skillNameClashes: z.array(z.string()),
+      mcpServers: z.array(z.object({ name: z.string(), url: z.string() })),
+      access: z.object({ level: z.string(), overrides: z.record(z.string(), z.boolean()) }).nullable(),
+      instructions: z.object({ entryFile: z.string().nullable(), sent: z.boolean() }),
+      claudeMd: claudeRunPreviewRepoLoad,
+      repoSkills: claudeRunPreviewRepoLoad,
+      envKeys: z.array(z.string()),
+      extraArgs: z.array(z.string()),
+      github: z.object({ mode: z.enum(["connection", "server_login", "none"]) }).passthrough().optional(),
+    }).passthrough(),
+    blockers: z.array(z.object({ code: z.string(), message: z.string() })),
+  }),
+  z.object({
+    supported: z.literal(false),
+    reason: z.enum(["not_claude_local", "not_cli_engine", "runner", "remote_target"]),
+  }),
+]);
+
+registry.registerPath({
+  method: "get",
+  path: "/api/agents/{id}/run-preview",
+  tags: ["agents"],
+  summary: "Preview what the agent's next run gets",
+  description:
+    "Board only. The manifest of the agent's next sealed claude_local CLI run, for a task in `projectId` or in no project, " +
+    "worked out read-only: nothing is started, written or minted. `supported: false` for other adapters, the ACP engine, the Runner and remote targets.",
+  request: { params: z.object({ id: z.string() }), query: z.object({ projectId: z.string().optional() }) },
+  responses: { 200: r.ok(claudeRunPreviewSchema), 401: r.unauthorized, 403: r.forbidden, 404: r.notFound },
+});
+
 registry.registerPath({
   method: "get",
   path: "/api/agents/{id}/runtime-state",
