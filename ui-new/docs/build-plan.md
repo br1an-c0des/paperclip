@@ -1343,6 +1343,41 @@ Raised Nov 18, 2026, while designing hard-fork step 4b; not designed or schedule
   run can call, or both; which settings are worth importing (permissions, hooks, env) and how each
   shows in Paperclip; and whether an imported item tracks the repo or becomes an editable copy.
 
+### 3.19 GitHub without Paperclip's cloud: your own GitHub App
+
+Raised Nov 20, 2026, after step 4b's real-run check; not designed or scheduled yet.
+
+- **Why:** the only GitHub connection that gives runs a managed identity ("Connect GitHub",
+  `oauthStrategy: "paperclip_cloud_connector"` in `packages/shared/src/app-definitions/github.json`)
+  signs in to **upstream's** GitHub App through upstream's broker at `my.paperclip.app`
+  (`paperclip-cloud-connector-enrollment.ts`), which holds the app's OAuth secret. Setup and token
+  refresh depend on a hosted service we don't control, and the token passes through it. The other
+  method, "Personal access token (advanced)", feeds the connection's MCP tools but isn't a managed
+  identity for shell `git`/`gh`.
+- **Since step 4b:** sealed runs get GitHub only through a Paperclip connection, plus a per-agent
+  opt-in to use the server's own login; commits carry the agent as author ("authored by Builder,
+  committed by br1an-c0des").
+- **Options explored so far (2026-11-20):**
+  1. **Your own GitHub App acting as its bot** (the favourite). Created under your account through
+     GitHub's app-manifest flow, installed on chosen repos; Paperclip keeps its app ID and private
+     key and mints a one-hour installation token per `git`/`gh` operation. Identity
+     `yourapp[bot]`. Start with **one shared app** for all agents, with per-agent commit authors;
+     an agent whose PRs, comments or reviews must show as itself gets **its own app** (one manifest
+     flow and one install each). Reuses the GitHub chat channel's code
+     (`chat-channels/github/app-setup.ts`, the installation-token minting in `webhook-ingress.ts`).
+  2. **Your own GitHub App acting as you:** the same app with user OAuth, the code exchanged
+     directly at `github.com/login/oauth` with your app's client, plus refresh; feeds the existing
+     installation discovery (`tool-access/github-access-discovery.ts`).
+  3. **A token connection as a proper identity:** resolve the token's account once (`/user`) and
+     treat it as a managed identity. Quickest, but each identity is a separate GitHub account.
+- **Have today:** the per-operation credential broker and token-free `git`/`gh` launchers
+  ([doc/execution-github-identity.md](../../doc/execution-github-identity.md)), personal and
+  dedicated grants, the agent's "GitHub identity" card (Tools settings), the manifest flow in the
+  chat channel.
+- **Questions:** a "Give this agent its own GitHub identity" button wrapping the manifest flow;
+  whether the shared app or the agent's own app approves and reviews; how repo access per app shows
+  in Paperclip; retiring the cloud-connector method once this works; what server1 should move to.
+
 ## Stage 4: source-change features (merged into stage 3)
 
 Before the hard fork, this held what a plugin couldn't: changes to core tables or API paths, the run
