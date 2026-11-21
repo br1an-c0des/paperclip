@@ -42,6 +42,17 @@ export type ClaudeFreshSessionReason =
   | "target_changed"
   | "session_unavailable";
 
+/**
+ * How a sealed run got GitHub, as the server decided it at launch: through a Paperclip GitHub
+ * connection (login: the account's, when the selected grant records one), the server's own
+ * GitHub login (the agent's "Use this server's GitHub login"), or not at all (git and gh run
+ * without credentials).
+ */
+export type ClaudeRunGitHub =
+  | { mode: "connection"; identitySource: "personal" | "dedicated"; login: string | null }
+  | { mode: "server_login" }
+  | { mode: "none" };
+
 export interface ClaudeRunManifest {
   version: 1;
   engine: "cli";
@@ -73,6 +84,8 @@ export interface ClaudeRunManifest {
   envKeys: string[];
   extraArgs: string[];
   session: { mode: "fresh"; reason: ClaudeFreshSessionReason } | { mode: "resumed"; sessionId: string };
+  /** Added after version 1 shipped, so optional: older manifests don't have it. */
+  github?: ClaudeRunGitHub;
 }
 
 /** A light guard: a non-null object with `version === 1` and `engine === "cli"`. Not a full schema check. */

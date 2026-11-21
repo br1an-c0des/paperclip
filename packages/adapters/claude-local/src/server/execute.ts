@@ -1257,6 +1257,7 @@ async function executeClaudeCli(
           repoSkills: input.sealedRun.repoSkills,
           mcpServers: runtimeMcpServers,
           access: context.paperclipAgentAccess,
+          github: context.paperclipGitHub,
           instructions: {
             entryFile: instructionsFilePath || null,
             // The agent's instructions went out with --append-system-prompt-file: a fresh

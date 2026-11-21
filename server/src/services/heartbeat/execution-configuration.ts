@@ -40,7 +40,7 @@ import {
   resolveRunScopedMentionedSkillKeys, type createHeartbeatRunPreparation, type resolveAcceptedPlanWakeRoutingDecision,
 } from "./run-preparation.js";
 import { buildExecutionWorkspaceConfigSnapshot, stripWorkspaceRuntimeFromExecutionRunConfig } from "./workspaces.js";
-import { decideRunGitHubAccess, readUseServerGitHubLogin, sealedRunGitHubEnv } from "./sealed-run-github.js";
+import { decideRunGitHubAccess, readUseServerGitHubLogin, runGitHubManifest, sealedRunGitHubEnv } from "./sealed-run-github.js";
 import type { HeartbeatWorkspacePreparationInput } from "./workspace-preparation.js";
 
 const ACCEPTED_PLAN_CONVERSION_SKILL_KEY =
@@ -207,6 +207,9 @@ export async function prepareHeartbeatExecutionConfiguration(db: Db, input: Hear
   });
   const { useHostGitHub } = githubAccess;
   const githubRunEnv = await sealedRunGitHubEnv({ access: githubAccess });
+  // Server-owned, like paperclipSecrets: wake context can't supply it.
+  if (githubAccess.sealed) context.paperclipGitHub = runGitHubManifest({ useHostGitHub, selection: githubSelection });
+  else delete context.paperclipGitHub;
 
   const { resolvedConfig, configuredTaskEnvironment, secretKeys, secretManifest } =
     await time("configuration_secrets", () => resolveExecutionRunAdapterConfig({

@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { resolveClaudeExecutionEngine } from "@paperclipai/adapter-claude-local/server";
+import type { ClaudeRunGitHub } from "@paperclipai/shared";
 
 /**
  * Step 4b: GitHub for sealed runs (fork/step-4b-plan.md, "Added after the real-run check",
@@ -51,6 +52,26 @@ export function decideRunGitHubAccess(input: {
     && input.trustKind === "standard"
     && ["local", "ssh"].includes(input.environmentDriver ?? "local");
   return { sealed, useHostGitHub: hostFallback && (!sealed || input.useServerLogin) };
+}
+
+/**
+ * What the run manifest records about GitHub (`context.paperclipGitHub`, copied into the
+ * manifest by the adapter): a connection when one covers the agent, even if it's unavailable
+ * right now (the launchers then say why), else the server's login, else none.
+ */
+export function runGitHubManifest(input: {
+  useHostGitHub: boolean;
+  selection: {
+    configured: boolean;
+    identitySource?: "personal" | "dedicated";
+    grant?: { providerTenant?: { github?: { login?: string | null } | null } | null };
+  };
+}): ClaudeRunGitHub {
+  if (input.selection.configured) {
+    const login = input.selection.grant?.providerTenant?.github?.login?.trim() || null;
+    return { mode: "connection", identitySource: input.selection.identitySource ?? "personal", login };
+  }
+  return input.useHostGitHub ? { mode: "server_login" } : { mode: "none" };
 }
 
 export type GitIdentity = { name: string; email: string };

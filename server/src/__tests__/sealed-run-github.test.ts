@@ -9,6 +9,7 @@ import {
   isSealedClaudeRun,
   readServerGitIdentity,
   readUseServerGitHubLogin,
+  runGitHubManifest,
   sealedRunGitHubEnv,
 } from "../services/heartbeat/sealed-run-github.js";
 
@@ -56,6 +57,22 @@ describe("decideRunGitHubAccess", () => {
     expect(decideRunGitHubAccess({ ...SEALED, ...STANDARD, environmentDriver: "ssh" }).useHostGitHub).toBe(true);
     expect(decideRunGitHubAccess({ ...SEALED, ...STANDARD, adapterType: "codex_local", environmentDriver: "sandbox" }).useHostGitHub).toBe(false);
     expect(decideRunGitHubAccess({ ...SEALED, ...STANDARD, adapterType: "codex_local", trustKind: "low_trust_review" }).useHostGitHub).toBe(false);
+  });
+});
+
+describe("runGitHubManifest", () => {
+  it("records the connection and its account when one covers the agent", () => {
+    const grant = { providerTenant: { github: { login: "octocat" } } };
+    expect(runGitHubManifest({ useHostGitHub: false, selection: { configured: true, identitySource: "dedicated", grant } }))
+      .toEqual({ mode: "connection", identitySource: "dedicated", login: "octocat" });
+    // Configured but unavailable: still the connection, with no account to name.
+    expect(runGitHubManifest({ useHostGitHub: false, selection: { configured: true, identitySource: "personal" } }))
+      .toEqual({ mode: "connection", identitySource: "personal", login: null });
+  });
+
+  it("records the server's login, or none", () => {
+    expect(runGitHubManifest({ useHostGitHub: true, selection: { configured: false } })).toEqual({ mode: "server_login" });
+    expect(runGitHubManifest({ useHostGitHub: false, selection: { configured: false } })).toEqual({ mode: "none" });
   });
 });
 

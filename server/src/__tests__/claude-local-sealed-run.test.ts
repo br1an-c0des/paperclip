@@ -551,6 +551,18 @@ describe("sealed claude_local CLI runs: arguments, repo, prompt and manifest", (
     );
   });
 
+  it("records how the run got GitHub, from the server's context", async () => {
+    const connection = metaCollector();
+    await execute(buildContext({
+      context: { paperclipGitHub: { mode: "connection", identitySource: "personal", login: "octocat" } },
+      onMeta: connection.onMeta,
+    }));
+    expect(manifestOf(connection.metas[0]).github).toEqual({ mode: "connection", identitySource: "personal", login: "octocat" });
+    const none = metaCollector();
+    await execute(buildContext({ onMeta: none.onMeta }));
+    expect(manifestOf(none.metas[0])).not.toHaveProperty("github");
+  });
+
   it("records the instructions as sent on a fresh session only", async () => {
     const instructions = path.join(root, "AGENTS.md");
     await fs.writeFile(instructions, "# M7 test agent\n", "utf8");
