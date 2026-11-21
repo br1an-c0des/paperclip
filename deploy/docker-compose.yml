@@ -76,10 +76,11 @@ services:
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
 
-      # Claude Code's own auto-memory off for claude_local runs, so every run
-      # of an agent sees the same per-agent memory (ui-new/docs/decisions.md,
-      # decision 5). Paperclip Runner agents don't inherit the server's
-      # environment: set it in their adapter env instead.
+      # Claude Code's own auto-memory off (ui-new/docs/decisions.md, decision
+      # 5). Sealed claude_local runs (the CLI engine, the default) don't
+      # inherit the server's environment: the adapter sets it for them
+      # (fork/step-4b-sealed-runs.md). This stays for the ACP engine and
+      # anything else that still inherits it.
       CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1"
     volumes:
       # PAPERCLIP_HOME: config, uploads, logs, secrets key, repo clones and

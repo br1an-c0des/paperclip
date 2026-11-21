@@ -639,6 +639,9 @@ From the requests proposal, item 5 (was build plan 2a-5). A bug report, not a pu
 
 ### 39. Turn off Claude Code's auto memory when an agent has `para-memory-files`
 
+**Fixed 2026-11-20** in step 4b (`feat/step-4b`): every sealed `claude_local` run gets
+`CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` from the adapter, and the run manifest shows `autoMemory: false`.
+
 From [decision 5](../ui-new/docs/decisions.md#5-agents-can-have-three-memory-systems-that-dont-know-about-each-other),
 option 3 (was build plan 2a-6). Revives #2700.
 

@@ -1,7 +1,8 @@
 # Step 4b: sealed runs on the CLI engine
 
-**Status: approved 2026-11-18; updated 2026-11-19 for 4a and 3a, both merged into `main`
-([what changed](#updated-2026-11-19-after-4a-and-3a)).** The second half of
+**Status: built 2026-11-20 on `feat/step-4b`** ([real-run check](#real-run-check-2026-11-20-rollout-step-2)).
+Approved 2026-11-18; updated 2026-11-19 for 4a and 3a, both merged into `main`
+([what changed](#updated-2026-11-19-after-4a-and-3a)). The second half of
 [hard-fork plan step 4](hard-fork-plan.md#4-make-runs-claude-native), following
 [decision 8](hard-fork-plan.md#decisions) (sealed runs). This document designs **part 1**: the
 switch to the CLI engine together with a sealed launch. Part 2 and later are listed at the end, not
@@ -227,11 +228,14 @@ so a shared folder would have them rewrite each other's skills.
   (a single plugin was tested to load under the user source on 2026-11-18; the CLI loads each
   child of a folder of plugins). Skill names are namespaced `<plugin>:<skill>`, so the plugins are
   named by where the skills come from (2026-11-20): `paperclip` for Paperclip's own skills (keys
-  starting `paperclipai/paperclip/`) and `company` for the company library. One plugin named
+  starting `paperclipai/`, the bundled ones included, as built) and `company` for the company library. One plugin named
   `paperclip` would have labelled every skill as being about Paperclip, a name the platform, the
   MCP server and the main skill already share. A plugin with no skills is left out.
 - The prefix is how Claude Code loads a skill, not its name: the manifest and `ui-new` show the
   plain names the Skills page uses, and the manifest records which plugin each came from.
+  As built, each skill's folder in its plugin is its plain name (the last segment of its key), so
+  Claude sees `company:review`, not the runtime name's hash suffix; two skills of one plugin that
+  share a plain name keep their runtime names (bundle layout 3).
 - A third plugin, `project`, carries the repo's own skills when its project allows them
   (section 5). It's built per run, outside the shared bundle.
 - Concurrent runs with different sets each get their own bundle, so nothing they share changes
@@ -395,6 +399,27 @@ truncated at 100 keys; the sealed-run tests cover the rest).
 5. **The manifest's `envKeys` is mostly noise** with a managed connection: ~90 other providers'
    credential keys, set to `""` to blank inherited values. A sealed run inherits nothing, so the
    blanks are unneeded there.
+
+**Settled 2026-11-20** by agents E and F, merged into `feat/step-4b`:
+
+1. Sealed runs get GitHub only through a Paperclip GitHub connection; without one, `git` and `gh`
+   run through Paperclip's launchers with no credentials. A per-agent switch, "Use this server's
+   GitHub login" (`runtimeConfig.github.useServerLogin`), opts back in. The manifest's `github`
+   row says which. Commits are authored by the agent (`Name (Title)
+   <agentId@agents.paperclip.invalid>`), committed by the connected account.
+2. New agents default to the classic runner (`legacy`, "Classic runner" in the UI) and
+   `claude_local` defaults to the CLI engine (Task 13). An explicit `runner: "paperclip"` still
+   converts.
+3. Every `paperclipai/` skill loads under `paperclip:`.
+4. Skills load, and the manifest names them, by plain name (section 4).
+5. A sealed launch drops variables set to `""`, from the spawned environment, `envKeys` and the
+   logged invocation env.
+
+**Run 6, 2026-11-20** (`567605d6`, TES-41, at `56f11722a4`): **pass.** The agent saw
+`company:m7-test-skill-renamed`, `paperclip:complain`, `paperclip:paperclip`,
+`paperclip:paperclip-create-agent`, `paperclip:suggestion-box` and `project:m7-test-repo-skill`.
+Manifest `github: none`. Its local commit in the M7 repo has the agent as author and committer (no
+connection, so no account to commit as).
 
 ## Testing
 
