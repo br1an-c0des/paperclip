@@ -77,7 +77,7 @@ const GROUPS: Array<{ plugin: SkillGroup["plugin"]; label: string }> = [
 ];
 
 /** The skills grouped Paperclip / company / repository, by their plain names; empty groups left out. */
-export function skillGroups(manifest: ClaudeRunManifest): SkillGroup[] {
+export function skillGroups(manifest: Pick<ClaudeRunManifest, "skills" | "skillNameClashes">): SkillGroup[] {
   const skills = Array.isArray(manifest.skills) ? manifest.skills : [];
   const clashes = new Set(Array.isArray(manifest.skillNameClashes) ? manifest.skillNameClashes : []);
   return GROUPS.map(({ plugin, label }) => ({
