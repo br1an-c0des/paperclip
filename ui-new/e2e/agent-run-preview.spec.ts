@@ -56,7 +56,7 @@ test("the Runtime section shows what runs get, for no project and for a project"
     return {
       supported: true,
       project: { id: project.id, name: project.name, checkout: { kind: "not_cloned", repoUrl: "https://github.com/m7-test/site" } },
-      manifest: { ...manifest, claudeMd: { enabled: false, reason: "not_cloned" }, repoSkills: { enabled: false, reason: "not_cloned" } },
+      manifest: { ...manifest, credential: null, claudeMd: { enabled: false, reason: "not_cloned" }, repoSkills: { enabled: false, reason: "not_cloned" } },
       blockers: [{ code: "claude_credential_missing", message: "M7 test: no Claude credential for this agent." }],
     };
   });
@@ -75,6 +75,7 @@ test("the Runtime section shows what runs get, for no project and for a project"
   await expect(card.getByRole("alert")).toContainText("M7 test: no Claude credential for this agent.");
   await expect(card.getByText("Not cloned yet: read on the first run")).toHaveCount(2);
   await expect(card.getByText("https://github.com/m7-test/site")).toBeVisible();
+  await expect(card.getByText("None: runs will be refused")).toBeVisible();
   expect(asked).toContain(project.id);
 
   // Nothing scrolls sideways at phone width.

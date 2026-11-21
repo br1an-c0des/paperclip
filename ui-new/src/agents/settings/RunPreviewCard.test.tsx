@@ -127,12 +127,17 @@ describe("What runs get", () => {
     expect(api.runPreview).toHaveBeenCalledWith("a1", null, "co1", expect.anything());
   });
 
-  it("warns about a blocker at the top", async () => {
-    api.runPreview.mockResolvedValue({ ...noProject, blockers: [{ code: "claude_credential_missing", message: "No Claude credential: connect one in AI connections." }] });
+  it("warns about a blocker at the top, and shows no credential", async () => {
+    api.runPreview.mockResolvedValue({
+      ...noProject,
+      manifest: { ...manifest, credential: null },
+      blockers: [{ code: "claude_credential_missing", message: "No Claude credential: connect one in AI connections." }],
+    });
     mount();
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("A run would be refused before it starts");
     expect(alert.textContent).toContain("No Claude credential: connect one in AI connections.");
+    expect(row("Credential")).toBe("None: runs will be refused");
   });
 
   it("says why in one line when it isn't available, without rows or a project picker", async () => {

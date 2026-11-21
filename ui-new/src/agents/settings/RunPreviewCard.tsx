@@ -6,7 +6,7 @@ import { agentsApi } from "@/api/agents";
 import { queryKeys } from "@/api/queryKeys";
 import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
-import { AccessRow, AutoMemoryRow, CredentialRow, GitHubRow, ManifestList, ManifestRow, McpServersRow, MonoValue, OverriddenRow, SkillsRow } from "@/runs/ManifestRows";
+import { AccessRow, AutoMemoryRow, GitHubRow, ManifestList, ManifestRow, McpServersRow, MonoValue, OverriddenRow, SkillsRow } from "@/runs/ManifestRows";
 import { InfoHeading } from "@/ui/Field";
 import { failure } from "../shared";
 import {
@@ -14,6 +14,7 @@ import {
   checkoutValue,
   chosenProject,
   claudeMdValue,
+  credentialValue,
   engineValue,
   instructionsValue,
   previewManifest,
@@ -138,7 +139,7 @@ export function RunPreviewCard(props: { agent: AgentDetail; dirty?: boolean }) {
               <ManifestRow label="Engine" info="The CLI engine runs claude --print with only Paperclip's settings, read from this agent's own Claude config folder.">
                 <Value value={engineValue(got())} />
               </ManifestRow>
-              <CredentialRow credential={got().credential} />
+              <ManifestRow label="Credential">{credentialValue(got().credential)}</ManifestRow>
               <SkillsRow manifest={got()} total />
               <McpServersRow servers={got().mcpServers} />
               <AccessRow access={got().access} />

@@ -6,6 +6,7 @@ import type {
   ClaudeRunPreviewProject,
   ClaudeRunPreviewUnsupportedReason,
 } from "@paperclipai/shared";
+import { credentialText } from "@/runs/run-manifest";
 
 /*
  * "What runs get" (step 4b part 2, fork/step-4b-parts-2-3.md): the words for an agent's run
@@ -41,6 +42,14 @@ export function blockerLines(blockers: ClaudeRunPreviewBlocker[] | undefined): s
   return blockers.map((blocker) => (typeof blocker?.message === "string" && blocker.message.trim() ? blocker.message.trim() : String(blocker?.code ?? "A run would be refused"))).filter(Boolean);
 }
 
+/**
+ * The credential row: as a run's, or none, when the run would have no credential (a
+ * `claude_credential_missing` blocker then says so at the top).
+ */
+export function credentialValue(credential: ClaudeRunPreviewManifest["credential"] | undefined): string {
+  return credential === null ? "None: runs will be refused" : credentialText(credential);
+}
+
 /** "CLI, sealed · config folder" and the folder. */
 export function engineValue(manifest: Pick<ClaudeRunPreviewManifest, "engine" | "configDir">): PreviewValue {
   const engine = manifest.engine === "cli" ? "CLI, sealed" : String(manifest.engine ?? "Unknown engine");
@@ -56,11 +65,15 @@ export function checkoutValue(checkout: ClaudeRunPreviewCheckout | undefined): P
   return words("Not recorded");
 }
 
-/** Why the repo's CLAUDE.md or skills won't load, for the reasons both share. */
+/**
+ * Why the repo's CLAUDE.md or skills won't load, for the reasons both share. A project with no
+ * workspace runs in the agent's own folder, outside any project, so the preview reads `no_project`
+ * for it too (server/src/services/run-preview.ts): with a project chosen, that means no repository.
+ */
 function repoSkip(reason: unknown, project: ClaudeRunPreviewProject | null): string | null {
   switch (reason) {
     case "no_project":
-      return "No project selected";
+      return project ? "Not loaded: the project has no repository" : "No project selected";
     case "project_switch_off":
       return "Off for this project";
     case "not_cloned":

@@ -5,6 +5,7 @@ import {
   checkoutValue,
   chosenProject,
   claudeMdValue,
+  credentialValue,
   engineValue,
   instructionsValue,
   previewManifest,
@@ -64,6 +65,17 @@ describe("the rows' values", () => {
   it("say no project is selected", () => {
     expect(claudeMdValue({ enabled: false, reason: "no_project" }, null).text).toBe("No project selected");
     expect(repoSkillsValue({ enabled: false, reason: "no_project" }, null).text).toBe("No project selected");
+  });
+
+  it("say a chosen project without a workspace has no repository (the preview reads no_project for it)", () => {
+    expect(claudeMdValue({ enabled: false, reason: "no_project" }, noWorkspace).text).toBe("Not loaded: the project has no repository");
+    expect(repoSkillsValue({ enabled: false, reason: "no_project" }, noWorkspace).text).toBe("Not loaded: the project has no repository");
+  });
+
+  it("name the credential, or say runs will be refused without one", () => {
+    expect(credentialValue({ kind: "managed_connection", method: "subscription", connectionId: "c1", connectionName: "Claude Max" })).toBe("Claude subscription · connection Claude Max");
+    expect(credentialValue(null)).toBe("None: runs will be refused");
+    expect(credentialValue(undefined)).toBe("Not recorded");
   });
 
   it("read a repository that isn't cloned yet", () => {
