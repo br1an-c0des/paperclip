@@ -1349,7 +1349,9 @@ async function executeClaudeCli(
           cwd: effectiveExecutionCwd,
           commandArgs: args,
           commandNotes,
-          env: loggedEnv,
+          // A sealed launch logs what it spawns with (redacted the same way), not the
+          // pre-launch env, which still holds the blanked variables the launch drops.
+          env: launch ? buildInvocationEnvForLogs(launch.env, { resolvedCommand }) : loggedEnv,
           prompt,
           promptMetrics,
           context,
