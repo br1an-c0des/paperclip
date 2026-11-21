@@ -1561,6 +1561,8 @@ describe("agent permission routes", () => {
         name: "OpenCode Builder",
         role: "engineer",
         adapterType: "opencode_local",
+        // The Runner path: new agents default to the classic runner.
+        runner: "paperclip",
         adapterConfig: {
           model: "anthropic/claude-sonnet-4-5",
         },
@@ -2042,7 +2044,9 @@ describe("agent permission routes", () => {
 
   for (const adapterCase of sshCapableAdapterCases) {
     it(`allows creating a ${adapterCase.adapterType} agent with an SSH default environment`, async () => {
-      const expectedAdapterType = ["codex_local", "claude_local", "opencode_local", "pi_local"].includes(adapterCase.adapterType) ? "paperclip_runner" : adapterCase.adapterType;
+      // The Runner is chosen explicitly where it can carry the harness: new agents default to the classic runner.
+      const runnerCapable = ["codex_local", "claude_local", "opencode_local", "pi_local"].includes(adapterCase.adapterType);
+      const expectedAdapterType = runnerCapable ? "paperclip_runner" : adapterCase.adapterType;
       const environmentId = "33333333-3333-4333-8333-333333333333";
       mockEnvironmentService.getById.mockResolvedValue({
         id: environmentId,
@@ -2071,6 +2075,7 @@ describe("agent permission routes", () => {
           name: adapterCase.name,
           role: "engineer",
           adapterType: adapterCase.adapterType,
+          ...(runnerCapable ? { runner: "paperclip" } : {}),
           adapterConfig: adapterCase.adapterConfig,
           defaultEnvironmentId: environmentId,
         }));

@@ -474,7 +474,8 @@ describe("agent routes adapter validation", () => {
     } finally { await unregisterTestAdapter("paperclip_runner"); }
   });
 
-  it("defaults new Codex on a qualified Linux target while the experimental flag is off", async () => {
+  // New agents default to the classic runner; these cover the Runner path, chosen explicitly.
+  it("creates new Codex on the Runner when chosen on a qualified Linux target while the experimental flag is off", async () => {
     const selection = await import("../services/agent-runner-selection.js");
     vi.spyOn(selection, "resolveNewAgentRunnerForCompany").mockImplementation(async (_db, _companyId, input) =>
       selection.resolveNewAgentRunner({ ...input, target: { driver: "local", platform: "linux", architecture: "x64" } }));
@@ -483,7 +484,7 @@ describe("agent routes adapter validation", () => {
     const res = await requestApp(app, (baseUrl) =>
       request(baseUrl)
         .post("/api/companies/company-1/agents")
-        .send({ name: "Native Codex", adapterType: "codex_local" }),
+        .send({ name: "Native Codex", adapterType: "codex_local", runner: "paperclip" }),
     );
 
     expect(res.status, JSON.stringify(res.body)).toBe(201);
@@ -491,7 +492,7 @@ describe("agent routes adapter validation", () => {
     expect(mockAgentService.create.mock.calls.at(-1)?.[2]).toMatchObject({ runnerResolved: true });
   });
 
-  it("retains explicit legacy Codex and rejects incompatible automatic settings before persistence", async () => {
+  it("retains explicit legacy Codex and rejects incompatible Runner settings before persistence", async () => {
     const selection = await import("../services/agent-runner-selection.js");
     vi.spyOn(selection, "resolveNewAgentRunnerForCompany").mockImplementation(async (_db, _companyId, input) =>
       selection.resolveNewAgentRunner({ ...input, target: { driver: "local", platform: "linux", architecture: "x64" } }));
@@ -500,13 +501,13 @@ describe("agent routes adapter validation", () => {
     expect(legacy.status, JSON.stringify(legacy.body)).toBe(201);
     expect(mockAgentService.create.mock.calls.at(-1)?.[1]).toMatchObject({ adapterType: "codex_local", adapterConfig: { extraArgs: ["--search"] } });
     mockAgentService.create.mockClear();
-    const incompatible = await requestApp(app, baseUrl => request(baseUrl).post("/api/companies/company-1/agents").send({ name: "Custom", adapterType: "codex_local", adapterConfig: { extraArgs: ["--search"] } }));
+    const incompatible = await requestApp(app, baseUrl => request(baseUrl).post("/api/companies/company-1/agents").send({ name: "Custom", adapterType: "codex_local", runner: "paperclip", adapterConfig: { extraArgs: ["--search"] } }));
     expect(incompatible.status).toBe(422);
     expect(incompatible.body.details).toMatchObject({ code: "agent_runner_config_incompatible", fields: ["extraArgs"] });
     expect(mockAgentService.create).not.toHaveBeenCalled();
   });
 
-  it.each(["auto", "legacy"] as const)("creates OpenCode through the public route with %s selection and the experimental flag off", async runner => {
+  it.each(["paperclip", "legacy"] as const)("creates OpenCode through the public route with %s selection and the experimental flag off", async runner => {
     const selection = await import("../services/agent-runner-selection.js");
     vi.spyOn(selection, "resolveNewAgentRunnerForCompany").mockImplementation(async (_db, _companyId, input) =>
       selection.resolveNewAgentRunner({ ...input, target: { driver: "local", platform: "darwin", architecture: "arm64" } }));
@@ -524,7 +525,7 @@ describe("agent routes adapter validation", () => {
     const originalCreate = mockAgentService.create.getMockImplementation()!;
     mockAgentService.create.mockImplementation(async (...args) => ({ ...await originalCreate(...args), lifecycleHolds: ["setup"] }));
     const app = await createApp();
-    const input = { name: "OpenCode draft", adapterType: "opencode_local", adapterConfig: {} };
+    const input = { name: "OpenCode draft", adapterType: "opencode_local", runner: "paperclip", adapterConfig: {} };
     const draft = await requestApp(app, baseUrl => request(baseUrl).post("/api/companies/company-1/agents")
       .send({ ...input, setupId: "00000000-0000-4000-8000-000000000092" }));
     expect(draft.status, JSON.stringify(draft.body)).toBe(201);
@@ -577,7 +578,7 @@ describe("agent routes adapter validation", () => {
     expect(mockAgentService.update).not.toHaveBeenCalled();
   });
 
-  it.each(["auto", "legacy"] as const)("creates Pi through the public route with %s selection and the experimental flag off", async runner => {
+  it.each(["paperclip", "legacy"] as const)("creates Pi through the public route with %s selection and the experimental flag off", async runner => {
     const selection = await import("../services/agent-runner-selection.js");
     vi.spyOn(selection, "resolveNewAgentRunnerForCompany").mockImplementation(async (_db, _companyId, input) =>
       selection.resolveNewAgentRunner({ ...input, target: { driver: "local", platform: "darwin", architecture: "arm64" } }));
@@ -595,7 +596,7 @@ describe("agent routes adapter validation", () => {
     const originalCreate = mockAgentService.create.getMockImplementation()!;
     mockAgentService.create.mockImplementation(async (...args) => ({ ...await originalCreate(...args), lifecycleHolds: ["setup"] }));
     const app = await createApp();
-    const input = { name: "Pi draft", adapterType: "pi_local", adapterConfig: {} };
+    const input = { name: "Pi draft", adapterType: "pi_local", runner: "paperclip", adapterConfig: {} };
     const draft = await requestApp(app, baseUrl => request(baseUrl).post("/api/companies/company-1/agents")
       .send({ ...input, setupId: "00000000-0000-4000-8000-000000000092" }));
     expect(draft.status, JSON.stringify(draft.body)).toBe(201);
@@ -615,7 +616,7 @@ describe("agent routes adapter validation", () => {
     mockAgentService.getById.mockResolvedValue({ ...(await mockAgentService.getById()), adapterType: "process", adapterConfig: {}, status: "paused", lifecycleState: "paused", pauseReason: "setup", lifecycleHolds: ["setup"] });
     const app = await createApp();
     const response = await requestApp(app, baseUrl => request(baseUrl).patch("/api/agents/11111111-1111-4111-8111-111111111111")
-      .send({ adapterType: "pi_local", runner: "auto", adapterConfig: {} }));
+      .send({ adapterType: "pi_local", runner: "paperclip", adapterConfig: {} }));
     expect(response.status, JSON.stringify(response.body)).toBe(200);
     expect(mockAgentService.update.mock.calls.at(-1)?.[1]).toMatchObject({ adapterType: "paperclip_runner", adapterConfig: { provider: "acpx", acpxAgent: "pi", model: "" } });
   });
