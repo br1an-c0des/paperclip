@@ -126,7 +126,9 @@ describe("the Claude prompt bundle", () => {
     expect(claudeSkillPlugin("paperclipai/paperclip/para-memory-files")).toBe("paperclip");
     expect(claudeSkillPlugin("company/company-1/review")).toBe("company");
     expect(claudeSkillPlugin("github.com/acme/remote-skill")).toBe("company");
-    expect(claudeSkillPlugin("paperclipai/other/thing")).toBe("company");
+    expect(claudeSkillPlugin("paperclipai/bundled/paperclip-operations/status-card-query")).toBe("paperclip");
+    expect(claudeSkillPlugin("paperclipai/other/thing")).toBe("paperclip");
+    expect(claudeSkillPlugin("paperclipai-fork/thing")).toBe("company");
   });
 
   it("the bundle key depends on the layout", async () => {

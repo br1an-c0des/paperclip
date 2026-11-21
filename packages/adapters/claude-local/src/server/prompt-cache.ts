@@ -32,7 +32,7 @@ export const CLAUDE_PROMPT_BUNDLE_LAYOUT = 2;
 
 export type ClaudeSkillPlugin = "paperclip" | "company";
 
-const PAPERCLIP_SKILL_KEY_PREFIX = "paperclipai/paperclip/";
+const PAPERCLIP_SKILL_KEY_PREFIX = "paperclipai/";
 
 const CLAUDE_SKILL_PLUGIN_DESCRIPTIONS: Record<ClaudeSkillPlugin, string> = {
   paperclip: "Paperclip's own skills: working in Paperclip, feedback, hiring, memory",
@@ -41,7 +41,9 @@ const CLAUDE_SKILL_PLUGIN_DESCRIPTIONS: Record<ClaudeSkillPlugin, string> = {
 
 /**
  * The plugin a skill loads from, by where it comes from: `paperclip` for Paperclip's own skills
- * (keys starting `paperclipai/paperclip/`), `company` for everything from the company library.
+ * (keys starting `paperclipai/`: `paperclipai/paperclip/…` and the bundled
+ * `paperclipai/bundled/…`, such as the status-card skills), `company` for everything from the
+ * company library.
  */
 export function claudeSkillPlugin(key: string): ClaudeSkillPlugin {
   return key.startsWith(PAPERCLIP_SKILL_KEY_PREFIX) ? "paperclip" : "company";
