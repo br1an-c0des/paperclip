@@ -117,8 +117,10 @@ export type ClaudeRunPreviewCheckout =
  * the task: each new task starts fresh, later wakes on it resume) and `setAside` (what a run
  * moves out of the config folder is known only when it moves it). `claudeMd` and `repoSkills`
  * can also read `not_cloned`. `credential` is null when the run would have none (a
- * `claude_credential_missing` blocker says so). `envKeys` are the names a run on a task gets
- * before its wake's own (`PAPERCLIP_TASK_ID`, `PAPERCLIP_WAKE_REASON` and the like).
+ * `claude_credential_missing` blocker says so). `envKeys` are the names from the agent's
+ * settings and Paperclip's own; a run adds launch-time ones on top: its wake's and task's
+ * (`PAPERCLIP_TASK_ID` and the like), its workspace and scratch folders, the managed git/gh
+ * launchers, telemetry export, and the agent's signing identity.
  */
 export type ClaudeRunPreviewManifest = Omit<
   ClaudeRunManifest,
