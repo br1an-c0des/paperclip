@@ -387,6 +387,25 @@ describe("sealed claude_local CLI runs: arguments, repo, prompt and manifest", (
     expect(pluginSkills).toContain("paperclip:paperclip");
   });
 
+  it("loads a company skill with a suffixed runtime name under its plain name", async () => {
+    const skillDir = path.join(root, "library", "m7-test-skill-renamed");
+    await fs.mkdir(skillDir, { recursive: true });
+    await fs.writeFile(path.join(skillDir, "SKILL.md"), "---\nname: m7-test-skill-renamed\ndescription: M7 test\n---\n# M7 test\n", "utf8");
+    const key = "company/company-sealed/m7-test-skill-renamed";
+    const { metas, onMeta } = metaCollector();
+    await execute(buildContext({
+      config: {
+        paperclipRuntimeSkills: [{ key, runtimeName: "m7-test-skill-renamed--cb66fbdc10", source: skillDir }],
+        paperclipSkillSync: { desiredSkills: [key] },
+      },
+      onMeta,
+    }));
+    const { pluginSkills } = await readCapture();
+    expect(pluginSkills).toContain("company:m7-test-skill-renamed");
+    expect(pluginSkills.some((skill) => skill.includes("--cb66fbdc10"))).toBe(false);
+    expect(manifestOf(metas[0]).skills).toContainEqual({ name: "m7-test-skill-renamed", key, origin: "assigned", plugin: "company" });
+  });
+
   it("adds the repo root when the project allows it", async () => {
     const repo = await makeCheckout(path.join(root, "repo"), { claudeMd: true });
     const on = metaCollector();

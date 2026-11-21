@@ -94,6 +94,22 @@ describe("buildClaudeRunManifest", () => {
     expect(manifest.skills.find((skill) => skill.key === "paperclipai/paperclip/complain")?.plugin).toBe("paperclip");
   });
 
+  it("names a skill with a suffixed runtime name by its plain name", () => {
+    const manifest = buildClaudeRunManifest(fullInput({
+      skills: [
+        { key: "company/co/m7-test-skill-renamed", runtimeName: "m7-test-skill-renamed--cb66fbdc10" },
+        { key: "company/co/deploy", runtimeName: "deploy--aaaaaaaaaa" },
+        { key: "github.com/acme/skills/deploy", runtimeName: "deploy--bbbbbbbbbb" },
+      ],
+    }));
+    expect(manifest.skills.slice(0, 3).map((skill) => skill.name)).toEqual([
+      "m7-test-skill-renamed",
+      // Two of one plugin share a plain name: each keeps its runtime name, as its folder does.
+      "deploy--aaaaaaaaaa",
+      "deploy--bbbbbbbbbb",
+    ]);
+  });
+
   it("lists repo skills last, from the project plugin", () => {
     const manifest = buildClaudeRunManifest(fullInput());
     const origins = manifest.skills.map((skill) => skill.origin);

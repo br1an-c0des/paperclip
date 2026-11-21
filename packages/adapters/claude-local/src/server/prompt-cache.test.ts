@@ -6,6 +6,8 @@ import type { PaperclipSkillEntry } from "@paperclipai/adapter-utils/server-util
 import {
   CLAUDE_PROMPT_BUNDLE_LAYOUT,
   buildClaudePromptBundleKey,
+  claudePluginSkillFolders,
+  claudeSkillPlainName,
   claudeSkillPlugin,
   prepareClaudePromptBundle,
 } from "./prompt-cache.js";
@@ -132,11 +134,47 @@ describe("the Claude prompt bundle", () => {
   });
 
   it("the bundle key depends on the layout", async () => {
-    expect(CLAUDE_PROMPT_BUNDLE_LAYOUT).toBe(2);
+    expect(CLAUDE_PROMPT_BUNDLE_LAYOUT).toBe(3);
     const input = { skills, instructionsContents: "Be brief." };
     const layout1 = await buildClaudePromptBundleKey({ ...input, layout: 1 });
     const layout2 = await buildClaudePromptBundleKey({ ...input, layout: 2 });
-    expect(layout1).not.toBe(layout2);
-    expect(await buildClaudePromptBundleKey(input)).toBe(layout2);
+    const layout3 = await buildClaudePromptBundleKey({ ...input, layout: 3 });
+    expect(new Set([layout1, layout2, layout3]).size).toBe(3);
+    expect(await buildClaudePromptBundleKey(input)).toBe(layout3);
+  });
+
+  it("loads a company skill with a suffixed runtime name as its plain name", async () => {
+    const renamed = {
+      key: "company/company-1/m7-test-skill-renamed",
+      runtimeName: "m7-test-skill-renamed--cb66fbdc10",
+      source: await writeSkill(root, "m7-test-skill-renamed"),
+    };
+    const bundle = await prepareClaudePromptBundle({ companyId: "company-1", skills: [...skills, renamed], instructionsContents: null, onLog });
+    expect(await list(path.join(bundle.pluginDir, "company", "skills"))).toEqual(["m7-test-skill-renamed", "review"]);
+    // The dormant remote path's .claude/skills keeps runtime names.
+    expect(await list(path.join(bundle.rootDir, ".claude", "skills"))).toContain("m7-test-skill-renamed--cb66fbdc10");
+    expect(logs).toEqual([]);
+  });
+
+  it("keeps the runtime names of two skills that share a plain name in one plugin", async () => {
+    const a = { key: "company/company-1/deploy", runtimeName: "deploy--aaaaaaaaaa", source: await writeSkill(root, "deploy-a") };
+    const b = { key: "github.com/acme/skills/deploy", runtimeName: "deploy--bbbbbbbbbb", source: await writeSkill(root, "deploy-b") };
+    const ownDeploy = { key: "paperclipai/bundled/ops/deploy", runtimeName: "deploy--cccccccccc", source: await writeSkill(root, "deploy-c") };
+    expect(claudePluginSkillFolders([a, b, ownDeploy])).toEqual(new Map([
+      [a.key, "deploy--aaaaaaaaaa"],
+      [b.key, "deploy--bbbbbbbbbb"],
+      // Alone in the paperclip plugin, so its plain name.
+      [ownDeploy.key, "deploy"],
+    ]));
+    const bundle = await prepareClaudePromptBundle({ companyId: "company-1", skills: [a, b, ownDeploy], instructionsContents: null, onLog });
+    expect(await list(path.join(bundle.pluginDir, "company", "skills"))).toEqual(["deploy--aaaaaaaaaa", "deploy--bbbbbbbbbb"]);
+    expect(await list(path.join(bundle.pluginDir, "paperclip", "skills"))).toEqual(["deploy"]);
+  });
+
+  it("takes the plain name from the key's last segment", () => {
+    expect(claudeSkillPlainName({ key: "company/company-1/review", runtimeName: "review--0123456789" })).toBe("review");
+    expect(claudeSkillPlainName({ key: "paperclipai/paperclip/paperclip", runtimeName: "paperclip" })).toBe("paperclip");
+    expect(claudeSkillPlainName({ key: "test-skill", runtimeName: "test-skill" })).toBe("test-skill");
+    expect(claudeSkillPlainName({ key: "company/..", runtimeName: "fallback--0123456789" })).toBe("fallback--0123456789");
   });
 });

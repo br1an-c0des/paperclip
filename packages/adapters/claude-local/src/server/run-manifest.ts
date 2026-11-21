@@ -12,7 +12,7 @@ import {
   PAPERCLIP_FEEDBACK_SKILL_KEYS,
   PAPERCLIP_OPERATIONAL_SKILL_KEY,
 } from "@paperclipai/adapter-utils/server-utils";
-import { claudeSkillPlugin } from "./prompt-cache.js";
+import { claudePluginSkillFolders, claudeSkillPlugin } from "./prompt-cache.js";
 import { REPO_SKILLS_PLUGIN_NAME, type RepoSkill } from "./repo-skills.js";
 
 /**
@@ -89,8 +89,10 @@ function sortedUnique(values: Iterable<string>): string[] {
 
 /** Pure: the manifest for one attempt of a sealed run. */
 export function buildClaudeRunManifest(input: ClaudeRunManifestInput): ClaudeRunManifest {
+  // The name the skill loads under after its plugin's prefix: its plain name (prompt-cache.ts).
+  const folders = claudePluginSkillFolders(input.skills);
   const skills: ClaudeRunManifest["skills"] = input.skills.map((entry) => ({
-    name: entry.runtimeName,
+    name: folders.get(entry.key) ?? entry.runtimeName,
     key: entry.key,
     origin: ALWAYS_ON_SKILL_KEYS.has(entry.key.trim().toLowerCase()) ? "always_on" : "assigned",
     plugin: claudeSkillPlugin(entry.key),
