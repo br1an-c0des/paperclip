@@ -75,7 +75,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 38 | [Report the review-stage bypass, with failing tests](#38-report-the-review-stage-bypass-with-failing-tests) | candidate | | | 2026-10-24 | | |
 | 39 | [Turn off Claude Code's auto memory when an agent has `para-memory-files`](#39-turn-off-claude-codes-auto-memory-when-an-agent-has-para-memory-files) | candidate | | | 2026-10-24 | | |
 | 40 | [Find why 11 server tests fail on `main` (one file is core)](#40-find-why-11-server-tests-fail-on-main-one-file-is-core) | fixed | `test/bug40` | | 2026-11-18 | | `741e8c5231` (2026-11-18) |
-| 41 | [Give `para-memory-files` a recall tool that exists](#41-give-para-memory-files-a-recall-tool-that-exists) | candidate | | | 2026-11-18 | | |
+| 41 | [Give `para-memory-files` a recall tool that exists](#41-give-para-memory-files-a-recall-tool-that-exists) | fixed (`08749b9df`) | `fix/para-memory-recall` | | 2026-11-18 | | `f484c486b` (2026-11-20) |
 | 42 | [Fix or move the 8 test files that fail in a full run on `main`](#42-fix-or-move-the-8-test-files-that-fail-in-a-full-run-on-main) | fixed | `test/tiers` | | 2026-11-18 | | `b6e7076fae` (2026-11-18) |
 | 43 | [Stop a company import from setting an existing agent's access level](#43-stop-a-company-import-from-setting-an-existing-agents-access-level) | fixed on `feat/step-4a` (`fd0acf010`) | | | 2026-11-18 | | |
 | 44 | [Return 409, not 500, when a new label's name is taken](#44-return-409-not-500-when-a-new-labels-name-is-taken) | candidate | | | 2026-11-18 | | |
@@ -101,6 +101,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 64 | [Find the file that leaves a heartbeat run behind for heartbeat-task-drain](#64-find-the-file-that-leaves-a-heartbeat-run-behind-for-heartbeat-task-drain) | fixed (`877fe4dd7`, `ec3d65627`) | | | 2026-11-20 | | |
 | 65 | [Tag the running image as previous before Compose builds the new one](#65-tag-the-running-image-as-previous-before-compose-builds-the-new-one) | fixed (`49b1c703d`) | | | 2026-11-20 | | |
 | 66 | [Let the database decide a lease that looks expired on the server's clock](#66-let-the-database-decide-a-lease-that-looks-expired-on-the-servers-clock) | fixed (`c67fff236`) | | | 2026-11-20 | | |
+| 67 | [Make `agent-commentary-skills` pass in a worktree under `.claude/`](#67-make-agent-commentary-skills-pass-in-a-worktree-under-claude) | candidate | | | 2026-11-20 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -720,6 +721,11 @@ Found 2026-11-18 while comparing the memory systems
   first is simpler; the memory files are small. If memory moves to a memory service
   ([build plan 3.5](../ui-new/docs/build-plan.md#35-memory-service)), this section goes anyway.
 - **Fork workaround:** none.
+- **Fixed** (`08749b9df`, merged `f484c486b`, 2026-11-20), the first option: the section is now
+  "Memory Recall -- Summaries First, Then Search": `life/index.md`, the entity's `summary.md`,
+  `MEMORY.md`, then `rg` over `$AGENT_HOME` (`grep -r` without it; the image installs `ripgrep`).
+  The "Planning" section's `qmd` line went the same way. Done ahead of step 4b, which turns
+  Claude Code's auto memory off for every run.
 
 ### 42. Fix or move the 8 test files that fail in a full run on `main`
 
@@ -1150,3 +1156,18 @@ exit code or output.
   (`renewal_deadline`). With two CPUs, `issue-recovery-activity-hints` now has 0 failed runs out of
   60 (three runs; before, 2–4 in every run). The test's 10% allowance for failed runs is left as
   upstream wrote it.
+
+### 67. Make `agent-commentary-skills` pass in a worktree under `.claude/`
+
+Found 2026-11-20 by step 4b's agent A.
+
+- **Problem:** `server/src/__tests__/agent-commentary-skills.test.ts`, "mounts both skills and their
+  shared helper for Codex, Claude and the Codex sandbox home", fails with `ENOENT` on
+  `<tmp>/codex/skills/complain/SKILL.md` when run from an agent worktree
+  (`.claude/worktrees/agent-*`), with or without the branch's changes. It passes from the main
+  checkout at the same commit, and CI is green. So it depends on where the checkout lives: likely
+  the Codex skill discovery skips, or resolves differently, a source path under a `.claude/` folder.
+  Dormant code (Codex), but it puts a red test in every agent's `test:quick` report.
+- **Likely fix:** find which path rule the Codex half applies to the skill source; make the test
+  independent of the checkout's location, or fix the rule if it's wrong for real installs.
+- **Fork workaround:** none; reviewers re-run it from the main checkout.
