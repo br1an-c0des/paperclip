@@ -66,9 +66,11 @@ export function agentRunnerAvailability(harness: string, target: RunnerTarget = 
   }
   if (target.driver === "unavailable") return { supportedRunners: [], defaultRunner: "legacy" };
   if (target.runnerTasks || target.managedCloudImage) {
-    return runnerAdaptersAvailable(harness, target.driver, disabledTypes)
-      ? { supportedRunners: target.runnerTasks ? ["paperclip"] : ["paperclip", "legacy"], defaultRunner: "paperclip" }
-      : { supportedRunners: ["legacy"], defaultRunner: "legacy" };
+    if (!runnerAdaptersAvailable(harness, target.driver, disabledTypes)) return { supportedRunners: ["legacy"], defaultRunner: "legacy" };
+    // An environment that runs agents only through the Runner has no classic runner to default to.
+    return target.runnerTasks
+      ? { supportedRunners: ["paperclip"], defaultRunner: "paperclip" }
+      : { supportedRunners: ["paperclip", "legacy"], defaultRunner: "legacy" };
   }
   const supported = runnerAdaptersAvailable(harness, target.driver, disabledTypes)
     && (target.driver !== "sandbox" || Boolean(target.platform && target.architecture
@@ -76,8 +78,9 @@ export function agentRunnerAvailability(harness: string, target: RunnerTarget = 
     && (["claude_local", "grok_local"].includes(harness)
       ? !!target.platform && paperclipRunnerSupportsPlatform(harness, target.platform, target.architecture ?? "", target.libc, target.glibcVersion)
       : !target.platform || paperclipRunnerSupportsPlatform(harness, target.platform, target.architecture ?? "", target.libc, target.glibcVersion));
-  const automatic = supported && !(harness === "claude_local" && target.driver === "ssh" && target.platform === "darwin");
-  return { supportedRunners: supported ? ["paperclip", "legacy"] : ["legacy"], defaultRunner: automatic ? "paperclip" : "legacy" };
+  // New agents default to the classic runner (`legacy`) wherever it can carry the harness; the
+  // Paperclip Runner is an explicit choice (`runner: "paperclip"`).
+  return { supportedRunners: supported ? ["paperclip", "legacy"] : ["legacy"], defaultRunner: "legacy" };
 }
 
 function incompatible(fields: string[]): never {

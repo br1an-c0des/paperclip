@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AdapterExecutionContext, AdapterExecutionResult } from "@paperclipai/adapter-utils";
+import { sealedRunInputs } from "./helpers/claude-local-sealed-run.js";
 
 const processResult = vi.hoisted(() => vi.fn());
 vi.mock("@paperclipai/adapter-utils/execution-target", async (original) => ({
@@ -11,6 +12,14 @@ vi.mock("@paperclipai/adapter-utils/execution-target", async (original) => ({
 }));
 
 type Execute = (context: AdapterExecutionContext) => Promise<AdapterExecutionResult>;
+
+// claude_local's local runs are sealed (step 4b): they start only with a run token and the
+// `paperclip` MCP server (the credential is the fixture's ANTHROPIC_API_KEY).
+function sealedInputsFor(name: string): Pick<AdapterExecutionContext, "authToken" | "runtimeMcp"> {
+  if (name !== "claude") return {};
+  const { authToken, runtimeMcp } = sealedRunInputs();
+  return { authToken, runtimeMcp };
+}
 const cases: Array<{ name: string; execute: () => Promise<Execute>; event: unknown; tokens?: { inputTokens: number; outputTokens: number; cachedInputTokens: number }; price: number | null }> = [
   { name: "codex", execute: async () => (await import("../../../packages/adapters/codex-local/src/server/execute.js")).execute,
     event: { type: "turn.completed", usage: { input_tokens: 120, cached_input_tokens: 100, output_tokens: 10 } }, tokens: { inputTokens: 20, cachedInputTokens: 100, outputTokens: 10 }, price: null },
@@ -80,7 +89,7 @@ describe("CLI adapter accounting on timeout", () => {
       runtime: { sessionId: null, sessionParams: null, sessionDisplayId: null, taskKey: null },
       config: { engine: "cli", command, cwd: dir, model: ["opencode", "pi"].includes(fixture.name) ? "openai/test" : fixture.name === "cursor" ? "gpt-5" : "test", paperclipRuntimeSkills: [],
         env: { XDG_CONFIG_HOME: dir, OPENAI_API_KEY: "test-placeholder", ANTHROPIC_API_KEY: "test-placeholder", GEMINI_API_KEY: "test-placeholder", OPENCODE_ALLOW_ALL_MODELS: "1", CLAUDE_CONFIG_DIR: dir } },
-      context: {}, onLog: async () => {}, onUsage,
+      context: {}, onLog: async () => {}, onUsage, ...sealedInputsFor(fixture.name),
     };
     const execute = await fixture.execute();
     const initial = await execute(context);
@@ -234,7 +243,7 @@ describe("CLI adapter accounting on timeout", () => {
       runtime: { sessionId: null, sessionParams: null, sessionDisplayId: null, taskKey: null },
       config: { engine: "cli", command, cwd: dir, model: ["opencode", "pi"].includes(fixture.name) ? "openai/test" : fixture.name === "cursor" ? "gpt-5" : "test", paperclipRuntimeSkills: [],
         env: { XDG_CONFIG_HOME: dir, OPENAI_API_KEY: "test-placeholder", ANTHROPIC_API_KEY: "test-placeholder", GEMINI_API_KEY: "test-placeholder", MOONSHOT_API_KEY: "test-placeholder", OPENCODE_ALLOW_ALL_MODELS: "1", CLAUDE_CONFIG_DIR: dir } },
-      context: {}, onLog: async () => {},
+      context: {}, onLog: async () => {}, ...sealedInputsFor(fixture.name),
     });
     expect(result.timedOut).toBe(true);
     expect(result.usageComplete).toBe(["codex", "cursor", "gemini", "kimi"].includes(fixture.name));

@@ -1,4 +1,4 @@
-import type { HeartbeatRunEvent } from "@paperclipai/shared";
+import type { ClaudeRunManifest, HeartbeatRunEvent } from "@paperclipai/shared";
 import { redactCommandText } from "@paperclipai/adapter-utils/command-redaction";
 import { redactHomePathUserSegments, redactHomePathUserSegmentsInValue } from "@paperclipai/adapter-utils/log-redaction";
 
@@ -23,6 +23,8 @@ export type RunInvocation = {
   command: string | null;
   commandNotes: string[];
   env: EnvLine[];
+  /** What a sealed claude_local CLI run got (step 4b); null for other runs and older ones. */
+  manifest: ClaudeRunManifest | null;
 };
 
 const REDACTED = "••••••••";
@@ -55,6 +57,16 @@ function envLine(key: string, value: unknown, censor: boolean): EnvLine {
   }
 }
 
+/**
+ * The run manifest a sealed claude_local CLI run records on its `adapter.invoke` event
+ * (`payload.runManifest`, step 4b). ui-new takes only types from `@paperclipai/shared`, so this
+ * repeats `isClaudeRunManifest`'s checks: an object with `version: 1` and `engine: "cli"`.
+ */
+export function readRunManifest(payload: Record<string, unknown> | null | undefined): ClaudeRunManifest | null {
+  const manifest = record(payload?.runManifest);
+  return manifest && manifest.version === 1 && manifest.engine === "cli" ? (manifest as unknown as ClaudeRunManifest) : null;
+}
+
 export function readInvocation(payload: Record<string, unknown> | null | undefined, options: { censorUsername?: boolean } = {}): RunInvocation | null {
   if (!payload) return null;
   const censor = options.censorUsername ?? false;
@@ -81,6 +93,10 @@ export function readInvocation(payload: Record<string, unknown> | null | undefin
       ? payload.commandNotes.filter((note): note is string => typeof note === "string" && note.trim().length > 0).map(paths)
       : [],
     env: env ? Object.keys(env).sort().map((key) => envLine(key, env[key], censor)) : [],
+    manifest: (() => {
+      const manifest = readRunManifest(payload);
+      return manifest ? (redactHomePathUserSegmentsInValue(manifest, { enabled: censor }) as ClaudeRunManifest) : null;
+    })(),
   };
 }
 

@@ -239,7 +239,8 @@ option 3 is a feature idea, [F2](build-plan.md#317-smaller-feature-ideas).
 
 ### 5. Agents can have three memory systems that don't know about each other
 
-- **Status:** Open. An interim fix is decided; the long-term fix isn't.
+- **Status:** Partly decided. Auto memory is off in every sealed `claude_local` run (step 4b, built
+  2026-11-20); the long-term memory service isn't built.
 - **Area:** `agents/runtime`, `agents/skills`, `agents/instructions`, Connectors, and the
   `enableMemoryConnectors` flag
 - **Found in:** a review of how Claude agents remember things between runs.
@@ -334,6 +335,11 @@ Paperclip in each run's environment rather than inherited from the server
 ([step-4b-sealed-runs.md](../../fork/step-4b-sealed-runs.md), section 6). Agents remember through
 `para-memory-files` where it's assigned. The long-term answer is the memory service
 ([build plan 3.5](build-plan.md#35-memory-service)).
+
+**Built 2026-11-20.** Step 4b sets `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in every sealed `claude_local`
+run (the CLI engine, now the default), and the run's "What this run got" panel shows auto memory as
+off. The variable in `deploy/docker-compose.yml` now matters only for runs that still inherit the
+server's environment, such as the ACP engine.
 
 Harnesses in use (Oct 24, 2026): `claude_local`, the Paperclip Runner and Claude Managed. So:
 

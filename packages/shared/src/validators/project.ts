@@ -121,6 +121,10 @@ const projectFields = {
   color: z.string().optional().nullable(),
   icon: z.enum(PROJECT_ICON_NAMES).optional().nullable(),
   env: envConfigSchema.optional().nullable(),
+  /** Step 4b: sealed claude_local runs load the repository's root CLAUDE.md. Default on. */
+  agentsReadClaudeMd: z.boolean().optional(),
+  /** Step 4b: sealed claude_local runs get the repository's `.claude/skills`. Default on. */
+  agentsUseRepoSkills: z.boolean().optional(),
   executionWorkspacePolicy: projectExecutionWorkspacePolicySchema.optional().nullable(),
   archivedAt: z.string().datetime().optional().nullable(),
 };

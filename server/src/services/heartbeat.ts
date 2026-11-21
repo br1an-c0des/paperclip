@@ -58,6 +58,7 @@ import { createHeartbeatRunOutput } from "./heartbeat/run-output.js";
 import { readRecoverableRunLog } from "./native-runtime/native-run-log-recovery.js";
 import { observabilitySecretValues } from "@paperclipai/adapter-utils/agent-observability";
 import { prepareHeartbeatSession, resolveHeartbeatAdapterSession } from "./heartbeat/session-preparation.js";
+import { readRunAgentAccess } from "./heartbeat/claude-run-context.js";
 import { prepareHeartbeatTaskContext } from "./heartbeat/task-context.js";
 import { selectHeartbeatEnvironment, resolveSshAuthenticationBeforeRouting } from "./heartbeat/environment-selection.js";
 import { reconcileMuseNativeTerminalRun } from "./native-runtime/muse-terminal-reconciliation.js";
@@ -3348,6 +3349,14 @@ export function heartbeatService(
             ]
           : []),
       ];
+      // Step 4b: the project's repo switches, for a sealed claude_local launch (null: no project).
+      const workspaceProjectSwitches = executionWorkspace.projectId
+        ? await db
+          .select({ agentsReadClaudeMd: projects.agentsReadClaudeMd, agentsUseRepoSkills: projects.agentsUseRepoSkills })
+          .from(projects)
+          .where(and(eq(projects.id, executionWorkspace.projectId), eq(projects.companyId, agent.companyId)))
+          .then((rows) => rows[0] ?? null)
+        : null;
       context.paperclipWorkspace = {
         cwd: executionWorkspace.cwd,
         source: executionWorkspace.source,
@@ -3365,7 +3374,12 @@ export function heartbeatService(
           await fs.mkdir(home, { recursive: true });
           return home;
         })(),
+        agentsReadClaudeMd: workspaceProjectSwitches?.agentsReadClaudeMd ?? null,
+        agentsUseRepoSkills: workspaceProjectSwitches?.agentsUseRepoSkills ?? null,
       };
+      // Step 4b: what the run manifest records about the agent's access and its AI connection.
+      context.paperclipAgentAccess = readRunAgentAccess(agent.permissions);
+      context.paperclipAiConnectionName = managedAiRuntime?.accountName ?? null;
       context.paperclipWorkspaces = buildRunWorkspaceHints(resolvedWorkspace);
       // Emit exactly one requested-vs-synced observability line for the referenced-project set. A run
       // with no referenced project stays silent, so this adds no noise to the anchor-only default. The

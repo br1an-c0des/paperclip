@@ -1943,6 +1943,7 @@ export {
   type AgentSkillSync,
   createAgentSchema,
   agentRuntimeConfigSchema,
+  agentRuntimeGitHubSchema,
   builtInAgentEmptyMutationSchema,
   builtInAgentProvisionSchema,
   builtInAgentResetSchema,
@@ -2979,6 +2980,7 @@ export { readBoardBootstrap } from "./board-bootstrap.js";
 export * from "./provider-rate-limits.js";
 export * from "./agent-interaction-permissions.js";
 export * from "./agent-access.js";
+export * from "./claude-run-manifest.js";
 export * from "./run-disposition.js";
 export * from "./permission-request.js";
 export * from "./run-failure-cause.js";

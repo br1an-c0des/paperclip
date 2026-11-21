@@ -32,6 +32,8 @@ import {
   selectPaperclipTaskMarkdown,
   selectInitialCommunicationGuidance,
   hydrateFreshSessionHandoff,
+  hasPaperclipMcpServer,
+  renderPaperclipMcpNote,
   runningProcesses,
   runChildProcess,
   sanitizeSshRemoteEnv,
@@ -4274,5 +4276,39 @@ describe("wake continuation comment ownership", () => {
       executionContinuation: { ...continuation([]), objective },
     }, { suppressIssueDescription: true });
     expect(legacy).toContain(`"objective":"${objective}"`);
+  });
+});
+
+describe("the Paperclip MCP note", () => {
+  const paperclipServer = {
+    name: "paperclip",
+    url: "http://127.0.0.1:3100/mcp",
+    token: "run-token",
+    connectionId: "paperclip",
+  };
+  const env = { PAPERCLIP_API_URL: "http://127.0.0.1:3100", PAPERCLIP_API_KEY: "key" };
+
+  it("hasPaperclipMcpServer looks for the paperclip connection", () => {
+    expect(hasPaperclipMcpServer([paperclipServer])).toBe(true);
+    expect(hasPaperclipMcpServer([{ ...paperclipServer, connectionId: "github-1" }])).toBe(false);
+    expect(hasPaperclipMcpServer([])).toBe(false);
+  });
+
+  it("points the run at the MCP tools with a server, an API URL and a key", () => {
+    const note = renderPaperclipMcpNote(env, true);
+    expect(note).toContain("paperclip_task_context");
+    expect(note).toContain("paperclip_finish");
+    expect(note).toBe([
+      "Paperclip API access note:",
+      "Work with Paperclip through the `paperclip` MCP server's `paperclip_*` tools, not HTTP requests.",
+      "Start with `paperclip_task_context`; end the run with `paperclip_finish`, `paperclip_block`, or `paperclip_report_progress` with `continue: true`.",
+      "PAPERCLIP_API_KEY is there for scripts that need the REST API.",
+    ].join("\n"));
+  });
+
+  it("is empty without the server, the API URL or the key", () => {
+    expect(renderPaperclipMcpNote(env, false)).toBe("");
+    expect(renderPaperclipMcpNote({ PAPERCLIP_API_KEY: "key" }, true)).toBe("");
+    expect(renderPaperclipMcpNote({ PAPERCLIP_API_URL: "http://127.0.0.1:3100" }, true)).toBe("");
   });
 });

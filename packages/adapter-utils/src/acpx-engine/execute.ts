@@ -90,6 +90,8 @@ import {
   renderTemplate,
   resolvePaperclipInstanceRootForAdapter,
   hydrateFreshSessionHandoff,
+  hasPaperclipMcpServer,
+  renderPaperclipMcpNote,
   selectInitialCommunicationGuidance,
   selectPaperclipPromptSections,
   resolveLegacyPaperclipDesiredSkillNames,
@@ -3149,22 +3151,6 @@ function renderPaperclipEnvNote(env: Record<string, string>): string {
   ].join("\n");
 }
 
-/** Paperclip's own MCP server for the run, which the server gives every run with a token. */
-function hasPaperclipMcpServer(ctx: AdapterExecutionContext): boolean {
-  return (ctx.runtimeMcp?.getServers() ?? []).some((server) => server.connectionId === "paperclip");
-}
-
-/** Points the run at the `paperclip` MCP tools; nothing when the run has no Paperclip API access. */
-function renderApiAccessNote(env: Record<string, string>, paperclipMcp: boolean): string {
-  if (!paperclipMcp || !env.PAPERCLIP_API_URL || !env.PAPERCLIP_API_KEY) return "";
-  return [
-    "Paperclip API access note:",
-    "Work with Paperclip through the `paperclip` MCP server's `paperclip_*` tools, not HTTP requests.",
-    "Start with `paperclip_task_context`; end the run with `paperclip_finish`, `paperclip_block`, or `paperclip_report_progress` with `continue: true`.",
-    "PAPERCLIP_API_KEY is there for scripts that need the REST API.",
-  ].join("\n");
-}
-
 async function buildPrompt(ctx: AdapterExecutionContext, resumedSession: boolean, env: Record<string, string>): Promise<{
   prompt: string;
   promptMetrics: Record<string, number>;
@@ -3228,7 +3214,7 @@ async function buildPrompt(ctx: AdapterExecutionContext, resumedSession: boolean
       : renderTemplate(promptTemplate, templateData);
   const sessionHandoffNote = asString(context.paperclipSessionHandoffMarkdown, "").trim();
   const paperclipEnvNote = externalChatTurn || resumedSession ? "" : renderPaperclipEnvNote(env);
-  const apiAccessNote = externalChatTurn || resumedSession ? "" : renderApiAccessNote(env, hasPaperclipMcpServer(ctx));
+  const apiAccessNote = externalChatTurn || resumedSession ? "" : renderPaperclipMcpNote(env, hasPaperclipMcpServer(ctx.runtimeMcp?.getServers() ?? []));
   const prompt = joinPromptSections([
     promptInstructionsPrefix,
     renderedBootstrapPrompt,

@@ -214,6 +214,8 @@
       "color": null,
       "icon": null,
       "env": null,
+      "agentsReadClaudeMd": true,
+      "agentsUseRepoSkills": true,
       "gitAuthorizationGrantId": null,
       "gitAuthorizedByUserId": null,
       "pauseReason": null,

@@ -139,7 +139,7 @@ export function roleTitle(agent: Pick<Agent, "title" | "role">) {
 
 /**
  * The Harness and model column: what runs the agent as its agent page names it ("Claude Code ·
- * Paperclip Runner", "Codex · Legacy runner", "Process"), and its default model.
+ * Paperclip Runner", "Codex · Classic runner", "Process"), and its default model.
  */
 export function harnessAndModel(agent: Pick<Agent, "adapterType" | "adapterConfig">) {
   const external = ["process", "http"].includes(agent.adapterType);

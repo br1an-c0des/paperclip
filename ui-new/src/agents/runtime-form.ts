@@ -45,7 +45,7 @@ export function createRuntimeForm(input: {
   const [own, setOwn] = createStore<ExtrasDraft>({ ...ownBase() });
   const ownChanges = createMemo(() => extrasChanges(ownBase(), own));
 
-  /** The switch from the legacy runner to Paperclip Runner is staged. */
+  /** The switch from the classic runner to Paperclip Runner is staged. */
   const switching = createMemo(() => draft.runner === "paperclip" && identity().runner === "legacy" && runnerCapable(identity().harness));
   const runnerFields = createMemo(() => (switching() ? harnessFields("paperclip_runner", input.runnerSchema()) : []));
   /** The legacy config with the form's edits: what the switch starts from. */

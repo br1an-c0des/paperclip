@@ -45,6 +45,21 @@ describe("Claude runner defaults", () => {
     }
     expect(agentRunnerAvailability("claude_local", { driver: "local", platform: "linux", architecture, libc: "glibc", glibcVersion: "2.17" }).defaultRunner).toBe("legacy");
   });
+  it("keeps a new Claude agent on the classic runner with its engine when no runner is chosen", async () => {
+    const adapterConfig = { model: "claude-sonnet-5", engine: "cli", effort: "high" };
+    expect(agentRunnerAvailability("claude_local", mac)).toEqual({ supportedRunners: ["paperclip", "legacy"], defaultRunner: "legacy" });
+    for (const runner of [undefined, "auto" as const]) {
+      expect(resolveNewAgentRunner({ adapterType: "claude_local", target: mac, adapterConfig, runner })).toEqual({ adapterType: "claude_local", adapterConfig });
+      await expect(resolveNewAgentRunnerForCompany({} as never, "company", { adapterType: "claude_local", adapterConfig, runner }))
+        .resolves.toEqual({ adapterType: "claude_local", adapterConfig });
+    }
+  });
+  it("still converts a new Claude agent to the Paperclip Runner when it's chosen", () => {
+    const converted = resolveNewAgentRunner({ adapterType: "claude_local", target: mac, runner: "paperclip", adapterConfig: { model: "claude-sonnet-5", engine: "cli" } });
+    expect(converted.adapterType).toBe("paperclip_runner");
+    expect(converted.adapterConfig).toMatchObject({ provider: "acpx", acpxAgent: "claude", model: "claude-sonnet-5" });
+    expect(converted.adapterConfig).not.toHaveProperty("engine");
+  });
   it("preserves explicit models and Legacy choices", () => {
     const legacy = { adapterType: "claude_local", target: mac, runner: "legacy" as const, adapterConfig: { model: "custom", chrome: true } };
     expect(resolveNewAgentRunner(legacy)).toEqual({ adapterType: legacy.adapterType, adapterConfig: legacy.adapterConfig });
@@ -57,7 +72,7 @@ describe("Claude runner defaults", () => {
     expect(() => resolveNewAgentRunner({ ...saved, runner: "legacy", adapterConfig: { ...saved.adapterConfig, acpxPermissionMode: "deny-all" } })).toThrow("cannot honor");
   });
   it("rejects invalid effort and unknown platform defaults", () => {
-    expect(() => resolveNewAgentRunner({ adapterType: "claude_local", target: mac, adapterConfig: { effort: "ultra" } })).toThrow("Claude effort");
+    expect(() => resolveNewAgentRunner({ adapterType: "claude_local", target: mac, runner: "paperclip", adapterConfig: { effort: "ultra" } })).toThrow("Claude effort");
     expect(agentRunnerAvailability("claude_local", { driver: "sandbox" }).defaultRunner).toBe("legacy");
   });
   it("keeps unqualified targets and overrides legacy", () => {

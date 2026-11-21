@@ -145,8 +145,8 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
         const why = probeQualified(probe);
         if (why) throw new Error(why);
         const after = await agentsApi.adapters(company().id, environmentId);
-        if (after.find((adapter) => adapter.type === identity().harness)?.defaultRunner !== "paperclip") {
-          throw new Error(`This environment doesn't support Paperclip Runner. ${props.agent.name} still uses the legacy runner.`);
+        if (!after.find((adapter) => adapter.type === identity().harness)?.supportedRunners?.includes("paperclip")) {
+          throw new Error(`This environment doesn't support Paperclip Runner. ${props.agent.name} still uses the classic runner.`);
         }
       }
       const saved = await agentsApi.update(props.agent.id, patch, company().id);
@@ -267,10 +267,10 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
         </SettingsRow>
         <SettingsRow
           label="Runner"
-          info="What starts and supervises the harness for each run. Paperclip Runner supervises it; the legacy runner runs the harness program directly."
+          info="What starts and supervises the harness for each run. Paperclip Runner supervises it; the classic runner runs the harness program directly."
           changed={form.changed("runner") && { from: runnerLabel(identity().runner) }}
         >
-          <Show when={identity().runnerApplies} fallback={<span class="ag-static-text">Not applicable: {identity().harnessLabel} runs only on the legacy runner.</span>}>
+          <Show when={identity().runnerApplies} fallback={<span class="ag-static-text">Not applicable: {identity().harnessLabel} runs only on the classic runner.</span>}>
             <div class="ps-stack">
               {/* Where the adapters allow a switch either way, the runner is a choice like the other settings, staged until you save. */}
               <Show
@@ -338,7 +338,7 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
       >
         <SettingsCard
           title="Paperclip Runner settings"
-          info={`How Paperclip Runner will run ${identity().harnessLabel}: the settings carried over from the legacy runner and the Runner's defaults. Saved with the switch.`}
+          info={`How Paperclip Runner will run ${identity().harnessLabel}: the settings carried over from the classic runner and the Runner's defaults. Saved with the switch.`}
         >
           <Show when={runnerSchema.data} fallback={<p class="ps-muted-line">{runnerSchema.isError ? "Couldn't load the Runner's settings. The switch saves with its defaults." : "Loading the Runner's settings…"}</p>}>
             <For each={form.visibleFields()}>

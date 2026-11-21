@@ -94,6 +94,15 @@ import { execute } from "./execute.js";
 import { sessionCodec } from "./index.js";
 import { resetClaudeCliCapabilitiesCacheForTests } from "./cli-capabilities.js";
 
+// A local CLI run is sealed (step 4b): it needs a run token and the `paperclip` MCP server, beside
+// a credential in its env. The few local runs in this file pass these.
+const SEALED_LOCAL_RUN_INPUTS = {
+  authToken: "run-jwt-token",
+  runtimeMcp: {
+    getServers: () => [{ name: "paperclip", url: "http://127.0.0.1:3100/api/mcp/paperclip", token: "run-jwt-token", connectionId: "paperclip" }],
+  },
+};
+
 describe("claude remote execution", () => {
   const cleanupDirs: string[] = [];
 
@@ -121,7 +130,7 @@ describe("claude remote execution", () => {
     };
   }
 
-  it.each([undefined, "acp"])("admits managed SSH ACP through the public execution entry (engine=%s)", async engine => {
+  it.each(["acp"])("admits managed SSH ACP through the public execution entry (engine=%s)", async engine => {
     const ctx = managedSshAcpContext(engine);
     const actual = await vi.importActual<typeof import("@paperclipai/adapter-utils/server-utils")>("@paperclipai/adapter-utils/server-utils");
     const bin = await mkdtemp(path.join(os.tmpdir(), "paperclip-ssh-client-probe-"));
@@ -518,8 +527,10 @@ describe("claude remote execution", () => {
         sessionDisplayId: null,
         taskKey: null,
       },
-      config: { model: "claude-opus-5", engine: "cli", command: "claude", cwd: rootDir, paperclipRuntimeSkills: [] },
+      config: { model: "claude-opus-5", engine: "cli", command: "claude", cwd: rootDir, paperclipRuntimeSkills: [],
+        env: { CLAUDE_CODE_OAUTH_TOKEN: "fixture-token" } },
       context: {},
+      ...SEALED_LOCAL_RUN_INPUTS,
       onLog,
     });
 
@@ -787,6 +798,7 @@ describe("claude remote execution", () => {
   it("reselects the full assignment and bootstrap guidance after a failed resume", async () => {
     const rootDir = await mkdtemp(path.join(os.tmpdir(), "paperclip-claude-cli-fallback-context-"));
     cleanupDirs.push(rootDir);
+    vi.stubEnv("PAPERCLIP_HOME", rootDir);
     const workspaceDir = path.join(rootDir, "workspace");
     await mkdir(workspaceDir, { recursive: true });
 
@@ -843,6 +855,7 @@ describe("claude remote execution", () => {
         ...createPromptContextFixture(),
         paperclipWorkspace: { cwd: workspaceDir, source: "project_primary" },
       },
+      ...SEALED_LOCAL_RUN_INPUTS,
       onLog: async () => {},
     });
 

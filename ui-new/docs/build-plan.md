@@ -118,7 +118,7 @@ it gets built. Numbers like 3.4 and F3 refer to stage 3 further down; "fix 39" i
 | Agents message you first: a morning briefing, scheduled reports, reports after milestones | 1, then 3 | Raised in discussion on Oct 24, 2026. A recurring task does the work, and the agent sends the result to your chat with upstream's `send_chat_message` (added Nov 1, 2026), so the fork plugin tool and the upstream ask aren't needed ([3.13](#313-briefings-and-reports)). |
 | A "fast mode" for meetings | 3 (feature idea) | Codex agents already have a `fastMode` setting (`codex_local`). `claude_local` has none ([F3](#317-smaller-feature-ideas)). A fast model or low effort per message works today. |
 | A core skill add-on for new behaviour | 3 | [3.10](#310-core-skill-add-on). Fork-owned, with no conflict. |
-| Import a repo's skills, agent definitions and maybe settings into Paperclip, and give a project's tasks its own skills | Idea, then 3 | Raised Nov 18, 2026, with hard-fork step 4b's sealed runs ([3.18](#318-importing-from-a-repo-and-project-skills)). Skills from a project's GitHub repo are imported today, but scoping limits who sees them, not which runs get them. Not designed yet. |
+| Import a repo's skills, agent definitions and maybe settings into Paperclip, and give a project's tasks its own skills | Idea, then 3 | Raised Nov 18, 2026, with hard-fork step 4b's sealed runs ([3.18](#318-importing-from-a-repo-and-project-skills)). A repo's own `.claude/skills` load in runs behind a project switch since 4b (2026-11-20). Importing agent definitions and settings, and library skills by project, aren't designed yet. |
 | A `COMPANY.md`: company-wide instructions every run in the company receives, like an agent's `AGENTS.md` | Idea, then 3 | Raised Oct 27, 2026 ([3.14](#314-company-instructions-companymd)). Not designed yet. |
 | Help people understand what Paperclip is and how to use each feature: a user guide with worked examples, and an interactive guide in the app | Idea, then 1 or 3 | Raised Oct 28, 2026 ([3.15](#315-an-in-app-guide-to-paperclip)). Notes collect in [guides/](guides/README.md). Not designed yet. |
 | Investigate and design upstream's Coordinator workspace (one conversation per agent, task proposals from chat, decision cards, a Needs You queue) against `ui-new`'s Inbox, requests and chat | 1 | Raised Oct 29, 2026, from the upstream sync ([3.16](#316-upstreams-coordinator-workspace)). Not investigated yet. |
@@ -1334,14 +1334,50 @@ Raised Nov 18, 2026, while designing hard-fork step 4b; not designed or schedule
   - Those become "project skills" (`accessScope: 'projects'`). That limits **who can see** them
     (people and agents who can read the project, `skill-access.ts`), not **which runs get them**.
   - A run gets exactly the skills assigned to its agent, whatever the task's project.
-- **Coming in hard-fork step 4b part 1** (2026-11-20): a repo's own `.claude/skills`, read from
-  the run's checkout behind a project switch and loaded as a `project` plugin
-  ([4b plan](../../fork/step-4b-plan.md#one-decision-this-plan-makes-changes-design-section-4)).
+- **Built in hard-fork step 4b part 1** (2026-11-20): a repo's own `.claude/skills`, read from
+  the run's checkout behind a project switch ("Agents use the repo's skills", next to "Agents read
+  the repo's CLAUDE.md") and loaded as a `project` plugin; the run's manifest lists them
+  ([4b design](../../fork/step-4b-sealed-runs.md), section 5).
 - **Missing:** importing agent definitions and settings; library project skills added to runs by
   project (for skills that live in another repo, or that aren't in a repo at all).
 - **Questions:** whether an imported `.claude/agents` file becomes a Paperclip agent, a subagent the
   run can call, or both; which settings are worth importing (permissions, hooks, env) and how each
   shows in Paperclip; and whether an imported item tracks the repo or becomes an editable copy.
+
+### 3.19 GitHub without Paperclip's cloud: your own GitHub App
+
+Raised Nov 20, 2026, after step 4b's real-run check; not designed or scheduled yet.
+
+- **Why:** the only GitHub connection that gives runs a managed identity ("Connect GitHub",
+  `oauthStrategy: "paperclip_cloud_connector"` in `packages/shared/src/app-definitions/github.json`)
+  signs in to **upstream's** GitHub App through upstream's broker at `my.paperclip.app`
+  (`paperclip-cloud-connector-enrollment.ts`), which holds the app's OAuth secret. Setup and token
+  refresh depend on a hosted service we don't control, and the token passes through it. The other
+  method, "Personal access token (advanced)", feeds the connection's MCP tools but isn't a managed
+  identity for shell `git`/`gh`.
+- **Since step 4b:** sealed runs get GitHub only through a Paperclip connection, plus a per-agent
+  opt-in to use the server's own login; commits carry the agent as author ("authored by Builder,
+  committed by br1an-c0des").
+- **Options explored so far (2026-11-20):**
+  1. **Your own GitHub App acting as its bot** (the favourite). Created under your account through
+     GitHub's app-manifest flow, installed on chosen repos; Paperclip keeps its app ID and private
+     key and mints a one-hour installation token per `git`/`gh` operation. Identity
+     `yourapp[bot]`. Start with **one shared app** for all agents, with per-agent commit authors;
+     an agent whose PRs, comments or reviews must show as itself gets **its own app** (one manifest
+     flow and one install each). Reuses the GitHub chat channel's code
+     (`chat-channels/github/app-setup.ts`, the installation-token minting in `webhook-ingress.ts`).
+  2. **Your own GitHub App acting as you:** the same app with user OAuth, the code exchanged
+     directly at `github.com/login/oauth` with your app's client, plus refresh; feeds the existing
+     installation discovery (`tool-access/github-access-discovery.ts`).
+  3. **A token connection as a proper identity:** resolve the token's account once (`/user`) and
+     treat it as a managed identity. Quickest, but each identity is a separate GitHub account.
+- **Have today:** the per-operation credential broker and token-free `git`/`gh` launchers
+  ([doc/execution-github-identity.md](../../doc/execution-github-identity.md)), personal and
+  dedicated grants, the agent's "GitHub identity" card (Tools settings), the manifest flow in the
+  chat channel.
+- **Questions:** a "Give this agent its own GitHub identity" button wrapping the manifest flow;
+  whether the shared app or the agent's own app approves and reviews; how repo access per app shows
+  in Paperclip; retiring the cloud-connector method once this works; what server1 should move to.
 
 ## Stage 4: source-change features (merged into stage 3)
 

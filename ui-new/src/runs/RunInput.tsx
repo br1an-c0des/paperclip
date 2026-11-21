@@ -5,6 +5,7 @@ import { InfoTip } from "@/ui/InfoTip";
 import { pushToast } from "@/ui/Toast";
 import type { RunInvocation } from "./invocation";
 import { capitalize, isActiveRun, shortId } from "./run-model";
+import { RunManifest } from "./RunManifest";
 import "./RunInput.css";
 
 /*
@@ -131,6 +132,8 @@ export function RunInput(props: {
                 </Show>
               </ul>
             </section>
+
+            <Show when={invocation().manifest}>{(manifest) => <RunManifest manifest={manifest()} />}</Show>
 
             <Show when={invocation().context}>
               {(context) => (

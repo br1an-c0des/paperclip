@@ -52,8 +52,8 @@ Claude agent can take, and **not the default one**:
 | Path | How it's chosen | What runs |
 | --- | --- | --- |
 | **Paperclip Runner** | The agent's `adapterType` is `paperclip_runner` (`provider: "acpx"`, `acpxAgent: "claude"`). Decided when the agent is hired or switched, not per run. | The Rust runner daemon and `claude-agent-acp`. Not traced here. |
-| **Legacy, ACP engine** (the default) | `adapterType: "claude_local"` and `adapterConfig.engine` unset, `"auto"` or `"acp"` (`packages/adapters/claude-local/src/server/acp.ts:91-96`) | `claude-agent-acp` (the Claude Agent SDK over ACP), driven in-process by the shared ACP engine `packages/adapter-utils/src/acpx-engine/execute.ts` |
-| **Legacy, CLI engine** | `adapterType: "claude_local"` and `adapterConfig.engine: "cli"` | `claude --print --output-format stream-json …`, `packages/adapters/claude-local/src/server/execute.ts` |
+| **Legacy, ACP engine** | `adapterType: "claude_local"` and `adapterConfig.engine: "acp"` (`packages/adapters/claude-local/src/server/acp.ts:91-97`; the default until step 4b, 2026-11-20) | `claude-agent-acp` (the Claude Agent SDK over ACP), driven in-process by the shared ACP engine `packages/adapter-utils/src/acpx-engine/execute.ts` |
+| **Legacy, CLI engine** (the default since step 4b) | `adapterType: "claude_local"` and `adapterConfig.engine` unset, `"auto"` or `"cli"`. A sealed launch: [step-4b-sealed-runs.md](step-4b-sealed-runs.md) | `claude --print --output-format stream-json …`, `packages/adapters/claude-local/src/server/execute.ts` |
 
 - The branch is the first thing `execute()` does: `resolveClaudeExecutionEngineForRun`
   (`acp.ts:102-120`), then `if (engineSelection.engine === "acp") return executeClaudeAcp(ctx)`
@@ -730,6 +730,16 @@ cancel). The adapter (`toAdapterResult`, `execute.ts:1028-1332`) maps it:
 | No disposition (step 4a) | `settleRunDisposition` (`run-completion.ts`): a run is covered by a recorded disposition (`paperclip_finish`, `paperclip_block`, `paperclip_report_progress` with `continue: true`) or by its task ending `done`, `in_review` or `blocked` by any route; otherwise the missing-disposition repair below. A "continuing" run queues one continuation wake (at most 10 in a row). Exempt: chat turns, runs without a task, wakes on a done or cancelled task | Legacy |
 
 ## 10. Change points for steps 4 and 5
+
+**Built in step 4b, 2026-11-20** ([step-4b-sealed-runs.md](step-4b-sealed-runs.md)). The CLI is
+the default engine and new agents default to the classic runner. A CLI run is sealed: its own
+lasting `CLAUDE_CONFIG_DIR` per agent, a Paperclip-provided `HOME`, only an allowlist of the
+server's environment, `--setting-sources user` and `--strict-mcp-config` always, skills as the
+`paperclip`, `company` and per-run `project` plugins through `--plugin-dir`, the repo's
+`CLAUDE.md` through `--add-dir` behind the project's switch, auto memory off, GitHub only
+through a connection, and a run manifest ("What this run got"). So the rows below for setting
+sources, MCP servers, repo skills and memory are settled as described there; their code
+locations predate 4b.
 
 **Goals changed 2026-11-18** ([hard-fork plan, decision 8](hard-fork-plan.md#decisions)): runs are
 sealed, getting only what Paperclip gives them. So the rows "All setting sources", "Repo `.mcp.json`

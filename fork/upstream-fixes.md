@@ -102,6 +102,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 65 | [Tag the running image as previous before Compose builds the new one](#65-tag-the-running-image-as-previous-before-compose-builds-the-new-one) | fixed (`49b1c703d`) | | | 2026-11-20 | | |
 | 66 | [Let the database decide a lease that looks expired on the server's clock](#66-let-the-database-decide-a-lease-that-looks-expired-on-the-servers-clock) | fixed (`c67fff236`) | | | 2026-11-20 | | |
 | 67 | [Make `agent-commentary-skills` pass in a worktree under `.claude/`](#67-make-agent-commentary-skills-pass-in-a-worktree-under-claude) | candidate | | | 2026-11-20 | | |
+| 68 | [Steady `fresh-continuation-fallback`'s recycled-PID test](#68-steady-fresh-continuation-fallbacks-recycled-pid-test) | candidate | | | 2026-11-20 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -638,6 +639,9 @@ From the requests proposal, item 5 (was build plan 2a-5). A bug report, not a pu
 
 ### 39. Turn off Claude Code's auto memory when an agent has `para-memory-files`
 
+**Fixed 2026-11-20** in step 4b (`feat/step-4b`): every sealed `claude_local` run gets
+`CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` from the adapter, and the run manifest shows `autoMemory: false`.
+
 From [decision 5](../ui-new/docs/decisions.md#5-agents-can-have-three-memory-systems-that-dont-know-about-each-other),
 option 3 (was build plan 2a-6). Revives #2700.
 
@@ -1171,3 +1175,35 @@ Found 2026-11-20 by step 4b's agent A.
 - **Likely fix:** find which path rule the Codex half applies to the skill source; make the test
   independent of the checkout's location, or fix the rule if it's wrong for real installs.
 - **Fork workaround:** none; reviewers re-run it from the main checkout.
+
+### 68. Steady `fresh-continuation-fallback`'s recycled-PID test
+
+Found 2026-11-20 in CI on `feat/step-4b` (run 44797032206, shard 5).
+
+- **Problem:** `server/src/services/fresh-continuation-fallback.test.ts`, "does not mistake a
+  recycled PID for the old writer", expected `kind: "continued"` and got
+  `kind: "exact_recovery_pending"` (line 805). The same shard passed on the previous run of the
+  branch, and on the re-run of the failed job, and step 4b doesn't touch that code: a flake, likely
+  timing-sensitive around the process-start-time check.
+- **Likely fix:** find what the test races against (the recorded start time versus the probe), and
+  make it deterministic.
+- **Fork workaround:** re-run the failed CI job.
+
+### 69. Bring the opt-in hiring and portability tests up to step 4a's access levels
+
+Found 2026-11-20 by step 4b's agent E; confirmed on `feat/step-4b` before E's merge.
+
+- **Problem:** two opt-in test files fail since step 4a and CI never saw it, because the thorough tier
+  skips them (`server/**/*ai-connection*.test.*` and `server/**/*portability*.test.*` in
+  `scripts/test-tiers.json`, both marked dormant).
+  - `server/src/__tests__/agent-hire-ai-connections.test.ts`: 60 of 84 tests get 403 "This agent's
+    access level does not let it hire agents (needs agents:create)". Its fixture inserts a CEO
+    agent with no `access`, so it gets the default `worker` level, and grants the old
+    `principalPermissionGrants` keys, which 4a no longer reads for hiring.
+  - `server/src/__tests__/company-portability.test.ts`, "restores a CEO's recorded hiring denial":
+    the call it checks now carries an extra `access` field.
+- **Likely fix:** give the fixture's hiring agent an access level that allows `agents:create`, and
+  update the portability expectation to the 4a shape. Then decide whether managed AI connections
+  still belong in the opt-in tier: the `claude_local` agents here bind one (`aiConnection`), so
+  part of that area isn't dormant.
+- **Fork workaround:** none; the files only run with `corepack pnpm test:optin`.

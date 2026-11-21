@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 const { runAdapterExecutionTargetProcess } = vi.hoisted(() => ({
   runAdapterExecutionTargetProcess: vi.fn(),
@@ -72,15 +75,34 @@ function buildContext() {
       adapterConfig: {},
     },
     runtime: { sessionId: null, sessionParams: null, sessionDisplayId: null, taskKey: null },
-    config: { engine: "cli" },
+    // What a sealed CLI run needs to start: a credential, a run token and the `paperclip` server.
+    config: { engine: "cli", env: { CLAUDE_CODE_OAUTH_TOKEN: "test-token" } },
     context: {},
+    authToken: "run-jwt-token",
+    runtimeMcp: {
+      getServers: () => [{
+        name: "paperclip",
+        url: "http://127.0.0.1:3100/api/mcp/paperclip",
+        token: "run-jwt-token",
+        connectionId: "paperclip",
+      }],
+    },
     onLog: vi.fn(async () => {}),
   };
 }
 
 describe("claude_local failure classification precedence", () => {
-  beforeEach(() => {
+  let paperclipHome: string;
+
+  beforeEach(async () => {
     vi.clearAllMocks();
+    paperclipHome = await mkdtemp(path.join(os.tmpdir(), "paperclip-claude-max-turns-"));
+    vi.stubEnv("PAPERCLIP_HOME", paperclipHome);
+  });
+
+  afterEach(async () => {
+    vi.unstubAllEnvs();
+    await rm(paperclipHome, { recursive: true, force: true });
   });
 
   it("keeps max_turns_exhausted when stdout mentions model_not_found", async () => {

@@ -1,7 +1,8 @@
 # Step 4b: sealed runs on the CLI engine
 
-**Status: approved 2026-11-18; updated 2026-11-19 for 4a and 3a, both merged into `main`
-([what changed](#updated-2026-11-19-after-4a-and-3a)).** The second half of
+**Status: built 2026-11-20 on `feat/step-4b`** ([real-run check](#real-run-check-2026-11-20-rollout-step-2)).
+Approved 2026-11-18; updated 2026-11-19 for 4a and 3a, both merged into `main`
+([what changed](#updated-2026-11-19-after-4a-and-3a)). The second half of
 [hard-fork plan step 4](hard-fork-plan.md#4-make-runs-claude-native), following
 [decision 8](hard-fork-plan.md#decisions) (sealed runs). This document designs **part 1**: the
 switch to the CLI engine together with a sealed launch. Part 2 and later are listed at the end, not
@@ -227,11 +228,14 @@ so a shared folder would have them rewrite each other's skills.
   (a single plugin was tested to load under the user source on 2026-11-18; the CLI loads each
   child of a folder of plugins). Skill names are namespaced `<plugin>:<skill>`, so the plugins are
   named by where the skills come from (2026-11-20): `paperclip` for Paperclip's own skills (keys
-  starting `paperclipai/paperclip/`) and `company` for the company library. One plugin named
+  starting `paperclipai/`, the bundled ones included, as built) and `company` for the company library. One plugin named
   `paperclip` would have labelled every skill as being about Paperclip, a name the platform, the
   MCP server and the main skill already share. A plugin with no skills is left out.
 - The prefix is how Claude Code loads a skill, not its name: the manifest and `ui-new` show the
   plain names the Skills page uses, and the manifest records which plugin each came from.
+  As built, each skill's folder in its plugin is its plain name (the last segment of its key), so
+  Claude sees `company:review`, not the runtime name's hash suffix; two skills of one plugin that
+  share a plain name keep their runtime names (bundle layout 3).
 - A third plugin, `project`, carries the repo's own skills when its project allows them
   (section 5). It's built per run, outside the shared bundle.
 - Concurrent runs with different sets each get their own bundle, so nothing they share changes
@@ -355,6 +359,67 @@ so a shared folder would have them rewrite each other's skills.
    `CLAUDE.md` switch adds a migration (`deploy.sh` now backs up and rehearses migrations itself).
    4a was deployed on its own on 2026-11-19, so this deploy changes only the engine and the
    sealing.
+
+### Real-run check, 2026-11-20 (rollout step 2)
+
+Desktop dev instance at `feat/step-4b` `2d64e2181`, migration 0492 applied. Agent "M7 test sealed
+runner" (`2fa2531a`, TES, `claude_local`, `engine: "cli"`, `worker`, Sonnet 5.5, the TES "Company
+Claude subscription" managed connection), project "M7 test sealed runs" on
+`~/coding/m7-test-sealed-repo` (a root `CLAUDE.md` with a marker phrase, and
+`.claude/skills/m7-test-repo-skill`). Five runs, all `succeeded`, each finished `via: tool`:
+
+| Run | Task | Result |
+| --- | --- | --- |
+| 1 `34bd7404` | TES-37: report what you were given | **Pass.** Sealed flags, `--strict-mcp-config`, `--plugin-dir <bundle>/plugins` plus the run's `project` plugin, `--add-dir <repo>`. Manifest: `CLAUDE.md` loaded, repo skills 1, access `worker`, auto memory off, fresh `no_saved_session`. The agent quoted the `CLAUDE.md` marker and the repo skill's phrase, and saw exactly `paperclip:*`, `project:m7-test-repo-skill` and Claude Code's built-ins: none of the user's own plugins. 9 s. |
+| 2 `c2c66d3a` | TES-37 again, by comment | **Pass.** `--resume`, manifest `session: resumed`, instructions not re-sent; it answered from the earlier context. |
+| 3 `9698a631` | TES-38, both switches off | **Pass.** No `--add-dir`, one `--plugin-dir`; manifest `project_switch_off` for both; the repo skill wasn't offered. (The agent then `cat` the `CLAUDE.md` itself, as the task invited: a tool read, not a load.) |
+| 4 `74f7398f` | TES-39, delete TES-38 | **Pass.** `paperclip_delete_task` refused (`tasks:delete`), a pending `permission_request` (`c172f824`, left unapproved), TES-38 intact, the run finished. |
+| 5 `4c6bdc78` | TES-40, how would you hire | **Partial.** `init` listed `paperclip:paperclip-create-agent` and `company:m7-test-skill-renamed--cb66fbdc10`; the agent named the skill by its plain name and described its steps, but didn't invoke it (nothing needed hiring), so the plain-name pointer resolving to a namespaced skill load isn't proven either way. |
+
+No `BETTER_AUTH_SECRET`, `PAPERCLIP_AGENT_JWT_SECRET` or `DATABASE_URL` in the logged env (it's
+truncated at 100 keys; the sealed-run tests cover the rest).
+
+**Found, to settle before merging into `main`:**
+
+1. **The server's GitHub settings reach a sealed run.** `GH_CONFIG_DIR=/home/brian/.config/gh` and
+   `PAPERCLIP_GITHUB_HOST_HOME` were in run 1's env: `execution-target.ts:1735-1741` copies the
+   host's `GH_*`, `GIT_*`, `SSH_*` variables and defaults `GH_CONFIG_DIR` to the server user's
+   `~/.config/gh`. That's the server's `gh` sign-in, against the anti-goal "a run that loads
+   something from the machine … that its manifest doesn't list". Sealed runs should take git and
+   GitHub credentials from Paperclip only (the GitHub connection's `GH_TOKEN`).
+2. **New Claude hires still go to the Runner.** Creating a `claude_local` agent without
+   `runner: "legacy"` saved it as `paperclip_runner` with ACP settings and dropped `engine`
+   (`agent-runner-selection.ts`, `resolveNewAgentRunner`). Task 13 only flips the engine default
+   for `claude_local` agents; new hires need to land on `claude_local` too.
+3. **Paperclip's bundled skills land in `company`.** `claudeSkillPlugin` sends only
+   `paperclipai/paperclip/*` to `paperclip`; `paperclipai/bundled/…` (status-card skills) would load
+   as `company:`.
+4. **The manifest's skill name is the runtime name**, which for a company skill can carry a hash
+   (`m7-test-skill-renamed--cb66fbdc10`), not the plain name the Skills page shows.
+5. **The manifest's `envKeys` is mostly noise** with a managed connection: ~90 other providers'
+   credential keys, set to `""` to blank inherited values. A sealed run inherits nothing, so the
+   blanks are unneeded there.
+
+**Settled 2026-11-20** by agents E and F, merged into `feat/step-4b`:
+
+1. Sealed runs get GitHub only through a Paperclip GitHub connection; without one, `git` and `gh`
+   run through Paperclip's launchers with no credentials. A per-agent switch, "Use this server's
+   GitHub login" (`runtimeConfig.github.useServerLogin`), opts back in. The manifest's `github`
+   row says which. Commits are authored by the agent (`Name (Title)
+   <agentId@agents.paperclip.invalid>`), committed by the connected account.
+2. New agents default to the classic runner (`legacy`, "Classic runner" in the UI) and
+   `claude_local` defaults to the CLI engine (Task 13). An explicit `runner: "paperclip"` still
+   converts.
+3. Every `paperclipai/` skill loads under `paperclip:`.
+4. Skills load, and the manifest names them, by plain name (section 4).
+5. A sealed launch drops variables set to `""`, from the spawned environment, `envKeys` and the
+   logged invocation env.
+
+**Run 6, 2026-11-20** (`567605d6`, TES-41, at `56f11722a4`): **pass.** The agent saw
+`company:m7-test-skill-renamed`, `paperclip:complain`, `paperclip:paperclip`,
+`paperclip:paperclip-create-agent`, `paperclip:suggestion-box` and `project:m7-test-repo-skill`.
+Manifest `github: none`. Its local commit in the M7 repo has the agent as author and committer (no
+connection, so no account to commit as).
 
 ## Testing
 
