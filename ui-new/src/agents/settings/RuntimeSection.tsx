@@ -46,6 +46,7 @@ import { createRuntimeForm } from "../runtime-form";
 import type { DroppedSetting, RunnerPreview } from "../runner-switch-model";
 import { EnvironmentMenu, HarnessDisc, instanceDefaultEnvironment, ModelMenu, TestChecks, useInstanceDefaultId } from "./fields";
 import { HarnessChangeDialog } from "./HarnessChange";
+import { RunPreviewCard } from "./RunPreviewCard";
 import { RunnerStateCard } from "./RunnerStateCard";
 import { testFailureText } from "../ssh-ai-account";
 import { UsageLimitDetail, useUsageLimit } from "@/tasks/UsageLimit";
@@ -442,6 +443,8 @@ export function RuntimeSection(props: { agent: AgentDetail; base: string }) {
           />
         </SettingsCard>
       </Show>
+
+      <RunPreviewCard agent={props.agent} dirty={changes().length > 0} />
 
       <RunnerStateCard agent={props.agent} />
 
