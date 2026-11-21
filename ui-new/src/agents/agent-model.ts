@@ -78,7 +78,7 @@ export function harnessLabel(harness: string) {
 }
 
 export function runnerLabel(runner: AgentRunner) {
-  return runner === "paperclip" ? "Paperclip Runner" : "Legacy runner";
+  return runner === "paperclip" ? "Paperclip Runner" : "Classic runner";
 }
 
 /**
@@ -97,9 +97,9 @@ export type RuntimeIdentity = {
   harness: string;
   harnessLabel: string;
   runner: AgentRunner;
-  /** False for harnesses only the legacy runner carries (process, HTTP, Gemini…): there's no choice to show. */
+  /** False for harnesses only the classic runner carries (process, HTTP, Gemini…): there's no choice to show. */
   runnerApplies: boolean;
-  /** "Claude Code · Paperclip Runner", "Codex · Legacy runner", or just "Process". */
+  /** "Claude Code · Paperclip Runner", "Codex · Classic runner", or just "Process". */
   label: string;
 };
 
@@ -121,7 +121,7 @@ export function runtimeIdentity(agent: Pick<Agent, "adapterType" | "adapterConfi
  *   `runner: "paperclip"` switches it.
  * - `qualify`: the same, on a sandbox environment the Runner must first be qualified on
  *   (`POST /agents/:id/qualify-runner`); the switch happens if the probe confirms it.
- * - `legacy-available`: a Runner agent whose harness also runs on the legacy runner.
+ * - `legacy-available`: a Runner agent whose harness also runs on the classic runner.
  * - `none`: no choice (unsupported harness, adapters not loaded, or disabled).
  */
 export type RunnerOffer = { kind: "upgrade" | "qualify" | "legacy-available" | "none"; reason?: string };
@@ -490,7 +490,7 @@ export function runtimeFields(agent: Pick<Agent, "adapterType" | "adapterConfig"
   return {
     model: local || agent.adapterType === "cursor_cloud",
     effort: runtimeEffortKey(agent) !== null,
-    /** Claude Code's `chrome` option, which only the legacy runner reads. */
+    /** Claude Code's `chrome` option, which only the classic runner reads. */
     browser: agent.adapterType === "claude_local",
     timeouts: local || agent.adapterType === "process",
     command: legacyLocal || agent.adapterType === "process",

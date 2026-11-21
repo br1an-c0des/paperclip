@@ -97,8 +97,8 @@ describe("harness and runner", () => {
 
   it("labels the harness with its runner where there's a choice", () => {
     expect(runtimeIdentity(bob()).label).toBe("Claude Code · Paperclip Runner");
-    expect(runtimeIdentity(agent("claude_local")).label).toBe("Claude Code · Legacy runner");
-    expect(runtimeIdentity(agent("codex_local")).label).toBe("Codex · Legacy runner");
+    expect(runtimeIdentity(agent("claude_local")).label).toBe("Claude Code · Classic runner");
+    expect(runtimeIdentity(agent("codex_local")).label).toBe("Codex · Classic runner");
     const process = runtimeIdentity(agent("process"));
     expect(process.label).toBe("Process");
     expect(process.runnerApplies).toBe(false);
@@ -131,9 +131,9 @@ describe("harness and runner", () => {
     expect(runnerSwitchable({ kind: "none", reason: "not-supported-here" })).toBe(false);
     expect(runnerOptions("paperclip")).toEqual([
       { value: "paperclip", label: "Paperclip Runner (recommended)" },
-      { value: "legacy", label: "Legacy runner" },
+      { value: "legacy", label: "Classic runner" },
     ]);
-    expect(runnerOptions("legacy").map((option) => option.label)).toEqual(["Paperclip Runner", "Legacy runner"]);
+    expect(runnerOptions("legacy").map((option) => option.label)).toEqual(["Paperclip Runner", "Classic runner"]);
     expect(runnerOptions(undefined)[0]!.label).toBe("Paperclip Runner");
   });
 
