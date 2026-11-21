@@ -6,6 +6,7 @@ import {
   type ClaudeMdLoad,
   type ClaudeRepoSkillsLoad,
   type ClaudeRunCredential,
+  type ClaudeRunGitHub,
   type ClaudeRunManifest,
 } from "@paperclipai/shared";
 import {
@@ -55,6 +56,8 @@ export interface ClaudeRunManifestInput {
   mcpServers: ReadonlyArray<{ name: string; url: string }>;
   /** `context.paperclipAgentAccess`, as the server passed it. */
   access: unknown;
+  /** `context.paperclipGitHub`, as the server passed it (optional for older callers). */
+  github?: unknown;
   instructions: { entryFile: string | null; sent: boolean };
   claudeMd: ClaudeMdLoad;
   /** The launch environment; only its names reach the manifest. */
@@ -81,6 +84,21 @@ export function parseClaudeRunAccess(
   if (typeof level !== "string" || !(AGENT_ACCESS_LEVELS as readonly string[]).includes(level)) return null;
   const overrides = isRecord(value.overrides) ? (value.overrides as AgentAccessOverrides) : {};
   return { level: level as AgentAccessLevel, overrides };
+}
+
+/** How the run got GitHub, as the server decided it, or null when it passed none (or an unknown shape). */
+export function parseClaudeRunGitHub(value: unknown): ClaudeRunGitHub | null {
+  if (!isRecord(value)) return null;
+  if (value.mode === "server_login" || value.mode === "none") return { mode: value.mode };
+  if (value.mode !== "connection") return null;
+  const identitySource = value.identitySource === "dedicated" ? "dedicated" : "personal";
+  const login = typeof value.login === "string" && value.login.trim() ? value.login.trim() : null;
+  return { mode: "connection", identitySource, login };
+}
+
+function withRunGitHub(value: unknown): { github?: ClaudeRunGitHub } {
+  const github = parseClaudeRunGitHub(value);
+  return github ? { github } : {};
 }
 
 function sortedUnique(values: Iterable<string>): string[] {
@@ -140,6 +158,7 @@ export function buildClaudeRunManifest(input: ClaudeRunManifestInput): ClaudeRun
     envKeys: sortedUnique(Object.keys(input.env)),
     extraArgs: [...input.extraArgs],
     session: input.session,
+    ...withRunGitHub(input.github),
   };
 }
 

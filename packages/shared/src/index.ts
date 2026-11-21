@@ -1943,6 +1943,7 @@ export {
   type AgentSkillSync,
   createAgentSchema,
   agentRuntimeConfigSchema,
+  agentRuntimeGitHubSchema,
   builtInAgentEmptyMutationSchema,
   builtInAgentProvisionSchema,
   builtInAgentResetSchema,

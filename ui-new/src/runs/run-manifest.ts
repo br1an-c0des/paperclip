@@ -126,6 +126,21 @@ export function instructionsText(instructions: ClaudeRunManifest["instructions"]
   return instructions.sent ? `${instructions.entryFile}, sent` : `${instructions.entryFile}, not sent: the resumed session already has it`;
 }
 
+/**
+ * The GitHub line: "Connection: octocat (personal)", "This server's GitHub login" or "None".
+ * Null when the manifest has no `github` (older runs), so the row isn't shown.
+ */
+export function githubText(github: ClaudeRunManifest["github"] | undefined): string | null {
+  if (!github || typeof github !== "object") return null;
+  if (github.mode === "server_login") return "This server's GitHub login";
+  if (github.mode === "none") return "None";
+  if (github.mode === "connection") {
+    const source = github.identitySource === "dedicated" ? "dedicated" : "personal";
+    return `Connection: ${github.login ? github.login : "account not recorded"} (${source})`;
+  }
+  return null;
+}
+
 /** "Resumed 7f3a…", or "A new session: the working folder changed". */
 export function sessionText(session: ClaudeRunManifest["session"] | undefined, shortId: (id: string) => string): string {
   if (!session) return "Not recorded";

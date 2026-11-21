@@ -73,8 +73,18 @@ export const createAgentInstructionsBundleSchema = z.object({
   }),
 });
 
+/**
+ * `runtimeConfig.github`. `useServerLogin`: a sealed claude_local CLI run with no GitHub
+ * connection covering the agent uses the server's own GitHub login (gh, git and SSH) instead
+ * of running without credentials. Off by default; other runs ignore it.
+ */
+export const agentRuntimeGitHubSchema = z.object({
+  useServerLogin: z.boolean().optional(),
+}).strict();
+
 export const agentRuntimeConfigSchema = z.object({
   aiConnection: aiConnectionBindingSchema.optional(),
+  github: agentRuntimeGitHubSchema.optional(),
   debug: z.object({
     providerTrace: z.literal("raw").optional(),
   }).strict().optional(),

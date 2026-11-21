@@ -2,7 +2,7 @@ import type { ClaudeRunManifest } from "@paperclipai/shared";
 import { For, Show } from "solid-js";
 import { InfoTip } from "@/ui/InfoTip";
 import { shortId } from "./run-model";
-import { accessText, claudeMdText, credentialText, instructionsText, repoSkillsSkipped, sessionText, skillGroups } from "./run-manifest";
+import { accessText, claudeMdText, credentialText, githubText, instructionsText, repoSkillsSkipped, sessionText, skillGroups } from "./run-manifest";
 
 /*
  * "What this run got" (step 4b, design section 8): a sealed claude_local CLI run's manifest, one line
@@ -82,6 +82,20 @@ export function RunManifest(props: { manifest: ClaudeRunManifest }) {
           </span>
           <span>{mcpNames().length > 0 ? <span class="mono ri-wrap">{mcpNames().join(", ")}</span> : "None"}</span>
         </li>
+        <Show when={githubText(props.manifest.github)}>
+          {(text) => (
+            <li>
+              <span class="ri-k info-line">
+                GitHub
+                <InfoTip label="About GitHub">
+                  How git and gh got GitHub access: a GitHub connection in Paperclip, this server's own GitHub login (the agent's "Use this server's GitHub login"), or none, when
+                  they ran without credentials.
+                </InfoTip>
+              </span>
+              <span>{text()}</span>
+            </li>
+          )}
+        </Show>
         <li>
           <span class="ri-k">Access</span>
           <span>{accessText(props.manifest.access)}</span>
