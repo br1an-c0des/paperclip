@@ -250,6 +250,28 @@ describe("sealed claude_local CLI runs: environment and config folder", () => {
     expect(capture.env.CLAUDE_CONFIG_DIR).toBe(path.join(agentFolder(), "claude-config"));
   });
 
+  it("drops a managed connection's blanked provider keys", async () => {
+    const { metas, onMeta } = metaCollector();
+    const blanked = { ANTHROPIC_API_KEY: "", OPENAI_API_KEY: "", GEMINI_API_KEY: "", ANTHROPIC_AUTH_TOKEN: "", AWS_ACCESS_KEY_ID: "" };
+    const result = await execute(buildContext({
+      config: { managedAiConnection: { connectionId: "conn-1", method: "subscription" } },
+      configEnv: blanked,
+      onMeta,
+    }));
+    expect(result.exitCode).toBe(0);
+    const { env } = await readCapture();
+    const manifest = manifestOf(metas[0]);
+
+    for (const key of Object.keys(blanked)) {
+      expect(env).not.toHaveProperty(key);
+      expect(manifest.envKeys).not.toContain(key);
+    }
+    expect(Object.values(env)).not.toContain("");
+    expect(env.CLAUDE_CODE_DISABLE_AUTO_MEMORY).toBe("1");
+    expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe(SEALED_TEST_CLAUDE_TOKEN);
+    expect(manifest.envKeys).toEqual(expect.arrayContaining(["CLAUDE_CODE_DISABLE_AUTO_MEMORY", "CLAUDE_CODE_OAUTH_TOKEN"]));
+  });
+
   it("uses the agent's config folder", async () => {
     await execute(buildContext({ configEnv: { CLAUDE_CONFIG_DIR: path.join(root, "agent-chosen-config") } }));
     const capture = await readCapture();

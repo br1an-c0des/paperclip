@@ -383,12 +383,19 @@ async function prepareSealedClaudeRun(input: {
   };
 }
 
-/** The environment a sealed launch spawns with: the host allowlist, the run's `env`, then the sealed values. */
+/**
+ * The environment a sealed launch spawns with: the host allowlist, the run's `env`, then the
+ * sealed values. Empty values are dropped: a sealed run inherits nothing, so a variable set to
+ * `""` to blank an inherited one (the managed connection's other providers' keys) guards nothing.
+ */
 function buildSealedLaunchEnv(env: Record<string, string>, sealed: SealedClaudeRun): Record<string, string> {
   const launchEnv: Record<string, string> = { ...projectSealedHostEnvironment(process.env), ...env };
   for (const [key, value] of Object.entries(sealed.envOverrides)) {
     delete launchEnv[key];
     launchEnv[key] = value;
+  }
+  for (const [key, value] of Object.entries(launchEnv)) {
+    if (value === "") delete launchEnv[key];
   }
   return launchEnv;
 }
