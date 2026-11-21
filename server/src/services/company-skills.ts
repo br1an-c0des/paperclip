@@ -416,6 +416,11 @@ type RuntimeSkillEntryOptions = {
    * names the cache location only and must not be read.
    */
   admittedVersionsOnly?: boolean;
+  /**
+   * Read the library as it stands, without first reconciling bundled skills and local sources
+   * into it (which writes). The run preview reads this way; runs and settings pages don't.
+   */
+  skipInventoryRefresh?: boolean;
 };
 
 type SkillActor = {
@@ -2999,6 +3004,13 @@ async function listLastEditorsBySkillId(
   }
   return editors;
 }
+
+/**
+ * A runtime skill entry's `missingDetail` when only its version cache isn't written yet: a
+ * listing that doesn't materialize (`materializeMissing: false`) reports it missing, and the
+ * next run writes it. The run preview counts such a skill as mounted.
+ */
+export const RUNTIME_SKILL_PENDING_MATERIALIZATION_DETAIL = "The selected skill version will be materialized on the next run.";
 
 export function companySkillService(db: Db, options: { actor?: AuthorizationActor; packageDb?: Db } = {}) {
   const packageDb = options.packageDb ?? db;
@@ -6029,7 +6041,7 @@ export function companySkillService(db: Db, options: { actor?: AuthorizationActo
           } catch (error) {
             if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
             return { status: "missing", source: versionPath,
-              detail: "The selected skill version will be materialized on the next run." };
+              detail: RUNTIME_SKILL_PENDING_MATERIALIZATION_DETAIL };
           }
         }
         const versionSource = await measureRunPhase("skills.version.materialize", () => materializeVersionSnapshot(companyId, skill, version));
@@ -6130,7 +6142,7 @@ export function companySkillService(db: Db, options: { actor?: AuthorizationActo
         inArray(companySkills.key, [...requested]), await visibility().condition(companyId)));
     }
     const preparedSelection = requested && installed.length === requested.size;
-    if (!preparedSelection) {
+    if (!preparedSelection && !options.skipInventoryRefresh) {
       await measureRunPhase("skills.inventory", () => ensureSkillInventoryCurrent(companyId));
     }
     const resolve = async (selected: RuntimeSkillEntryOptions) => {

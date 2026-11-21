@@ -1,3 +1,5 @@
+import { and, eq } from "drizzle-orm";
+import { projects, type Db } from "@paperclipai/db";
 import {
   DEFAULT_AGENT_ACCESS_LEVEL,
   agentAccessSchema,
@@ -22,4 +24,22 @@ export function readRunAgentAccess(
   const parsed = agentAccessSchema.safeParse(record?.access);
   if (!parsed.success) return { level: DEFAULT_AGENT_ACCESS_LEVEL, overrides: {} };
   return { level: parsed.data.level, overrides: parsed.data.overrides ?? {} };
+}
+
+/**
+ * Step 4b: the project's repo switches for a sealed `claude_local` launch
+ * (`context.paperclipWorkspace.agentsReadClaudeMd` / `agentsUseRepoSkills`), or null without a
+ * project (or for a project outside the company). Read by the run and by its preview.
+ */
+export async function readProjectRepoSwitches(
+  db: Db,
+  companyId: string,
+  projectId: string | null | undefined,
+): Promise<{ agentsReadClaudeMd: boolean; agentsUseRepoSkills: boolean } | null> {
+  if (!projectId) return null;
+  return db
+    .select({ agentsReadClaudeMd: projects.agentsReadClaudeMd, agentsUseRepoSkills: projects.agentsUseRepoSkills })
+    .from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.companyId, companyId)))
+    .then((rows) => rows[0] ?? null);
 }

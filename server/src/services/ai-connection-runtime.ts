@@ -210,6 +210,150 @@ done`,
   }
 }
 
+const MANAGED_AI_INCOMPATIBLE_ROUTING_ENV_KEYS = [
+  "ANTHROPIC_BASE_URL",
+  "OPENAI_BASE_URL",
+  "XAI_BASE_URL",
+  "CLAUDE_CODE_USE_BEDROCK",
+  "CLAUDE_CODE_USE_VERTEX",
+  "CLAUDE_CODE_USE_FOUNDRY",
+  "PAPERCLIP_OPENCODE_PROVIDERS",
+  "PAPERCLIP_AI_PROVIDER_URL", "PAPERCLIP_CODEX_PROVIDERS", "PAPERCLIP_PI_PROVIDERS", "OPENCODE_CONFIG_CONTENT", "OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "GOOGLE_GEMINI_BASE_URL", "ANTHROPIC_BEDROCK_BASE_URL",
+] as const;
+
+/** Refuses an agent `env` that routes the provider itself, which a managed connection replaces. */
+export function assertManagedAiRoutingCompatible(config: Record<string, unknown>) {
+  const configuredEnv =
+    config.env && typeof config.env === "object"
+      ? (config.env as Record<string, unknown>)
+      : {};
+  for (const key of MANAGED_AI_INCOMPATIBLE_ROUTING_ENV_KEYS) {
+    if (configuredEnv[key])
+      throw unprocessable(
+        "The configured provider routing is incompatible with this AI connection",
+        { code: "ai_connection_incompatible" },
+      );
+  }
+}
+
+/**
+ * A managed run's env before harness-specific additions: the agent's env without its own AI
+ * credentials, every AI credential key blanked, the connection's private home, and the
+ * credential under its method's variable (unless it's routed or delivered as a file). Shared by
+ * a run and its preview (`describeManagedAiRuntime`).
+ */
+function managedAiBaseEnvironment(input: {
+  configEnv: unknown;
+  home: string;
+  provider: AiConnectionBinding["provider"];
+  method: string;
+  routed: boolean;
+  subscriptionFile: boolean;
+  credential: string;
+}): Record<string, unknown> {
+  const env: Record<string, unknown> = {
+    ...stripAiAuthBindings(input.configEnv),
+    ...Object.fromEntries(AI_AUTH_ENV_KEYS.map((key) => [key, ""])),
+    ...managedAiHomeEnvironment(input.home),
+    ...(input.provider === "github" ? { GH_TOKEN: "", GITHUB_TOKEN: "" } : {}),
+  };
+  const methods = AI_CONNECTION_CAPABILITIES[input.provider].methods as Record<string, { envKey: string } | undefined>;
+  const capability = methods[input.method]!;
+  if (!input.routed && !input.subscriptionFile) env[capability.envKey] = input.credential;
+  return env;
+}
+
+/** Lays a routed connection's projected variables over the env, keeping custom headers. */
+function applyManagedAiRoutingEnvironment(
+  env: Record<string, unknown>,
+  projected: NonNullable<ReturnType<typeof managedProviderRouting>>,
+) {
+  const customHeaders = env.ANTHROPIC_CUSTOM_HEADERS ?? process.env.ANTHROPIC_CUSTOM_HEADERS;
+  Object.assign(env, projected.env);
+  if (projected.env.ANTHROPIC_CUSTOM_HEADERS && customHeaders !== undefined) {
+    // Preserve secret references until adapter resolution; the adapter merges
+    // attribution after resolving them. Ordinary gateway headers survive too.
+    env.ANTHROPIC_CUSTOM_HEADERS = typeof customHeaders === "string"
+      ? openRouterClaudeHeaders(customHeaders)
+      : customHeaders;
+  }
+}
+
+/** The adapter config a managed run gets: its env, the routing, and the connection it ran under. */
+function managedAiRuntimeConfig<Attribution extends object, Routing>(input: {
+  config: Record<string, unknown>;
+  projected: ReturnType<typeof managedProviderRouting> | undefined;
+  routing: Routing;
+  env: Record<string, unknown>;
+  attribution: Attribution;
+  identity: string;
+  sessionIdentity: string;
+}) {
+  return {
+    ...input.config,
+    ...input.projected?.config,
+    ...(input.routing ? { managedAiRouting: input.routing } : {}),
+    env: input.env,
+    managedAiConnection: { ...input.attribution, identity: input.identity, sessionIdentity: input.sessionIdentity },
+  };
+}
+
+/** Stands in for a managed credential in a preview, which never decrypts it. */
+export const MANAGED_AI_PREVIEW_CREDENTIAL = "<managed credential: read at launch>";
+
+/**
+ * A managed AI connection as a run would get it, read-only (fork/step-4b-parts-2-3.md, part 2):
+ * the same selection and checks as `prepareManagedAiRuntime`, and the same config shape, with
+ * the credential, its private home and the session identities as placeholders. Decrypts
+ * nothing, makes no folder and registers nothing. Throws what the run would refuse with.
+ */
+export async function describeManagedAiRuntime(
+  db: Db,
+  input: {
+    companyId: string;
+    agentId: string;
+    responsibleUserId: string | null;
+    adapterType: string;
+    binding: AiConnectionBinding;
+    config: Record<string, unknown>;
+  },
+) {
+  assertManagedAiRoutingCompatible(input.config);
+  const harness = aiRoutingHarness(input.adapterType, input.config.provider, input.config.acpxAgent);
+  await assertManagedAiProjectAuth(input.config, harness === "claude_local" ? "anthropic" : harness === "codex_local" ? "openai" : input.binding.provider);
+  const selection = await aiConnectionService(db).select({
+    ...input,
+    userId: input.responsibleUserId,
+    model: input.config.model,
+    runnerProvider: input.config.provider,
+    acpxAgent: input.config.acpxAgent,
+  });
+  const routing = aiConnectionMetadataSchema.parse(selection.connection.config.ai).routing;
+  const subscriptionFile = selection.attribution.method === "subscription" && input.binding.provider !== "anthropic";
+  const home = path.join(os.tmpdir(), `paperclip-ai-${input.companyId}-${selection.grant.id}-preview`);
+  const env = managedAiBaseEnvironment({
+    configEnv: input.config.env,
+    home,
+    provider: input.binding.provider,
+    method: selection.attribution.method,
+    routed: Boolean(routing),
+    subscriptionFile,
+    credential: MANAGED_AI_PREVIEW_CREDENTIAL,
+  });
+  const projected = routing
+    ? managedProviderRouting(routing, harness, MANAGED_AI_PREVIEW_CREDENTIAL, typeof input.config.model === "string" ? input.config.model : "")
+    : undefined;
+  if (projected) applyManagedAiRoutingEnvironment(env, projected);
+  return {
+    config: managedAiRuntimeConfig({
+      config: input.config, projected, routing, env, attribution: selection.attribution,
+      identity: "preview", sessionIdentity: "preview",
+    }),
+    attribution: selection.attribution,
+    accountName: selection.connection.name,
+  };
+}
+
 export async function prepareManagedAiRuntime(
   db: Db,
   input: {
@@ -224,26 +368,7 @@ export async function prepareManagedAiRuntime(
     config: Record<string, unknown>;
   },
 ) {
-  const configuredEnv =
-    input.config.env && typeof input.config.env === "object"
-      ? (input.config.env as Record<string, unknown>)
-      : {};
-  for (const key of [
-    "ANTHROPIC_BASE_URL",
-    "OPENAI_BASE_URL",
-    "XAI_BASE_URL",
-    "CLAUDE_CODE_USE_BEDROCK",
-    "CLAUDE_CODE_USE_VERTEX",
-    "CLAUDE_CODE_USE_FOUNDRY",
-    "PAPERCLIP_OPENCODE_PROVIDERS",
-    "PAPERCLIP_AI_PROVIDER_URL", "PAPERCLIP_CODEX_PROVIDERS", "PAPERCLIP_PI_PROVIDERS", "OPENCODE_CONFIG_CONTENT", "OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "GOOGLE_GEMINI_BASE_URL", "ANTHROPIC_BEDROCK_BASE_URL",
-  ]) {
-    if (configuredEnv[key])
-      throw unprocessable(
-        "The configured provider routing is incompatible with this AI connection",
-        { code: "ai_connection_incompatible" },
-      );
-  }
+  assertManagedAiRoutingCompatible(input.config);
   const harness = aiRoutingHarness(input.adapterType, input.config.provider, input.config.acpxAgent);
   await assertManagedAiProjectAuth(input.config, harness === "claude_local" ? "anthropic" : harness === "codex_local" ? "openai" : input.binding.provider);
   const service = aiConnectionService(db);
@@ -318,16 +443,15 @@ export async function prepareManagedAiRuntime(
     const providerHome = path.join(home, "provider");
     await mkdir(providerHome, { mode: 0o700 });
     if (retainedCleanupScope) releaseCredentialHome = bindRetainedAiCredentialHome(providerHome, retainedCleanupScope);
-    const env: Record<string, unknown> = {
-      ...stripAiAuthBindings(input.config.env),
-      ...Object.fromEntries(AI_AUTH_ENV_KEYS.map((key) => [key, ""])),
-      ...managedAiHomeEnvironment(home),
-      ...(input.binding.provider === "github" ? { GH_TOKEN: "", GITHUB_TOKEN: "" } : {}),
-    };
-    const capability =
-      AI_CONNECTION_CAPABILITIES[input.binding.provider].methods[
-        selection.attribution.method
-      ]!;
+    const env = managedAiBaseEnvironment({
+      configEnv: input.config.env,
+      home,
+      provider: input.binding.provider,
+      method: selection.attribution.method,
+      routed: Boolean(routing),
+      subscriptionFile,
+      credential: value,
+    });
     const authFile = antigravitySubscription
       ? path.join(providerHome, "antigravity-acp", "acp_token.json")
       : path.join(providerHome, "auth.json");
@@ -338,7 +462,6 @@ export async function prepareManagedAiRuntime(
         { mode: 0o600 },
       );
     if (!routing && subscriptionFile && !antigravitySubscription) await writeFile(authFile, value, { mode: 0o600 });
-    else if (!routing && !subscriptionFile) env[capability.envKey] = value;
     if (
       !routing && input.binding.provider === "openai" && harness === "codex_local" &&
       selection.attribution.method === "api_key"
@@ -377,15 +500,7 @@ export async function prepareManagedAiRuntime(
     }
     const projected = routing ? managedProviderRouting(routing, harness, value, typeof input.config.model === "string" ? input.config.model : "") : undefined;
     if (projected) {
-      const customHeaders = env.ANTHROPIC_CUSTOM_HEADERS ?? process.env.ANTHROPIC_CUSTOM_HEADERS;
-      Object.assign(env, projected.env);
-      if (projected.env.ANTHROPIC_CUSTOM_HEADERS && customHeaders !== undefined) {
-        // Preserve secret references until adapter resolution; the adapter merges
-        // attribution after resolving them. Ordinary gateway headers survive too.
-        env.ANTHROPIC_CUSTOM_HEADERS = typeof customHeaders === "string"
-          ? openRouterClaudeHeaders(customHeaders)
-          : customHeaders;
-      }
+      applyManagedAiRoutingEnvironment(env, projected);
       if (projected.hermesConfig) await writeFile(path.join(providerHome, "config.yaml"), projected.hermesConfig, { mode: 0o600 });
       if (projected.codexConfig) await writeFile(path.join(providerHome, "config.toml"), 'cli_auth_credentials_store = "file"\n' + projected.codexConfig, { mode: 0o600 });
     }
@@ -583,13 +698,7 @@ export async function prepareManagedAiRuntime(
         credentialWriteback: { grantId: selection.grant.id, secretId: credentialRef.secretId, sessionEpoch: freshness.epoch,
           versionSelector: credentialRef.versionSelector ?? "latest" } satisfies ManagedAiCredentialWritebackBinding,
       } : {}),
-      config: {
-        ...input.config,
-        ...projected?.config,
-        ...(routing ? { managedAiRouting: routing } : {}),
-        env,
-        managedAiConnection: { ...attribution, identity, sessionIdentity },
-      },
+      config: managedAiRuntimeConfig({ config: input.config, projected, routing, env, attribution, identity, sessionIdentity }),
       attribution,
       accountName: selection.connection.name,
       accountOwnerUserId: selection.grant.subjectUserId,
