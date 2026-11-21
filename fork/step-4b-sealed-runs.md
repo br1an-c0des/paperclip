@@ -471,6 +471,8 @@ keeps the seam:
 
 ## Later parts of 4b (not designed here)
 
+Parts 2 and 3 are designed in [step-4b-parts-2-3.md](step-4b-parts-2-3.md) (2026-11-21).
+
 - **Part 2, what an agent's runs get:** the same list as the manifest, shown on the agent's page
   before any run, from the agent's configuration.
 - **Part 3, where runs work:** the project's repo or a per-task worktree by default, never the

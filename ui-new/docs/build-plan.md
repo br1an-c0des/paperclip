@@ -973,6 +973,7 @@ alone; anything else is deferred or waits on upstream.
 | [3.12](#312-chat-outside-tasks-dropped-kept-as-a-long-term-idea) Chat outside tasks, prompt suggestions | No | Stage 4, or proposed upstream |
 | [3.17](#317-smaller-feature-ideas) Smaller feature ideas (F1 to F12) | No: each changes upstream's server or an adapter | All of it: offered upstream where it would help any user, otherwise stage 4 or the hard fork |
 | [3.16](#316-upstreams-coordinator-workspace) Coordinator workspace | Decided; the two Inbox ideas are stage 1 work (U36) | — |
+| [3.20](#320-a-dedicated-workspaces-page) Workspaces page | Yes, in core | — |
 
 ### 3.1 Custom statuses and status rules
 
@@ -1378,6 +1379,28 @@ Raised Nov 20, 2026, after step 4b's real-run check; not designed or scheduled y
 - **Questions:** a "Give this agent its own GitHub identity" button wrapping the manifest flow;
   whether the shared app or the agent's own app approves and reviews; how repo access per app shows
   in Paperclip; retiring the cloud-connector method once this works; what server1 should move to.
+
+### 3.20 A dedicated workspaces page
+
+Raised Nov 21, 2026, while designing hard-fork step 4b part 3 (worktrees by default,
+[step-4b-parts-2-3.md](../../fork/step-4b-parts-2-3.md)); not designed or scheduled yet.
+
+- **Why:** with a worktree per task by default, workspaces multiply, and the user wants one place
+  to see them all and clean them up by hand, rather than finding each through its task.
+- **Wanted:** every workspace and worktree in one list, with its current state (open, in use by a
+  run, kept and why, closed, removed with a restore point), who used it recently (agents and
+  tasks, with when), and actions to remove or clean up one or several by hand.
+- **Have today:** the organization's Workspaces tab (`/:prefix/workspaces`,
+  `ui-new/src/workspaces/WorkspacesPage.tsx`): workspaces grouped by project, each card with its
+  status, kind, branch, folder, services and the tasks using it, start and stop services, Close
+  with the server's close check, and a Closed list. Close readiness
+  (`GET /execution-workspaces/:id/close-readiness`) already reports dirty files, ahead and behind
+  counts and whether the branch is merged.
+- **Missing:** recent use per workspace (last run, agent, when), the cleanup sweep's state and
+  skip reasons, restore points, disk use, bulk actions, and filters by state.
+- **Questions:** whether it stays an organization tab or becomes its own page in the nav; how it
+  relates to a project's Workspaces settings; whether bulk clean-up uses the sweep's rules or
+  Close's.
 
 ## Stage 4: source-change features (merged into stage 3)
 
