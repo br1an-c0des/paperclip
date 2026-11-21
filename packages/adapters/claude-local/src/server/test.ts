@@ -307,7 +307,7 @@ export async function testEnvironment(
             : "Could not determine the installed Claude Code version.",
           hint: targetIsSandbox && command === "claude"
             ? "Paperclip could not prepare a compatible Claude runtime. Retry connecting."
-            : "Upgrade Claude Code or restore the default ACP lane, then retry the Test.",
+            : "Upgrade Claude Code or set engine to acp, then retry the Test.",
         });
       }
     }

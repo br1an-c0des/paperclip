@@ -1725,7 +1725,7 @@ async function executeClaudeCli(
           : "could not determine the installed version";
         const errorMessage =
           `${model} requires Claude Code ${minimumCliVersion} or newer on the CLI lane; ${detected}. ` +
-          "Upgrade Claude Code or restore the default ACP lane before retrying.";
+          "Upgrade Claude Code or set engine to acp before retrying.";
         await onLog("stderr", `[paperclip] ${errorMessage}\n`);
         return {
           exitCode: 1,

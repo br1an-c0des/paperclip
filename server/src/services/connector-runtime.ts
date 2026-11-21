@@ -1,6 +1,7 @@
 import { SPEKO_SKILL } from "./voice/speko-skill.js";
 import { spekoAssignedResources } from "./voice/speko-agent-tools.js";
 import { SLACK_TOOLS } from "@paperclipai/shared";
+import { resolveClaudeExecutionEngine } from "@paperclipai/adapter-claude-local/server";
 import { slackAssignedResource, executeGovernedSlackTool } from "./connectors/slack.js";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -248,8 +249,8 @@ export async function prepareConnectorSkillDelivery(
 ) {
   const scopedFiles =
     adapterType === "paperclip_runner" ||
-    (config.engine === "cli" &&
-      ["codex_local", "claude_local", "kimi_local"].includes(adapterType));
+    (adapterType === "claude_local" && resolveClaudeExecutionEngine(config).engine === "cli") ||
+    (config.engine === "cli" && ["codex_local", "kimi_local"].includes(adapterType));
   if (scopedFiles) {
     // Runner models with semantic tools cannot necessarily read staged skill
     // files. Supply Slack and Speko contracts and verified source IDs in their input;
