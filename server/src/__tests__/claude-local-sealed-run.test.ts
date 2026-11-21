@@ -270,6 +270,15 @@ describe("sealed claude_local CLI runs: environment and config folder", () => {
     expect(env.CLAUDE_CODE_DISABLE_AUTO_MEMORY).toBe("1");
     expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe(SEALED_TEST_CLAUDE_TOKEN);
     expect(manifest.envKeys).toEqual(expect.arrayContaining(["CLAUDE_CODE_DISABLE_AUTO_MEMORY", "CLAUDE_CODE_OAUTH_TOKEN"]));
+
+    // The invocation event logs what was spawned: no blanked variables, secrets still redacted.
+    const logged = metas[0]?.env ?? {};
+    expect(Object.values(logged)).not.toContain("");
+    for (const key of Object.keys(blanked)) expect(logged).not.toHaveProperty(key);
+    expect(Object.keys(logged).filter((key) => key !== "PAPERCLIP_RESOLVED_COMMAND").sort()).toEqual(manifest.envKeys);
+    expect(logged.CLAUDE_CODE_DISABLE_AUTO_MEMORY).toBe("1");
+    expect(logged.CLAUDE_CODE_OAUTH_TOKEN).toBeTruthy();
+    expect(logged.CLAUDE_CODE_OAUTH_TOKEN).not.toBe(SEALED_TEST_CLAUDE_TOKEN);
   });
 
   it("uses the agent's config folder", async () => {
