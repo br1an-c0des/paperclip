@@ -124,3 +124,9 @@
   background: var(--well);
   font-size: 12px;
 }
+
+/* "Worktree kept: …" under the branch card (step 4b part 3): quiet, a state line. */
+.tb-kept {
+  margin: 8px 0 0;
+  font-size: 12px;
+}

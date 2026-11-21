@@ -1,4 +1,4 @@
-import type { InstanceExperimentalSettingsWithManaged } from "@paperclipai/shared";
+import type { InstanceExperimentalSettingsWithManaged, WorktreeCleanupMode } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Check, Lock } from "lucide-solid";
 import { createMemo, For, Show } from "solid-js";
@@ -9,7 +9,17 @@ import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { SettingsCard } from "@/ui/Field";
 import { InfoTip } from "@/ui/InfoTip";
 import { Switch } from "@/ui/Switch";
-import { featurePatch, featureRowState, linkedNote, visibleFeatureGroups, type FeatureContext, type FeatureFlag } from "./features-model";
+import {
+  featurePatch,
+  featureRowState,
+  linkedNote,
+  visibleFeatureGroups,
+  worktreeCleanupInfo,
+  worktreeCleanupNote,
+  worktreeCleanupOptions,
+  type FeatureContext,
+  type FeatureFlag,
+} from "./features-model";
 import { SaveNote, saveNote, useSaver } from "./shared";
 import "./FeaturesCard.css";
 
@@ -56,6 +66,18 @@ export function FeaturesCard(props: { hidden: ReadonlySet<string> }) {
     }, "Couldn't change the feature.");
   };
 
+  // The worktree cleanup choice saves like a switch, then rereads what's in force.
+  const changeCleanup = (mode: WorktreeCleanupMode) => {
+    void saver.run(async () => {
+      const saved = await instanceSettingsApi.updateExperimental({ worktreeCleanup: mode });
+      client.setQueryData<InstanceExperimentalSettingsWithManaged>(queryKeys.instance.experimentalSettings, (current) => ({
+        ...saved,
+        managedKeys: saved.managedKeys ?? current?.managedKeys,
+      }));
+      await client.invalidateQueries({ queryKey: queryKeys.instance.worktreeCleanup });
+    }, "Couldn't change worktree cleanup.");
+  };
+
   return (
     <Show when={groups().length}>
       <SettingsCard
@@ -80,6 +102,9 @@ export function FeaturesCard(props: { hidden: ReadonlySet<string> }) {
                   {group.title}
                 </h4>
                 <For each={group.flags}>{(flag) => <FeatureRow flag={flag} context={context()} onChange={(value) => change(flag, value)} />}</For>
+                <Show when={group.worktreeCleanup}>
+                  <WorktreeCleanupRow editable={context().editable} onChange={(mode) => changeCleanup(mode)} />
+                </Show>
               </div>
             )}
           </For>
@@ -126,6 +151,48 @@ function FeatureRow(props: { flag: FeatureFlag; context: FeatureContext; onChang
         <Show when={!state().managed && (state().note ?? also())}>{(text) => <span class="fhelp ft-note">{text()}</span>}</Show>
       </div>
       <Switch checked={state().checked} disabled={state().disabled} onChange={props.onChange} label={props.flag.label} labelHidden />
+    </div>
+  );
+}
+
+/*
+ * Clean up finished worktrees (step 4b part 3): upstream's sweep, off by default, in either of its
+ * modes. What each does, with the day counts in force, sits behind the "i"; the line below says only
+ * state: the environment fallback, a dry run, or why restore points can't be chosen.
+ */
+function WorktreeCleanupRow(props: { editable: boolean; onChange: (mode: WorktreeCleanupMode) => void }) {
+  const status = createQuery(() => ({
+    queryKey: queryKeys.instance.worktreeCleanup,
+    queryFn: () => instanceSettingsApi.worktreeCleanup(),
+  }));
+  const options = createMemo(() => worktreeCleanupOptions(status.data));
+  const note = () => (status.isError ? `Couldn't read the cleanup setting. ${status.error instanceof Error ? status.error.message : ""}` : worktreeCleanupNote(status.data));
+  return (
+    <div class="frow as-frow-switch ft-row">
+      <div class="flabel">
+        <span class="ft-name">
+          <span class="info-line">
+            <label for="ft-worktree-cleanup">Clean up finished worktrees</label>
+            <InfoTip label="About cleaning up finished worktrees">{worktreeCleanupInfo(status.data)}</InfoTip>
+          </span>
+        </span>
+        <Show when={note()}>{(text) => <span class="fhelp ft-note">{text()}</span>}</Show>
+      </div>
+      <select
+        id="ft-worktree-cleanup"
+        class="input ft-select"
+        value={status.data?.mode ?? "off"}
+        disabled={!props.editable || !status.data}
+        onChange={(event) => props.onChange(event.currentTarget.value as WorktreeCleanupMode)}
+      >
+        <For each={options()}>
+          {(option) => (
+            <option value={option.value} disabled={option.disabled}>
+              {option.label}
+            </option>
+          )}
+        </For>
+      </select>
     </div>
   );
 }

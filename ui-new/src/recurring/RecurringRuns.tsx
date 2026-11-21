@@ -12,7 +12,7 @@ import { taskActionsApi } from "@/api/task-actions";
 import { useCommands } from "@/lib/commands";
 import { useCompany } from "@/lib/company";
 import { useAgentsQuery, useExperimentalSettingsQuery, useProjectsQuery } from "@/lib/company-data";
-import { workspaceChoiceAvailable, type ReusedWorkspace, type WorkspaceMode } from "@/tasks/new-task";
+import { defaultWorkspaceMode, workspaceChoiceAvailable, type ReusedWorkspace, type WorkspaceMode } from "@/tasks/new-task";
 import { outsideLineage, useTaskLineage } from "@/tasks/workspace-lineage";
 import { AgentAvatar } from "@/ui/Avatar";
 import { Button } from "@/ui/Button";
@@ -168,9 +168,7 @@ export function RunNowForm(props: { routine: RoutineDetail; onDone: () => void; 
   const project = () => projects.data?.find((candidate) => candidate.id === props.routine.projectId) ?? null;
   const showWorkspace = () => workspaceChoiceAvailable(project(), settings.data?.enableIsolatedWorkspaces === true);
   const showEnvironment = () => environmentChoiceAvailable(project(), settings.data?.enableEnvironments === true);
-  const [workspace, setWorkspace] = createSignal<WorkspaceMode>(
-    project()?.executionWorkspacePolicy?.defaultMode === "isolated_workspace" ? "isolated_workspace" : "shared_workspace",
-  );
+  const [workspace, setWorkspace] = createSignal<WorkspaceMode>(defaultWorkspaceMode(project()));
   const [reused, setReused] = createSignal<ReusedWorkspace | null>(null);
   const [environmentId, setEnvironmentId] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);

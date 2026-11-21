@@ -369,30 +369,18 @@ export type CheckoutDraft = {
   teardownCommand: string;
 };
 
+type CheckoutProject = Pick<Project, "executionWorkspacePolicy" | "workspaceProvider"> & Partial<Pick<Project, "effectiveExecutionWorkspacePolicy">>;
+
 /**
- * Whether the server applies the project's task-checkout policy, so the Task checkouts card shows
- * its controls: with the instance's Isolated workspaces on (`enableIsolatedWorkspaces`), and on a
- * project created with a workspace storage plugin even with it off. The heartbeat gates the policy
- * on `isolatedWorkspacesEnabled || storageProviderPluginId` (server/src/services/heartbeat.ts,
- * `gateProjectExecutionWorkspacePolicy`). The plugin is only in the policy it reads when the
- * project has a workspace with a folder or repository: without one it reads
- * `sourcelessProjectWorkspacePolicy`, which drops the plugin (project-workspace-provider.ts), so the
- * Isolated workspaces switch decides again. `"plugin"` is the second case, for the card to say
- * why the controls are there.
+ * The policy in effect: the server's, with the worktree default applied (step 4b part 3: a project
+ * with a checkout and no explicit choice gives new tasks their own worktree), else a workspace
+ * provider's effective policy, else the stored one.
  */
-export function checkoutsInForce(project: Pick<Project, "executionWorkspacePolicy" | "workspaces">, isolatedWorkspacesOn: boolean): "instance" | "plugin" | null {
-  if (isolatedWorkspacesOn) return "instance";
-  if (!project.executionWorkspacePolicy?.storageProviderPluginId) return null;
-  const hasSource = (project.workspaces ?? []).some((workspace) => Boolean(workspace.cwd?.trim() || workspace.repoUrl?.trim()));
-  return hasSource ? "plugin" : null;
+export function effectivePolicy(project: CheckoutProject) {
+  return project.effectiveExecutionWorkspacePolicy ?? project.workspaceProvider?.effectivePolicy ?? project.executionWorkspacePolicy ?? null;
 }
 
-/** The policy in effect: a workspace provider's effective policy, else the stored one. */
-export function effectivePolicy(project: Pick<Project, "executionWorkspacePolicy" | "workspaceProvider">) {
-  return project.workspaceProvider?.effectivePolicy ?? project.executionWorkspacePolicy ?? null;
-}
-
-export function checkoutDraft(project: Pick<Project, "executionWorkspacePolicy" | "workspaceProvider">): CheckoutDraft {
+export function checkoutDraft(project: CheckoutProject): CheckoutDraft {
   const policy = effectivePolicy(project);
   const strategy = policy?.workspaceStrategy ?? null;
   return {
@@ -408,7 +396,7 @@ export function checkoutDraft(project: Pick<Project, "executionWorkspacePolicy" 
   };
 }
 
-export function checkoutDirty(project: Pick<Project, "executionWorkspacePolicy" | "workspaceProvider">, draft: CheckoutDraft) {
+export function checkoutDirty(project: CheckoutProject, draft: CheckoutDraft) {
   return JSON.stringify(checkoutDraft(project)) !== JSON.stringify(draft);
 }
 
@@ -419,15 +407,16 @@ export function checkoutDirty(project: Pick<Project, "executionWorkspacePolicy" 
  * written once it's been picked; "Auto" is what no value means. A legacy `environmentId` is dropped:
  * since #20835 a project has no run environment (runs follow the agent's or the instance's default)
  * and the server strips it anyway.
+ *
+ * `defaultMode` is always written (step 4b part 3): a stored `defaultMode` is how the server tells
+ * this project's explicit choice from a policy nobody chose, which gets the worktree default
+ * (`projectPolicyChoosesCheckoutMode`). Turning checkouts off saves `shared_workspace`.
  */
-export function checkoutPolicy(project: Pick<Project, "executionWorkspacePolicy" | "workspaceProvider">, draft: CheckoutDraft): ProjectExecutionWorkspacePolicy {
+export function checkoutPolicy(project: CheckoutProject, draft: CheckoutDraft): ProjectExecutionWorkspacePolicy {
   const stored = project.executionWorkspacePolicy;
   const effective = effectivePolicy(project);
   const policy: ProjectExecutionWorkspacePolicy = { ...(stored ?? {}), enabled: draft.enabled };
-  const wasIsolated = effective?.defaultMode === "isolated_workspace";
-  if (draft.isolatedByDefault !== wasIsolated || stored?.defaultMode) {
-    policy.defaultMode = draft.isolatedByDefault ? "isolated_workspace" : "shared_workspace";
-  }
+  policy.defaultMode = draft.enabled && draft.isolatedByDefault ? "isolated_workspace" : "shared_workspace";
   if (draft.concurrency !== "auto" || stored?.sharedWorkspaceConcurrency) policy.sharedWorkspaceConcurrency = draft.concurrency;
   delete policy.environmentId;
   const before = checkoutDraft(project);

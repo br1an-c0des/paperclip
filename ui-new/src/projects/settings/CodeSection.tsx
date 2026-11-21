@@ -1,5 +1,4 @@
 import type { Project, ProjectRepository, ProjectWorkspace, WorkspaceRuntimeService } from "@paperclipai/shared";
-import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Book, Check, ChevronDown, FolderOpen, Lock, Plus, Search, X } from "lucide-solid";
 import { batch, createEffect, createMemo, createSignal, createUniqueId, For, Match, on, Show, Switch } from "solid-js";
@@ -10,7 +9,6 @@ import { useCompany } from "@/lib/company";
 import { useExperimentalSettingsQuery } from "@/lib/company-data";
 import { readNote } from "@/lib/offline/read-state";
 import { WorkspacePlugins } from "@/plugins/WorkspacePlugins";
-import { APP_SETTINGS_PATH } from "@/settings/app/app-settings-model";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { SettingsCard, SettingsRow, TextArea, TextInput } from "@/ui/Field";
@@ -25,7 +23,6 @@ import {
   checkoutDirty,
   checkoutDraft,
   checkoutPolicy,
-  checkoutsInForce,
   CONCURRENCY_OPTIONS,
   legacyRepositories,
   localFolderRequest,
@@ -60,11 +57,10 @@ import { COMMANDS_EXAMPLE, commandEntries, commandsRequest, commandsText, parseC
  *   start, stop or restart their services. A workspace's commands JSON (its services and jobs,
  *   `runtimeConfig.workspaceRuntime`) is edited in the workspace's form, checked before saving
  *   (workspace-commands.ts).
- * - Task checkouts follow the instance's `enableIsolatedWorkspaces` (decision 12), except on a
- *   project with a workspace storage plugin and a workspace, whose checkout policy the server
- *   applies even with it off (`checkoutsInForce` in settings-model.ts; the card says so then).
- *   The folder paths hide under `enableManagedSandboxOnly`, as the old UI
- *   does.
+ * - Task checkouts are always available (step 4b part 3): a project with a checkout and no explicit
+ *   choice gives each new task its own worktree, so "New tasks get their own" shows on for it
+ *   (`effectiveExecutionWorkspacePolicy`, worked out by the server). Saving the card records the
+ *   choice. The folder paths hide under `enableManagedSandboxOnly`, as the old UI does.
  * - A workspace's Setup command is saved but the server never runs it (only the checkout policy's
  *   setup command runs, in a task's worktree), so its field says so. Its Cleanup command and
  *   commands JSON apply to every task working from the workspace, shared or in a worktree
@@ -84,7 +80,7 @@ export function CodeSection(props: { project: Project }) {
     <>
       <RepositoriesCard project={props.project} hideHostPaths={hideHostPaths()} />
       <WorkspacesCard project={props.project} hideHostPaths={hideHostPaths()} />
-      <CheckoutsCard project={props.project} inForce={checkoutsInForce(props.project, experimental.data?.enableIsolatedWorkspaces === true)} />
+      <CheckoutsCard project={props.project} />
       <RepoInstructionsCard project={props.project} />
     </>
   );
@@ -744,14 +740,7 @@ function WorkspaceForm(props: {
 // ---------------------------------------------------------------------------------------------
 
 
-function CheckoutsCard(props: { project: Project; inForce: ReturnType<typeof checkoutsInForce> }) {
-  const company = useCompany();
-  // Why the controls show with Isolated workspaces off: state, so it stays visible.
-  const pluginNote = () => {
-    const found = storageAvailability(props.project);
-    const storage = found.kind === "list" ? `${found.storageName} storage` : "workspace storage plugin";
-    return `Isolated workspaces is off on this instance, but this project's ${storage} still applies these settings.`;
-  };
+function CheckoutsCard(props: { project: Project }) {
   const saver = useProjectSaver(() => props.project);
   const [draft, setDraft] = createStore<CheckoutDraft>(checkoutDraft(props.project));
   // Follows the saved policy when it changes and nothing is being edited.
@@ -791,50 +780,34 @@ function CheckoutsCard(props: { project: Project; inForce: ReturnType<typeof che
         ) : undefined
       }
     >
-      <Show when={props.inForce === "plugin"}>
-        <p class="ps-list-note">{pluginNote()}</p>
-      </Show>
-      <Show
-        when={props.inForce !== null}
-        fallback={
-          <p class="ps-list-note">
-            Tasks share the project workspace. To give each its own worktree, an instance admin turns on Isolated workspaces in{" "}
-            <A class="ps-link" href={`/${company().issuePrefix}${APP_SETTINGS_PATH}/general`}>
-              App settings → General → Features
-            </A>
-            .
-          </p>
-        }
+      <SettingsRow
+        label="Separate checkout per task"
+        info="Lets this project's tasks work in their own git worktree instead of the shared project workspace."
+        changed={was("enabled", onOff)}
       >
+        <Toggle checked={draft.enabled} onChange={(value) => setDraft("enabled", value)} label="Separate checkout per task" labelHidden />
+      </SettingsRow>
+      <Show when={draft.enabled}>
         <SettingsRow
-          label="Separate checkout per task"
-          info="Lets this project's tasks work in their own git worktree instead of the shared project workspace."
-          changed={was("enabled", onOff)}
+          label="New tasks get their own"
+          info="On: each new task gets its own worktree. Off: new tasks share the project workspace unless someone picks a worktree for them. On unless this project chose otherwise; a folder that is not a git repository is always shared. Tasks already working keep their checkout."
+          changed={was("isolatedByDefault", onOff)}
         >
-          <Toggle checked={draft.enabled} onChange={(value) => setDraft("enabled", value)} label="Separate checkout per task" labelHidden />
+          <Toggle checked={draft.isolatedByDefault} onChange={(value) => setDraft("isolatedByDefault", value)} label="New tasks get their own checkout" labelHidden />
         </SettingsRow>
-        <Show when={draft.enabled}>
-          <SettingsRow
-            label="New tasks get their own"
-            info="On: each new task gets its own worktree. Off: new tasks share the project workspace unless someone picks a worktree for them."
-            changed={was("isolatedByDefault", onOff)}
-          >
-            <Toggle checked={draft.isolatedByDefault} onChange={(value) => setDraft("isolatedByDefault", value)} label="New tasks get their own checkout" labelHidden />
-          </SettingsRow>
-          <SettingsRow
-            label="Runs in the shared workspace"
-            info={`Whether runs that share the project workspace wait for each other. ${CONCURRENCY_OPTIONS.find((option) => option.value === draft.concurrency)?.help ?? ""}`}
-            changed={was("concurrency", (value) => CONCURRENCY_OPTIONS.find((option) => option.value === value)?.label ?? String(value))}
-          >
-            <Segmented label="Runs in the shared workspace" options={CONCURRENCY_OPTIONS} value={draft.concurrency} onChange={(value) => setDraft("concurrency", value)} />
-          </SettingsRow>
-          {text("baseRef", "Base branch", "origin/main", "The branch each task's worktree starts from.")}
-          {text("branchTemplate", "Branch name", "{{issue.identifier}}-{{slug}}", "The name each task's branch gets.")}
-          {text("worktreeParentDir", "Worktree folder", ".paperclip/worktrees", "Where task worktrees are created, relative to the repository.")}
-          {text("provisionCommand", "Setup command", "bash ./scripts/provision-worktree.sh", "Runs in a task's worktree when it's created.")}
-          {text("runtimeProvisionCommand", "Runtime setup command", "bash ./scripts/provision-runtime.sh", "Runs once before the first service starts, for heavy setup such as seeding a database.")}
-          {text("teardownCommand", "Teardown command", "bash ./scripts/teardown-worktree.sh", "Runs when a task's worktree is cleaned up.")}
-        </Show>
+        <SettingsRow
+          label="Runs in the shared workspace"
+          info={`Whether runs that share the project workspace wait for each other. ${CONCURRENCY_OPTIONS.find((option) => option.value === draft.concurrency)?.help ?? ""}`}
+          changed={was("concurrency", (value) => CONCURRENCY_OPTIONS.find((option) => option.value === value)?.label ?? String(value))}
+        >
+          <Segmented label="Runs in the shared workspace" options={CONCURRENCY_OPTIONS} value={draft.concurrency} onChange={(value) => setDraft("concurrency", value)} />
+        </SettingsRow>
+        {text("baseRef", "Base branch", "origin/main", "The branch each task's worktree starts from.")}
+        {text("branchTemplate", "Branch name", "{{issue.identifier}}-{{slug}}", "The name each task's branch gets.")}
+        {text("worktreeParentDir", "Worktree folder", ".paperclip/worktrees", "Where task worktrees are created, relative to the repository.")}
+        {text("provisionCommand", "Setup command", "bash ./scripts/provision-worktree.sh", "Runs in a task's worktree when it's created.")}
+        {text("runtimeProvisionCommand", "Runtime setup command", "bash ./scripts/provision-runtime.sh", "Runs once before the first service starts, for heavy setup such as seeding a database.")}
+        {text("teardownCommand", "Teardown command", "bash ./scripts/teardown-worktree.sh", "Runs when a task's worktree is cleaned up.")}
       </Show>
       <StorageAvailabilityRow project={props.project} />
     </SettingsCard>

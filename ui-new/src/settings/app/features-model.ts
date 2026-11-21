@@ -1,4 +1,13 @@
-import type { InstanceExperimentalSettingsWithManaged, InstanceFeatureKey, PatchInstanceExperimentalSettings } from "@paperclipai/shared";
+import type {
+  InstanceExperimentalSettingsWithManaged,
+  InstanceFeatureKey,
+  PatchInstanceExperimentalSettings,
+  WorktreeCleanupMode,
+  WorktreeCleanupStatus,
+} from "@paperclipai/shared";
+
+// Kept in step with WORKTREE_CLEANUP_MODES in @paperclipai/shared (imported as a type only here).
+const WORKTREE_CLEANUP_MODES: readonly WorktreeCleanupMode[] = ["off", "strict", "restore_points"];
 
 /*
  * App settings → General → Features (decision 32): plain switches for the experimental flags the
@@ -34,27 +43,22 @@ export type FeatureFlag = {
   linked?: boolean;
 };
 
-export type FeatureGroup = { title: string; flags: FeatureFlag[] };
+export type FeatureGroup = {
+  title: string;
+  flags: FeatureFlag[];
+  /** The group also holds the worktree cleanup choice (step 4b part 3), which isn't a switch. */
+  worktreeCleanup?: true;
+};
 
 export const FEATURE_GROUPS: FeatureGroup[] = [
   {
     title: "Tasks and workspaces",
+    worktreeCleanup: true,
     flags: [
       {
         key: "enableCases",
         label: "Cases",
         help: "Durable work products that tasks create and iterate on. Tasks show their case, New task can start one, and agents get the case API. Turning this off keeps case data.",
-      },
-      {
-        key: "enableIsolatedWorkspaces",
-        label: "Isolated workspaces",
-        help: "Lets a project give each task its own workspace, and shows the workspace controls in project and task settings.",
-      },
-      {
-        key: "enableIsolatedWorkspacesByDefault",
-        label: "Isolated workspaces by default",
-        help: "A project with no workspace policy of its own gives each task its own worktree instead of sharing the project checkout. Projects with their own policy keep it.",
-        requires: ["enableIsolatedWorkspaces"],
       },
       {
         key: "enableExternalObjects",
@@ -213,6 +217,8 @@ export const LEFT_OUT: Partial<Record<InstanceFeatureKey, string>> = {
   enableEnvironments: "Built in: Environments is a company settings section.",
   enableIssuePlanDecompositions: "Built in: shown in a task's history.",
   enableExperimentalFileViewer: "Built in: the task panel's file browser.",
+  enableIsolatedWorkspaces: "Built in: per-task worktrees are always available (step 4b part 3); the server reads it as on.",
+  enableIsolatedWorkspacesByDefault: "Built in: a project with a git checkout gives each new task its own worktree unless it opts out (step 4b part 3).",
   // Maintainer and developer tools.
   enableSmokeLab: "Maintainer tooling.",
   enablePaperclipDeveloperMode: "Maintainer tooling.",
@@ -263,9 +269,60 @@ const isFixed = (context: FeatureContext, key: InstanceFeatureKey) =>
 /** The groups and flags to show: an operator can hide a flag, or the whole card with `instance.experimental`. */
 export function visibleFeatureGroups(hidden: ReadonlySet<string>): FeatureGroup[] {
   if (hidden.has("instance.experimental")) return [];
-  return FEATURE_GROUPS.map((group) => ({ ...group, flags: group.flags.filter((flag) => !hidden.has(hiddenFeatureKey(flag.key))) })).filter(
-    (group) => group.flags.length > 0,
-  );
+  return FEATURE_GROUPS.map((group) => {
+    const flags = group.flags.filter((flag) => !hidden.has(hiddenFeatureKey(flag.key)));
+    const cleanup = group.worktreeCleanup && !hidden.has(WORKTREE_CLEANUP_HIDDEN_KEY);
+    return { title: group.title, flags, ...(cleanup ? { worktreeCleanup: true as const } : {}) };
+  }).filter((group) => group.flags.length > 0 || group.worktreeCleanup);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Cleaning up finished worktrees (step 4b part 3)
+//
+// Upstream's git workspace expiration sweep, behind `experimental.worktreeCleanup`: off by
+// default, or one of its two modes. `GET /instance/settings/worktree-cleanup` says what's in force:
+// never saved, the sweep follows the environment variables an operator set. It saves with the same
+// PATCH as the switches; the server refuses restore points when they can't work here.
+
+export const WORKTREE_CLEANUP_HIDDEN_KEY = "instance.experimental.worktreeCleanup";
+
+export const WORKTREE_CLEANUP_LABELS: Record<WorktreeCleanupMode, string> = {
+  off: "Off",
+  strict: "Only when everything is pushed",
+  restore_points: "Save a restore point, then remove",
+};
+
+export type WorktreeCleanupOption = { value: WorktreeCleanupMode; label: string; disabled: boolean };
+
+/** The choices, with restore points unavailable (unless in force already) when their prerequisites fail. */
+export function worktreeCleanupOptions(status: WorktreeCleanupStatus | undefined): WorktreeCleanupOption[] {
+  return WORKTREE_CLEANUP_MODES.map((value) => ({
+    value,
+    label: value === "restore_points" && status && !status.restorePoints.available ? `${WORKTREE_CLEANUP_LABELS[value]} (unavailable)` : WORKTREE_CLEANUP_LABELS[value],
+    disabled: value === "restore_points" && !!status && !status.restorePoints.available && status.mode !== "restore_points",
+  }));
+}
+
+const days = (count: number) => `${count} day${count === 1 ? "" : "s"}`;
+
+/** What each mode does, with the day counts in force, for the row's "i" tip. */
+export function worktreeCleanupInfo(status: WorktreeCleanupStatus | undefined): string {
+  const d = status?.days;
+  const strict = `Only when everything is pushed: removes a finished task's worktree ${d ? days(d.strictDelay) : "a day"} after its task tree closes, when the remote can rebuild it exactly. Unpushed or uncommitted work keeps it.`;
+  const idle = d && d.idle > 0 ? ` An open task's worktree goes after ${days(d.idle)} with nothing happening.` : "";
+  const restore = `Save a restore point, then remove: also removes worktrees with unpushed or uncommitted work, ${d ? days(d.restorePointDelay) : "3 days"} after the task tree closes, saving an encrypted restore point to file storage first${d ? `, kept ${days(d.retention)}` : ""}.${idle} A later run or a comment on the task brings it back.`;
+  return `Whether Paperclip removes finished tasks' worktrees. Off keeps them. ${strict} ${restore} Either way a worktree with a live run is never touched. The day counts are environment variables (PAPERCLIP_GIT_RESTORE_POINT_TERMINAL_DELAY_DAYS, _IDLE_DAYS, _RETENTION_DAYS).`;
+}
+
+/** The state line under the choice: the environment fallback, a dry run, or why restore points can't be picked. */
+export function worktreeCleanupNote(status: WorktreeCleanupStatus | undefined): string | null {
+  if (!status) return null;
+  const notes: string[] = [];
+  if (status.source === "environment" && status.mode !== "off") {
+    notes.push(`Set by the server's environment variables${status.dryRun ? ", as a dry run: nothing is removed yet" : ""}. Choosing here replaces them.`);
+  }
+  if (!status.restorePoints.available && status.restorePoints.reason) notes.push(`Restore points are unavailable: ${status.restorePoints.reason}`);
+  return notes.length ? notes.join(" ") : null;
 }
 
 export type FeatureRowState = {

@@ -57,3 +57,15 @@
 .ft-note {
   color: var(--body);
 }
+
+/* The worktree cleanup choice: a select where the other rows have a switch. */
+.ft-select {
+  width: auto;
+  max-width: 260px;
+}
+
+@media (max-width: 640px) {
+  .ft-select {
+    max-width: 180px;
+  }
+}

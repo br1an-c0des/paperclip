@@ -10,7 +10,6 @@ import {
   checkoutDirty,
   checkoutDraft,
   checkoutPolicy,
-  checkoutsInForce,
   storageAvailability,
   storageEnvironmentNames,
   currentPolicy,
@@ -322,7 +321,8 @@ describe("task checkouts", () => {
     const p = project({ executionWorkspacePolicy: { enabled: false, branchPolicy: { keep: true } } });
     const draft = { ...checkoutDraft(p), enabled: true };
     expect(checkoutDirty(p, draft)).toBe(true);
-    expect(checkoutPolicy(p, draft)).toEqual({ enabled: true, branchPolicy: { keep: true } });
+    // defaultMode is always written: it marks the project's choice (step 4b part 3).
+    expect(checkoutPolicy(p, draft)).toEqual({ enabled: true, defaultMode: "shared_workspace", branchPolicy: { keep: true } });
   });
 
   it("writes the worktree strategy as git_worktree, clearing emptied fields", () => {
@@ -344,16 +344,21 @@ describe("task checkouts", () => {
     expect("environmentId" in policy).toBe(false);
   });
 
-  it("is in force with Isolated workspaces on, or on a plugin-storage project with a workspace (J17)", () => {
-    const core = project({ executionWorkspacePolicy: { enabled: true, storageProviderPluginId: null }, workspaces: [workspace()] });
-    expect(checkoutsInForce(core, true)).toBe("instance");
-    expect(checkoutsInForce(core, false)).toBeNull();
-    const plugged = project({ executionWorkspacePolicy: { enabled: true, storageProviderPluginId: "plug" }, workspaces: [workspace({ cwd: null, repoUrl: "https://github.com/org/repo" })] });
-    expect(checkoutsInForce(plugged, true)).toBe("instance");
-    expect(checkoutsInForce(plugged, false)).toBe("plugin");
-    // Without a workspace the server reads the policy without its plugin, so the switch decides.
-    expect(checkoutsInForce({ ...plugged, workspaces: [] }, false)).toBeNull();
-    expect(checkoutsInForce({ ...plugged, workspaces: [workspace({ cwd: "  ", repoUrl: null })] }, false)).toBeNull();
+  it("shows the server's worktree default: on for a project that made no choice (step 4b part 3)", () => {
+    const defaulted = project({
+      executionWorkspacePolicy: null,
+      effectiveExecutionWorkspacePolicy: { enabled: true, defaultMode: "isolated_workspace" },
+      workspaces: [workspace()],
+    });
+    expect(checkoutDraft(defaulted)).toMatchObject({ enabled: true, isolatedByDefault: true });
+    // Saving it unchanged records the choice the page shows.
+    expect(checkoutPolicy(defaulted, checkoutDraft(defaulted))).toMatchObject({ enabled: true, defaultMode: "isolated_workspace" });
+  });
+
+  it("records turning checkouts off, or new tasks sharing, as an explicit shared choice", () => {
+    const defaulted = project({ executionWorkspacePolicy: null, effectiveExecutionWorkspacePolicy: { enabled: true, defaultMode: "isolated_workspace" } });
+    expect(checkoutPolicy(defaulted, { ...checkoutDraft(defaulted), enabled: false })).toMatchObject({ enabled: false, defaultMode: "shared_workspace" });
+    expect(checkoutPolicy(defaulted, { ...checkoutDraft(defaulted), isolatedByDefault: false })).toMatchObject({ enabled: true, defaultMode: "shared_workspace" });
   });
 });
 

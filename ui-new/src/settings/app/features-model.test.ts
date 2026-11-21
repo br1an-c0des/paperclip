@@ -10,8 +10,12 @@ import {
   featureRowState,
   linkedNote,
   visibleFeatureGroups,
+  worktreeCleanupInfo,
+  worktreeCleanupNote,
+  worktreeCleanupOptions,
   type FeatureContext,
 } from "./features-model";
+import type { WorktreeCleanupStatus } from "@paperclipai/shared";
 
 const schemaKeys = Object.keys(instanceExperimentalSettingsSchema.shape);
 const booleanKeys = schemaKeys.filter((key) => {
@@ -122,5 +126,53 @@ describe("visibleFeatureGroups", () => {
     expect(groups.flatMap((group) => group.flags.map((entry) => entry.key))).not.toContain("enableCases");
     expect(groups.length).toBe(FEATURE_GROUPS.length);
     expect(visibleFeatureGroups(new Set(["instance.experimental"]))).toEqual([]);
+  });
+});
+
+describe("worktree cleanup (step 4b part 3)", () => {
+  const status = (patch: Partial<WorktreeCleanupStatus> = {}): WorktreeCleanupStatus => ({
+    saved: null,
+    mode: "off",
+    source: "environment",
+    dryRun: false,
+    restorePoints: { available: true, reason: null },
+    days: { strictDelay: 1, restorePointDelay: 3, idle: 7, retention: 90 },
+    ...patch,
+  });
+
+  it("retires the two worktree switches and puts the cleanup choice in Tasks and workspaces", () => {
+    expect(listed).not.toContain("enableIsolatedWorkspaces");
+    expect(listed).not.toContain("enableIsolatedWorkspacesByDefault");
+    expect(LEFT_OUT.enableIsolatedWorkspaces).toMatch(/^Built in/);
+    const tasks = visibleFeatureGroups(new Set()).find((group) => group.title === "Tasks and workspaces");
+    expect(tasks?.worktreeCleanup).toBe(true);
+    expect(visibleFeatureGroups(new Set(["instance.experimental.worktreeCleanup"])).find((group) => group.title === "Tasks and workspaces")?.worktreeCleanup).toBeUndefined();
+  });
+
+  it("offers its three values, restore points unavailable without their prerequisites", () => {
+    expect(worktreeCleanupOptions(status()).map((option) => [option.value, option.disabled])).toEqual([
+      ["off", false],
+      ["strict", false],
+      ["restore_points", false],
+    ]);
+    const unavailable = status({ restorePoints: { available: false, reason: "File storage is S3 and PAPERCLIP_SECRETS_MASTER_KEY isn't set." } });
+    const restore = worktreeCleanupOptions(unavailable).find((option) => option.value === "restore_points")!;
+    expect(restore.disabled).toBe(true);
+    expect(restore.label).toMatch(/unavailable/);
+    expect(worktreeCleanupNote(unavailable)).toMatch(/Restore points are unavailable: File storage is S3/);
+  });
+
+  it("says when the environment variables decide, and a dry run", () => {
+    expect(worktreeCleanupNote(status())).toBeNull();
+    expect(worktreeCleanupNote(status({ mode: "strict", dryRun: true }))).toMatch(/environment variables, as a dry run/);
+    expect(worktreeCleanupNote(status({ saved: "strict", mode: "strict", source: "setting" }))).toBeNull();
+  });
+
+  it("puts what each mode does, with the day counts in force, behind the info icon", () => {
+    const info = worktreeCleanupInfo(status({ days: { strictDelay: 1, restorePointDelay: 5, idle: 0, retention: 30 } }));
+    expect(info).toMatch(/1 day after/);
+    expect(info).toMatch(/5 days after/);
+    expect(info).toMatch(/kept 30 days/);
+    expect(info).not.toMatch(/open task/);
   });
 });
