@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "@paperclipai/db";
-import { resolveConnectorAssignments } from "./connector-runtime.js";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { prepareConnectorSkillDelivery, resolveConnectorAssignments } from "./connector-runtime.js";
 
 const resolvers = vi.hoisted(() => ({
   browser: vi.fn(), speko: vi.fn(), slack: vi.fn(), inboxes: vi.fn(),
@@ -42,5 +45,41 @@ describe("connector assignment preparation", () => {
     expect(settled).toBe(false);
     slack.resolve([]);
     await result;
+  });
+});
+
+describe("connector skill delivery", () => {
+  async function connectorConfig(engine?: string) {
+    const source = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-connector-skill-"));
+    await fs.writeFile(path.join(source, "SKILL.md"), "---\nname: browser-use-cloud\n---\nUse the browser.\n");
+    return {
+      ...(engine === undefined ? {} : { engine }),
+      paperclipRuntimeSkills: [{
+        key: "paperclipai/paperclip/browser-use-cloud",
+        runtimeName: "browser-use-cloud",
+        source,
+        sourceStatus: "available" as const,
+      }],
+      paperclipConnectorSkillDigest: "digest",
+    };
+  }
+
+  it.each([undefined, "auto", "cli"])("connector skills for a claude_local agent with engine=%s are staged as files", async (engine) => {
+    const config = await connectorConfig(engine);
+    const delivery = await prepareConnectorSkillDelivery(config, "claude_local");
+    expect(delivery.config.paperclipRuntimeSkills).toEqual(config.paperclipRuntimeSkills);
+    expect(delivery.instructions).toBe("");
+  });
+
+  it("connector skills for an ACP claude_local agent go in the prompt", async () => {
+    const delivery = await prepareConnectorSkillDelivery(await connectorConfig("acp"), "claude_local");
+    expect(delivery.config.paperclipRuntimeSkills).toEqual([]);
+    expect(delivery.instructions).toContain("Use the browser.");
+  });
+
+  it("codex_local still needs an explicit CLI engine for staged files", async () => {
+    const delivery = await prepareConnectorSkillDelivery(await connectorConfig(), "codex_local");
+    expect(delivery.config.paperclipRuntimeSkills).toEqual([]);
+    expect(delivery.instructions).toContain("Use the browser.");
   });
 });

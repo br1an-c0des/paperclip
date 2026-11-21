@@ -77,7 +77,7 @@ describeEmbeddedPostgres("teams catalog install with no caller adapter overrides
     return new Map(rows.map((row) => [row.name, row]));
   }
 
-  it("installs core-exec-team end-to-end with no caller overrides and creates 3 native Claude agents", async () => {
+  it("installs core-exec-team end-to-end with no caller overrides and creates 3 classic-runner Claude agents", async () => {
     const companyId = await seedEmptyCompany();
     const svc = teamsCatalogService(db);
 
@@ -95,12 +95,12 @@ describeEmbeddedPostgres("teams catalog install with no caller adapter overrides
 
 
     const adapterTypes = Array.from(byName.values()).map((row) => row.adapterType);
-    expect(adapterTypes).toEqual(["paperclip_runner", "paperclip_runner", "paperclip_runner"]);
+    expect(adapterTypes).toEqual(["claude_local", "claude_local", "claude_local"]);
     expect(adapterTypes).not.toContain("process");
     expect(adapterTypes).not.toContain("http");
   });
 
-  it("installs product-design end-to-end with no caller overrides and uses native Claude", async () => {
+  it("installs product-design end-to-end with no caller overrides and uses Claude on the classic runner", async () => {
     const companyId = await seedEmptyCompany();
     const svc = teamsCatalogService(db);
 
@@ -112,11 +112,11 @@ describeEmbeddedPostgres("teams catalog install with no caller adapter overrides
     const byName = await listAdapterTypesByName(companyId);
     expect(byName.size).toBe(1);
     const adapterTypes = Array.from(byName.values()).map((row) => row.adapterType);
-    expect(adapterTypes).toEqual(["paperclip_runner"]);
+    expect(adapterTypes).toEqual(["claude_local"]);
     expect(adapterTypes).not.toContain("process");
   });
 
-  it("installs product-engineering end-to-end with no caller overrides and uses native Claude for every agent", async () => {
+  it("installs product-engineering end-to-end with no caller overrides and uses Claude on the classic runner for every agent", async () => {
     const companyId = await seedEmptyCompany();
     const svc = teamsCatalogService(db);
 
@@ -128,12 +128,12 @@ describeEmbeddedPostgres("teams catalog install with no caller adapter overrides
     const byName = await listAdapterTypesByName(companyId);
     expect(byName.size).toBe(3);
     const adapterTypes = Array.from(byName.values()).map((row) => row.adapterType);
-    expect(adapterTypes).toEqual(["paperclip_runner", "paperclip_runner", "paperclip_runner"]);
+    expect(adapterTypes).toEqual(["claude_local", "claude_local", "claude_local"]);
     expect(adapterTypes).not.toContain("process");
     expect(byName.get("CTO")?.permissions).toMatchObject({ canCreateAgents: true });
   });
 
-  it("honors an explicit caller adapter override for a single slug while defaulting the rest to native Claude", async () => {
+  it("honors an explicit caller adapter override for a single slug while defaulting the rest to Claude on the classic runner", async () => {
     const companyId = await seedEmptyCompany();
     const svc = teamsCatalogService(db);
 
@@ -148,11 +148,11 @@ describeEmbeddedPostgres("teams catalog install with no caller adapter overrides
     const byName = await listAdapterTypesByName(companyId, "CTO");
     expect(byName.size).toBe(3);
     const ctoRow = Array.from(byName.values()).find((row) => row.role === "engineering-manager" || row.name === "CTO");
-    expect(ctoRow?.adapterType).toBe("paperclip_runner");
+    expect(ctoRow?.adapterType).toBe("opencode_local");
     const otherAdapters = Array.from(byName.values())
       .filter((row) => row !== ctoRow)
       .map((row) => row.adapterType);
-    expect(otherAdapters).toEqual(["paperclip_runner", "paperclip_runner"]);
+    expect(otherAdapters).toEqual(["claude_local", "claude_local"]);
   });
   it("derived catalog installs selected native runtime without caller overrides", async () => {
     const repositoryRoot = path.resolve(import.meta.dirname, "../../..");

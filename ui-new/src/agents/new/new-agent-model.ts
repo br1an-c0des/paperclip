@@ -152,7 +152,7 @@ export function requiresProviderModel(harness: string) {
 export type RunnerChoice = "auto" | AgentRunner;
 
 export type RunnerResolution = {
-  /** False for harnesses only the legacy runner carries: no runner to show. */
+  /** False for harnesses only the classic runner carries: no runner to show. */
   applies: boolean;
   /** The runner the agent will get. */
   runner: AgentRunner;
@@ -222,25 +222,27 @@ export function runnerHelp(
   const name = harnessLabel(harness);
   if (resolution.alternative) {
     // The recommended runner is marked on the control itself (runnerOptions).
-    return { info: `Paperclip Runner supervises each run of ${name}; the legacy runner runs the program directly. You can switch later in the agent's settings.` };
+    return { info: `Paperclip Runner supervises each run of ${name}; the classic runner runs the program directly. You can switch later in the agent's settings.` };
   }
-  if (options.qualifies) return { help: `Test checks whether Paperclip Runner qualifies on this sandbox, and uses it if it does. Otherwise ${name} runs on the legacy runner.` };
+  if (options.qualifies) return { help: `Test checks whether Paperclip Runner qualifies on this sandbox, and uses it if it does. Otherwise ${name} runs on the classic runner.` };
   if (!resolution.recommended) return { help: "Paperclip picks a runner once it knows what this machine supports." };
   return { help: `The only runner that carries ${name} here.` };
 }
 
 /**
  * Whether Test must first qualify the environment for the Paperclip Runner, as the old UI's
- * `needsClaudeSetupQualification`: Claude Code left on "auto", on a sandbox whose image can be
- * qualified, where the server doesn't recommend the Runner yet.
+ * `needsClaudeSetupQualification` did for Claude Code left on "auto" on a sandbox whose image can be
+ * qualified. Never, now: "auto" means the classic runner (the server's `defaultRunner` is `legacy`),
+ * so there's no Runner to qualify on the way to a hire. A sandbox is qualified for the Runner from
+ * the agent's settings (`runnerOffer`'s `qualify`).
  */
 export function needsRunnerQualification(
-  harness: string,
-  choice: RunnerChoice,
-  recommended: AgentRunner | undefined,
-  environment: Pick<Environment, "driver" | "config"> | null | undefined,
+  _harness: string,
+  _choice: RunnerChoice,
+  _recommended: AgentRunner | undefined,
+  _environment: Pick<Environment, "driver" | "config"> | null | undefined,
 ) {
-  return harness === "claude_local" && choice === "auto" && recommended !== "paperclip" && canQualifyRunnerEnvironment(environment);
+  return false;
 }
 
 /** Why a qualification probe failed, or null when it recorded the platform (`probeQualified`). */
@@ -658,7 +660,7 @@ export type TestEnvironmentApi = (
 
 /**
  * Tests the setup, as the old UI's `testAgentSetup`: the harness as it will run, then, for Claude
- * Code, Codex and Grok when that didn't prove the sign-in, the harness's CLI on the legacy runner
+ * Code, Codex and Grok when that didn't prove the sign-in, the harness's CLI on the classic runner
  * for its hello probe. The two results are merged, one line per check.
  */
 /** How long a setup check may take before the page gives up on it (#19505: two minutes). */

@@ -227,7 +227,7 @@ describe("harness and model", () => {
   it("names the harness and runner as the agent page does", () => {
     const runner = { adapterType: "paperclip_runner", adapterConfig: { provider: "acpx", acpxAgent: "claude", model: "claude-opus-5-5" } };
     expect(harnessAndModel(runner)).toEqual({ harness: "Claude Code · Paperclip Runner", model: "claude-opus-5-5" });
-    expect(harnessAndModel({ adapterType: "claude_local", adapterConfig: {} })).toEqual({ harness: "Claude Code · Legacy runner", model: "Harness default" });
+    expect(harnessAndModel({ adapterType: "claude_local", adapterConfig: {} })).toEqual({ harness: "Claude Code · Classic runner", model: "Harness default" });
     expect(harnessAndModel({ adapterType: "process", adapterConfig: {} })).toEqual({ harness: "Process", model: "Managed externally" });
   });
 });

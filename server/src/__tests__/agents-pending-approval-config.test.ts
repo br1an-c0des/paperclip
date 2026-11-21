@@ -69,10 +69,14 @@ describeEmbeddedPostgres("pending approval agent config integrity", () => {
     const companyId = await seedCompany();
     const service = agentService(db);
     const lifecycle = createAgentLifecycle(db);
-    const native = await lifecycle.requestHire(companyId, { name: "New Codex", adapterType: "codex_local", adapterConfig: { modelReasoningEffort: "high" }, status: "pending_approval" });
+    // New agents default to the classic runner; the Runner is chosen explicitly where it's supported.
+    const runnerHere = paperclipRunnerSupportsPlatform("codex_local", process.platform, process.arch);
+    const native = await lifecycle.requestHire(companyId, { name: "New Codex", adapterType: "codex_local", ...(runnerHere ? { runner: "paperclip" as const } : {}), adapterConfig: { modelReasoningEffort: "high" }, status: "pending_approval" });
+    const automatic = await lifecycle.requestHire(companyId, { name: "Default Codex", adapterType: "codex_local", adapterConfig: { modelReasoningEffort: "high" }, status: "pending_approval" });
+    expect(automatic).toMatchObject({ adapterType: "codex_local", adapterConfig: { modelReasoningEffort: "high" } });
     const legacy = await lifecycle.requestHire(companyId, { name: "Legacy Codex", adapterType: "codex_local", runner: "legacy", adapterConfig: { extraArgs: ["--search"] }, status: "pending_approval" });
     const reviewedLegacy = await lifecycle.requestHire(companyId, { name: "Historical approved hire", adapterType: "codex_local", adapterConfig: {}, status: "pending_approval" }, { runnerResolved: true });
-    if (paperclipRunnerSupportsPlatform("codex_local", process.platform, process.arch)) {
+    if (runnerHere) {
       expect(native).toMatchObject({ adapterType: "paperclip_runner", adapterConfig: { provider: "codex", modelReasoningEffort: "high" } });
     } else {
       expect(native).toMatchObject({ adapterType: "codex_local", adapterConfig: { modelReasoningEffort: "high" } });

@@ -54,7 +54,7 @@ function adapter(type: string, extra: Partial<AdapterInfo> = {}): AdapterInfo {
 }
 
 const ADAPTERS = [
-  adapter("claude_local", { supportedRunners: ["paperclip", "legacy"], defaultRunner: "paperclip" }),
+  adapter("claude_local", { supportedRunners: ["paperclip", "legacy"], defaultRunner: "legacy" }),
   adapter("codex_local", { supportedRunners: ["paperclip", "legacy"], defaultRunner: "legacy" }),
   adapter("gemini_local"),
   adapter("cursor", { disabled: true }),
@@ -126,44 +126,43 @@ describe("runner defaulting", () => {
   it("takes the server's recommendation on auto and names the runner", () => {
     expect(resolveRunner("claude_local", "auto", ADAPTERS)).toEqual({
       applies: true,
-      runner: "paperclip",
-      recommended: "paperclip",
-      alternative: "legacy",
-      label: "Claude Code · Paperclip Runner",
+      runner: "legacy",
+      recommended: "legacy",
+      alternative: "paperclip",
+      label: "Claude Code · Classic runner",
     });
-    expect(resolveRunner("codex_local", "auto", ADAPTERS)).toMatchObject({ runner: "legacy", alternative: "paperclip", label: "Codex · Legacy runner" });
+    expect(resolveRunner("codex_local", "auto", ADAPTERS)).toMatchObject({ runner: "legacy", alternative: "paperclip", label: "Codex · Classic runner" });
   });
 
   it("keeps an explicit pick", () => {
-    expect(resolveRunner("claude_local", "legacy", ADAPTERS)).toMatchObject({ runner: "legacy", label: "Claude Code · Legacy runner", alternative: "paperclip" });
+    expect(resolveRunner("claude_local", "legacy", ADAPTERS)).toMatchObject({ runner: "legacy", label: "Claude Code · Classic runner", alternative: "paperclip" });
   });
 
-  it("falls back to the legacy runner while the adapters load, or when the Runner is disabled", () => {
+  it("falls back to the classic runner while the adapters load, or when the Runner is disabled", () => {
     expect(resolveRunner("claude_local", "auto", undefined)).toMatchObject({ runner: "legacy", recommended: undefined, alternative: null });
     const off = ADAPTERS.map((entry) => (entry.type === "paperclip_runner" ? { ...entry, disabled: true } : entry));
     expect(resolveRunner("claude_local", "auto", off)).toMatchObject({ runner: "legacy", recommended: "legacy", alternative: null });
   });
 
-  it("has no runner for harnesses only the legacy runner carries", () => {
+  it("has no runner for harnesses only the classic runner carries", () => {
     expect(resolveRunner("gemini_local", "auto", ADAPTERS)).toEqual({ applies: false, runner: "legacy", recommended: "legacy", alternative: null, label: "Gemini CLI" });
   });
 
-  it("qualifies a sandbox first only for Claude on auto when the Runner isn't recommended yet", () => {
+  it("never qualifies a sandbox on the way to a hire: auto is the classic runner", () => {
     const sandbox = { driver: "sandbox" as const, config: { image: `repo/img@sha256:${"a".repeat(64)}` } };
-    expect(needsRunnerQualification("claude_local", "auto", "legacy", sandbox)).toBe(true);
-    expect(needsRunnerQualification("claude_local", "auto", "paperclip", sandbox)).toBe(false);
-    expect(needsRunnerQualification("claude_local", "legacy", "legacy", sandbox)).toBe(false);
-    expect(needsRunnerQualification("claude_local", "auto", "legacy", { driver: "local" as const, config: {} })).toBe(false);
+    for (const choice of ["auto", "legacy", "paperclip"] as const) {
+      expect(needsRunnerQualification("claude_local", choice, "legacy", sandbox)).toBe(false);
+    }
   });
 });
 
 describe("runner choice", () => {
-  // A local Linux deployment: Claude Code on either runner, the Paperclip Runner by default (#20710's case).
+  // A local Linux deployment: Claude Code on either runner, the classic runner by default.
   const pick = (runner: SetupDraft["runner"]) => setup({ runner });
 
   it("follows an explicit pick through the resolution, the efforts, the save, the test and the hire", () => {
     const legacy = resolveRunner("claude_local", "legacy", ADAPTERS);
-    expect(legacy).toMatchObject({ runner: "legacy", recommended: "paperclip", alternative: "paperclip" });
+    expect(legacy).toMatchObject({ runner: "legacy", recommended: "legacy", alternative: "paperclip" });
     // Back to the Paperclip Runner, picked rather than left on auto.
     expect(resolveRunner("claude_local", "paperclip", ADAPTERS)).toMatchObject({ runner: "paperclip", alternative: "legacy" });
 
@@ -182,19 +181,13 @@ describe("runner choice", () => {
     expect(setupEffortOptions("pi_local", "", resolveRunner("pi_local", "auto", pi).runner).map((option) => option.value)).not.toContain("minimal");
   });
 
-  it("qualifies a sandbox only while the runner is left on auto", () => {
-    const sandbox = { driver: "sandbox" as const, config: { image: `repo/img@sha256:${"a".repeat(64)}` } };
-    expect(needsRunnerQualification("claude_local", "legacy", "legacy", sandbox)).toBe(false);
-    expect(needsRunnerQualification("claude_local", "paperclip", "legacy", sandbox)).toBe(false);
-  });
-
   it("keeps a pick the environment can carry, and lets go of one it can't", () => {
     expect(runnerChoiceSupported("claude_local", "legacy", ADAPTERS)).toBe(true);
     expect(runnerChoiceSupported("claude_local", "paperclip", ADAPTERS)).toBe(true);
     expect(runnerChoiceSupported("claude_local", "auto", [])).toBe(true);
     // While the environment's adapters load, a pick stands.
     expect(runnerChoiceSupported("claude_local", "paperclip", undefined)).toBe(true);
-    // An environment where only the legacy runner carries it, or where the Runner is off.
+    // An environment where only the classic runner carries it, or where the Runner is off.
     const legacyHere = [adapter("claude_local"), adapter("paperclip_runner")];
     expect(runnerChoiceSupported("claude_local", "paperclip", legacyHere)).toBe(false);
     expect(runnerChoiceSupported("claude_local", "legacy", legacyHere)).toBe(true);
@@ -207,7 +200,7 @@ describe("runner choice", () => {
 
   it("says what each runner is behind the tip when there's a choice, and visibly why there isn't one otherwise", () => {
     expect(runnerHelp("claude_local", resolveRunner("claude_local", "auto", ADAPTERS))).toEqual({
-      info: "Paperclip Runner supervises each run of Claude Code; the legacy runner runs the program directly. You can switch later in the agent's settings.",
+      info: "Paperclip Runner supervises each run of Claude Code; the classic runner runs the program directly. You can switch later in the agent's settings.",
     });
     expect(runnerHelp("claude_local", resolveRunner("claude_local", "auto", undefined))).toEqual({ help: "Paperclip picks a runner once it knows what this machine supports." });
     const legacyOnly = [adapter("claude_local"), adapter("paperclip_runner")];
@@ -415,7 +408,7 @@ describe("test", () => {
     expect(testAllowsHire("gemini_local", result("pass"))).toBe(true);
   });
 
-  it("adds the CLI's hello probe on the legacy runner when the first test didn't prove the sign-in", async () => {
+  it("adds the CLI's hello probe on the classic runner when the first test didn't prove the sign-in", async () => {
     const test = vi
       .fn()
       .mockResolvedValueOnce(result("pass", ["runner_ready"]))

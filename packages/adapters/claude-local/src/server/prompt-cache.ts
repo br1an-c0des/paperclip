@@ -18,21 +18,23 @@ export interface ClaudePromptBundle {
   addDir: string;
   /**
    * `<bundle>/plugins`, a folder of plugins (`paperclip`, `company`, each only when it has
-   * skills). A sealed local launch passes it with `--plugin-dir`; Claude sees `<plugin>:<skill>`.
+   * skills), each skill under its plain name. A sealed local launch passes it with
+   * `--plugin-dir`; Claude sees `<plugin>:<skill>`.
    */
   pluginDir: string;
   instructionsFilePath: string | null;
 }
 
 /**
- * Bundle layouts: 1 had only `.claude/skills/` and `agent-instructions.md`; 2 adds `plugins/`.
+ * Bundle layouts: 1 had only `.claude/skills/` and `agent-instructions.md`; 2 adds `plugins/`;
+ * 3 names each skill's folder in its plugin by its plain name (`claudePluginSkillFolders`).
  * The layout is part of the bundle key, so bundles cached under an older layout aren't reused.
  */
-export const CLAUDE_PROMPT_BUNDLE_LAYOUT = 2;
+export const CLAUDE_PROMPT_BUNDLE_LAYOUT = 3;
 
 export type ClaudeSkillPlugin = "paperclip" | "company";
 
-const PAPERCLIP_SKILL_KEY_PREFIX = "paperclipai/paperclip/";
+const PAPERCLIP_SKILL_KEY_PREFIX = "paperclipai/";
 
 const CLAUDE_SKILL_PLUGIN_DESCRIPTIONS: Record<ClaudeSkillPlugin, string> = {
   paperclip: "Paperclip's own skills: working in Paperclip, feedback, hiring, memory",
@@ -41,10 +43,40 @@ const CLAUDE_SKILL_PLUGIN_DESCRIPTIONS: Record<ClaudeSkillPlugin, string> = {
 
 /**
  * The plugin a skill loads from, by where it comes from: `paperclip` for Paperclip's own skills
- * (keys starting `paperclipai/paperclip/`), `company` for everything from the company library.
+ * (keys starting `paperclipai/`: `paperclipai/paperclip/…` and the bundled
+ * `paperclipai/bundled/…`, such as the status-card skills), `company` for everything from the
+ * company library.
  */
 export function claudeSkillPlugin(key: string): ClaudeSkillPlugin {
   return key.startsWith(PAPERCLIP_SKILL_KEY_PREFIX) ? "paperclip" : "company";
+}
+
+/**
+ * A skill's plain name: the last segment of its key, the slug the Skills page shows
+ * (`company/<id>/review` → `review`). Its runtime name when the key has no segment usable as a
+ * folder name.
+ */
+export function claudeSkillPlainName(entry: { key: string; runtimeName: string }): string {
+  const segment = entry.key.split("/").map((part) => part.trim()).filter(Boolean).at(-1);
+  return segment && segment !== "." && segment !== ".." && !segment.includes("\\") ? segment : entry.runtimeName;
+}
+
+/**
+ * Each skill's folder inside its plugin, by key: its plain name, so Claude sees `company:review`
+ * rather than the runtime name's hash suffix. Two skills of one plugin that share a plain name
+ * keep their (unique) runtime names instead.
+ */
+export function claudePluginSkillFolders(
+  skills: ReadonlyArray<{ key: string; runtimeName: string }>,
+): Map<string, string> {
+  const slot = (entry: { key: string; runtimeName: string }) =>
+    `${claudeSkillPlugin(entry.key)}/${claudeSkillPlainName(entry)}`;
+  const counts = new Map<string, number>();
+  for (const entry of skills) counts.set(slot(entry), (counts.get(slot(entry)) ?? 0) + 1);
+  return new Map(skills.map((entry) => [
+    entry.key,
+    (counts.get(slot(entry)) ?? 0) > 1 ? entry.runtimeName : claudeSkillPlainName(entry),
+  ]));
 }
 
 function nonEmpty(value: string | undefined): string | null {
@@ -181,6 +213,7 @@ export async function prepareClaudePromptBundle(input: {
 
   const pluginDir = path.join(rootDir, "plugins");
   await fs.mkdir(pluginDir, { recursive: true });
+  const folders = claudePluginSkillFolders(skills);
   for (const plugin of ["paperclip", "company"] as const) {
     const pluginSkills = skills.filter((entry) => claudeSkillPlugin(entry.key) === plugin);
     if (pluginSkills.length === 0) continue;
@@ -189,7 +222,7 @@ export async function prepareClaudePromptBundle(input: {
       path.join(pluginRoot, ".claude-plugin", "plugin.json"),
       JSON.stringify({ name: plugin, description: CLAUDE_SKILL_PLUGIN_DESCRIPTIONS[plugin] }, null, 2) + "\n",
     );
-    await linkSkills(path.join(pluginRoot, "skills"), pluginSkills, onLog);
+    await linkSkills(path.join(pluginRoot, "skills"), pluginSkills, onLog, (entry) => folders.get(entry.key) ?? entry.runtimeName);
   }
 
   const instructionsFilePath = instructionsContents
@@ -209,17 +242,19 @@ export async function prepareClaudePromptBundle(input: {
 }
 
 /**
- * Symlinks each skill into `skillsHome/<runtimeName>`. A link a concurrent preparation of the
- * same bundle made first (`EEXIST`) is fine; other failures are logged and the skill is left out.
+ * Symlinks each skill into `skillsHome/<folder>`, its runtime name unless `folderName` says
+ * otherwise. A link a concurrent preparation of the same bundle made first (`EEXIST`) is fine;
+ * other failures are logged and the skill is left out.
  */
 async function linkSkills(
   skillsHome: string,
   skills: SkillEntry[],
   onLog: AdapterExecutionContext["onLog"],
+  folderName: (entry: SkillEntry) => string = (entry) => entry.runtimeName,
 ): Promise<void> {
   await fs.mkdir(skillsHome, { recursive: true });
   for (const entry of skills) {
-    const target = path.join(skillsHome, entry.runtimeName);
+    const target = path.join(skillsHome, folderName(entry));
     try {
       await ensurePaperclipSkillSymlink(entry.source, target);
     } catch (err) {

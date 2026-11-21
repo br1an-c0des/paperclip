@@ -97,8 +97,8 @@ describe("harness and runner", () => {
 
   it("labels the harness with its runner where there's a choice", () => {
     expect(runtimeIdentity(bob()).label).toBe("Claude Code · Paperclip Runner");
-    expect(runtimeIdentity(agent("claude_local")).label).toBe("Claude Code · Legacy runner");
-    expect(runtimeIdentity(agent("codex_local")).label).toBe("Codex · Legacy runner");
+    expect(runtimeIdentity(agent("claude_local")).label).toBe("Claude Code · Classic runner");
+    expect(runtimeIdentity(agent("codex_local")).label).toBe("Codex · Classic runner");
     const process = runtimeIdentity(agent("process"));
     expect(process.label).toBe("Process");
     expect(process.runnerApplies).toBe(false);
@@ -108,7 +108,7 @@ describe("harness and runner", () => {
   it("offers the Runner only where the adapters list allows it", () => {
     const legacyClaude = agent("claude_local");
     const runner = adapter("paperclip_runner");
-    const upgradeable = adapter("claude_local", { supportedRunners: ["legacy", "paperclip"], defaultRunner: "paperclip" });
+    const upgradeable = adapter("claude_local", { supportedRunners: ["legacy", "paperclip"], defaultRunner: "legacy" });
     expect(runnerOffer(legacyClaude, [upgradeable, runner], null)).toEqual({ kind: "upgrade" });
     expect(runnerOffer(legacyClaude, undefined, null)).toEqual({ kind: "none" });
     expect(runnerOffer(legacyClaude, [upgradeable, adapter("paperclip_runner", { disabled: true })], null)).toEqual({ kind: "none", reason: "runner-disabled" });
@@ -131,9 +131,9 @@ describe("harness and runner", () => {
     expect(runnerSwitchable({ kind: "none", reason: "not-supported-here" })).toBe(false);
     expect(runnerOptions("paperclip")).toEqual([
       { value: "paperclip", label: "Paperclip Runner (recommended)" },
-      { value: "legacy", label: "Legacy runner" },
+      { value: "legacy", label: "Classic runner" },
     ]);
-    expect(runnerOptions("legacy").map((option) => option.label)).toEqual(["Paperclip Runner", "Legacy runner"]);
+    expect(runnerOptions("legacy").map((option) => option.label)).toEqual(["Paperclip Runner", "Classic runner"]);
     expect(runnerOptions(undefined)[0]!.label).toBe("Paperclip Runner");
   });
 
@@ -172,7 +172,7 @@ describe("requalifyEnvironment", () => {
       expect(requalifyEnvironment({ ...(agent as object), adapterConfig: { provider } } as never, input)).toBeNull();
     }
     expect(requalifyEnvironment({ ...(agent as object), runtimeConfig: { aiConnection: { mode: "router", connectionId: "c1" } } } as never, input)).toBeNull();
-    expect(requalifyEnvironment(agent, { ...input, adapters: [{ type: "opencode_local", defaultRunner: "paperclip" } as AdapterInfo] })).toBeNull();
+    expect(requalifyEnvironment(agent, { ...input, adapters: [{ type: "opencode_local", supportedRunners: ["paperclip", "legacy"], defaultRunner: "legacy" } as AdapterInfo] })).toBeNull();
   });
 
   it("reads the qualification", () => {

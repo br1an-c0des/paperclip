@@ -1212,17 +1212,22 @@ describe("agent skill routes", () => {
       .toContain("paperclipai/paperclip/first-task");
   });
 
+  // New agents default to the classic runner; the Paperclip Runner is chosen explicitly.
   const codexRunnerCases = [
-    { adapterType: "codex_local", runner: "auto", platform: "linux", expectedType: "paperclip_runner" },
+    { adapterType: "codex_local", runner: "auto", platform: "linux", expectedType: "codex_local" },
+    { adapterType: "codex_local", runner: "paperclip", platform: "linux", expectedType: "paperclip_runner" },
     { adapterType: "codex_local", runner: "legacy", platform: "linux", expectedType: "codex_local" },
-    { adapterType: "codex_local", runner: "auto", platform: "darwin", expectedType: "paperclip_runner" },
+    { adapterType: "codex_local", runner: "auto", platform: "darwin", expectedType: "codex_local" },
+    { adapterType: "codex_local", runner: "paperclip", platform: "darwin", expectedType: "paperclip_runner" },
     { adapterType: "codex_local", runner: "legacy", platform: "darwin", expectedType: "codex_local" },
     { adapterType: "codex_local", runner: "auto", platform: "win32", expectedType: "codex_local" },
   ];
   const creationRunnerCases = [...codexRunnerCases,
-    { adapterType: "claude_local", runner: "auto", platform: "linux", expectedType: "paperclip_runner" },
+    { adapterType: "claude_local", runner: "auto", platform: "linux", expectedType: "claude_local" },
+    { adapterType: "claude_local", runner: "paperclip", platform: "linux", expectedType: "paperclip_runner" },
     { adapterType: "claude_local", runner: "legacy", platform: "linux", expectedType: "claude_local" },
-    { adapterType: "claude_local", runner: "auto", platform: "darwin", expectedType: "paperclip_runner" },
+    { adapterType: "claude_local", runner: "auto", platform: "darwin", expectedType: "claude_local" },
+    { adapterType: "claude_local", runner: "paperclip", platform: "darwin", expectedType: "paperclip_runner" },
     { adapterType: "claude_local", runner: "legacy", platform: "darwin", expectedType: "claude_local" },
   ];
   it.each(creationRunnerCases.flatMap((runnerCase) => [

@@ -334,13 +334,15 @@ describeEmbeddedPostgres("plugin-managed agents", () => {
     const created = await services.agents.managedReconcile({ companyId, agentKey: "wiki-maintainer" });
 
     expect(created.status).toBe("created");
-    expect(created.agent).toMatchObject({ adapterType: "paperclip_runner", adapterConfig: { provider: "codex" } });
+    // New agents default to the classic runner, whatever the Runner supports here.
+    expect(created.agent?.adapterType).toBe("codex_local");
+    expect(created.agent?.adapterConfig).not.toHaveProperty("provider");
     const reconciled = await services.agents.managedReconcile({ companyId, agentKey: "wiki-maintainer" });
     expect(reconciled.agent?.adapterConfig).toEqual(created.agent?.adapterConfig);
     runnerTarget.platform = "win32";
     runnerTarget.architecture = "x64";
     const reset = await services.agents.managedReset({ companyId, agentKey: "wiki-maintainer" });
-    expect(reset.agent).toMatchObject({ adapterType: "paperclip_runner", adapterConfig: { provider: "codex" } });
+    expect(reset.agent?.adapterType).toBe("codex_local");
   });
 
   it("materializes declared managed agent instructions with local folder paths", async () => {
