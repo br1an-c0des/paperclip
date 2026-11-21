@@ -4275,7 +4275,11 @@ export function agentRoutes(
     if (!(await assertAgentReadAllowed(req, res, agent))) return;
     await assertCanReadAgent(req, agent);
     const rawProjectId = typeof req.query.projectId === "string" ? req.query.projectId.trim() : "";
-    const preview = await runPreview.previewAgentRun(agent, { projectId: rawProjectId || null });
+    const preview = await runPreview.previewAgentRun(agent, {
+      projectId: rawProjectId || null,
+      // A run on a task the user asking creates would be theirs.
+      responsibleUserId: req.actor.userId ?? null,
+    });
     res.json(preview);
   });
 
