@@ -25,6 +25,8 @@ export type {
   AdapterSkillEntry,
   AdapterSkillSnapshot,
   AdapterSkillContext,
+  AdapterRunPreviewContext,
+  AdapterRunPreview,
   AdapterSessionCodec,
   AdapterModel,
   HireApprovedPayload,
