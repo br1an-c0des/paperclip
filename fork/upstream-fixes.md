@@ -1185,3 +1185,22 @@ Found 2026-11-20 in CI on `feat/step-4b` (run 44797032206, shard 5).
 - **Likely fix:** find what the test races against (the recorded start time versus the probe), and
   make it deterministic.
 - **Fork workaround:** re-run the failed CI job.
+
+### 69. Bring the opt-in hiring and portability tests up to step 4a's access levels
+
+Found 2026-11-20 by step 4b's agent E; confirmed on `feat/step-4b` before E's merge.
+
+- **Problem:** two opt-in test files fail since step 4a and CI never saw it, because the thorough tier
+  skips them (`server/**/*ai-connection*.test.*` and `server/**/*portability*.test.*` in
+  `scripts/test-tiers.json`, both marked dormant).
+  - `server/src/__tests__/agent-hire-ai-connections.test.ts`: 60 of 84 tests get 403 "This agent's
+    access level does not let it hire agents (needs agents:create)". Its fixture inserts a CEO
+    agent with no `access`, so it gets the default `worker` level, and grants the old
+    `principalPermissionGrants` keys, which 4a no longer reads for hiring.
+  - `server/src/__tests__/company-portability.test.ts`, "restores a CEO's recorded hiring denial":
+    the call it checks now carries an extra `access` field.
+- **Likely fix:** give the fixture's hiring agent an access level that allows `agents:create`, and
+  update the portability expectation to the 4a shape. Then decide whether managed AI connections
+  still belong in the opt-in tier: the `claude_local` agents here bind one (`aiConnection`), so
+  part of that area isn't dormant.
+- **Fork workaround:** none; the files only run with `corepack pnpm test:optin`.
