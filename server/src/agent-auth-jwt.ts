@@ -120,6 +120,11 @@ function safeCompare(a: string, b: string) {
   return timingSafeEqual(left, right);
 }
 
+/** Whether `createLocalAgentJwt` can mint a run token (its secret is set), without minting one. */
+export function localAgentJwtAvailable(): boolean {
+  return jwtConfig() !== null;
+}
+
 export function createLocalAgentJwt(
   agentId: string,
   companyId: string,

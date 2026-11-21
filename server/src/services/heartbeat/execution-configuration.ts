@@ -23,7 +23,6 @@ import { connectionIntentService } from "../connection-intents.js";
 import { PLUGIN_RUNNER_AI_CONNECTION_REQUIRED, pluginEnvironmentRunnerTaskDriver, pluginRunnerAiConnectionRequiredMessage } from "../plugin-runner-ai-connection.js";
 import { prepareConnectionInstructionDelivery } from "../connection-instructions.js";
 import { applyConnectorSkills, prepareConnectorSkillDelivery, resolveConnectorAssignments } from "../connector-runtime.js";
-import { resolveManagedGitHubIdentitySelection } from "../git-credentials.js";
 import { resolveAssignedConnectionInstructionsForRun, resolveMcpConnectionSkillsForRun } from "../native-runtime/assigned-mcp-tools.js";
 import { applyMcpConnectionSkills } from "../mcp-skill-runtime.js";
 import { recordFailedSkillPreparation, type NativeRunHistoricalSpan } from "../native-runtime/native-run-trace.js";
@@ -40,7 +39,7 @@ import {
   resolveRunScopedMentionedSkillKeys, type createHeartbeatRunPreparation, type resolveAcceptedPlanWakeRoutingDecision,
 } from "./run-preparation.js";
 import { buildExecutionWorkspaceConfigSnapshot, stripWorkspaceRuntimeFromExecutionRunConfig } from "./workspaces.js";
-import { decideRunGitHubAccess, readUseServerGitHubLogin, runGitHubManifest, sealedRunGitHubEnv } from "./sealed-run-github.js";
+import { resolveRunGitHub } from "./sealed-run-github.js";
 import type { HeartbeatWorkspacePreparationInput } from "./workspace-preparation.js";
 
 const ACCEPTED_PLAN_CONVERSION_SKILL_KEY =
@@ -183,8 +182,9 @@ export async function prepareHeartbeatExecutionConfiguration(db: Db, input: Hear
       commentIds: extractWakeCommentIds(context),
       actor: skillActor,
     })),
-    time("configuration_github_identity", () => resolveManagedGitHubIdentitySelection(db, agent.companyId, {
-      agentId: agent.id, responsibleUserId, allowStandingDelegation: false,
+    time("configuration_github_identity", () => resolveRunGitHub(db, {
+      agent, adapterConfig: mergedConfig, environmentDriver: selectedEnvironmentForConfig?.driver,
+      trustKind: input.policy.trustPreset.kind, responsibleUserId,
     })),
   ]);
   if (mentionedSkills.status === "rejected") throw mentionedSkills.reason;
@@ -195,20 +195,10 @@ export async function prepareHeartbeatExecutionConfiguration(db: Db, input: Hear
     !acceptedPlanWakeRoutingDecision?.suppressAcceptedContinuation
       ? [...runScopedMentionedSkillKeys, ACCEPTED_PLAN_CONVERSION_SKILL_KEY]
       : runScopedMentionedSkillKeys;
-  const githubSelection = githubIdentity.value;
-  // A sealed claude_local CLI run uses the server's own GitHub login only when the agent opted in.
-  const githubAccess = decideRunGitHubAccess({
-    adapterType: agent.adapterType,
-    adapterConfig: mergedConfig,
-    environmentDriver: selectedEnvironmentForConfig?.driver,
-    trustKind: trustPreset.kind,
-    githubConfigured: githubSelection.configured,
-    useServerLogin: readUseServerGitHubLogin(agent.runtimeConfig),
-  });
+  const { githubSelection, githubAccess, githubRunEnv, manifest: githubManifest } = githubIdentity.value;
   const { useHostGitHub } = githubAccess;
-  const githubRunEnv = await sealedRunGitHubEnv({ access: githubAccess, agent });
   // Server-owned, like paperclipSecrets: wake context can't supply it.
-  if (githubAccess.sealed) context.paperclipGitHub = runGitHubManifest({ useHostGitHub, selection: githubSelection });
+  if (githubManifest) context.paperclipGitHub = githubManifest;
   else delete context.paperclipGitHub;
 
   const { resolvedConfig, configuredTaskEnvironment, secretKeys, secretManifest } =

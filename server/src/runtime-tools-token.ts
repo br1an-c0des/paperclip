@@ -39,6 +39,11 @@ function safeEqual(left: string, right: string) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/** Whether `createRuntimeToolsToken` can mint a token (its secret is set), without minting one. */
+export function runtimeToolsTokenAvailable(): boolean {
+  return secret() !== null;
+}
+
 export function createRuntimeToolsToken(input: {
   agentId: string;
   companyId: string;

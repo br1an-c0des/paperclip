@@ -2,6 +2,8 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { resolveClaudeExecutionEngine } from "@paperclipai/adapter-claude-local/server";
 import type { ClaudeRunGitHub } from "@paperclipai/shared";
+import type { Db } from "@paperclipai/db";
+import { resolveManagedGitHubIdentitySelection } from "../git-credentials.js";
 
 /**
  * Step 4b: GitHub for sealed runs (fork/step-4b-plan.md, "Added after the real-run check",
@@ -141,4 +143,39 @@ export async function sealedRunGitHubEnv(input: {
     GIT_COMMITTER_NAME: committer.name,
     GIT_COMMITTER_EMAIL: committer.email,
   };
+}
+
+/**
+ * GitHub for a run, as the run and its preview both decide it: the GitHub connection that
+ * covers the agent (read-only), whether the run uses the server's own login, the variables a
+ * sealed run adds, and what its manifest records (null for a run that isn't sealed).
+ */
+export async function resolveRunGitHub(db: Db, input: {
+  agent: { id: string; companyId: string; name: string; title?: string | null; adapterType: string; runtimeConfig: unknown };
+  adapterConfig: Record<string, unknown>;
+  environmentDriver: string | null | undefined;
+  trustKind: string;
+  responsibleUserId: string | null;
+  readServerIdentity?: () => Promise<GitIdentity | null>;
+}) {
+  const { agent } = input;
+  const githubSelection = await resolveManagedGitHubIdentitySelection(db, agent.companyId, {
+    agentId: agent.id, responsibleUserId: input.responsibleUserId, allowStandingDelegation: false,
+  });
+  // A sealed claude_local CLI run uses the server's own GitHub login only when the agent opted in.
+  const githubAccess = decideRunGitHubAccess({
+    adapterType: agent.adapterType,
+    adapterConfig: input.adapterConfig,
+    environmentDriver: input.environmentDriver,
+    trustKind: input.trustKind,
+    githubConfigured: githubSelection.configured,
+    useServerLogin: readUseServerGitHubLogin(agent.runtimeConfig),
+  });
+  const githubRunEnv = await sealedRunGitHubEnv({
+    access: githubAccess, agent, ...(input.readServerIdentity ? { readServerIdentity: input.readServerIdentity } : {}),
+  });
+  const manifest = githubAccess.sealed
+    ? runGitHubManifest({ useHostGitHub: githubAccess.useHostGitHub, selection: githubSelection })
+    : null;
+  return { githubSelection, githubAccess, githubRunEnv, manifest };
 }

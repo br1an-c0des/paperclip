@@ -94,3 +94,78 @@ export function isClaudeRunManifest(value: unknown): value is ClaudeRunManifest 
   const record = value as { version?: unknown; engine?: unknown };
   return record.version === 1 && record.engine === "cli";
 }
+
+/**
+ * Why the preview can't read the repo's `CLAUDE.md` or skills yet: the project's primary
+ * workspace has a repo URL but no local checkout, and the preview doesn't clone. A run clones
+ * it first, then reads them from the clone.
+ */
+export type ClaudeRunPreviewRepoSkipReason = "not_cloned";
+
+/**
+ * Where the preview read the repo's `CLAUDE.md` and skills from: the project's primary
+ * workspace's checkout (`local`), nothing yet (`not_cloned`: a repo URL and no checkout), or no
+ * workspace at all (`none`: runs work in the agent's own folder).
+ */
+export type ClaudeRunPreviewCheckout =
+  | { kind: "local"; path: string }
+  | { kind: "not_cloned"; repoUrl: string }
+  | { kind: "none" };
+
+/**
+ * The manifest as the next fresh run on a task would get it. Left out: `session` (it depends on
+ * the task: each new task starts fresh, later wakes on it resume) and `setAside` (what a run
+ * moves out of the config folder is known only when it moves it). `claudeMd` and `repoSkills`
+ * can also read `not_cloned`. `credential` is null when the run would have none (a
+ * `claude_credential_missing` blocker says so). `envKeys` are the names from the agent's
+ * settings and Paperclip's own; a run adds launch-time ones on top: its wake's and task's
+ * (`PAPERCLIP_TASK_ID` and the like), its workspace and scratch folders, the managed git/gh
+ * launchers, telemetry export, and the agent's signing identity.
+ */
+export type ClaudeRunPreviewManifest = Omit<
+  ClaudeRunManifest,
+  "session" | "setAside" | "claudeMd" | "repoSkills" | "credential"
+> & {
+  credential: ClaudeRunCredential | null;
+  claudeMd: ClaudeMdLoad | { enabled: false; reason: ClaudeRunPreviewRepoSkipReason };
+  repoSkills: ClaudeRepoSkillsLoad | { enabled: false; reason: ClaudeRunPreviewRepoSkipReason };
+};
+
+/** Why a run would be refused before it started (fork/step-4b-sealed-runs.md, section 7). */
+export interface ClaudeRunPreviewBlocker {
+  /** e.g. `claude_credential_missing`, `paperclip_mcp_unavailable` */
+  code: string;
+  message: string;
+}
+
+export type ClaudeRunPreviewUnsupportedReason =
+  /** Another adapter. */
+  | "not_claude_local"
+  /** `claude_local` on the ACP engine. */
+  | "not_cli_engine"
+  /** Runs on the Paperclip Runner. */
+  | "runner"
+  /** Runs on another remote execution target (SSH, sandbox, cloud), which isn't sealed. */
+  | "remote_target";
+
+export interface ClaudeRunPreviewProject {
+  id: string;
+  name: string;
+  checkout: ClaudeRunPreviewCheckout;
+}
+
+/**
+ * What an agent's runs get, before any run: `GET /api/agents/:id/run-preview?projectId=`
+ * (fork/step-4b-parts-2-3.md, part 2). Worked out by the same planning code as a real launch,
+ * without starting, writing or minting anything.
+ */
+export type ClaudeRunPreview =
+  | {
+      supported: true;
+      /** The project chosen with `projectId`, or null for tasks in no project. */
+      project: ClaudeRunPreviewProject | null;
+      manifest: ClaudeRunPreviewManifest;
+      /** Empty when the run would start. */
+      blockers: ClaudeRunPreviewBlocker[];
+    }
+  | { supported: false; reason: ClaudeRunPreviewUnsupportedReason };

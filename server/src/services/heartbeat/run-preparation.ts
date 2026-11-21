@@ -78,7 +78,7 @@ import type {
   AdapterRuntimeMcpServer,
   AdapterRuntimeToolAccess,
 } from "../../adapters/index.js";
-import { createRuntimeToolsToken } from "../../runtime-tools-token.js";
+import { createRuntimeToolsToken, runtimeToolsTokenAvailable } from "../../runtime-tools-token.js";
 import { parseObject } from "../../adapters/utils.js";
 import {
   authorizeChatConversationForBoundRun,
@@ -904,32 +904,24 @@ export async function revokeHeartbeatRunGatewayTokens(input: {
     );
 }
 
-export async function buildPaperclipRuntimeMcpServers(input: {
+/**
+ * The MCP connections and tools assigned to an agent's run, read-only: what
+ * `buildPaperclipRuntimeMcpServers` delivers through the assigned-tools gateway, before it
+ * records a diagnostic, makes the profile and gateway, or mints a token. The run preview uses it
+ * without a run (`runId` null: no run-bound chat or voice tools).
+ */
+export async function resolveRuntimeMcpAssignment(input: {
   db: Db;
   agent: Pick<typeof agents.$inferSelect, "id" | "companyId" | "name">;
-  runId: string;
-  expectedAssignmentDigest?: string | null;
-}): Promise<AdapterRuntimeMcpServer[]> {
+  runId: string | null;
+  runIdentity: { issueId: string | null; responsibleUserId: string | null; activeIdentityContextId: string | null } | null;
+}) {
+  const runIdentity = input.runIdentity;
   const access = toolAccessService(input.db);
   const effective = await access.getEffectiveToolAssignmentsForAgent(
     input.agent.companyId,
     input.agent.id,
   );
-  const [runIdentity] = await input.db
-    .select({
-      issueId: boundRunIssueIdSql(),
-      responsibleUserId: heartbeatRuns.responsibleUserId,
-      activeIdentityContextId: heartbeatRuns.activeIdentityContextId,
-    })
-    .from(heartbeatRuns)
-    .where(
-      and(
-        eq(heartbeatRuns.id, input.runId),
-        eq(heartbeatRuns.companyId, input.agent.companyId),
-        eq(heartbeatRuns.agentId, input.agent.id),
-      ),
-    )
-    .limit(1);
   const resolvedInstalledConnections = runIdentity?.activeIdentityContextId
     ? effective.installedConnections
     : await filterResolvedGitHubConnectionsForRun({
@@ -974,12 +966,14 @@ export async function buildPaperclipRuntimeMcpServers(input: {
     )
     .map(({ id, name }) => ({ id, name }))
     .sort((a, b) => a.name.localeCompare(b.name));
-  const githubBotConnectionIds = await githubBotConnectionIdsForRun(input.db, input.agent.companyId, input.agent.id, input.runId);
+  const githubBotConnectionIds = input.runId
+    ? await githubBotConnectionIdsForRun(input.db, input.agent.companyId, input.agent.id, input.runId)
+    : new Set<string>();
   const spekoConnectionIds = effective.installedConnections.some(connection => connection.transport === "voice")
     ? new Set((await spekoToolsForSession(input.db, {
         companyId: input.agent.companyId,
         agentId: input.agent.id,
-        runId: input.runId,
+        runId: input.runId ?? "",
         issueId: runIdentity?.issueId ?? null,
         identityContextId: runIdentity?.activeIdentityContextId,
       })).map(tool => tool.connectionId))
@@ -1003,15 +997,8 @@ export async function buildPaperclipRuntimeMcpServers(input: {
   const assignedTools = effective.allowedTools.filter((tool) =>
     assignedConnectionIds.has(tool.connectionId),
   );
-  const service = createToolGatewayService(input.db);
   if (assignedConnections.length === 0) {
-    await service.recordRuntimeMcpDeliveryDiagnostic({
-      companyId: input.agent.companyId,
-      agentId: input.agent.id,
-      runId: input.runId,
-      permittedNotInstalledConnections,
-    });
-    return [];
+    return { access, effective, assignedConnections, assignedTools, permittedNotInstalledConnections, assignmentDigest: null };
   }
   const assignment = {
     version: 1,
@@ -1022,6 +1009,72 @@ export async function buildPaperclipRuntimeMcpServers(input: {
   const assignmentDigest = createHash("sha256")
     .update(JSON.stringify(assignment))
     .digest("hex");
+  return { access, effective, assignedConnections, assignedTools, permittedNotInstalledConnections, assignmentDigest };
+}
+
+/** The assigned-tools gateway of an agent's assignment, when an earlier run made it. Read-only. */
+export async function findRuntimeMcpAssignmentGateway(input: {
+  db: Db;
+  agent: Pick<typeof agents.$inferSelect, "id" | "companyId">;
+  assignmentDigest: string;
+}) {
+  const candidates = await input.db
+    .select()
+    .from(toolMcpGateways)
+    .where(
+      and(
+        eq(toolMcpGateways.companyId, input.agent.companyId),
+        eq(toolMcpGateways.status, "active"),
+        isNull(toolMcpGateways.archivedAt),
+      ),
+    );
+  return candidates.find(
+    (candidate) =>
+      candidate.metadata?.nativeRuntimeAssignmentDigest === input.assignmentDigest &&
+      candidate.metadata?.agentId === input.agent.id &&
+      (!candidate.agentId || candidate.agentId === input.agent.id),
+  ) ?? null;
+}
+
+export async function buildPaperclipRuntimeMcpServers(input: {
+  db: Db;
+  agent: Pick<typeof agents.$inferSelect, "id" | "companyId" | "name">;
+  runId: string;
+  expectedAssignmentDigest?: string | null;
+}): Promise<AdapterRuntimeMcpServer[]> {
+  const [runIdentity] = await input.db
+    .select({
+      issueId: boundRunIssueIdSql(),
+      responsibleUserId: heartbeatRuns.responsibleUserId,
+      activeIdentityContextId: heartbeatRuns.activeIdentityContextId,
+    })
+    .from(heartbeatRuns)
+    .where(
+      and(
+        eq(heartbeatRuns.id, input.runId),
+        eq(heartbeatRuns.companyId, input.agent.companyId),
+        eq(heartbeatRuns.agentId, input.agent.id),
+      ),
+    )
+    .limit(1);
+  const resolved = await resolveRuntimeMcpAssignment({
+    db: input.db,
+    agent: input.agent,
+    runId: input.runId,
+    runIdentity: runIdentity ?? null,
+  });
+  const { access, effective, assignedConnections, assignedTools, permittedNotInstalledConnections } = resolved;
+  const service = createToolGatewayService(input.db);
+  if (assignedConnections.length === 0) {
+    await service.recordRuntimeMcpDeliveryDiagnostic({
+      companyId: input.agent.companyId,
+      agentId: input.agent.id,
+      runId: input.runId,
+      permittedNotInstalledConnections,
+    });
+    return [];
+  }
+  const assignmentDigest = resolved.assignmentDigest!;
   // Native runs may lose access after their immutable context is captured, but
   // they must never gain a new or changed assignment during dispatch.
   if (
@@ -1236,6 +1289,21 @@ export function createAdapterRuntimeMcpAccess(
   });
 }
 
+/**
+ * The connection-tools MCP endpoint a run would get, without minting its token: null when
+ * `createAdapterRuntimeToolAccess` would give the run none (no responsible user, no token
+ * secret, or no `PAPERCLIP_API_URL`). For the run preview.
+ */
+export function plannedRuntimeToolsMcpEndpoint(input: { responsibleUserId: string | null }): string | null {
+  if (!input.responsibleUserId || !runtimeToolsTokenAvailable()) return null;
+  const baseUrl = configuredPaperclipApiBaseUrl();
+  return baseUrl ? runtimeToolsMcpEndpoint(baseUrl) : null;
+}
+
+function runtimeToolsMcpEndpoint(baseUrl: string): string {
+  return `${baseUrl}/mcp/runtime-tools`;
+}
+
 export function createAdapterRuntimeToolAccess(input: {
   agentId: string;
   companyId: string;
@@ -1259,7 +1327,7 @@ export function createAdapterRuntimeToolAccess(input: {
   return Object.freeze({
     version: 1,
     guidance: CONNECTION_INTENT_AGENT_GUIDANCE,
-    mcpEndpoint: `${baseUrl}/mcp/runtime-tools`,
+    mcpEndpoint: runtimeToolsMcpEndpoint(baseUrl),
     rest: {
       connectionsSearch: `${baseUrl}/runtime-tools/connections/search`,
       connectionRequest: `${baseUrl}/runtime-tools/connections/request`,

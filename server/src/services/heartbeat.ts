@@ -58,7 +58,7 @@ import { createHeartbeatRunOutput } from "./heartbeat/run-output.js";
 import { readRecoverableRunLog } from "./native-runtime/native-run-log-recovery.js";
 import { observabilitySecretValues } from "@paperclipai/adapter-utils/agent-observability";
 import { prepareHeartbeatSession, resolveHeartbeatAdapterSession } from "./heartbeat/session-preparation.js";
-import { readRunAgentAccess } from "./heartbeat/claude-run-context.js";
+import { readProjectRepoSwitches, readRunAgentAccess } from "./heartbeat/claude-run-context.js";
 import { prepareHeartbeatTaskContext } from "./heartbeat/task-context.js";
 import { selectHeartbeatEnvironment, resolveSshAuthenticationBeforeRouting } from "./heartbeat/environment-selection.js";
 import { reconcileMuseNativeTerminalRun } from "./native-runtime/muse-terminal-reconciliation.js";
@@ -3350,13 +3350,7 @@ export function heartbeatService(
           : []),
       ];
       // Step 4b: the project's repo switches, for a sealed claude_local launch (null: no project).
-      const workspaceProjectSwitches = executionWorkspace.projectId
-        ? await db
-          .select({ agentsReadClaudeMd: projects.agentsReadClaudeMd, agentsUseRepoSkills: projects.agentsUseRepoSkills })
-          .from(projects)
-          .where(and(eq(projects.id, executionWorkspace.projectId), eq(projects.companyId, agent.companyId)))
-          .then((rows) => rows[0] ?? null)
-        : null;
+      const workspaceProjectSwitches = await readProjectRepoSwitches(db, agent.companyId, executionWorkspace.projectId);
       context.paperclipWorkspace = {
         cwd: executionWorkspace.cwd,
         source: executionWorkspace.source,
