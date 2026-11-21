@@ -40,6 +40,7 @@ import {
   resolveRunScopedMentionedSkillKeys, type createHeartbeatRunPreparation, type resolveAcceptedPlanWakeRoutingDecision,
 } from "./run-preparation.js";
 import { buildExecutionWorkspaceConfigSnapshot, stripWorkspaceRuntimeFromExecutionRunConfig } from "./workspaces.js";
+import { decideRunGitHubAccess } from "./sealed-run-github.js";
 import type { HeartbeatWorkspacePreparationInput } from "./workspace-preparation.js";
 
 const ACCEPTED_PLAN_CONVERSION_SKILL_KEY =
@@ -195,12 +196,14 @@ export async function prepareHeartbeatExecutionConfiguration(db: Db, input: Hear
       ? [...runScopedMentionedSkillKeys, ACCEPTED_PLAN_CONVERSION_SKILL_KEY]
       : runScopedMentionedSkillKeys;
   const githubSelection = githubIdentity.value;
-  const useHostGitHub =
-    !githubSelection.configured &&
-    trustPreset.kind === "standard" &&
-    ["local", "ssh"].includes(
-      selectedEnvironmentForConfig?.driver ?? "local",
-    );
+  // A sealed claude_local CLI run never falls back to the server's own GitHub login.
+  const { useHostGitHub } = decideRunGitHubAccess({
+    adapterType: agent.adapterType,
+    adapterConfig: mergedConfig,
+    environmentDriver: selectedEnvironmentForConfig?.driver,
+    trustKind: trustPreset.kind,
+    githubConfigured: githubSelection.configured,
+  });
 
   const { resolvedConfig, configuredTaskEnvironment, secretKeys, secretManifest } =
     await time("configuration_secrets", () => resolveExecutionRunAdapterConfig({

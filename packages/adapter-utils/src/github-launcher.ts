@@ -32,16 +32,24 @@ if (!['git', 'gh'].includes(program) || !executable) {
 const localGitCommands = new Set(['init', 'status', 'add', 'config', 'rev-parse', 'log', 'diff', 'diff-files', 'write-tree', 'show', 'branch', 'checkout', 'switch', 'restore', 'reset', 'rm', 'mv', 'worktree', 'grep', 'blame', 'describe', 'ls-files', 'ls-tree', 'cat-file', 'rev-list', 'merge-base', 'show-ref', 'for-each-ref', 'symbolic-ref', 'check-ignore', 'version', 'help']);
 const gitValueOptions = ['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--config-env', '--super-prefix', '--attr-source'];
 const gitFlagOptions = ['-p', '-P', '--paginate', '--no-pager', '--bare', '--no-replace-objects', '--no-lazy-fetch', '--no-optional-locks', '--no-advice', '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs'];
-function isLocalGit(args) {
-  if (program !== 'git') return false;
+function gitSubcommand(args) {
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
     if (gitValueOptions.includes(arg)) { index += 1; continue; }
     if (gitValueOptions.some(option => arg.startsWith(option + '='))) continue;
     if (gitFlagOptions.includes(arg)) continue;
-    return arg === '--version' || arg === '--help' || localGitCommands.has(arg);
+    return arg;
   }
-  return false;
+  return null;
+}
+function isLocalGit(args) {
+  if (program !== 'git') return false;
+  const arg = gitSubcommand(args);
+  return arg === '--version' || arg === '--help' || localGitCommands.has(arg);
+}
+// commit and var ask the broker only for the author, so a failure there is never about access.
+function usesGitHubAccess(args) {
+  return program === 'gh' || !['commit', 'var'].includes(gitSubcommand(args));
 }
 // With a Paperclip GitHub connection, repositories are created and forked
 // through its tools so access rules, approvals, owner defaults and audit apply.
@@ -68,6 +76,9 @@ ${options.brokerFile ? String.raw`
 ` : ''}
   const diagnostic = (code) => process.stderr.write('Paperclip: GitHub ' + code + '; continuing without managed credentials.\n');
   let connected = false;
+  // Set when the broker answered that no GitHub connection covers this run: the command runs
+  // anonymously, and a failure gets one line saying why private access wasn't there.
+  let absentReason = null;
   const configRoot = env.GH_CONFIG_DIR || os.tmpdir();
   // A missing/unwritable scratch directory must not break local Git. The
   // fallback deliberately cannot load the host's gh authentication files.
@@ -139,6 +150,11 @@ ${options.brokerFile ? String.raw`
           : 'Check the GitHub connection in Paperclip';
         process.stderr.write('Paperclip: GitHub access unavailable: ' + reason + '. Continuing without GitHub credentials.\n');
       }
+      if (result.status === 'absent') {
+        absentReason = typeof result.reason === 'string' && result.reason
+          ? result.reason.replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 500)
+          : 'No GitHub connection covers this run';
+      }
       connected = result.status === 'available';
       if (result.status === 'available' && configReady) {
         for (const [key, value] of Object.entries(result.env || {})) {
@@ -169,7 +185,13 @@ ${options.brokerFile ? String.raw`
   const child = spawn(executable, process.argv.slice(2), { env, stdio: 'inherit' });
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => child.kill(signal));
   child.once('error', () => { process.stderr.write('Paperclip: GitHub command could not start.\n'); process.exitCode = 1; });
-  child.once('exit', (code, signal) => { process.exitCode = code === null ? 128 : code; });
+  child.once('exit', (code, signal) => {
+    process.exitCode = code === null ? 128 : code;
+    if (code !== 0 && absentReason && usesGitHubAccess(process.argv.slice(2))) {
+      process.stderr.write('Paperclip: this command ran without GitHub credentials (' + absentReason + '). ' +
+        'Private repositories and authenticated GitHub operations need a GitHub connection for this agent in Paperclip.\n');
+    }
+  });
 }
 main().catch(() => { process.stderr.write('Paperclip: GitHub launcher_setup_failed.\n'); process.exitCode = 1; });
 `;
