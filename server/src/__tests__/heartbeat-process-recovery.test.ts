@@ -1494,9 +1494,11 @@ describeEmbeddedPostgres("heartbeat orphaned process recovery", () => {
     await waitForRunToSettle(heartbeat, runId);
     await heartbeat.waitForRunExecutionDrain(runId);
 
+    // Isolated workspaces are always on since step 4b part 3, so the preflight now stops at the
+    // next low-trust requirement: a sandbox environment.
     expect(await heartbeat.getRun(runId)).toMatchObject({
       status: "failed",
-      errorCode: "low_trust_isolation_unavailable",
+      errorCode: "low_trust_requires_sandbox_environment",
     });
     expect(
       mockAdapterExecute.mock.calls.some(

@@ -33,6 +33,8 @@ import {
 import { environmentService } from "../services/environments.js";
 import { assertEnvironmentSelectionForCompany } from "./environment-selection.js";
 import { assertBoard, assertBoardOrgAccess, getActorInfo } from "./authz.js";
+import { loadConfig } from "../config.js";
+import { restorePointAvailability, worktreeCleanupStatus, type WorktreeCleanupConfig } from "../services/worktree-cleanup.js";
 
 function sameJsonValue(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -139,6 +141,7 @@ export function instanceSettingsRoutes(
   prepareIdleDatabaseBackup?: () => Promise<boolean>,
   deadlineOwners?: IdleDeadlineOwners,
   prepareIdlePluginLifecycle?: (input: { canRetire: () => boolean }) => Promise<"none" | "present" | "unknown">,
+  readCleanupConfig: () => WorktreeCleanupConfig = loadConfig,
 ) {
   const router = Router();
   const svc = instanceSettingsService(db);
@@ -262,11 +265,26 @@ export function instanceSettingsRoutes(
     res.json(await svc.getExperimental());
   });
 
+  // Step 4b part 3: the worktree cleanup setting with what's in force (the environment fallback,
+  // restore points' prerequisites, the day counts). It saves through PATCH .../experimental.
+  router.get("/instance/settings/worktree-cleanup", async (req, res) => {
+    assertBoardOrgAccess(req);
+    res.json(worktreeCleanupStatus((await svc.getExperimental()).worktreeCleanup ?? null, readCleanupConfig()));
+  });
+
   router.patch(
     "/instance/settings/experimental",
     validate(patchInstanceExperimentalSettingsSchema),
     async (req, res) => {
       assertCanManageExperimentalSettings(req);
+      if (req.body.worktreeCleanup === "restore_points") {
+        const restorePoints = restorePointAvailability(readCleanupConfig());
+        if (!restorePoints.available) {
+          throw conflict(`Restore points aren't available on this instance: ${restorePoints.reason}`, {
+            code: "worktree_cleanup_restore_points_unavailable",
+          });
+        }
+      }
       // Hiding the whole Experimental page floors every toggle; otherwise
       // only individually hidden keys are floored.
       const hidden = getHiddenSettings();

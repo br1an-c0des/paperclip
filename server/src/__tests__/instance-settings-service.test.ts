@@ -93,6 +93,26 @@ describe("instance settings service", () => {
     const disabled = applyExperimentalSettingsPatch(enabled, { enableChatConnectors: false });
     expect(disabled).toMatchObject({ enableApps: true, enableChatConnectors: false });
   });
+  it("reads the retired worktree switches as on, ignoring stored and managed off values (step 4b part 3)", () => {
+    for (const stored of [undefined, {}, { enableIsolatedWorkspaces: false, enableIsolatedWorkspacesByDefault: false }, { enableCases: "invalid" }]) {
+      expect(normalizeExperimentalSettings(stored)).toMatchObject({ enableIsolatedWorkspaces: true, enableIsolatedWorkspacesByDefault: true });
+    }
+    expect(applyExperimentalSettingsPatch({}, { enableIsolatedWorkspaces: false })).toMatchObject({ enableIsolatedWorkspaces: true });
+    const config: ManagedInstanceConfig = {
+      v: 1, mode: "cloud", catalogVersion: "test", plugins: { autoInstall: [] }, environments: [], pluginEnvironments: [],
+      features: { enableIsolatedWorkspaces: false, enableIsolatedWorkspacesByDefault: false },
+    } as ManagedInstanceConfig;
+    expect(applyManagedExperimentalOverlay(normalizeExperimentalSettings({}), config).experimental)
+      .toMatchObject({ enableIsolatedWorkspaces: true, enableIsolatedWorkspacesByDefault: true });
+  });
+  it("keeps the worktree cleanup mode absent until saved, and clears it with null", () => {
+    expect("worktreeCleanup" in normalizeExperimentalSettings({})).toBe(false);
+    const saved = applyExperimentalSettingsPatch({}, { worktreeCleanup: "strict" });
+    expect(saved.worktreeCleanup).toBe("strict");
+    expect(applyExperimentalSettingsPatch(JSON.parse(JSON.stringify(saved)), { enableCases: true }).worktreeCleanup).toBe("strict");
+    expect("worktreeCleanup" in applyExperimentalSettingsPatch(saved, { worktreeCleanup: null })).toBe(false);
+    expect(normalizeExperimentalSettings({ worktreeCleanup: "bogus" }).worktreeCleanup).toBeUndefined();
+  });
   it("keeps GitHub review bots independent across legacy normalization and persistence", () => {
     expect(normalizeExperimentalSettings({ enableChatConnectors: true })).toMatchObject({ enableChatConnectors: true, enableGitHubReviewBots: false });
     const saved = applyExperimentalSettingsPatch({}, { enableGitHubReviewBots: true });
@@ -123,7 +143,7 @@ describe("instance settings service", () => {
       enableAiConnectionRouters: false,
       enableManagedSandboxOnly: false,
       enableIsolatedWorkspaces: true,
-      enableIsolatedWorkspacesByDefault: false,
+      enableIsolatedWorkspacesByDefault: true, // retired: always on (step 4b part 3)
       enableStreamlinedLeftNavigation: true,
       enableStreamlinedUi: true,
       enableApps: true,

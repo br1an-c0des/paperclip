@@ -28,7 +28,7 @@ type ExperimentalSettings = z.infer<typeof instanceExperimentalSettingsSchema>;
  * (activation timestamps, numeric tuning values) are excluded.
  */
 export type InstanceFeatureKey = {
-  [K in keyof ExperimentalSettings]: ExperimentalSettings[K] extends boolean ? K : never;
+  [K in keyof ExperimentalSettings]-?: ExperimentalSettings[K] extends boolean ? K : never;
 }[keyof ExperimentalSettings];
 
 export interface FeatureCatalogEntry {
@@ -77,10 +77,10 @@ export const INSTANCE_FEATURE_CATALOG: Record<InstanceFeatureKey, FeatureCatalog
   enableIsolatedWorkspaces: {
     title: "Isolated Workspaces",
     description:
-      "Show execution workspace controls in project configuration and allow isolated workspace behavior for task runs.",
+      "Retired: execution workspace controls and isolated task workspaces are always available. Stored values are ignored.",
     tier: "managed",
-    cloudDefault: false,
-    selfHostedDefault: false,
+    cloudDefault: true,
+    selfHostedDefault: true,
   },
   remoteWorkspaceStorageEnabled: {
     title: "Remote workspace storage",
@@ -92,10 +92,10 @@ export const INSTANCE_FEATURE_CATALOG: Record<InstanceFeatureKey, FeatureCatalog
   enableIsolatedWorkspacesByDefault: {
     title: "Isolated Workspaces By Default",
     description:
-      "Treat a project that has no execution workspace policy of its own as if it selected isolated workspaces, so its tasks get a per-task worktree instead of sharing the project checkout. Requires Isolated Workspaces. A project that carries its own policy keeps it.",
+      "Retired: a project with a git checkout gives each new task its own worktree unless the project chose otherwise. Stored values are ignored.",
     tier: "managed",
-    cloudDefault: false,
-    selfHostedDefault: false,
+    cloudDefault: true,
+    selfHostedDefault: true,
   },
   enableStreamlinedLeftNavigation: {
     title: "Streamlined Left Navigation",

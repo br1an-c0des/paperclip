@@ -82,6 +82,7 @@ import {
   formatIssueIdentifierLink,
 } from "./heartbeat/scheduling.js";
 import { canApplyTaskWorkspaceSelectionAtAdmission, taskWorkspaceRuntimeSelectionEnabled } from "./execution-workspace-policy.js";
+import { taskCheckoutSupportsWorktrees } from "./worktree-default.js";
 import { agentExecutionStopBlocker } from "./agent-execution-stop.js";
 import {
   cancelHeartbeatNativeRun,
@@ -2488,12 +2489,15 @@ export function heartbeatService(
         await timePreparation("instance_settings", () => instanceSettings.getExperimental());
       const isolatedWorkspacesEnabled =
         experimentalInstanceSettings.enableIsolatedWorkspaces;
-      // Inert on its own: the operator default only reaches the resolver when
-      // isolated workspaces are enabled at all, so a stack that has one flag
-      // without the other keeps its current behavior.
+      // Both switches are always on (step 4b part 3). The worktree default
+      // needs a git checkout: a project folder that isn't a git repository
+      // keeps sharing it.
       const defaultIsolatedWorkspacesEnabled =
         isolatedWorkspacesEnabled &&
-        experimentalInstanceSettings.enableIsolatedWorkspacesByDefault;
+        experimentalInstanceSettings.enableIsolatedWorkspacesByDefault &&
+        await taskCheckoutSupportsWorktrees(db, { companyId: agent.companyId,
+          projectId: issueContext ? issueContext.projectId : readNonEmptyString(context.projectId),
+          projectWorkspaceId: issueContext?.projectWorkspaceId });
       const providerApiPlacement = resolveProviderApiPlacement({ run, agent });
       const externalProvider = heartbeatExternalProvider({ run, agent }) ?? providerApiPlacement?.provider;
       const [taskWorkspaceIntentRow] = issueId && !externalProvider ? await timePreparation("workspace_context", () => db.select({ intent: issues.workspaceSelection }).from(issues)

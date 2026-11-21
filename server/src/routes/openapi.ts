@@ -7537,6 +7537,15 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
+  path: "/api/instance/settings/worktree-cleanup",
+  tags: ["instance"],
+  summary: "Get the worktree cleanup setting and what is in force",
+  description: "Cleaning up finished tasks' git worktrees: off (the default), strict (only when the remote can rebuild the worktree exactly) or restore_points (also with unpushed work, after saving an encrypted restore point). saved is null until someone chooses; the sweep then follows the PAPERCLIP_GIT_CACHE_EXPIRATION_ENABLED and PAPERCLIP_GIT_RESTORE_POINTS_ENABLED environment variables. restorePoints.available says whether restore points can work on this instance. Change it with PATCH /api/instance/settings/experimental and worktreeCleanup.",
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "get",
   path: "/api/instance/task-drain",
   tags: ["instance"],
   summary:

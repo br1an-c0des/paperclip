@@ -57,8 +57,9 @@ import { recoveryPostgresSupport as support } from "./helpers/recovery-postgres.
     try {
       await settings.updateExperimental({ enableIsolatedWorkspaces: true });
       expect(await read()).toEqual([href, href]);
+      // The switch is retired (step 4b part 3): a stored off value is ignored and the page stays.
       await settings.updateExperimental({ enableIsolatedWorkspaces: false });
-      expect(await read()).toEqual([undefined, undefined]);
+      expect(await read()).toEqual([href, href]);
     } finally {
       await settings.updateExperimental({ enableIsolatedWorkspaces: previous.enableIsolatedWorkspaces });
     }

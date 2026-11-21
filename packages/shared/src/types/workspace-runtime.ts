@@ -167,6 +167,21 @@ export interface ExecutionWorkspaceCloseReadiness {
   isProjectPrimaryWorkspace: boolean;
   git: ExecutionWorkspaceCloseGitReadiness | null;
   runtimeServices: WorkspaceRuntimeService[];
+  /**
+   * Why the worktree cleanup sweep kept this finished task's worktree, when it is on and skipped it.
+   * Null or absent with the sweep off, or when nothing was kept.
+   */
+  worktreeKept?: ExecutionWorkspaceWorktreeKept | null;
+}
+
+export interface ExecutionWorkspaceWorktreeKept {
+  /** The sweep's skip reason, such as `upstream_commit_unverified`. */
+  reason: string;
+  /** A short phrase for the reason, such as "branch not pushed". */
+  label: string;
+  /** When the sweep last kept it. */
+  at: string;
+  mode: "strict" | "restore_points";
 }
 
 export interface ProjectExecutionWorkspacePolicy {

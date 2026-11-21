@@ -19,6 +19,7 @@ import { ensureGitRestorePointCommit, validateGitRestorePointRef, type GitRestor
 import { getStorageService } from "../storage/index.js";
 import type { StorageService } from "../storage/types.js";
 import { PROJECT_REPOSITORIES_DIR } from "@paperclipai/adapter-utils/git-workspace-sync";
+import { isPaperclipManagedExcludeTail } from "./worktree-default.js";
 import { OWNED_NESTED_REF_LIMIT, forgetExpiredNestedRepositoryWorktree, nestedRepositoryBaseCandidates, readLinkedNestedCheckout, recordedNestedRepositoryBase, type LinkedNestedCheckout } from "./nested-repository-worktrees.js";
 
 const execFile = promisify(execFileCallback);
@@ -249,9 +250,12 @@ export async function assertReproducibleBaseGitStorage(cwd: string, signal?: Abo
       if (!entry.isFile()) throw new Error("custom_git_metadata");
       const actual = await fs.readFile(path.join(root, file));
       const template = templates.get(file);
+      // Paperclip's own exclude lines (nested checkouts, and since step 4b part 3 the task worktree
+      // folder) are regenerated when a worktree is next created, so they don't make a base custom.
       const managedExclude = file === "info/exclude" && template
-        ? Buffer.concat([template, Buffer.from(`\n/${PROJECT_REPOSITORIES_DIR}/\n`)]) : null;
-      if (!template?.equals(actual) && !managedExclude?.equals(actual)) throw new Error("custom_git_metadata");
+        && actual.subarray(0, template.length).equals(template)
+        && isPaperclipManagedExcludeTail(actual.subarray(template.length).toString("utf8"), [`/${PROJECT_REPOSITORIES_DIR}/`]);
+      if (!template?.equals(actual) && !managedExclude) throw new Error("custom_git_metadata");
     }
   }
   if (!templates.get("description")?.equals(await fs.readFile(path.join(root, "description")))) throw new Error("custom_git_metadata");

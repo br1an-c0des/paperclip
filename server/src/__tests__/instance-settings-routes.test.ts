@@ -330,6 +330,50 @@ describe("instance settings routes", () => {
     });
   });
 
+  describe("worktree cleanup (step 4b part 3)", () => {
+    const cleanupConfig = (patch: Record<string, unknown> = {}) => ({
+      gitCacheExpirationEnabled: false, gitCacheExpirationDryRun: true, gitRestorePointsEnabled: false,
+      storageProvider: "local_disk", gitRestorePointTerminalDelayDays: 3, gitRestorePointIdleDays: 7, gitRestorePointRetentionDays: 90,
+      ...patch,
+    });
+    function cleanupApp(config: Record<string, unknown>) {
+      const { errorHandler, instanceSettingsRoutes } = routeModules.value;
+      const app = express();
+      app.use(express.json());
+      app.use((req, _res, next) => { req.actor = localAdminActor() as any; next(); });
+      app.use("/api", instanceSettingsRoutes(mockDb as any, undefined, undefined, undefined, undefined, () => config as any));
+      app.use(errorHandler);
+      return app;
+    }
+
+    it("reads the environment fallback while never saved, and the saved mode once saved", async () => {
+      mockInstanceSettingsService.getExperimental.mockResolvedValue({});
+      const fallback = await request(cleanupApp(cleanupConfig({ gitCacheExpirationEnabled: true }))).get("/api/instance/settings/worktree-cleanup");
+      expect(fallback.status).toBe(200);
+      expect(fallback.body).toMatchObject({ saved: null, mode: "strict", source: "environment", dryRun: true,
+        restorePoints: { available: true }, days: { strictDelay: 1, restorePointDelay: 3, idle: 7, retention: 90 } });
+      mockInstanceSettingsService.getExperimental.mockResolvedValue({ worktreeCleanup: "off" });
+      const saved = await request(cleanupApp(cleanupConfig({ gitCacheExpirationEnabled: true }))).get("/api/instance/settings/worktree-cleanup");
+      expect(saved.body).toMatchObject({ saved: "off", mode: "off", source: "setting", dryRun: false });
+    });
+
+    it("reports restore points unavailable on S3 without the master key, and refuses to save them", async () => {
+      vi.stubEnv("PAPERCLIP_SECRETS_MASTER_KEY", "");
+      mockInstanceSettingsService.getExperimental.mockResolvedValue({});
+      const app = cleanupApp(cleanupConfig({ storageProvider: "s3" }));
+      const status = await request(app).get("/api/instance/settings/worktree-cleanup");
+      expect(status.body.restorePoints).toMatchObject({ available: false, reason: expect.stringMatching(/PAPERCLIP_SECRETS_MASTER_KEY/) });
+      const refused = await request(app).patch("/api/instance/settings/experimental").send({ worktreeCleanup: "restore_points" });
+      expect(refused.status).toBe(409);
+      expect(mockInstanceSettingsService.updateExperimental).not.toHaveBeenCalled();
+      mockInstanceSettingsService.updateExperimental.mockResolvedValue({ id: "settings-1", experimental: { worktreeCleanup: "strict" } });
+      mockInstanceSettingsService.listCompanyIds.mockResolvedValue([]);
+      await request(app).patch("/api/instance/settings/experimental").send({ worktreeCleanup: "strict" }).expect(200);
+      expect(mockInstanceSettingsService.updateExperimental).toHaveBeenCalledWith({ worktreeCleanup: "strict" });
+      vi.unstubAllEnvs();
+    });
+  });
+
   it("strips server-managed worktree run execution fields before updating experimental settings", async () => {
     const app = await createApp(localAdminActor());
 
@@ -930,7 +974,8 @@ describe("instance settings routes", () => {
     );
 
     it.each(["team.staging.paperclip.app", "team.paperclip.app"])(
-      "reads Cloud-enabled isolation and rejects disabling it through the real service on %s",
+      // Was the isolation switch, retired in step 4b part 3 (always on, never overlaid).
+      "reads a Cloud-enabled feature and rejects disabling it through the real service on %s",
       async (primaryHost) => {
         const { instanceSettingsService } = await vi.importActual<typeof import("../services/instance-settings.js")>(
           "../services/instance-settings.js",
@@ -939,7 +984,7 @@ describe("instance settings routes", () => {
         const db = {
           select: () => ({ from: () => ({ where: async () => [{
             id: "settings-1",
-            experimental: { enableIsolatedWorkspaces: false },
+            experimental: { enableEnvironments: false },
           }] }) }),
           update,
         } as unknown as Parameters<typeof instanceSettingsService>[0];
@@ -947,7 +992,7 @@ describe("instance settings routes", () => {
           PAPERCLIP_PRIMARY_HOST: primaryHost,
           PAPERCLIP_MANAGED_CONFIG: JSON.stringify({
             v: 1, mode: "cloud", catalogVersion: "test",
-            features: { enableIsolatedWorkspaces: true }, plugins: { autoInstall: [] },
+            features: { enableEnvironments: true }, plugins: { autoInstall: [] },
           }),
         } });
         mockInstanceSettingsService.getExperimental.mockImplementation(service.getExperimental);
@@ -958,11 +1003,11 @@ describe("instance settings routes", () => {
         });
         const current = await request(app).get("/api/instance/settings/experimental").expect(200);
         expect(current.body).toMatchObject({
-          enableIsolatedWorkspaces: true,
-          managedKeys: { enableIsolatedWorkspaces: { managed: true } },
+          enableEnvironments: true,
+          managedKeys: { enableEnvironments: { managed: true } },
         });
         const denied = await request(app).patch("/api/instance/settings/experimental")
-          .send({ enableIsolatedWorkspaces: false }).expect(403);
+          .send({ enableEnvironments: false }).expect(403);
         expect(denied.body.details).toMatchObject({ code: "settings_operator_managed" });
         expect(update).not.toHaveBeenCalled();
         expect(mockLogActivity).not.toHaveBeenCalled();

@@ -154,6 +154,8 @@ export type {
   ManagedExperimentalFeatureKey,
   ManagedSettingMetadata,
   BackupRetentionPolicy,
+  WorktreeCleanupMode,
+  WorktreeCleanupStatus,
 } from "./instance.js";
 export type {
   SmokeLabServiceStatus,
@@ -176,6 +178,7 @@ export {
   MONTHLY_RETENTION_PRESETS,
   DEFAULT_BACKUP_RETENTION,
   PAPERCLIP_CLOUD_MANAGED_BY,
+  WORKTREE_CLEANUP_MODES,
 } from "./instance.js";
 export {
   TRUST_PRESETS,
@@ -458,6 +461,7 @@ export type {
   ExecutionWorkspaceCloseGitReadiness,
   ExecutionWorkspaceCloseLinkedIssue,
   ExecutionWorkspaceCloseReadiness,
+  ExecutionWorkspaceWorktreeKept,
   ExecutionWorkspaceCloseReadinessState,
   ExecutionWorkspaceDeliveryState,
   WorkspaceOverviewItem,

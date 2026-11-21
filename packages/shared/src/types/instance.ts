@@ -52,14 +52,17 @@ export interface InstanceExperimentalSettings {
    * sandbox environment. Run selection refuses local while this is on.
    */
   enableManagedSandboxOnly: boolean;
+  /**
+   * Retired switch (step 4b part 3): per-task worktrees are always available, so the server always
+   * reads this as on. The stored key is accepted and ignored.
+   */
   enableIsolatedWorkspaces: boolean;
   /** Enroll eligible native sandbox workspaces in remote, snapshot-backed storage. */
   remoteWorkspaceStorageEnabled: boolean;
   /**
-   * Move the execution workspace default for a project that carries no policy
-   * of its own from the shared project checkout to an isolated per-task
-   * worktree. Inert unless `enableIsolatedWorkspaces` is also on, and never
-   * overrides a project that stores its own policy.
+   * Retired switch (step 4b part 3), always read as on: a project with a git checkout gives each
+   * new task its own worktree unless the project explicitly chose otherwise
+   * (`applyDefaultIsolatedExecutionWorkspacePolicy`). The stored key is accepted and ignored.
    */
   enableIsolatedWorkspacesByDefault: boolean;
   enableStreamlinedLeftNavigation: boolean;
@@ -174,6 +177,43 @@ export interface InstanceExperimentalSettings {
    * from another instance fail closed.
    */
   worktreeRunExecutionActivationInstanceId: string | null;
+  /**
+   * Cleaning up finished tasks' worktrees (upstream's git workspace expiration sweep). Absent when
+   * never saved: the sweep then follows `PAPERCLIP_GIT_CACHE_EXPIRATION_ENABLED` and
+   * `PAPERCLIP_GIT_RESTORE_POINTS_ENABLED`. A saved mode runs for real, never as a dry run.
+   */
+  worktreeCleanup?: WorktreeCleanupMode | null;
+}
+
+export const WORKTREE_CLEANUP_MODES = ["off", "strict", "restore_points"] as const;
+/**
+ * `off`: finished tasks' worktrees stay. `strict`: removed only when the remote can rebuild them
+ * exactly. `restore_points`: also removed with unpushed or uncommitted work, after saving an
+ * encrypted restore point.
+ */
+export type WorktreeCleanupMode = (typeof WORKTREE_CLEANUP_MODES)[number];
+
+/** `GET /api/instance/settings/worktree-cleanup`: the cleanup setting and what is in force. */
+export interface WorktreeCleanupStatus {
+  /** The saved mode, or null when never saved (the environment variables decide). */
+  saved: WorktreeCleanupMode | null;
+  /** The mode the sweep uses now. */
+  mode: WorktreeCleanupMode;
+  source: "setting" | "environment";
+  /** Only the environment fallback can be a dry run (`PAPERCLIP_GIT_CACHE_EXPIRATION_DRY_RUN`). */
+  dryRun: boolean;
+  restorePoints: { available: boolean; reason: string | null };
+  /** The day counts in force, all from environment variables. */
+  days: {
+    /** Strict mode waits at least this long after the task tree closes. */
+    strictDelay: number;
+    /** Restore point mode waits this long after the task tree closes. */
+    restorePointDelay: number;
+    /** Restore point mode removes an open task's worktree after this many idle days; 0 is off. */
+    idle: number;
+    /** How long restore points are kept. */
+    retention: number;
+  };
 }
 
 /**

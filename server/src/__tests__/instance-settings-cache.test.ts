@@ -62,9 +62,9 @@ async function waitUntil(check: () => Promise<boolean>, timeoutMs: number) {
 
   it("reads its own writes in this process at once", async () => {
     const settings = instanceSettingsService(db);
-    expect((await settings.getExperimental()).enableIsolatedWorkspaces).toBe(false);
-    await settings.updateExperimental({ enableIsolatedWorkspaces: true });
-    expect((await instanceSettingsService(db).getExperimental()).enableIsolatedWorkspaces).toBe(true);
+    expect((await settings.getExperimental()).enableCases).toBe(false);
+    await settings.updateExperimental({ enableCases: true });
+    expect((await instanceSettingsService(db).getExperimental()).enableCases).toBe(true);
     expect((await settings.getGeneral()).censorUsernameInLogs).toBe(false);
     await settings.updateGeneral({ censorUsernameInLogs: true });
     expect((await settings.getGeneral()).censorUsernameInLogs).toBe(true);
@@ -82,12 +82,12 @@ async function waitUntil(check: () => Promise<boolean>, timeoutMs: number) {
 
   it("takes a change made by another process within the cache bound", async () => {
     const settings = instanceSettingsService(db);
-    expect((await settings.getExperimental()).enableIsolatedWorkspaces).toBe(false);
+    expect((await settings.getExperimental()).enableCases).toBe(false);
     const changedAt = Date.now();
     await otherProcess.update(instanceSettings)
-      .set({ experimental: sql`coalesce(${instanceSettings.experimental}, '{}'::jsonb) || '{"enableIsolatedWorkspaces":true}'::jsonb` })
+      .set({ experimental: sql`coalesce(${instanceSettings.experimental}, '{}'::jsonb) || '{"enableCases":true}'::jsonb` })
       .where(eq(instanceSettings.singletonKey, "default"));
-    await waitUntil(async () => (await settings.getExperimental()).enableIsolatedWorkspaces === true,
+    await waitUntil(async () => (await settings.getExperimental()).enableCases === true,
       INSTANCE_SETTINGS_CACHE_TTL_MS + 1_000);
     expect(Date.now() - changedAt).toBeLessThanOrEqual(INSTANCE_SETTINGS_CACHE_TTL_MS + 500);
   });
@@ -95,18 +95,18 @@ async function waitUntil(check: () => Promise<boolean>, timeoutMs: number) {
   it("never shares cached rows with callers that mutate them", async () => {
     const settings = instanceSettingsService(db);
     const first = await settings.get();
-    (first.experimental as unknown as Record<string, unknown>).enableIsolatedWorkspaces = true;
-    expect((await settings.get()).experimental.enableIsolatedWorkspaces).toBe(false);
+    (first.experimental as unknown as Record<string, unknown>).enableCases = true;
+    expect((await settings.get()).experimental.enableCases).toBe(false);
   });
 
   it("reads inside a transaction bypass the cache", async () => {
     const settings = instanceSettingsService(db);
-    expect((await settings.getExperimental()).enableIsolatedWorkspaces).toBe(false);
+    expect((await settings.getExperimental()).enableCases).toBe(false);
     await db.transaction(async tx => {
-      await tx.update(instanceSettings).set({ experimental: { enableIsolatedWorkspaces: true } })
+      await tx.update(instanceSettings).set({ experimental: { enableCases: true } })
         .where(eq(instanceSettings.singletonKey, "default"));
       const inside = instanceSettingsService(tx as unknown as Db);
-      expect((await inside.getExperimental()).enableIsolatedWorkspaces).toBe(true);
+      expect((await inside.getExperimental()).enableCases).toBe(true);
       const census = createStatementCensus(db);
       try {
         const reads = await census.measure(async () => { await inside.getExperimental(); await inside.getGeneral(); });
@@ -116,7 +116,7 @@ async function waitUntil(check: () => Promise<boolean>, timeoutMs: number) {
       }
       throw new Error("rollback");
     }).catch(() => undefined);
-    expect((await settings.getExperimental()).enableIsolatedWorkspaces).toBe(false);
+    expect((await settings.getExperimental()).enableCases).toBe(false);
   });
 
   it("never stores a read that started before an invalidation", async () => {

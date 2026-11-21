@@ -40,7 +40,7 @@ import {
 } from "@paperclipai/shared";
 import { conflict, unprocessable } from "../errors.js";
 import { listCurrentRuntimeServicesForProjectWorkspaces } from "./workspace-runtime-read-model.js";
-import { parseProjectExecutionWorkspacePolicy } from "./execution-workspace-policy.js";
+import { applyDefaultIsolatedExecutionWorkspacePolicy, parseProjectExecutionWorkspacePolicy } from "./execution-workspace-policy.js";
 import { mergeProjectWorkspaceRuntimeConfig, readProjectWorkspaceRuntimeConfig } from "./project-workspace-runtime-config.js";
 import { resolveManagedProjectWorkspaceDir } from "../home-paths.js";
 import { recordProjectLifecycleEvent, recordResourceCreationEvent } from "./resource-lifecycle-events.js";
@@ -407,6 +407,10 @@ async function attachWorkspaces(
       ),
     );
     const primaryWorkspace = pickPrimaryWorkspace(projectWorkspaceRows, sharedRuntimeServicesByWorkspaceId);
+    const workspaceProvider = providerCatalog
+      ? resolveProjectWorkspaceProvider(row.executionWorkspacePolicy, providerCatalog,
+        workspaces.some(workspace => Boolean(workspace.repoUrl)))
+      : undefined;
     return {
       ...row,
       codebase: deriveProjectCodebase({
@@ -418,10 +422,14 @@ async function attachWorkspaces(
       workspaces,
       primaryWorkspace,
       managedByPlugin: managedByProjectId.get(row.id) ?? null,
-      ...(providerCatalog ? {
-        workspaceProvider: resolveProjectWorkspaceProvider(row.executionWorkspacePolicy, providerCatalog,
-          workspaces.some(workspace => Boolean(workspace.repoUrl))),
-      } : {}),
+      ...(workspaceProvider ? { workspaceProvider } : {}),
+      // Step 4b part 3: the policy new tasks follow, with the worktree default applied as the
+      // heartbeat applies it. Whether a local folder is a git repository is checked at run time.
+      effectiveExecutionWorkspacePolicy: applyDefaultIsolatedExecutionWorkspacePolicy({
+        projectPolicy: workspaceProvider?.effectivePolicy ?? parseProjectExecutionWorkspacePolicy(row.executionWorkspacePolicy),
+        defaultIsolatedWorkspacesEnabled: true,
+        hasProjectWorkspace: workspaces.some(workspace => Boolean(workspace.cwd?.trim() || workspace.repoUrl?.trim())),
+      }),
     };
   });
 }

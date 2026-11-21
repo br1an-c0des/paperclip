@@ -250,9 +250,11 @@ export function normalizeExperimentalSettings(raw: unknown): InstanceExperimenta
       enableNativeRunner: parsed.data.enableNativeRunner ?? true,
       enableAiConnectionRouters: parsed.data.enableAiConnectionRouters ?? false,
       enableManagedSandboxOnly: parsed.data.enableManagedSandboxOnly ?? false,
-      enableIsolatedWorkspaces: parsed.data.enableIsolatedWorkspaces ?? false,
+      // Retired switches (step 4b part 3): per-task worktrees are the default for every project
+      // with a git checkout, so every reader sees both as on. Stored off values are ignored.
+      enableIsolatedWorkspaces: true,
       remoteWorkspaceStorageEnabled: parsed.data.remoteWorkspaceStorageEnabled ?? true,
-      enableIsolatedWorkspacesByDefault: parsed.data.enableIsolatedWorkspacesByDefault ?? false,
+      enableIsolatedWorkspacesByDefault: true,
       enableStreamlinedLeftNavigation: parsed.data.enableStreamlinedLeftNavigation ?? true,
       enableStreamlinedUi: parsed.data.enableStreamlinedUi ?? true,
       // Apps graduated from Experimental. Ignore historical off values while
@@ -301,6 +303,8 @@ export function normalizeExperimentalSettings(raw: unknown): InstanceExperimenta
       worktreeRunExecutionActivatedAt: parsed.data.worktreeRunExecutionActivatedAt ?? null,
       worktreeRunExecutionActivationInstanceId:
         parsed.data.worktreeRunExecutionActivationInstanceId ?? null,
+      // Absent until saved, so the sweep can fall back to the environment variables.
+      ...(parsed.data.worktreeCleanup ? { worktreeCleanup: parsed.data.worktreeCleanup } : {}),
     };
   }
   return {
@@ -308,13 +312,13 @@ export function normalizeExperimentalSettings(raw: unknown): InstanceExperimenta
     enableNativeRunner: true,
     enableAiConnectionRouters: false,
     enableManagedSandboxOnly: false,
-    enableIsolatedWorkspaces: false,
+    enableIsolatedWorkspaces: true,
     // An unrelated malformed field must not erase an explicit enrollment opt-out.
     remoteWorkspaceStorageEnabled: !(
       raw !== null && typeof raw === "object" && !Array.isArray(raw)
       && "remoteWorkspaceStorageEnabled" in raw && raw.remoteWorkspaceStorageEnabled === false
     ),
-    enableIsolatedWorkspacesByDefault: false,
+    enableIsolatedWorkspacesByDefault: true,
     enableStreamlinedLeftNavigation: true,
     enableStreamlinedUi: true,
     enableApps: true,
@@ -390,6 +394,8 @@ export function applyManagedExperimentalOverlay(
     // Existing Cloud stack configs may still carry retired flags. Accept the
     // document during rollout, but never let retired flags disable Apps, Agent Chat or MCP aggregators.
     if (key === "enableApps" || key === "enableAgentChat" || key === "enableMcpAggregators") continue;
+    // Retired worktree switches (step 4b part 3) are always on.
+    if (key === "enableIsolatedWorkspaces" || key === "enableIsolatedWorkspacesByDefault") continue;
     next[key] = value;
     managedKeys[key] = { managed: true, managedBy: PAPERCLIP_CLOUD_MANAGED_BY };
   }
@@ -663,6 +669,8 @@ export function instanceSettingsService(db: Db, options: InstanceSettingsService
         if (chatBecameEnabled) await notifyDeferredExecutionEligibility(tx);
         if(toExperimentalView(current.experimental).enablePublicMcp!==toExperimentalView(nextExperimental).enablePublicMcp)await prepareMcpClientMirrorPolicy(tx as unknown as Db,toExperimentalView(nextExperimental).enablePublicMcp);
         if (patch.enableMcpTasks !== undefined) await notifyDeliveryWork(tx, DELIVERY_QUEUES.mcpTasks);
+        // Step 4b part 3: a new worktree cleanup mode arms the workspace sweep's next full rotation.
+        if (patch.worktreeCleanup !== undefined) await notifyDeliveryWork(tx, DELIVERY_QUEUES.terminalWorkspaces);
         await notifyDeliveryWork(tx, DELIVERY_QUEUES.mcpIngressHandoffs);
         await notifyDeliveryWork(tx, DELIVERY_QUEUES.mcpClientMirror);
         await notifyDeliveryWork(tx, DELIVERY_QUEUES.mcpRevocationIndex, "*");

@@ -5,6 +5,7 @@ import {
   WEEKLY_RETENTION_PRESETS,
   MONTHLY_RETENTION_PRESETS,
   DEFAULT_BACKUP_RETENTION,
+  WORKTREE_CLEANUP_MODES,
 } from "../types/instance.js";
 import { feedbackDataSharingPreferenceSchema } from "./feedback.js";
 import { shapeWithoutDefaults } from "./partial.js";
@@ -43,9 +44,10 @@ export const instanceExperimentalSettingsSchema = z.object({
   enableNativeRunner: z.boolean().default(true),
   enableAiConnectionRouters: z.boolean().default(false),
   enableManagedSandboxOnly: z.boolean().default(false),
-  enableIsolatedWorkspaces: z.boolean().default(false),
+  // Retired (step 4b part 3): always read as on; stored values are accepted and ignored.
+  enableIsolatedWorkspaces: z.boolean().default(true),
   remoteWorkspaceStorageEnabled: z.boolean().default(true),
-  enableIsolatedWorkspacesByDefault: z.boolean().default(false),
+  enableIsolatedWorkspacesByDefault: z.boolean().default(true),
   enableStreamlinedLeftNavigation: z.boolean().default(true),
   enableStreamlinedUi: z.boolean().default(true),
   // Deprecated compatibility key. Apps is a standard product surface and is
@@ -102,6 +104,8 @@ export const instanceExperimentalSettingsSchema = z.object({
   enableWorktreeRunExecution: z.boolean().default(false),
   worktreeRunExecutionActivatedAt: z.string().datetime().nullable().default(null),
   worktreeRunExecutionActivationInstanceId: z.string().min(1).nullable().default(null),
+  // Absent = never saved (env fallback); null in a PATCH clears it.
+  worktreeCleanup: z.enum(WORKTREE_CLEANUP_MODES).nullable().optional(),
 }).strict();
 
 export const patchInstanceExperimentalSettingsSchema = z

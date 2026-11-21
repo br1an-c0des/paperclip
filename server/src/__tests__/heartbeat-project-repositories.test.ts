@@ -858,7 +858,10 @@ suite("task project repository provisioning", () => {
       await db.insert(issues).values({ id: privateIssueId, companyId, title: "Private original", visibility: "private", responsibleUserId: "private-owner" });
       await db.insert(executionWorkspaces).values({ companyId, projectId: null, sourceIssueId: privateIssueId, name: "Private original files",
         mode: "shared_workspace", strategyType: "project_primary", cwd: source, providerType: "local_fs", status: "active" });
+      // The settings a shared selection writes with it (validateSelection), so the worktree default
+      // (step 4b part 3) leaves the explicit choice alone.
       await db.insert(issues).values({ id: issueId, companyId, title: "Read anchor", status: "todo", assigneeAgentId: agentId, projectWorkspaceId: sourceId,
+        executionWorkspaceSettings: { mode: "shared_workspace" },
         workspaceSelection: { version: 1, source: "explicit", selection: { kind: "configured_source", projectWorkspaceId: sourceId, mode: "shared" } } });
       const [actualAgent] = await db.select().from(agents).where(eq(agents.id, agentId));
       const [otherAgent] = await db.insert(agents).values({ companyId, name: "Other run owner", adapterType: "codex_local", status: "idle" }).returning();

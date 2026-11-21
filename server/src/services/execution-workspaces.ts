@@ -99,6 +99,8 @@ import {
   normalizeIssueExecutionPolicy,
   parseIssueExecutionState,
 } from "./issue-execution-policy.js";
+import { checkoutSupportsWorktrees } from "./worktree-default.js";
+import { WORKTREE_KEPT_METADATA_KEY, environmentWorktreeCleanupFlags, readSavedWorktreeCleanup, recordWorktreeKept, visibleWorktreeKept, resolveWorktreeCleanup } from "./worktree-cleanup.js";
 import { buildExecutionWorkspaceAdapterConfig, resolveEffectiveWorkspaceStrategyType, parseProjectExecutionWorkspacePolicy, gateProjectExecutionWorkspacePolicy, parseIssueExecutionWorkspaceSettings, resolveExecutionWorkspaceMode, parseIssueAssigneeAdapterOverrides, applyDefaultIsolatedExecutionWorkspacePolicy } from "./execution-workspace-policy.js";
 import { issueRecoveryActionService } from "./issue-recovery-actions.js";
 import { logActivity } from "./activity-log.js";
@@ -369,6 +371,14 @@ export type ExecutionWorkspaceServiceOptions = {
   nestedCloneMigrationEnabled?: boolean;
   nestedCloneMigrationDryRun?: boolean;
   gitRestorePoints?: { storage: StorageService; terminalDelayMs: number; keyDurable: boolean; idleMs?: number | null };
+  /**
+   * Step 4b part 3: the worktree cleanup in force (`worktree-cleanup.ts`), read at the start of
+   * every sweep so a change to the setting applies without a restart. It replaces
+   * `gitCacheExpirationEnabled`, `gitCacheExpirationDryRun` and `gitRestorePoints` for the git
+   * workspace expiration only; the other cleanups keep reading those options. Without it the sweep
+   * uses them as they are.
+   */
+  resolveGitExpiration?: () => Promise<GitExpirationPass>;
   taskDirectoryRetention?: { dryRun: boolean; terminalDelayMs: number; orphanGraceMs: number; perSweep?: number; trackedLimit?: number };
   terminalWorkspaceInspectionBackoffMs?: number;
   resolvePullRequestDetails?: PullRequestMergeDetailsResolver;
@@ -389,6 +399,14 @@ export type ExecutionWorkspaceServiceOptions = {
   // before it re-checks the guard under the lifecycle lock.
   afterWorkspaceCompactionMove?: (workspace: ExecutionWorkspaceRow) => Promise<void>;
   inspectGitCloseReadiness?: typeof inspectGitCloseReadiness;
+};
+
+/** The git workspace expiration settings one sweep pass uses. */
+export type GitExpirationPass = {
+  enabled: boolean;
+  dryRun: boolean;
+  mode: "strict" | "restore_points" | null;
+  restorePoints?: { storage: StorageService; terminalDelayMs: number; keyDurable: boolean; idleMs?: number | null };
 };
 
 function parseGitHubRepository(repoUrl: string | null) {
@@ -1608,7 +1626,7 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
     const experimental = await instanceSettingsService(db).getExperimental();
     const sourceId = input.sourceWorkspaceId ?? task?.projectWorkspaceId;
     const sourceProjectId = input.projectId ?? task?.projectId;
-    const [source] = sourceId || sourceProjectId ? await reader.select({ repoUrl: projectWorkspaces.repoUrl }).from(projectWorkspaces).where(and(
+    const [source] = sourceId || sourceProjectId ? await reader.select({ repoUrl: projectWorkspaces.repoUrl, cwd: projectWorkspaces.cwd }).from(projectWorkspaces).where(and(
       eq(projectWorkspaces.companyId, input.companyId),
       sourceId ? eq(projectWorkspaces.id, sourceId) : eq(projectWorkspaces.projectId, sourceProjectId!),
     )).orderBy(desc(projectWorkspaces.isPrimary), asc(projectWorkspaces.createdAt), asc(projectWorkspaces.id)).limit(1) : [];
@@ -1618,7 +1636,8 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
     const projectPolicy = applyDefaultIsolatedExecutionWorkspacePolicy({
       projectPolicy: gateProjectExecutionWorkspacePolicy(effectivePolicy, experimental.enableIsolatedWorkspaces || Boolean(effectivePolicy?.storageProviderPluginId)),
       defaultIsolatedWorkspacesEnabled: experimental.enableIsolatedWorkspaces && experimental.enableIsolatedWorkspacesByDefault,
-      hasProjectWorkspace: true,
+      // The worktree default needs a git checkout (step 4b part 3): a plain folder keeps sharing.
+      hasProjectWorkspace: await checkoutSupportsWorktrees(source),
     });
     const settingsEnabled = experimental.enableIsolatedWorkspaces || Boolean(effectivePolicy?.storageProviderPluginId) || input.typedSelection || task?.workspaceSelection || task?.executionWorkspaceId;
     const issueSettings = settingsEnabled ? parseIssueExecutionWorkspaceSettings(input.executionWorkspaceSettings) : null;
@@ -3572,6 +3591,11 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
         }
       }
 
+      // Step 4b part 3: why the cleanup sweep kept this worktree, only while it's on.
+      const worktreeKept = workspace.metadata && WORKTREE_KEPT_METADATA_KEY in workspace.metadata
+        ? visibleWorktreeKept(workspace.metadata,
+          resolveWorktreeCleanup(await readSavedWorktreeCleanup(db), environmentWorktreeCleanupFlags()).mode)
+        : null;
       const state =
         blockingReasons.length > 0
           ? "blocked"
@@ -3592,6 +3616,7 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
         isProjectPrimaryWorkspace,
         git,
         runtimeServices,
+        ...(worktreeKept ? { worktreeKept } : {}),
       };
     },
 
@@ -3624,6 +3649,14 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
       const previousBoundary = terminalSweepBoundary;
       terminalSweepInProgress = true;
       try {
+      const gitExpiration: GitExpirationPass = opts.resolveGitExpiration
+        ? await opts.resolveGitExpiration().catch((error: unknown) => {
+          logger.warn({ err: error }, "couldn't read the worktree cleanup setting; this sweep skips git workspace expiration");
+          return { enabled: false, dryRun: false, mode: null };
+        })
+        : { enabled: Boolean(opts.gitCacheExpirationEnabled), dryRun: Boolean(opts.gitCacheExpirationDryRun),
+          // No kept-reason records without the setting (mode null): upstream's env-only wiring is unchanged.
+          mode: null, restorePoints: opts.gitRestorePoints };
       if (options.compact !== false) await purgeDeferredCompactionTrash(signal);
       if (opts.taskDirectoryRetention) await runTaskDirectoryFolderWork(signal);
       const baseCandidateFilter = and(
@@ -3634,7 +3667,7 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
           and(inArray(executionWorkspaces.status, ["archived", "cleanup_failed"]),
             sql`${executionWorkspaces.metadata}->'remoteWorkspace'->>'schema' = 'paperclip.remote-workspace.v1'`,
             sql`jsonb_typeof(${executionWorkspaces.metadata}->'remoteWorkspace'->'location') = 'object'`),
-          opts.gitCacheExpirationEnabled ? and(inArray(executionWorkspaces.status, ["archived", "cleanup_failed"]),
+          gitExpiration.enabled ? and(inArray(executionWorkspaces.status, ["archived", "cleanup_failed"]),
             sql`${executionWorkspaces.metadata}->'gitCacheExpiration'->>'completed' = 'false'`) : undefined,
           opts.nestedCloneMigrationEnabled ? and(inArray(executionWorkspaces.status, ["archived", "cleanup_failed"]),
             sql`(${executionWorkspaces.metadata}->'nestedCloneMigrationPending') IS NOT NULL`) : undefined,
@@ -3860,7 +3893,7 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
         if (reopenPending) terminalWorkspaceDeadlines.set(workspace.id, now().getTime());
         const treeOpen = issueTree.some(issue => !TERMINAL_ISSUE_STATUSES.has(issue.status));
         const remoteWorkspace = readRemoteWorkspaceAuthority(workspace.metadata);
-        const gitExpirationCandidate = workspace.providerType !== "plugin" && !remoteWorkspace && Boolean(opts.gitCacheExpirationEnabled)
+        const gitExpirationCandidate = workspace.providerType !== "plugin" && !remoteWorkspace && gitExpiration.enabled
           && (hasPendingGitExpiration(workspace) || (workspace.mode === "isolated_workspace" && workspace.strategyType === "git_worktree"));
         const usingIssueIds = sourceIssue && gitExpirationCandidate && !reopenPending
           && TERMINAL_ISSUE_STATUSES.has(sourceIssue.status)
@@ -3874,20 +3907,20 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
               ),
             });
           }
-          const idleMs = opts.gitRestorePoints?.idleMs;
-          const pendingExpiration = opts.gitCacheExpirationEnabled && workspace.providerType !== "plugin" && !remoteWorkspace && hasPendingGitExpiration(workspace);
-          if (pendingExpiration || (sourceIssue && idleMs && !reopenPending && opts.gitCacheExpirationEnabled && workspace.providerType !== "plugin" && !remoteWorkspace
+          const idleMs = gitExpiration.restorePoints?.idleMs;
+          const pendingExpiration = gitExpiration.enabled && workspace.providerType !== "plugin" && !remoteWorkspace && hasPendingGitExpiration(workspace);
+          if (pendingExpiration || (sourceIssue && idleMs && !reopenPending && gitExpiration.enabled && workspace.providerType !== "plugin" && !remoteWorkspace
             && !isClosedExecutionWorkspaceStatus(workspace.status)
             && workspace.mode === "isolated_workspace" && workspace.strategyType === "git_worktree")) {
             const lastActivityAt = pendingExpiration ? null : await gitWorkspaceLastActivityAt(db, workspace);
             const idleDueAt = pendingExpiration ? now().getTime() : (lastActivityAt?.getTime() ?? 0) + idleMs!;
             if (idleDueAt <= now().getTime()) {
               const expiration = await expireReconstructableGitWorkspace(db, workspace, {
-                dryRun: opts.gitCacheExpirationDryRun ?? false, expireBase: opts.gitBaseExpirationEnabled ?? false,
+                dryRun: gitExpiration.dryRun, expireBase: opts.gitBaseExpirationEnabled ?? false,
                 now: now(), signal, beforeDelete: opts.beforeTerminalWorkspaceCleanup,
                 idleCutoff: idleMs ? new Date(now().getTime() - idleMs) : undefined,
-                restorePoint: opts.gitRestorePoints ? { storage: opts.gitRestorePoints.storage, notBefore: new Date(idleDueAt),
-                  keyDurable: opts.gitRestorePoints.keyDurable } : undefined,
+                restorePoint: gitExpiration.restorePoints ? { storage: gitExpiration.restorePoints.storage, notBefore: new Date(idleDueAt),
+                  keyDurable: gitExpiration.restorePoints.keyDurable } : undefined,
               });
               if (expiration.candidate) result.eligible += 1;
               if (expiration.expired) result.archived += 1;
@@ -3896,7 +3929,7 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
                 terminalWorkspaceDeadlines.set(workspace.id, now().getTime() + 60 * 60 * 1000);
               }
               logger.info({ event: "execution_workspace.git_cache_expiration", executionWorkspaceId: workspace.id,
-                companyId: workspace.companyId, dryRun: opts.gitCacheExpirationDryRun ?? false, idle: true, ...expiration },
+                companyId: workspace.companyId, dryRun: gitExpiration.dryRun, idle: true, ...expiration },
               "Git workspace cache expiration inspected");
               continue;
             }
@@ -3948,14 +3981,21 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
         }
         if (gitExpirationCandidate) {
           const expiration = await expireReconstructableGitWorkspace(db, workspace, {
-            dryRun: opts.gitCacheExpirationDryRun ?? false, expireBase: opts.gitBaseExpirationEnabled ?? false,
+            dryRun: gitExpiration.dryRun, expireBase: opts.gitBaseExpirationEnabled ?? false,
             now: now(), signal, beforeDelete: opts.beforeTerminalWorkspaceCleanup,
-            restorePoint: opts.gitRestorePoints ? {
-              storage: opts.gitRestorePoints.storage,
-              notBefore: new Date(expirationTerminalAt + opts.gitRestorePoints.terminalDelayMs),
-              keyDurable: opts.gitRestorePoints.keyDurable,
+            restorePoint: gitExpiration.restorePoints ? {
+              storage: gitExpiration.restorePoints.storage,
+              notBefore: new Date(expirationTerminalAt + gitExpiration.restorePoints.terminalDelayMs),
+              keyDurable: gitExpiration.restorePoints.keyDurable,
             } : undefined,
           });
+          // Why a finished task's worktree stays, for the task's branch area (step 4b part 3).
+          if (gitExpiration.mode && !gitExpiration.dryRun) {
+            await recordWorktreeKept(db, workspace, { expired: expiration.expired, skipReason: expiration.skipReason,
+              mode: gitExpiration.mode, now: now() }).catch((error: unknown) => {
+              logger.warn({ err: error, executionWorkspaceId: workspace.id }, "couldn't record why a worktree was kept");
+            });
+          }
           const expirationDueAt = now().getTime() + 60 * 60 * 1000;
           terminalWorkspaceDeadlines.set(workspace.id,
             compactionPending && compactedTerminalAt.get(workspace.id) !== latestTerminalAt
@@ -3963,7 +4003,7 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
           if (expiration.candidate) result.eligible += 1;
           if (expiration.expired) result.archived += 1;
           logger.info({ event: "execution_workspace.git_cache_expiration", executionWorkspaceId: workspace.id,
-            companyId: workspace.companyId, dryRun: opts.gitCacheExpirationDryRun ?? false, ...expiration },
+            companyId: workspace.companyId, dryRun: gitExpiration.dryRun, ...expiration },
           "Git workspace cache expiration inspected");
           continue;
         }

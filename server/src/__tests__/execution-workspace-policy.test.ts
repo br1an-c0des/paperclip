@@ -709,14 +709,48 @@ describe("operator default isolated execution workspaces", () => {
       .toEqual({ enabled: true, defaultMode: "isolated_workspace" });
   });
 
-  it("never overrides a policy the project already stores", () => {
+  it("never overrides a project's explicit choice (step 4b part 3: a stored defaultMode)", () => {
     expect(withDefault({ enabled: true, defaultMode: "shared_workspace" })).toEqual({
       enabled: true,
       defaultMode: "shared_workspace",
     });
-    // `enabled: false` is a tenant decision to stay on the shared checkout,
-    // not an absent policy to fill in.
-    expect(withDefault({ enabled: false })).toEqual({ enabled: false });
+    // Checkouts turned off with the default mode recorded: shared stays.
+    expect(withDefault({ enabled: false, defaultMode: "shared_workspace" })).toEqual({ enabled: false, defaultMode: "shared_workspace" });
+    expect(withDefault({ enabled: false, defaultMode: "isolated_workspace" })).toEqual({ enabled: false, defaultMode: "isolated_workspace" });
+    expect(resolveExecutionWorkspaceMode({
+      projectPolicy: withDefault({ enabled: false, defaultMode: "isolated_workspace" }),
+      issueSettings: null,
+      legacyUseProjectWorkspace: null,
+    })).toBe("shared_workspace");
+    // A non-worktree strategy is a choice too.
+    expect(withDefault({ enabled: true, workspaceStrategy: { type: "project_primary" } }))
+      .toEqual({ enabled: true, workspaceStrategy: { type: "project_primary" } });
+  });
+
+  it("lays the default over a stored policy nobody chose, keeping its other fields (step 4b part 3)", () => {
+    // Written as a side effect of picking Core storage at creation.
+    expect(withDefault({ enabled: false, storageProviderPluginId: null }))
+      .toEqual({ enabled: true, defaultMode: "isolated_workspace", storageProviderPluginId: null });
+    // Written by an authorization policy, with no `enabled` at all (parsed as false).
+    expect(withDefault(parseProjectExecutionWorkspacePolicy({ authorizationPolicy: { rules: [] } })))
+      .toMatchObject({ enabled: true, defaultMode: "isolated_workspace", authorizationPolicy: { rules: [] } });
+    // The old UI's bare "enable" switch, with a branch template.
+    expect(withDefault({ enabled: true, workspaceStrategy: { type: "git_worktree", branchTemplate: "x" } }))
+      .toEqual({ enabled: true, defaultMode: "isolated_workspace", workspaceStrategy: { type: "git_worktree", branchTemplate: "x" } });
+    expect(resolveExecutionWorkspaceMode({
+      projectPolicy: withDefault({ enabled: false, storageProviderPluginId: null }),
+      issueSettings: null,
+      legacyUseProjectWorkspace: null,
+    })).toBe("isolated_workspace");
+  });
+
+  it("keeps an already-bound task on the checkout it works in", () => {
+    // A task that ran before carries its bound mode in its own settings, which win.
+    expect(resolveExecutionWorkspaceMode({
+      projectPolicy: withDefault(null),
+      issueSettings: { mode: "shared_workspace" },
+      legacyUseProjectWorkspace: null,
+    })).toBe("shared_workspace");
   });
 
   it("resolves an unpolicied project's tasks to an isolated workspace", () => {

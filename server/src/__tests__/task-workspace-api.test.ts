@@ -275,11 +275,12 @@ const support = await getEmbeddedPostgresTestSupport();
     const workspaceHrefs = async () => [(await call("get_workspace")).workspace?.href,
       ((await call("list_workspaces")).workspaces as Array<{ id: string; href?: string }>).find(row => row.id === workspace.id)?.href];
     try {
+      // The switch is retired (step 4b part 3): workspace pages are always routed, so a stored off
+      // value still offers the href.
       await settings.updateExperimental({ enableIsolatedWorkspaces: false });
-      // The detail route redirects to the dashboard while the feature is off, so no href is offered.
-      expect(await workspaceHrefs()).toEqual([undefined, undefined]);
-      await settings.updateExperimental({ enableIsolatedWorkspaces: true });
       const href = `/${issuePrefix}/execution-workspaces/${workspace.id}`;
+      expect(await workspaceHrefs()).toEqual([href, href]);
+      await settings.updateExperimental({ enableIsolatedWorkspaces: true });
       expect(await workspaceHrefs()).toEqual([href, href]);
     } finally { await settings.updateExperimental({ enableIsolatedWorkspaces: false }); }
   });

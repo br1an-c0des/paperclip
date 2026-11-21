@@ -142,7 +142,9 @@ describe("instanceSettingsService managed overlay", () => {
       expect((await service.get()).experimental).toMatchObject(features);
       expect((await service.getExperimental()).managedKeys).toMatchObject(
         Object.fromEntries(Object.keys(features)
-          .filter((key) => key !== "enableApps" && key !== "enableMcpAggregators")
+          // Step 4b part 3: the isolated-workspace switches are always on, so the overlay doesn't manage them.
+          .filter((key) => key !== "enableApps" && key !== "enableMcpAggregators"
+            && key !== "enableIsolatedWorkspaces" && key !== "enableIsolatedWorkspacesByDefault")
           .map((key) => [key, { managed: true, managedBy: "paperclip-cloud" }])),
       );
       for (const key of Object.keys(features)) {

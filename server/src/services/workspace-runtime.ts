@@ -123,6 +123,7 @@ import {
 } from "./runtime-exposure/port-reservation.js";
 import { resolveTailscaleDnsName } from "./runtime-exposure/tailscale-hostname.js";
 import { collectNestedRepositoryWorktrees, releaseNestedRepositoryWorktrees } from "./nested-repository-worktrees.js";
+import { ensureWorktreeParentExcluded } from "./worktree-default.js";
 
 export function resolveShell(): string {
   const fallback = process.platform === "win32" ? "sh" : "/bin/sh";
@@ -3572,6 +3573,8 @@ export async function realizeExecutionWorkspace(input: {
   const currentBaseRefSha = await resolveBaseRefSha(repoRoot, baseRef);
 
   await fs.mkdir(worktreeParentDir, { recursive: true });
+  // Step 4b part 3: a worktree folder inside the repository never shows as untracked there.
+  await ensureWorktreeParentExcluded(repoRoot, worktreeParentDir);
 
   async function reuseExistingWorktree(reusablePath: string, effectiveBranchName = branchName, extraWarnings: string[] = []) {
     if (reusablePath !== worktreePath) await input.beforeSourceCopy?.(repoRoot, reusablePath);
