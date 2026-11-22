@@ -169,6 +169,13 @@ export interface Project {
   pausedAt: Date | null;
   executionWorkspacePolicy: ProjectExecutionWorkspacePolicy | null;
   workspaceProvider?: ProjectWorkspaceProviderConfiguration;
+  /**
+   * Step 4b part 3: the checkout policy new tasks follow, worked out by the server: the stored (or
+   * storage plugin's) policy with the worktree default applied when the project has a checkout and
+   * made no explicit choice. A checkout that turns out not to be a git repository still runs shared;
+   * that is checked when a task runs.
+   */
+  effectiveExecutionWorkspacePolicy?: ProjectExecutionWorkspacePolicy | null;
   codebase: ProjectCodebase;
   workspaces: ProjectWorkspace[];
   primaryWorkspace: ProjectWorkspace | null;

@@ -1,0 +1,108 @@
+/* "What runs get" (RunPreviewCard.tsx): the run modal's manifest rows in a settings card. */
+
+.rp-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.rp-head > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rp-for {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.rp-for > span {
+  flex: none;
+}
+
+.rp-select {
+  width: auto;
+  max-width: 260px;
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.rp-blockers {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 14px 20px 0;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--amber-fg) 40%, transparent);
+  border-radius: var(--r-inner);
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.rp-blockers > svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.rp-blockers > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rp-blockers b {
+  font-weight: 700;
+}
+
+.rp-note {
+  padding-bottom: 0;
+}
+
+.rp-body {
+  padding: 16px 20px 20px;
+  transition: opacity 120ms ease;
+}
+
+.rp-body--stale {
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rp-body {
+    transition: none;
+  }
+}
+
+/* In a narrow card (phones), labels move above their values and the project picker takes the row */
+@container (max-width: 560px) {
+  .rp-for {
+    flex: 1 1 100%;
+  }
+
+  .rp-select {
+    flex: 1 1 auto;
+    max-width: none;
+  }
+
+  .rp-blockers {
+    margin: 12px 16px 0;
+  }
+
+  .rp-body {
+    padding: 12px 16px 16px;
+  }
+
+  .rp .ri-kvl > li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}

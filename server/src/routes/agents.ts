@@ -65,6 +65,7 @@ import { executionProjectionForRun, executionProjectionsForRuns } from "../servi
 import { issueRunPresenceService } from "../services/issue-run-presence.js";
 import { returnStoppedWaitingTaskToTodo } from "../services/heartbeat/stopped-waiting-task.js";
 import { selectDashboardRunIds } from "../services/dashboard-run-selection.js";
+import { runPreviewService } from "../services/run-preview.js";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { generateKeyPairSync, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
@@ -808,6 +809,7 @@ export function agentRoutes(
     pluginWorkerManager: options.pluginWorkerManager,
   });
   const issueRunPresence = issueRunPresenceService(db, { heartbeat, getAgentById: (id) => svc.getById(id) });
+  const runPreview = runPreviewService(db);
   const providerTraces = providerTraceStore(db);
   const traceExpiryCleanup = providerTraces.cleanupExpired?.();
   void traceExpiryCleanup?.catch((error) => {
@@ -4261,6 +4263,24 @@ export function agentRoutes(
     }
     await assertCanReadAgent(req, agent);
     res.json(redactAgentConfiguration(agent));
+  });
+
+  // What the agent's next sealed run would get, for tasks in `projectId` or in no project
+  // (fork/step-4b-parts-2-3.md, part 2). Read-only: starts, writes and mints nothing.
+  router.get("/agents/:id/run-preview", async (req, res) => {
+    assertBoard(req);
+    const id = req.params.id as string;
+    const agent = await getAccessibleResource(req, res, svc.getById(id), "Agent not found");
+    if (!agent) return;
+    if (!(await assertAgentReadAllowed(req, res, agent))) return;
+    await assertCanReadAgent(req, agent);
+    const rawProjectId = typeof req.query.projectId === "string" ? req.query.projectId.trim() : "";
+    const preview = await runPreview.previewAgentRun(agent, {
+      projectId: rawProjectId || null,
+      // A run on a task the user asking creates would be theirs.
+      responsibleUserId: req.actor.userId ?? null,
+    });
+    res.json(preview);
   });
 
   router.get("/agents/:id/config-revisions", async (req, res) => {

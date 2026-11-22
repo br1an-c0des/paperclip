@@ -1,4 +1,5 @@
 export { claudeSessionCwdMatchesExecutionTarget, execute, runClaudeLogin } from "./execute.js";
+export { previewClaudeRun, CLAUDE_RUN_PREVIEW_RUN_ID } from "./preview.js";
 export * from "./acp.js";
 export { getConfigSchema } from "./config-schema.js";
 export { listClaudeSkills, syncClaudeSkills } from "./skills.js";

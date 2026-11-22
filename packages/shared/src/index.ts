@@ -937,6 +937,9 @@ export type {
   ManagedExperimentalFeatureKey,
   ManagedSettingMetadata,
   BackupRetentionPolicy,
+  WorktreeCleanupMode,
+  WorktreeCleanupStatus,
+  WorktreeCleanupValues,
   Agent,
   AgentAccessState,
   AgentChainOfCommandEntry,
@@ -1020,6 +1023,7 @@ export type {
   ExecutionWorkspaceCloseGitReadiness,
   ExecutionWorkspaceCloseLinkedIssue,
   ExecutionWorkspaceCloseReadiness,
+  ExecutionWorkspaceWorktreeKept,
   ExecutionWorkspaceCloseReadinessState,
   ExecutionWorkspaceDeliveryState,
   WorkspaceOverviewItem,
@@ -1831,6 +1835,8 @@ export {
   MONTHLY_RETENTION_PRESETS,
   DEFAULT_BACKUP_RETENTION,
   PAPERCLIP_CLOUD_MANAGED_BY,
+  WORKTREE_CLEANUP_MODES,
+  WORKTREE_CLEANUP_DEFAULTS,
 } from "./types/instance.js";
 
 export type {

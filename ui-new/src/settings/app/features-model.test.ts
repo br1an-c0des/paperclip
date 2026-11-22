@@ -10,8 +10,16 @@ import {
   featureRowState,
   linkedNote,
   visibleFeatureGroups,
+  parseCleanupDays,
+  WORKTREE_CLEANUP_VALUE_INFO,
+  worktreeCleanupInfo,
+  worktreeCleanupNote,
+  worktreeCleanupOptions,
+  worktreeCleanupPatch,
+  worktreeCleanupValuesShown,
   type FeatureContext,
 } from "./features-model";
+import type { WorktreeCleanupStatus } from "@paperclipai/shared";
 
 const schemaKeys = Object.keys(instanceExperimentalSettingsSchema.shape);
 const booleanKeys = schemaKeys.filter((key) => {
@@ -122,5 +130,77 @@ describe("visibleFeatureGroups", () => {
     expect(groups.flatMap((group) => group.flags.map((entry) => entry.key))).not.toContain("enableCases");
     expect(groups.length).toBe(FEATURE_GROUPS.length);
     expect(visibleFeatureGroups(new Set(["instance.experimental"]))).toEqual([]);
+  });
+});
+
+describe("worktree cleanup (step 4b part 3)", () => {
+  const status = (patch: Partial<WorktreeCleanupStatus> = {}): WorktreeCleanupStatus => ({
+    saved: false,
+    mode: "off",
+    source: "default",
+    restorePoints: { available: true, reason: null },
+    values: { waitDays: 1, removeBuildOutput: true, restorePointAfterDays: 3, restorePointIdleDays: 7 },
+    retentionDays: 90,
+    ...patch,
+  });
+
+  it("retires the two worktree switches and puts the cleanup choice in Tasks and workspaces", () => {
+    expect(listed).not.toContain("enableIsolatedWorkspaces");
+    expect(listed).not.toContain("enableIsolatedWorkspacesByDefault");
+    expect(LEFT_OUT.enableIsolatedWorkspaces).toMatch(/^Built in/);
+    const tasks = visibleFeatureGroups(new Set()).find((group) => group.title === "Tasks and workspaces");
+    expect(tasks?.worktreeCleanup).toBe(true);
+    expect(visibleFeatureGroups(new Set(["instance.experimental.worktreeCleanup"])).find((group) => group.title === "Tasks and workspaces")?.worktreeCleanup).toBeUndefined();
+  });
+
+  it("offers its four levels, restore points unavailable without their prerequisites", () => {
+    expect(worktreeCleanupOptions(status()).map((option) => [option.value, option.label, option.disabled])).toEqual([
+      ["off", "Off", false],
+      ["merged", "Merged work only", false],
+      ["strict", "Merged or pushed", false],
+      ["restore_points", "Everything, with restore points", false],
+    ]);
+    const unavailable = status({ restorePoints: { available: false, reason: "File storage is S3 and PAPERCLIP_SECRETS_MASTER_KEY isn't set." } });
+    const restore = worktreeCleanupOptions(unavailable).find((option) => option.value === "restore_points")!;
+    expect(restore.disabled).toBe(true);
+    expect(restore.label).toMatch(/unavailable/);
+    expect(worktreeCleanupNote(unavailable)).toMatch(/Restore points are unavailable: File storage is S3/);
+  });
+
+  it("says nothing under the level unless restore points are unavailable", () => {
+    expect(worktreeCleanupNote(status())).toBeNull();
+    expect(worktreeCleanupNote(status({ saved: true, mode: "strict", source: "setting" }))).toBeNull();
+  });
+
+  it("puts what each level does behind the info icon", () => {
+    const info = worktreeCleanupInfo(status({ retentionDays: 30 }));
+    expect(info).toMatch(/Off: nothing/);
+    expect(info).toMatch(/Merged work only: archives/);
+    expect(info).toMatch(/Merged or pushed: also removes/);
+    expect(info).toMatch(/kept 30 days/);
+    expect(WORKTREE_CLEANUP_VALUE_INFO.waitDays).toMatch(/Default 1 day\./);
+    expect(WORKTREE_CLEANUP_VALUE_INFO.restorePointIdleDays).toMatch(/0 never/);
+  });
+
+  it("shows the values only when not off, and the restore point days only at that level", () => {
+    expect(worktreeCleanupValuesShown("off")).toEqual({ general: false, restorePoints: false });
+    expect(worktreeCleanupValuesShown(undefined)).toEqual({ general: false, restorePoints: false });
+    expect(worktreeCleanupValuesShown("merged")).toEqual({ general: true, restorePoints: false });
+    expect(worktreeCleanupValuesShown("restore_points")).toEqual({ general: true, restorePoints: true });
+  });
+
+  it("reads day counts from 0 to 365", () => {
+    expect(parseCleanupDays(" 3 ")).toBe(3);
+    expect(parseCleanupDays("0")).toBe(0);
+    expect(parseCleanupDays("365")).toBe(365);
+    for (const bad of ["", "-1", "1.5", "366", "abc"]) expect(parseCleanupDays(bad)).toBeNull();
+  });
+
+  it("saves the level, and a value alone without touching the level", () => {
+    expect(worktreeCleanupPatch({ mode: "merged" })).toEqual({ worktreeCleanup: "merged" });
+    expect(worktreeCleanupPatch({ waitDays: 2 })).toEqual({ worktreeCleanupWaitDays: 2 });
+    expect(worktreeCleanupPatch({ removeBuildOutput: false })).toEqual({ worktreeCleanupRemoveBuildOutput: false });
+    expect(worktreeCleanupPatch({ restorePointAfterDays: 5, restorePointIdleDays: 0 }))
+      .toEqual({ worktreeRestorePointAfterDays: 5, worktreeRestorePointIdleDays: 0 });
   });
 });

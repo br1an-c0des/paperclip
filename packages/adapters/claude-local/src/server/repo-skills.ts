@@ -30,7 +30,11 @@ async function listRepoSkills(skillsDir: string): Promise<RepoSkill[]> {
     const dir = path.join(skillsDir, entry.name);
     if (await isFile(path.join(dir, "SKILL.md"))) skills.push({ name: entry.name, dir });
   }
-  return skills.sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
+  return skills.sort((left, right) => byName(left.name, right.name));
+}
+
+function byName(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 /**
@@ -43,6 +47,8 @@ export async function resolveRepoSkills(input: {
   /** null with a project: an older server, counts as on */
   agentsUseRepoSkills: boolean | null;
   repoRoot: string | null;
+  /** The skills' names, when the folder isn't there to list (a preview of a task worktree). */
+  skillNames?: string[];
 }): Promise<{ load: ClaudeRepoSkillsLoad; skills: RepoSkill[] }> {
   if (!input.projectId) return { load: { enabled: false, reason: "no_project" }, skills: [] };
   if (input.agentsUseRepoSkills === false) {
@@ -50,7 +56,9 @@ export async function resolveRepoSkills(input: {
   }
   if (!input.repoRoot) return { load: { enabled: false, reason: "not_in_repo" }, skills: [] };
   const dir = path.join(input.repoRoot, ".claude", "skills");
-  const skills = await listRepoSkills(dir);
+  const skills = input.skillNames
+    ? [...new Set(input.skillNames)].sort(byName).map((name) => ({ name, dir: path.join(dir, name) }))
+    : await listRepoSkills(dir);
   if (skills.length === 0) return { load: { enabled: false, reason: "no_skills" }, skills: [] };
   return { load: { enabled: true, dir, count: skills.length }, skills };
 }

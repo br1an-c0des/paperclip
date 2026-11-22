@@ -646,10 +646,6 @@ export function emailChannelService(db: Db, options: EmailChannelOptions) {
     if (agent.permissions.trustPreset === "low_trust_review") {
       const settings = instanceSettingsService(db);
       const experimental = await settings.getExperimental();
-      if (!experimental.enableIsolatedWorkspaces)
-        throw badRequest(
-          "Low-trust email agents require isolated workspaces and a sandbox environment. Complete runtime setup before connecting this inbox.",
-        );
       const envs = environmentService(db);
       const local = await envs.ensureLocalEnvironment(companyId);
       const managed = experimental.enableManagedSandboxOnly

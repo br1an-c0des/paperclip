@@ -6,7 +6,13 @@ import type { SshRemoteExecutionSpec } from "./ssh.js";
 import type { AdapterExecutionTarget } from "./execution-target.js";
 import type { RuntimeStatusSink } from "./runtime-progress.js";
 import type { AdapterExecutionPhaseSink } from "./execution-phase.js";
-import type { ExecutionContinuationEnvelope, NativeFinalizationResult } from "@paperclipai/shared";
+import type {
+  ClaudeRunPreviewBlocker,
+  ClaudeRunPreviewManifest,
+  ClaudeRunPreviewUnsupportedReason,
+  ExecutionContinuationEnvelope,
+  NativeFinalizationResult,
+} from "@paperclipai/shared";
 
 export interface AdapterAgent {
   id: string;
@@ -507,12 +513,53 @@ export interface AcpTargetDescriptor {
   };
 }
 
+/**
+ * The inputs of a run preview (fork/step-4b-parts-2-3.md, part 2): what the server would hand
+ * the adapter for the next fresh run on a task, resolved read-only. Secret values are
+ * placeholders, MCP servers carry placeholder tokens, and no run token is minted.
+ */
+export interface AdapterRunPreviewContext {
+  agent: AdapterAgent;
+  config: Record<string, unknown>;
+  context: Record<string, unknown>;
+  runtimeMcp?: AdapterRuntimeMcpAccess;
+  /** Whether the run would get a Paperclip run token (`authToken`); none is minted for a preview. */
+  runTokenAvailable: boolean;
+  executionTarget?: AdapterExecutionTarget | null;
+  /**
+   * The checkout the run would read the repo's `CLAUDE.md` and skills from, when it doesn't
+   * exist yet: a task worktree the run makes from a base commit. `root` is where it will be;
+   * `claudeMd` and `skillNames` say what that commit holds. Without it the adapter reads the
+   * checkout at the workspace's `cwd`.
+   */
+  repoView?: AdapterRunPreviewRepoView | null;
+}
+
+/** A repo checkout as it will be, read from git rather than from its (not yet made) folder. */
+export interface AdapterRunPreviewRepoView {
+  root: string;
+  /** Whether `<root>/CLAUDE.md` will be a file. */
+  claudeMd: boolean;
+  /** The names of `<root>/.claude/skills/<name>/SKILL.md`. */
+  skillNames: string[];
+}
+
+/** What the adapter's next run would get, planned without starting, writing or minting anything. */
+export type AdapterRunPreview =
+  | { supported: true; manifest: ClaudeRunPreviewManifest; blockers: ClaudeRunPreviewBlocker[] }
+  | { supported: false; reason: ClaudeRunPreviewUnsupportedReason };
+
 export interface ServerAdapterModule {
   type: string;
   execute(ctx: AdapterExecutionContext): Promise<AdapterExecutionResult>;
   testEnvironment(ctx: AdapterEnvironmentTestContext): Promise<AdapterEnvironmentTestResult>;
   acp?: AcpTargetDescriptor;
   listSkills?: (ctx: AdapterSkillContext) => Promise<AdapterSkillSnapshot>;
+  /**
+   * Optional: the next run's manifest, planned by the same code as a real launch but with no
+   * side effects (no files, tokens or processes). Only `claude_local` implements it.
+   */
+  previewRun?: (ctx: AdapterRunPreviewContext) => Promise<AdapterRunPreview>;
   syncSkills?: (ctx: AdapterSkillContext, desiredSkills: string[]) => Promise<AdapterSkillSnapshot>;
   sessionCodec?: AdapterSessionCodec;
   sessionManagement?: import("./session-compaction.js").AdapterSessionManagement;

@@ -15,6 +15,7 @@ import type { AdapterLoginCapability } from "@paperclipai/adapter-utils";
 import { runAdapterExecutionTargetShellCommand } from "@paperclipai/adapter-utils/execution-target";
 import {
   execute as claudeExecute,
+  previewClaudeRun,
   listClaudeSkills,
   syncClaudeSkills,
   listClaudeModels,
@@ -298,6 +299,7 @@ const claudeLocalAdapter: ServerAdapterModule = {
     },
   },
   listSkills: listClaudeSkills,
+  previewRun: previewClaudeRun,
   syncSkills: syncClaudeSkills,
   sessionCodec: claudeSessionCodec,
   sessionManagement: getAdapterSessionManagement("claude_local") ?? undefined,

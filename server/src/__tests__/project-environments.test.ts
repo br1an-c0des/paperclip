@@ -7,8 +7,7 @@ import { agents, authUsers, companyMemberships, builtInManagedResources, compani
 import { projectEnvironmentOptions, withDefaultProjectStorage } from "../services/project-environments.js";
 import { assertProjectStorageEnvironment, projectStorageForEnvironment } from "../services/project-workspace-provider.js";
 import { issueService } from "../services/issues.js";
-import { instanceSettingsService } from "../services/instance-settings.js";
-import { applyDefaultIsolatedExecutionWorkspacePolicy, gateProjectExecutionWorkspacePolicy, parseProjectExecutionWorkspacePolicy, resolveExecutionWorkspaceMode, buildExecutionWorkspaceAdapterConfig, resolveEffectiveWorkspaceStrategyType } from "../services/execution-workspace-policy.js";
+import { applyDefaultIsolatedExecutionWorkspacePolicy, parseProjectExecutionWorkspacePolicy, resolveExecutionWorkspaceMode, buildExecutionWorkspaceAdapterConfig, resolveEffectiveWorkspaceStrategyType } from "../services/execution-workspace-policy.js";
 import { projectService } from "../services/projects.js";
 import { preparePluginWorkspace } from "../services/plugin-workspaces.js";
 import { projectRoutes } from "../routes/projects.js";
@@ -137,14 +136,14 @@ describe.skipIf(!support.supported)("project environment compatibility", () => {
 
   it("preserves inherited task isolation when checking the observed core storage owner", async () => {
     const f = await fixture();
-    const { experimental: settings } = await instanceSettingsService(db).updateExperimental({ enableIsolatedWorkspaces: true, enableIsolatedWorkspacesByDefault: true });
     const project = await projectService(db).createWithRepositories(f.companyId, { name: "Inherited isolation" }, [
       { id: "42", fullName: "example/repo", url: "https://github.com/example/repo", connections: [] },
     ], { environmentId: f.sandbox.id, expectedStorageProviderPluginId: null });
     expect(project.executionWorkspacePolicy).toBeNull();
     const projectPolicy = applyDefaultIsolatedExecutionWorkspacePolicy({
-      projectPolicy: gateProjectExecutionWorkspacePolicy(parseProjectExecutionWorkspacePolicy(project.executionWorkspacePolicy), settings.enableIsolatedWorkspaces),
-      defaultIsolatedWorkspacesEnabled: settings.enableIsolatedWorkspacesByDefault,
+      // Step 4b part 3: isolated workspaces and the worktree default are always on.
+      projectPolicy: parseProjectExecutionWorkspacePolicy(project.executionWorkspacePolicy),
+      defaultIsolatedWorkspacesEnabled: true,
       hasProjectWorkspace: project.workspaces.length > 0,
     });
     const mode = resolveExecutionWorkspaceMode({ projectPolicy, issueSettings: null, legacyUseProjectWorkspace: null });

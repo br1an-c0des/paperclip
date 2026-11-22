@@ -3,12 +3,12 @@ import os from "node:os";
 import path from "node:path";
 import { ensurePersistedExecutionWorkspaceAvailable } from "../services/workspace-runtime.js";
 import { describe, expect, it } from "vitest";
-import { canApplyTaskWorkspaceSelectionAtAdmission, taskWorkspaceRuntimeSelectionEnabled, parseIssueExecutionWorkspaceSettings, resolveExecutionWorkspaceMode } from "../services/execution-workspace-policy.js";
+import { canApplyTaskWorkspaceSelectionAtAdmission, parseIssueExecutionWorkspaceSettings, resolveExecutionWorkspaceMode } from "../services/execution-workspace-policy.js";
 
 describe("task workspace admission authority", () => {
-  it.each([{ hasTypedSelection: true, hasBinding: false }, { hasTypedSelection: false, hasBinding: true }])("keeps isolated intent authoritative with the legacy UI disabled: %j", flags => {
-    const enabled = taskWorkspaceRuntimeSelectionEnabled({ legacyUiEnabled: false, ...flags });
-    const settings = enabled ? parseIssueExecutionWorkspaceSettings({ mode: "isolated_workspace" }) : null;
+  // Step 4b part 3: a task's workspace selection always applies (taskWorkspaceRuntimeSelectionEnabled is gone).
+  it("keeps isolated intent authoritative", () => {
+    const settings = parseIssueExecutionWorkspaceSettings({ mode: "isolated_workspace" });
     expect(resolveExecutionWorkspaceMode({ projectPolicy: null, issueSettings: settings, legacyUseProjectWorkspace: null })).toBe("isolated_workspace");
   });
   it.each([

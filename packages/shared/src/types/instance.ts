@@ -52,14 +52,17 @@ export interface InstanceExperimentalSettings {
    * sandbox environment. Run selection refuses local while this is on.
    */
   enableManagedSandboxOnly: boolean;
+  /**
+   * Retired switch (step 4b part 3): per-task worktrees are always available, so the server always
+   * reads this as on. The stored key is accepted and ignored.
+   */
   enableIsolatedWorkspaces: boolean;
   /** Enroll eligible native sandbox workspaces in remote, snapshot-backed storage. */
   remoteWorkspaceStorageEnabled: boolean;
   /**
-   * Move the execution workspace default for a project that carries no policy
-   * of its own from the shared project checkout to an isolated per-task
-   * worktree. Inert unless `enableIsolatedWorkspaces` is also on, and never
-   * overrides a project that stores its own policy.
+   * Retired switch (step 4b part 3), always read as on: a project with a git checkout gives each
+   * new task its own worktree unless the project explicitly chose otherwise
+   * (`applyDefaultIsolatedExecutionWorkspacePolicy`). The stored key is accepted and ignored.
    */
   enableIsolatedWorkspacesByDefault: boolean;
   enableStreamlinedLeftNavigation: boolean;
@@ -174,6 +177,61 @@ export interface InstanceExperimentalSettings {
    * from another instance fail closed.
    */
   worktreeRunExecutionActivationInstanceId: string | null;
+  /**
+   * How the terminal workspace reaper treats finished tasks' git worktrees (step 4b part 3): see
+   * `WorktreeCleanupMode`. Absent when never saved, which is Off: the reaper leaves task worktrees
+   * alone whatever the environment variables say. The values below apply once a level is chosen,
+   * and a level runs for real, never as a dry run. Other workspaces keep upstream's rules.
+   */
+  worktreeCleanup?: WorktreeCleanupMode | null;
+  /** Days to wait after a task's tree closes before archiving or expiring its worktree (default 1). */
+  worktreeCleanupWaitDays?: number | null;
+  /** Remove installed dependencies and build output from finished worktrees (default on). */
+  worktreeCleanupRemoveBuildOutput?: boolean | null;
+  /** Restore points mode: save the restore point this many days after the tree closes (default 3). */
+  worktreeRestorePointAfterDays?: number | null;
+  /** Restore points mode: also remove an open task's worktree idle this many days; 0 never (default 7). */
+  worktreeRestorePointIdleDays?: number | null;
+}
+
+export const WORKTREE_CLEANUP_MODES = ["off", "merged", "strict", "restore_points"] as const;
+/**
+ * `off`: the reaper leaves task worktrees alone (no archive, compaction or expiration); closing one
+ * by hand still works. `merged`: archive a worktree once its work is merged into the base and it's
+ * clean. `strict`: also remove one the remote can rebuild exactly (pushed, nothing local).
+ * `restore_points`: also remove one with unpushed or uncommitted work, after saving an encrypted
+ * restore point.
+ */
+export type WorktreeCleanupMode = (typeof WORKTREE_CLEANUP_MODES)[number];
+
+/** The worktree cleanup values a saved mode uses when the value itself was never saved. */
+export const WORKTREE_CLEANUP_DEFAULTS = {
+  waitDays: 1,
+  removeBuildOutput: true,
+  restorePointAfterDays: 3,
+  restorePointIdleDays: 7,
+} as const;
+
+/** The worktree cleanup values in force. */
+export interface WorktreeCleanupValues {
+  waitDays: number;
+  removeBuildOutput: boolean;
+  restorePointAfterDays: number;
+  restorePointIdleDays: number;
+}
+
+/** `GET /api/instance/settings/worktree-cleanup`: the cleanup setting and what is in force. */
+export interface WorktreeCleanupStatus {
+  /** Whether a level was ever saved; until then the level is Off. */
+  saved: boolean;
+  /** The level the reaper uses now. */
+  mode: WorktreeCleanupMode;
+  source: "setting" | "default";
+  restorePoints: { available: boolean; reason: string | null };
+  /** The values a level uses: the saved ones, else `WORKTREE_CLEANUP_DEFAULTS`. */
+  values: WorktreeCleanupValues;
+  /** How long restore points are kept (`PAPERCLIP_GIT_RESTORE_POINT_RETENTION_DAYS`, environment only). */
+  retentionDays: number;
 }
 
 /**

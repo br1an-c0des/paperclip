@@ -103,6 +103,14 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 66 | [Let the database decide a lease that looks expired on the server's clock](#66-let-the-database-decide-a-lease-that-looks-expired-on-the-servers-clock) | fixed (`c67fff236`) | | | 2026-11-20 | | |
 | 67 | [Make `agent-commentary-skills` pass in a worktree under `.claude/`](#67-make-agent-commentary-skills-pass-in-a-worktree-under-claude) | candidate | | | 2026-11-20 | | |
 | 68 | [Steady `fresh-continuation-fallback`'s recycled-PID test](#68-steady-fresh-continuation-fallbacks-recycled-pid-test) | candidate | | | 2026-11-20 | | |
+| 69 | [Bring the opt-in hiring and portability tests up to step 4a's access levels](#69-bring-the-opt-in-hiring-and-portability-tests-up-to-step-4as-access-levels) | candidate | | | 2026-11-20 | | |
+| 70 | [Find the bundled skills folder from a nested worktree](#70-find-the-bundled-skills-folder-from-a-nested-worktree) | candidate | | | 2026-11-21 | | |
+| 71 | [Fix the opt-in chat and email channel failures on `main`](#71-fix-the-opt-in-chat-and-email-channel-failures-on-main) | candidate | | | 2026-11-21 | | |
+| 72 | [Steady the server tests that fail only under a full local run's load](#72-steady-the-server-tests-that-fail-only-under-a-full-local-runs-load) | candidate | | | 2026-11-21 | | |
+| 73 | [Share the worktree folder and base-ref rules between a run and its preview](#73-share-the-worktree-folder-and-base-ref-rules-between-a-run-and-its-preview) | candidate | | | 2026-11-21 | | |
+| 74 | [Loosen `controller-instance-lease`'s wall-clock bound on a blocked renewal](#74-loosen-controller-instance-leases-wall-clock-bound-on-a-blocked-renewal) | candidate | | | 2026-11-21 | | |
+| 75 | [Stop redacting the run manifest's credential row](#75-stop-redacting-the-run-manifests-credential-row) | candidate | | | 2026-11-22 | | |
+| 76 | [Record and preview a run's full environment key list](#76-record-and-preview-a-runs-full-environment-key-list) | candidate | | | 2026-11-22 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1210,3 +1218,87 @@ Found 2026-11-20 by step 4b's agent E; confirmed on `feat/step-4b` before E's me
   still belong in the opt-in tier: the `claude_local` agents here bind one (`aiConnection`), so
   part of that area isn't dormant.
 - **Fork workaround:** none; the files only run with `corepack pnpm test:optin`.
+
+### 70. Find the bundled skills folder from a nested worktree
+
+Found 2026-11-21 by step 4b part 3's agent I.
+
+- **Problem:** `resolvePaperclipSkillsDir` (`server/src/services/connector-runtime.ts:200-205`)
+  walks up from the module and takes the first `.claude/skills` it meets. From a worktree nested
+  under the main checkout's `.claude/worktrees/`, that's the main checkout's
+  `/home/brian/coding/paperclip/.claude/skills`, not the repo's `skills/`, so the bundled connector
+  skills (agentmail, slack) read as missing there. Part of the `email-channels.integration` and
+  `chat-channels.integration` failures in agent worktrees comes from this. A deployment isn't
+  nested, so it's a dev and test problem.
+- **Likely fix:** look for the repo's own `skills/` (next to the package root) before any
+  `.claude/skills`, or stop at the first `pnpm-workspace.yaml`.
+
+### 71. Fix the opt-in chat and email channel failures on `main`
+
+Found 2026-11-21 by step 4b part 3's agent I; identical on `main` at `3535df8071`.
+
+- **Problem:** two opt-in files fail on `main`, and CI doesn't run them:
+  `chat-channels.integration.test.ts` (10 of 1970, among them "keeps one exact chat delivery
+  owner…", "does not resolve or mint a substitute owner…", "binds Slack tools to the admitted
+  linked request…", plus lock contention on `chat_endpoints`), and
+  `email-channels.integration.test.ts` (3). Some, maybe all, come from bug 70 when run in a
+  worktree; it's unchecked whether they also fail from the main checkout.
+- **Likely fix:** run both from the main checkout first; fix what remains, or skip it with a note
+  (chat channels are dormant here).
+
+### 72. Steady the server tests that fail only under a full local run's load
+
+Found 2026-11-21 by step 4b part 2's and part 3's agents G and I, in local `test:quick` runs.
+
+- **Problem:** these each failed once in a full local quick run and pass alone and in CI:
+  `heartbeat-run-output.test.ts` (`write CONNECTION_ENDED` on a `heartbeat_runs` select),
+  `connection-management.integration.test.ts` (Arcade discovery) and
+  `legacy-finalization-regression.test.ts` (a 30 s timeout). Related to bugs 62 and 68.
+- **Likely fix:** look for a shared cause (the embedded database's connection limit, or a slow
+  machine) before steadying each test.
+
+### 73. Share the worktree folder and base-ref rules between a run and its preview
+
+Found 2026-11-21 by step 4b part 2's agent G, while making the run preview match a worktree run.
+
+- **Problem:** `server/src/services/run-preview-worktree.ts` copies three rules from
+  `workspace-runtime.ts` (`resolveGitOwnerRepoRoot`, the worktree folder rule and
+  `resolveAuthoritativeBaseRef`, minus fetches), because they aren't exported. If the run's rules
+  change and the copy doesn't, the "What runs get" card stops matching real runs, and nothing fails.
+- **Likely fix:** export no-fetch versions from `workspace-runtime.ts`, use them in both places, and
+  delete the copy. Also noted in the preview code: a symlinked skill folder in the base commit isn't
+  followed, and a managed AI connection's project-auth check still reads the main checkout.
+
+### 74. Loosen `controller-instance-lease`'s wall-clock bound on a blocked renewal
+
+Found 2026-11-21 by step 4b part 2's agent G.
+
+- **Problem:** `controller-instance-lease.test.ts`, "has the server cancel a renewal blocked on a row
+  lock…", took about 10.1 s against its 9.5 s limit on the desktop, including when run alone. It
+  failed in agent I's quick run too. The file imports nothing step 4b changed. Related to bug 72.
+- **Likely fix:** check it on `main` first; if it fails there too, measure what the renewal waits
+  on and set the bound from that rather than from the wall clock.
+
+### 75. Stop redacting the run manifest's credential row
+
+Found 2026-11-22 in step 4b parts 2 and 3's real-run check (TES-42, run `0d7025ac`).
+
+- **Problem:** a sealed CLI run records its manifest on the `adapter.invoke` event, and the event
+  redaction (`server/src/redaction.ts`, `SECRET_FIELD_NAME_PATTERN`) masks any payload key named
+  `credential`. The manifest's `credential` holds no secret (kind, method, connection id and name),
+  but it's stored as `"***REDACTED***"`, so the run view's Credential row reads "Unknown method"
+  (`credentialText` in `ui-new/src/runs/run-manifest.ts`). The agent's "What runs get" card, read
+  from the preview route, shows it correctly. Since step 4b part 1.
+- **Likely fix:** exempt `runManifest.credential` from key-name redaction (the value-pattern
+  redaction still applies), or rename the field; add a test that the recorded manifest keeps it.
+
+### 76. Record and preview a run's full environment key list
+
+Found 2026-11-22 in the same real-run check.
+
+- **Problem:** the run's recorded `envKeys` is cut off after about 30 names (`{"_truncated": true,
+  "omittedItems": 22}` in the event payload). The launch also adds about 30 keys after planning
+  (telemetry, git config, the GitHub broker, Runner network roots, the agent's signing keys), which
+  the preview's `envKeys` doesn't list. Neither UI shows `envKeys` today, so nothing reads wrong yet.
+- **Likely fix:** record the key names without the payload truncation (they're short), and either
+  plan the launch-time keys in `planSealedClaudeRun` or mark the preview's list as "planned keys".

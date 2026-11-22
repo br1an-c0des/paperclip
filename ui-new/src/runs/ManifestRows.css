@@ -1,0 +1,90 @@
+/*
+ * A run manifest's rows (ManifestRows.tsx): the run modal's "What this run got" and the agent's
+ * "What runs get" card. RunInput's other key-value lists use `.ri-kvl` too.
+ */
+.ri-kvl {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--card);
+}
+
+.ri-kvl > li {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 38px;
+  padding: 6px 12px;
+  color: var(--body);
+  font-size: 13px;
+}
+
+.ri-kvl > li + li {
+  border-top: 1px solid var(--line);
+}
+
+.ri-k {
+  color: var(--muted);
+}
+
+.ri-wrap {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.ri-v {
+  min-width: 0;
+}
+
+/* "What this run got": the skills, one line per group */
+.ri-groups {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ri-groups > li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.ri-gk {
+  flex: none;
+  min-width: 76px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ri-gv {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ri-gv .mono {
+  font-size: 12px;
+}
+
+.ri-clash {
+  color: var(--amber-fg);
+  font-size: 12px;
+}
+
+.ri-count {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* In a narrow run modal, labels move above their values (the card has its own rule) */
+@container rm (max-width: 560px) {
+  .ri-kvl > li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}

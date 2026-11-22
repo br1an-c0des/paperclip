@@ -26,8 +26,12 @@ function schemaBooleanFlagKeys(): string[] {
       return current instanceof z.ZodBoolean;
     })
     .map(([key]) => key)
+    // A value of the worktree cleanup setting (step 4b part 3), not a feature switch.
+    .filter((key) => !NON_FEATURE_BOOLEAN_KEYS.has(key))
     .sort();
 }
+
+const NON_FEATURE_BOOLEAN_KEYS = new Set(["worktreeCleanupRemoveBuildOutput"]);
 
 describe("INSTANCE_FEATURE_CATALOG", () => {
   it("keeps Notebook a managed rollout disabled for Cloud and self-hosted instances", () => {

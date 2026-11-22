@@ -248,7 +248,8 @@
         "providers": [],
         "effectivePolicy": null,
         "error": null
-      }
+      },
+      "effectiveExecutionWorkspacePolicy": null
     }
   ],
   "currentExecutionWorkspace": null,

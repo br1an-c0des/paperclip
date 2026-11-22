@@ -24,6 +24,7 @@ import type {
   Approval,
   AgentRuntimeSettingsPatch,
   AiRuntimeConnectionBinding,
+  ClaudeRunPreview,
   EnvironmentProbeResult,
   ResolveAgentInstructionCandidate,
   ResourceMembershipUpdateResult,
@@ -270,6 +271,12 @@ export const agentsApi = {
     api.get<AgentRuntimeState | null>(agentPath(id, companyId, "/runtime-state"), { signal }),
   taskSessions: (id: string, companyId?: string, signal?: AbortSignal) =>
     api.get<AgentTaskSession[]>(agentPath(id, companyId, "/task-sessions"), { signal }),
+  /**
+   * What the agent's next sealed run would get, for tasks in `projectId` or in no project
+   * (`GET /agents/:id/run-preview`, step 4b part 2). A read: it starts and writes nothing.
+   */
+  runPreview: (id: string, projectId: string | null, companyId?: string, signal?: AbortSignal) =>
+    api.get<ClaudeRunPreview>(agentPath(id, companyId, `/run-preview${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""}`), { signal }),
   /** Clears the provider session for one task, or every session when `taskKey` is null. */
   resetSession: (id: string, taskKey: string | null, companyId?: string) =>
     api.post<void>(agentPath(id, companyId, "/runtime-state/reset-session"), { taskKey }),

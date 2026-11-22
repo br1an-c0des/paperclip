@@ -58,7 +58,7 @@ import { createHeartbeatRunOutput } from "./heartbeat/run-output.js";
 import { readRecoverableRunLog } from "./native-runtime/native-run-log-recovery.js";
 import { observabilitySecretValues } from "@paperclipai/adapter-utils/agent-observability";
 import { prepareHeartbeatSession, resolveHeartbeatAdapterSession } from "./heartbeat/session-preparation.js";
-import { readRunAgentAccess } from "./heartbeat/claude-run-context.js";
+import { readProjectRepoSwitches, readRunAgentAccess } from "./heartbeat/claude-run-context.js";
 import { prepareHeartbeatTaskContext } from "./heartbeat/task-context.js";
 import { selectHeartbeatEnvironment, resolveSshAuthenticationBeforeRouting } from "./heartbeat/environment-selection.js";
 import { reconcileMuseNativeTerminalRun } from "./native-runtime/muse-terminal-reconciliation.js";
@@ -81,7 +81,8 @@ import {
   createHeartbeatScheduling,
   formatIssueIdentifierLink,
 } from "./heartbeat/scheduling.js";
-import { canApplyTaskWorkspaceSelectionAtAdmission, taskWorkspaceRuntimeSelectionEnabled } from "./execution-workspace-policy.js";
+import { canApplyTaskWorkspaceSelectionAtAdmission } from "./execution-workspace-policy.js";
+import { taskCheckoutSupportsWorktrees } from "./worktree-default.js";
 import { agentExecutionStopBlocker } from "./agent-execution-stop.js";
 import {
   cancelHeartbeatNativeRun,
@@ -509,7 +510,6 @@ import {
   applyDefaultIsolatedExecutionWorkspacePolicy,
   buildExecutionWorkspaceAdapterConfig,
   parseIssueAssigneeAdapterOverrides,
-  gateProjectExecutionWorkspacePolicy,
   parseIssueExecutionWorkspaceSettings,
   resolveExecutionWorkspaceMode,
   selectEnvironmentExecutionWorkspaceSettings,
@@ -2486,14 +2486,13 @@ export function heartbeatService(
           : null;
       const experimentalInstanceSettings =
         await timePreparation("instance_settings", () => instanceSettings.getExperimental());
-      const isolatedWorkspacesEnabled =
-        experimentalInstanceSettings.enableIsolatedWorkspaces;
-      // Inert on its own: the operator default only reaches the resolver when
-      // isolated workspaces are enabled at all, so a stack that has one flag
-      // without the other keeps its current behavior.
+      // Per-task worktrees are always available and the default (step 4b
+      // part 3). The default needs a git checkout: a project folder that
+      // isn't a git repository keeps sharing it.
       const defaultIsolatedWorkspacesEnabled =
-        isolatedWorkspacesEnabled &&
-        experimentalInstanceSettings.enableIsolatedWorkspacesByDefault;
+        await taskCheckoutSupportsWorktrees(db, { companyId: agent.companyId,
+          projectId: issueContext ? issueContext.projectId : readNonEmptyString(context.projectId),
+          projectWorkspaceId: issueContext?.projectWorkspaceId });
       const providerApiPlacement = resolveProviderApiPlacement({ run, agent });
       const externalProvider = heartbeatExternalProvider({ run, agent }) ?? providerApiPlacement?.provider;
       const [taskWorkspaceIntentRow] = issueId && !externalProvider ? await timePreparation("workspace_context", () => db.select({ intent: issues.workspaceSelection }).from(issues)
@@ -2679,16 +2678,14 @@ export function heartbeatService(
         : sourcelessProjectWorkspacePolicy(workspacePolicyContext?.executionWorkspacePolicy);
       const projectExecutionWorkspacePolicy =
         applyDefaultIsolatedExecutionWorkspacePolicy({
-          projectPolicy: gateProjectExecutionWorkspacePolicy(
-            parsedProjectExecutionWorkspacePolicy,
-            isolatedWorkspacesEnabled || Boolean(parsedProjectExecutionWorkspacePolicy?.storageProviderPluginId),
-          ),
+          projectPolicy: parsedProjectExecutionWorkspacePolicy,
           defaultIsolatedWorkspacesEnabled,
           // Projects without workspace configuration get a plain managed
           // directory. The operator default cannot turn it into a worktree.
           hasProjectWorkspace: workspaceProjectContext?.hasWorkspace ?? false,
         });
-      const runtimeWorkspaceSelectionEnabled = !externalProvider && (freshWorkspace?.mode === "fresh_isolated_workspace" || taskWorkspaceRuntimeSelectionEnabled({ legacyUiEnabled: isolatedWorkspacesEnabled || Boolean(projectExecutionWorkspacePolicy?.storageProviderPluginId), hasTypedSelection: Boolean(taskWorkspaceIntentRow?.intent), hasBinding: Boolean(issueContext?.executionWorkspaceId) }));
+      // A task's workspace selection always applies now (step 4b part 3), except on an external provider.
+      const runtimeWorkspaceSelectionEnabled = !externalProvider;
       const parsedIssueExecutionWorkspaceSettings =
         parseIssueExecutionWorkspaceSettings(
           issueContext?.executionWorkspaceSettings,
@@ -3350,13 +3347,7 @@ export function heartbeatService(
           : []),
       ];
       // Step 4b: the project's repo switches, for a sealed claude_local launch (null: no project).
-      const workspaceProjectSwitches = executionWorkspace.projectId
-        ? await db
-          .select({ agentsReadClaudeMd: projects.agentsReadClaudeMd, agentsUseRepoSkills: projects.agentsUseRepoSkills })
-          .from(projects)
-          .where(and(eq(projects.id, executionWorkspace.projectId), eq(projects.companyId, agent.companyId)))
-          .then((rows) => rows[0] ?? null)
-        : null;
+      const workspaceProjectSwitches = await readProjectRepoSwitches(db, agent.companyId, executionWorkspace.projectId);
       context.paperclipWorkspace = {
         cwd: executionWorkspace.cwd,
         source: executionWorkspace.source,

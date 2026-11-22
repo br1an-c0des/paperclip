@@ -163,6 +163,14 @@ export function installDefaultHandlers(api: MockApi, options: MockOptions = {}):
 
   // Instance and plugins ----------------------------------------------------------------------
   api.get("/instance/settings/experimental", () => ({}));
+  api.get("/instance/settings/worktree-cleanup", () => ({
+    saved: false,
+    mode: "off",
+    source: "default",
+    restorePoints: { available: true, reason: null },
+    values: { waitDays: 1, removeBuildOutput: true, restorePointAfterDays: 3, restorePointIdleDays: 7 },
+    retentionDays: 90,
+  }));
   api.get("/instance/settings/general", () => ({
     censorUsernameInLogs: false,
     feedbackDataSharingPreference: "prompt",

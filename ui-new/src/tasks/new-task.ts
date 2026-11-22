@@ -148,14 +148,28 @@ export function buildExecutionPolicy(reviewer: Principal | null, approver: Princ
   return stages.length > 0 ? { mode: "normal" as const, commentRequired: true, stages } : null;
 }
 
-/** Whether the workspace pill shows: the project has execution workspaces on, and so does the instance. */
-export function workspaceChoiceAvailable(project: Pick<Project, "executionWorkspacePolicy"> | null | undefined, isolatedWorkspacesEnabled: boolean) {
-  return isolatedWorkspacesEnabled && project?.executionWorkspacePolicy?.enabled === true;
+type CheckoutPolicyProject = Pick<Project, "executionWorkspacePolicy"> & Partial<Pick<Project, "effectiveExecutionWorkspacePolicy">>;
+
+/**
+ * The checkout policy new tasks in the project follow: the server's, with the worktree default
+ * applied (step 4b part 3), else the stored one when the payload doesn't carry it.
+ */
+export function newTaskCheckoutPolicy(project: CheckoutPolicyProject | null | undefined) {
+  return project?.effectiveExecutionWorkspacePolicy ?? project?.executionWorkspacePolicy ?? null;
+}
+
+/**
+ * Whether the workspace pill shows: the project's tasks can have their own checkout. The instance
+ * switch is always on since step 4b part 3; the argument stays for the callers that pass it.
+ */
+export function workspaceChoiceAvailable(project: CheckoutPolicyProject | null | undefined, isolatedWorkspacesEnabled: boolean) {
+  return isolatedWorkspacesEnabled && newTaskCheckoutPolicy(project)?.enabled === true;
 }
 
 /** The project's default workspace mode, after `defaultExecutionWorkspaceModeForProject`. */
-export function defaultWorkspaceMode(project: Pick<Project, "executionWorkspacePolicy"> | null | undefined): WorkspaceMode {
-  const mode = project?.executionWorkspacePolicy?.enabled ? project.executionWorkspacePolicy.defaultMode : null;
+export function defaultWorkspaceMode(project: CheckoutPolicyProject | null | undefined): WorkspaceMode {
+  const policy = newTaskCheckoutPolicy(project);
+  const mode = policy?.enabled ? policy.defaultMode : null;
   return mode === "isolated_workspace" ? "isolated_workspace" : "shared_workspace";
 }
 
