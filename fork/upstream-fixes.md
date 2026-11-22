@@ -103,9 +103,9 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 66 | [Let the database decide a lease that looks expired on the server's clock](#66-let-the-database-decide-a-lease-that-looks-expired-on-the-servers-clock) | fixed (`c67fff236`) | | | 2026-11-20 | | |
 | 67 | [Make `agent-commentary-skills` pass in a worktree under `.claude/`](#67-make-agent-commentary-skills-pass-in-a-worktree-under-claude) | fixed (`e6e1b65da8`) | | | 2026-11-20 | | |
 | 68 | [Steady `fresh-continuation-fallback`'s recycled-PID test](#68-steady-fresh-continuation-fallbacks-recycled-pid-test) | fixed (`1577048c2f`, `657f0d91fb`) | | | 2026-11-20 | | |
-| 69 | [Bring the opt-in hiring and portability tests up to step 4a's access levels](#69-bring-the-opt-in-hiring-and-portability-tests-up-to-step-4as-access-levels) | candidate | | | 2026-11-20 | | |
+| 69 | [Bring the opt-in hiring and portability tests up to step 4a's access levels](#69-bring-the-opt-in-hiring-and-portability-tests-up-to-step-4as-access-levels) | fixed (`b60f981236`) | | | 2026-11-20 | | |
 | 70 | [Find the bundled skills folder from a nested worktree](#70-find-the-bundled-skills-folder-from-a-nested-worktree) | fixed (`e6e1b65da8`) | | | 2026-11-21 | | |
-| 71 | [Fix the opt-in chat and email channel failures on `main`](#71-fix-the-opt-in-chat-and-email-channel-failures-on-main) | candidate | | | 2026-11-21 | | |
+| 71 | [Fix the opt-in chat and email channel failures on `main`](#71-fix-the-opt-in-chat-and-email-channel-failures-on-main) | fixed (`5be9021f8e`) | | | 2026-11-21 | | |
 | 72 | [Steady the server tests that fail only under a full local run's load](#72-steady-the-server-tests-that-fail-only-under-a-full-local-runs-load) | fixed (`7058a272a5`, `f4f04c17a9`) | | | 2026-11-21 | | |
 | 73 | [Share the worktree folder and base-ref rules between a run and its preview](#73-share-the-worktree-folder-and-base-ref-rules-between-a-run-and-its-preview) | candidate | | | 2026-11-21 | | |
 | 74 | [Loosen `controller-instance-lease`'s wall-clock bound on a blocked renewal](#74-loosen-controller-instance-leases-wall-clock-bound-on-a-blocked-renewal) | fixed (`400317287b`) | | | 2026-11-21 | | |
@@ -1244,6 +1244,19 @@ Found 2026-11-20 by step 4b's agent E; confirmed on `feat/step-4b` before E's me
   still belong in the opt-in tier: the `claude_local` agents here bind one (`aiConnection`), so
   part of that area isn't dormant.
 - **Fork workaround:** none; the files only run with `corepack pnpm test:optin`.
+- **Fixed** (`b60f981236`, merged as `da1e574f2a`), tests only. The hire fixture's CEO now starts the way
+  `newAgentAccess` starts one, at manager with the `agents:create` override: 84 of 84. The
+  portability call's extra `access` field is intended: since `b14355472a` an imported CEO's hiring
+  denial also sets `agents:create` to false (`withAccessOverride`, `company-portability.ts`), and the
+  expectation now includes it. Both files 203 of 203, three runs.
+- **Tier question, still open:** the 17 files under the `ai-*` and `*ai-connection*` opt-in globs
+  take ~90 s with one worker (485 tests, all passing). Thirteen cover what server1's `claude_local`
+  runs use (credential resolution, rotation, write-back, hiring with an inherited connection,
+  Claude's limits and logins: ~40 s, among them `ai-connections` and `agent-hire-ai-connections`).
+  Four are dormant: `ai-connection-router` (pools, off), `antigravity-ai-connections.integration`,
+  `ai-provider-routing` (Pi, OpenRouter, Hermes) and `services/local-ai-browser-login` (Codex). The
+  suggestion: replace the broad globs in `scripts/test-tiers.json` with those four files, so the
+  rest join the thorough tier. Being opt-in is why CI never caught this bug.
 
 ### 70. Find the bundled skills folder from a nested worktree
 
@@ -1281,6 +1294,20 @@ Found 2026-11-21 by step 4b part 3's agent I; identical on `main` at `3535df8071
   worktree; it's unchecked whether they also fail from the main checkout.
 - **Likely fix:** run both from the main checkout first; fix what remains, or skip it with a note
   (chat channels are dormant here).
+- **Fixed** (`5be9021f8e`, merged as `da1e574f2a`), tests only. Run outside a nested worktree, 9 of the
+  13 failures remain; the other 4 (and the `chat_endpoints` lock contention) were bug 70.
+  - **Two fixed:** "checks both linked sender and agent assignment grants for protected
+    organizational defaults" (chat) and "checks sponsor and agent assignment grants for protected
+    email organizational defaults" (email) gave the agent a `tasks:assign_scope` grant, which step
+    4a no longer reads for an agent: a protected target needs a scoped `tasks:assign` override
+    (`authorization.ts`, the restricted-policy branch of assignment). The fixtures set that override
+    now; removing the person's grant still gives 403.
+  - **Seven skipped:** the `reconciled chat retry delivery ownership` block. They pass alone and fail
+    in a whole-file run: `deliverReconciledExecutions` sweeps every company, and by then the
+    execution-disposition worker has continued earlier tests' leftover runs, so the sweep also wakes
+    those. Test isolation in a dormant area. To bring them back, give the block its own file or
+    database.
+  - Both files after the change, two runs: 2008 passed, 7 skipped, ~28.5 min each.
 
 ### 72. Steady the server tests that fail only under a full local run's load
 
