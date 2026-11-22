@@ -39,7 +39,8 @@ async function executeFailure(
       agentCommand: `${JSON.stringify(process.execPath.replaceAll("\\", "/"))} ${JSON.stringify(fixture.replaceAll("\\", "/"))}`,
       mode,
       warmHandleIdleMs: 0,
-      cwd: repoRoot,
+      // Not the repo: a Claude run writes <cwd>/.claude/settings.local.json.
+      cwd: root,
       stateDir: path.join(root, "state"),
       env: {
         ...extraEnv,
