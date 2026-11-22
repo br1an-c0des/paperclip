@@ -112,6 +112,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 75 | [Stop redacting the run manifest's credential row](#75-stop-redacting-the-run-manifests-credential-row) | candidate | | | 2026-11-22 | | |
 | 76 | [Record and preview a run's full environment key list](#76-record-and-preview-a-runs-full-environment-key-list) | candidate | | | 2026-11-22 | | |
 | 77 | [Find the package test that failed once in a local `test:quick`](#77-find-the-package-test-that-failed-once-in-a-local-testquick) | candidate | | | 2026-11-22 | | |
+| 78 | [Tell the agent when its permission request is denied](#78-tell-the-agent-when-its-permission-request-is-denied) | candidate | | | 2026-11-22 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1317,3 +1318,16 @@ Found 2026-11-22 by the CI/DevOps session, in a local pre-push check of `main` (
   quick matched "test" in their names (being fixed on `ci/hook-lock-and-quick-names`).
 - **Likely fix:** none yet. If it recurs in CI, the shard's run summary or
   `node scripts/ci-flakes.mjs` names the test; fix it then.
+
+### 78. Tell the agent when its permission request is denied
+
+Found 2026-11-22 while evaluating step 4b part 4 (live sessions on the CLI).
+
+- **Problem:** approving a step 4a permission request replays the call and posts the outcome on
+  the task as a comment, which wakes the assignee (`server/src/routes/approvals.ts:498-511`).
+  Denying one (`POST /approvals/:id/reject`, :620-658) records the decision and logs activity, but
+  posts no comment and wakes no one, so an agent that carried on or blocked on the request never
+  learns the answer. Read from the code, not reproduced.
+- **Likely fix:** on reject of a `permission_request`, post the same kind of task comment as
+  approve ("Denied: <tool>, <note>"), or wake the requesting agent with the decision when there's
+  no task.
