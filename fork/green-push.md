@@ -10,7 +10,8 @@ every push locally (~21 min), so the aim is to run the cheap checks that catch w
 
 ## Before every push
 
-Run these two from the repo root. Together they take about 5 minutes.
+Run these two from the repo root, or let the pre-push hook run them for you (below). Together they
+take about 5 minutes.
 
 ```bash
 corepack pnpm typecheck
@@ -30,6 +31,22 @@ corepack pnpm test:quick
    red runs a local check could have caught. A new test that checks the whole app belongs in that
    list.
 
+**The pre-push hook** runs both on every push. Turn it on once per clone:
+
+```bash
+corepack pnpm hooks:install
+```
+
+- **What it checks:** the commits being pushed, so pushing `main` after a merge tests the merged
+  range. A push that changes only Markdown skips both checks.
+- **It covers every worktree:** the setting lives in `.git/config`, which all worktrees share, so
+  agents' pushes are checked too. A worktree without `node_modules` gets a blocked push telling it
+  to install first.
+- **What it can't check:** the checks run on the working tree. A pushed commit that isn't checked
+  out (`git push origin other-branch`) is let through with a warning, and uncommitted changes are
+  tested along with the commit.
+- **Bypass:** `git push --no-verify`, or `PAPERCLIP_SKIP_PREPUSH=1 git push`, when you have a reason.
+
 ## When the change touches…
 
 | You changed | Also run or do |
@@ -37,9 +54,10 @@ corepack pnpm test:quick
 | A route (added, removed, renamed a path) | Describe it in `server/src/routes/openapi.ts`. `openapi-routes` fails on any route the spec doesn't list. |
 | A field on an entity (`packages/shared/src/types`, `packages/db/src/schema`) | `issue-detail-statements` compares the issue response to `server/src/__tests__/fixtures/issue-detail-response.json`. Regenerate it with `PAPERCLIP_WRITE_ISSUE_DETAIL_GOLDEN=1`, read the diff, and commit it. The workspace typecheck finds fixtures that build the type. |
 | A migration | The db package's tests: `ls packages/db/src/*.test.ts > /tmp/db-tests.txt && node scripts/test.mjs --files /tmp/db-tests.txt`. The deploy rehearses the migration on a copy of server1's database too, but by then it's already on `main`. |
-| `ui-new` | `corepack pnpm --filter @paperclipai/ui-new typecheck` and `test`. If you changed a page, also `test:e2e` (mocked, no server). CI doesn't run e2e yet. |
+| `ui-new` | `corepack pnpm --filter @paperclipai/ui-new typecheck` and `test`. If you changed a page, also `test:e2e` (mocked, no server); CI's ui-new job runs it too, with `vite build`. |
 | Test infrastructure (`scripts/test.mjs`, `scripts/test-tiers.json`, vitest configs) | `corepack pnpm test:runner`, and `node scripts/test.mjs --dry-run --tier thorough --shard 1/10` to check every file still lands in exactly one shard. |
-| Shared code that dormant areas use | The opt-in files concerned (`corepack pnpm test:optin`, or a `--files` list). CI doesn't run them. |
+| Shared code that dormant areas use | The opt-in files concerned (`corepack pnpm test:optin`, or a `--files` list). Push runs don't include them; the weekly opt-in run does, after the fact. |
+| A `Dockerfile`, `deploy/`, a `package.json` or the lockfile | Nothing extra: CI builds the Docker images for such a push, which adds about 11 minutes to its run. |
 | Only Markdown | Nothing. CI still runs, and that's fine. |
 
 ## New or changed tests
@@ -68,8 +86,8 @@ corepack pnpm test:quick
 
 ## When a run fails anyway
 
-1. **Read the failure first.** In the run's summary, each failed shard ends with a
-   `Failed Tests` block. Or run:
+1. **Read the failure first.** The run's page shows a summary per shard: each failed test's file,
+   name and assertion. The full output is in the log:
 
    ```bash
    gh run view <id> -R br1an-c0des/paperclip --log-failed
@@ -82,6 +100,20 @@ corepack pnpm test:quick
    re-run the failed job. A re-run that passes overwrites the red result, so the bug list is the
    only record that the test flaked.
 4. **A test that flakes twice gets fixed before more work goes on top of it.**
+
+To see every re-run and red run of the last two weeks, with the tests that failed:
+
+```bash
+node scripts/ci-flakes.mjs --since 2026-11-19
+```
+
+## Now and then
+
+- **The weekly opt-in run** (`Opt-in tier (weekly)` in Actions, Mondays) shows how far the dormant
+  code has drifted. Read it before waking a dormant area up; don't fix it for its own sake.
+- **Shard weights:** when the shards' times spread out (in the run's job list), refresh them from a
+  few recent green runs, `node scripts/refresh-shard-weights.mjs --run <id> --run <id>`, and commit
+  `scripts/test-weights.json`.
 
 ## Deploying
 

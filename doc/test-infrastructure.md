@@ -20,13 +20,34 @@ in parallel, then `serialServer` files one at a time, then every other project),
 even after a failure, and prints one summary. Before running it lists each phase with
 `vitest list --filesOnly` and stops unless every test file lands in exactly one phase, so a new file
 can't be silently skipped. Options: `--workers N` (default min(8, cores ÷ 2, free memory ÷ 1.5 GB)),
-`--shard i/n` (longest-first split by `fork/test-suite-audit/classification.csv`'s timings, the same
-on every machine), `--report-dir <dir>` (keep each phase's Vitest JSON report), `--files <list>`,
-`--dry-run`, and `-- <vitest args>`.
+`--shard i/n` (longest-first split by expected seconds, the same on every machine: CI's own timings
+in `scripts/test-weights.json`, then `fork/test-suite-audit/classification.csv`, then the median),
+`--report-dir <dir>` (keep each phase's Vitest JSON report), `--files <list>`, `--dry-run`, and
+`-- <vitest args>`. Refresh the weights from recent green runs with
+`node scripts/refresh-shard-weights.mjs [--run <id> …]` and commit the file; CI keeps the reports
+14 days.
 
 **CI.** `.github/workflows/test.yml` runs on every push to any branch (pull requests only from forks):
-a typecheck job and the thorough tier in 10 shards, each with `--report-dir`. Vitest's module
-cache is restored from `main`'s last run.
+
+- a typecheck job, which also runs the `node --test` script tests (`corepack pnpm test:runner`);
+- a ui-new job: its unit tests, `vite build` and the mocked Playwright suite (report uploaded on
+  failure);
+- the thorough tier in 10 shards, each with `--report-dir`, and a summary of each shard's failed
+  tests on the run's page (`scripts/ci/summarize-reports.mjs`). Vitest's module cache is restored
+  from `main`'s last run;
+- the Docker images `deploy.sh` builds (root `Dockerfile`, then `deploy/Dockerfile`), only when the
+  push changes what they're built from (a `Dockerfile`, `deploy/`, a `package.json`, the lockfile,
+  `.nvmrc`, `.npmrc`, `patches/`, the workflow). A job gates it, so every commit still gets a run.
+
+`.github/workflows/optin-weekly.yml` runs the opt-in tier in 10 shards every Monday, and by hand.
+It only reports: dormant code drifts, failures there are expected, and it never gates a deploy.
+`node scripts/ci-flakes.mjs [--since <date>]` lists every re-run and red run with the tests that
+failed, since a re-run that passes hides the failure in the run list.
+
+**Pre-push hook.** `corepack pnpm hooks:install` sets `core.hooksPath` to `.githooks`, for every
+worktree of the clone. Before a push, `scripts/pre-push.mjs` runs the workspace typecheck and
+`test:quick` on the pushed range, unless only Markdown changed. Bypass with `git push --no-verify`
+or `PAPERCLIP_SKIP_PREPUSH=1`. See [fork/green-push.md](../fork/green-push.md).
 
 **Server projects.** `server/vitest.config.ts` splits the server's files into two Vitest projects:
 
