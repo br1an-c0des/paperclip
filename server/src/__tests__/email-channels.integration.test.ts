@@ -586,9 +586,13 @@ describe("AgentMail durable email pipeline", () => {
     await f.receive(f.message());
     expect(await tasks()).toHaveLength(0);
     expect(f.wakeup).not.toHaveBeenCalled();
-    await db.insert(principalPermissionGrants).values({ companyId: f.companyId,
-      principalType: "agent", principalId: f.agentId, permissionKey: "tasks:assign_scope",
-      scope: { projectId: project.id, assigneeAgentId: f.agentId } });
+    // Since step 4a an agent's scoped assignment is a tasks:assign override on its access, not a
+    // tasks:assign_scope grant (bug 71).
+    const [assignee] = await db.select({ permissions: agents.permissions }).from(agents).where(eq(agents.id, f.agentId));
+    const assigneeAccess = (assignee?.permissions as { access?: { level?: string; overrides?: object } } | null)?.access;
+    await db.update(agents).set({ permissions: { ...assignee?.permissions, access: { level: assigneeAccess?.level ?? "worker",
+      overrides: { ...assigneeAccess?.overrides, "tasks:assign": { scope: { projectId: project.id, assigneeAgentId: f.agentId } } } } } })
+      .where(eq(agents.id, f.agentId));
     await f.receive(f.message());
     expect(await tasks()).toEqual([expect.objectContaining({ projectId: project.id,
       assigneeAgentId: f.agentId,
