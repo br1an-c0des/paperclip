@@ -111,6 +111,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 74 | [Loosen `controller-instance-lease`'s wall-clock bound on a blocked renewal](#74-loosen-controller-instance-leases-wall-clock-bound-on-a-blocked-renewal) | candidate | | | 2026-11-21 | | |
 | 75 | [Stop redacting the run manifest's credential row](#75-stop-redacting-the-run-manifests-credential-row) | candidate | | | 2026-11-22 | | |
 | 76 | [Record and preview a run's full environment key list](#76-record-and-preview-a-runs-full-environment-key-list) | candidate | | | 2026-11-22 | | |
+| 77 | [Find the package test that failed once in a local `test:quick`](#77-find-the-package-test-that-failed-once-in-a-local-testquick) | candidate | | | 2026-11-22 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1302,3 +1303,17 @@ Found 2026-11-22 in the same real-run check.
   the preview's `envKeys` doesn't list. Neither UI shows `envKeys` today, so nothing reads wrong yet.
 - **Likely fix:** record the key names without the payload truncation (they're short), and either
   plan the launch-time keys in `planSealedClaudeRun` or mark the preview's list as "planned keys".
+
+### 77. Find the package test that failed once in a local `test:quick`
+
+Found 2026-11-22 by the CI/DevOps session, in a local pre-push check of `main` (`--changed b12b95be6f`).
+
+- **Problem:** one test failed in quick's packages phase (73 passed, 1 failed) among six files:
+  `packages/db/src/test-postgres-{owner,owner-process,admin,command}.test.ts`,
+  `packages/db/src/test-embedded-postgres.test.ts` and
+  `packages/adapters/claude-local/src/server/test.probe.test.ts`. The output didn't name the
+  file. The next two runs that finished both passed; a machine crash cut off a loop of three more
+  in between, while another session's tests were running alongside. Those files were selected only because `scripts/test.mjs` changed and
+  quick matched "test" in their names (being fixed on `ci/hook-lock-and-quick-names`).
+- **Likely fix:** none yet. If it recurs in CI, the shard's run summary or
+  `node scripts/ci-flakes.mjs` names the test; fix it then.
