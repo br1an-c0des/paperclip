@@ -1,5 +1,5 @@
-# The fork's CI (hard-fork step 3a, round 2): typecheck, and the thorough test tier split into
-# shards. Upstream's 38 workflows were removed; they're readable at the tag `upstream-freeze`.
+# The fork's CI (hard-fork step 3a, round 2): typecheck, ui-new's tests, build and mocked e2e, and
+# the thorough test tier split into shards. Upstream's 38 workflows were removed; they're readable at the tag `upstream-freeze`.
 # Design and numbers: fork/test-suite-audit/results-ci.md.
 #
 # Runs on every push to any branch. Pull requests run it only when they come from another
@@ -30,7 +30,7 @@ env:
 
 jobs:
   typecheck:
-    name: Typecheck, ui-new and runner tests
+    name: Typecheck and CI script tests
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -71,13 +71,92 @@ jobs:
       - name: Typecheck
         run: corepack pnpm typecheck
 
-      - name: ui-new tests
-        run: corepack pnpm --filter @paperclipai/ui-new test
-
       # The runner's own tests (node --test), including a dry run that checks the shards cover
       # the tier.
       - name: Test runner tests
         run: corepack pnpm test:runner
+
+      # The script behind the thorough job's run summary, on trimmed reports from real runs.
+      - name: Run summary script tests
+        run: node --test scripts/__tests__/summarize-reports.test.mjs
+
+  # ui-new on its own runner, so its tests and build aren't on the typecheck job's critical path.
+  # Its typecheck stays in `corepack pnpm typecheck` above. Each check after setup runs even when
+  # an earlier one failed, so one run shows them all.
+  ui-new:
+    name: ui-new unit tests, build and e2e
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Enable corepack (pnpm from package.json's packageManager)
+        run: corepack enable && corepack pnpm --version
+
+      - name: Locate the pnpm store
+        id: pnpm-store
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      # The id marks the end of setup: the checks below run if it got this far.
+      - name: Build the plugin SDK
+        id: setup
+        run: corepack pnpm --filter @paperclipai/plugin-sdk build
+
+      - name: ui-new unit tests
+        run: corepack pnpm --filter @paperclipai/ui-new test
+
+      # The production build deploy/Dockerfile makes, into ui-new/dist.
+      - name: ui-new build
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: corepack pnpm --filter @paperclipai/ui-new build
+
+      # The Chromium headless shell the suite runs in, at the version the root's @playwright/test
+      # expects, with its system libraries.
+      - name: Install Playwright's Chromium
+        id: browser
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: corepack pnpm exec playwright install --with-deps --only-shell chromium
+
+      # The mocked smoke suite (ui-new/playwright.config.ts): it builds the app, serves it with
+      # `vite preview` and answers every /api request from e2e/fixtures, so no server runs. CI=true
+      # gives it 2 workers, forbidOnly and the list reporter; the html reporter is added so that a
+      # failure leaves a report with its traces and screenshots.
+      - name: ui-new e2e (mocked API)
+        id: e2e
+        if: ${{ !cancelled() && steps.browser.outcome == 'success' }}
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: ${{ github.workspace }}/ui-new/e2e/.report
+          PLAYWRIGHT_HTML_OPEN: never
+        run: corepack pnpm --filter @paperclipai/ui-new test:e2e --reporter=list,html
+
+      - name: Upload the Playwright report
+        if: ${{ failure() && steps.e2e.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: ui-new/e2e/.report/
+          if-no-files-found: ignore
+          retention-days: 14
 
   thorough:
     name: Thorough tier, shard ${{ matrix.shard }}/${{ matrix.count }}
@@ -135,7 +214,17 @@ jobs:
 
       # Workers default to the machine: half of the runner's 4 cores, so 2 (scripts/test.mjs).
       - name: Run shard ${{ matrix.shard }} of the thorough tier
+        id: tests
         run: node scripts/test.mjs --tier thorough --shard ${{ matrix.shard }}/${{ matrix.count }} --report-dir test-reports
+
+      # Each failed test's file, name and error on the run's page, so a red run reads without
+      # opening the log. Passing the step's outcome lets it tell "no failures" from a failure
+      # outside any test (a coverage check, a crashed worker).
+      - name: Summarize the shard's results
+        if: always() && steps.tests.outcome != 'skipped'
+        env:
+          TEST_OUTCOME: ${{ steps.tests.outcome }}
+        run: node scripts/ci/summarize-reports.mjs test-reports --outcome "$TEST_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Save the Vitest module cache
         if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
