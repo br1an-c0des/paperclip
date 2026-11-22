@@ -14,6 +14,7 @@ import {
   readStoredProject,
   repoSkillsValue,
   storeProject,
+  taskWorktreeValue,
   unsupportedText,
 } from "./run-preview-model";
 
@@ -76,6 +77,18 @@ describe("the rows' values", () => {
     expect(credentialValue({ kind: "managed_connection", method: "subscription", connectionId: "c1", connectionName: "Claude Max" })).toBe("Claude subscription · connection Claude Max");
     expect(credentialValue(null)).toBe("None: runs will be refused");
     expect(credentialValue(undefined)).toBe("Not recorded");
+  });
+
+  it("show where tasks get their own worktree, and from what", () => {
+    const worktreeCheckout = { kind: "local" as const, path: "/work/site", worktree: { dir: "/work/site/.paperclip/worktrees", baseRef: "origin/main" } };
+    expect(checkoutValue(worktreeCheckout)).toEqual({ text: null, path: "/work/site" });
+    expect(taskWorktreeValue(worktreeCheckout)).toEqual({ text: "From origin/main, in", path: "/work/site/.paperclip/worktrees" });
+    expect(taskWorktreeValue({ ...worktreeCheckout, worktree: { dir: "/w", baseRef: null } })).toEqual({ text: "From a branch fetched on the first run, in", path: "/w" });
+    expect(taskWorktreeValue(local.checkout)).toBeNull();
+    expect(taskWorktreeValue(notCloned.checkout)).toBeNull();
+    expect(taskWorktreeValue(undefined)).toBeNull();
+    expect(claudeMdValue({ enabled: false, reason: "base_not_fetched" }, local).text).toBe("Not fetched yet: read from the task's worktree on its first run");
+    expect(repoSkillsValue({ enabled: false, reason: "base_not_fetched" }, local).text).toBe("Not fetched yet: read from the task's worktree on its first run");
   });
 
   it("read a repository that isn't cloned yet", () => {

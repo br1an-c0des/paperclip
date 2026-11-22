@@ -4136,7 +4136,11 @@ const claudeRunPreviewSchema = z.union([
       id: z.string(),
       name: z.string(),
       checkout: z.union([
-        z.object({ kind: z.literal("local"), path: z.string() }),
+        z.object({
+          kind: z.literal("local"),
+          path: z.string(),
+          worktree: z.object({ dir: z.string(), baseRef: z.string().nullable() }).optional(),
+        }),
         z.object({ kind: z.literal("not_cloned"), repoUrl: z.string() }),
         z.object({ kind: z.literal("none") }),
       ]),

@@ -23,6 +23,7 @@ import {
   repoSkillsValue,
   SESSION_TEXT,
   storeProject,
+  taskWorktreeValue,
   unsupportedText,
   type PreviewValue,
 } from "./run-preview-model";
@@ -148,6 +149,16 @@ export function RunPreviewCard(props: { agent: AgentDetail; dirty?: boolean }) {
                 {(chosen) => (
                   <ManifestRow label="Repository" info="Where a run on this project's tasks finds the repository's CLAUDE.md and skills: the project's primary workspace.">
                     <Value value={checkoutValue(chosen().checkout)} />
+                  </ManifestRow>
+                )}
+              </Show>
+              <Show when={taskWorktreeValue(project()?.checkout)}>
+                {(worktree) => (
+                  <ManifestRow
+                    label="Task worktrees"
+                    info="Each task gets its own git worktree of the repository, made on its first run. It holds only committed files, so CLAUDE.md and the repo skills are read from that commit. Their paths say <task branch>, the folder named after the task."
+                  >
+                    <Value value={worktree()} />
                   </ManifestRow>
                 )}
               </Show>

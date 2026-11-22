@@ -66,6 +66,19 @@ export function checkoutValue(checkout: ClaudeRunPreviewCheckout | undefined): P
 }
 
 /**
+ * The task worktrees row, when tasks each get their own worktree of the checkout (step 4b part
+ * 3): which branch or commit it starts from and the folder it goes in, else null (tasks work in
+ * the checkout). A worktree holds only what's committed there, so that's what CLAUDE.md and the
+ * repo skills are read from; their paths name the folder `<task branch>`, after the task.
+ */
+export function taskWorktreeValue(checkout: ClaudeRunPreviewCheckout | undefined): PreviewValue | null {
+  if (checkout?.kind !== "local" || !checkout.worktree) return null;
+  const { dir, baseRef } = checkout.worktree;
+  const from = typeof baseRef === "string" && baseRef ? `From ${baseRef}, in` : "From a branch fetched on the first run, in";
+  return typeof dir === "string" && dir ? { text: from, path: dir } : words(from.replace(/, in$/, ""));
+}
+
+/**
  * Why the repo's CLAUDE.md or skills won't load, for the reasons both share. A project with no
  * workspace runs in the agent's own folder, outside any project, so the preview reads `no_project`
  * for it too (server/src/services/run-preview.ts): with a project chosen, that means no repository.
@@ -78,6 +91,8 @@ function repoSkip(reason: unknown, project: ClaudeRunPreviewProject | null): str
       return "Off for this project";
     case "not_cloned":
       return "Not cloned yet: read on the first run";
+    case "base_not_fetched":
+      return "Not fetched yet: read from the task's worktree on its first run";
     case "not_in_repo":
       return project?.checkout?.kind === "none" ? "Not loaded: the project has no repository" : "Not loaded: runs won't be in the project's repository";
     default:
