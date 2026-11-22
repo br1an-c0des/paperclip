@@ -331,6 +331,7 @@ describe("instance settings routes", () => {
   });
 
   describe("worktree cleanup (step 4b part 3)", () => {
+    // The whole server config, as loadConfig gives it; the environment no longer decides the level.
     const cleanupConfig = (patch: Record<string, unknown> = {}) => ({
       gitCacheExpirationEnabled: false, gitCacheExpirationDryRun: true, gitRestorePointsEnabled: false,
       storageProvider: "local_disk", gitRestorePointTerminalDelayDays: 3, gitRestorePointIdleDays: 7, gitRestorePointRetentionDays: 90,
@@ -347,23 +348,24 @@ describe("instance settings routes", () => {
       return app;
     }
 
-    it("reads the environment fallback while never saved, and the saved mode once saved", async () => {
+    it("reads Off while never saved, whatever the environment says, and the saved level once saved", async () => {
       mockInstanceSettingsService.getExperimental.mockResolvedValue({});
-      const fallback = await request(cleanupApp(cleanupConfig({ gitCacheExpirationEnabled: true }))).get("/api/instance/settings/worktree-cleanup");
-      expect(fallback.status).toBe(200);
-      expect(fallback.body).toMatchObject({ saved: null, mode: "strict", source: "environment", dryRun: true,
-        restorePoints: { available: true }, values: { waitDays: 1, removeBuildOutput: true, restorePointAfterDays: 3, restorePointIdleDays: 7 },
+      const unsaved = await request(cleanupApp(cleanupConfig({ gitCacheExpirationEnabled: true, gitRestorePointsEnabled: true })))
+        .get("/api/instance/settings/worktree-cleanup");
+      expect(unsaved.status).toBe(200);
+      expect(unsaved.body).toEqual({ saved: false, mode: "off", source: "default",
+        restorePoints: { available: true, reason: null }, values: { waitDays: 1, removeBuildOutput: true, restorePointAfterDays: 3, restorePointIdleDays: 7 },
         retentionDays: 90 });
-      mockInstanceSettingsService.getExperimental.mockResolvedValue({});
-      const merged = await request(cleanupApp(cleanupConfig())).get("/api/instance/settings/worktree-cleanup");
-      expect(merged.body).toMatchObject({ saved: null, mode: "merged", source: "environment", dryRun: false });
+      mockInstanceSettingsService.getExperimental.mockResolvedValue({ worktreeCleanupWaitDays: 4 });
+      const valueOnly = await request(cleanupApp(cleanupConfig())).get("/api/instance/settings/worktree-cleanup");
+      expect(valueOnly.body).toMatchObject({ saved: false, mode: "off", source: "default", values: { waitDays: 4 } });
       mockInstanceSettingsService.getExperimental.mockResolvedValue({ worktreeCleanup: "off" });
-      const saved = await request(cleanupApp(cleanupConfig({ gitCacheExpirationEnabled: true }))).get("/api/instance/settings/worktree-cleanup");
-      expect(saved.body).toMatchObject({ saved: "off", mode: "off", source: "setting", dryRun: false });
+      const saved = await request(cleanupApp(cleanupConfig())).get("/api/instance/settings/worktree-cleanup");
+      expect(saved.body).toMatchObject({ saved: true, mode: "off", source: "setting" });
       mockInstanceSettingsService.getExperimental.mockResolvedValue({ worktreeCleanup: "restore_points", worktreeCleanupWaitDays: 2,
         worktreeCleanupRemoveBuildOutput: false, worktreeRestorePointAfterDays: 4, worktreeRestorePointIdleDays: 0 });
       const values = await request(cleanupApp(cleanupConfig())).get("/api/instance/settings/worktree-cleanup");
-      expect(values.body).toMatchObject({ saved: "restore_points", mode: "restore_points",
+      expect(values.body).toMatchObject({ saved: true, mode: "restore_points",
         values: { waitDays: 2, removeBuildOutput: false, restorePointAfterDays: 4, restorePointIdleDays: 0 } });
     });
 

@@ -1684,8 +1684,8 @@ async function startServerWithDatabaseTeardown(
         keyDurable: config.storageProvider !== "s3" || Boolean(process.env.PAPERCLIP_SECRETS_MASTER_KEY?.trim()),
       } : undefined,
       // Step 4b part 3: what the reaper does to task worktrees (archive, compaction, git workspace
-      // expiration) follows the worktree cleanup setting, read each sweep; never saved, it falls
-      // back to the environment variables these other options come from.
+      // expiration) follows the worktree cleanup setting, read each sweep, and is off until a level
+      // is saved. The environment options here keep governing every other workspace.
       resolveWorktreeCleanup: async () => worktreeSweepRules(await readWorktreeCleanup(db as any, config),
         { storage: storageService, keyDurable: restorePointAvailability(config).keyDurable }),
       taskDirectoryRetention: config.taskDirectoryRetentionEnabled ? {

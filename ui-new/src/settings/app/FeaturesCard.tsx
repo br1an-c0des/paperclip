@@ -1,4 +1,4 @@
-import type { InstanceExperimentalSettingsWithManaged, WorktreeCleanupMode, WorktreeCleanupStatus, WorktreeCleanupValues } from "@paperclipai/shared";
+import type { InstanceExperimentalSettingsWithManaged, WorktreeCleanupMode, WorktreeCleanupValues } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { Check, Lock } from "lucide-solid";
 import { createMemo, For, Show } from "solid-js";
@@ -74,9 +74,9 @@ export function FeaturesCard(props: { hidden: ReadonlySet<string> }) {
   };
 
   // The worktree cleanup level and values save like a switch, then reread what's in force.
-  const changeCleanup = (status: WorktreeCleanupStatus | undefined, change: WorktreeCleanupChange) => {
+  const changeCleanup = (change: WorktreeCleanupChange) => {
     void saver.run(async () => {
-      const saved = await instanceSettingsApi.updateExperimental(worktreeCleanupPatch(status, change));
+      const saved = await instanceSettingsApi.updateExperimental(worktreeCleanupPatch(change));
       client.setQueryData<InstanceExperimentalSettingsWithManaged>(queryKeys.instance.experimentalSettings, (current) => ({
         ...saved,
         managedKeys: saved.managedKeys ?? current?.managedKeys,
@@ -166,10 +166,10 @@ function FeatureRow(props: { flag: FeatureFlag; context: FeatureContext; onChang
  * Clean up finished worktrees (step 4b part 3): one level for everything the server's reaper does to
  * finished tasks' worktrees, and below it (unless Off) the wait, compaction and, at the restore point
  * level, its days. What each does and the defaults sit behind the "i"s; the line under the level
- * says only state: the environment fallback, a dry run, or why restore points can't be chosen. Each
+ * says only state: why restore points can't be chosen. Each
  * option marks itself selected, since the select's own value is set before <For> adds the options.
  */
-function WorktreeCleanupRow(props: { editable: boolean; onChange: (status: WorktreeCleanupStatus | undefined, change: WorktreeCleanupChange) => void }) {
+function WorktreeCleanupRow(props: { editable: boolean; onChange: (change: WorktreeCleanupChange) => void }) {
   const status = createQuery(() => ({
     queryKey: queryKeys.instance.worktreeCleanup,
     queryFn: () => instanceSettingsApi.worktreeCleanup(),
@@ -178,7 +178,7 @@ function WorktreeCleanupRow(props: { editable: boolean; onChange: (status: Workt
   const shown = () => worktreeCleanupValuesShown(status.data?.mode);
   const values = () => status.data?.values ?? WORKTREE_CLEANUP_DEFAULT_VALUES;
   const disabled = () => !props.editable || !status.data;
-  const change = (next: WorktreeCleanupChange) => props.onChange(status.data, next);
+  const change = (next: WorktreeCleanupChange) => props.onChange(next);
   const note = () => (status.isError ? `Couldn't read the cleanup setting. ${status.error instanceof Error ? status.error.message : ""}` : worktreeCleanupNote(status.data));
   return (
     <>

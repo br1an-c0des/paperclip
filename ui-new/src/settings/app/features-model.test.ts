@@ -135,10 +135,9 @@ describe("visibleFeatureGroups", () => {
 
 describe("worktree cleanup (step 4b part 3)", () => {
   const status = (patch: Partial<WorktreeCleanupStatus> = {}): WorktreeCleanupStatus => ({
-    saved: null,
-    mode: "merged",
-    source: "environment",
-    dryRun: false,
+    saved: false,
+    mode: "off",
+    source: "default",
     restorePoints: { available: true, reason: null },
     values: { waitDays: 1, removeBuildOutput: true, restorePointAfterDays: 3, restorePointIdleDays: 7 },
     retentionDays: 90,
@@ -168,10 +167,9 @@ describe("worktree cleanup (step 4b part 3)", () => {
     expect(worktreeCleanupNote(unavailable)).toMatch(/Restore points are unavailable: File storage is S3/);
   });
 
-  it("says when the environment variables decide, and a dry run", () => {
-    expect(worktreeCleanupNote(status())).toMatch(/environment variables decide\. Choosing/);
-    expect(worktreeCleanupNote(status({ mode: "strict", dryRun: true }))).toMatch(/dry run/);
-    expect(worktreeCleanupNote(status({ saved: "off", mode: "off", source: "setting" }))).toBeNull();
+  it("says nothing under the level unless restore points are unavailable", () => {
+    expect(worktreeCleanupNote(status())).toBeNull();
+    expect(worktreeCleanupNote(status({ saved: true, mode: "strict", source: "setting" }))).toBeNull();
   });
 
   it("puts what each level does behind the info icon", () => {
@@ -198,12 +196,11 @@ describe("worktree cleanup (step 4b part 3)", () => {
     for (const bad of ["", "-1", "1.5", "366", "abc"]) expect(parseCleanupDays(bad)).toBeNull();
   });
 
-  it("saves the level, and a value with the level in force while the environment still decides", () => {
-    expect(worktreeCleanupPatch(status(), { mode: "off" })).toEqual({ worktreeCleanup: "off" });
-    expect(worktreeCleanupPatch(status(), { waitDays: 2 })).toEqual({ worktreeCleanup: "merged", worktreeCleanupWaitDays: 2 });
-    expect(worktreeCleanupPatch(status({ saved: "strict", mode: "strict", source: "setting" }), { removeBuildOutput: false }))
-      .toEqual({ worktreeCleanupRemoveBuildOutput: false });
-    expect(worktreeCleanupPatch(status({ saved: "restore_points", mode: "restore_points", source: "setting" }), { restorePointAfterDays: 5, restorePointIdleDays: 0 }))
+  it("saves the level, and a value alone without touching the level", () => {
+    expect(worktreeCleanupPatch({ mode: "merged" })).toEqual({ worktreeCleanup: "merged" });
+    expect(worktreeCleanupPatch({ waitDays: 2 })).toEqual({ worktreeCleanupWaitDays: 2 });
+    expect(worktreeCleanupPatch({ removeBuildOutput: false })).toEqual({ worktreeCleanupRemoveBuildOutput: false });
+    expect(worktreeCleanupPatch({ restorePointAfterDays: 5, restorePointIdleDays: 0 }))
       .toEqual({ worktreeRestorePointAfterDays: 5, worktreeRestorePointIdleDays: 0 });
   });
 });

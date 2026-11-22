@@ -26,16 +26,12 @@ import {
  * Step 4b part 3: the worktree cleanup setting governs what the terminal workspace reaper does to
  * task worktrees: the merged-and-clean archive, compaction and git workspace expiration. The reaper
  * reads it each pass (`resolveWorktreeCleanup`), a chosen level runs for real, a kept finished
- * worktree records why (shown only while expiration runs), and a setting never saved keeps the
- * environment's rules.
+ * worktree records why (shown only while expiration runs), and until a level is saved the reaper
+ * leaves task worktrees alone. Other workspaces keep the environment's rules.
  */
 
-/** The environment's defaults, as `server/src/config.ts` reads them with no variables set. */
-const cleanupConfig = (patch: Partial<WorktreeCleanupConfig> = {}): WorktreeCleanupConfig => ({
-  gitCacheExpirationEnabled: false, gitCacheExpirationDryRun: true, gitRestorePointsEnabled: false, storageProvider: "local_disk",
-  gitRestorePointTerminalDelayDays: 3, gitRestorePointIdleDays: 7, gitRestorePointRetentionDays: 90,
-  workspaceReaperCooldownDays: 1, workspaceCompactionDelayHours: 1, ...patch,
-});
+/** The config the cleanup reads, as `server/src/config.ts` gives it with no variables set. */
+const cleanupConfig: WorktreeCleanupConfig = { storageProvider: "local_disk", gitRestorePointRetentionDays: 90, workspaceCompactionDelayHours: 1 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const gitEnv = { ...process.env, GIT_AUTHOR_NAME: "Fixture", GIT_AUTHOR_EMAIL: "fixture@example.test",
@@ -113,8 +109,8 @@ describeEmbeddedPostgres("worktree cleanup setting drives the terminal workspace
   }
 
   /** The rules the server builds from the setting each pass (index.ts), from a mutable saved setting. */
-  function settingDriven(state: { saved: SavedWorktreeCleanup | null }, env: Partial<WorktreeCleanupConfig> = {}) {
-    return async () => worktreeSweepRules(resolveWorktreeCleanup(state.saved, cleanupConfig(env)),
+  function settingDriven(state: { saved: SavedWorktreeCleanup | null }) {
+    return async () => worktreeSweepRules(resolveWorktreeCleanup(state.saved, cleanupConfig),
       { storage: getStorageService(), keyDurable: true });
   }
   const level = (mode: SavedWorktreeCleanup["worktreeCleanup"], patch: Partial<SavedWorktreeCleanup> = {}) => ({ worktreeCleanup: mode, ...patch });
@@ -212,29 +208,44 @@ describeEmbeddedPostgres("worktree cleanup setting drives the terminal workspace
     expect(await exists(pushed.cwd)).toBe(false);
   });
 
-  it("never saved, it keeps the environment's rules: the archive and compaction run as upstream's do", async () => {
+  it("never saved, it leaves task worktrees alone, even with the environment's options set to clean up", async () => {
     const merged = await fixture();
-    const pushed = await fixture({ providerType: "git_worktree" });
+    const pushed = await fixture();
     await pushed.commitPushed();
-    await addBuildOutput(pushed.cwd);
-    const worker = executionWorkspaceService(db, { resolveWorktreeCleanup: settingDriven({ saved: null }) });
-    await worker.sweepTerminalWorkspaces();
-    expect(await exists(merged.cwd)).toBe(false);
-    expect(await exists(nodeModules(pushed.cwd))).toBe(false);
-    // Expiration stays off unless PAPERCLIP_GIT_CACHE_EXPIRATION_ENABLED says otherwise.
-    expect(await exists(pushed.cwd)).toBe(true);
+    const compactable = await fixture({ providerType: "git_worktree" });
+    await compactable.commitPushed();
+    await addBuildOutput(compactable.cwd);
+    // What PAPERCLIP_GIT_CACHE_EXPIRATION_ENABLED=true, _DRY_RUN=false, a 0-day reaper cooldown and
+    // immediate compaction give the service in index.ts.
+    const worker = executionWorkspaceService(db, {
+      gitCacheExpirationEnabled: true, gitCacheExpirationDryRun: false, workspaceReaperCooldownDays: 0, workspaceCompactionDelayMs: 0,
+      resolveWorktreeCleanup: settingDriven({ saved: null }),
+    });
+    expect(await worker.sweepTerminalWorkspaces()).toMatchObject({ archived: 0, compacted: 0 });
+    for (const f of [merged, pushed, compactable]) expect(await exists(f.cwd)).toBe(true);
+    expect(await exists(nodeModules(compactable.cwd))).toBe(true);
     expect((await pushed.row()).metadata?.gitCacheRestoration).toBeUndefined();
+    // A value saved on its own doesn't turn it on either.
+    const valueOnly = executionWorkspaceService(db, { resolveWorktreeCleanup: settingDriven({ saved: { worktreeCleanupWaitDays: 0 } }) });
+    expect(await valueOnly.sweepTerminalWorkspaces()).toMatchObject({ archived: 0, compacted: 0 });
+    expect(await exists(merged.cwd)).toBe(true);
   });
 
-  it("never saved with expiration enabled in the environment, it keeps the environment's dry run", async () => {
-    const f = await fixture();
-    await f.commitPushed();
-    const worker = executionWorkspaceService(db, {
-      resolveWorktreeCleanup: settingDriven({ saved: null }, { gitCacheExpirationEnabled: true, gitCacheExpirationDryRun: true }),
-    });
-    await worker.sweepTerminalWorkspaces();
-    expect(await exists(f.cwd)).toBe(true);
-    expect((await f.row()).metadata?.[WORKTREE_KEPT_METADATA_KEY]).toBeUndefined();
+  it("other workspaces keep the environment's rules: a shared checkout follows the reaper cooldown while unsaved", async () => {
+    const companyId = randomUUID(), issueId = randomUUID(), workspaceId = randomUUID();
+    await db.insert(companies).values({ id: companyId, name: "Shared checkout fixture", issuePrefix: `SC${companyId.slice(0, 6)}` });
+    await db.insert(issues).values({ id: issueId, companyId, title: "Finished task", status: "done", completedAt: new Date(Date.now() - 2 * DAY_MS) });
+    await db.insert(executionWorkspaces).values({ id: workspaceId, companyId, sourceIssueId: issueId, mode: "shared_workspace", strategyType: "project_primary",
+      name: "Shared", status: "active", providerType: "local_fs", cwd: path.join(root, "missing-shared", workspaceId) });
+    await db.update(issues).set({ executionWorkspaceId: workspaceId }).where(eq(issues.id, issueId));
+    const status = () => db.select().from(executionWorkspaces).where(eq(executionWorkspaces.id, workspaceId)).then(rows => rows[0]!.status);
+    const unsaved = settingDriven({ saved: null });
+    const waiting = executionWorkspaceService(db, { workspaceReaperCooldownDays: 3, resolveWorktreeCleanup: unsaved });
+    expect((await waiting.sweepTerminalWorkspaces()).skippedCooldown).toBe(1);
+    expect(await status()).toBe("active");
+    const due = executionWorkspaceService(db, { workspaceReaperCooldownDays: 1, resolveWorktreeCleanup: unsaved });
+    // Past the cooldown it goes on to the delivery check, which a folder outside git doesn't pass.
+    expect(await due.sweepTerminalWorkspaces()).toMatchObject({ checked: 1, skippedCooldown: 0, skippedUndelivered: 1 });
   });
 
   it("falls back to the static options when no resolver is given (upstream's env wiring)", async () => {
@@ -243,5 +254,9 @@ describeEmbeddedPostgres("worktree cleanup setting drives the terminal workspace
     const dry = executionWorkspaceService(db, { gitCacheExpirationEnabled: true, gitCacheExpirationDryRun: true });
     await dry.sweepTerminalWorkspaces();
     expect(await exists(f.cwd)).toBe(true);
+    // Without the resolver, upstream's archive still removes a merged, clean worktree.
+    const merged = await fixture();
+    await executionWorkspaceService(db, {}).sweepTerminalWorkspaces();
+    expect(await exists(merged.cwd)).toBe(false);
   });
 });

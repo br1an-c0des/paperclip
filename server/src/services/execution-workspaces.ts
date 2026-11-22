@@ -100,7 +100,7 @@ import {
   parseIssueExecutionState,
 } from "./issue-execution-policy.js";
 import { checkoutSupportsWorktrees } from "./worktree-default.js";
-import { WORKTREE_KEPT_METADATA_KEY, environmentWorktreeCleanupFlags, readSavedWorktreeCleanup, recordWorktreeKept, visibleWorktreeKept, worktreeCleanupMode,
+import { WORKTREE_KEPT_METADATA_KEY, readSavedWorktreeCleanup, recordWorktreeKept, visibleWorktreeKept, worktreeCleanupMode,
   type GitExpirationPass, type WorktreeSweepRules } from "./worktree-cleanup.js";
 import { buildExecutionWorkspaceAdapterConfig, resolveEffectiveWorkspaceStrategyType, parseProjectExecutionWorkspacePolicy, parseIssueExecutionWorkspaceSettings, resolveExecutionWorkspaceMode, parseIssueAssigneeAdapterOverrides, applyDefaultIsolatedExecutionWorkspacePolicy } from "./execution-workspace-policy.js";
 import { issueRecoveryActionService } from "./issue-recovery-actions.js";
@@ -3601,7 +3601,7 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
       // Step 4b part 3: why the cleanup sweep kept this worktree, only while it's on.
       const worktreeKept = workspace.metadata && WORKTREE_KEPT_METADATA_KEY in workspace.metadata
         ? visibleWorktreeKept(workspace.metadata,
-          worktreeCleanupMode(await readSavedWorktreeCleanup(db), environmentWorktreeCleanupFlags()))
+          worktreeCleanupMode(await readSavedWorktreeCleanup(db)))
         : null;
       const state =
         blockingReasons.length > 0

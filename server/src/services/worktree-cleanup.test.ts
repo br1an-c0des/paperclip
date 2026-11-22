@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   WORKTREE_KEPT_METADATA_KEY,
-  environmentWorktreeCleanupFlags,
   readWorktreeKept,
   resolveWorktreeCleanup,
   restorePointAvailability,
   visibleWorktreeKept,
+  worktreeCleanupMode,
   worktreeCleanupStatus,
   worktreeKeptLabel,
   type SavedWorktreeCleanup,
@@ -16,14 +16,8 @@ const DAY = 24 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
 
 const config = (patch: Partial<WorktreeCleanupConfig> = {}): WorktreeCleanupConfig => ({
-  gitCacheExpirationEnabled: false,
-  gitCacheExpirationDryRun: true,
-  gitRestorePointsEnabled: false,
   storageProvider: "local_disk",
-  gitRestorePointTerminalDelayDays: 3,
-  gitRestorePointIdleDays: 7,
   gitRestorePointRetentionDays: 90,
-  workspaceReaperCooldownDays: 1,
   workspaceCompactionDelayHours: 1,
   ...patch,
 });
@@ -31,9 +25,18 @@ const saved = (mode: SavedWorktreeCleanup["worktreeCleanup"], patch: Partial<Sav
   ({ worktreeCleanup: mode, ...patch });
 
 describe("worktree cleanup setting (step 4b part 3)", () => {
+  it("is off until a level is saved, and values saved alone don't turn it on", () => {
+    for (const unsaved of [null, undefined, saved(null), saved(null, { worktreeCleanupWaitDays: 0, worktreeCleanupRemoveBuildOutput: true })]) {
+      expect(worktreeCleanupMode(unsaved)).toBe("off");
+      expect(resolveWorktreeCleanup(unsaved, config())).toMatchObject({
+        mode: "off", source: "default", archive: false, compactionDelayMs: null, expiration: null,
+      });
+    }
+  });
+
   it("off stops the archive, compaction and expiration of task worktrees", () => {
-    expect(resolveWorktreeCleanup(saved("off"), config({ gitCacheExpirationEnabled: true }))).toMatchObject({
-      mode: "off", source: "setting", dryRun: false, archive: false, compactionDelayMs: null, expiration: null,
+    expect(resolveWorktreeCleanup(saved("off"), config())).toMatchObject({
+      mode: "off", source: "setting", archive: false, compactionDelayMs: null, expiration: null,
     });
   });
 
@@ -43,10 +46,10 @@ describe("worktree cleanup setting (step 4b part 3)", () => {
       values: { waitDays: 1, removeBuildOutput: true, restorePointAfterDays: 3, restorePointIdleDays: 7 },
     });
     expect(resolveWorktreeCleanup(saved("strict"), config())).toMatchObject({
-      archive: true, expiration: { dryRun: false, restorePoints: false, terminalDelayMs: DAY },
+      archive: true, expiration: { restorePoints: false, terminalDelayMs: DAY },
     });
     expect(resolveWorktreeCleanup(saved("restore_points"), config())).toMatchObject({
-      archive: true, expiration: { dryRun: false, restorePoints: true, terminalDelayMs: DAY, restorePointDelayMs: 3 * DAY, idleMs: 7 * DAY },
+      archive: true, expiration: { restorePoints: true, terminalDelayMs: DAY, restorePointDelayMs: 3 * DAY, idleMs: 7 * DAY },
     });
   });
 
@@ -60,37 +63,21 @@ describe("worktree cleanup setting (step 4b part 3)", () => {
     expect(resolveWorktreeCleanup(saved("merged"), config({ workspaceCompactionDelayHours: 6 })).compactionDelayMs).toBe(6 * HOUR);
   });
 
-  it("falls back to the environment's rules while never saved", () => {
-    expect(resolveWorktreeCleanup(null, config())).toMatchObject({
-      mode: "merged", source: "environment", dryRun: false, archive: true, archiveCooldownMs: DAY, compactionDelayMs: HOUR, expiration: null,
-    });
-    expect(resolveWorktreeCleanup({ worktreeCleanup: null, worktreeCleanupWaitDays: 9 },
-      config({ workspaceReaperCooldownDays: 2, workspaceCompactionDelayHours: null }))).toMatchObject({
-      mode: "merged", archiveCooldownMs: 2 * DAY, compactionDelayMs: null, values: { waitDays: 2, removeBuildOutput: false },
-    });
-    const strict = resolveWorktreeCleanup(undefined, config({ gitCacheExpirationEnabled: true }));
-    expect(strict).toMatchObject({ mode: "strict", dryRun: true, expiration: { dryRun: true, restorePoints: false } });
-    expect(strict.expiration?.terminalDelayMs).toBeUndefined();
-    expect(resolveWorktreeCleanup(null, config({ gitCacheExpirationEnabled: true, gitRestorePointsEnabled: true, gitCacheExpirationDryRun: false })))
-      .toMatchObject({ mode: "restore_points", dryRun: false, expiration: { restorePoints: true, restorePointDelayMs: 3 * DAY } });
-    expect(environmentWorktreeCleanupFlags({ PAPERCLIP_GIT_CACHE_EXPIRATION_ENABLED: "true", PAPERCLIP_GIT_CACHE_EXPIRATION_DRY_RUN: "false" }))
-      .toEqual({ gitCacheExpirationEnabled: true, gitCacheExpirationDryRun: false, gitRestorePointsEnabled: false });
-  });
-
   it("reads restore points unavailable on S3 without PAPERCLIP_SECRETS_MASTER_KEY", () => {
     expect(restorePointAvailability(config({ storageProvider: "s3" }), {})).toMatchObject({ available: false, keyDurable: false, reason: expect.stringMatching(/PAPERCLIP_SECRETS_MASTER_KEY/) });
     expect(restorePointAvailability(config({ storageProvider: "s3" }), { PAPERCLIP_SECRETS_MASTER_KEY: "k" })).toMatchObject({ available: true });
     expect(restorePointAvailability(config(), {})).toMatchObject({ available: true, reason: null });
   });
 
-  it("reports the values in force", () => {
-    expect(worktreeCleanupStatus(null, config({ gitRestorePointIdleDays: 0 }), {})).toEqual({
-      saved: null, mode: "merged", source: "environment", dryRun: false,
+  it("reports Off by default, and the values in force", () => {
+    expect(worktreeCleanupStatus(null, config({ gitRestorePointRetentionDays: 30 }), {})).toEqual({
+      saved: false, mode: "off", source: "default",
       restorePoints: { available: true, reason: null },
-      values: { waitDays: 1, removeBuildOutput: true, restorePointAfterDays: 3, restorePointIdleDays: 0 },
-      retentionDays: 90,
+      values: { waitDays: 1, removeBuildOutput: true, restorePointAfterDays: 3, restorePointIdleDays: 7 },
+      retentionDays: 30,
     });
-    expect(worktreeCleanupStatus(saved("off"), config(), {})).toMatchObject({ saved: "off", mode: "off", source: "setting" });
+    expect(worktreeCleanupStatus(saved("strict", { worktreeCleanupWaitDays: 2 }), config(), {}))
+      .toMatchObject({ saved: true, mode: "strict", source: "setting", values: { waitDays: 2 } });
   });
 });
 

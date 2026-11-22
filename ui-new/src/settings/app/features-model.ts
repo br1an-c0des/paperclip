@@ -282,10 +282,9 @@ export function visibleFeatureGroups(hidden: ReadonlySet<string>): FeatureGroup[
 //
 // One setting, `experimental.worktreeCleanup`, for everything the server's workspace reaper does to
 // finished tasks' worktrees: archive merged work, remove dependencies and build output, and expire
-// worktrees the remote (or a restore point) can rebuild. Off once chosen. `GET
-// /instance/settings/worktree-cleanup` says what's in force: never saved, the reaper follows the
-// server's environment variables. Saves with the same PATCH as the switches; the server refuses
-// restore points when they can't work here.
+// worktrees the remote (or a restore point) can rebuild. Off until a level is chosen. `GET
+// /instance/settings/worktree-cleanup` says what's in force. Saves with the same PATCH as the
+// switches; the server refuses restore points when they can't work here.
 
 export const WORKTREE_CLEANUP_HIDDEN_KEY = "instance.experimental.worktreeCleanup";
 
@@ -338,15 +337,10 @@ export const WORKTREE_CLEANUP_VALUE_INFO = {
   restorePointIdleDays: `Also removes the worktree of a task that's still open once nothing has happened on it for this long, after saving a restore point. 0 never does. Default ${days(WORKTREE_CLEANUP_DEFAULT_VALUES.restorePointIdleDays)}.`,
 } as const;
 
-/** The state line under the level: the environment fallback, a dry run, or why restore points can't be picked. */
+/** The state line under the level: why restore points can't be picked. */
 export function worktreeCleanupNote(status: WorktreeCleanupStatus | undefined): string | null {
-  if (!status) return null;
-  const notes: string[] = [];
-  if (status.source === "environment") {
-    notes.push(`Not chosen yet: the server's environment variables decide${status.dryRun ? ", and expiration runs as a dry run" : ""}. Choosing here replaces them.`);
-  }
-  if (!status.restorePoints.available && status.restorePoints.reason) notes.push(`Restore points are unavailable: ${status.restorePoints.reason}`);
-  return notes.length ? notes.join(" ") : null;
+  if (!status || status.restorePoints.available || !status.restorePoints.reason) return null;
+  return `Restore points are unavailable: ${status.restorePoints.reason}`;
 }
 
 /** Whether the wait and compaction values show (not at Off), and the restore point days (at that level only). */
@@ -369,18 +363,13 @@ const VALUE_KEYS = {
   restorePointIdleDays: "worktreeRestorePointIdleDays",
 } as const satisfies Record<keyof WorktreeCleanupValues, keyof PatchInstanceExperimentalSettings>;
 
-/**
- * The PATCH for a new level or value. A value changed while the environment still decides saves the
- * level in force with it, since saved values only apply once a level is saved.
- */
+/** The PATCH for a new level or value. A value alone never sets the level, so it can't turn cleanup on. */
 export function worktreeCleanupPatch(
-  status: WorktreeCleanupStatus | undefined,
   change: { mode?: WorktreeCleanupMode } & Partial<WorktreeCleanupValues>,
 ): PatchInstanceExperimentalSettings {
   const patch: Record<string, unknown> = {};
   const { mode, ...values } = change;
   if (mode) patch.worktreeCleanup = mode;
-  else if (status?.source === "environment") patch.worktreeCleanup = status.mode;
   for (const [key, value] of Object.entries(values) as [keyof WorktreeCleanupValues, number | boolean | undefined][]) {
     if (value !== undefined) patch[VALUE_KEYS[key]] = value;
   }

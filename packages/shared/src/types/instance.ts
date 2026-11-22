@@ -179,11 +179,9 @@ export interface InstanceExperimentalSettings {
   worktreeRunExecutionActivationInstanceId: string | null;
   /**
    * How the terminal workspace reaper treats finished tasks' git worktrees (step 4b part 3): see
-   * `WorktreeCleanupMode`. Absent when never saved: the reaper then keeps upstream's
-   * environment-driven rules (the merged-and-clean archive and compaction always on,
-   * `PAPERCLIP_GIT_CACHE_EXPIRATION_ENABLED` and `PAPERCLIP_GIT_RESTORE_POINTS_ENABLED` for
-   * expiration, the environment's day counts). Once saved, the setting and the four values below
-   * rule, and a mode runs for real, never as a dry run. Other workspaces keep upstream's rules.
+   * `WorktreeCleanupMode`. Absent when never saved, which is Off: the reaper leaves task worktrees
+   * alone whatever the environment variables say. The values below apply once a level is chosen,
+   * and a level runs for real, never as a dry run. Other workspaces keep upstream's rules.
    */
   worktreeCleanup?: WorktreeCleanupMode | null;
   /** Days to wait after a task's tree closes before archiving or expiring its worktree (default 1). */
@@ -224,18 +222,13 @@ export interface WorktreeCleanupValues {
 
 /** `GET /api/instance/settings/worktree-cleanup`: the cleanup setting and what is in force. */
 export interface WorktreeCleanupStatus {
-  /** The saved mode, or null when never saved (the environment variables decide). */
-  saved: WorktreeCleanupMode | null;
-  /** The mode the reaper uses now. Never saved, `merged` unless the environment enables expiration. */
+  /** Whether a level was ever saved; until then the level is Off. */
+  saved: boolean;
+  /** The level the reaper uses now. */
   mode: WorktreeCleanupMode;
-  source: "setting" | "environment";
-  /** Only the environment fallback can be a dry run (`PAPERCLIP_GIT_CACHE_EXPIRATION_DRY_RUN`). */
-  dryRun: boolean;
+  source: "setting" | "default";
   restorePoints: { available: boolean; reason: string | null };
-  /**
-   * The values in force: the saved ones (or `WORKTREE_CLEANUP_DEFAULTS`), or the environment's when
-   * never saved. In the environment fallback, strict expiration's wait is upstream's fixed 1 day.
-   */
+  /** The values a level uses: the saved ones, else `WORKTREE_CLEANUP_DEFAULTS`. */
   values: WorktreeCleanupValues;
   /** How long restore points are kept (`PAPERCLIP_GIT_RESTORE_POINT_RETENTION_DAYS`, environment only). */
   retentionDays: number;

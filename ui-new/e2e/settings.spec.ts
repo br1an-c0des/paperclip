@@ -29,23 +29,26 @@ test("an edited budget shows its unsaved dot until it's saved", async ({ page, a
   await expect(page.getByRole("button", { name: "Save budget" })).toHaveCount(0);
 });
 
-// Step 4b part 3: cleaning up finished worktrees is one level in Features, Off here; restore points
-// can't be chosen when they can't work, the wait and compaction show once it isn't Off, and each
-// change saves through the experimental PATCH.
+// Step 4b part 3: cleaning up finished worktrees is one level in Features, Off until chosen; restore
+// points can't be chosen when they can't work, the wait and compaction show once it isn't Off, and
+// each change saves through the experimental PATCH.
 test("worktree cleanup starts off, then saves a level and its wait", async ({ page, api }) => {
   let mode = "off";
+  let levelSaved = false;
   api.get("/instance/settings/worktree-cleanup", () => ({
-    saved: mode,
+    saved: levelSaved,
     mode,
-    source: "setting",
-    dryRun: false,
+    source: levelSaved ? "setting" : "default",
     restorePoints: { available: false, reason: "File storage is S3 and PAPERCLIP_SECRETS_MASTER_KEY isn't set." },
     values: { waitDays: 1, removeBuildOutput: true, restorePointAfterDays: 3, restorePointIdleDays: 7 },
     retentionDays: 90,
   }));
   api.patch("/instance/settings/experimental", ({ body }) => {
     const patch = body as { worktreeCleanup?: string };
-    if (patch.worktreeCleanup) mode = patch.worktreeCleanup;
+    if (patch.worktreeCleanup) {
+      mode = patch.worktreeCleanup;
+      levelSaved = true;
+    }
     return { ...patch };
   });
   await page.goto("/MSE/company/settings/instance/general");
