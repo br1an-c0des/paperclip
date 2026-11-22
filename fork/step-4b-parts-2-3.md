@@ -1,6 +1,6 @@
 # Step 4b parts 2 and 3: what an agent's runs get, and worktrees by default
 
-**Status: design, 2026-11-21; part 3's cleanup revised the same day.** Hard-fork step 4b, after part 1 (sealed runs,
+**Status: built and merged into `main` 2026-11-22** (`97902f72ae`; designed 2026-11-21, part 3's cleanup revised the same day). Real run checked 2026-11-22 on the desktop's dev instance: see [the result](#real-run-check-2026-11-22). Hard-fork step 4b, after part 1 (sealed runs,
 [step-4b-sealed-runs.md](step-4b-sealed-runs.md), merged into `main` 2026-11-21). Part 2 shows
 on an agent's page what its runs will get, before any run. Part 3 makes per-task git worktrees the
 default. Part 4 (live sessions on the CLI) gets its own design later.
@@ -282,3 +282,21 @@ switches outside the Runner are removed as dead code; the rest of those gates st
   the sweep's skip reasons are worth showing.
 - Where the setting lives in the instance settings, and how the sweep reads it each pass.
 - Wording, within the run modal's existing wording.
+
+## Real run check (2026-11-22)
+
+On the desktop's dev instance, from `feat/step-4b-p23`: agent "M7 test sealed runner" (CLI engine),
+project "M7 test worktrees by default" on `~/coding/m7-test-worktree-repo` (one commit, plus an
+uncommitted skill `m7-draft`), task TES-42, run `0d7025ac`.
+
+- **Worktree:** the task got `.paperclip/worktrees/TES-42-m7-test-worktree-real-run-check` on its
+  own branch and the run worked there; `/.paperclip/worktrees/` was added to `.git/info/exclude`.
+  The agent saw only the committed `m7-release` skill.
+- **Preview:** reading it first created nothing in the repo. It equalled the run's manifest on
+  CLAUDE.md, repo skills, skills, MCP servers, config folder, access and GitHub. Differences: the
+  run's recorded credential is redacted by the event redaction (bug 75); the run's recorded env key
+  list is truncated and the launch adds keys the preview doesn't plan (bug 76); the instructions
+  entry file is the run's per-run copy, where the preview shows the agent's own file (expected).
+- **Cleanup:** the setting read Off (never saved) and the worktree was untouched after the task
+  closed. The run can't tell Off from the old rules (nothing to compact; the worktree wasn't clean),
+  so `worktree-cleanup-sweep.test.ts` is what covers Off.
